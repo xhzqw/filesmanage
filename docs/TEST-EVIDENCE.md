@@ -416,6 +416,27 @@ extraction dispatch, docx container reading, snippet windowing.
   (26 tables, 41 media objects) with 12/12 manifest unit tests.
 - Machine-readable reports under `.secrets/perf/` (root-only, not committed).
 
+### Executable MC mechanical matrix (commit aee51cb, 47/47 PASS)
+
+`scripts/mc_cad_e2e.py` generates the samples on the target (a gmsh/OpenCASCADE
+torus for STEP — the BooleanDifference syntax is rejected by this gmsh build
+with a parse error that silently degrades the model, so the generator avoids
+booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
+- the published format matrix is honest for all 12 formats (stl/obj/glb/gltf/
+  ply/3mf/dxf native, step/stp/iges/igs converted, dwg licensed);
+- native formats report ready without a conversion job and serve their mesh
+  bytes (ply: 1 triangle/3 vertices, 3mf: 1/3, obj, glb, dxf);
+- the converted STEP queues, the worker converts it (66,330-byte mesh) and the
+  bytes are served;
+- DWG is refused as licence-blocked (MC11) and an ungranted user is refused on
+  both the status and bytes endpoints (MC13).
+- Browser verification: the DXF page renders its entities with the layer
+  toggle panel (MC10-LAYER, 0); PLY and 3MF each render their geometry; the
+  /model/:id deep link creates the derivative on first visit.
+- IGES (MC03/MC04) stays unexercised: no IGES writer exists on the target.
+  The OCCT reader path itself is the one verified end-to-end for STEP (M5/PE11:
+  544 triangles from a real source).
+
 ### Consolidated acceptance gate (2026-10-08, one pass over every executable check)
 
 | Check | Result |
@@ -430,7 +451,8 @@ extraction dispatch, docx container reading, snippet windowing.
 | `media_range_check.py` (MP4 Range) | PASS (10/10) |
 | `office_session_check.py` | PASS (12/12) |
 | `perf_upload_stress.py` (10×100MB) | PASS (10/10) |
-| `check_architecture.py` | PASS (71 Go files, 40 TS modules) |
+| `mc_cad_e2e.py` (MC formats) | PASS (47/47) |
+| `check_architecture.py` | PASS (71 Go files, 41 TS modules) |
 
 Note: the perf instance (18092 → filesmanage_perf) and the dev instance
 (18091 → filesmanage_v21) keep separate session stores, so checks against the
