@@ -27,6 +27,8 @@ type memoryRepo struct {
 	compatReports []domain.OfficeCompatibilityReport
 	derivatives   []domain.ModelDerivative
 	derivativeJobs []memoryJob
+	shares         []domain.Share
+	favorites      []domain.Favorite
 	sessions     map[string]memorySession
 	folders      map[string]domain.Folder
 	files        map[string]domain.File

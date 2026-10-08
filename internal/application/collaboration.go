@@ -1,0 +1,356 @@
+package application
+
+import (
+	"context"
+	"encoding/csv"
+	"errors"
+	"filesmanage/internal/domain"
+	"filesmanage/internal/ports"
+	"strings"
+	"time"
+)
+
+// Collaboration use cases: shares, favorites, search, stats and CSV export.
+// Every read goes through the shared visibility scope (SPEC READ-01), so a
+// feature can never compute its own permission model.
+
+// ---------- shares ----------
+
+func (s *Service) ListShares(ctx context.Context, u domain.User, scope string) ([]domain.Share, error) {
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	switch scope {
+	case "received":
+		groups, gErr := tx.WorkgroupsOf(ctx, u.ID)
+		if gErr != nil {
+			return nil, gErr
+		}
+		return tx.ListSharesForSubject(ctx, u.ID, groups)
+	case "sent":
+		if !u.IsAdmin {
+			return nil, domain.ErrForbidden
+		}
+		return tx.ListSharesCreatedBy(ctx, u.ID)
+	default:
+		return nil, domain.ErrInvalidInput
+	}
+}
+
+type ShareDraft struct {
+	ResourceKind       string
+	ResourceID         string
+	RecipientKind      string
+	RecipientID        string
+	Actions            []domain.Action
+	IncludeDescendants bool
+	ExpiresAt          *time.Time
+}
+
+// CreateShare shares a resource the caller can already see. Write actions are
+// rejected: shares only carry {list,preview,download}.
+func (s *Service) CreateShare(ctx context.Context, u domain.User, draft ShareDraft) (domain.Share, error) {
+	if (draft.ResourceKind != "file" && draft.ResourceKind != "folder") || draft.ResourceID == "" {
+		return domain.Share{}, domain.ErrInvalidInput
+	}
+	if len(draft.Actions) == 0 || (draft.RecipientKind != "user" && draft.RecipientKind != "group") {
+		return domain.Share{}, domain.ErrInvalidInput
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return domain.Share{}, err
+	}
+	defer tx.Rollback(ctx)
+	if err = s.assertRecipientExists(ctx, tx, draft.RecipientKind, draft.RecipientID); err != nil {
+		return domain.Share{}, err
+	}
+	share := domain.Share{
+		ID: NewID("share"), RecipientKind: draft.RecipientKind, RecipientID: draft.RecipientID,
+		Actions: draft.Actions, IncludeDescendants: draft.IncludeDescendants,
+		ExpiresAt: draft.ExpiresAt, CreatedBy: u.ID, CreatedAt: s.now(),
+	}
+	if draft.ResourceKind == "file" {
+		fileID := draft.ResourceID
+		share.FileID = &fileID
+		if _, err = s.visibleFile(ctx, tx, u, fileID, domain.ActionPreview); err != nil {
+			return domain.Share{}, err
+		}
+	} else {
+		folderID := draft.ResourceID
+		share.FolderID = &folderID
+		folder, fErr := s.activeFolder(ctx, tx, folderID)
+		if fErr != nil {
+			return domain.Share{}, fErr
+		}
+		if err = s.require(ctx, tx, u, folder.ID, domain.ActionList); err != nil {
+			return domain.Share{}, err
+		}
+	}
+	if err = tx.CreateShare(ctx, share); err != nil {
+		return domain.Share{}, mapError(err)
+	}
+	audit(ctx, tx, u, "share.create", draft.ResourceKind, draft.ResourceID, "success",
+		map[string]any{"shareId": share.ID, "recipientKind": draft.RecipientKind, "recipientId": draft.RecipientID})
+	if err = tx.Commit(ctx); err != nil {
+		return domain.Share{}, err
+	}
+	return share, nil
+}
+
+func (s *Service) RevokeShare(ctx context.Context, u domain.User, shareID string) error {
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	share, err := tx.ShareByID(ctx, shareID)
+	if err != nil {
+		return notFoundOr(err)
+	}
+	if share.CreatedBy != u.ID && !u.IsAdmin {
+		return domain.ErrForbidden
+	}
+	if err = tx.RevokeShare(ctx, shareID); err != nil {
+		return err
+	}
+	audit(ctx, tx, u, "share.revoke", "share", shareID, "success", nil)
+	return tx.Commit(ctx)
+}
+
+func (s *Service) assertRecipientExists(ctx context.Context, repo subjectProbe, kind, id string) error {
+	switch kind {
+	case "user":
+		found, err := repo.UserExists(ctx, id)
+		if err != nil {
+			return err
+		}
+		if !found {
+			return domain.ErrInvalidInput
+		}
+	case "group":
+		found, err := repo.WorkgroupExists(ctx, id)
+		if err != nil {
+			return err
+		}
+		if !found {
+			return domain.ErrInvalidInput
+		}
+	default:
+		return domain.ErrInvalidInput
+	}
+	return nil
+}
+
+type subjectProbe interface {
+	UserExists(context.Context, string) (bool, error)
+	WorkgroupExists(context.Context, string) (bool, error)
+}
+
+// ---------- favorites ----------
+
+func (s *Service) ListFavorites(ctx context.Context, u domain.User) ([]domain.Favorite, error) {
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	return tx.ListFavorites(ctx, u.ID)
+}
+
+// SetFavorite adds or removes a favorite idempotently.
+func (s *Service) SetFavorite(ctx context.Context, u domain.User, kind, resourceID string, on bool) error {
+	if (kind != "file" && kind != "folder") || resourceID == "" {
+		return domain.ErrInvalidInput
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	// The resource must be visible to the caller before it can be favorited.
+	if kind == "file" {
+		if _, err = s.visibleFile(ctx, tx, u, resourceID, domain.ActionPreview); err != nil {
+			return err
+		}
+	} else {
+		folder, fErr := s.activeFolder(ctx, tx, resourceID)
+		if fErr != nil {
+			return fErr
+		}
+		if err = s.require(ctx, tx, u, folder.ID, domain.ActionList); err != nil {
+			return err
+		}
+	}
+	fileID, folderID := "", ""
+	if kind == "file" {
+		fileID = resourceID
+	} else {
+		folderID = resourceID
+	}
+	exists, err := tx.FavoriteExists(ctx, u.ID, fileID, folderID)
+	if err != nil {
+		return err
+	}
+	if on {
+		if exists {
+			return nil // idempotent
+		}
+		if err = tx.AddFavorite(ctx, domain.Favorite{ID: NewID("fav"), UserID: u.ID, FileID: optional(fileID), FolderID: optional(folderID), CreatedAt: s.now()}); err != nil {
+			return err
+		}
+	} else {
+		if !exists {
+			return nil // idempotent
+		}
+		if err = tx.RemoveFavorite(ctx, u.ID, fileID, folderID); err != nil {
+			return err
+		}
+	}
+	audit(ctx, tx, u, "favorite.set", kind, resourceID, "success", map[string]any{"on": on})
+	return tx.Commit(ctx)
+}
+
+func statsQuery(u domain.User, groups []string, filter SearchFilter) ports.StatsQuery {
+	return ports.StatsQuery{
+		UserID: u.ID, GroupIDs: groups, FolderID: filter.FolderID,
+		IncludeDescendant: filter.IncludeDescendant, Uploader: filter.Uploader,
+		MimePrefix: filter.MimePrefix, From: filter.From, To: filter.To,
+	}
+}
+
+func optional(v string) *string {
+	if v == "" {
+		return nil
+	}
+	return &v
+}
+
+// ---------- search, stats and export ----------
+
+type SearchFilter struct {
+	FolderID          string
+	IncludeDescendant bool
+	Query             string
+	Uploader          string
+	MimePrefix        string
+	From              *time.Time
+	To                *time.Time
+	Sort              string
+	Limit             int
+}
+
+func (s *Service) Search(ctx context.Context, u domain.User, filter SearchFilter) ([]domain.File, int, error) {
+	if filter.Limit <= 0 {
+		filter.Limit = 50
+	}
+	if filter.Limit > 200 {
+		filter.Limit = 200
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer tx.Rollback(ctx)
+	groups, err := tx.WorkgroupsOf(ctx, u.ID)
+	if err != nil {
+		return nil, 0, err
+	}
+	return tx.SearchFiles(ctx, searchQuery(u, groups, filter))
+}
+
+func searchQuery(u domain.User, groups []string, filter SearchFilter) ports.FileSearchQuery {
+	return ports.FileSearchQuery{
+		UserID: u.ID, GroupIDs: groups, FolderID: filter.FolderID,
+		IncludeDescendant: filter.IncludeDescendant, Query: filter.Query,
+		Uploader: filter.Uploader, MimePrefix: filter.MimePrefix,
+		From: filter.From, To: filter.To, Sort: filter.Sort, Limit: filter.Limit,
+	}
+}
+
+func (s *Service) Stats(ctx context.Context, u domain.User, filter SearchFilter) (domain.Stats, error) {
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return domain.Stats{}, err
+	}
+	defer tx.Rollback(ctx)
+	groups, err := tx.WorkgroupsOf(ctx, u.ID)
+	if err != nil {
+		return domain.Stats{}, err
+	}
+	return tx.Stats(ctx, statsQuery(u, groups, filter))
+}
+
+// ExportCSV renders the visible file list as UTF-8-BOM CSV with formula
+// injection neutralised (SPEC §9.3).
+func (s *Service) ExportCSV(ctx context.Context, u domain.User, filter SearchFilter) ([]byte, int, error) {
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer tx.Rollback(ctx)
+	groups, err := tx.WorkgroupsOf(ctx, u.ID)
+	if err != nil {
+		return nil, 0, err
+	}
+	// The export reuses the search path, so it inherits the search limit clamp
+	// rather than sending a zero limit into the query layer.
+	exportFilter := filter
+	if exportFilter.Limit <= 0 || exportFilter.Limit > 200 {
+		exportFilter.Limit = 200
+	}
+	files, err := tx.ExportFiles(ctx, statsQuery(u, groups, filter), exportFilter.Limit)
+	if err != nil {
+		return nil, 0, mapError(err)
+	}
+	var buf strings.Builder
+	writer := csv.NewWriter(&buf)
+	_ = writer.Write([]string{"文件ID", "名称", "目录ID", "大小(字节)", "SHA-256", "当前版本", "修改时间"})
+	for _, f := range files {
+		_ = writer.Write([]string{
+			f.ID, neutralizeCSV(f.Name), f.FolderID, intToString(f.SizeBytes), f.Sha256,
+			intToString(int64(currentSeq(f))), f.UpdatedAt.UTC().Format(time.RFC3339),
+		})
+	}
+	writer.Flush()
+	if err = writer.Error(); err != nil {
+		return nil, 0, err
+	}
+	// Excel needs the BOM to read UTF-8 Chinese correctly.
+	out := append([]byte{0xEF, 0xBB, 0xBF}, []byte(buf.String())...)
+	audit(ctx, tx, u, "files.export", "file", "", "success", map[string]any{"rows": len(files)})
+	if err = tx.Commit(ctx); err != nil {
+		return nil, 0, err
+	}
+	return out, len(files), nil
+}
+
+// neutralizeCSV blocks spreadsheet formula injection without altering content.
+func neutralizeCSV(v string) string {
+	if strings.HasPrefix(v, "=") || strings.HasPrefix(v, "+") || strings.HasPrefix(v, "-") || strings.HasPrefix(v, "@") {
+		return "'" + v
+	}
+	return v
+}
+
+func intToString(v int64) string {
+	if v == 0 {
+		return "0"
+	}
+	negative := v < 0
+	if negative {
+		v = -v
+	}
+	var digits []byte
+	for v > 0 {
+		digits = append([]byte{byte('0' + v%10)}, digits...)
+		v /= 10
+	}
+	if negative {
+		return "-" + string(digits)
+	}
+	return string(digits)
+}
+
+var _ = errors.Is

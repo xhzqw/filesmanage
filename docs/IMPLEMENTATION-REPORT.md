@@ -86,6 +86,20 @@ Defect found and fixed during M1: FolderTree rendered only from `parentId===null
 - DOCX: real editor in the browser, edit + save → v2 with valid DOCX bytes containing the edit and the original text; save-event ledger exactly 1 committed; audit recorded.
 - CAD: 108016-byte converted mesh with 544 triangles from a real STEP source; STL/OBJ derivative bytes byte-identical to source; DWG refused as licence-blocked; viewer canvas renders the geometry.
 
+---
+
+## Milestone 6 — collaboration (shares, favorites, search, stats, CSV)
+
+### What was built
+- Shares: create (file or folder, user or group, passive actions only, optional expiry and descendant inheritance), list received/sent, revoke. The recipient's visibility resolves through the shared scope CTE.
+- Favorites: idempotent add/remove, per-user listing with unavailable flags for deleted resources.
+- Search/stats/export: one shared visibility scope (READ-01) with folder scope (current/descendants/all), query, uploader, type and time filters; CSV with UTF-8 BOM, attachment disposition and formula-injection neutralisation.
+- Web: /workspace (sharing + favorites tabs) and /stats (aggregates + CSV export) pages.
+
+### Verification (executed, all PASS)
+- Search returns the caller's visible files; stats aggregate totals, by type, by month and by uploader; CSV downloads with a BOM and 17 rows.
+- Share create → list → revoke verified; favorites add → list → remove verified idempotent.
+
 ### Test data hygiene
 - The redundant full-permission grant created during browser acceptance was revoked; the test workgroup was removed; clerkA/clerkB were disabled. Hard deletion of principals with audit history is blocked by foreign keys by design, so the audit chain stays intact.
 

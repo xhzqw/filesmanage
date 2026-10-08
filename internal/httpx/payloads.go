@@ -83,6 +83,15 @@ func trashPayload(t domain.TrashEntry) gin.H {
 	return payload
 }
 
+// parseTime accepts RFC3339 timestamps from transport payloads.
+func parseTime(raw string) (time.Time, bool) {
+	parsed, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return parsed, true
+}
+
 func makeActions(raw []string) []domain.Action {
 	out := make([]domain.Action, 0, len(raw))
 	for _, a := range raw {

@@ -278,6 +278,11 @@ func isBodyTooLarge(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "request body too large")
 }
 
+// strconvAtoi keeps the numeric query parse next to its only caller.
+func strconvAtoi(raw string) (int, error) {
+	return strconv.Atoi(raw)
+}
+
 // copyReader streams a blob to the response writer.
 func copyReader(dst http.ResponseWriter, src interface {
 	Read([]byte) (int, error)

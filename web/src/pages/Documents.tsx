@@ -63,7 +63,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  },[selected?.id]);
  return <div className="shell"><header className="header">
    <div className="brand"><span className="logo-placeholder" aria-label="官方 Logo 尚未导入">标志待入库</span>中晟生物科技 <span className="product">文档治理中心</span></div>
-   <nav aria-label="主导航"><Link to="/doc">文档管理</Link><Link to="/approvals">审批</Link><Link to="/trash">回收站</Link><Link to="/org">组织管理</Link></nav>
+   <nav aria-label="主导航"><Link to="/doc">文档管理</Link><Link to="/workspace">共享/关注</Link><Link to="/stats">统计</Link><Link to="/approvals">审批</Link><Link to="/trash">回收站</Link><Link to="/org">组织管理</Link></nav>
    <span className="account">{user.displayName}</span><button onClick={onLogout}>退出</button>
  </header><div className="panels"><aside className="sidebar"><h2>文档管理</h2><p>文件夹</p>
    {status==="loading"&&<p>正在加载目录…</p>}

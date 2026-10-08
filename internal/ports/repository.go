@@ -136,6 +136,20 @@ type Repository interface {
 	DerivativeForFile(context.Context, string, int) (domain.ModelDerivative, bool, error)
 	SourceBlobPath(context.Context, string) (string, error)
 
+	// Collaboration: shares, favorites, search, stats and export.
+	ListSharesForSubject(context.Context, string, []string) ([]domain.Share, error)
+	ListSharesCreatedBy(context.Context, string) ([]domain.Share, error)
+	ShareByID(context.Context, string) (domain.Share, error)
+	CreateShare(context.Context, domain.Share) error
+	RevokeShare(context.Context, string) error
+	ListFavorites(context.Context, string) ([]domain.Favorite, error)
+	FavoriteExists(context.Context, string, string, string) (bool, error)
+	AddFavorite(context.Context, domain.Favorite) error
+	RemoveFavorite(context.Context, string, string, string) error
+	SearchFiles(context.Context, FileSearchQuery) ([]domain.File, int, error)
+	Stats(context.Context, StatsQuery) (domain.Stats, error)
+	ExportFiles(context.Context, StatsQuery, int) ([]domain.File, error)
+
 	// Audit and idempotency.
 	RecordAudit(context.Context, domain.AuditEvent) error
 	IdempotencyGet(context.Context, string, string, string) ([]byte, bool, error)

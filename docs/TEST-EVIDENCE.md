@@ -262,3 +262,35 @@ Worker: separate process (`.bin/worker`), claims jobs via `conversion_jobs` stat
 - Worker native-format detection keyed on output kind (STEP→STL looked native) — now keys on the source format.
 - Viewer canvas torn down by a dependency-change effect re-run — one-shot mount with unmount-only teardown.
 - `model_derivatives`/`approvals`/`office_sessions` column gaps → migrations 0007–0009.
+
+## Milestone 6 evidence — collaboration (executed on 192.168.1.22, 2026-10-08)
+
+### Gates
+```
+go build/vet/test ./... → PASS
+python3 scripts/check_architecture.py → PASS: 67 Go files, 39 TS modules
+go run ./cmd/migrate → MIGRATIONS_OK 10 (0010 adds shares.created_at)
+```
+
+### Verified (API)
+| Step | Result |
+|---|---|
+| GET /api/search | 200 with the caller's visible files (16 files for admin) |
+| GET /api/stats | totals + byType (txt 10, docx 1, dwg 1, bin 1, step 1, stl 1, obj 1) + byMonth + byUploader |
+| GET /api/exports/files.csv | Content-Type text/csv, attachment disposition, UTF-8 BOM (EF BB BF), 17 lines |
+| POST /api/shares (file → group, {preview,download}) | 201 with the created share |
+| GET /api/shares?scope=sent | lists the created share |
+| DELETE /api/shares/:id | 200 revoked |
+| PUT /api/favorites/file/:id | 200 favorited=true; listed in GET /api/favorites with resourceName |
+| DELETE /api/favorites/file/:id | 200 favorited=false (idempotent) |
+
+### Scope rules (SPEC READ-01)
+- Search, stats and export share one visibility scope: ACL grants with ancestor inheritance plus shares; admins bypass through the same code path.
+- Shares only accept {list,preview,download}; write actions are rejected by the store.
+- Favorites are per-user; deleted resources stay listed but flagged unavailable without leaking paths.
+
+### Fixes during the slice
+- shares.created_at column missing → migration 0010.
+- Scope CTE name collision (`scope` vs alias) → renamed to visible_scope.
+- Admin branch emitted no placeholders while args still bound $1 → placeholder emission now follows the emitted SQL.
+- CSV export sent a zero limit into the search path → inherits the search clamp.
