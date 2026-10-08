@@ -66,6 +66,7 @@ API).
   lifecycle, the full gate table with commands and expected results, backup/restore,
   upgrade/rollback, troubleshooting (incl. the pitfalls hit during implementation)
   and the prohibited actions.
+- **客户交付说明**: `docs/HANDOVER.md` — 面向中晟生物科技的验收摘要：当前可用能力与证据、需要客户决策的四件事（Logo / DWG 许可 / 上线授权 / 压测环境）、工程保障摘要与下一步。
 - Operator scripts: `scripts/build.sh [--with-tests]` (reproducible build:
   web → go → vet → architecture → tests → migration checksums) and
   `scripts/run-dev.sh [start|stop|status]` (single-instance dev services with
