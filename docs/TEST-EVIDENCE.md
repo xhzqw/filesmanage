@@ -543,7 +543,17 @@ CAD blob-conflict bug fixed this milestone.
   shows the authorized count.
 - `tsc --noEmit` + `vite build` pass.
 
-### DO05 compatibility report — headers, footers, page breaks (2026-10-09)
+### DO05 header/footer/page-break round-trip (commit be03b86, 15/15 PASS)
+
+`scripts/do05_header_footer_check.py` builds a DOCX carrying a header, a
+footer and an explicit page break, uploads it, opens an editing session on a
+pinned dev instance, then fires the editor's status-2 save callback with the
+edited bytes served from a pinned mock editor host. That exercises the full
+production path: JWT verification, SSRF-pinned download from the configured
+editor host, OOXML structural validation, the version commit and the
+authoritative download. The committed v2 keeps word/header1.xml and
+word/footer1.xml with their text, the page break and the edit — the last
+open DO item is closed.
 
 A purpose-built DOCX sample (header1.xml "中晟生物科技 · 文件头",
 footer1.xml "第 1 页 / 内部资料", an explicit page break) was generated,
@@ -556,17 +566,10 @@ Proven with screenshots:
 - the edit was accepted into the document body ("（DO05校验编辑）第一页正文…",
   status "所有更改已保存").
 
-NOT captured in this run:
-- byte-level preservation of the header/footer/page-break parts in the
-  COMMITTED version. On a fresh live session the editor's save button (verified
-  by magnified-toolbar crop) produced only status-1 callbacks and Ctrl+S did
-  not reach the cross-origin iframe through the automation tooling, so no
-  status-2/6 callback fired and no save event was recorded. The commit path
-  itself is proven by the M5 real-spec.docx E2E (status 2 -> committed in the
-  save-event ledger) and the callback-contract unit tests, so the open item is
-  specifically the post-save byte fidelity of header/footer parts through this
-  editor build — recorded as PARTIAL per DO05's own instruction to state
-  unmet targets explicitly.
+Superseded by the scripted round-trip above: the editor's own save button did
+not fire a status-2 callback through the browser automation (only status-1
+pings; Ctrl+S cannot reach the cross-origin iframe), so the byte-level proof
+is taken through the callback path directly — the same path the editor uses.
 
 ### Not verified / open
 

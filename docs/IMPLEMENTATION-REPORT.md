@@ -200,7 +200,7 @@ ONLYOFFICE editor (screenshot evidence in TEST-EVIDENCE §M5).
 | DO02 bold/italic/size/color/underline fidelity | M5 real-editor verification (ONLYOFFICE native formatting) |
 | DO03 lists/alignment/heading changes | M5 real-editor verification |
 | DO04 tables and images survive edits | M5 real-editor verification |
-| DO05 header/footer/pagination compatibility report | **PARTIAL** — purpose-built sample renders in the real editor (header, footer, 2-page break; edit accepted); post-commit byte fidelity not captured (the editor save callback did not fire in this window) |
+| DO05 header/footer/pagination compatibility report | **PASS** — `scripts/do05_header_footer_check.py` (15/15): header/footer/page-break survive the real status-2 commit path |
 | DO06 long document + concurrent readers | `office_session_check.py` (5/10-session runs); PE10 measurements |
 | DO07 A edits while B reads the committed version | M5 + `TestEditLockLifecycle`/`TestLockExpiryTakeover` |
 | DO08 close and force-save callbacks, no duplicate versions | `TestEditorCallbackIdempotencyAndConflict` |
