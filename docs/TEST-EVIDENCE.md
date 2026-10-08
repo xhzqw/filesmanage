@@ -440,6 +440,30 @@ booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
   "no IGES writer on the target" was wrong: reader-side samples exist and are
   the correct vehicle for this acceptance item.
 
+### Business surfaces over the real browser (2026-10-09, 12/12 PASS, run 2x)
+
+`scripts/browser_business_check.mjs` walks the business pages in headless
+Chrome and performs one real action on each, so "every real business operation
+is front-to-back connected" is evidenced at the browser and not only at the
+API:
+
+| Surface | Assertion |
+|---|---|
+| login | real login reaches /doc |
+| search | a query for the drill's own file returns its row, and the hit is wrapped in a safe `<mark>` whose text is the search term |
+| stats | real aggregates render (numbers present) |
+| organization | the create-user form creates an account that appears in the list, and the row's 禁用 flips it to 启用 |
+| approvals | a genuinely pending change (prepared through the API under a folder policy) is listed in the inbox; approving it through the UI commits, and the file's current version becomes v2 with the approved bytes |
+
+Two runs: 12/12 each, drill folder soft-deleted, zero leftovers.
+
+Data-hygiene note: every E2E script in this project creates a disposable probe
+account and disables it at cleanup (there is no delete-user API by design).
+Those probes stay referenced by version/approval/audit history, so deletion
+would break integrity — disabling is the correct terminal state. As of this run
+the business database holds 6 enabled accounts (the seeded ones plus admin) and
+45 disabled probe accounts from the acceptance runs.
+
 ### Core user journey over the real browser (2026-10-09, 19/19 PASS, run 3x)
 
 `scripts/browser_journey_check.mjs` drives headless Chrome against the dev
@@ -516,6 +540,7 @@ boundary fix, MSH conversion, assembly tree, rollback edges, crash sweep):
 | `office_session_check.py` | PASS 12/12 |
 | `loadtest.py --users 10` | PASS 11/11 (all endpoint budgets) |
 | `browser_journey_check.mjs` (real-browser core journey) | PASS 19/19 (run 3x) |
+| `browser_business_check.mjs` (search/stats/org/approvals surfaces) | PASS 12/12 (run 2x) |
 | `backup_restore_drill.py` | PASS (26 tables, 288 blobs) |
 | `test_backup_manifest.py` | PASS 12/12 |
 | `verify_migration.py` | PASS |
