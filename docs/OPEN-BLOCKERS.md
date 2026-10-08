@@ -11,7 +11,7 @@ Status date: 2026-10-08 (Milestone 7 acceptance evidence collected).
 | BLK-05 | Production port 8091 / systemd cutover not authorized | Delivery stays on dev port 18091; production switch requires explicit approval + backup/rollback drill | Explicit go-live authorization after acceptance gates |
 | BLK-06 | 2026-10-08 ~22:00: host unreachable on 192.168.1.22 (100% packet loss, no ARP entry) for ~40 min | Implementation paused; resumed over 10.144.144.1 with no data or service loss | Customer to confirm the network path; add a second management route if this recurs |
 | BLK-07 | Shared-host capacity: PostgreSQL instance (max_connections=100) and CPU shared with unrelated services (load 6–7) | §24.3 budgets met at ≤10 users, 10/11 at 30 users; 100/200 users pool-bound | Dedicated reference environment per SPEC PERF-003, or an approved capacity ADR |
-| BLK-08 | `/search` page missing from the React app | Search API, snippets and filters are verified server-side; users cannot reach search from the UI yet | Frontend slice (page + route + result list with safe `<mark>` highlighting) |
+| ~~BLK-08~~ | `/search` page was missing from the React app | RESOLVED | SearchPanel shipped (commit `3dd8682`): filters, result table, safe `<mark>` snippets, "1000+" capped total; browser-verified |
 
 Resolved this milestone:
 - ~~Folder-filtered search/stats/export could bypass the visibility scope~~ → scope intersection + placeholder fix, 31/31 E2E.

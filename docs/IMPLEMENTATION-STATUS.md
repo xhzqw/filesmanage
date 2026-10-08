@@ -11,12 +11,12 @@ Implementation started 2026-10-08. Status: Milestones 1–6 COMPLETE and verifie
 - **M4 approvals + locks**: admin approval policies per folder; pending approvals (202) under policy; approve commits a new immutable version attributed to the requester; reject/cancel publish nothing; single-winner concurrency; edit locks (file-level lease, 30 min server TTL, generation guard, row-lock serialised acquire, auto-release on save, expired-lock takeover, stale tokens cannot free newer locks).
 - **M5 DOCX editing + CAD**: ONLYOFFICE Document Server 8.2.2 (AGPL, zero licence cost) self-hosted in Docker on 18080 with JWT; real DOCX editing verified end-to-end with idempotent save-event ledger; CAD pipeline converts STEP/IGES to mesh derivatives in an isolated worker (gmsh + OpenCASCADE 7.8) with subprocess timeout, concurrency cap and memory limits; native STL/OBJ/GLB in three.js; honest format matrix (native / converted / licence-required / unverified).
 - **M6 collaboration**: shares (file/folder, user/group, passive actions, expiry, descendants), favorites (idempotent), search + stats + CSV export over one visibility scope, plain-text byte fidelity (12 samples), brand shell (DEC-14) with the explicit logo placeholder.
+- **Search UI**: `/search` workbench (query + uploader/type/sort filters, result table, safe `<mark>` snippets, "1000+" capped total) verified in the browser; the tsvector index backfills existing files via `cmd/reindex`.
 - **M7 security + performance acceptance**: dataset gate 12/12; security E2E 31/31; streaming CSV export 9/9; 10×100MB uploads; MP4 Range 10/10; Office sessions 12/12; CAD conversion verified incl. the dedup path; backup restore drill PASS; Go tests, vet, architecture check green. Capacity: budgets met at ≤10 users, 10/11 at 30 users on the shared host (see M7-PERF-DATASET-GATE.md).
 - **M8 (dev level)**: backup/restore drill PASS (snapshot-derived media manifest, 26 tables, 41 blobs, scratch DB removed); 12/12 manifest unit tests; dev systemd units written and syntax-verified (not installed).
 
 ## In progress
-- Frontend: the `/search` page (API, snippets and filters are done and verified).
-- PE15/PE16 browser-harness measurements.
+- PE15/PE16 browser-harness measurements (WebGL leak run; 1366/1440/1920 first-interactive timings).
 
 ## Not done / blockers
 - Official Logo binary not yet provided; UI shows explicit "待入库" placeholder (DEC-14: no self-drawn substitute). (BLK-01)

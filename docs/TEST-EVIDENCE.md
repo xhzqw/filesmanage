@@ -416,6 +416,16 @@ extraction dispatch, docx container reading, snippet windowing.
   (26 tables, 41 media objects) with 12/12 manifest unit tests.
 - Machine-readable reports under `.secrets/perf/` (root-only, not committed).
 
+### Search page (BLK-08 closed, commit 3dd8682)
+
+- `/search` route + nav entry; SearchPanel with query/uploader/type/sort filters,
+  result table (name, size, uploader, version, mtime) and snippets rendered as
+  escaped text nodes plus `<mark>` (SPEC §8.1/§10.3).
+- Browser verification against the business database: query 规范 returns
+  real-spec.docx with the extracted DOCX content as the snippet; total line
+  shows the authorized count.
+- `tsc --noEmit` + `vite build` pass.
+
 ### Not verified / open
 
 - PE15 (100-open WebGL leak run) and PE16 (1366/1440/1920 first-interactive
