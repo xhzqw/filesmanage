@@ -437,6 +437,16 @@ booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
   The OCCT reader path itself is the one verified end-to-end for STEP (M5/PE11:
   544 triangles from a real source).
 
+### PE15 WebGL context-leak check (coarse, 2026-10-09)
+
+A heap-snapshot run needs a scripted browser with CDP, which the acceptance
+tooling does not expose. As a coarse substitute the STEP model page was loaded,
+torn down (navigate to /doc) and re-loaded 10 times in a row, asserting the
+mesh renders (544 triangles / 1,632 vertices) after every cycle. Chrome
+forcibly drops WebGL contexts beyond roughly 16 live ones, so ten clean
+re-mounts demonstrate that the viewer disposes its context, geometry and
+listeners (MOD08). Memory-growth measurement itself remains open.
+
 ### PE12 CAD saturation isolation (commit cfb5d61, measured twice)
 
 `scripts/pe12_cad_saturation.py` queues 24 distinct gmsh/OpenCASCADE STEP

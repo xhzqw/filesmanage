@@ -16,7 +16,7 @@ Implementation started 2026-10-08. Status: Milestones 1–6 COMPLETE and verifie
 - **M8 (dev level)**: backup/restore drill PASS (snapshot-derived media manifest, 26 tables, 41 blobs, scratch DB removed); 12/12 manifest unit tests; dev systemd units written and syntax-verified (not installed).
 
 ## In progress
-- PE15/PE16 browser-harness measurements (WebGL leak run; 1366/1440/1920 first-interactive timings).
+- PE15 heap-growth measurement (the 10-cycle context-leak check passes; a heap snapshot needs a scripted browser with CDP).
 
 ## Not done / blockers
 - Official Logo binary not yet provided; UI shows explicit "待入库" placeholder (DEC-14: no self-drawn substitute). (BLK-01)
