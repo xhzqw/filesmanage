@@ -416,6 +416,20 @@ extraction dispatch, docx container reading, snippet windowing.
   (26 tables, 41 media objects) with 12/12 manifest unit tests.
 - Machine-readable reports under `.secrets/perf/` (root-only, not committed).
 
+### Viewport and model-viewer checks (PE16 / VS04, 2026-10-08)
+
+Measured with the desktop browser against http://10.144.144.1:18091 (warm,
+LAN): /doc reaches an interactive file table in 168 ms at 1440x900, 152 ms at
+1366x768 and 2 ms at 1920x1080 (budget WEB-PERF-01 <= 2.5 s). Visual snapshots
+at all three viewports: full navigation, breadcrumb, folder tree, toolbar and
+the six file-table columns render without overlap (VS04).
+
+The STEP model page (/model/:id) renders the converted mesh in the browser:
+544 triangles / 1632 vertices with the grid canvas and blue/white brand chrome,
+after the worker completed the original sample.step derivative (state ready,
+108,016-byte mesh). The previously failed derivative rows were leftovers of the
+CAD blob-conflict bug fixed this milestone.
+
 ### Search page (BLK-08 closed, commit 3dd8682)
 
 - `/search` route + nav entry; SearchPanel with query/uploader/type/sort filters,

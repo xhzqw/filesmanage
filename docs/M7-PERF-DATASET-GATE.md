@@ -125,6 +125,6 @@ SPEC's dedicated reference environment (PERF-003) or a materialised count.
 | PE13 pool behaviour | measured | pool wait dominates at ≥100 users (see analysis); no unbounded waits, controlled 503 under exhaustion |
 | PE14 query plans | collected | `EXPLAIN (ANALYZE, BUFFERS)` for list/hot-folder list/search/export/stats saved in TEST-EVIDENCE.md §M7 |
 | PE15 WebGL leak | NOT FULLY VERIFIED | viewer dispose exists in code; a 100-open heap-snapshot run needs a scripted browser and is recorded as open |
-| PE16 three viewports | PARTIAL | 768px responsive shell verified in M6c; 1366/1440/1920 first-interactive numbers not yet instrumented |
+| PE16 three viewports | PASS | /doc interactive 168/152/2 ms at 1440x900/1366x768/1920x1080 (budget 2.5 s); no overlap in any viewport (VS04); STEP model page renders 544 triangles |
 | PE17 dependency injection | PASS (scoped) | unreachable editor: session open stays non-blocking, preview/download of the DOCX both 200, `/health/ready` 200; PostgreSQL restart deliberately not injected (shared instance) |
 | PE18 machine-readable reports | PASS | every loadtest run wrote JSON to `.secrets/perf/` with per-endpoint p50/p95/p99, RPS, RSS, connections and error classes |
