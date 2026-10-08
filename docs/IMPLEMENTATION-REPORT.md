@@ -38,6 +38,26 @@ Defect found and fixed during M1: FolderTree rendered only from `parentId===null
 3. Trash payloads reported a zero `deleted_at` because the insert result was not reflected back; the use case now stamps the entry with the service clock.
 4. Browser upload failed on LAN http because `crypto.randomUUID` requires a secure context; a shared fallback key generator is used.
 
+---
+
+## Milestone 3 — organization and permission closure (verified end-to-end)
+
+### What was built
+- Organization use cases and stores: users (create with issued credential, list, disable/enable with immediate session kill, admin password reset with forced re-change), departments (list/create), workgroups (list/create, member add/remove). Every entry point is admin-only and audited; non-admin callers get 403.
+- Grant management surfaced through the existing admin-only ACL endpoints plus a browser dialog (subject picker across users and groups, nine action checkboxes, scope_only, expiry).
+- OrganizationPanel at /org with live user states, department name resolution, group membership management.
+
+### Verification (executed, all PASS)
+- Issued credentials force a change on first login (business reads 403 until changed); wrong old password 401; old password dead after change.
+- Password reset kills every session of the account and forces a change again; disable kills sessions immediately and blocks login; enable restores access.
+- Cross-user isolation: an ungranted user sees an empty tree, gets 403 on the granted folder, and every indirect attempt on another user's file (preview/download/delete/save/rollback/rename/versions) is rejected; restore of another user's trash entry is 404; admin-only endpoints 403 for non-admins.
+- Group grants apply on the next request: member added → folder visible, list 200, ungranted action still 403; member removed → invisible again.
+- Browser: /org renders real states and department names; grant dialog lists/creates/revokes grants.
+- Fixes during the slice: `workgroups` has no `created_at` column (500 on list), empty department string hit the FK (500 on user create), and use cases mapped real query failures to 404 — now only missing rows map to 404.
+
+### Test data hygiene
+- The redundant full-permission grant created during browser acceptance was revoked; the test workgroup was removed; clerkA/clerkB were disabled. Hard deletion of principals with audit history is blocked by foreign keys by design, so the audit chain stays intact.
+
 ### Known gaps (deliberate scope)
 - Edit locks, approval workflow, sharing, favorites, full-text search, stats/CSV, DOCX/CAD: later milestones. Writes on approval-policy folders are already blocked with `E_APPROVAL_PENDING` so review can never be bypassed.
 - Seeded staff accounts still have unusable passwords; user management ships in Milestone 3.

@@ -662,8 +662,12 @@ func (r *memoryRepo) UserExists(_ context.Context, id string) (bool, error) {
 func (r *memoryRepo) WorkgroupExists(_ context.Context, id string) (bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	for user, groups := range r.workgroups {
-		_ = user
+	for _, g := range r.workgroupList {
+		if g.ID == id {
+			return true, nil
+		}
+	}
+	for _, groups := range r.workgroups {
 		if contains(groups, id) {
 			return true, nil
 		}

@@ -7,6 +7,7 @@ import{Documents}from "../pages/Documents";
 import{FirstSignIn}from "../pages/FirstSignIn";
 import{Preview}from "../pages/Preview";
 import{Trash}from "../pages/Trash";
+import{Org}from "../pages/Org";
 export function App(){
  const user=useSession(s=>s.user),loading=useSession(s=>s.loading),setUser=useSession(s=>s.setUser),setLoading=useSession(s=>s.setLoading);
  useEffect(()=>{let valid=true;authApi.me().then(u=>{if(valid)setUser(u)}).catch(()=>{if(valid)setUser(null)}).finally(()=>{if(valid)setLoading(false)});return()=>{valid=false}},[setLoading,setUser]);
@@ -17,5 +18,6 @@ export function App(){
  <Route path="/doc" element={user?<Documents user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/preview/:id" element={user?<Preview/>:<Navigate to="/login" replace/>}/>
  <Route path="/trash" element={user?<Trash user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
+ <Route path="/org" element={user?<Org user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="*" element={<Navigate to={user?"/doc":"/login"} replace/>}/></Routes>;
 }

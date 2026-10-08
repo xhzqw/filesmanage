@@ -14,8 +14,11 @@ import (
 // memoryRepo is an in-memory ports.Repository for unit tests. Only the paths
 // under test carry behavior; untouched methods return zero values.
 type memoryRepo struct {
-	mu           sync.Mutex
-	users        map[string]memoryUser
+	mu            sync.Mutex
+	users         map[string]memoryUser
+	departments   []domain.Department
+	workgroupList []domain.Workgroup
+	groupMembers  map[string][]string
 	sessions     map[string]memorySession
 	folders      map[string]domain.Folder
 	files        map[string]domain.File
@@ -51,6 +54,7 @@ func newMemoryRepo() *memoryRepo {
 		grants:      map[string]domain.ACL{},
 		workgroups:  map[string][]string{},
 		idempotency: map[string][]byte{},
+		groupMembers: map[string][]string{},
 	}
 }
 

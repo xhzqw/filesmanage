@@ -112,3 +112,53 @@ blobs=3 (ready 3)  trash=3 (restored 3)  audit_events=22 (10 event types)
 idempotency_keys=6  outbox_jobs=0
 .blobs/ready/<2hex>/<sha256> layout on disk; staging directory empty
 ```
+
+## Milestone 3 evidence (executed on 192.168.1.22, 2026-10-08)
+
+### Gates
+```
+go build ./... / go vet ./... → OK
+go test ./... → ok cmd/server, application, domain, httpx (new: organization admin boundary,
+   workgroup membership, group-grant immediate effect)
+python3 scripts/check_architecture.py → PASS: 39 Go files, 28 TS modules
+cd web && npm run build → tsc --noEmit PASS; vite build ✓
+```
+
+### Identity lifecycle (API, admin session)
+| Step | Result |
+|---|---|
+| POST /api/users (clerkA/clerkB) | 201, mustChangePassword=true |
+| clerkA first login | 200 mustChangePassword=true |
+| clerkA business read before change | 403 E_PASSWORD_CHANGE_REQUIRED |
+| change password with wrong old | 401 |
+| change password | 200 mustChangePassword=false |
+| login with old password after change | 401 |
+| admin POST /api/users/:id/password (reset) | 200; old session 401; next login mustChange=true |
+| admin POST /api/users/:id/disable | session 401 immediately; login 401 while disabled |
+| admin POST /api/users/:id/enable | login 200 again |
+
+### Cross-user isolation (clerkA granted {list,preview,upload,download} on 市场部)
+| Attempt by clerkB (no grant) | Result |
+|---|---|
+| GET /api/folders/tree | empty list |
+| GET /api/files?folder=市场部 | 403 |
+| preview / bytes / DELETE / save / rollback / PATCH / versions on clerkA's file | 403 each |
+| upload into 市场部 / create subfolder / delete folder | 403 |
+| restore another user's trash entry | 404 |
+| purge trash (admin-only) | 403 |
+| GET /api/users, POST /api/users, GET /api/groups, POST acl | 403 each |
+
+### Group grants take effect on the next request
+- grant group {list} on 市场部 → clerkB tree [] → add clerkB to group → tree [活动素材, 市场部, 市场资料], list 200, upload still 403 → remove member → tree [] again.
+
+### Browser acceptance (LAN)
+- /org: user table with real states (待改密/正常/已禁用), department names resolved, group list, member management.
+- Documents page: 授权管理 dialog lists existing grants, subject picker (users + groups), nine action checkboxes, scopeOnly option; creating a grant appends a row; revoke removes it.
+- Redundant test grant created during acceptance was revoked; test workgroup and test accounts disabled (audit continuity blocks hard delete by design).
+
+### Final database state
+```
+users=8 (active 6; clerkA/clerkB disabled test accounts)
+workgroups=1 members=3
+acls: folder_root:group_market{list} | folder_market:group_market{list,preview,upload}
+```

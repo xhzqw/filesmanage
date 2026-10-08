@@ -236,7 +236,7 @@ func storeIdempotentResult(ctx context.Context, repo ports.Repository, actorID, 
 // mapError converts domain errors into transport-friendly sentinels.
 func mapError(err error) error {
 	switch {
-	case errors.Is(err, domain.ErrNotFound):
+	case errors.Is(err, domain.ErrNotFound), errors.Is(err, ports.ErrRowMissing):
 		return domain.ErrNotFound
 	case errors.Is(err, domain.ErrForbidden):
 		return domain.ErrForbidden
