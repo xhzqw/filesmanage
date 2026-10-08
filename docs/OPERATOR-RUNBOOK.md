@@ -1,0 +1,152 @@
+# filesmanage v2.1 — 操作手册（Operator Runbook）
+
+目标机：`192.168.1.22`（Debian 13；本机不可达时经 `10.144.144.1`，主机名 `openclaw77`）
+工程目录：`/root/repository77/filesmanage-v21`
+业务数据库：`filesmanage_v21`（PostgreSQL 14+，迁移 0001–0011 已应用）
+开发服务：`0.0.0.0:18091`（LAN 白名单外拒绝）｜压测实例：`127.0.0.1:18092`（库 `filesmanage_perf`）
+文档编辑：自托管 ONLYOFFICE Document Server 8.2.2（Docker 容器 `filesmanage-office`，端口 18080）
+
+> 生产端口 `8091` **未授权**（BLK-05）。在获得明确授权前，不得占用 8091、不得安装
+> systemd 单元、不得切换生产入口。本手册描述的一切均为 dev 级操作。
+
+---
+
+## 1. 访问与凭据
+
+| 项 | 值 |
+|---|---|
+| URL | `http://192.168.1.22:18091`（LAN 内；本机访问经 `10.144.144.1:18091`） |
+| 账号 | `admin` |
+| 初始/当前口令 | `/root/repository77/filesmanage-v21/.secrets/admin.password`（模式 0600，仅 root 可读） |
+| 环境变量 | `.secrets/server.env`（0600；含 `DATABASE_URL`、`FILESMANAGE_OFFICE_SECRET`、`FILESMANAGE_ADDR` 等） |
+| 压测库连接串 | `postgres://filesmanage_v21:***@127.0.0.1:5432/filesmanage_perf?sslmode=disable` |
+
+取口令的安全方式（不落盘、不进日志）：
+
+```bash
+ssh root@192.168.1.22 'cat /root/repository77/filesmanage-v21/.secrets/admin.password'
+```
+
+安全边界：会话 Cookie 为 `fm_session`（HttpOnly + SameSite=Strict，24h）；LAN 白名单
+`FILESMANAGE_LAN_ALLOW_CIDRS` 默认 `127.0.0.1/32,::1/128,192.168.1.0/24`，按**套接字对端地址**
+校验（不信任转发头）；非白名单对端一律 403 `E_NETWORK`。首次登录强制改密，未改密前除
+登录/改密/退出外的业务端点全部 403 `E_PASSWORD_CHANGE_REQUIRED`。
+
+## 2. 服务生命周期
+
+```bash
+cd /root/repository77/filesmanage-v21
+bash scripts/run-dev.sh start    # 构建检查 + 启动 server/worker + 健康验证
+bash scripts/run-dev.sh status   # PID + /health/ready
+bash scripts/run-dev.sh stop     # 停止（幂等）
+```
+
+- 日志：`.bin/server.log`、`.bin/worker.log`、`.bin/perf-server.log`
+- 健康：`curl -s http://127.0.0.1:18091/health/ready` → `{"ok":true}`
+- 构建：`bash scripts/build.sh --with-tests`（web → go → vet → 架构门禁 → OpenAPI 漂移门禁
+  → 验收矩阵门禁 → go test → 迁移校验），失败即非零退出
+- **改 Go 代码后必须 `go build -o .bin/server ./cmd/server` 再重启**：`go build ./...` 不会
+  产出 `.bin/` 下的二进制，只编译不替换（本手册维护期间实测踩过）
+
+## 3. 压测实例（仅压测门禁需要）
+
+```bash
+DATABASE_URL="postgres://filesmanage_v21:***@127.0.0.1:5432/filesmanage_perf?sslmode=disable" \
+FILESMANAGE_ADDR="127.0.0.1:18092" FILESMANAGE_DB_MAX_CONNS=25 \
+FILESMANAGE_BLOB_DIR=".blobs" FILESMANAGE_LAN_ALLOW_CIDRS="127.0.0.1/32" \
+setsid nohup ./.bin/server >> .bin/perf-server.log 2>&1 < /dev/null &
+```
+
+**测延迟的门禁（`pe12_cad_saturation.py`、`pe15_heap_growth.mjs`、`loadtest.py`）必须在
+perf 实例停止时运行**：perf 实例与 dev 实例共享 CPU 与同一台 PostgreSQL，并发运行会污染
+“空闲基线”，曾把 PE12 的比率门禁从 x1.14 推到 x1.64（实测复现，已记录在
+`docs/M7-PERF-DATASET-GATE.md`）。
+
+## 4. 验收门禁一览（全部在目标机执行）
+
+| 门禁 | 命令 | 结果 |
+|---|---|---|
+| 架构 | `python3 scripts/check_architecture.py` | PASS（71 Go / 41 TS） |
+| OpenAPI 漂移 | `python3 scripts/gen_openapi.py --check` | up to date |
+| 验收矩阵 | `python3 scripts/gen_acceptance_matrix.py --check` | 123 PASS / 2 PARTIAL / 1 EXTERNAL |
+| 迁移 | `python3 scripts/verify_migration.py` | PASS |
+| 未授权安全 | `python3 scripts/unauth_security_smoke.py` | 17/17 |
+| 安全 E2E | `python3 scripts/m7_security_e2e.py` | 31/31 |
+| S 矩阵 | `python3 scripts/s_matrix_e2e.py` | 35/35 |
+| 纯文本保真 | `python3 scripts/pt_samples_e2e.py` | 112/112 |
+| 回滚专项 | `python3 scripts/rb_rollback_e2e.py` | 72/72 |
+| CAD 矩阵 | `python3 scripts/mc_cad_e2e.py` | 78/78 |
+| 多样资源模型 | `node scripts/mc_multiasset_check.mjs` | 15/15 |
+| 查看器控件 | `node scripts/mod01_controls_check.mjs --file <id>` | 10/10 |
+| 元数据面板 | `node scripts/mod03_meta_check.mjs` | 30/30 |
+| 装配树 | `node scripts/mc02_assembly_check.mjs` | 8/8 |
+| DOCX 兼容 | `python3 scripts/do05_header_footer_check.py` | 15/15 |
+| 堆增长 | `node scripts/pe15_heap_growth.mjs --file <id> --control-json .secrets/perf/pe15-control-10.json` | PASS |
+| CAD 饱和 | `python3 scripts/pe12_cad_saturation.py` | 7/7 |
+| 数据集 | `python3 scripts/perf_readiness_audit.py` | 12/12 |
+| CSV 导出 | `python3 scripts/perf_csv_export_check.py` | 9/9 |
+| 上传压测 | `python3 scripts/perf_upload_stress.py` | 10/10 |
+| 媒体 Range | `python3 scripts/media_range_check.py --cookie <c> --file-id <mp4>` | 10/10 |
+| Office 会话 | `python3 scripts/office_session_check.py --cookie <c> --file-id <docx>` | 12/12 |
+| 负载 | `python3 scripts/loadtest.py --users 10 --duration 45` | 11/11 |
+| 备份清单 | `python3 scripts/test_backup_manifest.py` | 12/12 |
+| 备份恢复 | `set -a; . .secrets/server.env; set +a; python3 scripts/backup_restore_drill.py` | PASS |
+| 崩溃恢复 | `python3 scripts/ag09_recovery_drill.py` | 4/4 |
+| 升级回退 | `python3 scripts/upgrade_rollback_drill.py` | 12/12 |
+| 浏览器旅程 | `node scripts/browser_journey_check.mjs` | 19/19 |
+| 业务界面 | `node scripts/browser_business_check.mjs` | 12/12 |
+
+需要会话 Cookie 的门禁：`curl -s -c /tmp/c.txt -X POST http://127.0.0.1:18091/api/login
+-H 'Content-Type: application/json' -d "{\"login\":\"admin\",\"password\":\"$(cat .secrets/admin.password)\"}"`
+然后 `grep fm_session /tmp/c.txt | awk '{print $7}'`。
+
+## 5. 备份与恢复
+
+```bash
+set -a; . ./.secrets/server.env; set +a
+python3 scripts/backup_restore_drill.py     # 快照 + 媒体归档 + 恢复到临时库 + 校验 + 删除临时库
+```
+
+- 归档落在 `.secrets/backup-drills/<UTC时间戳>/`（root-only，不入 Git）
+- 演练断言表数与快照引用媒体一致（最近一次：26 表 / 288 blob）
+- 恢复使用一次性临时库，绝不触碰业务库
+
+## 6. 升级与回退
+
+```bash
+python3 scripts/upgrade_rollback_drill.py                    # 回滚到 HEAD~1
+python3 scripts/upgrade_rollback_drill.py --rollback-to <sha> # 指定提交
+```
+
+流程：验证当前构建 → 写入标记文件 → worktree 构建旧版并换入 → 旧版启动/认证/数据字节级存活
+→ 还原当前构建（摘要校验）。真实升级即反向操作：构建新二进制 → 换入 → 重启 → 验证。
+
+## 7. 故障排查
+
+| 现象 | 原因与处理 |
+|---|---|
+| 改完代码行为没变 | 只跑了 `go build ./...`；需 `go build -o .bin/server ./cmd/server` 再 `run-dev.sh stop/start` |
+| `GET /api/files?...&limit=200` 返回 400 | 历史缺陷（仓库守卫与服务端 page+1 探测差一），已修复为共享常量 `ports.MaxFilePage`；若复现说明二进制过期 |
+| PE12/PE15/loadtest 数字异常 | perf 实例是否还在跑（见 §3） |
+| 构建报 openapi/matrix drift | 路由或验收项变更后未重新生成：`python3 scripts/gen_openapi.py` / `python3 scripts/gen_acceptance_matrix.py` |
+| 启动报 `E_NETWORK` | 对端不在 `FILESMANAGE_LAN_ALLOW_CIDRS`；从 LAN 内访问或调整白名单 |
+| 上传同名文件 409 | 名称冲突属预期；E2E 脚本用时间戳避免 |
+| 畸形 CAD 文件派生 ready 且为空 | 已修复：worker 校验 MSH/STL 输出真含几何，否则 `failed` + `CONVERT_FAILED` |
+| 会话突然 401 | 24h 过期或被禁用/登出；重新登录 |
+
+日志位置：`.bin/server.log`、`.bin/worker.log`、`.bin/perf-server.log`；错误详情开关
+`FILESMANAGE_DEBUG_ERRORS=true`（仅开发用，生产响应不泄露内部信息）。
+
+## 8. 禁止事项
+
+- 不得占用 8091、不得安装 systemd 单元、不得切换生产入口（BLK-05 未授权）
+- 不得删除/覆盖/迁移旧 Node/SQLite 数据，不得复用旧 Blob（DEC-15）
+- 不得把密钥或管理员口令提交 Git 或写入日志
+- 不得对共享 PostgreSQL 执行破坏性操作；压测实例池上限 25，避免挤占其他项目
+- 不得宣称未经实测的功能已完成
+
+## 9. 发布门禁现状
+
+见 `docs/RELEASE-GATES.md`：M1–M6 GO(dev)，M7 证据齐全但 100/200 用户容量受共享主机限制
+（BLK-07），M8 dev 级恢复 GO、生产切换待授权。矩阵 123 PASS / 2 PARTIAL（S12 systemd、
+S20 Logo，均需客户输入）/ 1 EXTERNAL（MC11 DWG 许可）。

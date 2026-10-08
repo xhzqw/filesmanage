@@ -59,6 +59,10 @@ API).
 - Processes: `.bin/server` (API) and `.bin/worker` (CAD conversions) under the workspace; ONLYOFFICE container `filesmanage-office` on 18080.
 - Perf instance: 127.0.0.1:18092 → `filesmanage_perf` (loopback-only, `FILESMANAGE_DB_MAX_CONNS=25`).
 - Migrations 0001–0011 applied to both databases; checksums re-verified by `migrate -check`.
+- **Operator runbook**: `docs/OPERATOR-RUNBOOK.md` — access & credentials, service
+  lifecycle, the full gate table with commands and expected results, backup/restore,
+  upgrade/rollback, troubleshooting (incl. the pitfalls hit during implementation)
+  and the prohibited actions.
 - Operator scripts: `scripts/build.sh [--with-tests]` (reproducible build:
   web → go → vet → architecture → tests → migration checksums) and
   `scripts/run-dev.sh [start|stop|status]` (single-instance dev services with
