@@ -58,6 +58,25 @@ type statsCache struct {
 	ttl     time.Duration
 }
 
+// maxCacheEntries bounds every in-process cache: keys are principal+filter
+// combinations, so a long-running server with many users and varied filters
+// would otherwise grow the map without limit. Expired entries are evicted
+// whenever the cap is exceeded; if the map is still full afterwards the new
+// entry is simply not cached (a cache miss costs a query, never correctness).
+const maxCacheEntries = 4096
+
+// pruneLocked drops expired entries. Callers hold c.mu.
+func pruneLocked[E any](entries map[string]E, expireAt func(E) time.Time, now time.Time) int {
+	removed := 0
+	for key, entry := range entries {
+		if !expireAt(entry).After(now) {
+			delete(entries, key)
+			removed++
+		}
+	}
+	return removed
+}
+
 type statsEntry struct {
 	value    domain.Stats
 	expireAt time.Time
@@ -95,6 +114,12 @@ func (c *sessionCache) put(token string, value domain.Authenticated, now time.Ti
 	defer c.mu.Unlock()
 	if c.entries == nil {
 		c.entries = make(map[string]sessionEntry)
+	}
+	if len(c.entries) >= maxCacheEntries {
+		pruneLocked(c.entries, func(e sessionEntry) time.Time { return e.expireAt }, now)
+		if len(c.entries) >= maxCacheEntries {
+			return
+		}
 	}
 	c.entries[token] = sessionEntry{value: value, expireAt: now.Add(c.ttl)}
 }
@@ -152,6 +177,12 @@ func (c *searchCache) put(key string, value searchEntryValue, now time.Time) {
 	if c.entries == nil {
 		c.entries = make(map[string]searchEntry)
 	}
+	if len(c.entries) >= maxCacheEntries {
+		pruneLocked(c.entries, func(e searchEntry) time.Time { return e.expireAt }, now)
+		if len(c.entries) >= maxCacheEntries {
+			return
+		}
+	}
 	c.entries[key] = searchEntry{value: value, expireAt: now.Add(c.ttl)}
 }
 
@@ -170,6 +201,12 @@ func (c *statsCache) put(key string, value domain.Stats, now time.Time) {
 	defer c.mu.Unlock()
 	if c.entries == nil {
 		c.entries = make(map[string]statsEntry)
+	}
+	if len(c.entries) >= maxCacheEntries {
+		pruneLocked(c.entries, func(e statsEntry) time.Time { return e.expireAt }, now)
+		if len(c.entries) >= maxCacheEntries {
+			return
+		}
 	}
 	c.entries[key] = statsEntry{value: value, expireAt: now.Add(c.ttl)}
 }

@@ -440,6 +440,23 @@ booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
   "no IGES writer on the target" was wrong: reader-side samples exist and are
   the correct vehicle for this acceptance item.
 
+### Cache memory bound (2026-10-09)
+
+The three in-process caches key on principal + filter, so a long-running
+server with many users and varied filters would otherwise grow the maps
+without limit — a slow leak that a short loadtest cannot see (its key space
+is tiny). Each cache is now capped at `maxCacheEntries` (4096): on insert, if
+the cap is reached, expired entries are evicted first, and if the map is
+still full the new entry is simply not cached (a miss costs one query, never
+correctness).
+
+`TestCachesAreBounded` pins both properties: the map never exceeds the cap,
+and once the clock moves past the TTL the next insert evicts every dead
+entry (map shrinks back to 1). Re-verified after the change:
+`go test ./...`, vet, `m7_security_e2e.py` 31/31,
+`browser_business_check.mjs` 12/12, and a 10-user loadtest still 11/11 with
+`/api/me` p95 7.0 ms and `/api/search` p95 12.5 ms.
+
 ### Consolidated gate re-run after the caching change (2026-10-09)
 
 The caches touch session validation on every authenticated request plus the

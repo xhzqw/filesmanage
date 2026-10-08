@@ -150,7 +150,10 @@ python3 scripts/upgrade_rollback_drill.py --rollback-to <sha> # 指定提交
   缓存读失效，不等 TTL（PE04）；
 - 登出立即删除会话缓存；改密与禁用账号立即删除该用户全部会话缓存；
 - 因此“撤销后下一次请求即失权”“登出后会话立即失效”在缓存存在时依然成立，
-  由 `m7_security_e2e.py`（31/31）与 `TestSessionCacheRevokesImmediately` 把关。
+  由 `m7_security_e2e.py`（31/31）与 `TestSessionCacheRevokesImmediately` 把关；
+- 三个缓存均有上限（`maxCacheEntries` = 4096）：达到上限先驱逐过期条目，
+  仍满则不缓存新条目（只多一次查询，不影响正确性），由
+  `TestCachesAreBounded` 把关，长时间运行不会无界增长。
 
 ## 8. 禁止事项
 
