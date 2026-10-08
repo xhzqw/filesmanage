@@ -23,6 +23,9 @@ import (
 type blobStoreAdapter struct{ store *blob.Store }
 
 func (a blobStoreAdapter) Stage() (ports.BlobStage, error) { return a.store.Stage() }
+func (a blobStoreAdapter) SweepStaging(maxAge time.Duration) (int, error) {
+	return a.store.SweepStaging(maxAge)
+}
 func (a blobStoreAdapter) Open(key string) (io.ReadSeekCloser, error) {
 	return a.store.Open(key)
 }
@@ -85,6 +88,15 @@ func main() {
 		blobDir = ".blobs"
 	}
 	store := blobStoreAdapter{store: blob.New(blobDir)}
+	// AG09 crash recovery: an upload that died between staging and the database
+	// commit leaves a staging file behind. Sweeping at startup keeps the store
+	// from growing without bound after crashes; the one-hour age keeps any
+	// in-flight upload of a concurrently running process alive.
+	if swept, sweepErr := store.SweepStaging(time.Hour); sweepErr != nil {
+		log.Printf("staging sweep failed: %v", sweepErr)
+	} else if swept > 0 {
+		log.Printf("staging sweep removed %d orphaned upload(s)", swept)
+	}
 	service := application.New(postgres.New(pool), store).WithOffice(application.OfficeConfig{
 		EditorURL:     os.Getenv("FILESMANAGE_OFFICE_URL"),
 		Secret:        os.Getenv("FILESMANAGE_OFFICE_SECRET"),

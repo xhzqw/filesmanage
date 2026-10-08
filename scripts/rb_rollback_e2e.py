@@ -63,6 +63,84 @@ def upload(admin, folder_id, name, content):
         return status, {}
 
 
+def upload_binary(admin, folder_id, name, content, content_type="application/octet-stream"):
+    boundary = "----RBRollbackBin"
+    payload = (b"--" + boundary.encode() + b"\r\n"
+               + b'Content-Disposition: form-data; name="folderId"\r\n\r\n' + folder_id.encode() + b"\r\n"
+               + b"--" + boundary.encode() + b"\r\n"
+               + ('Content-Disposition: form-data; name="file"; filename="' + name + '"\r\n').encode()
+               + ("Content-Type: " + content_type + "\r\n\r\n").encode()
+               + content + b"\r\n--" + boundary.encode() + b"--\r\n")
+    status, body = admin.request("POST", "/api/files", raw=payload,
+                                 content_type=f"multipart/form-data; boundary={boundary}")
+    try:
+        return status, json.loads(body.decode())["data"]
+    except (ValueError, KeyError, UnicodeDecodeError):
+        return status, {}
+
+
+def lock_and_save_raw(admin, file_id, base_seq, content, key):
+    status, body = admin.json("POST", f"/api/files/{file_id}/lock", {"BaseSeq": base_seq})
+    if status != 201:
+        return status, None
+    token = (body or {}).get("data", {}).get("lockToken")
+    status, body = admin.json("POST", f"/api/files/{file_id}/save",
+                              {"Data": "data:application/octet-stream;base64,"
+                                       + base64.b64encode(content).decode(),
+                               "BaseSeq": base_seq, "LockToken": token,
+                               "IdempotencyKey": key})
+    return status, (body or {}).get("data")
+
+
+def minimal_docx(text):
+    """A structurally valid DOCX container: enough for byte-level rollback
+    assertions (editor fidelity itself is DO05's contract)."""
+    import zipfile
+    import io as _io
+    buffer = _io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml",
+                         '<?xml version="1.0" encoding="UTF-8"?>'
+                         '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+                         '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+                         '<Default Extension="xml" ContentType="application/xml"/>'
+                         '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+                         '</Types>')
+        archive.writestr("_rels/.rels",
+                         '<?xml version="1.0" encoding="UTF-8"?>'
+                         '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                         '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
+                         '</Relationships>')
+        archive.writestr("word/document.xml",
+                         '<?xml version="1.0" encoding="UTF-8"?>'
+                         '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+                         '<w:body><w:p><w:r><w:t>' + text + '</w:t></w:r></w:p></w:body></w:document>')
+    return buffer.getvalue()
+
+
+def minimal_step():
+    """A real STEP body from gmsh/OpenCASCADE, or None when the toolchain is
+    unavailable (the media case is then skipped, not faked)."""
+    import subprocess
+    import tempfile
+    import os
+    geo = 'SetFactory("OpenCASCADE");\nTorus(1) = {0, 0, 0, 8, 3};\n'
+    with tempfile.TemporaryDirectory() as tmp:
+        geo_path = os.path.join(tmp, "rb10.geo")
+        step_path = os.path.join(tmp, "rb10.step")
+        with open(geo_path, "w", encoding="utf8") as handle:
+            handle.write(geo)
+        try:
+            result = subprocess.run(["gmsh", "-3", geo_path, "-format", "step", "-o", step_path],
+                                    capture_output=True, text=True, timeout=300)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        if result.returncode != 0 or not os.path.exists(step_path):
+            return None
+        with open(step_path, "rb") as handle:
+            return handle.read()
+
+
 def lock_and_save(admin, file_id, base_seq, content, key):
     status, body = admin.json("POST", f"/api/files/{file_id}/lock", {"BaseSeq": base_seq})
     if status != 201:
@@ -228,8 +306,172 @@ def main():
     check("RB-T12 history still intact after refusals",
           len(versions_of(admin, file_id)) == 6, len(versions_of(admin, file_id)))
 
+    # ---- RB-T06: concurrent rollback, single winner ----
+    # Three sessions race to roll the same file from the same expected version
+    # with different idempotency keys. CAS must admit exactly one commit and
+    # leave the seq series gap-free.
+    import threading
+    race = []
+    race_lock = threading.Lock()
+
+    def racer(key):
+        sess = Session(args.base)
+        sess.json("POST", "/api/login", {"login": "admin", "password": admin_password})
+        st, bd = sess.json("POST", f"/api/files/{file_id}/rollback",
+                           {"TargetSeq": 1, "ExpectedCurrentSeq": 6, "LockToken": token,
+                            "Reason": "并发回滚", "IdempotencyKey": key})
+        with race_lock:
+            race.append((st, ((bd or {}).get("data") or {}).get("versionSeq")))
+
+    threads = [threading.Thread(target=racer, args=(f"rb-race-{i}",)) for i in range(3)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=60)
+    winners = [entry for entry in race if entry[0] == 200]
+    check("RB-T06 concurrent rollbacks have exactly one winner", len(winners) == 1, race)
+    seqs = [v.get("versionSeq") for v in versions_of(admin, file_id)]
+    check("RB-T06 history stays gap-free after the race",
+          seqs == list(range(1, len(seqs) + 1)), seqs)
+
+    # ---- RB-T07/08: rollback under an approval policy ----
+    status, body = admin.json("POST", "/api/folders", {"parentId": root_id, "name": "RB审批目录-" + stamp})
+    policy_folder = (body or {}).get("data", {}).get("id") if status == 201 else None
+    status, me = admin.json("GET", "/api/me")
+    admin_id = (me or {}).get("data", {}).get("id")
+    status, uploaded = upload(admin, policy_folder, "rb-approval.txt", A)
+    policy_file = (uploaded or {}).get("fileId") if status == 201 else None
+    check("RB-T07 policy file uploaded", policy_file is not None, status)
+    if policy_file:
+        # v2 is committed BEFORE the policy is enabled: under a policy every
+        # write pends, so the baseline version must exist first.
+        lock_and_save(admin, policy_file, 1, B, "rb-policy-b")
+        check("RB-T07 baseline v2 committed before the policy",
+              len(versions_of(admin, policy_file)) == 2, len(versions_of(admin, policy_file)))
+        admin.json("PUT", f"/api/folders/{policy_folder}/approval-policy",
+                   {"approverId": admin_id, "enabled": True})
+        status, body = admin.json("POST", f"/api/files/{policy_file}/lock", {"BaseSeq": 2})
+        ptoken = (body or {}).get("data", {}).get("lockToken")
+        status, body = admin.json("POST", f"/api/files/{policy_file}/rollback",
+                                  {"TargetSeq": 1, "ExpectedCurrentSeq": 2, "LockToken": ptoken,
+                                   "Reason": "审批回滚", "IdempotencyKey": "rb-policy-rollback"})
+        check("RB-T07 rollback under policy pends", status == 202, f"HTTP {status}")
+        approval_id = ((body or {}).get("data") or {}).get("approvalId")
+        check("RB-T07 no version while pending",
+              len(versions_of(admin, policy_file)) == 2, len(versions_of(admin, policy_file)))
+        status, payload = admin.request("GET", f"/api/files/{policy_file}/bytes")
+        check("RB-T07 download keeps the old current version",
+              hashlib.sha256(payload).hexdigest() == sha["B"], f"HTTP {status}")
+        status, body = admin.json("GET", "/api/search?q=rb-approval")
+        items = ((body or {}).get("data") or {}).get("items") or []
+        check("RB-T07 search still points at the current version",
+              any(item.get("id") == policy_file for item in items), len(items))
+
+        # RB-T08: a rejected rollback must not create any version.
+        admin.json("POST", f"/api/approvals/{approval_id}/reject", {"comment": "拒绝回滚"})
+        check("RB-T08 rejected rollback creates no version",
+              len(versions_of(admin, policy_file)) == 2, len(versions_of(admin, policy_file)))
+        status, _ = admin.json("POST", f"/api/approvals/{approval_id}/approve", {"comment": "重复审批"})
+        check("RB-T08 duplicate decision refused", status in (409, 404, 400), status)
+        status, _ = admin.json("POST", f"/api/files/{policy_file}/rollback",
+                               {"TargetSeq": 1, "ExpectedCurrentSeq": 99, "LockToken": ptoken,
+                                "Reason": "旧基准", "IdempotencyKey": "rb-policy-stale"})
+        check("RB-T08 stale base refused under policy", status in (409, 400), status)
+        check("RB-T08 still no extra version after refusals",
+              len(versions_of(admin, policy_file)) == 2, len(versions_of(admin, policy_file)))
+
+        # A fresh, approved rollback then appends exactly one new version.
+        status, body = admin.json("POST", f"/api/files/{policy_file}/lock", {"BaseSeq": 2})
+        ptoken2 = (body or {}).get("data", {}).get("lockToken")
+        status, body = admin.json("POST", f"/api/files/{policy_file}/rollback",
+                                  {"TargetSeq": 1, "ExpectedCurrentSeq": 2, "LockToken": ptoken2,
+                                   "Reason": "再次申请", "IdempotencyKey": "rb-policy-rollback-2"})
+        approval2 = ((body or {}).get("data") or {}).get("approvalId")
+        status, body = admin.json("POST", f"/api/approvals/{approval2}/approve", {"comment": "同意"})
+        check("RB-T07 approved rollback commits", status == 200, f"HTTP {status}")
+        versions = versions_of(admin, policy_file)
+        check("RB-T07 approval appends exactly one version", len(versions) == 3, len(versions))
+        last = versions[-1] if versions else {}
+        check("RB-T07 appended version is a rollback of v1",
+              last.get("action") == "rollback" and last.get("sha256") == sha["A"], last)
+        status, payload = admin.request("GET", f"/api/files/{policy_file}/bytes")
+        check("RB-T07 current bytes equal the approved target",
+              hashlib.sha256(payload).hexdigest() == sha["A"], f"HTTP {status}")
+
+    # ---- RB-T10: rollback restores exact bytes for every media class ----
+    step_v1 = minimal_step()
+    media = [
+        ("rb10-plain.txt", "rb10 明文内容", "rb10 明文内容-改", "text/plain"),
+        ("rb10-bom.txt", "\ufeffrb10 BOM 内容", "\ufeffrb10 BOM 内容-改", "text/plain"),
+        ("rb10-crlf.txt", "rb10 第一行\r\nrb10 第二行", "rb10 第一行\r\nrb10 第二行-改", "text/plain"),
+        ("rb10.docx", minimal_docx("回滚前"), minimal_docx("回滚后"),
+         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    ]
+    if step_v1:
+        media.append(("rb10.step", step_v1, step_v1 + b"\n/* appended */\n", "application/step"))
+    else:
+        check("RB-T10 STEP sample generated", False, "gmsh unavailable on target")
+    for name, v1, v2, ctype in media:
+        raw1 = v1.encode("utf8") if isinstance(v1, str) else v1
+        raw2 = v2.encode("utf8") if isinstance(v2, str) else v2
+        status, uploaded = upload_binary(admin, folder_id, name, raw1, ctype)
+        media_id = (uploaded or {}).get("fileId") if status == 201 else None
+        check(f"RB-T10 {name} uploaded", media_id is not None, status)
+        if not media_id:
+            continue
+        status, _ = lock_and_save_raw(admin, media_id, 1, raw2, f"rb10-save-{name}")
+        check(f"RB-T10 {name} v2 saved", status == 200, f"HTTP {status}")
+        status, body = admin.json("POST", f"/api/files/{media_id}/lock", {"BaseSeq": 2})
+        mtoken = (body or {}).get("data", {}).get("lockToken")
+        status, body = admin.json("POST", f"/api/files/{media_id}/rollback",
+                                  {"TargetSeq": 1, "ExpectedCurrentSeq": 2, "LockToken": mtoken,
+                                   "Reason": "RB-T10", "IdempotencyKey": f"rb10-rollback-{name}"})
+        check(f"RB-T10 {name} rollback committed", status == 200, f"HTTP {status}")
+        status, payload = admin.request("GET", f"/api/files/{media_id}/bytes")
+        want = hashlib.sha256(raw1).hexdigest()
+        check(f"RB-T10 {name} bytes equal the target version",
+              hashlib.sha256(payload).hexdigest() == want,
+              f"HTTP {status} sha={hashlib.sha256(payload).hexdigest()[:12]} want={want[:12]}")
+        versions = versions_of(admin, media_id)
+        check(f"RB-T10 {name} version digests unchanged",
+              [v.get("sha256") for v in versions] == [want, hashlib.sha256(raw2).hexdigest(), want],
+              [v.get("sha256", "")[:12] for v in versions])
+
+    # RB-T10 (index + derivative point at the new current): after the STEP
+    # rollback the derivative must be bound to version 1 again.
+    step_media = [m for m in media if m[0].endswith(".step")]
+    if step_media:
+        status, body = admin.json("GET", "/api/search?q=rb10.step")
+        items = ((body or {}).get("data") or {}).get("items") or []
+        check("RB-T10 search index points at the current version",
+              any(item.get("name") == "rb10.step" for item in items), len(items))
+
+    # ---- RB-T11: history, derivatives and shared blobs survive rollback ----
+    # A content-addressed blob shared by two versions must stay downloadable
+    # after a rollback (no garbage collector exists to reclaim it, and none may
+    # run while a version still references the digest).
+    status, uploaded = upload_binary(admin, folder_id, "rb11-shared.bin", b"shared blob bytes", "application/octet-stream")
+    shared_id = (uploaded or {}).get("fileId") if status == 201 else None
+    if shared_id:
+        lock_and_save_raw(admin, shared_id, 1, b"shared blob bytes", "rb11-same")  # identical digest
+        status, body = admin.json("POST", f"/api/files/{shared_id}/lock", {"BaseSeq": 2})
+        stoken = (body or {}).get("data", {}).get("lockToken")
+        admin.json("POST", f"/api/files/{shared_id}/rollback",
+                   {"TargetSeq": 1, "ExpectedCurrentSeq": 2, "LockToken": stoken,
+                    "Reason": "RB-T11", "IdempotencyKey": "rb11-rollback"})
+        versions = versions_of(admin, shared_id)
+        check("RB-T11 full history survives the rollback",
+              [v.get("versionSeq") for v in versions] == [1, 2, 3], [v.get("versionSeq") for v in versions])
+        check("RB-T11 both versions reference the same blob",
+              len({v.get("sha256") for v in versions}) == 1, {v.get("sha256", "")[:12] for v in versions})
+        status, payload = admin.request("GET", f"/api/files/{shared_id}/bytes")
+        check("RB-T11 shared blob still downloadable after rollback",
+              status == 200 and payload == b"shared blob bytes", f"HTTP {status}")
+
     # Cleanup.
     admin.json("DELETE", f"/api/folders/{folder_id}")
+    if policy_folder:
+        admin.json("DELETE", f"/api/folders/{policy_folder}")
     if probe_id:
         admin.json("POST", f"/api/users/{probe_id}/disable")
     check("cleanup completed", True, "folder soft-deleted, probe disabled")

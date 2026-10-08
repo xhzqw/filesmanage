@@ -440,6 +440,30 @@ booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
   "no IGES writer on the target" was wrong: reader-side samples exist and are
   the correct vehicle for this acceptance item.
 
+### Rollback concurrency/approval edges + crash recovery (2026-10-09, 72/72 + 4/4)
+
+`scripts/rb_rollback_e2e.py` grew from 27 to 72 checks:
+
+| ID | Assertion |
+|---|---|
+| RB-T06 | three sessions race to roll back from the same expected version with different idempotency keys: exactly one commits (v7), the others get 409, and the seq series stays 1..7 with no gap or duplicate |
+| RB-T07 | a rollback on an approval-governed folder answers 202 pending and creates no version; download and search keep serving the old current; after approval exactly one `action=rollback` version is appended |
+| RB-T08 | a rejected rollback creates no version, a duplicate decision is refused (409), a stale expected seq is refused (409), and the version count never moves |
+| RB-T10 | byte-exact rollback across five media classes — plain UTF-8, BOM, CRLF, DOCX and STEP: the downloaded SHA-256 equals the target version's digest in every case (version digest series A/B/A), and the search index points at the new current |
+| RB-T11 | after a rollback the full history survives, both versions reference the same content-addressed blob, and that blob stays downloadable |
+
+AG09 (crash between commit and rename) needed a mechanism as well as a
+drill. `CommitUpload` already uses the safe order — stage, rename into the
+content-addressed ready location, then commit the database row — so a crash
+can leave at most an unreferenced ready blob and never a dangling reference;
+what it does leave is a staging file. `Store.SweepStaging` now removes
+staging files older than an hour at server startup, and
+`scripts/ag09_recovery_drill.py` proves it end-to-end (4/4): a planted
+two-hour-old orphan staging file is swept, a fresh one survives, and a
+committed upload is still readable after the restart.
+
+Matrix: 121 PASS / 4 PARTIAL / 1 EXTERNAL.
+
 ### Model metadata panel MOD03/MOD04/MOD05 + MC05 (2026-10-09, 30/30 PASS)
 
 `scripts/mod03_meta_check.mjs` uploads samples whose geometry is known exactly

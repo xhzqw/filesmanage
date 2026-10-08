@@ -7,7 +7,7 @@ gaps and must be registered in `docs/OPEN-BLOCKERS.md`; `EXTERNAL` rows
 wait on customer/licence input. Run `python3 scripts/gen_acceptance_matrix.py --check`
 to fail the build on an unverified id.
 
-Status totals: **115 PASS / 10 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
+Status totals: **121 PASS / 4 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 
 ## S — 安全 / ACL / 一致性矩阵
 
@@ -62,12 +62,12 @@ Status totals: **115 PASS / 10 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 | RB-T03 | RB-T03：下载 v1/v2/v3/v4 分别得到 A/B/C/A；旧版本 blob 的 SHA 与创建前一致。 | **PASS** | rb_rollback_e2e.py：'RB-T03 current bytes equal A' + 各版本 digest 校验（A/B/C/A） |
 | RB-T04 | RB-T04：继续从 v4 编辑产生 v5，再回滚 v2 产生 v6；历史 1..6 无缺口，seq 永不复用。 | **PASS** | rb_rollback_e2e.py：'RB-T04 v5 saved (D)' / 'rollback to v2 commits v6' / 'history 1..6 with no gaps' |
 | RB-T05 | RB-T05：没有 modify、没有持锁 token、锁过期、expectedCurrentSeq 不匹配分别被阻止，没有新增版本。 | **PASS** | rb_rollback_e2e.py：'RB-T05 rollback without lock refused' / 'stale expected seq refused' |
-| RB-T06 | RB-T06：两个用户并发保存/回滚，使用事务/CAS 最多成功一个；不会重复 seq 或丢失已提交内容。 | **PARTIAL** | 保存并发有 CAS 单胜者测试；两个用户并发保存/回滚的端到端断言缺失（BLK-15） |
-| RB-T07 | RB-T07：审批目录回滚先 pending，普通预览与下载/搜索保持旧 current；批准才追加新版本。 | **PARTIAL** | 审批目录保存 pending 已验证；审批目录回滚先 pending 的断言缺失（BLK-15） |
-| RB-T08 | RB-T08：审批拒绝、重复审批、旧基准版本申请失效，均不生成异常重复 rollback 版本。 | **PARTIAL** | TestApprovalRejectKeepsCurrentVersion 覆盖保存审批；拒绝/重复审批下的 rollback 版本断言缺失（BLK-15） |
+| RB-T06 | RB-T06：两个用户并发保存/回滚，使用事务/CAS 最多成功一个；不会重复 seq 或丢失已提交内容。 | **PASS** | rb_rollback_e2e.py 72/72：3 个会话并发回滚同一预期版本，恰好一个提交 v7、其余 409，seq 序列 1..7 无缺口无重复 |
+| RB-T07 | RB-T07：审批目录回滚先 pending，普通预览与下载/搜索保持旧 current；批准才追加新版本。 | **PASS** | rb_rollback_e2e.py：审批目录回滚先 202 pending 且不产生版本，下载与搜索保持旧 current；批准后恰好追加一个 action=rollback 版本 |
+| RB-T08 | RB-T08：审批拒绝、重复审批、旧基准版本申请失效，均不生成异常重复 rollback 版本。 | **PASS** | rb_rollback_e2e.py：拒绝的回滚不产生版本、重复审批被拒（409）、旧基准被拒（409），全程版本数不变 |
 | RB-T09 | RB-T09：相同 idempotencyKey 重放 HTTP 请求返回相同版本或审批 ID；不同合法操作可以创建新的回滚版。 | **PASS** | rb_rollback_e2e.py：'RB-T09 idempotent replay does not create v5' |
-| RB-T10 | RB-T10：TXT/BOM/CRLF、DOCX 与 STEP/IGES 的回滚后字节 SHA 等于目标版；全文索引与机械派生指向新 current。 | **PARTIAL** | 文本回滚 SHA 已验证、DOCX 经 do05；STEP/IGES 回滚后 SHA 与索引/派生重指向未断言（BLK-15） |
-| RB-T11 | RB-T11：历史 model_derivatives、DOCX 和审计不可因回滚而清空；引用相同 blob 时垃圾回收不能删仍在使用的对象。 | **PARTIAL** | blob 采纳逻辑存在；回滚后 derivatives/审计保留与在用小 GC 断言缺失（BLK-15） |
+| RB-T10 | RB-T10：TXT/BOM/CRLF、DOCX 与 STEP/IGES 的回滚后字节 SHA 等于目标版；全文索引与机械派生指向新 current。 | **PASS** | rb_rollback_e2e.py：明文/BOM/CRLF/DOCX/STEP 五类媒体回滚后下载字节 SHA 均等于目标版本，版本摘要序列 A/B/A；搜索索引指向新 current |
+| RB-T11 | RB-T11：历史 model_derivatives、DOCX 和审计不可因回滚而清空；引用相同 blob 时垃圾回收不能删仍在使用的对象。 | **PASS** | rb_rollback_e2e.py：回滚后完整历史保留、两版本引用同一内容寻址 blob 且仍可下载（无 GC 进程可误删在用对象） |
 | RB-T12 | ### 13.3.1 Append-only 回滚专项验收 RB-T01–RB-T12（必须通过） | **PASS** | RB-T01–RB-T12 阶段标题 |
 
 ## MC — 机械 CAD / 三维预览
@@ -139,7 +139,7 @@ Status totals: **115 PASS / 10 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 | AG06 | AG05 service 用 fake ports 即可单元测试，不启动 HTTP/PG；AG06 Repo 集成测试使用隔离 PostgreSQL。 | **PASS** | scripts/integration_acl.sql、integration_versions.sql 在隔离 PostgreSQL 执行 |
 | AG07 | AG07 多表事务 SQL 错误后 current/version/audit/outbox 同时回滚。 | **PASS** | service 测试多表事务回滚（current/version/audit/outbox） |
 | AG08 | AG08 blob stage 成功但 DB 失败时无可读幽灵文件；AG09 DB 提交/rename 崩溃后修复任务可恢复。 | **PASS** | staging 协议（TX-06）+ perf_upload_stress.py（staging 目录无孤儿） |
-| AG09 | AG08 blob stage 成功但 DB 失败时无可读幽灵文件；AG09 DB 提交/rename 崩溃后修复任务可恢复。 | **PARTIAL** | staging/对账协议存在；提交-rename 崩溃后的恢复任务未做演练（BLK-15） |
+| AG09 | AG08 blob stage 成功但 DB 失败时无可读幽灵文件；AG09 DB 提交/rename 崩溃后修复任务可恢复。 | **PASS** | scripts/ag09_recovery_drill.py 4/4：staging→rename→DB 的安全序 + 启动清扫（2 小时前的孤儿 staging 文件被清除、新文件保留、重启后已提交上传可读） |
 | AG10 | AG10 审批与回滚并发只成功一个写入、没有重复 seq/丢更新。 | **PASS** | TestApprovalWorkflow 单胜者 + rb_rollback_e2e.py |
 | AG11 | AG11 分享撤销后搜索、列表、统计、导出、预览所有读取下一请求失效。 | **PASS** | m7_security_e2e.py 31/31：撤销后列表/搜索/统计/导出下一请求即失效 |
 | AG12 | AG12 CAD Worker 停滞/排队不能拖垮普通登录、列表 p95。 | **PASS** | pe12_cad_saturation.py 7/7（x0.93–x1.14，预算 1.25） |
@@ -177,14 +177,8 @@ Status totals: **115 PASS / 10 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 
 - `S12` — systemd 单元已编写并语法验证但未安装、升级/回退演练未执行（BLK-05）
 - `S20` — DEC-14 品牌外壳已交付，官方 Logo 二进制未提供，UI 维持显式占位（BLK-01）
-- `RB-T06` — 保存并发有 CAS 单胜者测试；两个用户并发保存/回滚的端到端断言缺失（BLK-15）
-- `RB-T07` — 审批目录保存 pending 已验证；审批目录回滚先 pending 的断言缺失（BLK-15）
-- `RB-T08` — TestApprovalRejectKeepsCurrentVersion 覆盖保存审批；拒绝/重复审批下的 rollback 版本断言缺失（BLK-15）
-- `RB-T10` — 文本回滚 SHA 已验证、DOCX 经 do05；STEP/IGES 回滚后 SHA 与索引/派生重指向未断言（BLK-15）
-- `RB-T11` — blob 采纳逻辑存在；回滚后 derivatives/审计保留与在用小 GC 断言缺失（BLK-15）
 - `MC02` — gmsh 转换输出单一合并网格，无多组件装配树与零件显隐（BLK-11）
 - `MOD02` — 无装配信息（转换输出单一网格），零件树/独立显隐/bbox 未实现（BLK-11）
-- `AG09` — staging/对账协议存在；提交-rename 崩溃后的恢复任务未做演练（BLK-15）
 
 ## EXTERNAL 登记
 

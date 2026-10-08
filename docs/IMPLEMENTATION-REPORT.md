@@ -393,3 +393,31 @@ two-part 3MF reports 2).
 MC05/MOD03/MOD04/MOD05 move to PASS (115 PASS / 10 PARTIAL / 1 EXTERNAL);
 BLK-13 is struck. Regressions re-run: mod01 10/10, multi-asset 15/15, PE15
 PASS, `go test ./...` green.
+
+---
+
+## BLK-15 closed: rollback edges, and the crash-recovery sweep they needed (2026-10-09)
+
+`scripts/rb_rollback_e2e.py` grew from 27 to 72 checks, closing the
+concurrency/approval intersection of append-only rollback: three racing
+rollback requests produce exactly one committed version with a gap-free seq
+series (RB-T06); a rollback under an approval policy pends without creating a
+version, keeps serving the old current version to download and search, and
+appends exactly one `action=rollback` version only after approval (RB-T07);
+rejections, duplicate decisions and stale bases never move the version count
+(RB-T08); rollback restores byte-exact content across plain UTF-8, BOM, CRLF,
+DOCX and STEP with the search index pointing at the new current (RB-T10); and
+history plus the shared content-addressed blob survive (RB-T11).
+
+AG09 needed a mechanism, not just a test. `CommitUpload` already stages,
+renames into the content-addressed ready location and only then commits the
+database row — the safe order — but a crash before that commit left a staging
+file behind forever. `Store.SweepStaging` now removes staging files older
+than an hour at startup (in-flight uploads of a concurrent process survive),
+and `scripts/ag09_recovery_drill.py` proves it: a planted two-hour-old orphan
+is swept, a fresh staging file is preserved, and a committed upload remains
+readable after the restart — 4/4.
+
+RB-T06/07/08/10/11 and AG09 move to PASS (121 PASS / 4 PARTIAL / 1
+EXTERNAL); BLK-15 is struck. Regressions re-run: `go test ./...`, vet and the
+architecture gate green.

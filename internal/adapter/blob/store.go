@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // Store is the server-controlled content-addressed blob store. User-supplied
@@ -31,6 +32,39 @@ type Staged struct {
 	hash  string
 	size  int64
 	done  bool
+}
+
+// SweepStaging removes staging files left behind by a crash before the
+// content was published (AG09). Uploads stage first and only rename into the
+// content-addressed ready location inside the same transaction-safe window, so
+// a crash between the rename and the database commit can leave at most an
+// unreferenced ready blob, never a dangling reference; what it does leave is a
+// staging file. maxAge keeps in-flight uploads of a concurrently running
+// process alive.
+func (s *Store) SweepStaging(maxAge time.Duration) (int, error) {
+	dir := filepath.Join(s.Root, "staging")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	cutoff := time.Now().Add(-maxAge)
+	removed := 0
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil || info.ModTime().After(cutoff) {
+			continue
+		}
+		if err = os.Remove(filepath.Join(dir, entry.Name())); err == nil {
+			removed++
+		}
+	}
+	return removed, nil
 }
 
 // Stage opens a new staging file for streaming.
