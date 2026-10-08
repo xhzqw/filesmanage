@@ -13,6 +13,9 @@ Status date: 2026-10-08 (Milestone 7 acceptance evidence collected).
 | BLK-07 | Shared-host capacity: PostgreSQL instance (max_connections=100) and CPU shared with unrelated services (load 6–7) | §24.3 budgets met at ≤10 users, 10/11 at 30 users; 100/200 users pool-bound | Dedicated reference environment per SPEC PERF-003, or an approved capacity ADR |
 | ~~BLK-08~~ | `/search` page was missing from the React app | RESOLVED | SearchPanel shipped (commit `3dd8682`): filters, result table, safe `<mark>` snippets, "1000+" capped total; browser-verified |
 
+| BLK-09 | DO05 (DOCX header/footer/pagination compatibility report) has no sample to run | One §19 sub-item is unverified; the report itself exists in code | Customer supplies a DOCX with headers/footers, or the item is formally waived |
+| BLK-10 | AG12 CAD-saturation isolation is only partially measured | The worker ran under load but no dedicated saturation run was executed | Run PE12 properly (worker at quota while measuring login/list p95) |
+
 Resolved this milestone:
 - ~~Folder-filtered search/stats/export could bypass the visibility scope~~ → scope intersection + placeholder fix, 31/31 E2E.
 - ~~Shares ignored include_descendants and were absent from direct permission checks~~ → unified share resolution.
