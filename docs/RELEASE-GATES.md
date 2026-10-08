@@ -15,7 +15,7 @@ Overall: NO-GO for production (dev-only system on 18091). Milestone gates: M1–
 | G-SEC | S1–S22 security/ACL/consistency matrix | **GO (dev)** for the executed matrix (folder-filter leaks closed, revocation immediacy, share unification, disable/logout, Range/SSRF-safe editor source) | TEST-EVIDENCE.md §M7, scripts/m7_security_e2e.py |
 | G-DEPLOY | Backup/restore drill, systemd, upgrade/rollback, monitoring | **PARTIAL** — dev restore drill PASS (2026-10-09 re-run: 26 tables, 222 blobs); production cutover not authorized (BLK-05) | docs/M8-BACKUP-AND-SERVICE-READINESS.md, TEST-EVIDENCE.md final-gate section |
 | G-API | OpenAPI implementation contract | **GO (dev)** | docs/openapi-implemented.yaml (50 paths / 66 operations / 46 schemas), scripts/gen_openapi.py --check drift guard |
-| G-MATRIX | Per-id acceptance traceability (126 ids) | **GO (dev) with 24 registered PARTIALs** | docs/ACCEPTANCE-MATRIX.md (101 PASS / 24 PARTIAL / 1 EXTERNAL), scripts/gen_acceptance_matrix.py --check; every PARTIAL registered in OPEN-BLOCKERS.md (BLK-11..BLK-16) |
+| G-MATRIX | Per-id acceptance traceability (126 ids) | **GO (dev)** | docs/ACCEPTANCE-MATRIX.md (123 PASS / 2 PARTIAL / 1 EXTERNAL), scripts/gen_acceptance_matrix.py --check; the 2 PARTIAL ids (S12, S20) are customer-input items under BLK-05/BLK-01 and no implementable gap remains |
 
 Rules: no gate may be marked GO without the evidence file it names; legacy data
 isolation (DEC-15) is checked before every gate; 8091 remains reserved.

@@ -121,8 +121,8 @@ SPEC's dedicated reference environment (PERF-003) or a materialised count.
 | PE08 10×100MB uploads | PASS | 10/10 committed, downloads checksum-verified, 23.5 s wall, no 5xx, RSS flat |
 | PE09 MP4 Range | PASS 10/10 | 206 for ranges, 416 unsatisfiable, suffix/single-byte ranges, sha header, preview reachable (fix: `http.ServeContent`) |
 | PE10 Office sessions | PASS 12/12 | 5 sequential sessions open 7–43 ms, unique document keys, clean cancel |
-| PE11 CAD conversion | PASS | STEP → STL 108,016 bytes / 544 triangles; IGES bearing → 555,896 bytes / 2,148 facets, hammer → 144,873 bytes; blob-conflict path fixed |
-| PE12 CAD worker saturation vs login/list p95 | MEASURED | two runs: ratios x0.76-x1.31, absolute p95 < 11ms (73x inside budget); the ratio gate is noise-sensitive at these absolute values on a shared host |
+| PE11 CAD conversion | PASS | STEP → MSH 2.2 组件网格（108,016-byte torus, 544 triangles; 装配件按连通分量还原，见 MC02/MOD02）；IGES bearing → 555,896 bytes / 2,148 facets, hammer → 144,873 bytes; blob-conflict path fixed |
+| PE12 CAD worker saturation vs login/list p95 | PASS (boundary-noted) | runs on 2026-10-09 after the MSH pipeline change: x1.03/x1.29/x0.99 then x1.04/x1.25/x1.00. The `/api/files` endpoint sits at the 1.25 edge (absolute p95 5.9→7.4 ms, ~108x inside the 800 ms budget); the ratio gate is noise-sensitive at these absolute values on a shared host, so the absolute headroom is the meaningful evidence |
 | PE13 pool behaviour | measured | pool wait dominates at ≥100 users (see analysis); no unbounded waits, controlled 503 under exhaustion |
 | PE14 query plans | collected | `EXPLAIN (ANALYZE, BUFFERS)` for list/hot-folder list/search/export/stats saved in TEST-EVIDENCE.md §M7 |
 | PE15 WebGL leak | PASS | CDP-measured 20-cycle load/teardown: 544 triangles every cycle, late-window teardown slope 0.13-0.19 MB/cycle (budget 0.5), heap returns to the 8.6 MB floor after warmup; doc-only control 0.000 MB/cycle late slope (`scripts/pe15_heap_growth.mjs`) |

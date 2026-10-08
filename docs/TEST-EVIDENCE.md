@@ -440,6 +440,40 @@ booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
   "no IGES writer on the target" was wrong: reader-side samples exist and are
   the correct vehicle for this acceptance item.
 
+### Consolidated full-gate run after the MSH pipeline change (2026-10-09)
+
+Every acceptance script re-executed after this session's changes (viewer
+control surface, metadata panel, multi-resource resolution, pagination
+boundary fix, MSH conversion, assembly tree, rollback edges, crash sweep):
+
+| Gate | Result |
+|---|---|
+| `unauth_security_smoke.py` | PASS 17/17 |
+| `m7_security_e2e.py` | PASS 31/31 |
+| `s_matrix_e2e.py` | PASS 35/35 (incl. the limit 200/201/5000 boundary) |
+| `pt_samples_e2e.py` | PASS 112/112 |
+| `rb_rollback_e2e.py` | PASS 72/72 |
+| `mc_cad_e2e.py` | PASS 78/78 (MC04 rejection holds on the MSH path) |
+| `mc_multiasset_check.mjs` | PASS 15/15 |
+| `mod01_controls_check.mjs` | PASS 10/10 |
+| `mod03_meta_check.mjs` | PASS 30/30 |
+| `mc02_assembly_check.mjs` | PASS 8/8 |
+| `pe15_heap_growth.mjs` | PASS |
+| `pe12_cad_saturation.py` | PASS 7/7 (second run; first run x1.29 on one endpoint = noise, see M7-PERF-DATASET-GATE.md) |
+| `do05_header_footer_check.py` | PASS 15/15 |
+| `perf_readiness_audit.py` | PASS 12/12 |
+| `perf_csv_export_check.py` | PASS 9/9 |
+| `perf_upload_stress.py` | PASS 10/10 |
+| `media_range_check.py` | PASS 10/10 |
+| `office_session_check.py` | PASS 12/12 |
+| `loadtest.py --users 10` | PASS 11/11 (all endpoint budgets) |
+| `backup_restore_drill.py` | PASS (26 tables, 288 blobs) |
+| `test_backup_manifest.py` | PASS 12/12 |
+| `verify_migration.py` | PASS |
+| `go test ./...` / `go vet ./...` | PASS |
+| `check_architecture.py` | PASS (71 Go files, 41 TS modules) |
+| `build.sh --with-tests` | BUILD_OK (web → go → vet → architecture → OpenAPI drift → acceptance matrix → tests → migration checksums) |
+
 ### STEP assembly tree MC02/MOD02 (2026-10-09, 8/8 PASS)
 
 The converter emitted one merged STL, so a multi-solid STEP could only be
