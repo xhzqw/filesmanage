@@ -11,6 +11,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -18,9 +19,23 @@ func main() {
 	if os.Getenv("FILESMANAGE_ALLOW_BOOTSTRAP") != "new-empty-database" {
 		log.Fatal("bootstrap explicitly disabled; set FILESMANAGE_ALLOW_BOOTSTRAP=new-empty-database")
 	}
-	password := os.Getenv("BOOTSTRAP_ADMIN_PASSWORD")
+	// The initial password is read from a protected target-local file;
+	// it never appears in argv, application logs or the process environment.
+	passwordFile := os.Getenv("BOOTSTRAP_ADMIN_PASSWORD_FILE")
+	if passwordFile == "" {
+		log.Fatal("BOOTSTRAP_ADMIN_PASSWORD_FILE required")
+	}
+	info, statErr := os.Stat(passwordFile)
+	if statErr != nil || info.Mode().Perm()&0077 != 0 {
+		log.Fatal("bootstrap password file missing or not owner-only")
+	}
+	passwordBytes, readErr := os.ReadFile(passwordFile)
+	if readErr != nil {
+		log.Fatal("cannot read bootstrap password file")
+	}
+	password := strings.TrimSpace(string(passwordBytes))
 	if len(password) < 20 {
-		log.Fatal("strong BOOTSTRAP_ADMIN_PASSWORD required (>=20 characters)")
+		log.Fatal("strong bootstrap password file required (>=20 characters)")
 	}
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {

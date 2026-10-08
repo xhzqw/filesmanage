@@ -1,38 +1,28 @@
-# filesmanage v2.1 — target-machine implementation evidence
+# filesmanage v2.1 — implementation status
 
 Target host: 192.168.1.22 (Debian 13 / Linux), workspace /root/repository77/filesmanage-v21.
-Legacy Node/SQLite and port 8091 remain untouched; no old data imported.
-Implementation started 2026-10-08. Status: B0 complete, B1 in progress, B2 UI scaffold only.
+Legacy Node/SQLite system and port 8091 remain untouched; DEC-15 data isolation in force (no old data imported, verified `legacy_data_imported=0`).
+Implementation started 2026-10-08. Status: Milestone 1 COMPLETE (real login, LAN-accessible), Milestones 2–8 open.
 
-## Implemented on target
-- New isolated Git repository with authoritative SPEC v2.1 and audit evidence.
-- Go modular boundaries domain/ports/application/adapters/httpx; authenticated session API and authorized folder tree.
-- Fresh PostgreSQL DDL migration file and a transaction-aware migration executable.
-- New-environment bootstrap executable with safe empty-database precondition.
-- Password-change API with must-change guard for initial accounts.
-- React 18 + TypeScript + Vite isolated login and document shell; app/pages/features/entities/shared split.
-- Target-host Go tests, go vet, Go build, TypeScript checker, Vite bundle build.
-- Static architecture and DDL preflight checks.
+## Done and verified on target (Milestone 1)
+- Fresh PostgreSQL database `filesmanage_v21` (PG 17.9) with least-privilege role; migrations 0001/0002/0003 applied, checksums recorded in `schema_migrations`, re-run `-check` passes.
+- Bootstrap executed: admin account `admin` created with strong random initial credential (64-char, stored target-local `0600`); 5 seeded staff accounts with unusable passwords, 2 departments, 1 workgroup, 8 real folders, 2 ACL rows. Bootstrap refuses non-empty `users` table.
+- Real authentication stack: bcrypt password hashing (`$2a$10$`), 24h opaque session tokens stored only as SHA-256 hashes, httpOnly SameSite=Strict cookies, DB-level logout revocation, disabled-user and expiry checks.
+- Forced initial password change: `/api/folders/tree` returns 403 `E_PASSWORD_CHANGE_REQUIRED` while `must_change_password` is set; `POST /api/me/password` enforces old-password verification, >=16-char policy, difference from old, and revokes other sessions.
+- Browser-verified end-to-end (headless Chromium over LAN): login, forced first-sign-in flow, real folder tree, refresh persistence, logout invalidation, deep-link redirect.
+- LAN access: server binds 0.0.0.0:18091 behind an explicit opt-in (`FILESMANAGE_ALLOW_LAN_HTTP=true`) plus a fail-closed source-IP allowlist (loopback + RFC1918 by config); non-loopback default remains blocked at startup.
+- Go toolchain on target: build, `go test ./...`, `go vet ./...`, `scripts/check_architecture.py` all PASS. Web: `tsc --noEmit` + `vite build` PASS.
+- Fixed defect found during E2E: granted folders whose parent is outside a user's visible set now render as tree top level (FolderTree promotion + Documents fallback selection).
 
-## Verified
-- go test ./... PASSED after latest Go changes (domain and application tests).
-- go vet ./... PASSED after latest Go changes.
-- python3 scripts/check_architecture.py PASSED (initial rule coverage only).
-- python3 scripts/verify_migration.py PASSED (static strings, not SQL execution).
-- npm run build PASSED after React layering refactor.
-- Port 8091 has not been claimed by this project.
+## In progress
+- Milestone 2: folder/file vertical slice (create → authorize → upload → list → preview → download → modify → new version → delete → trash → restore) with real blob storage.
 
-## Not done / hard blockers
-- New dedicated PostgreSQL database/role was NOT provisioned because the automated provisioning action was blocked by execution safeguards. No credentials were created. DDL has not actually run against PostgreSQL.
-- Bootstrap not executed; HTTP login and folder endpoints not end-to-end tested against a real database.
-- Frontend forced-initial-password-change form not yet implemented; backend guard exists.
-- Official logo binary not yet transferred into target assets. UI displays explicit temporary asset notice.
-- Upload/download/version rollback, ACL mutation, sharing, trash, favorites, stats, search, DOCX engine and CAD worker not built.
-- p95/p99, 100k-file load, S1-S22/DO/MC/AG/PE validations and deployment not executed.
+## Not done / blockers
+- Official Logo binary not yet provided by the customer; UI shows explicit "待入库" notice and must not be replaced by a self-drawn fake.
+- File upload/download, versions, approvals, sharing, favorites, trash, full-text search, stats, CSV, DOCX online editing, CAD preview, worker isolation: not built.
+- Performance suite (100k files / 400k versions, p95/p99), S1–S22/DO/MC/AG/PE acceptance matrix, backup/restore drill, systemd production deployment: not executed.
+- Production 8091 cutover: NOT authorized; dev service stays on 18091.
 
-## Next ordered tasks
-1. Approved secure provisioning of the fresh filesmanage_v21 PostgreSQL DB and least-privilege role.
-2. Execute real migrations and safe bootstrap on the target; run PostgreSQL integration and API tests.
-3. Build mandatory initial-password-change form; complete API authorization and file-list vertical slice.
-4. Import verified official Logo binary; run Office/CAD PoCs in resource-isolated target containers.
-5. Keep all work on 192.168.1.22. Never modify legacy Node code/data or install service on 8091 before release gate.
+## Access (development, LAN-only)
+- URL: http://192.168.1.22:18091  (account `admin`; credential at `/root/repository77/filesmanage-v21/.secrets/admin.password`, mode 0600, root-only).
+- Health: `GET /health/ready` → `{"ok":true}`.

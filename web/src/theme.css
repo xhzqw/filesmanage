@@ -24,3 +24,5 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:3px solid #02A0
 table{border-collapse:collapse;width:100%}th,td{padding:16px;border-bottom:1px solid #E4EEF5;text-align:left}
 th{color:#53677D;background:#F7FBFF;font-size:12px}.empty{color:#71859A;text-align:center;padding:75px 10px}
 @media(max-width:1050px){.header nav span{display:none}.sidebar{width:240px}}
+
+.secondary-action{background:transparent;border:0;color:#174098;text-decoration:underline;margin-top:16px;padding:8px 0}

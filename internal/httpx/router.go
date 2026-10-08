@@ -5,6 +5,7 @@ import (
 	"filesmanage/internal/application"
 	"filesmanage/internal/domain"
 	"github.com/gin-gonic/gin"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -19,11 +20,62 @@ type Handler struct {
 	Dist          string
 }
 
+// parseAllowlist fails closed: an unreadable or malformed allowlist must stop startup
+// rather than silently widen or narrow network exposure.
+func parseAllowlist(spec string) []*net.IPNet {
+	if strings.TrimSpace(spec) == "" {
+		spec = "127.0.0.1/32,::1/128,192.168.1.0/24"
+	}
+	var nets []*net.IPNet
+	for _, item := range strings.Split(spec, ",") {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if !strings.Contains(item, "/") {
+			item = item + "/32"
+		}
+		_, network, err := net.ParseCIDR(item)
+		if err != nil {
+			panic("invalid FILESMANAGE_LAN_ALLOW_CIDRS entry: " + item)
+		}
+		nets = append(nets, network)
+	}
+	if len(nets) == 0 {
+		panic("FILESMANAGE_LAN_ALLOW_CIDRS resolved to an empty allowlist")
+	}
+	return nets
+}
+
+// lanGuard admits only socket peers inside the configured CIDRs. It reads the kernel
+// peer address (never forwarded headers) so a client cannot spoof its way past it.
+func lanGuard(nets []*net.IPNet) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		host, _, err := net.SplitHostPort(c.Request.RemoteAddr)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"ok": false, "error": gin.H{"code": "E_NETWORK"}})
+			return
+		}
+		ip := net.ParseIP(host)
+		if ip == nil {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"ok": false, "error": gin.H{"code": "E_NETWORK"}})
+			return
+		}
+		for _, network := range nets {
+			if network.Contains(ip) {
+				c.Next()
+				return
+			}
+		}
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"ok": false, "error": gin.H{"code": "E_NETWORK"}})
+	}
+}
+
 func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	h := &Handler{S: s, SecureCookies: secure, Dist: dist}
 	r := gin.New()
-	r.Use(gin.Recovery(), gin.Logger())
+	r.Use(gin.Recovery(), lanGuard(parseAllowlist(os.Getenv("FILESMANAGE_LAN_ALLOW_CIDRS"))), gin.Logger())
 	r.GET("/health/live", func(c *gin.Context) { c.JSON(200, gin.H{"ok": true}) })
 	r.GET("/health/ready", func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)

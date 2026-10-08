@@ -7,9 +7,24 @@ import (
 	"filesmanage/internal/httpx"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"log"
+	"net"
 	"os"
+	"strings"
 	"time"
 )
+
+func isLoopbackAddr(addr string) bool {
+	host := addr
+	if h, _, err := net.SplitHostPort(addr); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
 
 func main() {
 	dsn := os.Getenv("DATABASE_URL")
@@ -36,8 +51,11 @@ func main() {
 		addr = "127.0.0.1:18091"
 	}
 	secure := os.Getenv("FILESMANAGE_COOKIE_SECURE") == "true"
-	if !secure && addr != "127.0.0.1:18091" {
-		log.Fatal("insecure cookie is only permitted on isolated loopback dev address")
+	// Default stays loopback-only. Cleartext cookies on a shared interface require the
+	// explicit FILESMANAGE_ALLOW_LAN_HTTP=true opt-in so a config slip cannot expose
+	// the dev service; httpx additionally enforces a source-IP allowlist.
+	if !secure && !isLoopbackAddr(addr) && os.Getenv("FILESMANAGE_ALLOW_LAN_HTTP") != "true" {
+		log.Fatal("cleartext cookies require loopback binding or FILESMANAGE_ALLOW_LAN_HTTP=true")
 	}
 	r := httpx.New(application.New(postgres.New(pool)), secure, "web/dist")
 	log.Println("filesmanage isolated development server listening ", addr)

@@ -17,4 +17,4 @@ checks={
 }
 for key,good in checks.items():print(("PASS" if good else "FAIL"),key)
 if not all(checks.values()):raise SystemExit(1)
-print("STATIC DDL CONTRACT PASS; actual PostgreSQL migration NOT YET EXECUTED")
+print("STATIC DDL CONTRACT PASS; PostgreSQL execution is verified by the migration runner and SQL integration tests")

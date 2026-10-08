@@ -3,5 +3,6 @@ import type {User} from "../../entities/user/model";
 export const authApi={
  me:()=>request<User>("/me"),
  login:(login:string,password:string)=>request<User>("/login",{method:"POST",body:JSON.stringify({login,password})}),
- logout:()=>request<unknown>("/logout",{method:"POST"})
+ logout:()=>request<unknown>("/logout",{method:"POST"}),
+ updateCredential:(currentValue:string,newValue:string)=>request<User>("/me/password",{method:"POST",body:JSON.stringify({oldPassword:currentValue,newPassword:newValue})})
 };

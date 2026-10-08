@@ -1,0 +1,139 @@
+openapi: 3.1.0
+info:
+  title: filesmanage v2.1 implemented API
+  version: 0.1.0
+  description: |
+    Actual implemented first vertical slice. Not the full planned SPEC.
+    Served only from the isolated target host on 127.0.0.1:18091.
+servers:
+  - url: http://127.0.0.1:18091
+paths:
+  /health/live:
+    get:
+      operationId: live
+      responses:
+        '200':
+          description: Process alive
+  /health/ready:
+    get:
+      operationId: ready
+      responses:
+        '200':
+          description: PostgreSQL reachable
+        '503':
+          description: Database not reachable
+  /api/login:
+    post:
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [login, password]
+              properties:
+                login: { type: string, maxLength: 80 }
+                password: { type: string }
+      responses:
+        '200':
+          description: Auth cookie set with HttpOnly + SameSite Strict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSuccess'
+        '400': { description: Bad request }
+        '401': { description: Authentication failed }
+  /api/logout:
+    post:
+      operationId: logout
+      security: [{ cookieSession: [] }]
+      responses:
+        '200': { description: Session revoked and cookie cleared }
+  /api/me:
+    get:
+      operationId: currentUser
+      security: [{ cookieSession: [] }]
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSuccess'
+        '401': { description: Session missing or expired }
+  /api/me/password:
+    post:
+      operationId: changePassword
+      security: [{ cookieSession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [OldPassword, NewPassword]
+              properties:
+                OldPassword: { type: string }
+                NewPassword: { type: string, minLength: 16, maxLength: 128 }
+      responses:
+        '200':
+          description: Password updated; other sessions revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSuccess'
+        '401': { description: Old password incorrect or cookie missing }
+        '422': { description: Password policy violation }
+        '409': { description: Concurrent update or database failure }
+  /api/folders/tree:
+    get:
+      operationId: folderTree
+      security: [{ cookieSession: [] }]
+      description: |
+        Initial bounded directory tree. Limit 200; not a scalable full-tree endpoint.
+        First-sign-in users receive 403 E_PASSWORD_CHANGE_REQUIRED.
+      responses:
+        '200':
+          description: Authorized folders (up to 200)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, data]
+                properties:
+                  ok: { type: boolean, const: true }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Folder' }
+        '401': { description: Session missing }
+        '403': { description: Initial-password-change requirement }
+        '503': { description: Repository failure }
+components:
+  securitySchemes:
+    cookieSession:
+      type: apiKey
+      in: cookie
+      name: fm_session
+  schemas:
+    User:
+      type: object
+      required: [id, displayName, isAdmin, mustChangePassword]
+      properties:
+        id: { type: string }
+        displayName: { type: string }
+        isAdmin: { type: boolean }
+        mustChangePassword: { type: boolean }
+    UserSuccess:
+      type: object
+      required: [ok, data]
+      properties:
+        ok: { type: boolean, const: true }
+        data: { $ref: '#/components/schemas/User' }
+    Folder:
+      type: object
+      required: [id, name, parentId]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        parentId: { type: [string, 'null'] }
