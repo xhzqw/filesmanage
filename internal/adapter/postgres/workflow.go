@@ -192,10 +192,26 @@ func (r *Repository) ForceReleaseLock(ctx context.Context, fileID string) (domai
 	err := r.Q.QueryRow(ctx,
 		"DELETE FROM edit_locks WHERE file_id=$1 RETURNING file_id,owner_id,token_hash,base_seq,expires_at,generation", fileID).
 		Scan(&l.FileID, &l.OwnerID, &l.TokenHash, &l.BaseSeq, &l.ExpiresAt, &l.Generation)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// Nothing to release: an idempotent no-op. A concurrent releaser may
+		// have taken the row already; the caller's InsertLock is the real gate.
+		return domain.EditLock{}, nil
+	}
 	if err != nil {
 		return domain.EditLock{}, err
 	}
 	return l, nil
+}
+
+// LockFileRow takes the file row lock so concurrent lock mutations serialise
+// inside the caller's transaction (SPEC §7.2).
+func (r *Repository) LockFileRow(ctx context.Context, fileID string) error {
+	var locked string
+	err := r.Q.QueryRow(ctx, "SELECT id FROM files WHERE id=$1 FOR UPDATE", fileID).Scan(&locked)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ports.ErrRowMissing
+	}
+	return err
 }
 
 // newID generates opaque identifiers without importing upper layers.

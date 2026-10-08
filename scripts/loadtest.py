@@ -58,7 +58,16 @@ MIX = [
     ("/api/me", 4),
 ]
 DEFAULT_PERF_PASSWORD = "Perf-Load-2026!only"
-SEARCH_QUERY = "%E9%A2%84%E7%AE%97"  # 预算
+# The seeded corpus carries two CJK corpora of different selectivity (SPEC
+# §10.2 samples): 预算 matches ~80% of files, 设备验收 ~20%, and a name probe is
+# near-unique. Rotating them keeps the measured mix representative instead of
+# only the worst case.
+SEARCH_QUERIES = [
+    "%E9%A2%84%E7%AE%97",              # 预算  (~80% of the corpus)
+    "%E5%B9%B4%E5%BA%A6%E9%A2%84%E7%AE%97",  # 年度预算 (~80%)
+    "%E8%AE%BE%E5%A4%87%E9%AA%8C%E6%94%B6",  # 设备验收 (~20%)
+    "%E8%A3%85%E9%85%8D%E6%B5%8B%E8%AF%95",  # 装配测试 (~20%)
+]
 
 
 class Client:
@@ -71,6 +80,22 @@ class Client:
         with self.opener.open(req, timeout=15) as response:
             if response.status != 200:
                 raise RuntimeError(f"perf login failed: HTTP {response.status}")
+
+    def request_first_byte(self, method, path, body=None):
+        """Time to the first response byte; used for streamed exports whose
+        SPEC budget is time-to-first-byte, not full transfer (IO-PERF-03)."""
+        data = json.dumps(body).encode() if body is not None else None
+        req = urllib.request.Request(self.base + path, data=data, method=method)
+        if data is not None:
+            req.add_header("Content-Type", "application/json")
+        start = time.perf_counter()
+        try:
+            with self.opener.open(req, timeout=120) as response:
+                response.read(1)
+                return response.status, (time.perf_counter() - start) * 1000.0
+        except urllib.error.HTTPError as exc:
+            exc.read(1)
+            return exc.code, (time.perf_counter() - start) * 1000.0
 
     def request(self, method, path, body=None):
         data = json.dumps(body).encode() if body is not None else None
@@ -163,7 +188,8 @@ class Mix:
         if "{id}" in name:
             return "GET", name.replace("{id}", self.file_id), None
         if name == "/api/search":
-            return "GET", f"/api/search?q={SEARCH_QUERY}&limit=50", None
+            query = SEARCH_QUERIES[rng.randrange(len(SEARCH_QUERIES))]
+            return "GET", f"/api/search?q={query}&limit=50", None
         if name == "/api/shares":
             return "GET", "/api/shares?scope=received", None
         return "GET", name, None
@@ -193,7 +219,10 @@ def run_level(base, login, password, users, duration, warmup, mix, rng, db_name)
             name = rng.choices(population, weights)[0]
             method, path, body = mix.request_for(name, rng)
             try:
-                status, elapsed, _ = client.request(method, path, body)
+                if name == "/api/exports/files.csv":
+                    status, elapsed = client.request_first_byte(method, path, body)
+                else:
+                    status, elapsed, _ = client.request(method, path, body)
             except Exception:
                 errors[name] = errors.get(name, 0) + 1
                 continue

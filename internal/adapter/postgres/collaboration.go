@@ -293,16 +293,6 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 		where = append(where, "f.updated_at<="+ph.next())
 		args = append(args, *q.To)
 	}
-	order := "f.updated_at DESC,f.id DESC"
-	switch q.Sort {
-	case "", "updated_desc":
-	case "name_asc":
-		order = "f.name ASC,f.id ASC"
-	case "size_desc":
-		order = "v.size_bytes DESC NULLS LAST,f.id DESC"
-	default:
-		return nil, 0, domain.ErrInvalidInput
-	}
 	if q.CursorID != "" {
 		if q.Sort == "name_asc" {
 			where = append(where, "(f.name,f.id)>("+ph.next()+","+ph.next()+")")
@@ -316,25 +306,54 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	if needsCTE {
 		cte = scopeCTE
 	}
-	// The text index is only joined when the query actually filters on content:
-	// a plain list must not drag the wide file_text table into the plan.
-	textJoin := ""
-	contentColumn := "''"
+	// Two-phase read: a narrow pre-sort over the matching ids carries the exact
+	// window count, and only the page's rows join versions and the wide text
+	// index (SPEC §10.2/READ-07). Joining file_text first would drag 100k wide
+	// rows through the sort for every search.
+	textColumn := "''"
 	if q.Query != "" {
-		textJoin = " LEFT JOIN file_text ft ON ft.file_id=f.id"
-		contentColumn = "coalesce(ft.content,'')"
+		textColumn = "coalesce(ft.content,'')"
 	}
 	// Content matches run against the tsvector GIN index with the CJK-spaced
-	// phrase (SPEC §10.2); the file name stays an ILIKE so name-only hits keep
-	// working for unindexed or binary formats.
+	// phrase; the file name stays an ILIKE so name-only hits keep working for
+	// unindexed or binary formats.
 	if q.Query != "" {
-		where = append(where, "(ft.tsv @@ phraseto_tsquery('simple', "+ph.next()+") OR f.name ILIKE "+ph.next()+")")
+		where = append(where, "(f.id IN (SELECT ft.file_id FROM file_text ft WHERE ft.tsv @@ phraseto_tsquery('simple', "+ph.next()+")) OR f.name ILIKE "+ph.next()+")")
 		args = append(args, q.TextQuery, "%"+q.Query+"%")
 	}
-	sql := cte + " SELECT f.id,f.folder_id,f.name,f.uploaded_by,f.content_type,f.current_version_seq,v.size_bytes,v.sha256,f.updated_at,f.deleted_at," + contentColumn + ",count(*) OVER () AS total_count" +
-		" FROM files f LEFT JOIN file_versions v ON v.file_id=f.id AND v.seq=f.current_version_seq" +
-		textJoin +
-		" WHERE " + strings.Join(where, " AND ") + " ORDER BY " + order + " LIMIT " + fmt.Sprint(q.Limit)
+	matchedOrder := "f.updated_at DESC,f.id DESC"
+	outerOrder := "m.updated_at DESC,m.id DESC"
+	matchedJoin := ""
+	switch q.Sort {
+	case "", "updated_desc":
+	case "name_asc":
+		matchedOrder = "f.name ASC,f.id ASC"
+		outerOrder = "m.name ASC,m.id ASC"
+	case "size_desc":
+		matchedJoin = " LEFT JOIN file_versions v ON v.file_id=f.id AND v.seq=f.current_version_seq"
+		matchedOrder = "v.size_bytes DESC NULLS LAST,f.id DESC"
+		outerOrder = "v.size_bytes DESC NULLS LAST,m.id DESC"
+	default:
+		return nil, 0, domain.ErrInvalidInput
+	}
+	with := cte
+	if with == "" {
+		with = "WITH"
+	} else {
+		with += ","
+	}
+	sql := with + ` matched AS (
+	  SELECT f.id,f.updated_at,f.name,count(*) OVER () AS total_count
+	    FROM files f` + matchedJoin + `
+	   WHERE ` + strings.Join(where, " AND ") + `
+	   ORDER BY ` + matchedOrder + ` LIMIT ` + fmt.Sprint(q.Limit) + `
+	)
+	SELECT f.id,f.folder_id,f.name,f.uploaded_by,f.content_type,f.current_version_seq,v.size_bytes,v.sha256,f.updated_at,f.deleted_at,` + textColumn + `,m.total_count
+	  FROM matched m
+	  JOIN files f ON f.id=m.id
+	  LEFT JOIN file_versions v ON v.file_id=f.id AND v.seq=f.current_version_seq
+	  LEFT JOIN file_text ft ON ft.file_id=f.id
+	 ORDER BY ` + outerOrder
 	rows, err := r.Q.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, 0, err
@@ -592,27 +611,142 @@ func (r *Repository) aggregate(ctx context.Context, sql string, args []any, scan
 }
 
 // ExportFilesStream streams every authorized export row for the filter (SPEC
-// §3.10, READ-06, PE07). The result set is never materialised: rows are read
-// through the driver's cursor and handed to yield one at a time, so a 100k-row
-// export keeps a flat memory profile. The visible folder path is computed with
-// a recursive walk over the caller's visible set only — invisible ancestors
-// never appear in the exported path.
+// §3.10, READ-06, PE07). The result set is never materialised: phase one reads
+// only the ordered ids, the visible folder paths are resolved once into a
+// bounded map, and each batch of rows is then served by primary-key lookups,
+// so a 100k-row export keeps a flat memory profile and starts delivering after
+// the first batch (IO-PERF-03 first-byte budget).
+const exportBatchSize = 500
+
 func (r *Repository) ExportFilesStream(ctx context.Context, q ports.StatsQuery, yield func(ports.ExportRow) error) error {
-	cte, predicate, args, err := r.statsScope(ctx, q)
-	if err != nil {
-		return err
-	}
 	admin, adminErr := r.isAdmin(ctx, q.UserID)
 	if adminErr != nil {
 		return adminErr
 	}
-	visible := "(SELECT folder_id FROM visible_scope)"
-	if admin {
-		visible = "(SELECT id FROM folders WHERE deleted_at IS NULL)"
+	scope := ""
+	visible := "(SELECT id FROM folders WHERE deleted_at IS NULL)"
+	if !admin {
+		scope = scopeCTE
+		visible = "(SELECT folder_id FROM visible_scope)"
 	}
-	// Path roots are visible folders whose parent is invisible (or the root):
-	// this mirrors the folder tree, where a granted folder below an invisible
-	// ancestor renders at the top level instead of exposing that ancestor.
+	// Visible folder paths, resolved once. Roots are visible folders whose
+	// parent is invisible (or the root): this mirrors the folder tree, where a
+	// granted folder below an invisible ancestor renders at the top level
+	// instead of exposing that ancestor.
+	paths, err := r.visibleFolderPaths(ctx, scope, visible)
+	if err != nil {
+		return err
+	}
+	// Phase one: ordered ids with the caller's filters only. The visibility
+	// scope is enforced in phase two through the visible-folder path map, which
+	// keeps this scan on the export order index instead of paying for a
+	// semi-join plus sort over the whole table before the first row can be
+	// written. No unauthorized row can reach the client: phase two drops every
+	// file whose folder is not in the visible map (SPEC DB-PERF-01).
+	filterWhere := []string{"f.deleted_at IS NULL"}
+	filterArgs := []any{}
+	fph := newPlaceholder(0)
+	if q.FolderID != "" {
+		if q.IncludeDescendant {
+			filterWhere = append(filterWhere, "f.folder_id IN (WITH RECURSIVE sub(id) AS (SELECT "+fph.next()+"::text UNION ALL SELECT c.id FROM sub s JOIN folders c ON c.parent_id=s.id WHERE c.deleted_at IS NULL) SELECT id FROM sub)")
+		} else {
+			filterWhere = append(filterWhere, "f.folder_id="+fph.next())
+		}
+		filterArgs = append(filterArgs, q.FolderID)
+	}
+	if q.Uploader != "" {
+		filterWhere = append(filterWhere, "f.uploaded_by="+fph.next())
+		filterArgs = append(filterArgs, q.Uploader)
+	}
+	if q.MimePrefix != "" {
+		filterWhere = append(filterWhere, "f.content_type LIKE "+fph.next())
+		filterArgs = append(filterArgs, q.MimePrefix+"%")
+	}
+	if q.From != nil {
+		filterWhere = append(filterWhere, "f.updated_at>="+fph.next())
+		filterArgs = append(filterArgs, *q.From)
+	}
+	if q.To != nil {
+		filterWhere = append(filterWhere, "f.updated_at<="+fph.next())
+		filterArgs = append(filterArgs, *q.To)
+	}
+	idRows, err := r.Q.Query(ctx,
+		" SELECT f.id FROM files f WHERE "+strings.Join(filterWhere, " AND ")+" ORDER BY f.updated_at DESC, f.id DESC",
+		filterArgs...)
+	if err != nil {
+		return err
+	}
+	ids := make([]string, 0, 1024)
+	for idRows.Next() {
+		var id string
+		if err = idRows.Scan(&id); err != nil {
+			idRows.Close()
+			return err
+		}
+		ids = append(ids, id)
+	}
+	if err = idRows.Err(); err != nil {
+		idRows.Close()
+		return err
+	}
+	idRows.Close()
+	// Phase two: each batch is served by primary-key lookups and yielded in the
+	// phase-one order. Files whose folder left the visible set between phases
+	// are skipped rather than exported with a leaked path.
+	batchSQL := `SELECT f.id,f.folder_id,f.name,f.uploaded_by,f.updated_at,coalesce(u.display_name,''),
+	       coalesce(v.size_bytes,0),coalesce(f.current_version_seq,0)
+	  FROM files f
+	  LEFT JOIN users u ON u.id=f.uploaded_by
+	  LEFT JOIN file_versions v ON v.file_id=f.id AND v.seq=f.current_version_seq
+	 WHERE f.id = ANY($1::text[])`
+	for start := 0; start < len(ids); start += exportBatchSize {
+		finish := start + exportBatchSize
+		if finish > len(ids) {
+			finish = len(ids)
+		}
+		batch := ids[start:finish]
+		rows, queryErr := r.Q.Query(ctx, batchSQL, batch)
+		if queryErr != nil {
+			return queryErr
+		}
+		byID := make(map[string]ports.ExportRow, len(batch))
+		for rows.Next() {
+			var row ports.ExportRow
+			var folderID string
+			// Column order matches batchSQL: id, folder, name, uploader,
+			// updatedAt, uploaderName, size, current seq.
+			if scanErr := rows.Scan(&row.FileID, &folderID, &row.Name, &row.UploaderID, &row.UpdatedAt,
+				&row.UploaderName, &row.SizeBytes, &row.VersionSeq); scanErr != nil {
+				rows.Close()
+				return scanErr
+			}
+			path, visiblePath := paths[folderID]
+			if !visiblePath {
+				continue
+			}
+			row.Path = path
+			byID[row.FileID] = row
+		}
+		if rowsErr := rows.Err(); rowsErr != nil {
+			rows.Close()
+			return rowsErr
+		}
+		rows.Close()
+		for _, id := range batch {
+			row, ok := byID[id]
+			if !ok {
+				continue
+			}
+			if yieldErr := yield(row); yieldErr != nil {
+				return yieldErr
+			}
+		}
+	}
+	return nil
+}
+
+// visibleFolderPaths resolves every visible folder's path once per export.
+func (r *Repository) visibleFolderPaths(ctx context.Context, cte, visible string) (map[string]string, error) {
 	with := cte
 	if with == "" {
 		with = "WITH RECURSIVE"
@@ -628,30 +762,21 @@ func (r *Repository) ExportFilesStream(ctx context.Context, q ports.StatsQuery, 
 	  SELECT f.id, p.path || '/' || f.name FROM folders f JOIN folder_paths p ON f.parent_id=p.id
 	   WHERE f.deleted_at IS NULL AND f.id IN (SELECT id FROM vis)
 	)
-	SELECT f.id, fp.path, f.name, f.uploaded_by, coalesce(u.display_name,''),
-	       coalesce(v.size_bytes,0), coalesce(f.current_version_seq,0), f.updated_at
-	  FROM files f
-	  JOIN folder_paths fp ON fp.id=f.folder_id
-	  LEFT JOIN users u ON u.id=f.uploaded_by
-	  LEFT JOIN file_versions v ON v.file_id=f.id AND v.seq=f.current_version_seq
-	 WHERE ` + predicate + `
-	 ORDER BY f.updated_at DESC, f.id DESC`
-	rows, err := r.Q.Query(ctx, sql, args...)
+	SELECT id, path FROM folder_paths`
+	rows, err := r.Q.Query(ctx, sql)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer rows.Close()
+	paths := make(map[string]string, 1024)
 	for rows.Next() {
-		var row ports.ExportRow
-		if err = rows.Scan(&row.FileID, &row.Path, &row.Name, &row.UploaderID, &row.UploaderName,
-			&row.SizeBytes, &row.VersionSeq, &row.UpdatedAt); err != nil {
-			return err
+		var id, path string
+		if err = rows.Scan(&id, &path); err != nil {
+			return nil, err
 		}
-		if err = yield(row); err != nil {
-			return err
-		}
+		paths[id] = path
 	}
-	return rows.Err()
+	return paths, rows.Err()
 }
 
 func backgroundCtx() context.Context { return context.Background() }

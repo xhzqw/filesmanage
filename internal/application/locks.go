@@ -99,6 +99,12 @@ func (s *Service) AcquireLock(ctx context.Context, u domain.User, fileID string,
 	if err != nil {
 		return "", 0, err
 	}
+	// Serialise every lock mutation on this file inside the transaction
+	// (SPEC §7.2). Without the row lock, concurrent acquires race on
+	// LockByFileID/ForceReleaseLock/InsertLock and surface as 500s.
+	if err = tx.LockFileRow(ctx, file.ID); err != nil {
+		return "", 0, err
+	}
 	if currentSeq(file) != baseSeq {
 		return "", 0, domain.ErrVersionConflict
 	}

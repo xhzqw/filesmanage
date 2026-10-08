@@ -740,6 +740,15 @@ func (r *memoryRepo) MarkTrashPurged(_ context.Context, id string) error {
 	return ports.ErrRowMissing
 }
 
+func (r *memoryRepo) LockFileRow(_ context.Context, fileID string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, ok := r.files[fileID]; !ok {
+		return ports.ErrRowMissing
+	}
+	return nil
+}
+
 func (r *memoryRepo) RecordAudit(_ context.Context, e domain.AuditEvent) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

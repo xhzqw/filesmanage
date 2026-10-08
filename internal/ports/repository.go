@@ -107,6 +107,10 @@ type Repository interface {
 	PendingApprovalForFile(context.Context, string) (domain.Approval, bool, error)
 	DecideApproval(context.Context, string, string, string) (bool, error)
 	LockByFileID(context.Context, string) (domain.EditLock, error)
+	// LockFileRow takes the file's row lock inside the caller's transaction so
+	// concurrent lock mutations on one file serialise instead of racing
+	// (SPEC §7.2: acquire runs under a row lock, not an application mutex).
+	LockFileRow(context.Context, string) error
 	InsertLock(context.Context, domain.EditLock) error
 	RenewLock(context.Context, string, string, time.Time, int64) (bool, error)
 	ReleaseLock(context.Context, string, string) (bool, error)

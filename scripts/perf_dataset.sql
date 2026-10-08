@@ -131,6 +131,41 @@ CREATE TEMP TABLE perf_files AS
   FROM folders f
   WHERE f.id LIKE 'pf_bulk_%' AND f.id <= 'pf_bulk_0815';
 
+-- SPEC §12.2 export edge cases: formula-leading names, commas, quotes and an
+-- emoji name, so CSV escaping and formula neutralisation are exercised.
+INSERT INTO folders(id,parent_id,name,owner_id,created_by)
+VALUES ('pf_edge','pf_root','导出边界样例','u_perf','u_perf');
+
+INSERT INTO files(id,folder_id,name,uploaded_by,content_type,current_version_seq)
+SELECT 'pf_edge_'||row_number() OVER (),'pf_edge',n,'u_perf','text/plain',NULL
+FROM (VALUES
+  ('=cmd|'' /C calc''!A0.txt'),
+  ('+1.txt'),('-2.txt'),('@SUM(A1:A9).txt'),
+  ('中文,逗号.txt'),('say"hi".txt'),('tab\there.txt'),
+  ('emoji-🚀-预算.txt'),('space name .txt'),
+  ('=HYPERLINK("http://x")!.txt')
+) AS t(n)
+CROSS JOIN generate_series(1,1) g;
+
+INSERT INTO blobs(id,storage_key,sha256,size_bytes,state)
+SELECT 'pbe_'||id, 'ready/'||substr(encode(sha256(('edge'||id)::bytea),'hex'),1,2)||'/'||encode(sha256(('edge'||id)::bytea),'hex'),
+       encode(sha256(('edge'||id)::bytea),'hex'), length('edge'||id), 'ready'
+FROM files WHERE folder_id='pf_edge' ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO file_versions(id,file_id,seq,blob_id,size_bytes,sha256,action,base_seq,created_by)
+SELECT 'pfev_'||f.id, f.id, 1, 'pbe_'||f.id, length('edge'||f.id), encode(sha256(('edge'||f.id)::bytea),'hex'),
+       'upload', NULL, 'u_perf'
+FROM files f WHERE f.folder_id='pf_edge' ON CONFLICT (file_id,seq) DO NOTHING;
+
+UPDATE files f SET current_version_seq=v.seq
+FROM (SELECT file_id,max(seq) AS seq FROM file_versions GROUP BY file_id) v
+WHERE f.id=v.file_id AND f.current_version_seq IS DISTINCT FROM v.seq AND f.folder_id='pf_edge';
+
+INSERT INTO file_text(file_id,current_seq,content,spaced)
+SELECT f.id,1,'导出边界样例 '||f.name,
+       regexp_replace('导出边界样例 '||f.name, E'([\u4e00-\u9fff])', E' \\1 ', 'g')
+FROM files f WHERE f.folder_id='pf_edge' ON CONFLICT (file_id) DO NOTHING;
+
 \echo 'seeding blobs'
 
 -- One immutable ready blob per version; content is the literal seed string so
@@ -173,9 +208,11 @@ ON CONFLICT (file_id,seq) DO NOTHING;
 -- phrase adjacency when searching Chinese content.
 INSERT INTO file_text(file_id,current_seq,content,spaced)
 SELECT id,nver,
-       '压测文件内容 '||name||' 预算 年度预算 项目',
-       regexp_replace('压测文件内容 '||name||' 预算 年度预算 项目',
-                      E'([\u4e00-\u9fff])', E' \1 ', 'g')
+       '压测文件内容 '||name||' '||CASE WHEN abs(hashtext(id)) % 5 = 0
+              THEN '设备验收报告 装配测试' ELSE '预算 年度预算 项目' END,
+       regexp_replace('压测文件内容 '||name||' '||CASE WHEN abs(hashtext(id)) % 5 = 0
+              THEN '设备验收报告 装配测试' ELSE '预算 年度预算 项目' END,
+                      E'([\u4e00-\u9fff])', E' \\1 ', 'g')
 FROM perf_files
 ON CONFLICT (file_id) DO NOTHING;
 
@@ -259,7 +296,7 @@ WHERE n <= 8000;
 INSERT INTO favorites(id,user_id,file_id,folder_id)
 SELECT 'pfa_'||n, 'pu_'||(((n - 1) % 1000) + 1), f.id, NULL
 FROM (SELECT id,row_number() OVER (ORDER BY id) AS n FROM files) f
-WHERE n <= 80000;
+WHERE n <= 90000;
 
 INSERT INTO favorites(id,user_id,file_id,folder_id)
 SELECT 'pfb_'||n, 'pu_'||(((n - 1) % 1000) + 1), NULL, f.id

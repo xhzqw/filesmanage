@@ -163,6 +163,11 @@ func (h *Handler) exportFiles(c *gin.Context) {
 	}
 	writer := csv.NewWriter(c.Writer)
 	_ = writer.Write(exportCSVHeader)
+	// Flush the BOM and header immediately: the SPEC budget for a streamed
+	// export is time-to-first-byte (IO-PERF-03), and a buffered 4 KiB would
+	// hold the header hostage until the first batch of rows fills it.
+	writer.Flush()
+	c.Writer.Flush()
 	rows := 0
 	_, err = h.S.ExportCSVStream(c.Request.Context(), u, filter, func(fields []string) error {
 		if werr := writer.Write(fields); werr != nil {
