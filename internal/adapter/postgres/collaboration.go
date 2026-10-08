@@ -670,15 +670,18 @@ func (r *Repository) ExportFilesStream(ctx context.Context, q ports.StatsQuery, 
 	}
 	scope := ""
 	visible := "(SELECT id FROM folders WHERE deleted_at IS NULL)"
+	scopeArgs := []any{}
 	if !admin {
 		scope = scopeCTE
 		visible = "(SELECT folder_id FROM visible_scope)"
+		// The scope CTE binds $1 to the caller.
+		scopeArgs = append(scopeArgs, q.UserID)
 	}
 	// Visible folder paths, resolved once. Roots are visible folders whose
 	// parent is invisible (or the root): this mirrors the folder tree, where a
 	// granted folder below an invisible ancestor renders at the top level
 	// instead of exposing that ancestor.
-	paths, err := r.visibleFolderPaths(ctx, scope, visible)
+	paths, err := r.visibleFolderPaths(ctx, scope, visible, scopeArgs)
 	if err != nil {
 		return err
 	}
@@ -791,7 +794,7 @@ func (r *Repository) ExportFilesStream(ctx context.Context, q ports.StatsQuery, 
 }
 
 // visibleFolderPaths resolves every visible folder's path once per export.
-func (r *Repository) visibleFolderPaths(ctx context.Context, cte, visible string) (map[string]string, error) {
+func (r *Repository) visibleFolderPaths(ctx context.Context, cte, visible string, args []any) (map[string]string, error) {
 	with := cte
 	if with == "" {
 		with = "WITH RECURSIVE"
@@ -808,7 +811,7 @@ func (r *Repository) visibleFolderPaths(ctx context.Context, cte, visible string
 	   WHERE f.deleted_at IS NULL AND f.id IN (SELECT id FROM vis)
 	)
 	SELECT id, path FROM folder_paths`
-	rows, err := r.Q.Query(ctx, sql)
+	rows, err := r.Q.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
 	}
