@@ -181,7 +181,7 @@ security E2E 31/31, `/search` page browser-verified, viewport timings recorded.
 | S16 favorites | §M6; executable re-run (s_matrix_e2e.py) |
 | S17 stats | §M6 + §M7 (single-pass aggregation); executable re-run (s_matrix_e2e.py) |
 | S18 CSV export | §M6 + §M7 (streaming contract 9/9); executable re-run (s_matrix_e2e.py) |
-| S19 plain text | §M6 (PT01–PT12) |
+| S19 plain text | §M6 + `scripts/pt_samples_e2e.py` (PT01–PT12, 112/112) |
 | S20 logo | BLOCKED (BLK-01: official asset not delivered; explicit placeholder) |
 | S21 DOCX editing | §M5 + §M7 PE10 |
 | S22 CAD preview | §M5 + §M7 PE11 (+ browser render check) |

@@ -416,6 +416,20 @@ extraction dispatch, docx container reading, snippet windowing.
   (26 tables, 41 media objects) with 12/12 manifest unit tests.
 - Machine-readable reports under `.secrets/perf/` (root-only, not committed).
 
+### Executable PT byte-fidelity matrix (commit 15663cd, 112/112 PASS)
+
+`scripts/pt_samples_e2e.py` builds the twelve SPEC §8 fixtures client-side and
+verifies them over the real API: preview metadata (encoding/BOM/EOL/trailing
+newline/printability) for every sample, download SHA-256 equality with the
+source bytes, byte-exact save round-trips (BOM, CRLF, 20k-char single line,
+no-trailing-newline), literal rendering of the `<script>` and Markdown
+samples, the 256 KiB truncation contract on a 300 KiB file (truncated=true,
+full download intact), an A/B concurrent save where the stale base is refused
+409 while the holder's version survives, and zero mutation when nothing is
+saved. Fixture notes: printable=false is the NUL rule, so the invalid-UTF-8
+sample is proven through the rawBase64 exact-bytes path plus the download
+digest; PT09's byteMeta describes the truncated preview prefix.
+
 ### Executable RB-T rollback matrix (commit 1fe8d26, 27/27 PASS)
 
 `scripts/rb_rollback_e2e.py` proves the DEC-13 append-only contract over the
