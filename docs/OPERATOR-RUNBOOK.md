@@ -32,6 +32,54 @@ ssh root@192.168.1.22 'cat /root/repository77/filesmanage-v21/.secrets/admin.pas
 校验（不信任转发头）；非白名单对端一律 403 `E_NETWORK`。首次登录强制改密，未改密前除
 登录/改密/退出外的业务端点全部 403 `E_PASSWORD_CHANGE_REQUIRED`。
 
+## 1.1 从零搭建一个新环境（clean clone 之后）
+
+`.secrets/` 被 `.gitignore` 排除，clone 出来的树里没有它；下列步骤用系统自身的
+bootstrap 流程建出环境（**不要**手工设默认密码）。
+
+```bash
+cd /root/repository77/filesmanage-v21
+
+# 1) 密钥目录（仅 root 可读）
+mkdir -p .secrets && chmod 700 .secrets
+
+# 2) 强随机初始口令（>=20 字符，仅本机留存）
+openssl rand -base64 48 > .secrets/bootstrap.password && chmod 600 .secrets/bootstrap.password
+
+# 3) 运行环境（按目标机实际情况填写）
+cat > .secrets/server.env <<'ENV'
+DATABASE_URL=postgres://filesmanage_v21:<password>@127.0.0.1:5432/filesmanage_v21?sslmode=disable
+FILESMANAGE_ADDR=0.0.0.0:18091
+FILESMANAGE_COOKIE_SECURE=false
+FILESMANAGE_ALLOW_LAN_HTTP=true
+FILESMANAGE_LAN_ALLOW_CIDRS=127.0.0.1/32,::1/128,192.168.1.0/24
+FILESMANAGE_BLOB_DIR=.blobs
+FILESMANAGE_OFFICE_URL=http://127.0.0.1:18080/
+FILESMANAGE_OFFICE_SECRET=<random>
+FILESMANAGE_OFFICE_SOURCE_BASE=http://192.168.1.22:18091
+FILESMANAGE_OFFICE_VERSION=8.2.2
+ENV
+chmod 600 .secrets/server.env
+
+# 4) 迁移 + 一次性 bootstrap（仅限空数据库）
+set -a; . ./.secrets/server.env; set +a
+go run ./cmd/migrate -dir migrations
+FILESMANAGE_ALLOW_BOOTSTRAP=new-empty-database \
+  BOOTSTRAP_ADMIN_PASSWORD_FILE=.secrets/bootstrap.password \
+  go run ./cmd/bootstrap
+
+# 5) 初始口令归档为 admin 口令，首次登录强制修改
+mv .secrets/bootstrap.password .secrets/admin.password
+```
+
+验证：`bash scripts/build.sh --with-tests` 全绿，`bash scripts/run-dev.sh start` 后
+`curl -s http://127.0.0.1:18091/health/ready` 返回 `{"ok":true}`。
+
+已实测（2026-10-09）：从 clean clone 执行 `bash scripts/build.sh`（无 node_modules、
+无 .bin）会自行 `npm ci` 并完成 web → go → vet → 架构门禁 → OpenAPI 漂移门禁 →
+验收矩阵门禁，`go test ./...` 4 个包全部通过；`--with-tests` 额外需要步骤 3 的
+`.secrets/server.env`（其中含迁移校验所需的 DATABASE_URL）。
+
 ## 2. 服务生命周期
 
 ```bash
