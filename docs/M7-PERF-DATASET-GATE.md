@@ -135,6 +135,22 @@ SPEC's dedicated reference environment (PERF-003) or a materialised count.
 | PE15 WebGL leak | PASS | CDP-measured 20-cycle load/teardown: 544 triangles every cycle, late-window teardown slope 0.13-0.19 MB/cycle (budget 0.5), heap returns to the 8.6 MB floor after warmup; doc-only control 0.000 MB/cycle late slope (`scripts/pe15_heap_growth.mjs`) |
 | PE16 three viewports | PASS | /doc interactive 168/152/2 ms at 1440x900/1366x768/1920x1080 (budget 2.5 s); no overlap in any viewport (VS04); STEP model page renders 544 triangles |
 | PE17 dependency injection | PASS (scoped) | unreachable editor: session open stays non-blocking, preview/download of the DOCX both 200, `/health/ready` 200; PostgreSQL restart deliberately not injected (shared instance) |
+### Throughput effect of the session cache (2026-10-09, measured)
+
+A hypothesis that the synchronous gin access log capped throughput was tested
+and **disproven** by a controlled A/B on the 200-user tier: with the perf
+instance's stdout discarded the run measured 525 rps, and with the file log
+restored it measured 554 rps — no material difference, so the access log is
+not in the hot path.
+
+What the comparison did surface is the session cache's own effect, because
+the two A/B runs sit either side of it: before the caches the same 200-user
+tier sustained **~119 rps**; after them it sustains **~550 rps** — a 4.6x
+throughput gain, almost entirely from removing one database round-trip per
+authenticated request (the 25-connection pool had been the ceiling). The
+remaining `/api/me` miss at 200 users is therefore queueing at ~550 rps on a
+shared host, not endpoint cost: its warm-cache cost is 1.4 ms.
+
 ## Optimisation pass (2026-10-09): caches with revocation-aware invalidation
 
 Following the capacity analysis, the expensive read paths were optimised
