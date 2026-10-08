@@ -27,7 +27,9 @@ func FormatMatrix() []CADSupport {
 		{Format: "stp", Class: "converted", Engine: "gmsh (OpenCASCADE)", Note: "服务端 Worker 三角化后渲染"},
 		{Format: "iges", Class: "converted", Engine: "gmsh (OpenCASCADE)", Note: "服务端 Worker 三角化后渲染"},
 		{Format: "igs", Class: "converted", Engine: "gmsh (OpenCASCADE)", Note: "服务端 Worker 三角化后渲染"},
-		{Format: "dxf", Class: "native", Engine: "dxf-parser (2D)", Note: "浏览器解析二维工程图实体"},
+		{Format: "ply", Class: "native", Engine: "three.js PLYLoader", Note: "浏览器直接渲染点云/网格"},
+		{Format: "3mf", Class: "native", Engine: "three.js 3MFLoader", Note: "浏览器直接渲染多部件 3MF"},
+		{Format: "dxf", Class: "native", Engine: "内置 DXF 二维渲染器", Note: "浏览器解析二维工程图实体与图层"},
 		{Format: "dwg", Class: "licensed", Engine: "—", Note: "需要商业 SDK（ODA Teigha）；LibreDwg 仅部分兼容，未验证"},
 	}
 }
