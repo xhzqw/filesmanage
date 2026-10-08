@@ -128,4 +128,43 @@ SPEC's dedicated reference environment (PERF-003) or a materialised count.
 | PE15 WebGL leak | PASS | CDP-measured 20-cycle load/teardown: 544 triangles every cycle, late-window teardown slope 0.13-0.19 MB/cycle (budget 0.5), heap returns to the 8.6 MB floor after warmup; doc-only control 0.000 MB/cycle late slope (`scripts/pe15_heap_growth.mjs`) |
 | PE16 three viewports | PASS | /doc interactive 168/152/2 ms at 1440x900/1366x768/1920x1080 (budget 2.5 s); no overlap in any viewport (VS04); STEP model page renders 544 triangles |
 | PE17 dependency injection | PASS (scoped) | unreachable editor: session open stays non-blocking, preview/download of the DOCX both 200, `/health/ready` 200; PostgreSQL restart deliberately not injected (shared instance) |
+## Capacity analysis (2026-10-09): what the 100-user miss actually is
+
+The 100/200-user budget misses were previously recorded as "pool-bound on a
+shared host". A controlled measurement now pins the mechanism:
+
+| endpoint | 1 user p50 | 100 users p50 | ratio |
+|---|---|---|---|
+| `/api/me` | 2.5 ms | 308 ms | 123x |
+| `/api/files/{id}` | 5.0 ms | 617 ms | 123x |
+| `/api/files` | 6.8 ms | 686 ms | 101x |
+| `/api/search` | 420 ms | 1,389 ms | 3.3x |
+| `/api/stats` | 656 ms | 1,882 ms | 2.9x |
+
+Resource picture during the 100-user run (all sampled on the target):
+
+- Go server CPU **11%**, loadtest client CPU **0.17 cores** (13.4 CPU-s over
+  79.7 s wall, measured from `/proc/<pid>/stat`) — neither side is saturated;
+- PostgreSQL `pg_stat_activity` for `filesmanage_perf`: pool grown to its
+  `FILESMANAGE_DB_MAX_CONNS=25` ceiling, up to 33 connections with ~33
+  **active** queries at peak; `max_connections=100` shared with other projects
+  (the dev instance alone holds 4, and other projects hold the rest);
+- the server's own gin log confirms the latencies are real server time
+  (`/api/stats` 1.4–2.4 s, `/api/search` up to 2.4 s per request).
+
+Reading: search and stats are intrinsically expensive on the 100k-file
+dataset (single-user p50 420 ms / 656 ms). Under 100 concurrent users those
+slow queries occupy the 25-connection pool, and the cheap requests queue
+behind them — hence the ~100x blow-up on endpoints whose intrinsic cost is
+2–7 ms. This is a **pool-size × request-mix interaction on a shared
+PostgreSQL**, not a code defect and not raw CPU saturation: the server had
+86% of a core's worth of headroom in use terms and the database was never
+connection-starved by us alone.
+
+Consequences for the SPEC's PERF-003 reference environment: it must provide
+(a) PostgreSQL headroom so the pool can exceed 25 without starving other
+tenants, and (b) enough CPU for concurrent search/stats aggregation. Raising
+the pool on the current shared instance is not safe — `max_connections=100`
+is already shared with other projects.
+
 | PE18 machine-readable reports | PASS | every loadtest run wrote JSON to `.secrets/perf/` with per-endpoint p50/p95/p99, RPS, RSS, connections and error classes |
