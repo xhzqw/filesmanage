@@ -185,10 +185,14 @@ type Download struct {
 	Size        int64
 	ContentType string
 	Reader      readCloser
+	ModTime     time.Time
 }
 
 type readCloser interface {
 	Read([]byte) (int, error)
+	// Seek lets the transport hand the stream to http.ServeContent, which
+	// implements Range revalidation (SPEC IO-PERF-02).
+	Seek(int64, int) (int64, error)
 	Close() error
 }
 
@@ -219,6 +223,9 @@ func (s *Service) OpenDownload(ctx context.Context, u domain.User, fileID string
 	return Download{
 		FileName: file.Name, Sha256: blob.Sha256, Size: blob.SizeBytes,
 		ContentType: file.ContentType, Reader: reader,
+		// The version's commit time anchors ServeContent's ETag/Last-Modified,
+		// so Range revalidation follows the signed version (IO-PERF-02).
+		ModTime: version.CreatedAt,
 	}, func() { _ = reader.Close() }, nil
 }
 

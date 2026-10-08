@@ -120,11 +120,12 @@ func (h *Handler) downloadFile(c *gin.Context) {
 	}
 	defer closeReader()
 	c.Header("Content-Type", contentTypeOr(download.ContentType))
-	c.Header("Content-Length", strconv.FormatInt(download.Size, 10))
 	c.Header("X-Content-Sha256", download.Sha256)
 	c.Header("Content-Disposition", contentDisposition(download.FileName))
-	c.Status(200)
-	_, _ = io.Copy(c.Writer, download.Reader)
+	// ServeContent implements Range/If-Range/ETag revalidation (206/416) on top
+	// of the immutable content-addressed blob, which is what media seeking and
+	// resumable downloads need (SPEC §7.1, IO-PERF-02, ENG-03).
+	http.ServeContent(c.Writer, c.Request, download.FileName, download.ModTime, download.Reader)
 }
 
 func (h *Handler) previewFile(c *gin.Context) {

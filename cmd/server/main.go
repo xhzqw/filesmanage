@@ -12,6 +12,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -48,7 +49,16 @@ func main() {
 	if err != nil {
 		log.Fatal("invalid DB configuration")
 	}
-	config.MaxConns = 10
+	// Pool sizing is a capacity knob: the SPEC reference environment runs a
+	// dedicated PostgreSQL, while shared hosts must keep the instance-wide
+	// connection budget in mind (FILESMANAGE_DB_MAX_CONNS).
+	maxConns := 10
+	if raw := os.Getenv("FILESMANAGE_DB_MAX_CONNS"); raw != "" {
+		if parsed, convErr := strconv.Atoi(raw); convErr == nil && parsed > 0 {
+			maxConns = parsed
+		}
+	}
+	config.MaxConns = int32(maxConns)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	pool, err := pgxpool.NewWithConfig(ctx, config)

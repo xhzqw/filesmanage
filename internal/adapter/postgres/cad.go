@@ -99,18 +99,30 @@ func (r *Repository) MarkDerivativeNative(ctx context.Context, derivativeID, sou
 }
 
 func (r *Repository) StoreDerivativeBlob(ctx context.Context, derivativeID, blobID, storageKey, sha string, size int64) error {
-	if _, err := r.Q.Exec(ctx,
+	tag, insertErr := r.Q.Exec(ctx,
 		`INSERT INTO blobs(id,storage_key,sha256,size_bytes,state) VALUES($1,$2,$3,$4,'ready')
-		 ON CONFLICT (storage_key) DO NOTHING`, blobID, storageKey, sha, size); err != nil {
-		return err
+		 ON CONFLICT (storage_key) DO NOTHING`, blobID, storageKey, sha, size)
+	if insertErr != nil {
+		return insertErr
 	}
-	tag, err := r.Q.Exec(ctx,
+	if tag.RowsAffected() == 0 {
+		// Content-addressed store: the same converted bytes are already stored
+		// (a retried conversion of the same source). Adopt the existing blob
+		// row instead of referencing the id the conflict just dropped, which
+		// would trip the derivative FK.
+		var existingID string
+		if existingErr := r.Q.QueryRow(ctx, "SELECT id FROM blobs WHERE storage_key=$1", storageKey).Scan(&existingID); existingErr != nil {
+			return existingErr
+		}
+		blobID = existingID
+	}
+	updateTag, err := r.Q.Exec(ctx,
 		`UPDATE model_derivatives SET state='ready',blob_id=$2,output_sha256=$3,output_size=$4,finished_at=now()
 		 WHERE id=$1`, derivativeID, blobID, sha, size)
 	if err != nil {
 		return err
 	}
-	if tag.RowsAffected() == 0 {
+	if updateTag.RowsAffected() == 0 {
 		return ports.ErrRowMissing
 	}
 	return nil

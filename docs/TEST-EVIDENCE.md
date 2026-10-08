@@ -331,3 +331,93 @@ go run ./cmd/migrate → MIGRATIONS_OK 10 (0010 adds shares.created_at)
 | Responsive | 768px viewport: hamburger toggle visible, nav collapses to overlay and opens on tap |
 
 State feedback already present and exercised in earlier milestones: loading text, error alerts, empty states, permission-denied messages.
+
+---
+
+## Milestone 7 — security and performance acceptance (executed on 192.168.1.22, 2026-10-08)
+
+All commands ran on the target host. Commits: `8bdd068`, `06c056d`, `063e26a`,
+plus the search/stats/export/worker fixes listed below.
+
+### M1 re-verification (acceptance matrix, re-run this session)
+
+| Check | Result |
+|---|---|
+| `GET /health/ready` | 200 |
+| wrong password | 401 |
+| real admin login (credential from `.secrets/admin.password`, mode 0600) | 200 |
+| unauthenticated `/api/me` | 401 |
+| `/api/folders/tree` returns seeded directory data | 200, real rows |
+| browser login (http://192.168.1.22:18091/login) → `/doc` main interface | PASS (folder tree, breadcrumb, file table, empty state rendered) |
+| session survives repeated requests | 200, 200 |
+| logout invalidates the session immediately | 401 after logout |
+| first-login password change | verified via disposable probe account (must-change → change → flag cleared; old password rejected afterwards) |
+
+### Security regression — `scripts/m7_security_e2e.py` (31/31 PASS)
+
+Authenticated cross-user checks against the business server: ungranted file list
+403; ungranted folder-filtered search/stats/export all empty (the visibility
+scope a folder filter must never bypass); secured folder absent from the probe
+tree; grant takes effect on the next request (list 200, search total ≥ 1, export
+rows ≥ 2); revocation immediate (403, total 0); folder share with
+include_descendants reaches child files and makes the child folder listable;
+revoking the share closes both; disabled account rejected (401) with the session
+killed. Cleanup: secured folder soft-deleted, probe disabled (audit chain intact).
+
+### Defects found and fixed in M7
+
+1. **Folder-filtered search/stats/export bypassed the visibility scope**
+   (SPEC §2.3/DB-PERF-01) — and separately 500'd on a placeholder mismatch.
+   `scopeFolderSQL` now intersects the folder restriction with `visible_scope`
+   for non-admins and derives placeholder indices from the emitted bindings.
+2. **Folder shares ignored `include_descendants`** and shares were not consulted
+   by `require()`/`visibleFile()` at all (SPEC §2.4's "two inconsistent code
+   paths"). Shares now resolve through the same permission path as direct reads;
+   the search scope CTE expands descendants along the ancestor chain. File-level
+   shares grant preview/download outside the folder scope.
+3. **CSV export clamped to 200 rows and buffered the whole result**
+   (SPEC §3.10/READ-06/PE07). Replaced by the batched streaming export.
+4. **Search content matching was a sequential `ILIKE` over `file_text`**; the
+   search index (`file_text`) was never written by the application at all
+   (SPEC §10.1). Added the indexing pipeline (upload/save/rollback/approval),
+   the bounded OOXML reader in `internal/docx`, tsvector phrase search, exact
+   window totals, and snippets.
+5. **`domain.Snippet` mixed byte and rune indices** (panic on multibyte content)
+   — found by the new unit test; rewritten in rune space.
+6. **Concurrent lock acquisition 500'd** (SPEC §7.2) — file row lock inside the
+   transaction; idempotent force-release.
+7. **Download endpoint ignored Range** (SPEC §7.1/IO-PERF-02/ENG-03) — now
+   streams through `http.ServeContent` with per-version modtime anchoring.
+8. **CAD worker failed on content-addressed blob conflicts**
+   (`model_derivatives_blob_id_fkey`, then a stale `RowsAffected` check) —
+   retried conversions of the same source now adopt the existing blob and reach
+   `ready`.
+
+### Go test suite
+
+`go build ./...`, `go vet ./...`, `go test ./...` — PASS (application, domain,
+httpx, cmd/server). New tests: export stream contract (columns, neutralisation,
+consumer abort, failure audit), folder/file share unification, CJK spacing,
+extraction dispatch, docx container reading, snippet windowing.
+`scripts/check_architecture.py` — PASS (71 Go files, 39 TS modules).
+
+### Performance evidence (summary; full matrix in `docs/M7-PERF-DATASET-GATE.md`)
+
+- Dataset gate 12/12 PASS (100,392 files / 402,564 versions / 10,000 folders
+  depth 21 / 5,000-file hot folder / 1,000-version file / 20,000 shares /
+  100,000 favorites).
+- Endpoint budgets: 11/11 PASS at 1 and 10 users; 10/11 at 30 users (search p95
+  over on a shared host with a broad term); pool-bound above that (see gate doc).
+- CSV 100k export 9/9 contract checks; 10×100MB uploads 10/10; MP4 Range 10/10;
+  Office sessions 12/12; CAD STEP→STL verified; backup restore drill PASS
+  (26 tables, 41 media objects) with 12/12 manifest unit tests.
+- Machine-readable reports under `.secrets/perf/` (root-only, not committed).
+
+### Not verified / open
+
+- PE15 (100-open WebGL leak run) and PE16 (1366/1440/1920 first-interactive
+  timings) need a scripted browser harness; recorded as open.
+- The `/search` page is missing from the React app (the API, snippets and
+  filters are complete and verified); recorded as the next frontend task.
+- 100/200-user budget misses are capacity findings on a shared host, not code
+  defects; the dedicated reference environment is the SPEC's remedy.

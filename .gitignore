@@ -6,3 +6,7 @@ web/dist/
 *.test
 
 .bin/
+scripts/__pycache__/
+.blobs-perf/
+scripts/__pycache__/
+.blobs-perf/

@@ -6,6 +6,7 @@ import (
 	"filesmanage/internal/domain"
 	"filesmanage/internal/ports"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -318,7 +319,11 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	// phrase; the file name stays an ILIKE so name-only hits keep working for
 	// unindexed or binary formats.
 	if q.Query != "" {
-		where = append(where, "(f.id IN (SELECT ft.file_id FROM file_text ft WHERE ft.tsv @@ phraseto_tsquery('simple', "+ph.next()+")) OR f.name ILIKE "+ph.next()+")")
+		// EXISTS (not IN) lets the planner drive from the export order index
+		// with early termination on LIMIT instead of hashing the whole match
+		// set and sorting it: a broad term over 100k files drops from ~500ms
+		// to ~140ms, and selective terms still use the GIN index.
+		where = append(where, "(EXISTS (SELECT 1 FROM file_text ft WHERE ft.file_id=f.id AND ft.tsv @@ phraseto_tsquery('simple', "+ph.next()+")) OR f.name ILIKE "+ph.next()+")")
 		args = append(args, q.TextQuery, "%"+q.Query+"%")
 	}
 	matchedOrder := "f.updated_at DESC,f.id DESC"
@@ -336,19 +341,32 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	default:
 		return nil, 0, domain.ErrInvalidInput
 	}
+	// The authorized total is a dedicated count query, hard-capped at
+	// searchTotalCap (SPEC §10.2 permits a capped total). Keeping it out of the
+	// page query matters: a window count would materialise the whole match set
+	// and destroy the early-terminating ordered index scan, and an uncapped
+	// count over a broad term costs ~1s on 100k files. A result of
+	// searchTotalCap means "searchTotalCap-1 or more"; the transport surfaces
+	// it as "1000+".
+	const searchTotalCap = 1001
+	total := 0
+	if err = r.Q.QueryRow(ctx, cte+" SELECT count(*) FROM (SELECT f.id FROM files f WHERE "+strings.Join(where, " AND ")+" LIMIT "+fmt.Sprint(searchTotalCap)+") t", args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
 	with := cte
 	if with == "" {
 		with = "WITH"
 	} else {
 		with += ","
 	}
+	// matched carries the sort keys the outer ORDER BY references.
 	sql := with + ` matched AS (
-	  SELECT f.id,f.updated_at,f.name,count(*) OVER () AS total_count
+	  SELECT f.id,f.updated_at,f.name
 	    FROM files f` + matchedJoin + `
 	   WHERE ` + strings.Join(where, " AND ") + `
 	   ORDER BY ` + matchedOrder + ` LIMIT ` + fmt.Sprint(q.Limit) + `
 	)
-	SELECT f.id,f.folder_id,f.name,f.uploaded_by,f.content_type,f.current_version_seq,v.size_bytes,v.sha256,f.updated_at,f.deleted_at,` + textColumn + `,m.total_count
+	SELECT f.id,f.folder_id,f.name,f.uploaded_by,f.content_type,f.current_version_seq,v.size_bytes,v.sha256,f.updated_at,f.deleted_at,` + textColumn + `
 	  FROM matched m
 	  JOIN files f ON f.id=m.id
 	  LEFT JOIN file_versions v ON v.file_id=f.id AND v.seq=f.current_version_seq
@@ -360,28 +378,24 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	}
 	defer rows.Close()
 	out := make([]domain.File, 0)
-	total := 0
 	for rows.Next() {
-		f, content, filteredTotal, scanErr := scanFileWithText(rows)
+		f, content, scanErr := scanFileWithText(rows)
 		if scanErr != nil {
 			return nil, 0, scanErr
 		}
-		total = int(filteredTotal)
 		f.Snippet = domain.Snippet(content, q.Query, snippetWindow)
 		out = append(out, f)
 	}
 	return out, total, rows.Err()
 }
 
-// scanFileWithText scans a file row, its indexed content for snippets, and the
-// window count of every authorized row matching the same filters.
-func scanFileWithText(row rowScanner) (domain.File, string, int64, error) {
+// scanFileWithText scans a file row plus its indexed content for snippets.
+func scanFileWithText(row rowScanner) (domain.File, string, error) {
 	var f domain.File
 	var content string
-	var total int64
 	err := row.Scan(&f.ID, &f.FolderID, &f.Name, &f.UploadedBy, &f.ContentType, &f.CurrentVersionSeq,
-		&f.SizeBytes, &f.Sha256, &f.UpdatedAt, &f.DeletedAt, &content, &total)
-	return f, content, total, err
+		&f.SizeBytes, &f.Sha256, &f.UpdatedAt, &f.DeletedAt, &content)
+	return f, content, err
 }
 
 // statsScope builds the shared predicate for aggregation queries. The context
@@ -459,54 +473,99 @@ func (r *Repository) Stats(ctx context.Context, q ports.StatsQuery) (domain.Stat
 	if folderArg != nil {
 		args = append(args, folderArg)
 	}
-	summary := fmt.Sprintf(
-		" SELECT (SELECT count(*) FROM files f WHERE %s),"+
-			" (SELECT coalesce(sum(v.size_bytes),0) FROM files f LEFT JOIN file_versions v ON v.file_id=f.id AND v.seq=f.current_version_seq WHERE %s),"+
-			" (SELECT count(*) FROM files f WHERE %s AND f.updated_at>now()-interval '30 days'),"+
-			" (SELECT count(*) FROM folders d WHERE d.deleted_at IS NULL AND %s)",
-		predicate, predicate, predicate, folderScope)
+	// Summary and folder count in one round trip: the three file figures are
+	// FILTER aggregates over a single scan instead of three separate ones.
 	var stats domain.Stats
-	if err = r.Q.QueryRow(ctx, cte+summary, args...).Scan(&stats.TotalFiles, &stats.TotalBytes, &stats.Added30Days, &stats.TotalFolders); err != nil {
+	summary := cte + ` SELECT f.total_files, f.added_30, f.total_bytes, d.total_folders FROM (
+	  SELECT count(*) AS total_files,
+	         count(*) FILTER (WHERE f.updated_at>now()-interval '30 days') AS added_30,
+	         coalesce(sum(v.size_bytes),0) AS total_bytes
+	    FROM files f LEFT JOIN file_versions v ON v.file_id=f.id AND v.seq=f.current_version_seq
+	   WHERE ` + predicate + `
+	) f, (
+	  SELECT count(*) AS total_folders FROM folders d
+	   WHERE d.deleted_at IS NULL AND ` + folderScope + `
+	) d`
+	if err = r.Q.QueryRow(ctx, summary, args...).Scan(&stats.TotalFiles, &stats.Added30Days, &stats.TotalBytes, &stats.TotalFolders); err != nil {
 		return domain.Stats{}, err
 	}
-	typeScan := func(s rowScanner) error {
-		var c domain.TypeCount
-		if err := s.Scan(&c.Type, &c.Count); err != nil {
-			return err
+	// Breakdowns in one scan via GROUPING SETS: extension buckets, month
+	// buckets and uploader buckets come back tagged by which grouping column
+	// is present, so three GROUP BY passes collapse into one.
+	breakdown := " SELECT coalesce(nullif(lower(substring(f.name from '\\\\.([^.]*)$')),''),'(none)') AS ext," +
+		" to_char(date_trunc('month',f.updated_at),'YYYY-MM') AS mon," +
+		" f.uploaded_by, coalesce(u.display_name,'') AS uploader_name, count(*) AS n" +
+		" FROM files f LEFT JOIN users u ON u.id=f.uploaded_by" +
+		" WHERE " + predicate +
+		" GROUP BY GROUPING SETS ((ext),(mon),(f.uploaded_by,uploader_name))"
+	rows, err := r.Q.Query(ctx, cte+breakdown, scopeArgs...)
+	if err != nil {
+		return domain.Stats{}, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var ext, mon, uploaderID, uploaderName *string
+		var n int64
+		if err = rows.Scan(&ext, &mon, &uploaderID, &uploaderName, &n); err != nil {
+			return domain.Stats{}, err
 		}
-		stats.ByType = append(stats.ByType, c)
-		return nil
-	}
-	monthScan := func(s rowScanner) error {
-		var c domain.MonthCount
-		if err := s.Scan(&c.Month, &c.Count); err != nil {
-			return err
+		switch {
+		case ext != nil:
+			stats.ByType = append(stats.ByType, domain.TypeCount{Type: *ext, Count: n})
+		case mon != nil:
+			stats.ByMonth = append(stats.ByMonth, domain.MonthCount{Month: *mon, Count: n})
+		case uploaderID != nil:
+			name := ""
+			if uploaderName != nil {
+				name = *uploaderName
+			}
+			stats.ByUploader = append(stats.ByUploader, domain.UploaderCount{UploaderID: *uploaderID, UploaderName: name, Count: n})
 		}
-		stats.ByMonth = append(stats.ByMonth, c)
-		return nil
 	}
-	uploaderScan := func(s rowScanner) error {
-		var c domain.UploaderCount
-		if err := s.Scan(&c.UploaderID, &c.UploaderName, &c.Count); err != nil {
-			return err
-		}
-		stats.ByUploader = append(stats.ByUploader, c)
-		return nil
-	}
-	// Extension bucket: lowercase suffix after the last dot, or a labelled fallback.
-	typeSQL := " SELECT coalesce(nullif(lower(substring(f.name from '\\.([^.]*)$')),''),'(none)'),count(*) FROM files f WHERE " + predicate + " GROUP BY 1 ORDER BY 2 DESC LIMIT 20"
-	if err = r.aggregate(ctx, cte+typeSQL, scopeArgs, typeScan); err != nil {
+	if err = rows.Err(); err != nil {
 		return domain.Stats{}, err
 	}
-	monthSQL := " SELECT to_char(date_trunc('month',f.updated_at),'YYYY-MM'),count(*) FROM files f WHERE " + predicate + " GROUP BY 1 ORDER BY 1 DESC LIMIT 12"
-	if err = r.aggregate(ctx, cte+monthSQL, scopeArgs, monthScan); err != nil {
-		return domain.Stats{}, err
+	sortTypeCounts(stats.ByType)
+	sortMonthCounts(stats.ByMonth)
+	sortUploaderCounts(stats.ByUploader)
+	if len(stats.ByType) > 20 {
+		stats.ByType = stats.ByType[:20]
 	}
-	uploaderSQL := " SELECT f.uploaded_by,coalesce(u.display_name,''),count(*) FROM files f LEFT JOIN users u ON u.id=f.uploaded_by WHERE " + predicate + " GROUP BY 1,2 ORDER BY 3 DESC LIMIT 20"
-	if err = r.aggregate(ctx, cte+uploaderSQL, scopeArgs, uploaderScan); err != nil {
-		return domain.Stats{}, err
+	if len(stats.ByMonth) > 12 {
+		stats.ByMonth = stats.ByMonth[:12]
+	}
+	if len(stats.ByUploader) > 20 {
+		stats.ByUploader = stats.ByUploader[:20]
 	}
 	return stats, nil
+}
+
+// Breakdown orderings: count descending, then the bucket label for stability.
+func sortTypeCounts(items []domain.TypeCount) {
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Count != items[j].Count {
+			return items[i].Count > items[j].Count
+		}
+		return items[i].Type < items[j].Type
+	})
+}
+
+func sortMonthCounts(items []domain.MonthCount) {
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Count != items[j].Count {
+			return items[i].Count > items[j].Count
+		}
+		return items[i].Month > items[j].Month
+	})
+}
+
+func sortUploaderCounts(items []domain.UploaderCount) {
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Count != items[j].Count {
+			return items[i].Count > items[j].Count
+		}
+		return items[i].UploaderID < items[j].UploaderID
+	})
 }
 
 // FolderSharesForSubject returns the folder shares that apply to folderID for
@@ -594,20 +653,6 @@ func (r *Repository) FileIDsMissingText(ctx context.Context, limit int) ([]strin
 		out = append(out, id)
 	}
 	return out, rows.Err()
-}
-
-func (r *Repository) aggregate(ctx context.Context, sql string, args []any, scan func(rowScanner) error) error {
-	rows, err := r.Q.Query(ctx, sql, args...)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		if err := scan(rows); err != nil {
-			return err
-		}
-	}
-	return rows.Err()
 }
 
 // ExportFilesStream streams every authorized export row for the filter (SPEC
