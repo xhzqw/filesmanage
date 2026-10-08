@@ -278,6 +278,13 @@ func isBodyTooLarge(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "request body too large")
 }
 
+// copyReader streams a blob to the response writer.
+func copyReader(dst http.ResponseWriter, src interface {
+	Read([]byte) (int, error)
+}) (int64, error) {
+	return io.Copy(dst, src)
+}
+
 func contentTypeOr(fallback string) string {
 	if fallback == "" {
 		return "application/octet-stream"

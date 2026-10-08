@@ -1,6 +1,6 @@
 # Release gates
 
-Overall: NO-GO for production (dev-only system on 18091). Milestone gates: M1–M4 GO (dev).
+Overall: NO-GO for production (dev-only system on 18091). Milestone gates: M1–M5 GO (dev).
 
 | Gate | Scope | Status | Evidence |
 |---|---|---|---|
@@ -8,8 +8,8 @@ Overall: NO-GO for production (dev-only system on 18091). Milestone gates: M1–
 | G-FS | File/folder vertical slice incl. versions, trash, restore | **GO (dev)** | TEST-EVIDENCE.md §M2 |
 | G-ACL | Org + ACL + cross-user isolation tests | **GO (dev)** | TEST-EVIDENCE.md §M3 |
 | G-WF | Approvals, locks, conflicts, append-only rollback interplay | **GO (dev)** | TEST-EVIDENCE.md §M4 |
-| G-DOCX | Real DOCX editing + write-back + idempotent callbacks | OPEN (blocked: BLK-02) | Milestone 5 |
-| G-CAD | Real CAD preview + Worker isolation + format matrix | OPEN (blocked: BLK-03/04) | Milestone 5 |
+| G-DOCX | Real DOCX editing + write-back + idempotent callbacks | **GO (dev)** | TEST-EVIDENCE.md §M5 |
+| G-CAD | Real CAD preview + Worker isolation + format matrix | **GO (dev, DWG blocked** by BLK-03) | TEST-EVIDENCE.md §M5 |
 | G-BIZ | Sharing, favorites, search, stats, CSV, plain-text fidelity | OPEN | Milestone 6 |
 | G-PERF | 100k files / 400k versions, p95/p99 budgets | OPEN | Milestone 7 |
 | G-SEC | S1–S22 security/ACL/consistency matrix | OPEN | Milestone 7 |

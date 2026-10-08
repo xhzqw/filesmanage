@@ -22,6 +22,11 @@ type memoryRepo struct {
 	policies     map[string]domain.ApprovalPolicy
 	approvals    []domain.Approval
 	locks        map[string]domain.EditLock
+	officeSessions []domain.OfficeSession
+	saveEvents    []domain.OfficeSaveEvent
+	compatReports []domain.OfficeCompatibilityReport
+	derivatives   []domain.ModelDerivative
+	derivativeJobs []memoryJob
 	sessions     map[string]memorySession
 	folders      map[string]domain.Folder
 	files        map[string]domain.File

@@ -3,8 +3,16 @@ import type {FileItem, FileVersion, PreviewData} from "../../entities/file/model
 
 export type FilePage={items:FileItem[];nextCursor:string};
 
-// Lock, save and rollback are file endpoints and therefore live with the
-// documents feature; approval inbox endpoints live in the workflow feature.
+export type OfficeSessionData={
+ sessionId:string;
+ documentKey:string;
+ baseSeq:number;
+ editorUrl:string;
+ config:{token:string};
+};
+
+// Lock, save, rollback and editor sessions are file endpoints and therefore
+// live with the documents feature; approval inbox endpoints live in workflow.
 export const fileApi={
  list:(folder:string,sort:string,cursor:string,limit:number)=>{
   const query=new URLSearchParams({folder,sort,limit:String(limit)});
@@ -25,6 +33,10 @@ export const fileApi={
  submitForApproval:(id:string,baseSeq:number,data:string)=>
   request<{status:string;approvalId:string;expectedCurrentSeq:number}>("/files/"+id+"/save",
    {method:"POST",body:JSON.stringify({baseSeq,data})}),
+ openOfficeSession:(id:string)=>request<OfficeSessionData>("/files/"+id+"/office/session",{method:"POST",body:"{}"}),
+ derivativeStatus:(id:string)=>request<{found:boolean;state:string;format:string;class:string;engine:string;note:string;outputKind?:string;outputSize?:number;outputSha256?:string;errorCode?:string}>("/files/"+id+"/derivative"),
+ requestDerivative:(id:string)=>request<{derivativeId:string;state:string;sourceFormat:string;outputKind:string;converter:string}>("/files/"+id+"/derivative",{method:"POST",body:"{}"}),
+ cancelOfficeSession:(fileId:string,sessionId:string)=>request<{cancelled:string}>("/files/"+fileId+"/office/session/"+sessionId+"/cancel",{method:"POST",body:"{}"}),
 };
 
 type UploadReply={

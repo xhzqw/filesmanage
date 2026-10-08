@@ -216,3 +216,49 @@ go run ./cmd/migrate → APPLIED 0006_approval_decision_trail.sql, MIGRATIONS_OK
 
 ### Test data hygiene
 - Editor account disabled, its grants/locks/sessions removed; test approval policy cleared; debug rows deleted.
+# Milestone 5 evidence — DOCX editing and CAD (executed on 192.168.1.22, 2026-10-08)
+
+### Gates
+```
+go build/vet/test ./... → PASS
+python3 scripts/check_architecture.py → PASS: 60 Go files, 35 TS modules
+go run ./cmd/migrate → MIGRATIONS_OK 9 (0007 office session generation/timestamps,
+  0008 session timestamps, 0009 derivative columns)
+```
+
+### DOCX editing (real ONLYOFFICE 8.2.2, AGPL community edition, zero licence cost)
+| Step | Result |
+|---|---|
+| Docker container (JWT enabled, private-IP allow for LAN source) | healthy on 18080 |
+| POST /api/files/:id/office/session | 201 with signed editor config (document key, source URL, callback URL) |
+| Source fetch by the document server | 200, exact source bytes (verified from inside the container) |
+| Editor iframe loads with real DOCX content | toolbar + page rendered, 1 page |
+| Type text + save (Ctrl+S) | editor save callback received 200 by our API |
+| New version committed | v2 action=edit, sha 8aca4d5a… |
+| v2 bytes | valid DOCX (zip with [Content_Types].xml), contains edited sentence AND original text |
+| office_save_events ledger | 1 committed (idempotency ledger) |
+| Audit | office.save_commit success |
+
+Callback plumbing details fixed during integration: Bearer prefix stripping, callback JWT without exp accepted (signature still mandatory), document keys restricted to [0-9-.a-zA-Z_=], docservice SSRF filter needs ALLOW_PRIVATE_IP_ADDRESS for LAN sources, api.js expects the full config plus a token field (not only a token).
+
+### CAD pipeline
+| Format | Class | Evidence |
+|---|---|---|
+| stl / obj | native | derivative bytes byte-identical to the uploaded source |
+| step / stp / iges / igs | converted | worker claims the queued job, runs gmsh (OpenCASCADE 7.8.1) with a 2 min timeout and memory cap; 108016-byte STL mesh with 544 triangles delivered |
+| dxf | native (2D parser) | classified native; 2D entity rendering path in the viewer |
+| dwg | licensed | no open-source toolchain packaged (LibreDwg unavailable); recorded as BLK-03, request refused with 400 |
+| Unknown format | — | derivative request refused with 400 |
+
+Worker: separate process (`.bin/worker`), claims jobs via `conversion_jobs` state predicate, concurrency cap 2, subprocess timeout, address-space cap; failures recorded on the job and derivative (`CONVERT_FAILED`).
+
+### Browser acceptance (LAN)
+- /office/:id: real editor iframe, edit, save → v2 (verified via versions API).
+- /model/:id: canvas 1668x697 rendered with 544 triangles / 1632 vertices from the converted STEP mesh; breadcrumb shows 服务端已转换; OrbitControls rotate/zoom/pan.
+- Format matrix endpoint returns the honest classification table.
+
+### Fixes during the slice
+- derivative status response omitted `format` (undefined crash) — added, viewer made null-safe.
+- Worker native-format detection keyed on output kind (STEP→STL looked native) — now keys on the source format.
+- Viewer canvas torn down by a dependency-change effect re-run — one-shot mount with unmount-only teardown.
+- `model_derivatives`/`approvals`/`office_sessions` column gaps → migrations 0007–0009.

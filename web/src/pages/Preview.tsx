@@ -10,6 +10,13 @@ const ACTION_LABELS:Record<string,string>={
  restore:"恢复",
 };
 
+const CAD_EXTENSIONS=[".stl",".obj",".glb",".gltf",".step",".stp",".iges",".igs",".dxf"];
+
+function isCadName(name:string):boolean{
+ const lower=name.toLowerCase();
+ return CAD_EXTENSIONS.some(ext=>lower.endsWith(ext));
+}
+
 export function Preview(){
  const{id=""}=useParams();
  const[preview,setPreview]=useState<PreviewData|null>(null);
@@ -41,6 +48,10 @@ export function Preview(){
      <div className="breadcrumb">{preview.name} · {preview.size} 字节 · v{versions.at(-1)?.versionSeq??1}</div>
      <div className="toolbar">
       <a className="primary" href={"/api/files/"+preview.fileId+"/bytes"} download={preview.name}>下载原始字节</a>
+      {preview.name.toLowerCase().endsWith(".docx")&&
+       <a className="primary" href={"/office/"+preview.fileId}>在线编辑 DOCX</a>}
+      {isCadName(preview.name)&&
+       <a className="primary" href={"/model/"+preview.fileId}>3D 模型预览</a>}
       <span className="toolbar-hint">SHA-256 {preview.sha256}</span>
      </div>
      {preview.textual

@@ -75,7 +75,13 @@ func main() {
 		blobDir = ".blobs"
 	}
 	store := blobStoreAdapter{store: blob.New(blobDir)}
-	r := httpx.New(application.New(postgres.New(pool), store), secure, "web/dist")
+	service := application.New(postgres.New(pool), store).WithOffice(application.OfficeConfig{
+		EditorURL:     os.Getenv("FILESMANAGE_OFFICE_URL"),
+		Secret:        os.Getenv("FILESMANAGE_OFFICE_SECRET"),
+		SourceBaseURL: os.Getenv("FILESMANAGE_OFFICE_SOURCE_BASE"),
+		EditorVersion: os.Getenv("FILESMANAGE_OFFICE_VERSION"),
+	})
+	r := httpx.New(service, secure, "web/dist")
 	log.Println("filesmanage isolated development server listening ", addr)
 	if err = r.Run(addr); err != nil {
 		log.Fatal(err)

@@ -73,6 +73,19 @@ Defect found and fixed during M1: FolderTree rendered only from `parentId===null
 - Browser: workbench, editor (v3 -> v4 with notice), policy dialog with active approvers.
 - Unit tests cover lock lifecycle, takeover, submit/approve/reject, and the single-winner race.
 
+---
+
+## Milestone 5 — real DOCX editing and CAD preview (verified end-to-end)
+
+### What was built
+- Document editor integration (SPEC §19): ONLYOFFICE Document Server 8.2.2 (AGPL community edition, no licence cost) self-hosted in Docker with JWT; session open/close, short-lived signed source tokens, callback endpoint with SSRF-pinned downloads (only the configured editor host, no redirects, single resolved IP), OOXML structural validation, idempotent save-event ledger, version attribution to the requester, edit-lock and approval interplay.
+- CAD pipeline (SPEC §20): separate worker process claiming `conversion_jobs` with concurrency cap, subprocess timeout and memory limit; gmsh + OpenCASCADE converts STEP/IGES to mesh derivatives; native STL/OBJ/GLB stream directly; three.js viewer with OrbitControls; honest format matrix (native / converted / licensed / unverified).
+- Migrations 0007–0009 for office session state, approval decision trail and derivative columns.
+
+### Verification (executed, all PASS)
+- DOCX: real editor in the browser, edit + save → v2 with valid DOCX bytes containing the edit and the original text; save-event ledger exactly 1 committed; audit recorded.
+- CAD: 108016-byte converted mesh with 544 triangles from a real STEP source; STL/OBJ derivative bytes byte-identical to source; DWG refused as licence-blocked; viewer canvas renders the geometry.
+
 ### Test data hygiene
 - The redundant full-permission grant created during browser acceptance was revoked; the test workgroup was removed; clerkA/clerkB were disabled. Hard deletion of principals with audit history is blocked by foreign keys by design, so the audit chain stays intact.
 

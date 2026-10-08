@@ -112,6 +112,30 @@ type Repository interface {
 	ReleaseLock(context.Context, string, string) (bool, error)
 	ForceReleaseLock(context.Context, string) (domain.EditLock, error)
 
+	// Document editor sessions and save events.
+	CreateOfficeSession(context.Context, domain.OfficeSession) error
+	OfficeSessionByID(context.Context, string) (domain.OfficeSession, error)
+	OfficeSessionByKey(context.Context, string) (domain.OfficeSession, error)
+	ActiveOfficeSessionForFile(context.Context, string) (domain.OfficeSession, bool, error)
+	SetOfficeSessionState(context.Context, string, string) error
+	BumpOfficeSessionGeneration(context.Context, string) (int64, error)
+	TouchOfficeSession(context.Context, string, time.Time) error
+	CloseOfficeSession(context.Context, string) error
+	SaveEventExists(context.Context, string, string) (bool, error)
+	RecordSaveEvent(context.Context, domain.OfficeSaveEvent) error
+	RecordCompatibilityReport(context.Context, domain.OfficeCompatibilityReport) error
+
+	// CAD derivatives and worker jobs.
+	EnsureDerivative(context.Context, domain.ModelDerivative) (domain.ModelDerivative, error)
+	EnqueueDerivativeJob(context.Context, string, string) error
+	ClaimDerivativeJob(context.Context) (domain.DerivativeJob, bool, error)
+	CompleteDerivativeJob(context.Context, string) error
+	FailDerivativeJob(context.Context, string, string) error
+	MarkDerivativeNative(context.Context, string, string) error
+	StoreDerivativeBlob(context.Context, string, string, string, string, int64) error
+	DerivativeForFile(context.Context, string, int) (domain.ModelDerivative, bool, error)
+	SourceBlobPath(context.Context, string) (string, error)
+
 	// Audit and idempotency.
 	RecordAudit(context.Context, domain.AuditEvent) error
 	IdempotencyGet(context.Context, string, string, string) ([]byte, bool, error)

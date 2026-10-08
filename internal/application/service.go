@@ -28,14 +28,18 @@ var (
 // obtained from the unit of work; blob bytes are staged outside transactions
 // and only referenced inside them.
 type Service struct {
-	uow   ports.UnitOfWork
-	blobs ports.BlobStore
-	now   func() time.Time
+	uow    ports.UnitOfWork
+	blobs  ports.BlobStore
+	office OfficeConfig
+	now    func() time.Time
 }
 
 func New(uow ports.UnitOfWork, blobs ports.BlobStore) *Service {
 	return &Service{uow: uow, blobs: blobs, now: time.Now}
 }
+
+// WithOffice wires the external document editor endpoints.
+func (s *Service) WithOffice(config OfficeConfig) *Service { s.office = config; return s }
 
 func (s *Service) WithClock(f func() time.Time) *Service { s.now = f; return s }
 

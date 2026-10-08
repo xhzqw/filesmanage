@@ -97,6 +97,17 @@ func (st *Staged) Commit() (string, bool, error) {
 	return key, false, nil
 }
 
+// ReadFrom streams a finished file into the staging upload.
+func (st *Staged) ReadFrom(path string) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	_, err = io.Copy(st, file)
+	return err
+}
+
 // Abort removes the staging file without publishing anything.
 func (st *Staged) Abort() error {
 	if st.done {
@@ -131,6 +142,14 @@ func (s *Store) Open(storageKey string) (io.ReadSeekCloser, error) {
 		return nil, err
 	}
 	return file, nil
+}
+
+// PathFor resolves a storage key to an absolute path inside the blob root.
+func (s *Store) PathFor(storageKey string) (string, error) {
+	if !ValidKey(storageKey) {
+		return "", fmt.Errorf("invalid blob storage key")
+	}
+	return filepath.Join(s.Root, filepath.FromSlash(storageKey)), nil
 }
 
 // ValidKey accepts only canonical ready keys: ready/<2 hex>/<64 hex> where the
