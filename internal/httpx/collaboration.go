@@ -112,7 +112,13 @@ func (h *Handler) searchFiles(c *gin.Context) {
 	}
 	data := make([]gin.H, 0, len(files))
 	for _, f := range files {
-		data = append(data, filePayload(f))
+		payload := filePayload(f)
+		// Snippet is a bounded plain-text window around the match (SPEC §10.3);
+		// the client renders it with safe text nodes plus <mark>.
+		if f.Snippet != "" {
+			payload["snippet"] = f.Snippet
+		}
+		data = append(data, payload)
 	}
 	c.JSON(200, gin.H{"ok": true, "data": gin.H{"items": data, "total": total}})
 }

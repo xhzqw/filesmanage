@@ -19,10 +19,13 @@ type FileSearchQuery struct {
 	From              *time.Time
 	To                *time.Time
 	Sort              string
-	CursorTime        time.Time
-	CursorName        string
-	CursorID          string
-	Limit             int
+	// TextQuery is the CJK-spaced form of Query used against the tsvector
+	// index (SPEC §10.2); Query itself still matches the file name.
+	TextQuery  string
+	CursorTime time.Time
+	CursorName string
+	CursorID   string
+	Limit      int
 }
 
 // StatsQuery is the aggregation filter over the same visibility scope.
@@ -74,4 +77,7 @@ type CollaborationStore interface {
 	// apply to the single shared file.
 	FolderSharesForSubject(context.Context, string, []string, string) ([]domain.Share, error)
 	FileSharesForSubject(context.Context, string, []string, string) ([]domain.Share, error)
+	// Search index writes (SPEC §10.1).
+	UpsertFileText(context.Context, string, int, string, string) error
+	FileIDsMissingText(context.Context, int) ([]string, error)
 }

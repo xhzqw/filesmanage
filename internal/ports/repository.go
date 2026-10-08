@@ -151,6 +151,8 @@ type Repository interface {
 	ExportFilesStream(context.Context, StatsQuery, func(ExportRow) error) error
 	FolderSharesForSubject(context.Context, string, []string, string) ([]domain.Share, error)
 	FileSharesForSubject(context.Context, string, []string, string) ([]domain.Share, error)
+	UpsertFileText(context.Context, string, int, string, string) error
+	FileIDsMissingText(context.Context, int) ([]string, error)
 
 	// Audit and idempotency.
 	RecordAudit(context.Context, domain.AuditEvent) error

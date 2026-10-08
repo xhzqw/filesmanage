@@ -200,6 +200,8 @@ func (s *Service) Approve(ctx context.Context, actor domain.User, approvalID, co
 	if err = tx.Commit(ctx); err != nil {
 		return SaveResult{}, err
 	}
+	// The approved version is now current; the search index follows it.
+	s.ReindexFile(ctx, approval.FileID)
 	return result, nil
 }
 

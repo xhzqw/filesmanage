@@ -263,7 +263,10 @@ func searchQuery(u domain.User, groups []string, filter SearchFilter) ports.File
 	return ports.FileSearchQuery{
 		UserID: u.ID, GroupIDs: groups, FolderID: filter.FolderID,
 		IncludeDescendant: filter.IncludeDescendant, Query: filter.Query,
-		Uploader: filter.Uploader, MimePrefix: filter.MimePrefix,
+		// The tsvector index is built from the CJK-spaced text; the query is
+		// spaced the same way so phraseto_tsquery keeps adjacency (SPEC §10.2).
+		TextQuery: SpaceCJK(filter.Query),
+		Uploader:  filter.Uploader, MimePrefix: filter.MimePrefix,
 		From: filter.From, To: filter.To, Sort: filter.Sort, Limit: filter.Limit,
 	}
 }

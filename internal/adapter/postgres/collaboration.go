@@ -3,9 +3,9 @@ package postgres
 import (
 	"context"
 	"errors"
-	"fmt"
 	"filesmanage/internal/domain"
 	"filesmanage/internal/ports"
+	"fmt"
 	"strings"
 )
 
@@ -256,6 +256,9 @@ func (p *placeholder) next() string {
 	return fmt.Sprintf("$%d", p.n)
 }
 
+// snippetWindow is the character window around a search match (SPEC §10.3).
+const snippetWindow = 60
+
 func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) ([]domain.File, int, error) {
 	if q.Limit <= 0 || q.Limit > 200 {
 		return nil, 0, domain.ErrInvalidInput
@@ -274,10 +277,6 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	args = append(args, folderArgs...)
 	where := []string{"f.deleted_at IS NULL", folderSQL}
 	ph := newPlaceholder(len(args))
-	if q.Query != "" {
-		where = append(where, "(ft.spaced ILIKE "+ph.next()+" OR f.name ILIKE "+ph.next()+")")
-		args = append(args, "%"+q.Query+"%", "%"+q.Query+"%")
-	}
 	if q.Uploader != "" {
 		where = append(where, "f.uploaded_by="+ph.next())
 		args = append(args, q.Uploader)
@@ -320,10 +319,19 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	// The text index is only joined when the query actually filters on content:
 	// a plain list must not drag the wide file_text table into the plan.
 	textJoin := ""
+	contentColumn := "''"
 	if q.Query != "" {
 		textJoin = " LEFT JOIN file_text ft ON ft.file_id=f.id"
+		contentColumn = "coalesce(ft.content,'')"
 	}
-	sql := cte + " SELECT f.id,f.folder_id,f.name,f.uploaded_by,f.content_type,f.current_version_seq,v.size_bytes,v.sha256,f.updated_at,f.deleted_at" +
+	// Content matches run against the tsvector GIN index with the CJK-spaced
+	// phrase (SPEC §10.2); the file name stays an ILIKE so name-only hits keep
+	// working for unindexed or binary formats.
+	if q.Query != "" {
+		where = append(where, "(ft.tsv @@ phraseto_tsquery('simple', "+ph.next()+") OR f.name ILIKE "+ph.next()+")")
+		args = append(args, q.TextQuery, "%"+q.Query+"%")
+	}
+	sql := cte + " SELECT f.id,f.folder_id,f.name,f.uploaded_by,f.content_type,f.current_version_seq,v.size_bytes,v.sha256,f.updated_at,f.deleted_at," + contentColumn + ",count(*) OVER () AS total_count" +
 		" FROM files f LEFT JOIN file_versions v ON v.file_id=f.id AND v.seq=f.current_version_seq" +
 		textJoin +
 		" WHERE " + strings.Join(where, " AND ") + " ORDER BY " + order + " LIMIT " + fmt.Sprint(q.Limit)
@@ -333,14 +341,28 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	}
 	defer rows.Close()
 	out := make([]domain.File, 0)
+	total := 0
 	for rows.Next() {
-		f, err := scanFile(rows)
-		if err != nil {
-			return nil, 0, err
+		f, content, filteredTotal, scanErr := scanFileWithText(rows)
+		if scanErr != nil {
+			return nil, 0, scanErr
 		}
+		total = int(filteredTotal)
+		f.Snippet = domain.Snippet(content, q.Query, snippetWindow)
 		out = append(out, f)
 	}
-	return out, len(out), rows.Err()
+	return out, total, rows.Err()
+}
+
+// scanFileWithText scans a file row, its indexed content for snippets, and the
+// window count of every authorized row matching the same filters.
+func scanFileWithText(row rowScanner) (domain.File, string, int64, error) {
+	var f domain.File
+	var content string
+	var total int64
+	err := row.Scan(&f.ID, &f.FolderID, &f.Name, &f.UploadedBy, &f.ContentType, &f.CurrentVersionSeq,
+		&f.SizeBytes, &f.Sha256, &f.UpdatedAt, &f.DeletedAt, &content, &total)
+	return f, content, total, err
 }
 
 // statsScope builds the shared predicate for aggregation queries. The context
@@ -517,6 +539,40 @@ func (r *Repository) FileSharesForSubject(ctx context.Context, userID string, gr
 			return nil, err
 		}
 		out = append(out, share)
+	}
+	return out, rows.Err()
+}
+
+// UpsertFileText stores the current version's indexed text (SPEC §10.1). The
+// composite FK (file_id,current_seq) is deferred, so callers write it after the
+// version row exists in the same transaction.
+func (r *Repository) UpsertFileText(ctx context.Context, fileID string, seq int, content, spaced string) error {
+	_, err := r.Q.Exec(ctx,
+		`INSERT INTO file_text(file_id,current_seq,content,spaced) VALUES ($1,$2,$3,$4)
+		 ON CONFLICT (file_id) DO UPDATE SET current_seq=EXCLUDED.current_seq,
+		   content=EXCLUDED.content, spaced=EXCLUDED.spaced`,
+		fileID, seq, content, spaced)
+	return err
+}
+
+// FileIDsMissingText lists active files that still need an index row, oldest
+// update first, so the backfill tool can work in bounded batches.
+func (r *Repository) FileIDsMissingText(ctx context.Context, limit int) ([]string, error) {
+	rows, err := r.Q.Query(ctx,
+		`SELECT f.id FROM files f LEFT JOIN file_text t ON t.file_id=f.id
+		 WHERE f.deleted_at IS NULL AND t.file_id IS NULL
+		 ORDER BY f.updated_at ASC LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]string, 0, limit)
+	for rows.Next() {
+		var id string
+		if err = rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
 	}
 	return out, rows.Err()
 }

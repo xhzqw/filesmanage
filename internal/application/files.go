@@ -93,6 +93,8 @@ func (s *Service) CommitUpload(ctx context.Context, u domain.User, folderID, fil
 	if err = tx.Commit(ctx); err != nil {
 		return UploadResult{}, err
 	}
+	// The search index follows the committed current version (SPEC §10.1).
+	s.ReindexFile(ctx, file.ID)
 	return result, nil
 }
 
@@ -303,6 +305,8 @@ func (s *Service) Save(ctx context.Context, u domain.User, fileID string, conten
 	if err = tx.Commit(ctx); err != nil {
 		return SaveOutcome{}, err
 	}
+	// The search index follows the committed current version (SPEC §10.1).
+	s.ReindexFile(ctx, file.ID)
 	return outcome, nil
 }
 
@@ -366,6 +370,9 @@ func (s *Service) Rollback(ctx context.Context, u domain.User, fileID string, ta
 	if err = tx.Commit(ctx); err != nil {
 		return SaveOutcome{}, err
 	}
+	// The appended rollback version is current now; its bytes equal the target
+	// version, so the index is refreshed from the new current version.
+	s.ReindexFile(ctx, file.ID)
 	return outcome, nil
 }
 

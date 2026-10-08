@@ -27,6 +27,9 @@ type File struct {
 	Sha256                  string
 	UpdatedAt               time.Time
 	DeletedAt               *time.Time
+	// Snippet is a search projection only (SPEC §10.3): a bounded plain-text
+	// window around the match, rendered with safe text nodes plus <mark>.
+	Snippet                 string
 }
 
 type FileVersion struct {

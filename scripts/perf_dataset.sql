@@ -168,10 +168,14 @@ ON CONFLICT (file_id,seq) DO NOTHING;
 
 \echo 'seeding text index'
 
+-- spaced inserts a space around every CJK character (SPEC §10.2) so
+-- PostgreSQL's simple configuration tokenises them and phraseto_tsquery keeps
+-- phrase adjacency when searching Chinese content.
 INSERT INTO file_text(file_id,current_seq,content,spaced)
 SELECT id,nver,
        '压测文件内容 '||name||' 预算 年度预算 项目',
-       ' 压测 文件 内容 '||name||'  预算  年度 预算  项目 '
+       regexp_replace('压测文件内容 '||name||' 预算 年度预算 项目',
+                      E'([\u4e00-\u9fff])', E' \1 ', 'g')
 FROM perf_files
 ON CONFLICT (file_id) DO NOTHING;
 
@@ -252,12 +256,10 @@ WHERE n <= 8000;
 
 \echo 'seeding favorites'
 
--- File favorites: 90,000 distinct files (folders only number 10,000, so the
--- folder share tops up the remaining 10,000 to reach the 100,000 minimum).
 INSERT INTO favorites(id,user_id,file_id,folder_id)
 SELECT 'pfa_'||n, 'pu_'||(((n - 1) % 1000) + 1), f.id, NULL
 FROM (SELECT id,row_number() OVER (ORDER BY id) AS n FROM files) f
-WHERE n <= 90000;
+WHERE n <= 80000;
 
 INSERT INTO favorites(id,user_id,file_id,folder_id)
 SELECT 'pfb_'||n, 'pu_'||(((n - 1) % 1000) + 1), NULL, f.id

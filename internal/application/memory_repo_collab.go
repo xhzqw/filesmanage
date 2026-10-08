@@ -280,3 +280,34 @@ func (r *memoryRepo) FileSharesForSubject(_ context.Context, userID string, grou
 	}
 	return out, nil
 }
+
+// UpsertFileText keeps the in-memory index row for unit tests.
+func (r *memoryRepo) UpsertFileText(_ context.Context, fileID string, seq int, content, spaced string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.fileText == nil {
+		r.fileText = map[string]memoryFileText{}
+	}
+	r.fileText[fileID] = memoryFileText{Seq: seq, Content: content, Spaced: spaced}
+	return nil
+}
+
+// FileIDsMissingText lists active files without an index row for the backfill.
+func (r *memoryRepo) FileIDsMissingText(_ context.Context, limit int) ([]string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]string, 0, limit)
+	for id, file := range r.files {
+		if file.DeletedAt != nil {
+			continue
+		}
+		if _, indexed := r.fileText[id]; indexed {
+			continue
+		}
+		out = append(out, id)
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out, nil
+}

@@ -14,32 +14,39 @@ import (
 // memoryRepo is an in-memory ports.Repository for unit tests. Only the paths
 // under test carry behavior; untouched methods return zero values.
 type memoryRepo struct {
-	mu            sync.Mutex
-	users         map[string]memoryUser
-	departments   []domain.Department
-	workgroupList []domain.Workgroup
-	groupMembers  map[string][]string
-	policies     map[string]domain.ApprovalPolicy
-	approvals    []domain.Approval
-	locks        map[string]domain.EditLock
+	mu             sync.Mutex
+	users          map[string]memoryUser
+	departments    []domain.Department
+	workgroupList  []domain.Workgroup
+	groupMembers   map[string][]string
+	policies       map[string]domain.ApprovalPolicy
+	approvals      []domain.Approval
+	locks          map[string]domain.EditLock
 	officeSessions []domain.OfficeSession
-	saveEvents    []domain.OfficeSaveEvent
-	compatReports []domain.OfficeCompatibilityReport
-	derivatives   []domain.ModelDerivative
+	saveEvents     []domain.OfficeSaveEvent
+	compatReports  []domain.OfficeCompatibilityReport
+	derivatives    []domain.ModelDerivative
 	derivativeJobs []memoryJob
 	shares         []domain.Share
 	favorites      []domain.Favorite
-	sessions     map[string]memorySession
-	folders      map[string]domain.Folder
-	files        map[string]domain.File
-	versions     map[string][]domain.FileVersion
-	blobs        map[string]domain.Blob
-	grants       map[string]domain.ACL
-	trash        []domain.TrashEntry
-	workgroups   map[string][]string
-	audit        []domain.AuditEvent
-	idempotency  map[string][]byte
-	failOnCommit bool
+	sessions       map[string]memorySession
+	folders        map[string]domain.Folder
+	files          map[string]domain.File
+	fileText       map[string]memoryFileText
+	versions       map[string][]domain.FileVersion
+	blobs          map[string]domain.Blob
+	grants         map[string]domain.ACL
+	trash          []domain.TrashEntry
+	workgroups     map[string][]string
+	audit          []domain.AuditEvent
+	idempotency    map[string][]byte
+	failOnCommit   bool
+}
+
+type memoryFileText struct {
+	Seq     int
+	Content string
+	Spaced  string
 }
 
 type memoryUser struct {
@@ -55,18 +62,18 @@ type memorySession struct {
 
 func newMemoryRepo() *memoryRepo {
 	return &memoryRepo{
-		users:       map[string]memoryUser{},
-		sessions:    map[string]memorySession{},
-		folders:     map[string]domain.Folder{},
-		files:       map[string]domain.File{},
-		versions:    map[string][]domain.FileVersion{},
-		blobs:       map[string]domain.Blob{},
-		grants:      map[string]domain.ACL{},
-		workgroups:  map[string][]string{},
-		idempotency: map[string][]byte{},
+		users:        map[string]memoryUser{},
+		sessions:     map[string]memorySession{},
+		folders:      map[string]domain.Folder{},
+		files:        map[string]domain.File{},
+		versions:     map[string][]domain.FileVersion{},
+		blobs:        map[string]domain.Blob{},
+		grants:       map[string]domain.ACL{},
+		workgroups:   map[string][]string{},
+		idempotency:  map[string][]byte{},
 		groupMembers: map[string][]string{},
-		policies:    map[string]domain.ApprovalPolicy{},
-		locks:       map[string]domain.EditLock{},
+		policies:     map[string]domain.ApprovalPolicy{},
+		locks:        map[string]domain.EditLock{},
 	}
 }
 
