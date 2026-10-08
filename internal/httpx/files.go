@@ -26,6 +26,10 @@ func (h *Handler) uploadFile(c *gin.Context) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadBytes)
 	header, err := c.FormFile("file")
 	if err != nil {
+		if isBodyTooLarge(err) {
+			c.JSON(413, gin.H{"ok": false, "error": gin.H{"code": "E_TOO_LARGE"}})
+			return
+		}
 		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
 		return
 	}
@@ -250,6 +254,12 @@ func decodeDataURL(raw string) ([]byte, error) {
 		return nil, nil
 	}
 	return base64.StdEncoding.DecodeString(raw)
+}
+
+// isBodyTooLarge detects the MaxBytesReader trip so the transport reports the
+// SPEC 413 instead of a generic 400.
+func isBodyTooLarge(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "request body too large")
 }
 
 func contentTypeOr(fallback string) string {
