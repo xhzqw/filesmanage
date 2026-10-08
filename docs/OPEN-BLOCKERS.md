@@ -1,6 +1,6 @@
 # Open blockers
 
-Status date: 2026-10-08 (Milestone 7 acceptance evidence collected).
+Status date: 2026-10-09 (final full-gate re-run, commit 1b91ba7). No new blockers; two earlier measurement caveats closed.
 
 | ID | Blocker | Impact | Needed from customer / next probe |
 |---|---|---|---|
@@ -14,7 +14,7 @@ Status date: 2026-10-08 (Milestone 7 acceptance evidence collected).
 | ~~BLK-08~~ | `/search` page was missing from the React app | RESOLVED | SearchPanel shipped (commit `3dd8682`): filters, result table, safe `<mark>` snippets, "1000+" capped total; browser-verified |
 
 | ~~BLK-09~~ | DO05 byte-level fidelity after commit | RESOLVED | `scripts/do05_header_footer_check.py` (15/15): header/footer/page-break all survive the real commit path |
-| ~~BLK-10~~ | AG12 CAD-saturation isolation | RESOLVED | `scripts/pe12_cad_saturation.py` measured twice (ratios x0.76-x1.31, absolute p95 < 11ms); the ratio gate is noise-sensitive at these absolute values |
+| ~~BLK-10~~ | AG12 CAD-saturation isolation | RESOLVED | `scripts/pe12_cad_saturation.py` PASS 7/7 in the 2026-10-09 final re-run (x0.93–x1.14, all inside the SPEC 25% budget). The one earlier failing run (x1.64) was traced to the loopback perf instance co-running and contaminating the baseline; with the perf instance stopped the same script passes. Latency-measuring gates must run with the perf instance stopped. |
 
 Resolved this milestone:
 - ~~Folder-filtered search/stats/export could bypass the visibility scope~~ → scope intersection + placeholder fix, 31/31 E2E.

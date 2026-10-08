@@ -582,3 +582,54 @@ is taken through the callback path directly — the same path the editor uses.
   filters are complete and verified); recorded as the next frontend task.
 - 100/200-user budget misses are capacity findings on a shared host, not code
   defects; the dedicated reference environment is the SPEC's remedy.
+
+
+## Final full-gate re-run (2026-10-09, commit 1b91ba7)
+
+Every gate re-executed on the target against the running dev instance
+(18091 → filesmanage_v21) and, where noted, the loopback perf instance
+(18092 → filesmanage_perf). No gate was carried over on trust.
+
+| Gate | Result | Notes |
+|---|---|---|
+| `check_architecture.py` | PASS | 71 Go files, 41 TS modules; negative-rule self-tests |
+| `go test ./...` | PASS | 4 test packages, 0 failures |
+| `verify_migration.py` | PASS | static DDL contract; runtime checksums via migrate -check |
+| `unauth_security_smoke.py` | PASS 17/17 | |
+| `m7_security_e2e.py` | PASS 31/31 | |
+| `s_matrix_e2e.py` | PASS 32/32 | |
+| `rb_rollback_e2e.py` | PASS 27/27 | append-only rollback (DEC-13) |
+| `pt_samples_e2e.py` | PASS 112/112 | byte fidelity incl. BOM/CRLF/truncation |
+| `mc_cad_e2e.py` | PASS 57/57 | IGES via OCCT-shipped samples |
+| `do05_header_footer_check.py` | PASS 15/15 | header/footer/page-break survive the real commit path |
+| `perf_readiness_audit.py` | PASS 12/12 | users=1001, files=100433, versions=402618 |
+| `perf_csv_export_check.py` | PASS 9/9 | rows=100433, TTFB 1548 ms, 10,208,082 bytes |
+| `perf_upload_stress.py` | PASS 10/10 | 10x100 MB, wall 25.7 s, checksums verified |
+| `media_range_check.py` | PASS 10/10 | fresh 10,454,399-byte MP4 upload; 206/416/suffix ranges |
+| `office_session_check.py` | PASS 12/12 | 5 sessions, open p95 64 ms, unique document keys |
+| `pe12_cad_saturation.py` | PASS 7/7 | clean-environment ratios x0.93-x1.14 (see note) |
+| `test_backup_manifest.py` | PASS 12/12 | |
+| `backup_restore_drill.py` | PASS | 26 tables, 222 blobs, scratch DB removed |
+| `loadtest.py --users 10` | PASS 11/11 | all endpoint p95 inside SPEC budgets |
+| `loadtest.py --users 100` | capacity-bound | shared-host PostgreSQL ceiling (BLK-07), not a code defect |
+| OpenAPI contract | DELIVERED | 50 paths / 66 operations / 46 schemas; `gen_openapi.py --check` drift guard |
+
+### PE12 measurement note (commit 1b91ba7)
+
+The first clean-environment run of `pe12_cad_saturation.py` failed its ratio
+gate (x1.22 / x1.64 / x1.41). Cause: the loopback perf instance (18092) was
+running concurrently on the same host, sharing CPU and the same PostgreSQL
+server, so the "idle baseline" was not idle. After stopping the perf instance
+the same script measured x0.94 / x1.14 / x0.93 — inside the SPEC 25% budget —
+confirming the failure was measurement contamination, not a regression. Gates
+that measure main-API latency must run with the perf instance stopped.
+
+### OpenAPI contract (commit 1b91ba7)
+
+`docs/openapi-implemented.yaml` previously documented 7 routes while the router
+served 66. `scripts/gen_openapi.py` now derives the contract from the
+implemented route table and handler payload builders: 50 paths, 66 operations,
+46 component schemas, session/JWT/source-token security schemes, the SPEC 5.3
+error envelope on every >=400 response, and admin-only / mustChangePassword
+semantics documented per operation. `python3 scripts/gen_openapi.py --check`
+fails when the router changes without regenerating the contract.

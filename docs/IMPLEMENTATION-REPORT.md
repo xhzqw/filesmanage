@@ -225,8 +225,44 @@ ONLYOFFICE editor (screenshot evidence in TEST-EVIDENCE §M5).
 | AG09 crash between commit and rename recovers | staging/reconciliation protocol; M2 evidence |
 | AG10 approval vs rollback concurrency, one winner | `TestApprovalWorkflow` single-winner + `rb_rollback_e2e.py` |
 | AG11 share revocation visible on the next request | `m7_security_e2e.py` (31/31, revocation immediacy) |
-| AG12 CAD worker saturation vs login/list p95 | `scripts/pe12_cad_saturation.py` (two runs, ratios x0.76-x1.31, absolute p95 < 11ms) |
+| AG12 CAD worker saturation vs login/list p95 | `scripts/pe12_cad_saturation.py` (final re-run 2026-10-09: 7/7 PASS, ratios x0.93–x1.14 with the perf instance stopped; one failing run traced to perf-instance baseline contamination) |
 | AG13 editor disconnect recovery via TTL + callback | office session lifecycle tests + TTL design |
 | AG14 stale frontend requests never overwrite | PT10 A/B 409 in `pt_samples_e2e.py`; request-key/cursor fixes from M2 |
 | AG15 new APIs traceable to use cases | `docs/openapi-implemented.yaml` + the S/RB-T/PT/MC matrices above |
 | AG16 injected cross-layer import fails CI | `check_architecture.py` negative rule self-tests (fail-closed) |
+
+
+---
+
+## Final full-gate re-run and OpenAPI delivery (2026-10-09, commit 1b91ba7)
+
+Scope: re-execute every acceptance gate on the target against the live
+services, and close the last contract gap.
+
+- **OpenAPI contract delivered.** `docs/openapi-implemented.yaml` documented
+  7 routes while the router served 66. `scripts/gen_openapi.py` now derives
+  the contract from the implemented route table and handler payload builders:
+  50 paths, 66 operations, 46 component schemas, session/JWT/source-token
+  security schemes, the SPEC 5.3 error envelope on every >=400 response, and
+  per-operation admin-only / mustChangePassword semantics. `--check` fails on
+  drift so the contract cannot silently diverge from the router.
+- **All gates re-executed and green** (details and numbers in TEST-EVIDENCE.md
+  "Final full-gate re-run"): architecture 71 Go / 41 TS; `go test ./...`;
+  migration contract; unauth smoke 17/17; security E2E 31/31; S matrix 32/32;
+  rollback 27/27; PT fidelity 112/112; CAD matrix 57/57; DO05 15/15; dataset
+  gate 12/12; CSV export 9/9 (100,433 rows, TTFB 1548 ms); 10×100 MB uploads
+  10/10; MP4 Range 10/10; office sessions 12/12; PE12 7/7; backup/restore
+  drill PASS (26 tables, 222 blobs) + manifest 12/12; loadtest 11/11 at 10
+  users.
+- **PE12 contamination found and documented.** The first re-run of the
+  saturation gate failed (x1.64) because the loopback perf instance was
+  running concurrently and sharing CPU/PostgreSQL; with it stopped the same
+  script measures x0.93–x1.14. Latency gates must run with the perf instance
+  stopped — now recorded in TEST-EVIDENCE and OPEN-BLOCKERS (BLK-10).
+- **100-user capacity fact re-confirmed** (BLK-07): the shared PostgreSQL
+  instance (max_connections=100, other projects attached) bounds concurrency;
+  this is a capacity/environment constraint, not a code defect, and is the
+  only reason G-PERF stays PARTIAL.
+
+No gate was carried over on trust from earlier runs; every number above comes
+from a command executed during this pass on 192.168.1.22.
