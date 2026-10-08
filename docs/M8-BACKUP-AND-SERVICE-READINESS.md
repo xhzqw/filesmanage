@@ -46,6 +46,20 @@ Result: `SUMMARY pass=17 total=17`.
 
 Boundary: this is a focused negative smoke test without actual sessions and does not replace S1–S22, API ACL matrices, cross-user isolation or security penetration testing.
 
+## Build and run scripts (commit 892afbc)
+
+- `scripts/build.sh [--with-tests]`: web build (npm ci / vite build) first —
+the dev server serves `web/dist` from disk, so the Go binaries can never embed
+a stale bundle — then `go build` for server and worker, `go vet`, the
+architecture gate, and with `--with-tests` the full `go test ./...` suite plus
+`migrate -check` checksum re-verification. Verified on target: BUILD_OK
+(server 37M, worker 14M, 11 migrations verified).
+- `scripts/run-dev.sh [start|stop|status]`: starts/stops the isolated dev API
+and CAD worker from the root-only `.secrets/server.env` (never printed),
+verifies `/health/ready`, and normalises to exactly one process of each kind —
+removing the duplicate-process footgun of ad-hoc restarts. 8091 stays reserved
+(BLK-05).
+
 ## Development systemd manifests
 
 - `deploy/filesmanage-v21-dev.service`

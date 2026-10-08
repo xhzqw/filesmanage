@@ -30,3 +30,7 @@ Implementation started 2026-10-08. Status: Milestones 1–6 COMPLETE and verifie
 - Processes: `.bin/server` (API) and `.bin/worker` (CAD conversions) under the workspace; ONLYOFFICE container `filesmanage-office` on 18080.
 - Perf instance: 127.0.0.1:18092 → `filesmanage_perf` (loopback-only, `FILESMANAGE_DB_MAX_CONNS=25`).
 - Migrations 0001–0011 applied to both databases; checksums re-verified by `migrate -check`.
+- Operator scripts: `scripts/build.sh [--with-tests]` (reproducible build:
+  web → go → vet → architecture → tests → migration checksums) and
+  `scripts/run-dev.sh [start|stop|status]` (single-instance dev services with
+  health verification).
