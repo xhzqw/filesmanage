@@ -67,3 +67,48 @@ Unit/engine tests: `TestLanGuardAdmitsConfiguredPeerOnly`, `TestNewEngineEnforce
 
 ## Non-destructive guarantee
 All E2E mutations used either the disposable admin bootstrap flow or the temporary `u_e2e_probe` account (created and removed within the test). No legacy Node/SQLite data, other projects' data, or port 8091 were touched.
+
+## Milestone 2 evidence (all executed on 192.168.1.22, 2026-10-08)
+
+### Gates
+```
+go build ./...            → BUILD_OK
+go vet ./...              → VET_OK
+go test ./...             → ok cmd/server, application, domain, httpx
+python3 scripts/check_architecture.py → ARCHITECTURE PASS: 31 Go files and 24 TS modules
+cd web && npm run build   → tsc --noEmit PASS; vite build ✓
+go run ./cmd/migrate      → APPLIED 0004_file_content_and_folder_creator.sql, APPLIED 0005_trash_purge_columns.sql, MIGRATIONS_OK 5
+```
+
+### API E2E (loopback curl, admin session)
+| Step | Result |
+|---|---|
+| POST /api/folders (create) | 201 folder id returned |
+| POST /api/files (multipart upload) | 201 versionSeq=1, sha256, size |
+| GET /api/files?folder=…&limit=10 | 200 page with item (fixed first-page bug) |
+| GET /api/files/:id/preview | 200 content + byteMeta {utf-8, lf, no BOM, trailing LF} |
+| GET /api/files/:id/bytes | bytes identical to source; X-Content-Sha256 matches local sha256sum |
+| POST /api/files/:id/save {baseSeq:1} | 200 versionSeq=2 (action=edit) |
+| POST /api/files/:id/rollback {targetSeq:1,expectedCurrentSeq:2} | 200 versionSeq=4 chain intact: 1 upload A, 2 edit B, 3 rollback→A, 4 rollback→A; SHA(v4)=SHA(v1) |
+| rollback replay with same idempotencyKey | identical response (versionSeq 4), no new version |
+| DELETE /api/files/:id | 200 trash entry; file preview then 404 |
+| GET /api/trash | 200 entry with deletedByName/deletedAt |
+| POST /api/trash/:id/restore | 200; file readable again |
+| DELETE /api/folders/:id (subtree) | 200 one trash entry; folder list 404, file preview 404 |
+| POST /api/trash/:id/restore (folder) | list 200, file preview 200 |
+| POST /api/folders/:id/acls + GET + DELETE | 201/200/200, audit rows recorded |
+| Error paths | 401 unauth list, 404 unknown file preview, 409 stale baseSeq save, 400 limit=999, 403 ungranted action (unit-tested) |
+
+### Browser E2E (LAN http://192.168.1.22:18091, headless Chromium)
+- Create folder via form → appears in tree; enter folder → breadcrumb updates.
+- Upload via hidden input → table row (name, 67 B, v1, sha prefix, timestamp) + notice "已上传 … 生成 v1 新版本".
+- Preview page: raw content rendered, byteMeta reports "编码 utf-8 · 行尾 mixed · BOM 无 · 末尾换行 有" (CRLF+LF sample correctly detected), SHA-256 shown, version table v1 上传.
+- Delete with confirm → notice "已移入回收站"; /trash lists entry; restore → "回收站为空".
+
+### Data consistency after E2E
+```
+users=6  folders=15 (active 15)  files=3 (active 3)  versions=6
+blobs=3 (ready 3)  trash=3 (restored 3)  audit_events=22 (10 event types)
+idempotency_keys=6  outbox_jobs=0
+.blobs/ready/<2hex>/<sha256> layout on disk; staging directory empty
+```

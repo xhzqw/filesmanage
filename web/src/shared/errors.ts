@@ -1,0 +1,25 @@
+// Shared error-shape helpers. API failures carry a stable `code` field on the
+// thrown Error; features map codes to user-facing copy.
+
+export function errorCode(error:unknown):string{
+ if(error instanceof Error&&"code" in error){
+  const code=error.code;
+  return typeof code==="string"?code:"";
+ }
+ return "";
+}
+
+export const ERROR_COPY:Record<string,string>={
+ E_FORBIDDEN:"没有执行该操作的权限",
+ E_NAME_CONFLICT:"名称已存在，请更换",
+ E_VERSION_CONFLICT:"文件已被其他人修改，请刷新后重试",
+ E_LOCKED:"文件被其他编辑锁定",
+ E_APPROVAL_PENDING:"该目录的修改需要审批",
+ E_PARENT_MISSING:"原位置已不存在，请选择目标目录",
+ E_NOT_FOUND:"资源不存在或已不可访问",
+};
+
+export function errorCopy(error:unknown,fallback:string):string{
+ const code=errorCode(error);
+ return ERROR_COPY[code]??fallback;
+}

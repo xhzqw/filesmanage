@@ -1,11 +1,11 @@
 # Release gates
 
-Overall: NO-GO for production (dev-only system on 18091). Milestone 1 gate: GO for continued development.
+Overall: NO-GO for production (dev-only system on 18091). Milestone gates: M1 GO (dev), M2 GO (dev) pending commit evidence.
 
 | Gate | Scope | Status | Evidence |
 |---|---|---|---|
-| G-M1 | Real login: bootstrap, auth, forced password change, real directory read, browser acceptance, LAN access | **GO (dev)** | docs/IMPLEMENTATION-REPORT.md, docs/TEST-EVIDENCE.md |
-| G-FS | File/folder vertical slice incl. versions, trash, restore | OPEN | Milestone 2 |
+| G-M1 | Real login: bootstrap, auth, forced password change, real directory read, browser acceptance, LAN access | **GO (dev)** | IMPLEMENTATION-REPORT.md, TEST-EVIDENCE.md §M1, commit 6266512 |
+| G-FS | File/folder vertical slice incl. versions, trash, restore | **GO (dev)** | IMPLEMENTATION-REPORT.md, TEST-EVIDENCE.md §M2 |
 | G-ACL | Org + ACL + cross-user isolation tests | OPEN | Milestone 3 |
 | G-WF | Approvals, locks, conflicts, append-only rollback | OPEN | Milestone 4 |
 | G-DOCX | Real DOCX editing + write-back + idempotent callbacks | OPEN (blocked: BLK-02) | Milestone 5 |

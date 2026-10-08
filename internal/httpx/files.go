@@ -1,0 +1,270 @@
+package httpx
+
+import (
+	"encoding/base64"
+	"filesmanage/internal/application"
+	"github.com/gin-gonic/gin"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
+)
+
+// maxUploadBytes caps a single request body; larger uploads are rejected with
+// 413 before any staging write.
+const maxUploadBytes = 1 << 30
+
+func (h *Handler) uploadFile(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	if u.MustChangePassword {
+		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadBytes)
+	header, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+		return
+	}
+	src, err := header.Open()
+	if err != nil {
+		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+		return
+	}
+	defer src.Close()
+	result, err := h.S.CommitUpload(c.Request.Context(), u,
+		c.PostForm("folderId"), header.Filename, header.Header.Get("Content-Type"),
+		c.PostForm("idempotencyKey"), src)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(201, gin.H{"ok": true, "data": gin.H{
+		"fileId": result.FileID, "versionSeq": result.VersionSeq, "sha256": result.Sha256,
+		"size": result.Size, "name": result.Name, "folderId": result.FolderID, "deduplicated": result.Dedup,
+	}})
+}
+
+func (h *Handler) listFiles(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	if u.MustChangePassword {
+		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
+		return
+	}
+	folderID := c.Query("folder")
+	if folderID == "" {
+		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+		return
+	}
+	limit := 50
+	if raw := c.Query("limit"); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 1 {
+			c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+			return
+		}
+		limit = parsed
+	}
+	cursor := application.DecodeFileCursor(c.Query("sort"), c.Query("cursor"))
+	page, err := h.S.ListFiles(c.Request.Context(), u, folderID, c.Query("sort"), cursor, limit)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	data := make([]gin.H, 0, len(page.Items))
+	for _, f := range page.Items {
+		data = append(data, filePayload(f))
+	}
+	payload := gin.H{"items": data, "nextCursor": page.NextCursor}
+	c.JSON(200, gin.H{"ok": true, "data": payload})
+}
+
+func (h *Handler) fileMeta(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	file, versions, err := h.S.FileMeta(c.Request.Context(), u, c.Param("id"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	versionData := make([]gin.H, 0, len(versions))
+	for _, v := range versions {
+		versionData = append(versionData, versionPayload(v))
+	}
+	c.JSON(200, gin.H{"ok": true, "data": gin.H{
+		"file": filePayload(file), "versions": versionData,
+	}})
+}
+
+func (h *Handler) downloadFile(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	download, closeReader, err := h.S.OpenDownload(c.Request.Context(), u, c.Param("id"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	defer closeReader()
+	c.Header("Content-Type", contentTypeOr(download.ContentType))
+	c.Header("Content-Length", strconv.FormatInt(download.Size, 10))
+	c.Header("X-Content-Sha256", download.Sha256)
+	c.Header("Content-Disposition", contentDisposition(download.FileName))
+	c.Status(200)
+	_, _ = io.Copy(c.Writer, download.Reader)
+}
+
+func (h *Handler) previewFile(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	preview, err := h.S.Preview(c.Request.Context(), u, c.Param("id"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true, "data": gin.H{
+		"fileId": preview.FileID, "name": preview.Name, "contentType": preview.ContentType,
+		"size": preview.Size, "sha256": preview.Sha256, "textual": preview.Textual,
+		"truncated": preview.Truncated, "content": preview.Content, "byteMeta": preview.ByteMeta,
+	}})
+}
+
+func (h *Handler) saveFile(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	if u.MustChangePassword {
+		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 64<<20)
+	var req struct {
+		Data           string
+		BaseSeq        int
+		IdempotencyKey string
+	}
+	if c.ShouldBindJSON(&req) != nil || req.BaseSeq <= 0 {
+		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+		return
+	}
+	content, err := decodeDataURL(req.Data)
+	if err != nil {
+		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+		return
+	}
+	result, err := h.S.Save(c.Request.Context(), u, c.Param("id"), content, req.BaseSeq, req.IdempotencyKey)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true, "data": gin.H{
+		"fileId": result.FileID, "versionSeq": result.VersionSeq,
+		"sha256": result.Sha256, "size": result.Size, "status": "committed",
+	}})
+}
+
+func (h *Handler) fileVersions(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	file, versions, err := h.S.FileMeta(c.Request.Context(), u, c.Param("id"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	_ = file
+	data := make([]gin.H, 0, len(versions))
+	for _, v := range versions {
+		data = append(data, versionPayload(v))
+	}
+	c.JSON(200, gin.H{"ok": true, "data": data})
+}
+
+func (h *Handler) rollbackFile(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	if u.MustChangePassword {
+		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
+		return
+	}
+	var req struct {
+		TargetSeq          int
+		ExpectedCurrentSeq int
+		Reason             string
+		IdempotencyKey     string
+	}
+	if c.ShouldBindJSON(&req) != nil || req.TargetSeq <= 0 || req.ExpectedCurrentSeq <= 0 {
+		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+		return
+	}
+	result, err := h.S.Rollback(c.Request.Context(), u, c.Param("id"), req.TargetSeq, req.ExpectedCurrentSeq, req.Reason, req.IdempotencyKey)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true, "data": gin.H{
+		"versionSeq": result.VersionSeq, "action": "rollback",
+		"rollbackTargetSeq": req.TargetSeq, "rollbackFromSeq": req.ExpectedCurrentSeq,
+		"sha256": result.Sha256, "status": "committed",
+	}})
+}
+
+func (h *Handler) deleteFile(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	if u.MustChangePassword {
+		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
+		return
+	}
+	entry, err := h.S.DeleteFile(c.Request.Context(), u, c.Param("id"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true, "data": trashPayload(entry)})
+}
+
+// decodeDataURL accepts a raw base64 body or a data: URL prefix.
+func decodeDataURL(raw string) ([]byte, error) {
+	if i := strings.Index(raw, ","); strings.HasPrefix(raw, "data:") && i > 0 {
+		raw = raw[i+1:]
+	}
+	if raw == "" {
+		return nil, nil
+	}
+	return base64.StdEncoding.DecodeString(raw)
+}
+
+func contentTypeOr(fallback string) string {
+	if fallback == "" {
+		return "application/octet-stream"
+	}
+	return fallback
+}
+
+func contentDisposition(name string) string {
+	safe := strings.Map(func(r rune) rune {
+		if r == '"' || r == '\\' || r < 0x20 {
+			return '_'
+		}
+		return r
+	}, name)
+	return `attachment; filename="` + safe + `"`
+}

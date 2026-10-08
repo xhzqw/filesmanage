@@ -1,0 +1,72 @@
+import {useEffect,useState} from "react";
+import {useParams,Link} from "react-router-dom";
+import {fileApi} from "../features/documents/api";
+import type {PreviewData,FileVersion} from "../entities/file/model";
+
+const ACTION_LABELS:Record<string,string>={
+ upload:"上传",
+ edit:"编辑",
+ rollback:"回滚",
+ restore:"恢复",
+};
+
+export function Preview(){
+ const{id=""}=useParams();
+ const[preview,setPreview]=useState<PreviewData|null>(null);
+ const[versions,setVersions]=useState<FileVersion[]>([]);
+ const[status,setStatus]=useState("loading");
+
+ useEffect(()=>{
+  let valid=true;
+  setStatus("loading");
+  Promise.all([fileApi.preview(id),fileApi.versions(id)])
+   .then(([data,history])=>{
+    if(!valid)return;
+    setPreview(data);setVersions(history);setStatus("ready");
+   })
+   .catch(()=>{if(valid)setStatus("failed");});
+  return()=>{valid=false;};
+ },[id]);
+
+ return <div className="shell">
+  <header className="header">
+   <div className="brand"><span className="logo-placeholder" aria-label="官方 Logo 尚未导入">标志待入库</span>中晟生物科技 <span className="product">文档治理中心</span></div>
+   <nav aria-label="主导航"><Link to="/doc">返回文档管理</Link></nav>
+  </header>
+  <div className="panels">
+   <main className="work">
+    {status==="loading"&&<p className="empty">正在加载预览…</p>}
+    {status==="failed"&&<p role="alert" className="notice error">无法读取该文件：不存在或没有预览权限。</p>}
+    {status==="ready"&&preview&&<>
+     <div className="breadcrumb">{preview.name} · {preview.size} 字节 · v{versions.at(-1)?.versionSeq??1}</div>
+     <div className="toolbar">
+      <a className="primary" href={"/api/files/"+preview.fileId+"/bytes"} download={preview.name}>下载原始字节</a>
+      <span className="toolbar-hint">SHA-256 {preview.sha256}</span>
+     </div>
+     {preview.textual
+      ?<pre className="preview-text" data-truncated={String(preview.truncated)}>{preview.content}{preview.truncated?"\n…（预览已截断，下载查看完整内容）":""}</pre>
+      :<p className="empty">该格式不支持在线预览，请下载后查看。</p>}
+     <div className="toolbar">
+      <span className="toolbar-hint">编码 {preview.byteMeta.encoding} · 行尾 {preview.byteMeta.eol} · BOM {preview.byteMeta.hasBom?"有":"无"} · 末尾换行 {preview.byteMeta.endsWithNewline?"有":"无"}</span>
+     </div>
+     <div className="table">
+      <table>
+       <thead><tr><th>版本</th><th>动作</th><th>大小</th><th>校验值</th><th>创建人</th><th>时间</th></tr></thead>
+       <tbody>
+        {versions.map(v=><tr key={v.versionSeq}>
+         <td>v{v.versionSeq}</td>
+         <td>{ACTION_LABELS[v.action]??v.action}{v.rollbackTargetSeq?` → v${v.rollbackTargetSeq}`:""}</td>
+         <td>{v.sizeBytes}</td>
+         <td className="hash" title={v.sha256}>{v.sha256.slice(0,12)}…</td>
+         <td>{v.createdBy}</td>
+         <td>{v.createdAt.replace("T"," ").slice(0,16)}</td>
+        </tr>)}
+       </tbody>
+      </table>
+     </div>
+     <p className="hint">回滚以追加新版本方式执行，历史版本不可删除或改写。</p>
+    </>}
+   </main>
+  </div>
+ </div>;
+}

@@ -79,7 +79,7 @@ func TestLanGuardAdmitsConfiguredPeerOnly(t *testing.T) {
 
 func TestNewEngineEnforcesAllowlistOnRoutes(t *testing.T) {
 	t.Setenv("FILESMANAGE_LAN_ALLOW_CIDRS", "127.0.0.1/32,192.168.0.0/16")
-	engine := New(application.New(nil), false, t.TempDir())
+	engine := New(application.New(nil, nil), false, t.TempDir())
 	cases := []struct {
 		remote string
 		want   int

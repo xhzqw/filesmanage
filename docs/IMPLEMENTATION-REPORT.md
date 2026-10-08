@@ -1,32 +1,43 @@
-# Implementation report — Milestone 1: real login
+# Implementation report
 
-Date: 2026-10-08. Host: 192.168.1.22 (openclaw77, Debian 13, Go 1.26.4, PostgreSQL 17.9).
-Workspace: /root/repository77/filesmanage-v21. Commit: see "Git" below.
+Date: 2026-10-08 (Milestones 1 and 2). Host: 192.168.1.22. Workspace: /root/repository77/filesmanage-v21.
 
-## What was done
-1. State audit: existing v2.1 workspace contained Go layered scaffold (domain/ports/application/adapters/httpx), 3 SQL migrations, React shell; `filesmanage_v21` database existed with all 3 migrations applied but zero business rows (no admin user). Legacy Node/SQLite project and port 8091 untouched.
-2. Migration verification: `go run ./cmd/migrate -check` → `CHECK 0001_core.sql`, `CHECK 0002_version_invariants.sql`, `CHECK 0003_acl_and_hierarchy.sql`, `MIGRATIONS_OK 3` (recorded SHA-256 checksums match files; re-runs never re-apply).
-3. Secure bootstrap: initial admin credential regenerated with `openssl rand -base64 48` (64 chars), written to `.secrets/bootstrap.password` (umask 077 → 0600); `go run ./cmd/bootstrap` with `FILESMANAGE_ALLOW_BOOTSTRAP=new-empty-database` → `BOOTSTRAP_OK users=6 departments=2 groups=1 folders=8 legacy_data_imported=0`. Bootstrap holds a transaction advisory lock and refuses to run when `users` is non-empty.
-4. LAN access support (user-requested): `cmd/server/main.go` accepts non-loopback binding only with explicit `FILESMANAGE_ALLOW_LAN_HTTP=true`; `internal/httpx` gained a fail-closed source-IP allowlist middleware (`FILESMANAGE_LAN_ALLOW_CIDRS`, default `127.0.0.1/32,::1/128,192.168.1.0/24`, runtime config `127.0.0.1/32,::1/128,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12`). Allowlist reads the kernel socket peer (RemoteAddr), never forwarded headers; a malformed/empty allowlist panics at startup instead of opening the service.
-5. Build & start: `go build -o .bin/server ./cmd/server`; `npm run build` (tsc --noEmit + vite build) both PASS; service started via setsid on `0.0.0.0:18091` (process verified alive, socket `*:18091`).
-6. Acceptance matrix executed (14 checks, all PASS) — see TEST-EVIDENCE.md.
-7. Browser acceptance (headless Chromium): login page → login → `/doc` with real folder tree (7 visible nodes under root incl. 市场部/研发部 branches) → reload keeps session → logout returns to `/login`, `/api/me` → 401, deep link `/doc` redirects to `/login`.
-8. FirstSignIn E2E with a temporary account (`u_e2e_probe`, user-level `list` grant on `folder_market`): login redirected to `/first-sign-in`; folder API answered 403 before the change; completing the form landed on `/doc` showing exactly the granted subtree; account and ACL deleted afterwards (verified back to 6 users / 2 ACLs).
-9. Defect fixed during E2E: FolderTree rendered only from `parentId===null`, so any user whose grant starts below the invisible root saw an empty tree. Now folders whose parent is outside the visible set render as top level; Documents anchors the breadcrumb to the first visible root when the requested/default folder is not visible.
+---
 
-## Files changed (main)
-- `cmd/server/main.go` (loopback guard + LAN opt-in), `internal/httpx/router.go` (allowlist middleware), `internal/httpx/router_test.go` (new), `cmd/server/main_test.go` (new)
-- `web/src/features/folders/FolderTree.tsx`, `web/src/pages/Documents.tsx`
-- `docs/*` status/report/evidence/blockers/gates (this set)
+## Milestone 1 — real login (GO for development)
 
-## Git
-Commit after Milestone 1 verification (single commit for the M1 slice, secrets excluded via .gitignore).
+Report: admin bootstrap on `filesmanage_v21`, real bcrypt auth, httpOnly SameSite=Strict session cookies, forced first-login password change, LAN-bounded dev service on 0.0.0.0:18091, browser acceptance over http://192.168.1.22:18091. Full acceptance matrix (14 checks), FirstSignIn E2E with a disposable account, negative network control. Evidence in TEST-EVIDENCE.md §M1; commit `6266512`.
 
-## Evidence
-- Service: PID + `ss -ltnp` show `*:18091`; `GET /health/ready` → 200 `{"ok":true}` from loopback, LAN client and direct (no-proxy) path.
-- DB rows: admin `must_change_password=false` after change, `$2a$10$` bcrypt prefix; sessions revoked on logout; 8 folders; 2 ACLs; audit `bootstrap/new-install/success`.
-- Negative network check: probe instance with allowlist `203.0.113.0/24` rejected loopback with 403 `E_NETWORK`, proving source-IP enforcement.
+Defect found and fixed during M1: FolderTree rendered only from `parentId===null`, so a user whose grant starts below an invisible root saw an empty tree. Granted folders whose parent is outside the visible set now render as top level.
 
-## Known issues / next
-- Seeded staff accounts have unusable passwords by design; user management (credential issue, disable) is Milestone 3.
-- Milestone 2 (file/folder vertical slice with real blobs) starts next.
+---
+
+## Milestone 2 — file/folder vertical slice (verified end-to-end)
+
+### What was built
+- Unit-of-work architecture: `ports.UnitOfWork/Tx`; every write use case runs in one transaction (TX-01). Reads use the same contract through a tx handle; blob bytes stage outside transactions and are only referenced inside them (TX-02).
+- Blob adapter (`internal/adapter/blob`): content-addressed store (`.blobs/ready/<2hex>/<sha256>`), random staging names, atomic rename publish, digest re-computed from disk, dedup of identical content, traversal-proof key validation.
+- Folders: create (upload on parent), rename, move (cycle guard trigger), recursive soft delete collapsing into exactly one top-level trash entry, restore of whole subtree.
+- Files: multipart streaming upload (1 GiB cap), upload → blob → file + v1 in one transaction, name-conflict rejection, idempotency-key replay; keyset-paginated list (5 sorts, cursor includes sort key + id, limit clamp 1–200); preview with byte-fidelity metadata (encoding/BOM/EOL/trailing newline, 256 KiB truncation flag); authoritative byte download (SHA-256 header); save with baseSeq CAS; append-only rollback (DEC-13); soft delete; versions history; rename.
+- Trash: list (own entries + restorable entries via upload grant on the original parent chain), restore with optional destination/new name (E_PARENT_MISSING / E_NAME_CONFLICT), purge (admin only, marks GC).
+- Grants: list/create/revoke, admin-only, subject existence + action whitelist validated, audit on every mutation. Audit events cover upload/save/rollback/delete/restore/purge/folder and ACL operations with request ids.
+- Migrations 0004 (files.content_type, folders.created_by) and 0005 (trash purged_at/purge_after) applied; checksums re-verified by `migrate -check`.
+- Frontend: FSD-compliant Documents page (FolderTree + NewFolderForm + FolderActions + FileTable), Preview page (content, byte meta, version table, raw-byte download), Trash page (list + restore), shared error-code mapping, shared idempotency-key generator that works on non-secure-context LAN http.
+
+### Verification (executed, all PASS)
+- Go: `go build ./...`, `go vet ./...`, `go test ./...` (application use cases incl. DEC-13 append-only rollback, idempotent replay, permission matrix; domain ACL rules; cursor pagination; byte-fidelity analysis; httpx allowlist tests; cmd/server tests) — PASS.
+- `scripts/check_architecture.py` — PASS (31 Go files, 24 TS modules, negative self-tests).
+- Web: `tsc --noEmit` + `vite build` — PASS.
+- API E2E over loopback: create folder → upload (checksum match on download bytes) → preview (meta correct) → save v2 (CAS) → rollback to v1 producing v4 with SHA(v4)=SHA(v1) and v1/v2/v3 intact → idempotent replay of the same rollback key returned the same seq (no duplicate version) → delete → trash → restore → folder subtree delete/restore → grant create/list/revoke. Error paths: 401 unauthenticated, 404 unknown file, 409 stale baseSeq, 400 over-limit, 403 ungranted action.
+- Browser E2E over LAN (headless Chromium): login → create folder via form → enter folder → upload via hidden input (row + notice) → preview page with byte fidelity (mixed EOL correctly reported) → delete with confirm → trash page → restore.
+- DB assertions after E2E: users=6, folders=15, files=3, versions=6, blobs=3 (all ready, content-addressed on disk), trash=3 all restored, audit_events=22 across 10 event types, idempotency_keys=6, staging directory empty (no orphaned staging files).
+
+### Defects found and fixed during M2
+1. File list first page returned empty: an absent cursor was passed as a keyset filter. Cursor is now omitted entirely when empty (regression covered by `TestListFilesAppliesPaginationLimit`).
+2. `GET /api/trash` returned 500 because `trash_entries.purged_at` was referenced but not in the schema; migration 0005 adds `purged_at` and the reserved `purge_after`.
+3. Trash payloads reported a zero `deleted_at` because the insert result was not reflected back; the use case now stamps the entry with the service clock.
+4. Browser upload failed on LAN http because `crypto.randomUUID` requires a secure context; a shared fallback key generator is used.
+
+### Known gaps (deliberate scope)
+- Edit locks, approval workflow, sharing, favorites, full-text search, stats/CSV, DOCX/CAD: later milestones. Writes on approval-policy folders are already blocked with `E_APPROVAL_PENDING` so review can never be bypassed.
+- Seeded staff accounts still have unusable passwords; user management ships in Milestone 3.

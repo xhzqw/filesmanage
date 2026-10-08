@@ -2,16 +2,29 @@ package main
 
 import (
 	"context"
+	"filesmanage/internal/adapter/blob"
 	"filesmanage/internal/adapter/postgres"
 	"filesmanage/internal/application"
 	"filesmanage/internal/httpx"
+	"filesmanage/internal/ports"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"io"
 	"log"
 	"net"
 	"os"
 	"strings"
 	"time"
 )
+
+// blobStoreAdapter bridges the concrete blob store to the application port.
+// Go interface satisfaction needs identical signatures, and *blob.Staged does
+// satisfy ports.BlobStage, so only the factory return type is adapted here.
+type blobStoreAdapter struct{ store *blob.Store }
+
+func (a blobStoreAdapter) Stage() (ports.BlobStage, error) { return a.store.Stage() }
+func (a blobStoreAdapter) Open(key string) (io.ReadSeekCloser, error) {
+	return a.store.Open(key)
+}
 
 func isLoopbackAddr(addr string) bool {
 	host := addr
@@ -57,7 +70,12 @@ func main() {
 	if !secure && !isLoopbackAddr(addr) && os.Getenv("FILESMANAGE_ALLOW_LAN_HTTP") != "true" {
 		log.Fatal("cleartext cookies require loopback binding or FILESMANAGE_ALLOW_LAN_HTTP=true")
 	}
-	r := httpx.New(application.New(postgres.New(pool)), secure, "web/dist")
+	blobDir := os.Getenv("FILESMANAGE_BLOB_DIR")
+	if blobDir == "" {
+		blobDir = ".blobs"
+	}
+	store := blobStoreAdapter{store: blob.New(blobDir)}
+	r := httpx.New(application.New(postgres.New(pool), store), secure, "web/dist")
 	log.Println("filesmanage isolated development server listening ", addr)
 	if err = r.Run(addr); err != nil {
 		log.Fatal(err)

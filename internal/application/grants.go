@@ -1,0 +1,140 @@
+package application
+
+import (
+	"context"
+	"errors"
+	"filesmanage/internal/domain"
+	"time"
+)
+
+// Grant use cases. Managing grants is an administrative capability in this
+// slice (SPEC §2.5 manage_acl, default admin only); listing requires list on
+// the folder.
+
+func (s *Service) ListGrants(ctx context.Context, u domain.User, folderID string) ([]domain.ACL, error) {
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	folder, err := s.activeFolder(ctx, tx, folderID)
+	if err != nil {
+		return nil, err
+	}
+	if !u.IsAdmin {
+		if err = s.require(ctx, tx, u, folder.ID, domain.ActionList); err != nil {
+			return nil, err
+		}
+	}
+	return tx.ListGrants(ctx, folder.ID)
+}
+
+type GrantRequest struct {
+	SubjectKind string
+	SubjectID   string
+	Actions     []domain.Action
+	ScopeOnly   bool
+	ExpiresAt   *time.Time
+}
+
+func (s *Service) CreateGrant(ctx context.Context, u domain.User, folderID string, req GrantRequest) (domain.ACL, error) {
+	if !u.IsAdmin {
+		return domain.ACL{}, domain.ErrForbidden
+	}
+	if len(req.Actions) == 0 || (req.SubjectKind != "user" && req.SubjectKind != "group") || req.SubjectID == "" {
+		return domain.ACL{}, domain.ErrInvalidInput
+	}
+	for _, a := range req.Actions {
+		if !domain.AllowedAction(a) {
+			return domain.ACL{}, domain.ErrInvalidInput
+		}
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return domain.ACL{}, err
+	}
+	defer tx.Rollback(ctx)
+	folder, err := s.activeFolder(ctx, tx, folderID)
+	if err != nil {
+		return domain.ACL{}, err
+	}
+	if err = s.assertSubjectExists(ctx, tx, req.SubjectKind, req.SubjectID); err != nil {
+		return domain.ACL{}, err
+	}
+	grant := domain.ACL{
+		ID: NewID("acl"), FolderID: folder.ID, SubjectKind: req.SubjectKind, SubjectID: req.SubjectID,
+		Actions: req.Actions, ScopeOnly: req.ScopeOnly, GrantedBy: u.ID,
+	}
+	if req.ExpiresAt != nil {
+		grant.ExpiresAt = req.ExpiresAt
+	}
+	if err = tx.InsertGrant(ctx, grant); err != nil {
+		return domain.ACL{}, mapError(err)
+	}
+	audit(ctx, tx, u, "acl.create", "folder", folder.ID, "success",
+		map[string]any{"grantId": grant.ID, "subjectKind": req.SubjectKind, "subjectId": req.SubjectID, "actions": actionNames(req.Actions)})
+	if err = tx.Commit(ctx); err != nil {
+		return domain.ACL{}, err
+	}
+	return grant, nil
+}
+
+func (s *Service) RevokeGrant(ctx context.Context, u domain.User, grantID string) error {
+	if !u.IsAdmin {
+		return domain.ErrForbidden
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	grant, err := tx.GrantByID(ctx, grantID)
+	if err != nil {
+		return domain.ErrNotFound
+	}
+	if err = tx.DeleteGrant(ctx, grantID); err != nil {
+		return mapError(err)
+	}
+	audit(ctx, tx, u, "acl.revoke", "folder", grant.FolderID, "success",
+		map[string]any{"grantId": grantID, "subjectKind": grant.SubjectKind, "subjectId": grant.SubjectID})
+	return tx.Commit(ctx)
+}
+
+func (s *Service) assertSubjectExists(ctx context.Context, repo domainSubjectProbe, kind, id string) error {
+	switch kind {
+	case "user":
+		found, err := repo.UserExists(ctx, id)
+		if err != nil {
+			return err
+		}
+		if !found {
+			return domain.ErrInvalidInput
+		}
+	case "group":
+		found, err := repo.WorkgroupExists(ctx, id)
+		if err != nil {
+			return err
+		}
+		if !found {
+			return domain.ErrInvalidInput
+		}
+	default:
+		return domain.ErrInvalidInput
+	}
+	return nil
+}
+
+type domainSubjectProbe interface {
+	UserExists(context.Context, string) (bool, error)
+	WorkgroupExists(context.Context, string) (bool, error)
+}
+
+func actionNames(actions []domain.Action) []string {
+	out := make([]string, 0, len(actions))
+	for _, a := range actions {
+		out = append(out, string(a))
+	}
+	return out
+}
+
+var _ = errors.Is
