@@ -416,6 +416,27 @@ extraction dispatch, docx container reading, snippet windowing.
   (26 tables, 41 media objects) with 12/12 manifest unit tests.
 - Machine-readable reports under `.secrets/perf/` (root-only, not committed).
 
+### Consolidated acceptance gate (2026-10-08, one pass over every executable check)
+
+| Check | Result |
+|---|---|
+| `perf_readiness_audit.py` (§24.2 dataset) | DATASET_READY_FOR_BASELINE (12/12) |
+| `unauth_security_smoke.py` | 17/17 |
+| `m7_security_e2e.py` (cross-user security) | PASS (31/31) |
+| `rb_rollback_e2e.py` (DEC-13 rollback) | PASS (27/27) |
+| `s_matrix_e2e.py` (S1–S18) | PASS (32/32) |
+| `pt_samples_e2e.py` (PT01–PT12) | PASS (112/112) |
+| `perf_csv_export_check.py` | PASS (9/9) |
+| `media_range_check.py` (MP4 Range) | PASS (10/10) |
+| `office_session_check.py` | PASS (12/12) |
+| `perf_upload_stress.py` (10×100MB) | PASS (10/10) |
+| `check_architecture.py` | PASS (71 Go files, 40 TS modules) |
+
+Note: the perf instance (18092 → filesmanage_perf) and the dev instance
+(18091 → filesmanage_v21) keep separate session stores, so checks against the
+perf database log in as the isolated perf user; this is expected isolation, not
+a defect.
+
 ### Executable PT byte-fidelity matrix (commit 15663cd, 112/112 PASS)
 
 `scripts/pt_samples_e2e.py` builds the twelve SPEC §8 fixtures client-side and
