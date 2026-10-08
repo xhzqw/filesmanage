@@ -1,0 +1,30 @@
+[Unit]
+Description=filesmanage v2.1 isolated development API (NOT production port 8091)
+Documentation=file:///root/repository77/filesmanage-v21/docs/M8-BACKUP-AND-SERVICE-READINESS.md
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/root/repository77/filesmanage-v21
+EnvironmentFile=/root/repository77/filesmanage-v21/.secrets/server.env
+ExecStart=/root/repository77/filesmanage-v21/.bin/server
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=20s
+LimitNOFILE=65536
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectControlGroups=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+RestrictSUIDSGID=true
+ReadWritePaths=/root/repository77/filesmanage-v21/.blobs
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
