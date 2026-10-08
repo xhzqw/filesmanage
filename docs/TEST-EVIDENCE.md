@@ -440,6 +440,31 @@ booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
   "no IGES writer on the target" was wrong: reader-side samples exist and are
   the correct vehicle for this acceptance item.
 
+### Cache soak under a key space far past the cap (2026-10-09, 4/4 PASS)
+
+`scripts/cache_soak_check.py` restarts the server fresh, opens 40 distinct
+sessions, then drives **6,000 distinct search queries** — a key space well
+past `maxCacheEntries` (4096), so the eviction path is exercised for real —
+while sampling the server's RSS every 500 queries:
+
+```
+trajectory: 26836kB -> 30464kB -> 29976kB -> ... -> 32164kB (plateau)
+growth after warm-up: 2,332kB over 6,000 distinct queries
+```
+
+A leak would show RSS climbing with the key count; the measured plateau is
+the bound doing its job. The soak then re-confirms revocation immediacy
+*after* all that churn, using a **non-admin** probe (an admin sees every
+folder regardless of grants, so an admin-based check proves nothing): the
+probe sees the uploaded file while granted (`total=1`) and loses it on the
+very next request after the revocation (`total=0`).
+
+Two soak-authoring mistakes were caught and fixed while building it, and are
+worth recording: a revocation check run as the admin is vacuous (grants do
+not constrain admins), and a probe opener without a cookie jar silently
+drops the session cookie (the change-password handler does not rotate it, so
+the jar is all that is needed).
+
 ### Cache memory bound (2026-10-09)
 
 The three in-process caches key on principal + filter, so a long-running
