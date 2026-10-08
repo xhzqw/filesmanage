@@ -440,6 +440,19 @@ booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
   "no IGES writer on the target" was wrong: reader-side samples exist and are
   the correct vehicle for this acceptance item.
 
+### Stability soak: sustained mixed traffic, FD/RSS plateau (2026-10-09)
+
+`scripts/stability_soak.py` restarts the server fresh and drives a realistic
+mix (session validation, folder tree, file list, CJK search, stats and one
+upload per round) for a sustained period while sampling the server's open-FD
+The cache soak proves the caches stay bounded; this one looks for the slow
+leaks a short run cannot see (IO-PERF-04: no FD or goroutine leak under
+sustained traffic). Measured over 10 minutes: 108,684 requests with zero
+5xx, open FDs flat at 9 (spread 0 across every sample), RSS spread 960 kB
+after warm-up. One authoring bug was caught: the cleanup step used a bare
+urlopen without the cookie jar and 401'd *after* the checks had already
+passed - the drill folder is now deleted through the session opener.
+
 ### Visual acceptance evidence (2026-10-09)
 
 `scripts/capture_evidence.mjs` captures every real page through the same

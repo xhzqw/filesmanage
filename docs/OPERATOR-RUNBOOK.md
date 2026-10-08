@@ -142,6 +142,7 @@ perf 实例停止时运行**：perf 实例与 dev 实例共享 CPU 与同一台 
 | 负载 | `python3 scripts/loadtest.py --users 10 --duration 45` | 11/11 |
 | 备份清单 | `python3 scripts/test_backup_manifest.py` | 12/12 |
 | 缓存 soak | `python3 scripts/cache_soak_check.py --queries 6000 --sessions 40` | 4/4（RSS 走平 + 撤销即时） |
+| 稳定性 soak | `python3 scripts/stability_soak.py --minutes 10` | FD/RSS 走平，无 5xx |
 | 备份恢复 | `set -a; . .secrets/server.env; set +a; python3 scripts/backup_restore_drill.py` | PASS |
 | 崩溃恢复 | `python3 scripts/ag09_recovery_drill.py` | 4/4 |
 | 升级回退 | `python3 scripts/upgrade_rollback_drill.py` | 12/12 |
