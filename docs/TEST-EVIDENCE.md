@@ -654,6 +654,34 @@ the same script measured x0.94 / x1.14 / x0.93 — inside the SPEC 25% budget �
 confirming the failure was measurement contamination, not a regression. Gates
 that measure main-API latency must run with the perf instance stopped.
 
+### Acceptance matrix ledger (2026-10-09)
+
+`scripts/gen_acceptance_matrix.py` cross-references every acceptance id
+declared in `docs/SPEC-v2.1.md` (S1-S22, PT01-PT12, RB-T01-12, MC01-18,
+DO01-14, MOD01-10, AG01-16, PE01-18, IO-PERF-01-04 — 126 ids) against the
+delivered evidence documents and a curated per-id evidence map, then emits
+`docs/ACCEPTANCE-MATRIX.md`.
+
+```
+$ python3 scripts/gen_acceptance_matrix.py --check
+acceptance matrix up to date: 126 ids (101 PASS / 24 PARTIAL / 1 EXTERNAL),
+all PARTIAL ids registered
+```
+
+Gate behaviour (all negative-tested):
+- a declared id with no curated row -> generator refuses to emit (fail);
+- an edited matrix -> `--check` exits 1 (drift);
+- a PARTIAL id missing from OPEN-BLOCKERS.md -> `--check` exits 1;
+- both gates run inside `scripts/build.sh` after the architecture gate.
+
+The 24 PARTIAL ids are genuine capability/assertion gaps, not documentation
+gaps: they are registered as BLK-11 (STEP assembly tree / MC02+MOD02), BLK-12
+(material-texture association / MC06+MC07+MC09), BLK-13 (unit hints and
+measurement labels / MC05+MOD03-05), BLK-14 (viewer control surface and WebGL
+failure handling / MOD01+MOD07), BLK-15 (rollback-concurrency-crash edge
+assertions / RB-T06-08+RB-T10-11+AG09), BLK-16 (CAD negative-path assertions
+/ MC04+MC14+MC16+MC17+MOD10); S12 folds into BLK-05 and S20 into BLK-01.
+
 ### OpenAPI contract (commit 1b91ba7)
 
 `docs/openapi-implemented.yaml` previously documented 7 routes while the router

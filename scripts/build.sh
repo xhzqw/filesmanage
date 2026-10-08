@@ -30,6 +30,9 @@ python3 scripts/check_architecture.py
 echo "== openapi contract drift gate =="
 python3 scripts/gen_openapi.py --check
 
+echo "== acceptance matrix gate =="
+python3 scripts/gen_acceptance_matrix.py --check
+
 if [ "${1:-}" = "--with-tests" ]; then
   echo "== go: full test suite =="
   go test ./...

@@ -1,20 +1,27 @@
 # Open blockers
 
-Status date: 2026-10-09 (final full-gate re-run, commit 1b91ba7). No new blockers; two earlier measurement caveats closed.
+Status date: 2026-10-09 (acceptance matrix generated, commit pending). The per-id matrix exposed 24 PARTIAL ids; they are registered below as BLK-11 to BLK-16 (plus S12/S20 folded into BLK-05/BLK-01).
 
 | ID | Blocker | Impact | Needed from customer / next probe |
 |---|---|---|---|
-| BLK-01 | Official 中晟生物科技 Logo binary not yet supplied | Brand page shows explicit "标志待入库" placeholder per DEC-14; must not fake an official logo | Customer delivers verified logo asset (vector/raster) for import |
+| BLK-01 | Official 中晟生物科技 Logo binary not yet supplied (covers S20 / VS01-VS18 brand acceptance: shell delivered, logo asset missing) | Brand page shows explicit "标志待入库" placeholder per DEC-14; must not fake an official logo | Customer delivers verified logo asset (vector/raster) for import |
 | BLK-02 | ~~DOCX editor engine~~ RESOLVED | — | ONLYOFFICE 8.2.2 (AGPL) self-hosted in Docker on 18080 with JWT; DO01–DO14-style E2E verified in M5 |
 | BLK-03 | DWG preview requires a commercial SDK/license (ODA Teigha or similar) | DWG support stays licence-blocked; DXF (native 2D) is delivered | Customer decision: license purchase or accept DWG = documented unsupported |
 | BLK-04 | ~~STEP/IGES converter toolchain~~ RESOLVED | — | gmsh + OpenCASCADE 7.8 installed in the worker; real geometry verified (544 triangles) |
-| BLK-05 | Production port 8091 / systemd cutover not authorized | Delivery stays on dev port 18091; production switch requires explicit approval + backup/rollback drill | Explicit go-live authorization after acceptance gates |
+| BLK-05 | Production port 8091 / systemd cutover not authorized (covers S12: units written and syntax-verified but not installed; upgrade/rollback drill not executed) | Delivery stays on dev port 18091; production switch requires explicit approval + backup/rollback drill | Explicit go-live authorization after acceptance gates |
 | BLK-06 | 2026-10-08 ~22:00: host unreachable on 192.168.1.22 (100% packet loss, no ARP entry) for ~40 min | Implementation paused; resumed over 10.144.144.1 with no data or service loss | Customer to confirm the network path; add a second management route if this recurs |
 | BLK-07 | Shared-host capacity: PostgreSQL instance (max_connections=100) and CPU shared with unrelated services (load 6–7) | §24.3 budgets met at ≤10 users, 10/11 at 30 users; 100/200 users pool-bound | Dedicated reference environment per SPEC PERF-003, or an approved capacity ADR |
 | ~~BLK-08~~ | `/search` page was missing from the React app | RESOLVED | SearchPanel shipped (commit `3dd8682`): filters, result table, safe `<mark>` snippets, "1000+" capped total; browser-verified |
 
 | ~~BLK-09~~ | DO05 byte-level fidelity after commit | RESOLVED | `scripts/do05_header_footer_check.py` (15/15): header/footer/page-break all survive the real commit path |
 | ~~BLK-10~~ | AG12 CAD-saturation isolation | RESOLVED | `scripts/pe12_cad_saturation.py` PASS 7/7 in the 2026-10-09 final re-run (x0.93–x1.14, all inside the SPEC 25% budget). The one earlier failing run (x1.64) was traced to the loopback perf instance co-running and contaminating the baseline; with the perf instance stopped the same script passes. Latency-measuring gates must run with the perf instance stopped. |
+
+| BLK-11 | STEP 多组件装配树与零件显隐未实现（MC02, MOD02）：gmsh 转换输出单一合并网格，查看器无零件树/独立显隐/bbox | 机械装配类文件只能整体查看，不能按组件隐藏/高亮 | 转换器保留组件边界（按 gmsh physical group 输出多 mesh 或改用 OCCT XCAF 路径），查看器增加零件树 |
+| BLK-12 | 材质/纹理关联未实现（MC06 OBJ+MTL、MC07 glTF 外部 .bin/textures、MC09 3MF 多部件材质）：几何渲染正常，但 OBJ 无 MTLLoader，多文件 glTF 以空资源路径解析 | 带材质的机械/产品模型丢失外观信息 | 引入 MTLLoader + glTF 资源路径解析（或改用 GLB），3MF 多部件材质验证 |
+| BLK-13 | 单位提示与量测标注未实现（MC05, MOD03, MOD04, MOD05）：查看器只有格式与三角/顶点数，无源 SHA/尺寸范围/组件数/转换日期，无“未知单位”提示，无测量工具与“近似”标注 | 用户可能把无单位网格误当毫米并误判真实尺寸 | 模型元数据面板 + 未知单位提示 + 近似量测标注 |
+| BLK-14 | 查看器控制面不完整（MOD01, MOD07）：有旋转/平移/缩放/网格，缺重置视角、适配模型、坐标轴、透视/正交切换；WebGL 失效或文件过大时无明确可操作错误与下载入口 | 交互能力低于 SPEC 模型查看器要求；失败态体验差 | 增加 reset/fit/axes/projection 控件、WebGL 上下文丢失监听与降级下载入口 |
+| BLK-15 | 回滚/并发/崩溃恢复边角断言缺失（RB-T06, RB-T07, RB-T08, RB-T10, RB-T11, AG09）：双用户并发回滚、审批目录回滚 pending、拒绝/重复审批下的 rollback 版本、STEP/IGES 回滚后 SHA 与索引/派生重指向、回滚后 GC 不删在用 blob、提交-rename 崩溃恢复演练均无端到端断言 | 追加式回滚在并发与审批交汇处只有间接证据 | rb_rollback_e2e.py 增加并发回滚与审批目录回滚用例；补 STEP/IGES 回滚 SHA 与派生重指向断言；做一次崩溃恢复演练 |
+| BLK-16 | CAD 负向路径断言缺失（MC04, MC14, MC16, MC17, MOD10）：不支持的 IGES 实体错误信息、同版本并发转换去重、pending 审批期间普通用户看旧模型、恶意纹理/zip-slip/异常模型拒绝、未授权账号看不到新几何——行为多由构造保证但无显式测试 | 负向路径无回归保护 | mc_cad_e2e.py 增加畸形 IGES、并发转换去重、pending 期间派生指向、畸形/恶意样本拒绝用例 |
 
 Resolved this milestone:
 - ~~Folder-filtered search/stats/export could bypass the visibility scope~~ → scope intersection + placeholder fix, 31/31 E2E.

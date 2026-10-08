@@ -266,3 +266,28 @@ services, and close the last contract gap.
 
 No gate was carried over on trust from earlier runs; every number above comes
 from a command executed during this pass on 192.168.1.22.
+
+---
+
+## Acceptance matrix ledger (2026-10-09)
+
+The SPEC declares 126 acceptance ids. Until now evidence was tracked per
+suite ("57/57", "31/31"), which could not answer "which id is covered by
+what". `scripts/gen_acceptance_matrix.py` now emits
+`docs/ACCEPTANCE-MATRIX.md`: every declared id with its SPEC wording, a
+status and a concrete evidence reference — 101 PASS / 24 PARTIAL / 1 EXTERNAL.
+
+The value is in what it exposed rather than what it confirmed. Cross-checking
+each id against the actual code found real gaps that the suite-level counts
+hid: the model viewer has no MTLLoader and parses multi-file glTF with an
+empty resource path (MC06/MC07), no unit hints or measurement labels
+(MC05/MOD03-05), no reset/fit/axes/projection controls or WebGL-failure
+handling (MOD01/MOD07), the STEP converter emits one merged mesh so there is
+no assembly tree (MC02/MOD02), and the rollback/concurrency/crash-recovery
+edge cases plus several CAD negative paths have only construction-level
+guarantees (RB-T06-08/10/11, AG09, MC04/14/16/17, MOD10).
+
+All 24 are registered as BLK-11..BLK-16 (S12 folded into BLK-05, S20 into
+BLK-01), and the gate fails the build on an unmapped id, matrix drift, or an
+unregistered PARTIAL — so the gaps can no longer rot silently. Both this gate
+and the OpenAPI drift gate run inside `scripts/build.sh`.
