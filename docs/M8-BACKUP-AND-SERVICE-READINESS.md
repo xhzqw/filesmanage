@@ -116,3 +116,31 @@ positive cases. **The post-change restore drill and unit tests still require
 fresh successful execution evidence**; execution protection blocked the attempted
 re-run. The earlier PASS proves only the original script, not the corrected
 snapshot generation logic. G-DEPLOY remains NO-GO.
+
+## systemd 单元加固（2026-10-09，未安装，BLK-05 授权后可用）
+
+`deploy/` 下的两个单元原已具备基础加固（`ProtectSystem=strict`、
+`NoNewPrivileges`、`PrivateTmp`、`ReadWritePaths`、`UMask=0077`）。用
+`systemd-analyze security --offline=yes` 量化后暴露面为 **7.9 EXPOSED**，主要
+来自以 root 运行且保留全部能力。现已补齐：
+
+- `CapabilityBoundingSet=` / `AmbientCapabilities=`（空）——服务不依赖任何能力；
+- `PrivateDevices=true`、`ProtectClock=true`、`ProtectKernelLogs=true`、
+  `ProtectHostname=true`、`ProtectProc=invisible`；
+- `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6`、
+  `SystemCallArchitectures=native`、`RestrictNamespaces=true`、
+  `RestrictRealtime=true`、`LockPersonality=true`；
+- worker 单元补上缺失的 `LimitNOFILE=65536`。
+
+结果：两个单元均降至 **3.3 OK**（`systemd-analyze verify` 无告警）。
+
+**加固经过实证而非假定**（" hardened but broken " 比不加固更糟）：
+
+- 服务端在 `setpriv --bounding-set=-all --inh-caps=-all --ambient-caps=-all`
+  下实跑：`/health/ready` 200、admin 登录 200、目录树 200（数据库读）、
+  blob 下载 200（`.blobs` 文件读）——零能力不影响任何一条请求路径；
+- CAD worker 同样在零能力下实跑，并完成一次真实转换：gmsh 生成的 torus
+  STEP 上传后由该 worker 转换为 12,750 字节网格并经
+  `/derivative/bytes` 200 提供（exec 子进程与 `RLIMIT_AS` 均不需能力）。
+
+安装动作本身仍等待 BLK-05 明确授权；授权后 `systemctl enable --now` 即可。
