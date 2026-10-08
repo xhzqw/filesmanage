@@ -440,6 +440,48 @@ booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
   "no IGES writer on the target" was wrong: reader-side samples exist and are
   the correct vehicle for this acceptance item.
 
+### Consolidated gate re-run after the caching change (2026-10-09)
+
+The caches touch session validation on every authenticated request plus the
+search/stats read paths, so every gate that exercises those was re-run:
+
+| Gate | Result |
+|---|---|
+| `unauth_security_smoke.py` | PASS 17/17 |
+| `m7_security_e2e.py` | PASS 31/31 |
+| `s_matrix_e2e.py` | PASS 35/35 |
+| `pt_samples_e2e.py` | PASS 112/112 |
+| `rb_rollback_e2e.py` | PASS 72/72 |
+| `mc_cad_e2e.py` | PASS 78/78 |
+| `do05_header_footer_check.py` | PASS 15/15 |
+| `perf_readiness_audit.py` | PASS 12/12 |
+| `mc02_assembly_check.mjs` | PASS 8/8 |
+| `mod01_controls_check.mjs` | PASS 10/10 |
+| `mod03_meta_check.mjs` | PASS 30/30 |
+| `mc_multiasset_check.mjs` | PASS 15/15 |
+| `browser_journey_check.mjs` | PASS 19/19 |
+| `browser_business_check.mjs` | PASS 12/12 |
+| `perf_csv_export_check.py` | PASS 9/9 |
+| `perf_upload_stress.py` | PASS 10/10 |
+| `media_range_check.py` | PASS 10/10 |
+| `office_session_check.py` | PASS 12/12 |
+| `pe12_cad_saturation.py` | PASS 7/7 (see note) |
+| `pe15_heap_growth.mjs` | PASS |
+| `loadtest.py` 10 / 100 / 200 users | 11/11 / 11/11 / 10/11 |
+| `test_backup_manifest.py` | PASS 12/12 |
+| `backup_restore_drill.py` | PASS (26 tables, 384 blobs) |
+| `ag09_recovery_drill.py` | PASS 4/4 |
+| `upgrade_rollback_drill.py` | PASS 12/12 |
+| `verify_migration.py` | PASS |
+| `go test ./...` / vet / architecture / build | PASS |
+
+PE12 note: the first run of this pass reported 4/7 because the loopback perf
+instance had been killed one second earlier in the same shell command — its
+connections and CPU had not settled, so the "idle baseline" was not idle. A
+clean re-run measured x0.81 / x1.12 / x0.87 (7/7). The rule is now explicit:
+stop the perf instance, **verify the process is gone**, and only then run a
+latency gate.
+
 ### Performance optimisation pass: revocation-aware caches (2026-10-09)
 
 Following the measured capacity diagnosis, the expensive read paths were
