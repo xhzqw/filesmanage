@@ -416,6 +416,17 @@ extraction dispatch, docx container reading, snippet windowing.
   (26 tables, 41 media objects) with 12/12 manifest unit tests.
 - Machine-readable reports under `.secrets/perf/` (root-only, not committed).
 
+### Executable S-matrix (commit 13e1df6, 32/32 PASS)
+
+`scripts/s_matrix_e2e.py` re-runs the API-verifiable SPEC §13.2/§13.3 items on
+demand: S1 login/session, S3 workgroup grant, S4 direct grant + union, S5
+isolation (tree/list/search), S10 time-limited ACL with a real 70-second
+expiry (visible before, 403 after), S11 admin-only endpoints, S16 favorites
+idempotency, S17 stats scope, S18 CSV export contract (BOM, header, visible
+paths only). It cleans up after itself (soft delete + disable) and is
+loopback-only. The traceability matrix in IMPLEMENTATION-REPORT.md maps every
+S item to its evidence.
+
 ### Viewport and model-viewer checks (PE16 / VS04, 2026-10-08)
 
 Measured with the desktop browser against http://10.144.144.1:18091 (warm,

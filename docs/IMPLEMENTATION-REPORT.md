@@ -162,25 +162,25 @@ security E2E 31/31, `/search` page browser-verified, viewport timings recorded.
 
 | Item | Evidence |
 |---|---|
-| S1 login/session | TEST-EVIDENCE §M1 (+ M1 re-verification in §M7) |
+| S1 login/session | TEST-EVIDENCE §M1 (+ M1 re-verification in §M7); executable re-run in `scripts/s_matrix_e2e.py` (32/32) |
 | S2 create group/members | §M3 |
-| S3 workgroup grant | §M3 |
-| S4 user grants union | §M3 |
-| S5 cross-department isolation | §M3 + §M7 security E2E |
+| S3 workgroup grant | §M3; executable re-run (s_matrix_e2e.py) |
+| S4 user grants union | §M3; executable re-run (s_matrix_e2e.py) |
+| S5 cross-department isolation | §M3 + §M7 security E2E; executable re-run (s_matrix_e2e.py) |
 | S6 format previews | §M2/M6 + §M7 PE09 |
 | S7 lock + version under policy | §M4 + §M7 (lock race fix) |
 | S8 approval commits | §M4 |
 | S8b append-only rollback | §M4 (RB-T shape) |
 | S9 Chinese search + safe summary | §M7 (tsvector, snippets, totals) |
-| S10 expiry boundaries | §M3 |
-| S11 org/user admin | §M3 |
+| S10 expiry boundaries | §M3; executable re-run with a real 70s expiry (s_matrix_e2e.py) |
+| S11 org/user admin | §M3; executable re-run (s_matrix_e2e.py) |
 | S12 remote/systemd | §M8 (dev units; remote S12 pending production authorization) |
 | S13 brand/tokens/layering | §M6c + architecture check in §M7 |
 | S14 trash | §M2 |
 | S15 sharing | §M6 + §M7 (descendants, revocation immediacy) |
-| S16 favorites | §M6 |
-| S17 stats | §M6 + §M7 (single-pass aggregation) |
-| S18 CSV export | §M6 + §M7 (streaming contract 9/9) |
+| S16 favorites | §M6; executable re-run (s_matrix_e2e.py) |
+| S17 stats | §M6 + §M7 (single-pass aggregation); executable re-run (s_matrix_e2e.py) |
+| S18 CSV export | §M6 + §M7 (streaming contract 9/9); executable re-run (s_matrix_e2e.py) |
 | S19 plain text | §M6 (PT01–PT12) |
 | S20 logo | BLOCKED (BLK-01: official asset not delivered; explicit placeholder) |
 | S21 DOCX editing | §M5 + §M7 PE10 |
