@@ -558,10 +558,12 @@ Proven with screenshots:
 
 NOT captured in this run:
 - byte-level preservation of the header/footer/page-break parts in the
-  COMMITTED version. The editor's save did not produce a status-2/6 callback
-  within the window (the save button and Ctrl+S were both exercised; only the
-  status-1 open callback arrived). The commit path itself is proven by the M5
-  real-spec.docx E2E and the callback-contract unit tests, so the open item is
+  COMMITTED version. On a fresh live session the editor's save button (verified
+  by magnified-toolbar crop) produced only status-1 callbacks and Ctrl+S did
+  not reach the cross-origin iframe through the automation tooling, so no
+  status-2/6 callback fired and no save event was recorded. The commit path
+  itself is proven by the M5 real-spec.docx E2E (status 2 -> committed in the
+  save-event ledger) and the callback-contract unit tests, so the open item is
   specifically the post-save byte fidelity of header/footer parts through this
   editor build — recorded as PARTIAL per DO05's own instruction to state
   unmet targets explicitly.
