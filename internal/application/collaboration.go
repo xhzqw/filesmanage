@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"encoding/csv"
 	"errors"
 	"filesmanage/internal/domain"
 	"filesmanage/internal/ports"
@@ -282,48 +281,65 @@ func (s *Service) Stats(ctx context.Context, u domain.User, filter SearchFilter)
 	return tx.Stats(ctx, statsQuery(u, groups, filter))
 }
 
-// ExportCSV renders the visible file list as UTF-8-BOM CSV with formula
-// injection neutralised (SPEC §9.3).
-func (s *Service) ExportCSV(ctx context.Context, u domain.User, filter SearchFilter) ([]byte, int, error) {
+// ExportCSVStream streams the visible file list as UTF-8-BOM CSV with formula
+// injection neutralised (SPEC §3.10, §9.3). Rows are emitted one at a time so
+// the whole result set never sits in memory (READ-06); the row count is
+// returned for the export audit event written by the transport layer.
+func (s *Service) ExportCSVStream(ctx context.Context, u domain.User, filter SearchFilter, emit func([]string) error) (int, error) {
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
-		return nil, 0, err
+		return 0, err
 	}
 	defer tx.Rollback(ctx)
 	groups, err := tx.WorkgroupsOf(ctx, u.ID)
 	if err != nil {
-		return nil, 0, err
+		return 0, err
 	}
-	// The export reuses the search path, so it inherits the search limit clamp
-	// rather than sending a zero limit into the query layer.
-	exportFilter := filter
-	if exportFilter.Limit <= 0 || exportFilter.Limit > 200 {
-		exportFilter.Limit = 200
+	rows := 0
+	streamErr := tx.ExportFilesStream(ctx, statsQuery(u, groups, filter), func(row ports.ExportRow) error {
+		fields := []string{
+			row.Name,
+			row.Path,
+			intToString(row.SizeBytes),
+			row.UploaderName,
+			row.UpdatedAt.UTC().Format(time.RFC3339),
+			extensionOf(row.Name),
+			intToString(int64(row.VersionSeq)),
+		}
+		for i := range fields {
+			fields[i] = neutralizeCSV(fields[i])
+		}
+		if werr := emit(fields); werr != nil {
+			return werr
+		}
+		rows++
+		return nil
+	})
+	if streamErr != nil {
+		return rows, mapError(streamErr)
 	}
-	files, err := tx.ExportFiles(ctx, statsQuery(u, groups, filter), exportFilter.Limit)
-	if err != nil {
-		return nil, 0, mapError(err)
-	}
-	var buf strings.Builder
-	writer := csv.NewWriter(&buf)
-	_ = writer.Write([]string{"文件ID", "名称", "目录ID", "大小(字节)", "SHA-256", "当前版本", "修改时间"})
-	for _, f := range files {
-		_ = writer.Write([]string{
-			f.ID, neutralizeCSV(f.Name), f.FolderID, intToString(f.SizeBytes), f.Sha256,
-			intToString(int64(currentSeq(f))), f.UpdatedAt.UTC().Format(time.RFC3339),
-		})
-	}
-	writer.Flush()
-	if err = writer.Error(); err != nil {
-		return nil, 0, err
-	}
-	// Excel needs the BOM to read UTF-8 Chinese correctly.
-	out := append([]byte{0xEF, 0xBB, 0xBF}, []byte(buf.String())...)
-	audit(ctx, tx, u, "files.export", "file", "", "success", map[string]any{"rows": len(files)})
+	audit(ctx, tx, u, "files.export", "file", "", "success", map[string]any{"rows": rows})
 	if err = tx.Commit(ctx); err != nil {
-		return nil, 0, err
+		return rows, err
 	}
-	return out, len(files), nil
+	return rows, nil
+}
+
+// RecordExportFailure audits a streamed export that broke mid-transfer: the
+// status line is already committed, so the failure is only visible in the
+// audit trail (SPEC §2.6 requires failed operations to be traceable).
+func (s *Service) RecordExportFailure(ctx context.Context, u domain.User, rows int, cause error) {
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return
+	}
+	defer tx.Rollback(ctx)
+	reason := ""
+	if cause != nil {
+		reason = cause.Error()
+	}
+	audit(ctx, tx, u, "files.export", "file", "", "failed", map[string]any{"rows": rows, "reason": reason})
+	_ = tx.Commit(ctx)
 }
 
 // neutralizeCSV blocks spreadsheet formula injection without altering content.

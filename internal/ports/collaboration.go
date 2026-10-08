@@ -37,6 +37,21 @@ type StatsQuery struct {
 	To                *time.Time
 }
 
+// ExportRow is one streamed CSV line. Fields follow SPEC §3.10: visible path,
+// name, size, uploader, modification time, extension and current version.
+// Blob paths and raw storage keys are never exported.
+type ExportRow struct {
+	FileID       string
+	Path         string
+	Name         string
+	UploaderID   string
+	UploaderName string
+	SizeBytes    int64
+	VersionSeq   int
+	Extension    string
+	UpdatedAt    time.Time
+}
+
 // CollaborationStore covers sharing, favorites, search, stats and export.
 type CollaborationStore interface {
 	ListSharesForSubject(context.Context, string, []string) ([]domain.Share, error)
@@ -50,5 +65,13 @@ type CollaborationStore interface {
 	RemoveFavorite(context.Context, string, string, string) error
 	SearchFiles(context.Context, FileSearchQuery) ([]domain.File, int, error)
 	Stats(context.Context, StatsQuery) (domain.Stats, error)
-	ExportFiles(context.Context, StatsQuery, int) ([]domain.File, error)
+	// ExportFilesStream yields every authorized row for the filter without
+	// materialising the result set (SPEC §3.10, READ-06, PE07): the export must
+	// cover the whole filtered scope and stream with backpressure.
+	ExportFilesStream(context.Context, StatsQuery, func(ExportRow) error) error
+	// Share authorization reads used by the unified permission resolution
+	// (SPEC §2.4): folder shares resolve along the ancestor chain, file shares
+	// apply to the single shared file.
+	FolderSharesForSubject(context.Context, string, []string, string) ([]domain.Share, error)
+	FileSharesForSubject(context.Context, string, []string, string) ([]domain.Share, error)
 }

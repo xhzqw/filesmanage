@@ -189,6 +189,13 @@ WITH RECURSIVE ancestry AS (
   WHERE s.folder_id IS NOT NULL AND s.revoked_at IS NULL AND (s.expires_at IS NULL OR s.expires_at>now())
     AND ((s.recipient_kind='user' AND s.recipient_id=$1)
       OR (s.recipient_kind='group' AND s.recipient_id IN (SELECT group_id FROM workgroup_members WHERE user_id=$1)))
+    AND NOT s.include_descendants
+  UNION
+  SELECT a.child AS folder_id FROM shares s JOIN ancestry a ON a.ancestor=s.folder_id
+  WHERE s.folder_id IS NOT NULL AND s.revoked_at IS NULL AND (s.expires_at IS NULL OR s.expires_at>now())
+    AND s.include_descendants
+    AND ((s.recipient_kind='user' AND s.recipient_id=$1)
+      OR (s.recipient_kind='group' AND s.recipient_id IN (SELECT group_id FROM workgroup_members WHERE user_id=$1)))
 ), visible_scope AS (
   SELECT folder_id FROM granted UNION SELECT folder_id FROM shared
 )`
@@ -202,24 +209,42 @@ func (r *Repository) isAdmin(ctx context.Context, userID string) (bool, error) {
 
 // scopeFolderSQL builds the folder restriction plus its placeholders, and
 // reports whether the shared scope CTE is required.
+//
+// Security (SPEC §2.3 / DB-PERF-01): an explicit folder filter never bypasses
+// the visibility scope. For non-admin callers the folder restriction is
+// intersected with visible_scope, so probing search/stats/export with another
+// department's folder id returns nothing instead of their data.
+//
+// Placeholders follow the emitted bindings: the scope CTE binds $1 to the
+// caller, so the folder filter takes the next free index ($2 with the CTE,
+// $1 without it).
 func (r *Repository) scopeFolderSQL(ctx context.Context, q ports.FileSearchQuery) (string, []any, bool, error) {
-	if q.FolderID != "" {
-		if q.IncludeDescendant {
-			return "f.folder_id IN (WITH RECURSIVE sub(id) AS (SELECT $2::text UNION ALL SELECT c.id FROM sub s JOIN folders c ON c.parent_id=s.id WHERE c.deleted_at IS NULL) SELECT id FROM sub)",
-				[]any{q.FolderID}, false, nil
-		}
-		return "f.folder_id=$2", []any{q.FolderID}, false, nil
-	}
 	admin, err := r.isAdmin(ctx, q.UserID)
 	if err != nil {
 		return "", nil, false, err
 	}
-	// Admins see every folder; the CTE is still emitted so the SQL text always
-	// resolves, and the admin predicate short-circuits its restrictions.
-	if admin {
-		return "f.folder_id IN (SELECT id FROM folders WHERE deleted_at IS NULL)", nil, false, nil
+	ph := newPlaceholder(0)
+	if !admin {
+		ph.next() // $1 is reserved for the scope CTE binding.
 	}
-	return "f.folder_id IN (SELECT folder_id FROM visible_scope)", nil, true, nil
+	folderPH := ph.next()
+	subtree := "f.folder_id IN (WITH RECURSIVE sub(id) AS (SELECT " + folderPH + "::text UNION ALL SELECT c.id FROM sub s JOIN folders c ON c.parent_id=s.id WHERE c.deleted_at IS NULL) SELECT id FROM sub)"
+	exact := "f.folder_id=" + folderPH
+	if q.FolderID == "" {
+		if admin {
+			return "f.folder_id IN (SELECT id FROM folders WHERE deleted_at IS NULL)", nil, false, nil
+		}
+		return "f.folder_id IN (SELECT folder_id FROM visible_scope)", nil, true, nil
+	}
+	restriction := exact
+	if q.IncludeDescendant {
+		restriction = subtree
+	}
+	if admin {
+		return restriction, []any{q.FolderID}, false, nil
+	}
+	return "(" + restriction + " AND f.folder_id IN (SELECT folder_id FROM visible_scope))",
+		[]any{q.FolderID}, true, nil
 }
 
 // placeholder assigns sequential parameters after the fixed prefix.
@@ -292,9 +317,15 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	if needsCTE {
 		cte = scopeCTE
 	}
+	// The text index is only joined when the query actually filters on content:
+	// a plain list must not drag the wide file_text table into the plan.
+	textJoin := ""
+	if q.Query != "" {
+		textJoin = " LEFT JOIN file_text ft ON ft.file_id=f.id"
+	}
 	sql := cte + " SELECT f.id,f.folder_id,f.name,f.uploaded_by,f.content_type,f.current_version_seq,v.size_bytes,v.sha256,f.updated_at,f.deleted_at" +
 		" FROM files f LEFT JOIN file_versions v ON v.file_id=f.id AND v.seq=f.current_version_seq" +
-		" LEFT JOIN file_text ft ON ft.file_id=f.id" +
+		textJoin +
 		" WHERE " + strings.Join(where, " AND ") + " ORDER BY " + order + " LIMIT " + fmt.Sprint(q.Limit)
 	rows, err := r.Q.Query(ctx, sql, args...)
 	if err != nil {
@@ -312,9 +343,11 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	return out, len(out), rows.Err()
 }
 
-// statsScope builds the shared predicate for aggregation queries.
-func (r *Repository) statsScope(q ports.StatsQuery) (cte string, predicate string, args []any, err error) {
-	folderSQL, folderArgs, needsCTE, scopeErr := r.scopeFolderSQL(backgroundCtx(), ports.FileSearchQuery{UserID: q.UserID, FolderID: q.FolderID, IncludeDescendant: q.IncludeDescendant})
+// statsScope builds the shared predicate for aggregation queries. The context
+// flows into the scope resolution so cancellation and timeouts are honoured
+// (SPEC TX-09).
+func (r *Repository) statsScope(ctx context.Context, q ports.StatsQuery) (cte string, predicate string, args []any, err error) {
+	folderSQL, folderArgs, needsCTE, scopeErr := r.scopeFolderSQL(ctx, ports.FileSearchQuery{UserID: q.UserID, FolderID: q.FolderID, IncludeDescendant: q.IncludeDescendant})
 	if scopeErr != nil {
 		return "", "", nil, scopeErr
 	}
@@ -349,7 +382,7 @@ func (r *Repository) statsScope(q ports.StatsQuery) (cte string, predicate strin
 }
 
 func (r *Repository) Stats(ctx context.Context, q ports.StatsQuery) (domain.Stats, error) {
-	cte, predicate, args, err := r.statsScope(q)
+	cte, predicate, args, err := r.statsScope(ctx, q)
 	if err != nil {
 		return domain.Stats{}, err
 	}
@@ -359,16 +392,31 @@ func (r *Repository) Stats(ctx context.Context, q ports.StatsQuery) (domain.Stat
 	if adminErr != nil {
 		return domain.Stats{}, adminErr
 	}
+	// The folder counter reuses the caller's folder restriction. Its parameter
+	// must follow the predicate's bindings, and a non-admin scope must stay
+	// intersected with the visible set so folder existence is not leaked.
+	ph := newPlaceholder(len(args))
 	folderScope := "d.id IN (SELECT folder_id FROM visible_scope)"
-	if admin && q.FolderID == "" {
+	folderArg := any(nil)
+	switch {
+	case q.FolderID == "" && admin:
 		folderScope = "d.id IN (SELECT id FROM folders WHERE deleted_at IS NULL)"
+	case q.FolderID == "":
+	case q.IncludeDescendant:
+		folderScope = "d.id IN (WITH RECURSIVE sub(id) AS (SELECT " + ph.next() + "::text UNION ALL SELECT c.id FROM sub s JOIN folders c ON c.parent_id=s.id WHERE c.deleted_at IS NULL) SELECT id FROM sub)"
+		folderArg = q.FolderID
+	default:
+		folderScope = "d.id=" + ph.next()
+		folderArg = q.FolderID
 	}
-	if q.FolderID != "" {
-		if q.IncludeDescendant {
-			folderScope = "d.id IN (WITH RECURSIVE sub(id) AS (SELECT $2::text UNION ALL SELECT c.id FROM sub s JOIN folders c ON c.parent_id=s.id WHERE c.deleted_at IS NULL) SELECT id FROM sub)"
-		} else {
-			folderScope = "d.id=$2"
-		}
+	if !admin {
+		folderScope += " AND d.id IN (SELECT folder_id FROM visible_scope)"
+	}
+	// The aggregate breakdowns below only bind the predicate's parameters; the
+	// folder counter's parameter is appended for the summary query alone.
+	scopeArgs := args
+	if folderArg != nil {
+		args = append(args, folderArg)
 	}
 	summary := fmt.Sprintf(
 		" SELECT (SELECT count(*) FROM files f WHERE %s),"+
@@ -406,18 +454,71 @@ func (r *Repository) Stats(ctx context.Context, q ports.StatsQuery) (domain.Stat
 	}
 	// Extension bucket: lowercase suffix after the last dot, or a labelled fallback.
 	typeSQL := " SELECT coalesce(nullif(lower(substring(f.name from '\\.([^.]*)$')),''),'(none)'),count(*) FROM files f WHERE " + predicate + " GROUP BY 1 ORDER BY 2 DESC LIMIT 20"
-	if err = r.aggregate(ctx, cte+typeSQL, args, typeScan); err != nil {
+	if err = r.aggregate(ctx, cte+typeSQL, scopeArgs, typeScan); err != nil {
 		return domain.Stats{}, err
 	}
 	monthSQL := " SELECT to_char(date_trunc('month',f.updated_at),'YYYY-MM'),count(*) FROM files f WHERE " + predicate + " GROUP BY 1 ORDER BY 1 DESC LIMIT 12"
-	if err = r.aggregate(ctx, cte+monthSQL, args, monthScan); err != nil {
+	if err = r.aggregate(ctx, cte+monthSQL, scopeArgs, monthScan); err != nil {
 		return domain.Stats{}, err
 	}
 	uploaderSQL := " SELECT f.uploaded_by,coalesce(u.display_name,''),count(*) FROM files f LEFT JOIN users u ON u.id=f.uploaded_by WHERE " + predicate + " GROUP BY 1,2 ORDER BY 3 DESC LIMIT 20"
-	if err = r.aggregate(ctx, cte+uploaderSQL, args, uploaderScan); err != nil {
+	if err = r.aggregate(ctx, cte+uploaderSQL, scopeArgs, uploaderScan); err != nil {
 		return domain.Stats{}, err
 	}
 	return stats, nil
+}
+
+// FolderSharesForSubject returns the folder shares that apply to folderID for
+// the user or their workgroups: the share on the folder itself plus, when
+// include_descendants is set, shares on any ancestor. The same rule the
+// search scope CTE applies, so direct reads and search agree (SPEC §2.4).
+func (r *Repository) FolderSharesForSubject(ctx context.Context, userID string, groupIDs []string, folderID string) ([]domain.Share, error) {
+	rows, err := r.Q.Query(ctx,
+		`WITH RECURSIVE anc(id,parent_id,depth) AS (
+		   SELECT f.id,f.parent_id,0 FROM folders f WHERE f.id=$3
+		   UNION ALL SELECT p.id,p.parent_id,a.depth+1 FROM anc a JOIN folders p ON p.id=a.parent_id
+		 )
+		 `+shareSelect+` JOIN anc a ON s.folder_id=a.id
+		 WHERE s.folder_id IS NOT NULL AND s.revoked_at IS NULL AND (s.expires_at IS NULL OR s.expires_at>now())
+		   AND (s.include_descendants OR a.depth=0)
+		   AND ((s.recipient_kind='user' AND s.recipient_id=$1)
+		     OR (s.recipient_kind='group' AND s.recipient_id=ANY($2::text[])))`,
+		userID, groupIDs, folderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]domain.Share, 0)
+	for rows.Next() {
+		share, err := scanShare(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, share)
+	}
+	return out, rows.Err()
+}
+
+// FileSharesForSubject returns the active file-level shares for a file.
+func (r *Repository) FileSharesForSubject(ctx context.Context, userID string, groupIDs []string, fileID string) ([]domain.Share, error) {
+	rows, err := r.Q.Query(ctx,
+		shareSelect+` WHERE s.file_id=$3 AND s.revoked_at IS NULL AND (s.expires_at IS NULL OR s.expires_at>now())
+		   AND ((s.recipient_kind='user' AND s.recipient_id=$1)
+		     OR (s.recipient_kind='group' AND s.recipient_id=ANY($2::text[])))`,
+		userID, groupIDs, fileID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]domain.Share, 0)
+	for rows.Next() {
+		share, err := scanShare(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, share)
+	}
+	return out, rows.Err()
 }
 
 func (r *Repository) aggregate(ctx context.Context, sql string, args []any, scan func(rowScanner) error) error {
@@ -434,16 +535,67 @@ func (r *Repository) aggregate(ctx context.Context, sql string, args []any, scan
 	return rows.Err()
 }
 
-func (r *Repository) ExportFiles(ctx context.Context, q ports.StatsQuery, limit int) ([]domain.File, error) {
-	if limit <= 0 || limit > 20000 {
-		return nil, domain.ErrInvalidInput
+// ExportFilesStream streams every authorized export row for the filter (SPEC
+// §3.10, READ-06, PE07). The result set is never materialised: rows are read
+// through the driver's cursor and handed to yield one at a time, so a 100k-row
+// export keeps a flat memory profile. The visible folder path is computed with
+// a recursive walk over the caller's visible set only — invisible ancestors
+// never appear in the exported path.
+func (r *Repository) ExportFilesStream(ctx context.Context, q ports.StatsQuery, yield func(ports.ExportRow) error) error {
+	cte, predicate, args, err := r.statsScope(ctx, q)
+	if err != nil {
+		return err
 	}
-	files, _, err := r.SearchFiles(ctx, ports.FileSearchQuery{
-		UserID: q.UserID, GroupIDs: q.GroupIDs, FolderID: q.FolderID,
-		IncludeDescendant: q.IncludeDescendant, Uploader: q.Uploader,
-		MimePrefix: q.MimePrefix, From: q.From, To: q.To, Limit: limit,
-	})
-	return files, err
+	admin, adminErr := r.isAdmin(ctx, q.UserID)
+	if adminErr != nil {
+		return adminErr
+	}
+	visible := "(SELECT folder_id FROM visible_scope)"
+	if admin {
+		visible = "(SELECT id FROM folders WHERE deleted_at IS NULL)"
+	}
+	// Path roots are visible folders whose parent is invisible (or the root):
+	// this mirrors the folder tree, where a granted folder below an invisible
+	// ancestor renders at the top level instead of exposing that ancestor.
+	with := cte
+	if with == "" {
+		with = "WITH RECURSIVE"
+	} else {
+		with += ","
+	}
+	sql := with + ` vis AS (SELECT id FROM folders f WHERE f.deleted_at IS NULL AND f.id IN ` + visible + `),
+	folder_paths AS (
+	  SELECT f.id, CAST(f.name AS text) AS path FROM folders f
+	   WHERE f.deleted_at IS NULL AND f.id IN (SELECT id FROM vis)
+	     AND (f.parent_id IS NULL OR f.parent_id NOT IN (SELECT id FROM vis))
+	  UNION ALL
+	  SELECT f.id, p.path || '/' || f.name FROM folders f JOIN folder_paths p ON f.parent_id=p.id
+	   WHERE f.deleted_at IS NULL AND f.id IN (SELECT id FROM vis)
+	)
+	SELECT f.id, fp.path, f.name, f.uploaded_by, coalesce(u.display_name,''),
+	       coalesce(v.size_bytes,0), coalesce(f.current_version_seq,0), f.updated_at
+	  FROM files f
+	  JOIN folder_paths fp ON fp.id=f.folder_id
+	  LEFT JOIN users u ON u.id=f.uploaded_by
+	  LEFT JOIN file_versions v ON v.file_id=f.id AND v.seq=f.current_version_seq
+	 WHERE ` + predicate + `
+	 ORDER BY f.updated_at DESC, f.id DESC`
+	rows, err := r.Q.Query(ctx, sql, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var row ports.ExportRow
+		if err = rows.Scan(&row.FileID, &row.Path, &row.Name, &row.UploaderID, &row.UploaderName,
+			&row.SizeBytes, &row.VersionSeq, &row.UpdatedAt); err != nil {
+			return err
+		}
+		if err = yield(row); err != nil {
+			return err
+		}
+	}
+	return rows.Err()
 }
 
 func backgroundCtx() context.Context { return context.Background() }

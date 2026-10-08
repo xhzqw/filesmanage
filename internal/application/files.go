@@ -416,6 +416,9 @@ func (s *Service) DeleteFile(ctx context.Context, u domain.User, fileID string) 
 }
 
 // visibleFile loads an active file whose folder grants the requested action.
+// Folder grants and folder shares resolve through require(); a file-level share
+// is the fallback for directly shared files outside the caller's folder scope
+// (SPEC §2.4 — the same rule the search scope CTE applies).
 func (s *Service) visibleFile(ctx context.Context, repo ports.Repository, u domain.User, fileID string, action domain.Action) (domain.File, error) {
 	file, err := repo.FileByID(ctx, fileID)
 	if err != nil {
@@ -429,7 +432,16 @@ func (s *Service) visibleFile(ctx context.Context, repo ports.Repository, u doma
 		return domain.File{}, err
 	}
 	if err = s.require(ctx, repo, u, folder.ID, action); err != nil {
-		return domain.File{}, err
+		if !errors.Is(err, domain.ErrForbidden) {
+			return domain.File{}, err
+		}
+		shared, shareErr := s.fileShareGrants(ctx, repo, u, fileID, action)
+		if shareErr != nil {
+			return domain.File{}, shareErr
+		}
+		if !shared {
+			return domain.File{}, err
+		}
 	}
 	return file, nil
 }

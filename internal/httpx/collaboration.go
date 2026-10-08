@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"encoding/csv"
 	"filesmanage/internal/application"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -134,6 +135,10 @@ func (h *Handler) statsFiles(c *gin.Context) {
 	c.JSON(200, gin.H{"ok": true, "data": stats})
 }
 
+// exportFiles streams the authorized CSV export (SPEC §3.10, PE07). The BOM is
+// written first so Excel reads UTF-8 Chinese correctly; rows flush in batches
+// so the client receives data while the server is still scanning, and the
+// memory profile stays flat regardless of the result size.
 func (h *Handler) exportFiles(c *gin.Context) {
 	u, ok := h.auth(c)
 	if !ok {
@@ -144,16 +149,42 @@ func (h *Handler) exportFiles(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	payload, rows, err := h.S.ExportCSV(c.Request.Context(), u, filter)
-	if err != nil {
-		respondError(c, err)
-		return
-	}
 	c.Header("Content-Type", "text/csv; charset=utf-8")
 	c.Header("Content-Disposition", `attachment; filename="files.csv"`)
-	c.Data(200, "text/csv; charset=utf-8", payload)
-	_ = rows
+	c.Status(200)
+	if _, err = c.Writer.Write([]byte{0xEF, 0xBB, 0xBF}); err != nil {
+		return
+	}
+	writer := csv.NewWriter(c.Writer)
+	_ = writer.Write(exportCSVHeader)
+	rows := 0
+	_, err = h.S.ExportCSVStream(c.Request.Context(), u, filter, func(fields []string) error {
+		if werr := writer.Write(fields); werr != nil {
+			return werr
+		}
+		rows++
+		if rows%500 == 0 {
+			writer.Flush()
+			if ferr := writer.Error(); ferr != nil {
+				return ferr
+			}
+			c.Writer.Flush()
+		}
+		return nil
+	})
+	writer.Flush()
+	if err != nil {
+		// The status line is already committed; record the failure in the audit
+		// trail and stop the stream instead of pretending the export succeeded.
+		h.S.RecordExportFailure(c.Request.Context(), u, rows, err)
+		return
+	}
+	c.Writer.Flush()
 }
+
+// exportCSVHeader follows SPEC §3.10: name, visible path, size, uploader,
+// modification time, extension and current version. No blob or storage paths.
+var exportCSVHeader = []string{"文件名", "完整可见路径", "大小(字节)", "上传人", "修改时间", "扩展名", "版本号"}
 
 func parseSearchFilter(c *gin.Context) (application.SearchFilter, error) {
 	filter := application.SearchFilter{

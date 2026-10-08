@@ -4,6 +4,7 @@ import (
 	"context"
 	"filesmanage/internal/domain"
 	"filesmanage/internal/ports"
+	"sort"
 	"strings"
 	"time"
 )
@@ -168,7 +169,114 @@ func (r *memoryRepo) Stats(_ context.Context, q ports.StatsQuery) (domain.Stats,
 	return stats, nil
 }
 
-func (r *memoryRepo) ExportFiles(ctx context.Context, q ports.StatsQuery, limit int) ([]domain.File, error) {
-	files, _, err := r.SearchFiles(ctx, ports.FileSearchQuery{UserID: q.UserID, FolderID: q.FolderID, Limit: limit})
-	return files, err
+// ExportFilesStream yields the in-memory equivalents of the export rows; the
+// memory repository exists for unit tests, not production scale, so it applies
+// the same filters directly instead of reusing the capped search path.
+func (r *memoryRepo) ExportFilesStream(_ context.Context, q ports.StatsQuery, yield func(ports.ExportRow) error) error {
+	r.mu.Lock()
+	visible := make([]domain.File, 0, len(r.files))
+	for _, f := range r.files {
+		if f.DeletedAt != nil {
+			continue
+		}
+		if q.FolderID != "" && f.FolderID != q.FolderID {
+			continue
+		}
+		if q.Uploader != "" && f.UploadedBy != q.Uploader {
+			continue
+		}
+		if q.MimePrefix != "" && !strings.HasPrefix(strings.ToLower(f.ContentType), strings.ToLower(q.MimePrefix)) {
+			continue
+		}
+		visible = append(visible, f)
+	}
+	r.mu.Unlock()
+	sort.Slice(visible, func(i, j int) bool {
+		if visible[i].UpdatedAt.Equal(visible[j].UpdatedAt) {
+			return visible[i].ID > visible[j].ID
+		}
+		return visible[i].UpdatedAt.After(visible[j].UpdatedAt)
+	})
+	for _, f := range visible {
+		seq := 0
+		if f.CurrentVersionSeq != nil {
+			seq = *f.CurrentVersionSeq
+		}
+		row := ports.ExportRow{
+			FileID: f.ID, Path: f.FolderID, Name: f.Name, UploaderID: f.UploadedBy,
+			SizeBytes: f.SizeBytes, VersionSeq: seq, UpdatedAt: f.UpdatedAt,
+		}
+		if err := yield(row); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// FolderSharesForSubject mirrors the PostgreSQL ancestor resolution for unit
+// tests: the share on the folder itself plus ancestor shares when
+// include_descendants is set.
+func (r *memoryRepo) FolderSharesForSubject(_ context.Context, userID string, groupIDs []string, folderID string) ([]domain.Share, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	depths := map[string]int{folderID: 0}
+	current := folderID
+	for depth := 1; depth < 64; depth++ {
+		folder, ok := r.folders[current]
+		if !ok || folder.ParentID == nil {
+			break
+		}
+		parent := *folder.ParentID
+		if _, seen := depths[parent]; seen {
+			break
+		}
+		depths[parent] = depth
+		current = parent
+	}
+	groups := make(map[string]bool, len(groupIDs))
+	for _, g := range groupIDs {
+		groups[g] = true
+	}
+	out := make([]domain.Share, 0)
+	for _, share := range r.shares {
+		if share.FolderID == nil || share.RevokedAt != nil {
+			continue
+		}
+		depth, onChain := depths[*share.FolderID]
+		if !onChain || (depth > 0 && !share.IncludeDescendants) {
+			continue
+		}
+		if share.RecipientKind == "user" && share.RecipientID == userID {
+			out = append(out, share)
+			continue
+		}
+		if share.RecipientKind == "group" && groups[share.RecipientID] {
+			out = append(out, share)
+		}
+	}
+	return out, nil
+}
+
+// FileSharesForSubject mirrors the PostgreSQL file-share lookup for unit tests.
+func (r *memoryRepo) FileSharesForSubject(_ context.Context, userID string, groupIDs []string, fileID string) ([]domain.Share, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	groups := make(map[string]bool, len(groupIDs))
+	for _, g := range groupIDs {
+		groups[g] = true
+	}
+	out := make([]domain.Share, 0)
+	for _, share := range r.shares {
+		if share.FileID == nil || *share.FileID != fileID || share.RevokedAt != nil {
+			continue
+		}
+		if share.RecipientKind == "user" && share.RecipientID == userID {
+			out = append(out, share)
+			continue
+		}
+		if share.RecipientKind == "group" && groups[share.RecipientID] {
+			out = append(out, share)
+		}
+	}
+	return out, nil
 }

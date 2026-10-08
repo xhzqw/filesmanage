@@ -148,7 +148,9 @@ type Repository interface {
 	RemoveFavorite(context.Context, string, string, string) error
 	SearchFiles(context.Context, FileSearchQuery) ([]domain.File, int, error)
 	Stats(context.Context, StatsQuery) (domain.Stats, error)
-	ExportFiles(context.Context, StatsQuery, int) ([]domain.File, error)
+	ExportFilesStream(context.Context, StatsQuery, func(ExportRow) error) error
+	FolderSharesForSubject(context.Context, string, []string, string) ([]domain.Share, error)
+	FileSharesForSubject(context.Context, string, []string, string) ([]domain.Share, error)
 
 	// Audit and idempotency.
 	RecordAudit(context.Context, domain.AuditEvent) error
