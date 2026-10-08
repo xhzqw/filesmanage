@@ -51,7 +51,10 @@ Boundary: this is a focused negative smoke test without actual sessions and does
 - `deploy/filesmanage-v21-dev.service`
 - `deploy/filesmanage-v21-worker.service`
 
-These are **dev-only** units. Unit verification validates syntax; it does not establish that the services have been installed/started.
+These are **dev-only** units. `systemd-analyze verify` passes for both (exit 0;
+the only warning is an unrelated pre-existing unit on the host). Unit
+verification validates syntax; it does not establish that the services have
+been installed/started.
 
 Target preflight for adoption:
 
