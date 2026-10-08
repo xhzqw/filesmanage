@@ -112,3 +112,76 @@ Defect found and fixed during M1: FolderTree rendered only from `parentId===null
 ### Known gaps (deliberate scope)
 - Edit locks, approval workflow, sharing, favorites, full-text search, stats/CSV, DOCX/CAD: later milestones. Writes on approval-policy folders are already blocked with `E_APPROVAL_PENDING` so review can never be bypassed.
 - Seeded staff accounts still have unusable passwords; user management ships in Milestone 3.
+
+---
+
+## Milestone 7 — security and performance acceptance (2026-10-08, on target)
+
+Dataset gate (SPEC §24.2): **12/12 PASS** — `scripts/perf_dataset.sql` regenerated
+the full distribution (100,392 files / 402,564 versions / 10,000 folders depth 21 /
+5,000-file hot folder / 350 ordinary 50-file folders / 1,000-version file /
+50,305 ACLs / 20,000 shares / 100,000 favorites / edge-case names), behind a
+`current_database()='filesmanage_perf'` fail-closed guard. Read-only audit:
+`scripts/perf_readiness_audit.py`.
+
+Defects found and fixed (all verified by re-running the affected suites):
+
+| Defect | Fix |
+|---|---|
+| folder-filtered search/stats/export bypassed the visibility scope (and 500'd on a placeholder mismatch) | scope intersection; placeholder indices follow the emitted bindings |
+| folder shares ignored `include_descendants`; shares absent from `require()`/`visibleFile()` | unified share resolution across search and direct reads |
+| CSV export clamped at 200 rows and fully buffered | batched streaming export (ids → path map → 500-row PK batches) |
+| search index never written; content match was a sequential ILIKE scan | indexing pipeline (upload/save/rollback/approval) + bounded OOXML reader + tsvector GIN phrase search + snippets |
+| `domain.Snippet` mixed byte/rune indices (multibyte panic) | rune-space rewrite |
+| concurrent lock acquisition 500'd | file row lock inside the transaction (SPEC §7.2) |
+| download endpoint ignored Range | `http.ServeContent` with per-version modtime |
+| CAD worker failed on content-addressed blob conflicts (+ stale tag check) | adopt the existing blob; UPDATE's own RowsAffected |
+| non-admin export path resolution dropped the scope binding | pass the caller id (caught by the security E2E) |
+
+Performance: endpoint budgets met at 1/10 users (11/11), 10/11 at 30 sustained
+users for 15 minutes (rps 111, RSS flat, zero 5xx); search p95 over budget at 30
+users on this shared host. Bottleneck analysis and the full matrix are in
+`docs/M7-PERF-DATASET-GATE.md`; machine-readable reports under `.secrets/perf/`.
+Checks: CSV export 9/9, 10×100MB uploads 10/10, MP4 Range 10/10, Office sessions
+12/12, CAD STEP→STL verified (incl. the dedup path), backup restore drill PASS,
+security E2E 31/31, `/search` page browser-verified, viewport timings recorded.
+
+## Milestone 8 — delivery readiness (dev level, 2026-10-08)
+
+- Backup/restore drill: **PASS** (snapshot-derived media manifest; 26 tables,
+  41 immutable blobs restored to a scratch database and verified, scratch DB
+  removed). Artifacts under `.secrets/backup-drills/`.
+- Manifest unit tests: **12/12 OK** (`scripts/test_backup_manifest.py`).
+- Dev systemd units written and syntax-verified (`deploy/filesmanage-v21-*.service`);
+  not installed — production cutover remains unauthorized (BLK-05).
+- `FILESMANAGE_DB_MAX_CONNS` added as the pool capacity knob (default 10).
+- Migrations 0001–0011 applied to both databases; `migrate -check` re-verifies
+  checksums; `cmd/reindex` backfilled the business text index (35 files).
+
+## S1–S22 traceability (where each acceptance item is proven)
+
+| Item | Evidence |
+|---|---|
+| S1 login/session | TEST-EVIDENCE §M1 (+ M1 re-verification in §M7) |
+| S2 create group/members | §M3 |
+| S3 workgroup grant | §M3 |
+| S4 user grants union | §M3 |
+| S5 cross-department isolation | §M3 + §M7 security E2E |
+| S6 format previews | §M2/M6 + §M7 PE09 |
+| S7 lock + version under policy | §M4 + §M7 (lock race fix) |
+| S8 approval commits | §M4 |
+| S8b append-only rollback | §M4 (RB-T shape) |
+| S9 Chinese search + safe summary | §M7 (tsvector, snippets, totals) |
+| S10 expiry boundaries | §M3 |
+| S11 org/user admin | §M3 |
+| S12 remote/systemd | §M8 (dev units; remote S12 pending production authorization) |
+| S13 brand/tokens/layering | §M6c + architecture check in §M7 |
+| S14 trash | §M2 |
+| S15 sharing | §M6 + §M7 (descendants, revocation immediacy) |
+| S16 favorites | §M6 |
+| S17 stats | §M6 + §M7 (single-pass aggregation) |
+| S18 CSV export | §M6 + §M7 (streaming contract 9/9) |
+| S19 plain text | §M6 (PT01–PT12) |
+| S20 logo | BLOCKED (BLK-01: official asset not delivered; explicit placeholder) |
+| S21 DOCX editing | §M5 + §M7 PE10 |
+| S22 CAD preview | §M5 + §M7 PE11 (+ browser render check) |
