@@ -57,7 +57,7 @@ Status totals: **123 PASS / 2 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 
 | ID | SPEC 要求（节选） | 状态 | 证据 / 缺口 |
 |---|---|---|---|
-| RB-T01 | ### 13.3.1 Append-only 回滚专项验收 RB-T01–RB-T12（必须通过） | **PASS** | 追加式回滚总纲；rb_rollback_e2e.py 27/27 |
+| RB-T01 | ### 13.3.1 Append-only 回滚专项验收 RB-T01–RB-T12（必须通过） | **PASS** | 追加式回滚总纲；rb_rollback_e2e.py 72/72 |
 | RB-T02 | RB-T02：GET versions 的 seq 为 1,2,3,4，v4.action=rollback、targetSeq=1、fromSeq=3，旧版本作者与时间不变。 | **PASS** | rb_rollback_e2e.py：'RB-T02 history is 1,2,3 before rollback' / 'full history 1,2,3,4 survives' / 'v4 is action=rollback with target/from' / 'v1..v3 metadata unchanged' |
 | RB-T03 | RB-T03：下载 v1/v2/v3/v4 分别得到 A/B/C/A；旧版本 blob 的 SHA 与创建前一致。 | **PASS** | rb_rollback_e2e.py：'RB-T03 current bytes equal A' + 各版本 digest 校验（A/B/C/A） |
 | RB-T04 | RB-T04：继续从 v4 编辑产生 v5，再回滚 v2 产生 v6；历史 1..6 无缺口，seq 永不复用。 | **PASS** | rb_rollback_e2e.py：'RB-T04 v5 saved (D)' / 'rollback to v2 commits v6' / 'history 1..6 with no gaps' |
@@ -74,7 +74,7 @@ Status totals: **123 PASS / 2 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 
 | ID | SPEC 要求（节选） | 状态 | 证据 / 缺口 |
 |---|---|---|---|
-| MC01 | [ ] 没有以部分通过的测试替代 S1–S22、PT01–PT12、DO01–DO14、MC01–MC18 总体验收。 | **PASS** | 总体验收矩阵即本文件；mc_cad_e2e.py 57/57 |
+| MC01 | [ ] 没有以部分通过的测试替代 S1–S22、PT01–PT12、DO01–DO14、MC01–MC18 总体验收。 | **PASS** | 总体验收矩阵即本文件；mc_cad_e2e.py 78/78 |
 | MC02 | MC02：STEP 多组件装配树及显隐； | **PASS** | mc02_assembly_check.mjs 8/8：双实体 STEP 经 worker 转 MSH 2.2（保留节点索引），viewer 按连通分量还原出 2 个零件，bbox 10x10x10 与 5x5x5 精确正确 |
 | MC03 | MC03：IGES 曲面件没有明显漏面和翻面； | **PASS** | OCCT 自带样本 bearing.iges → 2,148 facets / hammer.iges → 144,873 bytes，经真实 worker 转换并渲染 |
 | MC04 | MC04：IGES 不支持实体有清楚错误而不是空视图； | **PASS** | mc_cad_e2e.py：畸形 IGES 与截断 STEP 经真实 worker 均 state=failed + errorCode=CONVERT_FAILED，且不提供任何网格字节（404）；worker 新增空网格守卫，gmsh 对不可读几何退出码为 0 也会被拒 |

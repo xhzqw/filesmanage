@@ -83,7 +83,7 @@ MATRIX = {
     "PT11": ("PASS", "pt_samples_e2e.py：'PT11 bytes unchanged after preview' / 'still exactly one version'"),
     "PT12": ("PASS", "pt_samples_e2e.py + rb_rollback_e2e.py：保存/审批/回滚后下载 SHA、索引、预览、历史一致"),
     # ---- RB-T ----
-    "RB-T01": ("PASS", "追加式回滚总纲；rb_rollback_e2e.py 27/27"),
+    "RB-T01": ("PASS", "追加式回滚总纲；rb_rollback_e2e.py 72/72"),
     "RB-T02": ("PASS", "rb_rollback_e2e.py：'RB-T02 history is 1,2,3 before rollback' / 'full history 1,2,3,4 survives' / 'v4 is action=rollback with target/from' / 'v1..v3 metadata unchanged'"),
     "RB-T03": ("PASS", "rb_rollback_e2e.py：'RB-T03 current bytes equal A' + 各版本 digest 校验（A/B/C/A）"),
     "RB-T04": ("PASS", "rb_rollback_e2e.py：'RB-T04 v5 saved (D)' / 'rollback to v2 commits v6' / 'history 1..6 with no gaps'"),
@@ -96,7 +96,7 @@ MATRIX = {
     "RB-T11": ("PASS", "rb_rollback_e2e.py：回滚后完整历史保留、两版本引用同一内容寻址 blob 且仍可下载（无 GC 进程可误删在用对象）"),
     "RB-T12": ("PASS", "RB-T01–RB-T12 阶段标题"),
     # ---- MC ----
-    "MC01": ("PASS", "总体验收矩阵即本文件；mc_cad_e2e.py 57/57"),
+    "MC01": ("PASS", "总体验收矩阵即本文件；mc_cad_e2e.py 78/78"),
     "MC02": ("PASS", "mc02_assembly_check.mjs 8/8：双实体 STEP 经 worker 转 MSH 2.2（保留节点索引），viewer 按连通分量还原出 2 个零件，bbox 10x10x10 与 5x5x5 精确正确"),
     "MC03": ("PASS", "OCCT 自带样本 bearing.iges → 2,148 facets / hammer.iges → 144,873 bytes，经真实 worker 转换并渲染"),
     "MC04": ("PASS", "mc_cad_e2e.py：畸形 IGES 与截断 STEP 经真实 worker 均 state=failed + errorCode=CONVERT_FAILED，且不提供任何网格字节（404）；worker 新增空网格守卫，gmsh 对不可读几何退出码为 0 也会被拒"),

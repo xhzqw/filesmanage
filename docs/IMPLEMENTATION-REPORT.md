@@ -162,7 +162,7 @@ security E2E 31/31, `/search` page browser-verified, viewport timings recorded.
 
 | Item | Evidence |
 |---|---|
-| S1 login/session | TEST-EVIDENCE §M1 (+ M1 re-verification in §M7); executable re-run in `scripts/s_matrix_e2e.py` (32/32) |
+| S1 login/session | TEST-EVIDENCE §M1 (+ M1 re-verification in §M7); executable re-run in `scripts/s_matrix_e2e.py` (35/35) |
 | S2 create group/members | §M3 |
 | S3 workgroup grant | §M3; executable re-run (s_matrix_e2e.py) |
 | S4 user grants union | §M3; executable re-run (s_matrix_e2e.py) |
@@ -170,7 +170,7 @@ security E2E 31/31, `/search` page browser-verified, viewport timings recorded.
 | S6 format previews | §M2/M6 + §M7 PE09 |
 | S7 lock + version under policy | §M4 + §M7 (lock race fix) |
 | S8 approval commits | §M4 |
-| S8b append-only rollback | §M4 + `scripts/rb_rollback_e2e.py` (RB-T01/02/03/04/05/09/12, 27/27) |
+| S8b append-only rollback | §M4 + `scripts/rb_rollback_e2e.py` (RB-T01–RB-T12, 72/72) |
 | S9 Chinese search + safe summary | §M7 (tsvector, snippets, totals) |
 | S10 expiry boundaries | §M3; executable re-run with a real 70s expiry (s_matrix_e2e.py) |
 | S11 org/user admin | §M3; executable re-run (s_matrix_e2e.py) |
@@ -184,7 +184,7 @@ security E2E 31/31, `/search` page browser-verified, viewport timings recorded.
 | S19 plain text | §M6 + `scripts/pt_samples_e2e.py` (PT01–PT12, 112/112) |
 | S20 logo | BLOCKED (BLK-01: official asset not delivered; explicit placeholder) |
 | S21 DOCX editing | §M5 + §M7 PE10 |
-| S22 CAD preview | §M5 + §M7 PE11 + `scripts/mc_cad_e2e.py` (57/57 incl. IGES bearing/hammer) |
+| S22 CAD preview | §M5 + §M7 PE11 + `scripts/mc_cad_e2e.py` (78/78 incl. IGES bearing/hammer) |
 
 ---
 
@@ -248,11 +248,11 @@ services, and close the last contract gap.
   drift so the contract cannot silently diverge from the router.
 - **All gates re-executed and green** (details and numbers in TEST-EVIDENCE.md
   "Final full-gate re-run"): architecture 71 Go / 41 TS; `go test ./...`;
-  migration contract; unauth smoke 17/17; security E2E 31/31; S matrix 32/32;
-  rollback 27/27; PT fidelity 112/112; CAD matrix 57/57; DO05 15/15; dataset
+  migration contract; unauth smoke 17/17; security E2E 31/31; S matrix 35/35;
+  rollback 72/72; PT fidelity 112/112; CAD matrix 78/78; DO05 15/15; dataset
   gate 12/12; CSV export 9/9 (100,433 rows, TTFB 1548 ms); 10×100 MB uploads
   10/10; MP4 Range 10/10; office sessions 12/12; PE12 7/7; backup/restore
-  drill PASS (26 tables, 222 blobs) + manifest 12/12; loadtest 11/11 at 10
+  drill PASS (26 tables, 384 blobs) + manifest 12/12; loadtest 11/11 at 10
   users.
 - **PE12 contamination found and documented.** The first re-run of the
   saturation gate failed (x1.64) because the loopback perf instance was

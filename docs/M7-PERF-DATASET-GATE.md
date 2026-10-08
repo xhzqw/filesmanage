@@ -54,6 +54,13 @@ analysis are the transferable results. p95 budgets from §24.3.
 | 100 | 60–76 | 43.9 MB | over budget on latency endpoints (pool-bound, see below) |
 | 200 | 55 | 46.9 MB | over budget; one 503 observed at pool exhaustion |
 
+The 100/200 rows above are the **pre-optimisation** measurements (2026-10-08,
+reports `pe03-ladder*.json`); they are what motivated the caching work below.
+After the 2026-10-09 optimisation the same tiers measure: 100 users **11/11
+PASS** (`.secrets/perf/blk07-final.json`) and 200 users **10/11**, the only
+miss being `/api/me` queueing at 200 concurrent threads
+(`.secrets/perf/blk07-200-final.json`).
+
 Machine-readable reports: `.secrets/perf/pe03-ladder*.json`, `.secrets/perf/pe02-sustained30.json`.
 
 ### PE02 sustained run (30 users × 15 min, §24.3 mix)

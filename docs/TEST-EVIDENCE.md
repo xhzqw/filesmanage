@@ -882,14 +882,14 @@ absolute values — the absolute headroom is the meaningful evidence.
 | `perf_readiness_audit.py` (§24.2 dataset) | DATASET_READY_FOR_BASELINE (12/12) |
 | `unauth_security_smoke.py` | 17/17 |
 | `m7_security_e2e.py` (cross-user security) | PASS (31/31) |
-| `rb_rollback_e2e.py` (DEC-13 rollback) | PASS (27/27) |
-| `s_matrix_e2e.py` (S1–S18) | PASS (32/32) |
+| `rb_rollback_e2e.py` (DEC-13 rollback) | PASS (72/72) |
+| `s_matrix_e2e.py` (S1–S18) | PASS (35/35) |
 | `pt_samples_e2e.py` (PT01–PT12) | PASS (112/112) |
 | `perf_csv_export_check.py` | PASS (9/9) |
 | `media_range_check.py` (MP4 Range) | PASS (10/10) |
 | `office_session_check.py` | PASS (12/12) |
 | `perf_upload_stress.py` (10×100MB) | PASS (10/10) |
-| `mc_cad_e2e.py` (MC formats) | PASS (57/47→57, IGES included) |
+| `mc_cad_e2e.py` (MC formats) | PASS (78/78, IGES included) |
 | `pe12_cad_saturation.py` (worker isolation) | measured (x0.76-x1.31; absolute p95 < 11ms) |
 | `check_architecture.py` | PASS (71 Go files, 41 TS modules) |
 
