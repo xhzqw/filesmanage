@@ -18,6 +18,10 @@ type DerivativeInfo={
  errorCode?:string;
 };
 
+// Meshes beyond this size are refused before download (MOD07): a tab that
+// buffers hundreds of megabytes of geometry is not a usable error state.
+const MAX_INLINE_MODEL_BYTES=256*1024*1024;
+
 // Real 3D preview: fetches the (converted) mesh from the API and renders it
 // with three.js. STEP/IGES are server-converted by the CAD worker; STL/OBJ/GLB
 // are streamed natively.
@@ -79,8 +83,9 @@ export function ModelViewer(){
  // ready; teardown runs only on real unmount so the canvas is never removed
  // by a dependency change.
  const started=useRef(false);
- const teardown=useRef<null|(()=>void)>(null);
- useEffect(()=>()=>{if(teardown.current)teardown.current();},[]);
+ const controls=useRef<ViewerControls|null>(null);
+ const[view,setView]=useState({axes:false,grid:true,projection:"perspective" as "perspective"|"orthographic"});
+ useEffect(()=>()=>{controls.current?.dispose();controls.current=null;},[]);
  useEffect(()=>{
   if(status!=="loading-model"||started.current)return;
   started.current=true;
@@ -91,6 +96,13 @@ export function ModelViewer(){
     const {OrbitControls}=await import("three/examples/jsm/controls/OrbitControls.js");
     const res=await fetch("/api/files/"+id+"/derivative/bytes",{credentials:"same-origin"});
     if(!res.ok)throw new Error("derivative fetch failed");
+    // MOD07: a mesh too large for a browser tab is refused up front with an
+    // actionable error and a download entry instead of hanging the page.
+    const declared=Number(res.headers.get("Content-Length")??"0");
+    if(declared>MAX_INLINE_MODEL_BYTES){
+     if(valid)setStatus("too-large");
+     return;
+    }
     const buffer=await res.arrayBuffer();
     if(!valid)return;
     const format=(info?.outputKind??info?.format??"stl").toLowerCase();
@@ -104,7 +116,9 @@ export function ModelViewer(){
      const parse=await loadParser(format,THREE);
      object=await parse(buffer);
     }
-    teardown.current=mountScene(THREE,OrbitControls,holder.current!,object,setStats);
+    controls.current=mountScene(THREE,OrbitControls,holder.current!,object,setStats,()=>{
+     if(valid){setStatus("webgl-lost");setMessage("浏览器 WebGL 上下文已丢失（通常是 GPU 资源被系统回收）");}
+    });
     setStatus("ready");
    }catch(error){
     if(valid){setStatus("failed");setMessage(errorCopy(error,"模型加载失败"));}
@@ -136,9 +150,17 @@ export function ModelViewer(){
     {status==="unsupported"&&<p className="empty">{info?.note??"该格式当前不支持在线预览"}</p>}
     {status==="converting"&&<p className="empty">模型转换中（Worker 处理），请稍后刷新…</p>}
     {status==="failed"&&<p role="alert" className="notice error">{message||"预览失败"}</p>}
+    {status==="webgl-lost"&&<p role="alert" className="notice error">{message||"预览失败"} · <a href={"/api/files/"+id+"/bytes"}>下载原件</a></p>}
+    {status==="too-large"&&<p role="alert" className="notice error">模型过大，浏览器内联渲染已取消 · <a href={"/api/files/"+id+"/bytes"}>下载原件</a></p>}
     {status==="loading-model"&&<p className="empty">正在加载几何数据…</p>}
+    {status==="ready"&&<div className="toolbar" role="group" aria-label="视图控制">
+     <button type="button" onClick={()=>controls.current?.resetView()}>重置视角</button>
+     <button type="button" className={view.axes?"on":""} aria-pressed={view.axes} onClick={()=>setView(v=>({...v,axes:controls.current?.toggleAxes()??v.axes}))}>坐标轴</button>
+     <button type="button" className={view.grid?"on":""} aria-pressed={view.grid} onClick={()=>setView(v=>({...v,grid:controls.current?.toggleGrid()??v.grid}))}>网格</button>
+     <button type="button" className={view.projection==="orthographic"?"on":""} aria-pressed={view.projection==="orthographic"} onClick={()=>setView(v=>({...v,projection:controls.current?.toggleProjection()??v.projection}))}>{view.projection==="orthographic"?"正交投影":"透视投影"}</button>
+    </div>}
     <div className="viewer-stage" ref={holder}/>
-    {stats&&<div className="toolbar"><span className="toolbar-hint">三角形 {stats.triangles} · 顶点 {stats.vertices} · 拖拽旋转 / 滚轮缩放 / 右键平移</span></div>}
+    {stats&&<div className="toolbar"><span className="toolbar-hint">三角形 {stats.triangles} · 顶点 {stats.vertices} · 拖拽旋转 / 滚轮缩放 / 右键平移 · 工具栏可重置视角、切换坐标轴 / 网格 / 投影</span></div>}
    </main>
   </div>
  </div>;
@@ -189,21 +211,46 @@ async function loadParser(format:string,THREE:typeof import("three")):Promise<Me
  }
 }
 
+// ViewerControls is the imperative surface the toolbar drives (SPEC §模型查看器
+// MOD01/MOD07). mountScene returns it so the React layer stays declarative.
+type ViewerControls={
+ dispose:()=>void;
+ resetView:()=>void;
+ toggleAxes:()=>boolean;
+ toggleGrid:()=>boolean;
+ toggleProjection:()=>"perspective"|"orthographic";
+};
+
 function mountScene(
  THREE:typeof import("three"),
  OrbitControls:typeof import("three/examples/jsm/controls/OrbitControls.js").OrbitControls,
  holder:HTMLDivElement,
  object:import("three").Object3D,
  setStats:(s:{triangles:number;vertices:number})=>void,
-):()=>void{
+ onContextLost?:()=>void,
+):ViewerControls{
  const scene=new THREE.Scene();
  scene.background=new THREE.Color(0xf4f9fe);
- const camera=new THREE.PerspectiveCamera(45,holder.clientWidth/Math.max(holder.clientHeight,1),0.1,100000);
+ const aspect=holder.clientWidth/Math.max(holder.clientHeight,1);
+ const persp=new THREE.PerspectiveCamera(45,aspect,0.1,100000);
+ // Frame the model once: the box centre becomes the orbit target and the
+ // radius drives both the perspective distance and the orthographic frustum.
+ const box=new THREE.Box3().setFromObject(object);
+ const size=box.getSize(new THREE.Vector3());
+ const center=box.getCenter(new THREE.Vector3());
+ object.position.sub(center);
+ const radius=Math.max(size.x,size.y,size.z,0.001)/2;
+ const frustum=radius*2.6;
+ const ortho=new THREE.OrthographicCamera(
+  -frustum*aspect,frustum*aspect,frustum,-frustum,-radius*50,radius*50,
+ );
+ let camera:import("three").PerspectiveCamera|import("three").OrthographicCamera=persp;
  const renderer=new THREE.WebGLRenderer({antialias:true});
  renderer.setSize(holder.clientWidth,holder.clientHeight);
  renderer.setPixelRatio(window.devicePixelRatio);
  holder.appendChild(renderer.domElement);
- const controls=new OrbitControls(camera,renderer.domElement);
+ // Annotated so the projection swap can rebind controls to either camera type.
+ let controls:typeof OrbitControls.prototype=new OrbitControls(camera,renderer.domElement);
  controls.enableDamping=true;
 
  scene.add(new THREE.AmbientLight(0xffffff,0.6));
@@ -213,7 +260,11 @@ function mountScene(
  const fill=new THREE.DirectionalLight(0xcfe4ff,0.5);
  fill.position.set(-1,-0.5,-1);
  scene.add(fill);
- scene.add(new THREE.GridHelper(100,20,0x9fc2e8,0xdfe9f4));
+ const grid=new THREE.GridHelper(Math.max(radius*4,10),20,0x9fc2e8,0xdfe9f4);
+ scene.add(grid);
+ const axes=new THREE.AxesHelper(radius*1.6);
+ axes.visible=false;
+ scene.add(axes);
 
  object.traverse(child=>{
   const mesh=child as import("three").Mesh;
@@ -222,14 +273,19 @@ function mountScene(
   }
  });
  scene.add(object);
- const box=new THREE.Box3().setFromObject(object);
- const size=box.getSize(new THREE.Vector3());
- const center=box.getCenter(new THREE.Vector3());
- object.position.sub(center);
- const radius=Math.max(size.x,size.y,size.z)/2;
- camera.position.set(radius*2.2,radius*1.8,radius*2.2);
- controls.target.set(0,0,0);
- controls.update();
+
+ const frame=()=>{
+  // Damping residue from a drag would be re-applied on the next update() and
+  // pull the camera away from the reset pose, so flush it first: one update
+  // with damping off applies the leftover delta and zeroes it.
+  controls.enableDamping=false;
+  controls.update();
+  controls.enableDamping=true;
+  camera.position.set(radius*2.2,radius*1.8,radius*2.2);
+  controls.target.set(0,0,0);
+  controls.update();
+ };
+ frame();
  let triangles=0,vertices=0;
  object.traverse(child=>{
   const mesh=child as import("three").Mesh;
@@ -242,20 +298,59 @@ function mountScene(
  });
  setStats({triangles,vertices});
 
- let frame=0;
- const animate=()=>{frame=requestAnimationFrame(animate);controls.update();renderer.render(scene,camera);};
+ let raf=0;
+ const animate=()=>{raf=requestAnimationFrame(animate);controls.update();renderer.render(scene,camera);};
  animate();
  const onResize=()=>{
-  camera.aspect=holder.clientWidth/Math.max(holder.clientHeight,1);
-  camera.updateProjectionMatrix();
+  const next=holder.clientWidth/Math.max(holder.clientHeight,1);
+  persp.aspect=next;
+  persp.updateProjectionMatrix();
+  ortho.left=-frustum*next;
+  ortho.right=frustum*next;
+  ortho.updateProjectionMatrix();
   renderer.setSize(holder.clientWidth,holder.clientHeight);
  };
  window.addEventListener("resize",onResize);
- return()=>{
-  cancelAnimationFrame(frame);
-  window.removeEventListener("resize",onResize);
-  controls.dispose();
-  renderer.dispose();
-  if(renderer.domElement.parentNode)renderer.domElement.parentNode.removeChild(renderer.domElement);
+
+ // MOD07: a lost WebGL context is surfaced as an actionable error instead of a
+ // silently frozen canvas. preventDefault keeps the restore path available.
+ const onLost=(event:Event)=>{
+  event.preventDefault();
+  if(onContextLost)onContextLost();
+ };
+ renderer.domElement.addEventListener("webglcontextlost",onLost);
+
+ return {
+  resetView:frame,
+  toggleAxes:()=>{
+   axes.visible=!axes.visible;
+   return axes.visible;
+  },
+  toggleGrid:()=>{
+   grid.visible=!grid.visible;
+   return grid.visible;
+  },
+  toggleProjection:()=>{
+   const next=camera===persp?ortho:persp;
+   next.position.copy(camera.position);
+   controls.dispose();
+   camera=next;
+   controls=new OrbitControls(camera,renderer.domElement);
+   controls.enableDamping=true;
+   controls.target.set(0,0,0);
+   controls.update();
+   return camera===ortho?"orthographic":"perspective";
+  },
+  dispose:()=>{
+   cancelAnimationFrame(raf);
+   window.removeEventListener("resize",onResize);
+   renderer.domElement.removeEventListener("webglcontextlost",onLost);
+   controls.dispose();
+   // forceContextLoss releases the GPU context immediately rather than waiting
+   // for the GC to finalise the canvas (MOD08).
+   renderer.dispose();
+   renderer.forceContextLoss();
+   if(renderer.domElement.parentNode)renderer.domElement.parentNode.removeChild(renderer.domElement);
+  },
  };
 }

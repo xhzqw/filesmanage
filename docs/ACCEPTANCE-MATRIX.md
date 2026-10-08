@@ -7,7 +7,7 @@ gaps and must be registered in `docs/OPEN-BLOCKERS.md`; `EXTERNAL` rows
 wait on customer/licence input. Run `python3 scripts/gen_acceptance_matrix.py --check`
 to fail the build on an unverified id.
 
-Status totals: **101 PASS / 24 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
+Status totals: **103 PASS / 22 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 
 ## S — 安全 / ACL / 一致性矩阵
 
@@ -116,13 +116,13 @@ Status totals: **101 PASS / 24 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 
 | ID | SPEC 要求（节选） | 状态 | 证据 / 缺口 |
 |---|---|---|---|
-| MOD01 | MOD01：旋转、平移、缩放、重置视角、适配模型、坐标轴、透视/正交投影、网格显隐。 | **PARTIAL** | OrbitControls 提供旋转/平移/缩放 + GridHelper；重置视角/适配/坐标轴/透视-正交切换缺失（BLK-14） |
+| MOD01 | MOD01：旋转、平移、缩放、重置视角、适配模型、坐标轴、透视/正交投影、网格显隐。 | **PASS** | mod01_controls_check.mjs 10/10：坐标轴/网格/透视-正交切换均改变合成画面且可逆；拖拽后重置视角精确恢复初始取景（截图哈希一致）；旋转/平移/缩放由 OrbitControls 提供 |
 | MOD02 | MOD02：有装配信息时提供零件树、选中高亮、独立隐藏/显示、整体恢复和 bbox。 | **PARTIAL** | 无装配信息（转换输出单一网格），零件树/独立显隐/bbox 未实现（BLK-11） |
 | MOD03 | MOD03：显示来源格式、真实版本、源文件 SHA、单位、尺寸范围、组件数、转换日期和警告。 | **PARTIAL** | 工具栏显示格式与三角/顶点数；源 SHA、单位、尺寸范围、组件数、转换日期、警告未展示（BLK-13） |
 | MOD04 | MOD04：STL/OBJ 无单位时显示“未知单位”，不能默认为毫米再错误计算真实尺寸。 | **PARTIAL** | 未知单位提示未实现，不得默认毫米（BLK-13） |
 | MOD05 | MOD05：如果只拿到三角化网格，测量结果显示“近似”，不得宣称 B-Rep 精密量测。 | **PARTIAL** | 无测量工具；“近似”量测标注无从谈起（BLK-13） |
 | MOD06 | MOD06：内嵌缩略图、loading/progress/ready/failed/retry/unsupported 状态明确，不能无限转圈。 | **PASS** | 派生状态机（queued/running/ready/failed）+ 前端 loading/error/空态；derivativeStatus 提供 errorCode |
-| MOD07 | MOD07：浏览器 WebGL 失效或文件太大时有可操作错误和允许的下载入口。 | **PARTIAL** | WebGL 失效/文件过大时的可操作错误与下载入口未显式处理（BLK-14） |
+| MOD07 | MOD07：浏览器 WebGL 失效或文件太大时有可操作错误和允许的下载入口。 | **PASS** | mod01_controls_check.mjs：真实 webglcontextlost 监听器触发可操作错误态+下载原件入口；Fetch 域故障注入超大 Content-Length 触发 256MB 守卫+下载入口（不缓冲） |
 | MOD08 | MOD08：DOM 层级和 URL 改变时需 dispose 三维纹理、几何和事件监听，避免内存泄漏。 | **PASS** | pe15_heap_growth.mjs：20 次挂载/拆除后堆回落同一 8.6MB 地板，几何/纹理/监听/上下文已释放 |
 | MOD09 | MOD09：显示/隐藏动作只影响视图，不修改 source blob。 | **PASS** | 查看器只读，无任何写回 source blob 的路径 |
 | MOD10 | MOD10：待审模型不能对未获授权普通账号显示新几何，其他用户看到仍是当前签入版本。 | **PARTIAL** | 未授权账号看不到新几何由 current 版本机制保证，显式断言缺失（BLK-16） |
@@ -191,12 +191,10 @@ Status totals: **101 PASS / 24 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 - `MC14` — 重试转换采纳已存在 blob 已修复；同版本并发请求在途去重断言缺失（BLK-16）
 - `MC16` — pending 审批期间 current 不变故派生天然指向旧版，但显式断言缺失（BLK-16）
 - `MC17` — 异常模型走 failed 路径；恶意纹理 URL 因离线解析天然闭合，zip-slip/恶意纹理断言缺失（BLK-16）
-- `MOD01` — OrbitControls 提供旋转/平移/缩放 + GridHelper；重置视角/适配/坐标轴/透视-正交切换缺失（BLK-14）
 - `MOD02` — 无装配信息（转换输出单一网格），零件树/独立显隐/bbox 未实现（BLK-11）
 - `MOD03` — 工具栏显示格式与三角/顶点数；源 SHA、单位、尺寸范围、组件数、转换日期、警告未展示（BLK-13）
 - `MOD04` — 未知单位提示未实现，不得默认毫米（BLK-13）
 - `MOD05` — 无测量工具；“近似”量测标注无从谈起（BLK-13）
-- `MOD07` — WebGL 失效/文件过大时的可操作错误与下载入口未显式处理（BLK-14）
 - `MOD10` — 未授权账号看不到新几何由 current 版本机制保证，显式断言缺失（BLK-16）
 - `AG09` — staging/对账协议存在；提交-rename 崩溃后的恢复任务未做演练（BLK-15）
 

@@ -31,9 +31,10 @@ capability gap and is registered in OPEN-BLOCKERS.md as BLK-11 to BLK-16
 (S12 folded into BLK-05, S20 into BLK-01); the gate fails the build if an id
 has no curated row, if the matrix drifts, or if a PARTIAL id is unregistered.
 Partial areas: STEP assembly tree (BLK-11), material/texture association
-(BLK-12), unit hints and measurement labels (BLK-13), viewer control surface
-and WebGL failure handling (BLK-14), rollback/concurrency/crash-recovery
-edge-case assertions (BLK-15), CAD negative-path assertions (BLK-16).
+(BLK-12), unit hints and measurement labels (BLK-13), rollback/concurrency/
+crash-recovery edge-case assertions (BLK-15), CAD negative-path assertions
+(BLK-16). BLK-14 (viewer control surface) is closed: the controls are
+implemented and CDP-verified by `scripts/mod01_controls_check.mjs` (10/10).
 
 ## In progress
 - (none — every in-flight acceptance item now has a real measurement)

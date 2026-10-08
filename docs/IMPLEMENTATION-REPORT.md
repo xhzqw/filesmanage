@@ -291,3 +291,26 @@ All 24 are registered as BLK-11..BLK-16 (S12 folded into BLK-05, S20 into
 BLK-01), and the gate fails the build on an unmapped id, matrix drift, or an
 unregistered PARTIAL — so the gaps can no longer rot silently. Both this gate
 and the OpenAPI drift gate run inside `scripts/build.sh`.
+
+---
+
+## BLK-14 closed: viewer control surface (2026-10-09)
+
+The acceptance matrix's first actionable gap was the model viewer's control
+surface. `web/src/pages/ModelViewer.tsx` now implements, and
+`scripts/mod01_controls_check.mjs` verifies through the real page over CDP:
+
+- reset/fit framing that flushes OrbitControls damping residue first — the
+  check caught that a naive `camera.position.set()` reset was immediately
+  dragged away by the residual `sphericalDelta`, so the naive version really
+  did not work;
+- axes helper and grid toggles (aria-pressed + pixel-hash change, reversible);
+- perspective/orthographic camera swap with rebound controls;
+- a `webglcontextlost` listener that surfaces an actionable error plus a
+  download entry instead of a frozen canvas;
+- a 256 MB inline guard on the derivative response (fault-injected via the
+  Fetch domain in the check) that refuses to buffer and offers the download.
+
+10/10 checks pass; MOD01 and MOD07 moved to PASS in the acceptance matrix
+(103 PASS / 22 PARTIAL / 1 EXTERNAL) and BLK-14 is struck from the blocker
+list. Full `npm run build` (tsc + vite) re-run green.

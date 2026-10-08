@@ -440,6 +440,29 @@ booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
   "no IGES writer on the target" was wrong: reader-side samples exist and are
   the correct vehicle for this acceptance item.
 
+### Viewer control surface MOD01/MOD07 (2026-10-09, 10/10 PASS)
+
+`scripts/mod01_controls_check.mjs` drives the real `/model/:id` page in
+headless Chrome over CDP and verifies the controls through the actual UI,
+using composited-screenshot hashes so a no-op button cannot pass:
+
+| Check | Result |
+|---|---|
+| model page renders | 三角形 count present |
+| 坐标轴 toggle / back | aria-pressed true/false, pixels change and revert |
+| 网格 toggle / back | aria-pressed false/true, pixels change |
+| 透视/正交 projection | label flips 透视投影→正交投影, pixels change |
+| orbit drag moves camera | pixels change after drag |
+| 重置视角 restores framing | screenshot hash identical to the pre-drag framing |
+| MOD07 webglcontextlost | real listener fires: error notice + 下载原件 link |
+| MOD07 oversize guard | Fetch-domain fault injection (Content-Length 300MB) triggers the 256MB guard + 下载原件 link, no buffering |
+
+The check also caught a real bug: with OrbitControls damping enabled, the
+per-frame `update()` re-applies the drag's residual `sphericalDelta`, so a
+naive `camera.position.set(...)` reset was immediately dragged away. The
+reset now flushes damping residue first (one update with damping off), after
+which the framing hash matches exactly.
+
 ### PE15 WebGL/heap leak measurement (2026-10-09, PASS)
 
 `scripts/pe15_heap_growth.mjs` drives the real `/model/:id` page in headless
