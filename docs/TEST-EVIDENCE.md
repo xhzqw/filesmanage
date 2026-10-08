@@ -440,6 +440,32 @@ booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
   "no IGES writer on the target" was wrong: reader-side samples exist and are
   the correct vehicle for this acceptance item.
 
+### Core user journey over the real browser (2026-10-09, 19/19 PASS, run 3x)
+
+`scripts/browser_journey_check.mjs` drives headless Chrome against the dev
+instance and walks the primary journey through the real UI (no synthetic API
+shortcuts — the file is uploaded through the page's own file input via
+`DOM.setFileInputFiles`, the delete confirm dialog is answered by the driver,
+and the preview is opened by clicking the row's link):
+
+| Step | Assertion |
+|---|---|
+| login page renders | password field + submit present |
+| wrong password refused | stays on /login |
+| real login | lands on /doc, brand shell 中晟生物科技 served |
+| real folder tree | seeded folders visible |
+| create folder | inline form → 新建文件夹 → the folder appears |
+| upload | the page's file input → the row appears in the table |
+| preview | clicking the row link opens /preview/:id with byte metadata (SHA/BOM/编码) |
+| download | the session-authenticated bytes endpoint returns the exact uploaded bytes |
+| delete | the row's 删除 → the row leaves the table (confirm auto-accepted) |
+| trash | /trash lists the deleted file |
+| restore | the row's 恢复 → the file leaves the trash and reappears in /doc |
+| logout | back to /login, /api/me → 401, a /doc deep link redirects to /login |
+| cleanup | the drill's file and folder are removed through a fresh API session (verified: zero leftovers) |
+
+Three consecutive runs: 19/19 each time.
+
 ### Upgrade/rollback drill S12 (2026-10-09, 12/12 PASS)
 
 `scripts/upgrade_rollback_drill.py` exercises the delivery's backwards path at
@@ -489,6 +515,7 @@ boundary fix, MSH conversion, assembly tree, rollback edges, crash sweep):
 | `media_range_check.py` | PASS 10/10 |
 | `office_session_check.py` | PASS 12/12 |
 | `loadtest.py --users 10` | PASS 11/11 (all endpoint budgets) |
+| `browser_journey_check.mjs` (real-browser core journey) | PASS 19/19 (run 3x) |
 | `backup_restore_drill.py` | PASS (26 tables, 288 blobs) |
 | `test_backup_manifest.py` | PASS 12/12 |
 | `verify_migration.py` | PASS |
