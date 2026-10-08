@@ -440,6 +440,25 @@ booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
   "no IGES writer on the target" was wrong: reader-side samples exist and are
   the correct vehicle for this acceptance item.
 
+### Visual acceptance evidence (2026-10-09)
+
+`scripts/capture_evidence.mjs` captures every real page through the same
+authenticated headless-Chrome session the journey gate uses, into
+`docs/evidence/`: login, documents (folder tree), file preview with byte
+metadata, the model viewer with its assembly part tree, search, stats,
+organization, approvals and trash. DOM assertions prove behaviour; these
+images are what a reviewer looks at to confirm the brand shell (DEC-14) and
+the layouts actually render.
+
+The model shot is of a two-solid STEP converted through the real worker: the
+page shows the part tree (2 components plus restore-all), a component count
+of 2, the true combined bounding box 25.00 x 10.00 x 10.00 and the full
+metadata panel. Two capture-authoring bugs were caught while building it: the
+login selector missed the username field (so the first run produced two
+identical login-page screenshots, detected by hashing the outputs), and the
+model lookup picked the first model file found, whose derivative predates the
+MSH pipeline and therefore has no part tree; it now picks the newest model.
+
 ### Cache soak under a key space far past the cap (2026-10-09, 4/4 PASS)
 
 `scripts/cache_soak_check.py` restarts the server fresh, opens 40 distinct
