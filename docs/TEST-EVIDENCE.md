@@ -337,7 +337,10 @@ State feedback already present and exercised in earlier milestones: loading text
 ## Milestone 7 — security and performance acceptance (executed on 192.168.1.22, 2026-10-08)
 
 All commands ran on the target host. Commits: `8bdd068`, `06c056d`, `063e26a`,
-plus the search/stats/export/worker fixes listed below.
+`b8d5401`, `20f188c` (search/stats/export/worker/scope-binding fixes below).
+Browser acceptance re-verified after the final rebuild: login at
+http://10.144.144.1:18091/login (192.168.1.22 had a transient LAN outage) lands on
+`/doc` with the folder tree, breadcrumb, toolbar and file table rendered.
 
 ### M1 re-verification (acceptance matrix, re-run this session)
 
