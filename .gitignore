@@ -1,0 +1,6 @@
+.secrets/
+.blobs/
+.env
+node_modules/
+web/dist/
+*.test
