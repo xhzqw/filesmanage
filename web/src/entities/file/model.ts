@@ -8,6 +8,9 @@ export type FileItem={
  sha256:string;
  currentVersionSeq:number;
  updatedAt:string;
+ // Search projection only: a bounded plain-text window around the match
+ // (SPEC §10.3); rendered as escaped text nodes plus <mark>.
+ snippet?:string;
 };
 
 export type FileVersion={

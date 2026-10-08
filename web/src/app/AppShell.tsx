@@ -3,6 +3,7 @@ import {Link,Navigate,useLocation} from "react-router-dom";
 import type {User} from "../entities/user/model";
 import {CollaborationPanel} from "../features/collaboration/CollaborationPanel";
 import {StatsPanel} from "../features/collaboration/StatsPanel";
+import {SearchPanel} from "../features/collaboration/SearchPanel";
 
 // DEC-14 brand shell: blue/white engineering palette, yellow folder SVG icons,
 // and an explicit placeholder for the official logo until the asset is
@@ -20,6 +21,7 @@ function LogoSlot({label}:{label:string}){
 
 const NAV=[
  {to:"/doc",label:"文档管理",icon:"folder"},
+ {to:"/search",label:"搜索",icon:"search"},
  {to:"/workspace",label:"共享/关注",icon:"share"},
  {to:"/stats",label:"统计",icon:"chart"},
  {to:"/approvals",label:"审批",icon:"check"},
@@ -61,6 +63,17 @@ export function WorkspacePage({user,onLogout}:{user:User;onLogout:()=>void}){
    <main className="work">
     <div className="breadcrumb">{stats?"统计与导出":"共享与关注"}</div>
     {stats?<StatsPanel/>:<CollaborationPanel/>}
+   </main>
+  </div>
+ </AppShell>;
+}
+
+export function SearchPage({user,onLogout}:{user:User;onLogout:()=>void}){
+ return <AppShell user={user} onLogout={onLogout}>
+  <div className="panels">
+   <main className="work">
+    <div className="breadcrumb">全文检索</div>
+    <SearchPanel/>
    </main>
   </div>
  </AppShell>;

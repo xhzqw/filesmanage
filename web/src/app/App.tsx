@@ -11,7 +11,7 @@ import{Org}from "../pages/Org";
 import{Approvals}from "../pages/Approvals";
 import{OfficeEditor}from "../pages/OfficeEditor";
 import{ModelViewer}from "../pages/ModelViewer";
-import{WorkspacePage}from "./AppShell";
+import{SearchPage,WorkspacePage}from "./AppShell";
 export function App(){
  const user=useSession(s=>s.user),loading=useSession(s=>s.loading),setUser=useSession(s=>s.setUser),setLoading=useSession(s=>s.setLoading);
  useEffect(()=>{let valid=true;authApi.me().then(u=>{if(valid)setUser(u)}).catch(()=>{if(valid)setUser(null)}).finally(()=>{if(valid)setLoading(false)});return()=>{valid=false}},[setLoading,setUser]);
@@ -27,6 +27,7 @@ export function App(){
  <Route path="/office/:id" element={user?<OfficeEditor/>:<Navigate to="/login" replace/>}/>
  <Route path="/model/:id" element={user?<ModelViewer/>:<Navigate to="/login" replace/>}/>
  <Route path="/workspace" element={user?<WorkspacePage user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
+ <Route path="/search" element={user?<SearchPage user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/stats" element={user?<WorkspacePage user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="*" element={<Navigate to={user?"/doc":"/login"} replace/>}/></Routes>;
 }
