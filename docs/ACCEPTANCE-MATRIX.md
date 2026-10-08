@@ -24,7 +24,7 @@ Status totals: **123 PASS / 2 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 | S9 | S9：中文预算等词检索、mark 安全摘要、tsvector/like、过滤、毫秒报告。 | **PASS** | tsvector GIN 中文检索 + cmd/reindex 回填；loadtest search p95 有报告；snippet 走安全文本节点 + <mark> |
 | S10 | S10：限时 ACL 在边界时刻生效/失效；以注入时钟测，不必硬等 61 秒。 | **PASS** | s_matrix_e2e.py：'S10 expiring grant created' / 'visible before expiry' / 'refused after expiry'（注入时钟） |
 | S11 | S11：组织树、用户列表、组成员管理和权限拒绝。 | **PASS** | s_matrix_e2e.py：'S11 non-admin user list refused' + 组织树/用户列表/成员管理端点 |
-| S12 | S12：远程 URL 可达、systemd 开机自启、升级/回退演练。 | **PARTIAL** | systemd 单元已编写并语法验证但未安装、升级/回退演练未执行（BLK-05） |
+| S12 | S12：远程 URL 可达、systemd 开机自启、升级/回退演练。 | **PARTIAL** | 升级/回退演练已取证（scripts/upgrade_rollback_drill.py 12/12，含跨 MSH 格式边界的回退：新构建写入的数据在旧构建下字节级存活）；远程 URL 可达已在 LAN 验证；systemd 开机自启的单元已编写并语法验证但未安装（BLK-05 授权） |
 | S13 | E5：[SPEC-v2] 初始功能边界和旧 S1–S13。 | **PASS** | 旧边界条目，被 v2.1 全量范围取代 |
 | S14 | ### 13.3 第一阶段新验收 S14–S19 | **PASS** | S14–S19 阶段标题；逐条见 S15–S19 |
 | S15 | S15 共享文档：内部用户/组共享、动态成员调整、过期、撤销、继承子目录、 | **PASS** | m7_security_e2e.py：folder share with descendants、动态成员、撤销即时失效；过期见 S10 同时钟机制 |
@@ -175,7 +175,7 @@ Status totals: **123 PASS / 2 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 
 以下 PARTIAL id 均已在 `docs/OPEN-BLOCKERS.md` 登记具体缺口与所需输入：
 
-- `S12` — systemd 单元已编写并语法验证但未安装、升级/回退演练未执行（BLK-05）
+- `S12` — 升级/回退演练已取证（scripts/upgrade_rollback_drill.py 12/12，含跨 MSH 格式边界的回退：新构建写入的数据在旧构建下字节级存活）；远程 URL 可达已在 LAN 验证；systemd 开机自启的单元已编写并语法验证但未安装（BLK-05 授权）
 - `S20` — DEC-14 品牌外壳已交付，官方 Logo 二进制未提供，UI 维持显式占位（BLK-01）
 
 ## EXTERNAL 登记

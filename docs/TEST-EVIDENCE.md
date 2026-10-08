@@ -440,6 +440,28 @@ booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
   "no IGES writer on the target" was wrong: reader-side samples exist and are
   the correct vehicle for this acceptance item.
 
+### Upgrade/rollback drill S12 (2026-10-09, 12/12 PASS)
+
+`scripts/upgrade_rollback_drill.py` exercises the delivery's backwards path at
+dev level (systemd installation and the production cutover remain unauthorised
+under BLK-05, but the drill itself needs no production access):
+
+1. the current build is verified (health, real login, a known file's bytes);
+2. a marker file is written through the API (data created by the current build);
+3. the previous release is built in a git worktree and swapped in;
+4. the rolled-back build starts, authenticates, **still serves the marker
+   byte-for-byte**, and can write data itself;
+5. the current build is restored (binary digest verified identical) and the
+   marker is still readable; the drill's files are cleaned up.
+
+Run twice: against `HEAD~1` and against `HEAD~2` — the latter crosses the MSH
+derivative format change, so it also documents the one real compatibility
+boundary: a rolled-back (STL-era) server keeps serving data written by the
+MSH-era build without loss. 12/12 both times.
+
+S12 now has two of its three parts evidenced (LAN reachability + this drill);
+the systemd auto-start part stays with BLK-05 until installation is authorised.
+
 ### Consolidated full-gate run after the MSH pipeline change (2026-10-09)
 
 Every acceptance script re-executed after this session's changes (viewer

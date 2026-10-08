@@ -58,7 +58,7 @@ MATRIX = {
     "S9": ("PASS", "tsvector GIN 中文检索 + cmd/reindex 回填；loadtest search p95 有报告；snippet 走安全文本节点 + <mark>"),
     "S10": ("PASS", "s_matrix_e2e.py：'S10 expiring grant created' / 'visible before expiry' / 'refused after expiry'（注入时钟）"),
     "S11": ("PASS", "s_matrix_e2e.py：'S11 non-admin user list refused' + 组织树/用户列表/成员管理端点"),
-    "S12": ("PARTIAL", "systemd 单元已编写并语法验证但未安装、升级/回退演练未执行（BLK-05）"),
+    "S12": ("PARTIAL", "升级/回退演练已取证（scripts/upgrade_rollback_drill.py 12/12，含跨 MSH 格式边界的回退：新构建写入的数据在旧构建下字节级存活）；远程 URL 可达已在 LAN 验证；systemd 开机自启的单元已编写并语法验证但未安装（BLK-05 授权）"),
     "S13": ("PASS", "旧边界条目，被 v2.1 全量范围取代"),
     "S14": ("PASS", "S14–S19 阶段标题；逐条见 S15–S19"),
     "S15": ("PASS", "m7_security_e2e.py：folder share with descendants、动态成员、撤销即时失效；过期见 S10 同时钟机制"),
