@@ -153,6 +153,12 @@ perf 实例停止时运行**：perf 实例与 dev 实例共享 CPU 与同一台 
 -H 'Content-Type: application/json' -d "{\"login\":\"admin\",\"password\":\"$(cat .secrets/admin.password)\"}"`
 然后 `grep fm_session /tmp/c.txt | awk '{print $7}'`。
 
+## 4.1 证据采集工具
+
+`node scripts/capture_evidence.mjs` 通过已认证的 headless Chrome 抓取全部真实页面
+截图到 `docs/evidence/`（登录、文档管理、预览、模型查看器含装配零件树、搜索、统计、
+组织、审批、回收站），用于给客户做可视化验收；行为断言仍以 §4 各门禁为准。
+
 ## 5. 备份与恢复
 
 ```bash
