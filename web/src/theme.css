@@ -74,3 +74,12 @@ th{color:#53677D;background:#F7FBFF;font-size:12px}.empty{color:#71859A;text-ali
 .stat-card{background:#fff;border:1px solid #D1E1EC;border-radius:12px;padding:18px;display:grid;gap:6px;justify-items:center}
 .stat-num{font-size:24px;font-weight:700;color:#174098}
 .toolbar button.on{background:#DFEFFB;border-color:#02A0EA;color:#174098;font-weight:bold}
+
+.logo-slot{border:1px dashed #B4CADB;color:#8B9BAD;padding:6px 10px;font-size:10px;border-radius:6px;background:#F7FBFF}
+.nav-toggle{display:none;background:none;border:0;font-size:20px}
+@media(max-width:1050px){
+ .nav-toggle{display:inline-block}
+ .header nav{display:none;position:absolute;top:66px;left:0;right:0;background:#fff;border-bottom:1px solid #D1E1EC;flex-direction:column;padding:10px 20px;z-index:10}
+ .header nav.open{display:flex}
+ .header nav a{border-bottom:0;padding:10px 0}
+}

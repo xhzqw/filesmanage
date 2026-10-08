@@ -319,3 +319,15 @@ go run ./cmd/migrate → MIGRATIONS_OK 10 (0010 adds shares.created_at)
 
 ### Fix
 - AnalyzeBytes previously decoded to string first, which stripped the BOM and made EOL/trailing-newline detection unreliable; it now operates on raw bytes and PreviewBytes separates display decoding from metadata.
+
+## Milestone 6c — brand shell (DEC-14, executed on 192.168.1.22)
+
+| Item | Result |
+|---|---|
+| Official logo slot | explicit "官方 Logo 待入库" placeholder on every authenticated page (BLK-01; a self-drawn mark is never passed off as the corporate logo) |
+| Folder icon | yellow SVG (FolderIcon) rendered in the shell navigation |
+| Navigation | 文档管理 / 共享/关注 / 统计 / 审批 / 回收站 / 组织管理 |
+| Collaboration tabs | 与我共享 / 我共享的 / 我的关注 |
+| Responsive | 768px viewport: hamburger toggle visible, nav collapses to overlay and opens on tap |
+
+State feedback already present and exercised in earlier milestones: loading text, error alerts, empty states, permission-denied messages.

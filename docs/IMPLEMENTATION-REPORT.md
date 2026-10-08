@@ -103,6 +103,9 @@ Defect found and fixed during M1: FolderTree rendered only from `parentId===null
 ### Plain Text fidelity (SPEC §8)
 - Preview metadata (encoding, BOM, EOL, trailing newline, truncation) is computed from raw bytes; rawBase64 carries the exact prefix so editors round-trip without normalisation. 12 byte samples verified plus a 300KB truncation case and a byte-exact save round-trip.
 
+### Brand shell (DEC-14)
+- Blue/white engineering palette, yellow folder SVG, and an explicit logo placeholder labelled "待入库" on every authenticated page until the official asset arrives (BLK-01). Responsive navigation verified at 768px.
+
 ### Test data hygiene
 - The redundant full-permission grant created during browser acceptance was revoked; the test workgroup was removed; clerkA/clerkB were disabled. Hard deletion of principals with audit history is blocked by foreign keys by design, so the audit chain stays intact.
 
