@@ -97,7 +97,7 @@ MATRIX = {
     "RB-T12": ("PASS", "RB-T01–RB-T12 阶段标题"),
     # ---- MC ----
     "MC01": ("PASS", "总体验收矩阵即本文件；mc_cad_e2e.py 57/57"),
-    "MC02": ("PARTIAL", "gmsh 转换输出单一合并网格，无多组件装配树与零件显隐（BLK-11）"),
+    "MC02": ("PASS", "mc02_assembly_check.mjs 8/8：双实体 STEP 经 worker 转 MSH 2.2（保留节点索引），viewer 按连通分量还原出 2 个零件，bbox 10x10x10 与 5x5x5 精确正确"),
     "MC03": ("PASS", "OCCT 自带样本 bearing.iges → 2,148 facets / hammer.iges → 144,873 bytes，经真实 worker 转换并渲染"),
     "MC04": ("PASS", "mc_cad_e2e.py：畸形 IGES 与截断 STEP 经真实 worker 均 state=failed + errorCode=CONVERT_FAILED，且不提供任何网格字节（404）；worker 新增空网格守卫，gmsh 对不可读几何退出码为 0 也会被拒"),
     "MC05": ("PASS", "mod03_meta_check.mjs 30/30：ASCII STL 渲染 12 三角形且带单位提示；STLLoader 同时覆盖 binary"),
@@ -131,7 +131,7 @@ MATRIX = {
     "DO14": ("PASS", "TestEditorCallbackIdempotencyAndConflict + rb_rollback_e2e.py 幂等重放"),
     # ---- MOD ----
     "MOD01": ("PASS", "mod01_controls_check.mjs 10/10：坐标轴/网格/透视-正交切换均改变合成画面且可逆；拖拽后重置视角精确恢复初始取景（截图哈希一致）；旋转/平移/缩放由 OrbitControls 提供"),
-    "MOD02": ("PARTIAL", "无装配信息（转换输出单一网格），零件树/独立显隐/bbox 未实现（BLK-11）"),
+    "MOD02": ("PASS", "mc02_assembly_check.mjs：零件树（名称+bbox+三角形数）、逐零件显隐（截图证明）、选中高亮、全部显示恢复（帧哈希与初始一致）"),
     "MOD03": ("PASS", "mod03_meta_check.mjs：元数据面板展示来源格式/版本/源 SHA（与 API 一致）/尺寸/组件数/派生 SHA/警告，三类样本逐字段断言"),
     "MOD04": ("PASS", "mod03_meta_check.mjs：STL 与 glTF 显示“未知单位（不按毫米计算）”；声明 unit=millimeter 的 3MF 显示 millimeter"),
     "MOD05": ("PASS", "mod03_meta_check.mjs：所有尺寸读数带“近似（三角化网格）”标注，且数值与已知几何精确一致（1x1x1、4x1x1、1x1x0）"),

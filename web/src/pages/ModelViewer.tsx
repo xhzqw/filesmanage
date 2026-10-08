@@ -37,6 +37,11 @@ export function ModelViewer(){
  // viewer must never silently assume millimetres (MOD04).
  const[unit,setUnit]=useState("unknown");
  const[layers,setLayers]=useState<{name:string;visible:boolean}[]>([]);
+ // Assembly parts recovered from a converted mesh (MC02/MOD02): the MSH keeps
+ // shared node indices, so connected components are the solids.
+ const[parts,setParts]=useState<{name:string;visible:boolean;size:[number,number,number];triangles:number}[]>([]);
+ const[selectedPart,setSelectedPart]=useState(-1);
+ const mshRoot=useRef<import("three").Group|null>(null);
  const dxfRoot=useRef<import("three").Group|null>(null);
 
  useEffect(()=>{
@@ -125,6 +130,11 @@ export function ModelViewer(){
      object=parsed.object;
      dxfRoot.current=parsed.object;
      setLayers(parsed.layers);
+    }else if(format==="msh"){
+     const parsed=parseMsh(new TextDecoder().decode(buffer),THREE);
+     object=parsed.group;
+     mshRoot.current=parsed.group;
+     setParts(parsed.parts);
     }else{
      // Sibling resolution is only needed by the multi-resource formats; the
      // resolver itself is lazy so single-file formats pay nothing.
@@ -162,6 +172,38 @@ export function ModelViewer(){
       }}/>
       {layer.name}
      </label>)}
+    </div>}
+    {parts.length>0&&<div className="toolbar" role="group" aria-label="装配零件">
+     {parts.map((part,index)=>(
+      <label key={part.name} className="sort-label">
+       <input type="checkbox" checked={part.visible} onChange={event=>{
+        setParts(parts.map((item,i)=>i===index?{...item,visible:event.target.checked}:item));
+        const child=mshRoot.current?.children[index];
+        if(child)child.visible=event.target.checked;
+       }}/>
+       <button type="button" className={selectedPart===index?"on":""} onClick={()=>{
+        setSelectedPart(selectedPart===index?-1:index);
+        // Selecting a part highlights it; everything else returns to the base
+        // material so only one part is ever emphasised (MOD02).
+        mshRoot.current?.children.forEach((child,i)=>{
+         const mesh=child as import("three").Mesh;
+         const material=mesh.material as import("three").MeshPhongMaterial|undefined;
+         if(!material||!material.emissive)return;
+         material.emissive.setHex(i===(selectedPart===index?-1:index)?0x1b4f8a:0x000000);
+        });
+       }}>{part.name}</button>
+       <span className="toolbar-hint">{part.size.map(v=>v.toFixed(2)).join("×")} · {part.triangles}△</span>
+      </label>
+     ))}
+     <button type="button" onClick={()=>{
+      setParts(parts.map(item=>({...item,visible:true})));
+      setSelectedPart(-1);
+      mshRoot.current?.children.forEach(child=>{
+       child.visible=true;
+       const material=(child as import("three").Mesh).material as import("three").MeshPhongMaterial|undefined;
+       material?.emissive?.setHex(0x000000);
+      });
+     }}>全部显示</button>
     </div>}
     {status==="unsupported"&&<p className="empty">{info?.note??"该格式当前不支持在线预览"}</p>}
     {status==="converting"&&<p className="empty">模型转换中（Worker 处理），请稍后刷新…</p>}
@@ -309,6 +351,95 @@ async function loadParser(
    };
   }
  }
+}
+
+// parseMsh reads a gmsh MSH 2.2 ASCII mesh and recovers the assembly: nodes
+// are shared between triangles, so triangles joined through a common node are
+// one solid. Each connected component becomes a named part with its own
+// geometry and bounding box (MC02/MOD02).
+type MshPart={name:string;visible:boolean;size:[number,number,number];triangles:number};
+
+function parseMsh(text:string,THREE:typeof import("three")):{group:import("three").Group;parts:MshPart[]}{
+ const section=(name:string):string[]=>{
+  const start=text.indexOf("$"+name);
+  if(start<0)return [];
+  const end=text.indexOf("$End"+name,start);
+  return text.slice(start,end<0?text.length:end).split("\n").slice(1);
+ };
+ const nodes=new Map<number,[number,number,number]>();
+ for(const line of section("Nodes")){
+  const f=line.trim().split(/\s+/);
+  if(f.length<4||(f[0]??"").startsWith("$"))continue;
+  const tag=Number(f[0]);
+  if(Number.isFinite(tag))nodes.set(tag,[Number(f[1])||0,Number(f[2])||0,Number(f[3])||0]);
+ }
+ // Triangles are stored as node tags: the last three fields of an MSH 2.2
+ // element line are the node tags, whatever the preceding tag count is.
+ const tris:number[][]=[];
+ for(const line of section("Elements")){
+  const f=line.trim().split(/\s+/);
+  if(f.length<4||(f[0]??"").startsWith("$")||f[1]!=="2")continue;   // 2 = triangle
+  const tags=f.slice(f.length-3).map(Number);
+  if(tags.length!==3||!tags.every(tag=>nodes.has(tag)))continue;
+  tris.push(tags);
+ }
+ // Union-find over node tags: triangles sharing a node are one solid.
+ const parent=new Map<number,number>();
+ const find=(x:number):number=>{
+  let root=x;
+  for(;;){
+   const next=parent.get(root);
+   if(next===undefined||next===root)break;
+   root=next;
+  }
+  let cursor=x;
+  while(cursor!==root){
+   const next=parent.get(cursor);
+   if(next===undefined)break;
+   parent.set(cursor,root);
+   cursor=next;
+  }
+  return root;
+ };
+ const union=(a:number,b:number)=>{
+  const ra=find(a),rb=find(b);
+  if(ra!==rb)parent.set(ra,rb);
+ };
+ for(const tag of nodes.keys())parent.set(tag,tag);
+ for(const tri of tris)union(tri[0]??0,tri[1]??0);
+ for(const tri of tris)union(tri[1]??0,tri[2]??0);
+ const groups=new Map<number,number[][]>();
+ for(const tri of tris){
+  const root=find(tri[0]??0);
+  const list=groups.get(root);
+  if(list)list.push(tri);else groups.set(root,[tri]);
+ }
+ // Largest component first so the primary solid is 组件 1.
+ const ordered=[...groups.values()].sort((a,b)=>b.length-a.length);
+ const group=new THREE.Group();
+ const parts:MshPart[]=ordered.map((component,partIndex)=>{
+  const positions=new Float32Array(component.length*9);
+  component.forEach((tri,k)=>{
+   tri.forEach((tag,vertex)=>{
+    const coord=nodes.get(tag);
+    if(!coord)return;
+    positions[k*9+vertex*3]=coord[0];
+    positions[k*9+vertex*3+1]=coord[1];
+    positions[k*9+vertex*3+2]=coord[2];
+   });
+  });
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute("position",new THREE.BufferAttribute(positions,3));
+  geometry.computeVertexNormals();
+  const mesh=new THREE.Mesh(geometry,new THREE.MeshPhongMaterial({color:0x2f7fd0,shininess:40,specular:0x22406b}));
+  mesh.name="\u7ec4\u4ef6 "+(partIndex+1);
+  group.add(mesh);
+  geometry.computeBoundingBox();
+  const box=geometry.boundingBox;
+  const size=box?box.getSize(new THREE.Vector3()):new THREE.Vector3();
+  return{name:mesh.name,visible:true,size:[size.x,size.y,size.z] as [number,number,number],triangles:component.length};
+ });
+ return{group,parts};
 }
 
 // ViewerControls is the imperative surface the toolbar drives (SPEC §模型查看器

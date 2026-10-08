@@ -421,3 +421,33 @@ readable after the restart — 4/4.
 RB-T06/07/08/10/11 and AG09 move to PASS (121 PASS / 4 PARTIAL / 1
 EXTERNAL); BLK-15 is struck. Regressions re-run: `go test ./...`, vet and the
 architecture gate green.
+
+---
+
+## BLK-11 closed: STEP assembly recovered from the mesh (2026-10-09)
+
+The converter emitted a single merged STL, so a multi-solid STEP could only be
+viewed as one blob. Two experiments shaped the fix: gmsh on this target
+rejects OBJ and PLY output outright (the usual group-preserving routes are
+closed), while MSH 2.2 keeps shared node indices — and gmsh's per-solid
+triangle sets are exactly the connected components of that node graph, so the
+assembly can be recovered without any CAD-side assembly export.
+
+`cmd/worker` now writes MSH 2.2 for converted formats (`outputKind: msh`, with
+the empty-mesh guard generalised to count MSH triangles), and the viewer's
+`parseMsh` clusters triangles through a union-find over node tags, emitting one
+named part per component plus a part tree with per-part visibility, selection
+highlight, restore-all and per-part bounding boxes. Legacy STL derivatives and
+native formats are untouched.
+
+`scripts/mc02_assembly_check.mjs` proves it end-to-end (8/8) with a two-solid
+STEP built by gmsh: the tree shows 组件 1 / 组件 2 with the true bounding boxes
+(10.00x10.00x10.00 and 5.00x5.00x5.00) and triangle counts (260 / 84), hiding
+a part changes the composited frame, restore-all returns the exact original
+frame hash, and selecting a part highlights it.
+
+MC02/MOD02 move to PASS (123 PASS / 2 PARTIAL / 1 EXTERNAL); BLK-11 is struck
+and **no implementable code gap remains** — the two PARTIAL ids (S12, S20) are
+customer-input items already registered under BLK-05/BLK-01. Regressions
+re-run: mc_cad 78/78, mod01 10/10, multi-asset 15/15, MOD03 30/30, PE15 PASS,
+rb_rollback 72/72, `go test ./...`, vet and the architecture gate green.

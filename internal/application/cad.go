@@ -10,10 +10,10 @@ import (
 
 // CADSupport describes one source format's preview capability class.
 type CADSupport struct {
-	Format   string
-	Class    string // native | converted | licensed | unverified
-	Engine   string
-	Note     string
+	Format string
+	Class  string // native | converted | licensed | unverified
+	Engine string
+	Note   string
 }
 
 // FormatMatrix is the honest capability matrix surfaced by the API and UI.
@@ -23,9 +23,9 @@ func FormatMatrix() []CADSupport {
 		{Format: "obj", Class: "native", Engine: "three.js OBJLoader", Note: "浏览器直接渲染"},
 		{Format: "glb", Class: "native", Engine: "three.js GLTFLoader", Note: "浏览器直接渲染"},
 		{Format: "gltf", Class: "native", Engine: "three.js GLTFLoader", Note: "浏览器直接渲染"},
-		{Format: "step", Class: "converted", Engine: "gmsh (OpenCASCADE)", Note: "服务端 Worker 三角化后渲染"},
+		{Format: "step", Class: "converted", Engine: "gmsh (OpenCASCADE)", Note: "服务端 Worker 三角化为 MSH 组件网格后渲染"},
 		{Format: "stp", Class: "converted", Engine: "gmsh (OpenCASCADE)", Note: "服务端 Worker 三角化后渲染"},
-		{Format: "iges", Class: "converted", Engine: "gmsh (OpenCASCADE)", Note: "服务端 Worker 三角化后渲染"},
+		{Format: "iges", Class: "converted", Engine: "gmsh (OpenCASCADE)", Note: "服务端 Worker 三角化为 MSH 组件网格后渲染"},
 		{Format: "igs", Class: "converted", Engine: "gmsh (OpenCASCADE)", Note: "服务端 Worker 三角化后渲染"},
 		{Format: "ply", Class: "native", Engine: "three.js PLYLoader", Note: "浏览器直接渲染点云/网格"},
 		{Format: "3mf", Class: "native", Engine: "three.js 3MFLoader", Note: "浏览器直接渲染多部件 3MF"},
@@ -58,7 +58,10 @@ func (s *Service) RequestDerivative(ctx context.Context, u domain.User, fileID s
 	if err != nil {
 		return domain.ModelDerivative{}, domain.ErrNotFound
 	}
-	outputKind := "stl"
+	// Converted formats emit MSH 2.2: it keeps shared node indices, which lets
+	// the viewer recover the assembly's connected components (parts) from the
+	// merged mesh. STL carries no such structure.
+	outputKind := "msh"
 	if support.Class == "native" {
 		outputKind = format
 	}
@@ -170,6 +173,8 @@ func (s *Service) OpenDerivative(ctx context.Context, u domain.User, fileID stri
 
 func contentTypeFor(format string) string {
 	switch format {
+	case "msh":
+		return "model/mesh"
 	case "stl":
 		return "model/stl"
 	case "obj":

@@ -440,6 +440,34 @@ booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
   "no IGES writer on the target" was wrong: reader-side samples exist and are
   the correct vehicle for this acceptance item.
 
+### STEP assembly tree MC02/MOD02 (2026-10-09, 8/8 PASS)
+
+The converter emitted one merged STL, so a multi-solid STEP could only be
+viewed as a single blob. Two findings drove the fix:
+
+- gmsh on this target cannot emit OBJ or PLY (both rejected as unknown mesh
+  formats), so the usual "OBJ keeps `g`/`o` group names" route is closed;
+- MSH 2.2 keeps **shared node indices**, and gmsh's per-solid triangle sets
+  are exactly the connected components of that node graph — no CAD-side
+  assembly export needed.
+
+`cmd/worker` now writes MSH 2.2 for converted formats (`outputKind: msh`; the
+empty-mesh guard was generalised to count MSH triangles), and the viewer's
+`parseMsh` clusters triangles through a union-find over node tags, emitting one
+named part per component. STL remains the guard path for any legacy
+derivative, and native formats are untouched.
+
+`scripts/mc02_assembly_check.mjs` builds a two-solid STEP with gmsh (10x10x10
+box at the origin, 5x5x5 box at x=20), runs it through the real worker and
+verifies in the browser: 8/8 — the part tree shows 组件 1 / 组件 2 with the
+true bounding boxes (10.00x10.00x10.00, 5.00x5.00x5.00) and triangle counts
+(260 / 84), hiding a part changes the composited frame, restore-all returns
+the exact original frame hash, and selecting a part highlights it.
+
+Matrix: 123 PASS / 2 PARTIAL / 1 EXTERNAL — the two PARTIAL ids (S12, S20) are
+customer-input items folded into BLK-05/BLK-01; no implementable code gap
+remains.
+
 ### Rollback concurrency/approval edges + crash recovery (2026-10-09, 72/72 + 4/4)
 
 `scripts/rb_rollback_e2e.py` grew from 27 to 72 checks:

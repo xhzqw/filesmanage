@@ -1,6 +1,6 @@
 # Open blockers
 
-Status date: 2026-10-09 (BLK-12/13/14/15/16 closed; matrix now 121 PASS / 4 PARTIAL / 1 EXTERNAL). The only remaining PARTIAL id set is BLK-11 (STEP assembly tree / MC02+MOD02), plus S12/S20 folded into BLK-05/BLK-01.
+Status date: 2026-10-09 (BLK-11..BLK-16 all closed; matrix now 123 PASS / 2 PARTIAL / 1 EXTERNAL). The two remaining PARTIAL ids are S12 (systemd install + upgrade/rollback drill, folded into BLK-05) and S20 (official Logo asset, folded into BLK-01); both need customer input, and no implementable code gap remains.
 
 | ID | Blocker | Impact | Needed from customer / next probe |
 |---|---|---|---|
@@ -16,7 +16,7 @@ Status date: 2026-10-09 (BLK-12/13/14/15/16 closed; matrix now 121 PASS / 4 PART
 | ~~BLK-09~~ | DO05 byte-level fidelity after commit | RESOLVED | `scripts/do05_header_footer_check.py` (15/15): header/footer/page-break all survive the real commit path |
 | ~~BLK-10~~ | AG12 CAD-saturation isolation | RESOLVED | `scripts/pe12_cad_saturation.py` PASS 7/7 in the 2026-10-09 final re-run (x0.93–x1.14, all inside the SPEC 25% budget). The one earlier failing run (x1.64) was traced to the loopback perf instance co-running and contaminating the baseline; with the perf instance stopped the same script passes. Latency-measuring gates must run with the perf instance stopped. |
 
-| BLK-11 | STEP 多组件装配树与零件显隐未实现（MC02, MOD02）：gmsh 转换输出单一合并网格，查看器无零件树/独立显隐/bbox | 机械装配类文件只能整体查看，不能按组件隐藏/高亮 | 转换器保留组件边界（按 gmsh physical group 输出多 mesh 或改用 OCCT XCAF 路径），查看器增加零件树 |
+| ~~BLK-11~~ | STEP 多组件装配树与零件显隐未实现（MC02, MOD02） | RESOLVED | 转换输出改为 MSH 2.2（保留共享节点索引），viewer 按节点连通分量还原装配件；`scripts/mc02_assembly_check.mjs` 8/8：双实体 STEP 还原出 2 个零件，bbox 精确，逐零件显隐/选中高亮/全部显示均经截图证明 |
 | ~~BLK-12~~ | 材质/纹理关联未实现（MC06 OBJ+MTL、MC07 glTF 外部 .bin/textures、MC09 3MF 多部件材质） | RESOLVED | `scripts/mc_multiasset_check.mjs` 15/15：siblingResolver（MTLLoader + LoadingManager URL modifier）把相对资源映射到同目录兄弟文件，三类多样资源样本全部按预期三角形数渲染，兄弟资源真实拉取，无外部请求 |
 | ~~BLK-13~~ | 单位提示与量测标注未实现（MC05, MOD03, MOD04, MOD05） | RESOLVED | `scripts/mod03_meta_check.mjs` 30/30：元数据面板（格式/版本/源 SHA/尺寸/组件数/派生 SHA/警告，SHA 与版本逐字段对 API 断言）；STL 与 glTF 显示“未知单位（不按毫米计算）”，声明单位的 3MF 显示原值；尺寸一律带“近似（三角化网格）”标注 |
 | ~~BLK-14~~ | 查看器控制面不完整（MOD01, MOD07） | RESOLVED | `scripts/mod01_controls_check.mjs` 10/10：控件全部实现并经 CDP 实测（切换改变画面且可逆、重置视角精确恢复初始取景）；WebGL 丢失与超大文件均有可操作错误 + 下载入口 |
@@ -33,6 +33,8 @@ Status date: 2026-10-09 (BLK-12/13/14/15/16 closed; matrix now 121 PASS / 4 PART
 - ~~无单位提示/元数据面板/近似量测标注~~ → BLK-13 closed: the viewer publishes a metadata panel (format, version, source SHA, dimensions, component count, derivative SHA, warnings), reports 未知单位 for every mesh format instead of assuming millimetres (only 3MF's declared unit is shown), and labels every dimension readout 近似（三角化网格）; verified field-by-field against the API by `scripts/mod03_meta_check.mjs` (30/30).
 
 - ~~回滚/并发/崩溃恢复边角无断言~~ → BLK-15 closed: rb_rollback_e2e.py 72/72 (concurrent rollback single-winner with gap-free seq, approval-policy pending/reject/duplicate paths, byte-exact rollback across plain/BOM/CRLF/DOCX/STEP, shared-blob survival) and scripts/ag09_recovery_drill.py 4/4, which also added the missing startup sweep (`Store.SweepStaging`) so a crash before the database commit no longer leaves staging files behind forever.
+
+- ~~STEP 装配树与零件显隐未实现~~ → BLK-11 closed: the converter now emits MSH 2.2 (shared node indices survive), the viewer recovers solids as connected components and renders a part tree with per-part visibility, selection highlight, restore-all and per-part bboxes; `scripts/mc02_assembly_check.mjs` 8/8.
 
 Resolved this milestone:
 - ~~Folder-filtered search/stats/export could bypass the visibility scope~~ → scope intersection + placeholder fix, 31/31 E2E.

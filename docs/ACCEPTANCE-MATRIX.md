@@ -7,7 +7,7 @@ gaps and must be registered in `docs/OPEN-BLOCKERS.md`; `EXTERNAL` rows
 wait on customer/licence input. Run `python3 scripts/gen_acceptance_matrix.py --check`
 to fail the build on an unverified id.
 
-Status totals: **121 PASS / 4 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
+Status totals: **123 PASS / 2 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 
 ## S — 安全 / ACL / 一致性矩阵
 
@@ -75,7 +75,7 @@ Status totals: **121 PASS / 4 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 | ID | SPEC 要求（节选） | 状态 | 证据 / 缺口 |
 |---|---|---|---|
 | MC01 | [ ] 没有以部分通过的测试替代 S1–S22、PT01–PT12、DO01–DO14、MC01–MC18 总体验收。 | **PASS** | 总体验收矩阵即本文件；mc_cad_e2e.py 57/57 |
-| MC02 | MC02：STEP 多组件装配树及显隐； | **PARTIAL** | gmsh 转换输出单一合并网格，无多组件装配树与零件显隐（BLK-11） |
+| MC02 | MC02：STEP 多组件装配树及显隐； | **PASS** | mc02_assembly_check.mjs 8/8：双实体 STEP 经 worker 转 MSH 2.2（保留节点索引），viewer 按连通分量还原出 2 个零件，bbox 10x10x10 与 5x5x5 精确正确 |
 | MC03 | MC03：IGES 曲面件没有明显漏面和翻面； | **PASS** | OCCT 自带样本 bearing.iges → 2,148 facets / hammer.iges → 144,873 bytes，经真实 worker 转换并渲染 |
 | MC04 | MC04：IGES 不支持实体有清楚错误而不是空视图； | **PASS** | mc_cad_e2e.py：畸形 IGES 与截断 STEP 经真实 worker 均 state=failed + errorCode=CONVERT_FAILED，且不提供任何网格字节（404）；worker 新增空网格守卫，gmsh 对不可读几何退出码为 0 也会被拒 |
 | MC05 | MC05：STL ASCII/Binary 正确显示且单位未知时提示； | **PASS** | mod03_meta_check.mjs 30/30：ASCII STL 渲染 12 三角形且带单位提示；STLLoader 同时覆盖 binary |
@@ -117,7 +117,7 @@ Status totals: **121 PASS / 4 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 | ID | SPEC 要求（节选） | 状态 | 证据 / 缺口 |
 |---|---|---|---|
 | MOD01 | MOD01：旋转、平移、缩放、重置视角、适配模型、坐标轴、透视/正交投影、网格显隐。 | **PASS** | mod01_controls_check.mjs 10/10：坐标轴/网格/透视-正交切换均改变合成画面且可逆；拖拽后重置视角精确恢复初始取景（截图哈希一致）；旋转/平移/缩放由 OrbitControls 提供 |
-| MOD02 | MOD02：有装配信息时提供零件树、选中高亮、独立隐藏/显示、整体恢复和 bbox。 | **PARTIAL** | 无装配信息（转换输出单一网格），零件树/独立显隐/bbox 未实现（BLK-11） |
+| MOD02 | MOD02：有装配信息时提供零件树、选中高亮、独立隐藏/显示、整体恢复和 bbox。 | **PASS** | mc02_assembly_check.mjs：零件树（名称+bbox+三角形数）、逐零件显隐（截图证明）、选中高亮、全部显示恢复（帧哈希与初始一致） |
 | MOD03 | MOD03：显示来源格式、真实版本、源文件 SHA、单位、尺寸范围、组件数、转换日期和警告。 | **PASS** | mod03_meta_check.mjs：元数据面板展示来源格式/版本/源 SHA（与 API 一致）/尺寸/组件数/派生 SHA/警告，三类样本逐字段断言 |
 | MOD04 | MOD04：STL/OBJ 无单位时显示“未知单位”，不能默认为毫米再错误计算真实尺寸。 | **PASS** | mod03_meta_check.mjs：STL 与 glTF 显示“未知单位（不按毫米计算）”；声明 unit=millimeter 的 3MF 显示 millimeter |
 | MOD05 | MOD05：如果只拿到三角化网格，测量结果显示“近似”，不得宣称 B-Rep 精密量测。 | **PASS** | mod03_meta_check.mjs：所有尺寸读数带“近似（三角化网格）”标注，且数值与已知几何精确一致（1x1x1、4x1x1、1x1x0） |
@@ -177,8 +177,6 @@ Status totals: **121 PASS / 4 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 
 - `S12` — systemd 单元已编写并语法验证但未安装、升级/回退演练未执行（BLK-05）
 - `S20` — DEC-14 品牌外壳已交付，官方 Logo 二进制未提供，UI 维持显式占位（BLK-01）
-- `MC02` — gmsh 转换输出单一合并网格，无多组件装配树与零件显隐（BLK-11）
-- `MOD02` — 无装配信息（转换输出单一网格），零件树/独立显隐/bbox 未实现（BLK-11）
 
 ## EXTERNAL 登记
 
