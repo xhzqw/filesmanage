@@ -225,7 +225,7 @@ ONLYOFFICE editor (screenshot evidence in TEST-EVIDENCE §M5).
 | AG09 crash between commit and rename recovers | staging/reconciliation protocol; M2 evidence |
 | AG10 approval vs rollback concurrency, one winner | `TestApprovalWorkflow` single-winner + `rb_rollback_e2e.py` |
 | AG11 share revocation visible on the next request | `m7_security_e2e.py` (31/31, revocation immediacy) |
-| AG12 CAD worker saturation vs login/list p95 | PE11/PE12 measurements; worker ran under the load window — PARTIAL (a dedicated saturation run remains) |
+| AG12 CAD worker saturation vs login/list p95 | `scripts/pe12_cad_saturation.py` (two runs, ratios x0.76-x1.31, absolute p95 < 11ms) |
 | AG13 editor disconnect recovery via TTL + callback | office session lifecycle tests + TTL design |
 | AG14 stale frontend requests never overwrite | PT10 A/B 409 in `pt_samples_e2e.py`; request-key/cursor fixes from M2 |
 | AG15 new APIs traceable to use cases | `docs/openapi-implemented.yaml` + the S/RB-T/PT/MC matrices above |

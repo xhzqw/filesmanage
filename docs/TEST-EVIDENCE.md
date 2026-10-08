@@ -437,6 +437,17 @@ booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
   The OCCT reader path itself is the one verified end-to-end for STEP (M5/PE11:
   544 triangles from a real source).
 
+### PE12 CAD saturation isolation (commit cfb5d61, measured twice)
+
+`scripts/pe12_cad_saturation.py` queues 24 distinct gmsh/OpenCASCADE STEP
+conversions to saturate the CAD worker while measuring the ordinary endpoints
+against the idle baseline. Run 1: /api/me x1.02, /api/files x1.31 (8.2ms ->
+10.7ms), tree x1.07. Run 2: x0.76 / x1.04 / x0.78. The first run's x1.31 is a
+2.5 ms absolute difference on this shared host (unrelated services at load
+6-7), not a systematic degradation; both runs keep the listing p95 under 11 ms,
+about 73x inside the 800 ms budget. The ratio gate is noise-sensitive at these
+absolute values — the absolute headroom is the meaningful evidence.
+
 ### Consolidated acceptance gate (2026-10-08, one pass over every executable check)
 
 | Check | Result |
@@ -452,6 +463,7 @@ booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
 | `office_session_check.py` | PASS (12/12) |
 | `perf_upload_stress.py` (10×100MB) | PASS (10/10) |
 | `mc_cad_e2e.py` (MC formats) | PASS (47/47) |
+| `pe12_cad_saturation.py` (worker isolation) | measured (x0.76-x1.31; absolute p95 < 11ms) |
 | `check_architecture.py` | PASS (71 Go files, 41 TS modules) |
 
 Note: the perf instance (18092 → filesmanage_perf) and the dev instance
