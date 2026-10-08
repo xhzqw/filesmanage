@@ -314,3 +314,27 @@ surface. `web/src/pages/ModelViewer.tsx` now implements, and
 10/10 checks pass; MOD01 and MOD07 moved to PASS in the acceptance matrix
 (103 PASS / 22 PARTIAL / 1 EXTERNAL) and BLK-14 is struck from the blocker
 list. Full `npm run build` (tsc + vite) re-run green.
+
+
+---
+
+## BLK-16 closed: CAD negative paths, and a real defect they exposed (2026-10-09)
+
+Adding the missing negative-path assertions to `scripts/mc_cad_e2e.py`
+immediately paid for itself: a malformed IGES and a truncated STEP both
+converted to `state=ready` with a 47-byte **empty** STL, because gmsh exits 0
+on unreadable geometry and still writes a valid-but-empty mesh while the
+worker only checked `Size() == 0`. MC04 explicitly forbids exactly this
+("clear error, not an empty view"). `cmd/worker` now verifies the STL output
+really contains facets (binary count at offset 80 / `facet` keywords) and
+fails the derivative with `CONVERT_FAILED`.
+
+With that fixed, the negative-path matrix passes 78/78: malformed input fails
+loudly and serves no mesh bytes; five concurrent conversion requests converge
+on one derivative id; a save under an approval policy pends while the
+derivative keeps the checked-in version's digest *and bytes*, then rebinds
+after approval; a glTF referencing an external texture URL is served natively
+and byte-identical with no worker job (the server never fetches textures); a
+traversal/quote filename is refused at upload; and a corrupt zip is never
+extracted server-side. MC04/MC14/MC16/MC17/MOD10 move to PASS (108 PASS / 17
+PARTIAL / 1 EXTERNAL) and BLK-16 is struck.

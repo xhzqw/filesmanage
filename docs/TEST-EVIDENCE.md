@@ -440,6 +440,33 @@ booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
   "no IGES writer on the target" was wrong: reader-side samples exist and are
   the correct vehicle for this acceptance item.
 
+### CAD negative paths MC04/MC14/MC16/MC17/MOD10 (2026-10-09, 78/78 PASS)
+
+`scripts/mc_cad_e2e.py` gained a negative-path section. It found and fixed a
+real defect, not just missing assertions:
+
+**Defect found:** a malformed IGES and a truncated STEP both converted to
+`state=ready` with a 47-byte empty STL — gmsh exits 0 on unreadable geometry
+and still writes a valid but empty mesh, and the worker only checked
+`Size() == 0`. That is exactly the "empty view instead of a clear error"
+failure MC04 forbids. `cmd/worker` now validates that the STL output really
+contains facets (binary facet count at offset 80, or `facet` keywords for
+ASCII) and fails the derivative with `CONVERT_FAILED` otherwise.
+
+| Check | Result |
+|---|---|
+| MC04 broken IGES / truncated STEP | state=failed, errorCode=CONVERT_FAILED, no mesh bytes (404) |
+| MC14 5 concurrent conversion requests | all return the same derivativeId (EnsureDerivative ON CONFLICT) |
+| MC16 save under approval policy | 202 pending; derivative keeps the checked-in version's sha **and bytes** |
+| MC16 after approval | derivative rebinds to the new current version (different outputSha256) |
+| MC17 glTF with external texture URL | served natively, byte-identical, no worker job — the server never fetches textures |
+| MC17 hostile filename (traversal + quote) | upload refused HTTP 400 |
+| MC17 corrupt zip (3MF) | class native, no job, bytes served unchanged — no server-side unzip surface |
+
+MOD10 is closed by the same MC16 evidence (pending shows the checked-in
+version; the ungranted-account refusal is MC13). Matrix: 108 PASS / 17
+PARTIAL / 1 EXTERNAL.
+
 ### Viewer control surface MOD01/MOD07 (2026-10-09, 10/10 PASS)
 
 `scripts/mod01_controls_check.mjs` drives the real `/model/:id` page in

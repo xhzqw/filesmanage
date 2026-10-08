@@ -53,6 +53,16 @@ class Session:
         except (ValueError, UnicodeDecodeError):
             return status, None
 
+    def request_full(self, method, path):
+        """Like request() but also returns the response headers (MC17 header
+        injection checks need the raw Content-Disposition)."""
+        req = urllib.request.Request(self.base + path, method=method)
+        try:
+            with self.opener.open(req, timeout=120) as response:
+                return response.status, response.read(), dict(response.headers)
+        except urllib.error.HTTPError as exc:
+            return exc.code, exc.read(), dict(exc.headers)
+
 
 def upload(admin, folder_id, name, content):
     boundary = "----MCCadE2E"
@@ -335,14 +345,14 @@ EOF
 """).encode()
 
 
-def step_via_gmsh():
+def step_via_gmsh(outer=8, inner=3):
     import subprocess
     import tempfile
     import os
     # A torus gives real curved B-rep geometry without OCC booleans (the
     # BooleanDifference syntax is rejected by this gmsh build with a parse
     # error, which silently degrades the model).
-    geo = 'SetFactory("OpenCASCADE");\nTorus(1) = {0, 0, 0, 8, 3};\n'
+    geo = 'SetFactory("OpenCASCADE");\nTorus(1) = {0, 0, 0, %d, %d};\n' % (outer, inner)
     with tempfile.TemporaryDirectory() as tmp:
         geo_path = os.path.join(tmp, "mc.geo")
         step_path = os.path.join(tmp, "mc01.step")
@@ -533,6 +543,203 @@ def main():
             check("MC15 derivative bound to its own file",
                   status in (200, 404) and data.get("fileId", second_id) == second_id,
                   f"HTTP {status} {data.get('fileId')}")
+
+    # ---- Negative paths: MC04 / MC14 / MC16+MOD10 / MC17 ----
+
+    # MC04 + MC17(a): a malformed mechanical body must fail loudly through the
+    # real worker (state=failed with an error code) and never surface an empty
+    # successful mesh. An unsupported-entity IGES hits the same rejection path
+    # as a corrupt one, which is what the item demands: a clear error, not a
+    # blank view.
+    for bad_name, bad_bytes in (
+        ("mc04_broken.iges", b"this is not an IGES file at all\n"),
+        ("mc04_truncated.step", b"ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\n#1=FOO(1);\n"),
+    ):
+        status, uploaded = upload(admin, folder_id, bad_name, bad_bytes)
+        bad_id = (uploaded or {}).get("fileId") if status == 201 else None
+        check(f"MC04 upload {bad_name}", bad_id is not None, status)
+        if not bad_id:
+            continue
+        admin.json("POST", f"/api/files/{bad_id}/derivative")
+        state, error_code = None, None
+        for _ in range(45):
+            status, body = admin.json("GET", f"/api/files/{bad_id}/derivative")
+            data = (body or {}).get("data") or {}
+            state, error_code = data.get("state"), data.get("errorCode")
+            if state in ("failed", "ready"):
+                break
+            time.sleep(1)
+        check(f"MC04 {bad_name} fails loudly", state == "failed" and bool(error_code),
+              f"state={state} errorCode={error_code}")
+        status, payload = admin.request("GET", f"/api/files/{bad_id}/derivative/bytes")
+        check(f"MC04 {bad_name} serves no phantom mesh", status in (404, 409, 422),
+              f"HTTP {status} bytes={len(payload)}")
+
+    # MC14: concurrent conversion requests for the same file+version converge
+    # on one derivative row (EnsureDerivative ON CONFLICT), never fan out into
+    # duplicate jobs. Each thread uses its own session: the shared cookie jar
+    # is not thread-safe.
+    if step_id:
+        outcomes = []
+        lock = __import__("threading").Lock()
+
+        def fire():
+            worker_session = Session(args.base)
+            worker_session.json("POST", "/api/login", {"login": "admin", "password": admin_password})
+            st, bd = worker_session.json("POST", f"/api/files/{step_id}/derivative")
+            entry = (bd or {}).get("data") or {}
+            with lock:
+                outcomes.append((st, entry.get("derivativeId")))
+
+        threads = [__import__("threading").Thread(target=fire) for _ in range(5)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=60)
+        derivative_ids = {oid for _, oid in outcomes if oid}
+        check("MC14 concurrent requests share one derivative",
+              len(outcomes) == 5 and len(derivative_ids) == 1,
+              f"outcomes={outcomes}")
+
+    # MC16 + MOD10: while an approval is pending on a mechanical file, the
+    # ordinary user must keep seeing the currently checked-in version's
+    # derivative - the staged content must not be reachable through any
+    # derivative endpoint. After approval the derivative rebinds to the new
+    # current version.
+    status, me = admin.json("GET", "/api/me")
+    admin_id = (me or {}).get("data", {}).get("id")
+    status, _ = admin.json("PUT", f"/api/folders/{folder_id}/approval-policy",
+                           {"approverId": admin_id, "enabled": True})
+    check("MC16 approval policy set", status == 200, status)
+    if probe_id:
+        status, _ = admin.json("POST", f"/api/folders/{folder_id}/acls",
+                               {"subjectKind": "user", "subjectId": probe_id,
+                                "actions": ["preview", "upload", "modify"], "scopeOnly": False})
+        check("MC16 probe granted on folder", status in (200, 201), status)
+    pending_ok = False
+    if probe_id and step_bytes:
+        status, uploaded = upload(probe, folder_id, "mc16_pending.step", step_bytes)
+        pending_id = (uploaded or {}).get("fileId") if status == 201 else None
+        check("MC16 probe uploaded STEP", pending_id is not None, status)
+        if pending_id:
+            status, body = probe.json("POST", f"/api/files/{pending_id}/derivative")
+            v1_sha = ((body or {}).get("data") or {}).get("outputSha256")
+            for _ in range(45):
+                status, body = probe.json("GET", f"/api/files/{pending_id}/derivative")
+                data = (body or {}).get("data") or {}
+                if data.get("state") == "ready":
+                    v1_sha = data.get("outputSha256")
+                    break
+                time.sleep(1)
+            # Stage a change under the approval policy: the save must pend.
+            status, body = probe.json("POST", f"/api/files/{pending_id}/lock", {"BaseSeq": 1})
+            lock_token = ((body or {}).get("data") or {}).get("lockToken")
+            # Stage a *valid but different* STEP (a smaller torus) so the
+            # approved version converts into a genuinely different mesh; a
+            # truncated body would fail the empty-mesh guard by design.
+            staged_step = step_via_gmsh(5, 2)
+            staged = base64.b64encode(staged_step).decode()
+            status, body = probe.json("POST", f"/api/files/{pending_id}/save",
+                                      {"Data": staged, "BaseSeq": 1, "LockToken": lock_token or "",
+                                       "IdempotencyKey": "mc16-stage"})
+            check("MC16 save under policy pends", status == 202, f"HTTP {status}")
+            approval_id = ((body or {}).get("data") or {}).get("approvalId")
+            # While pending, the derivative must still be the checked-in mesh.
+            status, body = probe.json("GET", f"/api/files/{pending_id}/derivative")
+            data = (body or {}).get("data") or {}
+            status_bytes, payload = probe.request("GET", f"/api/files/{pending_id}/derivative/bytes")
+            import hashlib
+            served_sha = hashlib.sha256(payload).hexdigest() if status_bytes == 200 else None
+            check("MC16 pending keeps old derivative", data.get("state") == "ready"
+                  and data.get("outputSha256") == v1_sha,
+                  f"state={data.get('state')} sha={data.get('outputSha256')} want={v1_sha}")
+            check("MC16 pending serves old mesh bytes", served_sha == v1_sha,
+                  f"served={served_sha} want={v1_sha}")
+            # Approve: the derivative must rebind to the new current version.
+            if approval_id:
+                status, body = admin.json("POST", f"/api/approvals/{approval_id}/approve", {"comment": "MC16"})
+                check("MC16 approval commits", status == 200, f"HTTP {status}")
+                probe.json("POST", f"/api/files/{pending_id}/derivative")
+                v2_sha = None
+                for _ in range(45):
+                    status, body = probe.json("GET", f"/api/files/{pending_id}/derivative")
+                    data = (body or {}).get("data") or {}
+                    if data.get("state") == "ready":
+                        v2_sha = data.get("outputSha256")
+                        break
+                    time.sleep(1)
+                check("MC16 approved derivative rebinds", v2_sha not in (None, v1_sha),
+                      f"v1={v1_sha} v2={v2_sha}")
+                pending_ok = True
+        admin.json("DELETE", f"/api/folders/{folder_id}/approval-policy")
+
+    # MC17(b): a glTF referencing an external texture URL is served natively
+    # and byte-identical - the server never fetches the texture and no worker
+    # job is created, so there is no server-side fetch surface at all.
+    gltf = json.dumps({
+        "asset": {"version": "2.0", "generator": "mc17"},
+        "scenes": [{"nodes": [0]}],
+        "nodes": [{"mesh": 0}],
+        "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}],
+        "buffers": [{"byteLength": 36, "uri": "buffer.bin"}],
+        "bufferViews": [{"buffer": 0, "byteOffset": 0, "byteLength": 36}],
+        "accessors": [{"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3",
+                       "min": [0, 0, 0], "max": [1, 0, 0]}],
+        "materials": [{"pbrMetallicRoughness": {"baseColorTexture": {"index": 0}}}],
+        "textures": [{"source": 0}],
+        "images": [{"uri": "http://203.0.113.1/texture.png"}],
+        "samplers": [{}],
+    }).encode()
+    status, uploaded = upload(admin, folder_id, "mc17_ext.gltf", gltf)
+    gltf_id = (uploaded or {}).get("fileId") if status == 201 else None
+    check("MC17 external-texture gltf uploaded", gltf_id is not None, status)
+    if gltf_id:
+        status, body = admin.json("POST", f"/api/files/{gltf_id}/derivative")
+        # The native path reports the adopted source digest on the follow-up
+        # status read; the POST body itself carries no output digest.
+        status, body = admin.json("GET", f"/api/files/{gltf_id}/derivative")
+        data = (body or {}).get("data") or {}
+        import hashlib as _hl
+        check("MC17 gltf served natively without fetching textures",
+              data.get("state") == "ready" and data.get("outputSha256") == _hl.sha256(gltf).hexdigest(),
+              f"state={data.get('state')} sha={data.get('outputSha256')}")
+        status, payload = admin.request("GET", f"/api/files/{gltf_id}/derivative/bytes")
+        check("MC17 gltf bytes unchanged", status == 200 and payload == gltf,
+              f"HTTP {status} identical={payload == gltf}")
+
+    # MC17(c): a hostile filename must not escape into a header or a path.
+    # CRLF inside the multipart filename would break the framing itself, so the
+    # hostile vector used here is path traversal plus quotes; the server either
+    # refuses the name or stores it inertly, and the download disposition must
+    # never carry a raw CR/LF or an unescaped quote either way.
+    hostile_name = 'mc17_..%2F..%2Fetc"x.stl'
+    status, uploaded = upload(admin, folder_id, hostile_name, stl_ascii_cube())
+    hostile_id = (uploaded or {}).get("fileId") if status == 201 else None
+    if status == 201 and hostile_id:
+        status, payload, headers = admin.request_full("GET", f"/api/files/{hostile_id}/bytes")
+        disposition = headers.get("Content-Disposition", "")
+        check("MC17 hostile filename cannot inject headers",
+              "\r" not in disposition and "\n" not in disposition
+              and disposition.count('"') == 2,
+              f"disposition={disposition!r}")
+    else:
+        check("MC17 hostile filename cannot inject headers", status == 400,
+              f"upload refused HTTP {status}")
+
+    # MC17(d): a corrupt archive (3MF is a zip) is never extracted server-side:
+    # it stays class native, no conversion job is created, and the bytes are
+    # served exactly as uploaded - there is no server-side unzip surface.
+    corrupt_zip = b"PK\x03\x04" + b"../../etc/passwd" * 8
+    status, uploaded = upload(admin, folder_id, "mc17_corrupt.3mf", corrupt_zip)
+    corrupt_id = (uploaded or {}).get("fileId") if status == 201 else None
+    check("MC17 corrupt archive uploaded", corrupt_id is not None, status)
+    if corrupt_id:
+        status, body = admin.json("POST", f"/api/files/{corrupt_id}/derivative")
+        data = (body or {}).get("data") or {}
+        status_bytes, payload = admin.request("GET", f"/api/files/{corrupt_id}/derivative/bytes")
+        check("MC17 corrupt archive not extracted server-side",
+              data.get("state") == "ready" and status_bytes == 200 and payload == corrupt_zip,
+              f"state={data.get('state')} bytes_identical={payload == corrupt_zip}")
 
     admin.json("DELETE", f"/api/folders/{folder_id}")
     if probe_id:

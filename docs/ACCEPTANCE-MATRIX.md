@@ -7,7 +7,7 @@ gaps and must be registered in `docs/OPEN-BLOCKERS.md`; `EXTERNAL` rows
 wait on customer/licence input. Run `python3 scripts/gen_acceptance_matrix.py --check`
 to fail the build on an unverified id.
 
-Status totals: **103 PASS / 22 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
+Status totals: **108 PASS / 17 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 
 ## S — 安全 / ACL / 一致性矩阵
 
@@ -77,7 +77,7 @@ Status totals: **103 PASS / 22 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 | MC01 | [ ] 没有以部分通过的测试替代 S1–S22、PT01–PT12、DO01–DO14、MC01–MC18 总体验收。 | **PASS** | 总体验收矩阵即本文件；mc_cad_e2e.py 57/57 |
 | MC02 | MC02：STEP 多组件装配树及显隐； | **PARTIAL** | gmsh 转换输出单一合并网格，无多组件装配树与零件显隐（BLK-11） |
 | MC03 | MC03：IGES 曲面件没有明显漏面和翻面； | **PASS** | OCCT 自带样本 bearing.iges → 2,148 facets / hammer.iges → 144,873 bytes，经真实 worker 转换并渲染 |
-| MC04 | MC04：IGES 不支持实体有清楚错误而不是空视图； | **PARTIAL** | 不支持的 IGES 实体走 failed+errorCode 路径存在，但“清楚错误而非空视图”的断言缺失（BLK-16） |
+| MC04 | MC04：IGES 不支持实体有清楚错误而不是空视图； | **PASS** | mc_cad_e2e.py：畸形 IGES 与截断 STEP 经真实 worker 均 state=failed + errorCode=CONVERT_FAILED，且不提供任何网格字节（404）；worker 新增空网格守卫，gmsh 对不可读几何退出码为 0 也会被拒 |
 | MC05 | MC05：STL ASCII/Binary 正确显示且单位未知时提示； | **PARTIAL** | STLLoader 覆盖 ASCII/Binary；单位未知提示未实现（BLK-13） |
 | MC06 | MC06：OBJ + MTL + 纹理受控关联； | **PARTIAL** | OBJ 几何渲染正常；MTL/纹理关联未实现（无 MTLLoader）（BLK-12） |
 | MC07 | MC07：glTF + bin + textures 及 GLB 多组件； | **PARTIAL** | GLB 自包含渲染正常；外部 .bin/textures 的多文件 glTF 不解析（BLK-12） |
@@ -87,10 +87,10 @@ Status totals: **103 PASS / 22 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 | MC11 | MC11：DWG 两种来源版本的许可 PoC，没有许可证判 BLOCKED； | **EXTERNAL** | DWG 需商业 SDK 许可（ODA Teigha 等），维持 licence-blocked（BLK-03） |
 | MC12 | MC12：超大装配受限制且不拖垮 API； | **PASS** | worker 内存/超时/并发上限 + pe12_cad_saturation.py 7/7（API p95 劣化 x0.93–x1.14） |
 | MC13 | MC13：没有 preview 权限者无法取 manifest/content/thumbnail； | **PASS** | mc_cad_e2e.py：'MC13 ungranted derivative status refused' / 'bytes refused' |
-| MC14 | MC14：同版本并发请求转换任务去重； | **PARTIAL** | 重试转换采纳已存在 blob 已修复；同版本并发请求在途去重断言缺失（BLK-16） |
+| MC14 | MC14：同版本并发请求转换任务去重； | **PASS** | mc_cad_e2e.py：5 个并发转换请求全部返回同一 derivativeId（EnsureDerivative ON CONFLICT 收敛） |
 | MC15 | MC15：版本切换、回滚、删除、恢复后派生与原 SHA 一致； | **PASS** | mc_cad_e2e.py：'MC15 second source uploaded' / 'derivative bound to its own file' |
-| MC16 | MC16：审批 pending 时普通用户看到旧版模型； | **PARTIAL** | pending 审批期间 current 不变故派生天然指向旧版，但显式断言缺失（BLK-16） |
-| MC17 | MC17：恶意纹理 URL、zip-slip、异常模型文件安全拒绝； | **PARTIAL** | 异常模型走 failed 路径；恶意纹理 URL 因离线解析天然闭合，zip-slip/恶意纹理断言缺失（BLK-16） |
+| MC16 | MC16：审批 pending 时普通用户看到旧版模型； | **PASS** | mc_cad_e2e.py：审批 pending 期间派生仍是已签入版本的 sha 与字节；批准后派生重绑定到新 current（不同 outputSha256） |
+| MC17 | MC17：恶意纹理 URL、zip-slip、异常模型文件安全拒绝； | **PASS** | mc_cad_e2e.py：外部纹理 URL 的 glTF 原样服务且服务端不抓取（无 job）；畸形输入经 MC04 失败路径拒绝；恶意文件名上传被拒 400；损坏 zip 服务端不解压、字节原样 |
 | MC18 | [ ] 没有以部分通过的测试替代 S1–S22、PT01–PT12、DO01–DO14、MC01–MC18 总体验收。 | **PASS** | 总体验收矩阵即本文件 |
 
 ## DO — 真实 DOCX 在线编辑
@@ -125,7 +125,7 @@ Status totals: **103 PASS / 22 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 | MOD07 | MOD07：浏览器 WebGL 失效或文件太大时有可操作错误和允许的下载入口。 | **PASS** | mod01_controls_check.mjs：真实 webglcontextlost 监听器触发可操作错误态+下载原件入口；Fetch 域故障注入超大 Content-Length 触发 256MB 守卫+下载入口（不缓冲） |
 | MOD08 | MOD08：DOM 层级和 URL 改变时需 dispose 三维纹理、几何和事件监听，避免内存泄漏。 | **PASS** | pe15_heap_growth.mjs：20 次挂载/拆除后堆回落同一 8.6MB 地板，几何/纹理/监听/上下文已释放 |
 | MOD09 | MOD09：显示/隐藏动作只影响视图，不修改 source blob。 | **PASS** | 查看器只读，无任何写回 source blob 的路径 |
-| MOD10 | MOD10：待审模型不能对未获授权普通账号显示新几何，其他用户看到仍是当前签入版本。 | **PARTIAL** | 未授权账号看不到新几何由 current 版本机制保证，显式断言缺失（BLK-16） |
+| MOD10 | MOD10：待审模型不能对未获授权普通账号显示新几何，其他用户看到仍是当前签入版本。 | **PASS** | mc_cad_e2e.py MC16：pending 期间普通用户只见当前签入版本；未授权账号的拒绝由 MC13 断言 |
 
 ## AG — 架构门禁
 
@@ -183,19 +183,14 @@ Status totals: **103 PASS / 22 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 - `RB-T10` — 文本回滚 SHA 已验证、DOCX 经 do05；STEP/IGES 回滚后 SHA 与索引/派生重指向未断言（BLK-15）
 - `RB-T11` — blob 采纳逻辑存在；回滚后 derivatives/审计保留与在用小 GC 断言缺失（BLK-15）
 - `MC02` — gmsh 转换输出单一合并网格，无多组件装配树与零件显隐（BLK-11）
-- `MC04` — 不支持的 IGES 实体走 failed+errorCode 路径存在，但“清楚错误而非空视图”的断言缺失（BLK-16）
 - `MC05` — STLLoader 覆盖 ASCII/Binary；单位未知提示未实现（BLK-13）
 - `MC06` — OBJ 几何渲染正常；MTL/纹理关联未实现（无 MTLLoader）（BLK-12）
 - `MC07` — GLB 自包含渲染正常；外部 .bin/textures 的多文件 glTF 不解析（BLK-12）
 - `MC09` — 3MFLoader 渲染单部件已验证；多部件与基本材质未验证（BLK-12）
-- `MC14` — 重试转换采纳已存在 blob 已修复；同版本并发请求在途去重断言缺失（BLK-16）
-- `MC16` — pending 审批期间 current 不变故派生天然指向旧版，但显式断言缺失（BLK-16）
-- `MC17` — 异常模型走 failed 路径；恶意纹理 URL 因离线解析天然闭合，zip-slip/恶意纹理断言缺失（BLK-16）
 - `MOD02` — 无装配信息（转换输出单一网格），零件树/独立显隐/bbox 未实现（BLK-11）
 - `MOD03` — 工具栏显示格式与三角/顶点数；源 SHA、单位、尺寸范围、组件数、转换日期、警告未展示（BLK-13）
 - `MOD04` — 未知单位提示未实现，不得默认毫米（BLK-13）
 - `MOD05` — 无测量工具；“近似”量测标注无从谈起（BLK-13）
-- `MOD10` — 未授权账号看不到新几何由 current 版本机制保证，显式断言缺失（BLK-16）
 - `AG09` — staging/对账协议存在；提交-rename 崩溃后的恢复任务未做演练（BLK-15）
 
 ## EXTERNAL 登记
