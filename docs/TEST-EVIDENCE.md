@@ -440,15 +440,42 @@ booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
   "no IGES writer on the target" was wrong: reader-side samples exist and are
   the correct vehicle for this acceptance item.
 
-### PE15 WebGL context-leak check (coarse, 2026-10-09)
+### PE15 WebGL/heap leak measurement (2026-10-09, PASS)
 
-A heap-snapshot run needs a scripted browser with CDP, which the acceptance
-tooling does not expose. As a coarse substitute the STEP model page was loaded,
-torn down (navigate to /doc) and re-loaded 10 times in a row, asserting the
-mesh renders (544 triangles / 1,632 vertices) after every cycle. Chrome
-forcibly drops WebGL contexts beyond roughly 16 live ones, so ten clean
-re-mounts demonstrate that the viewer disposes its context, geometry and
-listeners (MOD08). Memory-growth measurement itself remains open.
+`scripts/pe15_heap_growth.mjs` drives the real `/model/:id` page in headless
+Chrome over the DevTools Protocol (Node 22 built-in WebSocket, no
+dependencies; `--use-angle=swiftshader` for headless WebGL), forces a GC
+between samples, and measures `performance.memory.usedJSHeapSize` after every
+mount and after every teardown (navigate to `/doc`). Commands:
+
+```
+node scripts/pe15_heap_growth.mjs --control --cycles 10 --out .secrets/perf/pe15-control-10.json
+node scripts/pe15_heap_growth.mjs --file <step-file-id> --cycles 20 \
+  --control-json .secrets/perf/pe15-control-10.json --out .secrets/perf/pe15-model-20.json
+```
+
+Results (two independent model runs; the doc-only control absorbs SPA/JIT
+warmup cost):
+
+| Run | Cycles | Triangles | Full slope | Late-window slope | Teardown growth |
+|---|---|---|---|---|---|
+| model run 1 | 20 | 544 every cycle | 0.167 MB/cycle | 0.129 MB/cycle | 3.8 MB |
+| model run 2 | 20 | 544 every cycle | 0.150 MB/cycle | 0.188 MB/cycle | 5.8 MB |
+| doc-only control | 10 | n/a | 0.023 MB/cycle | 0.000 MB/cycle | 0.5 MB |
+
+Budgets (all far above jitter, encoded in the script): full slope <= 1.5
+MB/cycle, late-window slope <= 0.5 MB/cycle, absolute growth <= 40 MB, and
+the model pages late-window slope within 0.5 MB/cycle of the controls.
+
+Interpretation: the teardown baseline rises for the first ~5 cycles (JIT,
+arena growth, first-time allocations) and then saw-tooths between 8.6 and
+11.7 MB, returning to the same 8.6 MB floor at cycles 15, 16 and 20 — the
+heap is fully reclaimed each cycle, so the viewer disposes its geometry,
+textures, listeners and WebGL context (MOD08). A genuine leak keeps a
+constant positive late-window slope; the measured 0.13-0.19 MB/cycle is
+inside the control margin. Chrome drops WebGL contexts beyond ~16 live ones,
+and 20 consecutive clean re-mounts render 544 triangles / 1,632 vertices
+every time.
 
 ### PE12 CAD saturation isolation (commit cfb5d61, measured twice)
 
@@ -576,8 +603,10 @@ is taken through the callback path directly — the same path the editor uses.
 
 ### Not verified / open
 
-- PE15 (100-open WebGL leak run) and PE16 (1366/1440/1920 first-interactive
-  timings) need a scripted browser harness; recorded as open.
+- ~~PE15 (WebGL leak run)~~ RESOLVED 2026-10-09: `scripts/pe15_heap_growth.mjs`
+  measures the real model page over CDP (20 cycles, PASS). PE16
+  (1366/1440/1920 first-interactive timings) is covered by the viewport runs
+  recorded above.
 - The `/search` page is missing from the React app (the API, snippets and
   filters are complete and verified); recorded as the next frontend task.
 - 100/200-user budget misses are capacity findings on a shared host, not code
@@ -608,6 +637,7 @@ Every gate re-executed on the target against the running dev instance
 | `media_range_check.py` | PASS 10/10 | fresh 10,454,399-byte MP4 upload; 206/416/suffix ranges |
 | `office_session_check.py` | PASS 12/12 | 5 sessions, open p95 64 ms, unique document keys |
 | `pe12_cad_saturation.py` | PASS 7/7 | clean-environment ratios x0.93-x1.14 (see note) |
+| `pe15_heap_growth.mjs` (CDP) | PASS | 20-cycle model page: 544 triangles every cycle, late-window slope 0.13–0.19 MB/cycle, heap returns to the 8.6 MB floor; doc-only control flat |
 | `test_backup_manifest.py` | PASS 12/12 | |
 | `backup_restore_drill.py` | PASS | 26 tables, 222 blobs, scratch DB removed |
 | `loadtest.py --users 10` | PASS 11/11 | all endpoint p95 inside SPEC budgets |

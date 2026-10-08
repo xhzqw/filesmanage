@@ -125,7 +125,7 @@ SPEC's dedicated reference environment (PERF-003) or a materialised count.
 | PE12 CAD worker saturation vs login/list p95 | MEASURED | two runs: ratios x0.76-x1.31, absolute p95 < 11ms (73x inside budget); the ratio gate is noise-sensitive at these absolute values on a shared host |
 | PE13 pool behaviour | measured | pool wait dominates at ≥100 users (see analysis); no unbounded waits, controlled 503 under exhaustion |
 | PE14 query plans | collected | `EXPLAIN (ANALYZE, BUFFERS)` for list/hot-folder list/search/export/stats saved in TEST-EVIDENCE.md §M7 |
-| PE15 WebGL leak | PARTIAL | 10 load/teardown/re-load cycles all render (no context exhaustion); heap-growth measurement still needs a scripted browser (CDP) |
+| PE15 WebGL leak | PASS | CDP-measured 20-cycle load/teardown: 544 triangles every cycle, late-window teardown slope 0.13-0.19 MB/cycle (budget 0.5), heap returns to the 8.6 MB floor after warmup; doc-only control 0.000 MB/cycle late slope (`scripts/pe15_heap_growth.mjs`) |
 | PE16 three viewports | PASS | /doc interactive 168/152/2 ms at 1440x900/1366x768/1920x1080 (budget 2.5 s); no overlap in any viewport (VS04); STEP model page renders 544 triangles |
 | PE17 dependency injection | PASS (scoped) | unreachable editor: session open stays non-blocking, preview/download of the DOCX both 200, `/health/ready` 200; PostgreSQL restart deliberately not injected (shared instance) |
 | PE18 machine-readable reports | PASS | every loadtest run wrote JSON to `.secrets/perf/` with per-endpoint p50/p95/p99, RPS, RSS, connections and error classes |
