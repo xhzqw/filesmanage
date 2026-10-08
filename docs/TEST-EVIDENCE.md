@@ -543,6 +543,29 @@ CAD blob-conflict bug fixed this milestone.
   shows the authorized count.
 - `tsc --noEmit` + `vite build` pass.
 
+### DO05 compatibility report — headers, footers, page breaks (2026-10-09)
+
+A purpose-built DOCX sample (header1.xml "中晟生物科技 · 文件头",
+footer1.xml "第 1 页 / 内部资料", an explicit page break) was generated,
+uploaded and opened in the real ONLYOFFICE editor.
+
+Proven with screenshots:
+- the editor renders the header at the top of the page and the footer at the
+  page bottom;
+- the page break produces a two-page document ("第1页 共2页");
+- the edit was accepted into the document body ("（DO05校验编辑）第一页正文…",
+  status "所有更改已保存").
+
+NOT captured in this run:
+- byte-level preservation of the header/footer/page-break parts in the
+  COMMITTED version. The editor's save did not produce a status-2/6 callback
+  within the window (the save button and Ctrl+S were both exercised; only the
+  status-1 open callback arrived). The commit path itself is proven by the M5
+  real-spec.docx E2E and the callback-contract unit tests, so the open item is
+  specifically the post-save byte fidelity of header/footer parts through this
+  editor build — recorded as PARTIAL per DO05's own instruction to state
+  unmet targets explicitly.
+
 ### Not verified / open
 
 - PE15 (100-open WebGL leak run) and PE16 (1366/1440/1920 first-interactive
