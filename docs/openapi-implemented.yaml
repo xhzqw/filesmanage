@@ -793,13 +793,15 @@ paths:
       - name: sort
         in: query
         required: false
-        description: Sort key.
+        description: Sort key (ListFiles accepts only these; anything else is 400 E_BAD).
         schema:
           type: string
           enum:
-          - name
-          - size
-          - updated
+          - updated_desc
+          - updated_asc
+          - name_asc
+          - name_desc
+          - size_desc
       - name: cursor
         in: query
         required: false
@@ -3452,14 +3454,13 @@ paths:
       - name: sort
         in: query
         required: false
-        description: Sort key.
+        description: Sort key (search/stats/export accept only these; anything else is 400 E_BAD).
         schema:
           type: string
           enum:
-          - name
-          - size
-          - updated
-          - relevance
+          - updated_desc
+          - name_asc
+          - size_desc
       - name: limit
         in: query
         required: false
@@ -3562,14 +3563,13 @@ paths:
       - name: sort
         in: query
         required: false
-        description: Sort key.
+        description: Sort key (search/stats/export accept only these; anything else is 400 E_BAD).
         schema:
           type: string
           enum:
-          - name
-          - size
-          - updated
-          - relevance
+          - updated_desc
+          - name_asc
+          - size_desc
       - name: limit
         in: query
         required: false
@@ -3672,14 +3672,13 @@ paths:
       - name: sort
         in: query
         required: false
-        description: Sort key.
+        description: Sort key (search/stats/export accept only these; anything else is 400 E_BAD).
         schema:
           type: string
           enum:
-          - name
-          - size
-          - updated
-          - relevance
+          - updated_desc
+          - name_asc
+          - size_desc
       - name: limit
         in: query
         required: false

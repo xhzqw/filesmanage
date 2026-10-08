@@ -338,3 +338,35 @@ and byte-identical with no worker job (the server never fetches textures); a
 traversal/quote filename is refused at upload; and a corrupt zip is never
 extracted server-side. MC04/MC14/MC16/MC17/MOD10 move to PASS (108 PASS / 17
 PARTIAL / 1 EXTERNAL) and BLK-16 is struck.
+
+---
+
+## BLK-12 closed: multi-resource models, and a pagination bug they exposed (2026-10-09)
+
+Multi-resource models (OBJ+MTL+textures, glTF+.bin+textures) reference their
+companions by relative name, and in this system every companion is a separate
+file in the same folder. `ModelViewer` now resolves those references through a
+`siblingResolver` that lists the folder once and installs a
+`LoadingManager.setURLModifier` callback — MTLLoader for OBJ `mtllib`,
+GLTFLoader for glTF. Absolute http(s) URLs are refused with a same-origin
+miss, so the viewer never becomes a fetch surface for attacker-controlled
+texture URLs (the MC17 property is preserved by construction).
+
+`scripts/mc_multiasset_check.mjs` builds the samples, uploads each companion
+as its own file and verifies over CDP: OBJ+MTL+PNG renders 12 triangles with
+both companions fetched through the API, glTF+.bin+PNG renders 1 triangle
+with both companions fetched, two-part 3MF renders 24 triangles, no request
+leaves for an external host, and no page raises an error — 15/15.
+
+The work immediately exposed a second real defect: the new resolver's
+`limit=200` list request was answered **400 E_BAD**, i.e. the documented
+maximum page size did not work. The service asks the repository for page+1
+lookahead rows while the PostgreSQL guard rejected anything above 200, so a
+200-page (201 internally) was refused. Fixed with a shared
+`ports.MaxFilePage` constant, a Go boundary test and HTTP-level checks in
+`s_matrix_e2e.py` (200/201/5000 all honoured, 35/35). The same pass corrected
+the generated OpenAPI contract, which had documented the wrong sort enums.
+
+MC06/MC07/MC09 move to PASS (111 PASS / 14 PARTIAL / 1 EXTERNAL); BLK-12 is
+struck. Regressions re-run: mod01 10/10, PE15 PASS, mc_cad 78/78,
+`go test ./...` + vet green.

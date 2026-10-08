@@ -113,7 +113,10 @@ export function ModelViewer(){
      dxfRoot.current=parsed.object;
      setLayers(parsed.layers);
     }else{
-     const parse=await loadParser(format,THREE);
+     // Sibling resolution is only needed by the multi-resource formats; the
+     // resolver itself is lazy so single-file formats pay nothing.
+     const resolveUrl=await siblingResolver(id);
+     const parse=await loadParser(format,THREE,resolveUrl);
      object=await parse(buffer);
     }
     controls.current=mountScene(THREE,OrbitControls,holder.current!,object,setStats,()=>{
@@ -167,13 +170,45 @@ export function ModelViewer(){
 }
 
 type MeshParser=(buffer:ArrayBuffer)=>Promise<import("three").Object3D>;
+type MTLLoaderType=import("three/examples/jsm/loaders/MTLLoader.js").MTLLoader;
 
-async function loadParser(format:string,THREE:typeof import("three")):Promise<MeshParser>{
+// Multi-resource models (OBJ+MTL+textures, glTF+.bin+textures) reference their
+// companions by relative name. In this system every companion is a separate
+// file in the same folder, so relative references are resolved through the API
+// against the sibling set. Absolute http(s) URLs are refused and redirected to
+// a same-origin miss: the viewer must never become a fetch surface for
+// attacker-controlled hosts (MC17).
+async function siblingResolver(fileId:string){
+ const meta=await fileApi.meta(fileId);
+ const siblings=new Map<string,string>();
+ let cursor="";
+ for(let guard=0;guard<50;guard++){
+  const page=await fileApi.list(meta.file.folderId,"name_asc",cursor,200);
+  for(const item of page.items)siblings.set(item.name,item.id);
+  if(!page.nextCursor)break;
+  cursor=page.nextCursor;
+ }
+ return(url:string)=>{
+  if(/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(url)){
+   // data:/blob: are self-contained and stay; http(s) and protocol-relative
+   // URLs are refused with a same-origin miss.
+   return /^(?:data|blob):/i.test(url)?url:"/api/files/__external_refused__/bytes";
+  }
+  const base=decodeURIComponent((url.split("/").pop()??"").split("?")[0]??"");
+  const id=siblings.get(base);
+  return id?"/api/files/"+id+"/bytes":url;
+ };
+}
+
+async function loadParser(
+ format:string,
+ THREE:typeof import("three"),
+ resolveUrl:(url:string)=>string,
+):Promise<MeshParser>{
  switch(format.toLowerCase()){
   case "ply":{
    const {PLYLoader}=await import("three/examples/jsm/loaders/PLYLoader.js");
    const loader=new PLYLoader();
-   const THREE=await import("three");
    return async (buffer:ArrayBuffer)=>{
     // PLYLoader yields a geometry; wrap it so every format is an Object3D.
     const geometry=loader.parse(buffer);
@@ -188,19 +223,50 @@ async function loadParser(format:string,THREE:typeof import("three")):Promise<Me
   }
   case "obj":{
    const {OBJLoader}=await import("three/examples/jsm/loaders/OBJLoader.js");
-   const loader=new OBJLoader();
-   return async (buffer:ArrayBuffer)=>loader.parse(new TextDecoder().decode(buffer));
+   const {MTLLoader}=await import("three/examples/jsm/loaders/MTLLoader.js");
+   const {LoadingManager}=await import("three");
+   return async (buffer:ArrayBuffer)=>{
+    const text=new TextDecoder().decode(buffer);
+    // mtllib references are separate files in the same folder; each is fetched
+    // through the sibling resolver and parsed so OBJ materials and their
+    // textures resolve (MC06).
+    const refs=[...text.matchAll(/^\s*mtllib\s+(.+?)\s*$/gm)].map(m=>(m[1]??"").trim());
+    let materials:Awaited<ReturnType<MTLLoaderType["parse"]>>|null=null;
+    if(refs.length){
+     const manager=new LoadingManager();
+     manager.setURLModifier(resolveUrl);
+     const mtlLoader=new MTLLoader(manager);
+     for(const ref of refs){
+      const url=resolveUrl(ref);
+      if(!url.startsWith("/api/files/"))continue;
+      const res=await fetch(url,{credentials:"same-origin"});
+      if(!res.ok)continue;
+      // parse() returns the MaterialCreator that owns the parsed materials.
+      materials=mtlLoader.parse(await res.text(),"");
+     }
+     materials?.preload();
+    }
+    const loader=new OBJLoader();
+    if(materials)loader.setMaterials(materials);
+    return loader.parse(text);
+   };
   }
   case "glb":
   case "gltf":{
    const {GLTFLoader}=await import("three/examples/jsm/loaders/GLTFLoader.js");
-   const loader=new GLTFLoader();
-   return async (buffer:ArrayBuffer)=>(await loader.parseAsync(buffer,"")).scene;
+   const {LoadingManager}=await import("three");
+   return async (buffer:ArrayBuffer)=>{
+    // External .bin/textures are sibling files; the manager's URL modifier maps
+    // them onto the API and refuses absolute URLs (MC07 + MC17).
+    const manager=new LoadingManager();
+    manager.setURLModifier(resolveUrl);
+    const loader=new GLTFLoader(manager);
+    return (await loader.parseAsync(buffer,"")).scene;
+   };
   }
   default:{
    const {STLLoader}=await import("three/examples/jsm/loaders/STLLoader.js");
    const loader=new STLLoader();
-   const THREE=await import("three");
    return async (buffer:ArrayBuffer)=>{
     // STLLoader yields a geometry; wrap it so the scene code can treat every
     // format as an Object3D.

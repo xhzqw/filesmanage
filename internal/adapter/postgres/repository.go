@@ -373,7 +373,9 @@ func scanFile(row rowScanner) (domain.File, error) {
 }
 
 func (r *Repository) ListFiles(ctx context.Context, q ports.FileQuery) ([]domain.File, error) {
-	if q.Limit <= 0 || q.Limit > 200 {
+	// The service sends page size + 1 lookahead row, so the ceiling is
+	// MaxFilePage+1; a plain MaxFilePage request must not fail here.
+	if q.Limit <= 0 || q.Limit > ports.MaxFilePage+1 {
 		return nil, domain.ErrInvalidInput
 	}
 	order := "f.updated_at DESC,f.id DESC"

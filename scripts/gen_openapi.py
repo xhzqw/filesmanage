@@ -568,7 +568,7 @@ add("POST", "/api/files", operation("Upload a file (multipart, idempotent)", "Fi
 add("GET", "/api/files", operation("List files in a folder (keyset pagination)", "Files", "listFiles", security=SESSION,
     params=[query("folder", "Folder id; empty lists across authorized scope.", required=True),
             query("limit", "Page size (clamped server-side).", {"type": "integer", "minimum": 1, "maximum": 200}),
-            query("sort", "Sort key.", {"type": "string", "enum": ["name", "size", "updated"]}),
+            query("sort", "Sort key (ListFiles accepts only these; anything else is 400 E_BAD).", {"type": "string", "enum": ["updated_desc", "updated_asc", "name_asc", "name_desc", "size_desc"]}),
             query("cursor", "Opaque keyset cursor from nextCursor.")],
     responses=dict([json_ok(ref("FilePage"), "Authorized file page."), resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"])]),
     auth_note=MUST_CHANGE))
@@ -792,7 +792,7 @@ SEARCH_PARAMS = [
     query("scope", "descendants includes child folders.", {"type": "string", "enum": ["", "descendants"]}),
     query("uploader", "Filter by uploader id."),
     query("type", "Filter by content-type prefix."),
-    query("sort", "Sort key.", {"type": "string", "enum": ["name", "size", "updated", "relevance"]}),
+    query("sort", "Sort key (search/stats/export accept only these; anything else is 400 E_BAD).", {"type": "string", "enum": ["updated_desc", "name_asc", "size_desc"]}),
     query("limit", "Page size.", {"type": "integer", "minimum": 1, "maximum": 200}),
     query("from", "Lower bound on updatedAt (RFC3339).", {"type": "string", "format": "date-time"}),
     query("to", "Upper bound on updatedAt (RFC3339).", {"type": "string", "format": "date-time"}),

@@ -2,6 +2,7 @@ package application
 
 import (
 	"filesmanage/internal/domain"
+	"filesmanage/internal/ports"
 	"strings"
 	"testing"
 	"time"
@@ -66,5 +67,32 @@ func TestListFilesAppliesPaginationLimit(t *testing.T) {
 	}
 	if next.Items[0].ID == page.Items[0].ID || next.Items[0].ID == page.Items[1].ID {
 		t.Fatal("pages must not repeat rows")
+	}
+}
+
+// The documented maximum page size must be honoured, not rejected: the
+// repository receives page+1 lookahead rows, so an off-by-one guard turns a
+// limit=MaxFilePage request into a 400. This pins the boundary.
+func TestListFilesAcceptsMaxPageSize(t *testing.T) {
+	s, _ := testService(t)
+	admin := domain.User{ID: "u_admin", Login: "admin", IsAdmin: true}
+	for _, name := range []string{"a.txt", "b.txt", "c.txt"} {
+		if _, err := s.CommitUpload(t.Context(), admin, "folder_root", name, "text/plain", "", strings.NewReader("x")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, limit := range []int{ports.MaxFilePage, ports.MaxFilePage + 1, ports.MaxFilePage * 4} {
+		page, err := s.ListFiles(t.Context(), admin, "folder_root", "", FileCursor{}, limit)
+		if err != nil {
+			t.Fatalf("limit %d must be clamped, not rejected: %v", limit, err)
+		}
+		if len(page.Items) != 3 {
+			t.Fatalf("limit %d: got %d items", limit, len(page.Items))
+		}
+	}
+	for _, sort := range []string{"updated_desc", "updated_asc", "name_asc", "name_desc", "size_desc"} {
+		if _, err := s.ListFiles(t.Context(), admin, "folder_root", sort, FileCursor{}, ports.MaxFilePage); err != nil {
+			t.Fatalf("sort %s at max page must succeed: %v", sort, err)
+		}
 	}
 }

@@ -7,7 +7,7 @@ gaps and must be registered in `docs/OPEN-BLOCKERS.md`; `EXTERNAL` rows
 wait on customer/licence input. Run `python3 scripts/gen_acceptance_matrix.py --check`
 to fail the build on an unverified id.
 
-Status totals: **108 PASS / 17 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
+Status totals: **111 PASS / 14 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 
 ## S — 安全 / ACL / 一致性矩阵
 
@@ -79,10 +79,10 @@ Status totals: **108 PASS / 17 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 | MC03 | MC03：IGES 曲面件没有明显漏面和翻面； | **PASS** | OCCT 自带样本 bearing.iges → 2,148 facets / hammer.iges → 144,873 bytes，经真实 worker 转换并渲染 |
 | MC04 | MC04：IGES 不支持实体有清楚错误而不是空视图； | **PASS** | mc_cad_e2e.py：畸形 IGES 与截断 STEP 经真实 worker 均 state=failed + errorCode=CONVERT_FAILED，且不提供任何网格字节（404）；worker 新增空网格守卫，gmsh 对不可读几何退出码为 0 也会被拒 |
 | MC05 | MC05：STL ASCII/Binary 正确显示且单位未知时提示； | **PARTIAL** | STLLoader 覆盖 ASCII/Binary；单位未知提示未实现（BLK-13） |
-| MC06 | MC06：OBJ + MTL + 纹理受控关联； | **PARTIAL** | OBJ 几何渲染正常；MTL/纹理关联未实现（无 MTLLoader）（BLK-12） |
-| MC07 | MC07：glTF + bin + textures 及 GLB 多组件； | **PARTIAL** | GLB 自包含渲染正常；外部 .bin/textures 的多文件 glTF 不解析（BLK-12） |
+| MC06 | MC06：OBJ + MTL + 纹理受控关联； | **PASS** | mc_multiasset_check.mjs 15/15：OBJ+MTL+PNG 三件套经 siblingResolver 解析（MTLLoader + URL modifier 映射同目录兄弟文件），渲染 12 三角形，2 个兄弟资源经 /api/files/<id>/bytes 真实拉取 |
+| MC07 | MC07：glTF + bin + textures 及 GLB 多组件； | **PASS** | mc_multiasset_check.mjs：glTF+bin+PNG 三件套渲染 1 三角形，.bin 与纹理均经兄弟文件解析拉取；绝对 URL 被拒绝（无外部请求） |
 | MC08 | MC08：PLY 受支持的点/网格类型； | **PASS** | PLYLoader 覆盖 ascii/binary 点/网格几何，浏览器实测渲染 |
-| MC09 | MC09：3MF 多部件及基本材质； | **PARTIAL** | 3MFLoader 渲染单部件已验证；多部件与基本材质未验证（BLK-12） |
+| MC09 | MC09：3MF 多部件及基本材质； | **PASS** | mc_multiasset_check.mjs：双部件 3MF 渲染 24 三角形（2x12），多部件解析生效 |
 | MC10 | MC10：DXF 图层、圆弧、尺寸/文字； | **PASS** | 自研 DXF 解析器渲染图层/圆弧/文字，浏览器实测图层开关面板 |
 | MC11 | MC11：DWG 两种来源版本的许可 PoC，没有许可证判 BLOCKED； | **EXTERNAL** | DWG 需商业 SDK 许可（ODA Teigha 等），维持 licence-blocked（BLK-03） |
 | MC12 | MC12：超大装配受限制且不拖垮 API； | **PASS** | worker 内存/超时/并发上限 + pe12_cad_saturation.py 7/7（API p95 劣化 x0.93–x1.14） |
@@ -184,9 +184,6 @@ Status totals: **108 PASS / 17 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 - `RB-T11` — blob 采纳逻辑存在；回滚后 derivatives/审计保留与在用小 GC 断言缺失（BLK-15）
 - `MC02` — gmsh 转换输出单一合并网格，无多组件装配树与零件显隐（BLK-11）
 - `MC05` — STLLoader 覆盖 ASCII/Binary；单位未知提示未实现（BLK-13）
-- `MC06` — OBJ 几何渲染正常；MTL/纹理关联未实现（无 MTLLoader）（BLK-12）
-- `MC07` — GLB 自包含渲染正常；外部 .bin/textures 的多文件 glTF 不解析（BLK-12）
-- `MC09` — 3MFLoader 渲染单部件已验证；多部件与基本材质未验证（BLK-12）
 - `MOD02` — 无装配信息（转换输出单一网格），零件树/独立显隐/bbox 未实现（BLK-11）
 - `MOD03` — 工具栏显示格式与三角/顶点数；源 SHA、单位、尺寸范围、组件数、转换日期、警告未展示（BLK-13）
 - `MOD04` — 未知单位提示未实现，不得默认毫米（BLK-13）

@@ -440,6 +440,43 @@ booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
   "no IGES writer on the target" was wrong: reader-side samples exist and are
   the correct vehicle for this acceptance item.
 
+### Multi-resource models MC06/MC07/MC09 + a pagination boundary bug (2026-10-09, 15/15)
+
+`scripts/mc_multiasset_check.mjs` builds the multi-resource samples itself,
+uploads every companion as its own file (how the system stores them), renders
+each model page over CDP and asserts the triangle count, that the companions
+were really fetched through `/api/files/<id>/bytes`, that no request leaves
+for an external host, and that the page raises no error:
+
+| Sample | Rendered | Companion fetches | External fetches |
+|---|---|---|---|
+| OBJ + MTL + PNG texture (MC06) | 12 triangles | 2 (mtl + png) | none |
+| glTF + .bin + PNG texture (MC07) | 1 triangle | 2 (bin + png) | none |
+| two-part 3MF (MC09) | 24 triangles (2x12) | n/a | none |
+
+Implementation: `siblingResolver` (ModelViewer) lists the file's folder once and
+returns a `LoadingManager.setURLModifier` callback; MTLLoader is constructed
+with that manager for OBJ `mtllib` references, GLTFLoader likewise for glTF.
+Absolute http(s) URLs are refused and redirected to a same-origin miss, so the
+viewer never becomes a fetch surface for attacker-controlled texture URLs
+(keeps the MC17 property).
+
+**Second real bug found on the way:** `GET /api/files?...&limit=200` answered
+400 E_BAD — the documented maximum page size did not work. The service sends
+page+1 lookahead rows to detect the next page while the PostgreSQL repository
+guard rejected anything above 200, so a limit=200 request (201 internally) was
+refused. Fixed with a shared `ports.MaxFilePage` constant on both sides, a Go
+boundary test (`TestListFilesAcceptsMaxPageSize`) and HTTP-level checks in
+`s_matrix_e2e.py` (limit 200/201/5000 all honoured, 35/35 total). The same
+investigation showed the generated OpenAPI contract documented the wrong sort
+enums (`name/size/updated`); it now carries the real values
+(updated_desc/updated_asc/name_asc/name_desc/size_desc for the list,
+updated_desc/name_asc/size_desc for search/stats/export).
+
+Regressions re-run after the change: mod01 controls 10/10, PE15 heap PASS,
+mc_cad 78/78, go test ./... + vet green. Matrix: 111 PASS / 14 PARTIAL / 1
+EXTERNAL.
+
 ### CAD negative paths MC04/MC14/MC16/MC17/MOD10 (2026-10-09, 78/78 PASS)
 
 `scripts/mc_cad_e2e.py` gained a negative-path section. It found and fixed a

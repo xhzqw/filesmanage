@@ -130,8 +130,8 @@ func (s *Service) ListFiles(ctx context.Context, u domain.User, folderID, sort s
 	if limit <= 0 {
 		limit = 50
 	}
-	if limit > 200 {
-		limit = 200
+	if limit > ports.MaxFilePage {
+		limit = ports.MaxFilePage
 	}
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {

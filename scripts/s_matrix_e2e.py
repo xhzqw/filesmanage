@@ -129,6 +129,13 @@ def main():
     check("S3 granted folder in probe tree", group_folder in names, group_folder in names)
     status, _ = probe.json("GET", f"/api/files?folder={user_folder}")
     check("S4 direct grant listable", status == 200, status)
+    # Pagination boundary: the documented maximum page size (and anything above
+    # it, which the server clamps) must be honoured. The list query fetches one
+    # lookahead row, so an off-by-one repository guard turns limit=200 into a
+    # 400; this pins the boundary at the HTTP surface.
+    for probe_limit in (200, 201, 5000):
+        status, body = probe.json("GET", f"/api/files?folder={user_folder}&sort=name_asc&limit={probe_limit}")
+        check(f"list limit {probe_limit} honoured", status == 200, status)
     # Union: the group folder also receives a direct user grant for download.
     status, _ = admin.json("POST", f"/api/folders/{group_folder}/acls",
                            {"subjectKind": "user", "subjectId": probe_id,

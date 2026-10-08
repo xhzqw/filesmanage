@@ -172,6 +172,11 @@ type GrantAt struct {
 	Depth int
 }
 
+// MaxFilePage is the largest page a client may request from the file list.
+// ListFiles asks the repository for one lookahead row beyond the page to
+// detect a next page, so the repository accepts MaxFilePage+1.
+const MaxFilePage = 200
+
 // FileQuery is the stable, cursor-paginated file list request. Cursor fields
 // carry the sort key of the last row of the previous page.
 type FileQuery struct {
