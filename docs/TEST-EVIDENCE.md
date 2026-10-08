@@ -416,6 +416,19 @@ extraction dispatch, docx container reading, snippet windowing.
   (26 tables, 41 media objects) with 12/12 manifest unit tests.
 - Machine-readable reports under `.secrets/perf/` (root-only, not committed).
 
+### Executable RB-T rollback matrix (commit 1fe8d26, 27/27 PASS)
+
+`scripts/rb_rollback_e2e.py` proves the DEC-13 append-only contract over the
+real API: v1=A/v2=B/v3=C built through lock+save; rollback to v1 appends v4 with
+v1's digest while v1..v3 keep theirs (RB-T01/02/03, current bytes = A); editing
+on to v5 and rolling back to v2 yields v6 with history 1..6 and no seq gaps
+(RB-T04); no-lock and stale-expected-seq rollbacks are refused 409 (RB-T05);
+the same idempotency key replays without creating a version (RB-T09); missing
+target 404, legacy {seq} body 400 and an ungranted user 403 all leave the
+history intact (RB-T12). Per-version byte download is not part of the API
+surface, so RB-T03 is proven through the version digest ledger plus the
+current-version bytes.
+
 ### Executable S-matrix (commit 13e1df6, 32/32 PASS)
 
 `scripts/s_matrix_e2e.py` re-runs the API-verifiable SPEC §13.2/§13.3 items on

@@ -170,7 +170,7 @@ security E2E 31/31, `/search` page browser-verified, viewport timings recorded.
 | S6 format previews | §M2/M6 + §M7 PE09 |
 | S7 lock + version under policy | §M4 + §M7 (lock race fix) |
 | S8 approval commits | §M4 |
-| S8b append-only rollback | §M4 (RB-T shape) |
+| S8b append-only rollback | §M4 + `scripts/rb_rollback_e2e.py` (RB-T01/02/03/04/05/09/12, 27/27) |
 | S9 Chinese search + safe summary | §M7 (tsvector, snippets, totals) |
 | S10 expiry boundaries | §M3; executable re-run with a real 70s expiry (s_matrix_e2e.py) |
 | S11 org/user admin | §M3; executable re-run (s_matrix_e2e.py) |
