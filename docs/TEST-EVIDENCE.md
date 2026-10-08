@@ -294,3 +294,28 @@ go run ./cmd/migrate → MIGRATIONS_OK 10 (0010 adds shares.created_at)
 - Scope CTE name collision (`scope` vs alias) → renamed to visible_scope.
 - Admin branch emitted no placeholders while args still bound $1 → placeholder emission now follows the emitted SQL.
 - CSV export sent a zero limit into the search path → inherits the search clamp.
+
+## Milestone 6b — Plain Text byte fidelity (executed on 192.168.1.22)
+
+| Sample | Bytes | Result |
+|---|---|---|
+| PT01 UTF-8+LF | 12 | encoding utf-8, eol lf, tail NL, download SHA identical |
+| PT02 UTF-8+CRLF | 16 | eol crlf detected, download SHA identical |
+| PT03 UTF-8 BOM | 11 | encoding utf-8-bom, hasBom true, BOM preserved on download |
+| PT04 tabs | 6 | printable, SHA identical |
+| PT05 no trailing NL | 18 | endsWithNewline false, SHA identical |
+| PT06 mixed EOL | 11 | eol mixed, SHA identical |
+| PT07 markdown with script tag | 40 | rendered as literal text (no HTML execution) |
+| PT08 JSON | 14 | SHA identical |
+| PT09 300KB text | 300000 | truncated=true, preview 262144 bytes, full download intact |
+| PT10 multibyte UTF-8 | 15 | decoded intact, SHA identical |
+| PT11 binary with NUL | 10 | printable=false, not treated as text |
+| PT12 short file | 5 | SHA identical |
+
+### Round-trip fidelity
+- Preview now returns rawBase64: the exact preview prefix bytes.
+- BOM + CRLF + tabs + trailing newline sample: byteMeta reports utf-8-bom/crlf/true; rawBase64 equals the source bytes exactly.
+- Editing one token and saving produces v2 whose SHA-256 equals the expected edited bytes (no encoding or newline normalisation).
+
+### Fix
+- AnalyzeBytes previously decoded to string first, which stripped the BOM and made EOL/trailing-newline detection unreliable; it now operates on raw bytes and PreviewBytes separates display decoding from metadata.

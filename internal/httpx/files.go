@@ -137,11 +137,30 @@ func (h *Handler) previewFile(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	c.JSON(200, gin.H{"ok": true, "data": gin.H{
+	// rawBase64 carries the exact preview prefix bytes so an editor can write
+	// them back without any encoding or newline normalisation.
+	data := gin.H{
 		"fileId": preview.FileID, "name": preview.Name, "contentType": preview.ContentType,
 		"size": preview.Size, "sha256": preview.Sha256, "textual": preview.Textual,
 		"truncated": preview.Truncated, "content": preview.Content, "byteMeta": preview.ByteMeta,
-	}})
+	}
+	if preview.Textual {
+		reader, _, _, closeReader, err := h.S.OpenPreviewBytes(c.Request.Context(), u, c.Param("id"))
+		if err == nil {
+			defer closeReader()
+			buf := make([]byte, application.PreviewLimit)
+			read := 0
+			for read < len(buf) {
+				n, readErr := reader.Read(buf[read:])
+				read += n
+				if readErr != nil {
+					break
+				}
+			}
+			data["rawBase64"] = base64.StdEncoding.EncodeToString(buf[:read])
+		}
+	}
+	c.JSON(200, gin.H{"ok": true, "data": data})
 }
 
 func (h *Handler) saveFile(c *gin.Context) {

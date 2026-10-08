@@ -100,6 +100,9 @@ Defect found and fixed during M1: FolderTree rendered only from `parentId===null
 - Search returns the caller's visible files; stats aggregate totals, by type, by month and by uploader; CSV downloads with a BOM and 17 rows.
 - Share create → list → revoke verified; favorites add → list → remove verified idempotent.
 
+### Plain Text fidelity (SPEC §8)
+- Preview metadata (encoding, BOM, EOL, trailing newline, truncation) is computed from raw bytes; rawBase64 carries the exact prefix so editors round-trip without normalisation. 12 byte samples verified plus a 300KB truncation case and a byte-exact save round-trip.
+
 ### Test data hygiene
 - The redundant full-permission grant created during browser acceptance was revoked; the test workgroup was removed; clerkA/clerkB were disabled. Hard deletion of principals with audit history is blocked by foreign keys by design, so the audit chain stays intact.
 

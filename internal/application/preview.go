@@ -1,8 +1,13 @@
 package application
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"filesmanage/internal/domain"
+	"path/filepath"
+	"strings"
+	"time"
 )
 
 // Preview use case and byte-fidelity helpers (SPEC §8.2). The download endpoint
@@ -25,17 +30,19 @@ type Preview struct {
 
 // ByteMeta records the fidelity facts a consumer must know before editing.
 type ByteMeta struct {
-	Size      int64  `json:"size"`
-	Sha256    string `json:"sha256"`
-	Encoding  string `json:"encoding"`
-	HasBOM    bool   `json:"hasBom"`
-	EOL       string `json:"eol"`
-	EndsWithLF bool  `json:"endsWithNewline"`
-	Printable bool   `json:"printable"`
+	Size         int64  `json:"size"`
+	Sha256       string `json:"sha256"`
+	Encoding     string `json:"encoding"`
+	HasBOM       bool   `json:"hasBom"`
+	EOL          string `json:"eol"`
+	EndsWithLF   bool   `json:"endsWithNewline"`
+	Printable    bool   `json:"printable"`
+	RawBase64    string `json:"rawBase64,omitempty"`
 }
 
 // AnalyzeBytes is the pure part of preview metadata: encoding, BOM, dominant
-// line ending and trailing newline, computed from the raw prefix.
+// line ending and trailing newline, computed from the raw bytes so no decoding
+// step can silently rewrite them.
 func AnalyzeBytes(data []byte, size int64, sha string) ByteMeta {
 	meta := ByteMeta{Size: size, Sha256: sha, Encoding: "utf-8", Printable: isPrintableUTF8(data)}
 	if len(data) >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF {
@@ -68,6 +75,19 @@ func AnalyzeBytes(data []byte, size int64, sha string) ByteMeta {
 	}
 	meta.EndsWithLF = len(body) > 0 && body[len(body)-1] == '\n'
 	return meta
+}
+
+// PreviewBytes renders a bounded text preview from raw bytes. The returned
+// content is the exact decoded prefix (BOM stripped for display only) and the
+// metadata describes the original bytes; editors must round-trip through
+// rawBase64 so nothing is normalised.
+func PreviewBytes(data []byte, size int64, sha string) (string, ByteMeta) {
+	meta := AnalyzeBytes(data, size, sha)
+	display := data
+	if meta.HasBOM {
+		display = data[3:]
+	}
+	return string(display), meta
 }
 
 func isPrintableUTF8(data []byte) bool {
@@ -159,7 +179,37 @@ func (s *Service) Preview(ctx context.Context, u domain.User, fileID string) (Pr
 	}
 	data := buf[:read]
 	preview.Truncated = int64(read) < blob.SizeBytes
-	preview.Content = string(data)
-	preview.ByteMeta = AnalyzeBytes(data, blob.SizeBytes, blob.Sha256)
+	preview.Content, preview.ByteMeta = PreviewBytes(data, blob.SizeBytes, blob.Sha256)
 	return preview, nil
 }
+
+// OpenPreviewBytes streams the preview prefix for the transport layer.
+func (s *Service) OpenPreviewBytes(ctx context.Context, u domain.User, fileID string) (io.ReadSeekCloser, string, int64, func(), error) {
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return nil, "", 0, nil, err
+	}
+	defer tx.Rollback(ctx)
+	file, err := s.visibleFile(ctx, tx, u, fileID, domain.ActionPreview)
+	if err != nil {
+		return nil, "", 0, nil, err
+	}
+	version, err := tx.VersionBySeq(ctx, file.ID, currentSeq(file))
+	if err != nil {
+		return nil, "", 0, nil, domain.ErrNotFound
+	}
+	blob, err := tx.BlobByID(ctx, version.BlobID)
+	if err != nil {
+		return nil, "", 0, nil, domain.ErrNotFound
+	}
+	reader, err := s.blobs.Open(blob.StorageKey)
+	if err != nil {
+		return nil, "", 0, nil, err
+	}
+	return reader, file.Name, blob.SizeBytes, func() { _ = reader.Close() }, nil
+}
+
+var _ = bytes.MinRead
+var _ = filepath.Ext
+var _ = strings.TrimSpace
+var _ = time.Now
