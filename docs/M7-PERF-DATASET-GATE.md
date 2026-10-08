@@ -121,7 +121,7 @@ SPEC's dedicated reference environment (PERF-003) or a materialised count.
 | PE08 10×100MB uploads | PASS | 10/10 committed, downloads checksum-verified, 23.5 s wall, no 5xx, RSS flat |
 | PE09 MP4 Range | PASS 10/10 | 206 for ranges, 416 unsatisfiable, suffix/single-byte ranges, sha header, preview reachable (fix: `http.ServeContent`) |
 | PE10 Office sessions | PASS 12/12 | 5 sequential sessions open 7–43 ms, unique document keys, clean cancel |
-| PE11 CAD conversion | PASS | STEP → STL 108,016 bytes / 544 triangles; content-addressed blob conflict path fixed and verified on a duplicate source |
+| PE11 CAD conversion | PASS | STEP → STL 108,016 bytes / 544 triangles; IGES bearing → 555,896 bytes / 2,148 facets, hammer → 144,873 bytes; blob-conflict path fixed |
 | PE12 CAD worker saturation vs login/list p95 | MEASURED | two runs: ratios x0.76-x1.31, absolute p95 < 11ms (73x inside budget); the ratio gate is noise-sensitive at these absolute values on a shared host |
 | PE13 pool behaviour | measured | pool wait dominates at ≥100 users (see analysis); no unbounded waits, controlled 503 under exhaustion |
 | PE14 query plans | collected | `EXPLAIN (ANALYZE, BUFFERS)` for list/hot-folder list/search/export/stats saved in TEST-EVIDENCE.md §M7 |

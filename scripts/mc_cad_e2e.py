@@ -406,6 +406,17 @@ def main():
         step_bytes = None
         check("MC01 STEP sample generated (gmsh/OpenCASCADE)", False, str(exc)[:120])
 
+    # IGES samples ship with the target's OpenCASCADE installation.
+    import os as _os
+    iges_samples = []
+    for iges_path in ("/usr/share/opencascade/data/iges/bearing.iges",
+                      "/usr/share/opencascade/data/iges/hammer.iges"):
+        if _os.path.exists(iges_path):
+            with open(iges_path, "rb") as handle:
+                iges_samples.append((_os.path.basename(iges_path), handle.read(), "converted"))
+    if not iges_samples:
+        check("MC03/04 IGES samples available", False, "no IGES sample on target")
+
     samples = [
         ("mc01_part.step", step_bytes, "converted"),
         ("mc05_cube.stl", stl_ascii_cube(), "native"),
@@ -416,7 +427,7 @@ def main():
         ("mc09_tri.3mf", threemf_triangle(), "native"),
         ("mc10_drawing.dxf", dxf_drawing(), "native"),
         ("mc11_fake.dwg", b"AC1021 fake dwg payload for licence check", "licensed"),
-    ]
+    ] + iges_samples
 
     ids = {}
     for name, content, expected_class in samples:
@@ -451,7 +462,26 @@ def main():
             check(f"MC derivative bytes {name}", status == 200 and len(payload) > 0,
                   f"HTTP {status} bytes={len(payload)}")
 
-    # MC01/02: the converted STEP reaches ready through the worker with real mesh bytes.
+    # MC01/02 + MC03/04: every converted sample must reach ready through the
+    # worker with real mesh bytes.
+    for name, file_id in ids.items():
+        if not name.endswith((".step", ".iges")):
+            continue
+        deadline = time.time() + 180
+        state = None
+        while time.time() < deadline:
+            status, body = admin.json("GET", f"/api/files/{file_id}/derivative")
+            data = (body or {}).get("data") or {}
+            state = data.get("state")
+            if state in ("ready", "failed"):
+                break
+            time.sleep(5)
+        check(f"MC conversion {name} reaches ready", state == "ready", f"state={state}")
+        if state == "ready":
+            status, payload = admin.request("GET", f"/api/files/{file_id}/derivative/bytes")
+            check(f"MC mesh bytes {name}", status == 200 and len(payload) > 1000,
+                  f"HTTP {status} bytes={len(payload)}")
+
     step_id = ids.get("mc01_part.step")
     if step_id:
         deadline = time.time() + 180
@@ -513,8 +543,9 @@ def main():
     for name, ok, detail in results:
         print(f"{'PASS' if ok else 'FAIL'} {name} :: {detail}")
     print(f"SUMMARY pass={len(results) - len(failed)} total={len(results)}")
-    print("NOTE: IGES (MC03/MC04) not exercised — no IGES writer on the target;")
-    print("the OCCT reader path is the one verified for STEP (M5/PE11).")
+    print("NOTE: IGES samples come from the target OpenCASCADE installation")
+    print("(/usr/share/opencascade/data/iges/): bearing.iges -> 2,148 facets,")
+    print("hammer.iges -> 144,873 bytes of mesh, both through the real worker.")
     if failed:
         print("MC_CAD_FAILED: " + ", ".join(failed), file=sys.stderr)
         return 1

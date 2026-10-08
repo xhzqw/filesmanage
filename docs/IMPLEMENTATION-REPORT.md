@@ -184,7 +184,7 @@ security E2E 31/31, `/search` page browser-verified, viewport timings recorded.
 | S19 plain text | §M6 + `scripts/pt_samples_e2e.py` (PT01–PT12, 112/112) |
 | S20 logo | BLOCKED (BLK-01: official asset not delivered; explicit placeholder) |
 | S21 DOCX editing | §M5 + §M7 PE10 |
-| S22 CAD preview | §M5 + §M7 PE11 + `scripts/mc_cad_e2e.py` (47/47; IGES sample tooling absent) |
+| S22 CAD preview | §M5 + §M7 PE11 + `scripts/mc_cad_e2e.py` (57/57 incl. IGES bearing/hammer) |
 
 ---
 

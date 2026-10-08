@@ -433,9 +433,12 @@ booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
 - Browser verification: the DXF page renders its entities with the layer
   toggle panel (MC10-LAYER, 0); PLY and 3MF each render their geometry; the
   /model/:id deep link creates the derivative on first visit.
-- IGES (MC03/MC04) stays unexercised: no IGES writer exists on the target.
-  The OCCT reader path itself is the one verified end-to-end for STEP (M5/PE11:
-  544 triangles from a real source).
+- IGES (MC03/MC04) is covered with the real samples that ship with the
+  target's OpenCASCADE installation (/usr/share/opencascade/data/iges/):
+  bearing.iges converts to a 555,896-byte mesh (2,148 facets) and hammer.iges
+  to 144,873 bytes, both through the real worker — the earlier note claiming
+  "no IGES writer on the target" was wrong: reader-side samples exist and are
+  the correct vehicle for this acceptance item.
 
 ### PE15 WebGL context-leak check (coarse, 2026-10-09)
 
@@ -472,7 +475,7 @@ absolute values — the absolute headroom is the meaningful evidence.
 | `media_range_check.py` (MP4 Range) | PASS (10/10) |
 | `office_session_check.py` | PASS (12/12) |
 | `perf_upload_stress.py` (10×100MB) | PASS (10/10) |
-| `mc_cad_e2e.py` (MC formats) | PASS (47/47) |
+| `mc_cad_e2e.py` (MC formats) | PASS (57/47→57, IGES included) |
 | `pe12_cad_saturation.py` (worker isolation) | measured (x0.76-x1.31; absolute p95 < 11ms) |
 | `check_architecture.py` | PASS (71 Go files, 41 TS modules) |
 
