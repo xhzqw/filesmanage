@@ -64,9 +64,8 @@ func (s *Service) CommitUpload(ctx context.Context, u domain.User, folderID, fil
 	if err = s.require(ctx, tx, u, folder.ID, domain.ActionUpload); err != nil {
 		return UploadResult{}, err
 	}
-	if err = s.assertNoApprovalPolicy(ctx, tx, folder.ID); err != nil {
-		return UploadResult{}, err
-	}
+	// Approval policies gate modifications of existing files (save/rollback),
+	// never the creation of a new file's first version.
 	if _, err = tx.FileByNameInFolder(ctx, folder.ID, fileName); err == nil {
 		return UploadResult{}, domain.ErrNameConflict
 	} else if !isRowMissing(err) {
@@ -228,115 +227,146 @@ type SaveResult struct {
 	Size       int64
 }
 
+// SaveOutcome distinguishes a committed version from a pending approval
+// request so the transport can answer 200 or 202.
+type SaveOutcome struct {
+	Result   SaveResult
+	Approval *domain.Approval
+}
+
 // Save writes new content as a fresh immutable version. CAS is enforced on
-// baseSeq. Edit locks and approval routes land with the workflow slice.
-func (s *Service) Save(ctx context.Context, u domain.User, fileID string, content []byte, baseSeq int, idempotencyKey string) (SaveResult, error) {
+// baseSeq and the direct path requires the live edit lock (SPEC §7.3). Under
+// an active folder policy the write becomes a pending approval instead.
+func (s *Service) Save(ctx context.Context, u domain.User, fileID string, content []byte, baseSeq int, lockToken, idempotencyKey string) (SaveOutcome, error) {
 	if baseSeq <= 0 {
-		return SaveResult{}, domain.ErrInvalidInput
+		return SaveOutcome{}, domain.ErrInvalidInput
 	}
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
-		return SaveResult{}, err
+		return SaveOutcome{}, err
 	}
 	defer tx.Rollback(ctx)
 	if cached, ok, err := idempotentResult(ctx, tx, u.ID, "file.save:"+fileID, idempotencyKey); err == nil && ok {
-		var result SaveResult
-		if jsonErr := json.Unmarshal(cached, &result); jsonErr == nil {
-			return result, nil
+		var outcome SaveOutcome
+		if jsonErr := json.Unmarshal(cached, &outcome); jsonErr == nil {
+			return outcome, nil
 		}
 	}
 	file, err := s.visibleFile(ctx, tx, u, fileID, domain.ActionModify)
 	if err != nil {
-		return SaveResult{}, err
+		return SaveOutcome{}, err
 	}
 	if currentSeq(file) != baseSeq {
-		return SaveResult{}, domain.ErrVersionConflict
+		return SaveOutcome{}, domain.ErrVersionConflict
 	}
-	if err = s.assertNoApprovalPolicy(ctx, tx, file.FolderID); err != nil {
-		return SaveResult{}, err
+	if policy, found, policyErr := tx.ApprovalPolicyFor(ctx, file.FolderID); policyErr == nil && found && policy.Enabled {
+		approval, submitErr := s.SubmitEdit(ctx, u, fileID, content, baseSeq, "")
+		if submitErr != nil {
+			return SaveOutcome{}, submitErr
+		}
+		return SaveOutcome{Approval: &approval}, nil
+	}
+	if err = s.requireOwnLock(ctx, tx, u, file, lockToken); err != nil {
+		return SaveOutcome{}, err
 	}
 	stage, err := s.blobs.Stage()
 	if err != nil {
-		return SaveResult{}, err
+		return SaveOutcome{}, err
 	}
 	if _, err = stage.Write(content); err != nil {
 		_ = stage.Abort()
-		return SaveResult{}, err
+		return SaveOutcome{}, err
 	}
 	storageKey, _, err := stage.Commit()
 	if err != nil {
 		_ = stage.Abort()
-		return SaveResult{}, err
+		return SaveOutcome{}, err
 	}
 	sha, size := stage.Sha256(), stage.Size()
 	blob, err := ensureBlob(ctx, tx, storageKey, sha, size)
 	if err != nil {
-		return SaveResult{}, err
+		return SaveOutcome{}, err
 	}
 	version, err := s.appendVersionTx(ctx, tx, u, file, blob, sha, size, domain.VersionActionEdit, nil, "")
 	if err != nil {
-		return SaveResult{}, err
+		return SaveOutcome{}, err
 	}
 	result := SaveResult{FileID: file.ID, VersionSeq: version.Seq, Sha256: sha, Size: size}
-	storeIdempotentResult(ctx, tx, u.ID, "file.save:"+fileID, idempotencyKey, mustMarshal(result))
+	// A successful save releases the lock (SPEC §7.2 state machine).
+	if _, err = tx.ReleaseLock(ctx, file.ID, HashToken(lockToken)); err != nil {
+		return SaveOutcome{}, err
+	}
+	outcome := SaveOutcome{Result: result}
+	storeIdempotentResult(ctx, tx, u.ID, "file.save:"+fileID, idempotencyKey, mustMarshal(outcome))
 	audit(ctx, tx, u, "file.save", "file", file.ID, "success",
 		map[string]any{"versionSeq": version.Seq, "sha256": sha, "size": size, "baseSeq": baseSeq})
 	if err = tx.Commit(ctx); err != nil {
-		return SaveResult{}, err
+		return SaveOutcome{}, err
 	}
-	return result, nil
+	return outcome, nil
 }
 
 // Rollback appends a new version whose bytes equal the target version, keeping
 // every historical version intact (DEC-13). The immutable target blob is reused.
-func (s *Service) Rollback(ctx context.Context, u domain.User, fileID string, targetSeq, expectedCurrentSeq int, reason, idempotencyKey string) (SaveResult, error) {
+func (s *Service) Rollback(ctx context.Context, u domain.User, fileID string, targetSeq, expectedCurrentSeq int, lockToken, reason, idempotencyKey string) (SaveOutcome, error) {
 	if targetSeq <= 0 || expectedCurrentSeq <= 0 {
-		return SaveResult{}, domain.ErrInvalidInput
+		return SaveOutcome{}, domain.ErrInvalidInput
 	}
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
-		return SaveResult{}, err
+		return SaveOutcome{}, err
 	}
 	defer tx.Rollback(ctx)
 	if cached, ok, err := idempotentResult(ctx, tx, u.ID, "file.rollback:"+fileID, idempotencyKey); err == nil && ok {
-		var result SaveResult
-		if jsonErr := json.Unmarshal(cached, &result); jsonErr == nil {
-			return result, nil
+		var outcome SaveOutcome
+		if jsonErr := json.Unmarshal(cached, &outcome); jsonErr == nil {
+			return outcome, nil
 		}
 	}
 	file, err := s.visibleFile(ctx, tx, u, fileID, domain.ActionModify)
 	if err != nil {
-		return SaveResult{}, err
+		return SaveOutcome{}, err
 	}
 	if currentSeq(file) != expectedCurrentSeq {
-		return SaveResult{}, domain.ErrVersionConflict
+		return SaveOutcome{}, domain.ErrVersionConflict
 	}
-	if err = s.assertNoApprovalPolicy(ctx, tx, file.FolderID); err != nil {
-		return SaveResult{}, err
+	if policy, found, policyErr := tx.ApprovalPolicyFor(ctx, file.FolderID); policyErr == nil && found && policy.Enabled {
+		approval, submitErr := s.SubmitRollback(ctx, u, fileID, targetSeq, expectedCurrentSeq, reason)
+		if submitErr != nil {
+			return SaveOutcome{}, submitErr
+		}
+		return SaveOutcome{Approval: &approval}, nil
+	}
+	if err = s.requireOwnLock(ctx, tx, u, file, lockToken); err != nil {
+		return SaveOutcome{}, err
 	}
 	target, err := tx.VersionBySeq(ctx, file.ID, targetSeq)
 	if err != nil {
-		return SaveResult{}, domain.ErrNotFound
+		return SaveOutcome{}, domain.ErrNotFound
 	}
 	if target.Seq >= expectedCurrentSeq {
-		return SaveResult{}, domain.ErrVersionConflict
+		return SaveOutcome{}, domain.ErrVersionConflict
 	}
 	blob, err := tx.BlobByID(ctx, target.BlobID)
 	if err != nil {
-		return SaveResult{}, domain.ErrNotFound
+		return SaveOutcome{}, domain.ErrNotFound
 	}
 	version, err := s.appendVersionTx(ctx, tx, u, file, blob, target.Sha256, target.SizeBytes, domain.VersionActionRollback, new(targetSeq), reason)
 	if err != nil {
-		return SaveResult{}, err
+		return SaveOutcome{}, err
 	}
 	result := SaveResult{FileID: file.ID, VersionSeq: version.Seq, Sha256: target.Sha256, Size: target.SizeBytes}
-	storeIdempotentResult(ctx, tx, u.ID, "file.rollback:"+fileID, idempotencyKey, mustMarshal(result))
+	if _, err = tx.ReleaseLock(ctx, file.ID, HashToken(lockToken)); err != nil {
+		return SaveOutcome{}, err
+	}
+	outcome := SaveOutcome{Result: result}
+	storeIdempotentResult(ctx, tx, u.ID, "file.rollback:"+fileID, idempotencyKey, mustMarshal(outcome))
 	audit(ctx, tx, u, "file.rollback", "file", file.ID, "success",
 		map[string]any{"versionSeq": version.Seq, "targetSeq": targetSeq, "fromSeq": expectedCurrentSeq, "reason": reason})
 	if err = tx.Commit(ctx); err != nil {
-		return SaveResult{}, err
+		return SaveOutcome{}, err
 	}
-	return result, nil
+	return outcome, nil
 }
 
 func (s *Service) appendVersionTx(ctx context.Context, tx ports.Tx, u domain.User, file domain.File, blob domain.Blob, sha string, size int64, action string, targetSeq *int, reason string) (domain.FileVersion, error) {

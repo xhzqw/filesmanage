@@ -3,6 +3,8 @@ import type {FileItem, FileVersion, PreviewData} from "../../entities/file/model
 
 export type FilePage={items:FileItem[];nextCursor:string};
 
+// Lock, save and rollback are file endpoints and therefore live with the
+// documents feature; approval inbox endpoints live in the workflow feature.
 export const fileApi={
  list:(folder:string,sort:string,cursor:string,limit:number)=>{
   const query=new URLSearchParams({folder,sort,limit:String(limit)});
@@ -14,6 +16,15 @@ export const fileApi={
  versions:(id:string)=>request<FileVersion[]>("/files/"+id+"/versions"),
  rename:(id:string,name:string)=>request<FileItem>("/files/"+id,{method:"PATCH",body:JSON.stringify({name})}),
  remove:(id:string)=>request<{id:string;oldName:string}>("/files/"+id,{method:"DELETE"}),
+ lockStatus:(id:string)=>request<{locked:boolean;ownerName?:string;baseSeq?:number;expiresAt?:string}>("/files/"+id+"/lock"),
+ acquireLock:(id:string,baseSeq:number)=>request<{lockToken:string;generation:number;expiresInSeconds:number}>("/files/"+id+"/lock",{method:"POST",body:JSON.stringify({baseSeq})}),
+ releaseLock:(id:string,lockToken:string)=>request<{released:string}>("/files/"+id+"/lock",{method:"DELETE",body:JSON.stringify({lockToken})}),
+ save:(id:string,baseSeq:number,lockToken:string,data:string,idempotencyKey:string)=>
+  request<{fileId:string;versionSeq:number;sha256:string;size:number;status:string}>("/files/"+id+"/save",
+   {method:"POST",body:JSON.stringify({baseSeq,lockToken,data,idempotencyKey})}),
+ submitForApproval:(id:string,baseSeq:number,data:string)=>
+  request<{status:string;approvalId:string;expectedCurrentSeq:number}>("/files/"+id+"/save",
+   {method:"POST",body:JSON.stringify({baseSeq,data})}),
 };
 
 type UploadReply={

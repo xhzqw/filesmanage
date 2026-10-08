@@ -96,6 +96,22 @@ type Repository interface {
 	AddWorkgroupMember(context.Context, string, string) error
 	RemoveWorkgroupMember(context.Context, string, string) error
 
+	// Approval policies, approvals and edit locks.
+	ApprovalPolicyFor(context.Context, string) (domain.ApprovalPolicy, bool, error)
+	UpsertApprovalPolicy(context.Context, domain.ApprovalPolicy) error
+	ClearApprovalPolicy(context.Context, string) error
+	CreateApproval(context.Context, domain.Approval) error
+	ApprovalByID(context.Context, string) (domain.Approval, error)
+	ListApprovalsForApprover(context.Context, string) ([]domain.Approval, error)
+	ListApprovalsByRequester(context.Context, string) ([]domain.Approval, error)
+	PendingApprovalForFile(context.Context, string) (domain.Approval, bool, error)
+	DecideApproval(context.Context, string, string, string) (bool, error)
+	LockByFileID(context.Context, string) (domain.EditLock, error)
+	InsertLock(context.Context, domain.EditLock) error
+	RenewLock(context.Context, string, string, time.Time, int64) (bool, error)
+	ReleaseLock(context.Context, string, string) (bool, error)
+	ForceReleaseLock(context.Context, string) (domain.EditLock, error)
+
 	// Audit and idempotency.
 	RecordAudit(context.Context, domain.AuditEvent) error
 	IdempotencyGet(context.Context, string, string, string) ([]byte, bool, error)

@@ -162,3 +162,57 @@ users=8 (active 6; clerkA/clerkB disabled test accounts)
 workgroups=1 members=3
 acls: folder_root:group_market{list} | folder_market:group_market{list,preview,upload}
 ```
+
+## Milestone 4 evidence (executed on 192.168.1.22, 2026-10-08)
+
+### Gates
+```
+go build/vet/test ./... → PASS (new: lock lifecycle, lock takeover, approval
+  workflow, reject keeps current, concurrent approvals single winner)
+python3 scripts/check_architecture.py → PASS: 48 Go files, 33 TS modules
+cd web && npm run build → tsc --noEmit PASS; vite build ✓
+go run ./cmd/migrate → APPLIED 0006_approval_decision_trail.sql, MIGRATIONS_OK 6
+```
+
+### Approval workflow (API)
+| Step | Result |
+|---|---|
+| admin PUT /api/folders/:id/approval-policy | 200 configured |
+| non-admin PUT policy | 403 |
+| editor save under policy | 202 status=pending + approvalId |
+| preview/download while pending | still committed content (v1 bytes) |
+| duplicate pending request | 409 E_APPROVAL_PENDING |
+| editor approves own request | 403 (approver only / admin) |
+| admin approves | 200, v2 committed, author = requester |
+| second approval of same request | 409 |
+| reject path: submit → reject | no new version; current content unchanged |
+| resubmit after rejection | 202 (new pending) |
+| rollback under policy → approve | v3 action=rollback target=1; v1/v2/v3 preserved; content = v1 bytes |
+
+### Edit locks (API)
+| Step | Result |
+|---|---|
+| acquire lock (editor) | 201 token + generation + 1800s |
+| lock status | locked, owner 编辑员 |
+| save without lock token | 409 |
+| admin acquire while editor holds | 409 |
+| save with live token | 200 (new version) |
+| lock status after save | released (auto) |
+| save with stale token | 409 |
+| acquire on approval-policy folder | 409 E_APPROVAL_PENDING (policy routes edits through approvals) |
+
+### Concurrency
+- 3 parallel approvals of the same request: exactly one 200, others 409; file kept exactly 2 versions (v1 + one committed edit). Verified via API and DB.
+
+### Browser acceptance (LAN)
+- /approvals workbench: inbox + my requests with states and comments.
+- Editor: opens with lock hint ("保存将创建新的不可变版本；当前为 vN"), saves → notice 已保存为 v(N+1), table row shows the new version and size.
+- Policy dialog (admin): lists active approvers; folder actions include 授权管理 / 审批策略 for admins only.
+
+### Fixes during the slice
+- `approval_policies` and `approvals` lacked columns the code referenced (created_at/decision trail) → migration 0006 + query fixes; raw pgx.ErrNoRows now maps to ports.ErrRowMissing in the workflow adapter.
+- Uploads were wrongly blocked by folder approval policies (policy gates only save/rollback).
+- FSD violations from cross-feature imports (documents↔workflow) removed: file endpoints live in features/documents, approval endpoints in features/workflow, pages compose.
+
+### Test data hygiene
+- Editor account disabled, its grants/locks/sessions removed; test approval policy cleared; debug rows deleted.

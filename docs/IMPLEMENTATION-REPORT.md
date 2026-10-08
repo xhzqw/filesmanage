@@ -55,6 +55,24 @@ Defect found and fixed during M1: FolderTree rendered only from `parentId===null
 - Browser: /org renders real states and department names; grant dialog lists/creates/revokes grants.
 - Fixes during the slice: `workgroups` has no `created_at` column (500 on list), empty department string hit the FK (500 on user create), and use cases mapped real query failures to 404 — now only missing rows map to 404.
 
+---
+
+## Milestone 4 — approvals, locks and version closure (verified end-to-end)
+
+### What was built
+- Approval policies (admin-only): one approver per folder with an enabled flag; while enabled, save and rollback create pending approvals (202 + approvalId) instead of versions, and the committed content stays authoritative for preview/download.
+- Approval decisions: approve commits the pending payload as a new immutable version attributed to the requester; reject and cancel publish nothing; the state predicate on the UPDATE is the concurrency gate, so concurrent deciders produce exactly one winner and losers get a controlled 409 (conflicted requests are auto-marked).
+- Edit locks: file-level single-writer lease (30 min server-side TTL, generation counter). Direct saves require the live token; a successful save releases the lock; expired leases are taken over (old token dies); stale tokens cannot release a newer holder's lock; own-lock re-acquire issues a fresh token so a stale tab cannot free the new lock. Admin-only paths are still role-checked.
+- Migration 0006 adds the approval decision trail (reason, decision_comment, decided_at).
+- Frontend: /approvals workbench (inbox + my requests, approve/reject/cancel), lock-aware plain-text editor (acquire on open, save with token, auto-release, approval submit under policy), admin approval-policy dialog. Feature modules stay FSD-clean: file endpoints in features/documents, approval endpoints in features/workflow, pages compose.
+
+### Verification (executed, all PASS)
+- Full matrix in TEST-EVIDENCE.md §M4: policy set/non-admin deny, 202 submission, no leak while pending, duplicate 409, approver-only 403, approve commits v2 with requester authorship, double-approve 409, reject keeps current version, rollback approval appends v3 with target=1.
+- Lock lifecycle: acquire/status/foreign-holder 409/save-without-token 409/save-with-token 200/auto-release/stale-token 409; acquire under an approval folder is 409 E_APPROVAL_PENDING.
+- Concurrency: 3 parallel approvals -> exactly one 200, file ends with exactly 2 versions.
+- Browser: workbench, editor (v3 -> v4 with notice), policy dialog with active approvers.
+- Unit tests cover lock lifecycle, takeover, submit/approve/reject, and the single-winner race.
+
 ### Test data hygiene
 - The redundant full-permission grant created during browser acceptance was revoked; the test workgroup was removed; clerkA/clerkB were disabled. Hard deletion of principals with audit history is blocked by foreign keys by design, so the audit chain stays intact.
 

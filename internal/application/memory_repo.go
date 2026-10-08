@@ -19,6 +19,9 @@ type memoryRepo struct {
 	departments   []domain.Department
 	workgroupList []domain.Workgroup
 	groupMembers  map[string][]string
+	policies     map[string]domain.ApprovalPolicy
+	approvals    []domain.Approval
+	locks        map[string]domain.EditLock
 	sessions     map[string]memorySession
 	folders      map[string]domain.Folder
 	files        map[string]domain.File
@@ -55,6 +58,8 @@ func newMemoryRepo() *memoryRepo {
 		workgroups:  map[string][]string{},
 		idempotency: map[string][]byte{},
 		groupMembers: map[string][]string{},
+		policies:    map[string]domain.ApprovalPolicy{},
+		locks:       map[string]domain.EditLock{},
 	}
 }
 

@@ -157,6 +157,7 @@ func (h *Handler) saveFile(c *gin.Context) {
 	var req struct {
 		Data           string
 		BaseSeq        int
+		LockToken      string
 		IdempotencyKey string
 	}
 	if c.ShouldBindJSON(&req) != nil || req.BaseSeq <= 0 {
@@ -168,14 +169,21 @@ func (h *Handler) saveFile(c *gin.Context) {
 		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
 		return
 	}
-	result, err := h.S.Save(c.Request.Context(), u, c.Param("id"), content, req.BaseSeq, req.IdempotencyKey)
+	outcome, err := h.S.Save(c.Request.Context(), u, c.Param("id"), content, req.BaseSeq, req.LockToken, req.IdempotencyKey)
 	if err != nil {
 		respondError(c, err)
 		return
 	}
+	if outcome.Approval != nil {
+		c.JSON(202, gin.H{"ok": true, "data": gin.H{
+			"status": "pending", "approvalId": outcome.Approval.ID,
+			"expectedCurrentSeq": outcome.Approval.BaseSeq, "lockReleased": true,
+		}})
+		return
+	}
 	c.JSON(200, gin.H{"ok": true, "data": gin.H{
-		"fileId": result.FileID, "versionSeq": result.VersionSeq,
-		"sha256": result.Sha256, "size": result.Size, "status": "committed",
+		"fileId": outcome.Result.FileID, "versionSeq": outcome.Result.VersionSeq,
+		"sha256": outcome.Result.Sha256, "size": outcome.Result.Size, "status": "committed",
 	}})
 }
 
@@ -209,6 +217,7 @@ func (h *Handler) rollbackFile(c *gin.Context) {
 	var req struct {
 		TargetSeq          int
 		ExpectedCurrentSeq int
+		LockToken          string
 		Reason             string
 		IdempotencyKey     string
 	}
@@ -216,15 +225,22 @@ func (h *Handler) rollbackFile(c *gin.Context) {
 		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
 		return
 	}
-	result, err := h.S.Rollback(c.Request.Context(), u, c.Param("id"), req.TargetSeq, req.ExpectedCurrentSeq, req.Reason, req.IdempotencyKey)
+	outcome, err := h.S.Rollback(c.Request.Context(), u, c.Param("id"), req.TargetSeq, req.ExpectedCurrentSeq, req.LockToken, req.Reason, req.IdempotencyKey)
 	if err != nil {
 		respondError(c, err)
 		return
 	}
+	if outcome.Approval != nil {
+		c.JSON(202, gin.H{"ok": true, "data": gin.H{
+			"status": "pending", "approvalId": outcome.Approval.ID,
+			"expectedCurrentSeq": req.ExpectedCurrentSeq, "rollbackTargetSeq": req.TargetSeq,
+		}})
+		return
+	}
 	c.JSON(200, gin.H{"ok": true, "data": gin.H{
-		"versionSeq": result.VersionSeq, "action": "rollback",
+		"versionSeq": outcome.Result.VersionSeq, "action": "rollback",
 		"rollbackTargetSeq": req.TargetSeq, "rollbackFromSeq": req.ExpectedCurrentSeq,
-		"sha256": result.Sha256, "status": "committed",
+		"sha256": outcome.Result.Sha256, "status": "committed",
 	}})
 }
 

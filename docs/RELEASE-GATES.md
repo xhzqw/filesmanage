@@ -1,13 +1,13 @@
 # Release gates
 
-Overall: NO-GO for production (dev-only system on 18091). Milestone gates: M1, M2, M3 GO (dev).
+Overall: NO-GO for production (dev-only system on 18091). Milestone gates: M1–M4 GO (dev).
 
 | Gate | Scope | Status | Evidence |
 |---|---|---|---|
 | G-M1 | Real login: bootstrap, auth, forced password change, real directory read, browser acceptance, LAN access | **GO (dev)** | IMPLEMENTATION-REPORT.md, TEST-EVIDENCE.md §M1 |
-| G-FS | File/folder vertical slice incl. versions, trash, restore | **GO (dev)** | IMPLEMENTATION-REPORT.md, TEST-EVIDENCE.md §M2 |
+| G-FS | File/folder vertical slice incl. versions, trash, restore | **GO (dev)** | TEST-EVIDENCE.md §M2 |
 | G-ACL | Org + ACL + cross-user isolation tests | **GO (dev)** | TEST-EVIDENCE.md §M3 |
-| G-WF | Approvals, locks, conflicts, append-only rollback interplay | OPEN | Milestone 4 |
+| G-WF | Approvals, locks, conflicts, append-only rollback interplay | **GO (dev)** | TEST-EVIDENCE.md §M4 |
 | G-DOCX | Real DOCX editing + write-back + idempotent callbacks | OPEN (blocked: BLK-02) | Milestone 5 |
 | G-CAD | Real CAD preview + Worker isolation + format matrix | OPEN (blocked: BLK-03/04) | Milestone 5 |
 | G-BIZ | Sharing, favorites, search, stats, CSV, plain-text fidelity | OPEN | Milestone 6 |

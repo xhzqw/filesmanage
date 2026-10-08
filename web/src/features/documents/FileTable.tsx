@@ -15,7 +15,7 @@ const SORT_LABELS:Record<SortKey,string>={
 
 const SORT_KEYS:SortKey[]=["updated_desc","name_asc","name_desc","size_desc"];
 
-export function FileTable({folder,folderName}:{folder:string;folderName:string}){
+export function FileTable({folder,folderName,onEdit}:{folder:string;folderName:string;onEdit:(fileId:string)=>void}){
  const[items,setItems]=useState<FileItem[]>([]);
  const[status,setStatus]=useState("loading");
  const[message,setMessage]=useState("");
@@ -47,6 +47,11 @@ export function FileTable({folder,folderName}:{folder:string;folderName:string})
   setMessageTone(tone);
  }
 
+ async function reload(){
+  const page=await fileApi.list(folder,sort,"",50);
+  setItems(page.items);setHasMore(page.nextCursor!=="");setCursor(page.nextCursor);
+ }
+
  async function onUpload(event:ChangeEvent<HTMLInputElement>){
   const file=event.target.files?.[0];
   event.target.value="";
@@ -54,8 +59,7 @@ export function FileTable({folder,folderName}:{folder:string;folderName:string})
   setUploading(true);announce("","info");
   try{
    await uploadFile(folder,file,newIdempotencyKey());
-   const page=await fileApi.list(folder,sort,"",50);
-   setItems(page.items);setHasMore(page.nextCursor!=="");setCursor(page.nextCursor);
+   await reload();
    announce(`已上传 ${file.name}，生成 v1 新版本`,"info");
   }catch(error){
    const code=errorCode(error);
@@ -124,6 +128,7 @@ export function FileTable({folder,folderName}:{folder:string;folderName:string})
       <td>{item.updatedAt.replace("T"," ").slice(0,16)}</td>
       <td className="row-actions">
        <a href={"/api/files/"+item.id+"/bytes"} download={item.name}>下载</a>
+       <button type="button" onClick={()=>onEdit(item.id)}>编辑</button>
        <button type="button" onClick={()=>{setRenaming(item);setRenameValue(item.name);}}>重命名</button>
        <button type="button" className="danger" onClick={()=>onDelete(item)}>删除</button>
       </td>

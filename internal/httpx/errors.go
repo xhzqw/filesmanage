@@ -3,6 +3,7 @@ package httpx
 import (
 	"errors"
 	"filesmanage/internal/application"
+	"os"
 	"filesmanage/internal/domain"
 	"github.com/gin-gonic/gin"
 )
@@ -36,6 +37,12 @@ func respondError(c *gin.Context, err error) {
 	case errors.Is(err, domain.ErrParentMissing):
 		c.JSON(409, gin.H{"ok": false, "error": gin.H{"code": "E_PARENT_MISSING"}})
 	default:
-		c.JSON(500, gin.H{"ok": false, "error": gin.H{"code": "E_INTERNAL"}})
+		payload := gin.H{"code": "E_INTERNAL"}
+		// Development-only detail switch; stays off unless explicitly enabled so
+		// production responses never leak internals.
+		if os.Getenv("FILESMANAGE_DEBUG_ERRORS") == "true" {
+			payload["message"] = err.Error()
+		}
+		c.JSON(500, gin.H{"ok": false, "error": payload})
 	}
 }

@@ -195,25 +195,41 @@ func TestUploadSaveRollbackAppendOnly(t *testing.T) {
 	}
 
 	// Stale CAS is rejected.
-	if _, err = s.Save(ctx, admin, uploaded.FileID, []byte("stale"), 99, ""); !errors.Is(err, domain.ErrVersionConflict) {
+	if _, err = s.Save(ctx, admin, uploaded.FileID, []byte("stale"), 99, "", ""); !errors.Is(err, domain.ErrVersionConflict) {
 		t.Fatalf("stale baseSeq must conflict: %v", err)
+	}
+	// A save without a live lock token must be refused (SPEC §7.3).
+	if _, err = s.Save(ctx, admin, uploaded.FileID, []byte("no-lock"), 1, "", ""); !errors.Is(err, domain.ErrLocked) {
+		t.Fatalf("save without lock token must be refused: %v", err)
 	}
 
 	// v1(A) -> v2(B) -> v3(C), then append-only rollback to v1.
-	v2, err := s.Save(ctx, admin, uploaded.FileID, []byte("B"), 1, "")
+	lock1, _, err := s.AcquireLock(ctx, admin, uploaded.FileID, 1)
+	if err != nil {
+		t.Fatalf("acquire lock failed: %v", err)
+	}
+	v2, err := s.Save(ctx, admin, uploaded.FileID, []byte("B"), 1, lock1, "")
 	if err != nil {
 		t.Fatalf("save v2 failed: %v", err)
 	}
-	v3, err := s.Save(ctx, admin, uploaded.FileID, []byte("C"), v2.VersionSeq, "")
+	lock2, _, err := s.AcquireLock(ctx, admin, uploaded.FileID, v2.Result.VersionSeq)
+	if err != nil {
+		t.Fatalf("re-acquire lock after save failed: %v", err)
+	}
+	v3, err := s.Save(ctx, admin, uploaded.FileID, []byte("C"), v2.Result.VersionSeq, lock2, "")
 	if err != nil {
 		t.Fatalf("save v3 failed: %v", err)
 	}
-	rolled, err := s.Rollback(ctx, admin, uploaded.FileID, 1, v3.VersionSeq, "恢复误修改", "")
+	lock3, _, err := s.AcquireLock(ctx, admin, uploaded.FileID, v3.Result.VersionSeq)
+	if err != nil {
+		t.Fatalf("acquire lock for rollback failed: %v", err)
+	}
+	rolled, err := s.Rollback(ctx, admin, uploaded.FileID, 1, v3.Result.VersionSeq, lock3, "恢复误修改", "")
 	if err != nil {
 		t.Fatalf("rollback failed: %v", err)
 	}
-	if rolled.VersionSeq != 4 {
-		t.Fatalf("rollback must append v4, got %d", rolled.VersionSeq)
+	if rolled.Result.VersionSeq != 4 {
+		t.Fatalf("rollback must append v4, got %d", rolled.Result.VersionSeq)
 	}
 	_, versions, err := s.FileMeta(ctx, admin, uploaded.FileID)
 	if err != nil {
@@ -225,24 +241,28 @@ func TestUploadSaveRollbackAppendOnly(t *testing.T) {
 	if versions[3].Action != domain.VersionActionRollback || versions[3].RollbackTargetSeq == nil || *versions[3].RollbackTargetSeq != 1 {
 		t.Fatalf("v4 must record rollback target 1: %+v", versions[3])
 	}
-	if versions[0].Sha256 != rolled.Sha256 {
-		t.Fatalf("v4 bytes must equal v1: %s vs %s", versions[0].Sha256, rolled.Sha256)
+	if versions[0].Sha256 != rolled.Result.Sha256 {
+		t.Fatalf("v4 bytes must equal v1: %s vs %s", versions[0].Sha256, rolled.Result.Sha256)
 	}
-	if versions[1].Sha256 == rolled.Sha256 || versions[2].Sha256 == rolled.Sha256 {
+	if versions[1].Sha256 == rolled.Result.Sha256 || versions[2].Sha256 == rolled.Result.Sha256 {
 		t.Fatal("v2/v3 must remain untouched")
 	}
 
 	// Idempotent save replay returns the recorded version.
-	replay, err := s.Save(ctx, admin, uploaded.FileID, []byte("D"), 4, "key-1")
+	lock4, _, err := s.AcquireLock(ctx, admin, uploaded.FileID, 4)
 	if err != nil {
 		t.Fatal(err)
 	}
-	again, err := s.Save(ctx, admin, uploaded.FileID, []byte("D"), 4, "key-1")
+	replay, err := s.Save(ctx, admin, uploaded.FileID, []byte("D"), 4, lock4, "key-1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if replay.VersionSeq != again.VersionSeq {
-		t.Fatalf("idempotent replay must return same version: %d vs %d", replay.VersionSeq, again.VersionSeq)
+	again, err := s.Save(ctx, admin, uploaded.FileID, []byte("D"), 4, lock4, "key-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replay.Result.VersionSeq != again.Result.VersionSeq {
+		t.Fatalf("idempotent replay must return same version: %d vs %d", replay.Result.VersionSeq, again.Result.VersionSeq)
 	}
 }
 
