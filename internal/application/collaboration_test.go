@@ -5,8 +5,10 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"filesmanage/internal/domain"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // TestExportStreamsAuthorizedRows locks the SPEC §3.10 export contract: every
@@ -209,3 +211,89 @@ func TestFileShareGrantsPreviewOutsideFolderScope(t *testing.T) {
 		t.Fatalf("file share must grant preview: %v", err)
 	}
 }
+
+// TestStatsCacheMemoisesPerPrincipal pins the dashboard cache contract: within
+// the TTL the same principal+scope is served from the cache (the aggregation
+// does not re-run), the TTL bounds staleness, and a different filter is a
+// different entry. Value-level ACL isolation is the PostgreSQL scope CTE's
+// job and is asserted end-to-end by scripts/m7_security_e2e.py; here the
+// cache key itself is asserted to carry the principal and the whole filter.
+func TestStatsCacheMemoisesPerPrincipal(t *testing.T) {
+	clock := time.Date(2026, 10, 8, 13, 0, 0, 0, time.UTC)
+	repo := newMemoryRepo()
+	hash, err := bcrypt.GenerateFromPassword([]byte("long-unit-test-password"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo.seedUser(domain.User{ID: "u_admin", Login: "admin", DisplayName: "系统管理员", IsAdmin: true}, string(hash))
+	repo.seedUser(domain.User{ID: "u_user", Login: "user1", DisplayName: "普通用户"}, string(hash))
+	repo.seedFolder(domain.Folder{ID: "folder_root", Name: "中晟生物科技", OwnerID: "u_admin"})
+	repo.seedFolder(domain.Folder{ID: "folder_market", Name: "市场部", ParentID: strPtr("folder_root"), OwnerID: "u_admin"})
+	s := New(repo, newMemoryBlob()).WithClock(func() time.Time { return clock })
+	admin := domain.User{ID: "u_admin", Login: "admin", IsAdmin: true}
+	other := domain.User{ID: "u_user", Login: "user1"}
+	ctx := context.Background()
+
+	for _, name := range []string{"a.txt", "b.txt"} {
+		if _, err := s.CommitUpload(ctx, admin, "folder_market", name, "text/plain", "", strings.NewReader(name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := s.CommitUpload(ctx, admin, "folder_root", "c.txt", "text/plain", "", strings.NewReader("c")); err != nil {
+		t.Fatal(err)
+	}
+
+	// Within the TTL the cached aggregation is returned even though the ground
+	// truth moved: that is the cache doing its job (and why the TTL exists).
+	first, err := s.Stats(ctx, admin, SearchFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.TotalFiles != 3 {
+		t.Fatalf("baseline total = %d, want 3", first.TotalFiles)
+	}
+	if _, err := s.CommitUpload(ctx, admin, "folder_root", "d.txt", "text/plain", "", strings.NewReader("d")); err != nil {
+		t.Fatal(err)
+	}
+	cached, err := s.Stats(ctx, admin, SearchFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cached.TotalFiles != 3 {
+		t.Fatalf("within the TTL the cached aggregation must be returned: got %d, want 3", cached.TotalFiles)
+	}
+
+	// A different filter is a different entry and is computed fresh.
+	scoped, err := s.Stats(ctx, admin, SearchFilter{FolderID: "folder_market"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if scoped.TotalFiles != 2 {
+		t.Fatalf("folder-scoped entry = %d, want 2", scoped.TotalFiles)
+	}
+
+	// Past the TTL the aggregation re-runs and sees the new file.
+	clock = clock.Add(31 * time.Second)
+	fresh, err := s.Stats(ctx, admin, SearchFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fresh.TotalFiles != 4 {
+		t.Fatalf("after the TTL the aggregation must re-run: got %d, want 4", fresh.TotalFiles)
+	}
+
+	// The cache key carries the principal and the whole filter, so one user's
+	// aggregation can never be served to another user or another scope.
+	base := statsCacheKey(admin, SearchFilter{})
+	if key := statsCacheKey(other, SearchFilter{}); key == base {
+		t.Fatal("the cache key must carry the principal")
+	}
+	if key := statsCacheKey(admin, SearchFilter{FolderID: "folder_market"}); key == base {
+		t.Fatal("the cache key must carry the filter")
+	}
+	if key := statsCacheKey(admin, SearchFilter{IncludeDescendant: true}); key == base {
+		t.Fatal("the cache key must carry the descendant flag")
+	}
+}
+
+func strPtr(v string) *string { return &v }

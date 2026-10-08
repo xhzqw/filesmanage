@@ -98,6 +98,10 @@ func (s *Service) MoveFolder(ctx context.Context, u domain.User, folderID, targe
 	if err = tx.Commit(ctx); err != nil {
 		return domain.Folder{}, err
 	}
+	// Authorisation just changed: drop every cached read so the next
+	// request sees the new scope (PE04).
+	s.bumpACLEpoch()
+
 	return folder, nil
 }
 

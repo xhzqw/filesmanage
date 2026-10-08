@@ -61,6 +61,10 @@ func (s *Service) RestoreFromTrash(ctx context.Context, u domain.User, entryID s
 	if err = tx.Commit(ctx); err != nil {
 		return domain.TrashEntry{}, err
 	}
+	// Authorisation just changed: drop every cached read so the next
+	// request sees the new scope (PE04).
+	s.bumpACLEpoch()
+
 	return entry, nil
 }
 

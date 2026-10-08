@@ -76,6 +76,10 @@ func (s *Service) CreateGrant(ctx context.Context, u domain.User, folderID strin
 	if err = tx.Commit(ctx); err != nil {
 		return domain.ACL{}, err
 	}
+	// Authorisation just changed: drop every cached read so the next
+	// request sees the new scope (PE04).
+	s.bumpACLEpoch()
+
 	return grant, nil
 }
 
@@ -97,6 +101,10 @@ func (s *Service) RevokeGrant(ctx context.Context, u domain.User, grantID string
 	}
 	audit(ctx, tx, u, "acl.revoke", "folder", grant.FolderID, "success",
 		map[string]any{"grantId": grantID, "subjectKind": grant.SubjectKind, "subjectId": grant.SubjectID})
+	// Authorisation just changed: drop every cached read so the next
+	// request sees the new scope (PE04).
+	s.bumpACLEpoch()
+
 	return tx.Commit(ctx)
 }
 

@@ -440,6 +440,36 @@ booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
   "no IGES writer on the target" was wrong: reader-side samples exist and are
   the correct vehicle for this acceptance item.
 
+### Performance optimisation pass: revocation-aware caches (2026-10-09)
+
+Following the measured capacity diagnosis, the expensive read paths were
+optimised instead of only documented. Three in-process caches (session
+validation 5 s, search pages 10 s, stats aggregates 30 s), each keyed by
+principal + full filter:
+
+| endpoint p95 @100 users | before | after |
+|---|---|---|
+| `/api/search` | 2,438 ms OVER | 362 ms PASS |
+| `/api/stats` | 2,718 ms OVER | 226 ms PASS |
+| `/api/me` | 526 ms OVER | 211 ms PASS |
+| `/api/files` | 1,020 ms OVER | 352 ms PASS |
+| all 11 endpoints | 7/11 | **11/11** |
+
+At 10 users every endpoint is 1-2 orders of magnitude inside budget; at 200
+users 10/11 (only `/api/me`, whose warm-cache cost is 1.4 ms, queues at 200
+concurrent threads).
+
+Correctness evidence (the part that needed care):
+- `m7_security_e2e.py` 31/31 - revocation immediacy for list, search, stats
+  and export all still hold with the caches live;
+- `TestSessionCacheRevokesImmediately` - logout and account disabling drop
+  cached sessions at once;
+- `TestStatsCacheMemoisesPerPrincipal` - TTL semantics plus per-principal and
+  per-filter cache keys;
+- `browser_business_check.mjs` 12/12 and `browser_journey_check.mjs` 19/19 -
+  the real UI still sees fresh data after writes;
+- full `go test ./...`, vet and the architecture gate green.
+
 ### Business surfaces over the real browser (2026-10-09, 12/12 PASS, run 2x)
 
 `scripts/browser_business_check.mjs` walks the business pages in headless
@@ -541,6 +571,7 @@ boundary fix, MSH conversion, assembly tree, rollback edges, crash sweep):
 | `loadtest.py --users 10` | PASS 11/11 (all endpoint budgets) |
 | `browser_journey_check.mjs` (real-browser core journey) | PASS 19/19 (run 3x) |
 | `browser_business_check.mjs` (search/stats/org/approvals surfaces) | PASS 12/12 (run 2x) |
+| `loadtest.py --users 100` (after caching) | PASS 11/11 (was 7/11) |
 | `backup_restore_drill.py` | PASS (26 tables, 288 blobs) |
 | `test_backup_manifest.py` | PASS 12/12 |
 | `verify_migration.py` | PASS |

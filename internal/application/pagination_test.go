@@ -1,6 +1,8 @@
 package application
 
 import (
+	"context"
+	"errors"
 	"filesmanage/internal/domain"
 	"filesmanage/internal/ports"
 	"strings"
@@ -95,4 +97,44 @@ func TestListFilesAcceptsMaxPageSize(t *testing.T) {
 			t.Fatalf("sort %s at max page must succeed: %v", sort, err)
 		}
 	}
+}
+
+// TestSessionCacheRevokesImmediately pins the security property that makes the
+// session cache acceptable: a cached session must stop validating the instant
+// it is revoked, not after the cache TTL. Logout and account disabling both
+// drop the cached entry.
+func TestSessionCacheRevokesImmediately(t *testing.T) {
+	s, repo := testService(t)
+	ctx := context.Background()
+	token, _, err := s.Login(ctx, "admin", "long-unit-test-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Warm the cache, then log out: the next validation must fail even though
+	// the cached entry has not expired.
+	if _, err = s.Session(ctx, token); err != nil {
+		t.Fatalf("session not found: %v", err)
+	}
+	if err = s.Logout(ctx, token); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Session(ctx, token); !errors.Is(err, ErrUnauthorized) {
+		t.Fatal("revoked token accepted from the session cache")
+	}
+
+	// The same must hold for a disabled account.
+	token2, _, err := s.Login(ctx, "user1", "long-unit-test-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Session(ctx, token2); err != nil {
+		t.Fatalf("second session not found: %v", err)
+	}
+	if err = s.SetUserDisabled(ctx, domain.User{ID: "u_admin", IsAdmin: true}, "u_user", true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Session(ctx, token2); !errors.Is(err, ErrUnauthorized) {
+		t.Fatal("disabled account's cached session still accepted")
+	}
+	_ = repo
 }

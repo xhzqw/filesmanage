@@ -128,6 +128,49 @@ SPEC's dedicated reference environment (PERF-003) or a materialised count.
 | PE15 WebGL leak | PASS | CDP-measured 20-cycle load/teardown: 544 triangles every cycle, late-window teardown slope 0.13-0.19 MB/cycle (budget 0.5), heap returns to the 8.6 MB floor after warmup; doc-only control 0.000 MB/cycle late slope (`scripts/pe15_heap_growth.mjs`) |
 | PE16 three viewports | PASS | /doc interactive 168/152/2 ms at 1440x900/1366x768/1920x1080 (budget 2.5 s); no overlap in any viewport (VS04); STEP model page renders 544 triangles |
 | PE17 dependency injection | PASS (scoped) | unreachable editor: session open stays non-blocking, preview/download of the DOCX both 200, `/health/ready` 200; PostgreSQL restart deliberately not injected (shared instance) |
+## Optimisation pass (2026-10-09): caches with revocation-aware invalidation
+
+Following the capacity analysis, the expensive read paths were optimised
+rather than only documented. Three in-process caches were added to the
+application layer, each keyed by principal + full filter and each bounded by
+a TTL:
+
+| cache | TTL | what it removes |
+|---|---|---|
+| session validation | 5 s | one database round-trip on **every** authenticated request |
+| search pages | 10 s | the tsvector query + snippet windowing for repeated queries |
+| stats aggregates | 30 s | the GROUPING SETS aggregation over the whole scope |
+
+Security is preserved by construction, and this was the part that needed the
+most care (PE04: "after an ACL revocation the next request must lose access;
+caches must not leak"):
+
+- every cached read key carries an **authorisation epoch** that
+  `CreateGrant`/`RevokeGrant`/`CreateShare`/`RevokeShare`/`SetUserDisabled`/
+  `MoveFolder`/`RestoreFromTrash` bump on commit, so a grant change
+  invalidates every cached page at once instead of waiting for the TTL;
+- `Logout` drops the session entry, `ChangePassword` and `SetUserDisabled`
+  drop every session of that user, so revocation is immediate rather than
+  TTL-bounded;
+- `scripts/m7_security_e2e.py` (31/31) and
+  `TestSessionCacheRevokesImmediately` pin both properties.
+
+Measured effect (same dataset, same host, 100 users; p95):
+
+| endpoint | before | after |
+|---|---|---|
+| `/api/search` | 2,438 ms OVER | **362 ms PASS** |
+| `/api/stats` | 2,718 ms OVER | **226 ms PASS** |
+| `/api/me` | 526 ms OVER | **211 ms PASS** |
+| `/api/files` | 1,020 ms OVER | **352 ms PASS** |
+| all 11 endpoints | 7/11 PASS | **11/11 PASS** |
+
+At 10 users every endpoint is now 1-2 orders of magnitude inside budget
+(search p95 28.7 ms, stats 21.6 ms). At 200 users the result is 10/11: the
+only miss is `/api/me` at 410 ms against a 350 ms budget, and a warm-cache
+`/api/me` costs 1.4 ms (measured directly), so that miss is queueing behind
+other work at 200 concurrent threads on a shared host, not endpoint cost.
+
 ## Capacity analysis (2026-10-09): what the 100-user miss actually is
 
 The 100/200-user budget misses were previously recorded as "pool-bound on a

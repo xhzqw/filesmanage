@@ -1,6 +1,8 @@
 package application
 
 import (
+	"encoding/json"
+	"fmt"
 	"context"
 	"errors"
 	"filesmanage/internal/domain"
@@ -95,6 +97,10 @@ func (s *Service) CreateShare(ctx context.Context, u domain.User, draft ShareDra
 	if err = tx.Commit(ctx); err != nil {
 		return domain.Share{}, err
 	}
+	// Authorisation just changed: drop every cached read so the next
+	// request sees the new scope (PE04).
+	s.bumpACLEpoch()
+
 	return share, nil
 }
 
@@ -115,6 +121,10 @@ func (s *Service) RevokeShare(ctx context.Context, u domain.User, shareID string
 		return err
 	}
 	audit(ctx, tx, u, "share.revoke", "share", shareID, "success", nil)
+	// Authorisation just changed: drop every cached read so the next
+	// request sees the new scope (PE04).
+	s.bumpACLEpoch()
+
 	return tx.Commit(ctx)
 }
 
@@ -247,6 +257,17 @@ func (s *Service) Search(ctx context.Context, u domain.User, filter SearchFilter
 	if filter.Limit > 200 {
 		filter.Limit = 200
 	}
+	// Repeated identical queries are memoised for a short TTL. The key carries
+	// the principal and the whole filter, so a cached page is only ever served
+	// to the same user with the same scope; the TTL bounds how long a newly
+	// uploaded file can be missing from results.
+	// The epoch invalidates every cached read the moment authorisation
+	// changes, so a revocation or a new grant is visible on the next request
+	// (PE04) instead of after the TTL.
+	key := fmt.Sprintf("%d|%s", s.epoch(), searchCacheKey(u, filter))
+	if cached, ok := s.search.get(key, s.now()); ok {
+		return cached.files, cached.total, nil
+	}
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -256,7 +277,36 @@ func (s *Service) Search(ctx context.Context, u domain.User, filter SearchFilter
 	if err != nil {
 		return nil, 0, err
 	}
-	return tx.SearchFiles(ctx, searchQuery(u, groups, filter))
+	files, total, err := tx.SearchFiles(ctx, searchQuery(u, groups, filter))
+	if err != nil {
+		return nil, 0, err
+	}
+	s.search.put(key, searchEntryValue{files: files, total: total}, s.now())
+	return files, total, nil
+}
+
+// searchCacheKey binds the caller's identity, admin flag and the whole filter
+// (query, folder, descendant flag, uploader, mime prefix, time range, sort and
+// limit), so no two users or two scopes can share a cached page.
+func searchCacheKey(u domain.User, filter SearchFilter) string {
+	raw, err := json.Marshal(struct {
+		UserID            string
+		Admin             bool
+		Query             string
+		FolderID          string
+		IncludeDescendant bool
+		Uploader          string
+		MimePrefix        string
+		From              *time.Time
+		To                *time.Time
+		Sort              string
+		Limit             int
+	}{u.ID, u.IsAdmin, filter.Query, filter.FolderID, filter.IncludeDescendant,
+		filter.Uploader, filter.MimePrefix, filter.From, filter.To, filter.Sort, filter.Limit})
+	if err != nil {
+		return NewID("search-uncacheable")
+	}
+	return string(raw)
 }
 
 func searchQuery(u domain.User, groups []string, filter SearchFilter) ports.FileSearchQuery {
@@ -272,6 +322,10 @@ func searchQuery(u domain.User, groups []string, filter SearchFilter) ports.File
 }
 
 func (s *Service) Stats(ctx context.Context, u domain.User, filter SearchFilter) (domain.Stats, error) {
+	key := fmt.Sprintf("%d|%s", s.epoch(), statsCacheKey(u, filter))
+	if cached, ok := s.stats.get(key, s.now()); ok {
+		return cached, nil
+	}
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
 		return domain.Stats{}, err
@@ -281,7 +335,35 @@ func (s *Service) Stats(ctx context.Context, u domain.User, filter SearchFilter)
 	if err != nil {
 		return domain.Stats{}, err
 	}
-	return tx.Stats(ctx, statsQuery(u, groups, filter))
+	stats, err := tx.Stats(ctx, statsQuery(u, groups, filter))
+	if err != nil {
+		return domain.Stats{}, err
+	}
+	// Only successful aggregations are memoised; a failed one must retry.
+	s.stats.put(key, stats, s.now())
+	return stats, nil
+}
+
+// statsCacheKey binds the caller's identity, admin flag and the whole filter,
+// so two users (or two scopes) never share an entry.
+func statsCacheKey(u domain.User, filter SearchFilter) string {
+	raw, err := json.Marshal(struct {
+		UserID             string
+		Admin              bool
+		FolderID           string
+		IncludeDescendant  bool
+		Uploader           string
+		MimePrefix         string
+		From               *time.Time
+		To                 *time.Time
+	}{u.ID, u.IsAdmin, filter.FolderID, filter.IncludeDescendant, filter.Uploader,
+		filter.MimePrefix, filter.From, filter.To})
+	if err != nil {
+		// A filter that cannot be serialised must not be cached: fall back to a
+		// per-call key so the aggregation always runs.
+		return NewID("stats-uncacheable")
+	}
+	return string(raw)
 }
 
 // ExportCSVStream streams the visible file list as UTF-8-BOM CSV with formula

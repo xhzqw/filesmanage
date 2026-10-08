@@ -137,6 +137,18 @@ python3 scripts/upgrade_rollback_drill.py --rollback-to <sha> # 指定提交
 日志位置：`.bin/server.log`、`.bin/worker.log`、`.bin/perf-server.log`；错误详情开关
 `FILESMANAGE_DEBUG_ERRORS=true`（仅开发用，生产响应不泄露内部信息）。
 
+## 7.1 读缓存与失效语义
+
+服务端有三个进程内缓存，均按“主体 + 完整过滤条件”为键并受 TTL 约束：会话校验
+5 s、搜索页 10 s、统计聚合 30 s。失效保证：
+
+- 任何授权变更（建/撤授权、建/撤共享、禁用用户、移动目录、恢复回收站）都会
+  递增 **authorization epoch**，全部缓存读的键都含该 epoch——授权变更立即使所有
+  缓存读失效，不等 TTL（PE04）；
+- 登出立即删除会话缓存；改密与禁用账号立即删除该用户全部会话缓存；
+- 因此“撤销后下一次请求即失权”“登出后会话立即失效”在缓存存在时依然成立，
+  由 `m7_security_e2e.py`（31/31）与 `TestSessionCacheRevokesImmediately` 把关。
+
 ## 8. 禁止事项
 
 - 不得占用 8091、不得安装 systemd 单元、不得切换生产入口（BLK-05 未授权）

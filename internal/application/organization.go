@@ -124,6 +124,13 @@ func (s *Service) SetUserDisabled(ctx context.Context, actor domain.User, userID
 	}
 	audit(ctx, tx, actor, map[bool]string{true: "user.disable", false: "user.enable"}[disabled], "user", userID, "success",
 		map[string]any{"login": target.Login})
+	// Authorisation just changed: drop every cached read so the next
+	// request sees the new scope (PE04).
+	s.bumpACLEpoch()
+	// A disabled account's sessions must stop working at once, not after the
+	// session cache TTL.
+	s.session.dropUser(userID)
+
 	return tx.Commit(ctx)
 }
 
