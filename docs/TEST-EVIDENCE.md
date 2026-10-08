@@ -662,4 +662,6 @@ implemented route table and handler payload builders: 50 paths, 66 operations,
 46 component schemas, session/JWT/source-token security schemes, the SPEC 5.3
 error envelope on every >=400 response, and admin-only / mustChangePassword
 semantics documented per operation. `python3 scripts/gen_openapi.py --check`
-fails when the router changes without regenerating the contract.
+fails when the router changes without regenerating the contract; the same
+check now runs inside `scripts/build.sh` (negative-tested: appending one
+line to the YAML makes the gate exit 1, restoring it passes).

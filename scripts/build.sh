@@ -27,6 +27,9 @@ go vet ./...
 echo "== architecture gate =="
 python3 scripts/check_architecture.py
 
+echo "== openapi contract drift gate =="
+python3 scripts/gen_openapi.py --check
+
 if [ "${1:-}" = "--with-tests" ]; then
   echo "== go: full test suite =="
   go test ./...
