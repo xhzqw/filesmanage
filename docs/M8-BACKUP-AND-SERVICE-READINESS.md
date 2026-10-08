@@ -76,3 +76,26 @@ Do not install/enable this unit over an occupied port, kill unrelated services, 
 - Safe dev-to-systemd handover and monitoring/log retention
 - Official Logo asset and DWG commercial licensing
 - Formal 8091 release approval
+
+## Snapshot-derived Blob manifest correction (new revision, verification pending)
+
+Prior approach queried the **live** `blobs` table after `pg_dump` and could
+choose a different media generation if an upload committed between those steps.
+
+The restore drill now:
+1. Produces a PostgreSQL custom-format snapshot.
+2. Restores that snapshot into an isolated verification database.
+3. Queries the **restored** database for its ready Blob manifest.
+4. Validates every immutable content-addressed media key against its SHA-256.
+5. Archives only snapshot-referenced media and verifies the extracted archive.
+
+The source implementation currently only deletes staging files; ready Blobs are
+immutable and not garbage-collected. That retention invariant is an explicit
+assumption for backups running concurrently with uploads. If ready-media garbage
+collection is added, it must coordinate with backup pinning before production.
+
+Added `scripts/test_backup_manifest.py` with twelve credential-free negative/
+positive cases. **The post-change restore drill and unit tests still require
+fresh successful execution evidence**; execution protection blocked the attempted
+re-run. The earlier PASS proves only the original script, not the corrected
+snapshot generation logic. G-DEPLOY remains NO-GO.

@@ -77,6 +77,27 @@ def rows(env, statement):
     return [line.split("\t") for line in output.splitlines() if line.strip()]
 
 
+def snapshot_manifest(blobs, blob_root):
+    """Require canonical immutable blob keys and exact hashes from restored DB rows."""
+    expected = {}
+    for key, hash_value in blobs:
+        path = PurePosixPath(key)
+        if (len(path.parts) != 3 or path.parts[0] != "ready" or
+                not re.fullmatch("[0-9a-f]{64}", hash_value) or
+                not re.fullmatch("[0-9a-f]{64}", path.parts[-1]) or
+                path.parts[1] != hash_value[:2] or path.parts[-1] != hash_value):
+            fail("invalid or unexpected blob storage key")
+        if key in expected:
+            fail("duplicate storage key in snapshot")
+        full_path = blob_root.joinpath(*path.parts)
+        if not full_path.is_file() or full_path.is_symlink():
+            fail("snapshot media is missing or not a regular file")
+        if sha256_file(full_path) != hash_value:
+            fail("snapshot media digest mismatch")
+        expected[key] = hash_value
+    return expected
+
+
 def main():
     if os.geteuid() != 0:
         fail("run as target host root; restricted backup directory is root-owned")
@@ -98,27 +119,6 @@ def main():
 
     print("BACKUP: snapshotting exact filesmanage_v21 database", flush=True)
     execute(["pg_dump", "-Fc", "--no-owner", "--no-acl", "-f", str(dump)], env=env)
-    blobs = rows(env, "SELECT storage_key, sha256 FROM blobs WHERE state='ready' ORDER BY storage_key")
-    if not blobs:
-        fail("no ready blobs; cannot demonstrate media restore")
-    expected = {}
-    for key, hash_value in blobs:
-        path = PurePosixPath(key)
-        if (len(path.parts) != 3 or path.parts[0] != "ready" or
-                not re.fullmatch("[0-9a-f]{64}", hash_value) or
-                not re.fullmatch("[0-9a-f]{64}", path.parts[-1])):
-            fail("invalid or unexpected blob storage key")
-        full_path = blob_root.joinpath(*path.parts)
-        if not full_path.is_file() or full_path.is_symlink():
-            fail("referenced media missing or not regular file")
-        if sha256_file(full_path) != hash_value:
-            fail("referenced media digest mismatch")
-        expected[key] = hash_value
-
-    print(f"BACKUP: verifying and archiving {len(expected)} referenced media objects", flush=True)
-    with tarfile.open(blobs_tar, "w:gz") as archive:
-        for key in expected:
-            archive.add(blob_root / key, arcname=key, recursive=False)
     restore_name = safe_identifier(RESTORE_PREFIX + dt.datetime.now(dt.timezone.utc).strftime("%m%d%H%M%S"))
     created = False
     try:
@@ -126,22 +126,38 @@ def main():
         created = True
         restore_env = env.copy()
         restore_env["PGDATABASE"] = restore_name
-        print("RESTORE: loading archive into separate scratch PostgreSQL database", flush=True)
-        execute(["pg_restore", "--exit-on-error", "--no-owner", "--no-acl", "-d", restore_name, str(dump)],
-                env=restore_env)
+        print("RESTORE: loading one consistent PostgreSQL snapshot into scratch database", flush=True)
+        execute(["pg_restore", "--exit-on-error", "--no-owner", "--no-acl",
+                 "-d", restore_name, str(dump)], env=restore_env)
         tables = rows(restore_env, "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename")
         table_names = {row[0] for row in tables}
         if not set(REQUIRED_TABLES) <= table_names:
             fail("restored schema is missing required application tables")
         counts = {}
         for table in sorted(table_names):
+            if not re.fullmatch(r"[a-z_][a-z_0-9]*", table):
+                fail("unexpected identifier in restored schema")
             counts[table] = int(query(restore_env, f'SELECT count(*) FROM "{table}"'))
-        if counts["blobs"] < len(expected) or counts["files"] < 1 or counts["file_versions"] < 1:
+        if counts["files"] < 1 or counts["file_versions"] < 1:
             fail("restored business data incomplete")
-        restored_blobs = rows(restore_env,
-                             "SELECT storage_key, sha256 FROM blobs WHERE state='ready' ORDER BY storage_key")
-        if restored_blobs != blobs:
-            fail("restored blob manifest differs from backup snapshot")
+        inaccessible_versions = int(query(
+            restore_env, "SELECT count(*) FROM file_versions v "
+            "LEFT JOIN blobs b ON b.id=v.blob_id WHERE b.id IS NULL OR b.state<>'ready'"))
+        if inaccessible_versions:
+            fail(f"restored snapshot has {inaccessible_versions} versions referencing unavailable blobs")
+        # Obtain the exact required media set FROM THE RESTORED pg_dump snapshot,
+        # never from live SQL after dump: concurrent new versions must not enlarge
+        # or corrupt the already chosen backup generation.
+        blobs = rows(restore_env,
+                     "SELECT storage_key, sha256 FROM blobs WHERE state='ready' ORDER BY storage_key")
+        if not blobs:
+            fail("restored snapshot has no ready blobs")
+        expected = snapshot_manifest(blobs, blob_root)
+
+        print(f"BACKUP: archiving {len(expected)} snapshot-referenced immutable media objects", flush=True)
+        with tarfile.open(blobs_tar, "w:gz") as archive:
+            for key in expected:
+                archive.add(blob_root / key, arcname=key, recursive=False)
         with tempfile.TemporaryDirectory(prefix="filesmanage-blobs-verify-", dir=archive_dir) as temp:
             with tarfile.open(blobs_tar, "r:gz") as archive:
                 archive.extractall(temp, filter="data")
@@ -156,6 +172,7 @@ def main():
             "restored_table_count": len(counts),
             "counts": counts,
             "verified_blob_objects": len(expected),
+            "blob_manifest_source": "restored PostgreSQL snapshot (pg_dump -Fc)",
             "database_archive_sha256": sha256_file(dump),
             "blob_archive_sha256": sha256_file(blobs_tar),
             "completed_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
