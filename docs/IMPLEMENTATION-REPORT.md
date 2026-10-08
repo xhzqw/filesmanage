@@ -185,3 +185,48 @@ security E2E 31/31, `/search` page browser-verified, viewport timings recorded.
 | S20 logo | BLOCKED (BLK-01: official asset not delivered; explicit placeholder) |
 | S21 DOCX editing | §M5 + §M7 PE10 |
 | S22 CAD preview | §M5 + §M7 PE11 + `scripts/mc_cad_e2e.py` (47/47; IGES sample tooling absent) |
+
+---
+
+## DO01–DO14 traceability (DOCX editing, SPEC §19)
+
+API/callback-level items are covered by Go unit tests and the executable
+scripts; formatting-fidelity items were verified in M5 inside the real
+ONLYOFFICE editor (screenshot evidence in TEST-EVIDENCE §M5).
+
+| Item | Evidence |
+|---|---|
+| DO01 edit → valid DOCX, old SHA unchanged | M5 real-editor E2E (v2 bytes re-opened, original text intact); `office_session_check.py` (12/12) |
+| DO02 bold/italic/size/color/underline fidelity | M5 real-editor verification (ONLYOFFICE native formatting) |
+| DO03 lists/alignment/heading changes | M5 real-editor verification |
+| DO04 tables and images survive edits | M5 real-editor verification |
+| DO05 header/footer/pagination compatibility report | **OPEN** — no sample carrying headers/footers has been run; recorded, not claimed |
+| DO06 long document + concurrent readers | `office_session_check.py` (5/10-session runs); PE10 measurements |
+| DO07 A edits while B reads the committed version | M5 + `TestEditLockLifecycle`/`TestLockExpiryTakeover` |
+| DO08 close and force-save callbacks, no duplicate versions | `TestEditorCallbackIdempotencyAndConflict` |
+| DO09 callback replay/restart/bad signature | `TestJWTRejectsTampering` + `TestEditorCallbackIdempotencyAndConflict` |
+| DO10 approval-directory save → pending, preview stays old | M4 `TestApprovalWorkflow` + `s_matrix_e2e.py` |
+| DO11 rejection leaves the current version, lock recovers | M4 `TestApprovalRejectKeepsCurrentVersion` |
+| DO12 late callback after delete/revoke/version change | `TestEditorCallbackIdempotencyAndConflict` (conflict paths) + `m7_security_e2e.py` revocation immediacy |
+| DO13 forged URL / redirect / ZIP bomb | `TestJWTRejectsTampering`, source-token rejection tests, SSRF-pinned download host (code-level, M5) |
+| DO14 two tabs / lock expiry / save retry, no double commit | `TestEditorCallbackIdempotencyAndConflict` + idempotency replay pattern proven in `rb_rollback_e2e.py` |
+
+## AG01–AG16 traceability (architecture gate, SPEC §23)
+
+| Item | Evidence |
+|---|---|
+| AG01/02 domain free of Gin/pgx; application free of the postgres adapter | `scripts/check_architecture.py` import-graph scan (71 Go files) |
+| AG03 no SQL in handlers | same scan |
+| AG04 shared does not import pages | same scan (41 TS modules) |
+| AG05 services unit-testable with fakes | the whole `go test ./...` suite runs on `memoryRepo` without HTTP or PostgreSQL |
+| AG06 repo integration tests on isolated PostgreSQL | `scripts/integration_acl.sql`, `scripts/integration_versions.sql`, perf-DB drills |
+| AG07 multi-table transaction rollback | service tests + integration SQL |
+| AG08 staged blob + DB failure leaves no ghost | staging protocol (TX-06) + `perf_upload_stress.py` (staging directory empty, no orphans) |
+| AG09 crash between commit and rename recovers | staging/reconciliation protocol; M2 evidence |
+| AG10 approval vs rollback concurrency, one winner | `TestApprovalWorkflow` single-winner + `rb_rollback_e2e.py` |
+| AG11 share revocation visible on the next request | `m7_security_e2e.py` (31/31, revocation immediacy) |
+| AG12 CAD worker saturation vs login/list p95 | PE11/PE12 measurements; worker ran under the load window — PARTIAL (a dedicated saturation run remains) |
+| AG13 editor disconnect recovery via TTL + callback | office session lifecycle tests + TTL design |
+| AG14 stale frontend requests never overwrite | PT10 A/B 409 in `pt_samples_e2e.py`; request-key/cursor fixes from M2 |
+| AG15 new APIs traceable to use cases | `docs/openapi-implemented.yaml` + the S/RB-T/PT/MC matrices above |
+| AG16 injected cross-layer import fails CI | `check_architecture.py` negative rule self-tests (fail-closed) |
