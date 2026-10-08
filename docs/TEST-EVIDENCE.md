@@ -440,6 +440,31 @@ booleans — plus hand-built STL/OBJ/MTL/GLB/PLY/3MF/DXF) and asserts:
   "no IGES writer on the target" was wrong: reader-side samples exist and are
   the correct vehicle for this acceptance item.
 
+### Model metadata panel MOD03/MOD04/MOD05 + MC05 (2026-10-09, 30/30 PASS)
+
+`scripts/mod03_meta_check.mjs` uploads samples whose geometry is known exactly
+(unit STL cube, two-cube 3MF declaring `unit="millimeter"`, one-triangle glTF
+with an external .bin) and asserts the viewer's metadata panel field by field
+against the API truth:
+
+| Field | STL cube | 3MF two cubes | glTF triangle |
+|---|---|---|---|
+| 来源格式 | STL | 3MF | GLTF |
+| 版本 | v1 (matches API) | v1 | v1 |
+| 源 SHA | matches API | matches API | matches API |
+| 单位 | 未知单位（不按毫米计算） | millimeter（声明值） | 未知单位（不按毫米计算） |
+| 尺寸（近似，三角化网格） | 1.00 × 1.00 × 1.00 | 4.00 × 1.00 × 1.00 | 1.00 × 1.00 × 0.00 |
+| 组件数 | 1 | 2 | 1 |
+| 派生 SHA / 警告 | present | present | present |
+| 三角形数 | 12 | 24 | 1 |
+
+The dimension readouts are labelled 近似（三角化网格） everywhere (MOD05: the
+system never claims B-Rep precision on a tessellated mesh), and mesh formats
+report an unknown unit rather than silently assuming millimetres (MOD04) —
+only 3MF's declared unit is shown. Regressions re-run: mod01 10/10,
+multi-asset 15/15, PE15 PASS, `go test ./...` green. Matrix: 115 PASS / 10
+PARTIAL / 1 EXTERNAL.
+
 ### Multi-resource models MC06/MC07/MC09 + a pagination boundary bug (2026-10-09, 15/15)
 
 `scripts/mc_multiasset_check.mjs` builds the multi-resource samples itself,

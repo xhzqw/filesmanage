@@ -30,8 +30,12 @@ export function ModelViewer(){
  const[status,setStatus]=useState("loading");
  const[message,setMessage]=useState("");
  const[info,setInfo]=useState<DerivativeInfo|null>(null);
+ const[fileMeta,setFileMeta]=useState<{sha256:string;versionSeq:number}|null>(null);
  const holder=useRef<HTMLDivElement>(null);
- const[stats,setStats]=useState<{triangles:number;vertices:number}|null>(null);
+ const[metrics,setMetrics]=useState<{triangles:number;vertices:number;size:[number,number,number];components:number}|null>(null);
+ // Mesh formats carry no unit; only 3MF declares one in its model XML. The
+ // viewer must never silently assume millimetres (MOD04).
+ const[unit,setUnit]=useState("unknown");
  const[layers,setLayers]=useState<{name:string;visible:boolean}[]>([]);
  const dxfRoot=useRef<import("three").Group|null>(null);
 
@@ -58,6 +62,14 @@ export function ModelViewer(){
      derivative=data as unknown as DerivativeInfo;
     }
     setInfo(derivative);
+    // The metadata panel (MOD03) shows the source digest and the real version,
+    // which live on the file rather than the derivative.
+    try{
+     const meta=await fileApi.meta(id);
+     if(valid)setFileMeta({sha256:meta.file.sha256,versionSeq:meta.file.currentVersionSeq});
+    }catch{
+     if(valid)setFileMeta(null);
+    }
     if(!derivative.found||derivative.class==="licensed"||derivative.class==="unverified"){
      setStatus("unsupported");
      return;
@@ -106,6 +118,7 @@ export function ModelViewer(){
     const buffer=await res.arrayBuffer();
     if(!valid)return;
     const format=(info?.outputKind??info?.format??"stl").toLowerCase();
+    setUnit(declaredUnit(buffer,format));
     let object:import("three").Object3D;
     if(format==="dxf"){
      const parsed=parseDxf(new TextDecoder().decode(buffer),THREE);
@@ -119,7 +132,7 @@ export function ModelViewer(){
      const parse=await loadParser(format,THREE,resolveUrl);
      object=await parse(buffer);
     }
-    controls.current=mountScene(THREE,OrbitControls,holder.current!,object,setStats,()=>{
+    controls.current=mountScene(THREE,OrbitControls,holder.current!,object,setMetrics,()=>{
      if(valid){setStatus("webgl-lost");setMessage("浏览器 WebGL 上下文已丢失（通常是 GPU 资源被系统回收）");}
     });
     setStatus("ready");
@@ -163,7 +176,17 @@ export function ModelViewer(){
      <button type="button" className={view.projection==="orthographic"?"on":""} aria-pressed={view.projection==="orthographic"} onClick={()=>setView(v=>({...v,projection:controls.current?.toggleProjection()??v.projection}))}>{view.projection==="orthographic"?"正交投影":"透视投影"}</button>
     </div>}
     <div className="viewer-stage" ref={holder}/>
-    {stats&&<div className="toolbar"><span className="toolbar-hint">三角形 {stats.triangles} · 顶点 {stats.vertices} · 拖拽旋转 / 滚轮缩放 / 右键平移 · 工具栏可重置视角、切换坐标轴 / 网格 / 投影</span></div>}
+    {metrics&&<div className="toolbar"><span className="toolbar-hint">三角形 {metrics.triangles} · 顶点 {metrics.vertices} · 拖拽旋转 / 滚轮缩放 / 右键平移 · 工具栏可重置视角、切换坐标轴 / 网格 / 投影</span></div>}
+    {metrics&&<div className="toolbar viewer-meta" role="group" aria-label="模型元数据">
+     <span className="toolbar-hint">来源格式 {info?.format?.toUpperCase()??"-"}{info?.class==="converted"?"（服务端转换）":""}</span>
+     <span className="toolbar-hint">版本 v{fileMeta?.versionSeq??"-"}</span>
+     <span className="toolbar-hint">源 SHA {fileMeta?.sha256?.slice(0,16)??"-"}…</span>
+     <span className="toolbar-hint">单位 {unit==="unknown"?"未知单位（不按毫米计算）":unit}</span>
+     <span className="toolbar-hint">尺寸（近似，三角化网格）{metrics.size.map(v=>v.toFixed(2)).join(" × ")}</span>
+     <span className="toolbar-hint">组件数 {metrics.components}</span>
+     {info?.outputSha256&&<span className="toolbar-hint">派生 SHA {info.outputSha256.slice(0,16)}…</span>}
+     {info?.note&&<span className="toolbar-hint">警告 {info.note}</span>}
+    </div>}
    </main>
   </div>
  </div>;
@@ -171,6 +194,17 @@ export function ModelViewer(){
 
 type MeshParser=(buffer:ArrayBuffer)=>Promise<import("three").Object3D>;
 type MTLLoaderType=import("three/examples/jsm/loaders/MTLLoader.js").MTLLoader;
+
+// declaredUnit reports the only unit the system can honestly state: 3MF
+// declares it in its model XML, every other mesh format (STL/OBJ/glTF/PLY)
+// carries none, so the viewer says "unknown" instead of assuming millimetres
+// (MOD04/MOD05).
+function declaredUnit(buffer:ArrayBuffer,format:string):string{
+ if(format!=="3mf")return "unknown";
+ const head=new TextDecoder().decode(buffer.slice(0,4096));
+ const match=/unit="([^"]+)"/.exec(head);
+ return match?match[1]??"unknown":"unknown";
+}
 
 // Multi-resource models (OBJ+MTL+textures, glTF+.bin+textures) reference their
 // companions by relative name. In this system every companion is a separate
@@ -292,7 +326,7 @@ function mountScene(
  OrbitControls:typeof import("three/examples/jsm/controls/OrbitControls.js").OrbitControls,
  holder:HTMLDivElement,
  object:import("three").Object3D,
- setStats:(s:{triangles:number;vertices:number})=>void,
+ setMetrics:(m:{triangles:number;vertices:number;size:[number,number,number];components:number})=>void,
  onContextLost?:()=>void,
 ):ViewerControls{
  const scene=new THREE.Scene();
@@ -362,7 +396,19 @@ function mountScene(
    if(g.attributes.position)vertices+=g.attributes.position.count;
   }
  });
- setStats({triangles,vertices});
+ // Components: direct children that carry geometry anywhere below them. A
+ // converted STEP is one merged mesh (honest count of 1); a multi-part
+ // glTF/3MF reports its parts even when the loader nests them in groups.
+ let components=0;
+ for(const child of object.children){
+  let carries=false;
+  child.traverse(node=>{
+   if((node as import("three").Mesh).isMesh)carries=true;
+  });
+  if(carries)components++;
+ }
+ if(components===0&&triangles>0)components=1;
+ setMetrics({triangles,vertices,size:[size.x,size.y,size.z],components});
 
  let raf=0;
  const animate=()=>{raf=requestAnimationFrame(animate);controls.update();renderer.render(scene,camera);};

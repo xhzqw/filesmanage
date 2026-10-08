@@ -7,7 +7,7 @@ gaps and must be registered in `docs/OPEN-BLOCKERS.md`; `EXTERNAL` rows
 wait on customer/licence input. Run `python3 scripts/gen_acceptance_matrix.py --check`
 to fail the build on an unverified id.
 
-Status totals: **111 PASS / 14 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
+Status totals: **115 PASS / 10 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 
 ## S — 安全 / ACL / 一致性矩阵
 
@@ -78,7 +78,7 @@ Status totals: **111 PASS / 14 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 | MC02 | MC02：STEP 多组件装配树及显隐； | **PARTIAL** | gmsh 转换输出单一合并网格，无多组件装配树与零件显隐（BLK-11） |
 | MC03 | MC03：IGES 曲面件没有明显漏面和翻面； | **PASS** | OCCT 自带样本 bearing.iges → 2,148 facets / hammer.iges → 144,873 bytes，经真实 worker 转换并渲染 |
 | MC04 | MC04：IGES 不支持实体有清楚错误而不是空视图； | **PASS** | mc_cad_e2e.py：畸形 IGES 与截断 STEP 经真实 worker 均 state=failed + errorCode=CONVERT_FAILED，且不提供任何网格字节（404）；worker 新增空网格守卫，gmsh 对不可读几何退出码为 0 也会被拒 |
-| MC05 | MC05：STL ASCII/Binary 正确显示且单位未知时提示； | **PARTIAL** | STLLoader 覆盖 ASCII/Binary；单位未知提示未实现（BLK-13） |
+| MC05 | MC05：STL ASCII/Binary 正确显示且单位未知时提示； | **PASS** | mod03_meta_check.mjs 30/30：ASCII STL 渲染 12 三角形且带单位提示；STLLoader 同时覆盖 binary |
 | MC06 | MC06：OBJ + MTL + 纹理受控关联； | **PASS** | mc_multiasset_check.mjs 15/15：OBJ+MTL+PNG 三件套经 siblingResolver 解析（MTLLoader + URL modifier 映射同目录兄弟文件），渲染 12 三角形，2 个兄弟资源经 /api/files/<id>/bytes 真实拉取 |
 | MC07 | MC07：glTF + bin + textures 及 GLB 多组件； | **PASS** | mc_multiasset_check.mjs：glTF+bin+PNG 三件套渲染 1 三角形，.bin 与纹理均经兄弟文件解析拉取；绝对 URL 被拒绝（无外部请求） |
 | MC08 | MC08：PLY 受支持的点/网格类型； | **PASS** | PLYLoader 覆盖 ascii/binary 点/网格几何，浏览器实测渲染 |
@@ -118,9 +118,9 @@ Status totals: **111 PASS / 14 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 |---|---|---|---|
 | MOD01 | MOD01：旋转、平移、缩放、重置视角、适配模型、坐标轴、透视/正交投影、网格显隐。 | **PASS** | mod01_controls_check.mjs 10/10：坐标轴/网格/透视-正交切换均改变合成画面且可逆；拖拽后重置视角精确恢复初始取景（截图哈希一致）；旋转/平移/缩放由 OrbitControls 提供 |
 | MOD02 | MOD02：有装配信息时提供零件树、选中高亮、独立隐藏/显示、整体恢复和 bbox。 | **PARTIAL** | 无装配信息（转换输出单一网格），零件树/独立显隐/bbox 未实现（BLK-11） |
-| MOD03 | MOD03：显示来源格式、真实版本、源文件 SHA、单位、尺寸范围、组件数、转换日期和警告。 | **PARTIAL** | 工具栏显示格式与三角/顶点数；源 SHA、单位、尺寸范围、组件数、转换日期、警告未展示（BLK-13） |
-| MOD04 | MOD04：STL/OBJ 无单位时显示“未知单位”，不能默认为毫米再错误计算真实尺寸。 | **PARTIAL** | 未知单位提示未实现，不得默认毫米（BLK-13） |
-| MOD05 | MOD05：如果只拿到三角化网格，测量结果显示“近似”，不得宣称 B-Rep 精密量测。 | **PARTIAL** | 无测量工具；“近似”量测标注无从谈起（BLK-13） |
+| MOD03 | MOD03：显示来源格式、真实版本、源文件 SHA、单位、尺寸范围、组件数、转换日期和警告。 | **PASS** | mod03_meta_check.mjs：元数据面板展示来源格式/版本/源 SHA（与 API 一致）/尺寸/组件数/派生 SHA/警告，三类样本逐字段断言 |
+| MOD04 | MOD04：STL/OBJ 无单位时显示“未知单位”，不能默认为毫米再错误计算真实尺寸。 | **PASS** | mod03_meta_check.mjs：STL 与 glTF 显示“未知单位（不按毫米计算）”；声明 unit=millimeter 的 3MF 显示 millimeter |
+| MOD05 | MOD05：如果只拿到三角化网格，测量结果显示“近似”，不得宣称 B-Rep 精密量测。 | **PASS** | mod03_meta_check.mjs：所有尺寸读数带“近似（三角化网格）”标注，且数值与已知几何精确一致（1x1x1、4x1x1、1x1x0） |
 | MOD06 | MOD06：内嵌缩略图、loading/progress/ready/failed/retry/unsupported 状态明确，不能无限转圈。 | **PASS** | 派生状态机（queued/running/ready/failed）+ 前端 loading/error/空态；derivativeStatus 提供 errorCode |
 | MOD07 | MOD07：浏览器 WebGL 失效或文件太大时有可操作错误和允许的下载入口。 | **PASS** | mod01_controls_check.mjs：真实 webglcontextlost 监听器触发可操作错误态+下载原件入口；Fetch 域故障注入超大 Content-Length 触发 256MB 守卫+下载入口（不缓冲） |
 | MOD08 | MOD08：DOM 层级和 URL 改变时需 dispose 三维纹理、几何和事件监听，避免内存泄漏。 | **PASS** | pe15_heap_growth.mjs：20 次挂载/拆除后堆回落同一 8.6MB 地板，几何/纹理/监听/上下文已释放 |
@@ -183,11 +183,7 @@ Status totals: **111 PASS / 14 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 - `RB-T10` — 文本回滚 SHA 已验证、DOCX 经 do05；STEP/IGES 回滚后 SHA 与索引/派生重指向未断言（BLK-15）
 - `RB-T11` — blob 采纳逻辑存在；回滚后 derivatives/审计保留与在用小 GC 断言缺失（BLK-15）
 - `MC02` — gmsh 转换输出单一合并网格，无多组件装配树与零件显隐（BLK-11）
-- `MC05` — STLLoader 覆盖 ASCII/Binary；单位未知提示未实现（BLK-13）
 - `MOD02` — 无装配信息（转换输出单一网格），零件树/独立显隐/bbox 未实现（BLK-11）
-- `MOD03` — 工具栏显示格式与三角/顶点数；源 SHA、单位、尺寸范围、组件数、转换日期、警告未展示（BLK-13）
-- `MOD04` — 未知单位提示未实现，不得默认毫米（BLK-13）
-- `MOD05` — 无测量工具；“近似”量测标注无从谈起（BLK-13）
 - `AG09` — staging/对账协议存在；提交-rename 崩溃后的恢复任务未做演练（BLK-15）
 
 ## EXTERNAL 登记

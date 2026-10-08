@@ -370,3 +370,26 @@ the generated OpenAPI contract, which had documented the wrong sort enums.
 MC06/MC07/MC09 move to PASS (111 PASS / 14 PARTIAL / 1 EXTERNAL); BLK-12 is
 struck. Regressions re-run: mod01 10/10, PE15 PASS, mc_cad 78/78,
 `go test ./...` + vet green.
+
+---
+
+## BLK-13 closed: model metadata panel, honest units, approximate dimensions (2026-10-09)
+
+The viewer published only triangle/vertex counts, so a user could easily read a
+unit-less mesh as millimetres and the system could not state what it actually
+knew about a model. It now renders a metadata panel — 来源格式, 版本, 源 SHA,
+尺寸, 组件数, 派生 SHA and the format-matrix warning — and
+`scripts/mod03_meta_check.mjs` verifies every field against the API on three
+samples with exactly known geometry (unit STL cube, two-cube 3MF declaring
+millimetre, one-triangle glTF): 30/30.
+
+Two honesty rules are now enforced by construction and asserted by the check:
+mesh formats report 未知单位（不按毫米计算） — only a 3MF's declared unit is
+shown — and every dimension readout carries 近似（三角化网格）, so the system
+never claims B-Rep precision it does not have (MOD04/MOD05). Component counts
+are computed from the parsed scene (a converted STEP honestly reports 1, the
+two-part 3MF reports 2).
+
+MC05/MOD03/MOD04/MOD05 move to PASS (115 PASS / 10 PARTIAL / 1 EXTERNAL);
+BLK-13 is struck. Regressions re-run: mod01 10/10, multi-asset 15/15, PE15
+PASS, `go test ./...` green.

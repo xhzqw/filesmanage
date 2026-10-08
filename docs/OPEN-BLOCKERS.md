@@ -1,6 +1,6 @@
 # Open blockers
 
-Status date: 2026-10-09 (BLK-12, BLK-14 and BLK-16 closed; matrix now 111 PASS / 14 PARTIAL / 1 EXTERNAL). Remaining PARTIAL ids are registered as BLK-11, BLK-13, BLK-15 (plus S12/S20 folded into BLK-05/BLK-01).
+Status date: 2026-10-09 (BLK-12, BLK-13, BLK-14 and BLK-16 closed; matrix now 115 PASS / 10 PARTIAL / 1 EXTERNAL). Remaining PARTIAL ids are registered as BLK-11 and BLK-15 (plus S12/S20 folded into BLK-05/BLK-01).
 
 | ID | Blocker | Impact | Needed from customer / next probe |
 |---|---|---|---|
@@ -18,7 +18,7 @@ Status date: 2026-10-09 (BLK-12, BLK-14 and BLK-16 closed; matrix now 111 PASS /
 
 | BLK-11 | STEP 多组件装配树与零件显隐未实现（MC02, MOD02）：gmsh 转换输出单一合并网格，查看器无零件树/独立显隐/bbox | 机械装配类文件只能整体查看，不能按组件隐藏/高亮 | 转换器保留组件边界（按 gmsh physical group 输出多 mesh 或改用 OCCT XCAF 路径），查看器增加零件树 |
 | ~~BLK-12~~ | 材质/纹理关联未实现（MC06 OBJ+MTL、MC07 glTF 外部 .bin/textures、MC09 3MF 多部件材质） | RESOLVED | `scripts/mc_multiasset_check.mjs` 15/15：siblingResolver（MTLLoader + LoadingManager URL modifier）把相对资源映射到同目录兄弟文件，三类多样资源样本全部按预期三角形数渲染，兄弟资源真实拉取，无外部请求 |
-| BLK-13 | 单位提示与量测标注未实现（MC05, MOD03, MOD04, MOD05）：查看器只有格式与三角/顶点数，无源 SHA/尺寸范围/组件数/转换日期，无“未知单位”提示，无测量工具与“近似”标注 | 用户可能把无单位网格误当毫米并误判真实尺寸 | 模型元数据面板 + 未知单位提示 + 近似量测标注 |
+| ~~BLK-13~~ | 单位提示与量测标注未实现（MC05, MOD03, MOD04, MOD05） | RESOLVED | `scripts/mod03_meta_check.mjs` 30/30：元数据面板（格式/版本/源 SHA/尺寸/组件数/派生 SHA/警告，SHA 与版本逐字段对 API 断言）；STL 与 glTF 显示“未知单位（不按毫米计算）”，声明单位的 3MF 显示原值；尺寸一律带“近似（三角化网格）”标注 |
 | ~~BLK-14~~ | 查看器控制面不完整（MOD01, MOD07） | RESOLVED | `scripts/mod01_controls_check.mjs` 10/10：控件全部实现并经 CDP 实测（切换改变画面且可逆、重置视角精确恢复初始取景）；WebGL 丢失与超大文件均有可操作错误 + 下载入口 |
 | BLK-15 | 回滚/并发/崩溃恢复边角断言缺失（RB-T06, RB-T07, RB-T08, RB-T10, RB-T11, AG09）：双用户并发回滚、审批目录回滚 pending、拒绝/重复审批下的 rollback 版本、STEP/IGES 回滚后 SHA 与索引/派生重指向、回滚后 GC 不删在用 blob、提交-rename 崩溃恢复演练均无端到端断言 | 追加式回滚在并发与审批交汇处只有间接证据 | rb_rollback_e2e.py 增加并发回滚与审批目录回滚用例；补 STEP/IGES 回滚 SHA 与派生重指向断言；做一次崩溃恢复演练 |
 | ~~BLK-16~~ | CAD 负向路径断言缺失（MC04, MC14, MC16, MC17, MOD10） | RESOLVED | mc_cad_e2e.py 78/78：畸形输入明确失败（worker 空网格守卫）、并发转换收敛单一 derivative、pending 期间派生保持旧版、外部纹理不抓取、恶意文件名被拒、损坏 zip 不解压 |
@@ -29,6 +29,8 @@ Status date: 2026-10-09 (BLK-12, BLK-14 and BLK-16 closed; matrix now 111 PASS /
 
 - ~~多样资源模型（OBJ+MTL、glTF+bin/贴图、3MF 多部件）不解析~~ → BLK-12 closed: siblingResolver maps relative references onto sibling files through the API (MTLLoader + LoadingManager URL modifier), verified by `scripts/mc_multiasset_check.mjs` (15/15).
 - ~~文件列表 limit=200 文档最大值返回 400~~ → repository guard was off by one against the service's page+1 lookahead; fixed with a shared `ports.MaxFilePage` constant, a Go boundary test (`TestListFilesAcceptsMaxPageSize`) and HTTP-level checks in `s_matrix_e2e.py` (35/35). Found by the multi-resource work; the OpenAPI sort enums were also wrong and are now corrected.
+
+- ~~无单位提示/元数据面板/近似量测标注~~ → BLK-13 closed: the viewer publishes a metadata panel (format, version, source SHA, dimensions, component count, derivative SHA, warnings), reports 未知单位 for every mesh format instead of assuming millimetres (only 3MF's declared unit is shown), and labels every dimension readout 近似（三角化网格）; verified field-by-field against the API by `scripts/mod03_meta_check.mjs` (30/30).
 
 Resolved this milestone:
 - ~~Folder-filtered search/stats/export could bypass the visibility scope~~ → scope intersection + placeholder fix, 31/31 E2E.
