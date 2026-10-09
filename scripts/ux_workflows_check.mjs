@@ -514,7 +514,169 @@ class CDP {
       await delay(250);
     }
   }
+  async key(key, code, vk, modifiers = 0) {
+    await this.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, modifiers });
+    await this.send("Input.dispatchKeyEvent", { type: "keyUp", key, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, modifiers });
+  }
   close() { this.ws.close(); }
+}
+
+// ================= MOVEUI suite (WF-01..06 through the real UI) =================
+async function moveUiSuite() {
+  const stamp = String(Date.now());
+  const tree = await call("GET", "/api/folders/tree");
+  const root = (tree.body?.data ?? []).find((f) => !f.parentId);
+  const mk = async (name) => (await call("POST", "/api/folders", { name, parentId: root.id })).body?.data?.id;
+  const srcId = await mk(`MV-SRC-${stamp}`);
+  const dstId = await mk(`MV-DST-${stamp}`);
+  const otherId = await mk(`MV-OTHER-${stamp}`);
+  const childId = await mk(`MV-CHILD-${stamp}`);
+  await call("POST", "/api/folders", { name: `MV-GRAND-${stamp}`, parentId: childId });
+  const uploadKeyed = async (folder, name) => {
+    const form = new FormData();
+    form.set("folderId", folder);
+    form.set("file", new Blob([`mv ${name} ${stamp}\n`]), name);
+    form.set("idempotencyKey", `${folder}-${name}-${stamp}`);
+    return (await (await fetch(`${BASE}/api/files`, { method: "POST", headers: { Origin: ORIGIN, Cookie: sessionCookie }, body: form })).json()).data;
+  };
+  const file = await uploadKeyed(srcId, "mv-file.txt");
+  await uploadKeyed(dstId, "mv-dup.txt");
+  await uploadKeyed(srcId, "mv-dup.txt");
+
+  let chrome = null;
+  let cdp = null;
+  try {
+    chrome = spawn("/usr/bin/google-chrome", [
+      "--headless=new", `--remote-debugging-port=${PORT}`, "--no-sandbox",
+      "--disable-gpu", "--window-size=1440,900", "about:blank",
+    ], { stdio: "ignore" });
+    await delay(1500);
+    const targets = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
+    const page = targets.find((t) => t.type === "page");
+    cdp = await CDP.connect(page.webSocketDebuggerUrl);
+    await cdp.send("Page.enable");
+    await cdp.send("Runtime.enable");
+    await cdp.send("Page.bringToFront");
+    await cdp.send("Emulation.setFocusEmulationEnabled", { enabled: true });
+
+    await cdp.navigate(`${BASE}/login`);
+    await cdp.waitFor(`()=>!!document.querySelector('input[type=password]')`, 15000);
+    await cdp.evaluate(`(()=>{
+      const set=(el,v)=>{const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));};
+      const fields=[...document.querySelectorAll('input')];
+      const user=fields.find(f=>f.type==='text'||f.type==='email'||(!f.type&&f.offsetParent!==null));
+      const pass=document.querySelector('input[type=password]');
+      if(user)set(user,'admin');
+      if(pass)set(pass,${JSON.stringify(password)});
+      [...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='登录')?.click();return true;})()`);
+    await cdp.waitFor(`()=>location.pathname==='/doc'||location.pathname==='/first-sign-in'`);
+    await cdp.navigate(`${BASE}/doc?folder=${srcId}`);
+    const rowsReady = await cdp.waitFor(`()=>document.querySelectorAll('tbody tr[data-id]').length>=2`);
+    check("source folder files listed", Boolean(rowsReady), String(rowsReady));
+
+    const picker = (fn) => cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));${fn};})()`);
+    // The picker tree starts collapsed, so targets are chosen through the
+    // search box (also exercising the contract's search clause).
+    const searchSelect = async (name) => {
+      await picker(`const input=d.querySelector('.folder-picker-search');const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;set.call(input,${JSON.stringify(name)});input.dispatchEvent(new Event('input',{bubbles:true}));return true;`);
+      await delay(400);
+      const clicked = await picker(`const btn=[...d.querySelectorAll('.folder-picker-result')].find(b=>b.textContent?.includes(${JSON.stringify(name)}));btn?.click();return Boolean(btn);`);
+      await delay(300);
+      return clicked;
+    };
+
+    // WF-01: row menu -> 移动到… opens the picker
+    await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr[data-id]')].find(r=>r.textContent?.includes('mv-file.txt'));row?.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:100,clientY:100}));return Boolean(row);})()`);
+    await cdp.waitFor(`()=>document.querySelector('[role=menu]')!==null`);
+    const hasMove = await cdp.evaluate(`(()=>[...document.querySelectorAll('[role=menuitem]')].some(b=>b.textContent?.trim()==='移动到…'))()`);
+    check("WF-01 row menu offers 移动到…", hasMove === true, String(hasMove));
+    await cdp.evaluate(`(()=>{const item=[...document.querySelectorAll('[role=menuitem]')].find(b=>b.textContent?.trim()==='移动到…');item?.click();return Boolean(item);})()`);
+    const pickerOpen = await cdp.waitFor(`()=>[...document.querySelectorAll('dialog.dialog')].some(d=>d.open&&d.querySelector('.folder-picker'))`, 8000);
+    check("WF-01 picker dialog opens with the visible tree", pickerOpen === true, String(pickerOpen));
+
+    // WF-02: the file's own folder is an invalid target with a reason
+    const ownPicked = await searchSelect(`MV-SRC-${stamp}`);
+    const invalidShown = await picker(`return d.textContent?.includes('文件已在该目录')||false;`);
+    check("WF-02 own folder is invalid with a reason", ownPicked === true && invalidShown === true, `picked=${ownPicked} reason=${invalidShown}`);
+
+    // WF-03: pick a clean target, preflight, commit
+    const dstPicked = await searchSelect(`MV-DST-${stamp}`);
+    const candidate = await picker(`return d.querySelector('.folder-picker-candidate')?.textContent||'';`);
+    check("candidate shows the full visible path", dstPicked === true && candidate.includes(`MV-DST-${stamp}`), String(candidate));
+    let btn = await picker(`const b=[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='检查并继续');return b?{disabled:b.disabled}:null;`);
+    check("检查并继续 enabled with a candidate", btn && btn.disabled === false, JSON.stringify(btn));
+    await picker(`[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='检查并继续')?.click();return true;`);
+    const ready = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));const b=d?[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='确认移动'):null;return b&&!b.disabled?true:false;}`, 15000);
+    check("WF-03 preflight ready enables 确认移动", ready === true, String(ready));
+    // WF-05: switching the target invalidates the previous preflight
+    await searchSelect(`MV-OTHER-${stamp}`);
+    btn = await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));const b=d?[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='确认移动'):null;return b?{disabled:b.disabled}:null;})()`);
+    check("WF-05 switching target re-disables 确认移动", btn && btn.disabled === true, JSON.stringify(btn));
+    await searchSelect(`MV-DST-${stamp}`);
+    await picker(`[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='检查并继续')?.click();return true;`);
+    await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));const b=d?[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='确认移动'):null;return b&&!b.disabled?true:false;}`, 15000);
+    await picker(`[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='确认移动')?.click();return true;`);
+    const moved = await cdp.waitFor(`()=>![...document.querySelectorAll('dialog.dialog')].some(d=>d.open&&d.querySelector('.folder-picker'))`, 20000);
+    check("WF-03 dialog closes after commit", moved === true, String(moved));
+    let list = await call("GET", `/api/files?folder=${dstId}&limit=200`);
+    check("WF-03 file is in the target folder", (list.body?.data?.items ?? []).some((f) => f.name === "mv-file.txt"), "");
+    list = await call("GET", `/api/files?folder=${srcId}&limit=200`);
+    check("WF-03 file left the source folder", !(list.body?.data?.items ?? []).some((f) => f.name === "mv-file.txt"), "");
+
+    // WF-05/conflict: the duplicate name must be reported by the preflight
+    await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr[data-id]')].find(r=>r.textContent?.includes('mv-dup.txt'));row?.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:100,clientY:100}));return Boolean(row);})()`);
+    await cdp.waitFor(`()=>document.querySelector('[role=menu]')!==null`);
+    await cdp.evaluate(`(()=>{const item=[...document.querySelectorAll('[role=menuitem]')].find(b=>b.textContent?.trim()==='移动到…');item?.click();return Boolean(item);})()`);
+    await cdp.waitFor(`()=>[...document.querySelectorAll('dialog.dialog')].some(d=>d.open&&d.querySelector('.folder-picker'))`, 8000);
+    await searchSelect(`MV-DST-${stamp}`);
+    await picker(`[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='检查并继续')?.click();return true;`);
+    const conflictNotice = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));return d&&(d.textContent?.includes('同名')||d.textContent?.includes('冲突'))?d.textContent:false;}`, 15000);
+    check("WF-05 name conflict reported, no silent commit", Boolean(conflictNotice), String(conflictNotice).slice(0, 120));
+    const confirmLocked = await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));const b=d?[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='确认移动'):null;return b?b.disabled:'no-button';})()`);
+    check("WF-05 conflict keeps 确认移动 disabled", confirmLocked === true, String(confirmLocked));
+    await cdp.key("Escape", "Escape", 27);
+    await delay(300);
+
+    // WF-04: folder move through the tree node menu
+    await cdp.evaluate(`(()=>{const li=document.querySelector('li[data-folder-id="${childId}"]');li?.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:80,clientY:400}));return Boolean(li);})()`);
+    await cdp.waitFor(`()=>document.querySelector('[role=menu]')!==null`);
+    const treeMove = await cdp.evaluate(`(()=>[...document.querySelectorAll('[role=menuitem]')].some(b=>b.textContent?.trim()==='移动到…'))()`);
+    check("WF-04 tree node menu offers 移动到…", treeMove === true, String(treeMove));
+    await cdp.evaluate(`(()=>{const item=[...document.querySelectorAll('[role=menuitem]')].find(b=>b.textContent?.trim()==='移动到…');item?.click();return Boolean(item);})()`);
+    const folderPicker = await cdp.waitFor(`()=>[...document.querySelectorAll('dialog.dialog')].some(d=>d.open&&d.querySelector('.folder-picker'))`, 8000);
+    check("WF-04 folder picker opens", folderPicker === true, String(folderPicker));
+    await picker(`const li=d.querySelector('li[data-folder-id="${childId}"]');li?.querySelector('.folder-picker-name')?.click();return true;`);
+    await delay(300);
+    const selfReason = await picker(`return d.textContent||'';`);
+    check("WF-02 self target disabled with a reason", selfReason.includes("自身"), String(selfReason).slice(0, 100));
+    await picker(`const li=d.querySelector('li[data-folder-id="${otherId}"]');li?.querySelector('.folder-picker-name')?.click();return Boolean(li);`);
+    await delay(300);
+    await picker(`[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='确认移动')?.click();return true;`);
+    const folderMoved = await cdp.waitFor(`()=>![...document.querySelectorAll('dialog.dialog')].some(d=>d.open&&d.querySelector('.folder-picker'))`, 20000);
+    check("WF-04 folder move commits and closes", folderMoved === true, String(folderMoved));
+    const treeAfter = await call("GET", "/api/folders/tree");
+    const movedFolder = (treeAfter.body?.data ?? []).find((f) => f.id === childId);
+    check("WF-04 folder reparented server-side", movedFolder?.parentId === otherId, JSON.stringify(movedFolder));
+    const grand = (treeAfter.body?.data ?? []).find((f) => f.name === `MV-GRAND-${stamp}`);
+    check("WF-04 subtree intact", grand?.parentId === childId, JSON.stringify(grand));
+  } finally {
+    cdp && cdp.close();
+    chrome && chrome.kill("SIGKILL");
+  }
+
+  const treeAfter = await call("GET", "/api/folders/tree");
+  for (const f of treeAfter.body?.data ?? []) {
+    if (String(f.name).includes("MV-") && String(f.name).includes(stamp)) {
+      await call("DELETE", `/api/folders/${f.id}`);
+    }
+  }
+  const trash = await call("GET", "/api/trash");
+  for (const entry of trash.body?.data ?? []) {
+    const name = String(entry.name ?? entry.oldName ?? "");
+    if ((name.includes("MV-") && name.includes(stamp)) || name.startsWith("mv-")) {
+      await call("DELETE", "/api/trash/" + entry.id);
+    }
+  }
 }
 
 async function main() {
@@ -539,6 +701,7 @@ async function main() {
     catch (err) { check(`${label} suite completed`, false, String(err?.message ?? err)); }
   };
   await runSuite("MOVE", moveSuite);
+  await runSuite("MOVEUI", moveUiSuite);
   await runSuite("WORKFLOW", workflowSuite);
   await runSuite("SAFE-EDIT", safeEditSuite);
 
