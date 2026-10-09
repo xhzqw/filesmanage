@@ -151,8 +151,9 @@ perf 实例停止时运行**：perf 实例与 dev 实例共享 CPU 与同一台 
 | UX 桌面交互 | `node scripts/ux_desktop_check.mjs` | 待远端复跑确认 |
 | UX 业务闭环 | `node scripts/ux_workflows_check.mjs` | 待远端复跑确认 |
 | UX 视觉与 a11y | `node scripts/ux_visual_check.mjs` | 待远端复跑确认（截图落 `docs/evidence/ux/`） |
+| UX 性能实测 | `node scripts/ux_perf_check.mjs` | 待远端复跑确认（advisory 阈值，见下） |
 
-新增的三条 UX 门禁（`UX-ACCEPTANCE-v1` §8/G5、`docs/design/UX-ACCEPTANCE-v1.md` §9）
+新增的四条 UX 门禁（`UX-ACCEPTANCE-v1` §8/G5、`docs/design/UX-ACCEPTANCE-v1.md` §9）
 独立于浏览器旅程/业务界面门禁，不削减既有覆盖，状态在**同一提交的远端复跑确认前不得记
 PASS**：
 
@@ -160,15 +161,22 @@ PASS**：
   文件选择控制器（DI-01..08）、目录树键盘合同（DI-12..15）、右键菜单与拖放上传队列
   （DI-03/05/17），共 89 项检查。
 - `ux_workflows_check.mjs`：文件移动 + 预检 API（含幂等/CAS/同名冲突/404 语义）、
-  回滚/回收站恢复/审批意见 UI 闭环、纯文本安全编辑字节保真，共 41 项检查。
+  经 FolderPicker 的文件/目录移动 UI（WF-01..06）、回滚/回收站恢复/审批意见 UI 闭环、
+  纯文本安全编辑字节保真，共 60 项检查。
 - `ux_visual_check.mjs`：1366×768 / 1440×900 / 1920×1080 三视口遍历
   `/doc`、`/trash`、`/org`、`/approvals`、`/preview/:id`，断言无横向溢出、主操作在视口内、
   表格与面包屑可达，PNG 落盘 `docs/evidence/ux/<route>-<viewport>.png`，并断言 `/doc`
   的 grid/tree/shell 可访问性元数据，共 51 项检查。
+- `ux_perf_check.mjs`：在**自建隔离夹具**（61 目录子树 / 200 文件目录 / 两文件夹快速切换）
+  上实测行单击选择、右键菜单、目录树键盘漫游、游标分页、快速切目录、上传中键盘响应的
+  p50/p95 与长任务/CPU/堆记录，并输出 DOM 节点计数。合同 §7 的阈值是**建议值**：只以
+  advisory 行打印，不作为失败条件；检查仅在缺样本、无反馈、分页重复、视图串流或 DOM
+  无界增长时失败。PERF-05/07 需全量数据集与 CAD 场景，明确 SKIP 并打印原因。
 
-三条命令均默认读取 `.secrets/admin.password`，可用 `--base`、`--password-file`、`--port`
-覆盖（默认端口 9360/9361/9362）；运行期间会临时创建时间戳夹具并自行清理。
-`ux_visual_check.mjs` 需要仓库目录可写（创建 `docs/evidence/ux/`）。
+四条命令均默认读取 `.secrets/admin.password`，可用 `--base`、`--password-file`、`--port`
+覆盖（默认端口 9360/9361/9362/9363）；运行期间会临时创建时间戳夹具并自行清理。
+`ux_visual_check.mjs` 需要仓库目录可写（创建 `docs/evidence/ux/`）；`ux_perf_check.mjs`
+会创建约 205 个上传文件与一个 12 MiB 上传任务并在结束后删除，单次运行约 2–5 分钟。
 
 需要会话 Cookie 的门禁：`curl -s -c /tmp/c.txt -X POST http://127.0.0.1:18091/api/login
 -H 'Content-Type: application/json' -d "{\"login\":\"admin\",\"password\":\"$(cat .secrets/admin.password)\"}"`

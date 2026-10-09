@@ -4258,7 +4258,6 @@ components:
           enum:
           - user
           - group
-          - department
         subjectId:
           type: string
         actions:
@@ -4266,15 +4265,15 @@ components:
           items:
             type: string
             enum:
-            - view
-            - download
+            - list
+            - preview
             - upload
-            - edit
+            - download
+            - modify
             - delete
-            - share
-            - manage
-            - restore
-            - purge
+            - rename
+            - move
+            - print
         scopeOnly:
           type: boolean
           description: When true the grant does not inherit into child folders.
@@ -4397,7 +4396,6 @@ components:
           enum:
           - user
           - group
-          - department
         recipientId:
           type: string
         recipientName:
@@ -4407,15 +4405,9 @@ components:
           items:
             type: string
             enum:
-            - view
+            - list
+            - preview
             - download
-            - upload
-            - edit
-            - delete
-            - share
-            - manage
-            - restore
-            - purge
         includeDescendants:
           type: boolean
         createdBy:
@@ -4848,7 +4840,6 @@ components:
           enum:
           - user
           - group
-          - department
         subjectId:
           type: string
         actions:
@@ -4856,15 +4847,15 @@ components:
           items:
             type: string
             enum:
-            - view
-            - download
+            - list
+            - preview
             - upload
-            - edit
+            - download
+            - modify
             - delete
-            - share
-            - manage
-            - restore
-            - purge
+            - rename
+            - move
+            - print
         scopeOnly:
           type: boolean
         expiresAt:
@@ -5108,7 +5099,6 @@ components:
           enum:
           - user
           - group
-          - department
         recipientId:
           type: string
         actions:
@@ -5116,15 +5106,9 @@ components:
           items:
             type: string
             enum:
-            - view
+            - list
+            - preview
             - download
-            - upload
-            - edit
-            - delete
-            - share
-            - manage
-            - restore
-            - purge
         includeDescendants:
           type: boolean
           description: Folder shares only.

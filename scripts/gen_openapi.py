@@ -102,7 +102,11 @@ def query(name, desc, schema=None, required=False):
     }
 
 
-ACTIONS_ENUM = ["view", "download", "upload", "edit", "delete", "share", "manage", "restore", "purge"]
+# Action vocabularies as the services actually enforce them: grants accept every
+# domain action (internal/domain/types.go AllowedAction), shares only the
+# read-only triple (internal/application/collaboration.go CreateShare).
+GRANT_ACTIONS = ["list", "preview", "upload", "download", "modify", "delete", "rename", "move", "print"]
+SHARE_ACTIONS = ["list", "preview", "download"]
 
 # --------------------------------------------------------------------------
 # Component schemas (mirrors of internal/httpx payload builders)
@@ -172,9 +176,9 @@ schema("FilePage", obj({"items": arr(ref("File")), "nextCursor": string("Opaque 
 schema("Grant", obj({
     "id": string(),
     "folderId": string(),
-    "subjectKind": string(enum=["user", "group", "department"]),
+    "subjectKind": string(enum=["user", "group"]),
     "subjectId": string(),
-    "actions": arr(string(enum=ACTIONS_ENUM)),
+    "actions": arr(string(enum=GRANT_ACTIONS)),
     "scopeOnly": boolean("When true the grant does not inherit into child folders."),
     "grantedBy": string(),
     "grantedByName": string(),
@@ -215,10 +219,10 @@ schema("Approval", obj({
 
 schema("Share", obj({
     "id": string(),
-    "recipientKind": string(enum=["user", "group", "department"]),
+    "recipientKind": string(enum=["user", "group"]),
     "recipientId": string(),
     "recipientName": string(),
-    "actions": arr(string(enum=ACTIONS_ENUM)),
+    "actions": arr(string(enum=SHARE_ACTIONS)),
     "includeDescendants": boolean(),
     "createdBy": string(),
     "createdAt": timestamp(),
@@ -355,9 +359,9 @@ schema("RenameFolderRequest", obj({"name": string()}, required=["name"]))
 schema("MoveFolderRequest", obj({"targetParentId": string()}, required=["targetParentId"]))
 
 schema("CreateGrantRequest", obj({
-    "subjectKind": string(enum=["user", "group", "department"]),
+    "subjectKind": string(enum=["user", "group"]),
     "subjectId": string(),
-    "actions": arr(string(enum=ACTIONS_ENUM)),
+    "actions": arr(string(enum=GRANT_ACTIONS)),
     "scopeOnly": boolean(),
     "expiresAt": timestamp("Optional grant expiry."),
 }, required=["subjectKind", "subjectId", "actions"]))
@@ -428,9 +432,9 @@ schema("SetApprovalPolicyRequest", obj({"approverId": string(), "enabled": boole
 schema("CreateShareRequest", obj({
     "resourceKind": string(enum=["file", "folder"]),
     "resourceId": string(),
-    "recipientKind": string(enum=["user", "group", "department"]),
+    "recipientKind": string(enum=["user", "group"]),
     "recipientId": string(),
-    "actions": arr(string(enum=ACTIONS_ENUM)),
+    "actions": arr(string(enum=SHARE_ACTIONS)),
     "includeDescendants": boolean("Folder shares only."),
     "expiresAt": timestamp(),
 }, required=["resourceKind", "resourceId", "recipientKind", "recipientId", "actions"]))
