@@ -85,6 +85,18 @@ type AuditEvent struct {
 	Details    map[string]any
 }
 
+// PermissionAuditRecord is the bounded admin-only access change projection.
+type PermissionAuditRecord struct {
+	ID         int64          `json:"id"`
+	ActorID    string         `json:"actorId"`
+	EventType  string         `json:"eventType"`
+	TargetKind string         `json:"targetKind"`
+	TargetID   string         `json:"targetId"`
+	Outcome    string         `json:"outcome"`
+	Details    map[string]any `json:"details"`
+	CreatedAt  time.Time      `json:"createdAt"`
+}
+
 type Action string
 
 const (

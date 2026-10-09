@@ -417,6 +417,30 @@ schema("CreateGrantRequest", obj({
     "expiresAt": timestamp("Optional grant expiry."),
 }, required=["subjectKind", "subjectId", "actions"]))
 
+schema("PermissionSource", obj({
+    "kind": string(enum=["direct_acl", "inherited_acl", "workgroup_acl", "folder_share", "admin_override"]),
+    "resourceId": string(), "grantId": string(),
+    "subjectKind": string(), "subjectId": string(),
+    "actions": arr(string(enum=GRANT_ACTIONS)), "scopeOnly": boolean(),
+    "depth": integer(), "expiresAt": timestamp(),
+}, required=["kind", "resourceId", "actions", "scopeOnly", "depth"]))
+
+schema("PermissionExplanation", obj({
+    "subjectKind": string(enum=["user"]), "subjectId": string(), "folderId": string(),
+    "subjectDisabled": boolean(), "effectiveActions": arr(string(enum=GRANT_ACTIONS)),
+    "sources": arr(ref("PermissionSource")), "evaluatedAt": timestamp(),
+}, required=["subjectKind", "subjectId", "folderId", "subjectDisabled", "effectiveActions", "sources", "evaluatedAt"]))
+
+schema("PermissionAuditEntry", obj({
+    "id": integer(), "actorId": string(), "eventType": string(), "targetKind": string(),
+    "targetId": string(), "outcome": string(), "details": {"type": "object"},
+    "createdAt": timestamp(),
+}, required=["id", "actorId", "eventType", "targetKind", "targetId", "outcome", "details", "createdAt"]))
+
+schema("PermissionAuditPage", obj({
+    "items": arr(ref("PermissionAuditEntry")), "nextCursor": string(),
+}, required=["items", "nextCursor"]))
+
 schema("SaveFileRequest", obj({
     "data": string("Raw base64 body or a data: URL; bytes are written verbatim."),
     "baseSeq": integer("Optimistic concurrency base version.", minimum=1),
@@ -665,6 +689,21 @@ add("POST", "/api/folders/{id}/acls", operation("Grant actions to a subject", "G
 add("DELETE", "/api/acls/{id}", operation("Revoke a grant", "Grants", "revokeGrant", security=SESSION,
     params=[id_param("id", "Grant id.")],
     responses=dict([json_ok(obj({"revoked": string()}, required=["revoked"]), "Revoked grant id."), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"])])))
+
+add("POST", "/api/permissions/explain", operation("Explain user's effective folder permissions (admin only)", "Grants", "explainPermissions", security=SESSION,
+    request={"application/json": {"schema": obj({
+        "subjectKind": string(enum=["user"]), "subjectId": string(), "folderId": string(),
+    }, required=["subjectKind", "subjectId", "folderId"])}},
+    responses=dict([json_ok(ref("PermissionExplanation"), "Effective actions and applied sources from the authoritative resolver."),
+                    resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"])]),
+    auth_note=MUST_CHANGE))
+
+add("GET", "/api/permissions/audit", operation("Read paged permission-change audit (admin only)", "Grants", "permissionAudit", security=SESSION,
+    params=[query("cursor", "Descending numeric audit id before which to read."),
+            query("limit", "Rows per page, 1-100 (default 30).", integer(minimum=1))],
+    responses=dict([json_ok(ref("PermissionAuditPage"), "Only access-changing events, descending audit id."),
+                    resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"])]),
+    auth_note=MUST_CHANGE))
 
 # --- Files ---
 add("POST", "/api/files", operation("Upload a file (multipart, idempotent)", "Files", "uploadFile", security=SESSION,

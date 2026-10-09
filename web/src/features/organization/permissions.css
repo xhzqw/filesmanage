@@ -1,6 +1,10 @@
 /* Resource ACL workspace: dense docked panels, independent scroll regions. */
 .org-workbench.org-permissions-workbench{grid-template-columns:minmax(0,1fr)}
 .org-permissions-workbench .org-stage-card{min-width:0}
+.perm-content-root{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0}
+.perm-subnav{display:flex;gap:4px;padding:4px 10px;border-bottom:1px solid var(--border-hairline);min-height:34px;flex:none}
+.perm-subnav button{border:0;border-bottom:2px solid transparent;background:transparent;font-size:12px;color:var(--text-secondary);padding:4px 12px}
+.perm-subnav button.active{border-bottom-color:var(--brand-blue);color:var(--brand-blue);font-weight:600}
 .perm-workspace{display:grid;grid-template-columns:240px minmax(0,1fr);flex:1;min-height:0;overflow:hidden}
 .perm-browser{display:flex;flex-direction:column;min-width:0;min-height:0;border-right:1px solid var(--border-hairline)}
 .perm-browser-title{display:flex;justify-content:space-between;align-items:center;background:var(--surface-header);border-bottom:1px solid var(--border-hairline);padding:4px 8px;font-weight:600;font-size:12px;min-height:34px}
@@ -41,4 +45,21 @@
 .perm-form-actions .hint{margin-right:auto}
 .perm-review{border:1px solid var(--border-strong);background:var(--surface-header);padding:10px;font-size:12px}
 .perm-review p{margin:5px 0}
+.perm-subtle{font-size:11px;font-weight:400;color:var(--text-secondary);margin-left:7px}
+.perm-insight{border-top:1px solid var(--border-hairline)}
+.perm-insight-picker{display:flex;gap:10px;align-items:end;flex-wrap:wrap;padding:8px 10px}
+.perm-insight-picker label{display:flex;flex-direction:column;gap:4px;font-size:11px;min-width:240px;max-width:400px;flex:1}
+.perm-insight-picker select{min-width:0;height:30px;font-size:12px}
+.perm-effective{display:flex;gap:7px;align-items:center;flex-wrap:wrap;padding:9px 10px;font-size:12px}
+.perm-effective>strong{margin-right:5px}
+.perm-action-token{border:1px solid var(--border-hairline);border-radius:var(--radius-sm);padding:3px 6px;background:var(--surface-subtle)}
+.perm-source-list{padding:8px 10px;font-size:12px}
+.perm-source-row{display:grid;grid-template-columns:110px minmax(0,1fr);gap:9px;border-bottom:1px solid var(--border-hairline);padding:6px 0}
+.perm-source-row>span{color:var(--text-secondary)}
+.perm-source-row small{display:block;margin-top:4px;color:var(--text-secondary);overflow-wrap:anywhere}
+.perm-audit{display:flex;flex-direction:column;min-width:0;min-height:0;flex:1}
+.perm-audit-header{display:flex;gap:10px;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-hairline);padding:10px;font-size:13px}
+.perm-audit-header .hint{margin:3px 0 0}
+.perm-audit-scroll{overflow:auto;min-width:0;min-height:0;flex:1}
+.perm-audit-detail{max-width:300px;overflow-wrap:anywhere;font-size:11px}
 @media(max-width:850px){.perm-workspace{grid-template-columns:minmax(0,1fr);overflow:auto}.perm-browser{height:210px;border-right:0;border-bottom:1px solid var(--border-hairline)}.perm-detail{overflow:visible}.perm-grants-scroller{max-height:300px}}

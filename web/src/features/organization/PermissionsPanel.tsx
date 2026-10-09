@@ -4,6 +4,7 @@ import type {User} from "../../entities/user/model";
 import {errorCode,errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
 import {permissionsApi,type DirectGrant,type FolderPage,type ResourceFolder} from "./permissionsApi";
+import {PermissionAudit,PermissionInsights} from "./PermissionInsights";
 import "./permissions.css";
 
 type Group={id:string;name:string};
@@ -139,6 +140,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
 }){
  const [params,setParams]=useSearchParams();
  const folderId=params.get("folder")??"";
+ const auditView=params.get("view")==="audit";
  const currentFolderRef=useRef(folderId);
  currentFolderRef.current=folderId;
  const [selectedName,setSelectedName]=useState<{id:string;name:string}|null>(null);
@@ -234,7 +236,14 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
     :errorCopy(e,"撤销失败"));
   }finally{setRevokeBusy(false);}
  }
- return <div className="perm-workspace">
+ return <div className="perm-content-root">
+  <nav className="perm-subnav" aria-label="权限管理功能">
+   <button type="button" className={!auditView?"active":""} aria-current={!auditView?"page":undefined}
+    onClick={()=>setParams(old=>{const next=new URLSearchParams(old);next.set("view","folder");return next;})}>目录授权与有效权限</button>
+   <button type="button" className={auditView?"active":""} aria-current={auditView?"page":undefined}
+    onClick={()=>{setRevokeTarget(null);setParams(old=>{const next=new URLSearchParams(old);next.set("view","audit");return next;});}}>权限变更审计</button>
+  </nav>
+  {auditView?<PermissionAudit users={users}/>:<div className="perm-workspace">
   <ResourceBrowser selected={folderId} onSelect={selectFolder}/>
   <section className="perm-detail" aria-label="目录权限">
    {!folderId?<div className="empty">请选择左侧资源目录，查看或配置直接授权。</div>:<>
@@ -254,6 +263,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
       <td><button type="button" className="danger" onClick={()=>{setRevokeError("");setRevokeTarget(g);}}>撤销</button></td></tr>)}</tbody></table>
      {grants.length===0&&<p className="empty">没有直接授权；可能仍存在父目录继承或共享权限。</p>}
     </div>}
+    <PermissionInsights folderId={folderId} users={users} usersState={usersState}/>
     <div className="perm-section-title">新增直接授权</div>
     <form className="perm-form" onSubmit={submit} onChange={()=>{if(submitState==="review")setSubmitState("edit");}}>
      {usersState==="failed"&&<p role="alert" className="notice error">读取用户列表失败。<button type="button" className="secondary-action" onClick={onRetryUsers}>重试用户列表</button></p>}
@@ -288,6 +298,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
     </form>
    </>}
   </section>
+  </div>}
   <Dialog open={revokeTarget!==null} title="撤销直接授权" onClose={()=>{if(!revokeBusy)setRevokeTarget(null);}} closeGuard={()=>!revokeBusy} className="dialog">
    {revokeTarget&&<>
     <p>确定撤销 {names.get(revokeTarget.subjectKind+":"+revokeTarget.subjectId)??revokeTarget.subjectId} 的「{displayActions(revokeTarget.actions)}」直接授权？</p>

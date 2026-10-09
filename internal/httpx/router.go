@@ -102,6 +102,8 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.GET("/folders/:id/acls", h.listGrants)
 	api.POST("/folders/:id/acls", h.createGrant)
 	api.DELETE("/acls/:id", h.revokeGrant)
+	api.POST("/permissions/explain", h.explainPermissions)
+	api.GET("/permissions/audit", h.permissionAudit)
 	api.POST("/files", h.uploadFile)
 	api.GET("/files", h.listFiles)
 	api.GET("/files/:id", h.fileMeta)

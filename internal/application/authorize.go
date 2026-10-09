@@ -15,34 +15,78 @@ import (
 // search/stats/export scope CTE uses the same rule, so the document page and
 // the search page can never disagree about what a share grants.
 func (s *Service) resolveActions(ctx context.Context, repo ports.Repository, u domain.User, folderID string) (map[domain.Action]bool, error) {
+	actions, _, err := s.resolveActionsWithSources(ctx, repo, u, folderID, false)
+	return actions, err
+}
+
+// resolveActionsWithSources is the single authorization decision path. The
+// optional explanation is assembled from the same checked grants and shares:
+// no independent UI or reporting algorithm can accidentally grant more.
+func (s *Service) resolveActionsWithSources(ctx context.Context, repo ports.Repository, u domain.User, folderID string, explain bool) (map[domain.Action]bool, []PermissionSource, error) {
 	if u.IsAdmin {
-		return allActions(), nil
+		if explain {
+			return allActions(), []PermissionSource{{Kind: "admin_override", ResourceID: folderID, Actions: orderedActions(allActions())}}, nil
+		}
+		return allActions(), nil, nil
 	}
 	grants, err := repo.EffectiveGrants(ctx, u.ID, folderID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	groups, err := repo.WorkgroupsOf(ctx, u.ID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	direct := make([]domain.ACL, 0, len(grants))
 	inherited := make([]domain.ACL, 0, len(grants))
+	sources := make([]PermissionSource, 0)
+	now := s.now()
 	for _, g := range grants {
 		if g.Depth == 0 {
 			direct = append(direct, g.Grant)
 		} else {
 			inherited = append(inherited, g.Grant)
 		}
+		if !explain || (g.Depth > 0 && g.Grant.ScopeOnly) ||
+			(g.Grant.ExpiresAt != nil && !g.Grant.ExpiresAt.After(now)) {
+			continue
+		}
+		if g.Grant.SubjectKind == "user" && g.Grant.SubjectID != u.ID {
+			continue
+		}
+		if g.Grant.SubjectKind == "group" && !containsGroup(groups, g.Grant.SubjectID) {
+			continue
+		}
+		sourceActions := make([]domain.Action, 0, len(g.Grant.Actions))
+		for _, action := range g.Grant.Actions {
+			if domain.AllowedAction(action) {
+				sourceActions = append(sourceActions, action)
+			}
+		}
+		if len(sourceActions) == 0 {
+			continue
+		}
+		kind := "direct_acl"
+		if g.Depth > 0 {
+			kind = "inherited_acl"
+		}
+		if g.Grant.SubjectKind == "group" {
+			kind = "workgroup_acl"
+		}
+		sources = append(sources, PermissionSource{
+			Kind: kind, ResourceID: g.Grant.FolderID, GrantID: g.Grant.ID,
+			SubjectKind: g.Grant.SubjectKind, SubjectID: g.Grant.SubjectID,
+			Actions: sourceActions, ScopeOnly: g.Grant.ScopeOnly, Depth: g.Depth,
+			ExpiresAt: g.Grant.ExpiresAt,
+		})
 	}
-	now := s.now()
 	actions := domain.ActionsFor(direct, u.ID, groups, true, now)
 	for action := range domain.ActionsFor(inherited, u.ID, groups, false, now) {
 		actions[action] = true
 	}
 	shares, shareErr := repo.FolderSharesForSubject(ctx, u.ID, groups, folderID)
 	if shareErr != nil {
-		return nil, shareErr
+		return nil, nil, shareErr
 	}
 	for _, share := range shares {
 		if share.RevokedAt != nil {
@@ -54,8 +98,16 @@ func (s *Service) resolveActions(ctx context.Context, repo ports.Repository, u d
 		for _, action := range share.Actions {
 			actions[action] = true
 		}
+		if explain && share.FolderID != nil {
+			sources = append(sources, PermissionSource{
+				Kind: "folder_share", ResourceID: *share.FolderID, GrantID: share.ID,
+				SubjectKind: share.RecipientKind, SubjectID: share.RecipientID,
+				Actions: share.Actions, ExpiresAt: share.ExpiresAt,
+				ScopeOnly: !share.IncludeDescendants,
+			})
+		}
 	}
-	return actions, nil
+	return actions, sources, nil
 }
 
 func (s *Service) require(ctx context.Context, repo ports.Repository, u domain.User, folderID string, action domain.Action) error {

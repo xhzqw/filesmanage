@@ -962,6 +962,38 @@ func (r *Repository) RecordAudit(ctx context.Context, e domain.AuditEvent) error
 	return err
 }
 
+// Descending keyset audit read, restricted to access-changing event types.
+func (r *Repository) ListPermissionAudit(ctx context.Context, beforeID int64, limit int) ([]domain.PermissionAuditRecord, error) {
+	if limit < 1 || limit > 101 || beforeID < 0 {
+		return nil, domain.ErrInvalidInput
+	}
+	rows, err := r.Q.Query(ctx, `SELECT id,coalesce(actor_id,''),event_type,target_kind,target_id,outcome,
+	  details,created_at FROM audit_events
+	  WHERE ($1::bigint=0 OR id<$1)
+	  AND event_type IN ('acl.create','acl.revoke','workgroup.member_add','workgroup.member_remove',
+	    'user.disable','user.enable','share.create','share.revoke')
+	  ORDER BY id DESC LIMIT $2`, beforeID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]domain.PermissionAuditRecord, 0, limit)
+	for rows.Next() {
+		var item domain.PermissionAuditRecord
+		var details []byte
+		if err = rows.Scan(&item.ID, &item.ActorID, &item.EventType, &item.TargetKind,
+			&item.TargetID, &item.Outcome, &details, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+		item.Details = map[string]any{}
+		if err = json.Unmarshal(details, &item.Details); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
 func (r *Repository) IdempotencyGet(ctx context.Context, actor, operation, key string) ([]byte, bool, error) {
 	var response []byte
 	err := r.Q.QueryRow(ctx, "SELECT response::text FROM idempotency_keys WHERE actor_id=$1 AND operation=$2 AND request_key=$3", actor, operation, key).Scan(&response)

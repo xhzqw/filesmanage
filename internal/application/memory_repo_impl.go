@@ -877,6 +877,32 @@ func (r *memoryRepo) RecordAudit(_ context.Context, e domain.AuditEvent) error {
 	return nil
 }
 
+func (r *memoryRepo) ListPermissionAudit(_ context.Context, beforeID int64, limit int) ([]domain.PermissionAuditRecord, error) {
+	if beforeID < 0 || limit < 1 || limit > 101 {
+		return nil, domain.ErrInvalidInput
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]domain.PermissionAuditRecord, 0, limit)
+	for i := len(r.audit) - 1; i >= 0 && len(out) < limit; i-- {
+		id := int64(i + 1)
+		if beforeID > 0 && id >= beforeID {
+			continue
+		}
+		e := r.audit[i]
+		switch e.EventType {
+		case "acl.create", "acl.revoke", "workgroup.member_add", "workgroup.member_remove",
+			"user.disable", "user.enable", "share.create", "share.revoke":
+			out = append(out, domain.PermissionAuditRecord{
+				ID: id, ActorID: e.ActorID, EventType: e.EventType,
+				TargetKind: e.TargetKind, TargetID: e.TargetID,
+				Outcome: e.Outcome, Details: e.Details,
+			})
+		}
+	}
+	return out, nil
+}
+
 func (r *memoryRepo) IdempotencyGet(_ context.Context, actor, operation, key string) ([]byte, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

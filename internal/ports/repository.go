@@ -163,6 +163,7 @@ type Repository interface {
 
 	// Audit and idempotency.
 	RecordAudit(context.Context, domain.AuditEvent) error
+	ListPermissionAudit(context.Context, int64, int) ([]domain.PermissionAuditRecord, error)
 	IdempotencyGet(context.Context, string, string, string) ([]byte, bool, error)
 	IdempotencyPut(context.Context, string, string, string, []byte) error
 }

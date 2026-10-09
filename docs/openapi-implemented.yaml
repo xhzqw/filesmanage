@@ -801,6 +801,133 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/permissions/explain:
+    post:
+      summary: Explain user's effective folder permissions (admin only)
+      operationId: explainPermissions
+      tags:
+      - Grants
+      security:
+      - cookieSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                subjectKind:
+                  type: string
+                  enum:
+                  - user
+                subjectId:
+                  type: string
+                folderId:
+                  type: string
+              required:
+              - subjectKind
+              - subjectId
+              - folderId
+      responses:
+        '200':
+          description: Effective actions and applied sources from the authoritative resolver.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PermissionExplanation'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN / E_PASSWORD_CHANGE_REQUIRED — authorization denied or first-login password change pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      description: Rejected with 403 E_PASSWORD_CHANGE_REQUIRED until the forced first-login password change completes.
+  /api/permissions/audit:
+    get:
+      summary: Read paged permission-change audit (admin only)
+      operationId: permissionAudit
+      tags:
+      - Grants
+      security:
+      - cookieSession: []
+      parameters:
+      - name: cursor
+        in: query
+        required: false
+        description: Descending numeric audit id before which to read.
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        description: Rows per page, 1-100 (default 30).
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Only access-changing events, descending audit id.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PermissionAuditPage'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN / E_PASSWORD_CHANGE_REQUIRED — authorization denied or first-login password change pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      description: Rejected with 403 E_PASSWORD_CHANGE_REQUIRED until the forced first-login password change completes.
   /api/files:
     post:
       summary: Upload a file (multipart, idempotent)
@@ -5332,6 +5459,135 @@ components:
       - subjectKind
       - subjectId
       - actions
+    PermissionSource:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum:
+          - direct_acl
+          - inherited_acl
+          - workgroup_acl
+          - folder_share
+          - admin_override
+        resourceId:
+          type: string
+        grantId:
+          type: string
+        subjectKind:
+          type: string
+        subjectId:
+          type: string
+        actions:
+          type: array
+          items:
+            type: string
+            enum:
+            - list
+            - preview
+            - upload
+            - download
+            - modify
+            - delete
+            - rename
+            - move
+            - print
+        scopeOnly:
+          type: boolean
+        depth:
+          type: integer
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - kind
+      - resourceId
+      - actions
+      - scopeOnly
+      - depth
+    PermissionExplanation:
+      type: object
+      properties:
+        subjectKind:
+          type: string
+          enum:
+          - user
+        subjectId:
+          type: string
+        folderId:
+          type: string
+        subjectDisabled:
+          type: boolean
+        effectiveActions:
+          type: array
+          items:
+            type: string
+            enum:
+            - list
+            - preview
+            - upload
+            - download
+            - modify
+            - delete
+            - rename
+            - move
+            - print
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermissionSource'
+        evaluatedAt:
+          type: string
+          format: date-time
+      required:
+      - subjectKind
+      - subjectId
+      - folderId
+      - subjectDisabled
+      - effectiveActions
+      - sources
+      - evaluatedAt
+    PermissionAuditEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        actorId:
+          type: string
+        eventType:
+          type: string
+        targetKind:
+          type: string
+        targetId:
+          type: string
+        outcome:
+          type: string
+        details:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - id
+      - actorId
+      - eventType
+      - targetKind
+      - targetId
+      - outcome
+      - details
+      - createdAt
+    PermissionAuditPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PermissionAuditEntry'
+        nextCursor:
+          type: string
+      required:
+      - items
+      - nextCursor
     SaveFileRequest:
       type: object
       properties:
