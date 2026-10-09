@@ -14,7 +14,7 @@ export function FolderActions({folder,onChanged,isAdmin,onManageGrants,onManageP
 
  useEffect(()=>{
   if(!moreOpen)return;
-  function onDocClick(e:MouseEvent){
+  function onDocClick(e:Event){
    if(moreRef.current&&!moreRef.current.contains(e.target as Node)){
     setMoreOpen(false);
    }

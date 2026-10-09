@@ -364,7 +364,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
 
   useEffect(()=>{
    if(!openRowMoreId)return;
-   function onDoc(e:MouseEvent){
+   function onDoc(e:Event){
     if(!(e.target as HTMLElement)?.closest(".row-more-wrapper")){
      setOpenRowMoreId(null);
     }
