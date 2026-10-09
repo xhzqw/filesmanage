@@ -201,7 +201,7 @@ async function workflowSuite() {
   let chrome = null;
   let cdp = null;
   try {
-    const v1 = await uploadKeyed("g4-roll.txt", `v1 ${stamp}\n`);
+    const v1 = await uploadKeyed(ROLL_NAME, `v1 ${stamp}\n`);
     // create v2 through the real save path (lock + base64 payload)
     const lock = (await json("POST", `/api/files/${v1.fileId}/lock`, { baseSeq: 1 })).body?.data?.lockToken;
     await json("POST", `/api/files/${v1.fileId}/save`, {
@@ -260,34 +260,34 @@ async function workflowSuite() {
     const del = await json("DELETE", `/api/files/${v1.fileId}`);
     check("file moved to trash for the restore flow", del.status === 200, String(del.status));
     await cdp.navigate(`${BASE}/trash`);
-    const trashRow = await cdp.waitFor(`()=>[...document.querySelectorAll('tbody tr')].some(tr=>tr.textContent?.includes('g4-roll.txt'))`, 20000);
+    const trashRow = await cdp.waitFor(`()=>[...document.querySelectorAll('tbody tr')].some(tr=>tr.textContent?.includes(${JSON.stringify(ROLL_NAME)}))`, 20000);
     check("trash lists the file", Boolean(trashRow), String(trashRow));
-    await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr')].find(tr=>tr.textContent?.includes('g4-roll.txt'));[...row.querySelectorAll('button')].find(b=>b.textContent?.trim()==='恢复')?.click();return true;})()`);
+    await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr')].find(tr=>tr.textContent?.includes(${JSON.stringify(ROLL_NAME)}));[...row.querySelectorAll('button')].find(b=>b.textContent?.trim()==='恢复')?.click();return true;})()`);
     const restoreReady = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('恢复 —'));return d&&d.textContent?.includes('目标位置')?d.textContent:false;}`, 15000);
     const restoreInfo = await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('恢复 —'));return d?d.textContent:null;})()`);
     check("WF-17 restore dialog shows original and target location",
       typeof restoreReady === "string" && restoreInfo?.includes("原位置") && restoreInfo?.includes("目标位置"), String(restoreInfo?.slice(0, 120)));
     await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('恢复 —'));[...d.querySelectorAll('button')].find(b=>b.textContent?.trim()==='确认恢复')?.click();return true;})()`);
-    const restored = await cdp.waitFor(`()=>![...document.querySelectorAll('tbody tr')].some(tr=>tr.textContent?.includes('g4-roll.txt'))`, 20000);
+    const restored = await cdp.waitFor(`()=>![...document.querySelectorAll('tbody tr')].some(tr=>tr.textContent?.includes(${JSON.stringify(ROLL_NAME)}))`, 20000);
     check("WF-17 restore removes the file from the trash list", restored === true, String(restored));
     const back = await json("GET", `/api/files?folder=${folderId}&limit=200`);
     check("WF-17 restored file is back in its folder",
-      (back.body?.data?.items ?? []).some((f) => f.name === "g4-roll.txt"), "");
+      (back.body?.data?.items ?? []).some((f) => f.name === ROLL_NAME), "");
 
     // ---- WF-31: approval decision with a custom comment ----
     await json("PUT", `/api/folders/${folderId}/approval-policy`, { approverId: me.id, enabled: true });
-    const v2file = await uploadKeyed("g4-approve.txt", `approve ${stamp}\n`);
+    const v2file = await uploadKeyed(APPROVE_NAME, `approve ${stamp}\n`);
     const lock2 = (await json("POST", `/api/files/${v2file.fileId}/lock`, { baseSeq: 1 })).body?.data?.lockToken;
     const submit = await json("POST", `/api/files/${v2file.fileId}/save`, {
       baseSeq: 1, lockToken: lock2, data: btoa(`approve2 ${stamp}\n`), idempotencyKey: "g4-approve-" + stamp,
     });
     check("approval-routed save returns 202 pending", submit.status === 202, String(submit.status));
     await cdp.navigate(`${BASE}/approvals`);
-    const pendingRow = await cdp.waitFor(`()=>[...document.querySelectorAll('tbody tr')].some(tr=>tr.textContent?.includes('g4-approve.txt'))`, 20000);
+    const pendingRow = await cdp.waitFor(`()=>[...document.querySelectorAll('tbody tr')].some(tr=>tr.textContent?.includes(${JSON.stringify(APPROVE_NAME)})&&/待审批|pending/.test(tr.textContent||''))`, 20000);
     check("approval inbox lists the pending decision", Boolean(pendingRow), String(pendingRow));
-    await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr')].find(tr=>tr.textContent?.includes('g4-approve.txt'));const input=row.querySelector('input[aria-label]');const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;set.call(input,'G4 冒烟审批意见');input.dispatchEvent(new Event('input',{bubbles:true}));return true;})()`);
-    await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr')].find(tr=>tr.textContent?.includes('g4-approve.txt'));[...row.querySelectorAll('button')].find(b=>b.textContent?.trim()==='通过')?.click();return true;})()`);
-    const decided = await cdp.waitFor(`()=>{const rows=[...document.querySelectorAll('tbody tr')];return rows.some(tr=>tr.textContent?.includes('g4-approve.txt')&&tr.textContent?.includes('G4 冒烟审批意见'));}`, 20000);
+    await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr')].find(tr=>tr.textContent?.includes(${JSON.stringify(APPROVE_NAME)}));const input=row.querySelector('input[aria-label]');const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;set.call(input,'G4 冒烟审批意见');input.dispatchEvent(new Event('input',{bubbles:true}));return true;})()`);
+    await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr')].find(tr=>tr.textContent?.includes(${JSON.stringify(APPROVE_NAME)}));[...row.querySelectorAll('button')].find(b=>b.textContent?.trim()==='通过')?.click();return true;})()`);
+    const decided = await cdp.waitFor(`()=>{const rows=[...document.querySelectorAll('tbody tr')];return rows.some(tr=>tr.textContent?.includes(${JSON.stringify(APPROVE_NAME)})&&tr.textContent?.includes('G4 冒烟审批意见'));}`, 20000);
     check("WF-31 custom comment ships with the decision", decided === true, String(decided));
     const afterApprove = await json("GET", `/api/files/${v2file.fileId}`);
     check("approval commits the new version",
