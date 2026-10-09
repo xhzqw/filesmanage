@@ -30,7 +30,7 @@ export function Menu({open,onClose,items,anchor,label,point}:{
  point?:MenuPoint|null;
 }){
  const node=useRef<HTMLDivElement>(null);
- const[position,setPosition]=useState<MenuPoint|null>(null);
+ const[position,setPosition]=useState<{left:number;top:number}|null>(null);
  const entered=useRef(false);
 
  // Focus enters on open, skipping disabled entries; a host re-render while
