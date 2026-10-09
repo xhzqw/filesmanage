@@ -147,6 +147,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  const[groupQuery,setGroupQuery]=useState("");
  const[groupLimit,setGroupLimit]=useState(GROUP_DISPLAY_STEP);
  const[groupMembers,setGroupMembers]=useState<User[]>([]);
+ const[groupMemberLimit,setGroupMemberLimit]=useState(MEMBER_DISPLAY_STEP);
  const[membersState,setMembersState]=useState<LoadState>("loading");
  const[membersToken,setMembersToken]=useState(0);
  const[candidateQuery,setCandidateQuery]=useState("");
@@ -329,6 +330,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   return groups.filter(g=>g.name.toLowerCase().includes(keyword));
  },[groups,groupQuery]);
  useEffect(()=>setGroupLimit(GROUP_DISPLAY_STEP),[groupQuery]);
+ useEffect(()=>setGroupMemberLimit(MEMBER_DISPLAY_STEP),[selectedGroup]);
 
  const selectedGroupRow=groups.find(g=>g.id===selectedGroup)??null;
 
@@ -1006,7 +1008,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
 
          {membersState==="loading"&&<p className="hint">正在读取工作组成员…</p>}
          {membersState==="ready"&&<div className="org-member-grid">
-          {groupMembers.map(member=><div key={member.id} className="org-member-card">
+          {groupMembers.slice(0,groupMemberLimit).map(member=><div key={member.id} className="org-member-card">
            <div className="org-member-card-info">
             <span className="org-avatar" aria-hidden="true">{member.displayName.slice(0,1)}</span>
             <div className="org-member-card-text">
@@ -1020,6 +1022,13 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
           </div>)}
           {groupMembers.length===0&&<p className="empty" style={{gridColumn:"1/-1"}}>该工作组暂无成员，可在下方添加成员。</p>}
          </div>}
+         {membersState==="ready"&&groupMembers.length>groupMemberLimit&&
+          <div className="org-list-more">
+           <span className="hint">已显示 {groupMemberLimit} / {groupMembers.length} 位工作组成员</span>
+           <button type="button" onClick={()=>setGroupMemberLimit(n=>n+MEMBER_DISPLAY_STEP)}>
+            显示更多组内成员
+           </button>
+          </div>}
         </div>
 
         {/* 添加成员到工作组 */}

@@ -2,12 +2,11 @@
 // Read-only Chrome/CDP smoke of Organization > Permissions P1.
 // Execute only on the remote dev target where admin.password is stored.
 import {spawn} from "node:child_process";
-import {readFileSync} from "node:fs";
 import {setTimeout as sleep} from "node:timers/promises";
+import {verifiedAdminSession} from "./qa_session.mjs";
 
 const BASE="http://127.0.0.1:18091";
 const PORT=9389;
-const password=readFileSync(".secrets/admin.password","utf8").trim();
 const assert=(condition,message)=>{
  if(!condition)throw new Error("FAIL "+message);
  console.log("PASS "+message);
@@ -65,6 +64,7 @@ const chrome=spawn("/usr/bin/google-chrome",[
 ],{stdio:"ignore"});
 let cdp;
 try{
+ const session=await verifiedAdminSession(BASE);
  let target;
  for(let i=0;i<50&&!target;i++){
   await sleep(200);
@@ -77,21 +77,13 @@ try{
  cdp=await CDP.connect(target.webSocketDebuggerUrl);
  await cdp.send("Page.enable");
  await cdp.send("Runtime.enable");
- await cdp.navigate(BASE+"/login");
- assert(await cdp.waitFor("()=>!!document.querySelector('input[type=password]')"),"login page renders");
- // This is a permissions UI test, not a login-input simulation test.
- // Authenticate in the browser's real cookie jar via the same API as the
- // app; the separate browser journey gate already covers the login form.
- const auth=await cdp.evaluate(`(async()=>{
-  const response=await fetch('/api/login',{
-   method:'POST',headers:{'Content-Type':'application/json'},
-   body:JSON.stringify({login:'admin',password:${JSON.stringify(password)}}),
-   credentials:'same-origin',
-  });
-  const body=await response.json().catch(()=>null);
-  return {status:response.status,code:body?.error?.code??null};
- })()`);
- assert(auth?.status===200,"admin browser session established (HTTP "+auth?.status+", code "+auth?.code+")");
+ await cdp.send("Network.enable");
+ await cdp.send("Network.setCookie",{
+  name:"fm_session",value:session.cookie.slice("fm_session=".length),
+  domain:new URL(BASE).hostname,path:"/",httpOnly:true,sameSite:"Strict",
+ });
+ assert(session.cookie.startsWith("fm_session="),
+  "verified admin browser session ("+(session.reused?"reused":"new")+")");
  await cdp.navigate(BASE+"/org?tab=permissions&view=folder");
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-workspace')"),"organization permission workspace renders");
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-tree-name')"),"resource folder browser loads");

@@ -2,10 +2,9 @@
 // Read-only smoke gate for Organization > Permissions P1.
 // Run ONLY on the development target (never in the local worktree).
 // The credential is read from the remote-only secret and never logged.
-import {readFileSync} from "node:fs";
+import {verifiedAdminSession} from "./qa_session.mjs";
 
 const BASE=(process.env.FILESMANAGE_DEV_URL||"http://127.0.0.1:18091").replace(/\/$/,"");
-const secret=readFileSync(".secrets/admin.password","utf8").trim();
 const assert=(okay,what)=>{if(!okay)throw new Error("FAIL "+what);console.log("PASS "+what);};
 let cookie="";
 
@@ -26,9 +25,9 @@ assert(anonymousExplain.status===401,"explain requires login");
 const anonymousRoles=await request("/api/roles/bindings");
 assert(anonymousRoles.status===401,"role bindings require login");
 
-const loggedIn=await request("/api/login","POST",{login:"admin",password:secret});
-assert(loggedIn.status===200&&loggedIn.setCookie?.includes("fm_session="),"admin login");
-cookie=loggedIn.setCookie.split(";")[0];
+const session=await verifiedAdminSession(BASE);
+cookie=session.cookie;
+assert((await request("/api/me")).status===200,"verified admin session ("+(session.reused?"reused":"new")+")");
 const roles=await request("/api/roles/bindings");
 assert(roles.status===200&&Array.isArray(roles.data),"admin can list management role bindings");
 const myRoles=await request("/api/roles/me");
