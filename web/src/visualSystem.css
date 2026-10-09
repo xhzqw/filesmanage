@@ -72,7 +72,7 @@ html{overflow-x:clip}
 button,input:not([type="checkbox"]):not([type="radio"]),select,textarea,
 .primary,.command-trigger,.ghost-action-btn,.ghost-more-btn,
 .toolbar-views select,.filter-search-input,
-.tree-search,.org-tab,.org-header-btn{
+.tree-search,.org-header-btn{
   border-radius:var(--radius-sm);
 }
 input[type="checkbox"],input[type="radio"]{border-radius:var(--radius-xs)}
