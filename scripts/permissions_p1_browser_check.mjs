@@ -115,6 +115,11 @@ try{
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-audit .perm-table')"),"audit view loads with event table");
  assert(await cdp.evaluate("(()=>new URLSearchParams(location.search).get('view')==='audit')()"),
   "audit tab is deep-linkable");
+ await cdp.navigate(BASE+"/org?tab=roles");
+ assert(await cdp.waitFor("()=>document.body.innerText.includes('管理角色委派')"),
+  "P2 role bindings page renders");
+ assert(await cdp.waitFor("()=>!!document.querySelector('.perm-detail form')"),
+  "P2 role delegation form is available");
  console.log("PERMISSIONS_P1_BROWSER_PASS");
 }finally{
  cdp?.close();

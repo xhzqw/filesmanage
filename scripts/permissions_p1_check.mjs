@@ -23,10 +23,16 @@ const anonymous=await request("/api/permissions/audit");
 assert(anonymous.status===401,"audit requires login");
 const anonymousExplain=await request("/api/permissions/explain","POST",{subjectKind:"user",subjectId:"x",folderId:"x"});
 assert(anonymousExplain.status===401,"explain requires login");
+const anonymousRoles=await request("/api/roles/bindings");
+assert(anonymousRoles.status===401,"role bindings require login");
 
 const loggedIn=await request("/api/login","POST",{login:"admin",password:secret});
 assert(loggedIn.status===200&&loggedIn.setCookie?.includes("fm_session="),"admin login");
 cookie=loggedIn.setCookie.split(";")[0];
+const roles=await request("/api/roles/bindings");
+assert(roles.status===200&&Array.isArray(roles.data),"admin can list management role bindings");
+const myRoles=await request("/api/roles/me");
+assert(myRoles.status===200&&Array.isArray(myRoles.data),"self-scoped management roles work");
 const users=await request("/api/users");
 const folders=await request("/api/folders/tree");
 assert(users.status===200&&Array.isArray(users.data),"admin subject list");
