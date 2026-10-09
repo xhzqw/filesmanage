@@ -38,6 +38,10 @@ func auditedPermissionRoute(method, path string) (event, kind string) {
 		return "workgroup.member_add", "workgroup"
 	case "DELETE /api/groups/:id/members/:uid":
 		return "workgroup.member_remove", "workgroup"
+	case "POST /api/roles/bindings":
+		return "role.assign", "user"
+	case "DELETE /api/roles/bindings/:id":
+		return "role.revoke", "role"
 	default:
 		return "", ""
 	}

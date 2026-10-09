@@ -911,7 +911,7 @@ paths:
       description: Rejected with 403 E_PASSWORD_CHANGE_REQUIRED until the forced first-login password change completes.
   /api/permissions/audit:
     get:
-      summary: Read paged permission-change audit (admin only)
+      summary: Read paged permission-change audit (admin or auditor)
       operationId: permissionAudit
       tags:
       - Grants
@@ -967,6 +967,191 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
       description: Rejected with 403 E_PASSWORD_CHANGE_REQUIRED until the forced first-login password change completes.
+  /api/roles/me:
+    get:
+      summary: Read current management roles
+      operationId: myRoles
+      tags:
+      - Roles
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Current user's active management roles.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ManagementRoleBinding'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN / E_PASSWORD_CHANGE_REQUIRED — authorization denied or first-login password change pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/roles/bindings:
+    get:
+      summary: List role assignments (admin)
+      operationId: listRoleBindings
+      tags:
+      - Roles
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Non-revoked bounded role bindings.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ManagementRoleBinding'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN / E_PASSWORD_CHANGE_REQUIRED — authorization denied or first-login password change pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      summary: Delegate management permission (admin)
+      operationId: createRoleBinding
+      tags:
+      - Roles
+      security:
+      - cookieSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRoleBindingRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/ManagementRoleBinding'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN / E_PASSWORD_CHANGE_REQUIRED — authorization denied or first-login password change pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/roles/bindings/{id}:
+    delete:
+      summary: Revoke management role binding (admin)
+      operationId: revokeRoleBinding
+      tags:
+      - Roles
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Management role binding ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Revoked binding.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      revoked:
+                        type: string
+                    required:
+                    - revoked
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN / E_PASSWORD_CHANGE_REQUIRED — authorization denied or first-login password change pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/files:
     post:
       summary: Upload a file (multipart, idempotent)
@@ -5633,6 +5818,91 @@ components:
       required:
       - items
       - nextCursor
+    ManagementRoleBinding:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        role:
+          type: string
+          enum:
+          - auditor
+          - permission_admin
+        scopeKind:
+          type: string
+          enum:
+          - global
+          - folder
+        scopeId:
+          type: string
+        allowedActions:
+          type: array
+          items:
+            type: string
+            enum:
+            - list
+            - preview
+            - upload
+            - download
+            - modify
+            - delete
+            - rename
+            - move
+            - print
+        expiresAt:
+          type: string
+          format: date-time
+        grantedBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type: string
+          format: date-time
+      required:
+      - id
+      - userId
+      - role
+      - scopeKind
+      - scopeId
+      - allowedActions
+      - grantedBy
+      - createdAt
+    CreateRoleBindingRequest:
+      type: object
+      properties:
+        userId:
+          type: string
+        role:
+          type: string
+          enum:
+          - auditor
+          - permission_admin
+        scopeId:
+          type: string
+        allowedActions:
+          type: array
+          items:
+            type: string
+            enum:
+            - list
+            - preview
+            - upload
+            - download
+            - modify
+            - delete
+            - rename
+            - move
+            - print
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+      - userId
+      - role
     SaveFileRequest:
       type: object
       properties:

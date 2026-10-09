@@ -72,6 +72,12 @@ type Repository interface {
 	GrantByID(context.Context, string) (domain.ACL, error)
 	InsertGrant(context.Context, domain.ACL) error
 	DeleteGrant(context.Context, string) error
+	// P2: management role bindings are never file ACL grants.
+	ListRoleBindings(context.Context) ([]domain.ManagementRoleBinding, error)
+	RoleBindingsForUser(context.Context, string) ([]domain.ManagementRoleBinding, error)
+	RoleBindingByID(context.Context, string) (domain.ManagementRoleBinding, error)
+	InsertRoleBinding(context.Context, domain.ManagementRoleBinding) error
+	RevokeRoleBinding(context.Context, string) error
 
 	// Trash.
 	InsertTrashEntry(context.Context, domain.TrashEntry) error

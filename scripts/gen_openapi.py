@@ -444,6 +444,19 @@ schema("PermissionAuditPage", obj({
     "items": arr(ref("PermissionAuditEntry")), "nextCursor": string(),
 }, required=["items", "nextCursor"]))
 
+schema("ManagementRoleBinding", obj({
+    "id": string(), "userId": string(), "role": string(enum=["auditor","permission_admin"]),
+    "scopeKind": string(enum=["global","folder"]), "scopeId": string(),
+    "allowedActions": arr(string(enum=GRANT_ACTIONS)), "expiresAt": timestamp(),
+    "grantedBy": string(), "createdAt": timestamp(), "revokedAt": timestamp(),
+}, required=["id","userId","role","scopeKind","scopeId","allowedActions","grantedBy","createdAt"]))
+
+schema("CreateRoleBindingRequest", obj({
+    "userId": string(), "role": string(enum=["auditor","permission_admin"]),
+    "scopeId": string(), "allowedActions": arr(string(enum=GRANT_ACTIONS)),
+    "expiresAt": timestamp(),
+}, required=["userId","role"]))
+
 schema("SaveFileRequest", obj({
     "data": string("Raw base64 body or a data: URL; bytes are written verbatim."),
     "baseSeq": integer("Optimistic concurrency base version.", minimum=1),
@@ -711,12 +724,27 @@ add("POST", "/api/permissions/explain", operation("Explain user's effective fold
                     resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"])]),
     auth_note=MUST_CHANGE))
 
-add("GET", "/api/permissions/audit", operation("Read paged permission-change audit (admin only)", "Grants", "permissionAudit", security=SESSION,
+add("GET", "/api/permissions/audit", operation("Read paged permission-change audit (admin or auditor)", "Grants", "permissionAudit", security=SESSION,
     params=[query("cursor", "Descending numeric audit id before which to read."),
             query("limit", "Rows per page, 1-100 (default 30).", integer(minimum=1))],
     responses=dict([json_ok(ref("PermissionAuditPage"), "Only access-changing events, descending audit id."),
                     resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"])]),
     auth_note=MUST_CHANGE))
+
+add("GET", "/api/roles/me", operation("Read current management roles", "Roles", "myRoles", security=SESSION,
+    responses=dict([json_ok(arr(ref("ManagementRoleBinding")), "Current user's active management roles."),
+                    resp("401", ERR["401"]),resp("403", ERR["403"])])))
+add("GET", "/api/roles/bindings", operation("List role assignments (admin)", "Roles", "listRoleBindings", security=SESSION,
+    responses=dict([json_ok(arr(ref("ManagementRoleBinding")), "Non-revoked bounded role bindings."),
+                    resp("401", ERR["401"]),resp("403", ERR["403"])])))
+add("POST", "/api/roles/bindings", operation("Delegate management permission (admin)", "Roles", "createRoleBinding", security=SESSION,
+    request={"application/json":{"schema":ref("CreateRoleBindingRequest")}},
+    responses=dict([resp("201","Created",obj({"ok":boolean(),"data":ref("ManagementRoleBinding")},required=["ok","data"])),
+                    resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+add("DELETE", "/api/roles/bindings/{id}", operation("Revoke management role binding (admin)", "Roles", "revokeRoleBinding", security=SESSION,
+    params=[id_param("id","Management role binding ID")],
+    responses=dict([json_ok(obj({"revoked":string()},required=["revoked"]),"Revoked binding."),
+                    resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
 
 # --- Files ---
 add("POST", "/api/files", operation("Upload a file (multipart, idempotent)", "Files", "uploadFile", security=SESSION,

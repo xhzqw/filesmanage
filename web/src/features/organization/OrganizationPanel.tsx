@@ -6,6 +6,7 @@ import type {User} from "../../entities/user/model";
 import "./organization.css";
 import {useSearchParams} from "react-router-dom";
 import {PermissionsPanel} from "./PermissionsPanel";
+import {RoleBindingsPanel,DelegatedRolesWorkspace} from "./RoleWorkspace";
 
 type LoadState="loading"|"ready"|"failed";
 type Tone="info"|"error";
@@ -124,8 +125,8 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
 
  // 视图与筛选状态：默认 Tab 1 为部门成员，Tab 2 为工作组管理
  const[queryParams,setQueryParams]=useSearchParams();
- const activeTab=queryParams.get("tab")==="permissions"?"permissions":queryParams.get("tab")==="groups"?"groups":"members";
- const setActiveTab=(tab:"members"|"groups"|"permissions")=>setQueryParams(old=>{
+ const activeTab=queryParams.get("tab")==="roles"?"roles":queryParams.get("tab")==="permissions"?"permissions":queryParams.get("tab")==="groups"?"groups":"members";
+ const setActiveTab=(tab:"members"|"groups"|"permissions"|"roles")=>setQueryParams(old=>{
   const next=new URLSearchParams(old);
   next.set("tab",tab);
   if(tab!=="permissions"){next.delete("view");next.delete("folder");}
@@ -580,7 +581,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  }
 
  if(!isAdmin)
-  return <p role="status" className="notice">组织管理仅系统管理员可用：当前账号没有用户、部门与工作组的管理权限。</p>;
+  return <DelegatedRolesWorkspace/>;
 
  const usersReady=usersState==="ready";
  const departmentsReady=departmentsState==="ready";
@@ -662,8 +663,8 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  return <div className="work-body">
   {/* 顶部工具栏：指标摘要与全局快捷创建 */}
   <div className="toolbar">
-   <span className="toolbar-hint">{activeTab==="permissions"?"按资源目录管理直接授权 · 仅系统管理员":`账号 ${users.length} · 部门 ${departments.length} · 工作组 ${groups.length}`}</span>
-   {activeTab!=="permissions"&&<>
+   <span className="toolbar-hint">{activeTab==="permissions"?"按资源目录管理直接授权":activeTab==="roles"?"管理角色 · 授权范围与职责":`账号 ${users.length} · 部门 ${departments.length} · 工作组 ${groups.length}`}</span>
+   {activeTab!=="permissions"&&activeTab!=="roles"&&<>
    <button type="button" onClick={()=>{setNotice(null);setCreateDepartmentOpen(true);}}>
     <IconPlus/>新建部门
    </button>
@@ -675,9 +676,9 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   {notice&&<p role={notice.tone==="error"?"alert":"status"} className={"notice"+(notice.tone==="error"?" error":"")}>{notice.text}</p>}
 
   {/* 双栏主工作台：左侧组织架构树 + 右侧主工作区卡片 */}
-  <div className={"org-workbench"+(activeTab==="permissions"?" org-permissions-workbench":"")}>
+  <div className={"org-workbench"+((activeTab==="permissions"||activeTab==="roles")?" org-permissions-workbench":"")}>
    {/* 左侧：组织架构树卡片 */}
-   {activeTab!=="permissions"&&<section className="org-card org-dept-card" aria-label="组织架构树">
+   {activeTab!=="permissions"&&activeTab!=="roles"&&<section className="org-card org-dept-card" aria-label="组织架构树">
     <div className="org-card-header">
      <h3 className="org-card-title">
       <IconBuilding/>
@@ -779,10 +780,13 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
       <button type="button" role="tab" aria-selected={activeTab==="permissions"}
        className={"org-tab"+(activeTab==="permissions"?" active":"")}
        onClick={()=>setActiveTab("permissions")}>权限管理</button>
+      <button type="button" role="tab" aria-selected={activeTab==="roles"}
+       className={"org-tab"+(activeTab==="roles"?" active":"")}
+       onClick={()=>setActiveTab("roles")}>管理角色</button>
      </div>
 
      {/* 当前部门范围标识 */}
-     {activeTab!=="permissions"&&<div className="org-scope-badge">
+     {activeTab!=="permissions"&&activeTab!=="roles"&&<div className="org-scope-badge">
       <span className="org-scope-dot" aria-hidden="true"/>
       <span>范围：{scopeLabel}</span>
       {selectedDepartment!==""&&<button type="button" className="org-scope-reset"
@@ -794,6 +798,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
      usersState={usersState} groupsState={groupsState}
      onRetryUsers={()=>setUsersToken(token=>token+1)}
      onRetryGroups={()=>setGroupsToken(token=>token+1)}/>}
+    {activeTab==="roles"&&<RoleBindingsPanel users={users}/>}
 
     {/* Tab 1: 部门成员 */}
     {activeTab==="members"&&<div className="org-tab-stage">

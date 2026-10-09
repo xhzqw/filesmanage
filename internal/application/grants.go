@@ -11,9 +11,6 @@ import (
 // manage_acl (system admin only until scoped delegation is implemented).
 
 func (s *Service) ListGrants(ctx context.Context, u domain.User, folderID string) ([]domain.ACL, error) {
-	if !u.IsAdmin {
-		return nil, domain.ErrForbidden
-	}
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -22,6 +19,13 @@ func (s *Service) ListGrants(ctx context.Context, u domain.User, folderID string
 	folder, err := s.activeFolder(ctx, tx, folderID)
 	if err != nil {
 		return nil, err
+	}
+	allowed, err := s.canManageFolderACL(ctx, tx, u, folder.ID, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, domain.ErrForbidden
 	}
 	return tx.ListGrants(ctx, folder.ID)
 }
@@ -35,9 +39,6 @@ type GrantRequest struct {
 }
 
 func (s *Service) CreateGrant(ctx context.Context, u domain.User, folderID string, req GrantRequest) (domain.ACL, error) {
-	if !u.IsAdmin {
-		return domain.ACL{}, domain.ErrForbidden
-	}
 	if len(req.Actions) == 0 || (req.SubjectKind != "user" && req.SubjectKind != "group") || req.SubjectID == "" {
 		return domain.ACL{}, domain.ErrInvalidInput
 	}
@@ -54,6 +55,26 @@ func (s *Service) CreateGrant(ctx context.Context, u domain.User, folderID strin
 	folder, err := s.activeFolder(ctx, tx, folderID)
 	if err != nil {
 		return domain.ACL{}, err
+	}
+	// Delegated managers may only issue direct grants, never inheritable ones.
+	if !u.IsAdmin && !req.ScopeOnly {
+		return domain.ACL{}, domain.ErrForbidden
+	}
+	allowed, err := s.canManageFolderACL(ctx, tx, u, folder.ID, req.Actions, req.ExpiresAt)
+	if err != nil {
+		return domain.ACL{}, err
+	}
+	if !allowed {
+		return domain.ACL{}, domain.ErrForbidden
+	}
+	if !u.IsAdmin {
+		self, err := s.blocksSelfGrant(ctx, tx, u, req.SubjectKind, req.SubjectID)
+		if err != nil {
+			return domain.ACL{}, err
+		}
+		if self {
+			return domain.ACL{}, domain.ErrForbidden
+		}
 	}
 	if err = s.assertSubjectExists(ctx, tx, req.SubjectKind, req.SubjectID); err != nil {
 		return domain.ACL{}, err
@@ -83,9 +104,6 @@ func (s *Service) CreateGrant(ctx context.Context, u domain.User, folderID strin
 }
 
 func (s *Service) RevokeGrant(ctx context.Context, u domain.User, grantID string) error {
-	if !u.IsAdmin {
-		return domain.ErrForbidden
-	}
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
 		return err
@@ -94,6 +112,16 @@ func (s *Service) RevokeGrant(ctx context.Context, u domain.User, grantID string
 	grant, err := tx.GrantByID(ctx, grantID)
 	if err != nil {
 		return domain.ErrNotFound
+	}
+	if !u.IsAdmin && !grant.ScopeOnly {
+		return domain.ErrForbidden
+	}
+	allowed, err := s.canManageFolderACL(ctx, tx, u, grant.FolderID, grant.Actions, grant.ExpiresAt)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return domain.ErrForbidden
 	}
 	if err = tx.DeleteGrant(ctx, grantID); err != nil {
 		return mapError(err)

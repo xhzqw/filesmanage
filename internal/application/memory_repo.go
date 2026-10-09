@@ -36,6 +36,7 @@ type memoryRepo struct {
 	versions       map[string][]domain.FileVersion
 	blobs          map[string]domain.Blob
 	grants         map[string]domain.ACL
+	roleBindings   map[string]domain.ManagementRoleBinding
 	trash          []domain.TrashEntry
 	workgroups     map[string][]string
 	audit          []domain.AuditEvent
@@ -69,6 +70,7 @@ func newMemoryRepo() *memoryRepo {
 		versions:     map[string][]domain.FileVersion{},
 		blobs:        map[string]domain.Blob{},
 		grants:       map[string]domain.ACL{},
+		roleBindings: map[string]domain.ManagementRoleBinding{},
 		workgroups:   map[string][]string{},
 		idempotency:  map[string][]byte{},
 		groupMembers: map[string][]string{},

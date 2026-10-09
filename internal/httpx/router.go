@@ -11,8 +11,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -91,7 +91,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 		c.JSON(200, gin.H{"ok": true})
 	})
 	api := r.Group("/api")
-	api.Use(checkOrigin)
+	api.Use(requestAuditContext, checkOrigin, h.auditPermissionDenial)
 	api.POST("/login", h.login)
 	api.POST("/logout", h.logout)
 	api.POST("/me/password", h.changePassword)
@@ -109,6 +109,10 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.DELETE("/acls/:id", h.revokeGrant)
 	api.POST("/permissions/explain", h.explainPermissions)
 	api.GET("/permissions/audit", h.permissionAudit)
+	api.GET("/roles/me", h.myRoleBindings)
+	api.GET("/roles/bindings", h.listRoleBindings)
+	api.POST("/roles/bindings", h.createRoleBinding)
+	api.DELETE("/roles/bindings/:id", h.revokeRoleBinding)
 	api.POST("/files", h.uploadFile)
 	api.GET("/files", h.listFiles)
 	api.GET("/files/:id", h.fileMeta)
@@ -209,6 +213,7 @@ func checkOrigin(c *gin.Context) {
 	}
 	c.Next()
 }
+
 // identity allows a newly created account to inspect /api/me before changing
 // its initial password. Business handlers must use auth instead.
 func (h *Handler) identity(c *gin.Context) (domain.User, bool) {
@@ -222,6 +227,7 @@ func (h *Handler) identity(c *gin.Context) (domain.User, bool) {
 		}
 		return domain.User{}, false
 	}
+	c.Set("auditActorID", a.User.ID)
 	return a.User, true
 }
 
