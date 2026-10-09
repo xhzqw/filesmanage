@@ -14,6 +14,8 @@ import urllib.request
 ROUTES = [
     "/api/me",
     "/api/folders/tree",
+    "/api/folders/children",
+    "/api/folders/search?q=probe",
     "/api/files",
     "/api/users",
     "/api/departments",
