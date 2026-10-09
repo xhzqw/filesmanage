@@ -148,6 +148,27 @@ perf 实例停止时运行**：perf 实例与 dev 实例共享 CPU 与同一台 
 | 升级回退 | `python3 scripts/upgrade_rollback_drill.py` | 12/12 |
 | 浏览器旅程 | `node scripts/browser_journey_check.mjs` | 19/19 |
 | 业务界面 | `node scripts/browser_business_check.mjs` | 12/12 |
+| UX 桌面交互 | `node scripts/ux_desktop_check.mjs` | 待远端复跑确认 |
+| UX 业务闭环 | `node scripts/ux_workflows_check.mjs` | 待远端复跑确认 |
+| UX 视觉与 a11y | `node scripts/ux_visual_check.mjs` | 待远端复跑确认（截图落 `docs/evidence/ux/`） |
+
+新增的三条 UX 门禁（`UX-ACCEPTANCE-v1` §8/G5、`docs/design/UX-ACCEPTANCE-v1.md` §9）
+独立于浏览器旅程/业务界面门禁，不削减既有覆盖，状态在**同一提交的远端复跑确认前不得记
+PASS**：
+
+- `ux_desktop_check.mjs`：Dialog 真模态/焦点回归/脏数据守卫、共享 Shell 8 路由一致性、
+  文件选择控制器（DI-01..08）、目录树键盘合同（DI-12..15）、右键菜单与拖放上传队列
+  （DI-03/05/17），共 89 项检查。
+- `ux_workflows_check.mjs`：文件移动 + 预检 API（含幂等/CAS/同名冲突/404 语义）、
+  回滚/回收站恢复/审批意见 UI 闭环、纯文本安全编辑字节保真，共 41 项检查。
+- `ux_visual_check.mjs`：1366×768 / 1440×900 / 1920×1080 三视口遍历
+  `/doc`、`/trash`、`/org`、`/approvals`、`/preview/:id`，断言无横向溢出、主操作在视口内、
+  表格与面包屑可达，PNG 落盘 `docs/evidence/ux/<route>-<viewport>.png`，并断言 `/doc`
+  的 grid/tree/shell 可访问性元数据，共 51 项检查。
+
+三条命令均默认读取 `.secrets/admin.password`，可用 `--base`、`--password-file`、`--port`
+覆盖（默认端口 9360/9361/9362）；运行期间会临时创建时间戳夹具并自行清理。
+`ux_visual_check.mjs` 需要仓库目录可写（创建 `docs/evidence/ux/`）。
 
 需要会话 Cookie 的门禁：`curl -s -c /tmp/c.txt -X POST http://127.0.0.1:18091/api/login
 -H 'Content-Type: application/json' -d "{\"login\":\"admin\",\"password\":\"$(cat .secrets/admin.password)\"}"`

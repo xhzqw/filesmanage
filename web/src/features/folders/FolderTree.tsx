@@ -9,13 +9,17 @@ const DEFAULT_EXPANDED=["folder_root","folder_market","folder_rd"];
 // roving tabindex, full keyboard roaming, one parent->children index instead
 // of per-render filtering, and orphaned subtrees (a parent outside the visible
 // set) surfacing as accessible roots without leaking hidden ancestors.
-export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onDeleteFolder,onManageGrants,onManagePolicy}:{
+export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFolder,onDeleteFolder,onManageGrants,onManagePolicy}:{
  items:Folder[];
  selected:string;
  // Admin-only entries are hidden for non-admins instead of being offered and
  // then rejected by the server (WF-11).
  isAdmin?:boolean;
  onRenameFolder?:(folder:Folder)=>void;
+ // Moving is offered to every folder the user can act on: whether the user may
+ // move the source and write the target is decided by the server, so the entry
+ // is never hidden behind isAdmin.
+ onMoveFolder?:(folder:Folder)=>void;
  onDeleteFolder?:(folder:Folder)=>void;
  onManageGrants?:(folder:Folder)=>void;
  onManagePolicy?:(folder:Folder)=>void;
@@ -128,11 +132,14 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onDelete
   setNodeMenu({folder,point,anchor:node});
  }
 
- // The menu reuses the page's FolderActions flows through callbacks, so rename
- // and delete never duplicate the dialog logic; admin-only entries are hidden
- // for non-admins (WF-11).
+ // The menu reuses the page's FolderActions flows through callbacks, so rename,
+ // move and delete never duplicate the dialog logic; admin-only entries are
+ // hidden for non-admins (WF-11).
  function nodeMenuItems(folder:Folder):MenuItem[]{
-  const items:MenuItem[]=[{id:"rename",label:"重命名目录",onSelect:()=>onRenameFolder?.(folder)}];
+  const items:MenuItem[]=[
+   {id:"rename",label:"重命名目录",onSelect:()=>onRenameFolder?.(folder)},
+   {id:"move",label:"移动到…",onSelect:()=>onMoveFolder?.(folder)},
+  ];
   if(isAdmin){
    items.push({id:"grants",label:"授权管理",onSelect:()=>onManageGrants?.(folder)});
    items.push({id:"policy",label:"审批策略",onSelect:()=>onManagePolicy?.(folder)});
