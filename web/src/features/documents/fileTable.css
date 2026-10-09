@@ -1,5 +1,5 @@
 /* Precision Workbench 2.0 high-density DataGrid (spec §4): a fixed-layout
-   seven-column grid (select/name/size/version/hash/date/actions) built only on
+   six-column grid (select/name/size/version/date/actions) built only on
    the shared token layer. */
 .file-table{table-layout:fixed;width:100%}
 .file-table th{padding:0 8px;height:var(--height-table-header)}
@@ -86,16 +86,56 @@
 }
 .filter-search-input:focus{border-color:var(--border-focus);outline:none;width:150px;transition:width .15s ease}
 
-/* ---- 核心文件表格：彻底拆除操作列边框围墙、Hover 唤出、收纳分流 ---- */
+/* ---- 核心文件表格：彻底拆除操作列边框围墙、Hover 唤出、收纳分流、常驻收藏星标 ---- */
 .file-table tbody td.row-actions{display:table-cell;vertical-align:middle;text-align:right}
 .actions-cell-wrap{
-  display:flex;align-items:center;justify-content:flex-end;gap:2px;height:100%;
-  opacity:0;transition:opacity .12s ease;
+  display:flex;align-items:center;justify-content:flex-end;gap:4px;height:100%;
 }
-table.file-table tbody tr:hover .actions-cell-wrap,
-table.file-table tbody tr.selected .actions-cell-wrap,
-table.file-table tbody tr:focus-within .actions-cell-wrap{
-  opacity:1;
+.actions-hover-group{
+  display:flex;align-items:center;gap:2px;
+  opacity:0;pointer-events:none;
+  transition:opacity .12s ease;
+}
+table.file-table tbody tr:hover .actions-hover-group,
+table.file-table tbody tr.selected .actions-hover-group,
+table.file-table tbody tr:focus-within .actions-hover-group{
+  opacity:1;pointer-events:auto;
+}
+
+.action-star-btn{
+  border:none !important;background:transparent !important;box-shadow:none !important;
+  color:var(--text-tertiary) !important;
+  width:22px;height:20px;padding:0 !important;
+  cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;
+  border-radius:var(--radius-xs);
+  transition:all .12s ease;
+  flex:none;
+}
+.action-star-btn:hover{
+  background:var(--surface-row-hover) !important;
+  color:var(--brand-star, #f59e0b) !important;
+}
+.action-star-btn.favorited{
+  color:var(--brand-star, #f59e0b) !important;
+}
+.action-star-btn.favorited:hover{
+  color:#d97706 !important;
+}
+.action-star-btn:disabled{
+  opacity:0.4;cursor:not-allowed;
+}
+.star-icon{
+  display:block;
+  transition:transform .12s ease;
+}
+.action-star-btn:hover .star-icon{
+  transform:scale(1.15);
+}
+
+.sr-only{
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;
 }
 
 .action-link,

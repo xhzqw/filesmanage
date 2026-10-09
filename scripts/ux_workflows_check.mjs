@@ -728,10 +728,10 @@ async function g4UiSuite() {
     await cdp.navigate(`${BASE}/doc?folder=${folderId}`);
     const rowReady = await cdp.waitFor(`()=>[...document.querySelectorAll('tbody tr[data-id]')].some(r=>r.textContent?.includes('g4-${stamp}.txt'))`, 20000);
     check("fixture file listed", Boolean(rowReady), String(rowReady));
-    const favButton = () => cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr[data-id]')].find(r=>r.textContent?.includes('g4-${stamp}.txt'));const b=row?[...row.querySelectorAll('.row-actions button')].find(x=>x.textContent?.trim()==='关注'||x.textContent?.trim()==='已关注'):null;return b?b.textContent.trim():null;})()`);
-    check("WF-23 favorite action present on the file row", (await favButton()) === "关注", String(await favButton()));
-    await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr[data-id]')].find(r=>r.textContent?.includes('g4-${stamp}.txt'));[...row.querySelectorAll('.row-actions button')].find(x=>x.textContent?.trim()==='关注')?.click();return true;})()`);
-    const favorited = await cdp.waitFor(`()=>{const row=[...document.querySelectorAll('tbody tr[data-id]')].find(r=>r.textContent?.includes('g4-${stamp}.txt'));const b=row?[...row.querySelectorAll('.row-actions button')].find(x=>x.textContent?.trim()==='已关注'):null;return Boolean(b);}`, 15000);
+    const favButton = () => cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr[data-id]')].find(r=>r.textContent?.includes('g4-${stamp}.txt'));const b=row?[...row.querySelectorAll('.row-actions button')].find(x=>['关注','已关注','收藏','已收藏'].includes(x.textContent?.trim())):null;return b?b.textContent.trim():null;})()`);
+    check("WF-23 favorite action present on the file row", (await favButton()) === "收藏" || (await favButton()) === "关注", String(await favButton()));
+    await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr[data-id]')].find(r=>r.textContent?.includes('g4-${stamp}.txt'));[...row.querySelectorAll('.row-actions button')].find(x=>['关注','收藏'].includes(x.textContent?.trim()))?.click();return true;})()`);
+    const favorited = await cdp.waitFor(`()=>{const row=[...document.querySelectorAll('tbody tr[data-id]')].find(r=>r.textContent?.includes('g4-${stamp}.txt'));const b=row?[...row.querySelectorAll('.row-actions button')].find(x=>['已关注','已收藏'].includes(x.textContent?.trim())):null;return Boolean(b);}`, 15000);
     check("WF-23 toggle reflects the server state", favorited === true, String(favorited));
     const favList = await call("GET", "/api/favorites");
     check("WF-23 favorite recorded server-side",

@@ -1232,7 +1232,7 @@ async function main() {
         && shell.panelsPad === "0px" && (shell.panelsGap === "normal" || shell.panelsGap === "0px"),
         JSON.stringify(shell));
 
-      // ---- PW-02: the seven-column fixed grid never overflows ----
+      // ---- PW-02: the six-column fixed grid never overflows ----
       const grid = await cdp.evaluate(`(()=>{
         const table=document.querySelector('table.file-table');
         const box=document.querySelector('.table');
@@ -1242,8 +1242,8 @@ async function main() {
                 row:getComputedStyle(tr).height,
                 overflowX:box.scrollWidth-box.clientWidth,
                 sticky:getComputedStyle(table.querySelector('thead th')).position};})()`);
-      check("PW-02 fixed 7-column grid, 26px ultra rows, sticky header, no horizontal overflow",
-        grid.cols === 7 && grid.layout === "fixed" && grid.row === "26px"
+      check("PW-02 fixed 6-column grid, 26px ultra rows, sticky header, no horizontal overflow",
+        grid.cols === 6 && grid.layout === "fixed" && grid.row === "26px"
         && grid.sticky === "sticky" && grid.overflowX <= 1,
         JSON.stringify(grid));
 

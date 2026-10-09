@@ -197,8 +197,6 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const[sort,setSort]=useState<SortKey>("updated_desc");
  const[categoryFilter,setCategoryFilter]=useState<FileCategory>("all");
  const[nameFilter,setNameFilter]=useState("");
- const[density]=useState<Density>("compact");
- const[ultraDensity,setUltraDensity]=useState<boolean>(true);
  const[cursor,setCursor]=useState("");
  const[hasMore,setHasMore]=useState(false);
  const[renaming,setRenaming]=useState<FileItem|null>(null);
@@ -324,14 +322,14 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   });
   try{
    await request<{id:string;favorited:boolean}>("/favorites/file/"+file.id,{method:on?"PUT":"DELETE"});
-   announce(on?`已关注：${file.name}`:`已取消关注：${file.name}`,"info");
+   announce(on?`已收藏：${file.name}`:`已取消收藏：${file.name}`,"info");
   }catch(error){
    setFavoriteIds(prev=>{
     const next=new Set(prev);
     if(on)next.delete(file.id);else next.add(file.id);
     return next;
    });
-   announce(errorCopy(error,on?"关注失败，请重试":"取消关注失败，请重试"),"error");
+   announce(errorCopy(error,on?"收藏失败，请重试":"取消收藏失败，请重试"),"error");
   }finally{
    setFavoriteBusy("");
   }
@@ -792,10 +790,6 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       <option value="other">其他文件 ({categoryCounts.other})</option>
      </select>
     </label>
-    <div className="density-switch" role="group" aria-label="列表密度">
-     <button type="button" aria-pressed={!ultraDensity} onClick={()=>setUltraDensity(false)}>紧凑</button>
-     <button type="button" aria-pressed={ultraDensity} onClick={()=>setUltraDensity(true)}>超紧凑</button>
-    </div>
     <div className="filter-search-wrap">
      <input type="search" className="filter-search-input" placeholder="过滤当前目录…" aria-label="当前目录内过滤"
       value={nameFilter} onChange={e=>setNameFilter(e.target.value)}/>
@@ -804,26 +798,25 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   </div>
   {message&&<p role="status" className={"notice "+messageTone}>{message}</p>}
   <div className="table" onClick={event=>{if(!(event.target as HTMLElement).closest("tr")){setSelectedIds(new Set<string>());setAnchorId(null);}}}>
-   <table role="grid" aria-label={folderName+" 文件列表"} className={"file-table "+(ultraDensity?"file-table-ultra":"")}>
-    <colgroup><col className="col-select"/><col className="col-name"/><col className="col-size"/><col className="col-version"/><col className="col-hash"/><col className="col-date"/><col className="col-actions"/></colgroup>
+   <table role="grid" aria-label={folderName+" 文件列表"} className="file-table file-table-ultra">
+    <colgroup><col className="col-select"/><col className="col-name"/><col className="col-size"/><col className="col-version"/><col className="col-date"/><col className="col-actions"/></colgroup>
     <thead><tr>
      <th className="col-select" scope="col"><input type="checkbox" tabIndex={-1} checked={allLoadedSelected} onChange={toggleSelectAllLoaded} aria-label="选择当前已加载的文件"/></th>
      <th className="col-name" scope="col">文件名</th>
      <th className="col-size" scope="col">大小</th>
      <th className="col-version" scope="col">版本</th>
-     <th className="col-hash" scope="col">校验值</th>
      <th className="col-date" scope="col">修改日期</th>
      <th className="col-actions" scope="col">操作</th>
     </tr></thead>
     <tbody onKeyDown={onGridKeyDown}>
-     {status==="loading"&&<tr><td colSpan={7} className="empty">正在加载文件…</td></tr>}
-     {status==="failed"&&<tr><td colSpan={7} className="empty" role="alert">获取文件失败，请刷新重试</td></tr>}
-     {status==="ready"&&items.length===0&&<tr><td colSpan={7} className="empty">
+     {status==="loading"&&<tr><td colSpan={6} className="empty">正在加载文件…</td></tr>}
+     {status==="failed"&&<tr><td colSpan={6} className="empty" role="alert">获取文件失败，请刷新重试</td></tr>}
+     {status==="ready"&&items.length===0&&<tr><td colSpan={6} className="empty">
       <svg className="empty-mark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.5h8A1.5 1.5 0 0 1 20 10v7.5A1.5 1.5 0 0 1 18.5 19h-14A1.5 1.5 0 0 1 3 17.5z"/></svg>
       <span className="empty-title">目录为空</span>
       <span className="empty-hint">上传第一个文件开始使用。</span>
      </td></tr>}
-     {status==="ready"&&items.length>0&&visibleItems.length===0&&<tr><td colSpan={7} className="empty">
+     {status==="ready"&&items.length>0&&visibleItems.length===0&&<tr><td colSpan={6} className="empty">
       <span className="empty-title">无匹配文件</span>
       <span className="empty-hint">当前目录下没有属于该类型的文件。</span>
       <button type="button" className="secondary-action" style={{marginTop:6}} onClick={()=>{
@@ -847,24 +840,32 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       <td className="col-name"><div className="file-cell-wrap"><FileTypeIcon name={item.name}/><span className="file-name" title={item.name}>{item.name}</span></div></td>
       <td className="col-size num">{formatSize(item.sizeBytes)}</td>
       <td className="col-version"><span className="version-badge">v{item.currentVersionSeq}</span></td>
-      <td className="col-hash hash" title={item.sha256}>{item.sha256.slice(0,8)}</td>
       <td className="col-date date">{item.updatedAt.replace("T"," ").slice(0,16)}</td>
       <td className="row-actions col-actions" onClick={event=>event.stopPropagation()}><div className="actions-cell-wrap">
-       <button type="button" className="action-link" onClick={()=>navigate("/preview/"+item.id)}>打开</button>
-       <a href={"/api/files/"+item.id+"/bytes"} download={item.name} className="action-link">下载</a>
-       <button type="button" className="action-link" onClick={()=>onEdit(item.id)}>编辑</button>
-       <div className="row-more-wrapper">
-        <button type="button" className="action-link more-trigger" aria-label="更多操作" aria-expanded={openRowMoreId===item.id}
-         onClick={()=>setOpenRowMoreId(prev=>prev===item.id?null:item.id)}>···</button>
-        <div className={"row-more-menu"+(openRowMoreId===item.id?" open":"")} role="menu">
-         <button type="button" role="menuitem" onClick={()=>{setOpenRowMoreId(null);setRenaming(item);setRenameValue(item.name);}}>重命名</button>
-         <button type="button" role="menuitem" aria-pressed={favoriteIds.has(item.id)}
-          disabled={favoritesState!=="ready"||favoriteBusy!==""}
-          title={favoritesState==="failed"?"关注状态加载失败，请刷新后重试":undefined}
-          onClick={()=>{setOpenRowMoreId(null);toggleFavorite(item);}}>{favoriteIds.has(item.id)?"已关注":"关注"}</button>
-         <button type="button" role="menuitem" className="danger" onClick={()=>{setOpenRowMoreId(null);setPendingDelete([item]);}}>删除</button>
+       <div className="actions-hover-group">
+        <button type="button" className="action-link" onClick={()=>navigate("/preview/"+item.id)}>打开</button>
+        <a href={"/api/files/"+item.id+"/bytes"} download={item.name} className="action-link">下载</a>
+        <button type="button" className="action-link" onClick={()=>onEdit(item.id)}>编辑</button>
+        <div className="row-more-wrapper">
+         <button type="button" className="action-link more-trigger" aria-label="更多操作" aria-expanded={openRowMoreId===item.id}
+          onClick={()=>setOpenRowMoreId(prev=>prev===item.id?null:item.id)}>···</button>
+         <div className={"row-more-menu"+(openRowMoreId===item.id?" open":"")} role="menu">
+          <button type="button" role="menuitem" onClick={()=>{setOpenRowMoreId(null);setRenaming(item);setRenameValue(item.name);}}>重命名</button>
+          <button type="button" role="menuitem" className="danger" onClick={()=>{setOpenRowMoreId(null);setPendingDelete([item]);}}>删除</button>
+         </div>
         </div>
        </div>
+       <button type="button"
+        className={"action-star-btn"+(favoriteIds.has(item.id)?" favorited":"")}
+        aria-label={favoriteIds.has(item.id)?"已收藏":"收藏"}
+        title={favoritesState==="failed"?"收藏状态加载失败，请刷新重试":favoriteIds.has(item.id)?"已收藏（点击取消）":"收藏"}
+        disabled={favoritesState!=="ready"||favoriteBusy!==""}
+        onClick={()=>toggleFavorite(item)}>
+        <svg className="star-icon" viewBox="0 0 24 24" width="14" height="14" fill={favoriteIds.has(item.id)?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>
+        <span className="sr-only">{favoriteIds.has(item.id)?"已收藏":"收藏"}</span>
+       </button>
       </div></td>
      </tr>)}
     </tbody>
