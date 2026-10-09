@@ -194,9 +194,9 @@ try{
    await navigate("/doc",".sidebar");
    await inspectCompact("documents",width);
    if(width<=600){
+    await evaluate(`(()=>{document.querySelector(".nav-toggle")?.click();return true})()`);
+    await delay(200);
     const toggled=await evaluate(`(()=>{
-     const btn=document.querySelector(".nav-toggle");
-     btn?.click();
      const menu=document.querySelector(".header nav.open");
      if(!menu)return null;
      const r=menu.getBoundingClientRect();
