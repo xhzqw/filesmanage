@@ -2,6 +2,7 @@ import {useEffect,useRef,useState,type FormEvent} from "react";
 import {useNavigate,useParams} from "react-router-dom";
 import {fileApi} from "../features/documents/api";
 import {errorCopy} from "../shared/errors";
+import {reportSessionResponse} from "../shared/http";
 import type {FileItem} from "../entities/file/model";
 import type {User} from "../entities/user/model";
 import {AppShell} from "../shared/ui/AppShell";
@@ -115,7 +116,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
     const THREE=await import("three");
     const {OrbitControls}=await import("three/examples/jsm/controls/OrbitControls.js");
     const res=await fetch("/api/files/"+id+"/derivative/bytes",{credentials:"same-origin"});
-    if(!res.ok)throw new Error("derivative fetch failed");
+    if(!res.ok){await reportSessionResponse(res,"/files/derivative/bytes");throw new Error("derivative fetch failed");}
     // MOD07: a mesh too large for a browser tab is refused up front with an
     // actionable error and a download entry instead of hanging the page.
     const declared=Number(res.headers.get("Content-Length")??"0");
@@ -314,7 +315,7 @@ async function loadParser(
       const url=resolveUrl(ref);
       if(!url.startsWith("/api/files/"))continue;
       const res=await fetch(url,{credentials:"same-origin"});
-      if(!res.ok)continue;
+      if(!res.ok){await reportSessionResponse(res,url);continue;}
       // parse() returns the MaterialCreator that owns the parsed materials.
       materials=mtlLoader.parse(await res.text(),"");
      }

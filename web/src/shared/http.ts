@@ -6,6 +6,21 @@ export function subscribeSessionIssues(listener:(issue:SessionIssue)=>void):()=>
  issueListener=listener;
  return ()=>{if(issueListener===listener)issueListener=null};
 }
+// Shared by JSON, multipart/XHR and binary endpoints.
+export function reportSessionIssue(status:number,code:string,url:string):void{
+ if(status===401&&code==="E_AUTH"&&url!=="/login"&&url!=="/logout"&&url!=="/me"){
+  issueListener?.("expired");
+ }else if(status===403&&code==="E_PASSWORD_CHANGE_REQUIRED"){
+  issueListener?.("password_change_required");
+ }
+}
+export async function reportSessionResponse(res:Response,url:string):Promise<void>{
+ if(res.ok)return;
+ let body:Reply<unknown>|undefined;
+ try{body=await res.clone().json() as Reply<unknown>;}catch{body=undefined;}
+ reportSessionIssue(res.status,body?.error?.code||(res.status===401?"E_AUTH":""),url);
+}
+
 export class ApiError extends Error{
  readonly code:string;
  readonly httpStatus:number;
@@ -38,12 +53,7 @@ export async function request<T>(url:string,options?:RequestInit):Promise<T>{
  try{reply=await res.json() as Reply<T>;}catch{reply=undefined;}
  if(!res.ok||!reply||!reply.ok){
   const code=reply?.error?.code||(res.status===401?"E_AUTH":"E_INTERNAL");
-  // A wrong password is not a lost session. Logout errors are handled by App.
-  if(res.status===401&&code==="E_AUTH"&&url!=="/login"&&url!=="/logout"&&url!=="/me"){
-   issueListener?.("expired");
-  }else if(res.status===403&&code==="E_PASSWORD_CHANGE_REQUIRED"){
-   issueListener?.("password_change_required");
-  }
+  reportSessionIssue(res.status,code,url);
   const header=res.headers.get("Retry-After");
   const parsed=header===null?NaN:Number(header);
   const retryAfter=Number.isFinite(parsed)&&parsed>0?parsed:undefined;

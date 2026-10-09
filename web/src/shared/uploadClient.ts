@@ -1,4 +1,4 @@
-import {ApiError} from "./http";
+import {ApiError,reportSessionIssue} from "./http";
 
 type UploadReply={ok:boolean;data?:unknown;error?:{code:string;message?:string}};
 
@@ -25,6 +25,7 @@ export async function postMultipart<T>(url:string,body:FormData,options?:{signal
 // the XHR uploader must not drift into two code/status/message mappings.
 function envelopeError(status:number,requestId:string|undefined,reply:UploadReply|undefined,fallbackMessage?:string):ApiError{
  const code=reply?.error?.code||(status===401?"E_AUTH":"E_INTERNAL");
+ reportSessionIssue(status,code,"/files");
  return new ApiError(code,status,requestId,reply?.error?.message||fallbackMessage||"请求失败");
 }
 
