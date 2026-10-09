@@ -362,7 +362,7 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 	}
 	// Keep the principal only for a post-commit notification. No failed
 	// revocation may be published as a successful logout.
-	principal, _ := s.Session(ctx, token)
+	principal, _ := s.session.get(token, s.now(), s.epoch())
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
 		return err
