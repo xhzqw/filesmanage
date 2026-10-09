@@ -248,7 +248,7 @@ try{
   // from media query source. Include a genuinely narrow phone viewport.
   for(const width of [820,600,390,320]){
    await compactViewport(width);
-   await navigate("/doc",".sidebar");
+   await navigate("/doc",".table");
    await inspectCompact("documents",width);
    if(width<=600){
     await evaluate(`(()=>{document.querySelector(".nav-toggle")?.click();return true})()`);
@@ -291,6 +291,7 @@ try{
     permissionsLayout.workspace.right<=width+2&&
     permissionsLayout.tree.width>=Math.min(200,width*.6)&&
     permissionsLayout.tree.height>=110&&
+    permissionsLayout.treeScroll.height>=80&&
     permissionsLayout.detail.width>=Math.min(250,width*.7)&&
     permissionsLayout.detail.height>=300&&
     permissionsLayout.detail.overflowY==="auto"&&
@@ -320,8 +321,8 @@ try{
     })()`);
     check("phone file name exposes reachable full action menu",
      quickMenuOpened&&!!quickMenu&&quickMenu.visible&&quickMenu.left>=0&&
-     quickMenu.right<=390&&quickMenu.labels.includes("移动到…")&&
-     quickMenu.labels.includes("重命名"),
+     quickMenu.right<=390&&quickMenu.labels.some(x=>x?.startsWith("移动到"))&&
+     quickMenu.labels.some(x=>x?.startsWith("重命名")),
      JSON.stringify(quickMenu));
     await navigate("/doc?folder="+fixture.folderId,".file-table");
     for(let i=0;i<50;i++){

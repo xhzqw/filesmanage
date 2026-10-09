@@ -65,8 +65,10 @@
 .perm-audit-scroll{overflow:auto;min-width:0;min-height:0;flex:1}
 .perm-audit-detail{max-width:300px;overflow-wrap:anywhere;font-size:11px}
 @media(max-width:850px){
- .perm-workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(140px,28%) minmax(0,1fr);overflow:hidden}
+ .perm-workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(160px,34%) minmax(0,1fr);overflow:hidden}
  .perm-browser{height:auto;min-height:0;border-right:0;border-bottom:1px solid var(--border-hairline)}
+ .perm-browser-search{flex-direction:row;align-items:center;gap:8px;padding:3px 8px;min-height:34px;flex:none}
+ .perm-browser-search input{flex:1;min-width:0;height:26px}
  .perm-detail{min-height:0;overflow-y:auto;overflow-x:hidden}
  .perm-grants-scroller{max-height:300px}
 }
