@@ -37,7 +37,9 @@ export function assessEditable(preview:PreviewData):EditAssessment{
  if(!preview.textual)return{editable:false,reason:"该文件不是可识别的纯文本格式，无法在网页编辑器中安全保存。"+BLOCKED_HINT};
  if(preview.truncated)return{editable:false,reason:"文件大小超过预览上限，当前没有完整字节读取路径；编辑并保存会写入不完整内容，已禁止。"+BLOCKED_HINT};
  if(!preview.byteMeta.printable)return{editable:false,reason:"文件包含二进制内容，无法按文本安全编辑。"+BLOCKED_HINT};
- if(!preview.rawBase64)return{editable:false,reason:"无法获取文件的精确字节，暂时不能编辑。"+BLOCKED_HINT};
+ // An empty file legitimately carries an empty rawBase64, so presence is a
+ // type check, not a truthiness check.
+ if(typeof preview.rawBase64!=="string")return{editable:false,reason:"无法获取文件的精确字节，暂时不能编辑。"+BLOCKED_HINT};
  // Mixed EOL cannot be reconstructed line-by-line after a user edit, so the
  // byte-fidelity strategy would be violated; editing stays disabled.
  if(preview.byteMeta.eol==="mixed")return{editable:false,reason:"文件混合使用 CRLF 与 LF 换行，编辑器无法逐行保留原始换行符。"+BLOCKED_HINT};
