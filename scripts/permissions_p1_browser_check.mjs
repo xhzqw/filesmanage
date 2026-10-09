@@ -88,9 +88,10 @@ try{
    body:JSON.stringify({login:'admin',password:${JSON.stringify(password)}}),
    credentials:'same-origin',
   });
-  return response.status;
+  const body=await response.json().catch(()=>null);
+  return {status:response.status,code:body?.error?.code??null};
  })()`);
- assert(auth===200,"admin browser session established");
+ assert(auth?.status===200,"admin browser session established (HTTP "+auth?.status+", code "+auth?.code+")");
  await cdp.navigate(BASE+"/org?tab=permissions&view=folder");
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-workspace')"),"organization permission workspace renders");
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-tree-name')"),"resource folder browser loads");
