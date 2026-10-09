@@ -157,7 +157,7 @@ func TestMoveFileTargetMissingOrDeleted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = s.DeleteFolder(ctx, admin, target.ID); err != nil {
+	if _, _, err = s.DeleteFolder(ctx, admin, target.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = s.MoveFile(ctx, admin, uploaded.FileID, target.ID, "", ""); !errors.Is(err, domain.ErrNotFound) {
