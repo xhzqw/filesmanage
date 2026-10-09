@@ -90,7 +90,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 		c.JSON(200, gin.H{"ok": true})
 	})
 	api := r.Group("/api")
-	api.Use(requestAuditContext, checkOrigin, h.auditPermissionDenial)
+	api.Use(checkOrigin)
 	api.POST("/login", h.login)
 	api.POST("/logout", h.logout)
 	api.POST("/me/password", h.changePassword)
@@ -220,7 +220,6 @@ func (h *Handler) identity(c *gin.Context) (domain.User, bool) {
 		}
 		return domain.User{}, false
 	}
-	c.Set("auditActorID", a.User.ID)
 	return a.User, true
 }
 
