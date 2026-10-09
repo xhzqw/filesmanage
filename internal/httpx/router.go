@@ -108,6 +108,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.GET("/files/:id/preview", h.previewFile)
 	api.POST("/files/:id/save", h.saveFile)
 	api.POST("/files/:id/move", h.moveFile)
+	api.POST("/files/move-batch", h.moveFilesBatch)
 	api.POST("/moves/preflight", h.preflightMoves)
 	api.GET("/files/:id/versions", h.fileVersions)
 	api.POST("/files/:id/rollback", h.rollbackFile)

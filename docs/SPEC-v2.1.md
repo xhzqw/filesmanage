@@ -706,6 +706,7 @@ GET /api/approvals、POST /api/approvals/:id/decide、GET /api/search。
 | GET | /api/files/:id/metadata | 有效 preview/list | 可见文件元数据 |
 | GET | /api/files/:id/bytes-meta | 有效 preview | 编码/行尾/checksum 元数据 |
 | POST | /api/files/:id/move | 来源 move + 目标 upload | 单文件移动（CAS + 幂等 + 审计） |
+| POST | /api/files/move-batch | 来源 move + 目标 upload | 批量移动，all-or-nothing（上限 100 文件，幂等 + 审计） |
 | POST | /api/moves/preflight | 已登录 | 移动前只读预检（UX 提示，非授权证明） |
 
 ### 9.3 新增 API 请求响应示例
@@ -804,8 +805,8 @@ rollbackTargetSeq、rollbackFromSeq、sha256、versionSeq、createdAt、createdB
 - 成功保持稳定 file id、版本历史与内容哈希；写入 `file.move` 审计事件；提交后按现有权限 epoch 失效缓存，
   搜索/关注/共享范围在下一个请求重算。
 - 幂等：以 (user_id,file_id,idempotencyKey) 记录 `{fileId,fromFolderId,toFolderId}`，与 save/rollback 同一机制；
-  重放返回相同结果，不产生第二次移动或审计行。批量移动与目录移动（POST /api/folders/:id/move）复用同一机制，
-  批量上限在实现前以 ADR 明确。
+  重放返回相同结果，不产生第二次移动或审计行。批量移动见 §9.7（上限 100 个文件）；
+  目录移动（POST /api/folders/:id/move）复用同一机制。
 
 预检：POST /api/moves/preflight，请求 `{resources:[{kind,id}],targetFolderId,mode}`，只读，不写任何数据、不加锁。
 - status：`ready`（全部可移动）/`conflict`（重名、不存在、已在目标等）/`forbidden`（权限不足）；
@@ -815,6 +816,35 @@ rollbackTargetSeq、rollbackFromSeq、sha256、versionSeq、createdAt、createdB
 - `sourceSummary`/`targetSummary` 仅包含调用方可见的目录名，不可见祖先处截断，不泄露隐藏路径或名称；
   目标对调用方不可见时返回 404 E_NOT_FOUND，与“不存在”不可区分（SAFE-04）。
 - mode 仅支持 `all_or_nothing`；任一资源冲突时提交不得产生部分写入。
+
+### 9.7 批量文件移动（COMPLEX-WORKFLOWS §3.2 草案 C，ADR-UX-02 / WF-07 / WF-08）
+请求：POST /api/files/move-batch
+```json
+{
+  "fileIds": ["f_1", "f_2"],
+  "targetFolderId": "fd_target",
+  "mode": "all_or_nothing",
+  "idempotencyKey": "opaque-client-key"
+}
+```
+- 上限：单次最多 100 个文件（服务端常量 MaxMoveBatchFiles）；超出返回 400 E_BAD，error.message 说明上限
+  （`fileIds exceeds the batch limit of 100`）。fileIds 为空、targetFolderId 为空、fileId 重复或 mode 为
+  `all_or_nothing` 之外的其它取值同样返回 400 E_BAD（mode 缺省视为 `all_or_nothing`），且在任何数据库写入前拒绝。
+- 全部成功/全部失败（ADR-UX-02）：服务端在同一事务内先逐项重验来源目录 `move`、文件活跃状态、目标目录存在且
+  未删除、目标目录 `upload`、文件是否已在目标目录、目标内名称唯一（含批次内两个文件同名），全部通过后才执行移动；
+  任一失败则整批不写入——没有部分移动、没有审计行，事务回滚。
+- 成功 200：
+  `{"ok":true,"data":{"status":"committed","moved":[{"fileId":"f_1","fromFolderId":"fd_source","toFolderId":"fd_target"}],"conflicts":[],"count":2}}`；
+  moved 按请求顺序逐项给出 from/to，count 为已移动文件数；保持稳定 file id、版本历史与内容哈希不变；
+  每个文件写一条 `file.move` 审计事件；提交后按现有权限 epoch 失效缓存，搜索/关注/共享范围在下一个请求重算。
+- 冲突 200：status 为 `conflict`，moved 为空，conflicts 逐项 `{id,code,message?}`，code 使用与单文件提交一致的
+  稳定错误码（E_FORBIDDEN/E_NOT_FOUND/E_NAME_CONFLICT/E_MOVE_CONFLICT），count 为冲突项数；
+  用户可排除问题项后重新预检/重试。
+- 幂等：以 (user_id, `file.move-batch:`+排序后的 fileIds, idempotencyKey) 记录整个提交结果
+  `{status,moved,conflicts,count}`，与 save/rollback 同一机制；重放返回相同结果，不产生第二次移动或审计行。
+  冲突结果不写入任何记录（事务已回滚），相同请求重放会重新校验并返回相同的冲突列表。
+- 批量请求不含 CAS 字段：`expectedFolderId` 是单文件守卫，批量无语义；并发改名/移动由事务内名称唯一与数据库
+  唯一索引最终拒绝（E_NAME_CONFLICT，整批不写入），不静默覆盖。
 
 ---
 

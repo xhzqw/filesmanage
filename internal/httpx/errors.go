@@ -18,6 +18,10 @@ func respondError(c *gin.Context, err error) {
 		c.JSON(401, gin.H{"ok": false, "error": gin.H{"code": "E_INVALID_CREDENTIALS"}})
 	case errors.Is(err, application.ErrPasswordPolicy):
 		c.JSON(422, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_POLICY"}})
+	case errors.Is(err, application.ErrBatchTooLarge):
+		// The over-limit rejection is the one 400 that carries a message: the
+		// caller must learn the exact batch limit to retry with a smaller set.
+		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD", "message": err.Error()}})
 	case errors.Is(err, application.ErrInvalidInput), errors.Is(err, domain.ErrInvalidInput):
 		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
 	case errors.Is(err, domain.ErrUnauthorized):

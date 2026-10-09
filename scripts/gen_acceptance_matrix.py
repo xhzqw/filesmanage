@@ -155,7 +155,7 @@ MATRIX = {
     "AG12": ("PASS", "pe12_cad_saturation.py 7/7（x0.93–x1.14，预算 1.25）"),
     "AG13": ("PASS", "office session TTL + callback 恢复测试"),
     "AG14": ("PASS", "pt_samples_e2e.py PT10 A/B 409；cursor/baseSeq 竞态修复"),
-    "AG15": ("PASS", "docs/openapi-implemented.yaml（68 端点）+ 本矩阵逐 ID 追溯"),
+    "AG15": ("PASS", "docs/openapi-implemented.yaml（69 端点）+ 本矩阵逐 ID 追溯"),
     "AG16": ("PASS", "check_architecture.py 负向规则自测（注入跨层导入即失败）"),
     # ---- PE ----
     "PE01": ("PASS", "§24 + PE01–PE18 统一由 loadtest/perf 脚本执行，不按口头说明宣布高性能"),

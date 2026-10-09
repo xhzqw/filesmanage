@@ -3,7 +3,7 @@ import {useNavigate}from "react-router-dom";
 import type {FileItem} from "../../entities/file/model";
 import type {Folder} from "../../entities/folder/model";
 import {fileApi,formatSize,uploadFile} from "./api";
-import {failed,fileMoveInvalidTarget,openFlow,pickTarget,preflightConflict,preflightReady,preflightStarted,submitStarted,succeeded,type MoveFlow,type MovePreflight}from"./moveFileFlow";
+import {batchConflict,batchExcluded,batchFailed,batchMoveInvalidTarget,batchPickTarget,batchSubmitStarted,batchSucceeded,failed,fileMoveInvalidTarget,openBatch,openFlow,pickTarget,preflightConflict,preflightReady,preflightStarted,submitStarted,succeeded,type BatchMoveFlow,type MoveFlow,type MovePreflight}from"./moveFileFlow";
 import {errorCode,errorCopy} from "../../shared/errors";
 import {request} from "../../shared/http";
 import {newIdempotencyKey} from "../../shared/ids";
@@ -54,9 +54,11 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
  // lives only while the row menu is open and is never business state.
  const[rowMenu,setRowMenu]=useState<{targets:FileItem[];point:MenuPoint|null;anchor:HTMLElement|null}|null>(null);
  const[deleteBusy,setDeleteBusy]=useState(false);
- // WF-01: the file being moved. Every move endpoint takes one id, so this is
- // single-selection like the other per-file actions.
+ // WF-01: the file being moved through the single-file CAS endpoint.
  const[moving,setMoving]=useState<FileItem|null>(null);
+ // WF-07/WF-08/ADR-UX-02: the multi-selection being moved through the
+ // all-or-nothing batch endpoint — the snapshot the row menu opened on.
+ const[movingBatch,setMovingBatch]=useState<FileItem[]|null>(null);
  // WF-23: ids favorited by the caller, the load state of that list, and the row
  // whose toggle is in flight.
  const[favoriteIds,setFavoriteIds]=useState<Set<string>>(()=>new Set<string>());
@@ -300,10 +302,13 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
  }
 
  // WF-11: the menu only offers what the whole target set can legally perform.
- // FileItem carries no permission or lock facts, so per-file actions stay
- // single-selection (every endpoint takes one id) and deletion keeps the
- // existing per-item confirmation with partial-failure reporting instead of
- // silently applying to part of a mixed-permission selection.
+ // FileItem carries no permission or lock facts, so actions without a batch
+ // endpoint — open, edit, rename, download — stay single-selection, while the
+ // move entry acts on the whole selection: one file through the CAS endpoint,
+ // two or more through the all-or-nothing batch (ADR-UX-02), which the server
+ // rejects as a unit rather than silently applying to part of the set.
+ // Deletion keeps its per-item confirmation with explicit partial-failure
+ // reporting.
  function rowMenuItems(targets:FileItem[]):MenuItem[]{
   const single=targets.length===1?targets[0]:null;
   const items:MenuItem[]=[];
@@ -314,6 +319,8 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
    items.push({id:"rename",label:"重命名",hint:"F2",onSelect:()=>{setRenaming(file);setRenameValue(file.name);}});
    items.push({id:"move",label:"移动到…",onSelect:()=>startMove(file)});
    items.push({id:"download",label:"下载",onSelect:()=>startDownload(file)});
+  }else if(targets.length>1){
+   items.push({id:"move-batch",label:"移动到…",onSelect:()=>setMovingBatch(targets)});
   }
   items.push({id:"delete",label:"删除",hint:"Delete",danger:true,onSelect:()=>setPendingDelete(targets)});
   return items;
@@ -397,6 +404,20 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
   void reload().catch(()=>announce("列表刷新失败，请手动刷新后核对","error"));
  }
 
+ // WF-09: the same boundary as the single-file move — this table reloads its
+ // own list and announces the committed result; the destination tree, the
+ // inspector and the search/favorites views refresh as the page re-reads them.
+ function onBatchMoved(movedIds:string[]){
+  setMovingBatch(null);
+  setSelectedIds(prev=>{
+   const next=new Set(prev);
+   for(const id of movedIds)next.delete(id);
+   return next;
+  });
+  announce(`已移动 ${movedIds.length} 个文件`,"info");
+  void reload().catch(()=>announce("操作已提交，但列表刷新失败，请手动刷新后核对","error"));
+ }
+
  const selection=items.filter(i=>selectedIds.has(i.id));
 
  return <div className="work-body">
@@ -477,6 +498,7 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
    </form>
   </Dialog>}
   {moving&&<MoveDialog file={moving} onClose={()=>setMoving(null)} onMoved={onMoved} onReload={onMoveReload}/>}
+  {movingBatch&&<BatchMoveDialog files={movingBatch} onClose={()=>setMovingBatch(null)} onMoved={onBatchMoved} onReload={onMoveReload}/>}
   {rowMenu&&<Menu open label="文件操作菜单" items={rowMenuItems(rowMenu.targets)} anchor={rowMenu.anchor}
    point={rowMenu.point} onClose={()=>setRowMenu(null)}/>}
  </div>;
@@ -496,6 +518,12 @@ function conflictNotice(preflight:MovePreflight):string{
  const first=preflight.conflicts[0];
  if(!first)return "预检未通过，请更换目标";
  return MOVE_CONFLICT_COPY[first.code]??first.message??"预检未通过，请更换目标";
+}
+
+// The batch answers itemised: the stable code names the reason for one file, so
+// every row keeps its own copy instead of collapsing the list into one notice.
+function conflictItemCopy(conflict:{code:string;message?:string}):string{
+ return MOVE_CONFLICT_COPY[conflict.code]??conflict.message??"无法移动该文件";
 }
 
 // Visible-ancestor path only: a folder outside the loaded tree is never
@@ -662,6 +690,147 @@ function MoveDialog({file,onClose,onMoved,onReload}:{
      <button type="button" className="secondary-action" onClick={close} disabled={busy}>取消</button>
      <button type="button" className="secondary-action" onClick={check} disabled={!canCheck}>{flow.state==="validating"?"检查中…":"检查并继续"}</button>
      <button type="button" className="primary" onClick={submit} disabled={!canConfirm}>{flow.state==="submitting"?"移动中…":"确认移动"}</button>
+    </>}
+  />}
+ </Dialog>;
+}
+
+// Batch move (WF-07/WF-08, ADR-UX-02). The whole selection goes to one
+// all-or-nothing transaction: there is no preflight step (the commit
+// re-verifies everything anyway) and a conflict answer wrote nothing, so the
+// dialog stays open with the per-item list and lets the user exclude the
+// problem files and submit the remainder. An unknown outcome offers only a
+// re-read — it never claims the move happened or that it did not.
+function BatchMoveDialog({files,onClose,onMoved,onReload}:{
+ files:FileItem[];
+ onClose:()=>void;
+ onMoved:(movedIds:string[])=>void;
+ onReload:()=>void;
+}){
+ const[folders,setFolders]=useState<Folder[]>([]);
+ const[tree,setTree]=useState<"loading"|"ready"|"failed">("loading");
+ const[treeToken,setTreeToken]=useState(0);
+ const[flow,setFlow]=useState<BatchMoveFlow>(openBatch);
+ // The pending set is the live scope of the submission; only the explicit
+ // exclude-and-retry step narrows it, never the dialog on its own.
+ const[pendingIds,setPendingIds]=useState<string[]>(()=>files.map(file=>file.id));
+ const[needsRefresh,setNeedsRefresh]=useState(false);
+
+ useEffect(()=>{
+  let valid=true;
+  setTree("loading");
+  // Read through the shared JSON client, as RestoreDialog does, so this
+  // feature stays independent of the folders module.
+  request<Folder[]>("/folders/tree")
+   .then(data=>{if(!valid)return;setFolders(data);setTree("ready");})
+   .catch(()=>{if(valid)setTree("failed");});
+  return()=>{valid=false;};
+ },[treeToken]);
+
+ const busy=flow.state==="submitting";
+ const selected=folders.find(folder=>folder.id===flow.targetId)??null;
+ const invalid=selected?batchMoveInvalidTarget(selected,files,folders):null;
+ const canSubmit=tree==="ready"&&!busy&&!needsRefresh&&flow.state==="candidate"&&selected!==null&&invalid===null&&pendingIds.length>0;
+ const conflictIds=new Set(flow.conflicts.map(conflict=>conflict.id));
+ const nameOf=new Map(files.map(file=>[file.id,file.name]));
+ const sourcePath=pathOf(folders,files[0]?.folderId??"");
+ const targetPath=flow.targetId!==""?pathOf(folders,flow.targetId):"";
+
+ function close(){
+  if(busy)return;
+  onClose();
+ }
+
+ function choose(targetId:string){
+  // A new candidate voids the previous conflict list; the picker is
+  // busy-locked while a submission is in flight, so no stale answer survives.
+  setFlow(current=>batchPickTarget(current,targetId));
+ }
+
+ // ADR-UX-02 exclude-and-retry: drop exactly the conflicting items from the
+ // pending set and return to the candidate step, where the remainder can be
+ // submitted again. Nothing is dropped without the user asking for it.
+ function excludeConflicts(){
+  if(flow.state!=="conflict"||pendingIds.length===0)return;
+  const remaining=pendingIds.filter(id=>!conflictIds.has(id));
+  setPendingIds(remaining);
+  if(remaining.length===0)return;
+  setFlow(current=>batchExcluded(current,`已排除 ${pendingIds.length-remaining.length} 个问题文件，可提交剩余 ${remaining.length} 个`));
+ }
+
+ async function submit(){
+  if(!canSubmit)return;
+  const targetId=flow.targetId;
+  setFlow(current=>batchSubmitStarted(current));
+  try{
+   const data=await fileApi.moveBatch(pendingIds,targetId,newIdempotencyKey());
+   if(data.status==="committed"){
+    setFlow(current=>batchSucceeded(current,data.moved));
+    onMoved(data.moved.map(item=>item.fileId));
+    return;
+   }
+   if(data.conflicts.length>0){
+    setFlow(current=>batchConflict(current,data.conflicts));
+    return;
+   }
+   // Neither a commit nor an itemised conflict: the outcome is not something
+   // this dialog may read as success.
+   setNeedsRefresh(true);
+   setFlow(current=>batchFailed(current,"移动结果未确认，请刷新查看状态"));
+  }catch(error){
+   const code=errorCode(error);
+   if(code==="E_NETWORK"){
+    // The request never completed, so the outcome is unknown: never report
+    // success or failure — only the refreshed list tells the truth.
+    setNeedsRefresh(true);
+    setFlow(current=>batchFailed(current,"网络中断，无法确认是否已移动，请刷新查看状态"));
+    return;
+   }
+   if(code==="E_FORBIDDEN"){setFlow(current=>batchFailed(current,"没有权限移动所选文件，请更换目标或确认权限"));return;}
+   if(code==="E_BAD"){setFlow(current=>batchFailed(current,"所选文件超出单次移动上限，请分批选择后重试"));return;}
+   if(code==="E_NOT_FOUND"){setFlow(current=>batchFailed(current,"目标目录不存在或已不可见，请刷新后重试"));return;}
+   if(code==="E_NAME_CONFLICT"){setFlow(current=>batchFailed(current,"目标目录已存在同名文件，请更改目标"));return;}
+   setFlow(current=>batchFailed(current,"移动失败，请重试"));
+  }
+ }
+
+ return <Dialog open title={pendingIds.length>0?`移动 ${pendingIds.length} 个文件到…`:"移动到…"} onClose={close} closeGuard={()=>!busy} className="dialog">
+  {tree==="loading"&&<p className="empty">正在读取目录…</p>}
+  {tree==="failed"&&<>
+   <p role="alert" className="notice error">获取目录失败，请稍后重试。</p>
+   <div className="dialog-actions">
+    <button type="button" className="secondary-action" onClick={close} disabled={busy}>取消</button>
+    <button type="button" className="secondary-action" onClick={()=>setTreeToken(token=>token+1)} disabled={busy}>重试</button>
+   </div>
+  </>}
+  {tree==="ready"&&<FolderPicker
+   open
+   title={pendingIds.length>0?`移动 ${pendingIds.length} 个文件到…`:"移动到…"}
+   folders={folders}
+   selectedId={flow.targetId}
+   onSelect={choose}
+   onClose={close}
+   invalidTarget={folder=>batchMoveInvalidTarget(folder,files,folders)}
+   notice={flow.notice}
+   busy={busy}
+   detail={<>
+    <p className="hint">来源：{sourcePath||"当前目录"} · 目标：{targetPath||"未选择"}{pendingIds.length>0?` · 本次将移动 ${pendingIds.length} 个文件`:" · 已无可提交的文件"}</p>
+    {flow.state==="conflict"&&pendingIds.length>0&&<>
+     <p className="hint" role="status">以下 {flow.conflicts.length} 个文件无法移动，本次没有移动任何文件：</p>
+     <ul className="delete-list" style={{maxHeight:"160px",overflow:"auto"}}>
+      {flow.conflicts.map(conflict=><li key={conflict.id}>{nameOf.get(conflict.id)??conflict.id}：{conflictItemCopy(conflict)}</li>)}
+     </ul>
+    </>}
+    {flow.state==="conflict"&&pendingIds.length===0&&
+     <p className="hint" role="status">已排除全部问题文件，没有可提交的项。请关闭后重新选择要移动的文件。</p>}
+   </>}
+   footer={needsRefresh
+    ?<button type="button" className="secondary-action" onClick={()=>{onReload();onClose();}} disabled={busy}>刷新查看状态</button>
+    :<>
+     <button type="button" className="secondary-action" onClick={close} disabled={busy}>取消</button>
+     {flow.state==="conflict"&&pendingIds.length>0&&
+      <button type="button" className="secondary-action" onClick={excludeConflicts} disabled={busy}>排除问题项并重试</button>}
+     <button type="button" className="primary" onClick={submit} disabled={!canSubmit}>{busy?"移动中…":"确认移动"}</button>
     </>}
   />}
  </Dialog>;

@@ -79,3 +79,74 @@ export function fileMoveInvalidTarget(folder:Folder,source:FileItem,visible?:Fol
  if(visible&&!visible.some(item=>item.id===folder.id))return "目标目录不可见";
  return null;
 }
+
+// Batch move flow (COMPLEX-WORKFLOWS-v1 §3.1/§3.2 C, WF-07/WF-08, ADR-UX-02).
+// The all-or-nothing endpoint makes one server-side decision, so there is no
+// preflight step and no per-file CAS: `candidate → submitting → succeeded |
+// conflict | failed`. A conflict reply itemises the failing resources and
+// wrote nothing, so the only paths forward are a new candidate, an explicit
+// exclusion of the problem items, or a refresh.
+
+export type BatchMoveState="candidate"|"submitting"|"succeeded"|"conflict"|"failed";
+
+export type BatchMoveResult={fileId:string;fromFolderId:string;toFolderId:string};
+
+export type BatchMoveConflict={id:string;code:string;message?:string};
+
+export type BatchMoveFlow={
+ state:BatchMoveState;
+ targetId:string;
+ notice:string;
+ conflicts:BatchMoveConflict[];
+ moved:BatchMoveResult[];
+};
+
+export function openBatch():BatchMoveFlow{
+ return {state:"candidate",targetId:"",notice:"",conflicts:[],moved:[]};
+}
+
+// Any pick — the same folder included — voids the previous conflict list and
+// move summary: they describe a submission the current candidate no longer
+// matches.
+export function batchPickTarget(_flow:BatchMoveFlow,targetId:string):BatchMoveFlow{
+ return {state:"candidate",targetId,notice:"",conflicts:[],moved:[]};
+}
+
+export function batchSubmitStarted(flow:BatchMoveFlow):BatchMoveFlow{
+ return {state:"submitting",targetId:flow.targetId,notice:"",conflicts:[],moved:[]};
+}
+
+export function batchSucceeded(flow:BatchMoveFlow,moved:BatchMoveResult[]):BatchMoveFlow{
+ return {state:"succeeded",targetId:flow.targetId,notice:"",conflicts:[],moved};
+}
+
+// Nothing was written: the itemised conflicts stay on screen until the user
+// changes the target or explicitly narrows the pending set.
+export function batchConflict(flow:BatchMoveFlow,conflicts:BatchMoveConflict[]):BatchMoveFlow{
+ return {state:"conflict",targetId:flow.targetId,notice:"",conflicts,moved:[]};
+}
+
+// Exclude-and-retry (ADR-UX-02): the caller removes the conflicting ids from
+// its own pending set and returns to the candidate step, where the remainder
+// can be submitted again. The flow never narrows the set by itself.
+export function batchExcluded(flow:BatchMoveFlow,notice:string):BatchMoveFlow{
+ return {state:"candidate",targetId:flow.targetId,notice,conflicts:[],moved:[]};
+}
+
+// A server rejection or an unknown network outcome. The candidate stays visible
+// so the user can retry or change it; the caller decides whether a refresh is
+// the only safe next step.
+export function batchFailed(flow:BatchMoveFlow,notice:string):BatchMoveFlow{
+ return {state:"failed",targetId:flow.targetId,notice,conflicts:[],moved:[]};
+}
+
+// Client-side structural rule only, mirroring fileMoveInvalidTarget: a target
+// outside the loaded visible tree is never offered, and a folder that already
+// holds the whole selection is a no-op. Per-file permissions and name
+// conflicts stay the server's answer — never silently skipped, but reported
+// per item by the all-or-nothing commit.
+export function batchMoveInvalidTarget(folder:Folder,sources:FileItem[],visible?:Folder[]):string|null{
+ if(visible&&!visible.some(item=>item.id===folder.id))return "目标目录不可见";
+ if(sources.length>0&&sources.every(source=>source.folderId===folder.id))return "所选文件已全部在该目录";
+ return null;
+}

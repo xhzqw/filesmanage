@@ -5,10 +5,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// File move handlers (COMPLEX-WORKFLOWS §3.2 drafts A and B). The commit
-// endpoint authorizes, CAS-guards and audits inside the application
-// transaction; the preflight endpoint is a read-only UX check that never
-// writes and whose result is not an authorization proof.
+// File move handlers (COMPLEX-WORKFLOWS §3.2 drafts A, B and C). The commit
+// endpoints authorize, CAS-guard and audit inside the application transaction;
+// the preflight endpoint is a read-only UX check that never writes and whose
+// result is not an authorization proof.
 
 func (h *Handler) moveFile(c *gin.Context) {
 	u, ok := h.auth(c)
@@ -36,6 +36,51 @@ func (h *Handler) moveFile(c *gin.Context) {
 	c.JSON(200, gin.H{"ok": true, "data": gin.H{
 		"fileId": result.FileID, "fromFolderId": result.FromFolderID,
 		"toFolderId": result.ToFolderID, "status": "committed",
+	}})
+}
+
+// moveFilesBatch implements COMPLEX-WORKFLOWS §3.2 draft C: the all-or-nothing
+// batch move (ADR-UX-02). The application validates every item inside one
+// transaction and answers per-item conflicts instead of partial writes; the
+// over-limit rejection carries the explicit batch limit in its message.
+func (h *Handler) moveFilesBatch(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	if u.MustChangePassword {
+		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
+		return
+	}
+	var req struct {
+		FileIDs        []string
+		TargetFolderID string
+		Mode           string
+		IdempotencyKey string
+	}
+	if c.ShouldBindJSON(&req) != nil || len(req.FileIDs) == 0 || req.TargetFolderID == "" {
+		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+		return
+	}
+	result, err := h.S.MoveFilesBatch(c.Request.Context(), u, req.FileIDs, req.TargetFolderID, req.Mode, req.IdempotencyKey)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	moved := make([]gin.H, 0, len(result.Moved))
+	for _, item := range result.Moved {
+		moved = append(moved, gin.H{"fileId": item.FileID, "fromFolderId": item.FromFolderID, "toFolderId": item.ToFolderID})
+	}
+	conflicts := make([]gin.H, 0, len(result.Conflicts))
+	for _, item := range result.Conflicts {
+		entry := gin.H{"id": item.ID, "code": item.Code}
+		if item.Message != "" {
+			entry["message"] = item.Message
+		}
+		conflicts = append(conflicts, entry)
+	}
+	c.JSON(200, gin.H{"ok": true, "data": gin.H{
+		"status": result.Status, "moved": moved, "conflicts": conflicts, "count": result.Count,
 	}})
 }
 

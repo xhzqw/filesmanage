@@ -119,7 +119,7 @@ def schema(name, value):
     SCHEMAS[name] = value
 
 
-schema("ErrorEnvelope", obj({"ok": {"type": "boolean", "enum": [False]}, "error": obj({"code": string("Stable SPEC 5.3 error code."), "message": string("Present only when FILESMANAGE_DEBUG_ERRORS=true.")}, required=["code"])}, required=["ok", "error"]))
+schema("ErrorEnvelope", obj({"ok": {"type": "boolean", "enum": [False]}, "error": obj({"code": string("Stable SPEC 5.3 error code."), "message": string("Present when the server attaches a deliberate public message (e.g. the batch-move limit) or when FILESMANAGE_DEBUG_ERRORS=true.")}, required=["code"])}, required=["ok", "error"]))
 
 schema("SessionUser", obj({
     "id": string(),
@@ -405,6 +405,22 @@ schema("MovePreflightResult", obj({
     "targetSummary": string("Visible target folder path only; hidden ancestors truncate the path."),
 }, required=["status", "candidateRevision", "allowedCount", "conflicts", "warnings", "sourceSummary", "targetSummary"]))
 
+schema("MoveBatchRequest", obj({
+    "fileIds": arr(string(), "Distinct file ids; all moved together or none. At most 100 per request."),
+    "targetFolderId": string("Shared destination folder id."),
+    "mode": string(enum=["all_or_nothing"]),
+    "idempotencyKey": string("Replay-safe batch key; a repeat returns the recorded result."),
+}, required=["fileIds", "targetFolderId"]))
+
+schema("MoveBatchResult", obj({
+    "status": string(enum=["committed", "conflict"]),
+    "moved": arr(obj({"fileId": string(), "fromFolderId": string(), "toFolderId": string()}, required=["fileId", "fromFolderId", "toFolderId"]),
+                 "Moved files in request order; empty on conflict."),
+    "conflicts": arr(obj({"id": string(), "code": string("Stable envelope code the single-file commit would answer."), "message": string()}),
+                     "Per-item failures; empty on commit. When any entry exists nothing was written."),
+    "count": integer("Files moved on committed; conflicts reported on conflict."),
+}, required=["status", "moved", "conflicts", "count"]))
+
 schema("CreateUserRequest", obj({
     "login": string(max_length=80),
     "displayName": string(),
@@ -642,6 +658,14 @@ add("POST", "/api/files/{id}/move", operation("Move a file to another folder (CA
     responses=dict([json_ok(obj({"fileId": string(), "fromFolderId": string(), "toFolderId": string(), "status": {"type": "string", "enum": ["committed"]}}, required=["fileId", "fromFolderId", "toFolderId", "status"]), "File moved in one transaction; id, version history and content hash unchanged."),
                     resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"]),
                     resp("409", "Conflict — E_NAME_CONFLICT (live name in target), E_VERSION_CONFLICT (stale expectedFolderId) or E_MOVE_CONFLICT (target is the current folder)")]),
+    auth_note=MUST_CHANGE))
+
+add("POST", "/api/files/move-batch", operation("Move a batch of files into one folder (all-or-nothing, idempotent)", "Files", "moveFilesBatch", security=SESSION,
+    request={"application/json": {"schema": ref("MoveBatchRequest")}},
+    responses=dict([json_ok(ref("MoveBatchResult"), "Batch verdict. committed: every file moved; conflict: nothing was written and each failing item is listed."),
+                    resp("400", ERR["400"] + " — an over-limit batch states the 100-file limit in error.message"),
+                    resp("401", ERR["401"]), resp("403", ERR["403"]),
+                    resp("409", "Conflict — E_NAME_CONFLICT when a concurrent write takes a target name between validation and commit; the whole batch rolls back")]),
     auth_note=MUST_CHANGE))
 
 add("POST", "/api/moves/preflight", operation("Read-only preflight for a candidate move", "Files", "preflightMoves", security=SESSION,

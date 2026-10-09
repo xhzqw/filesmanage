@@ -1,8 +1,9 @@
 import{useEffect,useRef,useState,type DragEvent,type FormEvent,type ReactNode}from"react";
-import{uploadFile,formatSize}from"./api";
+import{formatSize}from"./api";
+import{uploadFileWithProgress}from"../../shared/uploadClient";
 import{errorCode}from"../../shared/errors";
 import{
- enqueue,markUploading,markCommitted,markFailed,markCancelled,
+ enqueue,markUploading,markProgress,markServerProcessing,markCommitted,markFailed,markCancelled,
  cancelTask,retryTask,renameTask,skipTask,
  type UploadTask,
 }from"./uploadQueue";
@@ -44,6 +45,9 @@ export function DropZone({folderId,disabled,onCommitted,children}:{folderId:stri
  const tasksRef=useRef<UploadTask[]>([]);
  const dragDepth=useRef(0);
  const pumping=useRef(false);
+ // queueId → the AbortController of its in-flight XHR, so 取消 on an uploading
+ // item aborts exactly that request while a queued item is cancelled in state.
+ const inFlight=useRef(new Map<string,AbortController>());
  const mounted=useRef(true);
  const folderIdRef=useRef(folderId);
  const onCommittedRef=useRef(onCommitted);
@@ -76,9 +80,22 @@ export function DropZone({folderId,disabled,onCommitted,children}:{folderId:stri
    while(mounted.current){
     const next=tasksRef.current.find(task=>task.status==="queued");
     if(!next)break;
+    const controller=new AbortController();
+    inFlight.current.set(next.queueId,controller);
     applyTasks(prev=>markUploading(prev,next.queueId));
     try{
-     const reply=await uploadFile(next.targetFolderId,next.file,next.idempotencyKey);
+     const reply=await uploadFileWithProgress(next.targetFolderId,next.file,next.idempotencyKey,{
+      signal:controller.signal,
+      // Byte progress is not success: when every byte is on the wire the item
+      // moves to server-processing and only the committed envelope resolves it
+      // (COMPLEX-WORKFLOWS-v1 §5.1).
+      onProgress:progress=>{
+       applyTasks(prev=>{
+        const withBytes=markProgress(prev,next.queueId,progress);
+        return progress.total>0&&progress.loaded>=progress.total?markServerProcessing(withBytes,next.queueId):withBytes;
+       });
+      },
+     });
      applyTasks(prev=>markCommitted(prev,next.queueId,{fileId:reply.fileId,versionSeq:reply.versionSeq,deduplicated:reply.deduplicated}));
      if(next.targetFolderId===folderIdRef.current)onCommittedRef.current();
     }catch(error){
@@ -87,6 +104,8 @@ export function DropZone({folderId,disabled,onCommitted,children}:{folderId:stri
      }else{
       applyTasks(prev=>markFailed(prev,next.queueId,failureCopy(error)));
      }
+    }finally{
+     inFlight.current.delete(next.queueId);
     }
    }
   }finally{
@@ -160,33 +179,52 @@ export function DropZone({folderId,disabled,onCommitted,children}:{folderId:stri
     {committed} 项完成 · {failed} 项失败{pending>0?` · ${pending} 项进行中`:""}
    </p>
    <ul className="upload-queue-list">
-    {tasks.map(task=><li key={task.queueId} className={"upload-item "+task.status}>
-     <div className="upload-item-main">
-      <span className="upload-item-name" title={task.name}>{task.name}</span>
-      <span className="upload-item-size">{formatSize(task.size)}</span>
-      {task.targetFolderId!==folderId&&<span className="upload-item-target" title="队列保留加入时的目标目录">其他目录</span>}
-     </div>
-     <span className="upload-item-status">
-      {task.status==="queued"&&"排队中"}
-      {task.status==="uploading"&&"上传中…"}
-      {task.status==="committed"&&(task.result?`${task.result.deduplicated?"内容已存在，当前为":"已生成"} v${task.result.versionSeq}`:"")}
-      {task.status==="failed"&&<span className="upload-item-error">{task.error}</span>}
-      {task.status==="cancelled"&&"已取消"}
-     </span>
-     <div className="upload-item-actions">
-      {task.status==="queued"&&<button type="button" onClick={()=>applyTasks(prev=>cancelTask(prev,task.queueId))}>取消</button>}
-      {task.status==="failed"&&<>
-       <button type="button" onClick={()=>{applyTasks(prev=>retryTask(prev,task.queueId));void pump();}}>重试</button>
-       <button type="button" onClick={()=>{setRenamingId(task.queueId);setRenameValue(task.name);}}>改名重试</button>
-       <button type="button" onClick={()=>applyTasks(prev=>skipTask(prev,task.queueId))}>跳过</button>
-      </>}
-     </div>
-     {renamingId===task.queueId&&<form className="upload-rename" onSubmit={submitRename}>
-      <input aria-label="新文件名" value={renameValue} maxLength={200} onChange={e=>setRenameValue(e.target.value)} autoFocus required/>
-      <button type="submit" className="primary">确认改名</button>
-      <button type="button" className="secondary-action" onClick={()=>setRenamingId(null)}>取消</button>
-     </form>}
-    </li>)}
+    {tasks.map(task=>{
+     const progress=task.progress;
+     const processing=task.status==="uploading"&&task.serverProcessing===true;
+     // Byte information is dropped while server-processing, so a completed send
+     // renders as indeterminate instead of a finished bar (§5.1).
+     const sent=!processing&&progress!==undefined&&progress.total>0?progress:undefined;
+     const percent=sent?Math.min(99,Math.floor(sent.loaded/sent.total*100)):0;
+     return <li key={task.queueId} className={"upload-item "+task.status}>
+      <div className="upload-item-main">
+       <span className="upload-item-name" title={task.name}>{task.name}</span>
+       <span className="upload-item-size">{formatSize(task.size)}</span>
+       {task.targetFolderId!==folderId&&<span className="upload-item-target" title="队列保留加入时的目标目录">其他目录</span>}
+      </div>
+      <span className="upload-item-status">
+       {task.status==="queued"&&"排队中"}
+       {task.status==="uploading"&&(processing?"服务端处理中…":sent?`上传中 ${percent}%`:"上传中…")}
+       {task.status==="committed"&&(task.result?`${task.result.deduplicated?"内容已存在，当前为":"已生成"} v${task.result.versionSeq}`:"")}
+       {task.status==="failed"&&<span className="upload-item-error">{task.error}</span>}
+       {task.status==="cancelled"&&<span title="取消只保证本地中断请求；服务端已提交的结果无法撤销">已取消</span>}
+      </span>
+      <div className="upload-item-actions">
+       {task.status==="queued"&&<button type="button" onClick={()=>applyTasks(prev=>cancelTask(prev,task.queueId))}>取消</button>}
+       {task.status==="uploading"&&<button type="button" title="取消只中断本地请求；服务端已提交的结果无法撤销" onClick={()=>inFlight.current.get(task.queueId)?.abort()}>取消</button>}
+       {task.status==="failed"&&<>
+        <button type="button" onClick={()=>{applyTasks(prev=>retryTask(prev,task.queueId));void pump();}}>重试</button>
+        <button type="button" onClick={()=>{setRenamingId(task.queueId);setRenameValue(task.name);}}>改名重试</button>
+        <button type="button" onClick={()=>applyTasks(prev=>skipTask(prev,task.queueId))}>跳过</button>
+       </>}
+      </div>
+      {task.status==="uploading"&&<div
+       className={"upload-progress"+(sent?"":" indeterminate")}
+       role="progressbar"
+       aria-label={processing?"服务端处理中":"上传进度"}
+       aria-valuemin={0}
+       aria-valuemax={sent?sent.total:task.size}
+       aria-valuenow={sent?sent.loaded:undefined}
+      >
+       <div className="upload-progress-fill" style={sent?{width:percent+"%"}:undefined}/>
+      </div>}
+      {renamingId===task.queueId&&<form className="upload-rename" onSubmit={submitRename}>
+       <input aria-label="新文件名" value={renameValue} maxLength={200} onChange={e=>setRenameValue(e.target.value)} autoFocus required/>
+       <button type="submit" className="primary">确认改名</button>
+       <button type="button" className="secondary-action" onClick={()=>setRenamingId(null)}>取消</button>
+      </form>}
+     </li>;
+    })}
    </ul>
   </div>}
  </div>;

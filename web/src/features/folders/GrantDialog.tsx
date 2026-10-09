@@ -41,13 +41,25 @@ export function GrantDialog({folder,onClose,subjects}:{folder:Folder;onClose:()=
  const[subjectsState,setSubjectsState]=useState<"loading"|"ready"|"failed">("loading");
  const[reloadToken,setReloadToken]=useState(0);
  const[message,setMessage]=useState("");
+ const[messageTone,setMessageTone]=useState<"info"|"error">("info");
+ // The grant held here waits for an explicit confirmation; every write shares
+ // the single `busy` flag so the form and the revocation cannot overlap.
+ const[pendingRevoke,setPendingRevoke]=useState<Grant|null>(null);
+ const[revokeMessage,setRevokeMessage]=useState("");
  const[busy,setBusy]=useState(false);
+
+ // One notice channel: failures keep the error styling while a completed
+ // revocation reports success in the same place.
+ function say(text:string,tone:"info"|"error"="info"){
+  setMessage(text);
+  setMessageTone(tone);
+ }
 
  useEffect(()=>{
   let valid=true;
   folderApi.grants(folder.id)
    .then(data=>{if(valid)setGrants(data);})
-   .catch(()=>{if(valid)setMessage("读取授权列表失败");});
+   .catch(()=>{if(valid)say("读取授权列表失败","error");});
   return()=>{valid=false;};
  },[folder.id]);
 
@@ -92,10 +104,10 @@ export function GrantDialog({folder,onClose,subjects}:{folder:Folder;onClose:()=
   // is still valid stays a server decision.
   const expiresMs=expiresAt===""?null:Date.parse(expiresAt);
   if(expiresMs!==null&&(Number.isNaN(expiresMs)||expiresMs<=Date.now())){
-   setMessage("到期时间必须晚于当前时间");
+   say("到期时间必须晚于当前时间","error");
    return;
   }
-  setMessage("");setBusy(true);
+  say("");setBusy(true);
   // RFC3339 UTC on the wire; the handler parses with time.RFC3339.
   const expiresISO=expiresMs===null?undefined:new Date(expiresMs).toISOString();
   try{
@@ -105,30 +117,59 @@ export function GrantDialog({folder,onClose,subjects}:{folder:Folder;onClose:()=
    setSubjectId("");
    setExpiresAt("");
   }catch(error){
-   setMessage(errorCopy(error,"授权失败"));
+   say(errorCopy(error,"授权失败"),"error");
   }finally{setBusy(false);}
  }
 
- async function revoke(grantId:string){
-  if(busy)return;
-  setMessage("");setBusy(true);
+ // Called only by the confirmation step: the revocation commits first and the
+ // list is then re-read from the server. A failed re-read must not be reported
+ // as a failed revocation, so the two outcomes are reported separately.
+ async function confirmRevoke(){
+  const grant=pendingRevoke;
+  if(!grant||busy)return;
+  setRevokeMessage("");setBusy(true);
   try{
-   await folderApi.revokeGrant(grantId);
-   setGrants(prev=>prev.filter(g=>g.id!==grantId));
+   await folderApi.revokeGrant(grant.id);
   }catch(error){
-   setMessage(errorCopy(error,"撤销失败"));
+   setRevokeMessage(errorCopy(error,"撤销失败"));
+   setBusy(false);
+   return;
+  }
+  setPendingRevoke(null);
+  setGrants(prev=>prev.filter(g=>g.id!==grant.id));
+  say("已撤销该授权记录");
+  try{
+   setGrants(await folderApi.grants(folder.id));
+  }catch{
+   say("授权已撤销，但列表刷新失败，请重新打开本对话框查看最新授权。","error");
   }finally{setBusy(false);}
  }
 
- return <Dialog open title={`目录授权 — ${folder.name}`} onClose={onClose} closeGuard={()=>!busy} className="dialog grant-dialog">
-  <form onSubmit={submit}>
+ // Escape unwinds only the confirmation step; the grant list stays reachable.
+ // The confirmation is an in-dialog step, not a second dialog, so the host
+ // keeps the single focus trap (DESKTOP-INTERACTION-v1 §4.1, VIS-11).
+ return <Dialog open title={pendingRevoke?"撤销授权确认":`目录授权 — ${folder.name}`}
+  onClose={()=>{if(pendingRevoke)setPendingRevoke(null);else onClose();}} closeGuard={()=>!busy}
+  initialFocus={pendingRevoke?"#revoke-cancel":undefined} className="dialog grant-dialog">
+  {pendingRevoke?<form onSubmit={event=>{event.preventDefault();confirmRevoke();}}>
+   <p className="hint">撤销后该条直接授权将被删除；继承授权与最终生效能力由服务端重新判定，本对话框不重新计算。</p>
+   <p>目录：{folder.name}</p>
+   <p>主体：{pendingRevoke.subjectKind==="user"?"用户":"工作组"} {subjectName(pendingRevoke.subjectKind,pendingRevoke.subjectId)}</p>
+   <p>移除的动作：{pendingRevoke.actions.map(a=>ACTION_LABELS[a]??a).join("、")}</p>
+   <p>范围：{pendingRevoke.scopeOnly?"仅本目录":"本目录及子目录（以服务端判定为准）"}{pendingRevoke.expiresAt?`；原到期 ${new Date(pendingRevoke.expiresAt).toLocaleString("zh-CN")}`:""}</p>
+   {revokeMessage&&<p role="alert" className="notice error">{revokeMessage}</p>}
+   <div className="dialog-actions">
+    <button type="button" id="revoke-cancel" className="secondary-action" onClick={()=>setPendingRevoke(null)} disabled={busy}>取消</button>
+    <button type="submit" className="danger" disabled={busy}>{busy?"撤销中…":"确认撤销"}</button>
+   </div>
+  </form>:<form onSubmit={submit}>
    <p className="hint">下列为直接授权记录；继承授权与最终生效能力由服务端判定，本对话框不重新计算。</p>
    <div className="grant-existing">
     {grants.length===0&&<p className="hint">当前没有显式授权（管理员不受限）。</p>}
     {grants.map(g=><div key={g.id} className="grant-row">
      <span>{g.subjectKind==="user"?"用户":"工作组"} {subjectName(g.subjectKind,g.subjectId)}</span>
      <span>{g.actions.map(a=>ACTION_LABELS[a]??a).join("、")}{g.scopeOnly?"（仅本目录）":""}{g.expiresAt?`；到期 ${new Date(g.expiresAt).toLocaleString("zh-CN")}`:""}</span>
-     <button type="button" className="danger" onClick={()=>revoke(g.id)} disabled={busy}>撤销</button>
+     <button type="button" className="danger" disabled={busy} onClick={()=>{setRevokeMessage("");setPendingRevoke(g);}}>撤销</button>
     </div>)}
    </div>
    <div className="grant-form">
@@ -164,12 +205,12 @@ export function GrantDialog({folder,onClose,subjects}:{folder:Folder;onClose:()=
      仅本目录（不向子目录继承）
     </label>
    </div>
-   {message&&<p role="alert" className="notice error">{message}</p>}
+   {message&&<p role={messageTone==="error"?"alert":"status"} className={"notice"+(messageTone==="error"?" error":"")}>{message}</p>}
    <div className="dialog-actions">
     <button type="button" className="secondary-action" onClick={onClose} disabled={busy}>关闭</button>
     <button type="submit" className="primary" disabled={busy||subjectsState!=="ready"||subjectId===""||actions.length===0}>{busy?"提交中…":"添加授权"}</button>
    </div>
-  </form>
+  </form>}
  </Dialog>;
 }
 

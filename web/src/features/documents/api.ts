@@ -47,6 +47,14 @@ export const fileApi={
  move:(id:string,targetFolderId:string,expectedFolderId:string,idempotencyKey:string)=>
   request<{fileId:string;fromFolderId:string;toFolderId:string;status:string}>("/files/"+id+"/move",
    {method:"POST",body:JSON.stringify({targetFolderId,expectedFolderId,idempotencyKey})}),
+ // Batch move (WF-07/WF-08, ADR-UX-02): one all-or-nothing transaction, so
+ // there is no per-file CAS basis; fileIds is the whole working set. A 200
+ // answer discriminates its own outcome — status "conflict" carries the
+ // failing items and means nothing was written. The idempotency key makes a
+ // retry replay the recorded result instead of moving a second time.
+ moveBatch:(fileIds:string[],targetFolderId:string,idempotencyKey:string)=>
+  request<{status:string;moved:{fileId:string;fromFolderId:string;toFolderId:string}[];conflicts:{id:string;code:string;message?:string}[];count:number}>("/files/move-batch",
+   {method:"POST",body:JSON.stringify({fileIds,targetFolderId,mode:"all_or_nothing",idempotencyKey})}),
  openOfficeSession:(id:string)=>request<OfficeSessionData>("/files/"+id+"/office/session",{method:"POST",body:"{}"}),
  derivativeStatus:(id:string)=>request<{found:boolean;state:string;format:string;class:string;engine:string;note:string;outputKind?:string;outputSize?:number;outputSha256?:string;errorCode?:string}>("/files/"+id+"/derivative"),
  requestDerivative:(id:string)=>request<{derivativeId:string;state:string;sourceFormat:string;outputKind:string;converter:string}>("/files/"+id+"/derivative",{method:"POST",body:"{}"}),

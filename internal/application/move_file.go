@@ -3,15 +3,19 @@ package application
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"filesmanage/internal/domain"
 	"filesmanage/internal/ports"
+	"fmt"
+	"sort"
 	"strings"
 )
 
 // File move use cases implement the COMPLEX-WORKFLOWS §3 end-to-end contract:
-// the committed single-file move (draft B) and the read-only preflight (draft A).
+// the committed single-file move (draft B), the all-or-nothing batch commit
+// (draft C), and the read-only preflight (draft A).
 // The preflight is UX only and never an authorization proof; the commit
-// transaction re-verifies the source move action, the target upload action,
+// transactions re-verify the source move action, the target upload action,
 // the target's active state, name uniqueness and the CAS guard.
 
 type MoveResult struct {
@@ -76,6 +80,176 @@ func (s *Service) MoveFile(ctx context.Context, u domain.User, fileID, targetFol
 	// request sees the new scope (PE04).
 	s.bumpACLEpoch()
 	return result, nil
+}
+
+// MaxMoveBatchFiles bounds one all-or-nothing batch move. The whole batch runs
+// in a single transaction (ADR-UX-02 / COMPLEX-WORKFLOWS §3.1), so the cap keeps
+// the transaction's validation work and row locks bounded; an over-limit request
+// is rejected with ErrBatchTooLarge before any database work.
+const MaxMoveBatchFiles = 100
+
+// ErrBatchTooLarge rejects a fileIds list over MaxMoveBatchFiles. It answers the
+// 400 E_BAD class of other invalid input (its Is hook keeps errors.Is against
+// domain.ErrInvalidInput true) and its message states the limit.
+var ErrBatchTooLarge error = batchTooLargeError{}
+
+type batchTooLargeError struct{}
+
+func (batchTooLargeError) Error() string {
+	return fmt.Sprintf("fileIds exceeds the batch limit of %d", MaxMoveBatchFiles)
+}
+
+func (batchTooLargeError) Is(target error) bool { return target == domain.ErrInvalidInput }
+
+// MoveBatchResult is the outcome of one batch move. Status is "committed" when
+// every file moved (Moved lists them in request order) or "conflict" when at
+// least one item failed validation: nothing was written then, Moved is empty and
+// Conflicts lists every failure with the same stable codes the single-file path
+// answers. Count is the number of files moved on commit, and the number of
+// reported conflicts otherwise.
+type MoveBatchResult struct {
+	Status    string
+	Moved     []MoveResult
+	Conflicts []MoveConflict
+	Count     int
+}
+
+const (
+	moveBatchCommitted = "committed"
+	moveBatchConflict  = "conflict"
+)
+
+// addConflict records one per-item failure. The aggregate status flips to
+// "conflict" after the validation loop when at least one entry exists.
+func (r *MoveBatchResult) addConflict(c MoveConflict) {
+	r.Conflicts = append(r.Conflicts, c)
+}
+
+// MoveFilesBatch moves many files into one active folder inside a single
+// transaction (COMPLEX-WORKFLOWS §3.2 draft C). Every item is validated with the
+// same checks MoveFile performs - source move, target active and upload, same
+// folder and target name uniqueness - before the first write; any failure leaves
+// nothing written (no move, no audit row) and answers a per-item conflict list so
+// the caller can exclude failing items and retry. A repeated idempotency key
+// replays the recorded committed result without a second move or audit rows.
+//
+// The batch has no CAS field: expectedFolderId is a single-file guard and has no
+// well-defined batch meaning. Concurrent moves are caught by the target's live
+// name uniqueness and, finally, by the database unique index at commit time.
+func (s *Service) MoveFilesBatch(ctx context.Context, u domain.User, fileIDs []string, targetFolderID, mode, idempotencyKey string) (MoveBatchResult, error) {
+	if len(fileIDs) == 0 || targetFolderID == "" {
+		return MoveBatchResult{}, domain.ErrInvalidInput
+	}
+	if mode != "" && mode != "all_or_nothing" {
+		return MoveBatchResult{}, domain.ErrInvalidInput
+	}
+	if len(fileIDs) > MaxMoveBatchFiles {
+		return MoveBatchResult{}, ErrBatchTooLarge
+	}
+	seen := make(map[string]bool, len(fileIDs))
+	for _, fileID := range fileIDs {
+		if fileID == "" || seen[fileID] {
+			return MoveBatchResult{}, domain.ErrInvalidInput
+		}
+		seen[fileID] = true
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return MoveBatchResult{}, err
+	}
+	defer tx.Rollback(ctx)
+	operation := moveBatchOperation(fileIDs)
+	if cached, ok, cacheErr := idempotentResult(ctx, tx, u.ID, operation, idempotencyKey); cacheErr == nil && ok {
+		var result MoveBatchResult
+		if jsonErr := json.Unmarshal(cached, &result); jsonErr == nil {
+			return result, nil
+		}
+	}
+	// The target verdict is identical for every item, so resolve it once and
+	// still apply it per item in MoveFile's check order.
+	target, targetErr := s.activeFolder(ctx, tx, targetFolderID)
+	targetForbidden := false
+	if targetErr == nil {
+		if err = s.require(ctx, tx, u, target.ID, domain.ActionUpload); err != nil {
+			if !errors.Is(err, domain.ErrForbidden) {
+				return MoveBatchResult{}, err
+			}
+			targetForbidden = true
+		}
+	}
+	result := MoveBatchResult{Status: moveBatchCommitted, Moved: []MoveResult{}, Conflicts: []MoveConflict{}}
+	movedNames := make([]string, 0, len(fileIDs))
+	names := make(map[string]bool, len(fileIDs))
+	for _, fileID := range fileIDs {
+		file, err := s.visibleFile(ctx, tx, u, fileID, domain.ActionMove)
+		if err != nil {
+			if errors.Is(err, domain.ErrNotFound) {
+				result.addConflict(MoveConflict{ID: fileID, Code: "E_NOT_FOUND", Message: "资源不存在或不可见"})
+				continue
+			}
+			if errors.Is(err, domain.ErrForbidden) {
+				result.addConflict(MoveConflict{ID: fileID, Code: "E_FORBIDDEN", Message: "来源目录缺少 move 权限"})
+				continue
+			}
+			return MoveBatchResult{}, err
+		}
+		if file.FolderID == targetFolderID {
+			result.addConflict(MoveConflict{ID: fileID, Code: "E_MOVE_CONFLICT", Message: "文件已在目标目录"})
+			continue
+		}
+		if targetErr != nil {
+			result.addConflict(MoveConflict{ID: fileID, Code: "E_NOT_FOUND", Message: "目标目录不存在或不可见"})
+			continue
+		}
+		if targetForbidden {
+			result.addConflict(MoveConflict{ID: fileID, Code: "E_FORBIDDEN", Message: "目标目录缺少 upload 权限"})
+			continue
+		}
+		// names also catches two batch entries that would land as the same live
+		// name in the target: the later entry conflicts instead of racing the
+		// database unique index mid-commit.
+		if _, nameErr := tx.FileByNameInFolder(ctx, target.ID, file.Name); nameErr == nil || names[file.Name] {
+			result.addConflict(MoveConflict{ID: fileID, Code: "E_NAME_CONFLICT", Message: "目标目录已存在同名文件"})
+			continue
+		} else if !isRowMissing(nameErr) {
+			return MoveBatchResult{}, nameErr
+		}
+		names[file.Name] = true
+		movedNames = append(movedNames, file.Name)
+		result.Moved = append(result.Moved, MoveResult{FileID: file.ID, FromFolderID: file.FolderID, ToFolderID: target.ID})
+	}
+	if len(result.Conflicts) > 0 {
+		// All-or-nothing: return the per-item verdicts and let the deferred
+		// rollback end the transaction without a single write.
+		result.Status = moveBatchConflict
+		result.Moved = []MoveResult{}
+		result.Count = len(result.Conflicts)
+		return result, nil
+	}
+	for i, moved := range result.Moved {
+		if err = tx.MoveFile(ctx, moved.FileID, moved.ToFolderID); err != nil {
+			return MoveBatchResult{}, mapError(err)
+		}
+		audit(ctx, tx, u, "file.move", "file", moved.FileID, "success",
+			map[string]any{"fromFolderId": moved.FromFolderID, "toFolderId": moved.ToFolderID, "name": movedNames[i]})
+	}
+	result.Count = len(result.Moved)
+	storeIdempotentResult(ctx, tx, u.ID, operation, idempotencyKey, mustMarshal(result))
+	if err = tx.Commit(ctx); err != nil {
+		return MoveBatchResult{}, err
+	}
+	// The batch changed the tree scope: drop every cached read (PE04).
+	s.bumpACLEpoch()
+	return result, nil
+}
+
+// moveBatchOperation scopes the single idempotency record to the exact file set
+// of the request - the same convention as the single-file "file.move:"+fileID
+// key - so a repeated key carries the same operation regardless of request order.
+func moveBatchOperation(fileIDs []string) string {
+	sorted := append([]string(nil), fileIDs...)
+	sort.Strings(sorted)
+	return "file.move-batch:" + strings.Join(sorted, ",")
 }
 
 // MoveResource references one resource under preflight; only files are

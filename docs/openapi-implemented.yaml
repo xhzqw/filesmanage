@@ -1451,6 +1451,64 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
       description: Rejected with 403 E_PASSWORD_CHANGE_REQUIRED until the forced first-login password change completes.
+  /api/files/move-batch:
+    post:
+      summary: Move a batch of files into one folder (all-or-nothing, idempotent)
+      operationId: moveFilesBatch
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoveBatchRequest'
+      responses:
+        '200':
+          description: 'Batch verdict. committed: every file moved; conflict: nothing was written and each failing item is
+            listed.'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/MoveBatchResult'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters — an over-limit batch states the 100-file limit in error.message
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN / E_PASSWORD_CHANGE_REQUIRED — authorization denied or first-login password change pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT when a concurrent write takes a target name between validation and commit;
+            the whole batch rolls back
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      description: Rejected with 403 E_PASSWORD_CHANGE_REQUIRED until the forced first-login password change completes.
   /api/moves/preflight:
     post:
       summary: Read-only preflight for a candidate move
@@ -4061,7 +4119,8 @@ components:
               description: Stable SPEC 5.3 error code.
             message:
               type: string
-              description: Present only when FILESMANAGE_DEBUG_ERRORS=true.
+              description: Present when the server attaches a deliberate public message (e.g. the batch-move limit) or when
+                FILESMANAGE_DEBUG_ERRORS=true.
           required:
           - code
       required:
@@ -4999,6 +5058,72 @@ components:
       - warnings
       - sourceSummary
       - targetSummary
+    MoveBatchRequest:
+      type: object
+      properties:
+        fileIds:
+          type: array
+          items:
+            type: string
+          description: Distinct file ids; all moved together or none. At most 100 per request.
+        targetFolderId:
+          type: string
+          description: Shared destination folder id.
+        mode:
+          type: string
+          enum:
+          - all_or_nothing
+        idempotencyKey:
+          type: string
+          description: Replay-safe batch key; a repeat returns the recorded result.
+      required:
+      - fileIds
+      - targetFolderId
+    MoveBatchResult:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - committed
+          - conflict
+        moved:
+          type: array
+          items:
+            type: object
+            properties:
+              fileId:
+                type: string
+              fromFolderId:
+                type: string
+              toFolderId:
+                type: string
+            required:
+            - fileId
+            - fromFolderId
+            - toFolderId
+          description: Moved files in request order; empty on conflict.
+        conflicts:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              code:
+                type: string
+                description: Stable envelope code the single-file commit would answer.
+              message:
+                type: string
+          description: Per-item failures; empty on commit. When any entry exists nothing was written.
+        count:
+          type: integer
+          description: Files moved on committed; conflicts reported on conflict.
+      required:
+      - status
+      - moved
+      - conflicts
+      - count
     CreateUserRequest:
       type: object
       properties:

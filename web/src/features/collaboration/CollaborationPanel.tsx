@@ -3,6 +3,7 @@ import {Link} from "react-router-dom";
 import {collaborationApi,formatBytes,type Favorite,type Share} from "./api";
 import {ShareDialog,type ShareResource} from "./ShareDialog";
 import {errorCopy} from "../../shared/errors";
+import {Dialog} from "../../shared/ui/Dialog";
 import type {FileItem} from "../../entities/file/model";
 import type {Folder} from "../../entities/folder/model";
 
@@ -42,6 +43,11 @@ export function CollaborationPanel(){
  const[filesState,setFilesState]=useState<"idle"|"loading"|"ready"|"failed">("idle");
  const[fileId,setFileId]=useState("");
  const[pickBusy,setPickBusy]=useState(false);
+ // The share awaiting explicit revocation confirmation; the write is mutually
+ // excluded through revokeBusy and blocks closing while it is in flight.
+ const[revokeTarget,setRevokeTarget]=useState<Share|null>(null);
+ const[revokeBusy,setRevokeBusy]=useState(false);
+ const[revokeMessage,setRevokeMessage]=useState("");
 
  useEffect(()=>{
   let valid=true;
@@ -169,13 +175,30 @@ export function CollaborationPanel(){
   }catch(error){say(errorCopy(error,"操作失败"),"error");}
  }
 
- async function revoke(id:string){
-  setMessage("");
+ function askRevoke(share:Share){
+  setRevokeMessage("");
+  setRevokeTarget(share);
+ }
+
+ // The confirmation dialog is the only caller. The revocation commits first and
+ // the panel then re-reads the active list (the revision mechanism below), so
+ // the next request already excludes the revoked share instead of reusing a
+ // stale in-memory row (WF-22).
+ async function confirmRevoke(){
+  const share=revokeTarget;
+  if(!share||revokeBusy)return;
+  setRevokeBusy(true);setRevokeMessage("");
   try{
-   await collaborationApi.revokeShare(id);
-   say("已撤销分享");
-   refresh();
-  }catch(error){say(errorCopy(error,"撤销失败"),"error");}
+   await collaborationApi.revokeShare(share.id);
+  }catch(error){
+   setRevokeMessage(errorCopy(error,"撤销失败"));
+   setRevokeBusy(false);
+   return;
+  }
+  setRevokeTarget(null);
+  say("已撤销分享");
+  refresh();
+  setRevokeBusy(false);
  }
 
  async function favoriteChosen(){
@@ -312,12 +335,24 @@ export function CollaborationPanel(){
       <td>{s.actions.join("、")}</td>
       <td>{s.includeDescendants?"是":"否"}</td>
       <td>{s.expiresAt?s.expiresAt.slice(0,10):"长期"}</td>
-      <td className="row-actions">{tab==="sent"&&!s.revoked&&<button type="button" className="danger" onClick={()=>revoke(s.id)}>撤销</button>}</td>
+      <td className="row-actions">{tab==="sent"&&!s.revoked&&<button type="button" className="danger" onClick={()=>askRevoke(s)}>撤销</button>}</td>
      </tr>)}
     </tbody>
    </table>}
   </div>
   <p className="hint">{formatBytes(0)==="0 B"?"":" "}统计与导出请前往「统计」页。</p>
   {shareTarget&&<ShareDialog resource={shareTarget} onClose={()=>setShareTarget(null)} onCreated={createdShare}/>}
+  {revokeTarget&&<Dialog open title="撤销分享确认" onClose={()=>setRevokeTarget(null)} closeGuard={()=>!revokeBusy} className="dialog">
+   <p className="hint">撤销后该分享立即失效；下一次列表与搜索读取不会返回基于该分享的内容，最终授权仍由服务端判定。</p>
+   <p>资源：{revokeTarget.resourceKind==="file"?"文件":"目录"}「{revokeTarget.resourceName}」</p>
+   <p>接收方：{revokeTarget.recipientKind==="user"?"用户":"工作组"}「{revokeTarget.recipientName||revokeTarget.recipientId}」</p>
+   <p>权限：{revokeTarget.actions.join("、")}</p>
+   <p>继承子目录：{revokeTarget.includeDescendants?"是":"否"}；截止：{revokeTarget.expiresAt?revokeTarget.expiresAt.slice(0,10):"长期"}</p>
+   {revokeMessage&&<p role="alert" className="notice error">{revokeMessage}</p>}
+   <div className="dialog-actions">
+    <button type="button" className="secondary-action" onClick={()=>setRevokeTarget(null)} disabled={revokeBusy}>取消</button>
+    <button type="button" className="danger" onClick={confirmRevoke} disabled={revokeBusy}>{revokeBusy?"撤销中…":"确认撤销"}</button>
+   </div>
+  </Dialog>}
  </div>;
 }
