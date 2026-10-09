@@ -144,6 +144,35 @@ schema("Workgroup", obj({"id": string(), "name": string(), "departmentId": strin
 
 schema("Folder", obj({"id": string(), "name": string(), "parentId": string()}, required=["id", "name", "parentId"]))
 
+schema("FolderChildrenItem", obj({
+    "id": string(),
+    "name": string(),
+    "parentId": string("Null for a visible root, including a pruned subtree whose real parent the caller may not list."),
+    "hasChildren": boolean("True when at least one child folder is listable by the caller; probed server-side with EXISTS, never by loading the children."),
+    "canSelect": boolean("UI hint only: the caller holds upload on the folder, so it can be a move/upload target. The transaction that consumes the selection re-verifies."),
+    "disabledReason": string("Present only when canSelect is false; a short public reason that never explains visibility."),
+}, required=["id", "name", "parentId", "hasChildren", "canSelect"]))
+
+schema("FolderSearchItem", obj({
+    "id": string(),
+    "name": string(),
+    "parentId": string("Null for a visible root, including a pruned subtree whose real parent the caller may not list."),
+    "hasChildren": boolean("True when at least one child folder is listable by the caller; probed server-side with EXISTS, never by loading the children."),
+    "canSelect": boolean("UI hint only: the caller holds upload on the folder, so it can be a move/upload target. The transaction that consumes the selection re-verifies."),
+    "disabledReason": string("Present only when canSelect is false; a short public reason that never explains visibility."),
+    "path": string("Listable ancestor names joined with \" / \", truncated at the first ancestor the caller may not list; an orphaned subtree shows its own name only."),
+}, required=["id", "name", "parentId", "hasChildren", "canSelect", "path"]))
+
+schema("FolderChildrenPage", obj({
+    "items": arr(ref("FolderChildrenItem")),
+    "nextCursor": string("Opaque keyset cursor over (name,id); empty on the last page."),
+}, required=["items", "nextCursor"]))
+
+schema("FolderSearchPage", obj({
+    "items": arr(ref("FolderSearchItem")),
+    "nextCursor": string("Opaque keyset cursor over (name,id); empty on the last page."),
+}, required=["items", "nextCursor"]))
+
 schema("File", obj({
     "id": string(),
     "folderId": string(),
@@ -559,6 +588,26 @@ add("GET", "/api/me", operation("Current session user", "Auth", "currentUser", s
 # --- Folders ---
 add("GET", "/api/folders/tree", operation("Authorized folder tree", "Folders", "folderTree", security=SESSION,
     responses=dict([json_ok(arr(ref("Folder")), "Folders the caller may see, with parent links."), resp("401", ERR["401"]), resp("403", ERR["403"])]),
+    auth_note=MUST_CHANGE))
+
+# The paged FolderPicker reads (COMPLEX-WORKFLOWS §2.3 / ADR-UX-07). /folders/tree
+# stays the whole-tree read for small trees; these two page a large tree on demand.
+FOLDER_PAGE_PARAMS = [
+    query("limit", "Page size; defaults to 50 and is capped at 200.", {"type": "integer", "minimum": 1, "maximum": 200}),
+    query("cursor", "Opaque keyset cursor from nextCursor over the (name,id) sort key."),
+]
+
+add("GET", "/api/folders/children", operation("List one page of a folder's visible children (keyset pagination)", "Folders", "folderChildren", security=SESSION,
+    params=[query("parentId", "Parent folder id; empty or absent lists the caller's visible roots, including a pruned subtree whose parent is not visible.")] + FOLDER_PAGE_PARAMS,
+    responses=dict([json_ok(ref("FolderChildrenPage"), "Authorized page, name-ordered. A parent the caller may not list answers exactly like a missing one."),
+                    resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"]),
+                    resp("404", "E_NOT_FOUND — the parent is missing, trashed, or not listable by the caller (indistinguishable on purpose)")]),
+    auth_note=MUST_CHANGE))
+
+add("GET", "/api/folders/search", operation("Search visible folders by name (keyset pagination)", "Folders", "searchFolders", security=SESSION,
+    params=[query("q", "Folder name fragment; required and non-blank (400 E_BAD otherwise).", required=True)] + FOLDER_PAGE_PARAMS,
+    responses=dict([json_ok(ref("FolderSearchPage"), "Authorized matches, each with its visible path truncated at a hidden ancestor."),
+                    resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"])]),
     auth_note=MUST_CHANGE))
 
 add("POST", "/api/folders", operation("Create a folder", "Folders", "createFolder", security=SESSION,

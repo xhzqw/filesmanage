@@ -708,6 +708,8 @@ GET /api/approvals、POST /api/approvals/:id/decide、GET /api/search。
 | POST | /api/files/:id/move | 来源 move + 目标 upload | 单文件移动（CAS + 幂等 + 审计） |
 | POST | /api/files/move-batch | 来源 move + 目标 upload | 批量移动，all-or-nothing（上限 100 文件，幂等 + 审计） |
 | POST | /api/moves/preflight | 已登录 | 移动前只读预检（UX 提示，非授权证明） |
+| GET | /api/folders/children | 已登录；parentId 需 list | FolderPicker 子目录分页（可见根/孤立根；不可见父目录 404） |
+| GET | /api/folders/search | 已登录；q 非空 | 可见目录名检索分页，path 在不可见祖先处截断 |
 
 ### 9.3 新增 API 请求响应示例
 ```json
@@ -845,6 +847,41 @@ rollbackTargetSeq、rollbackFromSeq、sha256、versionSeq、createdAt、createdB
   冲突结果不写入任何记录（事务已回滚），相同请求重放会重新校验并返回相同的冲突列表。
 - 批量请求不含 CAS 字段：`expectedFolderId` 是单文件守卫，批量无语义；并发改名/移动由事务内名称唯一与数据库
   唯一索引最终拒绝（E_NAME_CONFLICT，整批不写入），不静默覆盖。
+
+### 9.8 目录分页读取（FolderPicker children/search，COMPLEX-WORKFLOWS §2.3 / ADR-UX-07 / WF-10）
+`GET /api/folders/tree` 保持不变，继续返回整棵可见树（小树字段与行为字节兼容）；大数据集（万级目录）改用下面
+两个只读分页端点按需加载，二者都不写库、不加锁、不产生审计或幂等记录。
+
+**GET /api/folders/children?parentId=&cursor=&limit=**
+- `parentId` 省略或为空表示调用方**可见根**：没有父目录的目录，以及父目录不在调用方可见集合内的目录；权限裁剪后的
+  孤立子树显示为可访问根，不泄露隐藏祖先（DI-07/DI-14）。
+- 其余情况下 `parentId` 必须存在且调用方在该目录持有 `list`；否则返回 404 `E_NOT_FOUND`，与“目录不存在”完全
+  不可区分——探测无法判断隐藏与不存在（SAFE-04）。已删除（回收站中）的目录同样回答 404。
+- `limit` 缺省 50，服务端上限 200（`ports.MaxFolderPage`，与文件列表同约定）；非正整数返回 400 `E_BAD`，
+  超过上限按上限截断而不是报错。服务端按 `limit+1` 预读一行判断是否还有下一页。
+- 排序为 `name` 升序、同名时 `id` 升序（与树列表同一键）；游标是上一页最后一行的 `(name,id)` 键，base64url
+  无填充、不透明，客户端原样回传即可续页。无法解析的游标按空游标处理（等同于第一页），不返回错误。
+- 响应：
+  `{"ok":true,"data":{"items":[{"id":"fd_a","name":"市场部","parentId":"fd_root","hasChildren":true,"canSelect":false,"disabledReason":"没有上传权限"}],"nextCursor":""}}`
+  `nextCursor` 为空表示已是最后一页。
+- item 字段：
+  - `parentId` 为 null 表示可见根；孤立根仍带真实 `parentId`，客户端据此识别父目录不可见。
+  - `hasChildren` 表示存在调用方**可见（可 list）**的子目录；服务端用 EXISTS 探测，不加载整棵子树。
+  - `canSelect` 仅是 UI 提示：调用方在该目录持有 `upload`（直接授予、继承与分享的并集）时可作为移动/上传目标；
+    提交事务会重新校验权限，客户端不得把它当作授权凭证。
+  - `disabledReason` 只在 `canSelect=false` 时出现，是简短公开理由（当前固定为“没有上传权限”），永不解释不可见原因。
+
+**GET /api/folders/search?q=&limit=&cursor=**
+- `q` 必填；空或只含空白字符返回 400 `E_BAD`（不把空查询当作“全部目录”）。
+- 只匹配调用方可 `list` 的目录名：大小写不敏感的包含匹配，与文件搜索一致的 ILIKE 语义（`%` 与 `_` 仍按通配符处理）。
+- 排序、游标、`limit` 缺省与上限、错误码规则与 children 相同。
+- item 形状与 children 相同，另加 `path`：可 `list` 的祖先名用 `" / "` 连接，到第一个不可 `list` 的祖先处截断，
+  不臆造、不泄露隐藏祖先名；孤立子树的 path 只含自身名称。
+- 隐藏目录既不能按名称命中，也不能从条数、错误码或耗时上被推断出存在（SAFE-04）；跨目录搜索的可见路径使用同一
+  可见性判定，不出现“目录页看不到、搜索页看得到”的分叉。
+
+两个端点都要求已登录；`mustChangePassword` 会话与其它业务路由一致返回 403 `E_PASSWORD_CHANGE_REQUIRED`。
+读取不缓存分页结果，`list`/`upload` 判定在请求内实时解析，因此撤权后的下一个请求立即看不到该目录。
 
 ---
 

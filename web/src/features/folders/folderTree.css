@@ -1,0 +1,16 @@
+/* FolderTree extras (ADR-UX-07 paged mode): only the pieces the shared theme
+   has no class for — the tree header search, the per-node loading/empty/error
+   notes and the search result rows. Colors come from the token layer. */
+.tree-head{display:grid;gap:4px;margin:0 0 10px}
+.tree-search{width:100%;border:1px solid var(--color-border-strong);border-radius:var(--radius-control);padding:8px 10px}
+.tree-search-hint{margin:0;color:var(--color-text-secondary);font-size:12px}
+.tree-chevron-spacer{width:28px;flex:none}
+.tree-note{display:flex;align-items:center;gap:8px;min-height:26px;color:var(--color-text-secondary);font-size:12px}
+.tree-note-error{color:var(--color-danger)}
+.tree-note .secondary-action{padding:0;font-size:12px}
+.tree-search-panel{display:grid;gap:4px;margin-top:10px;padding-top:8px;border-top:1px solid var(--color-border)}
+.tree-results{list-style:none;margin:0;padding:0;display:grid;gap:2px;max-height:220px;overflow:auto}
+.tree-results a{display:grid;gap:1px;padding:4px 6px;border-radius:6px}
+.tree-results a:hover{background:var(--color-row-hover)}
+.tree-hit-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tree-hit-path{color:var(--color-text-secondary);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

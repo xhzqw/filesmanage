@@ -2,7 +2,8 @@ import {useEffect,useRef,useState,type ChangeEvent,type FormEvent,type KeyboardE
 import {useNavigate}from "react-router-dom";
 import type {FileItem} from "../../entities/file/model";
 import type {Folder} from "../../entities/folder/model";
-import {fileApi,formatSize,uploadFile} from "./api";
+import {fileApi,formatSize} from "./api";
+import {useUploadStore} from "./uploadStore";
 import {batchConflict,batchExcluded,batchFailed,batchMoveInvalidTarget,batchPickTarget,batchSubmitStarted,batchSucceeded,failed,fileMoveInvalidTarget,openBatch,openFlow,pickTarget,preflightConflict,preflightReady,preflightStarted,submitStarted,succeeded,type BatchMoveFlow,type MoveFlow,type MovePreflight}from"./moveFileFlow";
 import {errorCode,errorCopy} from "../../shared/errors";
 import {request} from "../../shared/http";
@@ -42,7 +43,6 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
  const[sort,setSort]=useState<SortKey>("updated_desc");
  const[cursor,setCursor]=useState("");
  const[hasMore,setHasMore]=useState(false);
- const[uploading,setUploading]=useState(false);
  const[renaming,setRenaming]=useState<FileItem|null>(null);
  const[renameValue,setRenameValue]=useState("");
  const[renameBusy,setRenameBusy]=useState(false);
@@ -64,6 +64,7 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
  const[favoriteIds,setFavoriteIds]=useState<Set<string>>(()=>new Set<string>());
  const[favoritesState,setFavoritesState]=useState<"loading"|"ready"|"failed">("loading");
  const[favoriteBusy,setFavoriteBusy]=useState("");
+ const enqueueFiles=useUploadStore(state=>state.enqueueFiles);
  const navigate=useNavigate();
 
  useEffect(()=>{
@@ -147,19 +148,17 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
   setItems(page.items);setHasMore(page.nextCursor!=="");setCursor(page.nextCursor);
  }
 
- async function onUpload(event:ChangeEvent<HTMLInputElement>){
-  const file=event.target.files?.[0];
+ // DI-18/WF-27: the toolbar input is the non-drag upload entry. It enqueues
+ // into the same store the drop zone feeds, so both entries share one queue,
+ // one idempotency identity and the same per-item progress, failures and
+ // 重试/改名重试/跳过/取消 actions, which the queue itself reports. The
+ // announcement only states the local enqueue fact, never a server result.
+ function onUpload(event:ChangeEvent<HTMLInputElement>){
+  const files=Array.from(event.target.files??[]);
   event.target.value="";
-  if(!file)return;
-  setUploading(true);announce("","info");
-  try{
-   await uploadFile(folder,file,newIdempotencyKey());
-   await reload();
-   announce(`已上传 ${file.name}，生成 v1 新版本`,"info");
-  }catch(error){
-   const code=errorCode(error);
-   announce(code==="E_NAME_CONFLICT"?"同名文件已存在，请改名后上传":code==="E_FORBIDDEN"?"当前目录没有上传权限":"上传失败，请重试","error");
-  }finally{setUploading(false);}
+  if(files.length===0)return;
+  enqueueFiles(files,folder);
+  announce(`已加入上传队列：${files.length} 个文件`,"info");
  }
 
  async function loadMore(){
@@ -422,9 +421,11 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
 
  return <div className="work-body">
   <div className="toolbar">
+   {/* The input allows multiple files: it feeds the same batch queue as a
+       drop (WF-27), so it no longer locks while one upload is in flight. */}
    <label className="upload-button">
-    {uploading?"上传中…":"上传文件"}
-    <input type="file" onChange={onUpload} disabled={uploading}/>
+    上传文件
+    <input type="file" multiple onChange={onUpload}/>
    </label>
    <label className="sort-label">排序
     <select aria-label="排序方式" value={sort} onChange={e=>setSort(e.target.value as SortKey)}>

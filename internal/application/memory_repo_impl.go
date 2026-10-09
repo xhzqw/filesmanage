@@ -5,6 +5,8 @@ import (
 	"errors"
 	"filesmanage/internal/domain"
 	"filesmanage/internal/ports"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -90,6 +92,113 @@ func (r *memoryRepo) ListVisibleFolders(_ context.Context, u domain.User) ([]dom
 		}
 	}
 	return out, nil
+}
+
+// folderKeyAfter reports whether the folder sorts after the (name,id) cursor
+// key, using the same ascending name-then-id order the page query applies.
+func folderKeyAfter(f domain.Folder, cursorName, cursorID string) bool {
+	if f.Name != cursorName {
+		return f.Name > cursorName
+	}
+	return f.ID > cursorID
+}
+
+// hasVisibleChildrenLocked mirrors the page query's EXISTS probe over the
+// caller's visible children. Callers hold r.mu.
+func (r *memoryRepo) hasVisibleChildrenLocked(u domain.User, folderID string) bool {
+	for _, child := range r.folders {
+		if child.DeletedAt != nil || child.ParentID == nil || *child.ParentID != folderID {
+			continue
+		}
+		if u.IsAdmin || r.grantCoversLocked(u.ID, child.ID, domain.ActionList) {
+			return true
+		}
+	}
+	return false
+}
+
+// folderPageRowsLocked mirrors the SQL page read: visible folders passing filter,
+// ordered by name then id, cut to the caller's lookahead limit. Callers hold r.mu.
+func (r *memoryRepo) folderPageRowsLocked(u domain.User, filter func(domain.Folder) bool, cursorName, cursorID string, limit int) []ports.FolderPageRow {
+	ordered := make([]domain.Folder, 0, len(r.folders))
+	for _, f := range r.folders {
+		if f.DeletedAt != nil {
+			continue
+		}
+		if !u.IsAdmin && !r.grantCoversLocked(u.ID, f.ID, domain.ActionList) {
+			continue
+		}
+		if !filter(f) {
+			continue
+		}
+		if cursorID != "" && !folderKeyAfter(f, cursorName, cursorID) {
+			continue
+		}
+		ordered = append(ordered, f)
+	}
+	sort.Slice(ordered, func(i, j int) bool {
+		if ordered[i].Name != ordered[j].Name {
+			return ordered[i].Name < ordered[j].Name
+		}
+		return ordered[i].ID < ordered[j].ID
+	})
+	if limit > 0 && len(ordered) > limit {
+		ordered = ordered[:limit]
+	}
+	rows := make([]ports.FolderPageRow, 0, len(ordered))
+	for _, f := range ordered {
+		rows = append(rows, ports.FolderPageRow{Folder: f, HasChildren: r.hasVisibleChildrenLocked(u, f.ID)})
+	}
+	return rows
+}
+
+func (r *memoryRepo) ListVisibleFolderChildren(_ context.Context, q ports.FolderChildQuery) ([]ports.FolderPageRow, error) {
+	if q.Limit <= 0 || q.Limit > ports.MaxFolderPage+1 {
+		return nil, domain.ErrInvalidInput
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	entry, ok := r.users[q.UserID]
+	if !ok {
+		return nil, ports.ErrRowMissing
+	}
+	u := entry.user
+	filter := func(f domain.Folder) bool {
+		if q.ParentID != "" {
+			return f.ParentID != nil && *f.ParentID == q.ParentID
+		}
+		if f.ParentID == nil {
+			return true
+		}
+		// A visible folder under a parent the caller cannot see is an accessible
+		// root: the pruned subtree surfaces without its hidden ancestor.
+		parent, exists := r.folders[*f.ParentID]
+		if !exists || parent.DeletedAt != nil {
+			return true
+		}
+		return !u.IsAdmin && !r.grantCoversLocked(u.ID, parent.ID, domain.ActionList)
+	}
+	return r.folderPageRowsLocked(u, filter, q.CursorName, q.CursorID, q.Limit), nil
+}
+
+func (r *memoryRepo) SearchVisibleFolders(_ context.Context, q ports.FolderSearchQuery) ([]ports.FolderPageRow, error) {
+	if q.Limit <= 0 || q.Limit > ports.MaxFolderPage+1 {
+		return nil, domain.ErrInvalidInput
+	}
+	if q.Query == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	entry, ok := r.users[q.UserID]
+	if !ok {
+		return nil, ports.ErrRowMissing
+	}
+	needle := lowerASCII(q.Query)
+	filter := func(f domain.Folder) bool {
+		return strings.Contains(lowerASCII(f.Name), needle)
+	}
+	return r.folderPageRowsLocked(entry.user, filter, q.CursorName, q.CursorID, q.Limit), nil
 }
 
 // grantCoversLocked approximates the SQL visibility rule: a live grant with the

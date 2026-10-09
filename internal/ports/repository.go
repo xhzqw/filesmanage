@@ -26,6 +26,8 @@ type Repository interface {
 
 	// Folders and visibility.
 	ListVisibleFolders(context.Context, domain.User) ([]domain.Folder, error)
+	ListVisibleFolderChildren(context.Context, FolderChildQuery) ([]FolderPageRow, error)
+	SearchVisibleFolders(context.Context, FolderSearchQuery) ([]FolderPageRow, error)
 	FolderByID(context.Context, string) (domain.Folder, error)
 	FolderParentMap(context.Context) (map[string]*string, error)
 	CreateFolder(context.Context, domain.Folder) error
@@ -177,6 +179,44 @@ type GrantAt struct {
 // ListFiles asks the repository for one lookahead row beyond the page to
 // detect a next page, so the repository accepts MaxFilePage+1.
 const MaxFilePage = 200
+
+// MaxFolderPage is the largest page a client may request from the paged folder
+// reads (children/search). The service asks for one lookahead row beyond the
+// page to detect a next page, so the repository accepts MaxFolderPage+1.
+const MaxFolderPage = 200
+
+// FolderChildQuery is the keyset-paginated children read behind
+// GET /api/folders/children. ParentID "" addresses the caller's visible roots,
+// which include a listable folder whose parent the caller may not list (a pruned
+// subtree surfaces as an accessible root). Cursor fields carry the sort key
+// (name, id) of the last row of the previous page.
+type FolderChildQuery struct {
+	UserID     string
+	ParentID   string
+	CursorName string
+	CursorID   string
+	Limit      int
+}
+
+// FolderSearchQuery is the keyset-paginated name search behind
+// GET /api/folders/search, scoped to folders the caller may list. Query is the
+// already-validated name fragment; the cursor follows the same (name, id) key as
+// FolderChildQuery.
+type FolderSearchQuery struct {
+	UserID     string
+	Query      string
+	CursorName string
+	CursorID   string
+	Limit      int
+}
+
+// FolderPageRow is one visible folder plus the read hints the FolderPicker
+// renders. HasChildren is probed with an EXISTS over the caller's visible
+// children, so a page never loads the children it only has to count.
+type FolderPageRow struct {
+	Folder      domain.Folder
+	HasChildren bool
+}
 
 // FileQuery is the stable, cursor-paginated file list request. Cursor fields
 // carry the sort key of the last row of the previous page.

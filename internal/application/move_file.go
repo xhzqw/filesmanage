@@ -385,36 +385,12 @@ func (p *MovePreflight) addConflict(c MoveConflict) {
 // folderListable reports whether the caller holds the list action on the
 // folder, which is the visibility rule every tree, list and search read uses.
 func (s *Service) folderListable(ctx context.Context, repo ports.Repository, u domain.User, folderID string) (bool, error) {
-	actions, err := s.resolveActions(ctx, repo, u, folderID)
-	if err != nil {
-		return false, err
-	}
-	return actions[domain.ActionList], nil
+	return newFolderReadView(s, repo, u).listable(ctx, folderID)
 }
 
 // visiblePath renders the " / "-joined folder names from the root down to
 // folderID, stopping at the first ancestor the caller may not list so a hidden
 // branch never leaks its name or the path above it.
 func (s *Service) visiblePath(ctx context.Context, repo ports.Repository, u domain.User, folderID string) string {
-	names := make([]string, 0, 8)
-	current := folderID
-	for depth := 0; depth <= 64 && current != ""; depth++ {
-		folder, err := repo.FolderByID(ctx, current)
-		if err != nil {
-			break
-		}
-		listable, err := s.folderListable(ctx, repo, u, folder.ID)
-		if err != nil || !listable {
-			break
-		}
-		names = append(names, folder.Name)
-		if folder.ParentID == nil {
-			break
-		}
-		current = *folder.ParentID
-	}
-	for i, j := 0, len(names)-1; i < j; i, j = i+1, j-1 {
-		names[i], names[j] = names[j], names[i]
-	}
-	return strings.Join(names, " / ")
+	return newFolderReadView(s, repo, u).path(ctx, folderID)
 }

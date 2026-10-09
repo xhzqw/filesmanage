@@ -1,22 +1,7 @@
 import{useEffect,useRef,useState,type DragEvent,type FormEvent,type ReactNode}from"react";
 import{formatSize}from"./api";
-import{uploadFileWithProgress}from"../../shared/uploadClient";
-import{errorCode}from"../../shared/errors";
-import{
- enqueue,markUploading,markProgress,markServerProcessing,markCommitted,markFailed,markCancelled,
- cancelTask,retryTask,renameTask,skipTask,
- type UploadTask,
-}from"./uploadQueue";
+import{useUploadStore}from"./uploadStore";
 import"./dropZone.css";
-
-// Error-code to Chinese copy (COMPLEX-WORKFLOWS-v1 §4.1): every failure keeps
-// the stable server code and maps to an actionable recovery.
-function failureCopy(error:unknown):string{
- const code=errorCode(error);
- if(code==="E_NAME_CONFLICT")return"同名文件已存在，可改名或跳过";
- if(code==="E_FORBIDDEN")return"当前目录没有上传权限";
- return"上传失败，可重试";
-}
 
 // DESKTOP-INTERACTION-v1 §7.1: a drop onto a text-entry surface must not be
 // hijacked into an upload. The file <input> is intentionally allowed through so
@@ -29,95 +14,49 @@ function dropOnTextEntry(event:DragEvent<HTMLDivElement>):boolean{
  return input instanceof HTMLInputElement&&input.type!=="file";
 }
 
-// Drag-and-drop upload target with a real per-item queue (DI-17, WF-24..28).
-// The whole subtree is the drop zone; a non-drag entry (the file input inside
-// FileTable, DI-18) stays the keyboard/touch path and is untouched here. Drops
-// enqueue files that upload sequentially (concurrency 1 is a G4 decision,
-// ADR-UX-05); each item keeps its own targetFolderId so a queue survives a
-// folder switch and only reloads the list when it committed into the current
-// folder (WF-28). No window-level listeners are registered: every handler is
-// scoped to this subtree, so a drop over a text input elsewhere never uploads.
+// Drag-and-drop upload target rendering the shared queue (DI-17, WF-24..28).
+// The queue itself lives in uploadStore, so this drop and the toolbar file
+// input in FileTable feed one queue with identical business semantics (WF-27)
+// and an upload keeps running while either component is unmounted. Each item
+// keeps its own targetFolderId, so a queue survives a folder switch; the store
+// asks for a reload only when the committed item's target is the folder this
+// zone last reported (WF-28). No window-level listeners are registered: every
+// handler is scoped to this subtree, so a drop over a text input elsewhere
+// never uploads.
 export function DropZone({folderId,disabled,onCommitted,children}:{folderId:string;disabled?:boolean;onCommitted:()=>void;children:ReactNode}){
- const[tasks,setTasks]=useState<UploadTask[]>([]);
+ const tasks=useUploadStore(state=>state.tasks);
+ const reloadTick=useUploadStore(state=>state.reloadTick);
+ const setCurrentFolder=useUploadStore(state=>state.setCurrentFolder);
+ const enqueueFiles=useUploadStore(state=>state.enqueueFiles);
+ const cancel=useUploadStore(state=>state.cancel);
+ const retry=useUploadStore(state=>state.retry);
+ const rename=useUploadStore(state=>state.rename);
+ const skip=useUploadStore(state=>state.skip);
  const[dragging,setDragging]=useState(false);
  const[renamingId,setRenamingId]=useState<string|null>(null);
  const[renameValue,setRenameValue]=useState("");
- const tasksRef=useRef<UploadTask[]>([]);
  const dragDepth=useRef(0);
- const pumping=useRef(false);
- // queueId → the AbortController of its in-flight XHR, so 取消 on an uploading
- // item aborts exactly that request while a queued item is cancelled in state.
- const inFlight=useRef(new Map<string,AbortController>());
- const mounted=useRef(true);
- const folderIdRef=useRef(folderId);
- const onCommittedRef=useRef(onCommitted);
- folderIdRef.current=folderId;
- onCommittedRef.current=onCommitted;
+ const seenReload=useRef(reloadTick);
 
+ // Report the shown folder to the store so a commit into another folder never
+ // reloads this list, and make "no zone is visible" explicit on unmount
+ // (WF-28; the empty value is never a folder id).
  useEffect(()=>{
-  mounted.current=true;
-  return()=>{mounted.current=false;};
- },[]);
+  setCurrentFolder(folderId);
+  return()=>setCurrentFolder("");
+ },[folderId,setCurrentFolder]);
+
+ // The store bumps reloadTick for a commit into the folder above; the tick
+ // already present at mount is skipped because the table re-reads on mount.
+ useEffect(()=>{
+  if(seenReload.current===reloadTick)return;
+  seenReload.current=reloadTick;
+  onCommitted();
+ },[reloadTick,onCommitted]);
 
  // Without a writable target the zone is inert (no highlight, no enqueue) but
  // still renders its children and any in-flight queue unchanged.
  const active=folderId!==""&&disabled!==true;
-
- // tasksRef mirrors state synchronously so the async pump always reads the
- // latest queue; every mutation flows through here to keep the two in step.
- function applyTasks(change:(prev:UploadTask[])=>UploadTask[]){
-  const next=change(tasksRef.current);
-  tasksRef.current=next;
-  if(mounted.current)setTasks(next);
- }
-
- // Sequential pump (concurrency 1, ADR-UX-05). It re-reads the queue each pass,
- // so items enqueued while an upload is in flight are picked up in order.
- async function pump(){
-  if(pumping.current)return;
-  pumping.current=true;
-  try{
-   while(mounted.current){
-    const next=tasksRef.current.find(task=>task.status==="queued");
-    if(!next)break;
-    const controller=new AbortController();
-    inFlight.current.set(next.queueId,controller);
-    applyTasks(prev=>markUploading(prev,next.queueId));
-    try{
-     const reply=await uploadFileWithProgress(next.targetFolderId,next.file,next.idempotencyKey,{
-      signal:controller.signal,
-      // Byte progress is not success: when every byte is on the wire the item
-      // moves to server-processing and only the committed envelope resolves it
-      // (COMPLEX-WORKFLOWS-v1 §5.1).
-      onProgress:progress=>{
-       applyTasks(prev=>{
-        const withBytes=markProgress(prev,next.queueId,progress);
-        return progress.total>0&&progress.loaded>=progress.total?markServerProcessing(withBytes,next.queueId):withBytes;
-       });
-      },
-     });
-     applyTasks(prev=>markCommitted(prev,next.queueId,{fileId:reply.fileId,versionSeq:reply.versionSeq,deduplicated:reply.deduplicated}));
-     if(next.targetFolderId===folderIdRef.current)onCommittedRef.current();
-    }catch(error){
-     if(errorCode(error)==="E_CANCELLED"){
-      applyTasks(prev=>markCancelled(prev,next.queueId));
-     }else{
-      applyTasks(prev=>markFailed(prev,next.queueId,failureCopy(error)));
-     }
-    }finally{
-     inFlight.current.delete(next.queueId);
-    }
-   }
-  }finally{
-   pumping.current=false;
-  }
- }
-
- function enqueueFiles(files:File[]){
-  if(!active||files.length===0)return;
-  applyTasks(prev=>enqueue(prev,files,folderId));
-  void pump();
- }
 
  function onDragEnter(event:DragEvent<HTMLDivElement>){
   if(!active)return;
@@ -146,18 +85,16 @@ export function DropZone({folderId,disabled,onCommitted,children}:{folderId:stri
   dragDepth.current=0;
   setDragging(false);
   if(dropOnTextEntry(event))return;
-  enqueueFiles(Array.from(event.dataTransfer.files));
+  enqueueFiles(Array.from(event.dataTransfer.files),folderId);
  }
 
  function submitRename(event:FormEvent<HTMLFormElement>){
   event.preventDefault();
   const name=renameValue.trim();
   if(renamingId===null||name==="")return;
-  const target=renamingId;
-  applyTasks(prev=>renameTask(prev,target,name));
+  rename(renamingId,name);
   setRenamingId(null);
   setRenameValue("");
-  void pump();
  }
 
  const committed=tasks.filter(task=>task.status==="committed").length;
@@ -200,12 +137,12 @@ export function DropZone({folderId,disabled,onCommitted,children}:{folderId:stri
        {task.status==="cancelled"&&<span title="取消只保证本地中断请求；服务端已提交的结果无法撤销">已取消</span>}
       </span>
       <div className="upload-item-actions">
-       {task.status==="queued"&&<button type="button" onClick={()=>applyTasks(prev=>cancelTask(prev,task.queueId))}>取消</button>}
-       {task.status==="uploading"&&<button type="button" title="取消只中断本地请求；服务端已提交的结果无法撤销" onClick={()=>inFlight.current.get(task.queueId)?.abort()}>取消</button>}
+       {task.status==="queued"&&<button type="button" onClick={()=>cancel(task.queueId)}>取消</button>}
+       {task.status==="uploading"&&<button type="button" title="取消只中断本地请求；服务端已提交的结果无法撤销" onClick={()=>cancel(task.queueId)}>取消</button>}
        {task.status==="failed"&&<>
-        <button type="button" onClick={()=>{applyTasks(prev=>retryTask(prev,task.queueId));void pump();}}>重试</button>
+        <button type="button" onClick={()=>retry(task.queueId)}>重试</button>
         <button type="button" onClick={()=>{setRenamingId(task.queueId);setRenameValue(task.name);}}>改名重试</button>
-        <button type="button" onClick={()=>applyTasks(prev=>skipTask(prev,task.queueId))}>跳过</button>
+        <button type="button" onClick={()=>skip(task.queueId)}>跳过</button>
        </>}
       </div>
       {task.status==="uploading"&&<div

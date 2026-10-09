@@ -2,8 +2,9 @@ import{newIdempotencyKey}from"../../shared/ids";
 import type{UploadProgress}from"../../shared/uploadClient";
 
 // Upload queue state machine (COMPLEX-WORKFLOWS-v1 §5, UX-ACCEPTANCE WF-24..28).
-// Pure transitions only: the component owns the async upload loop and calls
-// these to move a task between states, so the identity rules stay testable.
+// Pure transitions only: the shared upload store owns the async upload loop and
+// calls these to move a task between states, so the identity rules stay
+// testable.
 //
 // Two ids, two meanings. `queueId` is the stable UI key for one dropped/selected
 // file and never changes. `idempotencyKey` is the server operation identity:

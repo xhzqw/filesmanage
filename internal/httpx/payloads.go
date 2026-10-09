@@ -13,6 +13,26 @@ func folderPayload(id, name string, parentID *string) gin.H {
 	return gin.H{"id": id, "name": name, "parentId": parentID}
 }
 
+// folderPageItemPayload is the FolderPicker read row: parentId is null for a
+// visible root, and disabledReason only appears when the row cannot be selected.
+func folderPageItemPayload(item application.FolderPageItem) gin.H {
+	payload := gin.H{
+		"id": item.ID, "name": item.Name, "parentId": item.ParentID,
+		"hasChildren": item.HasChildren, "canSelect": item.CanSelect,
+	}
+	if item.DisabledReason != "" {
+		payload["disabledReason"] = item.DisabledReason
+	}
+	return payload
+}
+
+// folderSearchItemPayload adds the visible path the search read renders.
+func folderSearchItemPayload(item application.FolderPageItem) gin.H {
+	payload := folderPageItemPayload(item)
+	payload["path"] = item.Path
+	return payload
+}
+
 func filePayload(f domain.File) gin.H {
 	payload := gin.H{
 		"id": f.ID, "folderId": f.FolderID, "name": f.Name,

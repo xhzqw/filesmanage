@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"filesmanage/internal/application"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
@@ -98,6 +99,75 @@ func (h *Handler) deleteFolder(c *gin.Context) {
 	c.JSON(200, gin.H{"ok": true, "data": gin.H{
 		"trashId": entry.ID, "folders": folders, "oldName": entry.OldName,
 	}})
+}
+
+// folderChildren serves GET /api/folders/children: one keyset page of the
+// caller's visible children. An absent parentId addresses the visible roots.
+func (h *Handler) folderChildren(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	if u.MustChangePassword {
+		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
+		return
+	}
+	limit, ok := folderPageLimit(c)
+	if !ok {
+		return
+	}
+	page, err := h.S.FolderChildren(c.Request.Context(), u, c.Query("parentId"), application.DecodeFolderCursor(c.Query("cursor")), limit)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	items := make([]gin.H, 0, len(page.Items))
+	for _, item := range page.Items {
+		items = append(items, folderPageItemPayload(item))
+	}
+	c.JSON(200, gin.H{"ok": true, "data": gin.H{"items": items, "nextCursor": page.NextCursor}})
+}
+
+// searchFolders serves GET /api/folders/search: one keyset page of the caller's
+// visible folders whose name matches q, each carrying its visible path.
+func (h *Handler) searchFolders(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	if u.MustChangePassword {
+		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
+		return
+	}
+	limit, ok := folderPageLimit(c)
+	if !ok {
+		return
+	}
+	page, err := h.S.SearchFolders(c.Request.Context(), u, c.Query("q"), application.DecodeFolderCursor(c.Query("cursor")), limit)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	items := make([]gin.H, 0, len(page.Items))
+	for _, item := range page.Items {
+		items = append(items, folderSearchItemPayload(item))
+	}
+	c.JSON(200, gin.H{"ok": true, "data": gin.H{"items": items, "nextCursor": page.NextCursor}})
+}
+
+// folderPageLimit parses the shared limit query of the paged folder reads: an
+// absent limit keeps the application default, a malformed one is E_BAD.
+func folderPageLimit(c *gin.Context) (int, bool) {
+	raw := c.Query("limit")
+	if raw == "" {
+		return 0, true
+	}
+	parsed, err := strconvAtoi(raw)
+	if err != nil || parsed < 1 {
+		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+		return 0, false
+	}
+	return parsed, true
 }
 
 func (h *Handler) listGrants(c *gin.Context) {

@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"strings"
 	"time"
 )
 
@@ -170,6 +171,119 @@ func (r *Repository) ListVisibleFolders(ctx context.Context, u domain.User) ([]d
 		out = append(out, f)
 	}
 	return out, rows.Err()
+}
+
+// ---------- paged folder reads (COMPLEX-WORKFLOWS §2.3, ADR-UX-07) ----------
+
+// folderVisibility carries the SQL fragments that decide which folders one
+// caller may list. Non-admin reads reuse scopeCTE - the exact rule the
+// search/stats/export scope uses (READ-01) - so a folder can never be listable
+// in one read and hidden in another; admins see every active folder without the
+// recursive CTE. The fragments are written against the folder aliases c (the
+// page row) and g (a candidate child).
+type folderVisibility struct {
+	cte          string
+	args         []any
+	visible      string
+	childVisible string
+	parentHidden string
+}
+
+func (r *Repository) folderVisibilityOf(ctx context.Context, userID string) (folderVisibility, error) {
+	admin, err := r.isAdmin(ctx, userID)
+	if err != nil {
+		return folderVisibility{}, err
+	}
+	if admin {
+		return folderVisibility{
+			visible:      "true",
+			childVisible: "EXISTS (SELECT 1 FROM folders g WHERE g.parent_id=c.id AND g.deleted_at IS NULL)",
+			parentHidden: "c.parent_id IS NULL OR NOT EXISTS (SELECT 1 FROM folders p WHERE p.id=c.parent_id AND p.deleted_at IS NULL)",
+		}, nil
+	}
+	return folderVisibility{
+		cte:          scopeCTE,
+		args:         []any{userID}, // scopeCTE binds the caller to $1
+		visible:      "c.id IN (SELECT folder_id FROM visible_scope)",
+		childVisible: "EXISTS (SELECT 1 FROM folders g WHERE g.parent_id=c.id AND g.deleted_at IS NULL AND g.id IN (SELECT folder_id FROM visible_scope))",
+		// A listable folder whose parent is not in the caller's visible set is an
+		// accessible root, so a pruned subtree surfaces without its hidden
+		// ancestor (DESKTOP-INTERACTION §5).
+		parentHidden: "c.parent_id IS NULL OR c.parent_id NOT IN (SELECT folder_id FROM visible_scope)",
+	}, nil
+}
+
+// folderPageRows runs one ordered page. Ordering is name then id, and the
+// (name,id) keyset cursor uses the same key, so paging is total and stable even
+// for duplicate names.
+func (r *Repository) folderPageRows(ctx context.Context, scope folderVisibility, where []string, limit int) ([]ports.FolderPageRow, error) {
+	sql := scope.cte + " SELECT c.id,c.name,c.parent_id," + scope.childVisible + " AS has_children" +
+		" FROM folders c WHERE " + strings.Join(where, " AND ") +
+		" ORDER BY c.name ASC,c.id ASC LIMIT " + fmt.Sprint(limit)
+	rows, err := r.Q.Query(ctx, sql, scope.args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]ports.FolderPageRow, 0)
+	for rows.Next() {
+		var row ports.FolderPageRow
+		if err := rows.Scan(&row.Folder.ID, &row.Folder.Name, &row.Folder.ParentID, &row.HasChildren); err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+// ListVisibleFolderChildren returns one page of the caller's visible children of
+// ParentID ("" addresses the visible roots).
+func (r *Repository) ListVisibleFolderChildren(ctx context.Context, q ports.FolderChildQuery) ([]ports.FolderPageRow, error) {
+	if q.Limit <= 0 || q.Limit > ports.MaxFolderPage+1 {
+		return nil, domain.ErrInvalidInput
+	}
+	scope, err := r.folderVisibilityOf(ctx, q.UserID)
+	if err != nil {
+		return nil, err
+	}
+	ph := newPlaceholder(len(scope.args))
+	where := []string{"c.deleted_at IS NULL", scope.visible}
+	if q.ParentID == "" {
+		where = append(where, "("+scope.parentHidden+")")
+	} else {
+		where = append(where, "c.parent_id="+ph.next())
+		scope.args = append(scope.args, q.ParentID)
+	}
+	if q.CursorID != "" {
+		where = append(where, "(c.name,c.id)>("+ph.next()+","+ph.next()+")")
+		scope.args = append(scope.args, q.CursorName, q.CursorID)
+	}
+	return r.folderPageRows(ctx, scope, where, q.Limit)
+}
+
+// SearchVisibleFolders returns one page of visible folders whose name matches
+// Query. The match is a plain ILIKE fragment, so % and _ behave as wildcards
+// exactly like the file search.
+func (r *Repository) SearchVisibleFolders(ctx context.Context, q ports.FolderSearchQuery) ([]ports.FolderPageRow, error) {
+	if q.Limit <= 0 || q.Limit > ports.MaxFolderPage+1 {
+		return nil, domain.ErrInvalidInput
+	}
+	query := strings.TrimSpace(q.Query)
+	if query == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	scope, err := r.folderVisibilityOf(ctx, q.UserID)
+	if err != nil {
+		return nil, err
+	}
+	ph := newPlaceholder(len(scope.args))
+	where := []string{"c.deleted_at IS NULL", scope.visible, "c.name ILIKE " + ph.next()}
+	scope.args = append(scope.args, "%"+query+"%")
+	if q.CursorID != "" {
+		where = append(where, "(c.name,c.id)>("+ph.next()+","+ph.next()+")")
+		scope.args = append(scope.args, q.CursorName, q.CursorID)
+	}
+	return r.folderPageRows(ctx, scope, where, q.Limit)
 }
 
 func (r *Repository) FolderByID(ctx context.Context, id string) (domain.Folder, error) {

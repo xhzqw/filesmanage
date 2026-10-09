@@ -51,3 +51,30 @@ func DecodeFileCursor(sort, encoded string) FileCursor {
 	}
 	return cursor
 }
+
+// Folder cursors follow the file-cursor shape: the sort key of the last returned
+// row plus its id, in base64url without padding.
+
+func encodeFolderCursor(last domain.Folder) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(last.Name + "\x1f" + last.ID))
+}
+
+// DecodeFolderCursor parses a client cursor for the paged folder reads. A cursor
+// the server did not issue decodes to the zero value, which starts at the first
+// page instead of failing the read.
+func DecodeFolderCursor(encoded string) FolderCursor {
+	var cursor FolderCursor
+	if encoded == "" {
+		return cursor
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(encoded)
+	if err != nil {
+		return cursor
+	}
+	parts := strings.SplitN(string(raw), "\x1f", 2)
+	if len(parts) != 2 {
+		return cursor
+	}
+	cursor.Name, cursor.ID = parts[0], parts[1]
+	return cursor
+}

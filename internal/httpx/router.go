@@ -93,6 +93,8 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.POST("/me/password", h.changePassword)
 	api.GET("/me", h.me)
 	api.GET("/folders/tree", h.folders)
+	api.GET("/folders/children", h.folderChildren)
+	api.GET("/folders/search", h.searchFolders)
 	api.POST("/folders", h.createFolder)
 	api.PATCH("/folders/:id", h.renameFolder)
 	api.POST("/folders/:id/move", h.moveFolder)
