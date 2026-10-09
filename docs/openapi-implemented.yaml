@@ -192,6 +192,263 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/me/sessions:
+    get:
+      summary: List own active login devices
+      operationId: listOwnSessions
+      tags:
+      - Auth
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: At most 50 own sessions; includes current marker.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          description: 96-bit prefix of session-token SHA-256; selector only, not a bearer token.
+                        device:
+                          type: string
+                          description: Coarse browser and operating-system label.
+                        address:
+                          type: string
+                          description: Authenticated socket client IP or trusted Nginx-forwarded IP.
+                        createdAt:
+                          type: string
+                          format: date-time
+                        lastSeenAt:
+                          type: string
+                          format: date-time
+                        expiresAt:
+                          type: string
+                          format: date-time
+                        current:
+                          type: boolean
+                      required:
+                      - id
+                      - device
+                      - address
+                      - createdAt
+                      - lastSeenAt
+                      - expiresAt
+                      - current
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN / E_PASSWORD_CHANGE_REQUIRED — authorization denied or first-login password change pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      description: Rejected with 403 E_PASSWORD_CHANGE_REQUIRED until the forced first-login password change completes.
+  /api/me/auth-activity:
+    get:
+      summary: List own recent account security actions
+      operationId: listOwnAuthActivity
+      tags:
+      - Auth
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: At most 30 own login/logout/revoke audit records.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          description: auth.login, auth.logout, auth.session_revoke or auth.sessions_revoke
+                        device:
+                          type: string
+                        address:
+                          type: string
+                        count:
+                          type: integer
+                        occurredAt:
+                          type: string
+                          format: date-time
+                      required:
+                      - type
+                      - device
+                      - address
+                      - occurredAt
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN / E_PASSWORD_CHANGE_REQUIRED — authorization denied or first-login password change pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      description: Rejected with 403 E_PASSWORD_CHANGE_REQUIRED until the forced first-login password change completes.
+  /api/me/sessions/others:
+    delete:
+      summary: Revoke every other active session
+      operationId: revokeOtherSessions
+      tags:
+      - Auth
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Number of other sessions revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      revoked:
+                        type: integer
+                    required:
+                    - revoked
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN / E_PASSWORD_CHANGE_REQUIRED — authorization denied or first-login password change pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      description: Rejected with 403 E_PASSWORD_CHANGE_REQUIRED until the forced first-login password change completes.
+  /api/me/sessions/{id}:
+    delete:
+      summary: Revoke a single other session belonging to the caller
+      operationId: revokeOwnSession
+      tags:
+      - Auth
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: 24 lowercase hexadecimal characters, never a bearer token.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Other session revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      revoked:
+                        type: boolean
+                    required:
+                    - revoked
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN / E_PASSWORD_CHANGE_REQUIRED — authorization denied or first-login password change pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      description: Rejected with 403 E_PASSWORD_CHANGE_REQUIRED until the forced first-login password change completes. Foreign-account
+        IDs and missing IDs are indistinguishable (404). Current session cannot be revoked here.
   /api/events/ws:
     get:
       summary: Subscribe to live session events (WebSocket)
