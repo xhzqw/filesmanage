@@ -1,7 +1,10 @@
 // Shared error-shape helpers. API failures carry a stable `code` field on the
 // thrown Error; features map codes to user-facing copy.
 
+import {ApiError} from "./http";
+
 export function errorCode(error:unknown):string{
+ if(error instanceof ApiError)return error.code;
  if(error instanceof Error&&"code" in error){
   const code=error.code;
   return typeof code==="string"?code:"";

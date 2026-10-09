@@ -1,40 +1,57 @@
-import {useEffect,useState,type FormEvent} from "react";
-import {fileApi} from "./api";
-import {errorCode,errorCopy} from "../../shared/errors";
-import {newIdempotencyKey} from "../../shared/ids";
-import type {FileItem} from "../../entities/file/model";
+import {useEffect,useState,type FormEvent}from "react";
+import {fileApi,formatSize}from "./api";
+import {assessEditable,encodeEditedText,type EditAssessment}from "./safeEdit";
+import {errorCode,errorCopy}from "../../shared/errors";
+import {newIdempotencyKey}from "../../shared/ids";
+import type{FileItem}from"../../entities/file/model";
 
 // Lock-aware plain-text editor. The dialog acquires the server-side edit lock
 // before the user types, saves with the live token, and releases on close.
 // Folders under an approval policy submit instead of committing directly.
+//
+// Safe Text Editor gate (COMPLEX-WORKFLOWS-v1 §1): the editor only opens when
+// the preview provides the exact bytes (rawBase64) and they round-trip without
+// re-encoding or newline normalisation. Truncated, non-textual, binary,
+// non-UTF-8 and mixed-EOL files are blocked with an actionable reason instead
+// of risking a lossy save. A submitted transaction can never be cancelled
+// away: closing is blocked while busy and unsaved edits ask first.
 export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileItem;requiresApproval:boolean;onClose:()=>void;onSaved:()=>void}){
+ const[status,setStatus]=useState<"loading"|"ready"|"blocked"|"failed">("loading");
+ const[assessment,setAssessment]=useState<EditAssessment|null>(null);
  const[content,setContent]=useState("");
- const[status,setStatus]=useState("loading");
+ const[loaded,setLoaded]=useState("");
  const[message,setMessage]=useState("");
  const[busy,setBusy]=useState(false);
  const[lockToken,setLockToken]=useState("");
  const[baseSeq,setBaseSeq]=useState(file.currentVersionSeq);
+ const[pending,setPending]=useState<null|"close"|"reload">(null);
+ const[reloadToken,setReloadToken]=useState(0);
 
  useEffect(()=>{
   let valid=true;
+  setStatus("loading");setMessage("");setLockToken("");setPending(null);
   fileApi.preview(file.id)
    .then(preview=>{
     if(!valid)return;
-    setContent(preview.content);
+    const result=assessEditable(preview);
+    setAssessment(result);
+    if(!result.editable){setStatus("blocked");return;}
+    setContent(result.value.text);
+    setLoaded(result.value.text);
     setStatus("ready");
    })
-   .catch(()=>{if(valid){setStatus("failed");}});
+   .catch(error=>{if(valid){setStatus("failed");setMessage(errorCopy(error,"无法读取文件内容。"));}});
   return()=>{valid=false;};
- },[file.id]);
+ },[file.id,reloadToken]);
 
  useEffect(()=>{
   if(status!=="ready"||requiresApproval)return;
   let valid=true;
   fileApi.acquireLock(file.id,baseSeq)
    .then(result=>{if(valid)setLockToken(result.lockToken);})
-   .catch(()=>{if(valid)setMessage("无法获取编辑锁，可能文件被其他人锁定");});
+   .catch(error=>{if(valid)setMessage(errorCopy(error,"无法获取编辑锁：文件可能被其他人锁定或已被修改。"));});
   return()=>{valid=false;};
- },[status,requiresApproval,file.id,baseSeq]);
+ },[status,requiresApproval,file.id,baseSeq,reloadToken]);
 
  useEffect(()=>{
   // Release the lock when the editor unmounts without saving; a save already
@@ -46,14 +63,34 @@ export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileIte
   };
  },[file.id,lockToken]);
 
+ const editable=status==="ready"&&assessment?.editable?assessment.value:null;
+ const dirty=editable!==null&&content!==loaded;
+ const lockPending=editable!==null&&!requiresApproval&&lockToken==="";
+
+ // Escape and the close button only ever unwind one layer: an in-flight
+ // submit is not cancellable, and unsaved edits ask before they are dropped.
+ function requestClose(){
+  if(busy||pending!==null)return;
+  if(dirty){setPending("close");return;}
+  onClose();
+ }
+
+ function requestReload(){
+  if(busy||pending!==null)return;
+  if(dirty){setPending("reload");return;}
+  setReloadToken(token=>token+1);
+ }
+
  async function submit(event:FormEvent<HTMLFormElement>){
   event.preventDefault();
+  if(editable===null)return;
   setBusy(true);setMessage("");
   try{
-   const data=btoa(unescape(encodeURIComponent(content)));
+   const data=encodeEditedText(content,editable.eol,editable.hasBom);
    if(requiresApproval){
     await fileApi.submitForApproval(file.id,baseSeq,data);
-    setMessage("已提交审批，通过后生成新版本");
+    setLoaded(content);
+    setMessage("已提交审批，通过后生成新版本；当前生效版本未变。");
     onSaved();
     return;
    }
@@ -64,6 +101,7 @@ export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileIte
    const result=await fileApi.save(file.id,baseSeq,lockToken,data,newIdempotencyKey());
    setLockToken("");
    setBaseSeq(result.versionSeq);
+   setLoaded(content);
    setMessage(`已保存为 v${result.versionSeq}`);
    onSaved();
   }catch(error){
@@ -72,22 +110,35 @@ export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileIte
   }finally{setBusy(false);}
  }
 
- return <dialog open className="dialog editor-dialog">
+ return <dialog open className="dialog editor-dialog" onKeyDown={event=>{if(event.key==="Escape"){event.preventDefault();requestClose();}}}>
   <form onSubmit={submit}>
    <h3>编辑 {file.name}</h3>
    <p className="hint">{requiresApproval?"该目录的修改需要审批：提交后由审批人通过才生成新版本。":"保存将创建新的不可变版本；当前为 v"+baseSeq+"。"}</p>
    {status==="loading"&&<p className="empty">正在加载内容…</p>}
-   {status==="failed"&&<p role="alert" className="notice error">无法读取文件内容。</p>}
-   {status==="ready"&&<>
+   {status==="failed"&&<p role="alert" className="notice error">{message||"无法读取文件内容。"}</p>}
+   {status==="blocked"&&assessment&&!assessment.editable&&<>
+    <p role="alert" className="notice error">{assessment.reason}</p>
+    <p className="hint">文件大小 {formatSize(file.sizeBytes)} · 校验值 {file.sha256.slice(0,12)}…</p>
+   </>}
+   {editable&&<>
+    <p className="hint">字节保真：UTF-8 · {editable.eol==="crlf"?"CRLF":"LF"} 换行 · {editable.hasBom?"含 BOM":"无 BOM"}，保存时按原始字节特征写回。</p>
     <label htmlFor="editor-content">内容</label>
     <textarea id="editor-content" value={content} rows={16} onChange={e=>setContent(e.target.value)}/>
    </>}
-   {message&&<p role="alert" className="notice error">{message}</p>}
+   {message&&status!=="failed"&&<p role="alert" className="notice error">{message}</p>}
+   {pending&&<p role="alert" className="notice error">有未保存的修改，放弃后将丢失本次编辑。</p>}
    <div className="dialog-actions">
-    <button type="button" className="secondary-action" onClick={onClose}>关闭</button>
-    <button type="submit" className="primary" disabled={busy||status!=="ready"||(!requiresApproval&&lockToken==="")}>
-     {busy?"保存中…":requiresApproval?"提交审批":"保存新版本"}
-    </button>
+    {pending===null&&<>
+     <button type="button" className="secondary-action" onClick={requestClose} disabled={busy}>关闭</button>
+     {lockPending&&<button type="button" className="secondary-action" onClick={requestReload} disabled={busy}>重新加载</button>}
+     {editable&&<button type="submit" className="primary" disabled={busy||(!requiresApproval&&lockToken==="")}>
+      {busy?"保存中…":requiresApproval?"提交审批":"保存新版本"}
+     </button>}
+    </>}
+    {pending!==null&&<>
+     <button type="button" className="danger" onClick={()=>{if(pending==="close")onClose();else setReloadToken(token=>token+1);}}>放弃修改</button>
+     <button type="button" className="secondary-action" onClick={()=>setPending(null)}>继续编辑</button>
+    </>}
    </div>
   </form>
  </dialog>;

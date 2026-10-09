@@ -35,6 +35,10 @@ export type PreviewData={
  textual:boolean;
  truncated:boolean;
  content:string;
+ // Exact preview-prefix bytes (BOM included), base64. Only present for
+ // textual files; the Safe Text Editor round-trips through these bytes so
+ // nothing is re-encoded or newline-normalised (COMPLEX-WORKFLOWS-v1 §1).
+ rawBase64?:string;
  byteMeta:{
   size:number;
   sha256:string;

@@ -15,7 +15,7 @@ const SORT_LABELS:Record<SortKey,string>={
 
 const SORT_KEYS:SortKey[]=["updated_desc","name_asc","name_desc","size_desc"];
 
-export function FileTable({folder,folderName,onEdit}:{folder:string;folderName:string;onEdit:(fileId:string)=>void}){
+export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;folderName:string;onEdit:(fileId:string)=>void;reloadKey:number}){
  const[items,setItems]=useState<FileItem[]>([]);
  const[status,setStatus]=useState("loading");
  const[message,setMessage]=useState("");
@@ -40,7 +40,7 @@ export function FileTable({folder,folderName,onEdit}:{folder:string;folderName:s
    })
    .catch(()=>{if(valid)setStatus("failed");});
   return()=>{valid=false;};
- },[folder,sort]);
+ },[folder,sort,reloadKey]);
 
  function announce(text:string,tone:"info"|"error"){
   setMessage(text);

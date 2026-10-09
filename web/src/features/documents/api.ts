@@ -1,4 +1,5 @@
 import {request} from "../../shared/http";
+import {postMultipart} from "../../shared/uploadClient";
 import type {FileItem, FileVersion, PreviewData} from "../../entities/file/model";
 
 export type FilePage={items:FileItem[];nextCursor:string};
@@ -45,21 +46,15 @@ type UploadReply={
  error?:{code:string;message?:string};
 };
 
-// upload bypasses the JSON helper: the body is multipart and the response is
-// still the standard envelope, so it is parsed the same way here.
-export async function uploadFile(folder:string,file:File,idempotencyKey:string):Promise<NonNullable<UploadReply["data"]>>{
+// upload bypasses the JSON helper: the body is multipart, but the response is
+// still the standard envelope and failures still surface as ApiError with the
+// server `code` preserved.
+export async function uploadFile(folder:string,file:File,idempotencyKey:string,signal?:AbortSignal):Promise<NonNullable<UploadReply["data"]>>{
  const body=new FormData();
  body.set("folderId",folder);
  body.set("file",file);
  body.set("idempotencyKey",idempotencyKey);
- const res=await fetch("/api/files",{method:"POST",credentials:"same-origin",body});
- const reply=await res.json() as UploadReply;
- if(!res.ok||!reply.ok||!reply.data){
-  const failure=new Error(reply.error?.message||reply.error?.code||"上传失败");
-  if(reply.error)Object.assign(failure,{code:reply.error.code});
-  throw failure;
- }
- return reply.data;
+ return postMultipart<NonNullable<UploadReply["data"]>>("/files",body,{signal,fallbackMessage:"上传失败"});
 }
 
 export function formatSize(bytes:number):string{

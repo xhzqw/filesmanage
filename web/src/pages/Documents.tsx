@@ -74,7 +74,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
      <div className="breadcrumb">文档管理 / {selected.name}</div>
      <NewFolderForm parentId={selected.id} onCreated={()=>setReloadKey(k=>k+1)}/>
      <FolderActions folder={selected} isAdmin={user.isAdmin} onChanged={()=>setReloadKey(k=>k+1)} onManageGrants={()=>setGrantOpen(true)} onManagePolicy={()=>setPolicyOpen(true)}/>
-     <FileTable folder={selected.id} folderName={selected.name} onEdit={setEditingId}/>
+     <FileTable folder={selected.id} folderName={selected.name} onEdit={setEditingId} reloadKey={reloadKey}/>
    </>}
    {status==="ready"&&!selected&&<p className="empty">当前账号没有可访问的目录，请联系管理员授权。</p>}
    </main></div>

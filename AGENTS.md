@@ -73,5 +73,6 @@ python3 scripts/gen_acceptance_matrix.py
 | `migrations/` | PostgreSQL 迁移 0001–0011 |
 | `scripts/` | 构建、run-dev、全部验收门禁脚本 |
 | `docs/` | SPEC v2.1、OPERATOR-RUNBOOK、验收证据 |
+| `docs/design/` | UX 设计合同包（DESIGN-SYSTEM / DESKTOP-INTERACTION / COMPLEX-WORKFLOWS / UX-ACCEPTANCE，草案，按 G0–G5 门禁实施） |
 | `deploy/` | systemd 单元（**未安装**，BLK-05） |
 | `.secrets/` `.blobs/` | 仅存在于远端，gitignore 排除 |
