@@ -43,9 +43,10 @@ async function evaluate(expression){
 }
 async function navigate(path,selector){
  await send("Page.navigate",{url:BASE+path});
+ const expectedPath=new URL(path,BASE).pathname;
  for(let i=0;i<70;i++){
   await delay(200);
-  const ready=await evaluate(`(()=>location.pathname===${JSON.stringify(path)}&&!!document.querySelector(${JSON.stringify(selector)}))()`).catch(()=>false);
+  const ready=await evaluate(`(()=>location.pathname===${JSON.stringify(expectedPath)}&&!!document.querySelector(${JSON.stringify(selector)}))()`).catch(()=>false);
   if(ready)return;
  }
  throw Error("page did not render "+path+" "+selector);
@@ -123,6 +124,12 @@ async function inspectCompact(page,width){
   check(`${page} ${width}px folder tree remains accessible`,
    report.sidebar.width>=170&&report.sidebar.height>=100&&
    report.sidebar.right<=width+2,`sidebar=${Math.round(report.sidebar.width)}x${Math.round(report.sidebar.height)}`);
+ }
+ if(page==="documents"&&width<=600){
+  check(`${page} ${width}px file grid scrolls inside panel`,
+   !!report.table&&report.table.right<=width+2&&
+   report.table.scrollWidth>report.table.clientWidth,
+   `table=${report.table?.clientWidth}/${report.table?.scrollWidth} right=${report.table?.right}`);
  }
  if(report.org){
   check(`${page} ${width}px organization grid fits`,
@@ -224,6 +231,27 @@ try{
    await navigate("/org",".org-card");
    await inspectCompact("organization",width);
    if(width===390){
+    await navigate("/doc?folder="+fixture.folderId,".file-table");
+    const opened=await evaluate(`(()=>{
+     const button=document.querySelector(".more-trigger");
+     if(!button)return false;
+     button.click();
+     return true;
+    })()`);
+    await delay(130);
+    await evaluate(`(()=>{document.querySelector(".row-more-menu.open button")?.click();return true})()`);
+    await delay(220);
+    const dialog=await evaluate(`(()=>{
+     const el=document.querySelector("dialog.dialog[open]");
+     if(!el)return null;
+     const rect=el.getBoundingClientRect();
+     return {left:rect.left,right:rect.right,width:rect.width,
+       radius:parseFloat(getComputedStyle(el).borderTopLeftRadius)};
+    })()`);
+    check("phone 390px edit dialog fits and is rounded",
+     opened&&dialog&&dialog.left>=0&&dialog.right<=390&&dialog.radius>=18,
+     JSON.stringify(dialog));
+    await evaluate(`(()=>document.querySelector("dialog.dialog[open] button[type=button]")?.click())()`);
     await navigate("/preview/"+fixture.fileId,".media-preview");
     await inspectCompact("media preview",width);
    }

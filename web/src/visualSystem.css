@@ -89,10 +89,20 @@ input[type="checkbox"],input[type="radio"]{border-radius:var(--radius-xs)}
 .work-body{min-height:0}
 .table{
   min-height:0;
+  min-width:0;
   margin:6px 7px 7px;
   border:1px solid var(--border-hairline);
   border-radius:var(--radius-md);
   overflow:auto;
+}
+/* Preserve six-column table density on narrow screens: the full-width grid
+   scrolls inside its bounded panel, never the entire document viewport. */
+.work-body>.table{
+  box-sizing:border-box;
+  width:calc(100% - 14px);
+  max-width:calc(100% - 14px);
+  min-width:0;
+  overflow-x:auto;
 }
 .table table{border-collapse:separate;border-spacing:0}
 .table thead tr:first-child th:first-child{border-top-left-radius:var(--radius-sm)}
@@ -218,6 +228,10 @@ input[type="checkbox"],input[type="radio"]{border-radius:var(--radius-xs)}
   .sidebar,.work,.header{border-radius:var(--radius-md)}
   .breadcrumb,.toolbar,.folder-actions{margin:4px 4px 0}
   .table,.media-preview,.preview-text,.office-holder,.viewer-stage{margin:4px}
+  .work-body>.table{
+    width:calc(100% - 8px);
+    max-width:calc(100% - 8px);
+  }
   .stat-cards{gap:5px;padding:5px}
   .org-workbench{gap:6px;padding:6px}
 }
@@ -237,7 +251,35 @@ input[type="checkbox"],input[type="radio"]{border-radius:var(--radius-xs)}
   .sidebar-resizer{display:none}
   .panels>.work{flex:1;min-width:0;min-height:0}
   .work .folder-context-bar{min-width:0}
-  .folder-actions-slot{min-width:0}
+  .work .folder-context-bar{
+    height:auto;
+    max-height:none;
+    min-height:32px;
+    flex-wrap:wrap;
+    gap:4px;
+    padding:5px 8px;
+  }
+  .folder-actions-slot{min-width:0;max-width:100%}
+  .file-toolbar{
+    height:auto;
+    max-height:none;
+    min-height:30px;
+    flex-wrap:wrap;
+    gap:6px;
+    padding:5px 8px;
+  }
+  .file-toolbar .toolbar-actions,
+  .file-toolbar .toolbar-views{
+    min-width:0;
+    max-width:100%;
+    flex-wrap:wrap;
+    gap:5px;
+  }
+  .file-toolbar .batch-actions-group{
+    min-width:0;
+    margin-left:0;
+    flex-wrap:wrap;
+  }
   .header{padding-right:4px;min-width:0}
   .header .nav-toggle{flex:none}
   .header .brand{
@@ -285,4 +327,5 @@ input[type="checkbox"],input[type="radio"]{border-radius:var(--radius-xs)}
   .header .account-caret{display:none}
   .header .header-right{gap:2px}
   .status-bar{padding-inline:6px}
+  .status-bar .status-right{display:none}
 }
