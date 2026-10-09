@@ -41,7 +41,7 @@ let sessionCookie = "";
 // JSON call helper shared by the API suites (same contract as the Python
 // urllib opener: JSON in, parsed JSON out, HTTP error statuses returned).
 async function call(method, path, body) {
-  const headers = { Origin: ORIGIN };
+  const headers = { Origin: ORIGIN, Cookie: sessionCookie };
   let data;
   if (body !== undefined) {
     data = JSON.stringify(body);
