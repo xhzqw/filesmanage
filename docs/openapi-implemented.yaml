@@ -3570,6 +3570,74 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/share-recipients:
+    get:
+      summary: List share recipients (minimal picker read)
+      operationId: shareRecipients
+      tags:
+      - Collaboration
+      security:
+      - cookieSession: []
+      parameters:
+      - name: kind
+        in: query
+        required: true
+        description: Recipient kind; user rows carry {id,displayName}, group rows {id,name}.
+        schema:
+          type: string
+          enum:
+          - user
+          - group
+      - name: q
+        in: query
+        required: false
+        description: Case-insensitive display-name fragment.
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        description: Page size; defaults to 50 and is capped at 200.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+      responses:
+        '200':
+          description: Minimal recipient rows for the requested kind; disabled accounts are excluded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/ShareRecipientPage'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN / E_PASSWORD_CHANGE_REQUIRED — authorization denied or first-login password change pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      description: Rejected with 403 E_PASSWORD_CHANGE_REQUIRED until the forced first-login password change completes.
   /api/favorites:
     get:
       summary: List favorites
@@ -3820,9 +3888,16 @@ paths:
         schema:
           type: string
           format: date-time
+      - name: cursor
+        in: query
+        required: false
+        description: Opaque keyset cursor from nextCursor; an unparseable value restarts at the first page instead of failing
+          the read (WF-30).
+        schema:
+          type: string
       responses:
         '200':
-          description: Authorized matches with snippets and the authorized total.
+          description: Authorized matches with snippets, the authorized total and the cursor for the next page.
           content:
             application/json:
               schema:
@@ -4724,6 +4799,42 @@ components:
       - createdBy
       - createdAt
       - revoked
+    ShareRecipientUser:
+      type: object
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+      required:
+      - id
+      - displayName
+    ShareRecipientGroup:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      required:
+      - id
+      - name
+    ShareRecipientPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/ShareRecipientUser'
+            - $ref: '#/components/schemas/ShareRecipientGroup'
+          description: 'Rows match the requested kind: user rows carry displayName, group rows carry name.'
+        truncated:
+          type: boolean
+          description: True when more matches exist beyond the capped list; the count itself is not disclosed.
+      required:
+      - items
+      - truncated
     Favorite:
       type: object
       properties:
@@ -5028,10 +5139,16 @@ components:
             - updatedAt
         total:
           type: integer
-          description: Authorized total across all pages.
+          description: Authorized count for the whole filter; the count query ignores the cursor so it stays the same on every
+            page, and it is capped at 1001 (the client displays that as 1000+).
+        nextCursor:
+          type: string
+          description: Opaque keyset cursor over the active sort key (updatedAt+id, name+id or size+id); empty on the last
+            page.
       required:
       - items
       - total
+      - nextCursor
     OfficeSession:
       type: object
       properties:

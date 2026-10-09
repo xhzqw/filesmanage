@@ -261,7 +261,9 @@ func (p *placeholder) next() string {
 const snippetWindow = 60
 
 func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) ([]domain.File, int, error) {
-	if q.Limit <= 0 || q.Limit > 200 {
+	// The service sends page size + 1 lookahead row, so the ceiling is
+	// MaxSearchPage+1; a plain max-size request must not fail here (WF-30).
+	if q.Limit <= 0 || q.Limit > ports.MaxSearchPage+1 {
 		return nil, 0, domain.ErrInvalidInput
 	}
 	folderSQL, folderArgs, needsCTE, err := r.scopeFolderSQL(ctx, q)
@@ -293,15 +295,6 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	if q.To != nil {
 		where = append(where, "f.updated_at<="+ph.next())
 		args = append(args, *q.To)
-	}
-	if q.CursorID != "" {
-		if q.Sort == "name_asc" {
-			where = append(where, "(f.name,f.id)>("+ph.next()+","+ph.next()+")")
-			args = append(args, q.CursorName, q.CursorID)
-		} else {
-			where = append(where, "(f.updated_at,f.id)<("+ph.next()+","+ph.next()+")")
-			args = append(args, q.CursorTime, q.CursorID)
-		}
 	}
 	cte := ""
 	if needsCTE {
@@ -347,11 +340,32 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	// and destroy the early-terminating ordered index scan, and an uncapped
 	// count over a broad term costs ~1s on 100k files. A result of
 	// searchTotalCap means "searchTotalCap-1 or more"; the transport surfaces
-	// it as "1000+".
+	// it as "1000+". The cursor is deliberately NOT part of the count: total is
+	// the authorized count for the whole filter and must not shrink as the
+	// caller pages (WF-30).
 	const searchTotalCap = 1001
 	total := 0
 	if err = r.Q.QueryRow(ctx, cte+" SELECT count(*) FROM (SELECT f.id FROM files f WHERE "+strings.Join(where, " AND ")+" LIMIT "+fmt.Sprint(searchTotalCap)+") t", args...).Scan(&total); err != nil {
 		return nil, 0, err
+	}
+	// The cursor trims only the page read, and each supported sort uses its own
+	// keyset so paging can neither skip nor duplicate rows: name_asc walks the
+	// (name,id) key ascending, size_desc the (size,id) key descending (the
+	// version join above provides the size), and the default updated_desc the
+	// (updated_at,id) key descending.
+	pageWhere := where
+	if q.CursorID != "" {
+		switch q.Sort {
+		case "name_asc":
+			pageWhere = append(pageWhere, "(f.name,f.id)>("+ph.next()+","+ph.next()+")")
+			args = append(args, q.CursorName, q.CursorID)
+		case "size_desc":
+			pageWhere = append(pageWhere, "(coalesce(v.size_bytes,-1),f.id)<("+ph.next()+","+ph.next()+")")
+			args = append(args, q.CursorSize, q.CursorID)
+		default:
+			pageWhere = append(pageWhere, "(f.updated_at,f.id)<("+ph.next()+","+ph.next()+")")
+			args = append(args, q.CursorTime, q.CursorID)
+		}
 	}
 	with := cte
 	if with == "" {
@@ -363,7 +377,7 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	sql := with + ` matched AS (
 	  SELECT f.id,f.updated_at,f.name
 	    FROM files f` + matchedJoin + `
-	   WHERE ` + strings.Join(where, " AND ") + `
+	   WHERE ` + strings.Join(pageWhere, " AND ") + `
 	   ORDER BY ` + matchedOrder + ` LIMIT ` + fmt.Sprint(q.Limit) + `
 	)
 	SELECT f.id,f.folder_id,f.name,f.uploaded_by,f.content_type,f.current_version_seq,v.size_bytes,v.sha256,f.updated_at,f.deleted_at,` + textColumn + `

@@ -97,3 +97,17 @@ func TestNewEngineEnforcesAllowlistOnRoutes(t *testing.T) {
 		}
 	}
 }
+
+// TestShareRecipientPayloadKeepsOnlyThePublicFields locks the WF-21 wire shape:
+// a picker row carries an id plus a display label and nothing else — in
+// particular no login, department, admin or disabled fields.
+func TestShareRecipientPayloadKeepsOnlyThePublicFields(t *testing.T) {
+	user := shareRecipientPayload("user", application.ShareRecipient{ID: "u_1", Name: "张三"})
+	if len(user) != 2 || user["id"] != "u_1" || user["displayName"] != "张三" {
+		t.Fatalf("user row must carry exactly id+displayName, got %v", user)
+	}
+	group := shareRecipientPayload("group", application.ShareRecipient{ID: "g_1", Name: "市场部"})
+	if len(group) != 2 || group["id"] != "g_1" || group["name"] != "市场部" {
+		t.Fatalf("group row must carry exactly id+name, got %v", group)
+	}
+}

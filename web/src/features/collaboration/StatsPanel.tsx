@@ -3,6 +3,7 @@ import {request} from "../../shared/http";
 import type {Folder} from "../../entities/folder/model";
 import {Dialog} from "../../shared/ui/Dialog";
 import {FolderPicker} from "../../shared/ui/FolderPicker";
+import {AnimatedCounter} from "../../shared/ui/rare";
 import {collaborationApi,formatBytes} from "./api";
 import "./stats.css";
 
@@ -101,10 +102,10 @@ export function StatsPanel(){
   {status==="failed"&&<p role="alert" className="notice error">统计失败。</p>}
   {stats&&<>
    <div className="stat-cards">
-    <div className="stat-card"><span className="stat-num">{stats.totalFiles}</span><span>文件数</span></div>
-    <div className="stat-card"><span className="stat-num">{stats.totalFolders}</span><span>目录数</span></div>
+    <div className="stat-card"><span className="stat-num"><AnimatedCounter value={stats.totalFiles} /></span><span>文件数</span></div>
+    <div className="stat-card"><span className="stat-num"><AnimatedCounter value={stats.totalFolders} /></span><span>目录数</span></div>
     <div className="stat-card"><span className="stat-num">{formatBytes(stats.totalBytes)}</span><span>当前版本总字节</span></div>
-    <div className="stat-card"><span className="stat-num">{stats.added30Days}</span><span>近 30 日新增</span></div>
+    <div className="stat-card"><span className="stat-num"><AnimatedCounter value={stats.added30Days} /></span><span>近 30 日新增</span></div>
    </div>
    <div className="table">
     <table>

@@ -157,6 +157,87 @@ type subjectProbe interface {
 	WorkgroupExists(context.Context, string) (bool, error)
 }
 
+// ShareRecipient is the minimal share-target row the share wizard renders
+// (COMPLEX-WORKFLOWS §9, WF-21): an id plus the display label. Account details
+// (login, department, admin flag) stay behind the admin user directory.
+type ShareRecipient struct {
+	ID   string
+	Name string
+}
+
+// ShareRecipientPage is a recipient list truncated at the read cap. Truncated
+// reports that more matches exist without disclosing how many, so the picker
+// can ask for a narrower query instead of paging a directory.
+type ShareRecipientPage struct {
+	Items     []ShareRecipient
+	Truncated bool
+}
+
+// Recipient reads stay hard-capped so the endpoint cannot serve as a general
+// user directory (WF-21).
+const (
+	shareRecipientDefaultLimit = 50
+	shareRecipientMaxLimit     = 200
+)
+
+// ShareRecipients lists the subjects a share may target. Any authenticated
+// session may read it — creating a share only requires the recipient to exist —
+// so the caller's role grants nothing extra and the resolved user is accepted
+// only to keep the use-case API uniform. Disabled accounts are excluded: a
+// share to a disabled account is rejected at creation time
+// (assertRecipientExists), so it must not be offered here either. The read
+// reuses the organization stores, so the recipient rule never forks.
+func (s *Service) ShareRecipients(ctx context.Context, _ domain.User, kind, query string, limit int) (ShareRecipientPage, error) {
+	if kind != "user" && kind != "group" {
+		return ShareRecipientPage{}, domain.ErrInvalidInput
+	}
+	if limit <= 0 {
+		limit = shareRecipientDefaultLimit
+	}
+	if limit > shareRecipientMaxLimit {
+		limit = shareRecipientMaxLimit
+	}
+	needle := strings.ToLower(strings.TrimSpace(query))
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return ShareRecipientPage{}, err
+	}
+	defer tx.Rollback(ctx)
+	page := ShareRecipientPage{Items: make([]ShareRecipient, 0)}
+	switch kind {
+	case "user":
+		users, listErr := tx.ListUsers(ctx)
+		if listErr != nil {
+			return ShareRecipientPage{}, listErr
+		}
+		for _, item := range users {
+			if item.DisabledAt != nil {
+				continue
+			}
+			if needle != "" && !strings.Contains(strings.ToLower(item.DisplayName), needle) {
+				continue
+			}
+			page.Items = append(page.Items, ShareRecipient{ID: item.ID, Name: item.DisplayName})
+		}
+	case "group":
+		groups, listErr := tx.ListWorkgroups(ctx)
+		if listErr != nil {
+			return ShareRecipientPage{}, listErr
+		}
+		for _, item := range groups {
+			if needle != "" && !strings.Contains(strings.ToLower(item.Name), needle) {
+				continue
+			}
+			page.Items = append(page.Items, ShareRecipient{ID: item.ID, Name: item.Name})
+		}
+	}
+	if len(page.Items) > limit {
+		page.Items = page.Items[:limit]
+		page.Truncated = true
+	}
+	return page, nil
+}
+
 // ---------- favorites ----------
 
 func (s *Service) ListFavorites(ctx context.Context, u domain.User) ([]domain.Favorite, error) {
@@ -247,47 +328,70 @@ type SearchFilter struct {
 	From              *time.Time
 	To                *time.Time
 	Sort              string
-	Limit             int
+	// Cursor is the opaque nextCursor of the previous page (WF-30); empty
+	// starts at the first page, and a cursor the server did not issue restarts
+	// there too instead of failing the read.
+	Cursor string
+	Limit  int
 }
 
-func (s *Service) Search(ctx context.Context, u domain.User, filter SearchFilter) ([]domain.File, int, error) {
+// SearchPage is one page of authorized search results: the keyset cursor for
+// the next page ("" on the last page) and the authorized total for the whole
+// filter, which does not shrink as the caller pages.
+type SearchPage struct {
+	Items      []domain.File
+	Total      int
+	NextCursor string
+}
+
+func (s *Service) Search(ctx context.Context, u domain.User, filter SearchFilter) (SearchPage, error) {
 	if filter.Limit <= 0 {
 		filter.Limit = 50
 	}
-	if filter.Limit > 200 {
-		filter.Limit = 200
+	if filter.Limit > ports.MaxSearchPage {
+		filter.Limit = ports.MaxSearchPage
 	}
 	// Repeated identical queries are memoised for a short TTL. The key carries
-	// the principal and the whole filter, so a cached page is only ever served
-	// to the same user with the same scope; the TTL bounds how long a newly
-	// uploaded file can be missing from results.
+	// the principal and the whole filter — including the page cursor — so a
+	// cached page is only ever served to the same user with the same scope and
+	// page; the TTL bounds how long a newly uploaded file can be missing from
+	// results.
 	// The epoch invalidates every cached read the moment authorisation
 	// changes, so a revocation or a new grant is visible on the next request
 	// (PE04) instead of after the TTL.
 	key := fmt.Sprintf("%d|%s", s.epoch(), searchCacheKey(u, filter))
 	if cached, ok := s.search.get(key, s.now()); ok {
-		return cached.files, cached.total, nil
+		return SearchPage{Items: cached.files, Total: cached.total, NextCursor: cached.nextCursor}, nil
 	}
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
-		return nil, 0, err
+		return SearchPage{}, err
 	}
 	defer tx.Rollback(ctx)
 	groups, err := tx.WorkgroupsOf(ctx, u.ID)
 	if err != nil {
-		return nil, 0, err
+		return SearchPage{}, err
 	}
+	// The repository read carries one lookahead row beyond the page so a full
+	// page can be told apart from the last one, exactly like the file list
+	// (WF-30).
 	files, total, err := tx.SearchFiles(ctx, searchQuery(u, groups, filter))
 	if err != nil {
-		return nil, 0, err
+		return SearchPage{}, err
 	}
-	s.search.put(key, searchEntryValue{files: files, total: total}, s.now())
-	return files, total, nil
+	page := SearchPage{Items: files, Total: total}
+	if len(files) > filter.Limit {
+		page.Items = files[:filter.Limit]
+		page.NextCursor = encodeCursor(filter.Sort, files[filter.Limit-1])
+	}
+	s.search.put(key, searchEntryValue{files: page.Items, total: page.Total, nextCursor: page.NextCursor}, s.now())
+	return page, nil
 }
 
 // searchCacheKey binds the caller's identity, admin flag and the whole filter
-// (query, folder, descendant flag, uploader, mime prefix, time range, sort and
-// limit), so no two users or two scopes can share a cached page.
+// (query, folder, descendant flag, uploader, mime prefix, time range, sort,
+// page cursor and limit), so no two users, scopes or pages can share a cached
+// entry.
 func searchCacheKey(u domain.User, filter SearchFilter) string {
 	raw, err := json.Marshal(struct {
 		UserID            string
@@ -300,16 +404,22 @@ func searchCacheKey(u domain.User, filter SearchFilter) string {
 		From              *time.Time
 		To                *time.Time
 		Sort              string
+		Cursor            string
 		Limit             int
 	}{u.ID, u.IsAdmin, filter.Query, filter.FolderID, filter.IncludeDescendant,
-		filter.Uploader, filter.MimePrefix, filter.From, filter.To, filter.Sort, filter.Limit})
+		filter.Uploader, filter.MimePrefix, filter.From, filter.To, filter.Sort, filter.Cursor, filter.Limit})
 	if err != nil {
 		return NewID("search-uncacheable")
 	}
 	return string(raw)
 }
 
+// searchQuery maps the filter onto the shared repository query. Each supported
+// sort pages on its own ordering keys: the cursor decodes to the key matching
+// filter.Sort and a cursor the server did not issue decodes to the zero value,
+// which restarts at page one.
 func searchQuery(u domain.User, groups []string, filter SearchFilter) ports.FileSearchQuery {
+	cursor := DecodeFileCursor(filter.Sort, filter.Cursor)
 	return ports.FileSearchQuery{
 		UserID: u.ID, GroupIDs: groups, FolderID: filter.FolderID,
 		IncludeDescendant: filter.IncludeDescendant, Query: filter.Query,
@@ -317,7 +427,11 @@ func searchQuery(u domain.User, groups []string, filter SearchFilter) ports.File
 		// spaced the same way so phraseto_tsquery keeps adjacency (SPEC §10.2).
 		TextQuery: SpaceCJK(filter.Query),
 		Uploader:  filter.Uploader, MimePrefix: filter.MimePrefix,
-		From: filter.From, To: filter.To, Sort: filter.Sort, Limit: filter.Limit,
+		From: filter.From, To: filter.To, Sort: filter.Sort,
+		CursorTime: cursor.Time, CursorName: cursor.Name, CursorID: cursor.ID, CursorSize: cursor.Size,
+		// One lookahead row beyond the page tells the service whether more
+		// matches exist (WF-30), the same convention the file list uses.
+		Limit: filter.Limit + 1,
 	}
 }
 

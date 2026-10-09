@@ -1,16 +1,14 @@
-import {useEffect,useState,type FormEvent} from "react";
+import {useEffect,useRef,useState,type FormEvent} from "react";
 import {Link} from "react-router-dom";
 import {collaborationApi,formatBytes} from "./api";
 import type {FileItem} from "../../entities/file/model";
+import "./search.css";
 
 // The API caps the authorized total at 1001, which the UI renders as "1000+"
 // (SPEC §10.2 permits a hard-capped total).
 const TOTAL_CAP=1000;
-// GET /api/search accepts a single limit (server-clamped to 1..200) and has no
-// cursor, so the panel sizes one honest page instead of paging over one response.
 const PAGE_SIZES=[50,100,200];
 const DEFAULT_PAGE_SIZE=50;
-const MAX_PAGE_SIZE=200;
 
 // Split the snippet into text nodes and <mark> around the query. React escapes
 // text nodes by default, so a snippet containing HTML renders literally
@@ -36,9 +34,9 @@ function Highlighted({text,query}:{text:string;query:string}){
 
 type Query={q:string;uploader:string;type:string;sort:string;limit:number};
 
-// Full-text search workbench (SPEC C13/§10): query plus uploader/type/sort
-// filters, authorized results with snippets and safe highlighting, and the
-// same loading/empty/error feedback as every other page.
+// Full-text search workbench (SPEC C13/§10, WF-30): query plus uploader/type/
+// sort filters, authorized results with snippets and safe highlighting, and
+// cursor paging that appends strictly by the server's nextCursor (DI-16 §9).
 export function SearchPanel(){
  const[q,setQ]=useState("");
  const[uploader,setUploader]=useState("");
@@ -48,27 +46,37 @@ export function SearchPanel(){
  const[query,setQuery]=useState<Query|null>(null);
  const[items,setItems]=useState<FileItem[]>([]);
  const[total,setTotal]=useState(0);
+ const[nextCursor,setNextCursor]=useState("");
  const[status,setStatus]=useState<"idle"|"loading"|"ready"|"failed">("idle");
+ const[moreStatus,setMoreStatus]=useState<"idle"|"loading"|"failed">("idle");
  const[message,setMessage]=useState("");
  const[reloadToken,setReloadToken]=useState(0);
+ // Query generation plus the append mutex (DI-16 §9): the generation discards
+ // every response of an older revision, the mutex keeps 加载更多 single-flight.
+ const epochRef=useRef(0);
+ const moreBusyRef=useRef(false);
 
- // One request per committed query. The cleanup flag discards a response that was
- // still in flight when the query (or a retry) changed, so an older page can never
- // overwrite a newer one. Rows are replaced, never appended: the endpoint has no
- // cursor, so a retry cannot duplicate an already loaded result (DI-16/WF-30).
+ // The first page of the committed query. Bumping the generation synchronously
+ // on a new query (and on cleanup) discards a response still in flight, so an
+ // older page can never overwrite a newer one; rows are replaced, not appended.
  useEffect(()=>{
   if(!query)return;
-  let valid=true;
+  const epoch=++epochRef.current;
+  // The new revision owns the append state: a previous revision's page request
+  // is stale now, and this first page is not a 加载更多.
+  moreBusyRef.current=false;
   setStatus("loading");
+  setMoreStatus("idle");
   collaborationApi.search({...query})
    .then(page=>{
-    if(!valid)return;
+    if(epochRef.current!==epoch)return;
     setItems(page.items);
     setTotal(page.total);
+    setNextCursor(page.nextCursor??"");
     setStatus("ready");
    })
-   .catch(()=>{if(valid)setStatus("failed");});
-  return()=>{valid=false;};
+   .catch(()=>{if(epochRef.current===epoch)setStatus("failed");});
+  return()=>{epochRef.current++;};
  },[query,reloadToken]);
 
  function submit(event:FormEvent){
@@ -78,18 +86,48 @@ export function SearchPanel(){
    setMessage("请输入检索关键词");
    return;
   }
+  // Invalidate the previous revision before React commits, so a page request
+  // that resolves in the gap between render and effect cannot append old rows.
+  epochRef.current++;
+  moreBusyRef.current=false;
   setQuery({q:q.trim(),uploader:uploader.trim(),type:type.trim(),sort,limit:pageSize});
  }
 
- // The count is always what was actually loaded, and the hint only names actions
- // the endpoint can really serve (a bigger page or a narrower filter).
+ // Appends the server's next page. The cursor is the only append authority: rows
+ // go in exactly as returned, never sliced or re-sorted client-side. A failed
+ // page leaves nextCursor untouched, so 重试 re-requests the same page instead
+ // of skipping or duplicating already-loaded rows.
+ async function loadMore(){
+  if(!query||nextCursor===""||moreBusyRef.current)return;
+  const epoch=epochRef.current;
+  const cursor=nextCursor;
+  moreBusyRef.current=true;
+  setMoreStatus("loading");
+  try{
+   const page=await collaborationApi.search({...query,cursor});
+   if(epochRef.current!==epoch)return;
+   setItems(prev=>{
+    const seen=new Set(prev.map(item=>item.id));
+    const fresh=page.items.filter(item=>!seen.has(item.id));
+    return fresh.length===0?prev:prev.concat(fresh);
+   });
+   setTotal(page.total);
+   setNextCursor(page.nextCursor??"");
+   setMoreStatus("idle");
+  }catch{
+   if(epochRef.current===epoch)setMoreStatus("failed");
+  }finally{
+   if(epochRef.current===epoch)moreBusyRef.current=false;
+  }
+ }
+
+ // The count is what was actually loaded; the server's nextCursor is the only
+ // "more" signal (DI-16 §9). An exhausted cursor with a count mismatch can only
+ // mean the endpoint's hard cap, so the hint names a filter, not a dead action.
  const capped=total>TOTAL_CAP;
  const loadedLimit=query?.limit??DEFAULT_PAGE_SIZE;
- const more=capped||items.length<total;
- const moreHint=more?(loadedLimit<MAX_PAGE_SIZE
-  ?<> · 可提高“每页”条数或添加筛选条件查看更多</>
-  :<> · 单次最多返回 {MAX_PAGE_SIZE} 条，请添加筛选条件缩小范围</>)
-  :null;
+ const hasMore=nextCursor!=="";
+ const limitReached=!hasMore&&(capped||items.length<total);
 
  return <div className="work-body">
   <form className="toolbar search-bar" onSubmit={submit} role="search">
@@ -121,7 +159,7 @@ export function SearchPanel(){
    <button type="button" className="secondary-action" onClick={()=>setReloadToken(token=>token+1)}>重试</button>
   </>:null}
   {status==="ready"?<div className="table">
-   <div className="search-total">已显示 {items.length} / 共 {capped?TOTAL_CAP+"+":""+total} 个结果 · 每页最多 {loadedLimit} 条（仅显示你有权访问的文件）{moreHint}</div>
+   <div className="search-total">已显示 {items.length} / 共 {capped?TOTAL_CAP+"+":total} 个结果 · 每页最多 {loadedLimit} 条（仅显示你有权访问的文件）{limitReached?<> · 已达本次检索可浏览的上限，请添加筛选条件缩小范围</>:null}</div>
    {items.length===0?<p className="empty">没有匹配的文件。换个关键词，或确认你有该内容的预览权限。</p>:(
     <table>
      <thead><tr><th>文件名</th><th>大小</th><th>上传人</th><th>版本</th><th>修改日期</th><th>所在目录</th></tr></thead>
@@ -142,6 +180,12 @@ export function SearchPanel(){
      </tbody>
     </table>
    )}
+   {hasMore?<div className="search-more">
+    {moreStatus==="failed"?<span className="error" role="alert">加载下一页失败。</span>:null}
+    <button type="button" className="secondary-action" disabled={moreStatus==="loading"} onClick={loadMore}>
+     {moreStatus==="loading"?"加载中…":moreStatus==="failed"?"重试加载":"加载更多"}
+    </button>
+   </div>:null}
   </div>:null}
   {status==="idle"?<p className="empty">输入关键词开始检索。中文按相邻子串匹配，标题与正文都会参与。</p>:null}
  </div>;

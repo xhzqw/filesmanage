@@ -296,4 +296,127 @@ func TestStatsCacheMemoisesPerPrincipal(t *testing.T) {
 	}
 }
 
+// TestShareRecipientsAreMinimalAndRoleIndependent pins WF-21: the share wizard
+// needs a recipient picker any authenticated caller may use, but it must stay a
+// minimal read — id plus display label only, disabled accounts excluded,
+// matches capped, unknown kinds rejected — never the admin user directory.
+func TestShareRecipientsAreMinimalAndRoleIndependent(t *testing.T) {
+	s, _ := testService(t)
+	admin := domain.User{ID: "u_admin", Login: "admin", IsAdmin: true}
+	member := domain.User{ID: "u_user", Login: "user1"}
+	ctx := context.Background()
+	clerk, err := s.CreateUser(ctx, admin, UserDraft{Login: "clerk01", DisplayName: "市场部文员", Password: "initial-credential-0001"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	alice, err := s.CreateUser(ctx, admin, UserDraft{Login: "clerk02", DisplayName: "Alice Chen", Password: "initial-credential-0002"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	suspended, err := s.CreateUser(ctx, admin, UserDraft{Login: "clerk03", DisplayName: "暂停账号", Password: "initial-credential-0003"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.SetUserDisabled(ctx, admin, suspended.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.CreateWorkgroup(ctx, admin, "市场工作组", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.CreateWorkgroup(ctx, admin, "研发组", ""); err != nil {
+		t.Fatal(err)
+	}
+
+	// A non-admin and an admin observe exactly the same minimal user rows: the
+	// endpoint is role-independent by design, and ShareRecipient carries no
+	// field beyond id and the display label to leak.
+	var memberRows, adminRows map[string]string
+	for i, caller := range []domain.User{member, admin} {
+		page, err := s.ShareRecipients(ctx, caller, "user", "", 50)
+		if err != nil {
+			t.Fatalf("caller %s: %v", caller.ID, err)
+		}
+		if page.Truncated {
+			t.Fatalf("caller %s: %d matches fit the default cap", caller.ID, len(page.Items))
+		}
+		rows := map[string]string{}
+		for _, row := range page.Items {
+			if row.ID == "" || row.Name == "" {
+				t.Fatalf("caller %s: a recipient row must carry an id and a display label: %+v", caller.ID, row)
+			}
+			rows[row.ID] = row.Name
+		}
+		// The two fixture accounts plus 文员 and Alice are active; the disabled
+		// account is not offered.
+		if len(rows) != 4 {
+			t.Fatalf("caller %s: got %d active users, want 4", caller.ID, len(rows))
+		}
+		if _, disabled := rows[suspended.ID]; disabled {
+			t.Fatal("a disabled account must not be offered as a share recipient")
+		}
+		if rows[clerk.ID] != "市场部文员" {
+			t.Fatalf("user row label = %q, want the display name", rows[clerk.ID])
+		}
+		if i == 0 {
+			memberRows = rows
+		} else {
+			adminRows = rows
+		}
+	}
+	if len(memberRows) != len(adminRows) {
+		t.Fatal("admin and non-admin must see the same recipient set")
+	}
+	for id, name := range memberRows {
+		if adminRows[id] != name {
+			t.Fatalf("admin and non-admin rows differ for %s", id)
+		}
+	}
+
+	// The q filter matches the display name case-insensitively.
+	filtered, err := s.ShareRecipients(ctx, member, "user", "市场", 50)
+	if err != nil || len(filtered.Items) != 1 || filtered.Items[0].ID != clerk.ID {
+		t.Fatalf("q must filter the display name: %v %+v", err, filtered.Items)
+	}
+	upper, err := s.ShareRecipients(ctx, member, "user", "ALICE", 50)
+	if err != nil || len(upper.Items) != 1 || upper.Items[0].ID != alice.ID {
+		t.Fatalf("q must match case-insensitively: %v %+v", err, upper.Items)
+	}
+	if none, err := s.ShareRecipients(ctx, member, "user", "查无此人", 50); err != nil || len(none.Items) != 0 {
+		t.Fatalf("a non-matching q must return no rows: %v %+v", err, none.Items)
+	}
+
+	// Groups come back with id + name; the q filter applies there too.
+	groups, err := s.ShareRecipients(ctx, member, "group", "", 50)
+	if err != nil || len(groups.Items) != 2 || groups.Truncated {
+		t.Fatalf("group recipients wrong: %v %+v", err, groups)
+	}
+	for _, row := range groups.Items {
+		if row.ID == "" || row.Name == "" {
+			t.Fatalf("group row must carry id and name: %+v", row)
+		}
+	}
+	groupMatch, err := s.ShareRecipients(ctx, member, "group", "研发", 50)
+	if err != nil || len(groupMatch.Items) != 1 || groupMatch.Items[0].Name != "研发组" {
+		t.Fatalf("q must filter group names: %v %+v", err, groupMatch.Items)
+	}
+
+	// The cap holds and flags the truncation without disclosing the count.
+	capped, err := s.ShareRecipients(ctx, member, "user", "", 2)
+	if err != nil || len(capped.Items) != 2 || !capped.Truncated {
+		t.Fatalf("the cap must cut the list and flag the truncation: %v %+v", err, capped)
+	}
+	// A limit over the cap is clamped, not rejected.
+	clamped, err := s.ShareRecipients(ctx, member, "user", "", 5000)
+	if err != nil || len(clamped.Items) != 4 || clamped.Truncated {
+		t.Fatalf("an over-cap limit must clamp and still return every match: %v %+v", err, clamped)
+	}
+
+	// Unknown kinds and empty kinds are rejected outright.
+	for _, kind := range []string{"", "dept", "USER"} {
+		if _, err := s.ShareRecipients(ctx, member, kind, "", 50); !errors.Is(err, domain.ErrInvalidInput) {
+			t.Fatalf("kind %q must be rejected, got %v", kind, err)
+		}
+	}
+}
+
 func strPtr(v string) *string { return &v }

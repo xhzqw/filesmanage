@@ -53,6 +53,16 @@ func favoritePayload(f domain.Favorite) gin.H {
 	return payload
 }
 
+// shareRecipientPayload maps one share-target row onto its kind's public shape:
+// users carry displayName, groups carry name. Login, department, admin and
+// disabled fields stay behind the admin user directory (WF-21).
+func shareRecipientPayload(kind string, r application.ShareRecipient) gin.H {
+	if kind == "group" {
+		return gin.H{"id": r.ID, "name": r.Name}
+	}
+	return gin.H{"id": r.ID, "displayName": r.Name}
+}
+
 func shareDraft(resourceKind, resourceID, recipientKind, recipientID string, actions []domain.Action, includeDescendants bool, expiresAt *string) application.ShareDraft {
 	draft := application.ShareDraft{
 		ResourceKind: resourceKind, ResourceID: resourceID,

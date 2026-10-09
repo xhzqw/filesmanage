@@ -1,0 +1,32 @@
+/* 组织工作台（COMPLEX-WORKFLOWS-v1 §9 组织行）：只补主题没有的三栏外壳、部门树行、
+   搜索框与状态标记。颜色一律引用 theme.css 的语义 token，不新增随机品牌色（VIS-01）。 */
+.org-columns.org-workbench{align-items:start;grid-template-columns:minmax(210px,1fr) minmax(330px,1.9fr) minmax(230px,1.15fr)}
+/* 三个面板各自内部滚动：工具栏与面包屑始终留在视口内（VIS-04） */
+.org-columns.org-workbench .table{max-height:calc(100dvh - 236px)}
+.inline-form.org-form{flex-wrap:wrap}
+.org-select{border:1px solid var(--color-border-strong);border-radius:var(--radius-control);padding:9px 10px;background:var(--color-panel)}
+.org-search{width:100%;border:1px solid var(--color-border-strong);border-radius:var(--radius-control);padding:8px 10px;margin:0 0 6px;background:var(--color-panel)}
+.org-scope{margin:0 0 8px}
+/* 部门名按钮占据行内剩余宽度并省略超长名称（.tree-row button 的 28px 是给 chevron 的） */
+.tree .tree-row .org-node-label{flex:1;width:auto;min-width:0;text-align:left;border:0;background:none;padding:4px 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.org-node-count{color:var(--color-text-secondary);font-size:12px;white-space:nowrap}
+.org-badges{display:inline-flex;flex-wrap:wrap;gap:6px}
+.org-badge{display:inline-block;padding:1px 8px;border-radius:999px;border:1px solid var(--color-border);background:var(--color-panel-subtle);font-size:12px;white-space:nowrap}
+.org-badge-disabled{color:var(--color-danger);border-color:var(--color-danger)}
+.org-badge-warning{color:var(--color-warning);border-color:var(--color-warning)}
+.org-badge-admin{color:var(--color-action);border-color:var(--color-row-selected-border);background:var(--color-row-selected)}
+.org-member-name{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px}
+.org-hits-panel{display:grid;gap:4px;margin:0 0 8px}
+.org-hits{display:grid;gap:4px;list-style:none;margin:0;padding:0;max-height:180px;overflow:auto}
+.org-hits button{display:grid;gap:1px;width:100%;text-align:left}
+.org-hit-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 对话框里的破坏性确认按钮：与 .row-actions .danger 同一 token，不新造颜色 */
+.org-dialog .danger{color:var(--color-danger);border-color:var(--color-danger)}
+@media(max-width:1280px){
+ .org-columns.org-workbench{grid-template-columns:minmax(200px,1fr) minmax(320px,2fr)}
+ .org-columns.org-workbench .org-group-pane{grid-column:1/-1}
+}
+@media(max-width:900px){
+ .org-columns.org-workbench{grid-template-columns:minmax(0,1fr)}
+ .org-columns.org-workbench .org-group-pane{grid-column:auto}
+}

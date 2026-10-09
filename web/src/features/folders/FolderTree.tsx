@@ -1,9 +1,66 @@
-import {useEffect,useId,useMemo,useRef,useState,type KeyboardEvent,type ReactNode}from "react";
+import {useEffect,useId,useMemo,useRef,useState,type CSSProperties,type DragEvent,type KeyboardEvent,type ReactNode}from "react";
 import {Link,useNavigate}from "react-router-dom";
 import type{Folder}from"../../entities/folder/model";
 import {Menu,type MenuItem,type MenuPoint}from"../../shared/ui/Menu";
 import {request}from"../../shared/http";
 import "./folderTree.css";
+
+// Internal file→folder move gesture (DESKTOP-INTERACTION-v1 §7.2, DI-17). The
+// file table is a sibling feature and neither feature may import the other
+// (scripts/check_architecture.py), so the two halves of one gesture speak over
+// two window events with a fixed detail shape; documents/FileTable.tsx carries
+// the same block:
+//   filesmanage:move-session {active,ids,sourceFolderId,focusId}
+//     FileTable → tree on dragstart/dragend: a live source set that has written
+//     nothing to the server.
+//   filesmanage:move-drop {targetFolderId}
+//     tree → FileTable on a legal drop: the file table opens its ordinary move
+//     dialog with that folder preselected; the drop itself moves nothing.
+const MOVE_SESSION_EVENT="filesmanage:move-session";
+const MOVE_DROP_EVENT="filesmanage:move-drop";
+const DRAG_MIME="application/x-filesmanage-files";
+
+type MoveSessionDetail={active:boolean;ids:string[];sourceFolderId:string;focusId:string|null};
+type MoveDropDetail={targetFolderId:string};
+
+// An internal move drag and nothing else. A drag that also carries OS files is
+// treated as an upload (the conservative choice, DI-17): the DropZone keeps it
+// and this tree stays out of it. The duplicate of this helper in
+// documents/FileTable.tsx is deliberate — the import boundary forbids sharing it.
+function isInternalMoveDrag(dataTransfer:DataTransfer|null):boolean{
+ if(!dataTransfer)return false;
+ const types=Array.from(dataTransfer.types);
+ if(!types.includes(DRAG_MIME)||types.includes("Files"))return false;
+ for(let index=0;index<dataTransfer.items.length;index+=1){
+  if(dataTransfer.items[index]?.kind==="file")return false;
+ }
+ return true;
+}
+
+// Drop markers are drawn inline from the theme tokens: the file table owns the
+// gesture's stylesheet and features/folders may not import it.
+const DROP_MARKER:Record<"accept"|"reject",CSSProperties>={
+ accept:{outline:"2px solid var(--color-focus)",outlineOffset:"-2px",background:"var(--color-row-selected)"},
+ reject:{outline:"2px dashed var(--color-danger)",outlineOffset:"-2px"},
+};
+
+// The nearest scrollable ancestor of the tree list (the page sidebar in the
+// explorer layout), found by overflow geometry rather than by a class name the
+// hosting page could rename.
+function scrollHost(node:Element|null):HTMLElement|null{
+ let current=node?.parentElement??null;
+ while(current){
+  const style=window.getComputedStyle(current);
+  if((style.overflowY==="auto"||style.overflowY==="scroll")&&current.scrollHeight>current.clientHeight)return current;
+  current=current.parentElement;
+ }
+ return null;
+}
+
+const SCROLL_EDGE_PX=56;
+const SCROLL_STEP_PX=16;
+const SCROLL_TICK_MS=50;
+const HOVER_EXPAND_MS=700;
 
 // Toggles insert/remove ids at runtime, so Set is the correct membership structure.
 const DEFAULT_EXPANDED=["folder_root","folder_market","folder_rd"];
@@ -67,6 +124,14 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
  // Transient context-menu target (DESKTOP-INTERACTION §1.1 contextTarget):
  // it exists only while the node menu is open and is never business state.
  const[nodeMenu,setNodeMenu]=useState<{folder:Folder;point:MenuPoint|null;anchor:HTMLElement|null}|null>(null);
+ // Internal move gesture (§7.2): the session captured by the file table's
+ // dragstart, and the row the pointer is currently over with that row's
+ // legality. Both are transient — they exist only while a drag is live.
+ const[session,setSession]=useState<MoveSessionDetail|null>(null);
+ const[dropHover,setDropHover]=useState<{id:string;legal:boolean}|null>(null);
+ const treeRef=useRef<HTMLUListElement|null>(null);
+ const autoScroll=useRef<{timer:number;step:number}|null>(null);
+ const hoverExpand=useRef<{timer:number;id:string}|null>(null);
  // Paged mode only: parent id -> loaded level. Small-tree mode never fills it.
  const[levels,setLevels]=useState<Map<string,Level>>(()=>new Map());
  const[query,setQuery]=useState("");
@@ -167,7 +232,140 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
   for(const pending of requests.current.values())pending.controller.abort();
   requests.current.clear();
   searchRequest.current?.abort();
+  stopAutoScroll();
+  clearHoverExpand();
  },[]);
+
+ // The gesture's two directions. The session arrives from the file table and is
+ // dropped on every dragend, so a cancelled drag (Escape, dropped on nothing,
+ // dragged back to the source) can never leave the tree claiming a target.
+ useEffect(()=>{
+  function onSession(event:Event){
+   const detail=(event as CustomEvent<MoveSessionDetail|undefined>).detail;
+   setSession(detail&&detail.active?detail:null);
+   setDropHover(null);
+   clearHoverExpand();
+   stopAutoScroll();
+  }
+  function onDragEnd(){
+   setSession(null);
+   setDropHover(null);
+   clearHoverExpand();
+   stopAutoScroll();
+  }
+  window.addEventListener(MOVE_SESSION_EVENT,onSession);
+  window.addEventListener("dragend",onDragEnd);
+  return()=>{
+   window.removeEventListener(MOVE_SESSION_EVENT,onSession);
+   window.removeEventListener("dragend",onDragEnd);
+  };
+ },[]);
+
+ // Structural legality only: the same rules the move dialogs' picker applies.
+ // The source folder itself is never a target, and only rows the tree actually
+ // shows can be targets at all — permissions, locks and name conflicts stay the
+ // server's answer (§6/§7.2).
+ function dropLegal(entry:TreeEntry):boolean{
+  return session!==null&&entry.id!==session.sourceFolderId;
+ }
+
+ function onRowDragOver(event:DragEvent<HTMLDivElement>,entry:TreeEntry){
+  if(!session||!isInternalMoveDrag(event.dataTransfer))return;
+  event.preventDefault();
+  const legal=dropLegal(entry);
+  // The cursor carries the same verdict as the marker: a legal target takes a
+  // move, an illegal one keeps the "no drop" cursor and writes nothing.
+  event.dataTransfer.dropEffect=legal?"move":"none";
+  setDropHover(current=>current&&current.id===entry.id&&current.legal===legal?current:{id:entry.id,legal});
+  updateAutoScroll(event.clientY);
+  scheduleHoverExpand(entry,legal);
+ }
+
+ function onRowDragLeave(event:DragEvent<HTMLDivElement>,entry:TreeEntry){
+  const next=event.relatedTarget;
+  if(next instanceof Node&&event.currentTarget.contains(next))return;
+  setDropHover(current=>current&&current.id===entry.id?null:current);
+  clearHoverExpand(entry.id);
+ }
+
+ function onRowDrop(event:DragEvent<HTMLDivElement>,entry:TreeEntry){
+  if(!session||!isInternalMoveDrag(event.dataTransfer))return;
+  event.preventDefault();
+  const legal=dropLegal(entry);
+  setDropHover(null);
+  clearHoverExpand();
+  stopAutoScroll();
+  // A drop on an illegal area cancels: no dialog, no session, no server write.
+  if(!legal)return;
+  // The drop only hands the target to the file table, which opens the SAME move
+  // dialog the 移动到… menu opens — its preflight and commit are unchanged, so
+  // dropping can never bypass validation (§7.2, DI-17).
+  window.dispatchEvent(new CustomEvent<MoveDropDetail>(MOVE_DROP_EVENT,{detail:{targetFolderId:entry.id}}));
+ }
+
+ // The list keeps auto-scroll fed while a drag moves over it, including over
+ // its empty/notes area, and stops as soon as the pointer leaves the list.
+ function onTreeDragOver(event:DragEvent<HTMLUListElement>){
+  if(!session||!isInternalMoveDrag(event.dataTransfer))return;
+  updateAutoScroll(event.clientY);
+ }
+
+ function onTreeDragLeave(event:DragEvent<HTMLUListElement>){
+  const next=event.relatedTarget;
+  if(next instanceof Node&&event.currentTarget.contains(next))return;
+  stopAutoScroll();
+ }
+
+ // Long lists auto-scroll while a drag hovers the edge of the scroll host
+ // (§7.2). One interval in one direction, restarted only when the edge changes.
+ function updateAutoScroll(clientY:number){
+  const host=scrollHost(treeRef.current);
+  let step=0;
+  if(host){
+   const box=host.getBoundingClientRect();
+   if(clientY<box.top+SCROLL_EDGE_PX)step=-SCROLL_STEP_PX;
+   else if(clientY>box.bottom-SCROLL_EDGE_PX)step=SCROLL_STEP_PX;
+  }
+  if(step===0){stopAutoScroll();return;}
+  if(autoScroll.current?.step===step)return;
+  stopAutoScroll();
+  const timer=window.setInterval(()=>{
+   const target=scrollHost(treeRef.current);
+   if(!target){stopAutoScroll();return;}
+   target.scrollTop+=step;
+  },SCROLL_TICK_MS);
+  autoScroll.current={timer,step};
+ }
+
+ function stopAutoScroll(){
+  const current=autoScroll.current;
+  if(!current)return;
+  window.clearInterval(current.timer);
+  autoScroll.current=null;
+ }
+
+ // Hover-expand is the §7.2 optional enhancement, implemented through the
+ // tree's existing expansion so no second loading path exists: it schedules the
+ // same read-only children request the chevron starts, and only for a node that
+ // is both a legal target and actually expandable.
+ function scheduleHoverExpand(entry:TreeEntry,legal:boolean){
+  if(!legal||expanded.has(entry.id)||!canExpandNode(entry)){clearHoverExpand();return;}
+  if(hoverExpand.current?.id===entry.id)return;
+  clearHoverExpand();
+  const id=entry.id;
+  const timer=window.setTimeout(()=>{
+   hoverExpand.current=null;
+   toggle(id,true);
+  },HOVER_EXPAND_MS);
+  hoverExpand.current={timer,id};
+ }
+
+ function clearHoverExpand(id?:string){
+  const current=hoverExpand.current;
+  if(!current||(id!==undefined&&current.id!==id))return;
+  window.clearTimeout(current.timer);
+  hoverExpand.current=null;
+ }
 
  // A level needs a request when it has no record yet, or when its record is
  // stuck in "loading" with no in-flight request (the StrictMode
@@ -497,6 +695,9 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
   // it. A node whose children cannot be fetched keeps its group open with the
   // empty/error note in it.
   const busy=paged&&levels.get(entry.id)?.status==="loading";
+  // The drop marker for a live internal move: accept or reject, never both.
+  const hovered=dropHover&&dropHover.id===entry.id?dropHover:null;
+  const dropMarker=hovered?DROP_MARKER[hovered.legal?"accept":"reject"]:null;
   return <li key={entry.id} data-folder-id={entry.id} role="treeitem"
    aria-expanded={canExpand?isExpanded:undefined}
    aria-busy={busy?true:undefined}
@@ -513,7 +714,11 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
     event.preventDefault();
     openNodeMenu(entry,{x:event.clientX,y:event.clientY});
    }}>
-   <div className={"tree-row "+(entry.id===selected?"on":"")} style={{paddingLeft:String(depth*16)+"px"}}>
+   <div className={"tree-row "+(entry.id===selected?"on":"")}
+    style={{paddingLeft:String(depth*16)+"px",...(dropMarker??{})}}
+    onDragOver={event=>onRowDragOver(event,entry)}
+    onDragLeave={event=>onRowDragLeave(event,entry)}
+    onDrop={event=>onRowDrop(event,entry)}>
     {canExpand
      ?<button type="button" aria-label={isExpanded?"折叠":"展开"} tabIndex={-1}
        onClick={()=>toggle(entry.id)}>{isExpanded?"▾":"▸"}</button>
@@ -540,9 +745,12 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
     {paged?"仅搜索你有权查看的目录，结果不含未授权路径。":"在当前可见目录中筛选。"}
    </p>
   </div>
-  <ul className="tree" role="tree" aria-label="目录树"
+  {session&&<p className="tree-search-hint" role="status">拖放中：{session.ids.length} 个文件 · 高亮目录可放入，红框目录不可用</p>}
+  <ul className="tree" role="tree" aria-label="目录树" ref={treeRef}
    aria-busy={paged&&levels.get("")?.status==="loading"?true:undefined}
-   onKeyDown={onTreeKeyDown}>
+   onKeyDown={onTreeKeyDown}
+   onDragOver={onTreeDragOver}
+   onDragLeave={onTreeDragLeave}>
    {levelItems("").map(entry=>renderNode(entry,0))}
    {paged&&levelNotes("",-1,levelItems("").length)}
   </ul>

@@ -697,6 +697,7 @@ GET /api/approvals、POST /api/approvals/:id/decide、GET /api/search。
 | PATCH | /api/shares/:id | 分享创建者/管理权限 | 修改有效权限或截止时间 |
 | DELETE | /api/shares/:id | 分享管理权限 | 撤销分享 |
 | GET | /api/shares/:id | 对该分享有权 | 分享详情 |
+| GET | /api/share-recipients | 已登录；kind=user\|group | 分享向导的接收人候选（仅 id + 显示名；禁用账号排除；上限 200，无分页） |
 | GET | /api/favorites | 已登录 | 个人关注列表 |
 | PUT | /api/favorites/:kind/:id | 有权可见 | 幂等添加关注 |
 | DELETE | /api/favorites/:kind/:id | 本人 | 幂等取消关注 |
@@ -883,6 +884,20 @@ rollbackTargetSeq、rollbackFromSeq、sha256、versionSeq、createdAt、createdB
 两个端点都要求已登录；`mustChangePassword` 会话与其它业务路由一致返回 403 `E_PASSWORD_CHANGE_REQUIRED`。
 读取不缓存分页结果，`list`/`upload` 判定在请求内实时解析，因此撤权后的下一个请求立即看不到该目录。
 
+### 9.9 分享接收人候选（COMPLEX-WORKFLOWS §9 分享 / WF-21）
+`GET /api/share-recipients?kind=user|group&q=&limit=`
+- 分享向导在选择接收人时读取；任何已登录会话都可调用（创建分享只要求接收人存在，不需要用户目录管理权）。
+  端点严格只读：不写库、不加锁、不产生审计或幂等记录，也不复用 `GET /api/users`、`GET /api/groups` 的管理载荷。
+- `kind` 必填，只接受 `user`、`group`；其它取值返回 400 `E_BAD`。
+- `q` 可选：对显示名（用户）或组名（组）做大小写不敏感的包含匹配；空白视为不过滤。
+- `limit` 缺省 50、上限 200（`shareRecipientMaxLimit`）；超过上限按上限截断而不是报错，非正整数返回 400 `E_BAD`。
+  结果不提供游标或第二页：这不是通用用户目录，超出上限时以 `truncated=true` 如实告知，客户端应提示缩小查询范围。
+- 字段最小化：用户行只有 `{id, displayName}`，组行只有 `{id, name}`；不返回 login、部门、管理员标志、
+  密码状态或禁用状态等任何账户字段。共享对象在 `shares` 与搜索中的既有展示口径（display_name 级）与本端点一致。
+- 禁用账号不出现：创建分享本身即拒绝禁用接收人（`assertRecipientExists` 只认未禁用用户），因此预选列表不得提供。
+- 响应 `{"ok":true,"data":{"items":[...],"truncated":false}}`；`truncated=true` 只表示匹配数超过上限，不暴露具体人数。
+- 路由要求已登录；`mustChangePassword` 会话与其它业务路由一致返回 403 `E_PASSWORD_CHANGE_REQUIRED`。
+
 ---
 
 ## 10. 全文检索与元数据查询
@@ -914,6 +929,22 @@ fts 查询错误时可降级参数化 LIKE，必须对 %、_、反斜线和转�
 无权用户即便查询唯一关键词也不能凭 total、时间或错误差异推断秘密文件存在。
 当用户通过共享获得一份文件的 preview 时，搜索可依据分享范围显示该文件，
 但不得因此索引/公开未共享的同级文件。
+
+### 10.4 搜索分页游标与 nextCursor（WF-30 / DESKTOP-INTERACTION §9）
+`GET /api/search` 在既有过滤参数之外增加 `cursor`，响应在 `items,total` 之外增加 `nextCursor`：
+- `cursor` 不透明（base64url 无填充），是上一页最后一行的排序键 + 资源 id，按当前 `sort` 编码：
+  `updated_desc`（缺省）为 `(updated_at,id)`，`name_asc` 为 `(name,id)`，`size_desc` 为 `(size_bytes,id)`。
+  每种排序使用各自的 keyset，因此同时间戳、同名或同大小的行既不会漏页也不会重复（稳定性由 id 决胜保证）。
+- 缺省或空 `cursor` 为第一页；服务端没有签发过的游标（非 base64、缺少分隔符等无法解析的输入）按第一页处理，
+  与目录分页读取的规则一致，不返回错误。`sort` 仍只接受 `updated_desc`、`name_asc`、`size_desc`，其它值 400 `E_BAD`。
+- 服务端按 `limit+1` 预读判定下一页：只有“本页已满且仍有更多匹配”时才返回游标，`nextCursor` 为空字符串表示
+  已是最后一页；`limit` 缺省 50、上限 200（`ports.MaxSearchPage`）。
+- `total` 语义不变：它是**整次过滤**（含全部可见性约束）的授权计数，计数查询不包含游标，因此翻页时保持不变；
+  计数硬上限 1001（既有 `searchTotalCap`），取到 1001 表示“1000 或更多”，客户端展示为 1000+。
+- 每一页都走与首页相同的可见性范围：分页不改变搜索授权，也不泄露无权结果（SAFE-04）；无权对象既不计数也不返回。
+  既有响应字段、snippet 语义与 1000+ 行为保持兼容，新增字段为前进兼容。
+- 客户端合同（DESKTOP-INTERACTION §9）：`loadMore` 只按服务端返回的 `nextCursor` 追加；排序/过滤变化后旧游标作废；
+  过期响应不得污染当前结果集，游标只用于追加，不用于覆盖。
 
 ---
 

@@ -148,6 +148,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.GET("/shares", h.listShares)
 	api.POST("/shares", h.createShare)
 	api.DELETE("/shares/:id", h.revokeShare)
+	api.GET("/share-recipients", h.shareRecipients)
 	api.GET("/favorites", h.listFavorites)
 	api.PUT("/favorites/:kind/:id", h.setFavorite)
 	api.DELETE("/favorites/:kind/:id", h.setFavorite)

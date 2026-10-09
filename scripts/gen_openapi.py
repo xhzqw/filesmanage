@@ -263,6 +263,25 @@ schema("Share", obj({
     "revoked": boolean(),
 }, required=["id", "recipientKind", "recipientId", "recipientName", "actions", "includeDescendants", "createdBy", "createdAt", "revoked"]))
 
+# Share recipients (WF-21): the minimal picker rows an authenticated share
+# creator may read. Users expose a display label only — never login,
+# department, admin or disabled state; groups expose id + name.
+schema("ShareRecipientUser", obj({
+    "id": string(),
+    "displayName": string(),
+}, required=["id", "displayName"]))
+
+schema("ShareRecipientGroup", obj({
+    "id": string(),
+    "name": string(),
+}, required=["id", "name"]))
+
+schema("ShareRecipientPage", obj({
+    "items": arr({"oneOf": [ref("ShareRecipientUser"), ref("ShareRecipientGroup")]},
+                 "Rows match the requested kind: user rows carry displayName, group rows carry name."),
+    "truncated": boolean("True when more matches exist beyond the capped list; the count itself is not disclosed."),
+}, required=["items", "truncated"]))
+
 schema("Favorite", obj({
     "id": string(),
     "resourceName": string(),
@@ -359,8 +378,9 @@ schema("SearchResult", obj({
         "currentVersionSeq": integer(),
         "snippet": string("Bounded plain-text window around the match."),
     }, required=["id", "folderId", "name", "uploadedBy", "contentType", "sizeBytes", "sha256", "updatedAt"])),
-    "total": integer("Authorized total across all pages."),
-}, required=["items", "total"]))
+    "total": integer("Authorized count for the whole filter; the count query ignores the cursor so it stays the same on every page, and it is capped at 1001 (the client displays that as 1000+)."),
+    "nextCursor": string("Opaque keyset cursor over the active sort key (updatedAt+id, name+id or size+id); empty on the last page."),
+}, required=["items", "total", "nextCursor"]))
 
 schema("OfficeSession", obj({
     "sessionId": string(),
@@ -887,6 +907,17 @@ add("DELETE", "/api/shares/{id}", operation("Revoke a share", "Collaboration", "
     params=[id_param("id", "Share id.")],
     responses=dict([json_ok(obj({"revoked": string()}, required=["revoked"]), "Revoked share id."), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"])])))
 
+# WF-21: the share wizard's recipient picker. Any authenticated caller may read
+# it (a share only needs the recipient to exist), but it stays a minimal read:
+# id + display label only, disabled accounts excluded, hard-capped at 200.
+add("GET", "/api/share-recipients", operation("List share recipients (minimal picker read)", "Collaboration", "shareRecipients", security=SESSION,
+    params=[query("kind", "Recipient kind; user rows carry {id,displayName}, group rows {id,name}.", {"type": "string", "enum": ["user", "group"]}, required=True),
+            query("q", "Case-insensitive display-name fragment."),
+            query("limit", "Page size; defaults to 50 and is capped at 200.", {"type": "integer", "minimum": 1, "maximum": 200})],
+    responses=dict([json_ok(ref("ShareRecipientPage"), "Minimal recipient rows for the requested kind; disabled accounts are excluded."),
+                    resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"])]),
+    auth_note=MUST_CHANGE))
+
 add("GET", "/api/favorites", operation("List favorites", "Collaboration", "listFavorites", security=SESSION,
     responses=dict([json_ok(arr(ref("Favorite")), "Favorites of the caller."), resp("401", ERR["401"]), resp("403", ERR["403"])])))
 
@@ -912,8 +943,8 @@ SEARCH_PARAMS = [
 ]
 
 add("GET", "/api/search", operation("Full-text search over authorized files", "Search", "searchFiles", security=SESSION,
-    params=SEARCH_PARAMS,
-    responses=dict([json_ok(ref("SearchResult"), "Authorized matches with snippets and the authorized total."), resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"])])))
+    params=SEARCH_PARAMS + [query("cursor", "Opaque keyset cursor from nextCursor; an unparseable value restarts at the first page instead of failing the read (WF-30).")],
+    responses=dict([json_ok(ref("SearchResult"), "Authorized matches with snippets, the authorized total and the cursor for the next page."), resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"])])))
 
 add("GET", "/api/stats", operation("Aggregate statistics over authorized files", "Search", "statsFiles", security=SESSION,
     params=SEARCH_PARAMS,

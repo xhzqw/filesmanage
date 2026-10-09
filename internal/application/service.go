@@ -157,8 +157,9 @@ type searchEntry struct {
 }
 
 type searchEntryValue struct {
-	files []domain.File
-	total int
+	files      []domain.File
+	total      int
+	nextCursor string
 }
 
 func (c *searchCache) get(key string, now time.Time) (searchEntryValue, bool) {

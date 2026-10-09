@@ -65,6 +65,42 @@ func (h *Handler) revokeShare(c *gin.Context) {
 	c.JSON(200, gin.H{"ok": true, "data": gin.H{"revoked": c.Param("id")}})
 }
 
+// shareRecipients lists the minimal user/group rows a share creator may pick
+// (COMPLEX-WORKFLOWS §9, WF-21). It is deliberately not the admin user
+// directory: any authenticated session may call it (creating a share only
+// requires the recipient to exist), the payload carries an id plus display
+// label only, disabled accounts are excluded and the read is hard-capped.
+func (h *Handler) shareRecipients(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	if u.MustChangePassword {
+		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
+		return
+	}
+	limit := 0
+	if raw := c.Query("limit"); raw != "" {
+		parsed, err := strconvAtoi(raw)
+		if err != nil || parsed < 1 {
+			c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+			return
+		}
+		limit = parsed
+	}
+	kind := c.Query("kind")
+	page, err := h.S.ShareRecipients(c.Request.Context(), u, kind, c.Query("q"), limit)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	data := make([]gin.H, 0, len(page.Items))
+	for _, item := range page.Items {
+		data = append(data, shareRecipientPayload(kind, item))
+	}
+	c.JSON(200, gin.H{"ok": true, "data": gin.H{"items": data, "truncated": page.Truncated}})
+}
+
 func (h *Handler) listFavorites(c *gin.Context) {
 	u, ok := h.auth(c)
 	if !ok {
@@ -105,13 +141,13 @@ func (h *Handler) searchFiles(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	files, total, err := h.S.Search(c.Request.Context(), u, filter)
+	page, err := h.S.Search(c.Request.Context(), u, filter)
 	if err != nil {
 		respondError(c, err)
 		return
 	}
-	data := make([]gin.H, 0, len(files))
-	for _, f := range files {
+	data := make([]gin.H, 0, len(page.Items))
+	for _, f := range page.Items {
 		payload := filePayload(f)
 		// Snippet is a bounded plain-text window around the match (SPEC §10.3);
 		// the client renders it with safe text nodes plus <mark>.
@@ -120,7 +156,10 @@ func (h *Handler) searchFiles(c *gin.Context) {
 		}
 		data = append(data, payload)
 	}
-	c.JSON(200, gin.H{"ok": true, "data": gin.H{"items": data, "total": total}})
+	// total is the authorized count for the whole filter and nextCursor is ""
+	// on the last page; the client only appends the page the server's cursor
+	// names (DESKTOP-INTERACTION §9, WF-30).
+	c.JSON(200, gin.H{"ok": true, "data": gin.H{"items": data, "total": page.Total, "nextCursor": page.NextCursor}})
 }
 
 func (h *Handler) statsFiles(c *gin.Context) {
@@ -205,6 +244,8 @@ func parseSearchFilter(c *gin.Context) (application.SearchFilter, error) {
 		Uploader:          c.Query("uploader"),
 		MimePrefix:        c.Query("type"),
 		Sort:              c.Query("sort"),
+		// Opaque keyset cursor from nextCursor; empty means the first page.
+		Cursor: c.Query("cursor"),
 	}
 	if raw := c.Query("limit"); raw != "" {
 		parsed, err := strconvAtoi(raw)

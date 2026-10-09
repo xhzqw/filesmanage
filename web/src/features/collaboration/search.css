@@ -1,0 +1,8 @@
+/* WF-30 cursor paging (DI-16 §9): the append control is a real button, never an
+   intersection-observer auto-scroll, and it stays the single entry for the next
+   server page — the busy and retry states live on that same control, so a
+   failed page re-requests its own cursor. Component-owned styles; values come
+   from the token layer in theme.css. */
+.search-more{display:flex;align-items:center;gap:var(--space-3);padding:12px 16px}
+.search-more .error{font-size:12px}
+.search-more button:disabled{color:var(--color-text-secondary);cursor:not-allowed;text-decoration:none;background:transparent}

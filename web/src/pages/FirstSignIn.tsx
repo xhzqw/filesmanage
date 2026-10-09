@@ -19,9 +19,15 @@ export function FirstSignIn({onSuccess,onExit}:{onSuccess:(u:User)=>void;onExit:
     finally{setBusy(false);}
   }
   return <main className="login-bg">
+    <div className="bg-glow bg-glow-blue" aria-hidden="true"/>
+    <div className="bg-glow bg-glow-amber" aria-hidden="true"/>
     <section className="login-card" aria-label="首次登录安全设置">
-      <div className="brand-lockup"><BrandLogo size={88} className="login-logo"/><span className="organization">中晟生物科技</span></div>
-      <h1>首次登录安全设置</h1>
+      <div className="brand-lockup">
+        <BrandLogo size={48} className="login-logo"/>
+        <h1 className="system-name">文档管理系统</h1>
+        <p className="organization-line">中晟生物科技 · 医疗器械规范合规平台</p>
+      </div>
+      <h2 className="page-purpose">首次登录安全设置</h2>
       <p>首次登录必须更新初始凭据，完成前不能访问业务目录。</p>
       <form onSubmit={submit}>
         <label htmlFor="previous">原凭据</label>

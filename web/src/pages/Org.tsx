@@ -7,7 +7,7 @@ export function Org({user,onLogout}:{user:User;onLogout:()=>void}){
   <div className="panels">
    <main className="work">
     <div className="breadcrumb">组织管理</div>
-    <OrganizationPanel/>
+    <OrganizationPanel isAdmin={user.isAdmin} currentUserId={user.id}/>
    </main>
   </div>
  </AppShell>;

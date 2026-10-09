@@ -130,10 +130,24 @@ func (r *memoryRepo) RemoveFavorite(_ context.Context, userID, fileID, folderID 
 	return ports.ErrRowMissing
 }
 
+// SearchFiles mirrors the SQL search read for unit tests: the same supported
+// sort keys, the same keyset cursor and the same contract that Total counts the
+// whole filter while Limit only cuts the page (WF-30).
 func (r *memoryRepo) SearchFiles(_ context.Context, q ports.FileSearchQuery) ([]domain.File, int, error) {
+	switch q.Sort {
+	case "", "updated_desc", "name_asc", "size_desc":
+	default:
+		return nil, 0, domain.ErrInvalidInput
+	}
+	// The service sends page size + 1 lookahead, so the ceiling is
+	// MaxSearchPage+1; a plain max-size request must not fail here.
+	if q.Limit <= 0 || q.Limit > ports.MaxSearchPage+1 {
+		return nil, 0, domain.ErrInvalidInput
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	out := make([]domain.File, 0)
+	matched := make([]domain.File, 0)
+	total := 0
 	for _, f := range r.files {
 		if f.DeletedAt != nil {
 			continue
@@ -144,12 +158,35 @@ func (r *memoryRepo) SearchFiles(_ context.Context, q ports.FileSearchQuery) ([]
 		if q.Query != "" && !strings.Contains(lowerASCII(f.Name), lowerASCII(q.Query)) {
 			continue
 		}
-		out = append(out, f)
+		// Total counts the whole filter, so it is tallied before the cursor
+		// trims the page — the same contract the SQL count query keeps.
+		total++
+		if !searchFileAfterCursor(f, q) {
+			continue
+		}
+		matched = append(matched, f)
 	}
-	if q.Limit > 0 && len(out) > q.Limit {
-		out = out[:q.Limit]
+	sortFiles(matched, q.Sort)
+	if len(matched) > q.Limit {
+		matched = matched[:q.Limit]
 	}
-	return out, len(out), nil
+	return matched, total, nil
+}
+
+// searchFileAfterCursor mirrors the SQL keyset predicates: each supported sort
+// compares the row against the cursor on its own ordering keys.
+func searchFileAfterCursor(f domain.File, q ports.FileSearchQuery) bool {
+	if q.CursorID == "" {
+		return true
+	}
+	switch q.Sort {
+	case "name_asc":
+		return f.Name > q.CursorName || (f.Name == q.CursorName && f.ID > q.CursorID)
+	case "size_desc":
+		return f.SizeBytes < q.CursorSize || (f.SizeBytes == q.CursorSize && f.ID < q.CursorID)
+	default:
+		return f.UpdatedAt.Before(q.CursorTime) || (f.UpdatedAt.Equal(q.CursorTime) && f.ID < q.CursorID)
+	}
 }
 
 func (r *memoryRepo) Stats(_ context.Context, q ports.StatsQuery) (domain.Stats, error) {

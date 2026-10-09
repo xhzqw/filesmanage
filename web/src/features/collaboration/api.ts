@@ -38,7 +38,7 @@ export type Stats={
  byUploader:{uploaderId:string;uploaderName:string;count:number}[];
 };
 
-export type SearchPage={items:FileItem[];total:number};
+export type SearchPage={items:FileItem[];total:number;nextCursor:string};
 
 export type Workgroup={id:string;name:string;departmentId:string|null};
 
@@ -58,7 +58,9 @@ export const collaborationApi={
  groups:()=>request<Workgroup[]>("/groups"),
  folderTree:()=>request<Folder[]>("/folders/tree"),
  folderFiles:(folderId:string)=>request<FilePage>("/files?"+new URLSearchParams({folder:folderId,sort:"updated_desc",limit:"50"}).toString()),
- search:(params:{folder?:string;scope?:string;q?:string;uploader?:string;type?:string;from?:string;to?:string;sort?:string;limit?:number})=>{
+ // The opaque cursor is passed back verbatim; a missing or empty cursor asks for
+ // the first page and nextCursor==="" means the server's last page (WF-30).
+ search:(params:{folder?:string;scope?:string;q?:string;uploader?:string;type?:string;from?:string;to?:string;sort?:string;limit?:number;cursor?:string})=>{
   const query=new URLSearchParams();
   for(const [key,value] of Object.entries(params)){
    if(value!==undefined&&value!=="")query.set(key,String(value));

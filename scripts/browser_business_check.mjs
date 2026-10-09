@@ -204,6 +204,17 @@ async function main() {
         const btn=[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='创建用户');
         if(!btn||btn.disabled)return 'button-disabled';
         btn.click();
+        // The create flow now confirms in a real dialog (no window.prompt).
+        const confirmReady=await new Promise(resolve=>{
+          const deadline=Date.now()+8000;
+          const timer=setInterval(()=>{
+            const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('确认创建'));
+            if(d){clearInterval(timer);resolve(d);}
+            else if(Date.now()>deadline){clearInterval(timer);resolve(null);}
+          },150);
+        });
+        if(!confirmReady)return 'no-confirm-dialog';
+        [...confirmReady.querySelectorAll('button')].find(b=>b.textContent?.trim()==='确认创建')?.click();
         await new Promise(r=>setTimeout(r,2500));
         return document.body.textContent?.includes(${JSON.stringify(probeLogin)})?'created':'not-visible';
       })()`);
@@ -215,6 +226,17 @@ async function main() {
         const btn=[...row.querySelectorAll('button')].find(b=>b.textContent?.trim()==='禁用');
         if(!btn)return 'no-disable-button';
         btn.click();
+        // Disabling is a destructive action with its own confirmation dialog.
+        const confirmReady=await new Promise(resolve=>{
+          const deadline=Date.now()+8000;
+          const timer=setInterval(()=>{
+            const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('确认禁用'));
+            if(d){clearInterval(timer);resolve(d);}
+            else if(Date.now()>deadline){clearInterval(timer);resolve(null);}
+          },150);
+        });
+        if(!confirmReady)return 'no-confirm-dialog';
+        [...confirmReady.querySelectorAll('button')].find(b=>b.textContent?.trim()==='确认禁用')?.click();
         await new Promise(r=>setTimeout(r,2500));
         const row2=[...document.querySelectorAll('tr')].find(tr=>tr.textContent?.includes(${JSON.stringify(probeLogin)}));
         return row2?.textContent?.includes('启用')?'disabled':'not-disabled';

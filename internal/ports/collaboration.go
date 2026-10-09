@@ -22,9 +22,15 @@ type FileSearchQuery struct {
 	// TextQuery is the CJK-spaced form of Query used against the tsvector
 	// index (SPEC §10.2); Query itself still matches the file name.
 	TextQuery  string
+	// The cursor fields carry the ordering keys of the active sort for the
+	// last row of the previous page; an empty CursorID starts at page one.
 	CursorTime time.Time
 	CursorName string
 	CursorID   string
+	CursorSize int64
+	// Limit is the repository row budget: search reads send their page size
+	// plus one lookahead row so the caller can tell a full page from the last
+	// one (WF-30); the repository accepts up to MaxSearchPage+1.
 	Limit      int
 }
 

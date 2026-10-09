@@ -3,6 +3,10 @@ import type {User} from "../../entities/user/model";
 
 export type Department={id:string;name:string;parentId:string|null};
 export type Workgroup={id:string;name:string;departmentId:string|null};
+// POST /departments 与 POST /groups 目前只返回 {id,name}（internal/httpx/organization.go 的
+// createDepartment/createWorkgroup），响应里没有 parentId/departmentId，所以调用方必须
+// 在成功后重读列表，不能把这个响应当作完整的 Department/Workgroup。
+export type Created={id:string;name:string};
 
 export const organizationApi={
  users:()=>request<User[]>("/users"),
@@ -10,9 +14,9 @@ export const organizationApi={
  resetPassword:(id:string,password:string)=>request<{reset:string}>("/users/"+id+"/password",{method:"POST",body:JSON.stringify({password})}),
  setDisabled:(id:string,disabled:boolean)=>request<{id:string;disabled:boolean}>("/users/"+id+"/"+(disabled?"disable":"enable"),{method:"POST"}),
  departments:()=>request<Department[]>("/departments"),
- createDepartment:(name:string)=>request<Department>("/departments",{method:"POST",body:JSON.stringify({name})}),
+ createDepartment:(name:string,parentId:string)=>request<Created>("/departments",{method:"POST",body:JSON.stringify({name,parentId})}),
  groups:()=>request<Workgroup[]>("/groups"),
- createGroup:(name:string)=>request<Workgroup>("/groups",{method:"POST",body:JSON.stringify({name})}),
+ createGroup:(name:string,departmentId:string)=>request<Created>("/groups",{method:"POST",body:JSON.stringify({name,departmentId})}),
  members:(groupId:string)=>request<User[]>("/groups/"+groupId+"/members"),
  addMember:(groupId:string,userId:string)=>request<{groupId:string;userId:string}>("/groups/"+groupId+"/members",{method:"POST",body:JSON.stringify({userId})}),
  removeMember:(groupId:string,userId:string)=>request<{removed:boolean}>("/groups/"+groupId+"/members/"+userId,{method:"DELETE"}),

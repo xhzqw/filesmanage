@@ -1,0 +1,6 @@
+/* Internal move gesture (DESKTOP-INTERACTION-v1 §7.2, DI-17). The file table
+   only needs the source rows to stay marked while the drag is live; the folder
+   tree draws its own accept/reject markers inline from the token layer,
+   because features/folders may not import this stylesheet
+   (scripts/check_architecture.py). */
+.table tbody tr.drag-source{opacity:.55}

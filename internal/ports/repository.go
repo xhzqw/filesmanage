@@ -185,6 +185,11 @@ const MaxFilePage = 200
 // page to detect a next page, so the repository accepts MaxFolderPage+1.
 const MaxFolderPage = 200
 
+// MaxSearchPage is the largest page a client may request from the file search
+// (GET /api/search). The service asks for one lookahead row beyond the page to
+// detect a next page, so the repository accepts MaxSearchPage+1.
+const MaxSearchPage = 200
+
 // FolderChildQuery is the keyset-paginated children read behind
 // GET /api/folders/children. ParentID "" addresses the caller's visible roots,
 // which include a listable folder whose parent the caller may not list (a pruned
