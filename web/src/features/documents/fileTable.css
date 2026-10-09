@@ -1,0 +1,39 @@
+/* Precision Workbench 2.0 high-density DataGrid (spec §4): a fixed-layout
+   seven-column grid (select/name/size/version/hash/date/actions) built only on
+   the shared token layer. The old 44px/36px consumer rows are gone — standard
+   rows are var(--height-row-standard) and the ultra density drops to
+   var(--height-row-ultra) with tighter cell padding, while the density switch
+   only swaps the table class and leaves selection, sort, keyboard and paging
+   untouched. */
+.file-table{table-layout:fixed}
+.file-table th{padding:0 10px;height:var(--height-table-header)}
+.file-table tbody tr{height:var(--height-row-standard)}
+.file-table tbody td:not(.empty){vertical-align:middle;padding:6px 10px}
+.col-select{width:32px;text-align:center}
+.col-name{min-width:220px}
+.col-size{width:90px;text-align:right}
+.col-version{width:60px;text-align:center}
+.col-hash{width:90px}
+.col-date{width:130px;text-align:right}
+/* Six labelled row actions (打开/下载/编辑/重命名/删除/关注) are part of the
+   desktop contract the gates drive, so the column must hold their natural
+   width (~235px) instead of clipping into a horizontal scrollbar. */
+.col-actions{width:260px;text-align:center}
+.file-table tbody td.row-actions{justify-content:center}
+/* Name cell: a 14px type icon plus the name, one flex line, so the label keeps
+   its ellipsis instead of wrapping under the icon. */
+.file-table tbody td.col-name{display:flex;align-items:center;gap:var(--space-1);min-width:0}
+/* The label is the only shrinkable item on that line, so the icon keeps its
+   14px and the name is what ellipsizes (VIS-08). */
+.file-table tbody td.col-name .file-name{flex:1 1 auto}
+.file-type-icon{flex:none;color:var(--text-tertiary)}
+.file-table tbody td.row-actions button,.file-table tbody td.row-actions a{min-height:24px;padding:0 5px;font-size:11px}
+table.file-table-ultra tbody tr{height:var(--height-row-ultra)}
+table.file-table-ultra tbody td:not(.empty){padding:2px 8px}
+/* 24px is the WCAG 2.2 AA target floor (DESIGN-SYSTEM §3.2), so the ultra
+     density tightens everything else before it ever goes under it. */
+table.file-table-ultra .row-actions button,table.file-table-ultra .row-actions a{height:24px;min-height:24px;padding:0 4px;font-size:11px}
+.density-switch{display:inline-flex;align-items:center;gap:var(--space-1);font-size:11px;color:var(--text-tertiary)}
+.density-title{color:var(--text-tertiary);white-space:nowrap}
+.density-switch button{height:22px;min-height:22px;padding:0 var(--space-2);font-size:11px}
+.toolbar .density-switch button[aria-pressed="true"]{background:var(--surface-row-selected);border-color:var(--border-selected);color:var(--brand-blue);font-weight:600}

@@ -1,9 +1,9 @@
 /* Stats folder scope (AUD-15/WF-29): the chosen target is shown as its visible
    path next to the trigger, never as a raw folder ID. Component-owned styles;
    every value comes from the semantic token layer in theme.css. */
-.stats-folder{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-2);min-width:0}
-.stats-folder-label{color:var(--color-text-secondary)}
-.stats-folder-path{color:var(--color-text-secondary);overflow-wrap:anywhere}
+.stats-folder{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-1);min-width:0}
+.stats-folder-label{color:var(--color-text-secondary);font-size:11px}
+.stats-folder-path{color:var(--color-text-secondary);font-size:11px;overflow-wrap:anywhere}
 .stats-folder-path.chosen{font-weight:600;color:var(--color-text)}
 /* The trigger is inert while the range already covers everything; the disabled
    state alone stays visually weak, so the reason is stated next to it. */

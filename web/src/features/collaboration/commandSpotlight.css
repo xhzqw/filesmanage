@@ -1,0 +1,32 @@
+/* CommandSpotlight (spec §6.4): the ⌘K/Ctrl+K global command palette — a 480px
+   panel over a dimmed scrim, a 36px input row and a 240px result stream that
+   keeps the caret in the input while the arrow keys walk the rows.
+   Component-owned styles; every value comes from the token layer in theme.css,
+   so no new colour is introduced here. */
+/* Spec §6.4 frosts the workbench behind the scrim: the blur lives on the
+   overlay, so the panel itself can stay an opaque, fully legible surface. */
+.command-overlay{position:fixed;inset:0;z-index:90;display:flex;align-items:flex-start;justify-content:center;padding-top:12vh;background:rgba(15,39,92,.28);backdrop-filter:blur(10px)}
+.command-panel{width:var(--width-command);max-width:calc(100vw - var(--space-4));background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-md);box-shadow:0 1px 2px rgba(15,39,92,.06),0 12px 32px rgba(15,39,92,.12);overflow:hidden;animation:command-in .12s ease}
+/* 120ms open: opacity plus a 2px rise. The global prefers-reduced-motion
+   override in theme.css already neutralises it. */
+@keyframes command-in{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}
+.command-input-row{display:flex;align-items:center;gap:var(--space-2);height:var(--height-command);padding:0 var(--space-3);border-bottom:1px solid var(--border-hairline)}
+.command-icon{flex:none;color:var(--text-tertiary)}
+.command-input{flex:1;min-width:0;height:100%;padding:0;border:0;border-radius:0;background:transparent;font-size:13px;color:var(--text-primary)}
+/* The panel is a single modal text field: the browser's default focus chrome on
+   the input would draw a second boundary inside the panel's own hairline. */
+.command-input:focus{outline:0;box-shadow:none}
+.command-input::placeholder{color:var(--text-tertiary)}
+.command-status{margin:0;padding:var(--space-2) var(--space-3)}
+.command-list{list-style:none;margin:0;padding:var(--space-1);max-height:240px;overflow:auto;display:grid;gap:1px;align-content:start}
+.command-row{display:flex;align-items:center;gap:var(--space-2);min-height:var(--height-row-standard);padding:var(--space-1) var(--space-2);border-radius:var(--radius-sm);font-size:12px;color:var(--text-primary);cursor:pointer;user-select:none}
+.command-row:hover{background:var(--surface-row-hover)}
+/* The active row is the keyboard cursor, so it must read apart from hover alone
+   (VIS-02): selected background plus the 2px rail from spec §4.2. The rail uses
+   the selected-border token, not the decorative cyan, because an inset ring is
+   a measured boundary and must clear 3:1 (spec §6.2 keeps cyan for the glow). */
+.command-row.active,.command-row.active:hover{background:var(--surface-row-selected);box-shadow:inset 2px 0 0 var(--border-selected)}
+.command-row-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;color:var(--brand-blue)}
+.command-row[data-kind="folder"] .command-row-name{color:var(--text-primary);font-weight:600}
+.command-row-path{flex:none;max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-tertiary);font-size:11px}
+.command-row-meta{flex:none;color:var(--text-secondary);font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap}

@@ -5,6 +5,7 @@ import {RestoreDialog} from "./RestoreDialog";
 import {request} from "../../shared/http";
 import {errorCode,errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
+import {MicroHoldToDelete} from "../../shared/ui/rare";
 
 export function TrashList({onRestored}:{onRestored:()=>void}){
  const[entries,setEntries]=useState<TrashEntry[]>([]);
@@ -82,7 +83,7 @@ export function TrashList({onRestored}:{onRestored:()=>void}){
   {message&&<p role={messageTone==="error"?"alert":"status"} className={"notice"+(messageTone==="error"?" error":"")}>{message}</p>}
   <div className="table">
    <table>
-    <thead><tr><th>名称</th><th>类型</th><th>删除人</th><th>删除时间</th><th>操作</th></tr></thead>
+    <thead><tr><th scope="col">名称</th><th scope="col">类型</th><th scope="col">删除人</th><th scope="col">删除时间</th><th scope="col">操作</th></tr></thead>
     <tbody>
      {status==="loading"&&<tr><td colSpan={5} className="empty">正在加载回收站…</td></tr>}
      {status==="failed"&&<tr><td colSpan={5} className="empty" role="alert">获取回收站失败，请刷新重试</td></tr>}
@@ -123,7 +124,8 @@ export function TrashList({onRestored}:{onRestored:()=>void}){
      ?<button type="button" className="primary" disabled={purgeBusy} onClick={()=>setPurgeStage("final")}>继续（下一步）</button>
      :<>
       <button type="button" id="purge-back" className="secondary-action" disabled={purgeBusy} onClick={()=>setPurgeStage("impact")}>返回</button>
-      <button type="button" className="danger" disabled={purgeBusy} onClick={confirmPurge}>{purgeBusy?"删除中…":"确认永久删除"}</button>
+      {/* 长按确认取代第三次点击：误触不会立刻销毁版本历史（spec §6.3） */}
+      <MicroHoldToDelete label="确认永久删除" tone="danger" disabled={purgeBusy} onConfirm={confirmPurge}/>
      </>}
    </div>
   </Dialog>}

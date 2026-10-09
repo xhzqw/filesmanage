@@ -249,7 +249,11 @@ async function workflowSuite() {
     const rollbackOpen = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('回滚将生成新版本'));return Boolean(d);}`, 8000);
     check("WF-12 rollback dialog explains append-only semantics", rollbackOpen === true, String(rollbackOpen));
     await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('回滚将生成新版本'));const input=d.querySelector('#rollback-reason');const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;set.call(input,'G4 冒烟回滚');input.dispatchEvent(new Event('input',{bubbles:true}));return true;})()`);
-    await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('回滚将生成新版本'));[...d.querySelectorAll('button')].find(b=>b.textContent?.trim()==='确认回滚')?.click();return true;})()`);
+    // The commit control is a hold-to-confirm (PRECISION-WORKBENCH-V2-SPEC 6.3): a bare click()
+    // only presses it, so the gate drives the real gesture - pointerdown, then let the 800ms fill
+    // run to completion - exactly as a user would. The assertions below are unchanged.
+    await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('回滚将生成新版本'));const b=[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='确认回滚');b?.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,cancelable:true}));return Boolean(b);})()`);
+    await delay(1200);
     const committed = await cdp.waitFor(`()=>{const rows=[...document.querySelectorAll('.table tbody tr')];return rows.length>=3&&rows.some(r=>r.textContent?.includes('回滚'));}`, 20000);
     check("WF-13 rollback appends a new version row", committed === true, String(committed));
     const bytes = await (await fetch(`${BASE}/api/files/${v1.fileId}/bytes`, { headers: { Cookie: sessionCookie } })).text();
@@ -1041,7 +1045,9 @@ async function batchUiSuite() {
     await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('永久删除确认'));[...d.querySelectorAll('button')].find(b=>b.textContent?.trim()==='继续（下一步）')?.click();return true;})()`);
     const stage2 = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('再次确认'));return d?true:false;}`, 8000);
     check("purge requires the second confirmation", stage2 === true, String(stage2));
-    await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('再次确认'));[...d.querySelectorAll('button')].find(b=>b.textContent?.trim()==='确认永久删除')?.click();return true;})()`);
+    // Same hold-to-confirm gesture as WF-13 (spec 6.3): press, hold past the fill, no click.
+    await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('再次确认'));const b=[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='确认永久删除');b?.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,cancelable:true}));return Boolean(b);})()`);
+    await delay(1200);
     const purged = await cdp.waitFor(`()=>![...document.querySelectorAll('tbody tr')].some(tr=>tr.textContent?.includes('bm-purge.txt'))`, 20000);
     check("purge removes the entry from the trash", purged === true, String(purged));
 

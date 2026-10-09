@@ -66,7 +66,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
      {notice&&<p role="status" className="notice">{notice}</p>}
      <div className="table">
       <table>
-       <thead><tr><th>版本</th><th>动作</th><th>大小</th><th>校验值</th><th>创建人</th><th>时间</th><th>操作</th></tr></thead>
+       <thead><tr><th scope="col">版本</th><th scope="col">动作</th><th scope="col">大小</th><th scope="col">校验值</th><th scope="col">创建人</th><th scope="col">时间</th><th scope="col">操作</th></tr></thead>
        <tbody>
         {versions.map(v=><tr key={v.versionSeq}>
          <td>v{v.versionSeq}</td>

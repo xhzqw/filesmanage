@@ -265,7 +265,7 @@ export function CollaborationPanel(){
       {shownFolders.map(row=><button key={row.folder.id} type="button" role="radio"
        aria-checked={folderId===row.folder.id}
        className={"share-picker-row"+(folderId===row.folder.id?" on":"")}
-       style={{paddingLeft:String(8+row.depth*18)+"px"}} disabled={pickBusy}
+       style={{paddingLeft:String(8+Math.min(row.depth,8)*14)+"px"}} disabled={pickBusy}
        title={row.path} onClick={()=>pickFolder(row.folder.id)}>{row.folder.name}</button>)}
      </div>}
     {rows.length>PICKER_PAGE&&keyword===""&&<p className="hint">目录较多，仅显示前 {PICKER_PAGE} 个，请先按名称筛选。</p>}
@@ -304,7 +304,7 @@ export function CollaborationPanel(){
   </section>}
   <div className="table">
    {tab==="favorites"?<table>
-    <thead><tr><th>资源</th><th>类型</th><th>状态</th><th>关注时间</th><th>操作</th></tr></thead>
+    <thead><tr><th scope="col">资源</th><th scope="col">类型</th><th scope="col">状态</th><th scope="col">关注时间</th><th scope="col">操作</th></tr></thead>
     <tbody>
      {status==="loading"&&<tr><td colSpan={5} className="empty">正在加载…</td></tr>}
      {status==="failed"&&<tr><td colSpan={5} className="empty" role="alert">获取关注列表失败，请刷新重试。</td></tr>}
@@ -323,7 +323,7 @@ export function CollaborationPanel(){
      </tr>)}
     </tbody>
    </table>:<table>
-    <thead><tr><th>资源</th><th>类型</th><th>接收方/来源</th><th>权限</th><th>继承子目录</th><th>截止</th><th>操作</th></tr></thead>
+    <thead><tr><th scope="col">资源</th><th scope="col">类型</th><th scope="col">接收方/来源</th><th scope="col">权限</th><th scope="col">继承子目录</th><th scope="col">截止</th><th scope="col">操作</th></tr></thead>
     <tbody>
      {status==="loading"&&<tr><td colSpan={7} className="empty">正在加载…</td></tr>}
      {status==="failed"&&<tr><td colSpan={7} className="empty" role="alert">获取分享列表失败，请刷新重试。</td></tr>}

@@ -1,6 +1,7 @@
 import{useEffect}from "react";
 import{Navigate,Route,Routes}from "react-router-dom";
 import{authApi}from "../features/auth/api";
+import{CommandSpotlight}from "../features/collaboration/CommandSpotlight";
 import{useSession}from "./session";
 import{Login}from "../pages/Login";
 import{Documents}from "../pages/Documents";
@@ -18,7 +19,7 @@ export function App(){
  async function logout(){try{await authApi.logout()}finally{setUser(null)}}
  if(loading)return <main className="login-bg">正在检查会话…</main>;
  if(user?.mustChangePassword)return <Routes><Route path="/first-sign-in" element={<FirstSignIn onSuccess={setUser} onExit={logout}/>}/><Route path="*" element={<Navigate to="/first-sign-in" replace/>}/></Routes>;
- return <Routes><Route path="/login" element={user?<Navigate to="/doc" replace/>:<Login onSuccess={setUser}/>}/>
+ return <><Routes><Route path="/login" element={user?<Navigate to="/doc" replace/>:<Login onSuccess={setUser}/>}/>
  <Route path="/doc" element={user?<Documents user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/preview/:id" element={user?<Preview user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/trash" element={user?<Trash user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
@@ -29,5 +30,6 @@ export function App(){
  <Route path="/workspace" element={user?<WorkspacePage user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/search" element={user?<SearchPage user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/stats" element={user?<WorkspacePage user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
- <Route path="*" element={<Navigate to={user?"/doc":"/login"} replace/>}/></Routes>;
+ <Route path="*" element={<Navigate to={user?"/doc":"/login"} replace/>}/></Routes>
+  {user?<CommandSpotlight/>:null}</>;
 }

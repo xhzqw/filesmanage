@@ -5,9 +5,9 @@
    backdrop and no second focus trap here. */
 .folder-picker{display:grid;gap:var(--space-3);min-width:0;width:100%;background:var(--color-panel);color:var(--color-text)}
 .folder-picker-search-row{display:grid;gap:var(--space-1);min-width:0}
-.folder-picker .folder-picker-search{width:100%;min-width:0;min-height:var(--height-control);padding:var(--space-1) var(--space-3);border:1px solid var(--color-border-strong);border-radius:var(--radius-control);background:var(--color-panel);color:var(--color-text)}
+.folder-picker .folder-picker-search{width:100%;min-width:0;min-height:var(--height-control);padding:var(--space-1) var(--space-2);border:1px solid var(--color-border-strong);border-radius:var(--radius-control);background:var(--color-panel);color:var(--color-text)}
 .folder-picker .folder-picker-search:disabled{background:var(--color-panel-subtle);color:var(--color-text-secondary)}
-.folder-picker-hint{margin:0;color:var(--color-text-secondary);font-size:12px}
+.folder-picker-hint{margin:0;color:var(--color-text-secondary);font-size:11px}
 .folder-picker-notice{margin:0;padding:var(--space-2) var(--space-3);border:1px solid var(--color-border);border-left:3px solid var(--color-row-selected-border);border-radius:var(--radius-control);background:var(--color-panel-subtle);color:var(--color-text)}
 .folder-picker-candidate{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--space-1) var(--space-2);margin:0;padding:var(--space-2) var(--space-3);border:1px solid var(--color-border);border-radius:var(--radius-control);background:var(--color-panel-subtle)}
 .folder-picker-candidate-label,.folder-picker-candidate-none{color:var(--color-text-secondary);font-size:12px;white-space:nowrap}
@@ -21,10 +21,10 @@
 .folder-picker-result:hover{background:var(--color-row-hover)}
 .folder-picker-result.candidate,.folder-picker-result.candidate:hover{border-color:var(--color-row-selected-border);background:var(--color-row-selected);color:var(--color-action)}
 .folder-picker-result-name{font-weight:600}
-.folder-picker-result-path{font-size:12px;color:var(--color-text-secondary);overflow-wrap:anywhere}
+.folder-picker-result-path{font-size:11px;color:var(--color-text-secondary);overflow-wrap:anywhere}
 .folder-picker-result-flag{font-size:12px;color:var(--color-action)}
 .folder-picker-result .folder-picker-reason{flex-basis:100%;margin-left:0}
-/* Tree: 36px rows, one roving tab stop, hover never impersonates selection. */
+/* Tree: 28px rows (--height-tree-row), one roving tab stop, hover never impersonates selection. */
 .folder-picker-tree{list-style:none;margin:0;padding:var(--space-1);max-height:min(46vh,360px);overflow:auto;border:1px solid var(--color-border);border-radius:var(--radius-control);background:var(--color-panel)}
 .folder-picker-tree ul{list-style:none;margin:0;padding:0}
 .folder-picker-tree[aria-busy="true"]{opacity:.6}

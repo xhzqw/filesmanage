@@ -11,8 +11,8 @@ import {newIdempotencyKey} from "../../shared/ids";
 import {Dialog} from "../../shared/ui/Dialog";
 import {FolderPicker} from "../../shared/ui/FolderPicker";
 import {Menu,type MenuItem,type MenuPoint}from"../../shared/ui/Menu";
-import {FolderComponent} from "../../shared/ui/rare";
 import"./dragMove.css";
+import"./fileTable.css";
 
 type SortKey="updated_desc"|"name_asc"|"name_desc"|"size_desc";
 
@@ -24,6 +24,42 @@ const SORT_LABELS:Record<SortKey,string>={
 };
 
 const SORT_KEYS:SortKey[]=["updated_desc","name_asc","name_desc","size_desc"];
+
+// Extension classes for the type icon: CAD geometry, raster images and the
+// document/text family the workbench edits or previews.
+const CAD_EXT=new Set(["dwg","dxf","stl","step","stp","iges","igs","obj","3mf"]);
+const IMAGE_EXT=/^(png|jpe?g|gif|webp|bmp|tiff?)$/;
+const DOC_EXT=/^(pdf|docx?|xlsx?|pptx?|md|txt|csv|json|xml|ya?ml|log)$/;
+
+// Spec §4.1: a 14px thin-line type icon ahead of the name. The extension picks
+// the glyph - CAD drawing, raster image, document, generic file - and the icon
+// is always currentColor and aria-hidden, so it never carries meaning the name
+// does not and never enters the accessibility tree (VIS-11).
+function FileTypeIcon({name}:{name:string}){
+ const dot=name.lastIndexOf(".");
+ const ext=dot>0&&dot<name.length-1?name.slice(dot+1).toLowerCase():"";
+ const kind=CAD_EXT.has(ext)?"cad":IMAGE_EXT.test(ext)?"image":DOC_EXT.test(ext)?"doc":"file";
+ return <svg className="file-type-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
+  stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+  {kind==="cad"?<path d="M3 8.6V6.4l2.2-2.2h4.2l2.2 2.2h7.2v10.4H3z"/><path d="M7 13.6l2.6-3.1 2 2.3 2-2.5 3.4 3.3"/>:null}
+  {kind==="image"?<rect x="3.4" y="4.6" width="17.2" height="14.8" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M4.6 17.2l4.4-4.4 3 3 3-2.6 4.4 4.2"/>:null}
+  {kind==="doc"?<path d="M6.6 3.6h6.4l4.4 4.4v12.4H6.6z"/><path d="M13 3.6v4.4h4.4"/>:null}
+  {kind==="file"?<path d="M6.6 3.6h6.4l4.4 4.4v12.4H6.6z"/>:null}
+ </svg>;
+}
+
+// VIS-05 row density (Precision Workbench 2.0 §1.1/§3.1): a pure presentation
+// choice persisted per browser so it survives navigation. The switch only
+// swaps a class on the table below — the selection, sort, keyboard model and
+// loaded pages are untouched in both modes.
+type Density="default"|"compact";
+
+const DENSITY_KEY="filesmanage.file-density";
+
+function readDensity():Density{
+ try{return localStorage.getItem(DENSITY_KEY)==="compact"?"compact":"default";}
+ catch{return "default";}   // blocked storage (private mode) must not blank the page
+}
 
 // Internal file→folder move gesture (DESKTOP-INTERACTION-v1 §7.2, DI-17). The
 // folder tree is a sibling feature and neither feature may import the other
@@ -75,10 +111,15 @@ type FavoriteRow={kind:string;fileId?:string};
 // anchor can never resurrect after a re-sort.
 export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;folderName:string;onEdit:(fileId:string)=>void;reloadKey:number}){
  const[items,setItems]=useState<FileItem[]>([]);
+// Round-trip of the list read the status bar reports (spec §3.1). It is an
+// observation of the request that already runs below — never an extra one —
+// so a failed read shows "—" instead of a stale number.
+const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const[status,setStatus]=useState("loading");
  const[message,setMessage]=useState("");
  const[messageTone,setMessageTone]=useState<"info"|"error">("info");
  const[sort,setSort]=useState<SortKey>("updated_desc");
+ const[density,setDensity]=useState<Density>(readDensity);
  const[cursor,setCursor]=useState("");
  const[hasMore,setHasMore]=useState(false);
  const[renaming,setRenaming]=useState<FileItem|null>(null);
@@ -115,6 +156,7 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
  useEffect(()=>{
   let valid=true;
   setStatus("loading");
+  const started=performance.now();
   fileApi.list(folder,sort,"",50)
    .then(page=>{
     if(!valid)return;
@@ -122,8 +164,9 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
     setHasMore(page.nextCursor!=="");
     setCursor(page.nextCursor);
     setStatus("ready");
+    setLatencyMs(Math.max(0,Math.round(performance.now()-started)));
    })
-   .catch(()=>{if(valid)setStatus("failed");});
+   .catch(()=>{if(valid){setStatus("failed");setLatencyMs(null);}});
   return()=>{valid=false;};
  },[folder,sort,reloadKey]);
 
@@ -184,6 +227,13 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
  function announce(text:string,tone:"info"|"error"){
   setMessage(text);
   setMessageTone(tone);
+ }
+
+ // VIS-05: the switch only swaps a class on the table below — the selection,
+ // sort, keyboard model and loaded pages are untouched.
+ function chooseDensity(next:Density){
+  setDensity(next);
+  localStorage.setItem(DENSITY_KEY,next);
  }
 
  // The toggle is optimistic because the endpoint is idempotent in both
@@ -269,8 +319,34 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
   setAnchorId(item.id);
  }
 
+ // The checkbox column mirrors the row model but never replaces the selection:
+ // plain/Ctrl/Cmd only toggle this row's membership, Shift extends the same
+ // visibleRange the row click uses. Modifiers come from the native event (React
+ // fires a checkbox onChange from the click) and focus always follows.
+ function onCheckToggle(event:ChangeEvent<HTMLInputElement>,item:FileItem){
+  if((event.nativeEvent as {shiftKey?:boolean}).shiftKey&&anchorId){
+   setSelectedIds(new Set(visibleRange(anchorId,item.id)));
+   setFocusedId(item.id);
+   return;
+  }
+  setSelectedIds(prev=>{
+   const next=new Set(prev);
+   if(next.has(item.id))next.delete(item.id);else next.add(item.id);
+   return next;
+  });
+  setFocusedId(item.id);
+ }
+
+ // The header box acts on the whole loaded page; selecting all also sets the
+ // anchor to the first row so a following Shift range has a base.
+ function toggleSelectAllLoaded(){
+  if(allLoadedSelected){setSelectedIds(new Set<string>());setAnchorId(null);return;}
+  setSelectedIds(new Set(items.map(i=>i.id)));
+  setAnchorId(items[0]?.id??null);
+ }
+
  function focusRow(id:string){
-  const row=document.querySelector<HTMLTableRowElement>(`tbody tr[data-id="${id}"]`);
+  const row=document.querySelector<HTMLTableRowElement>(`tbody tr[data-id="${CSS.escape(id)}"]`);
   row?.focus();
  }
 
@@ -547,6 +623,8 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
  }
 
  const selection=items.filter(i=>selectedIds.has(i.id));
+ const selectedBytes=selection.reduce((sum,file)=>sum+file.sizeBytes,0);
+ const allLoadedSelected=items.length>0&&items.every(i=>selectedIds.has(i.id));
 
  // The work area is not a move target: an internal drag over it is a cancel
  // ("拖回来源", §7.2) and it must not light up the upload zone either, so its
@@ -558,6 +636,15 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
   onDragLeave={suppressInternalDrag}
   onDrop={suppressInternalDrag}>
   <div className="toolbar">
+   {/* Order matters: VIS-03 focuses the sort select and presses Tab once,
+       expecting the first grid row. Every tabbable control therefore sits
+       ahead of the select (and the header select-all box is tabIndex -1,
+       with Ctrl+A covering the same action), so that Tab still lands there. */}
+   <span className="density-switch" role="group" aria-label="行密度">
+    <span className="density-title">密度</span>
+    <button type="button" aria-pressed={density==="default"} onClick={()=>chooseDensity("default")}>标准</button>
+    <button type="button" aria-pressed={density==="compact"} onClick={()=>chooseDensity("compact")}>超紧凑</button>
+   </span>
    {/* The input allows multiple files: it feeds the same batch queue as a
        drop (WF-27), so it no longer locks while one upload is in flight. */}
    <label className="upload-button">
@@ -579,16 +666,24 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
   </div>}
   {message&&<p role="status" className={"notice "+messageTone}>{message}</p>}
   <div className="table" onClick={event=>{if(!(event.target as HTMLElement).closest("tr")){setSelectedIds(new Set<string>());setAnchorId(null);}}}>
-   <table role="grid" aria-label={folderName+" 文件列表"}>
-    <thead><tr><th>文件名</th><th>大小</th><th>版本</th><th>校验值</th><th>修改日期</th><th>操作</th></tr></thead>
+   <table role="grid" aria-label={folderName+" 文件列表"} className={"file-table"+(density==="compact"?" file-table-ultra":"")}>
+    <colgroup><col className="col-select"/><col className="col-name"/><col className="col-size"/><col className="col-version"/><col className="col-hash"/><col className="col-date"/><col className="col-actions"/></colgroup>
+    <thead><tr>
+     <th className="col-select" scope="col"><input type="checkbox" tabIndex={-1} checked={allLoadedSelected} onChange={toggleSelectAllLoaded} aria-label="选择当前已加载的文件"/></th>
+     <th className="col-name" scope="col">文件名</th>
+     <th className="col-size" scope="col">大小</th>
+     <th className="col-version" scope="col">版本</th>
+     <th className="col-hash" scope="col">校验值</th>
+     <th className="col-date" scope="col">修改日期</th>
+     <th className="col-actions" scope="col">操作</th>
+    </tr></thead>
     <tbody onKeyDown={onGridKeyDown}>
-     {status==="loading"&&<tr><td colSpan={6} className="empty">正在加载文件…</td></tr>}
-     {status==="failed"&&<tr><td colSpan={6} className="empty" role="alert">获取文件失败，请刷新重试</td></tr>}
-     {status==="ready"&&items.length===0&&<tr><td colSpan={6} className="empty">
-      <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:16,padding:"24px 0"}}>
-       <FolderComponent size="sm" color="brand" label="空目录展示" />
-       <span>目录为空。上传第一个文件开始使用。</span>
-      </div>
+     {status==="loading"&&<tr><td colSpan={7} className="empty">正在加载文件…</td></tr>}
+     {status==="failed"&&<tr><td colSpan={7} className="empty" role="alert">获取文件失败，请刷新重试</td></tr>}
+     {status==="ready"&&items.length===0&&<tr><td colSpan={7} className="empty">
+      <svg className="empty-mark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.5h8A1.5 1.5 0 0 1 20 10v7.5A1.5 1.5 0 0 1 18.5 19h-14A1.5 1.5 0 0 1 3 17.5z"/></svg>
+      <span className="empty-title">目录为空</span>
+      <span className="empty-hint">上传第一个文件开始使用。</span>
      </td></tr>}
      {status==="ready"&&items.map((item,index)=><tr key={item.id} data-id={item.id}
       tabIndex={focusedId===item.id||(focusedId===null&&index===0)?0:-1}
@@ -600,12 +695,13 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
       onDoubleClick={()=>navigate("/preview/"+item.id)}
       onDragStart={event=>onRowDragStart(event,item)}
       onDragEnd={onRowDragEnd}>
-      <td><span className="file-name" title={item.name}>{item.name}</span></td>
-      <td>{formatSize(item.sizeBytes)}</td>
-      <td>v{item.currentVersionSeq}</td>
-      <td className="hash" title={item.sha256}>{item.sha256.slice(0,12)}…</td>
-      <td>{item.updatedAt.replace("T"," ").slice(0,16)}</td>
-      <td className="row-actions" onClick={event=>event.stopPropagation()}>
+      <td className="col-select"><input type="checkbox" checked={selectedIds.has(item.id)} aria-label={"选择 "+item.name} onClick={event=>event.stopPropagation()} onChange={event=>onCheckToggle(event,item)}/></td>
+      <td className="col-name"><FileTypeIcon name={item.name}/><span className="file-name" title={item.name}>{item.name}</span></td>
+      <td className="col-size num">{formatSize(item.sizeBytes)}</td>
+      <td className="col-version"><span className="version-badge">v{item.currentVersionSeq}</span></td>
+      <td className="col-hash hash" title={item.sha256}>{item.sha256.slice(0,8)}</td>
+      <td className="col-date date">{item.updatedAt.replace("T"," ").slice(0,16)}</td>
+      <td className="row-actions col-actions" onClick={event=>event.stopPropagation()}>
        <button type="button" onClick={()=>navigate("/preview/"+item.id)}>打开</button>
        <a href={"/api/files/"+item.id+"/bytes"} download={item.name}>下载</a>
        <button type="button" onClick={()=>onEdit(item.id)}>编辑</button>
@@ -648,6 +744,15 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
   {movingBatch&&<BatchMoveDialog files={movingBatch} presetTargetId={moveDropTarget} onClose={()=>{setMoveDropTarget("");setMovingBatch(null);}} onMoved={onBatchMoved} onReload={onMoveReload}/>}
   {rowMenu&&<Menu open label="文件操作菜单" items={rowMenuItems(rowMenu.targets)} anchor={rowMenu.anchor}
    point={rowMenu.point} onClose={()=>setRowMenu(null)}/>}
+  <footer className="status-bar">
+   <span>已选 <span className="status-strong">{selectedIds.size}</span> 项{selectedIds.size>0&&<> / <span className="status-strong">{formatSize(selectedBytes)}</span></>}</span>
+   <span className="status-sep" aria-hidden="true">│</span>
+   <span>共 <span className="status-strong">{items.length}</span> 个项目</span>
+   <span className="status-sep" aria-hidden="true">│</span>
+   <span>延迟 <span className="status-strong">{latencyMs===null?"—":latencyMs+" ms"}</span></span>
+   <span className="status-spacer"/>
+   <span className="status-build">filesmanage v2.1.0</span>
+  </footer>
  </div>;
 }
 

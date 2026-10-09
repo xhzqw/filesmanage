@@ -4,6 +4,7 @@ import {errorCode,errorCopy}from"../../shared/errors";
 import {newIdempotencyKey}from"../../shared/ids";
 import type {FileVersion}from"../../entities/file/model";
 import {Dialog}from"../../shared/ui/Dialog";
+import {MicroHoldToDelete}from"../../shared/ui/rare";
 
 // Version rollback (COMPLEX-WORKFLOWS-v1 §7, WF-12..WF-16). A rollback appends a
 // new immutable version, so the dialog takes a reason, acquires the edit lock
@@ -33,8 +34,10 @@ export function RollbackDialog({fileId,currentSeq,version,onClose,onCommitted,on
   if(lock.current)void fileApi.releaseLock(fileId,lock.current).catch(()=>undefined);
  },[fileId]);
 
- async function submit(event:FormEvent<HTMLFormElement>){
-  event.preventDefault();
+ // The reason field keeps the native form submit (Enter); the hold-to-confirm
+ // control is the deliberate pointer path and arrives without a form event.
+ async function submit(event?:FormEvent<HTMLFormElement>){
+  event?.preventDefault();
   if(busy||reason.trim()==="")return;
   setBusy(true);setMessage("");setUnknown(false);
   try{
@@ -86,7 +89,8 @@ export function RollbackDialog({fileId,currentSeq,version,onClose,onCommitted,on
    <div className="dialog-actions">
     {unknown&&<button type="button" className="secondary-action" onClick={onRefresh} disabled={busy}>刷新查看状态</button>}
     <button type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</button>
-    <button type="submit" className="primary" disabled={busy||reason.trim()===""}>{busy?"提交中…":"确认回滚"}</button>
+    {/* 长按确认是刻意的指针路径；表单 onSubmit 仍让回车直接提交 */}
+    <MicroHoldToDelete label="确认回滚" tone="brand" disabled={busy||reason.trim()===""} onConfirm={()=>submit()}/>
    </div>
   </form>
  </Dialog>;

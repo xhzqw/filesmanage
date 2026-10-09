@@ -3,6 +3,6 @@
    server page — the busy and retry states live on that same control, so a
    failed page re-requests its own cursor. Component-owned styles; values come
    from the token layer in theme.css. */
-.search-more{display:flex;align-items:center;gap:var(--space-3);padding:12px 16px}
-.search-more .error{font-size:12px}
+.search-more{display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2) var(--space-3)}
+.search-more .error{font-size:11px}
 .search-more button:disabled{color:var(--color-text-secondary);cursor:not-allowed;text-decoration:none;background:transparent}

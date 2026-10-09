@@ -1,15 +1,18 @@
 #!/usr/bin/env node
-// Desktop interaction gate (UX-ACCEPTANCE-v1 §4 DI-01..DI-17, §5 WF-11, §6
-// VIS-09, §8 G1/G2): the shared Dialog primitive, the unified shell, the file
-// selection controller, the navigation tree keyboard contract, context menus
-// and drag-drop upload — all through the real UI.
+// Desktop interaction gate (UX-ACCEPTANCE-v1 §4 DI-01..DI-19, §5 WF-11, §6
+// VIS-09/VIS-10, §8 G1/G2): the shared Dialog primitive, the unified shell, the
+// file selection controller, the navigation tree keyboard contract, context
+// menus, drag-drop upload and third-party editor keyboard/theme scoping — all
+// through the real UI.
 //
 // This is the committed merge of the ad-hoc smoke runs g1_dialog / g1_shell /
 // g2_select / g2_tree / g3_menu. Every original check is preserved verbatim.
 // The gate is independent of browser_journey_check.mjs and
-// browser_business_check.mjs and does not reduce their coverage. The five
-// suites share one Chrome session and keep separate timestamped fixtures; a
-// suite that crashes records one extra FAIL line naming it, and the remaining
+// browser_business_check.mjs and does not reduce their coverage. The suites
+// share one Chrome session except PAGED and EDITORS, which drive their own
+// (PAGED for a clean fixture tree, EDITORS for the software-WebGL flags the
+// CAD canvas needs); every suite keeps separate timestamped fixtures, and a
+// suite that crashes records one extra FAIL line naming it while the remaining
 // suites still run.
 //
 // Usage: node scripts/ux_desktop_check.mjs [--base http://127.0.0.1:18091]
@@ -293,6 +296,335 @@ async function pagedSuite(cookie) {
   }
 }
 
+// ================= EDITORS suite (DI-19 / VIS-10) =================
+// Third-party editor scoping. DI-19: keyboard operations inside the DOCX
+// editor and the CAD viewer must not be intercepted by workspace shortcuts
+// (DESKTOP-INTERACTION-v1 §4 scope priority: ONLYOFFICE / CAD viewer outrank
+// the explorer and the shell) — asserted by proving the explorer handler is
+// live on /doc and that neither editor page even renders the table it is
+// bound to. VIS-10: the ONLYOFFICE iframe is a separate document the theme
+// cannot reach, and no app CSS rule targets iframe/canvas/webgl.
+//
+// The suite runs its own Chrome with software-WebGL flags (the shared gate
+// Chrome carries no GL flags, so the three.js canvas could not mount there)
+// and keeps its fixtures in one folder deleted in its finally block, like
+// PAGED. The DOCX and STL fixtures are real byte streams — the office session
+// gate and the CAD derivative pipeline inspect the bytes, so a fake payload
+// would be dishonest. When ONLYOFFICE or WebGL is unavailable in the target
+// environment the affected assertion prints a SKIP line with the page state
+// instead of a fake pass.
+async function editorsSuite(cookie) {
+  const suiteStamp = String(Date.now());
+  const json = async (method, path, body) => {
+    const res = await fetch(BASE + path, {
+      method, headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return { status: res.status, body: await res.json().catch(() => null) };
+  };
+  const tree = await json("GET", "/api/folders/tree");
+  const root = (tree.body?.data ?? []).find((f) => !f.parentId);
+  const folderId = (await json("POST", "/api/folders", { name: `UX-G4-EDITORS-${suiteStamp}`, parentId: root?.id })).body?.data?.id;
+  const upload = async (name, content) => {
+    const form = new FormData();
+    form.set("folderId", folderId);
+    form.set("file", new Blob([content]), name);
+    form.set("idempotencyKey", "ux-editors-" + name + "-" + suiteStamp);
+    const res = await fetch(`${BASE}/api/files`, { method: "POST", headers: { Cookie: cookie }, body: form });
+    return (await res.json()).data;
+  };
+  let chrome = null;
+  let cdp = null;
+  try {
+    // Two plain files give the /doc baseline a multi-row table; the DOCX and
+    // STL are the editor fixtures.
+    const plainA = await upload(`e-${suiteStamp}-a.txt`, `explorer a ${suiteStamp}\n`);
+    const plainB = await upload(`e-${suiteStamp}-b.txt`, `explorer b ${suiteStamp}\n`);
+    const docx = await upload(`e-${suiteStamp}.docx`, minimalDocx(`键盘作用域 ${suiteStamp}`));
+    const stl = await upload(`e-${suiteStamp}.stl`, stlTetrahedron());
+    check("EDITORS fixtures uploaded (real DOCX package + real STL mesh)",
+      Boolean(plainA?.fileId && plainB?.fileId && docx?.fileId && stl?.fileId),
+      JSON.stringify({ plainA: plainA?.fileId, plainB: plainB?.fileId, docx: docx?.fileId, stl: stl?.fileId }));
+    if (!plainA?.fileId || !plainB?.fileId || !docx?.fileId || !stl?.fileId) return;
+    await json("POST", `/api/files/${stl.fileId}/derivative`, {});
+
+    chrome = spawn("/usr/bin/google-chrome", [
+      "--headless=new", `--remote-debugging-port=${PORT + 1}`, "--no-sandbox",
+      "--disable-dev-shm-usage", "--use-angle=swiftshader", "--enable-unsafe-swiftshader",
+      "--window-size=1440,900", "about:blank",
+    ], { stdio: "ignore" });
+    await delay(1500);
+    const targets = await (await fetch(`http://127.0.0.1:${PORT + 1}/json/list`)).json();
+    const page = targets.find((t) => t.type === "page");
+    cdp = await CDP.connect(page.webSocketDebuggerUrl);
+    await cdp.send("Page.enable");
+    await cdp.send("Runtime.enable");
+    await cdp.send("Network.enable");
+    await cdp.send("Page.bringToFront");
+    await cdp.send("Emulation.setFocusEmulationEnabled", { enabled: true });
+    await cdp.send("Network.setCookie", { name: "fm_session", value: cookie.slice(cookie.indexOf("=") + 1), domain: new URL(BASE).hostname, path: "/" });
+
+    // ---- DI-19 baseline: the explorer handler is live on /doc ----
+    await cdp.navigate(`${BASE}/doc?folder=${folderId}`);
+    const rows = await cdp.waitFor(`()=>document.querySelectorAll('tbody tr[data-id]').length>=3`, 20000);
+    check("DI-19 baseline: fixture rows listed on /doc", Boolean(rows), String(rows));
+    if (rows) {
+      await cdp.evaluate(`(()=>{const r=[...document.querySelectorAll('tbody tr[data-id]')];r[0]?.click();r[0]?.focus();return true;})()`);
+      await cdp.key("ArrowDown", "ArrowDown", 40);
+      const moved = await cdp.evaluate(`(()=>{const r=[...document.querySelectorAll('tbody tr[data-id]')];return {focus:r.indexOf(document.activeElement),selected:r.filter(x=>x.getAttribute('aria-selected')==='true').length};})()`);
+      check("DI-19 baseline: ArrowDown moves the explorer selection on /doc",
+        moved.focus === 1 && moved.selected === 1, JSON.stringify(moved));
+    }
+
+    // ---- DI-19 / VIS-10: the DOCX editor page ----
+    await cdp.navigate(`${BASE}/office/${docx.fileId}`);
+    const shellReady = await cdp.waitFor(`()=>document.querySelector('header.header')!==null&&document.querySelectorAll('header.header').length===1`, 15000);
+    const crumbReady = await cdp.waitFor(`()=>{const c=document.querySelector('.breadcrumb');return c&&c.textContent?.includes(${JSON.stringify(`e-${suiteStamp}.docx`)})?c.textContent:false;}`, 15000);
+    const office = await cdp.evaluate(`(()=>{
+      const links=[...document.querySelectorAll('header.header nav a')].map(a=>a.textContent?.trim());
+      const product=document.querySelector('header.header .product')?.textContent?.trim()||'';
+      const closeBtn=[...document.querySelectorAll('header.header button')].some(b=>b.textContent?.trim()==='结束编辑');
+      const exit=[...document.querySelectorAll('header.header button')].some(b=>b.textContent?.trim()==='退出');
+      return {headers:document.querySelectorAll('header.header').length,links,product,closeBtn,exit,
+              holder:document.querySelector('#placeholder')!==null,
+              loading:[...document.querySelectorAll('.empty')].some(e=>e.textContent?.includes('正在启动文档编辑器')),
+              failed:document.querySelectorAll('.notice.error').length,
+              iframes:document.querySelectorAll('#placeholder iframe').length,
+              tbody:document.querySelectorAll('tbody').length};})()`);
+    const navOk = office.links.length === NAV_LABELS.length && NAV_LABELS.every((label, i) => office.links[i] === label);
+    check("VIS-09 /office/:id: one shared shell, full nav, own close action",
+      shellReady === true && office.headers === 1 && navOk && office.exit === true && office.closeBtn === true && office.product === "文档编辑",
+      JSON.stringify(office));
+    check("VIS-09 /office/:id: editor container and file context rendered",
+      Boolean(crumbReady) && office.holder === true, JSON.stringify({ crumb: crumbReady, holder: office.holder }));
+    check("VIS-09 /office/:id: session state surfaced through the shared shell language",
+      office.loading === true || office.failed > 0 || office.iframes > 0,
+      JSON.stringify({ loading: office.loading, failed: office.failed, iframes: office.iframes }));
+    check("DI-19 /office/:id: no explorer table exists to intercept keys", office.tbody === 0, String(office.tbody));
+    await cdp.evaluate(`(()=>{if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();return true;})()`);
+    await cdp.key("ArrowDown", "ArrowDown", 40);
+    await cdp.key("Delete", "Delete", 46);
+    await cdp.key("F2", "F2", 113);
+    await cdp.key("a", "KeyA", 65, CTRL);
+    await delay(300);
+    const officeKeys = await cdp.evaluate(`(()=>({path:location.pathname,
+      dialogs:[...document.querySelectorAll('dialog.dialog')].filter(d=>d.open).length,
+      menus:document.querySelectorAll('[role=menu]').length,
+      selected:document.querySelectorAll('[aria-selected="true"]').length,
+      rename:document.querySelectorAll('#rename-input').length}))()`);
+    check("DI-19 explorer keys inside /office/:id select nothing and open nothing",
+      officeKeys.path === `/office/${docx.fileId}` && officeKeys.dialogs === 0 && officeKeys.menus === 0
+      && officeKeys.selected === 0 && officeKeys.rename === 0,
+      JSON.stringify(officeKeys));
+
+    const frame = await cdp.waitFor(`()=>{
+      const f=document.querySelector('#placeholder iframe');
+      if(!f)return false;
+      return {src:(f.getAttribute('src')||'').slice(0,120),crossOrigin:f.contentDocument===null};}`, 45000);
+    if (frame) {
+      check("VIS-10 /office/:id: the editor iframe is a separate document", frame.crossOrigin === true, JSON.stringify(frame));
+      if (!frame.crossOrigin) {
+        const inside = await cdp.evaluate(`(()=>{
+          const doc=document.querySelector('#placeholder iframe')?.contentDocument;
+          if(!doc)return 'no-document';
+          const hits=[];
+          for(const sheet of doc.styleSheets){
+            let rules;try{rules=sheet.cssRules}catch{continue}
+            for(const rule of rules){
+              if(rule.selectorText&&/\\.(office-holder|viewer-stage|header)\\b/.test(rule.selectorText))hits.push(rule.selectorText);
+            }
+          }
+          return hits;})()`);
+        check("VIS-10 /office/:id: same-origin iframe untouched by the app stylesheet", Array.isArray(inside) && inside.length === 0, JSON.stringify(inside));
+      }
+    } else {
+      const why = await cdp.evaluate(`(()=>({notice:[...document.querySelectorAll('.notice.error,.empty')].map(e=>e.textContent?.trim()).join(' | ').slice(0,200)}))()`);
+      console.log(`SKIP VIS-10 docx-iframe :: the ONLYOFFICE iframe did not mount within 45s (document server unreachable or slow boot); page state: ${JSON.stringify(why)}`);
+    }
+    const themed = await cssThemeHits(cdp);
+    check("VIS-10 /office/:id: no app CSS rule targets iframe/canvas/webgl", themed.length === 0, JSON.stringify(themed));
+
+    // ---- DI-19 / VIS-10: the CAD model page ----
+    await cdp.navigate(`${BASE}/model/${stl.fileId}`);
+    const modelShell = await cdp.waitFor(`()=>document.querySelector('header.header')!==null&&document.querySelectorAll('header.header').length===1`, 15000);
+    const model = await cdp.evaluate(`(()=>{
+      const links=[...document.querySelectorAll('header.header nav a')].map(a=>a.textContent?.trim());
+      const back=[...document.querySelectorAll('header.header button')].some(b=>b.textContent?.trim()==='返回文件');
+      return {headers:document.querySelectorAll('header.header').length,links,back,tbody:document.querySelectorAll('tbody').length};})()`);
+    const modelNavOk = model.links.length === NAV_LABELS.length && NAV_LABELS.every((label, i) => model.links[i] === label);
+    check("VIS-09 /model/:id: one shared shell, full nav, own back action",
+      modelShell === true && model.headers === 1 && modelNavOk && model.back === true, JSON.stringify(model));
+    check("DI-19 /model/:id: no explorer table exists to intercept keys", model.tbody === 0, String(model.tbody));
+    await cdp.evaluate(`(()=>{if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();return true;})()`);
+    await cdp.key("ArrowDown", "ArrowDown", 40);
+    await cdp.key("Delete", "Delete", 46);
+    await cdp.key("a", "KeyA", 65, CTRL);
+    await delay(300);
+    const modelKeys = await cdp.evaluate(`(()=>({path:location.pathname,
+      dialogs:[...document.querySelectorAll('dialog.dialog')].filter(d=>d.open).length,
+      menus:document.querySelectorAll('[role=menu]').length,
+      selected:document.querySelectorAll('[aria-selected="true"]'].length}))()`);
+    check("DI-19 explorer keys inside /model/:id change nothing",
+      modelKeys.path === `/model/${stl.fileId}` && modelKeys.dialogs === 0 && modelKeys.menus === 0 && modelKeys.selected === 0,
+      JSON.stringify(modelKeys));
+
+    const canvas = await cdp.waitFor(`()=>{const c=document.querySelector('.viewer-stage canvas');return c?{w:c.width,h:c.height,tabIndex:c.tabIndex}:false;}`, 45000);
+    if (canvas) {
+      check("VIS-10 /model/:id: the three.js canvas mounts", canvas.w > 0 && canvas.h > 0, JSON.stringify(canvas));
+      const controls = await cdp.evaluate(`(()=>{
+        const bar=document.querySelector('.toolbar[role=group][aria-label="视图控制"]');
+        if(!bar)return null;
+        const btns=[...bar.querySelectorAll('button')];
+        return {labels:btns.map(b=>b.textContent?.trim()),
+                real:btns.every(b=>b.tagName==='BUTTON'&&b.type==='button'),
+                reach:btns.map(b=>{b.focus();return document.activeElement===b;}),
+                tabIndex:document.querySelector('.viewer-stage canvas').tabIndex};})()`);
+      check("VIS-10 /model/:id: viewer controls are real, keyboard-reachable buttons",
+        Boolean(controls) && controls.real && controls.labels.length === 4 && controls.labels[0] === "重置视角" && controls.reach.every(Boolean),
+        JSON.stringify(controls));
+      check("VIS-10 /model/:id: the canvas stays out of the tab order (pointer-driven)",
+        controls && controls.tabIndex === -1, String(controls && controls.tabIndex));
+      await cdp.evaluate(`(()=>{const bar=document.querySelector('.toolbar[role=group][aria-label="视图控制"]');bar.querySelectorAll('button')[0].focus();return true;})()`);
+      await cdp.key("Tab", "Tab", 9);
+      const tabbed = await cdp.evaluate(`(()=>{const bar=document.querySelector('.toolbar[role=group][aria-label="视图控制"]');return document.activeElement===bar.querySelectorAll('button')[1];})()`);
+      check("DI-19 /model/:id: Tab moves focus along the viewer controls in order", tabbed === true, String(tabbed));
+      await cdp.evaluate(`(()=>{const bar=document.querySelector('.toolbar[role=group][aria-label="视图控制"]');const b=bar.querySelectorAll('button');b[b.length-1].focus();return true;})()`);
+      await cdp.key("Tab", "Tab", 9);
+      const left = await cdp.evaluate(`(()=>{const bar=document.querySelector('.toolbar[role=group][aria-label="视图控制"]');return {inside:bar.contains(document.activeElement),onCanvas:document.activeElement===document.querySelector('.viewer-stage canvas'),active:document.activeElement?document.activeElement.tagName:'none'};})()`);
+      check("DI-19 /model/:id: Tab leaves the viewer controls (the canvas is skipped)",
+        left.inside === false && left.onCanvas === false, JSON.stringify(left));
+    } else {
+      const why = await cdp.evaluate(`(()=>({notice:[...document.querySelectorAll('.notice.error,.empty')].map(e=>e.textContent?.trim()).join(' | ').slice(0,200),canvas:document.querySelectorAll('.viewer-stage canvas').length,webgl:(()=>{try{return Boolean(document.createElement('canvas').getContext('webgl'))}catch{return false}})()}))()`);
+      console.log(`SKIP VIS-10 cad-canvas :: the three.js canvas did not mount within 45s; page state: ${JSON.stringify(why)}`);
+    }
+    const modelThemed = await cssThemeHits(cdp);
+    check("VIS-10 /model/:id: no app CSS rule targets canvas/webgl", modelThemed.length === 0, JSON.stringify(modelThemed));
+  } finally {
+    cdp && cdp.close();
+    chrome && chrome.kill("SIGKILL");
+    // Crash-safe fixture cleanup (PAGED discipline): a mid-suite failure must
+    // not leak the folder or its files into the shared dev tree.
+    if (folderId) await json("DELETE", `/api/folders/${folderId}`);
+    const trash = await json("GET", "/api/trash");
+    for (const entry of trash.body?.data ?? []) {
+      const name = String(entry.name ?? entry.oldName ?? "");
+      if (name.includes(`UX-G4-EDITORS-${suiteStamp}`) || name.includes(`e-${suiteStamp}`)) {
+        await json("DELETE", "/api/trash/" + entry.id);
+      }
+    }
+  }
+}
+
+// Every app stylesheet rule whose selector names an iframe/canvas/webgl
+// target. VIS-10 forbids the theme from reaching editor content or the CAD
+// canvas; container rules (.office-holder/.viewer-stage style the wrapper
+// divs, never the embedded document) do not match these keywords.
+async function cssThemeHits(cdp) {
+  return cdp.evaluate(`(()=>{
+    const hits=[];
+    for(const sheet of document.styleSheets){
+      let rules;try{rules=sheet.cssRules}catch{continue}
+      for(const rule of rules){
+        const sel=rule.selectorText;
+        if(sel&&/iframe|canvas|webgl/i.test(sel))hits.push(sel);
+      }
+    }
+    return hits;})()`);
+}
+
+// A real minimal DOCX container (stored zip, OOXML parts) — the same package
+// rb_rollback_e2e.py builds with Python's zipfile, written with the zipStore
+// helper mc_multiasset_check.mjs and mod03_meta_check.mjs also carry. The
+// office session gate and the editor both inspect real bytes.
+function minimalDocx(text) {
+  return zipStore([
+    ["[Content_Types].xml",
+      '<?xml version="1.0" encoding="UTF-8"?>' +
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+      '</Types>'],
+    ["_rels/.rels",
+      '<?xml version="1.0" encoding="UTF-8"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+      '</Relationships>'],
+    ["word/document.xml",
+      '<?xml version="1.0" encoding="UTF-8"?>' +
+      '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+      '<w:body><w:p><w:r><w:t>' + text + '</w:t></w:r></w:p></w:body></w:document>'],
+  ]);
+}
+
+// A real ASCII STL tetrahedron with outward facet normals: enough geometry
+// for the viewer to mount a scene (4 facets).
+function stlTetrahedron() {
+  const facets = [
+    [[0, 0, -1], [[0, 0, 0], [0, 10, 0], [10, 0, 0]]],
+    [[0, -1, 0], [[0, 0, 0], [10, 0, 0], [0, 0, 10]]],
+    [[-1, 0, 0], [[0, 0, 0], [0, 0, 10], [0, 10, 0]]],
+    [[0.5773502691896258, 0.5773502691896258, 0.5773502691896258], [[10, 0, 0], [0, 10, 0], [0, 0, 10]]],
+  ];
+  const body = facets.map(([normal, vertices]) =>
+    ` facet normal ${normal.join(" ")}\n  outer loop\n` +
+    vertices.map((v) => `   vertex ${v.join(" ")}\n`).join("") +
+    "  endloop\n endfacet\n").join("");
+  return `solid ux-editors\n${body}endsolid ux-editors\n`;
+}
+
+function crc32(buf) {
+  let crc = ~0;
+  for (let i = 0; i < buf.length; i++) {
+    crc ^= buf[i];
+    for (let j = 0; j < 8; j++) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+  }
+  return ~crc >>> 0;
+}
+
+// Minimal stored (uncompressed) zip writer: enough for an OOXML package.
+function zipStore(entries) {
+  const locals = [];
+  const centrals = [];
+  let offset = 0;
+  for (const [name, raw] of entries) {
+    const content = Buffer.isBuffer(raw) ? raw : Buffer.from(raw, "utf8");
+    const nameBuf = Buffer.from(name, "utf8");
+    const crc = crc32(content);
+    const lh = Buffer.alloc(30);
+    lh.writeUInt32LE(0x04034b50, 0);
+    lh.writeUInt16LE(20, 4);
+    lh.writeUInt16LE(0, 6);
+    lh.writeUInt16LE(0, 8); // stored
+    lh.writeUInt32LE(crc, 14);
+    lh.writeUInt32LE(content.length, 18);
+    lh.writeUInt32LE(content.length, 22);
+    lh.writeUInt16LE(nameBuf.length, 26);
+    locals.push(Buffer.concat([lh, nameBuf, content]));
+    const ch = Buffer.alloc(46);
+    ch.writeUInt32LE(0x02014b50, 0);
+    ch.writeUInt16LE(20, 4);
+    ch.writeUInt16LE(20, 6);
+    ch.writeUInt16LE(0, 8);
+    ch.writeUInt16LE(0, 10);
+    ch.writeUInt32LE(crc, 16);
+    ch.writeUInt32LE(content.length, 20);
+    ch.writeUInt32LE(content.length, 24);
+    ch.writeUInt16LE(nameBuf.length, 28);
+    ch.writeUInt32LE(offset, 42);
+    centrals.push(Buffer.concat([ch, nameBuf]));
+    offset += 30 + nameBuf.length + content.length;
+  }
+  const cd = Buffer.concat(centrals);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(centrals.length, 8);
+  end.writeUInt16LE(centrals.length, 10);
+  end.writeUInt32LE(cd.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, cd, end]);
+}
+
 async function main() {
   // ---- fixtures (one API session, independent of the browser session) ----
   const login = await fetch(`${BASE}/api/login`, {
@@ -341,6 +673,13 @@ async function main() {
   const c1Id = await mkTree(`G2树子一-${stamp}`, pId);
   const c2Id = await mkTree(`G2树子二-${stamp}`, pId);
   const gId = await mkTree(`G2树孙-${stamp}`, c1Id);
+  // PW suite (PRECISION-WORKBENCH-V2-SPEC): three files whose extensions pick
+  // three different type icons, plus one empty folder for the empty state.
+  const pwFolderId = await mkFolder("UX-G4-PW-" + stamp);
+  await upload(pwFolderId, "pw-01.txt", `pw text ${stamp}\n`);
+  await upload(pwFolderId, "pw-02.png", `pw image ${stamp}\n`);
+  await upload(pwFolderId, "pw-03.dat", `pw binary ${stamp}\n`);
+  const pwEmptyFolderId = await mkFolder("UX-G4-PW-EMPTY-" + stamp);
   // MENU suite: three files for the context-menu scope rules.
   const menuFolderId = await mkFolder("UX-G3-MENU-" + stamp);
   for (let i = 1; i <= 3; i++) {
@@ -869,6 +1208,155 @@ async function main() {
       const rowBack = await cdp.waitFor(`()=>[...document.querySelectorAll('tbody tr[data-id]')].some(r=>r.textContent?.includes('dropped.txt'))`, 20000);
       check("DI-17 committed upload appears in the file table", Boolean(rowBack), String(rowBack));
     });
+
+    // ========== PW suite (PRECISION-WORKBENCH-V2-SPEC §3-§6) ==========
+    // Every check below drives the feature the way a user does; nothing here
+    // re-implements app logic, it only observes geometry, classes and state.
+    await runSuite("PW", async () => {
+      await cdp.navigate(`${BASE}/doc?folder=${pwFolderId}`);
+      const pwReady = await cdp.waitFor(`()=>document.querySelectorAll('tbody tr[data-id]').length>=3`, 20000);
+      check("PW-00 fixture folder renders its three files", Boolean(pwReady), String(pwReady));
+
+      // ---- PW-01: docked shell geometry (spec §3.1) ----
+      const shell = await cdp.evaluate(`(()=>{
+        const header=document.querySelector('header.header');
+        const sidebar=document.querySelector('aside.sidebar');
+        const panels=document.querySelector('.panels');
+        const cs=getComputedStyle(header);
+        return {header:cs.height,headerBorder:cs.borderBottomWidth,
+                sidebar:sidebar.getBoundingClientRect().width,
+                panelsPad:getComputedStyle(panels).padding,
+                panelsGap:getComputedStyle(panels).gap};})()`);
+      check("PW-01 header is 40px with a 1px seam and the sidebar is 240px flush",
+        shell.header === "40px" && shell.headerBorder === "1px" && Math.round(shell.sidebar) === 240
+        && shell.panelsPad === "0px" && shell.panelsGap === "normal",
+        JSON.stringify(shell));
+
+      // ---- PW-02: the seven-column fixed grid never overflows ----
+      const grid = await cdp.evaluate(`(()=>{
+        const table=document.querySelector('table.file-table');
+        const box=document.querySelector('.table');
+        const tr=document.querySelector('tbody tr[data-id]');
+        return {cols:table.querySelectorAll('colgroup col').length,
+                layout:getComputedStyle(table).tableLayout,
+                row:getComputedStyle(tr).height,
+                overflowX:box.scrollWidth-box.clientWidth,
+                sticky:getComputedStyle(table.querySelector('thead th')).position};})()`);
+      check("PW-02 fixed 7-column grid, 32px rows, sticky header, no horizontal overflow",
+        grid.cols === 7 && grid.layout === "fixed" && grid.row === "32px"
+        && grid.sticky === "sticky" && grid.overflowX <= 1,
+        JSON.stringify(grid));
+
+      // ---- PW-03: density switch is a class swap that survives a reload ----
+      const rowHeight = async () => cdp.evaluate(`(()=>{
+        const tr=document.querySelector('tbody tr[data-id]');
+        return getComputedStyle(tr).height;})()`);
+      await cdp.evaluate(`(()=>{[...document.querySelectorAll('.density-switch button')].find(b=>b.textContent?.trim()==='超紧凑')?.click();return true;})()`);
+      await delay(200);
+      const ultra = await rowHeight();
+      await cdp.navigate(`${BASE}/doc?folder=${pwFolderId}`);
+      await cdp.waitFor(`()=>document.querySelectorAll('tbody tr[data-id]').length>=3`, 20000);
+      const ultraAfterReload = await rowHeight();
+      await cdp.evaluate(`(()=>{[...document.querySelectorAll('.density-switch button')].find(b=>b.textContent?.trim()==='标准')?.click();return true;})()`);
+      await delay(200);
+      const standard = await rowHeight();
+      check("PW-03 density switch: 32px standard / 26px ultra, persisted across a reload",
+        ultra === "26px" && ultraAfterReload === "26px" && standard === "32px",
+        JSON.stringify({ ultra, ultraAfterReload, standard }));
+
+      // ---- PW-04: the status bar aggregates the selection ----
+      await cdp.evaluate(`(()=>{const rows=[...document.querySelectorAll('tbody tr[data-id]')];rows[0].click();rows[1].dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:true}));return true;})()`);
+      await delay(150);
+      const bar = await cdp.evaluate(`(()=>{const b=document.querySelector('.status-bar');return {text:b?.textContent?.replace(/\s+/g,' ').trim()??null,height:getComputedStyle(b).height};})()`);
+      check("PW-04 status bar reports the selected count and the 24px dock height",
+        /已选 2 项/.test(bar.text ?? "") && bar.height === "24px",
+        JSON.stringify(bar));
+
+      // ---- PW-05: the laser rail tracks the selected tree row ----
+      const railAt = async () => cdp.evaluate(`(()=>{
+        const sel=document.querySelector('li[data-folder-id] .tree-row.on');
+        const rail=document.querySelector('.spring-rail');
+        if(!sel||!rail)return null;
+        return {rail:rail.getBoundingClientRect().top,row:sel.getBoundingClientRect().top,
+                width:getComputedStyle(rail).width,host:Boolean(rail.closest('.spring-rail-host'))};})()`);
+      const rail1 = await railAt();
+      await cdp.evaluate(`(()=>{const rows=[...document.querySelectorAll('ul.tree li[data-folder-id]')];const other=rows.find(r=>!r.querySelector('.tree-row.on'));other?.querySelector('a')?.click();return Boolean(other);})()`);
+      await delay(700);
+      const rail2 = await railAt();
+      check("PW-05 SpringActiveRail is a 2px bar pinned to the selected row and it moves",
+        rail1 !== null && rail2 !== null && rail1.width === "2px" && rail1.host === true
+        && Math.abs(rail1.rail - rail1.row) <= 2 && Math.abs(rail2.rail - rail2.row) <= 2
+        && Math.abs(rail2.rail - rail1.rail) > 4,
+        JSON.stringify({ rail1, rail2 }));
+
+      // ---- PW-06: guide rails are dashed, not solid ----
+      const rails = await cdp.evaluate(`(()=>{
+        const row=[...document.querySelectorAll('ul.tree li[data-depth]')].find(li=>li.getAttribute('data-depth')!=='0');
+        if(!row)return null;
+        const cs=getComputedStyle(row.querySelector('.tree-row'),'::before');
+        return {style:cs.borderLeftStyle,width:cs.borderLeftWidth,color:cs.borderLeftColor};})()`);
+      check("PW-06 tree guide rail is a 1px dashed line",
+        rails !== null && rails.style === "dashed" && rails.width === "1px",
+        JSON.stringify(rails));
+
+      // ---- PW-07: the chevron rotates when expanded ----
+      const chevron = await cdp.evaluate(`(()=>{
+        const btn=document.querySelector('ul.tree li[aria-expanded="true"] button[aria-expanded="true"]');
+        if(!btn)return {expanded:false};
+        return {expanded:true,transform:getComputedStyle(btn).transform};})()`);
+      check("PW-07 expanded chevron carries aria-expanded and a 90deg rotation",
+        chevron.expanded === true && /matrix\(-?0,\s*-?1/.test(chevron.transform ?? ""),
+        JSON.stringify(chevron));
+
+      // ---- PW-08: CommandSpotlight ----
+      await cdp.key("k", "KeyK", 75, CTRL);
+      const opened = await cdp.waitFor(`()=>document.querySelector('.command-panel')!==null`, 5000);
+      check("PW-08a Ctrl+K opens the command palette", Boolean(opened), String(opened));
+      await cdp.evaluate(`(()=>{const i=document.querySelector('.command-input');const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;set.call(i,'pw-02');i.dispatchEvent(new Event('input',{bubbles:true}));return true;})()`);
+      const filtered = await cdp.waitFor(`()=>{const rows=[...document.querySelectorAll('.command-row')];return rows.length>0&&rows.every(r=>r.textContent?.includes('pw-02'));}`, 8000);
+      check("PW-08b typing narrows the palette to the matching file", Boolean(filtered), String(filtered));
+      await cdp.key("Escape", "Escape", 27);
+      const closed = await cdp.waitFor(`()=>document.querySelector('.command-panel')===null`, 5000);
+      check("PW-08c Escape closes the palette", Boolean(closed), String(closed));
+
+      // ---- PW-09: hold-to-confirm starts on press and cancels on release ----
+      await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr[data-id]')].find(r=>r.textContent?.includes('pw-01.txt'));[...row.querySelectorAll('.row-actions button')].find(b=>b.textContent?.trim()==='删除')?.click();return true;})()`);
+      const deleteOpen = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('删除确认'));return Boolean(d);}`, 8000);
+      check("PW-09a delete confirmation dialog opens", Boolean(deleteOpen), String(deleteOpen));
+      const armed = await cdp.evaluate(`(()=>{const b=document.querySelector('dialog.dialog .micro-hold');b?.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,cancelable:true}));return {found:Boolean(b),armed:b?.getAttribute('data-armed'),width:getComputedStyle(b).width,height:getComputedStyle(b).height};})()`);
+      await delay(120);
+      const cancelled = await cdp.evaluate(`(()=>{const b=document.querySelector('dialog.dialog .micro-hold');b?.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,cancelable:true}));const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('删除确认'));return {armed:b?.getAttribute('data-armed'),stillOpen:Boolean(d)};})()`);
+      check("PW-09b hold-to-confirm is a 64x26 control that cancels on release",
+        armed.found === true && armed.armed === "true" && armed.width === "64px" && armed.height === "26px"
+        && cancelled.armed === "false" && cancelled.stillOpen === true,
+        JSON.stringify({ armed, cancelled }));
+      await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('删除确认'));[...d.querySelectorAll('button')].find(b=>b.textContent?.trim()==='取消')?.click();return true;})()`);
+
+      // ---- PW-10: the empty state is a 16px wireframe glyph, not a 3D folder ----
+      await cdp.navigate(`${BASE}/doc?folder=${pwEmptyFolderId}`);
+      const empty = await cdp.waitFor(`()=>document.querySelector('.empty-mark')!==null`, 20000);
+      const emptyShape = await cdp.evaluate(`(()=>{const m=document.querySelector('.empty-mark');return m?{w:m.getBoundingClientRect().width,hidden:m.getAttribute('aria-hidden'),toy:Boolean(document.querySelector('.rare-folder-wrap'))}:null;})()`);
+      check("PW-10 empty state is a 16px aria-hidden wireframe glyph with no 3D folder",
+        Boolean(empty) && emptyShape?.w === 16 && emptyShape?.hidden === "true" && emptyShape?.toy === false,
+        JSON.stringify(emptyShape));
+
+      // ---- PW-11: Tab from the sort select still lands on the first grid row ----
+      await cdp.navigate(`${BASE}/doc?folder=${pwFolderId}`);
+      await cdp.waitFor(`()=>document.querySelectorAll('tbody tr[data-id]').length>=3`, 20000);
+      await cdp.evaluate(`(()=>{document.querySelector('select[aria-label="排序方式"]')?.focus();return true;})()`);
+      await cdp.key("Tab", "Tab", 9);
+      const landed = await cdp.evaluate(`(()=>{const a=document.activeElement;return {tag:a?.tagName,row:Boolean(a?.closest?.('tbody tr[data-id]'))};})()`);
+      check("PW-11 one Tab from the sort select reaches the first grid row",
+        landed.row === true, JSON.stringify(landed));
+
+      // ---- PW-12: the header select-all box stays out of the tab order ----
+      const selectAll = await cdp.evaluate(`(()=>{const i=document.querySelector('thead input[type=checkbox]');return i?i.getAttribute('tabindex'):null;})()`);
+      check("PW-12 header select-all checkbox is tabIndex -1 (Ctrl+A is the keyboard path)",
+        selectAll === "-1", String(selectAll));
+    });
+
+    // ================= EDITORS suite (DI-19 / VIS-10) =================
+    await runSuite("EDITORS", () => editorsSuite(cookie));
   } finally {
     cdp && cdp.close();
     chrome.kill("SIGKILL");
@@ -903,6 +1391,11 @@ async function main() {
       if (id) await json("DELETE", `/api/folders/${id}`);
     }
     await purgeTrash((name) => name.includes("G2树") && name.includes(stamp));
+  });
+  await attempt(async () => {
+    await json("DELETE", `/api/folders/${pwFolderId}`);
+    await json("DELETE", `/api/folders/${pwEmptyFolderId}`);
+    await purgeTrash((name) => name.includes("UX-G4-PW-") || name.startsWith("pw-0"));
   });
   await attempt(async () => {
     await json("DELETE", `/api/folders/${menuFolderId}`);

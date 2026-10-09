@@ -1,4 +1,4 @@
-import{useEffect,useRef,useState}from "react";
+import{useEffect,useRef,useState,type KeyboardEvent as ReactKeyboardEvent,type PointerEvent as ReactPointerEvent}from "react";
 import{Link,useLocation,useNavigate}from "react-router-dom";
 import type{User}from "../entities/user/model";
 import type{Folder}from "../entities/folder/model";
@@ -22,6 +22,33 @@ import type {FileItem} from "../entities/file/model";
 
 type Subject={id:string;displayName:string;login?:string};
 
+// The sidebar width is a user preference, not layout state (SPEC §3.1: 240px
+// default, 180~360px draggable): read once per mount, written back on every
+// change, so a reload lands on the width the user left behind. A value outside
+// the range (an older build, a hand-edited store) is clamped, never trusted.
+const SIDEBAR_WIDTH_KEY="filesmanage.sidebar-width";
+const SIDEBAR_MIN=180;
+const SIDEBAR_MAX=360;
+const SIDEBAR_DEFAULT=240;
+
+function clampSidebarWidth(width:number){
+ return Math.min(SIDEBAR_MAX,Math.max(SIDEBAR_MIN,width));
+}
+
+function readSidebarWidth(){
+ let width=SIDEBAR_DEFAULT;
+ try{
+  const stored=localStorage.getItem(SIDEBAR_WIDTH_KEY);
+  const parsed=stored===null?NaN:parseInt(stored,10);
+  if(!Number.isNaN(parsed))width=parsed;
+ }catch{}
+ return clampSidebarWidth(width);
+}
+
+function persistSidebarWidth(width:number){
+ try{localStorage.setItem(SIDEBAR_WIDTH_KEY,String(width));}catch{}
+}
+
 export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  const[folders,setFolders]=useState<Folder[]>([]);
  const[status,setStatus]=useState("loading");
@@ -42,6 +69,12 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  const[movingFolder,setMovingFolder]=useState<Folder|null>(null);
  const[move,setMove]=useState<FolderMoveState>(folderMoveIdle);
  const[moveMessage,setMoveMessage]=useState("");
+ const[sidebarWidth,setSidebarWidth]=useState(readSidebarWidth);
+ // Dragging is transient state the handle alone reads: it drives its own hit
+ // area and the data-dragging laser rail, never the persisted width.
+ const[resizing,setResizing]=useState(false);
+ const resizeStart=useRef({x:0,width:sidebarWidth});
+ const latestWidth=useRef(sidebarWidth);
  const location=useLocation();
  const navigate=useNavigate();
  const requested=new URLSearchParams(location.search).get("folder")||"folder_root";
@@ -140,8 +173,45 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
    target?.click();
   });
  }
- return <AppShell user={user} onLogout={onLogout}>
-  <div className="panels"><aside className="sidebar"><h2>文档管理</h2><p>文件夹</p>
+ // Pointer capture keeps the drag alive once the cursor leaves the 4px hit area
+ // (SPEC §3.1), so the width tracks the pointer instead of the handle.
+ function startResize(event:ReactPointerEvent<HTMLDivElement>){
+  event.currentTarget.setPointerCapture(event.pointerId);
+  resizeStart.current={x:event.clientX,width:sidebarWidth};
+  setResizing(true);
+ }
+ function onResizeMove(event:ReactPointerEvent<HTMLDivElement>){
+  if(!resizing)return;
+  const width=clampSidebarWidth(resizeStart.current.width+(event.clientX-resizeStart.current.x));
+  latestWidth.current=width;
+  setSidebarWidth(width);
+ }
+ function endResize(event:ReactPointerEvent<HTMLDivElement>){
+  if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);
+  setResizing(false);
+  // The last pointermove may not have committed yet, so persist the measured
+  // value rather than the one this closure was rendered with.
+  persistSidebarWidth(latestWidth.current);
+ }
+ // Keyboard parity with the drag: 16px steps, 48px with shift, Home/End jump to
+ // the spec bounds; the separator is a real focusable widget either way.
+ function onResizeKey(event:ReactKeyboardEvent<HTMLDivElement>){
+  const step=event.shiftKey?48:16;
+  let next=sidebarWidth;
+  if(event.key==="ArrowRight")next=sidebarWidth+step;
+  else if(event.key==="ArrowLeft")next=sidebarWidth-step;
+  else if(event.key==="Home")next=SIDEBAR_MIN;
+  else if(event.key==="End")next=SIDEBAR_MAX;
+  else return;
+  event.preventDefault();
+  const width=clampSidebarWidth(next);
+  setSidebarWidth(width);
+  persistSidebarWidth(width);
+ }
+ return <AppShell user={user} onLogout={onLogout} breadcrumb={selected?<FolderBreadcrumb folders={folders} folder={selected}/>:null}>
+  <div className="panels"><aside className="sidebar" style={{width:sidebarWidth+"px"}}>
+   <div className="sidebar-scroll">
+   <h2>文档管理</h2><p>文件夹</p>
    {/* The tree stays mounted across reloadKey cycles (an upload commit, a folder
        change, an edit save): unmounting it would drop keyboard focus and the
        expand state, so the previous folders keep rendering while the fresh tree
@@ -156,6 +226,14 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
     onManagePolicy={folder=>setPolicyFolder(folder)}/>}
    {folders.length>0&&status==="loading"&&<p className="hint">正在刷新目录…</p>}
    {folders.length>0&&status==="failed"&&<p role="alert" className="error">目录刷新失败，以下为上次数据。</p>}
+   </div>
+   {/* The handle is a sibling of the scroll port, not a child of it: a 40-row
+       tree would otherwise scroll the handle off screen while it stays
+       focusable, and overflow-x:hidden would clip half of its 4px hot zone. */}
+   <div className="sidebar-resizer" role="separator" aria-orientation="vertical" aria-label="调整侧边栏宽度" tabIndex={0}
+    data-dragging={resizing?"true":"false"}
+    onPointerDown={startResize} onPointerMove={onResizeMove} onPointerUp={endResize} onPointerCancel={endResize}
+    onKeyDown={onResizeKey}/>
    </aside>
    <main className="work">
    {moveMessage&&<p role="status" className="notice">{moveMessage}</p>}
@@ -164,15 +242,6 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
        tree lands, so the explorer (and any in-flight upload queue) is not
        torn down and remounted on every folder change. */}
    {selected&&<DropZone folderId={selected.id} onCommitted={()=>setReloadKey(k=>k+1)}>
-     <nav className="breadcrumb" aria-label="当前位置">
-      <span>文档管理</span>
-      {ancestorPath(folders,selected.id).map((folder,index,chain)=><span key={folder.id}>
-       {" / "}
-       {index===chain.length-1
-        ?<span aria-current="page">{folder.name}</span>
-        :<Link to={"/doc?folder="+encodeURIComponent(folder.id)}>{folder.name}</Link>}
-      </span>)}
-     </nav>
      <NewFolderForm parentId={selected.id} onCreated={()=>setReloadKey(k=>k+1)}/>
      <div ref={actionsRef}><FolderActions folder={actionsFolder??selected} isAdmin={user.isAdmin} onChanged={()=>setReloadKey(k=>k+1)}
       onManageGrants={()=>setGrantFolder(actionsFolder??selected)} onManagePolicy={()=>setPolicyFolder(actionsFolder??selected)}/></div>
@@ -221,6 +290,33 @@ function FileEditorBridge({fileId,requiresApproval,onClose,onSaved}:{fileId:stri
  },[fileId,onClose]);
  if(!file)return null;
  return <FileEditor file={file} requiresApproval={requiresApproval} onClose={onClose} onSaved={onSaved}/>;
+}
+
+// The path belongs in the top bar (SPEC §3.1), not in a work-area row: the
+// visible ancestor chain of the selected folder, root first, current last.
+function FolderBreadcrumb({folders,folder}:{folders:Folder[];folder:Folder}){
+ const segments:{id:string|null;name:string}[]=[{id:null,name:"文档管理"},
+  ...ancestorPath(folders,folder.id).map(ancestor=>({id:ancestor.id,name:ancestor.name}))];
+ // A deep chain would squeeze the command trigger out of the 40px bar, so only
+ // the root and the last two segments stay, with the gap marked as a collapse.
+ // The fold waits for a sixth segment: DI-15 walks root + three levels and
+ // asserts every visible ancestor is still named, so folding one level earlier
+ // would hide a real ancestor the gate requires.
+ const collapsed=segments.length>5;
+ const tail=collapsed?segments.slice(-2):segments.slice(1);
+ const[root]=segments;
+ return <nav className="breadcrumb" aria-label="当前位置">
+  {tail.length===0
+   ?<span className="crumb-current" aria-current="page">{root?.name??"文档管理"}</span>
+   :<Link to="/doc">{root?.name??"文档管理"}</Link>}
+  {collapsed?<span className="crumb-collapse">…</span>:null}
+  {tail.map((segment,index)=><span key={segment.id??"root"}>
+   <span className="crumb-sep" aria-hidden="true">›</span>
+   {index===tail.length-1
+    ?<span className="crumb-current" aria-current="page">{segment.name}</span>
+    :<Link to={segment.id===null?"/doc":"/doc?folder="+encodeURIComponent(segment.id)}>{segment.name}</Link>}
+  </span>)}
+ </nav>;
 }
 
 // Visible-ancestor path only (the tree's own walk), so a path segment the

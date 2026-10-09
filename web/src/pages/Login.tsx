@@ -21,8 +21,8 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
   }catch{setError("账号或密码错误，或服务暂不可用");}finally{setBusy(false);}
  }
  return <main className="login-bg">
-  <FluidOrb size={480} color="#02A0EA" style={{ top: -160, left: -120 }} />
-  <FluidOrb size={520} color="#174098" style={{ bottom: -180, right: -140, opacity: 0.35 }} />
+  <FluidOrb size={320} color="#02A0EA" style={{top:-90,left:-70}}/>
+  <FluidOrb size={320} color="#174098" style={{bottom:-100,right:-80,opacity:.12}}/>
   <div className="login-card">
    <div className="brand-lockup">
     <BrandLogo size={48} className="login-logo"/>

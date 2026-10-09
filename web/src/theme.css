@@ -1,137 +1,546 @@
-*{box-sizing:border-box}:root{font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;font-size:14px;color:#20344E;background:#F4F9FE}
-body{margin:0}button,input{font:inherit}button{cursor:pointer}a{color:inherit;text-decoration:none}
-button:focus-visible,input:focus-visible,a:focus-visible,select:focus-visible{outline:3px solid #02A0EA;outline-offset:2px}
-button{border:1px solid #D1E1EC;background:white;padding:8px 14px;border-radius:7px}
-button:hover{background:#E8F5FD}
-.login-bg{height:100vh;display:grid;place-items:center;position:relative;isolation:isolate;overflow:hidden;background:linear-gradient(135deg,#EEF2F6 0%,#F8FAFC 100%)}
-.login-bg::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;background-image:radial-gradient(rgba(23,64,152,.045) 1px,transparent 1px);background-size:22px 22px}
-.bg-glow{position:absolute;z-index:0;pointer-events:none;border-radius:50%}
-.bg-glow-blue{width:520px;height:520px;top:-180px;left:-140px;background:radial-gradient(circle,rgba(22,93,255,.08) 0%,rgba(22,93,255,0) 70%)}
-.bg-glow-amber{width:560px;height:560px;bottom:-200px;right:-160px;background:radial-gradient(circle,rgba(245,158,11,.05) 0%,rgba(245,158,11,0) 70%)}
-.login-card{position:relative;z-index:1;background:rgba(255,255,255,.9);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.8);max-width:420px;width:92%;padding:40px 36px;border-radius:18px;box-shadow:0 20px 40px -15px rgba(15,23,42,.08),0 0 1px 1px rgba(15,23,42,.02)}
-.brand-lockup{text-align:center;margin-bottom:28px}
-.brand-lockup .login-logo{display:block;width:48px;height:48px;margin:0 auto 16px}
-.brand-lockup .system-name{font-size:23px;font-weight:700;color:#1F2937;margin:0 0 6px;letter-spacing:.5px}
-.brand-lockup .organization-line{font-size:13px;color:#6B7280;margin:0}
-.page-purpose{font-size:18px;color:#1F2937;margin:18px 0 6px}
-.login-card p{color:#53677D}.login-card form{display:grid;gap:10px;margin-top:4px}
-.login-card input{border:1px solid #B4CADB;border-radius:10px;padding:12px;margin-bottom:7px}.login-card label{font-weight:600}
-.input-wrap{position:relative}.input-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#9CA3AF;pointer-events:none}
-.input-wrap input{width:100%;padding-left:38px;margin-bottom:0}
-.input-wrap input:focus{outline:none;border-color:#2563EB;box-shadow:0 0 0 3px rgba(22,93,255,.12)}
-.form-extras{display:flex;align-items:center;justify-content:space-between;margin:2px 0 4px}
-.form-extras .remember{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:400;color:#53677D}
-.form-extras input{width:auto;margin:0;padding:0;border:0;border-radius:0;accent-color:#2563EB}
-.forgot{background:none;border:0;padding:0;font-size:13px;color:#6B7280;cursor:pointer}
-.forgot:hover{background:none;color:#2563EB;text-decoration:underline}
-.reset-hint{font-size:12px;color:#53677D;margin:0}
-.primary{background:#174098;color:white;border:0;border-radius:8px;padding:10px 16px;font-weight:700;display:inline-block;text-align:center}.primary:disabled{opacity:.5}
-.login-card .primary{height:44px;padding:0 16px;border-radius:10px;background:linear-gradient(135deg,#1D4ED8,#2563EB);box-shadow:0 4px 12px rgba(37,99,235,.3);font-size:15px;font-weight:500;letter-spacing:2px}
-.login-card .primary:hover{filter:brightness(1.07)}
-.error{color:#AA3145}.shell{height:100vh;display:flex;flex-direction:column}
-.header{height:66px;background:#fff;border-bottom:1px solid #D1E1EC;padding:0 20px;display:flex;align-items:center;gap:20px}
-.brand{display:flex;align-items:center;gap:10px;font-weight:700;color:#174098;white-space:nowrap}
-.product{font-weight:500;color:#53677D}.header nav{flex:1;display:flex;align-items:center;gap:20px}
-.header nav a,.header nav a:visited{font-weight:bold;color:#174098;padding:22px 3px;border-bottom:2px solid #02A0EA}
-.header nav a.active{background:var(--color-row-selected);border-bottom-color:var(--color-row-selected-border)}
-.header nav span{color:#8599AA;font-size:12px}.header button{border:1px solid #D1E1EC;background:white;padding:8px;border-radius:7px}
-.account{white-space:nowrap}.panels{display:flex;flex:1;min-height:0;padding:14px;gap:14px}
-.sidebar{background:white;width:280px;overflow:auto;border:1px solid #D1E1EC;border-radius:12px;padding:18px}
-.sidebar h2{font-size:17px;margin:0}.sidebar p{color:#53677D}.tree,.tree ul{padding:0;list-style:none;margin:0}
-.tree-row{display:flex;align-items:center;min-height:36px;border-radius:7px}.tree-row.on{background:#DFEFFB;color:#174098;font-weight:bold}
-.tree-row:hover{background:#E8F5FD}.tree-row button{width:28px;border:0;background:none}.tree-row a{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
-.work{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
-.work-body{display:flex;flex-direction:column;gap:12px}
-.breadcrumb,.toolbar,.folder-actions{padding:14px 16px;background:#fff;border:1px solid #D1E1EC;border-radius:10px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-.folder-actions{padding:10px 16px}.toolbar-hint{color:#8599AA;font-size:12px}
-.table{flex:1;background:white;border:1px solid #D1E1EC;border-radius:12px;overflow:auto}
-table{border-collapse:collapse;width:100%}th,td{padding:14px 16px;border-bottom:1px solid #E4EEF5;text-align:left}
-th{color:#53677D;background:#F7FBFF;font-size:12px}.empty{color:#71859A;text-align:center;padding:75px 10px}
-.hash{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#53677D}
-.notice{margin:0;padding:12px 16px;border-radius:10px;background:#E8F5FD;border:1px solid #B9DCF7;color:#174098}
-.notice.error{background:#FDECEF;border-color:#F3C2CC;color:#8E2A3C}
-.inline-form{display:flex;align-items:center;gap:10px}.inline-form input{border:1px solid #B4CADB;border-radius:8px;padding:9px 12px}
-.upload-button{position:relative;overflow:hidden;display:inline-block}
-.upload-button input{position:absolute;left:0;top:0;opacity:0;width:100%;height:100%;cursor:pointer}
-.sort-label{color:#53677D;display:flex;align-items:center;gap:8px}.sort-label select{border:1px solid #B4CADB;border-radius:8px;padding:9px 10px;background:white}
-.row-actions{display:flex;gap:10px;white-space:nowrap}.row-actions a{color:#174098;font-weight:600}
-.row-actions .danger,.folder-actions .danger{color:#AA3145;border-color:#F3C2CC}
-.dialog{border:1px solid #D1E1EC;border-radius:12px;padding:24px;min-width:380px}
-.dialog::backdrop{background:#0d2a4a44}.dialog form{display:grid;gap:12px}
-.dialog h3{margin:0;color:#174098}.dialog input{border:1px solid #B4CADB;border-radius:8px;padding:10px}
-.dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:6px}
-.preview-text{background:#fff;border:1px solid #D1E1EC;border-radius:12px;padding:18px;margin:0;overflow:auto;flex:1;white-space:pre-wrap;font-family:ui-monospace,Menlo,monospace;font-size:13px}
-.hint{color:#8599AA;font-size:12px}
-.secondary-action{background:transparent;border:0;color:#174098;text-decoration:underline;padding:8px 0}
-@media(max-width:1050px){.header nav span{display:none}.sidebar{width:240px}}
+/* ==========================================================================
+   Precision Workbench 2.0 — Core Tokens & Reset
+   (docs/design/PRECISION-WORKBENCH-V2-SPEC.md §2/§3/§7.1)
 
-.org-columns{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;flex:1;min-height:0}
-.org-columns .table{padding:14px;overflow:auto}
-.org-columns h3{margin:4px 0 10px;color:#174098;font-size:15px}
-.org-form{gap:8px}.org-form input{min-width:120px;border:1px solid #B4CADB;border-radius:8px;padding:9px 10px}
-.group-list,.member-list{list-style:none;padding:0;margin:0 0 12px;display:grid;gap:6px}
-.group-list button{width:100%;text-align:left}
-.group-list button.on{background:#DFEFFB;border-color:#02A0EA;color:#174098;font-weight:bold}
-.member-list li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 10px;border:1px solid #E4EEF5;border-radius:8px}
-.member-list li.empty{border:0;display:block}
-.grant-dialog{min-width:560px}.grant-dialog form{display:flex;flex-direction:column;gap:12px}
-.grant-existing{display:grid;gap:6px;max-height:180px;overflow:auto}
-.grant-row{display:grid;grid-template-columns:1.2fr 2fr auto;gap:10px;align-items:center;padding:8px 10px;border:1px solid #E4EEF5;border-radius:8px}
-.grant-form{display:grid;gap:8px}.grant-form select{border:1px solid #B4CADB;border-radius:8px;padding:9px 10px;background:white}
-.grant-form fieldset{border:1px solid #E4EEF5;border-radius:8px;display:flex;flex-wrap:wrap;gap:10px;padding:10px}
-.grant-form legend{color:#53677D;font-size:12px;padding:0 6px}
-.checkbox-label{display:flex;align-items:center;gap:6px;font-weight:400}
+   Replaces the consumer-app skin (14px type, 12–25px radii, 14px module
+   padding/gap, 44–52px rows) with a docked, hairline-seamed engineering
+   workbench: 13px type, 2/4/6px radii, 0-gap panels, 32/26px data rows,
+   28px tree rows, 40px top bar, 24px status bar.
 
-.editor-dialog{min-width:640px}.editor-dialog form{display:flex;flex-direction:column;gap:10px}
-.editor-dialog textarea{font-family:ui-monospace,Menlo,monospace;font-size:13px;border:1px solid #B4CADB;border-radius:8px;padding:12px;resize:vertical}
+   Colour deviations from the spec's §2.1 sketch are deliberate and are the
+   only places this file does not copy the spec verbatim; each one is forced
+   by the VIS-03 gate in scripts/ux_visual_check.mjs, which measures real
+   computed styles in the browser:
+     · text >= 4.5:1, so --text-tertiary is #5E7185, not #94A3B8 (2.56:1);
+     · interactive boundaries >= 3:1, so --border-subtle is #6C8BA6, not
+       #CBD5E1 (1.48:1), and --border-focus is #1473B8, not #02A0EA (2.91:1).
+   --brand-cyan (#02A0EA) therefore never draws a focus ring, an input
+   border or any other measured boundary: it stays the laser accent for
+   decorative rails, underlines and micro-interactions.
+   Legacy --color-, --space-, --height- and --radius- names are kept as
+   aliases at the end of the token block so the component sheets and the
+   three inline styles in FolderTree.tsx keep resolving; new code uses the
+   spec names.
+   ========================================================================== */
 
-.office-stage{flex:1;min-height:0;padding:14px}
-.office-holder{height:100%;min-height:640px;background:#fff;border:1px solid #D1E1EC;border-radius:12px;overflow:hidden}
+*{box-sizing:border-box}
 
-.viewer-stage{flex:1;min-height:560px;background:#fff;border:1px solid #D1E1EC;border-radius:12px;overflow:hidden}
-
-.stat-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-.stat-card{background:#fff;border:1px solid #D1E1EC;border-radius:12px;padding:18px;display:grid;gap:6px;justify-items:center}
-.stat-num{font-size:24px;font-weight:700;color:#174098}
-.toolbar button.on{background:#DFEFFB;border-color:#02A0EA;color:#174098;font-weight:bold}
-
-.brand-logo{display:block;flex:none;width:30px;height:30px}
-.nav-toggle{display:none;background:none;border:0;font-size:20px}
-@media(max-width:1050px){
- .nav-toggle{display:inline-block}
- .header nav{display:none;position:absolute;top:66px;left:0;right:0;background:#fff;border-bottom:1px solid #D1E1EC;flex-direction:column;padding:10px 20px;z-index:10}
- .header nav.open{display:flex}
- .header nav a{border-bottom:0;padding:10px 0}
+:root{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-size:13px;
+  color:var(--text-primary);
+  background:var(--surface-canvas);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
 }
 
-.search-bar input{border:1px solid #B4CADB;border-radius:8px;padding:9px 12px}
-.search-total{color:#53677D;padding:12px 16px 0}
-.snippet{color:#53677D;font-size:12px;max-width:560px;margin-top:2px}
-.snippet mark{background:#DFEFFB;color:#174098;padding:0 2px;border-radius:3px}
+/* ================= 品牌核心色 (Brand Archetype) ================= */
+:root{
+  --brand-navy:#0F275C;            /* 权威深海蓝 */
+  --brand-blue:#174098;            /* 工业工程蓝: 主交互/行选中/主要链接 */
+  --brand-cyan:#02A0EA;            /* 激光极客亮蓝: 装饰轨/下划线/微交互 */
+  --brand-cyan-muted:#E0F2FE;      /* 激光蓝微透底色 */
 
-/* Semantic token layer (DESIGN-SYSTEM-v1 §2.1, additive migration).
-   Feature components consume these variables instead of new hex literals.
-   --color-app-bg is intentionally absent: ADR-UX-06 (SPEC #F4F9FE vs
-   candidate #F6F8FB) is not signed off, so the root background stays as
-   the SPEC value and no token may silently drift. */
-:root{--brand-cyan:#02A0EA;--brand-navy:#174098;--color-panel:#FFFFFF;--color-panel-subtle:#F7FBFF;--color-border:#DCE3EB;--color-border-strong:#B4CADB;--color-text:#1E293B;--color-text-secondary:#53677D;--color-action:#174098;--color-action-hover:#103679;--color-focus:#1473B8;--color-row-hover:#E8F5FD;--color-row-selected:#DFEFFB;--color-row-selected-border:#2386C9;--color-danger:#AA3145;--color-success:#17765D;--color-warning:#995E05;--color-folder:#E3AD3D;--space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-6:24px;--space-8:32px;--height-control:36px;--height-file-row:44px;--height-file-row-compact:36px;--height-tree-row:36px;--radius-control:8px;--radius-surface:12px;--font-ui:"PingFang SC","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif;--font-mono:ui-monospace,"SFMono-Regular",Consolas,monospace}
-/* Modal dialogs now open through showModal(); the panel itself lays out the
-   title plus the host form as one grid. */
-.dialog{display:grid;gap:12px;align-content:start;max-height:calc(100dvh - 40px);overflow:auto}
-.dialog-title{margin:0;color:#174098;font-size:16px}
+  /* ================= 表面与层级 (Surface & Elevation) ================= */
+  --surface-canvas:#F8FAFC;        /* 工作台底衬冷白 (Slate 50) */
+  --surface-panel:#FFFFFF;         /* 数据面板/表格纯白背景 */
+  --surface-header:#F1F5F9;        /* 表头/工具栏/状态栏淡冷灰底 (Slate 100) */
+  --surface-subtle:#F1F5F9;        /* 控件悬停底色 */
+  --surface-row-hover:#F0F7FF;     /* 极轻微蓝行悬停底色 */
+  --surface-row-selected:#E2EFFE;  /* 明确选中的蓝白高亮底 */
+  --surface-active:#DBEAFE;        /* 按下/激活态底色 */
+  --surface-danger-soft:#FDECEF;     /* 错误通知底色: tokenised so the one
+                                      surface a measured pair depends on is
+                                      governed like every other colour */
 
-/* Desktop explorer row states (DESKTOP-INTERACTION-v1 §2): hover must never
-   impersonate selection, and the selected/focused states are distinct. */
+  /* ================= 结构线条与边界 (Hairline Borders) ================= */
+  --border-hairline:#E2E8F0;       /* 1px 精细分界线 (Slate 200) */
+  --border-subtle:#6C8BA6;         /* 控件未激活边框 (VIS-03: >=3:1, spec's
+                                      #CBD5E1 measures 1.48:1) */
+  --border-strong:#5E7C93;         /* 强对比边框 (VIS-03 >=3:1, spec's
+                                      #94A3B8 measures 2.56:1) */
+  --border-focus:#1473B8;          /* 激光焦点线 (1px + 1px inset; VIS-03
+                                      >=3:1, spec's #02A0EA measures 2.91:1) */
+  --border-selected:#2A6FDD;       /* 选中项外廓线 (VIS-03: 4.08:1 on the
+                                      selected row; the spec's #3B82F6 only 3.16:1) */
+
+  /* ================= 文字与数据排印 (Typography Hierarchy) ================= */
+  --text-primary:#0F172A;          /* Slate 900: 文件名/主要输入 */
+  --text-secondary:#475569;        /* Slate 600: 大小/版本/更新时间 */
+  --text-tertiary:#5A6C80;         /* 哈希短码/表头标题/禁用文字 (VIS-03:
+                                      4.93:1 on the header surface; the spec's
+                                      #94A3B8 measures 2.34:1 there) */
+  --text-inverse:#FFFFFF;          /* 反白文字 */
+
+  /* ================= 语义状态色 (Functional Indicators) ================= */
+  --status-success:#15803D;        /* 正常/通过 */
+  --status-warning:#A34B08;        /* 待审核/锁定 (VIS-03: 5.37:1 on the header
+                                      surface, the spec's #B45309 only 4.58:1) */
+  --status-danger:#B91C1C;         /* 冲突/删除/严重警告 */
+
+  /* ================= 几何与紧凑度标尺 (Compact Metrics) ================= */
+  --radius-xs:2px;                 /* 紧凑标签/复选框 */
+  --radius-sm:4px;                 /* 按钮/输入框/行条 */
+  --radius-md:6px;                 /* 弹出菜单/轻量对话框 (最高限度) */
+
+  --height-header:40px;            /* 瘦身顶栏 */
+  --height-toolbar:34px;           /* 操作工具栏 */
+  --height-table-header:30px;      /* 表头高度 */
+  --height-row-standard:32px;      /* 标准紧凑数据行 */
+  --height-row-ultra:26px;         /* 极限紧凑数据行 (极客模式) */
+  --height-tree-row:28px;          /* 目录树节点行高 */
+  --height-control:28px;           /* 紧凑标准按钮/输入框高度 */
+  --height-statusbar:24px;         /* 极细状态底栏 */
+  --height-command:36px;           /* 指令台输入条 */
+
+  --width-sidebar:240px;           /* 目录树侧边栏 (可拖拽 180~360) */
+  --width-sidebar-min:180px;
+  --width-sidebar-max:360px;
+  --width-command:480px;           /* CommandSpotlight 悬浮框宽度 */
+
+  --tree-indent:14px;              /* 目录树每级缩进 */
+
+  /* ================= 间距与字体 ================= */
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px;
+  --space-6:24px; --space-8:32px;
+  --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --font-mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+
+  /* ---- Legacy aliases (component sheets + FolderTree inline styles) ---- */
+  --color-panel:var(--surface-panel);
+  --color-panel-subtle:var(--surface-header);
+  --color-border:var(--border-hairline);
+  --color-border-strong:var(--border-subtle);
+  --color-text:var(--text-primary);
+  --color-text-secondary:var(--text-secondary);
+  --color-action:var(--brand-blue);
+  --color-action-hover:#11347D;
+  --color-focus:var(--border-focus);
+  --color-row-hover:var(--surface-row-hover);
+  --color-row-selected:var(--surface-row-selected);
+  --color-row-selected-border:var(--border-selected);
+  --color-danger:var(--status-danger);
+  --color-success:var(--status-success);
+  --color-warning:var(--status-warning);
+  --radius-control:var(--radius-sm);
+  --radius-surface:var(--radius-sm);
+}
+
+html,body{height:100%}
+body{margin:0;overflow:hidden;background:var(--surface-canvas);color:var(--text-primary);font-family:var(--font-ui);font-size:13px;line-height:1.45}
+a{color:inherit;text-decoration:none}
+img,svg{vertical-align:middle}
+
+/* ================= 基础控件紧凑化 ================= */
+button,input,select,textarea{font:inherit;font-size:12px;font-family:var(--font-ui);color:var(--text-primary)}
+button{
+  cursor:pointer;
+  height:var(--height-control);
+  min-height:var(--height-control);
+  padding:0 var(--space-2);
+  border:1px solid var(--border-subtle);
+  border-radius:var(--radius-sm);
+  background:var(--surface-panel);
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:var(--space-1);
+  white-space:nowrap;
+  transition:background-color .1s ease,border-color .1s ease,color .1s ease;
+}
+button:hover{background:var(--surface-subtle);border-color:var(--border-subtle)}
+button:active{background:var(--surface-active)}
+button:disabled{cursor:not-allowed;opacity:.55}
+button.primary,.primary{
+  background:var(--brand-blue);
+  color:var(--text-inverse);
+  border-color:var(--brand-navy);
+  font-weight:500;
+}
+button.primary:hover,.primary:hover{background:var(--color-action-hover);border-color:var(--brand-navy)}
+button.danger,.danger{color:var(--status-danger);border-color:var(--status-danger)}
+button.danger:hover{background:var(--status-danger);color:var(--text-inverse);border-color:var(--status-danger)}
+
+/* HairlineFocusBeam (spec §6.2): a 1px laser edge glow instead of a fat ring.
+   The outline carries the keyboard affordance at >=3:1; the outer cyan bloom
+   is decorative and non-inset, so it never reads as a control boundary. */
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,[tabindex]:focus-visible{
+  outline:1px solid var(--border-focus);
+  outline-offset:1px;
+  box-shadow:0 0 0 3px rgba(2,160,234,.16);
+}
+input,select,textarea{
+  height:var(--height-control);
+  padding:0 var(--space-2);
+  border:1px solid var(--border-subtle);
+  border-radius:var(--radius-sm);
+  background:var(--surface-panel);
+}
+input[type=checkbox],input[type=radio]{height:14px;width:14px;padding:0;accent-color:var(--brand-blue)}
+input[type=file]{height:auto;padding:0;border:0;background:none}
+textarea{height:auto;padding:var(--space-1) var(--space-2);line-height:1.5;resize:vertical}
+
+/* ================= 一体化嵌合外壳 (Docked Paneling) ================= */
+.shell{height:100vh;display:flex;flex-direction:column;background:var(--surface-canvas);overflow:hidden}
+
+/* ---- 顶栏 40px ---- */
+.header{
+  height:var(--height-header);
+  flex:none;
+  position:relative;
+  display:flex;
+  align-items:center;
+  gap:var(--space-3);
+  padding:0 var(--space-3) 0 0;
+  background:var(--surface-panel);
+  border-bottom:1px solid var(--border-hairline);
+}
+.brand{display:flex;align-items:center;gap:var(--space-2);width:var(--width-sidebar);flex:none;padding-left:var(--space-3);font-weight:700;font-size:13px;color:var(--brand-navy);white-space:nowrap;overflow:hidden}
+.brand-logo{display:block;flex:none;width:22px;height:22px}
+.product{font-weight:500;font-size:11px;color:var(--text-tertiary);overflow:hidden;text-overflow:ellipsis}
+.header nav{flex:none;display:flex;align-items:center;gap:var(--space-1);height:100%}
+.header nav a{
+  display:inline-flex;align-items:center;gap:var(--space-1);
+  height:100%;padding:0 var(--space-2);
+  font-size:12px;font-weight:500;color:var(--text-secondary);
+  border-bottom:2px solid transparent;
+}
+.header nav a:hover{color:var(--brand-blue);background:var(--surface-row-hover)}
+.header nav a.active{color:var(--brand-blue);background:var(--surface-row-selected);border-bottom-color:var(--brand-cyan)}
+.account{display:inline-flex;align-items:center;gap:var(--space-1);min-width:0;white-space:nowrap;font-size:12px;color:var(--text-secondary)}
+/* Spec §3.1 user badge: a 18px monogram plate, decorative next to the name. */
+.account-avatar{flex:none;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:var(--radius-xs);background:var(--surface-row-selected);border:1px solid var(--border-hairline);color:var(--brand-blue);font-size:10px;font-weight:600}
+.account-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.header button{height:26px;min-height:26px;padding:0 var(--space-2);font-size:12px}
+
+/* 面包屑槽位 (spec §3.1): 顶栏中部, 溢出中间折叠 */
+.header-crumb{flex:1;min-width:0;display:flex;align-items:center;overflow:hidden}
+.header-crumb .breadcrumb{min-width:0}
+
+/* CommandSpotlight 触发器 (spec §6.4) */
+.command-trigger{
+  flex:none;width:200px;height:26px;min-height:26px;
+  justify-content:flex-start;gap:var(--space-2);
+  padding:0 var(--space-2);font-size:12px;font-weight:400;
+  color:var(--text-tertiary);background:var(--surface-panel);
+  border:1px solid var(--border-subtle);border-radius:var(--radius-sm);
+}
+.command-trigger:hover{color:var(--text-secondary);background:var(--surface-subtle);border-color:var(--border-strong)}
+.command-trigger .command-keys{margin-left:auto;display:inline-flex;gap:2px}
+.command-trigger kbd{font-family:var(--font-mono);font-size:10px;line-height:14px;padding:0 3px;color:var(--text-tertiary);background:var(--surface-header);border:1px solid var(--border-hairline);border-radius:var(--radius-xs)}
+
+.nav-toggle{display:none;background:none;border:0;font-size:16px;height:26px;min-height:26px;padding:0 var(--space-1)}
+
+.panels{display:flex;flex:1;min-height:0;padding:0;gap:0;background:var(--surface-panel)}
+
+/* ---- 侧边栏: 贴边, 240px, 可拖拽 ---- */
+.sidebar{
+  position:relative;
+  width:var(--width-sidebar);
+  min-width:var(--width-sidebar-min);
+  max-width:var(--width-sidebar-max);
+  flex:none;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  background:var(--surface-panel);
+  border-right:1px solid var(--border-hairline);
+  border-radius:0;
+  padding:0;
+}
+/* The scroll port. It is a child of .sidebar rather than .sidebar itself, so
+   the resize handle below never scrolls away with a deep tree and its 4px hot
+   zone is never clipped. FolderTree's scrollHost() still finds it, because it
+   walks up for the first overflow-y:auto ancestor. */
+.sidebar-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:var(--space-1) 0}
+.sidebar h2{font-size:11px;margin:0;padding:var(--space-1) var(--space-3);color:var(--text-tertiary);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.sidebar p{color:var(--text-secondary);font-size:12px;margin:0;padding:0 var(--space-3)}
+.sidebar-resizer{
+  position:absolute;top:0;right:0;bottom:0;width:4px;z-index:3;
+  background:transparent;border:0;padding:0;cursor:col-resize;
+}
+.sidebar-resizer::after{content:"";position:absolute;top:0;bottom:0;left:1px;width:2px;background:var(--border-hairline)}
+.sidebar-resizer:hover::after,.sidebar-resizer[data-dragging="true"]::after{background:var(--brand-cyan)}
+.sidebar-resizer:focus-visible::after{background:var(--border-focus)}
+.sidebar-resizer:focus-visible{outline:1px solid var(--border-focus);outline-offset:0;box-shadow:none}
+
+/* ---- 主工作区 ---- */
+.work{flex:1;min-width:0;display:flex;flex-direction:column;gap:0;background:var(--surface-canvas)}
+.work-body{display:flex;flex-direction:column;gap:0;flex:1;min-height:0}
+
+/* 工具栏/面包屑/目录操作条: 与表格无缝, 仅 1px 水平分割线 */
+.breadcrumb,.toolbar,.folder-actions{
+  flex:none;
+  min-height:var(--height-toolbar);
+  padding:var(--space-1) var(--space-3);
+  background:var(--surface-panel);
+  border:0;
+  border-bottom:1px solid var(--border-hairline);
+  border-radius:0;
+  display:flex;
+  align-items:center;
+  gap:var(--space-2);
+  flex-wrap:wrap;
+  font-size:12px;
+}
+.folder-actions{min-height:var(--height-toolbar)}
+.work .notice{border-bottom:1px solid var(--border-hairline)}
+.toolbar-hint{color:var(--text-tertiary);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* 面包屑: 极细 › 分割 */
+.breadcrumb{display:flex;align-items:center;gap:var(--space-1);min-width:0;color:var(--text-secondary);font-size:12px}
+.breadcrumb a{color:var(--brand-blue);font-weight:500;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.breadcrumb a:hover{text-decoration:underline;text-underline-offset:2px}
+.breadcrumb .crumb-sep{color:var(--text-tertiary);font-size:11px;user-select:none;flex:none}
+.breadcrumb .crumb-current{color:var(--text-primary);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 0 auto}
+.breadcrumb .crumb-collapse{color:var(--text-tertiary);user-select:none}
+
+/* ================= 极高密度数据表格 ================= */
+.table{flex:1;min-height:0;background:var(--surface-panel);border:0;border-radius:0;overflow:auto}
+table{border-collapse:collapse;width:100%}
+th,td{padding:6px 10px;border-bottom:1px solid var(--border-hairline);text-align:left;font-size:12px;color:var(--text-primary)}
+th{
+  position:sticky;top:0;z-index:2;
+  height:var(--height-table-header);
+  padding:0 10px;
+  background:var(--surface-header);
+  color:var(--text-secondary);
+  font-weight:600;font-size:11px;letter-spacing:.02em;
+  white-space:nowrap;
+}
+td{vertical-align:middle}
+tbody tr{height:var(--height-row-standard);transition:background-color .05s ease}
+
+/* 行交互状态机 (spec §4.2): hover/selected/focused 三态可辨, 不仅靠颜色 */
 .table tbody tr{cursor:default;user-select:none}
-.table tbody tr:hover{background:var(--color-row-hover)}
-.table tbody tr.selected,.table tbody tr.selected:hover{background:var(--color-row-selected)}
-.table tbody tr:focus-visible{outline:3px solid var(--color-focus);outline-offset:-3px}
-.file-name{display:block;max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--color-action);font-weight:600}
-.selection-bar{border-color:var(--color-row-selected-border)}
-.delete-list{margin:0;padding-left:20px;display:grid;gap:4px;max-height:180px;overflow:auto}
+.table tbody tr:hover{background:var(--surface-row-hover)}
+.table tbody tr.selected,.table tbody tr.selected:hover{background:var(--surface-row-selected);box-shadow:inset 2px 0 0 var(--border-selected)}
+.table tbody tr.focused{box-shadow:inset 0 0 0 1px var(--border-focus)}
+.table tbody tr.selected.focused{box-shadow:inset 2px 0 0 var(--border-selected),inset 0 0 0 1px var(--border-focus)}
+.table tbody tr:focus-visible{outline:1px solid var(--border-focus);outline-offset:-1px}
 
-/* Ancestor breadcrumb renders as inline flow (links + separators), and the
-   navigation tree exposes a keyboard focus ring on the treeitem. */
-.breadcrumb{display:block}
-.breadcrumb a{color:var(--color-action);font-weight:600}
-.tree li:focus-visible{outline:3px solid var(--color-focus);outline-offset:-2px;border-radius:7px}
+/* 等宽数字与哈希排印 (spec §4.1) */
+td.num,td.date,.num,.date{font-variant-numeric:tabular-nums;text-align:right}
+.hash{font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);white-space:nowrap}
+td.hash,.hash{font-variant-numeric:tabular-nums}
+.file-name{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--brand-blue);font-weight:500}
+
+/* 版本徽章: 18px 高, 2px 圆角 */
+.version-badge{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:18px;padding:0 var(--space-1);border-radius:var(--radius-xs);background:var(--surface-header);color:var(--text-secondary);font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;border:1px solid var(--border-hairline)}
+
+/* 行操作: 平时低调, 悬停/聚焦显露 (spec §4.1). The reveal is carried by
+   colour, never by opacity: an alpha fade drops the rendered contrast below
+   4.5:1 (the gate reads the declared colour, the user reads the composite),
+   so the resting state is --text-secondary (7.58:1) and hover/focus raises it
+   to the brand blue (9.45:1). */
+.row-actions{display:flex;gap:var(--space-1);white-space:nowrap;justify-content:center}
+.row-actions a,.row-actions button{color:var(--text-secondary);font-weight:500;transition:color .1s ease}
+.row-actions .danger,.folder-actions .danger{color:var(--status-danger);border-color:var(--status-danger)}
+tr:hover .row-actions a,tr:hover .row-actions button,tr:focus-within .row-actions a,tr:focus-within .row-actions button,
+.row-actions a:focus-visible,.row-actions button:focus-visible{color:var(--brand-blue)}
+tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions .danger:focus-visible{color:var(--status-danger)}
+
+/* 空状态: 16px 极简工程线框小标 + 精致文字排版 (spec §1.1/§4) */
+.empty{color:var(--text-tertiary);text-align:center;padding:var(--space-8) var(--space-4)}
+.empty-mark{display:block;margin:0 auto var(--space-2);color:var(--border-strong)}
+.empty-title{display:block;font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:2px}
+.empty-hint{display:block;font-size:12px;color:var(--text-tertiary)}
+
+/* 选择列: 14px 微型复选框 */
+.col-select input[type=checkbox]{height:14px;width:14px}
+
+/* ================= 状态底栏 (spec §3.1) ================= */
+.status-bar{
+  flex:none;display:flex;align-items:center;gap:var(--space-3);
+  height:var(--height-statusbar);padding:0 var(--space-3);
+  background:var(--surface-header);
+  border-top:1px solid var(--border-hairline);
+  font-size:11px;color:var(--text-secondary);
+  white-space:nowrap;overflow:hidden;
+}
+.status-bar .status-strong{color:var(--text-secondary);font-weight:600;font-variant-numeric:tabular-nums}
+.status-bar .status-sep{color:var(--text-tertiary);user-select:none}
+.status-bar .status-spacer{flex:1}
+.status-bar .status-build{font-family:var(--font-mono)}
+
+/* ================= 目录树 (Compact FolderTree, spec §5) ================= */
+.tree,.tree ul{padding:0;list-style:none;margin:0}
+.tree{position:relative}
+.tree-row{
+  position:relative;
+  display:flex;align-items:center;
+  height:var(--height-tree-row);
+  padding:0 var(--space-2);
+  padding-left:calc(var(--tree-depth,0)*var(--tree-indent) + var(--space-2));
+  border-radius:var(--radius-xs);
+  font-size:12px;color:var(--text-primary);
+}
+/* 1px 层级导轨虚线 */
+.tree-row::before{
+  content:"";position:absolute;top:0;bottom:0;
+  left:calc(var(--tree-depth,0)*var(--tree-indent) - 1px);
+  border-left:1px dashed var(--border-hairline);
+}
+.tree li[data-depth="0"]>.tree-row::before{display:none}
+.tree-row:hover{background:var(--surface-row-hover)}
+.tree-row.on{background:var(--surface-row-selected);color:var(--brand-blue);font-weight:600}
+.tree-row button{width:16px;min-width:16px;height:16px;min-height:16px;padding:0;border:0;background:none;font-size:10px;line-height:1;color:var(--text-tertiary);display:inline-flex;align-items:center;justify-content:center;transition:transform .12s linear}
+.tree-row button:hover{background:none;color:var(--brand-blue)}
+.tree-row button[aria-expanded="true"]{transform:rotate(90deg)}
+.tree-row a{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;padding:0 var(--space-1)}
+.tree li:focus-visible{outline:1px solid var(--border-focus);outline-offset:-1px;border-radius:var(--radius-xs)}
+
+/* SpringActiveRail (spec §6.1): 2px 激光高亮轨, spring 480/32. The host li
+   keeps the rail a legal child of ul[role=tree] (a bare div inside a ul is
+   invalid HTML) while staying out of the accessibility tree and out of flow. */
+.spring-rail-host{position:absolute;left:0;right:0;top:0;bottom:0;margin:0;padding:0;list-style:none;pointer-events:none}
+.spring-rail{position:absolute;left:0;width:2px;height:var(--height-tree-row);border-radius:1px;background:var(--brand-cyan);pointer-events:none;z-index:1}
+
+/* ================= 提示/通知/表单 ================= */
+.hint{color:var(--text-tertiary);font-size:11px;margin:0}
+.error{color:var(--status-danger)}
+.notice{margin:0;padding:var(--space-2) var(--space-3);border:0;border-bottom:1px solid var(--border-hairline);border-left:2px solid var(--brand-blue);background:var(--brand-cyan-muted);color:var(--brand-blue);font-size:12px}
+.notice.error{background:var(--surface-danger-soft);border-left-color:var(--status-danger);color:var(--status-danger)}
+.inline-form{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap}
+.inline-form input{border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:0 var(--space-2);height:var(--height-control)}
+.upload-button{position:relative;overflow:hidden;display:inline-flex;align-items:center;height:var(--height-control)}
+.upload-button input{position:absolute;left:0;top:0;opacity:0;width:100%;height:100%;cursor:pointer}
+.sort-label{color:var(--text-secondary);display:inline-flex;align-items:center;gap:var(--space-1);font-size:11px;white-space:nowrap}
+.sort-label select{height:var(--height-control);padding:0 var(--space-1);font-size:12px}
+.secondary-action{background:transparent;border:0;color:var(--brand-blue);text-decoration:underline;text-underline-offset:2px;height:auto;min-height:20px;padding:2px 0;font-size:12px}
+.secondary-action:hover{background:transparent;color:var(--color-action-hover)}
+
+
+/* ================= 对话框 / 菜单 ================= */
+.dialog{border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:var(--space-4);min-width:380px;background:var(--surface-panel);color:var(--text-primary)}
+.dialog::backdrop{background:#0d2a4a44}
+.dialog form{display:grid;gap:var(--space-3)}
+.dialog h3{margin:0;color:var(--brand-navy);font-size:13px}
+.dialog-title{margin:0;color:var(--brand-navy);font-size:14px;font-weight:600}
+.restore-dialog,.rollback-dialog{min-width:480px}
+.dialog input,.dialog select,.dialog textarea{border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:0 var(--space-2);height:var(--height-control);width:100%}
+.dialog textarea{height:auto;padding:var(--space-2)}
+.dialog-actions{display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-1);flex-wrap:wrap}
+.preview-text{background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-sm);padding:var(--space-3);margin:0;overflow:auto;flex:1;white-space:pre-wrap;font-family:var(--font-mono);font-size:12px}
+.delete-list{margin:0;padding-left:var(--space-4);display:grid;gap:var(--space-1);max-height:180px;overflow:auto;font-size:12px}
+.checkbox-label{display:inline-flex;align-items:center;gap:var(--space-1);font-weight:400;font-size:12px}
+
+/* MicroHoldToDelete (spec §6.3): 26px 高 / 64px 宽硬朗长按按钮 */
+.micro-hold{
+  position:relative;overflow:hidden;
+  width:64px;min-width:64px;height:26px;min-height:26px;
+  padding:0;font-size:11px;font-weight:600;
+  border-radius:var(--radius-sm);
+  isolation:isolate;
+}
+.micro-hold .micro-hold-fill{position:absolute;inset:0 auto 0 0;width:0;background:var(--status-danger);z-index:-1}
+.micro-hold[data-tone="brand"] .micro-hold-fill{background:var(--brand-blue)}
+.micro-hold[data-armed="true"]{border-color:var(--status-danger)}
+.micro-hold[data-tone="brand"][data-armed="true"]{border-color:var(--brand-navy)}
+.micro-hold:disabled{opacity:.55}
+.micro-hold .micro-hold-label{position:relative;font-variant-numeric:tabular-nums}
+/* The countdown turns white only where the fill already covers it: --hold is
+   the 0..1 progress the component writes onto the button, so the label is
+   mixed against the fill instead of flashing white-on-white for the first
+   third of the press. */
+.micro-hold[data-armed="true"] .micro-hold-label{color:color-mix(in oklab,var(--text-inverse) calc(var(--hold,0)*100%),var(--status-danger))}
+.micro-hold[data-tone="brand"][data-armed="true"] .micro-hold-label{color:color-mix(in oklab,var(--text-inverse) calc(var(--hold,0)*100%),var(--brand-blue))}
+
+/* ================= 登录 / 首次登录 ================= */
+.login-bg{height:100vh;display:grid;place-items:center;position:relative;isolation:isolate;overflow:hidden;background:linear-gradient(135deg,#EEF2F6 0%,#F8FAFC 100%)}
+.bg-glow{position:absolute;border-radius:50%;filter:blur(48px);opacity:.18;pointer-events:none}
+.bg-glow-blue{width:320px;height:320px;background:#02A0EA;top:-80px;left:-60px}
+.bg-glow-amber{width:320px;height:320px;background:#E3AD3D;bottom:-90px;right:-70px}
+.login-card{background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-md);padding:var(--space-8) var(--space-6);width:92%;max-width:380px;box-shadow:0 1px 2px rgba(15,39,92,.06),0 12px 32px rgba(15,39,92,.08)}
+.login-card p{color:var(--text-secondary);font-size:12px}
+.login-card form{display:grid;gap:var(--space-2);margin-top:var(--space-2)}
+.login-card input{border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:0 var(--space-3);height:var(--height-control);width:100%}
+.login-card label{font-weight:600;font-size:12px;color:var(--text-secondary)}
+.brand-lockup{display:grid;justify-items:center;gap:var(--space-1);text-align:center}
+.brand-lockup .login-logo{width:40px;height:40px}
+.brand-lockup .system-name{margin:0;font-size:16px;color:var(--brand-navy)}
+.brand-lockup .organization-line{font-size:11px;color:var(--text-tertiary);margin:0}
+.page-purpose{font-size:15px;color:var(--text-primary);margin:var(--space-3) 0 var(--space-1)}
+.input-wrap{position:relative}
+.input-icon{position:absolute;left:var(--space-2);top:50%;transform:translateY(-50%);color:var(--text-tertiary);pointer-events:none}
+.input-wrap input{padding-left:30px}
+.input-wrap input:focus{outline:1px solid var(--border-focus);outline-offset:0;border-color:var(--border-focus);box-shadow:0 0 0 3px rgba(2,160,234,.16)}
+.form-extras{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);font-size:12px}
+.form-extras .remember{display:inline-flex;align-items:center;gap:var(--space-1);font-weight:400;color:var(--text-secondary)}
+.forgot{background:none;border:0;color:var(--brand-blue);font-size:12px;height:auto;min-height:0;padding:2px 0;text-decoration:underline;text-underline-offset:2px}
+.forgot:hover{background:none;color:var(--color-action-hover)}
+.reset-hint{margin:0;font-size:11px;color:var(--status-warning)}
+.primary{display:inline-flex;align-items:center;justify-content:center;height:var(--height-control);padding:0 var(--space-4);border-radius:var(--radius-sm);font-weight:600}
+.primary:disabled{opacity:.6;cursor:progress}
+.login-card .primary{height:34px;font-size:13px;letter-spacing:.04em}
+
+/* ================= 组织 / 编辑器 / 预览 / 统计 / 检索 ================= */
+.org-columns{display:grid;grid-template-columns:1.4fr 1fr;gap:0;flex:1;min-height:0}
+.org-columns .table{padding:0;overflow:auto}
+.org-columns h3{font-size:12px;margin:0;padding:var(--space-2) var(--space-3);color:var(--text-secondary);border-bottom:1px solid var(--border-hairline);position:sticky;top:var(--height-table-header);background:var(--surface-panel);z-index:1}
+.org-form{gap:var(--space-2)}
+.org-form input{min-width:120px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:0 var(--space-2);height:var(--height-control)}
+.group-list,.member-list{list-style:none;padding:0;margin:0 0 var(--space-3);display:grid;gap:2px}
+.group-list button{width:100%;text-align:left;justify-content:flex-start;font-weight:400}
+.group-list button.on{background:var(--surface-row-selected);border-color:var(--border-selected);color:var(--brand-blue);font-weight:600}
+.member-list li{display:flex;justify-content:space-between;align-items:center;gap:var(--space-2);padding:var(--space-1) var(--space-2);border:1px solid var(--border-hairline);border-radius:var(--radius-sm);font-size:12px}
+.member-list li.empty{border:0;display:block}
+.grant-dialog{min-width:560px}
+.grant-existing{display:grid;gap:2px;max-height:180px;overflow:auto}
+.grant-row{display:grid;grid-template-columns:1.2fr 2fr auto;gap:var(--space-2);align-items:center;padding:var(--space-1) var(--space-2);border:1px solid var(--border-hairline);border-radius:var(--radius-sm);font-size:12px}
+.grant-form{display:grid;gap:var(--space-2)}
+.grant-form select{border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:0 var(--space-2);height:var(--height-control);background:var(--surface-panel)}
+.grant-form fieldset{border:1px solid var(--border-hairline);border-radius:var(--radius-sm);display:flex;flex-wrap:wrap;gap:var(--space-2);padding:var(--space-2)}
+.grant-form legend{color:var(--text-tertiary);font-size:11px;padding:0 var(--space-1)}
+
+.editor-dialog{min-width:640px}
+.editor-dialog form{display:flex;flex-direction:column;gap:var(--space-2)}
+.editor-dialog textarea{font-family:var(--font-mono);font-size:12px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:var(--space-2);resize:vertical;width:100%}
+
+.office-stage{flex:1;min-height:0;padding:0;display:flex;flex-direction:column}
+/* flex:1 (not height:100%) so the editor takes the space left after the
+   breadcrumb instead of the stage's full height, which used to push its own
+   bottom chrome 43px past the viewport at every gate resolution. */
+.office-holder{flex:1;min-height:600px;background:var(--surface-panel);border:0;border-radius:0;overflow:hidden}
+.viewer-stage{flex:1;min-height:480px;background:var(--surface-panel);border:0;border-radius:0;overflow:hidden}
+
+.stat-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-bottom:1px solid var(--border-hairline)}
+.stat-card{background:var(--surface-panel);border:0;border-right:1px solid var(--border-hairline);border-radius:0;padding:var(--space-3);display:grid;gap:2px;justify-items:start}
+.stat-card:last-child{border-right:0}
+.stat-num{font-size:20px;font-weight:700;color:var(--brand-navy);font-variant-numeric:tabular-nums}
+.toolbar button.on{background:var(--surface-row-selected);border-color:var(--border-selected);color:var(--brand-blue);font-weight:600}
+
+.search-bar input{border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:0 var(--space-2);height:var(--height-control)}
+.search-total{color:var(--text-secondary);font-size:11px;padding:var(--space-2) var(--space-3)}
+.snippet{color:var(--text-secondary);font-size:11px;max-width:560px;margin-top:2px}
+.snippet mark{background:var(--brand-cyan-muted);color:var(--brand-navy);padding:0 2px;border-radius:var(--radius-xs)}
+.selection-bar{border-bottom-color:var(--border-selected);background:var(--surface-row-selected)}
+.selection-bar .toolbar-hint{color:var(--text-secondary)}
+
+/* Row density lives in features/documents/fileTable.css: the switch only ever
+   puts file-table-ultra on the <table> itself, so a body-level hook here would
+   be dead weight competing with that sheet on specificity. */
+
+/* ================= 响应式 ================= */
+@media(max-width:1050px){
+  .nav-toggle{display:inline-flex}
+  .header nav{display:none;position:absolute;top:var(--height-header);left:0;right:0;background:var(--surface-panel);border-bottom:1px solid var(--border-hairline);flex-direction:column;align-items:stretch;padding:var(--space-1) var(--space-3);z-index:20;height:auto;gap:0}
+  .header nav.open{display:flex}
+  .header nav a{height:32px;padding:0 var(--space-2);border-bottom:0;border-left:2px solid transparent}
+  .header nav a.active{border-bottom:0;border-left-color:var(--brand-cyan)}
+  .sidebar{width:200px}
+  .command-trigger{width:140px}
+  .command-trigger .command-keys{display:none}
+  .product{display:none}
+}
+@media(max-width:820px){
+  .header-crumb{display:none}
+  .stat-cards{grid-template-columns:repeat(2,1fr)}
+}
+
+/* ================= VIS-07: prefers-reduced-motion ================= */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+  .upload-progress.indeterminate .upload-progress-fill{animation:none!important;width:100%!important}
+  .tree-row button{transform:none!important}
+}

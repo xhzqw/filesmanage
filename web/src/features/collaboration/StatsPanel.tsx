@@ -109,7 +109,7 @@ export function StatsPanel(){
    </div>
    <div className="table">
     <table>
-     <thead><tr><th>类型</th><th>数量</th></tr></thead>
+     <thead><tr><th scope="col">类型</th><th scope="col">数量</th></tr></thead>
      <tbody>
       {stats.byType.length===0&&<tr><td colSpan={2} className="empty">无数据</td></tr>}
       {stats.byType.map(t=><tr key={t.type}><td>{t.type}</td><td>{t.count}</td></tr>)}
@@ -118,7 +118,7 @@ export function StatsPanel(){
    </div>
    <div className="table">
     <table>
-     <thead><tr><th>月份</th><th>新增文件</th></tr></thead>
+     <thead><tr><th scope="col">月份</th><th scope="col">新增文件</th></tr></thead>
      <tbody>
       {stats.byMonth.length===0&&<tr><td colSpan={2} className="empty">无数据</td></tr>}
       {stats.byMonth.map(m=><tr key={m.month}><td>{m.month}</td><td>{m.count}</td></tr>)}
@@ -127,7 +127,7 @@ export function StatsPanel(){
    </div>
    <div className="table">
     <table>
-     <thead><tr><th>上传人</th><th>上传文件数</th></tr></thead>
+     <thead><tr><th scope="col">上传人</th><th scope="col">上传文件数</th></tr></thead>
      <tbody>
       {stats.byUploader.length===0&&<tr><td colSpan={2} className="empty">无数据</td></tr>}
       {stats.byUploader.map(u=><tr key={u.uploaderId}><td>{u.uploaderName||u.uploaderId}</td><td>{u.count}</td></tr>)}

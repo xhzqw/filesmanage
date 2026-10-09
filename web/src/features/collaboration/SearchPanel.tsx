@@ -162,7 +162,7 @@ export function SearchPanel(){
    <div className="search-total">已显示 {items.length} / 共 {capped?TOTAL_CAP+"+":total} 个结果 · 每页最多 {loadedLimit} 条（仅显示你有权访问的文件）{limitReached?<> · 已达本次检索可浏览的上限，请添加筛选条件缩小范围</>:null}</div>
    {items.length===0?<p className="empty">没有匹配的文件。换个关键词，或确认你有该内容的预览权限。</p>:(
     <table>
-     <thead><tr><th>文件名</th><th>大小</th><th>上传人</th><th>版本</th><th>修改日期</th><th>所在目录</th></tr></thead>
+     <thead><tr><th scope="col">文件名</th><th scope="col">大小</th><th scope="col">上传人</th><th scope="col">版本</th><th scope="col">修改日期</th><th scope="col">所在目录</th></tr></thead>
      <tbody>
       {items.map(file=><tr key={file.id}>
        <td>

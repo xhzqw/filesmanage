@@ -32,20 +32,27 @@ const NAV=[
 
 // The single shell shared by every authenticated page (DESIGN-SYSTEM-v1 §3.1,
 // VIS-09): one brand block, one navigation, one identity/exit area. Pages may
-// add `actions` (page-specific header buttons) and a `product` subtitle; they
-// must not draw their own header.
-export function AppShell({user,onLogout,product,actions,children}:{user:ShellUser;onLogout:()=>void;product?:string;actions?:ReactNode;children:ReactNode}){
+// add `actions` (page-specific header buttons), a `product` subtitle and a
+// `breadcrumb` path; they must not draw their own header (SPEC §3.1: the path
+// lives inside the top bar, not in the work area).
+export function AppShell({user,onLogout,product,actions,breadcrumb,children}:{user:ShellUser;onLogout:()=>void;product?:string;actions?:ReactNode;breadcrumb?:ReactNode;children:ReactNode}){
  const[open,setOpen]=useState(false);
  return <div className="shell">
   <header className="header">
    <button className="nav-toggle" aria-label="导航菜单" aria-expanded={open} onClick={()=>setOpen(v=>!v)}>☰</button>
-   <div className="brand"><BrandLogo size={30} className="brand-logo"/>中晟生物科技 <span className="product">{product??"文档管理系统"}</span></div>
+   <div className="brand"><BrandLogo size={22} className="brand-logo"/>中晟生物科技<span className="product">{product??"文档管理系统"}</span></div>
    <nav aria-label="主导航" className={open?"open":""}>
     {NAV.map(item=><NavLink key={item.to} to={item.to} onClick={()=>setOpen(false)}>
      {item.icon==="folder"?<FolderIcon size={14}/>:null}{item.label}
     </NavLink>)}
    </nav>
-   <span className="account">{user.displayName}</span>
+   {breadcrumb?<div className="header-crumb">{breadcrumb}</div>:null}
+   <button type="button" className="command-trigger" aria-label="打开快速指令台" onClick={()=>window.dispatchEvent(new CustomEvent("filesmanage:command-spotlight"))}>
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+    <span>快速搜索</span>
+    <span className="command-keys"><kbd>⌘</kbd><kbd>K</kbd></span>
+   </button>
+   <span className="account"><span className="account-avatar" aria-hidden="true">{accountInitial(user.displayName)}</span><span className="account-name">{user.displayName}</span></span>
    {actions}
    <button onClick={onLogout}>退出</button>
   </header>
@@ -53,8 +60,15 @@ export function AppShell({user,onLogout,product,actions,children}:{user:ShellUse
  </div>;
 }
 
+// Spec §3.1: the identity slot carries a small monogram badge next to the
+// name. One character, decorative (the name is the accessible label).
+function accountInitial(name:string){
+ const first=[...name.trim()][0];
+ return first??"·";
+}
+
 function NavLink({to,children,onClick}:{to:string;children:ReactNode;onClick:()=>void}){
  const location=useLocation();
  const active=location.pathname===to;
- return <Link to={to} className={active?"active":""} onClick={onClick}>{children}</Link>;
+ return <Link to={to} className={active?"active":""} aria-current={active?"page":undefined} onClick={onClick}>{children}</Link>;
 }

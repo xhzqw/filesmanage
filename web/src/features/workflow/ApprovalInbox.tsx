@@ -78,7 +78,7 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
   <section className="table">
    <h3>待我审批</h3>
    <table>
-    <thead><tr><th>文件</th><th>申请人</th><th>类型</th><th>基准版本</th><th>申请时间</th><th>操作</th></tr></thead>
+    <thead><tr><th scope="col">文件</th><th scope="col">申请人</th><th scope="col">类型</th><th scope="col">基准版本</th><th scope="col">申请时间</th><th scope="col">操作</th></tr></thead>
     <tbody>
      {inbox.length===0&&<tr><td colSpan={6} className="empty">没有待处理的审批。</td></tr>}
      {inbox.map(a=><tr key={a.id}>
@@ -102,7 +102,7 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
   <section className="table">
    <h3>我发起的</h3>
    <table>
-    <thead><tr><th>文件</th><th>类型</th><th>状态</th><th>审批人</th><th>意见</th><th>操作</th></tr></thead>
+    <thead><tr><th scope="col">文件</th><th scope="col">类型</th><th scope="col">状态</th><th scope="col">审批人</th><th scope="col">意见</th><th scope="col">操作</th></tr></thead>
     <tbody>
      {mine.length===0&&<tr><td colSpan={6} className="empty">没有发起过审批。</td></tr>}
      {mine.map(a=><tr key={a.id}>

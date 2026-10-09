@@ -1,14 +1,20 @@
-.dropzone{display:flex;flex-direction:column;gap:var(--space-3);min-width:0;border-radius:var(--radius-surface)}
+/* Docked: the queue sits flush inside the work column, so the hairlines come
+   from theme.css and this sheet adds no outer radius or gap. */
+/* flex:1 + min-height:0 is load-bearing: .work-body and .table size
+   themselves from a bounded parent, and without it the work area grows past
+   the viewport, where body{overflow:hidden} clips the status bar and the
+   load-more button out of reach. */
+.dropzone{display:flex;flex-direction:column;flex:1;min-height:0;gap:0;min-width:0;border-radius:0}
 .dropzone.dragging{background:var(--color-row-selected);outline:2px dashed var(--color-row-selected-border);outline-offset:-4px}
-.upload-queue{background:var(--color-panel);border:1px solid var(--color-border);border-radius:var(--radius-surface);padding:var(--space-3) var(--space-4)}
+.upload-queue{background:var(--color-panel);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:var(--space-2) var(--space-3)}
 .upload-queue-summary{margin:0 0 var(--space-2);color:var(--color-text-secondary);font-size:12px}
 .upload-queue-list{list-style:none;margin:0;padding:0;display:grid;gap:var(--space-2)}
-.upload-item{display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;padding:var(--space-2) 0;border-bottom:1px solid var(--color-border)}
+.upload-item{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;padding:var(--space-1) 0;border-bottom:1px solid var(--color-border)}
 .upload-item:last-child{border-bottom:0}
 .upload-item.committed,.upload-item.cancelled{opacity:.55}
 .upload-item-main{display:flex;align-items:center;gap:var(--space-2);flex:1;min-width:0}
-.upload-item-name{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.upload-item-size,.upload-item-target{color:var(--color-text-secondary);font-size:12px;white-space:nowrap;flex-shrink:0}
+.upload-item-name{flex:1;min-width:0;font-weight:600;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.upload-item-size,.upload-item-target{color:var(--color-text-secondary);font-size:11px;white-space:nowrap;flex-shrink:0}
 .upload-item-target{border:1px solid var(--color-border);border-radius:999px;padding:0 var(--space-2)}
 .upload-item-status{color:var(--color-text-secondary);font-size:12px;white-space:nowrap}
 .upload-item-error{color:var(--color-danger)}

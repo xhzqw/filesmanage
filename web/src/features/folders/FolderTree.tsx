@@ -1,7 +1,8 @@
-import {useEffect,useId,useMemo,useRef,useState,type CSSProperties,type DragEvent,type KeyboardEvent,type ReactNode}from "react";
+import {useEffect,useId,useLayoutEffect,useMemo,useRef,useState,type CSSProperties,type DragEvent,type KeyboardEvent,type ReactNode}from "react";
 import {Link,useNavigate}from "react-router-dom";
 import type{Folder}from"../../entities/folder/model";
 import {Menu,type MenuItem,type MenuPoint}from"../../shared/ui/Menu";
+import {SpringActiveRail}from"../../shared/ui/rare";
 import {request}from"../../shared/http";
 import "./folderTree.css";
 
@@ -58,6 +59,10 @@ function scrollHost(node:Element|null):HTMLElement|null{
 }
 
 const SCROLL_EDGE_PX=56;
+// Spec §5 indents 14px per level; past this depth the rail stops moving right
+// and the label keeps its ellipsis, because a 32-level tree would otherwise
+// push the folder name out of the 240px sidebar entirely.
+const MAX_INDENT_DEPTH=8;
 const SCROLL_STEP_PX=16;
 const SCROLL_TICK_MS=50;
 const HOVER_EXPAND_MS=700;
@@ -130,6 +135,9 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
  const[session,setSession]=useState<MoveSessionDetail|null>(null);
  const[dropHover,setDropHover]=useState<{id:string;legal:boolean}|null>(null);
  const treeRef=useRef<HTMLUListElement|null>(null);
+ // Spec §6.1: measured offset of the selected row inside the tree list, or -1
+ // when nothing is selected or that row is not rendered.
+ const[railTop,setRailTop]=useState(-1);
  const autoScroll=useRef<{timer:number;step:number}|null>(null);
  const hoverExpand=useRef<{timer:number;id:string}|null>(null);
  // Paged mode only: parent id -> loaded level. Small-tree mode never fills it.
@@ -225,6 +233,16 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
   const node=document.querySelector<HTMLElement>(`li[data-folder-id="${focusedId}"]`);
   node?.focus();
  },[focusedId,nodeMenu]);
+
+ // Spec §6.1: the laser rail must sit on the selected row, so it is measured
+ // from the DOM after every change that can move a row — the flattened rows,
+ // the open levels, the selection and a level's load status. A row that is not
+ // rendered (collapsed ancestor, paged level not loaded) parks the rail off.
+ useLayoutEffect(()=>{
+  if(selected===""){setRailTop(-1);return;}
+  const row=treeRef.current?.querySelector<HTMLElement>('li[data-folder-id="'+CSS.escape(selected)+'"]>.tree-row');
+  setRailTop(row?row.offsetTop:-1);
+ },[rows,expanded,selected,levels]);
 
  // Unmount: nothing in flight may write state afterwards. Aborting rejects the
  // fetch; clearing the map makes the late rejection a no-op even synchronously.
@@ -665,7 +683,7 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
  function levelNotes(parentId:string,parentDepth:number,count:number):ReactNode{
   const level=levels.get(parentId);
   if(!level)return null;
-  const style={paddingLeft:String((parentDepth+1)*16+8)+"px"};
+  const style={paddingLeft:String((parentDepth+1)*14+8)+"px"};
   if(level.status==="loading")
    return <li role="none" className="tree-note hint" style={style}>{count>0?"正在加载…":"正在加载子目录…"}</li>;
   if(level.status==="error")
@@ -698,7 +716,7 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
   // The drop marker for a live internal move: accept or reject, never both.
   const hovered=dropHover&&dropHover.id===entry.id?dropHover:null;
   const dropMarker=hovered?DROP_MARKER[hovered.legal?"accept":"reject"]:null;
-  return <li key={entry.id} data-folder-id={entry.id} role="treeitem"
+  return <li key={entry.id} data-folder-id={entry.id} data-depth={depth} role="treeitem"
    aria-expanded={canExpand?isExpanded:undefined}
    aria-busy={busy?true:undefined}
    aria-current={entry.id===selected?"page":undefined}
@@ -715,13 +733,13 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
     openNodeMenu(entry,{x:event.clientX,y:event.clientY});
    }}>
    <div className={"tree-row "+(entry.id===selected?"on":"")}
-    style={{paddingLeft:String(depth*16)+"px",...(dropMarker??{})}}
+    style={{["--tree-depth"]:Math.min(depth,MAX_INDENT_DEPTH),...(dropMarker??{})} as CSSProperties}
     onDragOver={event=>onRowDragOver(event,entry)}
     onDragLeave={event=>onRowDragLeave(event,entry)}
     onDrop={event=>onRowDrop(event,entry)}>
     {canExpand
-     ?<button type="button" aria-label={isExpanded?"折叠":"展开"} tabIndex={-1}
-       onClick={()=>toggle(entry.id)}>{isExpanded?"▾":"▸"}</button>
+     ?<button type="button" aria-expanded={isExpanded} aria-label={isExpanded?"折叠":"展开"} tabIndex={-1}
+       onClick={()=>toggle(entry.id)}><span aria-hidden="true">▸</span></button>
      :<span className="tree-chevron-spacer" aria-hidden="true"/>}
     <Link to={"/doc?folder="+encodeURIComponent(entry.id)} tabIndex={-1}
      title={entry.disabledReason||undefined}>{entry.name}</Link>
@@ -751,6 +769,9 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
    onKeyDown={onTreeKeyDown}
    onDragOver={onTreeDragOver}
    onDragLeave={onTreeDragLeave}>
+   {/* Spec §6.1 laser rail: inside the list so it scrolls with the rows. The
+       host li keeps it a legal, out-of-flow child of the tree. */}
+   <li role="none" aria-hidden="true" className="spring-rail-host"><SpringActiveRail offset={railTop<0?0:railTop} visible={railTop>=0}/></li>
    {levelItems("").map(entry=>renderNode(entry,0))}
    {paged&&levelNotes("",-1,levelItems("").length)}
   </ul>

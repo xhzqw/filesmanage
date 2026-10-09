@@ -121,7 +121,7 @@ export function RestoreDialog({entry,onClose,onRestored,onReload}:{
     {rows.map(({folder,depth})=><button key={folder.id} type="button" role="radio"
      aria-checked={targetId===folder.id}
      className={targetId===folder.id?"on":""}
-     style={{paddingLeft:String(8+depth*18)+"px"}}
+     style={{paddingLeft:String(8+Math.min(depth,8)*14)+"px"}}
      disabled={busy}
      onClick={()=>setTargetId(folder.id)}>{folder.name}</button>)}
    </div>

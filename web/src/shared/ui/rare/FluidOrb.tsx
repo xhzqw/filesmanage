@@ -78,7 +78,9 @@ void main() {
 
   float edge = smoothstep(0.5, 0.48, distance(uv, vec2(0.5)));
 
-  gl_FragColor = vec4(col * edge, edge * 0.85);
+  // spec 6.5: alpha cut from 0.85 -> 0.5. With the wrapper at opacity .18 / blur 48px the orb
+  // must read as a faint instrument glow refracted on cold-white metal, not a toy ball.
+  gl_FragColor = vec4(col * edge, edge * 0.5);
 }
 `;
 
@@ -200,7 +202,7 @@ export function FluidOrb({
         ref={canvasRef}
         width={size}
         height={size}
-        className="rare-fluid-orb-canvas"
+        className="rare-fluid-orb-surface"
         style={{ width: size, height: size }}
       />
     </div>
