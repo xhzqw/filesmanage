@@ -84,6 +84,9 @@ func (r *Repository) UserByLogin(ctx context.Context, login string) (domain.User
 	err := r.Q.QueryRow(ctx,
 		"SELECT id,login,display_name,password_hash,is_admin,must_change_password,department_id,disabled_at FROM users WHERE login=$1 AND disabled_at IS NULL", login).
 		Scan(&u.ID, &u.Login, &u.DisplayName, &hash, &u.IsAdmin, &u.MustChangePassword, &dept, &u.DisabledAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.User{}, "", ports.ErrRowMissing
+	}
 	if err != nil {
 		return domain.User{}, "", err
 	}
@@ -99,6 +102,9 @@ func (r *Repository) UserBySessionHash(ctx context.Context, hash string) (domain
 	err := r.Q.QueryRow(ctx,
 		"SELECT u.id,u.login,u.display_name,u.is_admin,u.must_change_password,u.department_id,u.disabled_at,s.expires_at FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.sid_hash=$1 AND s.revoked_at IS NULL AND s.expires_at>now() AND u.disabled_at IS NULL", hash).
 		Scan(&a.User.ID, &a.User.Login, &a.User.DisplayName, &a.User.IsAdmin, &a.User.MustChangePassword, &dept, &a.User.DisabledAt, &a.ExpiresAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Authenticated{}, ports.ErrRowMissing
+	}
 	if err != nil {
 		return domain.Authenticated{}, err
 	}
@@ -119,7 +125,7 @@ func (r *Repository) RevokeSession(ctx context.Context, hash string) error {
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return pgx.ErrNoRows
+		return ports.ErrRowMissing
 	}
 	return nil
 }

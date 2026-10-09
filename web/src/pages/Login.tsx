@@ -1,6 +1,7 @@
 import {useState,type FormEvent} from "react";
 import type {User} from "../entities/user/model";
 import {authApi} from "../features/auth/api";
+import {ApiError} from "../shared/http";
 import {BrandLogo} from "../shared/ui/AppShell";
 import {FluidOrb} from "../shared/ui/rare";
 
@@ -14,11 +15,22 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
  const [remember,setRemember]=useState(()=>localStorage.getItem(REMEMBER_KEY)!==null);
  const [resetHint,setResetHint]=useState(false);
  const [busy,setBusy]=useState(false);const [error,setError]=useState("");
- async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();setBusy(true);setError("");
+ async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();if(busy)return;setBusy(true);setError("");
   try{
+   const user=await authApi.login(login,password);
    if(remember)localStorage.setItem(REMEMBER_KEY,login);else localStorage.removeItem(REMEMBER_KEY);
-   onSuccess(await authApi.login(login,password));
-  }catch{setError("账号或密码错误，或服务暂不可用");}finally{setBusy(false);}
+   onSuccess(user);
+  }catch(cause){
+   if(cause instanceof ApiError&&cause.code==="E_RATE_LIMIT"){
+    setError(`登录尝试过于频繁，请约 ${cause.retryAfterSeconds??60} 秒后重试。`);
+   }else if(cause instanceof ApiError&&cause.code==="E_NETWORK"){
+    setError("网络连接失败，请检查连接后重试。");
+   }else if(cause instanceof ApiError&&cause.code==="E_INVALID_CREDENTIALS"){
+    setError("账号或密码错误。");
+   }else{
+    setError("登录暂不可用，请稍后重试。");
+   }
+  }finally{setBusy(false);}
  }
  return <main className="login-bg">
   <FluidOrb size={320} color="#02A0EA" style={{top:-90,left:-70}}/>

@@ -1,43 +1,53 @@
-// Unified API error contract (UX contracts COMPLEX-WORKFLOWS-v1 §4.1): every
-// failure surfaces the stable server `code`, the HTTP status and the request id
-// when the server provides one. Features branch on `code`; the message is
-// never a transaction truth and a network failure never means the write was
-// rolled back.
+// Unified API error contract: stable server code, HTTP status and optional retry window.
+export type SessionIssue="expired"|"password_change_required";
+let issueListener:((issue:SessionIssue)=>void)|null=null;
+// Transport remains independent of React and Zustand.
+export function subscribeSessionIssues(listener:(issue:SessionIssue)=>void):()=>void{
+ issueListener=listener;
+ return ()=>{if(issueListener===listener)issueListener=null};
+}
 export class ApiError extends Error{
  readonly code:string;
  readonly httpStatus:number;
  readonly requestId?:string;
  readonly retryable:boolean;
- constructor(code:string,httpStatus:number,requestId?:string,message?:string){
+ readonly retryAfterSeconds?:number;
+ constructor(code:string,httpStatus:number,requestId?:string,message?:string,retryAfterSeconds?:number){
   super(message||code||"请求失败");
   this.name="ApiError";
   this.code=code;
   this.httpStatus=httpStatus;
   this.requestId=requestId;
   this.retryable=httpStatus===0||httpStatus===408||httpStatus===429||httpStatus>=500;
+  this.retryAfterSeconds=retryAfterSeconds;
  }
 }
-
 type Reply<T>={ok:boolean;data?:T;error?:{code:string;message?:string}};
-
 function requestIdOf(res:Response):string|undefined{
  return res.headers.get("X-Request-Id")||undefined;
 }
-
 export async function request<T>(url:string,options?:RequestInit):Promise<T>{
  let res:Response;
  try{
   res=await fetch("/api"+url,{credentials:"same-origin",...options,headers:{"Content-Type":"application/json",...options?.headers}});
  }catch(error){
-  // The request never completed: the server outcome is unknown, so callers
-  // must verify state (idempotency key / re-read) instead of assuming failure.
+  // A network error does not prove whether the write committed.
   throw new ApiError("E_NETWORK",0,undefined,error instanceof Error?error.message:"网络请求失败");
  }
  let reply:Reply<T>|undefined;
  try{reply=await res.json() as Reply<T>;}catch{reply=undefined;}
  if(!res.ok||!reply||!reply.ok){
   const code=reply?.error?.code||(res.status===401?"E_AUTH":"E_INTERNAL");
-  throw new ApiError(code,res.status,requestIdOf(res),reply?.error?.message||"请求失败");
+  // A wrong password is not a lost session. Logout errors are handled by App.
+  if(res.status===401&&code==="E_AUTH"&&url!=="/login"&&url!=="/logout"&&url!=="/me"){
+   issueListener?.("expired");
+  }else if(res.status===403&&code==="E_PASSWORD_CHANGE_REQUIRED"){
+   issueListener?.("password_change_required");
+  }
+  const header=res.headers.get("Retry-After");
+  const parsed=header===null?NaN:Number(header);
+  const retryAfter=Number.isFinite(parsed)&&parsed>0?parsed:undefined;
+  throw new ApiError(code,res.status,requestIdOf(res),reply?.error?.message||"请求失败",retryAfter);
  }
  return reply.data as T;
 }

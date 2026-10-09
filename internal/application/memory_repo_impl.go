@@ -21,7 +21,7 @@ func (r *memoryRepo) UserByLogin(_ context.Context, login string) (domain.User, 
 	defer r.mu.Unlock()
 	entry, ok := r.users[login]
 	if !ok || entry.user.DisabledAt != nil {
-		return domain.User{}, "", errors.New("not found")
+		return domain.User{}, "", ports.ErrRowMissing
 	}
 	return entry.user, entry.hash, nil
 }
@@ -31,11 +31,11 @@ func (r *memoryRepo) UserBySessionHash(_ context.Context, hash string) (domain.A
 	defer r.mu.Unlock()
 	session, ok := r.sessions[hash]
 	if !ok || session.revoked {
-		return domain.Authenticated{}, errors.New("missing")
+		return domain.Authenticated{}, ports.ErrRowMissing
 	}
 	entry, ok := r.users[session.userID]
 	if !ok || entry.user.DisabledAt != nil {
-		return domain.Authenticated{}, errors.New("missing")
+		return domain.Authenticated{}, ports.ErrRowMissing
 	}
 	return domain.Authenticated{User: entry.user, ExpiresAt: session.expires}, nil
 }

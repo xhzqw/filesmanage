@@ -297,7 +297,10 @@ func (s *Service) Login(ctx context.Context, login, password string) (string, do
 	defer tx.Rollback(ctx)
 	u, hash, err := tx.UserByLogin(ctx, login)
 	if err != nil {
-		return "", domain.User{}, ErrInvalidCredentials
+		if errors.Is(err, ports.ErrRowMissing) {
+			return "", domain.User{}, ErrInvalidCredentials
+		}
+		return "", domain.User{}, err
 	}
 	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
 		return "", domain.User{}, ErrInvalidCredentials
@@ -332,7 +335,13 @@ func (s *Service) Session(ctx context.Context, token string) (domain.Authenticat
 	}
 	defer tx.Rollback(ctx)
 	a, err := tx.UserBySessionHash(ctx, HashToken(token))
-	if err != nil || !a.ExpiresAt.After(s.now()) {
+	if err != nil {
+		if errors.Is(err, ports.ErrRowMissing) {
+			return domain.Authenticated{}, ErrUnauthorized
+		}
+		return domain.Authenticated{}, err
+	}
+	if !a.ExpiresAt.After(s.now()) {
 		return domain.Authenticated{}, ErrUnauthorized
 	}
 	s.session.put(token, a, s.now(), epoch)
@@ -349,11 +358,16 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 	}
 	defer tx.Rollback(ctx)
 	if err = tx.RevokeSession(ctx, HashToken(token)); err != nil {
+		if errors.Is(err, ports.ErrRowMissing) {
+			s.session.drop(token)
+			return ErrUnauthorized
+		}
 		return err
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return err
 	}
+	s.bumpACLEpoch()
 	s.session.drop(token)
 	return nil
 }

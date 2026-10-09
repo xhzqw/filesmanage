@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"context"
+	"errors"
 	"filesmanage/internal/application"
 	"filesmanage/internal/domain"
 	"github.com/gin-gonic/gin"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"strconv"
 	"time"
 )
 
@@ -18,6 +20,7 @@ type Handler struct {
 	S             *application.Service
 	SecureCookies bool
 	Dist          string
+	LoginLimit    *loginLimiter
 }
 
 // parseAllowlist fails closed: an unreadable or malformed allowlist must stop startup
@@ -73,7 +76,7 @@ func lanGuard(nets []*net.IPNet) gin.HandlerFunc {
 
 func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
-	h := &Handler{S: s, SecureCookies: secure, Dist: dist}
+	h := &Handler{S: s, SecureCookies: secure, Dist: dist, LoginLimit: newLoginLimiter()}
 	r := gin.New()
 	r.Use(gin.Recovery(), lanGuard(parseAllowlist(os.Getenv("FILESMANAGE_LAN_ALLOW_CIDRS"))), gin.Logger())
 	r.GET("/health/live", func(c *gin.Context) { c.JSON(200, gin.H{"ok": true}) })
@@ -210,7 +213,11 @@ func (h *Handler) identity(c *gin.Context) (domain.User, bool) {
 	token, _ := c.Cookie("fm_session")
 	a, err := h.S.Session(c.Request.Context(), token)
 	if err != nil {
-		c.JSON(401, gin.H{"ok": false, "error": gin.H{"code": "E_AUTH"}})
+		if errors.Is(err, application.ErrUnauthorized) {
+			c.JSON(401, gin.H{"ok": false, "error": gin.H{"code": "E_AUTH"}})
+		} else {
+			c.JSON(503, gin.H{"ok": false, "error": gin.H{"code": "E_DEPENDENCY"}})
+		}
 		return domain.User{}, false
 	}
 	return a.User, true
@@ -248,11 +255,26 @@ func (h *Handler) login(c *gin.Context) {
 		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
 		return
 	}
+	if wait := h.LoginLimit.allow(c.Request.RemoteAddr, req.Login); wait > 0 {
+		c.Header("Retry-After", strconv.Itoa(retrySeconds(wait)))
+		c.JSON(429, gin.H{"ok": false, "error": gin.H{"code": "E_RATE_LIMIT"}})
+		return
+	}
+	if !h.LoginLimit.acquire() {
+		c.Header("Retry-After", "1")
+		c.JSON(429, gin.H{"ok": false, "error": gin.H{"code": "E_RATE_LIMIT"}})
+		return
+	}
+	defer h.LoginLimit.release()
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 4*time.Second)
 	defer cancel()
 	token, user, err := h.S.Login(ctx, req.Login, req.Password)
 	if err != nil {
-		c.JSON(401, gin.H{"ok": false, "error": gin.H{"code": "E_INVALID_CREDENTIALS"}})
+		if errors.Is(err, application.ErrInvalidCredentials) || errors.Is(err, application.ErrInvalidInput) {
+			c.JSON(401, gin.H{"ok": false, "error": gin.H{"code": "E_INVALID_CREDENTIALS"}})
+		} else {
+			c.JSON(503, gin.H{"ok": false, "error": gin.H{"code": "E_DEPENDENCY"}})
+		}
 		return
 	}
 	c.SetSameSite(http.SameSiteStrictMode)
@@ -261,7 +283,11 @@ func (h *Handler) login(c *gin.Context) {
 }
 func (h *Handler) logout(c *gin.Context) {
 	token, _ := c.Cookie("fm_session")
-	_ = h.S.Logout(c.Request.Context(), token)
+	if err := h.S.Logout(c.Request.Context(), token); err != nil && !errors.Is(err, application.ErrUnauthorized) {
+		// Revocation not confirmed: preserve the cookie and report failure.
+		c.JSON(http.StatusServiceUnavailable, gin.H{"ok": false, "error": gin.H{"code": "E_LOGOUT_FAILED"}})
+		return
+	}
 	c.SetSameSite(http.SameSiteStrictMode)
 	c.SetCookie("fm_session", "", -1, "/", "", h.SecureCookies, true)
 	c.JSON(200, gin.H{"ok": true})
