@@ -124,14 +124,13 @@ func (s *Service) SetUserDisabled(ctx context.Context, actor domain.User, userID
 	}
 	audit(ctx, tx, actor, map[bool]string{true: "user.disable", false: "user.enable"}[disabled], "user", userID, "success",
 		map[string]any{"login": target.Login})
-	// Authorisation just changed: drop every cached read so the next
-	// request sees the new scope (PE04).
+	if err = tx.Commit(ctx); err != nil {
+		return err
+	}
+	// Invalidate only after the database decision is durable.
 	s.bumpACLEpoch()
-	// A disabled account's sessions must stop working at once, not after the
-	// session cache TTL.
 	s.session.dropUser(userID)
-
-	return tx.Commit(ctx)
+	return nil
 }
 
 // ResetUserPassword issues a new credential for an account and kills its
@@ -163,7 +162,14 @@ func (s *Service) ResetUserPassword(ctx context.Context, actor domain.User, user
 		return err
 	}
 	audit(ctx, tx, actor, "user.password_reset", "user", userID, "success", map[string]any{"login": target.Login})
-	return tx.Commit(ctx)
+	if err = tx.Commit(ctx); err != nil {
+		return err
+	}
+	// SetUserPassword revokes every server session in the same transaction.
+	// Without eviction the session cache can continue authorizing stale tokens.
+	s.bumpACLEpoch()
+	s.session.dropUser(userID)
+	return nil
 }
 
 func (s *Service) ListDepartments(ctx context.Context, u domain.User) ([]domain.Department, error) {

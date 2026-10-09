@@ -102,7 +102,9 @@ func (s *Service) resolveActionsWithSources(ctx context.Context, repo ports.Repo
 			sources = append(sources, PermissionSource{
 				Kind: "folder_share", ResourceID: *share.FolderID, GrantID: share.ID,
 				SubjectKind: share.RecipientKind, SubjectID: share.RecipientID,
-				Actions: share.Actions, ExpiresAt: share.ExpiresAt,
+				// The explanation sorts actions; never mutate the backing share
+				// slice returned from a repository or shared with other readers.
+				Actions: append([]domain.Action(nil), share.Actions...), ExpiresAt: share.ExpiresAt,
 				ScopeOnly: !share.IncludeDescendants,
 			})
 		}

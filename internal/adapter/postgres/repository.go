@@ -971,7 +971,7 @@ func (r *Repository) ListPermissionAudit(ctx context.Context, beforeID int64, li
 	  details,created_at FROM audit_events
 	  WHERE ($1::bigint=0 OR id<$1)
 	  AND event_type IN ('acl.create','acl.revoke','workgroup.member_add','workgroup.member_remove',
-	    'user.disable','user.enable','share.create','share.revoke')
+	    'user.create','user.disable','user.enable','user.password_reset','share.create','share.revoke')
 	  ORDER BY id DESC LIMIT $2`, beforeID, limit)
 	if err != nil {
 		return nil, err

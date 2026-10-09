@@ -892,7 +892,8 @@ func (r *memoryRepo) ListPermissionAudit(_ context.Context, beforeID int64, limi
 		e := r.audit[i]
 		switch e.EventType {
 		case "acl.create", "acl.revoke", "workgroup.member_add", "workgroup.member_remove",
-			"user.disable", "user.enable", "share.create", "share.revoke":
+			"user.create", "user.disable", "user.enable", "user.password_reset",
+			"share.create", "share.revoke":
 			out = append(out, domain.PermissionAuditRecord{
 				ID: id, ActorID: e.ActorID, EventType: e.EventType,
 				TargetKind: e.TargetKind, TargetID: e.TargetID,

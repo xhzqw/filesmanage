@@ -50,14 +50,27 @@ type ShareDraft struct {
 	ExpiresAt          *time.Time
 }
 
-// CreateShare shares a resource the caller can already see. Write actions are
-// rejected: shares only carry {list,preview,download}.
+// CreateShare is a management capability, not a consequence of list/preview.
+// In the absence of delegated manage_share roles only system admins and
+// resource owners may share, and non-admin owners cannot delegate actions
+// they cannot perform themselves.
 func (s *Service) CreateShare(ctx context.Context, u domain.User, draft ShareDraft) (domain.Share, error) {
 	if (draft.ResourceKind != "file" && draft.ResourceKind != "folder") || draft.ResourceID == "" {
 		return domain.Share{}, domain.ErrInvalidInput
 	}
 	if len(draft.Actions) == 0 || (draft.RecipientKind != "user" && draft.RecipientKind != "group") {
 		return domain.Share{}, domain.ErrInvalidInput
+	}
+	for _, action := range draft.Actions {
+		if action != domain.ActionList && action != domain.ActionPreview && action != domain.ActionDownload {
+			return domain.Share{}, domain.ErrInvalidInput
+		}
+	}
+	// A subtree share applies to descendants regardless of their own ACLs.
+	// The owner of the parent alone cannot prove rights on every descendant.
+	// Until scoped manage_share delegation exists, only admin may create one.
+	if !u.IsAdmin && draft.ResourceKind == "folder" && draft.IncludeDescendants {
+		return domain.Share{}, domain.ErrForbidden
 	}
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
@@ -75,8 +88,20 @@ func (s *Service) CreateShare(ctx context.Context, u domain.User, draft ShareDra
 	if draft.ResourceKind == "file" {
 		fileID := draft.ResourceID
 		share.FileID = &fileID
-		if _, err = s.visibleFile(ctx, tx, u, fileID, domain.ActionPreview); err != nil {
+		file, fileErr := tx.FileByID(ctx, fileID)
+		if fileErr != nil || file.DeletedAt != nil {
+			return domain.Share{}, domain.ErrNotFound
+		}
+		if _, err = s.activeFolder(ctx, tx, file.FolderID); err != nil {
 			return domain.Share{}, err
+		}
+		if !u.IsAdmin && file.UploadedBy != u.ID {
+			return domain.Share{}, domain.ErrForbidden
+		}
+		for _, action := range draft.Actions {
+			if _, err = s.visibleFile(ctx, tx, u, fileID, action); err != nil {
+				return domain.Share{}, err
+			}
 		}
 	} else {
 		folderID := draft.ResourceID
@@ -85,8 +110,13 @@ func (s *Service) CreateShare(ctx context.Context, u domain.User, draft ShareDra
 		if fErr != nil {
 			return domain.Share{}, fErr
 		}
-		if err = s.require(ctx, tx, u, folder.ID, domain.ActionList); err != nil {
-			return domain.Share{}, err
+		if !u.IsAdmin && folder.OwnerID != u.ID {
+			return domain.Share{}, domain.ErrForbidden
+		}
+		for _, action := range draft.Actions {
+			if err = s.require(ctx, tx, u, folder.ID, action); err != nil {
+				return domain.Share{}, err
+			}
 		}
 	}
 	if err = tx.CreateShare(ctx, share); err != nil {
@@ -121,11 +151,11 @@ func (s *Service) RevokeShare(ctx context.Context, u domain.User, shareID string
 		return err
 	}
 	audit(ctx, tx, u, "share.revoke", "share", shareID, "success", nil)
-	// Authorisation just changed: drop every cached read so the next
-	// request sees the new scope (PE04).
+	if err = tx.Commit(ctx); err != nil {
+		return err
+	}
 	s.bumpACLEpoch()
-
-	return tx.Commit(ctx)
+	return nil
 }
 
 func (s *Service) assertRecipientExists(ctx context.Context, repo subjectProbe, kind, id string) error {

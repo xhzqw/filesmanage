@@ -97,19 +97,20 @@ type sessionCache struct {
 type sessionEntry struct {
 	value    domain.Authenticated
 	expireAt time.Time
+	epoch    uint64
 }
 
-func (c *sessionCache) get(token string, now time.Time) (domain.Authenticated, bool) {
+func (c *sessionCache) get(token string, now time.Time, epoch uint64) (domain.Authenticated, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	entry, ok := c.entries[token]
-	if !ok || !entry.expireAt.After(now) {
+	if !ok || !entry.expireAt.After(now) || entry.epoch != epoch {
 		return domain.Authenticated{}, false
 	}
 	return entry.value, true
 }
 
-func (c *sessionCache) put(token string, value domain.Authenticated, now time.Time) {
+func (c *sessionCache) put(token string, value domain.Authenticated, now time.Time, epoch uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.entries == nil {
@@ -121,7 +122,7 @@ func (c *sessionCache) put(token string, value domain.Authenticated, now time.Ti
 			return
 		}
 	}
-	c.entries[token] = sessionEntry{value: value, expireAt: now.Add(c.ttl)}
+	c.entries[token] = sessionEntry{value: value, expireAt: now.Add(c.ttl), epoch: epoch}
 }
 
 func (c *sessionCache) drop(token string) {
@@ -318,7 +319,11 @@ func (s *Service) Session(ctx context.Context, token string) (domain.Authenticat
 	if len(token) != 43 {
 		return domain.Authenticated{}, ErrUnauthorized
 	}
-	if cached, ok := s.session.get(token, s.now()); ok {
+	// The epoch is sampled BEFORE any DB read. If a revocation commits while
+	// the read is in flight, a later cache insertion remains tagged with the
+	// old epoch and cannot survive into the next request.
+	epoch := s.epoch()
+	if cached, ok := s.session.get(token, s.now(), epoch); ok {
 		return cached, nil
 	}
 	tx, err := s.uow.Begin(ctx)
@@ -330,7 +335,7 @@ func (s *Service) Session(ctx context.Context, token string) (domain.Authenticat
 	if err != nil || !a.ExpiresAt.After(s.now()) {
 		return domain.Authenticated{}, ErrUnauthorized
 	}
-	s.session.put(token, a, s.now())
+	s.session.put(token, a, s.now(), epoch)
 	return a, nil
 }
 
