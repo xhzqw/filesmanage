@@ -4,7 +4,7 @@ import type {FileItem} from "../../entities/file/model";
 import type {Folder} from "../../entities/folder/model";
 import {fileApi,formatSize,uploadFile} from "./api";
 import {failed,fileMoveInvalidTarget,openFlow,pickTarget,preflightConflict,preflightReady,preflightStarted,submitStarted,succeeded,type MoveFlow,type MovePreflight}from"./moveFileFlow";
-import {errorCode} from "../../shared/errors";
+import {errorCode,errorCopy} from "../../shared/errors";
 import {request} from "../../shared/http";
 import {newIdempotencyKey} from "../../shared/ids";
 import {Dialog} from "../../shared/ui/Dialog";
@@ -21,6 +21,13 @@ const SORT_LABELS:Record<SortKey,string>={
 };
 
 const SORT_KEYS:SortKey[]=["updated_desc","name_asc","name_desc","size_desc"];
+
+// WF-23 row action state. The caller's favorites are read and written through
+// the shared JSON client instead of the collaboration feature's api module:
+// features/documents -> features/collaboration would fail
+// scripts/check_architecture.py (the same reason RestoreDialog reads
+// /folders/tree directly).
+type FavoriteRow={kind:string;fileId?:string};
 
 // Desktop resource-explorer semantics (DESKTOP-INTERACTION-v1 §1-§3): single
 // click selects, double click opens, Ctrl/Cmd toggles, Shift ranges over the
@@ -50,6 +57,11 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
  // WF-01: the file being moved. Every move endpoint takes one id, so this is
  // single-selection like the other per-file actions.
  const[moving,setMoving]=useState<FileItem|null>(null);
+ // WF-23: ids favorited by the caller, the load state of that list, and the row
+ // whose toggle is in flight.
+ const[favoriteIds,setFavoriteIds]=useState<Set<string>>(()=>new Set<string>());
+ const[favoritesState,setFavoritesState]=useState<"loading"|"ready"|"failed">("loading");
+ const[favoriteBusy,setFavoriteBusy]=useState("");
  const navigate=useNavigate();
 
  useEffect(()=>{
@@ -76,9 +88,56 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
   setRowMenu(null);
  },[folder,sort,reloadKey]);
 
+ // The favorite marks are read once per list revision. A failed read leaves the
+ // row action disabled: the button must not claim "not favorited" when the
+ // caller's list is unknown.
+ useEffect(()=>{
+  let valid=true;
+  setFavoritesState("loading");
+  request<FavoriteRow[]>("/favorites")
+   .then(rows=>{
+    if(!valid)return;
+    const next=new Set<string>();
+    for(const row of rows){
+     if(row.kind==="file"&&row.fileId)next.add(row.fileId);
+    }
+    setFavoriteIds(next);
+    setFavoritesState("ready");
+   })
+   .catch(()=>{if(valid)setFavoritesState("failed");});
+  return()=>{valid=false;};
+ },[folder,reloadKey]);
+
  function announce(text:string,tone:"info"|"error"){
   setMessage(text);
   setMessageTone(tone);
+ }
+
+ // The toggle is optimistic because the endpoint is idempotent in both
+ // directions; a failed write restores the previous local state instead of
+ // leaving the row showing a favorite the server never recorded.
+ async function toggleFavorite(file:FileItem){
+  if(favoritesState!=="ready"||favoriteBusy!=="")return;
+  const on=!favoriteIds.has(file.id);
+  setFavoriteBusy(file.id);
+  setFavoriteIds(prev=>{
+   const next=new Set(prev);
+   if(on)next.add(file.id);else next.delete(file.id);
+   return next;
+  });
+  try{
+   await request<{id:string;favorited:boolean}>("/favorites/file/"+file.id,{method:on?"PUT":"DELETE"});
+   announce(on?`已关注：${file.name}`:`已取消关注：${file.name}`,"info");
+  }catch(error){
+   setFavoriteIds(prev=>{
+    const next=new Set(prev);
+    if(on)next.delete(file.id);else next.add(file.id);
+    return next;
+   });
+   announce(errorCopy(error,on?"关注失败，请重试":"取消关注失败，请重试"),"error");
+  }finally{
+   setFavoriteBusy("");
+  }
  }
 
  async function reload(){
@@ -384,6 +443,10 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
        <button type="button" onClick={()=>onEdit(item.id)}>编辑</button>
        <button type="button" onClick={()=>{setRenaming(item);setRenameValue(item.name);}}>重命名</button>
        <button type="button" className="danger" onClick={()=>setPendingDelete([item])}>删除</button>
+       <button type="button" aria-pressed={favoriteIds.has(item.id)}
+        disabled={favoritesState!=="ready"||favoriteBusy!==""}
+        title={favoritesState==="failed"?"关注状态加载失败，请刷新后重试":undefined}
+        onClick={()=>toggleFavorite(item)}>{favoriteIds.has(item.id)?"已关注":"关注"}</button>
       </td>
      </tr>)}
     </tbody>
