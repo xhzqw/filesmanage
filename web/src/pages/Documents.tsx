@@ -1,5 +1,5 @@
 import{useEffect,useState}from "react";
-import{Link,useLocation}from "react-router-dom";
+import{useLocation}from "react-router-dom";
 import type{User}from "../entities/user/model";
 import type{Folder}from "../entities/folder/model";
 import{folderApi}from "../features/folders/api";
@@ -13,6 +13,7 @@ import{FileEditor}from "../features/documents/FileEditor";
 import{workflowApi}from "../features/workflow/api";
 import{PolicyDialog}from "../features/workflow/PolicyDialog";
 import{organizationApi}from "../features/organization/api";
+import{AppShell}from "../shared/ui/AppShell";
 import type {FileItem} from "../entities/file/model";
 
 type Subject={id:string;displayName:string;login?:string};
@@ -61,11 +62,8 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
    .catch(()=>{if(valid)setRequiresApproval(false);});
   return()=>{valid=false;};
  },[selected?.id]);
- return <div className="shell"><header className="header">
-   <div className="brand"><span className="logo-placeholder" aria-label="官方 Logo 尚未导入">标志待入库</span>中晟生物科技 <span className="product">文档治理中心</span></div>
-   <nav aria-label="主导航"><Link to="/doc">文档管理</Link><Link to="/workspace">共享/关注</Link><Link to="/stats">统计</Link><Link to="/approvals">审批</Link><Link to="/trash">回收站</Link><Link to="/org">组织管理</Link></nav>
-   <span className="account">{user.displayName}</span><button onClick={onLogout}>退出</button>
- </header><div className="panels"><aside className="sidebar"><h2>文档管理</h2><p>文件夹</p>
+ return <AppShell user={user} onLogout={onLogout}>
+  <div className="panels"><aside className="sidebar"><h2>文档管理</h2><p>文件夹</p>
    {status==="loading"&&<p>正在加载目录…</p>}
    {status==="failed"&&<p role="alert" className="error">获取目录失败，请刷新重试</p>}
    {status==="ready"&&<FolderTree items={folders} selected={selected?.id||""}/>}</aside>
@@ -82,7 +80,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
    {policyOpen&&selected&&<PolicyDialog folder={selected} approvers={subjects} onClose={()=>setPolicyOpen(false)}/>}
    {editingId&&<FileEditorBridge fileId={editingId} requiresApproval={requiresApproval}
     onClose={()=>setEditingId(null)} onSaved={()=>setReloadKey(k=>k+1)}/>}
- </div>;
+ </AppShell>;
 }
 
 // FileEditorBridge loads the file row for the editor dialog; the page owns the

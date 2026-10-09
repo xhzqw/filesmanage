@@ -1,8 +1,10 @@
 import {useEffect,useRef,useState,type FormEvent} from "react";
-import {useParams,Link} from "react-router-dom";
+import {useNavigate,useParams} from "react-router-dom";
 import {fileApi} from "../features/documents/api";
 import {errorCopy} from "../shared/errors";
 import type {FileItem} from "../entities/file/model";
+import type {User} from "../entities/user/model";
+import {AppShell} from "../shared/ui/AppShell";
 import {parseDxf} from "../features/modelViewer/dxf";
 
 type DerivativeInfo={
@@ -25,8 +27,9 @@ const MAX_INLINE_MODEL_BYTES=256*1024*1024;
 // Real 3D preview: fetches the (converted) mesh from the API and renders it
 // with three.js. STEP/IGES are server-converted by the CAD worker; STL/OBJ/GLB
 // are streamed natively.
-export function ModelViewer(){
+export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
  const{id=""}=useParams();
+ const navigate=useNavigate();
  const[status,setStatus]=useState("loading");
  const[message,setMessage]=useState("");
  const[info,setInfo]=useState<DerivativeInfo|null>(null);
@@ -152,12 +155,7 @@ export function ModelViewer(){
   })();
  },[status,id,info?.outputKind,info?.format]);
 
- return <div className="shell">
-  <header className="header">
-   <div className="brand"><span className="logo-placeholder" aria-label="官方 Logo 尚未导入">标志待入库</span>中晟生物科技 <span className="product">模型预览</span></div>
-   <nav aria-label="主导航"><Link to={"/preview/"+id}>返回文件</Link><Link to="/doc">文档管理</Link></nav>
-   <span className="account">{info?.format?.toUpperCase()??""}</span>
-  </header>
+ return <AppShell user={user} onLogout={onLogout} product="模型预览" actions={<button type="button" onClick={()=>navigate("/preview/"+id)}>返回文件</button>}>
   <div className="panels">
    <main className="work">
     <div className="breadcrumb">模型预览 · {info?.format?.toUpperCase()??""} · {info?.class==="converted"?"服务端已转换":info?.format?.toLowerCase()==="dxf"?"二维工程图":"浏览器原生渲染"}</div>
@@ -231,7 +229,7 @@ export function ModelViewer(){
     </div>}
    </main>
   </div>
- </div>;
+ </AppShell>;
 }
 
 type MeshParser=(buffer:ArrayBuffer)=>Promise<import("three").Object3D>;

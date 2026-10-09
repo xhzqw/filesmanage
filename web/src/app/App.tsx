@@ -20,12 +20,12 @@ export function App(){
  if(user?.mustChangePassword)return <Routes><Route path="/first-sign-in" element={<FirstSignIn onSuccess={setUser} onExit={logout}/>}/><Route path="*" element={<Navigate to="/first-sign-in" replace/>}/></Routes>;
  return <Routes><Route path="/login" element={user?<Navigate to="/doc" replace/>:<Login onSuccess={setUser}/>}/>
  <Route path="/doc" element={user?<Documents user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
- <Route path="/preview/:id" element={user?<Preview/>:<Navigate to="/login" replace/>}/>
+ <Route path="/preview/:id" element={user?<Preview user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/trash" element={user?<Trash user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/org" element={user?<Org user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/approvals" element={user?<Approvals user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
- <Route path="/office/:id" element={user?<OfficeEditor/>:<Navigate to="/login" replace/>}/>
- <Route path="/model/:id" element={user?<ModelViewer/>:<Navigate to="/login" replace/>}/>
+ <Route path="/office/:id" element={user?<OfficeEditor user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
+ <Route path="/model/:id" element={user?<ModelViewer user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/workspace" element={user?<WorkspacePage user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/search" element={user?<SearchPage user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/stats" element={user?<WorkspacePage user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>

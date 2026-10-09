@@ -1,9 +1,11 @@
 import {useEffect,useRef,useState} from "react";
-import {useParams,Link} from "react-router-dom";
+import {useParams} from "react-router-dom";
 import {fileApi} from "../features/documents/api";
 import {errorCopy} from "../shared/errors";
 import type {OfficeSessionData} from "../features/documents/api";
 import type {FileItem} from "../entities/file/model";
+import type {User} from "../entities/user/model";
+import {AppShell} from "../shared/ui/AppShell";
 
 declare global{
  interface Window{
@@ -14,7 +16,7 @@ declare global{
 // Loads the external document editor inside the page. This is the real
 // ONLYOFFICE editor: the iframe renders and edits the actual DOCX bytes, and
 // saves arrive through the server-side callback.
-export function OfficeEditor(){
+export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
  const{id=""}=useParams();
  const[status,setStatus]=useState("loading");
  const[message,setMessage]=useState("");
@@ -62,19 +64,14 @@ export function OfficeEditor(){
   window.location.href="/preview/"+id;
  }
 
- return <div className="shell">
-  <header className="header">
-   <div className="brand"><span className="logo-placeholder" aria-label="官方 Logo 尚未导入">标志待入库</span>中晟生物科技 <span className="product">文档编辑</span></div>
-   <nav aria-label="主导航"><Link to={"/preview/"+id}>返回预览</Link><Link to="/doc">文档管理</Link></nav>
-   <span className="account">{file?.name??""}</span>
-   <button onClick={close}>结束编辑</button>
-  </header>
+ return <AppShell user={user} onLogout={onLogout} product="文档编辑" actions={<button type="button" onClick={close}>结束编辑</button>}>
   <div className="office-stage">
+   {file&&<div className="breadcrumb">{file.name} · 当前 v{file.currentVersionSeq}</div>}
    {status==="loading"&&<p className="empty">正在启动文档编辑器…</p>}
    {status==="failed"&&<p role="alert" className="notice error">{message}</p>}
    <div id="placeholder" ref={holder} className="office-holder"/>
   </div>
- </div>;
+ </AppShell>;
 }
 
 function loadEditorScript(src:string):Promise<void>{

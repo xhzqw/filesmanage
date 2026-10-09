@@ -1,7 +1,9 @@
 import {useEffect,useState} from "react";
-import {useParams,Link} from "react-router-dom";
+import {useParams} from "react-router-dom";
 import {fileApi} from "../features/documents/api";
 import type {PreviewData,FileVersion} from "../entities/file/model";
+import type {User} from "../entities/user/model";
+import {AppShell} from "../shared/ui/AppShell";
 
 const ACTION_LABELS:Record<string,string>={
  upload:"上传",
@@ -17,7 +19,7 @@ function isCadName(name:string):boolean{
  return CAD_EXTENSIONS.some(ext=>lower.endsWith(ext));
 }
 
-export function Preview(){
+export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const{id=""}=useParams();
  const[preview,setPreview]=useState<PreviewData|null>(null);
  const[versions,setVersions]=useState<FileVersion[]>([]);
@@ -35,11 +37,7 @@ export function Preview(){
   return()=>{valid=false;};
  },[id]);
 
- return <div className="shell">
-  <header className="header">
-   <div className="brand"><span className="logo-placeholder" aria-label="官方 Logo 尚未导入">标志待入库</span>中晟生物科技 <span className="product">文档治理中心</span></div>
-   <nav aria-label="主导航"><Link to="/doc">返回文档管理</Link></nav>
-  </header>
+ return <AppShell user={user} onLogout={onLogout}>
   <div className="panels">
    <main className="work">
     {status==="loading"&&<p className="empty">正在加载预览…</p>}
@@ -79,5 +77,5 @@ export function Preview(){
     </>}
    </main>
   </div>
- </div>;
+ </AppShell>;
 }

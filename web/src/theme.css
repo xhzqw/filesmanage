@@ -11,9 +11,9 @@ button:hover{background:#E8F5FD}
 .error{color:#AA3145}.shell{height:100vh;display:flex;flex-direction:column}
 .header{height:66px;background:#fff;border-bottom:1px solid #D1E1EC;padding:0 20px;display:flex;align-items:center;gap:20px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:700;color:#174098;white-space:nowrap}
-.logo-placeholder{border:1px dashed #B4CADB;color:#8B9BAD;padding:9px;font-size:10px}
 .product{font-weight:500;color:#53677D}.header nav{flex:1;display:flex;align-items:center;gap:20px}
 .header nav a,.header nav a:visited{font-weight:bold;color:#174098;padding:22px 3px;border-bottom:2px solid #02A0EA}
+.header nav a.active{background:var(--color-row-selected);border-bottom-color:var(--color-row-selected-border)}
 .header nav span{color:#8599AA;font-size:12px}.header button{border:1px solid #D1E1EC;background:white;padding:8px;border-radius:7px}
 .account{white-space:nowrap}.panels{display:flex;flex:1;min-height:0;padding:14px;gap:14px}
 .sidebar{background:white;width:280px;overflow:auto;border:1px solid #D1E1EC;border-radius:12px;padding:18px}
