@@ -131,10 +131,21 @@ async function inspectCompact(page,width){
    report.table.scrollWidth>report.table.clientWidth,
    `table=${report.table?.clientWidth}/${report.table?.scrollWidth} right=${report.table?.right}`);
  }
- if(report.org){
+  if(report.org){
   check(`${page} ${width}px organization grid fits`,
    report.org.width<=width+2&&report.org.scrollWidth<=report.org.clientWidth+2,
    `grid scrollWidth=${report.org.scrollWidth} clientWidth=${report.org.clientWidth}`);
+ }
+ if(page==="organization"&&width<=600){
+  const tabs=await evaluate(`(()=>{
+   const el=document.querySelector(".org-tabs-nav");
+   if(!el)return null;
+   const r=el.getBoundingClientRect();
+   return {right:r.right,clientWidth:el.clientWidth,scrollWidth:el.scrollWidth};
+  })()`);
+  check(`${page} ${width}px tabs scroll within viewport`,
+   !!tabs&&tabs.right<=width+2&&tabs.clientWidth<=width,
+   JSON.stringify(tabs));
  }
  return report;
 }
