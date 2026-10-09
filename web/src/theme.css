@@ -83,7 +83,7 @@
   --radius-sm:4px;                 /* 按钮/输入框/行条 */
   --radius-md:6px;                 /* 弹出菜单/轻量对话框 (最高限度) */
 
-  --height-header:38px;            /* 瘦身顶栏 */
+  --height-header:40px;            /* 瘦身顶栏 (36~40px) */
   --height-toolbar:34px;           /* 操作工具栏 */
   --height-table-header:30px;      /* 表头高度 */
   --height-row-standard:32px;      /* 标准紧凑数据行 */
@@ -198,30 +198,56 @@ textarea{height:auto;padding:var(--space-1) var(--space-2);line-height:1.5;resiz
 .brand{display:flex;align-items:center;gap:var(--space-2);width:auto;flex:none;padding-left:var(--space-3);padding-right:var(--space-2);font-weight:700;font-size:13px;color:var(--brand-navy);white-space:nowrap;overflow:hidden}
 .brand-logo{display:block;flex:none;width:22px;height:22px}
 .product{font-weight:500;font-size:11px;color:var(--text-tertiary);overflow:hidden;text-overflow:ellipsis}
-.header nav{flex:1;display:flex;align-items:center;gap:2px;height:100%;margin-left:var(--space-2)}
+.header nav{flex:1;display:flex;align-items:center;gap:4px;height:100%;margin-left:var(--space-3)}
 .header nav a{
   display:inline-flex;align-items:center;gap:0;
   height:100%;padding:0 var(--space-3);
-  font-size:12px;font-weight:500;color:var(--text-secondary);
+  font-size:13px;font-weight:500;color:var(--text-secondary);
   border-bottom:2px solid transparent;
+  background:transparent;
   text-decoration:none;
-  transition:color .12s ease, background-color .12s ease;
+  transition:color .12s ease;
 }
-.header nav a:hover{color:var(--brand-blue);background:var(--surface-row-hover)}
-.header nav a.active{color:var(--brand-blue);background:var(--surface-row-selected);border-bottom-color:var(--brand-blue);font-weight:600}
+.header nav a:hover{color:var(--brand-blue);background:transparent}
+.header nav a.active{color:var(--brand-blue);background:transparent;border-bottom-color:var(--brand-blue);font-weight:600}
 .header-right{margin-left:auto;display:flex;align-items:center;gap:var(--space-2);padding-right:var(--space-2);height:100%}
-.account{display:inline-flex;align-items:center;gap:var(--space-1);min-width:0;white-space:nowrap;font-size:12px;color:var(--text-secondary);cursor:pointer;padding:2px 4px;border-radius:var(--radius-xs)}
-.account:hover{color:var(--text-primary)}
+.account-dropdown-wrapper{position:relative;display:inline-flex;align-items:center}
+.account-trigger{
+  border:none;background:transparent;padding:2px 4px;cursor:pointer;
+  border-radius:var(--radius-xs);display:inline-flex;align-items:center;
+}
+.account-trigger:hover{background:var(--surface-subtle)}
+.account{display:inline-flex;align-items:center;gap:var(--space-1);min-width:0;white-space:nowrap;font-size:12px;color:var(--text-secondary)}
 .account-avatar{flex:none;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:var(--radius-xs);background:var(--surface-row-selected);border:1px solid var(--border-hairline);color:var(--brand-blue);font-size:10px;font-weight:600}
 .account-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.account-caret{font-size:10px;color:var(--text-tertiary);margin-left:2px}
+.account-caret{color:var(--text-tertiary);margin-left:2px;flex:none}
+.account-dropdown-menu{
+  position:absolute;top:calc(100% + 4px);right:0;
+  background:var(--surface-panel);border:1px solid var(--border-subtle);
+  border-radius:var(--radius-sm);box-shadow:0 4px 16px rgba(0,0,0,0.12);
+  z-index:50;min-width:130px;padding:4px 0;
+}
+.account-menu-info{padding:6px 12px}
+.account-menu-name{font-size:12px;font-weight:600;color:var(--text-primary)}
+.account-menu-role{font-size:11px;color:var(--text-tertiary);margin-top:1px}
+.account-menu-divider{height:1px;background:var(--border-hairline);margin:4px 0}
+.account-menu-item{
+  width:100%;border:none;background:transparent;padding:6px 12px;
+  font-size:12px;color:var(--text-primary);cursor:pointer;
+  display:flex;align-items:center;gap:6px;text-align:left;
+  border-radius:0;height:auto;min-height:26px;
+}
+.account-menu-item:hover{background:var(--surface-row-hover);color:var(--brand-blue)}
+.account-menu-item.danger{color:var(--status-danger)}
+.account-menu-item.danger:hover{background:var(--surface-danger-soft);color:var(--status-danger)}
 .header-exit-btn{
   border:none;background:transparent;color:var(--text-secondary);
-  font-size:11px;height:26px;min-height:26px;padding:0 var(--space-2);
-  cursor:pointer;border-radius:var(--radius-xs);display:inline-flex;align-items:center;gap:4px;
+  font-size:11px;height:26px;min-height:26px;padding:0 6px;
+  cursor:pointer;border-radius:var(--radius-xs);display:inline-flex;align-items:center;gap:3px;
 }
 .header-exit-btn:hover{color:var(--status-danger);background:var(--surface-danger-soft)}
-.header button:not(.header-exit-btn):not(.nav-toggle):not(.command-trigger){height:26px;min-height:26px;padding:0 var(--space-2);font-size:12px}
+.header-exit-label{font-size:11px}
+.header button:not(.header-exit-btn):not(.nav-toggle):not(.command-trigger):not(.account-trigger){height:26px;min-height:26px;padding:0 var(--space-2);font-size:12px}
 
 /* 面包屑条 (spec §3.1): 停靠在工具列上方的 24px 路径条。它必须是 <nav>
    地标 (DI-15)，而 VIS-11 只允许 header.header 内有一个 nav，所以路径不住
@@ -235,31 +261,33 @@ textarea{height:auto;padding:var(--space-1) var(--space-2);line-height:1.5;resiz
   border-bottom:1px solid var(--border-hairline);box-sizing:border-box;
 }
 .folder-context-bar .breadcrumb{
-  display:flex;align-items:center;gap:var(--space-1);
+  display:flex;align-items:center;gap:0;
   min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   font-size:12px;color:var(--text-secondary);
+  padding:0;border:none;background:transparent;
 }
 .folder-context-bar .breadcrumb a{color:var(--brand-blue);font-weight:500;text-decoration:none}
 .folder-context-bar .breadcrumb a:hover{text-decoration:underline;text-underline-offset:2px}
+.folder-context-bar .breadcrumb .crumb-sep{margin:0 6px;color:var(--text-tertiary);font-size:11px;user-select:none;flex:none}
 .folder-context-bar .breadcrumb .crumb-current{font-weight:600;color:var(--text-primary)}
 .folder-actions-slot{flex:none;display:flex;align-items:center}
-.folder-actions{display:flex;align-items:center;gap:var(--space-1);position:relative}
+.folder-actions{display:flex;align-items:center;gap:var(--space-1);position:relative;height:32px;min-height:32px;padding:0;border:none;background:transparent}
 .ghost-action-btn{
-  border:none;background:transparent;color:var(--brand-blue);
-  font-size:12px;font-weight:500;height:24px;padding:0 var(--space-2);
+  border:1px solid transparent;background:transparent;color:var(--brand-blue);
+  font-size:12px;font-weight:500;height:24px;line-height:24px;padding:0 var(--space-2);
   cursor:pointer;border-radius:var(--radius-xs);display:inline-flex;align-items:center;
-  transition:background-color .1s ease;
+  transition:all .1s ease;
 }
-.ghost-action-btn:hover{background:var(--surface-row-hover);color:var(--color-action-hover)}
+.ghost-action-btn:hover{background:var(--surface-row-hover);color:var(--color-action-hover);border-color:var(--border-hairline)}
 .folder-more-wrapper{position:relative;display:inline-flex}
 .ghost-more-btn{
-  border:1px solid var(--border-subtle);background:var(--surface-panel);
+  border:1px solid var(--border-hairline);background:var(--surface-panel);
   color:var(--text-secondary);font-size:12px;font-weight:700;
-  height:22px;min-height:22px;width:24px;padding:0;
+  height:24px;min-height:24px;width:26px;padding:0;
   display:inline-flex;align-items:center;justify-content:center;
   border-radius:var(--radius-xs);cursor:pointer;
 }
-.ghost-more-btn:hover{background:var(--surface-row-hover);color:var(--brand-blue);border-color:var(--border-selected)}
+.ghost-more-btn:hover{background:var(--surface-row-hover);color:var(--brand-blue);border-color:var(--border-subtle)}
 .folder-more-menu{
   display:none;position:absolute;top:calc(100% + 4px);right:0;
   background:var(--surface-panel);border:1px solid var(--border-subtle);
@@ -449,21 +477,30 @@ tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions 
   opacity:0.6;
 }
 .tree li[data-depth="0"]>.tree-row::before{display:none}
-.tree-row:hover{background:var(--surface-row-hover, #F8FAFC)}
+.tree-row:hover{background:var(--surface-subtle, #F1F5F9)}
 .tree-row.on{
-  background:var(--surface-row-selected, #EDF5FE);
+  background:var(--surface-row-selected, #E2EFFE);
   color:var(--brand-blue);
-  font-weight:500;
+  font-weight:600;
   box-shadow:inset 2px 0 0 var(--brand-blue);
 }
+.tree-row.on:hover{background:var(--surface-row-selected, #E2EFFE)}
 .tree-row button{width:16px;min-width:16px;height:16px;min-height:16px;padding:0;border:0;background:none;font-size:10px;line-height:1;color:var(--text-tertiary);display:inline-flex;align-items:center;justify-content:center;transition:transform .12s linear;flex:none}
 .tree-row button:hover{background:none;color:var(--brand-blue)}
 .tree-row button[aria-expanded="true"]{transform:rotate(90deg)}
 .tree-row a,.tree-node-link{
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   flex:1;min-width:0;padding:0 var(--space-1);color:inherit;text-decoration:none;
+  outline:none !important;border:none !important;box-shadow:none !important;
 }
-.tree li:focus-visible{outline:1px solid var(--border-focus);outline-offset:-1px;border-radius:var(--radius-xs)}
+.tree-row a:focus,.tree-row a:focus-visible,.tree-node-link:focus,.tree-node-link:focus-visible,
+.tree li:focus,.tree li:focus-visible{
+  outline:none !important;border:none !important;box-shadow:none !important;
+}
+.tree li:focus-visible > .tree-row{
+  background:var(--surface-row-selected, #E2EFFE);
+  box-shadow:inset 2px 0 0 var(--brand-blue);
+}
 
 /* SpringActiveRail (spec §6.1): 2px 激光高亮轨, spring 480/32. The host li
    keeps the rail a legal child of ul[role=tree] (a bare div inside a ul is

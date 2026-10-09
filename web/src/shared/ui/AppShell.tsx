@@ -1,9 +1,9 @@
-import {useState,type ReactNode} from "react";
+import {useEffect,useRef,useState,type ReactNode} from "react";
 import {Link,useLocation} from "react-router-dom";
 
 // The shell only needs the display name; keeping the type structural avoids a
 // shared -> entities dependency, which the architecture gate forbids.
-type ShellUser={displayName:string};
+type ShellUser={displayName:string;isAdmin?:boolean};
 
 // DEC-14 brand shell: blue/white engineering palette and yellow folder SVG
 // icons. A self-drawn icon must never stand in for the corporate mark — that
@@ -40,6 +40,20 @@ const NAV=[
 // Documents.tsx and the .crumb-bar rule in theme.css).
 export function AppShell({user,onLogout,product,actions,children}:{user:ShellUser;onLogout:()=>void;product?:string;actions?:ReactNode;children:ReactNode}){
  const[open,setOpen]=useState(false);
+ const[accountOpen,setAccountOpen]=useState(false);
+ const accountRef=useRef<HTMLDivElement>(null);
+
+ useEffect(()=>{
+  if(!accountOpen)return;
+  function onDocClick(e:Event){
+   if(accountRef.current&&!accountRef.current.contains(e.target as Node)){
+    setAccountOpen(false);
+   }
+  }
+  document.addEventListener("mousedown",onDocClick);
+  return()=>document.removeEventListener("mousedown",onDocClick);
+ },[accountOpen]);
+
  return <div className="shell">
   <header className="header">
    <button className="nav-toggle" aria-label="导航菜单" aria-expanded={open} onClick={()=>setOpen(v=>!v)}>☰</button>
@@ -55,17 +69,31 @@ export function AppShell({user,onLogout,product,actions,children}:{user:ShellUse
      <span>全局搜索</span>
      <span className="command-keys"><kbd>Ctrl</kbd><kbd>K</kbd></span>
     </button>
-    <div className="account-dropdown-trigger" title="当前登录用户">
-     <span className="account">
-      <span className="account-avatar" aria-hidden="true">{accountInitial(user.displayName)}</span>
-      <span className="account-name">{user.displayName}</span>
-      <span className="account-caret" aria-hidden="true">▾</span>
-     </span>
+    <div className="account-dropdown-wrapper" ref={accountRef}>
+     <button type="button" className="account-trigger" aria-label="当前登录用户" aria-haspopup="true" aria-expanded={accountOpen}
+      onClick={()=>setAccountOpen(v=>!v)}>
+      <span className="account">
+       <span className="account-avatar" aria-hidden="true">{accountInitial(user.displayName)}</span>
+       <span className="account-name">{user.displayName}</span>
+       <svg className="account-caret" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </span>
+     </button>
+     {accountOpen&&<div className="account-dropdown-menu" role="menu">
+      <div className="account-menu-info">
+       <div className="account-menu-name">{user.displayName}</div>
+       <div className="account-menu-role">{user.isAdmin?"系统管理员":"标准用户"}</div>
+      </div>
+      <div className="account-menu-divider" />
+      <button type="button" role="menuitem" className="account-menu-item danger" onClick={()=>{setAccountOpen(false);onLogout();}}>
+       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+       <span>退出系统</span>
+      </button>
+     </div>}
     </div>
     {actions}
     <button type="button" className="header-exit-btn" onClick={onLogout} title="退出系统">
      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-     <span>退出</span>
+     <span className="header-exit-label">退出</span>
     </button>
    </div>
   </header>

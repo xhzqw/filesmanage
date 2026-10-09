@@ -748,16 +748,21 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
    }}>
    <div className={"tree-row "+(entry.id===selected?"on":"")}
     style={{["--tree-depth"]:Math.min(depth,MAX_INDENT_DEPTH),...(dropMarker??{})} as CSSProperties}
+    onClick={event=>{
+     if((event.target as HTMLElement).closest("button"))return;
+     navigate("/doc?folder="+encodeURIComponent(entry.id));
+    }}
     onDragOver={event=>onRowDragOver(event,entry)}
     onDragLeave={event=>onRowDragLeave(event,entry)}
     onDrop={event=>onRowDrop(event,entry)}>
     {canExpand
      ?<button type="button" aria-expanded={isExpanded} aria-label={isExpanded?"折叠":"展开"} tabIndex={-1}
-       onClick={()=>toggle(entry.id)}><span aria-hidden="true">▸</span></button>
+       onClick={event=>{event.stopPropagation();toggle(entry.id);}}><span aria-hidden="true">▸</span></button>
      :<span className="tree-chevron-spacer" aria-hidden="true"/>}
     <FolderGlyph expanded={isExpanded}/>
     <Link to={"/doc?folder="+encodeURIComponent(entry.id)} tabIndex={-1}
      className="tree-node-link"
+     onClick={event=>event.stopPropagation()}
      title={entry.disabledReason?`${entry.name} (${entry.disabledReason})`:entry.name}>{entry.name}</Link>
    </div>
    {isExpanded&&<ul role="group">

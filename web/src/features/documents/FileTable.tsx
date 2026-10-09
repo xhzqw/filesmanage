@@ -198,6 +198,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const[categoryFilter,setCategoryFilter]=useState<FileCategory>("all");
  const[nameFilter,setNameFilter]=useState("");
  const[density]=useState<Density>("compact");
+ const[ultraDensity,setUltraDensity]=useState<boolean>(true);
  const[cursor,setCursor]=useState("");
  const[hasMore,setHasMore]=useState(false);
  const[renaming,setRenaming]=useState<FileItem|null>(null);
@@ -791,6 +792,10 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       <option value="other">其他文件 ({categoryCounts.other})</option>
      </select>
     </label>
+    <div className="density-switch" role="group" aria-label="列表密度">
+     <button type="button" aria-pressed={!ultraDensity} onClick={()=>setUltraDensity(false)}>紧凑</button>
+     <button type="button" aria-pressed={ultraDensity} onClick={()=>setUltraDensity(true)}>超紧凑</button>
+    </div>
     <div className="filter-search-wrap">
      <input type="search" className="filter-search-input" placeholder="过滤当前目录…" aria-label="当前目录内过滤"
       value={nameFilter} onChange={e=>setNameFilter(e.target.value)}/>
@@ -799,7 +804,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   </div>
   {message&&<p role="status" className={"notice "+messageTone}>{message}</p>}
   <div className="table" onClick={event=>{if(!(event.target as HTMLElement).closest("tr")){setSelectedIds(new Set<string>());setAnchorId(null);}}}>
-   <table role="grid" aria-label={folderName+" 文件列表"} className="file-table file-table-ultra">
+   <table role="grid" aria-label={folderName+" 文件列表"} className={"file-table "+(ultraDensity?"file-table-ultra":"")}>
     <colgroup><col className="col-select"/><col className="col-name"/><col className="col-size"/><col className="col-version"/><col className="col-hash"/><col className="col-date"/><col className="col-actions"/></colgroup>
     <thead><tr>
      <th className="col-select" scope="col"><input type="checkbox" tabIndex={-1} checked={allLoadedSelected} onChange={toggleSelectAllLoaded} aria-label="选择当前已加载的文件"/></th>

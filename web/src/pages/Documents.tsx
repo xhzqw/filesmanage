@@ -29,7 +29,7 @@ type Subject={id:string;displayName:string;login?:string};
 const SIDEBAR_WIDTH_KEY="filesmanage.sidebar-width";
 const SIDEBAR_MIN=180;
 const SIDEBAR_MAX=360;
-const SIDEBAR_DEFAULT=220;
+const SIDEBAR_DEFAULT=240;
 
 function clampSidebarWidth(width:number){
  return Math.min(SIDEBAR_MAX,Math.max(SIDEBAR_MIN,width));
@@ -213,7 +213,6 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  return <AppShell user={user} onLogout={onLogout}>
   <div className="panels"><aside className="sidebar" style={{width:sidebarWidth+"px"}}>
    <div className="sidebar-scroll">
-   <h2>文档管理</h2><p>文件夹</p>
    {/* The tree stays mounted across reloadKey cycles (an upload commit, a folder
        change, an edit save): unmounting it would drop keyboard focus and the
        expand state, so the previous folders keep rendering while the fresh tree
