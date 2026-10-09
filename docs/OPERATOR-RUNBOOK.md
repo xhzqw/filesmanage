@@ -251,5 +251,5 @@ python3 scripts/upgrade_rollback_drill.py --rollback-to <sha> # 指定提交
 ## 9. 发布门禁现状
 
 见 `docs/RELEASE-GATES.md`：M1–M6 GO(dev)，M7 证据齐全但 100/200 用户容量受共享主机限制
-（BLK-07），M8 dev 级恢复 GO、生产切换待授权。矩阵 123 PASS / 2 PARTIAL（S12 systemd、
-S20 Logo，均需客户输入）/ 1 EXTERNAL（MC11 DWG 许可）。
+（BLK-07），M8 dev 级恢复 GO、生产切换待授权。矩阵 123 PASS / 2 PARTIAL（S12 systemd
+安装待授权 BLK-05、S20 官方 Logo 已入库待远端 VS01–VS18 截图签收）/ 1 EXTERNAL（MC11 DWG 许可）。

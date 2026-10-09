@@ -32,7 +32,7 @@ Status totals: **123 PASS / 2 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 | S17 | S17 统计：文件数/目录数/容量、类型聚合、最近新增、时间筛选、授权差异、 | **PASS** | s_matrix_e2e.py：'S17 stats reachable'；/api/stats 类型/月份/上传人聚合 |
 | S18 | S18 导出：中文 UTF-8 BOM CSV、引号/逗号/换行正确、防公式注入、 | **PASS** | s_matrix_e2e.py：'S18 export BOM + header' / 'contains only visible rows'；perf_csv_export_check.py 9/9 |
 | S19 | ### 13.3 第一阶段新验收 S14–S19 | **PASS** | S14–S19 阶段标题 |
-| S20 | VS01–VS18 属于首期品牌验收，附加在 S13/S20，不可被“已经有 CSS 文件”代替。 | **PARTIAL** | DEC-14 品牌外壳已交付，官方 Logo 二进制未提供，UI 维持显式占位（BLK-01） |
+| S20 | VS01–VS18 属于首期品牌验收，附加在 S13/S20，不可被“已经有 CSS 文件”代替。 | **PARTIAL** | 官方 Logo 已按 BRAND-03 可信入库（SHA-256 与 BRAND-02 一致，BLK-01 关闭），登录/顶栏/favicon 已使用该资产；VS01–VS18 截图签收待在远端重跑 |
 | S21 | S21：DO01–DO14，真正 DOCX 编辑+保存、锁/审批、回调、版本、服务不可用和安全负面用例。 | **PASS** | DO01–DO14 全矩阵 + office_session_check.py 12/12 + do05_header_footer_check.py 15/15 |
 | S22 | S6：DOCX、MP4、PNG、PDF、TXT 基础预览和 MP4 Range/206；模型格式完整预览在 S22 验收，不用提示页代替。 | **PASS** | 真实查看器（three.js）渲染原生格式、STEP/IGES 经 worker 转换后渲染；无提示页代替；DWG 属 MC11 外部项 |
 
@@ -176,7 +176,7 @@ Status totals: **123 PASS / 2 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 以下 PARTIAL id 均已在 `docs/OPEN-BLOCKERS.md` 登记具体缺口与所需输入：
 
 - `S12` — 升级/回退演练已取证（scripts/upgrade_rollback_drill.py 12/12，含跨 MSH 格式边界的回退：新构建写入的数据在旧构建下字节级存活）；远程 URL 可达已在 LAN 验证；systemd 开机自启的单元已编写并语法验证但未安装（BLK-05 授权）
-- `S20` — DEC-14 品牌外壳已交付，官方 Logo 二进制未提供，UI 维持显式占位（BLK-01）
+- `S20` — 官方 Logo 已按 BRAND-03 可信入库（SHA-256 与 BRAND-02 一致，BLK-01 关闭），登录/顶栏/favicon 已使用该资产；VS01–VS18 截图签收待在远端重跑
 
 ## EXTERNAL 登记
 

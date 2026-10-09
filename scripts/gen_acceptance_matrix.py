@@ -66,7 +66,7 @@ MATRIX = {
     "S17": ("PASS", "s_matrix_e2e.py：'S17 stats reachable'；/api/stats 类型/月份/上传人聚合"),
     "S18": ("PASS", "s_matrix_e2e.py：'S18 export BOM + header' / 'contains only visible rows'；perf_csv_export_check.py 9/9"),
     "S19": ("PASS", "S14–S19 阶段标题"),
-    "S20": ("PARTIAL", "DEC-14 品牌外壳已交付，官方 Logo 二进制未提供，UI 维持显式占位（BLK-01）"),
+    "S20": ("PARTIAL", "官方 Logo 已按 BRAND-03 可信入库（SHA-256 与 BRAND-02 一致，BLK-01 关闭），登录/顶栏/favicon 已使用该资产；VS01–VS18 截图签收待在远端重跑"),
     "S21": ("PASS", "DO01–DO14 全矩阵 + office_session_check.py 12/12 + do05_header_footer_check.py 15/15"),
     "S22": ("PASS", "真实查看器（three.js）渲染原生格式、STEP/IGES 经 worker 转换后渲染；无提示页代替；DWG 属 MC11 外部项"),
     # ---- PT ----

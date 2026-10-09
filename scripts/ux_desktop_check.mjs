@@ -358,7 +358,8 @@ async function main() {
           const brand=document.querySelector('header.header .brand')?.textContent?.includes('中晟生物科技');
           const account=document.querySelector('header.header .account')?.textContent?.trim()||'';
           const exit=[...document.querySelectorAll('header.header button')].some(b=>b.textContent?.trim()==='退出');
-          const logo=document.querySelector('header.header .logo-slot')!==null;
+          const logoImg=document.querySelector('header.header .brand img.brand-logo');
+          const logo=logoImg!==null&&logoImg.naturalWidth>0&&logoImg.getBoundingClientRect().width>0;
           return {headers,links,active,brand,account,exit,logo};})()`);
         const navOk = state && state.links.length === NAV_LABELS.length &&
           NAV_LABELS.every((label, i) => state.links[i] === label);

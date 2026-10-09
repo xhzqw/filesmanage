@@ -104,7 +104,7 @@ Defect found and fixed during M1: FolderTree rendered only from `parentId===null
 - Preview metadata (encoding, BOM, EOL, trailing newline, truncation) is computed from raw bytes; rawBase64 carries the exact prefix so editors round-trip without normalisation. 12 byte samples verified plus a 300KB truncation case and a byte-exact save round-trip.
 
 ### Brand shell (DEC-14)
-- Blue/white engineering palette, yellow folder SVG, and an explicit logo placeholder labelled "待入库" on every authenticated page until the official asset arrives (BLK-01). Responsive navigation verified at 768px.
+- Blue/white engineering palette, yellow folder SVG; the milestone shipped with an explicit "待入库" logo placeholder (BLK-01), which the customer-verified official asset replaced on 2026-10-09 (SPEC §18 BRAND-03: SHA-256 checked, favicon 16/32/48 + login/topbar PNG derived by `scripts/brand_assets.py`). Responsive navigation verified at 768px.
 
 ### Test data hygiene
 - The redundant full-permission grant created during browser acceptance was revoked; the test workgroup was removed; clerkA/clerkB were disabled. Hard deletion of principals with audit history is blocked by foreign keys by design, so the audit chain stays intact.
@@ -182,7 +182,7 @@ security E2E 31/31, `/search` page browser-verified, viewport timings recorded.
 | S17 stats | §M6 + §M7 (single-pass aggregation); executable re-run (s_matrix_e2e.py) |
 | S18 CSV export | §M6 + §M7 (streaming contract 9/9); executable re-run (s_matrix_e2e.py) |
 | S19 plain text | §M6 + `scripts/pt_samples_e2e.py` (PT01–PT12, 112/112) |
-| S20 logo | BLOCKED (BLK-01: official asset not delivered; explicit placeholder) |
+| S20 logo | 官方 Logo 已按 BRAND-03 入库（BLK-01 关闭，SHA-256 校验）；余留 VS01–VS18 远端截图签收 |
 | S21 DOCX editing | §M5 + §M7 PE10 |
 | S22 CAD preview | §M5 + §M7 PE11 + `scripts/mc_cad_e2e.py` (78/78 incl. IGES bearing/hammer) |
 
