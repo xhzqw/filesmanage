@@ -642,7 +642,9 @@ async function main() {
       check("DI-05 right-click on a selected row keeps the whole selection",
         menuForSelection === true && sel.length === 2, JSON.stringify({ sel, labels }));
       check("DI-03/WF-11 multi-selection menu only offers set-wide actions",
-        Array.isArray(labels) && labels.length === 1 && labels[0].includes("删除"), JSON.stringify(labels));
+        Array.isArray(labels) && labels.length === 2
+        && labels.some((l) => l.startsWith("移动到…")) && labels.some((l) => l.startsWith("删除"))
+        && !labels.some((l) => /^(打开|编辑|重命名|下载)/.test(l)), JSON.stringify(labels));
 
       // DI-05: right-click an unselected row makes it the single selection
       await cdp.key("Escape", "Escape", 27);
