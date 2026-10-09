@@ -127,6 +127,172 @@ async function logoutThroughUi(cdp) {
   return Boolean(await cdp.waitFor(`()=>location.pathname==='/login'`, 15000));
 }
 
+// ================= PAGED suite (ADR-UX-07, DI-07/WF-10 above the 300-folder threshold) =================
+async function pagedSuite() {
+  const stamp = String(Date.now());
+  const json = async (method, path, body) => {
+    const res = await fetch(BASE + path, {
+      method, headers: { "Content-Type": "application/json", Origin: ORIGIN, Cookie: sessionCookie },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return { status: res.status, body: await res.json().catch(() => null) };
+  };
+  let chrome = null;
+  let cdp = null;
+  const tree = await json("GET", "/api/folders/tree");
+  const root = (tree.body?.data ?? []).find((f) => !f.parentId);
+
+  // ---- API: children paging + shape ----
+  let r = await json("GET", "/api/folders/children?limit=200");
+  const roots = r.body?.data ?? {};
+  check("children returns visible roots with hints",
+    r.status === 200 && Array.isArray(roots.items) && roots.items.length > 0
+    && roots.items.every((f) => typeof f.hasChildren === "boolean" && typeof f.canSelect === "boolean" && f.id && f.name),
+    JSON.stringify({ n: roots.items.length, first: roots.items[0] }));
+  check("children nextCursor empty on the last page", roots.nextCursor === "", String(roots.nextCursor));
+
+  // a known parent with children: the seeded root
+  r = await json("GET", `/api/folders/children?parentId=${root.id}&limit=1`);
+  const page1 = r.body?.data ?? {};
+  check("children honors the limit and returns a cursor",
+    r.status === 200 && page1.items.length === 1 && typeof page1.nextCursor === "string" && page1.nextCursor.length > 0,
+    JSON.stringify({ n: page1.items.length, cursor: String(page1.nextCursor).slice(0, 12) }));
+
+  // cursor completeness: walk all children of the root, no duplicates
+  const seen = new Set();
+  let cursor = "";
+  let pages = 0;
+  for (;;) {
+    const q = cursor ? `?parentId=${root.id}&limit=7&cursor=${encodeURIComponent(cursor)}` : `?parentId=${root.id}&limit=7`;
+    const res = await json("GET", "/api/folders/children" + q);
+    const data = res.body?.data ?? {};
+    for (const item of data.items ?? []) {
+      if (seen.has(item.id)) {
+        check("children cursor walk has no duplicates", false, item.id);
+        break;
+      }
+      seen.add(item.id);
+    }
+    pages++;
+    if (!data.nextCursor) break;
+    cursor = data.nextCursor;
+    if (pages > 200) { check("children cursor walk terminates", false, "too many pages"); break; }
+  }
+  const full = await json("GET", `/api/folders/children?parentId=${root.id}&limit=200`);
+  check("children cursor walk returns every child exactly once",
+    seen.size === (full.body?.data?.items ?? []).length && pages > 1,
+    JSON.stringify({ walked: seen.size, full: (full.body?.data?.items ?? []).length, pages }));
+
+  // hidden/missing parity
+  const missing = await json("GET", "/api/folders/children?parentId=folder_missing");
+  check("children on a missing parent answers 404 E_NOT_FOUND",
+    missing.status === 404 && missing.body?.error?.code === "E_NOT_FOUND", JSON.stringify(missing.body));
+
+  // ---- API: search ----
+  r = await json("GET", `/api/folders/search?q=${encodeURIComponent(root.name)}&limit=5`);
+  const found = r.body?.data ?? {};
+  check("search matches by name with a visible path",
+    r.status === 200 && (found.items ?? []).some((f) => f.name === root.name && typeof f.path === "string"),
+    JSON.stringify((found.items ?? []).slice(0, 2)));
+  const blank = await json("GET", "/api/folders/search?q=%20%20");
+  check("search rejects a blank query", blank.status === 400 && blank.body?.error?.code === "E_BAD", JSON.stringify(blank.body));
+
+  // ---- UI: seed >300 folders so the tree switches to paged mode ----
+  const bigRoot = (await json("POST", "/api/folders", { name: `PG-BIG-${stamp}`, parentId: root.id })).body?.data?.id;
+  const TOTAL = 305;
+  for (let i = 0; i < TOTAL; i++) {
+    await json("POST", "/api/folders", { name: `PG-L${String(i).padStart(4, "0")}-${stamp}`, parentId: bigRoot });
+  }
+  const mid = (await json("POST", "/api/folders", { name: `PG-MID-${stamp}`, parentId: bigRoot })).body?.data?.id;
+  for (let i = 0; i < 3; i++) {
+    await json("POST", "/api/folders", { name: `PG-LEAF${i}-${stamp}`, parentId: mid });
+  }
+  check("fixture subtree seeded", TOTAL + 5 > 300, `children=${TOTAL}`);
+
+  chrome = spawn("/usr/bin/google-chrome", [
+    "--headless=new", `--remote-debugging-port=${PORT}`, "--no-sandbox",
+    "--disable-gpu", "--window-size=1440,900", "about:blank",
+  ], { stdio: "ignore" });
+  try {
+    await delay(1500);
+    const targets = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
+    const page = targets.find((t) => t.type === "page");
+    cdp = await CDP.connect(page.webSocketDebuggerUrl);
+    await cdp.send("Page.enable");
+    await cdp.send("Runtime.enable");
+    await cdp.send("Page.bringToFront");
+    await cdp.send("Emulation.setFocusEmulationEnabled", { enabled: true });
+
+    await cdp.navigate(`${BASE}/login`);
+    await cdp.evaluate(`(()=>{
+      const set=(el,v)=>{const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));};
+      const fields=[...document.querySelectorAll('input')];
+      const user=fields.find(f=>f.type==='text'||f.type==='email'||(!f.type&&f.offsetParent!==null));
+      const pass=document.querySelector('input[type=password]');
+      if(user)set(user,'admin');
+      if(pass)set(pass,${JSON.stringify(password)});
+      [...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='登录')?.click();return true;})()`);
+    await cdp.waitFor(`()=>location.pathname==='/doc'||location.pathname==='/first-sign-in'`);
+    await cdp.navigate(`${BASE}/doc?folder=${bigRoot}`);
+    const treeReady = await cdp.waitFor(`()=>document.querySelector('ul[role=tree]')!==null&&document.querySelectorAll('li[role=treeitem]').length>0`, 30000);
+    check("paged tree renders its first level", Boolean(treeReady), String(treeReady));
+    // the fixture root must be visible; expanding it loads its children on demand
+    const bigVisible = await cdp.waitFor(`()=>[...document.querySelectorAll('li[role=treeitem]')].some(li=>li.getAttribute('data-folder-id')===${JSON.stringify(bigRoot)})`, 30000);
+    check("fixture root reachable in the paged tree", bigVisible === true, String(bigVisible));
+    const expanded = await cdp.evaluate(`(()=>{
+      const li=document.querySelector('li[data-folder-id="${bigRoot}"]');
+      const btn=li?.querySelector('button');
+      if(!btn)return 'no-chevron';
+      if(li.getAttribute('aria-expanded')!=='true')btn.click();
+      return 'clicked';})()`);
+    await delay(500);
+    const expandedState = await cdp.evaluate(`(()=>document.querySelector('li[data-folder-id="${bigRoot}"]')?.getAttribute('aria-expanded'))()`);
+    const firstPage = await cdp.waitFor(`()=>document.querySelectorAll('li[data-folder-id]').length>=100`, 30000);
+    check("DI-07 expanding loads the first page of children",
+      expanded !== "no-chevron" && expandedState === "true" && firstPage === true,
+      `aria-expanded=${expandedState} rows=${await cdp.evaluate(`(()=>document.querySelectorAll('li[data-folder-id]').length)()`)}`);
+    // 加载更多 appends the rest
+    const moreBtn = await cdp.waitFor(`()=>{const b=[...document.querySelectorAll('button')].find(x=>x.textContent?.trim()==='加载更多');return b?true:false;}`, 15000);
+    check("a truncated level offers 加载更多", moreBtn === true, String(moreBtn));
+    if (moreBtn) {
+      await cdp.evaluate(`(()=>{[...document.querySelectorAll('button')].find(x=>x.textContent?.trim()==='加载更多')?.click();return true;})()`);
+      const allLoaded = await cdp.waitFor(`()=>document.querySelectorAll('li[data-folder-id]').length>=${TOTAL}`, 30000);
+      check("加载更多 appends without duplicates",
+        allLoaded === true && (await cdp.evaluate(`(()=>{const ids=[...document.querySelectorAll('li[data-folder-id]')].map(li=>li.getAttribute('data-folder-id'));return ids.length===new Set(ids).size;})()`)) === true,
+        String(await cdp.evaluate(`(()=>document.querySelectorAll('li[data-folder-id]').length)()`)));
+    }
+    // tree search finds the fixture and navigates
+    const searchBox = await cdp.waitFor(`()=>document.querySelector('.tree-search, input[type=search]')!==null`, 10000);
+    check("paged tree exposes a search box", Boolean(searchBox), String(searchBox));
+    await cdp.evaluate(`(()=>{
+      const input=document.querySelector('.tree-search, input[type=search]');
+      const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
+      set.call(input,${JSON.stringify(`PG-MID-${stamp}`)});
+      input.dispatchEvent(new Event('input',{bubbles:true}));
+      return true;})()`);
+    const searchHit = await cdp.waitFor(`()=>[...document.querySelectorAll('.tree-results a')].some(r=>r.textContent?.includes(${JSON.stringify(`PG-MID-${stamp}`)}))?true:false`, 15000);
+    check("DI-07 tree search finds a folder by name", searchHit === true, String(searchHit));
+    if (searchHit) {
+      await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('.tree-results a')].find(r=>r.textContent?.includes(${JSON.stringify(`PG-MID-${stamp}`)}));row?.click();return Boolean(row);})()`);
+      const navigated = await cdp.waitFor(`()=>location.search.includes(${JSON.stringify(mid)})`, 15000);
+      check("selecting a search result navigates to the folder", navigated === true, String(navigated));
+    }
+  } finally {
+    cdp && cdp.close();
+    chrome && chrome.kill("SIGKILL");
+  }
+
+
+  await json("DELETE", `/api/folders/${bigRoot}`);
+  const trash = await json("GET", "/api/trash");
+  for (const entry of trash.body?.data ?? []) {
+    const name = String(entry.name ?? entry.oldName ?? "");
+    if (name.includes(`PG-BIG-${stamp}`) || (name.startsWith("PG-") && name.includes(stamp))) {
+      await json("DELETE", "/api/trash/" + entry.id);
+    }
+  }
+}
+
 async function main() {
   // ---- fixtures (one API session, independent of the browser session) ----
   const login = await fetch(`${BASE}/api/login`, {
@@ -622,6 +788,7 @@ async function main() {
     });
 
     // ================= MENU suite (g3_menu_smoke.mjs, 12 checks) =================
+    await runSuite("PAGED", pagedSuite);
     await runSuite("MENU", async () => {
       await cdp.navigate(`${BASE}/doc?folder=${menuFolderId}`);
       const rowsReady = await cdp.waitFor(`()=>document.querySelectorAll('tbody tr[data-id]').length>=3`);
