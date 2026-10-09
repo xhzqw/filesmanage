@@ -265,7 +265,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
       <td><button type="button" className="danger" onClick={()=>{setRevokeError("");setRevokeTarget(g);}}>撤销</button></td></tr>)}</tbody></table>
      {grants.length===0&&<p className="empty">没有直接授权；可能仍存在父目录继承或共享权限。</p>}
     </div>}
-    <PermissionInsights folderId={folderId} users={users} usersState={usersState}/>
+    <PermissionInsights folderId={folderId} users={users} usersState={usersState} refreshToken={refresh}/>
     <div className="perm-section-title">新增直接授权</div>
     <form className="perm-form" onSubmit={submit} onChange={()=>{if(submitState==="review")setSubmitState("edit");}}>
      {usersState==="failed"&&<p role="alert" className="notice error">读取用户列表失败。<button type="button" className="secondary-action" onClick={onRetryUsers}>重试用户列表</button></p>}

@@ -26,6 +26,7 @@ type PermissionExplanation struct {
 	SubjectID        string             `json:"subjectId"`
 	FolderID         string             `json:"folderId"`
 	SubjectDisabled  bool               `json:"subjectDisabled"`
+	SubjectRequiresPasswordChange bool  `json:"subjectRequiresPasswordChange"`
 	EffectiveActions []domain.Action    `json:"effectiveActions"`
 	Sources          []PermissionSource `json:"sources"`
 	EvaluatedAt      time.Time          `json:"evaluatedAt"`
@@ -82,12 +83,13 @@ func (s *Service) ExplainFolderPermissions(ctx context.Context, actor domain.Use
 	result := PermissionExplanation{
 		SubjectKind: "user", SubjectID: subject.ID, FolderID: folderID,
 		SubjectDisabled: subject.DisabledAt != nil,
+		SubjectRequiresPasswordChange: subject.MustChangePassword,
 		EffectiveActions: []domain.Action{}, Sources: []PermissionSource{},
 		EvaluatedAt: s.now().UTC(),
 	}
-	// A disabled account cannot authenticate. Do not present hypothetical
-	// grants as rights the subject can currently exercise.
-	if result.SubjectDisabled {
+	// Neither a disabled account nor a first-sign-in account can use business
+	// operations. Do not present hypothetical ACLs as currently usable rights.
+	if result.SubjectDisabled || result.SubjectRequiresPasswordChange {
 		return result, nil
 	}
 	allowed, sources, err := s.resolveActionsWithSources(ctx, tx, subject, folderID, true)

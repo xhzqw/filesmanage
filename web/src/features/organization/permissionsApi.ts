@@ -14,6 +14,7 @@ export type PermissionSource={
 };
 export type PermissionExplanation={
  subjectKind:"user";subjectId:string;folderId:string;subjectDisabled:boolean;
+ subjectRequiresPasswordChange:boolean;
  effectiveActions:string[];sources:PermissionSource[];evaluatedAt:string;
 };
 export type PermissionAuditRow={

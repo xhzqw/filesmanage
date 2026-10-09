@@ -82,6 +82,25 @@ func TestPermissionExplanationUsesAuthorizationSources(t *testing.T) {
 		len(adminView.Sources) != 1 || adminView.Sources[0].Kind != "admin_override" {
 		t.Fatalf("admin override explanation: %v %+v", err, adminView)
 	}
+	// Authentication states must take precedence over hypothetical grants.
+	repo.seedUser(domain.User{ID: "u_pending", Login: "pending", MustChangePassword: true}, "")
+	if _, err = s.CreateGrant(ctx, admin, "folder_market", GrantRequest{
+		SubjectKind: "user", SubjectID: "u_pending", Actions: []domain.Action{domain.ActionList},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	pending, err := s.ExplainFolderPermissions(ctx, admin, "u_pending", "folder_market")
+	if err != nil || !pending.SubjectRequiresPasswordChange ||
+		len(pending.EffectiveActions) != 0 || len(pending.Sources) != 0 {
+		t.Fatalf("password-change-required principal has no exercisable rights: %v %+v", err, pending)
+	}
+	if err = s.SetUserDisabled(ctx, admin, member.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	disabled, err := s.ExplainFolderPermissions(ctx, admin, member.ID, "folder_market")
+	if err != nil || !disabled.SubjectDisabled || len(disabled.EffectiveActions) != 0 || len(disabled.Sources) != 0 {
+		t.Fatalf("disabled principal has no exercisable rights: %v %+v", err, disabled)
+	}
 }
 
 func TestPermissionAuditAdminOnlyAndKeyset(t *testing.T) {

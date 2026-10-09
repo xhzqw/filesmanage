@@ -427,9 +427,11 @@ schema("PermissionSource", obj({
 
 schema("PermissionExplanation", obj({
     "subjectKind": string(enum=["user"]), "subjectId": string(), "folderId": string(),
-    "subjectDisabled": boolean(), "effectiveActions": arr(string(enum=GRANT_ACTIONS)),
+    "subjectDisabled": boolean(), "subjectRequiresPasswordChange": boolean(),
+    "effectiveActions": arr(string(enum=GRANT_ACTIONS)),
     "sources": arr(ref("PermissionSource")), "evaluatedAt": timestamp(),
-}, required=["subjectKind", "subjectId", "folderId", "subjectDisabled", "effectiveActions", "sources", "evaluatedAt"]))
+}, required=["subjectKind", "subjectId", "folderId", "subjectDisabled", "subjectRequiresPasswordChange",
+             "effectiveActions", "sources", "evaluatedAt"]))
 
 schema("PermissionAuditEntry", obj({
     "id": integer(), "actorId": string(), "eventType": string(), "targetKind": string(),

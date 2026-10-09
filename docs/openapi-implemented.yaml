@@ -5518,6 +5518,8 @@ components:
           type: string
         subjectDisabled:
           type: boolean
+        subjectRequiresPasswordChange:
+          type: boolean
         effectiveActions:
           type: array
           items:
@@ -5544,6 +5546,7 @@ components:
       - subjectId
       - folderId
       - subjectDisabled
+      - subjectRequiresPasswordChange
       - effectiveActions
       - sources
       - evaluatedAt

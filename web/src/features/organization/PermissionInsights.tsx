@@ -1,4 +1,4 @@
-import {useEffect,useMemo,useState} from "react";
+import {useEffect,useMemo,useRef,useState} from "react";
 import type {User} from "../../entities/user/model";
 import {errorCopy} from "../../shared/errors";
 import {permissionsApi,type PermissionExplanation,type PermissionAuditPage} from "./permissionsApi";
@@ -23,8 +23,8 @@ const labelActions=(actions:string[])=>actions.map(a=>ACTIONS[a]??a).join("、")
 
 // The service returns authoritative allowed actions and the applied sources
 // from the same resolver. No client-side grant union is performed here.
-export function PermissionInsights({folderId,users,usersState}:{
- folderId:string;users:User[];usersState:"loading"|"ready"|"failed";
+export function PermissionInsights({folderId,users,usersState,refreshToken}:{
+ folderId:string;users:User[];usersState:"loading"|"ready"|"failed";refreshToken:number;
 }){
  const [subjectId,setSubjectId]=useState("");
  const [result,setResult]=useState<PermissionExplanation|null>(null);
@@ -41,7 +41,7 @@ export function PermissionInsights({folderId,users,usersState}:{
    if(live){setResult(value);setBusy(false);}
   }).catch(e=>{if(live){setError(errorCopy(e,"无法读取有效权限"));setBusy(false);}});
   return()=>{live=false;};
- },[folderId,activeUser,generation]);
+ },[folderId,activeUser,generation,refreshToken]);
  return <section className="perm-insight" aria-label="有效权限解释">
   <div className="perm-section-title">有效权限解释 <span className="perm-subtle">服务端实时计算 · 只读</span></div>
   <p className="perm-hint">检查用户在当前目录的实际动作及来源；包含工作组、祖先 ACL 和目录共享，文件级分享不在此视图内。</p>
@@ -57,6 +57,7 @@ export function PermissionInsights({folderId,users,usersState}:{
   {error&&<p role="alert" className="notice error">{error}</p>}
   {result&&result.folderId===folderId&&result.subjectId===activeUser&&<>
    {result.subjectDisabled&&<p className="notice">该账号已禁用，没有可使用的文件权限。</p>}
+   {result.subjectRequiresPasswordChange&&<p className="notice">该账号尚未完成首次密码修改，目前不能执行文件操作。</p>}
    <div className="perm-effective"><strong>当前有效动作</strong>
     {result.effectiveActions.length===0?<span>无（默认拒绝）</span>
      :result.effectiveActions.map(a=><span key={a} className="perm-action-token">{ACTIONS[a]??a}</span>)}
@@ -85,25 +86,36 @@ export function PermissionAudit({users}:{users:User[]}){
  const [moreBusy,setMoreBusy]=useState(false);
  const [error,setError]=useState("");
  const [version,setVersion]=useState(0);
+ const queryGeneration=useRef(0);
  const names=useMemo(()=>new Map(users.map(u=>[u.id,u.displayName])),[users]);
  useEffect(()=>{
-  let live=true;setBusy(true);setError("");
-  permissionsApi.audit().then(data=>{if(live){setPage(data);setBusy(false);}})
-   .catch(e=>{if(live){setError(errorCopy(e,"读取权限审计失败"));setBusy(false);}});
+  let live=true;
+  const generation=++queryGeneration.current;
+  setBusy(true);setError("");
+  permissionsApi.audit().then(data=>{
+   if(live&&generation===queryGeneration.current){setPage(data);setBusy(false);}
+  }).catch(e=>{
+   if(live&&generation===queryGeneration.current){setError(errorCopy(e,"读取权限审计失败"));setBusy(false);}
+  });
   return()=>{live=false;};
  },[version]);
  async function more(){
   if(!page.nextCursor||moreBusy)return;
+  const generation=queryGeneration.current;
   setMoreBusy(true);setError("");
   try{const data=await permissionsApi.audit(page.nextCursor);
-   setPage(old=>({...data,items:[...old.items,...data.items]}));
-  }catch(e){setError(errorCopy(e,"加载更多审计记录失败"));}
+   if(generation===queryGeneration.current){
+    setPage(old=>({...data,items:[...old.items,...data.items]}));
+   }
+  }catch(e){if(generation===queryGeneration.current)setError(errorCopy(e,"加载更多审计记录失败"));}
   finally{setMoreBusy(false);}
  }
  return <section className="perm-audit" aria-label="权限审计">
   <div className="perm-audit-header"><div><strong>权限变更审计</strong>
    <p className="hint">仅管理员可见，按事件顺序倒序显示授权、分享、工作组及账号启停操作。</p></div>
-   <button type="button" className="secondary-action" disabled={busy} onClick={()=>setVersion(v=>v+1)}>刷新</button></div>
+   <button type="button" className="secondary-action" disabled={busy} onClick={()=>{
+    queryGeneration.current++;setVersion(v=>v+1);
+   }}>刷新</button></div>
   {busy&&<p role="status" className="hint">正在读取审计记录…</p>}
   {error&&<p role="alert" className="notice error">{error}</p>}
   {!busy&&<div className="perm-audit-scroll">
