@@ -5,6 +5,7 @@
 业务数据库：`filesmanage_v21`（PostgreSQL 14+，迁移 0001–0011 已应用）
 开发服务：`0.0.0.0:18091`（LAN 白名单外拒绝）｜压测实例：`127.0.0.1:18092`（库 `filesmanage_perf`）
 文档编辑：自托管 ONLYOFFICE Document Server 8.2.2（Docker 容器 `filesmanage-office`，端口 18080）
+内部 HTTPS（LAN/VPN）：`https://192.168.1.22:18443` 或 `https://10.144.144.1:18443`；在线编辑器 HTTPS `18444`。独立内部 CA 的安装、信任、验证及回退详见 [LAN-HTTPS.md](LAN-HTTPS.md)。旧 `18091` HTTP 为兼容过渡期入口，尚未关闭。
 
 > 生产端口 `8091` **未授权**（BLK-05）。在获得明确授权前，不得占用 8091、不得安装
 > systemd 单元、不得切换生产入口。本手册描述的一切均为 dev 级操作。

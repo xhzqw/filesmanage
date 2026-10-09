@@ -40,7 +40,7 @@ export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
     if(!valid)return;
     const opened=session as OfficeSessionData;
     setSessionId(opened.sessionId);
-    await loadEditorScript(opened.editorUrl+"/web-apps/apps/api/documents/api.js");
+     await loadEditorScript(editorBrowserUrl(opened.editorUrl)+"/web-apps/apps/api/documents/api.js");
     if(!valid||!holder.current)return;
     // The server returns the full editor config with its signed token; the
     // editor validates the signature server-side.
@@ -74,6 +74,19 @@ export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
    </div>
   </div>
  </AppShell>;
+}
+
+// Browser traffic from the new HTTPS frontend must never load HTTP editor
+// scripts or iframes. Backend callbacks/downloads continue using the pinned
+// internal editor URL, independent of this browser-only URL selection.
+function editorBrowserUrl(internalUrl:string):string{
+ if(window.location.protocol==="https:"&&window.location.port==="18443"){
+  const host=window.location.hostname;
+  if(host==="192.168.1.22"||host==="10.144.144.1"||host==="openclaw77"){
+   return "https://"+host+":18444";
+  }
+ }
+ return internalUrl.replace(/\/$/,"");
 }
 
 function loadEditorScript(src:string):Promise<void>{
