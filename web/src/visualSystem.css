@@ -1,0 +1,212 @@
+/*
+ * Filesmanage Visual System 3 — compact, continuous, softly resolved geometry.
+ *
+ * The earlier workbench used 0-radius welded panels and 2/4/6px controls.
+ * This layer is the canonical geometry authority across legacy and feature
+ * styles. Preserve dense 26/32px data rows and semantic contrast, but give
+ * every independent surface a deliberate corner radius and clear hierarchy.
+ * Keep material colours in theme.css; never override accessibility focus.
+ */
+:root{
+  --radius-xs:4px;      /* chips / keyboard hints / tiny affordances */
+  --radius-sm:7px;      /* compact controls / row affordances */
+  --radius-md:11px;     /* subpanels / tables / menus */
+  --radius-lg:15px;     /* workspaces / cards */
+  --radius-xl:20px;     /* modal dialogs / login */
+  --radius-pill:999px;  /* truly pill-shaped tags only */
+  --shadow-panel:0 1px 2px rgba(15,39,92,.045),0 4px 16px rgba(15,39,92,.035);
+  --shadow-overlay:0 12px 40px rgba(15,39,92,.15),0 2px 8px rgba(15,39,92,.07);
+}
+
+/* A single frame rhythm instead of flat screens or large floating cards. */
+.shell{
+  padding:8px;
+  gap:8px;
+}
+.header{
+  border:1px solid var(--border-hairline);
+  border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-panel);
+}
+.header nav{gap:3px}
+.header nav a{
+  height:calc(100% - 8px);
+  border:0;
+  border-radius:var(--radius-sm);
+  padding:0 var(--space-3);
+}
+.header nav a.active{
+  background:var(--surface-row-selected);
+  color:var(--brand-blue);
+  border:0;
+  box-shadow:inset 0 -2px 0 var(--border-selected);
+}
+.header nav a:hover{background:var(--surface-row-hover)}
+.panels{gap:8px;background:transparent}
+.sidebar,.work{
+  border:1px solid var(--border-hairline);
+  border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-panel);
+  min-height:0;
+}
+.sidebar{border-right:1px solid var(--border-hairline)}
+.work{overflow:hidden;background:var(--surface-canvas)}
+.work.file-preview-page{overflow-y:auto;overflow-x:hidden}
+.sidebar-scroll{padding:5px 4px}
+.sidebar .tree-row{
+  width:calc(100% - 8px);
+  margin-inline:4px;
+  border-radius:var(--radius-sm);
+}
+.status-bar{
+  border:1px solid var(--border-hairline);
+  border-radius:var(--radius-md);
+  background:var(--surface-panel);
+  padding-inline:var(--space-3);
+}
+
+/* Floating controls are compact and softly rectangular, never bubbles. */
+button,input:not([type="checkbox"]):not([type="radio"]),select,textarea,
+.primary,.command-trigger,.ghost-action-btn,.ghost-more-btn,
+.toolbar-views select,.filter-search-input,
+.tree-search,.org-tab,.org-header-btn{
+  border-radius:var(--radius-sm);
+}
+input[type="checkbox"],input[type="radio"]{border-radius:var(--radius-xs)}
+.toolbar button.on,.group-list button.on{box-shadow:inset 0 0 0 1px var(--border-selected)}
+.nav-toggle,.account-trigger{border-radius:var(--radius-sm)}
+
+/* Independent content bands gain air and rounded edges without sacrificing
+   scroll ownership or table density. No sticky ancestor gets overflow:auto. */
+.breadcrumb,.toolbar,.folder-actions{
+  margin:6px 7px 0;
+  padding:4px var(--space-2);
+  min-height:30px;
+  border:1px solid var(--border-hairline);
+  border-radius:var(--radius-sm);
+  background:var(--surface-panel);
+}
+.work-body{min-height:0}
+.table{
+  min-height:0;
+  margin:6px 7px 7px;
+  border:1px solid var(--border-hairline);
+  border-radius:var(--radius-md);
+  overflow:auto;
+}
+.table table{border-collapse:separate;border-spacing:0}
+.table thead tr:first-child th:first-child{border-top-left-radius:var(--radius-sm)}
+.table thead tr:first-child th:last-child{border-top-right-radius:var(--radius-sm)}
+.table tbody tr:focus-visible{border-radius:var(--radius-xs)}
+.version-badge,.org-count-pill{border-radius:var(--radius-pill)}
+.file-preview-page .table{margin-top:6px}
+.preview-text{
+  min-height:180px;
+  margin:6px 7px;
+  border-radius:var(--radius-md);
+}
+.notice,.hint:not(.toolbar-hint){border-radius:var(--radius-sm)}
+
+/* Contextual popup surfaces share one elevation / interior item vocabulary. */
+.menu,.folder-more-menu,.row-more-menu,.command-panel{
+  border-radius:var(--radius-md);
+  box-shadow:var(--shadow-overlay);
+}
+.folder-more-menu,.row-more-menu{padding:4px}
+.folder-more-menu button,.row-more-menu button{
+  border-radius:var(--radius-sm);
+  width:100%;
+}
+.menu-item,.command-row{border-radius:var(--radius-sm)}
+.dialog,.login-card{
+  border-radius:var(--radius-xl);
+  box-shadow:var(--shadow-overlay);
+}
+.dialog{
+  max-width:calc(100vw - 32px);
+  max-height:calc(100dvh - 32px);
+  overflow:auto;
+}
+.dialog form fieldset,.grant-form fieldset,.perm-form fieldset{
+  border-radius:var(--radius-md);
+}
+
+/* Dashboard, organization and permission screens have the same card shape. */
+.stat-cards{
+  gap:8px;
+  padding:8px;
+  border-bottom:0;
+}
+.stat-card,.stat-card:last-child{
+  border:1px solid var(--border-hairline);
+  border-radius:var(--radius-md);
+  box-shadow:var(--shadow-panel);
+}
+.org-card,.share-workbench,.upload-queue{
+  border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-panel);
+}
+.org-tabs-nav{
+  padding:3px;
+  border-radius:var(--radius-md);
+  background:var(--surface-header);
+}
+.org-tab{
+  border:0;
+  border-radius:var(--radius-sm);
+}
+.org-tab:hover{background:var(--surface-row-hover)}
+.org-tab.active{
+  border:0;
+  border-radius:var(--radius-sm);
+  background:var(--surface-row-selected);
+  box-shadow:inset 0 -2px 0 var(--border-selected);
+}
+.perm-workspace{
+  margin:7px;
+  border:1px solid var(--border-hairline);
+  border-radius:var(--radius-md);
+}
+.perm-tree-row,.perm-result{border-radius:var(--radius-sm)}
+.perm-review{border-radius:var(--radius-md)}
+
+/* Preview stages must not end as boxy exceptions to the global shell. */
+.media-preview{
+  margin:6px 7px;
+  border-radius:var(--radius-md);
+  overflow:hidden;
+  box-shadow:var(--shadow-panel);
+}
+.media-image-stage,.media-video-stage,.media-audio-stage{overflow:auto}
+.office-holder,.viewer-stage{
+  margin:6px 7px 7px;
+  border:1px solid var(--border-hairline);
+  border-radius:var(--radius-md);
+  box-shadow:var(--shadow-panel);
+  overflow:hidden;
+}
+.dropzone{border-radius:var(--radius-md)}
+
+/* Small widths retain the same geometry with less inset and no horizontal
+   scrollbar induced by outer panel margins. */
+@media(max-width:1050px){
+  .header nav{
+    top:calc(var(--height-header) + 4px);
+    left:0;right:0;
+    border:1px solid var(--border-hairline);
+    border-radius:var(--radius-md);
+    box-shadow:var(--shadow-overlay);
+    padding:6px;
+  }
+  .header nav a{height:32px;border:0;border-radius:var(--radius-sm)}
+  .header nav a.active{border:0;box-shadow:inset 2px 0 0 var(--border-selected)}
+}
+@media(max-width:820px){
+  .shell{padding:5px;gap:5px}
+  .panels{gap:5px}
+  .sidebar,.work,.header{border-radius:var(--radius-md)}
+  .breadcrumb,.toolbar,.folder-actions{margin:4px 4px 0}
+  .table,.media-preview,.preview-text,.office-holder,.viewer-stage{margin:4px}
+  .stat-cards{gap:5px;padding:5px}
+  .org-workbench{gap:6px;padding:6px}
+}
