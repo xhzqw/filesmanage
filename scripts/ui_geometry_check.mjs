@@ -292,9 +292,37 @@ try{
     permissionsLayout.tree.width>=Math.min(200,width*.6)&&
     permissionsLayout.tree.height>=110&&
     permissionsLayout.detail.width>=Math.min(250,width*.7)&&
-    permissionsLayout.detail.height>=170,
+    permissionsLayout.detail.height>=300&&
+    permissionsLayout.detail.overflowY==="auto"&&
+    permissionsLayout.treeScroll.overflowY==="auto"&&
+    permissionsLayout.workspace.overflowY==="hidden",
     JSON.stringify(permissionsLayout));
    if(width===390){
+    await navigate("/doc?folder="+fixture.folderId,".file-table");
+    for(let i=0;i<50;i++){
+     if(await evaluate(`!!document.querySelector(".more-trigger")`))break;
+     await delay(100);
+    }
+    const quickMenuOpened=await evaluate(`(()=>{
+     const button=document.querySelector(".file-mobile-actions");
+     if(!button)return false;
+     const style=getComputedStyle(button);
+     if(style.display==="none")return false;
+     button.click();return true;
+    })()`);
+    await delay(140);
+    const quickMenu=await evaluate(`(()=>{
+     const menu=document.querySelector('[role="menu"][aria-label="文件操作菜单"]');
+     if(!menu)return null;
+     const r=menu.getBoundingClientRect(),s=getComputedStyle(menu);
+     return {left:r.left,right:r.right,visible:s.opacity!=="0",
+      labels:[...menu.querySelectorAll('[role="menuitem"]')].map(el=>el.textContent?.trim())};
+    })()`);
+    check("phone file name exposes reachable full action menu",
+     quickMenuOpened&&!!quickMenu&&quickMenu.visible&&quickMenu.left>=0&&
+     quickMenu.right<=390&&quickMenu.labels.includes("移动到…")&&
+     quickMenu.labels.includes("重命名"),
+     JSON.stringify(quickMenu));
     await navigate("/doc?folder="+fixture.folderId,".file-table");
     for(let i=0;i<50;i++){
      if(await evaluate(`!!document.querySelector(".more-trigger")`))break;

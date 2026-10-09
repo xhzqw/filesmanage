@@ -837,7 +837,11 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       onDragStart={event=>onRowDragStart(event,item)}
       onDragEnd={onRowDragEnd}>
       <td className="col-select"><input type="checkbox" checked={selectedIds.has(item.id)} aria-label={"选择 "+item.name} onClick={event=>event.stopPropagation()} onChange={event=>onCheckToggle(event,item)}/></td>
-      <td className="col-name"><div className="file-cell-wrap"><FileTypeIcon name={item.name}/><span className="file-name" title={item.name}>{item.name}</span></div></td>
+      <td className="col-name"><div className="file-cell-wrap">
+       <FileTypeIcon name={item.name}/><span className="file-name" title={item.name}>{item.name}</span>
+       <button type="button" className="file-mobile-actions" aria-label={"操作 "+item.name}
+        title={"文件操作："+item.name} onClick={event=>{event.stopPropagation();openRowMenu(item);}}>···</button>
+      </div></td>
       <td className="col-size num">{formatSize(item.sizeBytes)}</td>
       <td className="col-version"><span className="version-badge">v{item.currentVersionSeq}</span></td>
       <td className="col-date date">{item.updatedAt.replace("T"," ").slice(0,16)}</td>

@@ -119,7 +119,9 @@ function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(folder:R
     {searchState==="loading"&&<p className="hint">正在搜索…</p>}
     {searchState==="failed"&&<p role="alert" className="notice error">{searchError}</p>}
     {searchState==="ready"&&searchPage.items.length===0&&<p className="hint">没有匹配的目录</p>}
-    {searchState==="ready"&&searchPage.items.map(f=><button type="button" key={f.id} className="perm-result" onClick={()=>onSelect(f)}>
+    {searchState==="ready"&&searchPage.items.map(f=><button type="button" key={f.id}
+     className={"perm-result"+(selected===f.id?" selected":"")} aria-current={selected===f.id?"true":undefined}
+     onClick={()=>onSelect(f)}>
      <span>{f.name}</span><small>{f.path||"资源目录"}</small></button>)}
     {searchState==="ready"&&searchPage.nextCursor&&<button type="button" className="perm-more" disabled={moreSearch} onClick={()=>void loadMoreSearch()}>加载更多结果</button>}
    </>:<>
@@ -251,7 +253,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
      <div><strong>目录权限</strong><span className="perm-path" title={folderId}>{selectedName?.id===folderId?selectedName.name:folderId}</span></div>
      <div><Link to={"/doc?folder="+encodeURIComponent(folderId)}>返回文档目录</Link> <button type="button" className="secondary-action" onClick={reload}>刷新授权</button></div>
     </div>
-    <div className="perm-section-title">直接授权记录</div>
+    <div className="perm-section-title">直接授权记录{state==="ready"&&<span className="perm-subtle">{grants.length} 条</span>}</div>
     <p className="perm-hint">显示的仅是当前目录直接 ACL；继承与共享可能仍赋予相同动作，不代表最终有效权限。</p>
     {notice&&<p role={notice.error?"alert":"status"} className={"notice"+(notice.error?" error":"")}>{notice.text}</p>}
     {state==="loading"&&<p role="status" className="hint">正在读取直接授权…</p>}
