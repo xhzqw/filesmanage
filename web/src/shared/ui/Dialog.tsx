@@ -20,10 +20,14 @@ export function Dialog({open,title,onClose,closeGuard,initialFocus,className,chi
  const node=useRef<HTMLDialogElement>(null);
  const trigger=useRef<HTMLElement|null>(null);
  const titleId=useId();
+ // React state mirror: a dialog unmounted while open is already closed by the
+ // DOM removal, so the native `open` flag cannot drive the focus restore.
+ const shown=useRef(false);
 
  useEffect(()=>{
   const dialog=node.current;
   if(!dialog)return;
+  shown.current=open;
   if(open){
    if(!dialog.open){
     const active=document.activeElement;
@@ -35,16 +39,17 @@ export function Dialog({open,title,onClose,closeGuard,initialFocus,className,chi
    return;
   }
   if(dialog.open)dialog.close();
-  const previous=trigger.current;
-  trigger.current=null;
-  // If the trigger is gone, keep keyboard focus inside the page instead of
-  // dropping it to <body>.
-  if(previous&&previous.isConnected)previous.focus();
+  restoreFocus();
  },[open,initialFocus]);
 
  // Unmounting an open dialog (route change, parent condition) must not leave
- // the native top-layer element behind.
- useEffect(()=>()=>{if(node.current?.open)node.current.close();},[]);
+ // the native top-layer element behind, and focus still returns to the
+ // trigger when it survives.
+ useEffect(()=>()=>{
+  const dialog=node.current;
+  if(dialog?.open)dialog.close();
+  if(shown.current)restoreFocus();
+ },[]);
 
  useEffect(()=>{
   const dialog=node.current;
@@ -57,6 +62,14 @@ export function Dialog({open,title,onClose,closeGuard,initialFocus,className,chi
   dialog.addEventListener("cancel",onCancel);
   return()=>dialog.removeEventListener("cancel",onCancel);
  },[open,onClose,closeGuard]);
+
+ // If the trigger is gone, keep keyboard focus inside the page instead of
+ // dropping it to <body>.
+ function restoreFocus(){
+  const previous=trigger.current;
+  trigger.current=null;
+  if(previous&&previous.isConnected)previous.focus();
+ }
 
  return <dialog ref={node} className={"dialog "+(className??"")} aria-labelledby={titleId}>
   <h2 id={titleId} className="dialog-title">{title}</h2>
