@@ -8,17 +8,13 @@ import "./organization.css";
 type LoadState="loading"|"ready"|"failed";
 type Tone="info"|"error";
 type Notice={text:string;tone:Tone};
-// 对话框只报告服务端确认过的结果：ok 是服务端受理后的真实文案，error 让对话框保持打开可重试
-// （DESKTOP-INTERACTION-v1 §4.1 第 4 条）。
 type DialogResult={ok:string}|{error:string};
 type DeptRow={department:Department;depth:number};
+type StatusFilter="all"|"normal"|"warning"|"disabled"|"admin";
 
-// 与目录树一致的深度上限：异常数据（父子成环）下渲染与键盘行走一起停住
 const MAX_DEPTH=32;
-// 添加成员候选一次最多渲染 50 行，长账号列表不整表 mount（DESKTOP-INTERACTION-v1 §5 同一取舍）
 const CANDIDATE_CAP=50;
 const DEPT_HIT_CAP=30;
-// 服务端 GET /users、/departments、/groups 的单次上限（ListUsers/ListDepartments/ListWorkgroups LIMIT 1000）
 const LIST_CAP=1000;
 
 function loginOf(user:User):string{return user.login??"";}
@@ -27,7 +23,6 @@ function matchesQuery(user:User,needle:string):boolean{
  return user.displayName.toLowerCase().includes(needle)||loginOf(user).toLowerCase().includes(needle);
 }
 
-// 可见祖先路径（不含自身）：祖先不在可见集合时绝不臆造（DESKTOP-INTERACTION-v1 §5）
 function ancestorPathOf(byId:Map<string,Department>,id:string):string{
  const names:string[]=[];
  const seen=new Set<string>();
@@ -54,8 +49,6 @@ function departmentLabelOf(byId:Map<string,Department>,id:string|undefined):stri
  return byId.get(key)?.name??`未知部门（${key}）`;
 }
 
-// 组织写入的统一错误文案。E_NETWORK 说明结果未知（调用方随即重读服务端状态），
-// 其余分支只描述服务端已确认的拒绝，绝不把失败说成成功（DESKTOP-INTERACTION-v1 §8）。
 function mutationCopy(error:unknown,fallback:string):string{
  const code=errorCode(error);
  if(code==="E_NETWORK")return "网络中断，无法确认操作是否已提交；请以列表最新状态为准。";
@@ -67,14 +60,58 @@ function mutationCopy(error:unknown,fallback:string):string{
  return errorCopy(error,fallback);
 }
 
-// 组织工作台（COMPLEX-WORKFLOWS-v1 §9 组织行、UX-ACCEPTANCE WF-32）：部门树 + 工作组/成员详情
-// + 可搜索选择；重置密码、禁用/启用、移除成员等危险管理操作一律走真实模态 Dialog 确认。
-// 前端能力提示（isAdmin、按钮可用性）不是授权证据，每个写入都由服务端重新判定。
+function IconBuilding(){
+ return <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+  <path d="M2 14V3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v11h4v1H1v-1h1zm2-10v2h2V4H4zm0 3v2h2V7H4zm0 3v2h2v-2H4zm4-6v2h2V4H8zm0 3v2h2V7H8zm0 3v2h2v-2H8z"/>
+ </svg>;
+}
+
+function IconFolder(){
+ return <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+  <path d="M1.5 2.5A1.5 1.5 0 0 0 0 4v8a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 16 12V6a1.5 1.5 0 0 0-1.5-1.5H8.414l-1.707-1.707A1 1 0 0 0 6 2.5H1.5z"/>
+ </svg>;
+}
+
+function IconUsers(){
+ return <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <path d="M11 14v-1.5a2.5 2.5 0 0 0-2.5-2.5h-5A2.5 2.5 0 0 0 1 12.5V14"/>
+  <circle cx="6" cy="5" r="3"/>
+  <path d="M15 14v-1.2a2.3 2.3 0 0 0-1.8-2.2"/>
+  <path d="M11 2.2a2.3 2.3 0 0 1 0 4.5"/>
+ </svg>;
+}
+
+function IconGroup(){
+ return <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <rect x="2" y="3" width="12" height="10" rx="2"/>
+  <path d="M6 8h4"/>
+  <path d="M8 6v4"/>
+ </svg>;
+}
+
+function IconSearch(){
+ return <svg className="org-search-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <circle cx="7" cy="7" r="4.5"/>
+  <path d="M10.5 10.5L14 14"/>
+ </svg>;
+}
+
+function IconPlus(){
+ return <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <path d="M8 2v12M2 8h12"/>
+ </svg>;
+}
+
+function IconChevron({open}:{open:boolean}){
+ return <svg className={"org-chevron-svg"+(open?" open":"")} width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <path d="M6 3l5 5-5 5"/>
+ </svg>;
+}
+
 export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;currentUserId:string}){
  const[users,setUsers]=useState<User[]>([]);
  const[departments,setDepartments]=useState<Department[]>([]);
  const[groups,setGroups]=useState<Workgroup[]>([]);
- // 三个数据源各自成败：一个失败不掩盖其他面板的真实数据，也不用空表冒充“没有数据”
  const[usersState,setUsersState]=useState<LoadState>("loading");
  const[departmentsState,setDepartmentsState]=useState<LoadState>("loading");
  const[groupsState,setGroupsState]=useState<LoadState>("loading");
@@ -82,17 +119,26 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  const[departmentsToken,setDepartmentsToken]=useState(0);
  const[groupsToken,setGroupsToken]=useState(0);
  const[notice,setNotice]=useState<Notice|null>(null);
+
+ // 视图与筛选状态：默认 Tab 1 为部门成员，Tab 2 为工作组管理
+ const[activeTab,setActiveTab]=useState<"members"|"groups">("members");
  const[selectedDepartment,setSelectedDepartment]=useState("");
  const[deptQuery,setDeptQuery]=useState("");
  const[expanded,setExpanded]=useState<Set<string>>(()=>new Set<string>());
  const[focusedId,setFocusedId]=useState<string|null>(null);
  const[memberQuery,setMemberQuery]=useState("");
+ const[statusFilter,setStatusFilter]=useState<StatusFilter>("all");
+
+ // 工作组状态
  const[selectedGroup,setSelectedGroup]=useState("");
+ const[groupQuery,setGroupQuery]=useState("");
  const[groupMembers,setGroupMembers]=useState<User[]>([]);
  const[membersState,setMembersState]=useState<LoadState>("loading");
  const[membersToken,setMembersToken]=useState(0);
  const[candidateQuery,setCandidateQuery]=useState("");
  const[addBusy,setAddBusy]=useState("");
+
+ // 对话框表单状态
  const[newUser,setNewUser]=useState({login:"",displayName:"",password:"",departmentId:""});
  const[resetTarget,setResetTarget]=useState<User|null>(null);
  const[stateTarget,setStateTarget]=useState<User|null>(null);
@@ -102,7 +148,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  const[createGroupOpen,setCreateGroupOpen]=useState(false);
  const rootsExpanded=useRef(false);
 
- // 非管理员不发组织请求：这些端点在服务端是 admin-only，前端提示不构成授权依据
  useEffect(()=>{
   if(!isAdmin)return;
   let valid=true;
@@ -133,15 +178,13 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   return()=>{valid=false;};
  },[isAdmin,groupsToken]);
 
- // 首次拿到部门数据时展开顶层部门，之后尊重用户的折叠状态
  useEffect(()=>{
   if(departments.length===0||rootsExpanded.current)return;
   rootsExpanded.current=true;
-  const ids=new Set(departments.map(department=>department.id));
+  const ids=new Set(departments.map(d=>d.id));
   setExpanded(new Set(departments.filter(d=>d.parentId===null||!ids.has(d.parentId)).map(d=>d.id)));
  },[departments]);
 
- // 默认选中第一个工作组，与改造前的面板行为一致
  useEffect(()=>{
   if(selectedGroup!=="")return;
   const first=groups[0];
@@ -158,26 +201,25 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   return()=>{valid=false;};
  },[isAdmin,selectedGroup,membersToken]);
 
- const deptById=useMemo(()=>new Map(departments.map(department=>[department.id,department])),[departments]);
- // parentId→children 索引只建一次：渲染与计数都不在子数组上反复 filter（DESKTOP-INTERACTION-v1 §5）
+ const deptById=useMemo(()=>new Map(departments.map(d=>[d.id,d])),[departments]);
  const deptIndex=useMemo(()=>{
-  const ids=new Set(departments.map(department=>department.id));
+  const ids=new Set(departments.map(d=>d.id));
   const childrenOf=new Map<string,Department[]>();
-  for(const department of departments){
-   const key=department.parentId!==null&&ids.has(department.parentId)?department.parentId:"";
+  for(const d of departments){
+   const key=d.parentId!==null&&ids.has(d.parentId)?d.parentId:"";
    const list=childrenOf.get(key);
-   if(list)list.push(department);else childrenOf.set(key,[department]);
+   if(list)list.push(d);else childrenOf.set(key,[d]);
   }
   return childrenOf;
  },[departments]);
+
  const departmentLabel=(id:string|undefined):string=>departmentLabelOf(deptById,id);
  const departmentOptions=useMemo(
-  ()=>departments.map(department=>({id:department.id,label:fullPathOf(deptById,department.id)})),
+  ()=>departments.map(d=>({id:d.id,label:fullPathOf(deptById,d.id)})),
   [departments,deptById]);
 
- // 选中部门的整棵子树（由 parentId 索引一次展开）：成员筛选按“本部门及其全部子部门”
  const selectedDeptIds=useMemo(()=>{
-  if(selectedDepartment==="")return null;
+  if(selectedDepartment===""||selectedDepartment==="__unassigned")return null;
   const out=new Set<string>();
   const walk=(id:string)=>{
    if(out.has(id))return;
@@ -188,7 +230,10 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   return out;
  },[selectedDepartment,deptIndex]);
 
- // 行内人数 = 本部门及全部子部门人数，与选择后的筛选范围一致；visiting 防成环数据无限递归
+ const unassignedCount=useMemo(
+  ()=>users.filter(u=>!u.departmentId||!deptById.has(u.departmentId)).length,
+  [users,deptById]);
+
  const deptCounts=useMemo(()=>{
   const direct=new Map<string,number>();
   for(const user of users){
@@ -208,21 +253,20 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    totals.set(id,total);
    return total;
   };
-  for(const department of departments)sum(department.id);
+  for(const d of departments)sum(d.id);
   return totals;
  },[users,departments,deptIndex]);
 
- // 可见行（展平）：键盘只在这份列表上行走；seen 让渲染与行走的可见集合保持一致
  const rows=useMemo(()=>{
   const out:DeptRow[]=[];
   const seen=new Set<string>();
   const walk=(parentId:string,depth:number)=>{
    if(depth>MAX_DEPTH)return;
-   for(const department of deptIndex.get(parentId)??[]){
-    if(seen.has(department.id))continue;
-    seen.add(department.id);
-    out.push({department,depth});
-    if(expanded.has(department.id))walk(department.id,depth+1);
+   for(const d of deptIndex.get(parentId)??[]){
+    if(seen.has(d.id))continue;
+    seen.add(d.id);
+    out.push({department:d,depth});
+    if(expanded.has(d.id))walk(d.id,depth+1);
    }
   };
   walk("",0);
@@ -236,30 +280,45 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   node?.focus();
  },[focusedId]);
 
- // 部门数据不可用时不做筛选：成员列表退回全部账号，并在面板里明确说明原因
  const deptFilter=departmentsState==="ready"?selectedDepartment:"";
- const activeDeptIds=deptFilter!==""?selectedDeptIds:null;
+ const activeDeptIds=deptFilter!==""&&deptFilter!=="__unassigned"?selectedDeptIds:null;
  const needle=memberQuery.trim().toLowerCase();
- const filteredMembers=useMemo(
-  ()=>users.filter(user=>{
-   if(activeDeptIds&&!activeDeptIds.has(user.departmentId??""))return false;
+
+ const filteredMembers=useMemo(()=>{
+  return users.filter(user=>{
+   if(selectedDepartment==="__unassigned"){
+    const dId=user.departmentId??"";
+    if(dId!==""&&deptById.has(dId))return false;
+   }else if(activeDeptIds&&!activeDeptIds.has(user.departmentId??"")){
+    return false;
+   }
+   if(statusFilter==="normal"&&(user.disabled===true||user.mustChangePassword))return false;
+   if(statusFilter==="warning"&&!user.mustChangePassword)return false;
+   if(statusFilter==="disabled"&&user.disabled!==true)return false;
+   if(statusFilter==="admin"&&!user.isAdmin)return false;
    if(needle==="")return true;
    return matchesQuery(user,needle);
-  }),
-  [users,activeDeptIds,needle]);
+  });
+ },[users,activeDeptIds,selectedDepartment,deptById,statusFilter,needle]);
 
  const deptHits=useMemo(()=>{
   const keyword=deptQuery.trim().toLowerCase();
   if(keyword==="")return{items:[] as Department[],truncated:false};
-  const matched=departments.filter(department=>department.name.toLowerCase().includes(keyword));
+  const matched=departments.filter(d=>d.name.toLowerCase().includes(keyword));
   return{items:matched.slice(0,DEPT_HIT_CAP),truncated:matched.length>DEPT_HIT_CAP};
  },[departments,deptQuery]);
 
- const selectedGroupRow=groups.find(group=>group.id===selectedGroup)??null;
+ const filteredGroups=useMemo(()=>{
+  const keyword=groupQuery.trim().toLowerCase();
+  if(keyword==="")return groups;
+  return groups.filter(g=>g.name.toLowerCase().includes(keyword));
+ },[groups,groupQuery]);
+
+ const selectedGroupRow=groups.find(g=>g.id===selectedGroup)??null;
+
  const candidates=useMemo(()=>{
   const keyword=candidateQuery.trim().toLowerCase();
-  const current=new Set(groupMembers.map(member=>member.id));
-  // 已禁用账号不进入新成员候选（与授权对话框同一取舍）；成员列表里仍显示并标注
+  const current=new Set(groupMembers.map(m=>m.id));
   return users
    .filter(user=>user.disabled!==true&&!current.has(user.id)&&(keyword===""||matchesQuery(user,keyword)))
    .slice(0,CANDIDATE_CAP);
@@ -268,8 +327,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  const canCreateUser=
   newUser.login.trim()!==""&&newUser.displayName.trim()!==""&&newUser.password.length>=16;
 
- // 变更成功后重新读取服务端列表；刷新失败单独反馈，不否定已提交的写入（DESKTOP-INTERACTION-v1 §8）。
- // 刷新失败时清掉旧列表：面板只剩显式错误态与重试，不把可能过期的管理数据当成当前事实。
  async function refreshUsers(failure:string):Promise<void>{
   try{
    setUsers(await organizationApi.users());
@@ -303,7 +360,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   }
  }
 
- // 返回是否刷新成功：调用方据此决定“已提交”的成功文案是否还能覆盖失败文案（§8 分别反馈）
  async function refreshMembers(failure:string):Promise<boolean>{
   if(selectedGroup==="")return false;
   try{
@@ -333,8 +389,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   if(target)setFocusedId(target.department.id);
  }
 
- // 键盘漫游（DESKTOP-INTERACTION-v1 §5）：方向键在可见节点间移动，Right 展开/进入首个子项，
- // Left 折叠/回到父项，Enter/空格激活部门即筛选成员；名称按钮只选择，chevron 只展开/折叠。
  function onTreeKeyDown(event:KeyboardEvent<HTMLUListElement>){
   if(!focusedId)return;
   const index=rows.findIndex(row=>row.department.id===focusedId);
@@ -377,7 +431,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   }
  }
 
- // 搜索结果选择：展开可见祖先链再筛选该部门，祖先不臆造
  function revealDepartment(id:string){
   const chain:string[]=[];
   const seen=new Set<string>();
@@ -420,7 +473,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    await organizationApi.resetPassword(target.id,password);
   }catch(error){
    const code=errorCode(error);
-   // 结果未知或记录已变：重读用户列表，用“待改密”标记让最终状态可核对
    if(code==="E_NETWORK"||code==="E_NOT_FOUND")
     await refreshUsers(`重置 ${loginOf(target)} 密码的结果未确认，用户列表刷新失败，请重试。`);
    return{error:mutationCopy(error,"重置密码失败")};
@@ -473,8 +525,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    await organizationApi.addMember(group.id,user.id);
   }catch(error){
    const code=errorCode(error);
-   // 成员关系已存在时服务端当前实现会落到 E_INTERNAL；这类失败也重读成员列表，
-   // 让界面显示服务端事实而不是猜测
    if(code==="E_NETWORK"||code==="E_NOT_FOUND"||code==="E_INTERNAL"||code==="E_NAME_CONFLICT")
     await refreshMembers("添加成员未成功，工作组成员刷新失败，请重试。");
    setNotice({tone:"error",text:code==="E_INTERNAL"||code==="E_NAME_CONFLICT"
@@ -484,7 +534,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    return;
   }
   setAddBusy("");
-  // 刷新失败时 refreshMembers 已写好“已提交但刷新失败”的错误文案，成功文案不再覆盖它
   const refreshed=await refreshMembers(`已把 ${user.displayName} 加入工作组 ${group.name}，但成员列表刷新失败，请点击重试。`);
   if(refreshed)setNotice({tone:"info",text:`已把 ${user.displayName} 加入工作组 ${group.name}。`});
  }
@@ -527,31 +576,43 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  const usersReady=usersState==="ready";
  const departmentsReady=departmentsState==="ready";
  const groupsReady=groupsState==="ready";
+
  const memberEmpty=users.length===0
   ?"还没有账号。"
   :needle!==""
    ?"没有匹配的成员（按姓名或账号搜索）。"
-   :deptFilter!==""
-    ?"该部门（含子部门）暂无成员。"
-    :"没有成员。";
+   :selectedDepartment==="__unassigned"
+    ?"暂无未分配部门的成员。"
+    :deptFilter!==""
+     ?"该部门（含子部门）暂无成员。"
+     :"没有成员。";
+
  const scopeText=departmentsState==="failed"
   ?"范围：全部账号（部门数据不可用，暂不能按部门筛选）"
-  :deptFilter===""
-   ?"范围：全部账号"
-   :"范围："+departmentLabel(deptFilter)+"（含全部子部门）";
+  :selectedDepartment==="__unassigned"
+   ?`范围：未分配部门（${unassignedCount} 人）`
+   :deptFilter===""
+    ?`范围：全体组织（${users.length} 人）`
+    :"范围："+departmentLabel(deptFilter)+"（含全部子部门）";
+
+ const scopeLabel=selectedDepartment===""
+  ?"全体组织"
+  :selectedDepartment==="__unassigned"
+   ?"未分配部门"
+   :departmentLabel(selectedDepartment);
+
  const candidateEmpty=!usersReady
   ?"账号列表不可用，无法选择成员。"
   :candidateQuery.trim()!==""
    ?"没有匹配的可加入账号。"
    :"所有可用账号都已在该工作组中。";
- // 加载中/失败时表格仍渲染：表格行自己说明真实状态，不冒充“没有数据”
+
  const memberTableEmpty=usersState==="loading"
   ?"正在读取用户…"
   :usersState==="failed"
    ?"用户列表读取失败，请先用上方的重试按钮。"
    :memberEmpty;
 
- // 树内渲染与 rows 使用同一 seen 规则，异常环数据下两者的可见集合保持一致
  const rendered=new Set<string>();
  function renderDeptNodes(parentId:string,depth:number):ReactNode{
   if(depth>MAX_DEPTH)return null;
@@ -561,21 +622,28 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    const isOpen=expanded.has(department.id);
    const hasChildren=(deptIndex.get(department.id)??[]).length>0;
    const count=deptCounts.get(department.id)??0;
+   const isSelected=selectedDepartment===department.id;
+
    return <li key={department.id} data-dept-id={department.id} role="treeitem"
     aria-expanded={hasChildren?isOpen:undefined}
-    aria-selected={selectedDepartment===department.id}
+    aria-selected={isSelected}
     tabIndex={focusedId===department.id||(focusedId===null&&rows[0]?.department.id===department.id)?0:-1}
     onFocus={event=>{if(event.target===event.currentTarget)setFocusedId(department.id);}}>
-    <div className={"tree-row "+(selectedDepartment===department.id?"on":"")} style={{paddingLeft:String(depth*16)+"px"}}>
+    <div className={"tree-row "+(isSelected?"on":"")} style={{paddingLeft:`${depth*16+14}px`}}>
      {hasChildren
-      ?<button type="button" aria-label={(isOpen?"折叠":"展开")+" "+department.name} tabIndex={-1}
-        onClick={()=>toggle(department.id)}>{isOpen?"▾":"▸"}</button>
-      :<span className="tree-chevron-spacer" aria-hidden="true"/>}
+      ?<button type="button" className={"org-tree-chevron"+(isOpen?" open":"")}
+        aria-label={(isOpen?"折叠":"展开")+" "+department.name} tabIndex={-1}
+        onClick={e=>{e.stopPropagation();toggle(department.id);}}>
+        <IconChevron open={isOpen}/>
+       </button>
+      :<span className="org-tree-chevron-spacer" aria-hidden="true"/>}
+     <span className="org-tree-icon" aria-hidden="true"><IconFolder/></span>
      <button type="button" className="org-node-label" tabIndex={-1}
       title={fullPathOf(deptById,department.id)+"｜含子部门 "+String(count)+" 人"}
       onClick={()=>setSelectedDepartment(department.id)}>
-      {department.name}<span className="org-node-count">（{count}）</span>
+      {department.name}
      </button>
+     <span className="org-node-count">（{count}）</span>
     </div>
     {isOpen&&<ul role="group">{renderDeptNodes(department.id,depth+1)}</ul>}
    </li>;
@@ -583,167 +651,382 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  }
 
  return <div className="work-body">
+  {/* 顶部工具栏：指标摘要与全局快捷创建 */}
   <div className="toolbar">
    <span className="toolbar-hint">账号 {users.length} · 部门 {departments.length} · 工作组 {groups.length}</span>
-   <button type="button" onClick={()=>{setNotice(null);setCreateDepartmentOpen(true);}}>新建部门</button>
-   <button type="button" className="primary" onClick={()=>{setNotice(null);setCreateGroupOpen(true);}}>创建工作组</button>
+   <button type="button" onClick={()=>{setNotice(null);setCreateDepartmentOpen(true);}}>
+    <IconPlus/>新建部门
+   </button>
+   <button type="button" className="primary" onClick={()=>{setNotice(null);setCreateGroupOpen(true);}}>
+    <IconPlus/>创建工作组
+   </button>
   </div>
+
   {notice&&<p role={notice.tone==="error"?"alert":"status"} className={"notice"+(notice.tone==="error"?" error":"")}>{notice.text}</p>}
-  <div className="org-columns org-workbench">
-   <section className="table org-dept-pane">
-    <h3>部门</h3>
-    {departmentsState==="loading"&&<p className="hint">正在读取部门…</p>}
-    {departmentsState==="failed"&&<>
-     <p role="alert" className="notice error">读取部门失败（GET /api/departments），部门树与按部门筛选不可用。</p>
+
+  {/* 双栏主工作台：左侧组织架构树 + 右侧主工作区卡片 */}
+  <div className="org-workbench">
+   {/* 左侧：组织架构树卡片 */}
+   <section className="org-card org-dept-card" aria-label="组织架构树">
+    <div className="org-card-header">
+     <h3 className="org-card-title">
+      <IconBuilding/>
+      <span>组织架构</span>
+      <span className="org-count-pill">{departments.length} 部门</span>
+     </h3>
+     <button type="button" className="org-header-btn" title="新建部门"
+      onClick={()=>{setNotice(null);setCreateDepartmentOpen(true);}}>
+      <IconPlus/>新建
+     </button>
+    </div>
+
+    {departmentsState==="loading"&&<p className="hint" style={{padding:"8px 12px"}}>正在读取部门…</p>}
+    {departmentsState==="failed"&&<div style={{padding:"8px 12px"}}>
+     <p role="alert" className="notice error">读取部门列表失败，部门树与筛选暂不可用。</p>
      <button type="button" className="secondary-action" onClick={()=>setDepartmentsToken(token=>token+1)}>重试</button>
-    </>}
+    </div>}
+
     {departmentsReady&&<>
-     <ul className="group-list">
-      <li><button type="button" className={selectedDepartment===""?"on":""} aria-pressed={selectedDepartment===""}
-       onClick={()=>setSelectedDepartment("")}>全部用户（{users.length}）</button></li>
-     </ul>
-     <label className="hint" htmlFor="org-dept-search">查找部门</label>
-     <input id="org-dept-search" className="org-search" type="search" autoComplete="off"
-      value={deptQuery} onChange={event=>setDeptQuery(event.target.value)} placeholder="按部门名称查找"/>
+     <div className="org-search-box">
+      <IconSearch/>
+      <input id="org-dept-search" className="org-search" type="search" autoComplete="off"
+       value={deptQuery} onChange={event=>setDeptQuery(event.target.value)} placeholder="按部门名称查找"/>
+     </div>
+
      {deptQuery.trim()!==""&&<div className="org-hits-panel">
       {deptHits.items.length===0
        ?<p className="hint">没有匹配的部门。</p>
        :<ul className="org-hits">
-        {deptHits.items.map(department=><li key={department.id}>
-         <button type="button" aria-label={"选择部门 "+fullPathOf(deptById,department.id)}
-          onClick={()=>revealDepartment(department.id)}>
-          <span className="org-hit-name">{department.name}</span>
-          <span className="hint">{ancestorPathOf(deptById,department.id)||"顶层部门"}</span>
+        {deptHits.items.map(d=><li key={d.id}>
+         <button type="button" aria-label={"选择部门 "+fullPathOf(deptById,d.id)}
+          onClick={()=>revealDepartment(d.id)}>
+          <span className="org-hit-name">{d.name}</span>
+          <span className="hint">{ancestorPathOf(deptById,d.id)||"顶层部门"}</span>
          </button>
         </li>)}
        </ul>}
       {deptHits.truncated&&<p className="hint">结果较多，仅显示前 {deptHits.items.length} 个，请细化关键词。</p>}
      </div>}
-     <ul className="tree" role="tree" aria-label="部门树" onKeyDown={onTreeKeyDown}>
-      {departments.length===0&&<li role="none" className="hint">还没有部门；可用工具栏的“新建部门”创建。</li>}
-      {renderDeptNodes("",0)}
-     </ul>
-     <p className="hint">单击部门名筛选其成员，chevron 只展开/折叠；括号内人数含全部子部门。未分配部门的账号只在“全部用户”中出现。</p>
+
+     <div className="org-tree-scroll">
+      <ul className="tree" role="tree" aria-label="部门树" onKeyDown={onTreeKeyDown}>
+       {/* 全体组织根节点 */}
+       <li role="treeitem" aria-selected={selectedDepartment===""} tabIndex={0}
+        onClick={()=>setSelectedDepartment("")}>
+        <div className={"tree-row "+(selectedDepartment===""?"on":"")} style={{paddingLeft:"10px"}}>
+         <span className="org-tree-chevron-spacer" aria-hidden="true"/>
+         <span className="org-tree-icon" aria-hidden="true"><IconBuilding/></span>
+         <button type="button" className="org-node-label" tabIndex={-1}
+          title={"全体组织｜共 "+String(users.length)+" 人"}
+          onClick={()=>setSelectedDepartment("")}>
+          全体组织
+         </button>
+         <span className="org-node-count">（{users.length}）</span>
+        </div>
+       </li>
+
+       {/* 部门层级子树 */}
+       {departments.length===0&&<li role="none" className="hint" style={{padding:"8px 12px"}}>还没有部门；可用上方按钮创建。</li>}
+       {renderDeptNodes("",0)}
+
+       {/* 未分配部门节点 */}
+       {unassignedCount>0&&<li role="treeitem" aria-selected={selectedDepartment==="__unassigned"} tabIndex={-1}
+        onClick={()=>setSelectedDepartment("__unassigned")}>
+        <div className={"tree-row "+(selectedDepartment==="__unassigned警"||selectedDepartment==="__unassigned"?"on":"")} style={{paddingLeft:"10px"}}>
+         <span className="org-tree-chevron-spacer" aria-hidden="true"/>
+         <span className="org-tree-icon" aria-hidden="true"><IconUsers/></span>
+         <button type="button" className="org-node-label" tabIndex={-1}
+          title={"未分配部门｜共 "+String(unassignedCount)+" 人"}
+          onClick={()=>setSelectedDepartment("__unassigned")}>
+          未分配部门
+         </button>
+         <span className="org-node-count">（{unassignedCount}）</span>
+        </div>
+       </li>}
+      </ul>
+     </div>
     </>}
    </section>
 
-   <section className="table org-member-pane">
-    <h3>成员（{filteredMembers.length}{filteredMembers.length!==users.length?` / ${users.length}`:""}）</h3>
-    {usersState==="loading"&&<p className="hint">正在读取用户…</p>}
-    {usersState==="failed"&&<>
-     <p role="alert" className="notice error">读取用户失败（GET /api/users），成员列表与按部门筛选不可用。</p>
-     <button type="button" className="secondary-action" onClick={()=>setUsersToken(token=>token+1)}>重试</button>
-    </>}
-    {usersReady&&departmentsState==="failed"&&<p role="alert" className="notice error">部门数据不可用，成员列表暂不能按部门筛选。</p>}
-    {usersReady&&<>
-     <input className="org-search" type="search" aria-label="搜索成员" autoComplete="off"
-      placeholder="按姓名或账号搜索成员" value={memberQuery} onChange={event=>setMemberQuery(event.target.value)}/>
-     <p className="hint org-scope">{scopeText}{memberQuery.trim()!==""?`；关键词“${memberQuery.trim()}”`:""}</p>
-    </>}
-    <table aria-label="成员列表" aria-busy={usersState==="loading"?true:undefined}>
-     <thead><tr><th scope="col">姓名</th><th scope="col">账号</th><th scope="col">部门</th><th scope="col">状态</th><th scope="col">操作</th></tr></thead>
-     <tbody>
-      {filteredMembers.map(user=><tr key={user.id}>
-       <td>{user.displayName}</td>
-       <td>{loginOf(user)||"—"}</td>
-       <td title={user.departmentId&&!deptById.has(user.departmentId)?user.departmentId:undefined}>{departmentLabel(user.departmentId)}</td>
-       <td><span className="org-badges">
-        {user.isAdmin&&<span className="org-badge org-badge-admin">系统管理员</span>}
-        {user.disabled===true&&<span className="org-badge org-badge-disabled"
-         title="账号已禁用：无法登录，现有会话已失效；其工作组与授权记录仍保留。">已禁用</span>}
-        {user.mustChangePassword&&<span className="org-badge org-badge-warning"
-         title="该账号下次登录必须修改密码（初始密码或刚被重置）。">待改密</span>}
-        {user.disabled!==true&&!user.mustChangePassword&&<span className="org-badge">正常</span>}
-       </span></td>
-       <td className="row-actions">
-        <button type="button" onClick={()=>{setNotice(null);setResetTarget(user);}}>重置密码</button>
-        {user.id===currentUserId
-         ?<button type="button" disabled title="不能对当前登录账号执行禁用">禁用</button>
-         :<button type="button" className={user.disabled===true?"":"danger"}
-           onClick={()=>{setNotice(null);setStateTarget(user);}}>{user.disabled===true?"启用":"禁用"}</button>}
-       </td>
-      </tr>)}
-      {filteredMembers.length===0&&<tr><td colSpan={5} className="empty">{memberTableEmpty}</td></tr>}
-     </tbody>
-    </table>
-    {usersReady&&users.length>=LIST_CAP&&<p className="hint">服务端单次最多返回 {LIST_CAP} 个账号，列表可能未显示全部。</p>}
-    <form className="inline-form org-form" onSubmit={submitCreateUser}>
-     <input aria-label="新账号" placeholder="新账号" value={newUser.login}
-      onChange={event=>setNewUser(prev=>({...prev,login:event.target.value}))}/>
-     <input aria-label="姓名" placeholder="姓名" value={newUser.displayName}
-      onChange={event=>setNewUser(prev=>({...prev,displayName:event.target.value}))}/>
-     <input aria-label="初始密码" placeholder="初始密码（≥16 位）" type="password" autoComplete="new-password" value={newUser.password}
-      onChange={event=>setNewUser(prev=>({...prev,password:event.target.value}))}/>
-     <select className="org-select" aria-label="部门" value={newUser.departmentId}
-      onChange={event=>setNewUser(prev=>({...prev,departmentId:event.target.value}))}>
-      <option value="">未分配部门</option>
-      {departmentOptions.map(option=><option key={option.id} value={option.id}>{option.label}</option>)}
-     </select>
-     <button className="primary" type="submit" disabled={!canCreateUser}>创建用户</button>
-    </form>
-    <p className="hint">点“创建用户”会先在对话框中确认账号、姓名与部门；新账号为普通账号（本面板不提供管理员角色授予），首次登录必须修改初始密码。</p>
-   </section>
+   {/* 右侧：主工作区卡片（Tab 1: 部门成员 / Tab 2: 工作组管理） */}
+   <section className="org-card org-stage-card" aria-label="组织管理主工作区">
+    <div className="org-tabs-bar" role="tablist" aria-label="组织管理视图">
+     <div className="org-tabs-nav">
+      <button type="button" role="tab" aria-selected={activeTab==="members"}
+       className={"org-tab"+(activeTab==="members"?" active":"")}
+       onClick={()=>setActiveTab("members")}>
+       <span className="org-tab-icon"><IconUsers/></span>
+       <span>部门成员</span>
+       <span className="org-tab-badge">{filteredMembers.length}</span>
+      </button>
+      <button type="button" role="tab" aria-selected={activeTab==="groups"}
+       className={"org-tab"+(activeTab==="groups"?" active":"")}
+       onClick={()=>setActiveTab("groups")}>
+       <span className="org-tab-icon"><IconGroup/></span>
+       <span>工作组管理</span>
+       <span className="org-tab-badge">{groups.length}</span>
+      </button>
+     </div>
 
-   <section className="table org-group-pane">
-    <h3>工作组（{groups.length}）</h3>
-    {groupsState==="loading"&&<p className="hint">正在读取工作组…</p>}
-    {groupsState==="failed"&&<>
-     <p role="alert" className="notice error">读取工作组失败（GET /api/groups），工作组与成员不可用。</p>
-     <button type="button" className="secondary-action" onClick={()=>setGroupsToken(token=>token+1)}>重试</button>
-    </>}
-    {groupsReady&&groups.length===0&&<p className="hint">还没有工作组；可用工具栏的“创建工作组”新建。</p>}
-    {groupsReady&&groups.length>0&&<>
-     <ul className="group-list">
-      {groups.map(group=><li key={group.id}>
-       <button type="button" className={group.id===selectedGroup?"on":""} aria-pressed={group.id===selectedGroup}
-        onClick={()=>setSelectedGroup(group.id)}>
-        {group.name}{group.departmentId&&<span className="hint">（{departmentLabel(group.departmentId)}）</span>}
-       </button>
-      </li>)}
-     </ul>
-     {selectedGroupRow===null
-      ?<p className="hint">选择一个工作组查看成员。</p>
-      :<>
-       <h3>成员 — {selectedGroupRow.name}</h3>
-       {membersState==="loading"&&<p className="hint">正在读取工作组成员…</p>}
-       {membersState==="failed"&&<>
-        <p role="alert" className="notice error">读取工作组成员失败（GET /api/groups/:id/members）。</p>
-        <button type="button" className="secondary-action" onClick={()=>setMembersToken(token=>token+1)}>重试</button>
-       </>}
-       {membersState==="ready"&&<>
-        <ul className="member-list">
-         {groupMembers.map(member=><li key={member.id}>
-          <span className="org-member-name">{member.displayName}（{loginOf(member)}）
-           {member.disabled===true&&<span className="org-badge org-badge-disabled" title="账号已禁用：无法登录，但成员关系仍保留。">已禁用</span>}
+     {/* 当前部门范围标识 */}
+     <div className="org-scope-badge">
+      <span className="org-scope-dot" aria-hidden="true"/>
+      <span>范围：{scopeLabel}</span>
+      {selectedDepartment!==""&&<button type="button" className="org-scope-reset"
+       title="清除部门筛选，显示全体" onClick={()=>setSelectedDepartment("")}>✕</button>}
+     </div>
+    </div>
+
+    {/* Tab 1: 部门成员 */}
+    {activeTab==="members"&&<div className="org-tab-stage">
+     {/* 搜索与筛选条 */}
+     <div className="org-filter-bar">
+      <div className="org-filter-left">
+       <div className="org-member-search-wrap">
+        <IconSearch/>
+        <input className="org-search" type="search" aria-label="搜索成员" autoComplete="off"
+         placeholder="按姓名或账号搜索成员" value={memberQuery} onChange={event=>setMemberQuery(event.target.value)}/>
+       </div>
+       <select className="org-select" aria-label="按状态筛选"
+        value={statusFilter} onChange={e=>setStatusFilter(e.target.value as StatusFilter)}>
+        <option value="all">全部状态</option>
+        <option value="normal">正常</option>
+        <option value="warning">待改密</option>
+        <option value="disabled">已禁用</option>
+        <option value="admin">系统管理员</option>
+       </select>
+       {usersState==="failed"&&<button type="button" className="secondary-action" onClick={()=>setUsersToken(token=>token+1)}>重新读取用户</button>}
+      </div>
+      <span className="toolbar-hint">共 {filteredMembers.length} 位成员</span>
+     </div>
+
+     {notice&&notice.tone==="error"&&usersState==="failed"&&<p role="alert" className="notice error">{notice.text}</p>}
+
+     {/* 成员数据表格 */}
+     <div className="org-table-container">
+      <table aria-label="成员列表" aria-busy={usersState==="loading"?true:undefined}>
+       <thead>
+        <tr>
+         <th scope="col" style={{width:"22%"}}>姓名</th>
+         <th scope="col" style={{width:"18%"}}>账号</th>
+         <th scope="col" style={{width:"24%"}}>部门</th>
+         <th scope="col" style={{width:"18%"}}>状态</th>
+         <th scope="col" style={{width:"18%"}}>操作</th>
+        </tr>
+       </thead>
+       <tbody>
+        {filteredMembers.map(user=><tr key={user.id}>
+         <td>
+          <div className="org-user-cell">
+           <span className="org-avatar" aria-hidden="true">{user.displayName.slice(0,1)}</span>
+           <span className="org-user-name">{user.displayName}</span>
+          </div>
+         </td>
+         <td>
+          <code className="org-user-login">{loginOf(user)||"—"}</code>
+         </td>
+         <td title={user.departmentId&&!deptById.has(user.departmentId)?user.departmentId:undefined}>
+          <span className="org-dept-tag">{departmentLabel(user.departmentId)}</span>
+         </td>
+         <td>
+          <span className="org-badges">
+           {user.isAdmin&&<span className="org-badge org-badge-admin"><span className="org-badge-dot"/>系统管理员</span>}
+           {user.disabled===true&&<span className="org-badge org-badge-disabled"
+            title="账号已禁用：无法登录，现有会话已失效；其工作组与授权记录仍保留。"><span className="org-badge-dot"/>已禁用</span>}
+           {user.mustChangePassword&&<span className="org-badge org-badge-warning"
+            title="该账号下次登录必须修改密码（初始密码或刚被重置）。"><span className="org-badge-dot"/>待改密</span>}
+           {user.disabled!==true&&!user.mustChangePassword&&<span className="org-badge org-badge-success"><span className="org-badge-dot"/>正常</span>}
           </span>
-          <button type="button" className="danger" onClick={()=>{setNotice(null);setRemoveTarget(member);}}>移除</button>
-         </li>)}
-         {groupMembers.length===0&&<li className="empty">该工作组暂无成员。</li>}
-        </ul>
-        <h3>添加成员</h3>
-        {!usersReady
-         ?<p className="hint">{usersState==="loading"?"正在读取可选择的账号…":"账号列表不可用，无法选择新成员。"}</p>
-         :<>
-          <input className="org-search" type="search" aria-label="搜索可加入的账号" autoComplete="off"
-           placeholder="按姓名或账号搜索可加入的账号" value={candidateQuery} onChange={event=>setCandidateQuery(event.target.value)}/>
-          <p className="hint">数据源：GET /api/users；已禁用账号不出现在候选列表。</p>
-          <ul className="member-list">
-           {candidates.map(user=><li key={user.id}>
-            <span className="org-member-name">{user.displayName}（{loginOf(user)}）</span>
-            <button type="button" onClick={()=>addMember(user)} disabled={addBusy!==""}>
-             {addBusy===user.id?"加入中…":"加入"}
-            </button>
-           </li>)}
-           {candidates.length===0&&<li className="empty">{candidateEmpty}</li>}
-          </ul>
-          {candidates.length>=CANDIDATE_CAP&&<p className="hint">最多显示 {CANDIDATE_CAP} 个候选账号，继续输入可缩小范围。</p>}
-         </>}
+         </td>
+         <td className="row-actions">
+          <button type="button" onClick={()=>{setNotice(null);setResetTarget(user);}}>重置密码</button>
+          {user.id===currentUserId
+           ?<button type="button" disabled title="不能对当前登录账号执行禁用">禁用</button>
+           :<button type="button" className={user.disabled===true?"org-btn-enable":"danger"}
+             onClick={()=>{setNotice(null);setStateTarget(user);}}>{user.disabled===true?"启用":"禁用"}</button>}
+         </td>
+        </tr>)}
+        {filteredMembers.length===0&&<tr><td colSpan={5} className="empty">{memberTableEmpty}</td></tr>}
+       </tbody>
+      </table>
+     </div>
+
+     {usersReady&&users.length>=LIST_CAP&&<p className="hint" style={{padding:"4px 12px"}}>服务端单次最多返回 {LIST_CAP} 个账号，列表可能未显示全部。</p>}
+
+     {/* 快速添加成员卡片 */}
+     <div className="org-create-user-card">
+      <div className="org-create-user-head">
+       <div className="org-create-user-title">
+        <IconPlus/>
+        <span>快速添加新成员</span>
+       </div>
+       <span className="hint">初始密码需 ≥16 位；首次登录需自行修改</span>
+      </div>
+      <form className="inline-form org-form org-create-form" onSubmit={submitCreateUser}>
+       <div className="org-field">
+        <label className="org-field-label" htmlFor="org-new-login">新账号</label>
+        <input id="org-new-login" aria-label="新账号" placeholder="新账号" value={newUser.login}
+         onChange={event=>setNewUser(prev=>({...prev,login:event.target.value}))}/>
+       </div>
+       <div className="org-field">
+        <label className="org-field-label" htmlFor="org-new-name">姓名</label>
+        <input id="org-new-name" aria-label="姓名" placeholder="姓名" value={newUser.displayName}
+         onChange={event=>setNewUser(prev=>({...prev,displayName:event.target.value}))}/>
+       </div>
+       <div className="org-field">
+        <label className="org-field-label" htmlFor="org-new-pwd">初始密码</label>
+        <input id="org-new-pwd" aria-label="初始密码" placeholder="初始密码（≥16 位）" type="password" autoComplete="new-password" value={newUser.password}
+         onChange={event=>setNewUser(prev=>({...prev,password:event.target.value}))}/>
+       </div>
+       <div className="org-field">
+        <label className="org-field-label" htmlFor="org-new-dept">部门</label>
+        <select id="org-new-dept" className="org-select" aria-label="部门" value={newUser.departmentId}
+         onChange={event=>setNewUser(prev=>({...prev,departmentId:event.target.value}))}>
+         <option value="">未分配部门</option>
+         {departmentOptions.map(option=><option key={option.id} value={option.id}>{option.label}</option>)}
+        </select>
+       </div>
+       <button className="primary" type="submit" disabled={!canCreateUser}>创建用户</button>
+      </form>
+     </div>
+    </div>}
+
+    {/* Tab 2: 工作组管理（Master-Detail 双栏结构） */}
+    {activeTab==="groups"&&<div className="org-groups-stage">
+     {/* 左侧：工作组卡片列表 */}
+     <div className="org-group-list-col">
+      <div className="org-card-header">
+       <h4 className="org-card-title">
+        <IconGroup/>
+        <span>工作组列表</span>
+        <span className="org-count-pill">{groups.length}</span>
+       </h4>
+       <button type="button" className="org-header-btn" title="创建工作组"
+        onClick={()=>{setNotice(null);setCreateGroupOpen(true);}}>
+        <IconPlus/>新建
+       </button>
+      </div>
+
+      <div className="org-search-box">
+       <IconSearch/>
+       <input className="org-search" type="search" placeholder="搜索工作组..."
+        value={groupQuery} onChange={e=>setGroupQuery(e.target.value)}/>
+      </div>
+
+      {groupsState==="loading"&&<p className="hint" style={{padding:"8px 12px"}}>正在读取工作组…</p>}
+      {groupsState==="failed"&&<div style={{padding:"8px 12px"}}>
+       <p role="alert" className="notice error">读取工作组列表失败。</p>
+       <button type="button" className="secondary-action" onClick={()=>setGroupsToken(t=>t+1)}>重试</button>
+      </div>}
+
+      {groupsReady&&groups.length===0&&<p className="empty" style={{padding:"16px 12px"}}>暂无工作组，可点上方“新建”创建。</p>}
+
+      {groupsReady&&groups.length>0&&<ul className="org-group-cards-list">
+       {filteredGroups.map(group=>{
+        const isSelected=group.id===selectedGroup;
+        return <li key={group.id}>
+         <button type="button" className={"org-group-card"+(isSelected?" active":"")}
+          aria-pressed={isSelected} onClick={()=>setSelectedGroup(group.id)}>
+          <div className="org-group-card-header">
+           <span className="org-group-name">{group.name}</span>
+           {isSelected&&<span className="org-active-pill">选中</span>}
+          </div>
+          <div className="org-group-card-sub">
+           <span className="org-dept-pill">
+            {group.departmentId?departmentLabel(group.departmentId):"公共工作组"}
+           </span>
+          </div>
+         </button>
+        </li>;
+       })}
+       {filteredGroups.length===0&&<li className="empty">没有匹配的工作组。</li>}
+      </ul>}
+     </div>
+
+     {/* 右侧：所选工作组详情与成员维护 */}
+     <div className="org-group-detail-col">
+      {selectedGroupRow===null
+       ?<div className="empty" style={{margin:"auto",textAlign:"center"}}>请从左侧选择一个工作组以查看并配置成员。</div>
+       :<>
+        <div className="org-group-banner">
+         <div className="org-group-banner-info">
+          <h4 className="org-group-detail-title">{selectedGroupRow.name}</h4>
+          <span className="org-dept-pill">
+           {selectedGroupRow.departmentId?departmentLabel(selectedGroupRow.departmentId):"公共工作组"}
+          </span>
+         </div>
+         <span className="toolbar-hint">当前成员 {groupMembers.length} 人</span>
+        </div>
+
+        {/* 组内成员列表 */}
+        <div className="org-group-section">
+         <div className="org-section-header">
+          <h5>组内成员（{groupMembers.length}）</h5>
+          {membersState==="failed"&&<button type="button" className="secondary-action" onClick={()=>setMembersToken(t=>t+1)}>重试</button>}
+         </div>
+
+         {membersState==="loading"&&<p className="hint">正在读取工作组成员…</p>}
+         {membersState==="ready"&&<div className="org-member-grid">
+          {groupMembers.map(member=><div key={member.id} className="org-member-card">
+           <div className="org-member-card-info">
+            <span className="org-avatar" aria-hidden="true">{member.displayName.slice(0,1)}</span>
+            <div className="org-member-card-text">
+             <span className="org-member-card-name">{member.displayName}</span>
+             <code className="org-member-card-login">{loginOf(member)}</code>
+            </div>
+            {member.disabled===true&&<span className="org-badge org-badge-disabled"><span className="org-badge-dot"/>已禁用</span>}
+           </div>
+           <button type="button" className="danger org-action-btn"
+            onClick={()=>{setNotice(null);setRemoveTarget(member);}}>移除</button>
+          </div>)}
+          {groupMembers.length===0&&<p className="empty" style={{gridColumn:"1/-1"}}>该工作组暂无成员，可在下方添加成员。</p>}
+         </div>}
+        </div>
+
+        {/* 添加成员到工作组 */}
+        <div className="org-group-section">
+         <div className="org-section-header">
+          <h5>添加成员</h5>
+          <span className="hint">仅显示未加入该工作组的正常账号</span>
+         </div>
+
+         {!usersReady
+          ?<p className="hint">{usersState==="loading"?"正在读取可选择的账号…":"账号列表不可用，无法选择新成员。"}</p>
+          :<>
+           <div className="org-search-box" style={{border:"1px solid var(--border-hairline)",borderRadius:"var(--radius-sm)",padding:"0 var(--space-2)"}}>
+            <IconSearch/>
+            <input className="org-search" type="search" aria-label="搜索可加入的账号" autoComplete="off"
+             placeholder="按姓名或账号搜索可加入的账号" value={candidateQuery} onChange={event=>setCandidateQuery(event.target.value)}
+             style={{border:"0"}}/>
+           </div>
+
+           <div className="org-candidate-grid">
+            {candidates.map(user=><div key={user.id} className="org-candidate-card">
+             <div className="org-candidate-info">
+              <span className="org-avatar" aria-hidden="true">{user.displayName.slice(0,1)}</span>
+              <div className="org-candidate-text">
+               <span className="org-candidate-name">{user.displayName}</span>
+               <code className="org-candidate-login">{loginOf(user)}</code>
+              </div>
+              <span className="org-dept-pill">{departmentLabel(user.departmentId)}</span>
+             </div>
+             <button type="button" className="primary org-action-btn" onClick={()=>addMember(user)} disabled={addBusy!==""}>
+              {addBusy===user.id?"加入中…":"加入"}
+             </button>
+            </div>)}
+            {candidates.length===0&&<p className="empty" style={{gridColumn:"1/-1"}}>{candidateEmpty}</p>}
+           </div>
+
+           {candidates.length>=CANDIDATE_CAP&&<p className="hint">最多显示 {CANDIDATE_CAP} 个候选账号，继续输入可缩小范围。</p>}
+          </>}
+        </div>
        </>}
-      </>}
-    </>}
+     </div>
+    </div>}
    </section>
   </div>
 
+  {/* 对话框保持原样 */}
   {resetTarget&&<ResetPasswordDialog target={resetTarget} department={departmentLabel(resetTarget.departmentId)}
    onClose={()=>setResetTarget(null)} onSubmit={resetPassword}/>}
   {stateTarget&&<SetDisabledDialog target={stateTarget} department={departmentLabel(stateTarget.departmentId)}
@@ -763,8 +1046,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  </div>;
 }
 
-// 重置密码：替换原先的 window.prompt（COMPLEX-WORKFLOWS-v1 §9 组织行）。
-// 客户端只校验长度与空值，密码策略由服务端判定；busy 期间禁止重复提交与关闭，结果与错误都在对话框内报告。
 function ResetPasswordDialog({target,department,onClose,onSubmit}:{
  target:User;
  department:string;
@@ -785,7 +1066,6 @@ function ResetPasswordDialog({target,department,onClose,onSubmit}:{
   setBusy(false);
   if("error" in outcome)setResult({text:outcome.error,tone:"error"});
   else{
-   // 成功后立即丢掉对话框里的明文密码，只保留服务端确认过的结果文案
    setPassword("");
    setResult({text:outcome.ok,tone:"info"});
   }
@@ -830,7 +1110,6 @@ function ResetPasswordDialog({target,department,onClose,onSubmit}:{
  </Dialog>;
 }
 
-// 禁用/启用确认：说明账号、当前状态与影响，busy 互斥，成功后列表刷新（WF-32“禁用确认可理解”）
 function SetDisabledDialog({target,department,onClose,onSubmit}:{
  target:User;
  department:string;
@@ -873,7 +1152,6 @@ function SetDisabledDialog({target,department,onClose,onSubmit}:{
  </Dialog>;
 }
 
-// 移除工作组成员：破坏性操作，确认对话框说明影响面后提交
 function RemoveMemberDialog({member,groupName,department,onClose,onSubmit}:{
  member:User;
  groupName:string;
@@ -912,7 +1190,6 @@ function RemoveMemberDialog({member,groupName,department,onClose,onSubmit}:{
  </Dialog>;
 }
 
-// 创建账号确认：凭据相关动作先在对话框里确认账号、姓名与部门，密码不回显
 function CreateUserConfirmDialog({draft,department,onClose,onSubmit}:{
  draft:{login:string;displayName:string};
  department:string;
@@ -951,7 +1228,6 @@ function CreateUserConfirmDialog({draft,department,onClose,onSubmit}:{
  </Dialog>;
 }
 
-// 创建部门：上级部门可选（默认当前筛选的部门），不创建成员或工作组
 function CreateDepartmentDialog({options,defaultParentId,listAvailable,onClose,onSubmit}:{
  options:{id:string;label:string}[];
  defaultParentId:string;
@@ -1001,7 +1277,6 @@ function CreateDepartmentDialog({options,defaultParentId,listAvailable,onClose,o
  </Dialog>;
 }
 
-// 创建工作组：部门归属可选（默认当前筛选的部门）；成员在创建后另行维护
 function CreateGroupDialog({options,defaultDepartmentId,listAvailable,onClose,onSubmit}:{
  options:{id:string;label:string}[];
  defaultDepartmentId:string;
