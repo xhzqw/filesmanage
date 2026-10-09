@@ -1,0 +1,292 @@
+{
+  "id": "VIS-03",
+  "route": "org",
+  "url": "http://127.0.0.1:18091/org",
+  "viewport": "1440x900",
+  "stamp": "1791550564736",
+  "measuredAt": "2026-10-09T12:56:37.635Z",
+  "standard": "WCAG 2.x AA (DESIGN-SYSTEM-v1 §2.2/§5): body-size text >= 4.5:1; large text (>=24px or >=18.66px bold) and non-text UI boundaries >= 3:1",
+  "backgroundResolution": "effective background = ancestor chain with every semi-transparent layer composited over the first opaque layer (canvas default white)",
+  "summary": {
+    "measured": 11,
+    "pass": 11,
+    "fail": 0,
+    "skipped": 9
+  },
+  "pairs": [
+    {
+      "id": "nav-link",
+      "kind": "text",
+      "selector": "header.header nav a",
+      "measuredAs": "a",
+      "fg": "#475569",
+      "fgRaw": "rgb(71, 85, 105)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "header.header"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 500,
+      "largeText": false,
+      "ratio": 7.58,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "breadcrumb-text",
+      "kind": "text",
+      "selector": ".breadcrumb",
+      "measuredAs": "div.breadcrumb",
+      "fg": "#475569",
+      "fgRaw": "rgb(71, 85, 105)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "div.breadcrumb"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 7.58,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "breadcrumb-link",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: .breadcrumb a"
+    },
+    {
+      "id": "toolbar-hint",
+      "kind": "text",
+      "selector": ".toolbar-hint",
+      "measuredAs": "span.toolbar-hint",
+      "fg": "#5a6c80",
+      "fgRaw": "rgb(90, 108, 128)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "div.toolbar"
+      ],
+      "gradientBackground": false,
+      "fontSize": 11,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 5.4,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "table-header",
+      "kind": "text",
+      "selector": "table thead th",
+      "measuredAs": "th",
+      "fg": "#475569",
+      "fgRaw": "rgb(71, 85, 105)",
+      "bg": "#f1f5f9",
+      "bgChain": [
+        "th"
+      ],
+      "gradientBackground": false,
+      "fontSize": 11,
+      "fontWeight": 600,
+      "largeText": false,
+      "ratio": 6.92,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "row-name-cell",
+      "kind": "text",
+      "selector": "tbody tr td:first-child",
+      "measuredAs": "td",
+      "fg": "#0f172a",
+      "fgRaw": "rgb(15, 23, 42)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "section.table.org-member-pane"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 17.85,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "row-cell",
+      "kind": "text",
+      "selector": "tbody tr td:nth-child(2)",
+      "measuredAs": "td",
+      "fg": "#0f172a",
+      "fgRaw": "rgb(15, 23, 42)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "section.table.org-member-pane"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 17.85,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "file-name",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: tbody tr[data-id] .file-name"
+    },
+    {
+      "id": "tree-row-label",
+      "kind": "text",
+      "selector": ".tree-row a, .tree-row .org-node-label",
+      "measuredAs": "button.org-node-label",
+      "fg": "#5a6c80",
+      "fgRaw": "rgb(90, 108, 128)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "section.table.org-dept-pane"
+      ],
+      "gradientBackground": false,
+      "fontSize": 10,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 5.4,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "hint",
+      "kind": "text",
+      "selector": ".hint",
+      "measuredAs": "label.hint",
+      "fg": "#5a6c80",
+      "fgRaw": "rgb(90, 108, 128)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "section.table.org-dept-pane"
+      ],
+      "gradientBackground": false,
+      "fontSize": 11,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 5.4,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "notice",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: p.notice:not(.error)"
+    },
+    {
+      "id": "error-notice",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: p.notice.error"
+    },
+    {
+      "id": "empty-state",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: .empty"
+    },
+    {
+      "id": "hash",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: .hash"
+    },
+    {
+      "id": "primary-action",
+      "kind": "text",
+      "selector": "a.primary, button.primary",
+      "measuredAs": "button.primary",
+      "fg": "#ffffff",
+      "fgRaw": "rgb(255, 255, 255)",
+      "bg": "#174098",
+      "bgChain": [
+        "button.primary"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 500,
+      "largeText": false,
+      "ratio": 9.45,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "row-actions-link",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: .row-actions a"
+    },
+    {
+      "id": "row-actions-button",
+      "kind": "text",
+      "selector": ".row-actions button",
+      "measuredAs": "button",
+      "fg": "#475569",
+      "fgRaw": "rgb(71, 85, 105)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "button"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 500,
+      "largeText": false,
+      "ratio": 7.58,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "danger-label",
+      "kind": "text",
+      "selector": ".row-actions .danger, button.danger",
+      "measuredAs": "button.danger",
+      "fg": "#b91c1c",
+      "fgRaw": "rgb(185, 28, 28)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "button.danger"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 6.47,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "secondary-action",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: .secondary-action"
+    },
+    {
+      "id": "preview-text",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: .preview-text"
+    }
+  ]
+}

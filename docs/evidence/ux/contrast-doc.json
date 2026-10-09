@@ -1,0 +1,767 @@
+{
+  "id": "VIS-03",
+  "route": "doc",
+  "url": "http://127.0.0.1:18091/doc?folder=folder_f6f81e41908179808bbc9fe5",
+  "viewport": "1440x900",
+  "stamp": "1791550564736",
+  "measuredAt": "2026-10-09T12:56:45.557Z",
+  "standard": "WCAG 2.x AA (DESIGN-SYSTEM-v1 §2.2/§5): body-size text >= 4.5:1; large text (>=24px or >=18.66px bold) and non-text UI boundaries >= 3:1",
+  "backgroundResolution": "effective background = ancestor chain with every semi-transparent layer composited over the first opaque layer (canvas default white)",
+  "summary": {
+    "measured": 27,
+    "pass": 27,
+    "fail": 0,
+    "skipped": 7
+  },
+  "pairs": [
+    {
+      "id": "nav-link",
+      "kind": "text",
+      "selector": "header.header nav a",
+      "measuredAs": "a.active",
+      "fg": "#174098",
+      "fgRaw": "rgb(23, 64, 152)",
+      "bg": "#e2effe",
+      "bgChain": [
+        "a.active"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 500,
+      "largeText": false,
+      "ratio": 8.1,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "breadcrumb-text",
+      "kind": "text",
+      "selector": ".breadcrumb",
+      "measuredAs": "a",
+      "fg": "#174098",
+      "fgRaw": "rgb(23, 64, 152)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "nav.breadcrumb.crumb-bar"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 500,
+      "largeText": false,
+      "ratio": 9.45,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "breadcrumb-link",
+      "kind": "text",
+      "selector": ".breadcrumb a",
+      "measuredAs": "a",
+      "fg": "#174098",
+      "fgRaw": "rgb(23, 64, 152)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "nav.breadcrumb.crumb-bar"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 500,
+      "largeText": false,
+      "ratio": 9.45,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "toolbar-hint",
+      "kind": "text",
+      "selector": ".toolbar-hint",
+      "measuredAs": "span.toolbar-hint",
+      "fg": "#5a6c80",
+      "fgRaw": "rgb(90, 108, 128)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "div.toolbar"
+      ],
+      "gradientBackground": false,
+      "fontSize": 11,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 5.4,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "table-header",
+      "kind": "text",
+      "selector": "table thead th",
+      "measuredAs": "th.col-select",
+      "fg": "#475569",
+      "fgRaw": "rgb(71, 85, 105)",
+      "bg": "#f1f5f9",
+      "bgChain": [
+        "th.col-select"
+      ],
+      "gradientBackground": false,
+      "fontSize": 11,
+      "fontWeight": 600,
+      "largeText": false,
+      "ratio": 6.92,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "row-name-cell",
+      "kind": "text",
+      "selector": "tbody tr td:first-child",
+      "measuredAs": "td.col-select",
+      "fg": "#0f172a",
+      "fgRaw": "rgb(15, 23, 42)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "div.table"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 17.85,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "row-cell",
+      "kind": "text",
+      "selector": "tbody tr td:nth-child(2)",
+      "measuredAs": "span.file-name",
+      "fg": "#174098",
+      "fgRaw": "rgb(23, 64, 152)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "div.table"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 500,
+      "largeText": false,
+      "ratio": 9.45,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "file-name",
+      "kind": "text",
+      "selector": "tbody tr[data-id] .file-name",
+      "measuredAs": "span.file-name",
+      "fg": "#174098",
+      "fgRaw": "rgb(23, 64, 152)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "div.table"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 500,
+      "largeText": false,
+      "ratio": 9.45,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "tree-row-label",
+      "kind": "text",
+      "selector": ".tree-row a, .tree-row .org-node-label",
+      "measuredAs": "a",
+      "fg": "#0f172a",
+      "fgRaw": "rgb(15, 23, 42)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "aside.sidebar"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 17.85,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "hint",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: .hint"
+    },
+    {
+      "id": "notice",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: p.notice:not(.error)"
+    },
+    {
+      "id": "error-notice",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: p.notice.error"
+    },
+    {
+      "id": "empty-state",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: .empty"
+    },
+    {
+      "id": "hash",
+      "kind": "text",
+      "selector": ".hash",
+      "measuredAs": "td.col-hash.hash",
+      "fg": "#475569",
+      "fgRaw": "rgb(71, 85, 105)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "div.table"
+      ],
+      "gradientBackground": false,
+      "fontSize": 11,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 7.58,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "primary-action",
+      "kind": "text",
+      "selector": "a.primary, button.primary",
+      "measuredAs": "button.primary",
+      "fg": "#ffffff",
+      "fgRaw": "rgb(255, 255, 255)",
+      "bg": "#174098",
+      "bgChain": [
+        "button.primary"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 500,
+      "largeText": false,
+      "ratio": 9.45,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "row-actions-link",
+      "kind": "text",
+      "selector": ".row-actions a",
+      "measuredAs": "a",
+      "fg": "#475569",
+      "fgRaw": "rgb(71, 85, 105)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "div.table"
+      ],
+      "gradientBackground": false,
+      "fontSize": 11,
+      "fontWeight": 500,
+      "largeText": false,
+      "ratio": 7.58,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "row-actions-button",
+      "kind": "text",
+      "selector": ".row-actions button",
+      "measuredAs": "button",
+      "fg": "#475569",
+      "fgRaw": "rgb(71, 85, 105)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "button"
+      ],
+      "gradientBackground": false,
+      "fontSize": 11,
+      "fontWeight": 500,
+      "largeText": false,
+      "ratio": 7.58,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "danger-label",
+      "kind": "text",
+      "selector": ".row-actions .danger, button.danger",
+      "measuredAs": "button.danger",
+      "fg": "#b91c1c",
+      "fgRaw": "rgb(185, 28, 28)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "button.danger"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 6.47,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "secondary-action",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: .secondary-action"
+    },
+    {
+      "id": "preview-text",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: .preview-text"
+    },
+    {
+      "id": "input-border",
+      "kind": "border",
+      "selector": "input:not([type=file])",
+      "measuredAs": "input#:r0:.tree-search",
+      "required": 3,
+      "boundaries": [
+        {
+          "part": "border-top",
+          "width": 1,
+          "rgba": {
+            "r": 108,
+            "g": 139,
+            "b": 166,
+            "a": 1
+          },
+          "color": "#6c8ba6",
+          "ratioElement": 3.57,
+          "ratioParent": 3.57,
+          "ok": true
+        },
+        {
+          "part": "border-right",
+          "width": 1,
+          "rgba": {
+            "r": 108,
+            "g": 139,
+            "b": 166,
+            "a": 1
+          },
+          "color": "#6c8ba6",
+          "ratioElement": 3.57,
+          "ratioParent": 3.57,
+          "ok": true
+        },
+        {
+          "part": "border-bottom",
+          "width": 1,
+          "rgba": {
+            "r": 108,
+            "g": 139,
+            "b": 166,
+            "a": 1
+          },
+          "color": "#6c8ba6",
+          "ratioElement": 3.57,
+          "ratioParent": 3.57,
+          "ok": true
+        },
+        {
+          "part": "border-left",
+          "width": 1,
+          "rgba": {
+            "r": 108,
+            "g": 139,
+            "b": 166,
+            "a": 1
+          },
+          "color": "#6c8ba6",
+          "ratioElement": 3.57,
+          "ratioParent": 3.57,
+          "ok": true
+        }
+      ],
+      "active": false,
+      "focusVisible": false,
+      "ratio": 3.57,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "select-border",
+      "kind": "border",
+      "selector": "select",
+      "measuredAs": "select",
+      "required": 3,
+      "boundaries": [
+        {
+          "part": "border-top",
+          "width": 1,
+          "rgba": {
+            "r": 108,
+            "g": 139,
+            "b": 166,
+            "a": 1
+          },
+          "color": "#6c8ba6",
+          "ratioElement": 3.57,
+          "ratioParent": 3.57,
+          "ok": true
+        },
+        {
+          "part": "border-right",
+          "width": 1,
+          "rgba": {
+            "r": 108,
+            "g": 139,
+            "b": 166,
+            "a": 1
+          },
+          "color": "#6c8ba6",
+          "ratioElement": 3.57,
+          "ratioParent": 3.57,
+          "ok": true
+        },
+        {
+          "part": "border-bottom",
+          "width": 1,
+          "rgba": {
+            "r": 108,
+            "g": 139,
+            "b": 166,
+            "a": 1
+          },
+          "color": "#6c8ba6",
+          "ratioElement": 3.57,
+          "ratioParent": 3.57,
+          "ok": true
+        },
+        {
+          "part": "border-left",
+          "width": 1,
+          "rgba": {
+            "r": 108,
+            "g": 139,
+            "b": 166,
+            "a": 1
+          },
+          "color": "#6c8ba6",
+          "ratioElement": 3.57,
+          "ratioParent": 3.57,
+          "ok": true
+        }
+      ],
+      "active": false,
+      "focusVisible": false,
+      "ratio": 3.57,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "focus-ring-input",
+      "kind": "outline",
+      "selector": "input:not([type=file])",
+      "measuredAs": "input#:r0:.tree-search",
+      "required": 3,
+      "boundaries": [
+        {
+          "part": "border-top",
+          "width": 1,
+          "rgba": {
+            "r": 108,
+            "g": 139,
+            "b": 166,
+            "a": 1
+          },
+          "color": "#6c8ba6",
+          "ratioElement": 3.57,
+          "ratioParent": 3.57,
+          "ok": true
+        },
+        {
+          "part": "border-right",
+          "width": 1,
+          "rgba": {
+            "r": 108,
+            "g": 139,
+            "b": 166,
+            "a": 1
+          },
+          "color": "#6c8ba6",
+          "ratioElement": 3.57,
+          "ratioParent": 3.57,
+          "ok": true
+        },
+        {
+          "part": "border-bottom",
+          "width": 1,
+          "rgba": {
+            "r": 108,
+            "g": 139,
+            "b": 166,
+            "a": 1
+          },
+          "color": "#6c8ba6",
+          "ratioElement": 3.57,
+          "ratioParent": 3.57,
+          "ok": true
+        },
+        {
+          "part": "border-left",
+          "width": 1,
+          "rgba": {
+            "r": 108,
+            "g": 139,
+            "b": 166,
+            "a": 1
+          },
+          "color": "#6c8ba6",
+          "ratioElement": 3.57,
+          "ratioParent": 3.57,
+          "ok": true
+        }
+      ],
+      "active": true,
+      "focusVisible": false,
+      "ratio": 3.57,
+      "ok": true,
+      "note": "",
+      "focused": true
+    },
+    {
+      "id": "focus-ring-row",
+      "kind": "outline",
+      "selector": "tbody tr[data-id]",
+      "measuredAs": "tr",
+      "required": 3,
+      "boundaries": [
+        {
+          "part": "outline",
+          "width": 1,
+          "rgba": {
+            "r": 20,
+            "g": 115,
+            "b": 184,
+            "a": 1
+          },
+          "color": "#1473b8",
+          "ratioElement": 5.03,
+          "ratioParent": 5.03,
+          "ok": true
+        }
+      ],
+      "active": true,
+      "focusVisible": true,
+      "ratio": 5.03,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "hover-row-text",
+      "kind": "text",
+      "selector": "tbody tr[data-id]:hover .file-name",
+      "measuredAs": "span.file-name",
+      "fg": "#174098",
+      "fgRaw": "rgb(23, 64, 152)",
+      "bg": "#f0f7ff",
+      "bgChain": [
+        "tr"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 500,
+      "largeText": false,
+      "ratio": 8.75,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "selected-row-text",
+      "kind": "text",
+      "selector": "tbody tr.selected .file-name",
+      "measuredAs": "span.file-name",
+      "fg": "#174098",
+      "fgRaw": "rgb(23, 64, 152)",
+      "bg": "#e2effe",
+      "bgChain": [
+        "tr.selected.focused"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 500,
+      "largeText": false,
+      "ratio": 8.1,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "selected-row-border",
+      "kind": "boundary",
+      "selector": "tbody tr.selected",
+      "measuredAs": "tr.selected.focused",
+      "required": 3,
+      "boundaries": [
+        {
+          "part": "inset box-shadow",
+          "width": null,
+          "rgba": {
+            "r": 42,
+            "g": 111,
+            "b": 221,
+            "a": 1
+          },
+          "color": "#2a6fdd",
+          "ratioElement": 4.08,
+          "ratioParent": 4.76,
+          "ok": true
+        }
+      ],
+      "active": false,
+      "focusVisible": false,
+      "ratio": 4.08,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "selection-bar-action",
+      "kind": "text",
+      "selector": ".selection-bar .secondary-action",
+      "measuredAs": "button.secondary-action",
+      "fg": "#174098",
+      "fgRaw": "rgb(23, 64, 152)",
+      "bg": "#e2effe",
+      "bgChain": [
+        "div.toolbar.selection-bar"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 8.1,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "primary-button",
+      "kind": "text",
+      "selector": "dialog.dialog button.primary",
+      "measuredAs": "button.primary",
+      "fg": "#ffffff",
+      "fgRaw": "rgb(255, 255, 255)",
+      "bg": "#174098",
+      "bgChain": [
+        "button.primary"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 500,
+      "largeText": false,
+      "ratio": 9.45,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "dialog-title",
+      "kind": "text",
+      "selector": ".dialog-title",
+      "measuredAs": "h2#:r2:.dialog-title",
+      "fg": "#0f275c",
+      "fgRaw": "rgb(15, 39, 92)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "dialog.dialog.dialog"
+      ],
+      "gradientBackground": false,
+      "fontSize": 14,
+      "fontWeight": 600,
+      "largeText": false,
+      "ratio": 14.33,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "error-notice",
+      "kind": "text",
+      "selector": "p.notice.error",
+      "measuredAs": "p.notice.error",
+      "fg": "#b91c1c",
+      "fgRaw": "rgb(185, 28, 28)",
+      "bg": "#fdecef",
+      "bgChain": [
+        "p.notice.error"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 5.68,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "dialog-hint",
+      "kind": "text",
+      "selector": "dialog.dialog .hint",
+      "measuredAs": "p.hint",
+      "fg": "#5a6c80",
+      "fgRaw": "rgb(90, 108, 128)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "dialog.dialog.dialog"
+      ],
+      "gradientBackground": false,
+      "fontSize": 11,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 5.4,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "dialog-danger",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: dialog.dialog .danger"
+    },
+    {
+      "id": "dialog-secondary",
+      "kind": "text",
+      "selector": "dialog.dialog .secondary-action",
+      "measuredAs": "button.secondary-action",
+      "fg": "#174098",
+      "fgRaw": "rgb(23, 64, 152)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "dialog.dialog.dialog"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 9.45,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    }
+  ]
+}

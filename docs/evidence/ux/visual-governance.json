@@ -1,0 +1,32 @@
+{
+  "id": "VIS-01/06",
+  "stamp": "1791550564736",
+  "scannedAt": "2026-10-09T12:56:05.188Z",
+  "roots": [
+    "web/src/shared/ui",
+    "web/src/features"
+  ],
+  "files": [
+    "web/src/shared/ui/folderPicker.css",
+    "web/src/shared/ui/menu.css",
+    "web/src/shared/ui/rare/rare.css",
+    "web/src/features/collaboration/commandSpotlight.css",
+    "web/src/features/collaboration/search.css",
+    "web/src/features/collaboration/share.css",
+    "web/src/features/collaboration/stats.css",
+    "web/src/features/documents/dragMove.css",
+    "web/src/features/documents/dropZone.css",
+    "web/src/features/documents/fileTable.css",
+    "web/src/features/folders/folderTree.css",
+    "web/src/features/organization/organization.css"
+  ],
+  "violations": [],
+  "exceptions": [
+    {
+      "file": "web/src/shared/ui/menu.css",
+      "line": 5,
+      "value": "#1740981f",
+      "reason": "menu.css header: the popup shadow has no token yet and follows the existing alpha-hex pattern"
+    }
+  ]
+}

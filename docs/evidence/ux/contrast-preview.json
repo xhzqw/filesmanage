@@ -1,0 +1,278 @@
+{
+  "id": "VIS-03",
+  "route": "preview",
+  "url": "http://127.0.0.1:18091/preview/file_7ea6631584fb48e3a108b6cd",
+  "viewport": "1440x900",
+  "stamp": "1791550564736",
+  "measuredAt": "2026-10-09T12:56:40.499Z",
+  "standard": "WCAG 2.x AA (DESIGN-SYSTEM-v1 §2.2/§5): body-size text >= 4.5:1; large text (>=24px or >=18.66px bold) and non-text UI boundaries >= 3:1",
+  "backgroundResolution": "effective background = ancestor chain with every semi-transparent layer composited over the first opaque layer (canvas default white)",
+  "summary": {
+    "measured": 10,
+    "pass": 10,
+    "fail": 0,
+    "skipped": 10
+  },
+  "pairs": [
+    {
+      "id": "nav-link",
+      "kind": "text",
+      "selector": "header.header nav a",
+      "measuredAs": "a",
+      "fg": "#475569",
+      "fgRaw": "rgb(71, 85, 105)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "header.header"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 500,
+      "largeText": false,
+      "ratio": 7.58,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "breadcrumb-text",
+      "kind": "text",
+      "selector": ".breadcrumb",
+      "measuredAs": "div.breadcrumb",
+      "fg": "#475569",
+      "fgRaw": "rgb(71, 85, 105)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "div.breadcrumb"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 7.58,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "breadcrumb-link",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: .breadcrumb a"
+    },
+    {
+      "id": "toolbar-hint",
+      "kind": "text",
+      "selector": ".toolbar-hint",
+      "measuredAs": "span.toolbar-hint",
+      "fg": "#5a6c80",
+      "fgRaw": "rgb(90, 108, 128)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "div.toolbar"
+      ],
+      "gradientBackground": false,
+      "fontSize": 11,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 5.4,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "table-header",
+      "kind": "text",
+      "selector": "table thead th",
+      "measuredAs": "th",
+      "fg": "#475569",
+      "fgRaw": "rgb(71, 85, 105)",
+      "bg": "#f1f5f9",
+      "bgChain": [
+        "th"
+      ],
+      "gradientBackground": false,
+      "fontSize": 11,
+      "fontWeight": 600,
+      "largeText": false,
+      "ratio": 6.92,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "row-name-cell",
+      "kind": "text",
+      "selector": "tbody tr td:first-child",
+      "measuredAs": "td",
+      "fg": "#0f172a",
+      "fgRaw": "rgb(15, 23, 42)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "div.table"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 17.85,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "row-cell",
+      "kind": "text",
+      "selector": "tbody tr td:nth-child(2)",
+      "measuredAs": "td",
+      "fg": "#0f172a",
+      "fgRaw": "rgb(15, 23, 42)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "div.table"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 17.85,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "file-name",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: tbody tr[data-id] .file-name"
+    },
+    {
+      "id": "tree-row-label",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: .tree-row a, .tree-row .org-node-label"
+    },
+    {
+      "id": "hint",
+      "kind": "text",
+      "selector": ".hint",
+      "measuredAs": "p.hint",
+      "fg": "#5a6c80",
+      "fgRaw": "rgb(90, 108, 128)",
+      "bg": "#f8fafc",
+      "bgChain": [
+        "main.work"
+      ],
+      "gradientBackground": false,
+      "fontSize": 11,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 5.16,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "notice",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: p.notice:not(.error)"
+    },
+    {
+      "id": "error-notice",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: p.notice.error"
+    },
+    {
+      "id": "empty-state",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: .empty"
+    },
+    {
+      "id": "hash",
+      "kind": "text",
+      "selector": ".hash",
+      "measuredAs": "td.hash",
+      "fg": "#475569",
+      "fgRaw": "rgb(71, 85, 105)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "div.table"
+      ],
+      "gradientBackground": false,
+      "fontSize": 11,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 7.58,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "primary-action",
+      "kind": "text",
+      "selector": "a.primary, button.primary",
+      "measuredAs": "a.primary",
+      "fg": "#ffffff",
+      "fgRaw": "rgb(255, 255, 255)",
+      "bg": "#174098",
+      "bgChain": [
+        "a.primary"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 600,
+      "largeText": false,
+      "ratio": 9.45,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "id": "row-actions-link",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: .row-actions a"
+    },
+    {
+      "id": "row-actions-button",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: .row-actions button"
+    },
+    {
+      "id": "danger-label",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: .row-actions .danger, button.danger"
+    },
+    {
+      "id": "secondary-action",
+      "kind": "text",
+      "skipped": true,
+      "reason": "selector not present: .secondary-action"
+    },
+    {
+      "id": "preview-text",
+      "kind": "text",
+      "selector": ".preview-text",
+      "measuredAs": "pre.preview-text",
+      "fg": "#0f172a",
+      "fgRaw": "rgb(15, 23, 42)",
+      "bg": "#ffffff",
+      "bgChain": [
+        "pre.preview-text"
+      ],
+      "gradientBackground": false,
+      "fontSize": 12,
+      "fontWeight": 400,
+      "largeText": false,
+      "ratio": 17.85,
+      "required": 4.5,
+      "ok": true,
+      "note": ""
+    }
+  ]
+}
