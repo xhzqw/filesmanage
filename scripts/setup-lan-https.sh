@@ -73,9 +73,33 @@ fi
 if [[ -L "$ENABLED" && "$(readlink -f "$ENABLED")" != "$SITE" ]]; then
   echo "refusing to replace an unexpected nginx site link" >&2; exit 1
 fi
+# Keep the prior site configuration intact if the new one fails validation.
+previous="$(mktemp)"
+had_site=false
+had_link=false
+if [[ -f "$SITE" ]]; then
+  cp "$SITE" "$previous"
+  had_site=true
+fi
+if [[ -L "$ENABLED" ]]; then
+  had_link=true
+fi
 install -m 644 "$SRC" "$SITE"
 ln -sfn "$SITE" "$ENABLED"
-nginx -t
+if ! nginx -t; then
+  if [[ "$had_site" == true ]]; then
+    install -m 644 "$previous" "$SITE"
+  else
+    rm -f "$SITE"
+  fi
+  if [[ "$had_link" == false ]]; then
+    rm -f "$ENABLED"
+  fi
+  rm -f "$previous"
+  echo "HTTPS site rejected: nginx configuration restored, no reload" >&2
+  exit 1
+fi
+rm -f "$previous"
 systemctl reload nginx
 echo "LAN HTTPS ready (ports 18443 and 18444; old 18091 unchanged)."
 echo "CA public certificate: $TLS_DIR/ca.crt"
