@@ -381,12 +381,13 @@ tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions 
 .tree-row::before{
   content:"";position:absolute;top:0;bottom:0;
   left:calc(var(--tree-depth,0)*var(--tree-indent) - 1px);
-  border-left:1px dashed var(--border-hairline);
+  border-left:1px dashed var(--border-subtle);
+  opacity:0.6;
 }
 .tree li[data-depth="0"]>.tree-row::before{display:none}
 .tree-row:hover{background:var(--surface-row-hover)}
 .tree-row.on{background:var(--surface-row-selected);color:var(--brand-blue);font-weight:600}
-.tree-row button{width:16px;min-width:16px;height:16px;min-height:16px;padding:0;border:0;background:none;font-size:10px;line-height:1;color:var(--text-tertiary);display:inline-flex;align-items:center;justify-content:center;transition:transform .12s linear}
+.tree-row button{width:16px;min-width:16px;height:16px;min-height:16px;padding:0;border:0;background:none;font-size:10px;line-height:1;color:var(--text-tertiary);display:inline-flex;align-items:center;justify-content:center;transition:transform .12s linear;flex:none}
 .tree-row button:hover{background:none;color:var(--brand-blue)}
 .tree-row button[aria-expanded="true"]{transform:rotate(90deg)}
 .tree-row a{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;padding:0 var(--space-1)}
