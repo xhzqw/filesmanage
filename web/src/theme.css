@@ -99,3 +99,13 @@ th{color:#53677D;background:#F7FBFF;font-size:12px}.empty{color:#71859A;text-ali
    title plus the host form as one grid. */
 .dialog{display:grid;gap:12px;align-content:start;max-height:calc(100dvh - 40px);overflow:auto}
 .dialog-title{margin:0;color:#174098;font-size:16px}
+
+/* Desktop explorer row states (DESKTOP-INTERACTION-v1 §2): hover must never
+   impersonate selection, and the selected/focused states are distinct. */
+.table tbody tr{cursor:default;user-select:none}
+.table tbody tr:hover{background:var(--color-row-hover)}
+.table tbody tr.selected,.table tbody tr.selected:hover{background:var(--color-row-selected)}
+.table tbody tr:focus-visible{outline:3px solid var(--color-focus);outline-offset:-3px}
+.file-name{display:block;max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--color-action);font-weight:600}
+.selection-bar{border-color:var(--color-row-selected-border)}
+.delete-list{margin:0;padding-left:20px;display:grid;gap:4px;max-height:180px;overflow:auto}
