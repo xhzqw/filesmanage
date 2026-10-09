@@ -39,6 +39,16 @@ func (r *Repository) ListUsers(ctx context.Context) ([]domain.User, error) {
 	return scanUserRows(rows)
 }
 
+// Keyset scan uses the indexed user ID. The legacy read order is unchanged.
+func (r *Repository) PageUsers(ctx context.Context, afterID string, limit int) ([]domain.User, error) {
+	rows, err := r.Q.Query(ctx, userListSelect+" WHERE id > $1 ORDER BY id LIMIT $2", afterID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanUserRows(rows)
+}
+
 func (r *Repository) UserByID(ctx context.Context, id string) (domain.User, error) {
 	rows, err := r.Q.Query(ctx, userListSelect+" WHERE id=$1", id)
 	if err != nil {
@@ -170,6 +180,23 @@ func (r *Repository) RenameDepartment(ctx context.Context, id, name string) erro
 
 func (r *Repository) ListWorkgroups(ctx context.Context) ([]domain.Workgroup, error) {
 	rows, err := r.Q.Query(ctx, "SELECT id,name,department_id FROM workgroups ORDER BY name,id LIMIT 1000")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]domain.Workgroup, 0)
+	for rows.Next() {
+		var g domain.Workgroup
+		if err := rows.Scan(&g.ID, &g.Name, &g.DepartmentID); err != nil {
+			return nil, err
+		}
+		out = append(out, g)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) PageWorkgroups(ctx context.Context, afterID string, limit int) ([]domain.Workgroup, error) {
+	rows, err := r.Q.Query(ctx, "SELECT id,name,department_id FROM workgroups WHERE id > $1 ORDER BY id LIMIT $2", afterID, limit)
 	if err != nil {
 		return nil, err
 	}

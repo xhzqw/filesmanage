@@ -35,6 +35,25 @@ assert(myRoles.status===200&&Array.isArray(myRoles.data),"self-scoped management
 const users=await request("/api/users");
 const folders=await request("/api/folders/tree");
 assert(users.status===200&&Array.isArray(users.data),"admin subject list");
+const firstUsers=await request("/api/users?limit=1");
+assert(firstUsers.status===200&&firstUsers.data?.items?.length===1&&
+ typeof firstUsers.data.nextCursor==="string","user keyset first page");
+if(firstUsers.data.nextCursor){
+ const next=await request("/api/users?limit=1&cursor="+encodeURIComponent(firstUsers.data.nextCursor));
+ assert(next.status===200&&Array.isArray(next.data?.items)&&
+ next.data.items.every(item=>item.id>firstUsers.data.items[0].id),"user cursor advances without overlap");
+}
+const firstGroups=await request("/api/groups?limit=1");
+assert(firstGroups.status===200&&Array.isArray(firstGroups.data?.items)&&
+ typeof firstGroups.data.nextCursor==="string","group keyset first page");
+if(firstGroups.data.nextCursor){
+ const next=await request("/api/groups?limit=1&cursor="+encodeURIComponent(firstGroups.data.nextCursor));
+ assert(next.status===200&&Array.isArray(next.data?.items)&&
+ next.data.items.every(item=>item.id>firstGroups.data.items[0].id),"group cursor advances without overlap");
+}
+for(const url of ["/api/users?limit=201","/api/groups?limit=0","/api/users?limit=1&cursor=bad%2Fid"]){
+ assert((await request(url)).status===400,"invalid organization page is rejected");
+}
 assert(folders.status===200&&Array.isArray(folders.data)&&folders.data.length>0,"visible folder list");
 const user=users.data.find(u=>u.isAdmin===true)||users.data[0];
 const folder=folders.data[0];

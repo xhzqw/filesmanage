@@ -5,6 +5,7 @@ import (
 	"errors"
 	"filesmanage/internal/domain"
 	"filesmanage/internal/ports"
+	"sort"
 	"time"
 )
 
@@ -22,6 +23,21 @@ func (r *memoryRepo) ListUsers(_ context.Context) ([]domain.User, error) {
 		}
 		seen[entry.user.ID] = true
 		out = append(out, entry.user)
+	}
+	return out, nil
+}
+
+func (r *memoryRepo) PageUsers(ctx context.Context, afterID string, limit int) ([]domain.User, error) {
+	users, err := r.ListUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(users, func(i, j int) bool { return users[i].ID < users[j].ID })
+	out := make([]domain.User, 0)
+	for _, u := range users {
+		if u.ID > afterID && len(out) < limit {
+			out = append(out, u)
+		}
 	}
 	return out, nil
 }
@@ -151,6 +167,21 @@ func (r *memoryRepo) ListWorkgroups(_ context.Context) ([]domain.Workgroup, erro
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return append([]domain.Workgroup{}, r.workgroupList...), nil
+}
+
+func (r *memoryRepo) PageWorkgroups(ctx context.Context, afterID string, limit int) ([]domain.Workgroup, error) {
+	groups, err := r.ListWorkgroups(ctx)
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(groups, func(i, j int) bool { return groups[i].ID < groups[j].ID })
+	out := make([]domain.Workgroup, 0)
+	for _, g := range groups {
+		if g.ID > afterID && len(out) < limit {
+			out = append(out, g)
+		}
+	}
+	return out, nil
 }
 
 func (r *memoryRepo) WorkgroupByID(_ context.Context, id string) (domain.Workgroup, error) {

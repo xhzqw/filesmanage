@@ -54,12 +54,22 @@ const inject=`(()=>{
  const respond=data=>Promise.resolve(new Response(JSON.stringify({ok:true,data}),{
   status:200,headers:{"Content-Type":"application/json"}
  }));
+ window.__orgPages={users:0,groups:0};
+ const page=(source,url,kind)=>{
+  const limit=Number(url.searchParams.get("limit")??200);
+  const cursor=url.searchParams.get("cursor")??"";
+  const start=cursor?source.findIndex(item=>item.id===cursor)+1:0;
+  if(start<0)throw Error("invalid synthetic cursor");
+  const items=source.slice(start,start+limit);
+  window.__orgPages[kind]++;
+  return respond({items,nextCursor:start+limit<source.length?items.at(-1).id:""});
+ };
  window.fetch=(resource,init)=>{
   const url=new URL(typeof resource==="string"?resource:resource.url,location.href);
   const method=(init?.method??"GET").toUpperCase();
   if(method==="GET"&&url.origin===location.origin){
-   if(url.pathname==="/api/users")return respond(users);
-   if(url.pathname==="/api/groups")return respond(groups);
+   if(url.pathname==="/api/users")return page(users,url,"users");
+   if(url.pathname==="/api/groups")return page(groups,url,"groups");
    if(url.pathname==="/api/groups/stress-group-000/members")return respond(users.slice(0,420));
   }
   return originalFetch(resource,init);
@@ -109,6 +119,9 @@ try{
  check(initialMs<15000,"1000-member initial render is bounded",initialMs+"ms, 100 DOM rows");
  const initialCount=await evalBrowser("(()=>document.querySelector('.org-filter-bar .toolbar-hint')?.textContent)()");
  check(initialCount?.includes("100 / 1000"),"full 1000-member count preserved",initialCount);
+ const pageCounts=await evalBrowser("(()=>window.__orgPages)()");
+ check(pageCounts?.users===5&&pageCounts?.groups===2,
+  "organization API reads all keyset pages",JSON.stringify(pageCounts));
  await evalBrowser(`(()=>{
   const button=[...document.querySelectorAll(".org-list-more button")]
    .find(b=>b.textContent?.includes("显示更多成员"));

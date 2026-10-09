@@ -871,7 +871,12 @@ add("DELETE", "/api/files/{id}", operation("Delete a file into the trash", "File
 
 # --- Organization ---
 add("GET", "/api/users", operation("List users", "Organization", "listUsers", security=SESSION,
-    responses=dict([json_ok(arr(ref("User")), "Users in the tenant."), resp("401", ERR["401"]), resp("403", ERR["403"])])))
+    params=[query("limit", "Enable keyset paging with 1–200 records; default 100 if only cursor is supplied.", integer(minimum=1)),
+            query("cursor", "Last returned ID from nextCursor; use with limit.")],
+    responses=dict([json_ok({"oneOf":[arr(ref("User")),
+        obj({"items":arr(ref("User")), "nextCursor":string()},required=["items","nextCursor"])]},
+        "Legacy no-query array (capped at 1000), or {items,nextCursor} when paged."),
+        resp("400", ERR["400"]),resp("401", ERR["401"]), resp("403", ERR["403"])])))
 
 add("POST", "/api/users", operation("Create a user", "Organization", "createUser", security=SESSION,
     request={"application/json": {"schema": ref("CreateUserRequest")}},
@@ -897,7 +902,12 @@ add("POST", "/api/departments", operation("Create a department", "Organization",
                     resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"])])))
 
 add("GET", "/api/groups", operation("List workgroups", "Organization", "listWorkgroups", security=SESSION,
-    responses=dict([json_ok(arr(ref("Workgroup")), "Workgroups."), resp("401", ERR["401"]), resp("403", ERR["403"])])))
+    params=[query("limit", "Enable keyset paging with 1–200 records; default 100 if only cursor is supplied.", integer(minimum=1)),
+            query("cursor", "Last returned ID from nextCursor; use with limit.")],
+    responses=dict([json_ok({"oneOf":[arr(ref("Workgroup")),
+        obj({"items":arr(ref("Workgroup")), "nextCursor":string()},required=["items","nextCursor"])]},
+        "Legacy no-query array (capped at 1000), or {items,nextCursor} when paged."),
+        resp("400", ERR["400"]),resp("401", ERR["401"]), resp("403", ERR["403"])])))
 
 add("POST", "/api/groups", operation("Create a workgroup", "Organization", "createWorkgroup", security=SESSION,
     request={"application/json": {"schema": ref("CreateWorkgroupRequest")}},

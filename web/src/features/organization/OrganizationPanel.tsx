@@ -18,7 +18,6 @@ type StatusFilter="all"|"normal"|"warning"|"disabled"|"admin";
 const MAX_DEPTH=32;
 const CANDIDATE_CAP=50;
 const DEPT_HIT_CAP=30;
-const LIST_CAP=1000;
 const MEMBER_DISPLAY_STEP=100;
 const GROUP_DISPLAY_STEP=60;
 
@@ -888,7 +887,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
       </button>
      </div>}
 
-     {usersReady&&users.length>=LIST_CAP&&<p className="hint" style={{padding:"4px 12px"}}>服务端单次最多返回 {LIST_CAP} 个账号，列表可能未显示全部。</p>}
 
      {/* 快速添加成员卡片 */}
      <div className="org-create-user-card">

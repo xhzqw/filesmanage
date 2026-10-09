@@ -1,7 +1,9 @@
 package httpx
 
 import (
+	"filesmanage/internal/domain"
 	"github.com/gin-gonic/gin"
+	"strconv"
 )
 
 // Organization handlers. Every route is admin-only; the application layer
@@ -10,6 +12,24 @@ import (
 func (h *Handler) listUsers(c *gin.Context) {
 	u, ok := h.auth(c)
 	if !ok {
+		return
+	}
+	if _, paged := c.GetQuery("limit"); paged || c.Query("cursor") != "" {
+		limit, err := organizationLimit(c)
+		if err != nil {
+			c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+			return
+		}
+		page, err := h.S.PageUsers(c.Request.Context(), u, c.Query("cursor"), limit)
+		if err != nil {
+			respondError(c, err)
+			return
+		}
+		items := make([]gin.H, 0, len(page.Items))
+		for _, item := range page.Items {
+			items = append(items, userPayload(item))
+		}
+		c.JSON(200, gin.H{"ok": true, "data": gin.H{"items": items, "nextCursor": page.NextCursor}})
 		return
 	}
 	users, err := h.S.ListUsers(c.Request.Context(), u)
@@ -22,6 +42,15 @@ func (h *Handler) listUsers(c *gin.Context) {
 		data = append(data, userPayload(item))
 	}
 	c.JSON(200, gin.H{"ok": true, "data": data})
+}
+
+func organizationLimit(c *gin.Context) (int, error) {
+	value := c.DefaultQuery("limit", "100")
+	limit, err := strconv.Atoi(value)
+	if err != nil || limit < 1 || limit > 200 {
+		return 0, domain.ErrInvalidInput
+	}
+	return limit, nil
 }
 
 func (h *Handler) createUser(c *gin.Context) {
@@ -120,6 +149,24 @@ func (h *Handler) createDepartment(c *gin.Context) {
 func (h *Handler) listWorkgroups(c *gin.Context) {
 	u, ok := h.auth(c)
 	if !ok {
+		return
+	}
+	if _, paged := c.GetQuery("limit"); paged || c.Query("cursor") != "" {
+		limit, err := organizationLimit(c)
+		if err != nil {
+			c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+			return
+		}
+		page, err := h.S.PageWorkgroups(c.Request.Context(), u, c.Query("cursor"), limit)
+		if err != nil {
+			respondError(c, err)
+			return
+		}
+		items := make([]gin.H, 0, len(page.Items))
+		for _, g := range page.Items {
+			items = append(items, gin.H{"id": g.ID, "name": g.Name, "departmentId": g.DepartmentID})
+		}
+		c.JSON(200, gin.H{"ok": true, "data": gin.H{"items": items, "nextCursor": page.NextCursor}})
 		return
 	}
 	groups, err := h.S.ListWorkgroups(c.Request.Context(), u)

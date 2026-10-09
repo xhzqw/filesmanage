@@ -1,4 +1,4 @@
-import{useEffect,useRef,useState}from "react";
+import{lazy,Suspense,useEffect,useRef,useState}from "react";
 import{Navigate,Route,Routes}from "react-router-dom";
 import{authApi}from "../features/auth/api";
 import{subscribeSessionIssues}from "../shared/http";
@@ -14,9 +14,9 @@ import{Trash}from "../pages/Trash";
 import{Org}from "../pages/Org";
 import{Approvals}from "../pages/Approvals";
 import{OfficeEditor}from "../pages/OfficeEditor";
-import{ModelViewer}from "../pages/ModelViewer";
 import{SessionDevices}from "../pages/SessionDevices";
 import{SearchPage,WorkspacePage}from "./AppShell";
+const ModelViewer=lazy(()=>import("../pages/ModelViewer").then(m=>({default:m.ModelViewer})));
 export function App(){
  const user=useSession(s=>s.user),loading=useSession(s=>s.loading),setUser=useSession(s=>s.setUser),setLoading=useSession(s=>s.setLoading);
  const [logoutError,setLogoutError]=useState("");
@@ -49,7 +49,7 @@ export function App(){
  <Route path="/org" element={user?<Org user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/approvals" element={user?<Approvals user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/office/:id" element={user?<OfficeEditor user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
- <Route path="/model/:id" element={user?<ModelViewer user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
+ <Route path="/model/:id" element={user?<Suspense fallback={<main className="login-bg" role="status">正在加载 CAD 模型预览…</main>}><ModelViewer user={user} onLogout={logout}/></Suspense>:<Navigate to="/login" replace/>}/>
  <Route path="/workspace" element={user?<WorkspacePage user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/search" element={user?<SearchPage user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/stats" element={user?<WorkspacePage user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>

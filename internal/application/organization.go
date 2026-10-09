@@ -6,6 +6,7 @@ import (
 	"filesmanage/internal/domain"
 	"filesmanage/internal/ports"
 	"golang.org/x/crypto/bcrypt"
+	"regexp"
 )
 
 // Organization use cases. SPEC §2.1 reserves user/group/department management
@@ -28,6 +29,72 @@ func (s *Service) ListUsers(ctx context.Context, u domain.User) ([]domain.User, 
 	}
 	defer tx.Rollback(ctx)
 	return tx.ListUsers(ctx)
+}
+
+type UserPage struct {
+	Items      []domain.User
+	NextCursor string
+}
+type WorkgroupPage struct {
+	Items      []domain.Workgroup
+	NextCursor string
+}
+
+var organizationCursorRE = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
+
+func validateOrganizationPage(cursor string, limit int) error {
+	if limit < 1 || limit > 200 || (cursor != "" && !organizationCursorRE.MatchString(cursor)) {
+		return domain.ErrInvalidInput
+	}
+	return nil
+}
+
+func (s *Service) PageUsers(ctx context.Context, u domain.User, cursor string, limit int) (UserPage, error) {
+	if err := s.requireAdmin(u); err != nil {
+		return UserPage{}, err
+	}
+	if err := validateOrganizationPage(cursor, limit); err != nil {
+		return UserPage{}, err
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return UserPage{}, err
+	}
+	defer tx.Rollback(ctx)
+	items, err := tx.PageUsers(ctx, cursor, limit+1)
+	if err != nil {
+		return UserPage{}, err
+	}
+	page := UserPage{Items: items}
+	if len(items) > limit {
+		page.Items = items[:limit]
+		page.NextCursor = page.Items[len(page.Items)-1].ID
+	}
+	return page, nil
+}
+
+func (s *Service) PageWorkgroups(ctx context.Context, u domain.User, cursor string, limit int) (WorkgroupPage, error) {
+	if err := s.requireAdmin(u); err != nil {
+		return WorkgroupPage{}, err
+	}
+	if err := validateOrganizationPage(cursor, limit); err != nil {
+		return WorkgroupPage{}, err
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return WorkgroupPage{}, err
+	}
+	defer tx.Rollback(ctx)
+	items, err := tx.PageWorkgroups(ctx, cursor, limit+1)
+	if err != nil {
+		return WorkgroupPage{}, err
+	}
+	page := WorkgroupPage{Items: items}
+	if len(items) > limit {
+		page.Items = items[:limit]
+		page.NextCursor = page.Items[len(page.Items)-1].ID
+	}
+	return page, nil
 }
 
 type UserDraft struct {
