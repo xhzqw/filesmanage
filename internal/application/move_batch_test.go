@@ -276,23 +276,23 @@ func TestMoveFilesBatchRejectsBadInput(t *testing.T) {
 	admin := domain.User{ID: "u_admin", Login: "admin", IsAdmin: true}
 	ctx := context.Background()
 	before := totalAudit(repo)
-	if _, err := s.MoveFilesBatch(ctx, admin, nil, "folder_market", ""); !errors.Is(err, domain.ErrInvalidInput) {
+	if _, err := s.MoveFilesBatch(ctx, admin, nil, "folder_market", "", ""); !errors.Is(err, domain.ErrInvalidInput) {
 		t.Fatalf("empty fileIds must be rejected, got %v", err)
 	}
-	if _, err := s.MoveFilesBatch(ctx, admin, []string{"file_x"}, ""); !errors.Is(err, domain.ErrInvalidInput) {
+	if _, err := s.MoveFilesBatch(ctx, admin, []string{"file_x"}, "", "", ""); !errors.Is(err, domain.ErrInvalidInput) {
 		t.Fatalf("empty target must be rejected, got %v", err)
 	}
-	if _, err := s.MoveFilesBatch(ctx, admin, []string{"file_x"}, "folder_market", "best_effort"); !errors.Is(err, domain.ErrInvalidInput) {
+	if _, err := s.MoveFilesBatch(ctx, admin, []string{"file_x"}, "folder_market", "best_effort", ""); !errors.Is(err, domain.ErrInvalidInput) {
 		t.Fatalf("unknown mode must be rejected, got %v", err)
 	}
-	if _, err := s.MoveFilesBatch(ctx, admin, []string{"file_x", "file_x"}, "folder_market", "all_or_nothing"); !errors.Is(err, domain.ErrInvalidInput) {
+	if _, err := s.MoveFilesBatch(ctx, admin, []string{"file_x", "file_x"}, "folder_market", "all_or_nothing", ""); !errors.Is(err, domain.ErrInvalidInput) {
 		t.Fatalf("duplicate fileIds must be rejected, got %v", err)
 	}
 	over := make([]string, 0, MaxMoveBatchFiles+1)
 	for i := 0; i <= MaxMoveBatchFiles; i++ {
 		over = append(over, fmt.Sprintf("file_over_%d", i))
 	}
-	_, err := s.MoveFilesBatch(ctx, admin, over, "folder_market", "all_or_nothing")
+	_, err := s.MoveFilesBatch(ctx, admin, over, "folder_market", "all_or_nothing", "")
 	if !errors.Is(err, ErrBatchTooLarge) || !errors.Is(err, domain.ErrInvalidInput) {
 		t.Fatalf("over-limit batch must be rejected as invalid input, got %v", err)
 	}
