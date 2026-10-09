@@ -109,7 +109,9 @@ export function FolderTree({items,selected}:{items:Folder[];selected:string}){
     aria-expanded={children.length>0?isExpanded:undefined}
     aria-current={f.id===selected?"page":undefined}
     tabIndex={focusedId===f.id||(focusedId===null&&visible[0]?.id===f.id)?0:-1}
-    onFocus={()=>setFocusedId(f.id)}>
+    // focusin bubbles: only the treeitem that is itself the focus target may
+    // claim the focus state, otherwise an ancestor would overwrite it.
+    onFocus={event=>{if(event.target===event.currentTarget)setFocusedId(f.id);}}>
     <div className={"tree-row "+(f.id===selected?"on":"")} style={{paddingLeft:String(depth*16)+"px"}}>
      <button aria-label={isExpanded?"折叠":"展开"} tabIndex={-1}
       onClick={()=>toggle(f.id)}>{children.length?(isExpanded?"▾":"▸"):" "}</button>
