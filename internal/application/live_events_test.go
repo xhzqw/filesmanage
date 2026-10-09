@@ -35,6 +35,10 @@ func TestUserEventsAreIsolatedAndReleased(t *testing.T) {
 		t.Fatalf("leaked a private session event to admin: %+v", event)
 	default:
 	}
+	// An active WebSocket has already validated (and cached) this session.
+	if _, err := s.Session(context.Background(), token); err != nil {
+		t.Fatal(err)
+	}
 	if err := s.Logout(context.Background(), token); err != nil {
 		t.Fatal(err)
 	}
