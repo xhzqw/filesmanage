@@ -192,6 +192,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/events/ws:
+    get:
+      summary: Subscribe to live session events (WebSocket)
+      operationId: sessionEventsWebSocket
+      tags:
+      - Auth
+      security:
+      - cookieSession: []
+      responses:
+        '101':
+          description: 'Switching Protocols: WebSocket JSON events (connection.ready, connection.heartbeat, session.changed,
+            session.revoked, session.password_change_required, server.unavailable).'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_ORIGIN or E_PASSWORD_CHANGE_REQUIRED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '426':
+          description: E_UPGRADE_REQUIRED — WebSocket Upgrade required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_LIVE_CAPACITY — live connection limit reached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      description: Origin must match Host, scheme and port; uses HttpOnly cookie, no URL token. Browser clients connect via
+        ws:// on HTTP or wss:// on HTTPS. Up to 128 live connections per server process and 12-second heartbeat. Server-to-client
+        JSON messages only; each event revalidates the session. Existing HTTP APIs remain authoritative.
   /api/folders/tree:
     get:
       summary: Authorized folder tree
