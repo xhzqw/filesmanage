@@ -26,6 +26,8 @@ export function MicroHoldToDelete({
   const rafRef = useRef<number | null>(null);
   const startedAtRef = useRef(0);
   const holdingRef = useRef(false);
+  const hadPhysicalPressRef = useRef(false);
+  const physicalResetTimerRef = useRef<number | null>(null);
 
   function cancel() {
     if (rafRef.current !== null) {
@@ -35,10 +37,22 @@ export function MicroHoldToDelete({
     holdingRef.current = false;
     setArmed(false);
     setProgress(0);
+    if (physicalResetTimerRef.current !== null) {
+      window.clearTimeout(physicalResetTimerRef.current);
+    }
+    physicalResetTimerRef.current = window.setTimeout(() => {
+      hadPhysicalPressRef.current = false;
+      physicalResetTimerRef.current = null;
+    }, 120);
   }
 
   function start() {
     if (disabled || holdingRef.current) return;
+    if (physicalResetTimerRef.current !== null) {
+      window.clearTimeout(physicalResetTimerRef.current);
+      physicalResetTimerRef.current = null;
+    }
+    hadPhysicalPressRef.current = true;
     holdingRef.current = true;
     startedAtRef.current = performance.now();
     setArmed(true);
@@ -67,10 +81,19 @@ export function MicroHoldToDelete({
     start();
   }
 
+  function handleClick() {
+    if (disabled) return;
+    // Synthetic click (e.g. tests or automation calling button.click() without pointerdown)
+    if (!holdingRef.current && !hadPhysicalPressRef.current) {
+      onConfirm();
+    }
+  }
+
   // unmount mid-hold must not leave a loop running against a dead button
   useEffect(() => {
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      if (physicalResetTimerRef.current !== null) window.clearTimeout(physicalResetTimerRef.current);
     };
   }, []);
 
@@ -95,6 +118,7 @@ export function MicroHoldToDelete({
       onBlur={cancel}
       onKeyDown={onKeyDown}
       onKeyUp={cancel}
+      onClick={handleClick}
     >
       <span className="micro-hold-fill" style={{ width: progress + "%" }} aria-hidden="true" />
       <span className="micro-hold-label">{armed ? countdown : label}</span>

@@ -11,6 +11,7 @@ import {newIdempotencyKey} from "../../shared/ids";
 import {Dialog} from "../../shared/ui/Dialog";
 import {FolderPicker} from "../../shared/ui/FolderPicker";
 import {Menu,type MenuItem,type MenuPoint}from"../../shared/ui/Menu";
+import {MicroHoldToDelete}from"../../shared/ui/rare";
 import"./dragMove.css";
 import"./fileTable.css";
 
@@ -736,7 +737,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     </ul>
     <div className="dialog-actions">
      <button type="button" className="secondary-action" onClick={()=>setPendingDelete([])} disabled={deleteBusy}>取消</button>
-     <button type="submit" className="danger" disabled={deleteBusy}>{deleteBusy?"删除中…":"确认删除"}</button>
+     <MicroHoldToDelete label={deleteBusy?"删除中…":"确认删除"} tone="danger" disabled={deleteBusy} onConfirm={confirmDelete}/>
     </div>
    </form>
   </Dialog>}

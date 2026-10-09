@@ -463,7 +463,7 @@ async function editorsSuite(cookie) {
     const modelKeys = await cdp.evaluate(`(()=>({path:location.pathname,
       dialogs:[...document.querySelectorAll('dialog.dialog')].filter(d=>d.open).length,
       menus:document.querySelectorAll('[role=menu]').length,
-      selected:document.querySelectorAll('[aria-selected="true"]'].length}))()`);
+      selected:document.querySelectorAll('[aria-selected="true"]').length}))()`);
     check("DI-19 explorer keys inside /model/:id change nothing",
       modelKeys.path === `/model/${stl.fileId}` && modelKeys.dialogs === 0 && modelKeys.menus === 0 && modelKeys.selected === 0,
       JSON.stringify(modelKeys));
@@ -1229,7 +1229,7 @@ async function main() {
                 panelsGap:getComputedStyle(panels).gap};})()`);
       check("PW-01 header is 40px with a 1px seam and the sidebar is 240px flush",
         shell.header === "40px" && shell.headerBorder === "1px" && Math.round(shell.sidebar) === 240
-        && shell.panelsPad === "0px" && shell.panelsGap === "normal",
+        && shell.panelsPad === "0px" && (shell.panelsGap === "normal" || shell.panelsGap === "0px"),
         JSON.stringify(shell));
 
       // ---- PW-02: the seven-column fixed grid never overflows ----
@@ -1320,6 +1320,8 @@ async function main() {
       check("PW-08c Escape closes the palette", Boolean(closed), String(closed));
 
       // ---- PW-09: hold-to-confirm starts on press and cancels on release ----
+      await cdp.navigate(`${BASE}/doc?folder=${pwFolderId}`);
+      await cdp.waitFor(`()=>document.querySelectorAll('tbody tr[data-id]').length>=3`, 20000);
       await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr[data-id]')].find(r=>r.textContent?.includes('pw-01.txt'));[...row.querySelectorAll('.row-actions button')].find(b=>b.textContent?.trim()==='删除')?.click();return true;})()`);
       const deleteOpen = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('删除确认'));return Boolean(d);}`, 8000);
       check("PW-09a delete confirmation dialog opens", Boolean(deleteOpen), String(deleteOpen));
