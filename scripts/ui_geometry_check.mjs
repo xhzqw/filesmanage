@@ -252,6 +252,10 @@ try{
    await inspectCompact("organization",width);
    if(width===390){
     await navigate("/doc?folder="+fixture.folderId,".file-table");
+    for(let i=0;i<50;i++){
+     if(await evaluate(`!!document.querySelector(".more-trigger")`))break;
+     await delay(100);
+    }
     const opened=await evaluate(`(()=>{
      const button=document.querySelector(".more-trigger");
      if(!button)return false;
@@ -282,10 +286,22 @@ try{
    });
    await delay(150);
    await navigate("/doc",".sidebar");
-   const mobile=await evaluate(`(()=>({
-    innerWidth,scrollWidth:document.documentElement.scrollWidth,
-    visualWidth:visualViewport.width,scale:visualViewport.scale,
-   }))()`);
+   const mobile=await evaluate(`(()=>{
+    const geom=selector=>{
+     const el=document.querySelector(selector);
+     if(!el)return null;
+     const r=el.getBoundingClientRect(),s=getComputedStyle(el);
+     return {width:Math.round(r.width),right:Math.round(r.right),
+      clientWidth:el.clientWidth,scrollWidth:el.scrollWidth,overflowX:s.overflowX};
+    };
+    return {
+     innerWidth,scrollWidth:document.documentElement.scrollWidth,
+     visualWidth:visualViewport.width,scale:visualViewport.scale,
+     meta:document.querySelector("meta[name=viewport]")?.content,
+     root:geom("html"),shell:geom(".shell"),work:geom(".work"),
+     grid:geom(".table"),table:geom("table.file-table"),
+    };
+   })()`);
    check(`mobile device ${width}px no automatic page zoom`,
     mobile.innerWidth===width&&Math.abs(mobile.scale-1)<.03,
     JSON.stringify(mobile));
