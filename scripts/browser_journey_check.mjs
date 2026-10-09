@@ -241,14 +241,28 @@ async function main() {
     })()`);
     check("download round-trips the exact bytes", download === "exact", String(download));
 
-    // 9. delete through the UI (the real modal confirmation, not window.confirm)
+    // 9. delete through the shared file action menu and native modal.
+    // The old inline Delete button was removed to avoid a popup clipped by
+    // the horizontally scrollable grid. Exercise the real menuitem path.
     const deleted = await cdp.evaluate(`(async()=>{
       const row=[...document.querySelectorAll('tbody tr')].find(tr=>tr.textContent?.includes('journey-${stamp}.txt'));
       if(!row)return 'no-row';
-      const btn=[...row.querySelectorAll('button')].find(b=>b.textContent?.trim()==='删除');
-      if(!btn)return 'no-delete-button';
+      const btn=row.querySelector('button.more-trigger');
+      if(!btn)return 'no-file-action-trigger';
       btn.click();
-      await new Promise(r=>setTimeout(r,600));
+      const menuItem=await new Promise(resolve=>{
+        const deadline=Date.now()+3000;
+        const timer=setInterval(()=>{
+          const menu=document.querySelector('[role="menu"][aria-label="文件操作菜单"]');
+          const item=[...(menu?.querySelectorAll('[role="menuitem"]')??[])]
+           .find(b=>b.querySelector('.menu-label')?.textContent==='删除');
+          if(item){clearInterval(timer);resolve(item);}
+          else if(Date.now()>deadline){clearInterval(timer);resolve(null);}
+        },60);
+      });
+      if(!menuItem)return 'no-delete-menuitem';
+      menuItem.click();
+      await new Promise(r=>setTimeout(r,450));
       const dialog=[...document.querySelectorAll('dialog.dialog')].find(d=>d.open&&d.textContent?.includes('删除确认'));
       if(!dialog)return 'no-confirm-dialog';
       const confirm=[...dialog.querySelectorAll('button')].find(b=>b.textContent?.trim()==='确认删除');
