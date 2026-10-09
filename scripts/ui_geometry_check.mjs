@@ -198,6 +198,21 @@ try{
   ["navigation",".header nav a.active",6],["table",".table",10],
   ["toolbar",".toolbar",6],["tree row",".sidebar .tree-row",6],
  ]);
+ await evaluate(`(()=>{document.querySelector(".command-trigger")?.click();return true})()`);
+ for(let i=0;i<25;i++){
+  if(await evaluate(`!!document.querySelector(".command-panel")`))break;
+  await delay(100);
+ }
+ const command=await evaluate(`(()=>{
+  const el=document.querySelector(".command-panel");
+  if(!el)return null;
+  const s=getComputedStyle(el),r=el.getBoundingClientRect();
+  return {radius:parseFloat(s.borderTopLeftRadius),
+   shadow:s.boxShadow,visible:r.width>0&&r.height>0};
+ })()`);
+ check("global command palette uses shared overlay geometry",
+  !!command&&command.visible&&command.radius>=10&&command.shadow!=="none",
+  JSON.stringify(command));
  await navigate("/org",".org-card");
  await inspect("organization",[
   ["workspace",".work",14],["card",".org-card",14],["tabs",".org-tabs-nav",10],
@@ -261,9 +276,18 @@ try{
      if(!button)return false;
      button.click();
      return true;
-    })()`);
-    await delay(130);
-    await evaluate(`(()=>{document.querySelector(".row-more-menu.open button")?.click();return true})()`);
+     })()`);
+     await delay(130);
+     const rowMenu=await evaluate(`(()=>{
+      const el=document.querySelector(".row-more-menu.open");
+      if(!el)return null;
+      const s=getComputedStyle(el);
+      return {radius:parseFloat(s.borderTopLeftRadius),shadow:s.boxShadow};
+     })()`);
+     check("phone file action menu uses shared overlay geometry",
+      !!rowMenu&&rowMenu.radius>=10&&rowMenu.shadow!=="none",
+      JSON.stringify(rowMenu));
+     await evaluate(`(()=>{document.querySelector(".row-more-menu.open button")?.click();return true})()`);
     await delay(220);
     const dialog=await evaluate(`(()=>{
      const el=document.querySelector("dialog.dialog[open]");
