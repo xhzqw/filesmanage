@@ -85,21 +85,6 @@ class CDP {
     await this.send("DOM.setFileInputFiles", { nodeId: node.nodeId, files: [path] });
   }
 
-  // Clicking a plain <a> triggers a full page load, which destroys the
-  // execution context; fire the click synchronously and wait for the load.
-  async clickAndSettle(text) {
-    await this.evaluate(`(()=>{const el=[...document.querySelectorAll('a')].find(a=>a.textContent?.includes(${JSON.stringify(text)}));if(!el)return false;el.click();return true;})()`);
-    const loaded = new Promise((resolve) => {
-      const timer = setInterval(() => {
-        const hit = this.events.find((e) => e.method === "Page.loadEventFired");
-        if (hit) { this.events.splice(this.events.indexOf(hit), 1); clearInterval(timer); resolve(); }
-      }, 100);
-      setTimeout(() => { clearInterval(timer); resolve(); }, 15000);
-    });
-    await loaded;
-    await delay(1500);
-  }
-
   async navigate(url) {
     const loaded = new Promise((resolve) => {
       const timer = setInterval(() => {
@@ -215,10 +200,24 @@ async function main() {
       check("file uploaded through the UI", false, "no upload input");
     }
 
-    // 7. open the preview page through the real row link
-    const hasLink = await cdp.evaluate(`(()=>[...document.querySelectorAll('a')].some(a=>a.textContent?.includes('journey-${stamp}.txt')))()`);
-    check("file row links to the preview page", Boolean(hasLink), "row link present");
-    await cdp.clickAndSettle(`journey-${stamp}.txt`);
+    // 7. open the preview page from the row (DESKTOP-INTERACTION-v1: the file
+    // name is no longer a single-click navigation link; the row offers an
+    // explicit 打开 action and double-click instead)
+    const rowSurface = await cdp.evaluate(`(()=>{
+      const row=[...document.querySelectorAll('tbody tr')].find(tr=>tr.textContent?.includes('journey-${stamp}.txt'));
+      if(!row)return 'no-row';
+      const nameLink=[...row.querySelectorAll('a')].some(a=>a.textContent?.includes('journey-${stamp}.txt'));
+      const open=[...row.querySelectorAll('button')].some(b=>b.textContent?.trim()==='打开');
+      return {nameLink,open};
+    })()`);
+    check("file row exposes an explicit open action, not a name link",
+      rowSurface && rowSurface.nameLink === false && rowSurface.open === true, JSON.stringify(rowSurface));
+    await cdp.evaluate(`(()=>{
+      const row=[...document.querySelectorAll('tbody tr')].find(tr=>tr.textContent?.includes('journey-${stamp}.txt'));
+      const open=[...row.querySelectorAll('button')].find(b=>b.textContent?.trim()==='打开');
+      open?.click();return true;})()`);
+    await cdp.waitFor(`()=>location.pathname.startsWith('/preview/')`, 15000);
+    await delay(1200);
     const preview = await cdp.evaluate(`(()=>{
       const text=document.body.textContent||'';
       const onPreview=location.pathname.startsWith('/preview/');
@@ -240,13 +239,19 @@ async function main() {
     })()`);
     check("download round-trips the exact bytes", download === "exact", String(download));
 
-    // 9. delete through the UI (the confirm dialog is auto-accepted)
+    // 9. delete through the UI (the real modal confirmation, not window.confirm)
     const deleted = await cdp.evaluate(`(async()=>{
       const row=[...document.querySelectorAll('tbody tr')].find(tr=>tr.textContent?.includes('journey-${stamp}.txt'));
       if(!row)return 'no-row';
       const btn=[...row.querySelectorAll('button')].find(b=>b.textContent?.trim()==='删除');
       if(!btn)return 'no-delete-button';
       btn.click();
+      await new Promise(r=>setTimeout(r,600));
+      const dialog=[...document.querySelectorAll('dialog.dialog')].find(d=>d.open&&d.textContent?.includes('删除确认'));
+      if(!dialog)return 'no-confirm-dialog';
+      const confirm=[...dialog.querySelectorAll('button')].find(b=>b.textContent?.trim()==='确认删除');
+      if(!confirm)return 'no-confirm-button';
+      confirm.click();
       await new Promise(r=>setTimeout(r,2500));
       // The announce notice echoes the file name, so the table is the
       // authoritative surface here, not document.body.
