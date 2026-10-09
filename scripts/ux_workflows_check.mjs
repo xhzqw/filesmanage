@@ -872,6 +872,223 @@ async function g4UiSuite() {
   }
 }
 
+// ================= BATCHUI suite (WF-07/08 batch move UI, purge, upload phases) =================
+async function batchUiSuite() {
+  const stamp = String(Date.now());
+  let chrome = null;
+  let cdp = null;
+  const json = async (method, path, body) => {
+    const res = await fetch(BASE + path, {
+      method, headers: { "Content-Type": "application/json", Origin: ORIGIN, Cookie: sessionCookie },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return { status: res.status, body: await res.json().catch(() => null) };
+  };
+  const tree = await json("GET", "/api/folders/tree");
+  const root = (tree.body?.data ?? []).find((f) => !f.parentId);
+  const mk = async (name) => (await json("POST", "/api/folders", { name, parentId: root.id })).body?.data?.id;
+  const aId = await mk(`BM-A-${stamp}`);
+  const bId = await mk(`BM-B-${stamp}`);
+  const cId = await mk(`BM-C-${stamp}`);
+  const upload = async (folder, name) => {
+    const form = new FormData();
+    form.set("folderId", folder);
+    form.set("file", new Blob([`bm ${name} ${stamp}\n`]), name);
+    form.set("idempotencyKey", `${folder}-${name}-${stamp}`);
+    return (await (await fetch(`${BASE}/api/files`, { method: "POST", headers: { Origin: BASE, Cookie: cookie }, body: form })).json()).data;
+  };
+  const f1 = await upload(aId, "bm-1.txt");
+  const f2 = await upload(aId, "bm-2.txt");
+  await upload(aId, "bm-3.txt");
+  await upload(bId, "bm-dup.txt");
+  const dup = await upload(aId, "bm-dup.txt");
+  const listIn = async (folder) => ((await json("GET", `/api/files?folder=${folder}&limit=200`)).body?.data?.items ?? []).map((f) => f.name);
+
+  // ---- WF-07: batch commit through the API ----
+  let r = await json("POST", "/api/files/move-batch", { fileIds: [f1.fileId, f2.fileId], targetFolderId: cId, mode: "all_or_nothing", idempotencyKey: "bm-key-1" });
+  const committed = r.body?.data ?? {};
+  check("WF-07 batch commits", r.status === 200 && committed.status === "committed" && committed.count === 2 && (committed.moved ?? []).length === 2, JSON.stringify(committed).slice(0, 160));
+  let inC = await listIn(cId);
+  check("WF-07 both files in the target", inC.includes("bm-1.txt") && inC.includes("bm-2.txt"), JSON.stringify(inC));
+  check("WF-07 source list emptied of them", !(await listIn(aId)).includes("bm-1.txt"), "");
+
+  // ---- WF-08: replay returns the same result ----
+  r = await json("POST", "/api/files/move-batch", { fileIds: [f1.fileId, f2.fileId], targetFolderId: cId, mode: "all_or_nothing", idempotencyKey: "bm-key-1" });
+  check("WF-08 replay returns the same committed result", r.status === 200 && r.body?.data?.status === "committed" && r.body?.data?.count === 2, JSON.stringify(r.body?.data ?? {}).slice(0, 120));
+
+  // ---- all-or-nothing: the duplicate name conflicts the whole batch ----
+  r = await json("POST", "/api/files/move-batch", { fileIds: [dup.fileId, f1.fileId], targetFolderId: bId, mode: "all_or_nothing", idempotencyKey: "bm-key-2" });
+  const conflicted = r.body?.data ?? {};
+  check("all-or-nothing conflict with a per-item entry",
+    r.status === 200 && conflicted.status === "conflict" && (conflicted.conflicts ?? []).some((c) => c.id === dup.fileId && c.code === "E_NAME_CONFLICT"),
+    JSON.stringify(conflicted).slice(0, 200));
+  const inC2 = await listIn(cId);
+  check("conflict wrote nothing (f1 still in C)", inC2.includes("bm-1.txt"), JSON.stringify(inC2));
+  check("conflict left the duplicate in A", (await listIn(aId)).includes("bm-dup.txt"), "");
+
+  // ---- over-limit ----
+  const over = Array.from({ length: 101 }, (_, i) => "file_" + i);
+  r = await json("POST", "/api/files/move-batch", { fileIds: over, targetFolderId: bId, mode: "all_or_nothing", idempotencyKey: "bm-key-3" });
+  check("over-limit batch rejected with the limit in the message",
+    r.status === 400 && r.body?.error?.code === "E_BAD" && /100/.test(r.body?.error?.message ?? ""), JSON.stringify(r.body).slice(0, 160));
+
+  chrome = spawn("/usr/bin/google-chrome", [
+    "--headless=new", `--remote-debugging-port=${PORT}`, "--no-sandbox",
+    "--disable-gpu", "--window-size=1440,900", "about:blank",
+  ], { stdio: "ignore" });
+  try {
+    await delay(1500);
+    const targets = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
+    const page = targets.find((t) => t.type === "page");
+    cdp = await CDP.connect(page.webSocketDebuggerUrl);
+    await cdp.send("Page.enable");
+    await cdp.send("Runtime.enable");
+    await cdp.send("Page.bringToFront");
+    await cdp.send("Emulation.setFocusEmulationEnabled", { enabled: true });
+
+    await cdp.navigate(`${BASE}/login`);
+    await cdp.evaluate(`(()=>{
+      const set=(el,v)=>{const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));};
+      const fields=[...document.querySelectorAll('input')];
+      const user=fields.find(f=>f.type==='text'||f.type==='email'||(!f.type&&f.offsetParent!==null));
+      const pass=document.querySelector('input[type=password]');
+      if(user)set(user,'admin');
+      if(pass)set(pass,${JSON.stringify(password)});
+      [...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='登录')?.click();return true;})()`);
+    await cdp.waitFor(`()=>location.pathname==='/doc'||location.pathname==='/first-sign-in'`);
+
+    // ---- UI: multi-selection batch move through the picker ----
+    await cdp.navigate(`${BASE}/doc?folder=${cId}`);
+    const rowsReady = await cdp.waitFor(`()=>document.querySelectorAll('tbody tr[data-id]').length>=2`, 20000);
+    check("target folder rows listed", Boolean(rowsReady), String(rowsReady));
+    await cdp.evaluate(`(()=>{const rows=[...document.querySelectorAll('tbody tr[data-id]')];rows[0]?.click();rows[1]?.dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:true}));return true;})()`);
+    const selCount = await cdp.evaluate(`(()=>[...document.querySelectorAll('tbody tr[data-id]')].filter(r=>r.getAttribute('aria-selected')==='true').length)()`);
+    check("two rows selected for the batch", selCount === 2, String(selCount));
+    await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr[data-id]')][0];row?.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:100,clientY:100}));return true;})()`);
+    await cdp.waitFor(`()=>document.querySelector('[role=menu]')!==null`);
+    const batchMenu = await cdp.evaluate(`(()=>{const items=[...document.querySelectorAll('[role=menuitem]')].map(b=>b.textContent?.trim());return {hasMove:items.includes('移动到…'),items};})()`);
+    check("WF-11 multi-selection menu offers the set-wide move only",
+      batchMenu.hasMove === true && batchMenu.items.some((i) => i.startsWith("删除")) && !batchMenu.items.some((i) => i.startsWith("编辑")),
+      JSON.stringify(batchMenu.items));
+    await cdp.evaluate(`(()=>{const item=[...document.querySelectorAll('[role=menuitem]')].find(b=>b.textContent?.trim()==='移动到…');item?.click();return Boolean(item);})()`);
+    const batchDialog = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));return d&&/移动 2 个文件/.test(d.textContent||'')?true:false;}`, 10000);
+    check("WF-07 batch picker opens scoped to the selection", batchDialog === true, String(batchDialog));
+    const pick = (name) => cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));
+      const input=d.querySelector('.folder-picker-search');const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
+      set.call(input,${JSON.stringify(name)});input.dispatchEvent(new Event('input',{bubbles:true}));return true;})()`);
+    await pick(`BM-A-${stamp}`);
+    await delay(500);
+    await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));
+      const btn=[...d.querySelectorAll('.folder-picker-result')].find(b=>b.textContent?.includes(${JSON.stringify(`BM-A-${stamp}`)}));btn?.click();return Boolean(btn);})()`);
+    await delay(300);
+    await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));
+      [...d.querySelectorAll('button')].find(b=>b.textContent?.trim()==='确认移动')?.click();return true;})()`);
+    const batchClosed = await cdp.waitFor(`()=>![...document.querySelectorAll('dialog.dialog')].some(d=>d.open&&d.querySelector('.folder-picker'))`, 20000);
+    check("WF-07 batch move commits through the UI", batchClosed === true, String(batchClosed));
+    const inAAfter = await listIn(aId);
+    check("WF-07 both files landed back in A", inAAfter.includes("bm-1.txt") && inAAfter.includes("bm-2.txt"), JSON.stringify(inAAfter));
+
+    // ---- UI: conflict list + exclude-and-retry (continue in A, which still holds files) ----
+    await cdp.navigate(`${BASE}/doc?folder=${aId}`);
+    await cdp.waitFor(`()=>document.querySelectorAll('tbody tr[data-id]').length>=3`, 20000);
+    await cdp.evaluate(`(()=>{
+      const rows=[...document.querySelectorAll('tbody tr[data-id]')];
+      const dupRow=rows.find(r=>r.textContent?.includes('bm-dup.txt'));
+      const other=rows.find(r=>r.textContent?.includes('bm-1.txt'));
+      if(!dupRow||!other)return false;
+      other.click();
+      dupRow.dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:true}));
+      return true;})()`);
+    const conflictSel = await cdp.evaluate(`(()=>[...document.querySelectorAll('tbody tr[data-id]')].filter(r=>r.getAttribute('aria-selected')==='true').length)()`);
+    check("conflict scenario selects the duplicate plus one clean file", conflictSel === 2, String(conflictSel));
+    await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr[data-id]')].find(r=>r.getAttribute('aria-selected')==='true');row?.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:100,clientY:100}));return true;})()`);
+    await cdp.waitFor(`()=>document.querySelector('[role=menu]')!==null`);
+    await cdp.evaluate(`(()=>{const item=[...document.querySelectorAll('[role=menuitem]')].find(b=>b.textContent?.trim()==='移动到…');item?.click();return Boolean(item);})()`);
+    await cdp.waitFor(`()=>[...document.querySelectorAll('dialog.dialog')].some(d=>d.open&&d.querySelector('.folder-picker'))`, 8000);
+    await pick(`BM-B-${stamp}`);
+    await delay(500);
+    await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));
+      const btn=[...d.querySelectorAll('.folder-picker-result')].find(b=>b.textContent?.includes(${JSON.stringify(`BM-B-${stamp}`)}));btn?.click();return Boolean(btn);})()`);
+    await delay(300);
+    await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));
+      [...d.querySelectorAll('button')].find(b=>b.textContent?.trim()==='确认移动')?.click();return true;})()`);
+    const conflictShown = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));return d&&/同名|无法移动/.test(d.textContent||'')?d.textContent.slice(0,80):false;}`, 15000);
+    check("WF-07 UI conflict keeps the dialog open with the reason", Boolean(conflictShown), String(conflictShown));
+    const excludeBtn = await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));const b=d?[...d.querySelectorAll('button')].find(x=>/排除/.test(x.textContent||'')):null;return b?{label:b.textContent?.trim(),disabled:b.disabled}:null;})()`);
+    check("exclude-and-retry offered after a conflict", Boolean(excludeBtn) && excludeBtn.disabled === false, JSON.stringify(excludeBtn));
+    await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));[...d.querySelectorAll('button')].find(x=>/排除/.test(x.textContent||''))?.click();return true;})()`);
+    await delay(400);
+    const remainder = await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));return d?d.textContent?.match(/剩余 (\d+) 个/)?.[1]??d.textContent?.slice(0,60):null;})()`);
+    check("exclude narrows the batch to the clean remainder", remainder !== null, String(remainder));
+    await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));[...d.querySelectorAll('button')].find(b=>b.textContent?.trim()==='确认移动')?.click();return true;})()`);
+    const retryClosed = await cdp.waitFor(`()=>![...document.querySelectorAll('dialog.dialog')].some(d=>d.open&&d.querySelector('.folder-picker'))`, 20000);
+    check("WF-07 remainder commits after exclusion", retryClosed === true, String(retryClosed));
+    const inBAfter = await listIn(bId);
+    // B legitimately holds its own bm-dup.txt from the fixture; the excluded copy must stay in A.
+    check("excluded file stayed, clean file moved",
+      inBAfter.includes("bm-1.txt") && (await listIn(aId)).includes("bm-dup.txt"),
+      JSON.stringify({ inB: inBAfter, inA: await listIn(aId) }));
+    await cdp.key("Escape", "Escape", 27);
+    await delay(300);
+
+    // ---- purge: admin-gated, two-stage confirmation ----
+    const victim = await upload(aId, "bm-purge.txt");
+    await json("DELETE", `/api/files/${victim.fileId}`);
+    await cdp.navigate(`${BASE}/trash`);
+    const purgeBtn = await cdp.waitFor(`()=>{const row=[...document.querySelectorAll('tbody tr')].find(tr=>tr.textContent?.includes('bm-purge.txt'));const b=row?[...row.querySelectorAll('button')].find(x=>x.textContent?.trim()==='永久删除'):null;return b?true:false;}`, 20000);
+    check("purge entry visible for admin", purgeBtn === true, String(purgeBtn));
+    await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr')].find(tr=>tr.textContent?.includes('bm-purge.txt'));[...row.querySelectorAll('button')].find(x=>x.textContent?.trim()==='永久删除')?.click();return true;})()`);
+    const stage1 = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('永久删除确认'));return d?d.textContent.slice(0,60):false;}`, 8000);
+    check("purge stage 1 states the irreversible impact", typeof stage1 === "string" && stage1.includes("不可逆"), String(stage1));
+    await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('永久删除确认'));[...d.querySelectorAll('button')].find(b=>b.textContent?.trim()==='继续（下一步）')?.click();return true;})()`);
+    const stage2 = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('再次确认'));return d?true:false;}`, 8000);
+    check("purge requires the second confirmation", stage2 === true, String(stage2));
+    await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('再次确认'));[...d.querySelectorAll('button')].find(b=>b.textContent?.trim()==='确认永久删除')?.click();return true;})()`);
+    const purged = await cdp.waitFor(`()=>![...document.querySelectorAll('tbody tr')].some(tr=>tr.textContent?.includes('bm-purge.txt'))`, 20000);
+    check("purge removes the entry from the trash", purged === true, String(purged));
+
+    // ---- upload two-phase progress ----
+    await cdp.navigate(`${BASE}/doc?folder=${aId}`);
+    await cdp.waitFor(`()=>document.querySelector('.dropzone')!==null`, 20000);
+    const phases = await cdp.evaluate(`(async ()=>{
+      const seen={progress:false,processing:false};
+      const zone=document.querySelector('.dropzone');
+      const dt=new DataTransfer();
+      dt.items.add(new File([new Uint8Array(3*1024*1024)],'bm-big.bin',{type:'application/octet-stream'}));
+      zone.dispatchEvent(new DragEvent('drop',{bubbles:true,dataTransfer:dt}));
+      const deadline=Date.now()+30000;
+      while(Date.now()<deadline){
+        const item=[...document.querySelectorAll('.upload-item')].find(li=>li.textContent?.includes('bm-big.bin'));
+        if(item){
+          if(item.querySelector('.upload-progress'))seen.progress=true;
+          if(/服务端处理中/.test(item.textContent||''))seen.processing=true;
+          if(item.className.includes('committed'))break;
+        }
+        await new Promise(r=>setTimeout(r,30));
+      }
+      return seen;})()`);
+    check("upload shows the byte-progress phase", phases && phases.progress === true, JSON.stringify(phases));
+    const bigCommitted = await cdp.waitFor(`()=>{const item=[...document.querySelectorAll('.upload-item')].find(li=>li.textContent?.includes('bm-big.bin'));return item&&item.className.includes('committed')?true:false;}`, 30000);
+    check("upload commits after the server phase", bigCommitted === true, String(bigCommitted));
+  } finally {
+    cdp && cdp.close();
+    chrome && chrome.kill("SIGKILL");
+  }
+
+
+  // cleanup
+  for (const folder of [aId, bId, cId]) {
+    if (folder) await json("DELETE", `/api/folders/${folder}`);
+  }
+  const trash = await json("GET", "/api/trash");
+  for (const entry of trash.body?.data ?? []) {
+    const name = String(entry.name ?? entry.oldName ?? "");
+    if (name.startsWith("bm-") || (name.startsWith("BM-") && name.includes(stamp))) {
+      await json("DELETE", "/api/trash/" + entry.id);
+    }
+  }
+}
+
 async function main() {
   const loginRes = await fetch(`${BASE}/api/login`, {
     method: "POST", headers: { "Content-Type": "application/json" },
@@ -898,6 +1115,7 @@ async function main() {
   await runSuite("WORKFLOW", workflowSuite);
   await runSuite("SAFE-EDIT", safeEditSuite);
   await runSuite("G4UI", g4UiSuite);
+  await runSuite("BATCHUI", batchUiSuite);
 
   const failed = results.filter((r) => !r.ok);
   console.log(`SUMMARY pass=${results.length - failed.length} total=${results.length}`);
