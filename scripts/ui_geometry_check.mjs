@@ -265,6 +265,35 @@ try{
    }
    await navigate("/org",".org-card");
    await inspectCompact("organization",width);
+   const permissionsTab=await evaluate(`(()=>{
+    const tab=[...document.querySelectorAll('.org-tab[role="tab"]')]
+     .find(el=>el.textContent?.includes("权限管理"));
+    if(!tab)return false;
+    tab.click();return true;
+   })()`);
+   await delay(230);
+   const permissionsLayout=await evaluate(`(()=>{
+    const info=selector=>{
+     const el=document.querySelector(selector);if(!el)return null;
+     const r=el.getBoundingClientRect(),style=getComputedStyle(el);
+     return {width:r.width,height:r.height,left:r.left,right:r.right,
+       top:r.top,bottom:r.bottom,scrollWidth:el.scrollWidth,
+       clientWidth:el.clientWidth,overflowX:style.overflowX,
+       overflowY:style.overflowY};
+    };
+    return {workspace:info(".perm-workspace"),
+      tree:info(".perm-browser"),treeScroll:info(".perm-browser-scroll"),
+      detail:info(".perm-detail"),subnav:info(".perm-subnav")};
+   })()`);
+   check(`permissions ${width}px tree and details accessible`,
+    permissionsTab&&!!permissionsLayout.workspace&&!!permissionsLayout.tree&&
+    !!permissionsLayout.detail&&
+    permissionsLayout.workspace.right<=width+2&&
+    permissionsLayout.tree.width>=Math.min(200,width*.6)&&
+    permissionsLayout.tree.height>=110&&
+    permissionsLayout.detail.width>=Math.min(250,width*.7)&&
+    permissionsLayout.detail.height>=170,
+    JSON.stringify(permissionsLayout));
    if(width===390){
     await navigate("/doc?folder="+fixture.folderId,".file-table");
     for(let i=0;i<50;i++){
