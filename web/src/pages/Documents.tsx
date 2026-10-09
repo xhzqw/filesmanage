@@ -1,9 +1,9 @@
 import{useEffect,useState}from "react";
-import{useLocation}from "react-router-dom";
+import{Link,useLocation}from "react-router-dom";
 import type{User}from "../entities/user/model";
 import type{Folder}from "../entities/folder/model";
 import{folderApi}from "../features/folders/api";
-import{FolderTree}from "../features/folders/FolderTree";
+import{FolderTree,ancestorPath}from "../features/folders/FolderTree";
 import{NewFolderForm}from "../features/folders/NewFolderForm";
 import{FolderActions}from "../features/folders/FolderActions";
 import{GrantDialog}from "../features/folders/GrantDialog";
@@ -69,7 +69,15 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
    {status==="ready"&&<FolderTree items={folders} selected={selected?.id||""}/>}</aside>
    <main className="work">
    {status==="ready"&&selected&&<>
-     <div className="breadcrumb">文档管理 / {selected.name}</div>
+     <nav className="breadcrumb" aria-label="当前位置">
+      <span>文档管理</span>
+      {ancestorPath(folders,selected.id).map((folder,index,chain)=><span key={folder.id}>
+       {" / "}
+       {index===chain.length-1
+        ?<span aria-current="page">{folder.name}</span>
+        :<Link to={"/doc?folder="+encodeURIComponent(folder.id)}>{folder.name}</Link>}
+      </span>)}
+     </nav>
      <NewFolderForm parentId={selected.id} onCreated={()=>setReloadKey(k=>k+1)}/>
      <FolderActions folder={selected} isAdmin={user.isAdmin} onChanged={()=>setReloadKey(k=>k+1)} onManageGrants={()=>setGrantOpen(true)} onManagePolicy={()=>setPolicyOpen(true)}/>
      <FileTable folder={selected.id} folderName={selected.name} onEdit={setEditingId} reloadKey={reloadKey}/>
