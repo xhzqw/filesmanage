@@ -92,6 +92,14 @@ async function inspectCompact(page,width){
      overflowX:s.overflowX,scrollWidth:el.scrollWidth,clientWidth:el.clientWidth};
   };
   return {width:innerWidth,htmlWidth:document.documentElement.scrollWidth,
+   rootOverflowX:getComputedStyle(document.documentElement).overflowX,
+   rootHorizontalScrollPossible:(()=>{
+    const x=scrollX,y=scrollY;
+    scrollTo(99999,y);
+    const moved=scrollX!==x;
+    scrollTo(x,y);
+    return moved;
+   })(),
    visualWidth:visualViewport?.width,visualScale:visualViewport?.scale,
    header:rect(".header"),brand:rect(".brand"),navToggle:rect(".nav-toggle"),
    headerRight:rect(".header-right"),sidebar:rect(".sidebar"),
@@ -107,8 +115,9 @@ async function inspectCompact(page,width){
     width:Math.round(el.getBoundingClientRect().width),
    }))};
  })()`);
- check(`${page} ${width}px document fits`,report.htmlWidth<=report.width+2,
-  `scroll=${report.htmlWidth} viewport=${report.width} outliers=${JSON.stringify(report.overflowing)}`);
+ check(`${page} ${width}px no page-level horizontal scrolling`,
+  !report.rootHorizontalScrollPossible&&(report.htmlWidth<=report.width+2||report.rootOverflowX==="clip"),
+  `scrollWidth=${report.htmlWidth} viewport=${report.width} rootOverflow=${report.rootOverflowX} outliers=${JSON.stringify(report.overflowing)}`);
  check(`${page} ${width}px exact layout viewport`,report.width===width,
   `layout=${report.width} target=${width}`);
  check(`${page} ${width}px header contents fit`,
@@ -266,6 +275,20 @@ try{
     await navigate("/preview/"+fixture.fileId,".media-preview");
     await inspectCompact("media preview",width);
    }
+  }
+  for(const width of [600,390,320]){
+   await send("Emulation.setDeviceMetricsOverride",{
+    width,height:760,deviceScaleFactor:1,mobile:true,
+   });
+   await delay(150);
+   await navigate("/doc",".sidebar");
+   const mobile=await evaluate(`(()=>({
+    innerWidth,scrollWidth:document.documentElement.scrollWidth,
+    visualWidth:visualViewport.width,scale:visualViewport.scale,
+   }))()`);
+   check(`mobile device ${width}px no automatic page zoom`,
+    mobile.innerWidth===width&&Math.abs(mobile.scale-1)<.03,
+    JSON.stringify(mobile));
   }
   await send("Emulation.clearDeviceMetricsOverride");
  }finally{
