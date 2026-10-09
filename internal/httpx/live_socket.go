@@ -124,6 +124,7 @@ func (h *Handler) streamLiveEvents(req *http.Request, ws *websocket.Conn, userID
 			send(map[string]any{"type": "session.password_change_required"})
 			return false
 		}
+		h.S.TouchActiveSession(req.Context(), token)
 		return true
 	}
 	if !checkSession() {

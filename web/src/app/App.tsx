@@ -15,6 +15,7 @@ import{Org}from "../pages/Org";
 import{Approvals}from "../pages/Approvals";
 import{OfficeEditor}from "../pages/OfficeEditor";
 import{ModelViewer}from "../pages/ModelViewer";
+import{SessionDevices}from "../pages/SessionDevices";
 import{SearchPage,WorkspacePage}from "./AppShell";
 export function App(){
  const user=useSession(s=>s.user),loading=useSession(s=>s.loading),setUser=useSession(s=>s.setUser),setLoading=useSession(s=>s.setLoading);
@@ -41,7 +42,8 @@ export function App(){
  if(loading)return <main className="login-bg">正在检查会话…</main>;
  if(user?.mustChangePassword)return <>{feedback}<Routes><Route path="/first-sign-in" element={<FirstSignIn onSuccess={setUser} onExit={logout}/>}/><Route path="*" element={<Navigate to="/first-sign-in" replace/>}/></Routes></>;
  return <>{feedback}<Routes><Route path="/login" element={user?<Navigate to="/doc" replace/>:<Login onSuccess={setUser}/>}/>
- <Route path="/doc" element={user?<Documents user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
+  <Route path="/doc" element={user?<Documents user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
+  <Route path="/account/sessions" element={user?<SessionDevices user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/preview/:id" element={user?<Preview user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/trash" element={user?<Trash user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/org" element={user?<Org user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>

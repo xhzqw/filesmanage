@@ -96,6 +96,10 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.POST("/logout", h.logout)
 	api.POST("/me/password", h.changePassword)
 	api.GET("/me", h.me)
+	api.GET("/me/sessions", h.mySessions)
+	api.GET("/me/auth-activity", h.mySessionActivity)
+	api.DELETE("/me/sessions/others", h.revokeOtherSessions)
+	api.DELETE("/me/sessions/:id", h.revokeOwnSession)
 	api.GET("/events/ws", h.websocketEvents)
 	api.GET("/folders/tree", h.folders)
 	api.GET("/folders/children", h.folderChildren)
@@ -276,6 +280,8 @@ func (h *Handler) login(c *gin.Context) {
 	defer h.LoginLimit.release()
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 4*time.Second)
 	defer cancel()
+	peerIP, _, _ := net.SplitHostPort(loginClientAddr(c.Request))
+	ctx = application.WithLoginMetadata(ctx, peerIP, c.Request.UserAgent())
 	token, user, err := h.S.Login(ctx, req.Login, req.Password)
 	if err != nil {
 		if errors.Is(err, application.ErrInvalidCredentials) || errors.Is(err, application.ErrInvalidInput) {

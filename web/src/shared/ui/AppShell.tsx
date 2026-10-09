@@ -84,7 +84,8 @@ export function AppShell({user,onLogout,product,actions,children}:{user:ShellUse
        <div className="account-menu-role">{user.isAdmin?"系统管理员":"标准用户"}</div>
       </div>
       <div className="account-menu-divider" />
-      <button type="button" role="menuitem" className="account-menu-item danger" onClick={()=>{setAccountOpen(false);onLogout();}}>
+       <Link to="/account/sessions" role="menuitem" className="account-menu-item" onClick={()=>setAccountOpen(false)}>登录设备与安全</Link>
+       <button type="button" role="menuitem" className="account-menu-item danger" onClick={()=>{setAccountOpen(false);onLogout();}}>
        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
        <span>退出系统</span>
       </button>

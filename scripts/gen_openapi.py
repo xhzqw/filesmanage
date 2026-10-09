@@ -647,6 +647,36 @@ add("POST", "/api/me/password", operation("Change own password (forced on first 
 add("GET", "/api/me", operation("Current session user", "Auth", "currentUser", security=SESSION,
     responses=dict([json_ok(ref("SessionUser"), "Authenticated user."), resp("401", ERR["401"])])))
 
+# Session inventory: each row is public, never the bearer cookie itself.
+SESSION_DEVICE = obj({
+    "id": string("96-bit prefix of session-token SHA-256; selector only, not a bearer token."),
+    "device": string("Coarse browser and operating-system label."),
+    "address": string("Authenticated socket client IP or trusted Nginx-forwarded IP."),
+    "createdAt": {"type": "string", "format": "date-time"},
+    "lastSeenAt": {"type": "string", "format": "date-time"},
+    "expiresAt": {"type": "string", "format": "date-time"},
+    "current": {"type": "boolean"}
+}, required=["id", "device", "address", "createdAt", "lastSeenAt", "expiresAt", "current"])
+SESSION_ACTIVITY = obj({
+    "type": string("auth.login, auth.logout, auth.session_revoke or auth.sessions_revoke"),
+    "device": string(), "address": string(), "count": integer(),
+    "occurredAt": {"type": "string", "format": "date-time"}
+}, required=["type", "device", "address", "occurredAt"])
+add("GET", "/api/me/sessions", operation("List own active login devices", "Auth", "listOwnSessions",
+    security=SESSION, responses=dict([json_ok(arr(SESSION_DEVICE), "At most 50 own sessions; includes current marker."),
+        resp("401", ERR["401"]), resp("403", ERR["403"]), resp("503", ERR["503"])]), auth_note=MUST_CHANGE))
+add("GET", "/api/me/auth-activity", operation("List own recent account security actions", "Auth", "listOwnAuthActivity",
+    security=SESSION, responses=dict([json_ok(arr(SESSION_ACTIVITY), "At most 30 own login/logout/revoke audit records."),
+        resp("401", ERR["401"]), resp("403", ERR["403"]), resp("503", ERR["503"])]), auth_note=MUST_CHANGE))
+add("DELETE", "/api/me/sessions/others", operation("Revoke every other active session", "Auth", "revokeOtherSessions",
+    security=SESSION, responses=dict([json_ok(obj({"revoked": integer()}, required=["revoked"]), "Number of other sessions revoked."),
+        resp("401", ERR["401"]), resp("403", ERR["403"]), resp("503", ERR["503"])]), auth_note=MUST_CHANGE))
+add("DELETE", "/api/me/sessions/{id}", operation("Revoke a single other session belonging to the caller", "Auth", "revokeOwnSession",
+    security=SESSION, params=[id_param("id", "24 lowercase hexadecimal characters, never a bearer token.")],
+    responses=dict([json_ok(obj({"revoked": {"type": "boolean"}}, required=["revoked"]), "Other session revoked."),
+        resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"]), resp("503", ERR["503"])]),
+    auth_note=MUST_CHANGE + " Foreign-account IDs and missing IDs are indistinguishable (404). Current session cannot be revoked here."))
+
 # RFC 6455 upgrade: same-origin, Cookie-authenticated, outbound JSON events.
 add("GET", "/api/events/ws", operation("Subscribe to live session events (WebSocket)", "Auth",
     "sessionEventsWebSocket", security=SESSION,

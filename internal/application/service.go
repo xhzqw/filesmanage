@@ -319,6 +319,16 @@ func (s *Service) Login(ctx context.Context, login, password string) (string, do
 	if err = tx.InsertSession(ctx, HashToken(token), u.ID, s.now().Add(24*time.Hour)); err != nil {
 		return "", domain.User{}, err
 	}
+	meta := metadataOf(ctx)
+	if store, ok := tx.(ports.SessionInventory); ok {
+		if err = store.SetSessionMetadata(ctx, HashToken(token), meta.address, meta.device); err != nil {
+			return "", domain.User{}, err
+		}
+	}
+	if err = auditRequired(ctx, tx, u, "auth.login", "session", HashToken(token)[:24], "success",
+		map[string]any{"device": meta.device, "ip": meta.address}); err != nil {
+		return "", domain.User{}, err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return "", domain.User{}, err
 	}
@@ -368,6 +378,12 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 		return err
 	}
 	defer tx.Rollback(ctx)
+	owner := principal.User.ID
+	if store, ok := tx.(ports.SessionInventory); ok {
+		owner, err = store.SessionOwner(ctx, HashToken(token))
+		if errors.Is(err, ports.ErrRowMissing) { return ErrUnauthorized }
+		if err != nil { return err }
+	}
 	if err = tx.RevokeSession(ctx, HashToken(token)); err != nil {
 		if errors.Is(err, ports.ErrRowMissing) {
 			s.session.drop(token)
@@ -375,12 +391,16 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 		}
 		return err
 	}
+	if owner != "" {
+		if err = auditRequired(ctx, tx, domain.User{ID: owner}, "auth.logout", "session",
+			HashToken(token)[:24], "success", map[string]any{}); err != nil { return err }
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return err
 	}
 	s.bumpACLEpoch()
 	s.session.drop(token)
-	s.notifySessionChange(principal.User.ID)
+	s.notifySessionChange(owner)
 	return nil
 }
 
