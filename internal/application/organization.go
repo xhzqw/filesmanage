@@ -139,6 +139,7 @@ func (s *Service) SetUserDisabled(ctx context.Context, actor domain.User, userID
 	// Invalidate only after the database decision is durable.
 	s.bumpACLEpoch()
 	s.session.dropUser(userID)
+	s.notifySessionChange(userID)
 	return nil
 }
 
@@ -184,6 +185,7 @@ func (s *Service) ResetUserPassword(ctx context.Context, actor domain.User, user
 	// Without eviction the session cache can continue authorizing stale tokens.
 	s.bumpACLEpoch()
 	s.session.dropUser(userID)
+	s.notifySessionChange(userID)
 	return nil
 }
 

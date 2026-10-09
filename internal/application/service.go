@@ -37,6 +37,7 @@ type Service struct {
 	stats   statsCache
 	search  searchCache
 	session sessionCache
+	live    userEventHub
 	// aclEpoch changes whenever an authorisation decision could change: grants,
 	// shares, user disabling, folder moves and trash restores all bump it, and
 	// every cached read key includes it. That is what makes "the next request
@@ -321,6 +322,7 @@ func (s *Service) Login(ctx context.Context, login, password string) (string, do
 	if err = tx.Commit(ctx); err != nil {
 		return "", domain.User{}, err
 	}
+	s.notifySessionChange(u.ID)
 	return token, u, nil
 }
 
@@ -358,6 +360,9 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 	if len(token) != 43 {
 		return ErrUnauthorized
 	}
+	// Keep the principal only for a post-commit notification. No failed
+	// revocation may be published as a successful logout.
+	principal, _ := s.Session(ctx, token)
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
 		return err
@@ -375,6 +380,7 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 	}
 	s.bumpACLEpoch()
 	s.session.drop(token)
+	s.notifySessionChange(principal.User.ID)
 	return nil
 }
 
@@ -416,6 +422,7 @@ func (s *Service) ChangePassword(ctx context.Context, sessionToken, oldPassword,
 	// session is re-cached on its next request.
 	s.bumpACLEpoch()
 	s.session.dropUser(u.ID)
+	s.notifySessionChange(u.ID)
 	u.MustChangePassword = false
 	return u, nil
 }

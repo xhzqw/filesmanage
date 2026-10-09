@@ -21,6 +21,7 @@ type Handler struct {
 	SecureCookies bool
 	Dist          string
 	LoginLimit    *loginLimiter
+	LiveSlots     chan struct{}
 }
 
 // parseAllowlist fails closed: an unreadable or malformed allowlist must stop startup
@@ -76,7 +77,7 @@ func lanGuard(nets []*net.IPNet) gin.HandlerFunc {
 
 func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
-	h := &Handler{S: s, SecureCookies: secure, Dist: dist, LoginLimit: newLoginLimiter()}
+	h := &Handler{S: s, SecureCookies: secure, Dist: dist, LoginLimit: newLoginLimiter(), LiveSlots: make(chan struct{}, maxLiveConnections)}
 	r := gin.New()
 	r.Use(gin.Recovery(), lanGuard(parseAllowlist(os.Getenv("FILESMANAGE_LAN_ALLOW_CIDRS"))), gin.Logger())
 	r.GET("/health/live", func(c *gin.Context) { c.JSON(200, gin.H{"ok": true}) })
@@ -95,6 +96,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.POST("/logout", h.logout)
 	api.POST("/me/password", h.changePassword)
 	api.GET("/me", h.me)
+	api.GET("/events/ws", h.websocketEvents)
 	api.GET("/folders/tree", h.folders)
 	api.GET("/folders/children", h.folderChildren)
 	api.GET("/folders/search", h.searchFolders)

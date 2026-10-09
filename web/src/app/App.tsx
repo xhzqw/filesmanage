@@ -2,6 +2,7 @@ import{useEffect,useRef,useState}from "react";
 import{Navigate,Route,Routes}from "react-router-dom";
 import{authApi}from "../features/auth/api";
 import{subscribeSessionIssues}from "../shared/http";
+import{connectSessionEvents}from "./liveConnection";
 import "./authFeedback.css";
 import{CommandSpotlight}from "../features/collaboration/CommandSpotlight";
 import{useSession}from "./session";
@@ -24,6 +25,10 @@ export function App(){
   if(issue==="expired"){setUser(null);setLogoutError("");}
   else useSession.setState(state=>({user:state.user?{...state.user,mustChangePassword:true}:null}));
  }),[setUser]);
+ useEffect(()=>{
+  if(!user || user.mustChangePassword)return;
+  return connectSessionEvents(setUser);
+ },[user?.id,user?.mustChangePassword,setUser]);
  async function logout(){
   if(logoutPending.current)return;
   logoutPending.current=true;
