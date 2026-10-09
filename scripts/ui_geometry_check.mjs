@@ -70,6 +70,53 @@ async function inspect(page,rules){
  }
 }
 
+async function compactViewport(width,height=760){
+ await send("Emulation.setDeviceMetricsOverride",{
+  width,height,deviceScaleFactor:1,mobile:width<=600,
+ });
+ await delay(250);
+}
+async function inspectCompact(page,width){
+ const report=await evaluate(`(()=>{
+  const rect=selector=>{
+   const el=document.querySelector(selector);
+   if(!el)return null;
+   const r=el.getBoundingClientRect(),s=getComputedStyle(el);
+   return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,
+     width:r.width,height:r.height,radius:parseFloat(s.borderTopLeftRadius),
+     overflowX:s.overflowX,scrollWidth:el.scrollWidth,clientWidth:el.clientWidth};
+  };
+  return {width:innerWidth,htmlWidth:document.documentElement.scrollWidth,
+   header:rect(".header"),brand:rect(".brand"),navToggle:rect(".nav-toggle"),
+   headerRight:rect(".header-right"),sidebar:rect(".sidebar"),
+   work:rect(".work"),table:rect(".table"),org:rect(".org-workbench"),
+   dialog:rect("dialog.dialog[open]"),
+   menu:rect(".header nav.open")};
+ })()`);
+ check(`${page} ${width}px document fits`,report.htmlWidth<=report.width+2,
+  `scroll=${report.htmlWidth} viewport=${report.width}`);
+ check(`${page} ${width}px header contents fit`,
+  !!report.header&&!!report.headerRight&&report.headerRight.right<=report.width+2&&
+  (!report.brand||report.brand.left>=-1)&&report.headerRight.left>=0,
+  `header-right=${report.headerRight?.right}`);
+ if(report.work){
+  check(`${page} ${width}px workspace remains usable`,
+   report.work.width>=Math.min(width*.72,width-16)&&report.work.height>=190,
+   `work=${Math.round(report.work.width)}x${Math.round(report.work.height)}`);
+ }
+ if(report.sidebar){
+  check(`${page} ${width}px folder tree remains accessible`,
+   report.sidebar.width>=170&&report.sidebar.height>=100&&
+   report.sidebar.right<=width+2,`sidebar=${Math.round(report.sidebar.width)}x${Math.round(report.sidebar.height)}`);
+ }
+ if(report.org){
+  check(`${page} ${width}px organization grid fits`,
+   report.org.width<=width+2&&report.org.scrollWidth<=report.org.clientWidth+2,
+   `grid scrollWidth=${report.org.scrollWidth} clientWidth=${report.org.clientWidth}`);
+ }
+ return report;
+}
+
 try{
  let target;
  for(let i=0;i<70&&!target;i++){
@@ -131,7 +178,7 @@ try{
  })()`);
  try{
   check("PNG preview fixture",!!fixture.fileId,fixture.error||"");
-  if(fixture.fileId){
+ if(fixture.fileId){
    await navigate("/preview/"+fixture.fileId,".media-preview");
    await inspect("media preview",[
     ["workspace",".work",14],["toolbar",".toolbar",6],
@@ -140,6 +187,33 @@ try{
    const scrolling=await evaluate(`(()=>getComputedStyle(document.querySelector(".file-preview-page")).overflowY)()`);
    check("preview scrolling retained",scrolling==="auto",scrolling);
   }
+  // Responsive geometry is measured from the actual browser, not inferred
+  // from media query source. Include a genuinely narrow phone viewport.
+  for(const width of [820,600,390,320]){
+   await compactViewport(width);
+   await navigate("/doc",".sidebar");
+   await inspectCompact("documents",width);
+   if(width<=600){
+    const toggled=await evaluate(`(()=>{
+     const btn=document.querySelector(".nav-toggle");
+     btn?.click();
+     const menu=document.querySelector(".header nav.open");
+     if(!menu)return null;
+     const r=menu.getBoundingClientRect();
+     return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};
+    })()`);
+    check(`navigation popup ${width}px fits`,
+     !!toggled&&toggled.left>=0&&toggled.right<=width+2&&toggled.bottom<=760,
+     JSON.stringify(toggled));
+   }
+   await navigate("/org",".org-card");
+   await inspectCompact("organization",width);
+   if(width===390){
+    await navigate("/preview/"+fixture.fileId,".media-preview");
+    await inspectCompact("media preview",width);
+   }
+  }
+  await send("Emulation.clearDeviceMetricsOverride");
  }finally{
   if(fixture.folderId)await evaluate(`fetch("/api/folders/${fixture.folderId}",{method:"DELETE"}).then(r=>r.status)`);
  }
