@@ -5,6 +5,7 @@ import {fileApi,formatSize,uploadFile} from "./api";
 import {errorCode} from "../../shared/errors";
 import {newIdempotencyKey} from "../../shared/ids";
 import {Dialog} from "../../shared/ui/Dialog";
+import {Menu,type MenuItem,type MenuPoint}from"../../shared/ui/Menu";
 
 type SortKey="updated_desc"|"name_asc"|"name_desc"|"size_desc";
 
@@ -38,6 +39,9 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
  const[focusedId,setFocusedId]=useState<string|null>(null);
  const[anchorId,setAnchorId]=useState<string|null>(null);
  const[pendingDelete,setPendingDelete]=useState<FileItem[]>([]);
+ // Transient context-menu state (DESKTOP-INTERACTION §1.1 contextTarget): it
+ // lives only while the row menu is open and is never business state.
+ const[rowMenu,setRowMenu]=useState<{targets:FileItem[];point:MenuPoint|null;anchor:HTMLElement|null}|null>(null);
  const[deleteBusy,setDeleteBusy]=useState(false);
  const navigate=useNavigate();
 
@@ -62,6 +66,7 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
   setSelectedIds(new Set<string>());
   setFocusedId(null);
   setAnchorId(null);
+  setRowMenu(null);
  },[folder,sort,reloadKey]);
 
  function announce(text:string,tone:"info"|"error"){
@@ -132,6 +137,19 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
   row?.focus();
  }
 
+ // DESKTOP-INTERACTION §3.1: right-clicking a row inside the selection keeps
+ // the whole selection; an unselected row becomes the single selection first.
+ function onRowContextMenu(event:MouseEvent<HTMLTableRowElement>,item:FileItem){
+  event.preventDefault();
+  const inside=selectedIds.has(item.id);
+  if(!inside){
+   setSelectedIds(new Set([item.id]));
+   setFocusedId(item.id);
+   setAnchorId(item.id);
+  }
+  setRowMenu({targets:inside?selection:[item],point:{x:event.clientX,y:event.clientY},anchor:event.currentTarget});
+ }
+
  function moveFocus(index:number,extend:boolean){
   if(items.length===0)return;
   const next=Math.max(0,Math.min(items.length-1,index));
@@ -189,12 +207,60 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
     event.preventDefault();
     {const only=items.find(i=>selectedIds.has(i.id));if(only){setRenaming(only);setRenameValue(only.name);}}
     break;
+   case "F10":
+    // Shift+F10 is the keyboard equivalent of a right-click on the focused
+    // row; the bare F10 key stays with the browser.
+    if(!event.shiftKey)return;
+    event.preventDefault();
+    if(current)openRowMenu(current);
+    break;
+   case "ContextMenu":
+    event.preventDefault();
+    if(current)openRowMenu(current);
+    break;
    default:
     if((event.metaKey||event.ctrlKey)&&(event.key==="a"||event.key==="A")){
      event.preventDefault();
      setSelectedIds(new Set(items.map(i=>i.id)));
     }
   }
+ }
+
+ function openRowMenu(item:FileItem){
+  const row=document.querySelector<HTMLTableRowElement>(`tbody tr[data-id="${item.id}"]`);
+  // The keyboard menu mirrors the mouse scoping: a focused row inside the
+  // selection acts on the whole selection, otherwise on the row alone.
+  setRowMenu({targets:selectedIds.has(item.id)?selection:[item],point:null,anchor:row});
+ }
+
+ // WF-11: the menu only offers what the whole target set can legally perform.
+ // FileItem carries no permission or lock facts, so per-file actions stay
+ // single-selection (every endpoint takes one id) and deletion keeps the
+ // existing per-item confirmation with partial-failure reporting instead of
+ // silently applying to part of a mixed-permission selection.
+ function rowMenuItems(targets:FileItem[]):MenuItem[]{
+  const single=targets.length===1?targets[0]:null;
+  const items:MenuItem[]=[];
+  if(single){
+   const file:FileItem=single;
+   items.push({id:"open",label:"打开",hint:"Enter",onSelect:()=>navigate("/preview/"+file.id)});
+   items.push({id:"edit",label:"编辑",onSelect:()=>onEdit(file.id)});
+   items.push({id:"rename",label:"重命名",hint:"F2",onSelect:()=>{setRenaming(file);setRenameValue(file.name);}});
+   items.push({id:"download",label:"下载",onSelect:()=>startDownload(file)});
+  }
+  items.push({id:"delete",label:"删除",hint:"Delete",danger:true,onSelect:()=>setPendingDelete(targets)});
+  return items;
+ }
+
+ // The row-actions cell downloads through a plain <a download>; the menu
+ // reproduces that navigation so the browser, not an XHR, fetches the bytes.
+ function startDownload(file:FileItem){
+  const link=document.createElement("a");
+  link.href="/api/files/"+file.id+"/bytes";
+  link.download=file.name;
+  document.body.append(link);
+  link.click();
+  link.remove();
  }
 
  async function submitRename(event:FormEvent<HTMLFormElement>){
@@ -272,6 +338,7 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
       aria-selected={selectedIds.has(item.id)}
       className={(selectedIds.has(item.id)?"selected":"")+(focusedId===item.id?" focused":"")}
       onClick={event=>onRowClick(event,item)}
+      onContextMenu={event=>onRowContextMenu(event,item)}
       onDoubleClick={()=>navigate("/preview/"+item.id)}>
       <td><span className="file-name" title={item.name}>{item.name}</span></td>
       <td>{formatSize(item.sizeBytes)}</td>
@@ -313,5 +380,7 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
     </div>
    </form>
   </Dialog>}
+  {rowMenu&&<Menu open label="文件操作菜单" items={rowMenuItems(rowMenu.targets)} anchor={rowMenu.anchor}
+   point={rowMenu.point} onClose={()=>setRowMenu(null)}/>}
  </div>;
 }

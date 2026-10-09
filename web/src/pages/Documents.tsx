@@ -1,4 +1,4 @@
-import{useEffect,useState}from "react";
+import{useEffect,useRef,useState}from "react";
 import{Link,useLocation}from "react-router-dom";
 import type{User}from "../entities/user/model";
 import type{Folder}from "../entities/folder/model";
@@ -9,6 +9,7 @@ import{FolderActions}from "../features/folders/FolderActions";
 import{GrantDialog}from "../features/folders/GrantDialog";
 import{fileApi}from "../features/documents/api";
 import{FileTable}from "../features/documents/FileTable";
+import{DropZone}from "../features/documents/DropZone";
 import{FileEditor}from "../features/documents/FileEditor";
 import{workflowApi}from "../features/workflow/api";
 import{PolicyDialog}from "../features/workflow/PolicyDialog";
@@ -22,8 +23,14 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  const[folders,setFolders]=useState<Folder[]>([]);
  const[status,setStatus]=useState("loading");
  const[reloadKey,setReloadKey]=useState(0);
- const[grantOpen,setGrantOpen]=useState(false);
- const[policyOpen,setPolicyOpen]=useState(false);
+ // Grant/policy dialogs are scoped to the folder the tree menu acted on, which
+ // is not necessarily the currently selected folder.
+ const[grantFolder,setGrantFolder]=useState<Folder|null>(null);
+ const[policyFolder,setPolicyFolder]=useState<Folder|null>(null);
+ // Rename/delete from the tree menu reuse FolderActions' own dialogs: the bar
+ // follows the right-clicked folder until the selection moves again.
+ const[actionsFolder,setActionsFolder]=useState<Folder|null>(null);
+ const actionsRef=useRef<HTMLDivElement>(null);
  const[subjects,setSubjects]=useState<Subject[]>([]);
  const[requiresApproval,setRequiresApproval]=useState(false);
  const[editingId,setEditingId]=useState<string|null>(null);
@@ -40,7 +47,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  // Only admins may manage grants and policies; both dialogs consume the
  // admin-only listings, loaded lazily when a dialog opens.
  useEffect(()=>{
-  if((!grantOpen&&!policyOpen)||!user.isAdmin)return;
+  if((!grantFolder&&!policyFolder)||!user.isAdmin)return;
   let valid=true;
   organizationApi.users()
    .then(users=>{
@@ -49,7 +56,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
    })
    .catch(()=>{if(valid)setSubjects([]);});
   return()=>{valid=false;};
- },[grantOpen,policyOpen,user.isAdmin]);
+ },[grantFolder,policyFolder,user.isAdmin]);
  const visibleRoots=folders.filter(f=>f.parentId===null||!folders.some(p=>p.id===f.parentId));
  const selected=folders.find(f=>f.id===requested)??visibleRoots[0];
  // The page resolves the selected folder's approval policy and hands the flag
@@ -62,13 +69,32 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
    .catch(()=>{if(valid)setRequiresApproval(false);});
   return()=>{valid=false;};
  },[selected?.id]);
+ // The actions bar follows the right-clicked tree node only until the
+ // selection moves again; navigation restores it to the selected folder.
+ useEffect(()=>{setActionsFolder(null);},[selected?.id]);
+ // Rename/delete from the tree menu reuse FolderActions' own dialogs instead
+ // of duplicating them: the bar switches to the target folder and its matching
+ // button is triggered programmatically (first button renames, last deletes).
+ function runFolderAction(folder:Folder,action:"rename"|"delete"){
+  setActionsFolder(folder);
+  requestAnimationFrame(()=>{
+   const buttons=actionsRef.current?.querySelectorAll<HTMLButtonElement>(".folder-actions>button");
+   if(!buttons||buttons.length===0)return;
+   const target=action==="rename"?buttons[0]:buttons[buttons.length-1];
+   target?.click();
+  });
+ }
  return <AppShell user={user} onLogout={onLogout}>
   <div className="panels"><aside className="sidebar"><h2>文档管理</h2><p>文件夹</p>
    {status==="loading"&&<p>正在加载目录…</p>}
    {status==="failed"&&<p role="alert" className="error">获取目录失败，请刷新重试</p>}
-   {status==="ready"&&<FolderTree items={folders} selected={selected?.id||""}/>}</aside>
+   {status==="ready"&&<FolderTree items={folders} selected={selected?.id||""} isAdmin={user.isAdmin}
+    onRenameFolder={folder=>runFolderAction(folder,"rename")}
+    onDeleteFolder={folder=>runFolderAction(folder,"delete")}
+    onManageGrants={folder=>setGrantFolder(folder)}
+    onManagePolicy={folder=>setPolicyFolder(folder)}/>}</aside>
    <main className="work">
-   {status==="ready"&&selected&&<>
+   {status==="ready"&&selected&&<DropZone folderId={selected.id} onCommitted={()=>setReloadKey(k=>k+1)}>
      <nav className="breadcrumb" aria-label="当前位置">
       <span>文档管理</span>
       {ancestorPath(folders,selected.id).map((folder,index,chain)=><span key={folder.id}>
@@ -79,13 +105,14 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
       </span>)}
      </nav>
      <NewFolderForm parentId={selected.id} onCreated={()=>setReloadKey(k=>k+1)}/>
-     <FolderActions folder={selected} isAdmin={user.isAdmin} onChanged={()=>setReloadKey(k=>k+1)} onManageGrants={()=>setGrantOpen(true)} onManagePolicy={()=>setPolicyOpen(true)}/>
+     <div ref={actionsRef}><FolderActions folder={actionsFolder??selected} isAdmin={user.isAdmin} onChanged={()=>setReloadKey(k=>k+1)}
+      onManageGrants={()=>setGrantFolder(actionsFolder??selected)} onManagePolicy={()=>setPolicyFolder(actionsFolder??selected)}/></div>
      <FileTable folder={selected.id} folderName={selected.name} onEdit={setEditingId} reloadKey={reloadKey}/>
-   </>}
+   </DropZone>}
    {status==="ready"&&!selected&&<p className="empty">当前账号没有可访问的目录，请联系管理员授权。</p>}
    </main></div>
-   {grantOpen&&selected&&<GrantDialog folder={selected} subjects={subjects} onClose={()=>setGrantOpen(false)}/>}
-   {policyOpen&&selected&&<PolicyDialog folder={selected} approvers={subjects} onClose={()=>setPolicyOpen(false)}/>}
+   {grantFolder&&<GrantDialog folder={grantFolder} subjects={subjects} onClose={()=>setGrantFolder(null)}/>}
+   {policyFolder&&<PolicyDialog folder={policyFolder} approvers={subjects} onClose={()=>setPolicyFolder(null)}/>}
    {editingId&&<FileEditorBridge fileId={editingId} requiresApproval={requiresApproval}
     onClose={()=>setEditingId(null)} onSaved={()=>setReloadKey(k=>k+1)}/>}
  </AppShell>;

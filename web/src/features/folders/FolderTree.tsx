@@ -1,6 +1,7 @@
 import {useEffect,useMemo,useState,type KeyboardEvent}from "react";
 import {Link,useNavigate}from "react-router-dom";
 import type{Folder}from"../../entities/folder/model";
+import {Menu,type MenuItem,type MenuPoint}from"../../shared/ui/Menu";
 // Toggles insert/remove ids at runtime, so Set is the correct membership structure.
 const DEFAULT_EXPANDED=["folder_root","folder_market","folder_rd"];
 
@@ -8,9 +9,22 @@ const DEFAULT_EXPANDED=["folder_root","folder_market","folder_rd"];
 // roving tabindex, full keyboard roaming, one parent->children index instead
 // of per-render filtering, and orphaned subtrees (a parent outside the visible
 // set) surfacing as accessible roots without leaking hidden ancestors.
-export function FolderTree({items,selected}:{items:Folder[];selected:string}){
+export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onDeleteFolder,onManageGrants,onManagePolicy}:{
+ items:Folder[];
+ selected:string;
+ // Admin-only entries are hidden for non-admins instead of being offered and
+ // then rejected by the server (WF-11).
+ isAdmin?:boolean;
+ onRenameFolder?:(folder:Folder)=>void;
+ onDeleteFolder?:(folder:Folder)=>void;
+ onManageGrants?:(folder:Folder)=>void;
+ onManagePolicy?:(folder:Folder)=>void;
+}){
  const[expanded,setExpanded]=useState<Set<string>>(()=>new Set<string>(DEFAULT_EXPANDED));
  const[focusedId,setFocusedId]=useState<string|null>(null);
+ // Transient context-menu target (DESKTOP-INTERACTION §1.1 contextTarget):
+ // it exists only while the node menu is open and is never business state.
+ const[nodeMenu,setNodeMenu]=useState<{folder:Folder;point:MenuPoint|null;anchor:HTMLElement|null}|null>(null);
  const navigate=useNavigate();
 
  const ids=useMemo(()=>new Set(items.map(f=>f.id)),[items]);
@@ -38,10 +52,12 @@ export function FolderTree({items,selected}:{items:Folder[];selected:string}){
  },[childrenOf,expanded]);
 
  useEffect(()=>{
-  if(!focusedId)return;
+  // While the node menu is open it owns keyboard focus; stealing it back to
+  // the treeitem here would break "focus moves into the menu on open".
+  if(!focusedId||nodeMenu)return;
   const node=document.querySelector<HTMLElement>(`li[data-folder-id="${focusedId}"]`);
   node?.focus();
- },[focusedId]);
+ },[focusedId,nodeMenu]);
 
  function toggle(id:string,force?:boolean){
   setExpanded(old=>{
@@ -92,12 +108,46 @@ export function FolderTree({items,selected}:{items:Folder[];selected:string}){
     event.preventDefault();
     navigate("/doc?folder="+encodeURIComponent(current.id));
     break;
+   case "F10":
+    // Shift+F10 (and the dedicated Menu key below) is the keyboard equivalent
+    // of a right-click on the focused node; bare F10 stays with the browser.
+    if(!event.shiftKey)return;
+    event.preventDefault();
+    openNodeMenu(current,null);
+    break;
+   case "ContextMenu":
+    event.preventDefault();
+    openNodeMenu(current,null);
+    break;
   }
  }
 
- return <ul className="tree" role="tree" aria-label="目录树" onKeyDown={onTreeKeyDown}>
-  {branch("",0)}
- </ul>;
+ function openNodeMenu(folder:Folder,point:MenuPoint|null){
+  const node=document.querySelector<HTMLElement>(`li[data-folder-id="${folder.id}"]`);
+  setFocusedId(folder.id);
+  setNodeMenu({folder,point,anchor:node});
+ }
+
+ // The menu reuses the page's FolderActions flows through callbacks, so rename
+ // and delete never duplicate the dialog logic; admin-only entries are hidden
+ // for non-admins (WF-11).
+ function nodeMenuItems(folder:Folder):MenuItem[]{
+  const items:MenuItem[]=[{id:"rename",label:"重命名目录",onSelect:()=>onRenameFolder?.(folder)}];
+  if(isAdmin){
+   items.push({id:"grants",label:"授权管理",onSelect:()=>onManageGrants?.(folder)});
+   items.push({id:"policy",label:"审批策略",onSelect:()=>onManagePolicy?.(folder)});
+  }
+  items.push({id:"delete",label:"删除目录",danger:true,onSelect:()=>onDeleteFolder?.(folder)});
+  return items;
+ }
+
+ return <>
+  <ul className="tree" role="tree" aria-label="目录树" onKeyDown={onTreeKeyDown}>
+   {branch("",0)}
+  </ul>
+  {nodeMenu&&<Menu open label={nodeMenu.folder.name+" 目录菜单"} items={nodeMenuItems(nodeMenu.folder)}
+   anchor={nodeMenu.anchor} point={nodeMenu.point} onClose={()=>setNodeMenu(null)}/>}
+ </>;
 
  function branch(parentId:string,depth:number):React.ReactNode{
   if(depth>32)return null;
@@ -111,7 +161,8 @@ export function FolderTree({items,selected}:{items:Folder[];selected:string}){
     tabIndex={focusedId===f.id||(focusedId===null&&visible[0]?.id===f.id)?0:-1}
     // focusin bubbles: only the treeitem that is itself the focus target may
     // claim the focus state, otherwise an ancestor would overwrite it.
-    onFocus={event=>{if(event.target===event.currentTarget)setFocusedId(f.id);}}>
+    onFocus={event=>{if(event.target===event.currentTarget)setFocusedId(f.id);}}
+    onContextMenu={event=>{event.preventDefault();openNodeMenu(f,{x:event.clientX,y:event.clientY});}}>
     <div className={"tree-row "+(f.id===selected?"on":"")} style={{paddingLeft:String(depth*16)+"px"}}>
      <button aria-label={isExpanded?"折叠":"展开"} tabIndex={-1}
       onClick={()=>toggle(f.id)}>{children.length?(isExpanded?"▾":"▸"):" "}</button>
