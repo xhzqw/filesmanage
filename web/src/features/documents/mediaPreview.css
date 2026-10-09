@@ -1,6 +1,6 @@
 .file-preview-page{overflow-y:auto;min-height:0}
 .file-preview-page .table{flex:none}
-.media-preview{display:flex;flex-direction:column;flex:none;min-height:0;border:1px solid var(--border-hairline);background:var(--surface-panel)}
+.media-preview{display:flex;flex-direction:column;flex:none;min-height:0;margin:6px 7px;border:1px solid var(--border-hairline);border-radius:var(--radius-md);overflow:hidden;box-shadow:var(--shadow-panel);background:var(--surface-panel)}
 .media-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:38px;padding:4px 10px;background:var(--surface-header);border-bottom:1px solid var(--border-hairline);color:var(--text-secondary);font-size:11px}
 .media-tools-label{font-size:12px;font-weight:600;color:var(--text-primary);margin-right:auto}
 .media-tools button{min-height:26px;height:26px}

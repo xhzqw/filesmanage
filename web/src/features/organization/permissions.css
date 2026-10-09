@@ -5,21 +5,21 @@
 .perm-subnav{display:flex;gap:4px;padding:4px 10px;border-bottom:1px solid var(--border-hairline);min-height:34px;flex:none}
 .perm-subnav button{border:0;border-bottom:2px solid transparent;background:transparent;font-size:12px;color:var(--text-secondary);padding:4px 12px}
 .perm-subnav button.active{border-bottom-color:var(--brand-blue);color:var(--brand-blue);font-weight:600}
-.perm-workspace{display:grid;grid-template-columns:240px minmax(0,1fr);flex:1;min-height:0;overflow:hidden}
+.perm-workspace{display:grid;grid-template-columns:240px minmax(0,1fr);flex:1;min-height:0;overflow:hidden;margin:7px;border:1px solid var(--border-hairline);border-radius:var(--radius-md)}
 .perm-browser{display:flex;flex-direction:column;min-width:0;min-height:0;border-right:1px solid var(--border-hairline)}
 .perm-browser-title{display:flex;justify-content:space-between;align-items:center;background:var(--surface-header);border-bottom:1px solid var(--border-hairline);padding:4px 8px;font-weight:600;font-size:12px;min-height:34px}
 .perm-browser-search{display:flex;flex-direction:column;gap:3px;padding:8px;font-size:11px;color:var(--text-secondary);border-bottom:1px solid var(--border-hairline)}
 .perm-browser-search input{width:100%;min-width:0;height:28px;font-size:12px}
 .perm-browser-scroll{overflow:auto;flex:1;min-height:0;padding:3px 0}
 .perm-browser-scroll ul{list-style:none;margin:0;padding:0}
-.perm-tree-row{display:flex;align-items:center;min-height:28px;font-size:12px}
+.perm-tree-row{display:flex;align-items:center;min-height:28px;font-size:12px;border-radius:var(--radius-sm)}
 .perm-tree-row.selected{background:var(--surface-row-selected);box-shadow:inset 2px 0 var(--brand-cyan)}
 .perm-tree-row:hover{background:var(--surface-row-hover)}
 .perm-tree-toggle,.perm-tree-spacer{width:22px;min-width:22px;min-height:26px;background:transparent;border:0;padding:0;color:var(--text-secondary)}
 .perm-tree-name{border:0;background:transparent;text-align:left;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-primary);padding:5px 2px}
 .perm-tree-info{margin:0 8px;font-size:11px}
 .perm-more{width:100%;min-height:28px;border:0;background:transparent;color:var(--brand-blue);font-size:12px}
-.perm-result{display:flex;flex-direction:column;gap:2px;align-items:start;width:100%;min-height:34px;background:transparent;border:0;border-bottom:1px solid var(--border-hairline);padding:5px 10px;font-size:12px;text-align:left}
+.perm-result{display:flex;flex-direction:column;gap:2px;align-items:start;width:100%;min-height:34px;background:transparent;border:0;border-bottom:1px solid var(--border-hairline);border-radius:var(--radius-sm);padding:5px 10px;font-size:12px;text-align:left}
 .perm-result:hover{background:var(--surface-row-hover)}
 .perm-result small{font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .perm-detail{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:auto}
@@ -43,7 +43,7 @@
 .perm-action-grid label{display:inline-flex;gap:5px;align-items:center;white-space:nowrap}
 .perm-form-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 .perm-form-actions .hint{margin-right:auto}
-.perm-review{border:1px solid var(--border-strong);background:var(--surface-header);padding:10px;font-size:12px}
+.perm-review{border:1px solid var(--border-strong);background:var(--surface-header);padding:10px;font-size:12px;border-radius:var(--radius-md)}
 .perm-review p{margin:5px 0}
 .perm-subtle{font-size:11px;font-weight:400;color:var(--text-secondary);margin-left:7px}
 .perm-insight{border-top:1px solid var(--border-hairline)}

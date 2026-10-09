@@ -115,7 +115,7 @@ input[type="checkbox"],input[type="radio"]{border-radius:var(--radius-xs)}
 .table thead tr:first-child th:first-child{border-top-left-radius:var(--radius-sm)}
 .table thead tr:first-child th:last-child{border-top-right-radius:var(--radius-sm)}
 .table tbody tr:focus-visible{border-radius:var(--radius-xs)}
-.version-badge,.org-count-pill{border-radius:var(--radius-pill)}
+.org-count-pill{border-radius:var(--radius-pill)}
 .file-preview-page .table{margin-top:6px}
 .preview-text{
   min-height:180px;
@@ -124,8 +124,9 @@ input[type="checkbox"],input[type="radio"]{border-radius:var(--radius-xs)}
 }
 .notice,.hint:not(.toolbar-hint){border-radius:var(--radius-sm)}
 
-/* Contextual popup surfaces share one elevation / interior item vocabulary. */
-.menu,.folder-more-menu,.row-more-menu,.command-panel{
+/* Legacy app-level surfaces still need geometry here. Context menus, file
+   menus and command palette are now owned by their component stylesheets. */
+.folder-more-menu{
   border-radius:var(--radius-md);
   box-shadow:var(--shadow-overlay);
 }
@@ -135,12 +136,11 @@ input[type="checkbox"],input[type="radio"]{border-radius:var(--radius-xs)}
   box-shadow:var(--shadow-overlay);
 }
 .account-dropdown-menu .account-menu-item{border-radius:var(--radius-sm)}
-.folder-more-menu,.row-more-menu{padding:4px}
-.folder-more-menu button,.row-more-menu button{
+.folder-more-menu{padding:4px}
+.folder-more-menu button{
   border-radius:var(--radius-sm);
   width:100%;
 }
-.menu-item,.command-row{border-radius:var(--radius-sm)}
 .dialog,.login-card{
   border-radius:var(--radius-xl);
   box-shadow:var(--shadow-overlay);
@@ -165,45 +165,7 @@ input[type="checkbox"],input[type="radio"]{border-radius:var(--radius-xs)}
   border-radius:var(--radius-md);
   box-shadow:var(--shadow-panel);
 }
-.org-card,.share-workbench,.upload-queue{
-  border-radius:var(--radius-lg);
-  box-shadow:var(--shadow-panel);
-}
-.org-tabs-nav{
-  padding:3px;
-  border-radius:var(--radius-md);
-  background:var(--surface-header);
-  min-width:0;
-  max-width:100%;
-  overflow-x:auto;
-}
-.org-tab{
-  border:0;
-  border-radius:var(--radius-sm);
-  flex:none;
-}
-.org-tab:hover{background:var(--surface-row-hover)}
-.org-tab.active{
-  border:0;
-  border-radius:var(--radius-sm);
-  background:var(--surface-row-selected);
-  box-shadow:inset 0 -2px 0 var(--border-selected);
-}
-.perm-workspace{
-  margin:7px;
-  border:1px solid var(--border-hairline);
-  border-radius:var(--radius-md);
-}
-.perm-tree-row,.perm-result{border-radius:var(--radius-sm)}
-.perm-review{border-radius:var(--radius-md)}
-
 /* Preview stages must not end as boxy exceptions to the global shell. */
-.media-preview{
-  margin:6px 7px;
-  border-radius:var(--radius-md);
-  overflow:hidden;
-  box-shadow:var(--shadow-panel);
-}
 .media-image-stage,.media-video-stage,.media-audio-stage{overflow:auto}
 .office-holder,.viewer-stage{
   margin:6px 7px 7px;
@@ -212,7 +174,6 @@ input[type="checkbox"],input[type="radio"]{border-radius:var(--radius-xs)}
   box-shadow:var(--shadow-panel);
   overflow:hidden;
 }
-.dropzone{border-radius:var(--radius-md)}
 
 /* Small widths retain the same geometry with less inset and no horizontal
    scrollbar induced by outer panel margins. */

@@ -19,7 +19,7 @@
 .share-list-empty{margin:0;padding:var(--space-3);color:var(--color-text-secondary);text-align:center}
 /* Resource picker inside the collaboration panel: the same section serves the
    share wizard and the 关注 entry, so both act on one chosen resource. */
-.share-workbench{display:grid;gap:var(--space-2);padding:var(--space-2) var(--space-3);background:var(--color-panel);border:1px solid var(--color-border);border-radius:var(--radius-surface)}
+.share-workbench{display:grid;gap:var(--space-2);padding:var(--space-2) var(--space-3);background:var(--color-panel);border:1px solid var(--color-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-panel)}
 .share-workbench-head{display:grid;gap:var(--space-1)}
 .share-workbench-head h3{margin:0;color:var(--color-action);font-size:13px}
 .share-workbench-head p{margin:0}

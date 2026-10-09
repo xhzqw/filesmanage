@@ -1,12 +1,12 @@
-/* Docked: the queue sits flush inside the work column, so the hairlines come
-   from theme.css and this sheet adds no outer radius or gap. */
+/* The upload workflow stays a bounded flex child; the outer workspace
+   applies the card boundary, while inline drag/drop respects its radius. */
 /* flex:1 + min-height:0 is load-bearing: .work-body and .table size
    themselves from a bounded parent, and without it the work area grows past
    the viewport, where body{overflow:hidden} clips the status bar and the
    load-more button out of reach. */
-.dropzone{display:flex;flex-direction:column;flex:1;min-height:0;gap:0;min-width:0;border-radius:0}
+.dropzone{display:flex;flex-direction:column;flex:1;min-height:0;gap:0;min-width:0;border-radius:var(--radius-md)}
 .dropzone.dragging{background:var(--color-row-selected);outline:2px dashed var(--color-row-selected-border);outline-offset:-4px}
-.upload-queue{background:var(--color-panel);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:var(--space-2) var(--space-3)}
+.upload-queue{background:var(--color-panel);border:1px solid var(--color-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-panel);padding:var(--space-2) var(--space-3)}
 .upload-queue-summary{margin:0 0 var(--space-2);color:var(--color-text-secondary);font-size:12px}
 .upload-queue-list{list-style:none;margin:0;padding:0;display:grid;gap:var(--space-2)}
 .upload-item{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;padding:var(--space-1) 0;border-bottom:1px solid var(--color-border)}
@@ -15,13 +15,13 @@
 .upload-item-main{display:flex;align-items:center;gap:var(--space-2);flex:1;min-width:0}
 .upload-item-name{flex:1;min-width:0;font-weight:600;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .upload-item-size,.upload-item-target{color:var(--color-text-secondary);font-size:11px;white-space:nowrap;flex-shrink:0}
-.upload-item-target{border:1px solid var(--color-border);border-radius:999px;padding:0 var(--space-2)}
+.upload-item-target{border:1px solid var(--color-border);border-radius:var(--radius-pill);padding:0 var(--space-2)}
 .upload-item-status{color:var(--color-text-secondary);font-size:12px;white-space:nowrap}
 .upload-item-error{color:var(--color-danger)}
 .upload-item-actions{display:flex;gap:var(--space-2);margin-left:auto}
 .upload-rename{flex-basis:100%;display:flex;gap:var(--space-2);margin-top:var(--space-1)}
 .upload-rename input{flex:1;min-width:0;border:1px solid var(--color-border-strong);border-radius:var(--radius-control);padding:var(--space-1) var(--space-2)}
-.upload-progress{flex-basis:100%;height:4px;border-radius:999px;background:var(--color-panel-subtle);box-shadow:inset 0 0 0 1px var(--color-border);overflow:hidden}
+.upload-progress{flex-basis:100%;height:4px;border-radius:var(--radius-pill);background:var(--color-panel-subtle);box-shadow:inset 0 0 0 1px var(--color-border);overflow:hidden}
 .upload-progress-fill{height:100%;width:0;border-radius:inherit;background:var(--color-row-selected-border);transition:width .15s linear}
 .upload-progress.indeterminate .upload-progress-fill{width:40%;animation:upload-progress-sweep 1.2s linear infinite}
 @keyframes upload-progress-sweep{from{transform:translateX(-100%)}to{transform:translateX(260%)}}

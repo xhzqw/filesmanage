@@ -166,14 +166,14 @@ table.file-table tbody tr:focus-within .actions-hover-group{
 .row-more-menu{
   display:none;position:absolute;top:calc(100% + 2px);right:0;
   background:var(--surface-panel);border:1px solid var(--border-subtle);
-  border-radius:var(--radius-sm);box-shadow:0 4px 12px rgba(0,0,0,0.12);
-  z-index:50;min-width:76px;padding:2px 0;
+  border-radius:var(--radius-md);box-shadow:var(--shadow-overlay);
+  z-index:50;min-width:76px;padding:4px;
 }
 .row-more-menu.open{display:flex;flex-direction:column}
 .row-more-menu button{
   border:none !important;background:transparent !important;text-align:left;
   padding:3px 8px !important;font-size:11px;color:var(--text-primary);
-  cursor:pointer;width:100%;border-radius:0;height:auto;min-height:20px;
+  cursor:pointer;width:100%;border-radius:var(--radius-sm);height:auto;min-height:20px;
   display:flex;align-items:center;
 }
 .row-more-menu button:hover{background:var(--surface-row-hover) !important;color:var(--brand-blue)}
@@ -193,7 +193,7 @@ table.file-table tbody tr:focus-within .actions-hover-group{
 }
 .version-badge{
   display:inline-flex;align-items:center;justify-content:center;
-  height:18px;padding:0 6px;border-radius:9px;
+  height:18px;padding:0 6px;border-radius:var(--radius-pill);
   background:var(--surface-header);color:var(--text-secondary);
   font-size:11px;font-weight:500;border:1px solid var(--border-subtle);
   font-variant-numeric:tabular-nums;

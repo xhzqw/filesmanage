@@ -6,13 +6,13 @@
 /* Spec §6.4 frosts the workbench behind the scrim: the blur lives on the
    overlay, so the panel itself can stay an opaque, fully legible surface. */
 .command-overlay{position:fixed;inset:0;z-index:90;display:flex;align-items:flex-start;justify-content:center;padding-top:12vh;background:rgba(15,39,92,.28);backdrop-filter:blur(10px)}
-.command-panel{width:var(--width-command);max-width:calc(100vw - var(--space-4));background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-md);box-shadow:0 1px 2px rgba(15,39,92,.06),0 12px 32px rgba(15,39,92,.12);overflow:hidden;animation:command-in .12s ease}
+.command-panel{width:var(--width-command);max-width:calc(100vw - var(--space-4));background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-md);box-shadow:var(--shadow-overlay);overflow:hidden;animation:command-in .12s ease}
 /* 120ms open: opacity plus a 2px rise. The global prefers-reduced-motion
    override in theme.css already neutralises it. */
 @keyframes command-in{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}
 .command-input-row{display:flex;align-items:center;gap:var(--space-2);height:var(--height-command);padding:0 var(--space-3);border-bottom:1px solid var(--border-hairline)}
 .command-icon{flex:none;color:var(--text-tertiary)}
-.command-input{flex:1;min-width:0;height:100%;padding:0;border:0;border-radius:0;background:transparent;font-size:13px;color:var(--text-primary)}
+.command-input{flex:1;min-width:0;height:100%;padding:0;border:0;border-radius:var(--radius-sm);background:transparent;font-size:13px;color:var(--text-primary)}
 /* The panel is a single modal text field: the browser's default focus chrome on
    the input would draw a second boundary inside the panel's own hairline. */
 .command-input:focus{outline:0;box-shadow:none}

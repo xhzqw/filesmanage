@@ -17,6 +17,9 @@ else
   (cd web && npm ci && npm run build)
 fi
 
+echo "== ui: component geometry governance gate =="
+node scripts/ui_style_governance_check.mjs
+
 echo "== go: build server and worker =="
 go build -o .bin/server ./cmd/server
 go build -o .bin/worker ./cmd/worker
