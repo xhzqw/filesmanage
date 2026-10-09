@@ -892,16 +892,20 @@ async function main() {
       check("VIS-02 /doc: default, hover and selected row states are distinguishable",
         bgs.every(Boolean) && new Set(bgs).size === 3, JSON.stringify(bgs));
 
-      // VIS-02: keyboard focus marks the focused row (and moves it)
-      await cdp.evaluate(`(()=>{const row=${keepRow};row?.focus();return document.activeElement===row;})()`);
+      // VIS-02: keyboard focus marks the focused row (and moves it). The row
+      // under test is the first one in the grid, not a named fixture: under
+      // updated_desc ordering the keep row can be the LAST row, where ArrowDown
+      // is clamped by design and could never move. What is asserted is that the
+      // focus marker follows the arrow key onto a different row with tabIndex 0.
+      const firstRowName = await cdp.evaluate(`(()=>{const row=document.querySelector('tbody tr[data-id]');row?.focus();return row?.querySelector('.file-name')?.textContent??null;})()`);
       await keyPress(cdp, "ArrowDown", "ArrowDown", 40);
       await delay(250);
       const focusedState = await vis(cdp, { op: "rowState" });
       stateEvidence.focused = focusedState;
       check("VIS-02 /doc: keyboard focus marks the focused row",
         Boolean(focusedState.focusedRow) && focusedState.focusedRow.tabIndex === 0
-        && focusedState.focusedRow.name !== "vis-keep.txt",
-        JSON.stringify(focusedState.focusedRow));
+        && focusedState.focusedRow.name !== firstRowName,
+        JSON.stringify({ from: firstRowName, to: focusedState.focusedRow }));
 
       // rename dialog: primary button label, dialog title, accessible name,
       // then a real E_NAME_CONFLICT for the error notice

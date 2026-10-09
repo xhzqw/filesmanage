@@ -213,9 +213,10 @@ textarea{height:auto;padding:var(--space-1) var(--space-2);line-height:1.5;resiz
 .account-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .header button{height:26px;min-height:26px;padding:0 var(--space-2);font-size:12px}
 
-/* 面包屑槽位 (spec §3.1): 顶栏中部, 溢出中间折叠 */
-.header-crumb{flex:1;min-width:0;display:flex;align-items:center;overflow:hidden}
-.header-crumb .breadcrumb{min-width:0}
+/* 面包屑条 (spec §3.1): 停靠在工具列上方的 24px 路径条。它必须是 <nav>
+   地标 (DI-15)，而 VIS-11 只允许 header.header 内有一个 nav，所以路径不住
+   在 40px 顶栏里，而是作为工作区第一条停靠行。 */
+.crumb-bar{min-height:24px;padding:2px var(--space-3);border-bottom:1px solid var(--border-hairline)}
 
 /* CommandSpotlight 触发器 (spec §6.4) */
 .command-trigger{
@@ -334,10 +335,11 @@ td.hash,.hash{font-variant-numeric:tabular-nums}
    so the resting state is --text-secondary (7.58:1) and hover/focus raises it
    to the brand blue (9.45:1). */
 .row-actions{display:flex;gap:var(--space-1);white-space:nowrap;justify-content:center}
-.row-actions a,.row-actions button{color:var(--text-secondary);font-weight:500;transition:color .1s ease}
+.row-actions a:not(.primary):not(.danger),.row-actions button:not(.primary):not(.danger){color:var(--text-secondary);font-weight:500;transition:color .1s ease}
 .row-actions .danger,.folder-actions .danger{color:var(--status-danger);border-color:var(--status-danger)}
-tr:hover .row-actions a,tr:hover .row-actions button,tr:focus-within .row-actions a,tr:focus-within .row-actions button,
-.row-actions a:focus-visible,.row-actions button:focus-visible{color:var(--brand-blue)}
+tr:hover .row-actions a:not(.primary):not(.danger),tr:hover .row-actions button:not(.primary):not(.danger),
+tr:focus-within .row-actions a:not(.primary):not(.danger),tr:focus-within .row-actions button:not(.primary):not(.danger),
+.row-actions a:not(.primary):not(.danger):focus-visible,.row-actions button:not(.primary):not(.danger):focus-visible{color:var(--brand-blue)}
 tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions .danger:focus-visible{color:var(--status-danger)}
 
 /* 空状态: 16px 极简工程线框小标 + 精致文字排版 (spec §1.1/§4) */
@@ -534,7 +536,7 @@ tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions 
   .product{display:none}
 }
 @media(max-width:820px){
-  .header-crumb{display:none}
+  .crumb-bar{display:none}
   .stat-cards{grid-template-columns:repeat(2,1fr)}
 }
 

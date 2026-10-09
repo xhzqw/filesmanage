@@ -32,10 +32,13 @@ const NAV=[
 
 // The single shell shared by every authenticated page (DESIGN-SYSTEM-v1 §3.1,
 // VIS-09): one brand block, one navigation, one identity/exit area. Pages may
-// add `actions` (page-specific header buttons), a `product` subtitle and a
-// `breadcrumb` path; they must not draw their own header (SPEC §3.1: the path
-// lives inside the top bar, not in the work area).
-export function AppShell({user,onLogout,product,actions,breadcrumb,children}:{user:ShellUser;onLogout:()=>void;product?:string;actions?:ReactNode;breadcrumb?:ReactNode;children:ReactNode}){
+// add `actions` (page-specific header buttons) and a `product` subtitle; they
+// must not draw their own header.
+// The page path deliberately does NOT live here: a breadcrumb is a second
+// navigation landmark, and VIS-11 asserts exactly one `header.header nav`, so
+// the path is a docked strip at the top of the work area instead (see
+// Documents.tsx and the .crumb-bar rule in theme.css).
+export function AppShell({user,onLogout,product,actions,children}:{user:ShellUser;onLogout:()=>void;product?:string;actions?:ReactNode;children:ReactNode}){
  const[open,setOpen]=useState(false);
  return <div className="shell">
   <header className="header">
@@ -46,7 +49,6 @@ export function AppShell({user,onLogout,product,actions,breadcrumb,children}:{us
      {item.icon==="folder"?<FolderIcon size={14}/>:null}{item.label}
     </NavLink>)}
    </nav>
-   {breadcrumb?<div className="header-crumb">{breadcrumb}</div>:null}
    <button type="button" className="command-trigger" aria-label="打开快速指令台" onClick={()=>window.dispatchEvent(new CustomEvent("filesmanage:command-spotlight"))}>
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
     <span>快速搜索</span>

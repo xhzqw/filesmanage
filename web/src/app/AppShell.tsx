@@ -6,15 +6,16 @@ import {StatsPanel} from "../features/collaboration/StatsPanel";
 import {SearchPanel} from "../features/collaboration/SearchPanel";
 
 // Page compositions only; the shell chrome itself lives in shared/ui so every
-// page layer can reuse it (VIS-09). The page path travels through the shell's
-// breadcrumb slot so the top bar carries it (SPEC §3.1) instead of the work
-// area spending a row on it.
+// page layer can reuse it (VIS-09). The page path is a docked strip at the top
+// of the work area: it must stay a <nav> landmark for DI-15, and VIS-11 allows
+// exactly one nav inside header.header.
 export function WorkspacePage({user,onLogout}:{user:User;onLogout:()=>void}){
  const location=useLocation();
  const stats=location.pathname.startsWith("/stats");
- return <AppShell user={user} onLogout={onLogout} breadcrumb={<div className="breadcrumb">{stats?"统计与导出":"共享与关注"}</div>}>
+ return <AppShell user={user} onLogout={onLogout}>
   <div className="panels">
    <main className="work">
+    <div className="breadcrumb crumb-bar">{stats?"统计与导出":"共享与关注"}</div>
     {stats?<StatsPanel/>:<CollaborationPanel/>}
    </main>
   </div>
@@ -22,9 +23,10 @@ export function WorkspacePage({user,onLogout}:{user:User;onLogout:()=>void}){
 }
 
 export function SearchPage({user,onLogout}:{user:User;onLogout:()=>void}){
- return <AppShell user={user} onLogout={onLogout} breadcrumb={<div className="breadcrumb">全文检索</div>}>
+ return <AppShell user={user} onLogout={onLogout}>
   <div className="panels">
    <main className="work">
+    <div className="breadcrumb crumb-bar">全文检索</div>
     <SearchPanel/>
    </main>
   </div>

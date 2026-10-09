@@ -208,7 +208,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
   setSidebarWidth(width);
   persistSidebarWidth(width);
  }
- return <AppShell user={user} onLogout={onLogout} breadcrumb={selected?<FolderBreadcrumb folders={folders} folder={selected}/>:null}>
+ return <AppShell user={user} onLogout={onLogout}>
   <div className="panels"><aside className="sidebar" style={{width:sidebarWidth+"px"}}>
    <div className="sidebar-scroll">
    <h2>文档管理</h2><p>文件夹</p>
@@ -236,6 +236,11 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
     onKeyDown={onResizeKey}/>
    </aside>
    <main className="work">
+   {/* The path is a docked strip here, not inside the 40px top bar: it has to
+       stay a <nav> landmark (DI-15) and VIS-11 allows only one nav in the
+       header. Docked at 24px it costs a fraction of the row the old 44px
+       breadcrumb bar used to take. */}
+   {selected&&<FolderBreadcrumb folders={folders} folder={selected}/>}
    {moveMessage&&<p role="status" className="notice">{moveMessage}</p>}
    {/* The work area is gated on the resolved folder, not on the tree load
        state: a reloadKey cycle keeps the previous folders until the fresh
@@ -305,7 +310,7 @@ function FolderBreadcrumb({folders,folder}:{folders:Folder[];folder:Folder}){
  const collapsed=segments.length>5;
  const tail=collapsed?segments.slice(-2):segments.slice(1);
  const[root]=segments;
- return <nav className="breadcrumb" aria-label="当前位置">
+ return <nav className="breadcrumb crumb-bar" aria-label="当前位置">
   {tail.length===0
    ?<span className="crumb-current" aria-current="page">{root?.name??"文档管理"}</span>
    :<Link to="/doc">{root?.name??"文档管理"}</Link>}
