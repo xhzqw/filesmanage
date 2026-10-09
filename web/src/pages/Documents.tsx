@@ -29,7 +29,7 @@ type Subject={id:string;displayName:string;login?:string};
 const SIDEBAR_WIDTH_KEY="filesmanage.sidebar-width";
 const SIDEBAR_MIN=180;
 const SIDEBAR_MAX=360;
-const SIDEBAR_DEFAULT=240;
+const SIDEBAR_DEFAULT=220;
 
 function clampSidebarWidth(width:number){
  return Math.min(SIDEBAR_MAX,Math.max(SIDEBAR_MIN,width));
@@ -167,9 +167,11 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  function runFolderAction(folder:Folder,action:"rename"|"delete"){
   setActionsFolder(folder);
   requestAnimationFrame(()=>{
-   const buttons=actionsRef.current?.querySelectorAll<HTMLButtonElement>(".folder-actions>button");
+   const buttons=actionsRef.current?.querySelectorAll<HTMLButtonElement>(".folder-actions button");
    if(!buttons||buttons.length===0)return;
-   const target=action==="rename"?buttons[0]:buttons[buttons.length-1];
+   const target=action==="rename"
+    ? Array.from(buttons).find(b=>b.textContent?.includes("重命名"))
+    : Array.from(buttons).find(b=>b.textContent?.includes("删除"));
    target?.click();
   });
  }
@@ -240,17 +242,17 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
        stay a <nav> landmark (DI-15) and VIS-11 allows only one nav in the
        header. Docked at 24px it costs a fraction of the row the old 44px
        breadcrumb bar used to take. */}
-   {selected&&<FolderBreadcrumb folders={folders} folder={selected}/>}
+   {selected&&<div className="folder-context-bar">
+     <FolderBreadcrumb folders={folders} folder={selected}/>
+     <div ref={actionsRef} className="folder-actions-slot">
+      <FolderActions folder={actionsFolder??selected} isAdmin={user.isAdmin} onChanged={()=>setReloadKey(k=>k+1)}
+       onManageGrants={()=>setGrantFolder(actionsFolder??selected)} onManagePolicy={()=>setPolicyFolder(actionsFolder??selected)}/>
+     </div>
+   </div>}
    {moveMessage&&<p role="status" className="notice">{moveMessage}</p>}
-   {/* The work area is gated on the resolved folder, not on the tree load
-       state: a reloadKey cycle keeps the previous folders until the fresh
-       tree lands, so the explorer (and any in-flight upload queue) is not
-       torn down and remounted on every folder change. */}
    {selected&&<DropZone folderId={selected.id} onCommitted={()=>setReloadKey(k=>k+1)}>
-     <NewFolderForm parentId={selected.id} onCreated={()=>setReloadKey(k=>k+1)}/>
-     <div ref={actionsRef}><FolderActions folder={actionsFolder??selected} isAdmin={user.isAdmin} onChanged={()=>setReloadKey(k=>k+1)}
-      onManageGrants={()=>setGrantFolder(actionsFolder??selected)} onManagePolicy={()=>setPolicyFolder(actionsFolder??selected)}/></div>
-     <FileTable folder={selected.id} folderName={selected.name} onEdit={setEditingId} reloadKey={reloadKey}/>
+     <FileTable folder={selected.id} folderName={selected.name} onEdit={setEditingId} reloadKey={reloadKey}
+      newFolderSlot={<NewFolderForm parentId={selected.id} onCreated={()=>setReloadKey(k=>k+1)}/>}/>
    </DropZone>}
    {!selected&&status!=="loading"&&<p className="empty">当前账号没有可访问的目录，请联系管理员授权。</p>}
    </main></div>

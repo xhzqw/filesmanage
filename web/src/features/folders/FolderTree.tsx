@@ -757,7 +757,8 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
      :<span className="tree-chevron-spacer" aria-hidden="true"/>}
     <FolderGlyph expanded={isExpanded}/>
     <Link to={"/doc?folder="+encodeURIComponent(entry.id)} tabIndex={-1}
-     title={entry.disabledReason||undefined}>{entry.name}</Link>
+     className="tree-node-link"
+     title={entry.disabledReason?`${entry.name} (${entry.disabledReason})`:entry.name}>{entry.name}</Link>
    </div>
    {isExpanded&&<ul role="group">
     {children.map(child=>renderNode(child,depth+1))}

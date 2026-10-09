@@ -21,13 +21,13 @@ export function BrandLogo({size,className}:{size:number;className:string}){
 }
 
 const NAV=[
- {to:"/doc",label:"文档管理",icon:"folder"},
- {to:"/search",label:"搜索",icon:"search"},
- {to:"/workspace",label:"共享/关注",icon:"share"},
- {to:"/stats",label:"统计",icon:"chart"},
- {to:"/approvals",label:"审批",icon:"check"},
- {to:"/trash",label:"回收站",icon:"trash"},
- {to:"/org",label:"组织管理",icon:"org"},
+ {to:"/doc",label:"文档管理"},
+ {to:"/search",label:"提要"},
+ {to:"/workspace",label:"共享/关注"},
+ {to:"/stats",label:"统计"},
+ {to:"/approvals",label:"审批"},
+ {to:"/trash",label:"回收站"},
+ {to:"/org",label:"组织管理"},
 ];
 
 // The single shell shared by every authenticated page (DESIGN-SYSTEM-v1 §3.1,
@@ -46,17 +46,28 @@ export function AppShell({user,onLogout,product,actions,children}:{user:ShellUse
    <div className="brand"><BrandLogo size={22} className="brand-logo"/>中晟生物科技<span className="product">{product??"文档管理系统"}</span></div>
    <nav aria-label="主导航" className={open?"open":""}>
     {NAV.map(item=><NavLink key={item.to} to={item.to} onClick={()=>setOpen(false)}>
-     {item.icon==="folder"?<FolderIcon size={14}/>:null}{item.label}
+     {item.label}
     </NavLink>)}
    </nav>
-   <button type="button" className="command-trigger" aria-label="打开快速指令台" onClick={()=>window.dispatchEvent(new CustomEvent("filesmanage:command-spotlight"))}>
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
-    <span>快速搜索</span>
-    <span className="command-keys"><kbd>⌘</kbd><kbd>K</kbd></span>
-   </button>
-   <span className="account"><span className="account-avatar" aria-hidden="true">{accountInitial(user.displayName)}</span><span className="account-name">{user.displayName}</span></span>
-   {actions}
-   <button onClick={onLogout}>退出</button>
+   <div className="header-right">
+    <button type="button" className="command-trigger" aria-label="全局搜索" onClick={()=>window.dispatchEvent(new CustomEvent("filesmanage:command-spotlight"))}>
+     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+     <span>全局搜索</span>
+     <span className="command-keys"><kbd>Ctrl</kbd><kbd>K</kbd></span>
+    </button>
+    <div className="account-dropdown-trigger" title="当前登录用户">
+     <span className="account">
+      <span className="account-avatar" aria-hidden="true">{accountInitial(user.displayName)}</span>
+      <span className="account-name">{user.displayName}</span>
+      <span className="account-caret" aria-hidden="true">▾</span>
+     </span>
+    </div>
+    {actions}
+    <button type="button" className="header-exit-btn" onClick={onLogout} title="退出系统">
+     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+     <span>退出</span>
+    </button>
+   </div>
   </header>
   {children}
  </div>;

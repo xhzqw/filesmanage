@@ -113,7 +113,7 @@ class CDP {
 
 const CTRL = 2, SHIFT = 8;
 
-const NAV_LABELS = ["文档管理", "搜索", "共享/关注", "统计", "审批", "回收站", "组织管理"];
+const NAV_LABELS = ["文档管理", "提要", "共享/关注", "统计", "审批", "回收站", "组织管理"];
 
 // The shell login check must exercise a real logged-out login page: the
 // browser session from the previous suite is revoked first.

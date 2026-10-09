@@ -1,4 +1,4 @@
-import {useEffect,useRef,useState,type ChangeEvent,type DragEvent,type FormEvent,type KeyboardEvent,type MouseEvent}from "react";
+import {useEffect,useMemo,useRef,useState,type ChangeEvent,type DragEvent,type FormEvent,type KeyboardEvent,type MouseEvent,type ReactNode}from "react";
 import {useNavigate}from "react-router-dom";
 import type {FileItem} from "../../entities/file/model";
 import type {Folder} from "../../entities/folder/model";
@@ -185,7 +185,7 @@ type FavoriteRow={kind:string;fileId?:string};
 // current visible order, and the keyboard mirrors every mouse action. The
 // selection model keeps focus, anchor and membership separate so a stale
 // anchor can never resurrect after a re-sort.
-export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;folderName:string;onEdit:(fileId:string)=>void;reloadKey:number}){
+export function FileTable({folder,folderName,onEdit,reloadKey,newFolderSlot}:{folder:string;folderName:string;onEdit:(fileId:string)=>void;reloadKey:number;newFolderSlot?:ReactNode}){
  const[items,setItems]=useState<FileItem[]>([]);
 // Round-trip of the list read the status bar reports (spec §3.1). It is an
 // observation of the request that already runs below — never an extra one —
@@ -196,12 +196,14 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const[messageTone,setMessageTone]=useState<"info"|"error">("info");
  const[sort,setSort]=useState<SortKey>("updated_desc");
  const[categoryFilter,setCategoryFilter]=useState<FileCategory>("all");
+ const[nameFilter,setNameFilter]=useState("");
  const[density]=useState<Density>("compact");
  const[cursor,setCursor]=useState("");
  const[hasMore,setHasMore]=useState(false);
  const[renaming,setRenaming]=useState<FileItem|null>(null);
  const[renameValue,setRenameValue]=useState("");
  const[renameBusy,setRenameBusy]=useState(false);
+ const[openRowMoreId,setOpenRowMoreId]=useState<string|null>(null);
  const[selectedIds,setSelectedIds]=useState<Set<string>>(()=>new Set<string>());
  const[focusedId,setFocusedId]=useState<string|null>(null);
  const[anchorId,setAnchorId]=useState<string|null>(null);
@@ -360,10 +362,40 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   setHasMore(page.nextCursor!=="");
  }
 
- const visibleItems=useMemo(()=>{
-  if(categoryFilter==="all")return items;
-  return items.filter(item=>classifyFile(item.name).category===categoryFilter);
- },[items,categoryFilter]);
+  useEffect(()=>{
+   if(!openRowMoreId)return;
+   function onDoc(e:MouseEvent){
+    if(!(e.target as HTMLElement)?.closest(".row-more-wrapper")){
+     setOpenRowMoreId(null);
+    }
+   }
+   document.addEventListener("mousedown",onDoc);
+   return()=>document.removeEventListener("mousedown",onDoc);
+  },[openRowMoreId]);
+
+  function batchDownload(files:FileItem[]){
+   if(files.length===0)return;
+   files.forEach(file=>{
+    const a=document.createElement("a");
+    a.href="/api/files/"+file.id+"/bytes";
+    a.download=file.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+   });
+  }
+
+  const visibleItems=useMemo(()=>{
+   let list=items;
+   if(nameFilter.trim()){
+    const q=nameFilter.trim().toLowerCase();
+    list=list.filter(item=>item.name.toLowerCase().includes(q));
+   }
+   if(categoryFilter!=="all"){
+    list=list.filter(item=>classifyFile(item.name).category===categoryFilter);
+   }
+   return list;
+  },[items,categoryFilter,nameFilter]);
 
  const categoryCounts=useMemo(()=>{
   const map:Record<FileCategory,number>={
@@ -722,49 +754,49 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   onDragOver={suppressInternalDrag}
   onDragLeave={suppressInternalDrag}
   onDrop={suppressInternalDrag}>
-  <div className="toolbar">
-   {/* The input allows multiple files: it feeds the same batch queue as a
-       drop (WF-27), so it no longer locks while one upload is in flight. */}
-   <label className="upload-button">
-    上传文件
-    <input type="file" multiple onChange={onUpload}/>
-   </label>
-   <label className="filter-label">类型
-    <select aria-label="文件类型筛选" value={categoryFilter} onChange={e=>{
-     setCategoryFilter(e.target.value as FileCategory);
-     setSelectedIds(new Set<string>());
-     setFocusedId(null);
-     setAnchorId(null);
-    }}>
-     <option value="all">全部类型 ({categoryCounts.all})</option>
-     <option value="cad">CAD / 3D 图纸 ({categoryCounts.cad})</option>
-     <option value="doc">办公文档 ({categoryCounts.doc})</option>
-     <option value="image">图片文件 ({categoryCounts.image})</option>
-     <option value="media">音视频 ({categoryCounts.media})</option>
-     <option value="archive">压缩包 ({categoryCounts.archive})</option>
-     <option value="code">代码与数据 ({categoryCounts.code})</option>
-     <option value="other">其他文件 ({categoryCounts.other})</option>
-    </select>
-   </label>
-   {categoryFilter!=="all"&&<button type="button" className="filter-clear-btn" onClick={()=>{
-    setCategoryFilter("all");
-    setSelectedIds(new Set<string>());
-    setFocusedId(null);
-    setAnchorId(null);
-   }} title="清除筛选">重置</button>}
-   <label className="sort-label">排序
-    <select aria-label="排序方式" value={sort} onChange={e=>setSort(e.target.value as SortKey)}>
-     {SORT_KEYS.map(key=><option key={key} value={key}>{SORT_LABELS[key]}</option>)}
-    </select>
-   </label>
-   <span className="toolbar-hint">{folderName}</span>
+  <div className="toolbar file-toolbar">
+   <div className="toolbar-actions">
+    <label className="upload-button primary-btn">
+     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>
+     <span>上传文件</span>
+     <input type="file" multiple onChange={onUpload}/>
+    </label>
+    {newFolderSlot}
+    <div className="batch-actions-group">
+     <button type="button" className="batch-btn" disabled={selectedIds.size===0} onClick={()=>batchDownload(selection)} title={selectedIds.size===0?"勾选文件后可批量下载":"批量下载已勾选文件"}>批量下载</button>
+     <button type="button" className="batch-btn" disabled={selectedIds.size===0} onClick={()=>startMoveSelection(selection)} title={selectedIds.size===0?"勾选文件后可批量移动":"批量移动已勾选文件"}>批量移动</button>
+     <button type="button" className="batch-btn danger" disabled={selectedIds.size===0} onClick={()=>setPendingDelete(selection)} title={selectedIds.size===0?"勾选文件后可批量删除":"批量删除已勾选文件"}>批量删除</button>
+    </div>
+   </div>
+   <div className="toolbar-views">
+    <label className="sort-label">排序
+     <select aria-label="排序方式" value={sort} onChange={e=>setSort(e.target.value as SortKey)}>
+      {SORT_KEYS.map(key=><option key={key} value={key}>{SORT_LABELS[key]}</option>)}
+     </select>
+    </label>
+    <label className="filter-label">类型
+     <select aria-label="文件类型筛选" value={categoryFilter} onChange={e=>{
+      setCategoryFilter(e.target.value as FileCategory);
+      setSelectedIds(new Set<string>());
+      setFocusedId(null);
+      setAnchorId(null);
+     }}>
+      <option value="all">全部类型 ({categoryCounts.all})</option>
+      <option value="cad">CAD / 3D 图纸 ({categoryCounts.cad})</option>
+      <option value="doc">办公文档 ({categoryCounts.doc})</option>
+      <option value="image">图片文件 ({categoryCounts.image})</option>
+      <option value="media">音视频 ({categoryCounts.media})</option>
+      <option value="archive">压缩包 ({categoryCounts.archive})</option>
+      <option value="code">代码与数据 ({categoryCounts.code})</option>
+      <option value="other">其他文件 ({categoryCounts.other})</option>
+     </select>
+    </label>
+    <div className="filter-search-wrap">
+     <input type="search" className="filter-search-input" placeholder="过滤当前目录…" aria-label="当前目录内过滤"
+      value={nameFilter} onChange={e=>setNameFilter(e.target.value)}/>
+    </div>
+   </div>
   </div>
-  {selectedIds.size>0&&<div className="toolbar selection-bar" role="status">
-   <span className="toolbar-hint">已选择 {selectedIds.size} 项（当前加载页）</span>
-   <button type="button" onClick={()=>startMoveSelection(selection)}>移动到…</button>
-   <button type="button" className="danger" onClick={()=>setPendingDelete(selection)}>删除所选</button>
-   <button type="button" className="secondary-action" onClick={()=>{setSelectedIds(new Set<string>());setAnchorId(null);}}>取消选择</button>
-  </div>}
   {message&&<p role="status" className={"notice "+messageTone}>{message}</p>}
   <div className="table" onClick={event=>{if(!(event.target as HTMLElement).closest("tr")){setSelectedIds(new Set<string>());setAnchorId(null);}}}>
    <table role="grid" aria-label={folderName+" 文件列表"} className="file-table file-table-ultra">
@@ -813,15 +845,21 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       <td className="col-hash hash" title={item.sha256}>{item.sha256.slice(0,8)}</td>
       <td className="col-date date">{item.updatedAt.replace("T"," ").slice(0,16)}</td>
       <td className="row-actions col-actions" onClick={event=>event.stopPropagation()}><div className="actions-cell-wrap">
-       <button type="button" onClick={()=>navigate("/preview/"+item.id)}>打开</button>
-       <a href={"/api/files/"+item.id+"/bytes"} download={item.name}>下载</a>
-       <button type="button" onClick={()=>onEdit(item.id)}>编辑</button>
-       <button type="button" onClick={()=>{setRenaming(item);setRenameValue(item.name);}}>重命名</button>
-       <button type="button" className="danger" onClick={()=>setPendingDelete([item])}>删除</button>
-       <button type="button" aria-pressed={favoriteIds.has(item.id)}
-        disabled={favoritesState!=="ready"||favoriteBusy!==""}
-        title={favoritesState==="failed"?"关注状态加载失败，请刷新后重试":undefined}
-        onClick={()=>toggleFavorite(item)}>{favoriteIds.has(item.id)?"已关注":"关注"}</button>
+       <button type="button" className="action-link" onClick={()=>navigate("/preview/"+item.id)}>打开</button>
+       <a href={"/api/files/"+item.id+"/bytes"} download={item.name} className="action-link">下载</a>
+       <button type="button" className="action-link" onClick={()=>onEdit(item.id)}>编辑</button>
+       <div className="row-more-wrapper">
+        <button type="button" className="action-link more-trigger" aria-label="更多操作" aria-expanded={openRowMoreId===item.id}
+         onClick={()=>setOpenRowMoreId(prev=>prev===item.id?null:item.id)}>···</button>
+        <div className={"row-more-menu"+(openRowMoreId===item.id?" open":"")} role="menu">
+         <button type="button" role="menuitem" onClick={()=>{setOpenRowMoreId(null);setRenaming(item);setRenameValue(item.name);}}>重命名</button>
+         <button type="button" role="menuitem" aria-pressed={favoriteIds.has(item.id)}
+          disabled={favoritesState!=="ready"||favoriteBusy!==""}
+          title={favoritesState==="failed"?"关注状态加载失败，请刷新后重试":undefined}
+          onClick={()=>{setOpenRowMoreId(null);toggleFavorite(item);}}>{favoriteIds.has(item.id)?"已关注":"关注"}</button>
+         <button type="button" role="menuitem" className="danger" onClick={()=>{setOpenRowMoreId(null);setPendingDelete([item]);}}>删除</button>
+        </div>
+       </div>
       </div></td>
      </tr>)}
     </tbody>
@@ -856,13 +894,12 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   {rowMenu&&<Menu open label="文件操作菜单" items={rowMenuItems(rowMenu.targets)} anchor={rowMenu.anchor}
    point={rowMenu.point} onClose={()=>setRowMenu(null)}/>}
   <footer className="status-bar">
-   <span>已选 <span className="status-strong">{selectedIds.size}</span> 项{selectedIds.size>0&&<> / <span className="status-strong">{formatSize(selectedBytes)}</span></>}</span>
-   <span className="status-sep" aria-hidden="true">│</span>
-   <span>共 <span className="status-strong">{categoryFilter==="all"?items.length:`${visibleItems.length}/${items.length}`}</span> 个项目</span>
-   <span className="status-sep" aria-hidden="true">│</span>
-   <span>延迟 <span className="status-strong">{latencyMs===null?"—":latencyMs+" ms"}</span></span>
-   <span className="status-spacer"/>
-   <span className="status-build">filesmanage v2.1.0</span>
+   <div className="status-left">
+    <span>已选 <span className="status-strong">{selectedIds.size}</span> 项{selectedIds.size>0&&<> / <span className="status-strong">{formatSize(selectedBytes)}</span></>} · 共 <span className="status-strong">{items.length}</span> 个文件</span>
+   </div>
+   <div className="status-right">
+    <span>延迟: <span className="status-strong">{latencyMs===null?"—":latencyMs+"ms"}</span> · <span className="status-build">v2.1.0</span></span>
+   </div>
   </footer>
  </div>;
 }
