@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"filesmanage/internal/application"
+	"filesmanage/internal/domain"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"net/http/httptest"
@@ -95,6 +96,29 @@ func TestNewEngineEnforcesAllowlistOnRoutes(t *testing.T) {
 		if rec.Code != tc.want {
 			t.Fatalf("engine peer %s: status = %d, want %d", tc.remote, rec.Code, tc.want)
 		}
+	}
+}
+
+func TestAuthPasswordChangeGate(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		pending bool
+		want    int
+	}{
+		{"normal", false, http.StatusOK},
+		{"first-sign-in", true, http.StatusForbidden},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			allowed := requireChangedPassword(c, domain.User{MustChangePassword: tc.pending})
+			if allowed == tc.pending || rec.Code != tc.want {
+				t.Fatalf("gate allowed=%v status=%d pending=%v, want status=%d", allowed, rec.Code, tc.pending, tc.want)
+			}
+			if tc.pending && !strings.Contains(rec.Body.String(), "E_PASSWORD_CHANGE_REQUIRED") {
+				t.Fatalf("missing pending-password error: %s", rec.Body.String())
+			}
+		})
 	}
 }
 

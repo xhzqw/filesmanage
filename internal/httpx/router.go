@@ -204,7 +204,9 @@ func checkOrigin(c *gin.Context) {
 	}
 	c.Next()
 }
-func (h *Handler) auth(c *gin.Context) (domain.User, bool) {
+// identity allows a newly created account to inspect /api/me before changing
+// its initial password. Business handlers must use auth instead.
+func (h *Handler) identity(c *gin.Context) (domain.User, bool) {
 	token, _ := c.Cookie("fm_session")
 	a, err := h.S.Session(c.Request.Context(), token)
 	if err != nil {
@@ -212,6 +214,29 @@ func (h *Handler) auth(c *gin.Context) (domain.User, bool) {
 		return domain.User{}, false
 	}
 	return a.User, true
+}
+
+// auth uniformly denies access to business APIs before the initial password
+// has been changed. /api/me, /api/me/password and logout remain available.
+func (h *Handler) auth(c *gin.Context) (domain.User, bool) {
+	u, ok := h.identity(c)
+	if !ok {
+		return domain.User{}, false
+	}
+	if !requireChangedPassword(c, u) {
+		return domain.User{}, false
+	}
+	return u, true
+}
+
+// This gate is deliberately separate from identity: /me needs to reveal the
+// pending state, while business API calls must deny it server-side.
+func requireChangedPassword(c *gin.Context, u domain.User) bool {
+	if u.MustChangePassword {
+		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
+		return false
+	}
+	return true
 }
 func (h *Handler) login(c *gin.Context) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 4096)
@@ -242,7 +267,7 @@ func (h *Handler) logout(c *gin.Context) {
 	c.JSON(200, gin.H{"ok": true})
 }
 func (h *Handler) me(c *gin.Context) {
-	u, ok := h.auth(c)
+	u, ok := h.identity(c)
 	if !ok {
 		return
 	}

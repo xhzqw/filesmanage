@@ -58,6 +58,31 @@ func TestOrganizationManagementIsAdminOnly(t *testing.T) {
 	}
 }
 
+// A password reset must evict a warmed session cache immediately, not only
+// revoke the persistent session stored in the repository.
+func TestResetUserPasswordRevokesCachedSession(t *testing.T) {
+	s, _ := testService(t)
+	ctx := context.Background()
+	token, _, err := s.Login(ctx, "user1", "long-unit-test-password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Session(ctx, token); err != nil {
+		t.Fatal(err)
+	}
+	admin := domain.User{ID: "u_admin", Login: "admin", IsAdmin: true}
+	if err := s.ResetUserPassword(ctx, admin, "u_user", "replacement-credential-0001"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Session(ctx, token); !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("cached session survived password reset: %v", err)
+	}
+	_, user, err := s.Login(ctx, "user1", "replacement-credential-0001")
+	if err != nil || !user.MustChangePassword {
+		t.Fatalf("replacement credential must force first sign-in: user=%+v err=%v", user, err)
+	}
+}
+
 func TestWorkgroupMembership(t *testing.T) {
 	s, _ := testService(t)
 	admin := domain.User{ID: "u_admin", Login: "admin", IsAdmin: true}
