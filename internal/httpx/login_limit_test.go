@@ -5,6 +5,7 @@ import (
 	"errors"
 	"filesmanage/internal/application"
 	"filesmanage/internal/ports"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -48,6 +49,61 @@ func TestLoginLimiterAccountAndIPBudgets(t *testing.T) {
 	now = now.Add(loginIPWindow + time.Second)
 	if wait := l.allow("192.168.1.30:9000", "fresh-name"); wait != 0 {
 		t.Fatalf("IP budget failed to expire: %s", wait)
+	}
+}
+
+func TestLoginClientAddrTrustBoundary(t *testing.T) {
+	tests := []struct {
+		name, remote, proto, forwarded, want string
+	}{
+		{"direct header spoof ignored", "192.168.1.42:1234", "https", "192.168.1.88", "192.168.1.42:1234"},
+		{"direct forwarded-for spoof ignored", "10.144.144.26:1234", "https", "192.168.1.88", "10.144.144.26:1234"},
+		{"loopback without tls proxy marker ignored", "127.0.0.1:54321", "http", "192.168.1.88", "127.0.0.1:54321"},
+		{"trusted loopback proxy", "127.0.0.1:54321", "https", "192.168.1.88", "192.168.1.88:0"},
+		{"trusted vpn proxy", "[::1]:54321", "https", "10.144.144.88", "10.144.144.88:0"},
+		{"malformed header ignored", "127.0.0.1:54321", "https", "192.168.1.88, 10.0.0.1", "127.0.0.1:54321"},
+		{"empty header ignored", "127.0.0.1:54321", "https", "", "127.0.0.1:54321"},
+		{"unspecified header ignored", "127.0.0.1:54321", "https", "0.0.0.0", "127.0.0.1:54321"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/api/login", nil)
+			req.RemoteAddr = tc.remote
+			req.Header.Set("X-Forwarded-Proto", tc.proto)
+			req.Header.Set("X-Filesmanage-Client-IP", tc.forwarded)
+			req.Header.Set("X-Forwarded-For", "203.0.113.200")
+			if got := loginClientAddr(req); got != tc.want {
+				t.Fatalf("client addr = %q; want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestProxyLoginIPBudgetsDoNotMergeAllStaff(t *testing.T) {
+	t.Setenv("FILESMANAGE_LAN_ALLOW_CIDRS", "127.0.0.1/32")
+	r := New(application.New(logoutTestUOW{beginErr: errors.New("test db unavailable")}, nil), false, t.TempDir())
+	send := func(ip, login string) int {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodPost, "/api/login",
+			strings.NewReader(`{"login":"`+login+`","password":"wrong-test-password"}`))
+		req.RemoteAddr = "127.0.0.1:12345"
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Forwarded-Proto", "https")
+		req.Header.Set("X-Filesmanage-Client-IP", ip)
+		resp := httptest.NewRecorder()
+		r.ServeHTTP(resp, req)
+		return resp.Code
+	}
+	for n := 0; n < loginIPAttempts; n++ {
+		if got := send("192.168.1.30", fmt.Sprintf("staff-%d", n)); got != http.StatusServiceUnavailable {
+			t.Fatalf("attempt %d status=%d; want 503", n+1, got)
+		}
+	}
+	if got := send("192.168.1.31", "another-staff"); got != http.StatusServiceUnavailable {
+		t.Fatalf("different HTTPS client incorrectly shared IP bucket: %d", got)
+	}
+	if got := send("192.168.1.30", "overflow"); got != http.StatusTooManyRequests {
+		t.Fatalf("original client IP bucket not enforced: %d", got)
 	}
 }
 

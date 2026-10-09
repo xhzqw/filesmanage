@@ -90,7 +90,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 		c.JSON(200, gin.H{"ok": true})
 	})
 	api := r.Group("/api")
-	api.Use(checkOrigin)
+	api.Use(requestAuditContext, checkOrigin, h.auditPermissionDenial)
 	api.POST("/login", h.login)
 	api.POST("/logout", h.logout)
 	api.POST("/me/password", h.changePassword)
@@ -220,6 +220,7 @@ func (h *Handler) identity(c *gin.Context) (domain.User, bool) {
 		}
 		return domain.User{}, false
 	}
+	c.Set("auditActorID", a.User.ID)
 	return a.User, true
 }
 
@@ -255,7 +256,7 @@ func (h *Handler) login(c *gin.Context) {
 		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
 		return
 	}
-	if wait := h.LoginLimit.allow(c.Request.RemoteAddr, req.Login); wait > 0 {
+	if wait := h.LoginLimit.allow(loginClientAddr(c.Request), req.Login); wait > 0 {
 		c.Header("Retry-After", strconv.Itoa(retrySeconds(wait)))
 		c.JSON(429, gin.H{"ok": false, "error": gin.H{"code": "E_RATE_LIMIT"}})
 		return

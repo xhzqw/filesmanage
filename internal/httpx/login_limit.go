@@ -3,13 +3,15 @@ package httpx
 import (
 	"filesmanage/internal/application"
 	"net"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
 )
 
-// Budgets are per server process and use the socket peer rather than a
-// client-supplied forwarding header. Reverse proxies need their own IP limits.
+// Budgets are per server process. Direct LAN clients use the socket peer;
+// the loopback Nginx TLS ingress supplies an overwritten client IP header.
+// Never trust this header from a direct LAN connection.
 const (
 	loginIPAttempts      = 30
 	loginIPWindow        = 5 * time.Minute
@@ -62,6 +64,26 @@ func pruneLoginWindows(entries map[string]loginWindow, now time.Time, window tim
 
 // allow atomically reserves both budgets. Names are digested to avoid storing
 // raw login names. When the bounded table fills up, new keys fail closed.
+// loginClientAddr uses the socket peer by default. For HTTPS traffic that
+// traverses the loopback reverse proxy, Nginx overwrites the real client IP
+// header. This avoids applying one shared 30-attempt IP budget to the entire
+// office. Forwarding headers from direct LAN clients are never authoritative.
+func loginClientAddr(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	peer := net.ParseIP(host)
+	if peer == nil || !peer.IsLoopback() || r.Header.Get("X-Forwarded-Proto") != "https" {
+		return r.RemoteAddr
+	}
+	ip := net.ParseIP(r.Header.Get("X-Filesmanage-Client-IP"))
+	if ip == nil || ip.IsUnspecified() || ip.IsMulticast() {
+		return r.RemoteAddr
+	}
+	return net.JoinHostPort(ip.String(), "0")
+}
+
 func (l *loginLimiter) allow(remoteAddr, login string) time.Duration {
 	host, _, err := net.SplitHostPort(remoteAddr)
 	if err != nil || net.ParseIP(host) == nil {
