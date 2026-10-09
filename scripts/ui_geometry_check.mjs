@@ -72,7 +72,11 @@ async function inspect(page,rules){
 
 async function compactViewport(width,height=760){
  await send("Emulation.setDeviceMetricsOverride",{
-  width,height,deviceScaleFactor:1,mobile:width<=600,
+  // First validate the *CSS layout viewport* at exactly the requested width.
+  // mobile:true can auto-expand the layout viewport to accommodate overflowing
+  // descendants, causing misleading passes (e.g. a 390px phone reporting a
+  // 725px layout viewport).
+  width,height,deviceScaleFactor:1,mobile:false,
  });
  await delay(250);
 }
@@ -87,6 +91,7 @@ async function inspectCompact(page,width){
      overflowX:s.overflowX,scrollWidth:el.scrollWidth,clientWidth:el.clientWidth};
   };
   return {width:innerWidth,htmlWidth:document.documentElement.scrollWidth,
+   visualWidth:visualViewport?.width,visualScale:visualViewport?.scale,
    header:rect(".header"),brand:rect(".brand"),navToggle:rect(".nav-toggle"),
    headerRight:rect(".header-right"),sidebar:rect(".sidebar"),
    work:rect(".work"),table:rect(".table"),org:rect(".org-workbench"),
@@ -95,6 +100,8 @@ async function inspectCompact(page,width){
  })()`);
  check(`${page} ${width}px document fits`,report.htmlWidth<=report.width+2,
   `scroll=${report.htmlWidth} viewport=${report.width}`);
+ check(`${page} ${width}px exact layout viewport`,report.width===width,
+  `layout=${report.width} target=${width}`);
  check(`${page} ${width}px header contents fit`,
   !!report.header&&!!report.headerRight&&report.headerRight.right<=report.width+2&&
   (!report.brand||report.brand.left>=-1)&&report.headerRight.left>=0,
