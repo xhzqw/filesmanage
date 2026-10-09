@@ -1,6 +1,7 @@
 import {useEffect,useState} from "react";
 import {useParams} from "react-router-dom";
-import {fileApi} from "../features/documents/api";
+import {fileApi,formatSize} from "../features/documents/api";
+import {MediaPreview} from "../features/documents/MediaPreview";
 import {RollbackDialog} from "../features/documents/RollbackDialog";
 import type {PreviewData,FileVersion} from "../entities/file/model";
 import type {User} from "../entities/user/model";
@@ -44,11 +45,11 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
 
  return <AppShell user={user} onLogout={onLogout}>
   <div className="panels">
-   <main className="work">
+   <main className="work file-preview-page">
     {status==="loading"&&<p className="empty">正在加载预览…</p>}
     {status==="failed"&&<p role="alert" className="notice error">无法读取该文件：不存在或没有预览权限。</p>}
     {status==="ready"&&preview&&<>
-     <div className="breadcrumb">{preview.name} · {preview.size} 字节 · v{currentSeq}</div>
+     <div className="breadcrumb">{preview.name} · {formatSize(preview.size)} · v{currentSeq}</div>
      <div className="toolbar">
       <a className="primary" href={"/api/files/"+preview.fileId+"/bytes"} download={preview.name}>下载原始字节</a>
       {preview.name.toLowerCase().endsWith(".docx")&&
@@ -57,12 +58,15 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
        <a className="primary" href={"/model/"+preview.fileId}>3D 模型预览</a>}
       <span className="toolbar-hint">SHA-256 {preview.sha256}</span>
      </div>
-     {preview.textual
-      ?<pre className="preview-text" data-truncated={String(preview.truncated)}>{preview.content}{preview.truncated?"\n…（预览已截断，下载查看完整内容）":""}</pre>
-      :<p className="empty">该格式不支持在线预览，请下载后查看。</p>}
-     <div className="toolbar">
+     {(preview.renderer==="image"||preview.renderer==="video"||preview.renderer==="audio")?
+      <MediaPreview key={preview.fileId+preview.sha256} fileId={preview.fileId} sha256={preview.sha256}
+       name={preview.name} kind={preview.renderer} mime={preview.mediaType??""}/>:
+      preview.textual?
+       <pre className="preview-text" data-truncated={String(preview.truncated)}>{preview.content}{preview.truncated?"\n…（预览已截断，下载查看完整内容）":""}</pre>:
+       <p className="empty">暂不支持该格式的安全在线预览。SVG/HTML 等活动内容不会直接嵌入页面，请下载后使用可信应用打开。</p>}
+     {preview.textual&&<div className="toolbar">
       <span className="toolbar-hint">编码 {preview.byteMeta.encoding} · 行尾 {preview.byteMeta.eol} · BOM {preview.byteMeta.hasBom?"有":"无"} · 末尾换行 {preview.byteMeta.endsWithNewline?"有":"无"}</span>
-     </div>
+     </div>}
      {notice&&<p role="status" className="notice">{notice}</p>}
      <div className="table">
       <table>

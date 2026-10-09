@@ -3,15 +3,17 @@ package httpx
 import (
 	"errors"
 	"filesmanage/internal/application"
-	"os"
 	"filesmanage/internal/domain"
 	"github.com/gin-gonic/gin"
+	"os"
 )
 
 // respondError maps domain and application failures onto the stable SPEC §5.3
 // error contract.
 func respondError(c *gin.Context, err error) {
 	switch {
+	case errors.Is(err, application.ErrPreviewUnsupported):
+		c.JSON(415, gin.H{"ok": false, "error": gin.H{"code": "E_PREVIEW_UNSUPPORTED"}})
 	case errors.Is(err, application.ErrUnauthorized):
 		c.JSON(401, gin.H{"ok": false, "error": gin.H{"code": "E_AUTH"}})
 	case errors.Is(err, application.ErrInvalidCredentials):

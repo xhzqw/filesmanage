@@ -138,30 +138,42 @@ func (h *Handler) previewFile(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	// rawBase64 carries the exact preview prefix bytes so an editor can write
-	// them back without any encoding or newline normalisation.
+	// The renderer is determined from the stored bytes, not the uploaded MIME.
+	// Text preview prefix is read only once; rawBase64 preserves edit fidelity.
 	data := gin.H{
 		"fileId": preview.FileID, "name": preview.Name, "contentType": preview.ContentType,
 		"size": preview.Size, "sha256": preview.Sha256, "textual": preview.Textual,
 		"truncated": preview.Truncated, "content": preview.Content, "byteMeta": preview.ByteMeta,
+		"renderer": preview.Renderer, "mediaType": preview.MediaType,
 	}
 	if preview.Textual {
-		reader, _, _, closeReader, err := h.S.OpenPreviewBytes(c.Request.Context(), u, c.Param("id"))
-		if err == nil {
-			defer closeReader()
-			buf := make([]byte, application.PreviewLimit)
-			read := 0
-			for read < len(buf) {
-				n, readErr := reader.Read(buf[read:])
-				read += n
-				if readErr != nil {
-					break
-				}
-			}
-			data["rawBase64"] = base64.StdEncoding.EncodeToString(buf[:read])
-		}
+		data["rawBase64"] = preview.RawBase64
 	}
 	c.JSON(200, gin.H{"ok": true, "data": data})
+}
+
+// previewMedia serves only passive, signature-verified media, and only to
+// users with preview access. Unlike /bytes it never grants download ACL.
+// ServeContent handles bounded streaming, Range, If-Range, 206 and 416.
+func (h *Handler) previewMedia(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	media, _, closeReader, err := h.S.OpenInlinePreview(c.Request.Context(), u, c.Param("id"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	defer closeReader()
+	c.Header("Content-Type", media.ContentType)
+	c.Header("Content-Disposition", "inline")
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Header("Cross-Origin-Resource-Policy", "same-origin")
+	c.Header("Referrer-Policy", "no-referrer")
+	c.Header("Cache-Control", "private, no-store")
+	c.Header("ETag", "\""+media.Sha256+"\"")
+	http.ServeContent(c.Writer, c.Request, "", media.ModTime, media.Reader)
 }
 
 func (h *Handler) saveFile(c *gin.Context) {

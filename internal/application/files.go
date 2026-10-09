@@ -199,12 +199,16 @@ type readCloser interface {
 // OpenDownload streams the current version's source bytes after verifying the
 // download permission; the caller must invoke the returned close func.
 func (s *Service) OpenDownload(ctx context.Context, u domain.User, fileID string) (Download, func(), error) {
+	return s.openFileBytes(ctx, u, fileID, domain.ActionDownload)
+}
+
+func (s *Service) openFileBytes(ctx context.Context, u domain.User, fileID string, action domain.Action) (Download, func(), error) {
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
 		return Download{}, nil, err
 	}
 	defer tx.Rollback(ctx)
-	file, err := s.visibleFile(ctx, tx, u, fileID, domain.ActionDownload)
+	file, err := s.visibleFile(ctx, tx, u, fileID, action)
 	if err != nil {
 		return Download{}, nil, err
 	}

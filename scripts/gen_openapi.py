@@ -299,10 +299,12 @@ schema("Preview", obj({
     "size": integer(),
     "sha256": string(),
     "textual": boolean(),
+    "renderer": string(enum=["text", "image", "video", "audio", "unsupported"]),
+    "mediaType": string("Signature-verified passive media MIME; empty for other renderers."),
     "truncated": boolean("True when the preview window cut the content."),
     "content": string("Decoded preview text; empty for binary files."),
     "byteMeta": ref("ByteMeta"),
-}, required=["fileId", "name", "contentType", "size", "sha256", "textual", "truncated", "content", "byteMeta"]))
+}, required=["fileId", "name", "contentType", "size", "sha256", "textual", "renderer", "mediaType", "truncated", "content", "byteMeta"]))
 
 schema("ByteMeta", obj({
     "size": integer(),
@@ -703,6 +705,15 @@ add("GET", "/api/files/{id}/bytes", operation("Download file content (Range supp
 add("GET", "/api/files/{id}/preview", operation("Preview content and byte-fidelity metadata", "Files", "previewFile", security=SESSION,
     params=[id_param("id", "File id.")],
     responses=dict([json_ok(ref("Preview"), "Preview window with byte metadata for lossless round-trips."), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"])])))
+
+add("GET", "/api/files/{id}/preview/media", operation("Stream passive media preview (Range supported, preview ACL)", "Files", "previewMedia", security=SESSION,
+    params=[id_param("id", "File id.")],
+    responses={"200": {"description": "Verified image/video/audio bytes with Content-Disposition: inline. Supports Range, ETag and If-Range.",
+                       "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}},
+               "206": {"description": "Partial media content for seek."},
+               "401": {"description": ERR["401"]}, "403": {"description": ERR["403"]},
+               "404": {"description": ERR["404"]}, "415": {"description": "Unsupported or unsafe inline format."},
+               "416": {"description": "Unsatisfiable media Range."}}))
 
 add("POST", "/api/files/{id}/save", operation("Save new file content (new version, idempotent)", "Files", "saveFile", security=SESSION,
     params=[id_param("id", "File id.")],

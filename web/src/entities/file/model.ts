@@ -33,6 +33,8 @@ export type PreviewData={
  size:number;
  sha256:string;
  textual:boolean;
+ renderer?:"text"|"image"|"video"|"audio"|"unsupported";
+ mediaType?:string;
  truncated:boolean;
  content:string;
  // Exact preview-prefix bytes (BOM included), base64. Only present for

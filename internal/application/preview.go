@@ -1,13 +1,12 @@
 package application
 
 import (
-	"bytes"
 	"context"
+	"encoding/base64"
+	"errors"
 	"io"
+
 	"filesmanage/internal/domain"
-	"path/filepath"
-	"strings"
-	"time"
 )
 
 // Preview use case and byte-fidelity helpers (SPEC §8.2). The download endpoint
@@ -26,18 +25,23 @@ type Preview struct {
 	Truncated   bool
 	ByteMeta    ByteMeta
 	Textual     bool
+	Renderer    string
+	MediaType   string
+	RawBase64   string
 }
+
+var ErrPreviewUnsupported = errors.New("inline preview format not supported")
 
 // ByteMeta records the fidelity facts a consumer must know before editing.
 type ByteMeta struct {
-	Size         int64  `json:"size"`
-	Sha256       string `json:"sha256"`
-	Encoding     string `json:"encoding"`
-	HasBOM       bool   `json:"hasBom"`
-	EOL          string `json:"eol"`
-	EndsWithLF   bool   `json:"endsWithNewline"`
-	Printable    bool   `json:"printable"`
-	RawBase64    string `json:"rawBase64,omitempty"`
+	Size       int64  `json:"size"`
+	Sha256     string `json:"sha256"`
+	Encoding   string `json:"encoding"`
+	HasBOM     bool   `json:"hasBom"`
+	EOL        string `json:"eol"`
+	EndsWithLF bool   `json:"endsWithNewline"`
+	Printable  bool   `json:"printable"`
+	RawBase64  string `json:"rawBase64,omitempty"`
 }
 
 // AnalyzeBytes is the pure part of preview metadata: encoding, BOM, dominant
@@ -157,17 +161,32 @@ func (s *Service) Preview(ctx context.Context, u domain.User, fileID string) (Pr
 	preview := Preview{
 		FileID: file.ID, Name: file.Name, ContentType: file.ContentType,
 		Size: blob.SizeBytes, Sha256: blob.Sha256,
-		Textual: looksTextual(file.Name, file.ContentType),
-	}
-	if !preview.Textual {
-		preview.ByteMeta = AnalyzeBytes(nil, blob.SizeBytes, blob.Sha256)
-		return preview, nil
+		Textual: looksTextual(file.Name, file.ContentType), Renderer: "unsupported",
 	}
 	reader, err := s.blobs.Open(blob.StorageKey)
 	if err != nil {
 		return Preview{}, err
 	}
 	defer reader.Close()
+	header := make([]byte, 512)
+	n, readErr := io.ReadFull(reader, header)
+	if readErr != nil && readErr != io.EOF && readErr != io.ErrUnexpectedEOF {
+		return Preview{}, readErr
+	}
+	preview.Renderer, preview.MediaType = BrowserMedia(header[:n])
+	if preview.Renderer != "unsupported" {
+		preview.Textual = false
+		preview.ByteMeta = AnalyzeBytes(nil, blob.SizeBytes, blob.Sha256)
+		return preview, nil
+	}
+	if !preview.Textual {
+		preview.ByteMeta = AnalyzeBytes(nil, blob.SizeBytes, blob.Sha256)
+		return preview, nil
+	}
+	preview.Renderer = "text"
+	if _, err = reader.Seek(0, io.SeekStart); err != nil {
+		return Preview{}, err
+	}
 	buf := make([]byte, PreviewLimit)
 	read := 0
 	for read < len(buf) {
@@ -180,36 +199,32 @@ func (s *Service) Preview(ctx context.Context, u domain.User, fileID string) (Pr
 	data := buf[:read]
 	preview.Truncated = int64(read) < blob.SizeBytes
 	preview.Content, preview.ByteMeta = PreviewBytes(data, blob.SizeBytes, blob.Sha256)
+	preview.RawBase64 = base64.StdEncoding.EncodeToString(data)
 	return preview, nil
 }
 
-// OpenPreviewBytes streams the preview prefix for the transport layer.
-func (s *Service) OpenPreviewBytes(ctx context.Context, u domain.User, fileID string) (io.ReadSeekCloser, string, int64, func(), error) {
-	tx, err := s.uow.Begin(ctx)
+// OpenInlinePreview streams only signature-verified passive media. Each
+// request, including Range requests, re-evaluates the preview ACL.
+func (s *Service) OpenInlinePreview(ctx context.Context, u domain.User, fileID string) (Download, string, func(), error) {
+	download, done, err := s.openFileBytes(ctx, u, fileID, domain.ActionPreview)
 	if err != nil {
-		return nil, "", 0, nil, err
+		return Download{}, "", nil, err
 	}
-	defer tx.Rollback(ctx)
-	file, err := s.visibleFile(ctx, tx, u, fileID, domain.ActionPreview)
-	if err != nil {
-		return nil, "", 0, nil, err
+	header := make([]byte, 512)
+	n, readErr := io.ReadFull(download.Reader, header)
+	if readErr != nil && readErr != io.EOF && readErr != io.ErrUnexpectedEOF {
+		done()
+		return Download{}, "", nil, readErr
 	}
-	version, err := tx.VersionBySeq(ctx, file.ID, currentSeq(file))
-	if err != nil {
-		return nil, "", 0, nil, domain.ErrNotFound
+	renderer, mime := BrowserMedia(header[:n])
+	if renderer == "unsupported" {
+		done()
+		return Download{}, "", nil, ErrPreviewUnsupported
 	}
-	blob, err := tx.BlobByID(ctx, version.BlobID)
-	if err != nil {
-		return nil, "", 0, nil, domain.ErrNotFound
+	if _, err := download.Reader.Seek(0, io.SeekStart); err != nil {
+		done()
+		return Download{}, "", nil, err
 	}
-	reader, err := s.blobs.Open(blob.StorageKey)
-	if err != nil {
-		return nil, "", 0, nil, err
-	}
-	return reader, file.Name, blob.SizeBytes, func() { _ = reader.Close() }, nil
+	download.ContentType = mime
+	return download, renderer, done, nil
 }
-
-var _ = bytes.MinRead
-var _ = filepath.Ext
-var _ = strings.TrimSpace
-var _ = time.Now

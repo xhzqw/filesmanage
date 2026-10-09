@@ -21,7 +21,8 @@ export const fileApi={
   return request<FilePage>("/files?"+query.toString());
  },
  meta:(id:string)=>request<{file:FileItem;versions:FileVersion[]}>("/files/"+id),
- preview:(id:string)=>request<PreviewData>("/files/"+id+"/preview"),
+	preview:(id:string)=>request<PreviewData>("/files/"+id+"/preview"),
+	mediaUrl:(id:string,sha:string)=>"/api/files/"+encodeURIComponent(id)+"/preview/media?v="+encodeURIComponent(sha),
  versions:(id:string)=>request<FileVersion[]>("/files/"+id+"/versions"),
  rename:(id:string,name:string)=>request<FileItem>("/files/"+id,{method:"PATCH",body:JSON.stringify({name})}),
  remove:(id:string)=>request<{id:string;oldName:string}>("/files/"+id,{method:"DELETE"}),
