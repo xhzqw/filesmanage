@@ -128,7 +128,7 @@ async function logoutThroughUi(cdp) {
 }
 
 // ================= PAGED suite (ADR-UX-07, DI-07/WF-10 above the 300-folder threshold) =================
-async function pagedSuite() {
+async function pagedSuite(cookie) {
   const stamp = String(Date.now());
   const json = async (method, path, body) => {
     const res = await fetch(BASE + path, {
@@ -788,7 +788,7 @@ async function main() {
     });
 
     // ================= MENU suite (g3_menu_smoke.mjs, 12 checks) =================
-    await runSuite("PAGED", pagedSuite);
+    await runSuite("PAGED", () => pagedSuite(cookie));
     await runSuite("MENU", async () => {
       await cdp.navigate(`${BASE}/doc?folder=${menuFolderId}`);
       const rowsReady = await cdp.waitFor(`()=>document.querySelectorAll('tbody tr[data-id]').length>=3`);
