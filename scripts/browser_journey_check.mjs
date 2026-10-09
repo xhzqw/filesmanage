@@ -193,8 +193,10 @@ async function main() {
     check("upload input present", Boolean(inputPresent), "input[type=file]");
     if (inputPresent) {
       await cdp.setFileInputFiles("input[type=file]", uploadPath);
+      // The upload queue shows the file name first; the table row lands after
+      // the committed reload, so wait for the row itself, not the page text.
       const uploaded = await cdp.waitFor(
-        `()=>document.body.textContent?.includes('journey-${stamp}.txt')`, 20000);
+        `()=>[...document.querySelectorAll('tbody tr')].some(tr=>tr.textContent?.includes('journey-${stamp}.txt'))`, 30000);
       check("file uploaded through the UI", Boolean(uploaded), "row visible in the table");
     } else {
       check("file uploaded through the UI", false, "no upload input");
