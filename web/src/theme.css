@@ -4,7 +4,7 @@ button:focus-visible,input:focus-visible,a:focus-visible,select:focus-visible{ou
 button{border:1px solid #D1E1EC;background:white;padding:8px 14px;border-radius:7px}
 button:hover{background:#E8F5FD}
 .login-bg{height:100vh;display:grid;place-items:center}.login-card{background:#fff;border:1px solid #D1E1EC;max-width:440px;width:92%;padding:36px;border-radius:14px;box-shadow:0 9px 25px #17409813}
-.login-logo{display:block;width:88px;height:88px;margin:0 0 20px}
+.brand-lockup{text-align:center;margin-bottom:20px}.login-logo{display:block;width:88px;height:88px;margin:0 auto 12px}
 .organization{color:#174098;font-weight:bold}.login-card h1{font-size:24px;margin:9px 0}.login-card p{color:#53677D}.login-card form{display:grid;gap:10px;margin-top:22px}
 .login-card input{border:1px solid #B4CADB;border-radius:8px;padding:12px;margin-bottom:7px}.login-card label{font-weight:600}
 .primary{background:#174098;color:white;border:0;border-radius:8px;padding:10px 16px;font-weight:700;display:inline-block;text-align:center}.primary:disabled{opacity:.5}

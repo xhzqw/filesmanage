@@ -20,8 +20,7 @@ export function FirstSignIn({onSuccess,onExit}:{onSuccess:(u:User)=>void;onExit:
   }
   return <main className="login-bg">
     <section className="login-card" aria-label="首次登录安全设置">
-      <BrandLogo size={88} className="login-logo"/>
-      <span className="organization">中晟生物科技</span>
+      <div className="brand-lockup"><BrandLogo size={88} className="login-logo"/><span className="organization">中晟生物科技</span></div>
       <h1>首次登录安全设置</h1>
       <p>首次登录必须更新初始凭据，完成前不能访问业务目录。</p>
       <form onSubmit={submit}>

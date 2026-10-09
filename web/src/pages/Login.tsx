@@ -9,9 +9,7 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
   try{onSuccess(await authApi.login(login,password));}catch{setError("账号或密码错误，或服务暂不可用");}finally{setBusy(false);}
  }
  return <main className="login-bg"><div className="login-card">
-  <BrandLogo size={88} className="login-logo"/>
-  <span className="organization">中晟生物科技</span><h1>文档管理系统</h1>
-  <p>机械设计与工程文件的安全协作系统</p>
+  <div className="brand-lockup"><BrandLogo size={88} className="login-logo"/><span className="organization">中晟生物科技</span></div>
   <form onSubmit={submit}><label htmlFor="username">账号</label>
   <input id="username" autoComplete="username" required value={login} onChange={e=>setLogin(e.target.value)}/>
   <label htmlFor="password">密码</label>
