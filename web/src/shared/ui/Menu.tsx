@@ -41,7 +41,9 @@ export function Menu({open,onClose,items,anchor,label,point}:{
   const menu=node.current;
   if(!menu)return;
   const first=enabledItems(menu)[0];
-  (first??menu).focus();
+  // Focus should never scroll the grid beneath the popup: scroll listeners
+  // dismiss the menu, so focus-induced scrolling can close it on opening.
+  (first??menu).focus({preventScroll:true});
   entered.current=true;
  },[open]);
 

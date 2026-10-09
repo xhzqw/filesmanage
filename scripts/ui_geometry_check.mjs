@@ -329,10 +329,16 @@ try{
      if(await evaluate(`!!document.querySelector(".more-trigger")`))break;
      await delay(100);
     }
-    const opened=await evaluate(`(()=>{
+    const actionScrolled=await evaluate(`(()=>{
      const button=document.querySelector(".more-trigger");
      if(!button)return false;
      button.scrollIntoView({block:"nearest",inline:"end"});
+     return true;
+    })()`);
+    await delay(240);
+    const opened=await evaluate(`(()=>{
+     const button=document.querySelector(".more-trigger");
+     if(!button)return false;
      button.click();
      return true;
     })()`);
@@ -365,7 +371,7 @@ try{
        radius:parseFloat(getComputedStyle(el).borderTopLeftRadius)};
     })()`);
     check("phone 390px edit dialog fits and is rounded",
-     opened&&dialog&&dialog.left>=0&&dialog.right<=390&&dialog.radius>=18,
+      actionScrolled&&opened&&dialog&&dialog.left>=0&&dialog.right<=390&&dialog.radius>=18,
      JSON.stringify(dialog));
     await evaluate(`(()=>document.querySelector("dialog.dialog[open] button[type=button]")?.click())()`);
     await navigate("/preview/"+fixture.fileId,".media-preview");
