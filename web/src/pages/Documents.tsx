@@ -94,7 +94,11 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
     onManageGrants={folder=>setGrantFolder(folder)}
     onManagePolicy={folder=>setPolicyFolder(folder)}/>}</aside>
    <main className="work">
-   {status==="ready"&&selected&&<DropZone folderId={selected.id} onCommitted={()=>setReloadKey(k=>k+1)}>
+   {/* The work area is gated on the resolved folder, not on the tree load
+       state: a reloadKey cycle keeps the previous folders until the fresh
+       tree lands, so the explorer (and any in-flight upload queue) is not
+       torn down and remounted on every folder change. */}
+   {selected&&<DropZone folderId={selected.id} onCommitted={()=>setReloadKey(k=>k+1)}>
      <nav className="breadcrumb" aria-label="当前位置">
       <span>文档管理</span>
       {ancestorPath(folders,selected.id).map((folder,index,chain)=><span key={folder.id}>
@@ -109,7 +113,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
       onManageGrants={()=>setGrantFolder(actionsFolder??selected)} onManagePolicy={()=>setPolicyFolder(actionsFolder??selected)}/></div>
      <FileTable folder={selected.id} folderName={selected.name} onEdit={setEditingId} reloadKey={reloadKey}/>
    </DropZone>}
-   {status==="ready"&&!selected&&<p className="empty">当前账号没有可访问的目录，请联系管理员授权。</p>}
+   {!selected&&status!=="loading"&&<p className="empty">当前账号没有可访问的目录，请联系管理员授权。</p>}
    </main></div>
    {grantFolder&&<GrantDialog folder={grantFolder} subjects={subjects} onClose={()=>setGrantFolder(null)}/>}
    {policyFolder&&<PolicyDialog folder={policyFolder} approvers={subjects} onClose={()=>setPolicyFolder(null)}/>}

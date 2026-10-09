@@ -162,7 +162,14 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onDelete
     // focusin bubbles: only the treeitem that is itself the focus target may
     // claim the focus state, otherwise an ancestor would overwrite it.
     onFocus={event=>{if(event.target===event.currentTarget)setFocusedId(f.id);}}
-    onContextMenu={event=>{event.preventDefault();openNodeMenu(f,{x:event.clientX,y:event.clientY});}}>
+    // contextmenu bubbles too: only the innermost treeitem under the pointer
+    // owns the menu, otherwise an ancestor would retarget it.
+    onContextMenu={event=>{
+     const owner=(event.target as HTMLElement|null)?.closest?.('li[role="treeitem"]');
+     if(owner!==event.currentTarget)return;
+     event.preventDefault();
+     openNodeMenu(f,{x:event.clientX,y:event.clientY});
+    }}>
     <div className={"tree-row "+(f.id===selected?"on":"")} style={{paddingLeft:String(depth*16)+"px"}}>
      <button aria-label={isExpanded?"折叠":"展开"} tabIndex={-1}
       onClick={()=>toggle(f.id)}>{children.length?(isExpanded?"▾":"▸"):" "}</button>
