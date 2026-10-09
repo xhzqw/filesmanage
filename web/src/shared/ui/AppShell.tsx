@@ -1,6 +1,9 @@
 import {useState,type ReactNode} from "react";
 import {Link,useLocation} from "react-router-dom";
-import type {User} from "../../entities/user/model";
+
+// The shell only needs the display name; keeping the type structural avoids a
+// shared -> entities dependency, which the architecture gate forbids.
+type ShellUser={displayName:string};
 
 // DEC-14 brand shell: blue/white engineering palette, yellow folder SVG icons,
 // and an explicit placeholder for the official logo until the asset is
@@ -30,7 +33,7 @@ const NAV=[
 // VIS-09): one brand block, one navigation, one identity/exit area. Pages may
 // add `actions` (page-specific header buttons) and a `product` subtitle; they
 // must not draw their own header.
-export function AppShell({user,onLogout,product,actions,children}:{user:User;onLogout:()=>void;product?:string;actions?:ReactNode;children:ReactNode}){
+export function AppShell({user,onLogout,product,actions,children}:{user:ShellUser;onLogout:()=>void;product?:string;actions?:ReactNode;children:ReactNode}){
  const[open,setOpen]=useState(false);
  return <div className="shell">
   <header className="header">
