@@ -183,6 +183,8 @@ async function moveSuite() {
 
 // ================= WORKFLOW suite (g4_workflow_smoke.mjs, 15 checks) =================
 async function workflowSuite() {
+  const ROLL_NAME = `g4-roll-${stamp}.txt`;
+  const APPROVE_NAME = `g4-approve-${stamp}.txt`;
   const tree = await call("GET", "/api/folders/tree");
   const root = (tree.body?.data ?? []).find((f) => !f.parentId);
   const me = (await call("GET", "/api/me")).body?.data;
@@ -614,7 +616,8 @@ async function moveUiSuite() {
     check("WF-05 switching target re-disables 确认移动", btn && btn.disabled === true, JSON.stringify(btn));
     await searchSelect(`MV-DST-${stamp}`);
     await picker(`[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='检查并继续')?.click();return true;`);
-    await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));const b=d?[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='确认移动'):null;return b&&!b.disabled?true:false;}`, 15000);
+    const rechecked = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));const b=d?[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='确认移动'):null;return b&&!b.disabled?true:false;}`, 15000);
+    check("WF-05 re-checking the new target re-enables 确认移动", rechecked === true, String(rechecked));
     await picker(`[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='确认移动')?.click();return true;`);
     const moved = await cdp.waitFor(`()=>![...document.querySelectorAll('dialog.dialog')].some(d=>d.open&&d.querySelector('.folder-picker'))`, 20000);
     check("WF-03 dialog closes after commit", moved === true, String(moved));
