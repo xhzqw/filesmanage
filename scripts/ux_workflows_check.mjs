@@ -679,6 +679,196 @@ async function moveUiSuite() {
   }
 }
 
+// ================= G4UI suite (WF-21..23, WF-29, ACL-01..05 through the UI) =================
+async function g4UiSuite() {
+  const stamp = String(Date.now());
+  const tree = await call("GET", "/api/folders/tree");
+  const root = (tree.body?.data ?? []).find((f) => !f.parentId);
+  const folderId = (await call("POST", "/api/folders", { name: `G4-${stamp}`, parentId: root.id })).body?.data?.id;
+  const form = new FormData();
+  form.set("folderId", folderId);
+  form.set("file", new Blob([`g4 ${stamp}\n`]), `g4-${stamp}.txt`);
+  form.set("idempotencyKey", "g4-" + stamp);
+  const uploaded = (await (await fetch(`${BASE}/api/files`, { method: "POST", headers: { Origin: ORIGIN, Cookie: sessionCookie }, body: form })).json()).data;
+  let chrome = null;
+  let cdp = null;
+  chrome = spawn("/usr/bin/google-chrome", [
+    "--headless=new", `--remote-debugging-port=${PORT}`, "--no-sandbox",
+    "--disable-gpu", "--window-size=1440,900", "about:blank",
+  ], { stdio: "ignore" });
+  try {
+    await delay(1500);
+    const targets = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
+    const page = targets.find((t) => t.type === "page");
+    cdp = await CDP.connect(page.webSocketDebuggerUrl);
+    await cdp.send("Page.enable");
+    await cdp.send("Runtime.enable");
+    await cdp.send("Page.bringToFront");
+    await cdp.send("Emulation.setFocusEmulationEnabled", { enabled: true });
+
+    await cdp.navigate(`${BASE}/login`);
+    await cdp.evaluate(`(()=>{
+      const set=(el,v)=>{const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));};
+      const fields=[...document.querySelectorAll('input')];
+      const user=fields.find(f=>f.type==='text'||f.type==='email'||(!f.type&&f.offsetParent!==null));
+      const pass=document.querySelector('input[type=password]');
+      if(user)set(user,'admin');
+      if(pass)set(pass,${JSON.stringify(password)});
+      [...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='登录')?.click();return true;})()`);
+    await cdp.waitFor(`()=>location.pathname==='/doc'||location.pathname==='/first-sign-in'`);
+
+    // ---- WF-23: favorite toggle from the file row ----
+    await cdp.navigate(`${BASE}/doc?folder=${folderId}`);
+    const rowReady = await cdp.waitFor(`()=>[...document.querySelectorAll('tbody tr[data-id]')].some(r=>r.textContent?.includes('g4-${stamp}.txt'))`, 20000);
+    check("fixture file listed", Boolean(rowReady), String(rowReady));
+    const favButton = () => cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr[data-id]')].find(r=>r.textContent?.includes('g4-${stamp}.txt'));const b=row?[...row.querySelectorAll('.row-actions button')].find(x=>x.textContent?.trim()==='关注'||x.textContent?.trim()==='已关注'):null;return b?b.textContent.trim():null;})()`);
+    check("WF-23 favorite action present on the file row", (await favButton()) === "关注", String(await favButton()));
+    await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr[data-id]')].find(r=>r.textContent?.includes('g4-${stamp}.txt'));[...row.querySelectorAll('.row-actions button')].find(x=>x.textContent?.trim()==='关注')?.click();return true;})()`);
+    const favorited = await cdp.waitFor(`()=>{const row=[...document.querySelectorAll('tbody tr[data-id]')].find(r=>r.textContent?.includes('g4-${stamp}.txt'));const b=row?[...row.querySelectorAll('.row-actions button')].find(x=>x.textContent?.trim()==='已关注'):null;return Boolean(b);}`, 15000);
+    check("WF-23 toggle reflects the server state", favorited === true, String(favorited));
+    const favList = await call("GET", "/api/favorites");
+    check("WF-23 favorite recorded server-side",
+      (favList.body?.data ?? []).some((f) => f.resourceName === `g4-${stamp}.txt`), JSON.stringify((favList.body?.data ?? []).map((f) => f.resourceName)));
+
+    // ---- WF-21: share wizard through the collaboration panel ----
+    await cdp.navigate(`${BASE}/workspace`);
+    const panelReady = await cdp.waitFor(`()=>document.body.textContent?.includes('创建分享')`, 20000);
+    check("collaboration panel offers 创建分享", Boolean(panelReady), String(panelReady));
+    await cdp.evaluate(`(()=>{[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='创建分享')?.click();return true;})()`);
+    // the panel switches to its inline workbench: filter the visible tree, pick the fixture folder
+    const benchReady = await cdp.waitFor(`()=>document.querySelector('#share-picker-filter')!==null`, 10000);
+    check("WF-21 resource workbench opens", benchReady === true, String(benchReady));
+    await cdp.evaluate(`(()=>{
+      const search=document.querySelector('#share-picker-filter');
+      const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
+      set.call(search,${JSON.stringify(`G4-${stamp}`)});
+      search.dispatchEvent(new Event('input',{bubbles:true}));
+      return true;})()`);
+    await delay(500);
+    const folderPicked = await cdp.evaluate(`(()=>{
+      const btn=[...document.querySelectorAll('.share-picker-row')].find(b=>b.textContent?.includes(${JSON.stringify(`G4-${stamp}`)}));
+      btn?.click();return Boolean(btn);})()`);
+    await delay(300);
+    const chosenRaw = await cdp.evaluate(`(()=>document.querySelector('.share-chosen')?.textContent||'')()`);
+    console.log("DEBUG chosenRaw:", typeof chosenRaw, JSON.stringify(chosenRaw));
+    const chosenShown = typeof chosenRaw === "string" ? chosenRaw : String(chosenRaw ?? "");
+    check("WF-21 chosen resource shown with its name", folderPicked === true && chosenShown.includes(`G4-${stamp}`), String(chosenShown));
+    await cdp.evaluate(`(()=>{[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='分享…')?.click();return true;})()`);
+    // the share dialog: recipient kind + real recipient list + actions + submit
+    const shareDialog = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('分享'));return d?d.textContent.slice(0,80):false;}`, 10000);
+    check("WF-21 share dialog opens with the chosen resource", Boolean(shareDialog), String(shareDialog));
+    const recipientsReady = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('创建分享'));return d&&d.querySelectorAll('.share-recipient-list [role=radio]').length>=1?true:false;}`, 15000);
+    check("WF-21 recipient list loaded from the real endpoint", recipientsReady === true, String(recipientsReady));
+    const recipientState = await cdp.evaluate(`(()=>{
+      const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('创建分享'));
+      if(!d)return {dialog:false};
+      const radios=[...d.querySelectorAll('.share-recipient-list [role=radio]')];
+      const checked=[...d.querySelectorAll('input[type=checkbox]')].filter(c=>c.checked).length;
+      return {dialog:true,recipients:radios.length,first:radios[0]?radios[0].textContent?.trim():'',checkedActions:checked};})()`);
+    check("WF-21 recipient picker lists real users with default actions",
+      recipientState.dialog === true && recipientState.recipients >= 1 && recipientState.checkedActions >= 1,
+      JSON.stringify(recipientState));
+    await cdp.evaluate(`(()=>{
+      const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('创建分享'));
+      const radio=d.querySelector('.share-recipient-list [role=radio]');
+      radio?.click();return Boolean(radio);})()`);
+    await delay(300);
+    await cdp.evaluate(`(()=>{
+      const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('创建分享'));
+      const btn=[...d.querySelectorAll('button')].find(b=>b.textContent?.trim()==='创建分享');
+      btn?.click();return Boolean(btn);})()`);
+    const shareClosed = await cdp.waitFor(`()=>![...document.querySelectorAll('dialog.dialog')].some(d=>d.open&&d.textContent?.includes('创建分享'))`, 20000);
+    check("WF-21 share dialog closes after commit", shareClosed === true, String(shareClosed));
+    const shares = await call("GET", "/api/shares?scope=sent");
+    const created = (shares.body?.data ?? []).find((s) => s.resourceName === `G4-${stamp}`);
+    check("WF-21 share recorded server-side with the chosen resource and recipient",
+      Boolean(created) && created.actions.length >= 1 && Boolean(created.recipientId),
+      JSON.stringify(created ?? null));
+
+    // ---- WF-29: stats scope through the picker ----
+    await cdp.navigate(`${BASE}/stats`);
+    const statsReady = await cdp.waitFor(`()=>document.body.textContent?.includes('选择目录')`, 20000);
+    check("WF-29 stats page offers the directory picker", Boolean(statsReady), String(statsReady));
+    await cdp.evaluate(`(()=>{[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='选择目录')?.click();return true;})()`);
+    const statsPicker = await cdp.waitFor(`()=>[...document.querySelectorAll('dialog.dialog')].some(d=>d.open&&d.querySelector('.folder-picker'))`, 8000);
+    check("WF-29 folder picker opens", statsPicker === true, String(statsPicker));
+    await cdp.evaluate(`(()=>{
+      const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));
+      const search=d.querySelector('.folder-picker-search');
+      const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
+      set.call(search,${JSON.stringify(`G4-${stamp}`)});
+      search.dispatchEvent(new Event('input',{bubbles:true}));
+      return true;})()`);
+    await delay(500);
+    await cdp.evaluate(`(()=>{
+      const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));
+      const btn=[...d.querySelectorAll('.folder-picker-result')].find(b=>b.textContent?.includes(${JSON.stringify(`G4-${stamp}`)}));
+      btn?.click();return Boolean(btn);})()`);
+    await delay(300);
+    await cdp.evaluate(`(()=>{
+      const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));
+      [...d.querySelectorAll('button')].find(b=>b.textContent?.trim()==='应用')?.click();return true;})()`);
+    const applied = await cdp.waitFor(`()=>{const link=document.querySelector('a.primary[href*="exports/files.csv"]');return link&&link.href.includes('folder=')?link.href:false;}`, 15000);
+    check("WF-29 export link carries the chosen folder", typeof applied === "string" && applied.includes("folder="), String(applied));
+    const manualInput = await cdp.evaluate(`(()=>[...document.querySelectorAll('input')].some(i=>i.placeholder==='folder_…'))()`);
+    console.log("DEBUG manualInput:", typeof manualInput, JSON.stringify(manualInput));
+    check("WF-29 manual folder-ID input is gone", manualInput === false, String(manualInput));
+
+    // ---- ACL-01..05: grant dialog recipient sources + expiry ----
+    await cdp.navigate(`${BASE}/doc?folder=${folderId}`);
+    const treeReady2 = await cdp.waitFor(`()=>document.querySelector('li[data-folder-id="${folderId}"]')!==null`, 20000);
+    check("fixture folder in the tree", Boolean(treeReady2), String(treeReady2));
+    await cdp.evaluate(`(()=>{const li=document.querySelector('li[data-folder-id="${folderId}"]');li?.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:80,clientY:300}));return Boolean(li);})()`);
+    await cdp.waitFor(`()=>document.querySelector('[role=menu]')!==null`);
+    await cdp.evaluate(`(()=>{const item=[...document.querySelectorAll('[role=menuitem]')].find(b=>b.textContent?.trim()==='授权管理');item?.click();return Boolean(item);})()`);
+    const grantOpen = await cdp.waitFor(`()=>[...document.querySelectorAll('dialog.dialog')].some(d=>d.open&&d.textContent?.includes('目录授权'))`, 10000);
+    check("ACL grant dialog opens", grantOpen === true, String(grantOpen));
+    const kindOptions = await cdp.evaluate(`(()=>{
+      const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('目录授权'));
+      const selects=[...d.querySelectorAll('select')];
+      return {kinds:selects.length?[...selects[0].options].map(o=>o.value):[],subjects:selects.length>1?[...selects[1].options].map(o=>o.textContent?.trim()).slice(0,4):[]};})()`);
+    check("ACL subject kinds are user/group", JSON.stringify(kindOptions.kinds) === JSON.stringify(["user", "group"]), JSON.stringify(kindOptions));
+    // switch to group: the list must show groups, not user ids
+    await cdp.evaluate(`(()=>{
+      const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('目录授权'));
+      const selects=[...d.querySelectorAll('select')];
+      selects[0].value='group';selects[0].dispatchEvent(new Event('change',{bubbles:true}));
+      return true;})()`);
+    await delay(600);
+    const groupOptions = await cdp.evaluate(`(()=>{
+      const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('目录授权'));
+      const selects=[...d.querySelectorAll('select')];
+      return selects.length>1?[...selects[1].options].map(o=>o.textContent?.trim()):[];})()`);
+    check("ACL-01 group kind lists real workgroups",
+      Array.isArray(groupOptions) && groupOptions.length >= 1 && groupOptions.some(o => o && !o.startsWith("grp_")),
+      JSON.stringify(groupOptions));
+    const expiryPresent = await cdp.evaluate(`(()=>{
+      const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('目录授权'));
+      if(!d)return false;
+      return [...d.querySelectorAll('input')].some(i=>i.type==='datetime-local');})()`);
+    check("ACL-05 expiry control present", expiryPresent === true, String(expiryPresent));
+  } finally {
+    cdp && cdp.close();
+    chrome && chrome.kill("SIGKILL");
+  }
+
+
+  // cleanup
+  const shares = await call("GET", "/api/shares?scope=sent");
+  for (const s of shares.body?.data ?? []) {
+    if (s.resourceName === `G4-${stamp}`) await call("DELETE", `/api/shares/${s.id}`);
+  }
+  await call("DELETE", `/api/favorites/file/${uploaded.fileId}`);
+  await call("DELETE", `/api/folders/${folderId}`);
+  const trash = await call("GET", "/api/trash");
+  for (const entry of trash.body?.data ?? []) {
+    const name = String(entry.name ?? entry.oldName ?? "");
+    if (name === `G4-${stamp}` || name.startsWith(`g4-${stamp}`)) {
+      await call("DELETE", "/api/trash/" + entry.id);
+    }
+  }
+}
+
 async function main() {
   const loginRes = await fetch(`${BASE}/api/login`, {
     method: "POST", headers: { "Content-Type": "application/json" },
@@ -704,6 +894,7 @@ async function main() {
   await runSuite("MOVEUI", moveUiSuite);
   await runSuite("WORKFLOW", workflowSuite);
   await runSuite("SAFE-EDIT", safeEditSuite);
+  await runSuite("G4UI", g4UiSuite);
 
   const failed = results.filter((r) => !r.ok);
   console.log(`SUMMARY pass=${results.length - failed.length} total=${results.length}`);
