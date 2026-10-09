@@ -332,20 +332,30 @@ try{
     const opened=await evaluate(`(()=>{
      const button=document.querySelector(".more-trigger");
      if(!button)return false;
+     button.scrollIntoView({block:"nearest",inline:"end"});
      button.click();
      return true;
-     })()`);
+    })()`);
      await delay(130);
      const rowMenu=await evaluate(`(()=>{
-      const el=document.querySelector(".row-more-menu.open");
+      const el=document.querySelector('[role="menu"][aria-label="文件操作菜单"]');
       if(!el)return null;
-      const s=getComputedStyle(el);
-      return {radius:parseFloat(s.borderTopLeftRadius),shadow:s.boxShadow};
+      const s=getComputedStyle(el),r=el.getBoundingClientRect();
+      return {radius:parseFloat(s.borderTopLeftRadius),shadow:s.boxShadow,
+       left:r.left,right:r.right,top:r.top,bottom:r.bottom,
+       labels:[...el.querySelectorAll('[role="menuitem"] .menu-label')].map(x=>x.textContent)};
      })()`);
-     check("phone file action menu uses shared overlay geometry",
-      !!rowMenu&&rowMenu.radius>=10&&rowMenu.shadow!=="none",
+     check("phone action-column menu escapes horizontal grid clipping",
+      !!rowMenu&&rowMenu.radius>=10&&rowMenu.shadow!=="none"&&
+      rowMenu.left>=0&&rowMenu.right<=390&&rowMenu.top>=0&&rowMenu.bottom<=760&&
+      rowMenu.labels.includes("重命名")&&rowMenu.labels.includes("移动到…"),
       JSON.stringify(rowMenu));
-     await evaluate(`(()=>{document.querySelector(".row-more-menu.open button")?.click();return true})()`);
+     await evaluate(`(()=>{
+      const menu=document.querySelector('[role="menu"][aria-label="文件操作菜单"]');
+      [...(menu?.querySelectorAll('[role="menuitem"]')??[])]
+       .find(x=>x.querySelector('.menu-label')?.textContent==="重命名")?.click();
+      return true;
+     })()`);
     await delay(220);
     const dialog=await evaluate(`(()=>{
      const el=document.querySelector("dialog.dialog[open]");

@@ -202,7 +202,6 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const[renaming,setRenaming]=useState<FileItem|null>(null);
  const[renameValue,setRenameValue]=useState("");
  const[renameBusy,setRenameBusy]=useState(false);
- const[openRowMoreId,setOpenRowMoreId]=useState<string|null>(null);
  const[selectedIds,setSelectedIds]=useState<Set<string>>(()=>new Set<string>());
  const[focusedId,setFocusedId]=useState<string|null>(null);
  const[anchorId,setAnchorId]=useState<string|null>(null);
@@ -361,16 +360,6 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   setHasMore(page.nextCursor!=="");
  }
 
-  useEffect(()=>{
-   if(!openRowMoreId)return;
-   function onDoc(e:Event){
-    if(!(e.target as HTMLElement)?.closest(".row-more-wrapper")){
-     setOpenRowMoreId(null);
-    }
-   }
-   document.addEventListener("mousedown",onDoc);
-   return()=>document.removeEventListener("mousedown",onDoc);
-  },[openRowMoreId]);
 
   function batchDownload(files:FileItem[]){
    if(files.length===0)return;
@@ -604,8 +593,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   }
  }
 
- function openRowMenu(item:FileItem){
-  const row=document.querySelector<HTMLTableRowElement>(`tbody tr[data-id="${item.id}"]`);
+ function openRowMenu(item:FileItem,trigger?:HTMLElement){
+  const row=trigger??document.querySelector<HTMLTableRowElement>(`tbody tr[data-id="${CSS.escape(item.id)}"]`);
   // The keyboard menu mirrors the mouse scoping: a focused row inside the
   // selection acts on the whole selection, otherwise on the row alone.
   setRowMenu({targets:selectedIds.has(item.id)?selection:[item],point:null,anchor:row});
@@ -840,7 +829,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       <td className="col-name"><div className="file-cell-wrap">
        <FileTypeIcon name={item.name}/><span className="file-name" title={item.name}>{item.name}</span>
        <button type="button" className="file-mobile-actions" aria-label={"操作 "+item.name}
-        title={"文件操作："+item.name} onClick={event=>{event.stopPropagation();openRowMenu(item);}}>···</button>
+        title={"文件操作："+item.name} aria-haspopup="menu"
+        onClick={event=>{event.stopPropagation();openRowMenu(item,event.currentTarget);}}>···</button>
       </div></td>
       <td className="col-size num">{formatSize(item.sizeBytes)}</td>
       <td className="col-version"><span className="version-badge">v{item.currentVersionSeq}</span></td>
@@ -850,14 +840,9 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
         <button type="button" className="action-link" onClick={()=>navigate("/preview/"+item.id)}>打开</button>
         <a href={"/api/files/"+item.id+"/bytes"} download={item.name} className="action-link">下载</a>
         <button type="button" className="action-link" onClick={()=>onEdit(item.id)}>编辑</button>
-        <div className="row-more-wrapper">
-         <button type="button" className="action-link more-trigger" aria-label="更多操作" aria-expanded={openRowMoreId===item.id}
-          onClick={()=>setOpenRowMoreId(prev=>prev===item.id?null:item.id)}>···</button>
-         <div className={"row-more-menu"+(openRowMoreId===item.id?" open":"")} role="menu">
-          <button type="button" role="menuitem" onClick={()=>{setOpenRowMoreId(null);setRenaming(item);setRenameValue(item.name);}}>重命名</button>
-          <button type="button" role="menuitem" className="danger" onClick={()=>{setOpenRowMoreId(null);setPendingDelete([item]);}}>删除</button>
-         </div>
-        </div>
+        <button type="button" className="action-link more-trigger"
+         aria-label={"更多操作："+item.name} aria-haspopup="menu"
+         onClick={event=>openRowMenu(item,event.currentTarget)}>···</button>
        </div>
        <button type="button"
         className={"action-star-btn"+(favoriteIds.has(item.id)?" favorited":"")}

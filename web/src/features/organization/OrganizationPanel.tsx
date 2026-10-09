@@ -19,6 +19,8 @@ const MAX_DEPTH=32;
 const CANDIDATE_CAP=50;
 const DEPT_HIT_CAP=30;
 const LIST_CAP=1000;
+const MEMBER_DISPLAY_STEP=100;
+const GROUP_DISPLAY_STEP=60;
 
 function loginOf(user:User):string{return user.login??"";}
 
@@ -138,10 +140,12 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  const[focusedId,setFocusedId]=useState<string|null>(null);
  const[memberQuery,setMemberQuery]=useState("");
  const[statusFilter,setStatusFilter]=useState<StatusFilter>("all");
+ const[memberLimit,setMemberLimit]=useState(MEMBER_DISPLAY_STEP);
 
  // 工作组状态
  const[selectedGroup,setSelectedGroup]=useState("");
  const[groupQuery,setGroupQuery]=useState("");
+ const[groupLimit,setGroupLimit]=useState(GROUP_DISPLAY_STEP);
  const[groupMembers,setGroupMembers]=useState<User[]>([]);
  const[membersState,setMembersState]=useState<LoadState>("loading");
  const[membersToken,setMembersToken]=useState(0);
@@ -310,6 +314,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    return matchesQuery(user,needle);
   });
  },[users,activeDeptIds,selectedDepartment,deptById,statusFilter,needle]);
+ useEffect(()=>setMemberLimit(MEMBER_DISPLAY_STEP),[selectedDepartment,statusFilter,memberQuery]);
 
  const deptHits=useMemo(()=>{
   const keyword=deptQuery.trim().toLowerCase();
@@ -323,6 +328,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   if(keyword==="")return groups;
   return groups.filter(g=>g.name.toLowerCase().includes(keyword));
  },[groups,groupQuery]);
+ useEffect(()=>setGroupLimit(GROUP_DISPLAY_STEP),[groupQuery]);
 
  const selectedGroupRow=groups.find(g=>g.id===selectedGroup)??null;
 
@@ -820,7 +826,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
        </select>
        {usersState==="failed"&&<button type="button" className="secondary-action" onClick={()=>setUsersToken(token=>token+1)}>重新读取用户</button>}
       </div>
-      <span className="toolbar-hint">共 {filteredMembers.length} 位成员</span>
+      <span className="toolbar-hint">显示 {Math.min(memberLimit,filteredMembers.length)} / {filteredMembers.length} 位成员</span>
      </div>
 
      {notice&&notice.tone==="error"&&usersState==="failed"&&<p role="alert" className="notice error">{notice.text}</p>}
@@ -838,7 +844,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
         </tr>
        </thead>
        <tbody>
-        {filteredMembers.map(user=><tr key={user.id}>
+        {filteredMembers.slice(0,memberLimit).map(user=><tr key={user.id}>
          <td>
           <div className="org-user-cell">
            <span className="org-avatar" aria-hidden="true">{user.displayName.slice(0,1)}</span>
@@ -873,6 +879,12 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
        </tbody>
       </table>
      </div>
+     {filteredMembers.length>memberLimit&&<div className="org-list-more">
+      <span className="hint">已显示 {memberLimit} / {filteredMembers.length} 位成员</span>
+      <button type="button" onClick={()=>setMemberLimit(limit=>limit+MEMBER_DISPLAY_STEP)}>
+       显示更多成员
+      </button>
+     </div>}
 
      {usersReady&&users.length>=LIST_CAP&&<p className="hint" style={{padding:"4px 12px"}}>服务端单次最多返回 {LIST_CAP} 个账号，列表可能未显示全部。</p>}
 
@@ -945,7 +957,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
       {groupsReady&&groups.length===0&&<p className="empty" style={{padding:"16px 12px"}}>暂无工作组，可点上方“新建”创建。</p>}
 
       {groupsReady&&groups.length>0&&<ul className="org-group-cards-list">
-       {filteredGroups.map(group=>{
+       {filteredGroups.slice(0,groupLimit).map(group=>{
         const isSelected=group.id===selectedGroup;
         return <li key={group.id}>
          <button type="button" className={"org-group-card"+(isSelected?" active":"")}
@@ -964,6 +976,10 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
        })}
        {filteredGroups.length===0&&<li className="empty">没有匹配的工作组。</li>}
       </ul>}
+      {filteredGroups.length>groupLimit&&<div className="org-list-more">
+       <span className="hint">已显示 {groupLimit} / {filteredGroups.length} 个工作组</span>
+       <button type="button" onClick={()=>setGroupLimit(limit=>limit+GROUP_DISPLAY_STEP)}>显示更多工作组</button>
+      </div>}
      </div>
 
      {/* 右侧：所选工作组详情与成员维护 */}

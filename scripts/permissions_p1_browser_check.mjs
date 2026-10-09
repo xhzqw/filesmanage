@@ -108,6 +108,54 @@ try{
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-effective')"),"server explanation appears after user selection");
  const actions=await cdp.evaluate("(()=>document.querySelectorAll('.perm-action-token').length)()");
  assert(Number.isInteger(actions)&&actions>=0,"effective actions are rendered as read-only labels");
+ // Do not create an ACL entry: drive only the form's preview and consent gate.
+ assert(await cdp.waitFor("()=>document.querySelector('.perm-form')&&!document.querySelector('.perm-form select').disabled"),
+  "direct ACL form available for review");
+ await cdp.evaluate(`(()=>{
+  const subject=document.querySelector('.perm-form select');
+  const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;
+  setter.call(subject,'user');subject.dispatchEvent(new Event('change',{bubbles:true}));
+  return true;
+ })()`);
+ assert(await cdp.waitFor("()=>document.querySelector('.perm-form select')?.value==='user'"),
+  "ACL subject kind changed");
+ assert(await cdp.waitFor("()=>[...document.querySelectorAll('.perm-form select')].some(s=>[...s.options].some(o=>o.value&&o.value!=='user'&&o.value!=='group'&&o.value!=='only'&&o.value!=='subtree'))"),
+  "ACL subject candidates loaded");
+ await cdp.evaluate(`(()=>{
+  const subject=[...document.querySelectorAll('.perm-form select')]
+   .find(s=>s.options[0]?.value==='');
+  const option=[...subject.options].find(o=>o.value);
+  const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;
+  setter.call(subject,option.value);subject.dispatchEvent(new Event('change',{bubbles:true}));
+  return true;
+ })()`);
+ assert(await cdp.waitFor("()=>!!document.querySelector('.perm-form select[required]')?.value"),
+  "direct ACL subject selected");
+ await cdp.evaluate(`(()=>{
+  const risk=[...document.querySelectorAll('.perm-action-grid label')]
+   .find(label=>label.textContent?.includes('下载'))?.querySelector('input');
+  risk?.click();
+  return true;
+ })()`);
+ assert(await cdp.waitFor("()=>[...document.querySelectorAll('.perm-action-grid label')].some(x=>x.textContent?.includes('下载')&&x.querySelector('input')?.checked)"),
+  "high-risk download action selected");
+ await cdp.evaluate("(()=>{document.querySelector('.perm-form').requestSubmit();return true;})()");
+ assert(await cdp.waitFor("()=>!!document.querySelector('.perm-risk-consent')"),
+  "high-risk ACL review shows explicit consent");
+ assert(await cdp.evaluate("(()=>document.querySelector('.perm-form button[type=submit]').disabled)()"),
+  "high-risk ACL cannot be committed without acknowledgement");
+ await cdp.evaluate("(()=>{document.querySelector('.perm-risk-consent').click();return true;})()");
+ assert(await cdp.waitFor("()=>!document.querySelector('.perm-form button[type=submit]').disabled"),
+  "review consent unlocks only the confirm action");
+ await cdp.evaluate(`(()=>{
+  const scope=[...document.querySelectorAll('.perm-form select')]
+   .find(s=>[...s.options].some(o=>o.value==='subtree'));
+  const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;
+  setter.call(scope,'subtree');scope.dispatchEvent(new Event('change',{bubbles:true}));
+  return true;
+ })()`);
+ assert(await cdp.waitFor("()=>!document.querySelector('.perm-risk-consent')"),
+  "editing ACL scope invalidates reviewed consent");
  await cdp.evaluate(`(()=>{
   [...document.querySelectorAll('.perm-subnav button')]
    .find(b=>b.textContent?.includes('审计'))?.click();return true;

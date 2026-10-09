@@ -69,7 +69,7 @@ if(/--(?:radius|shadow)-(?:xs|sm|md|lg|xl|pill|panel|overlay)\s*:/.test(system))
  errors.push("visualSystem.css: shared tokens must be defined only in theme.css");
 }
 const ownership=[
- ".menu",".menu-item",".command-panel",".command-row",".row-more-menu",
+ ".menu",".menu-item",".command-panel",".command-row",
  ".org-card",".org-tabs-nav",".org-tab",".media-preview",".dropzone",
  ".upload-queue",".share-workbench",".perm-workspace",".perm-tree-row",
  ".perm-result",".perm-review",".version-badge",

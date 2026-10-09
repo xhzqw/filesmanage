@@ -158,6 +158,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
  const [expiresAt,setExpiresAt]=useState("");
  const [submitState,setSubmitState]=useState<"edit"|"review"|"saving">("edit");
  const [reviewFolderId,setReviewFolderId]=useState("");
+ const [riskAcknowledged,setRiskAcknowledged]=useState(false);
  const [revokeTarget,setRevokeTarget]=useState<DirectGrant|null>(null);
  const [revokeBusy,setRevokeBusy]=useState(false);
  const [revokeError,setRevokeError]=useState("");
@@ -165,7 +166,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
  // URL navigation is independent of ResourceBrowser selection (back/forward,
  // deep links). Never reuse a confirmation or grant subject across resources.
  useEffect(()=>{
-  setSubmitState("edit");setReviewFolderId("");
+  setSubmitState("edit");setReviewFolderId("");setRiskAcknowledged(false);
   setSubjectId("");setActions(["list"]);setScopeOnly(true);setExpiresAt("");
   setRevokeTarget(null);setRevokeError("");
  },[folderId]);
@@ -192,18 +193,23 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
   return out;
  },[users,groups]);
  const subjectSourceState=subjectKind==="user"?usersState:groupsState;
+ const riskyActions=actions.filter(action=>HIGHRISK.has(action));
+ const needsRiskConsent=riskyActions.length>0;
  const displayActions=(xs:string[])=>xs.map(x=>LABELS.get(x)??x).join("、");
  const reload=()=>setRefresh(x=>x+1);
  function selectFolder(folder:ResourceFolder){
   setSelectedName({id:folder.id,name:folder.path||folder.name});
   setParams(old=>{const next=new URLSearchParams(old);next.set("tab","permissions");next.set("view","folder");next.set("folder",folder.id);return next;});
-  setSubmitState("edit");setRevokeTarget(null);setNotice(null);
+  setSubmitState("edit");setRiskAcknowledged(false);setRevokeTarget(null);setNotice(null);
  }
  async function submit(event:FormEvent<HTMLFormElement>){
   event.preventDefault();
-  if(!folderId||!subjectId||!actions.length||submitState==="saving"||subjectSourceState!=="ready")return;
-  if(submitState!=="review"){setReviewFolderId(folderId);setSubmitState("review");return;}
+  if(!folderId||!subjectId||!actions.length||submitState==="saving"||state!=="ready"||subjectSourceState!=="ready")return;
+  if(submitState!=="review"){
+   setReviewFolderId(folderId);setRiskAcknowledged(false);setSubmitState("review");return;
+  }
   if(reviewFolderId!==folderId){setSubmitState("edit");return;}
+  if(needsRiskConsent&&!riskAcknowledged)return;
   const parsed=expiresAt?Date.parse(expiresAt):null;
   if(parsed!==null&&(!Number.isFinite(parsed)||parsed<=Date.now())){
    setNotice({text:"到期时间必须晚于当前时间",error:true});return;
@@ -267,7 +273,10 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
     </div>}
     <PermissionInsights folderId={folderId} users={users} usersState={usersState} refreshToken={refresh}/>
     <div className="perm-section-title">新增直接授权</div>
-    <form className="perm-form" onSubmit={submit} onChange={()=>{if(submitState==="review")setSubmitState("edit");}}>
+  <form className="perm-form" onSubmit={submit} onChange={event=>{
+   if((event.target as HTMLElement).classList.contains("perm-risk-consent"))return;
+   if(submitState==="review"){setSubmitState("edit");setRiskAcknowledged(false);}
+  }}>
      {usersState==="failed"&&<p role="alert" className="notice error">读取用户列表失败。<button type="button" className="secondary-action" onClick={onRetryUsers}>重试用户列表</button></p>}
      {groupsState==="failed"&&<p role="alert" className="notice error">读取工作组列表失败。<button type="button" className="secondary-action" onClick={onRetryGroups}>重试工作组列表</button></p>}
      {subjectSourceState==="loading"&&<p role="status" className="hint">正在读取可授权主体…</p>}
@@ -278,6 +287,8 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
       <label>授权给<select value={subjectId} required disabled={subjectSourceState!=="ready"} onChange={e=>setSubjectId(e.target.value)}>
        <option value="">请选择</option>{candidates.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
      </div>
+     {subjectSourceState==="ready"&&candidates.length===50&&
+      <p className="perm-hint">最多显示前 50 个匹配主体，请继续输入关键词缩小范围。</p>}
      <fieldset><legend>允许执行的文件动作</legend><div className="perm-action-grid">
       {ACTIONS.map(([key,label])=><label key={key}><input type="checkbox" checked={actions.includes(key)}
        onChange={e=>setActions(old=>e.target.checked?[...old,key]:old.filter(x=>x!==key))}/>{label}</label>)}
@@ -288,13 +299,23 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
       <label>到期时间（可选）<input type="datetime-local" value={expiresAt} onChange={e=>setExpiresAt(e.target.value)}/></label>
      </div>
      {submitState==="review"&&<div className="perm-review" role="status">
-      <strong>请核对授权摘要</strong><p>主体：{names.get(subjectKind+":"+subjectId)??subjectId}；动作：{displayActions(actions)}</p>
+      <strong>请核对授权摘要</strong>
+      <p>资源目录：{selectedName?.id===folderId?selectedName.name:folderId}</p>
+      <p>主体：{names.get(subjectKind+":"+subjectId)??subjectId}（{subjectKind==="user"?"用户":"工作组"}）；动作：{displayActions(actions)}</p>
       <p>范围：{scopeOnly?"仅当前目录":"当前及全部子目录"}；到期：{expiresAt||"不过期"}</p>
-      {actions.some(a=>HIGHRISK.has(a))&&<p>含下载、修改、删除或移动等高影响动作，请确认授权对象及范围。</p>}
+      {needsRiskConsent&&<>
+       <p className="perm-risk-warning" role="alert">高影响权限：{displayActions(riskyActions)}。{scopeOnly
+        ?"将允许主体在当前目录执行这些操作。"
+        :"还会作用于所有子目录，后续新增的子目录也在授权范围内。"}{expiresAt?"":"此授权没有到期时间。"}</p>
+       <label className="perm-risk-confirm"><input className="perm-risk-consent" type="checkbox"
+        checked={riskAcknowledged} onChange={e=>setRiskAcknowledged(e.target.checked)}/>
+        我已核对资源目录、授权主体、操作范围和期限，确认授予以上高影响权限
+       </label>
+      </>}
      </div>}
      <div className="perm-form-actions"><span className="hint">授权效果以服务端判定为准。</span>
-      {submitState==="review"&&<button type="button" className="secondary-action" onClick={()=>setSubmitState("edit")}>返回修改</button>}
-      <button type="submit" className="primary" disabled={submitState==="saving"||!subjectId||!actions.length||state!=="ready"||subjectSourceState!=="ready"}>
+      {submitState==="review"&&<button type="button" className="secondary-action" onClick={()=>{setSubmitState("edit");setRiskAcknowledged(false);}}>返回修改</button>}
+      <button type="submit" className="primary" disabled={submitState==="saving"||!subjectId||!actions.length||state!=="ready"||subjectSourceState!=="ready"||(submitState==="review"&&needsRiskConsent&&!riskAcknowledged)}>
        {submitState==="saving"?"提交中…":submitState==="review"?"确认添加授权":"预览授权"}</button>
      </div>
     </form>

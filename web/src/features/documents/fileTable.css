@@ -178,24 +178,7 @@ table.file-table tbody tr:focus-within .actions-hover-group{
   background:var(--surface-danger-soft) !important;color:var(--status-danger) !important;
 }
 
-.row-more-wrapper{position:relative;display:inline-flex}
 .action-link.more-trigger{width:18px;justify-content:center;font-weight:700}
-.row-more-menu{
-  display:none;position:absolute;top:calc(100% + 2px);right:0;
-  background:var(--surface-panel);border:1px solid var(--border-subtle);
-  border-radius:var(--radius-md);box-shadow:var(--shadow-overlay);
-  z-index:50;min-width:76px;padding:4px;
-}
-.row-more-menu.open{display:flex;flex-direction:column}
-.row-more-menu button{
-  border:none !important;background:transparent !important;text-align:left;
-  padding:3px 8px !important;font-size:11px;color:var(--text-primary);
-  cursor:pointer;width:100%;border-radius:var(--radius-sm);height:auto;min-height:20px;
-  display:flex;align-items:center;
-}
-.row-more-menu button:hover{background:var(--surface-row-hover) !important;color:var(--brand-blue)}
-.row-more-menu button.danger{color:var(--status-danger) !important}
-.row-more-menu button.danger:hover{background:var(--surface-danger-soft) !important;color:var(--status-danger) !important}
 
 /* ---- 字段对齐与细节 ---- */
 .col-size,

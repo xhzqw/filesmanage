@@ -47,6 +47,9 @@
 .perm-form-actions .hint{margin-right:auto}
 .perm-review{border:1px solid var(--border-strong);background:var(--surface-header);padding:10px;font-size:12px;border-radius:var(--radius-md)}
 .perm-review p{margin:5px 0}
+.perm-risk-warning{padding:8px 10px;border-left:3px solid var(--status-warning);background:var(--surface-header);color:var(--text-primary);border-radius:var(--radius-sm);line-height:1.55}
+.perm-risk-confirm{display:flex;align-items:flex-start;gap:8px;margin-top:8px;padding:8px 10px;background:var(--surface-panel);border:1px solid var(--border-strong);border-radius:var(--radius-sm);cursor:pointer;line-height:1.55}
+.perm-risk-confirm input{flex:none;margin-top:2px}
 .perm-subtle{font-size:11px;font-weight:400;color:var(--text-secondary);margin-left:7px}
 .perm-insight{border-top:1px solid var(--border-hairline)}
 .perm-insight-picker{display:flex;gap:10px;align-items:end;flex-wrap:wrap;padding:8px 10px}
