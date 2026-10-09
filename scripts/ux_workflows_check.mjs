@@ -1085,6 +1085,211 @@ async function batchUiSuite() {
   }
 }
 
+// ================= FINALE suite (WF-30 paging, WF-32 org, DI-17 drag-move, WF-21 recipients) =================
+async function finaleSuite() {
+  const stamp = String(Date.now());
+  const json = async (method, path, body) => {
+    const res = await fetch(BASE + path, {
+      method, headers: { "Content-Type": "application/json", Origin: BASE, Cookie: sessionCookie },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return { status: res.status, body: await res.json().catch(() => null) };
+  };
+  let chrome = null;
+  let cdp = null;
+  const tree = await json("GET", "/api/folders/tree");
+  const root = (tree.body?.data ?? []).find((f) => !f.parentId);
+  const mk = async (name) => (await json("POST", "/api/folders", { name, parentId: root.id })).body?.data?.id;
+  const folderId = await mk(`WF-SMOKE-${stamp}`);
+
+  // ---- fixture: 60 files sharing a search token ----
+  const TOKEN = `zzq${stamp}`;
+  for (let i = 0; i < 60; i++) {
+    const form = new FormData();
+    form.set("folderId", folderId);
+    form.set("file", new Blob([`${TOKEN} body ${i}\n`]), `${TOKEN}-${String(i).padStart(3, "0")}.txt`);
+    form.set("idempotencyKey", `${TOKEN}-${i}-${stamp}`);
+    await fetch(`${BASE}/api/files`, { method: "POST", headers: { Origin: BASE, Cookie: sessionCookie }, body: form });
+  }
+  // a second folder with one file for the drag target
+  const targetId = await mk(`WF-TARGET-${stamp}`);
+  const tform = new FormData();
+  tform.set("folderId", targetId);
+  tform.set("file", new Blob([`target ${stamp}\n`]), "wf-target.txt");
+  tform.set("idempotencyKey", "wf-target-" + stamp);
+  await fetch(`${BASE}/api/files`, { method: "POST", headers: { Origin: BASE, Cookie: sessionCookie }, body: tform });
+
+  // ---- API: search cursor ----
+  let r = await json("GET", `/api/search?q=${TOKEN}&limit=50`);
+  let page = r.body?.data ?? {};
+  check("WF-30 first page returns 50 with a cursor",
+    r.status === 200 && (page.items ?? []).length === 50 && typeof page.nextCursor === "string" && page.nextCursor.length > 0,
+    JSON.stringify({ n: (page.items ?? []).length, total: page.total, cursor: String(page.nextCursor).slice(0, 10) }));
+  r = await json("GET", `/api/search?q=${TOKEN}&limit=50&cursor=${encodeURIComponent(page.nextCursor)}`);
+  const page2 = r.body?.data ?? {};
+  const ids1 = new Set((page.items ?? []).map((f) => f.id));
+  const dup = (page2.items ?? []).filter((f) => ids1.has(f.id)).length;
+  check("WF-30 second page appends without duplicates",
+    r.status === 200 && (page2.items ?? []).length === 10 && dup === 0 && page2.nextCursor === "",
+    JSON.stringify({ n: (page2.items ?? []).length, dup, cursor: page2.nextCursor }));
+  const all = [...(page.items ?? []), ...(page2.items ?? [])];
+  check("WF-30 every match returned exactly once", all.length === 60 && new Set(all.map((f) => f.id)).size === 60, String(all.length));
+  r = await json("GET", `/api/search?q=${TOKEN}&limit=50&cursor=!!!forged!!!`);
+  check("WF-30 a forged cursor restarts at page 1",
+    r.status === 200 && (r.body?.data?.items ?? []).length === 50, String((r.body?.data?.items ?? []).length));
+
+  // ---- API: share recipients for a non-admin ----
+  const probeLogin = `wfprobe${stamp}`;
+  const probePw = "Wf-Probe-Pw-9f2c71ad40b6";
+  const created = await json("POST", "/api/users", { login: probeLogin, displayName: "工作流探针", password: probePw });
+  check("probe user created", created.status === 200 || created.status === 201, JSON.stringify(created.body));
+  const probeLoginRes = await fetch(`${BASE}/api/login`, {
+    method: "POST", headers: { "Content-Type": "application/json", Origin: BASE },
+    body: JSON.stringify({ login: probeLogin, password: probePw }),
+  });
+  const probeCookie = probeLoginRes.headers.getSetCookie().find((c) => c.startsWith("fm_session=")).split(";")[0];
+  const pwChange = await fetch(`${BASE}/api/me/password`, {
+    method: "POST", headers: { "Content-Type": "application/json", Origin: BASE, Cookie: probeCookie },
+    body: JSON.stringify({ oldPassword: probePw, newPassword: "Wf-Probe-Pw2-9f2c71ad40b6" }),
+  });
+  check("probe completed the first-login password change", pwChange.status === 200, String(pwChange.status));
+  const probeCall = async (method, path) => {
+    const res = await fetch(BASE + path, { method, headers: { Origin: BASE, Cookie: probeCookie } });
+    return { status: res.status, body: await res.json().catch(() => null) };
+  };
+  r = await probeCall("GET", "/api/share-recipients?kind=user&limit=5");
+  const recips = r.body?.data ?? {};
+  check("WF-21 non-admin can list share recipients",
+    r.status === 200 && Array.isArray(recips.items) && recips.items.length >= 1
+    && recips.items.every((u) => Object.keys(u).sort().join(",") === "displayName,id"),
+    JSON.stringify(recips.items?.slice(0, 2)));
+  r = await probeCall("GET", "/api/share-recipients?kind=group&limit=5");
+  check("WF-21 group recipients carry only id+name",
+    r.status === 200 && (r.body?.data?.items ?? []).every((g) => Object.keys(g).sort().join(",") === "id,name"),
+    JSON.stringify((r.body?.data?.items ?? []).slice(0, 2)));
+  r = await probeCall("GET", "/api/share-recipients?kind=dept");
+  check("WF-21 an invalid recipient kind is rejected", r.status === 400 && r.body?.error?.code === "E_BAD", JSON.stringify(r.body));
+
+  chrome = spawn("/usr/bin/google-chrome", [
+    "--headless=new", `--remote-debugging-port=${PORT}`, "--no-sandbox",
+    "--disable-gpu", "--window-size=1440,900", "about:blank",
+  ], { stdio: "ignore" });
+  try {
+    await delay(1500);
+    const targets = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
+    const page = targets.find((t) => t.type === "page");
+    cdp = await CDP.connect(page.webSocketDebuggerUrl);
+    await cdp.send("Page.enable");
+    await cdp.send("Runtime.enable");
+    await cdp.send("Page.bringToFront");
+    await cdp.send("Emulation.setFocusEmulationEnabled", { enabled: true });
+
+    const loginUi = async (user, pw) => {
+      await cdp.navigate(`${BASE}/login`);
+      await cdp.evaluate(`(()=>{
+        const set=(el,v)=>{const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));};
+        const fields=[...document.querySelectorAll('input')];
+        const u=fields.find(f=>f.type==='text'||f.type==='email'||(!f.type&&f.offsetParent!==null));
+        const p=document.querySelector('input[type=password]');
+        if(u)set(u,${JSON.stringify(user)});
+        if(p)set(p,${JSON.stringify(pw)});
+        [...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='登录')?.click();return true;})()`);
+      return cdp.waitFor(`()=>location.pathname==='/doc'||location.pathname==='/first-sign-in'`, 20000);
+    };
+    await loginUi("admin", password);
+
+    // ---- UI: search 加载更多 ----
+    await cdp.navigate(`${BASE}/search`);
+    const searchReady = await cdp.waitFor(`()=>document.querySelector('#search-q')!==null`, 20000);
+    check("search page ready", Boolean(searchReady), String(searchReady));
+    await cdp.evaluate(`(()=>{
+      const q=document.querySelector('#search-q');
+      const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
+      set.call(q,${JSON.stringify(TOKEN)});
+      q.dispatchEvent(new Event('input',{bubbles:true}));
+      const btn=[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='检索');
+      btn?.click();return true;})()`);
+    const firstRows = await cdp.waitFor(`()=>document.querySelectorAll('tbody tr').length>=50`, 30000);
+    check("WF-30 search renders the first page", firstRows === true, String(await cdp.evaluate(`(()=>document.querySelectorAll('tbody tr').length)()`)));
+    const moreVisible = await cdp.waitFor(`()=>[...document.querySelectorAll('button')].some(b=>b.textContent?.trim()==='加载更多')`, 15000);
+    check("WF-30 加载更多 appears with a cursor", moreVisible === true, String(moreVisible));
+    await cdp.evaluate(`(()=>{[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='加载更多')?.click();return true;})()`);
+    const allRows = await cdp.waitFor(`()=>document.querySelectorAll('tbody tr').length>=60`, 30000);
+    const uniqueRows = await cdp.evaluate(`(()=>{const names=[...document.querySelectorAll('tbody tr')].map(tr=>tr.textContent?.slice(0,40));return {rows:names.length,unique:new Set(names).size};})()`);
+    check("WF-30 加载更多 appends the rest without duplicates",
+      allRows === true && uniqueRows.rows === 60 && uniqueRows.unique === 60, JSON.stringify(uniqueRows));
+    const countLine = await cdp.evaluate(`(()=>document.querySelector('.search-total')?.textContent||'')()`);
+    check("WF-30 the count line reflects the loaded pages", /已显示 60/.test(countLine), String(countLine));
+
+    // ---- UI: org workbench (WF-32) ----
+    await cdp.navigate(`${BASE}/org`);
+    const orgReady = await cdp.waitFor(`()=>document.querySelector('ul[role=tree]')!==null||document.querySelector('input[aria-label="新账号"]')!==null`, 20000);
+    check("WF-32 org page renders the workbench", Boolean(orgReady), String(orgReady));
+    const resetEntry = await cdp.evaluate(`(()=>{const btns=[...document.querySelectorAll('button')].map(b=>b.textContent?.trim());return {reset:btns.includes('重置密码'),disable:btns.includes('禁用')};})()`);
+    check("WF-32 member actions available without window.prompt", resetEntry.reset === true && resetEntry.disable === true, JSON.stringify(resetEntry));
+    // open the reset-password dialog (the first row's action)
+    await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr')].find(tr=>tr.querySelector('button'));const btn=row?[...row.querySelectorAll('button')].find(b=>b.textContent?.trim()==='重置密码'):null;btn?.click();return Boolean(btn);})()`);
+    const resetDialog = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('重置'));return d?d.textContent.slice(0,60):false;}`, 10000);
+    check("WF-32 password reset is a real dialog", typeof resetDialog === "string", String(resetDialog));
+    await cdp.key("Escape", "Escape", 27);
+    await delay(300);
+
+    // ---- UI: internal drag -> move dialog (DI-17) ----
+    await cdp.navigate(`${BASE}/doc?folder=${folderId}`);
+    const rowsReady = await cdp.waitFor(`()=>document.querySelectorAll('tbody tr[data-id]').length>=2`, 30000);
+    check("drag source rows listed", Boolean(rowsReady), String(rowsReady));
+    // A real gesture separates dragstart and drop in time; the synthesized one
+    // must let React commit the DragSession between the two dispatches.
+    const dragResult = await cdp.evaluate(`(()=>{
+      const row=[...document.querySelectorAll('tbody tr[data-id]')][0];
+      if(!row)return 'no-row';
+      const dt=new DataTransfer();
+      dt.setData('application/x-filesmanage-files',JSON.stringify({ids:[row.getAttribute('data-id')],sourceFolderId:${JSON.stringify(folderId)},focusId:row.getAttribute('data-id')}));
+      dt.setData('text/plain','移动 1 个文件');
+      row.dispatchEvent(new DragEvent('dragstart',{bubbles:true,cancelable:true,dataTransfer:dt}));
+      const li=document.querySelector('li[data-folder-id="${targetId}"]');
+      if(!li)return 'no-target-node';
+      window.__wfdt=dt;
+      return 'dragstarted';})()`);
+    await delay(600);
+    const dropResult = await cdp.evaluate(`(()=>{
+      const dt=window.__wfdt;
+      const li=document.querySelector('li[data-folder-id="${targetId}"]');
+      if(!li||!dt)return 'no-target';
+      const rowEl=li.querySelector('.tree-row')||li;
+      rowEl.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:dt}));
+      rowEl.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));
+      return 'dropped';})()`);
+    const moveDialog = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));return d?{title:d.querySelector('.dialog-title')?.textContent,target:d.querySelector('.folder-picker-candidate')?.textContent}:false;}`, 10000);
+    check("DI-17 dropping on a folder opens the move dialog",
+      dragResult === "dragstarted" && dropResult === "dropped" && Boolean(moveDialog), JSON.stringify({ dragResult, dropResult, moveDialog }));
+    const targetPreset = moveDialog && /WF-TARGET/.test(moveDialog.target || "");
+    check("DI-17 the dropped folder is the pre-selected candidate", targetPreset === true, JSON.stringify(moveDialog));
+    // cancel: no server change
+    await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));[...d.querySelectorAll('button')].find(b=>b.textContent?.trim()==='取消')?.click();return true;})()`);
+    await delay(400);
+    const stillThere = await cdp.evaluate(`(()=>[...document.querySelectorAll('tbody tr[data-id]')].length>=2)()`);
+    check("DI-17 cancelling the drop changes nothing", stillThere === true, String(stillThere));
+  } finally {
+    cdp && cdp.close();
+    chrome && chrome.kill("SIGKILL");
+  }
+
+  // crash-safe cleanup
+  await json("POST", "/api/logout").catch(() => undefined);
+  await json("DELETE", `/api/folders/${folderId}`);
+  await json("DELETE", `/api/folders/${targetId}`);
+  const probe = (await json("GET", "/api/users")).body?.data?.find((u) => u.login === probeLogin);
+  if (probe) await json("POST", `/api/users/${probe.id}/disabled`);
+  const trash = await json("GET", "/api/trash");
+  for (const entry of trash.body?.data ?? []) {
+    const name = String(entry.name ?? entry.oldName ?? "");
+    if (name.includes(`WF-SMOKE-${stamp}`) || name.includes(`WF-TARGET-${stamp}`) || name.startsWith(TOKEN) || name === "wf-target.txt" || name === "工作流探针") {
+      await json("DELETE", "/api/trash/" + entry.id);
+    }
+  }
+}
+
 async function main() {
   const loginRes = await fetch(`${BASE}/api/login`, {
     method: "POST", headers: { "Content-Type": "application/json" },
@@ -1112,6 +1317,7 @@ async function main() {
   await runSuite("SAFE-EDIT", safeEditSuite);
   await runSuite("G4UI", g4UiSuite);
   await runSuite("BATCHUI", batchUiSuite);
+  await runSuite("FINALE", finaleSuite);
 
   const failed = results.filter((r) => !r.ok);
   console.log(`SUMMARY pass=${results.length - failed.length} total=${results.length}`);
