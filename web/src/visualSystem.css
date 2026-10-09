@@ -2,35 +2,15 @@
  * Filesmanage Visual System 3 — compact, continuous, softly resolved geometry.
  *
  * The earlier workbench used 0-radius welded panels and 2/4/6px controls.
- * This layer is the canonical geometry authority across legacy and feature
- * styles. Preserve dense 26/32px data rows and semantic contrast, but give
- * every independent surface a deliberate corner radius and clear hierarchy.
- * Keep material colours in theme.css; never override accessibility focus.
+ * Shared geometry and shadow tokens live in theme.css alongside colours.
+ * This layer governs layout and responsive compositions without changing
+ * dense data rows, contrast or accessibility focus.
  */
-:root{
-  --radius-xs:4px;      /* chips / keyboard hints / tiny affordances */
-  --radius-sm:7px;      /* compact controls / row affordances */
-  --radius-md:11px;     /* subpanels / tables / menus */
-  --radius-lg:15px;     /* workspaces / cards */
-  --radius-xl:20px;     /* modal dialogs / login */
-  --radius-pill:999px;  /* truly pill-shaped tags only */
-  --shadow-panel:0 1px 2px rgba(15,39,92,.045),0 4px 16px rgba(15,39,92,.035);
-  --shadow-overlay:0 12px 40px rgba(15,39,92,.15),0 2px 8px rgba(15,39,92,.07);
-}
 /* A wide, independently scrollable data grid must never enlarge Chrome's
    layout viewport. All full-height pages already own their scroll regions. */
 html{overflow-x:clip}
 
-/* A single frame rhythm instead of flat screens or large floating cards. */
-.shell{
-  padding:8px;
-  gap:8px;
-}
-.header{
-  border:1px solid var(--border-hairline);
-  border-radius:var(--radius-lg);
-  box-shadow:var(--shadow-panel);
-}
+/* Shell surface geometry now lives in theme.css. */
 .header nav{gap:3px}
 .header nav a{
   height:calc(100% - 8px);
@@ -45,14 +25,6 @@ html{overflow-x:clip}
   box-shadow:inset 0 -2px 0 var(--border-selected);
 }
 .header nav a:hover{background:var(--surface-row-hover)}
-.panels{gap:8px;background:transparent}
-.sidebar,.work{
-  border:1px solid var(--border-hairline);
-  border-radius:var(--radius-lg);
-  box-shadow:var(--shadow-panel);
-  min-height:0;
-}
-.sidebar{border-right:1px solid var(--border-hairline)}
 .work{overflow:hidden;background:var(--surface-canvas)}
 .work.file-preview-page{overflow-y:auto;overflow-x:hidden}
 .sidebar-scroll{padding:5px 4px}
@@ -86,7 +58,6 @@ input[type="checkbox"],input[type="radio"]{border-radius:var(--radius-xs)}
   padding:4px var(--space-2);
   min-height:30px;
   border:1px solid var(--border-hairline);
-  border-radius:var(--radius-sm);
   background:var(--surface-panel);
 }
 .work-body{min-height:0}
@@ -94,8 +65,6 @@ input[type="checkbox"],input[type="radio"]{border-radius:var(--radius-xs)}
   min-height:0;
   min-width:0;
   margin:6px 7px 7px;
-  border:1px solid var(--border-hairline);
-  border-radius:var(--radius-md);
   overflow:auto;
 }
 /* Preserve six-column table density on narrow screens: the full-width grid
@@ -124,27 +93,8 @@ input[type="checkbox"],input[type="radio"]{border-radius:var(--radius-xs)}
 }
 .notice,.hint:not(.toolbar-hint){border-radius:var(--radius-sm)}
 
-/* Legacy app-level surfaces still need geometry here. Context menus, file
-   menus and command palette are now owned by their component stylesheets. */
-.folder-more-menu{
-  border-radius:var(--radius-md);
-  box-shadow:var(--shadow-overlay);
-}
-.account-dropdown-menu{
-  border-radius:var(--radius-md);
-  padding:4px;
-  box-shadow:var(--shadow-overlay);
-}
-.account-dropdown-menu .account-menu-item{border-radius:var(--radius-sm)}
-.folder-more-menu{padding:4px}
-.folder-more-menu button{
-  border-radius:var(--radius-sm);
-  width:100%;
-}
-.dialog,.login-card{
-  border-radius:var(--radius-xl);
-  box-shadow:var(--shadow-overlay);
-}
+/* Legacy shell menus and dialogs now own their geometry in theme.css. */
+.login-card{border-radius:var(--radius-xl);box-shadow:var(--shadow-overlay)}
 .dialog{
   max-width:calc(100vw - 32px);
   max-height:calc(100dvh - 32px);
@@ -160,19 +110,10 @@ input[type="checkbox"],input[type="radio"]{border-radius:var(--radius-xs)}
   padding:8px;
   border-bottom:0;
 }
-.stat-card,.stat-card:last-child{
-  border:1px solid var(--border-hairline);
-  border-radius:var(--radius-md);
-  box-shadow:var(--shadow-panel);
-}
 /* Preview stages must not end as boxy exceptions to the global shell. */
 .media-image-stage,.media-video-stage,.media-audio-stage{overflow:auto}
 .office-holder,.viewer-stage{
   margin:6px 7px 7px;
-  border:1px solid var(--border-hairline);
-  border-radius:var(--radius-md);
-  box-shadow:var(--shadow-panel);
-  overflow:hidden;
 }
 
 /* Small widths retain the same geometry with less inset and no horizontal

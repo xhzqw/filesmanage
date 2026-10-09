@@ -21,7 +21,8 @@
 | `--radius-xl` | 20px | 对话框、登录卡片 |
 | `--radius-pill` | 999px | 版本徽章及明确的胶囊标签 |
 
-全站统一从 `web/src/visualSystem.css` 获得最终几何定义，
+全站几何令牌统一在 `web/src/theme.css` 定义，
+`web/src/visualSystem.css` 只保留布局与响应式组合，
 `web/src/main.tsx` 在 `theme.css` 后加载该样式。组件不得引入任意
 3/5/9/13 等独立半径，不得在独立表面使用 `border-radius:0`。
 只有完全贴边的内部构造、输入内嵌区域、浏览器原生视频内容可不额外设角，
@@ -87,5 +88,6 @@
   `scripts/build.sh` **每次构建自动运行**。对 feature / shared 组件
   禁止写死直角、随机像素半径和额外的全局组件几何覆盖；真实圆形和
   子元素继承半径例外。
-- 旧 `theme.css` 中的 V2 方角组件定义是待迁移遗留兼容层；
-  在尚有其他开发分支修改该文件时，不直接覆盖并行工作。
+- 旧 `theme.css` 中的 V2 方角定义已迁入 V3 令牌，不再通过
+  `visualSystem.css` 重定义变量。门禁还会检查核心主题的半径
+  必须全部来自令牌，禁止新旧几何共存。

@@ -2,10 +2,10 @@
    Precision Workbench 2.0 — Core Tokens & Reset
    (docs/design/PRECISION-WORKBENCH-V2-SPEC.md §2/§3/§7.1)
 
-   Replaces the consumer-app skin (14px type, 12–25px radii, 14px module
-   padding/gap, 44–52px rows) with a docked, hairline-seamed engineering
-   workbench: 13px type, 2/4/6px radii, 0-gap panels, 32/26px data rows,
-   28px tree rows, 40px top bar, 24px status bar.
+   Preserves compact engineering metrics (13px type, 32/26px data rows,
+   28px tree rows, 40px top bar and 24px status bar). Visual System V3
+   replaces the obsolete zero-gap square-corner arrangement; the radius and
+   elevation tokens below are canonical for both shell and feature sheets.
 
    Colour deviations from the spec's §2.1 sketch are deliberate and are the
    only places this file does not copy the spec verbatim; each one is forced
@@ -79,9 +79,14 @@
   --status-danger:#B91C1C;         /* 冲突/删除/严重警告 */
 
   /* ================= 几何与紧凑度标尺 (Compact Metrics) ================= */
-  --radius-xs:2px;                 /* 紧凑标签/复选框 */
-  --radius-sm:4px;                 /* 按钮/输入框/行条 */
-  --radius-md:6px;                 /* 弹出菜单/轻量对话框 (最高限度) */
+  --radius-xs:4px;                 /* 紧凑标签/复选框 */
+  --radius-sm:7px;                 /* 按钮/输入框/行条 */
+  --radius-md:11px;                /* 弹出菜单/轻量对话框 */
+  --radius-lg:15px;                /* 工作区/卡片 */
+  --radius-xl:20px;                /* 模态框/登录 */
+  --radius-pill:999px;             /* 胶囊徽记 */
+  --shadow-panel:0 1px 2px rgba(15,39,92,.045),0 4px 16px rgba(15,39,92,.035);
+  --shadow-overlay:0 12px 40px rgba(15,39,92,.15),0 2px 8px rgba(15,39,92,.07);
 
   --height-header:40px;            /* 瘦身顶栏 (36~40px) */
   --height-toolbar:34px;           /* 操作工具栏 */
@@ -181,7 +186,7 @@ input[type=file]{height:auto;padding:0;border:0;background:none}
 textarea{height:auto;padding:var(--space-1) var(--space-2);line-height:1.5;resize:vertical}
 
 /* ================= 一体化嵌合外壳 (Docked Paneling) ================= */
-.shell{height:100vh;display:flex;flex-direction:column;background:var(--surface-canvas);overflow:hidden}
+.shell{height:100vh;display:flex;flex-direction:column;background:var(--surface-canvas);overflow:hidden;padding:8px;gap:8px}
 
 /* ---- 顶栏 38px ---- */
 .header{
@@ -192,7 +197,9 @@ textarea{height:auto;padding:var(--space-1) var(--space-2);line-height:1.5;resiz
   align-items:center;
   padding:0 var(--space-2) 0 0;
   background:var(--surface-panel);
-  border-bottom:1px solid var(--border-hairline);
+  border:1px solid var(--border-hairline);
+  border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-panel);
   box-sizing:border-box;
 }
 .brand{display:flex;align-items:center;gap:var(--space-2);width:auto;flex:none;padding-left:var(--space-3);padding-right:var(--space-2);font-weight:700;font-size:13px;color:var(--brand-navy);white-space:nowrap;overflow:hidden}
@@ -224,8 +231,8 @@ textarea{height:auto;padding:var(--space-1) var(--space-2);line-height:1.5;resiz
 .account-dropdown-menu{
   position:absolute;top:calc(100% + 4px);right:0;
   background:var(--surface-panel);border:1px solid var(--border-subtle);
-  border-radius:var(--radius-sm);box-shadow:0 4px 16px rgba(0,0,0,0.12);
-  z-index:50;min-width:130px;padding:4px 0;
+  border-radius:var(--radius-md);box-shadow:var(--shadow-overlay);
+  z-index:50;min-width:130px;padding:4px;
 }
 .account-menu-info{padding:6px 12px}
 .account-menu-name{font-size:12px;font-weight:600;color:var(--text-primary)}
@@ -235,7 +242,7 @@ textarea{height:auto;padding:var(--space-1) var(--space-2);line-height:1.5;resiz
   width:100%;border:none;background:transparent;padding:6px 12px;
   font-size:12px;color:var(--text-primary);cursor:pointer;
   display:flex;align-items:center;gap:6px;text-align:left;
-  border-radius:0;height:auto;min-height:26px;
+  border-radius:var(--radius-sm);height:auto;min-height:26px;
 }
 .account-menu-item:hover{background:var(--surface-row-hover);color:var(--brand-blue)}
 .account-menu-item.danger{color:var(--status-danger)}
@@ -291,14 +298,14 @@ textarea{height:auto;padding:var(--space-1) var(--space-2);line-height:1.5;resiz
 .folder-more-menu{
   display:none;position:absolute;top:calc(100% + 4px);right:0;
   background:var(--surface-panel);border:1px solid var(--border-subtle);
-  border-radius:var(--radius-sm);box-shadow:0 4px 12px rgba(0,0,0,0.1);
-  z-index:50;min-width:110px;padding:3px 0;
+  border-radius:var(--radius-md);box-shadow:var(--shadow-overlay);
+  z-index:50;min-width:110px;padding:4px;
 }
 .folder-more-menu.open{display:flex;flex-direction:column}
 .folder-more-menu button{
   border:none;background:transparent;text-align:left;padding:5px 12px;
   font-size:12px;color:var(--text-primary);cursor:pointer;width:100%;
-  border-radius:0;height:auto;min-height:24px;
+  border-radius:var(--radius-sm);height:auto;min-height:24px;
 }
 .folder-more-menu button:hover{background:var(--surface-row-hover);color:var(--brand-blue)}
 .folder-more-menu button.danger{color:var(--status-danger)}
@@ -318,7 +325,7 @@ textarea{height:auto;padding:var(--space-1) var(--space-2);line-height:1.5;resiz
 
 .nav-toggle{display:none;background:none;border:0;font-size:16px;height:26px;min-height:26px;padding:0 var(--space-1)}
 
-.panels{display:flex;flex:1;min-height:0;padding:0;gap:0;background:var(--surface-panel)}
+.panels{display:flex;flex:1;min-height:0;padding:0;gap:8px;background:transparent}
 
 /* ---- 侧边栏: 贴边, 240px, 可拖拽 ---- */
 .sidebar{
@@ -331,8 +338,10 @@ textarea{height:auto;padding:var(--space-1) var(--space-2);line-height:1.5;resiz
   flex-direction:column;
   overflow:hidden;
   background:var(--surface-panel);
-  border-right:1px solid var(--border-hairline);
-  border-radius:0;
+  border:1px solid var(--border-hairline);
+  border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-panel);
+  min-height:0;
   padding:0;
 }
 /* The scroll port. It is a child of .sidebar rather than .sidebar itself, so
@@ -352,7 +361,7 @@ textarea{height:auto;padding:var(--space-1) var(--space-2);line-height:1.5;resiz
 .sidebar-resizer:focus-visible{outline:1px solid var(--border-focus);outline-offset:0;box-shadow:none}
 
 /* ---- 主工作区 ---- */
-.work{flex:1;min-width:0;display:flex;flex-direction:column;gap:0;background:var(--surface-canvas)}
+.work{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:0;background:var(--surface-canvas);border:1px solid var(--border-hairline);border-radius:var(--radius-lg);box-shadow:var(--shadow-panel)}
 .work-body{display:flex;flex-direction:column;gap:0;flex:1;min-height:0}
 
 /* 工具栏/面包屑/目录操作条: 与表格无缝, 仅 1px 水平分割线 */
@@ -363,7 +372,7 @@ textarea{height:auto;padding:var(--space-1) var(--space-2);line-height:1.5;resiz
   background:var(--surface-panel);
   border:0;
   border-bottom:1px solid var(--border-hairline);
-  border-radius:0;
+  border-radius:var(--radius-sm);
   display:flex;
   align-items:center;
   gap:var(--space-2);
@@ -383,7 +392,7 @@ textarea{height:auto;padding:var(--space-1) var(--space-2);line-height:1.5;resiz
 .breadcrumb .crumb-collapse{color:var(--text-tertiary);user-select:none}
 
 /* ================= 极高密度数据表格 ================= */
-.table{flex:1;min-height:0;background:var(--surface-panel);border:0;border-radius:0;overflow:auto}
+.table{flex:1;min-height:0;background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-md);overflow:auto}
 table{border-collapse:collapse;width:100%}
 th,td{padding:6px 10px;border-bottom:1px solid var(--border-hairline);text-align:left;font-size:12px;color:var(--text-primary)}
 th{
@@ -462,7 +471,7 @@ tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions 
   height:var(--height-tree-row);
   padding:0 var(--space-2);
   padding-left:calc(var(--tree-depth,0)*var(--tree-indent) + var(--space-2));
-  border-radius:0;
+  border-radius:var(--radius-sm);
   font-size:12px;color:var(--text-primary);
   cursor:pointer;
   transition:background-color .12s ease;
@@ -506,7 +515,7 @@ tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions 
    keeps the rail a legal child of ul[role=tree] (a bare div inside a ul is
    invalid HTML) while staying out of the accessibility tree and out of flow. */
 .spring-rail-host{position:absolute;left:0;right:0;top:0;bottom:0;margin:0;padding:0;list-style:none;pointer-events:none}
-.spring-rail{position:absolute;left:0;width:2px;height:var(--height-tree-row);border-radius:1px;background:var(--brand-cyan);pointer-events:none;z-index:1}
+.spring-rail{position:absolute;left:0;width:2px;height:var(--height-tree-row);border-radius:var(--radius-pill);background:var(--brand-cyan);pointer-events:none;z-index:1}
 
 /* ================= 提示/通知/表单 ================= */
 .hint{color:var(--text-tertiary);font-size:11px;margin:0}
@@ -524,7 +533,7 @@ tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions 
 
 
 /* ================= 对话框 / 菜单 ================= */
-.dialog{border:1px solid var(--border-subtle);border-radius:var(--radius-md);padding:var(--space-4);min-width:380px;background:var(--surface-panel);color:var(--text-primary)}
+.dialog{border:1px solid var(--border-subtle);border-radius:var(--radius-xl);box-shadow:var(--shadow-overlay);padding:var(--space-4);min-width:380px;background:var(--surface-panel);color:var(--text-primary)}
 .dialog::backdrop{background:#0d2a4a44}
 .dialog form{display:grid;gap:var(--space-3)}
 .dialog h3{margin:0;color:var(--brand-navy);font-size:13px}
@@ -613,12 +622,12 @@ tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions 
 /* flex:1 (not height:100%) so the editor takes the space left after the
    breadcrumb instead of the stage's full height, which used to push its own
    bottom chrome 43px past the viewport at every gate resolution. */
-.office-holder{flex:1;min-height:600px;background:var(--surface-panel);border:0;border-radius:0;overflow:hidden}
-.viewer-stage{flex:1;min-height:480px;background:var(--surface-panel);border:0;border-radius:0;overflow:hidden}
+.office-holder{flex:1;min-height:600px;background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-md);box-shadow:var(--shadow-panel);overflow:hidden}
+.viewer-stage{flex:1;min-height:480px;background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-md);box-shadow:var(--shadow-panel);overflow:hidden}
 
 .stat-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-bottom:1px solid var(--border-hairline)}
-.stat-card{background:var(--surface-panel);border:0;border-right:1px solid var(--border-hairline);border-radius:0;padding:var(--space-3);display:grid;gap:2px;justify-items:start}
-.stat-card:last-child{border-right:0}
+.stat-card{background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-md);box-shadow:var(--shadow-panel);padding:var(--space-3);display:grid;gap:2px;justify-items:start}
+.stat-card:last-child{border-right:1px solid var(--border-hairline)}
 .stat-num{font-size:20px;font-weight:700;color:var(--brand-navy);font-variant-numeric:tabular-nums}
 .toolbar button.on{background:var(--surface-row-selected);border-color:var(--border-selected);color:var(--brand-blue);font-weight:600}
 

@@ -5,8 +5,8 @@
  * Independent feature components own their surface geometry. Every radius
  * they declare must reference a shared token, except true circles (50%) and
  * nested surfaces that explicitly inherit an ancestor's clipping radius.
- * Legacy shell styles in theme.css are migrated independently and are not
- * silently grandfathered into new components.
+ * The root shell in theme.css and the feature styles must use the same V3
+ * tokens. Splitting a token across theme.css and visualSystem.css is forbidden.
  */
 import {readdirSync,readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
@@ -35,11 +35,39 @@ function walk(dir){
 }
 walk(join(cssRoot,"features"));
 walk(join(cssRoot,"shared"));
+walkTheme();
+
+function walkTheme(){
+ const themePath=join(cssRoot,"theme.css");
+ const theme=readFileSync(themePath,"utf8");
+ const uncommented=theme.replace(/\/\*[\s\S]*?\*\//g,"");
+ scanned.push(relative(projectRoot,themePath));
+ for(const match of uncommented.matchAll(/(?:^|[;{\s])border-radius\s*:\s*([^;}]+)/g)){
+  if(allowed.test(match[1].trim()))continue;
+  const line=uncommented.slice(0,match.index).split("\n").length;
+  errors.push(`theme.css:${line}: unsupported border-radius ${match[1].trim()}`);
+ }
+ const expected={xs:"4px",sm:"7px",md:"11px",lg:"15px",xl:"20px",pill:"999px"};
+ for(const [name,value] of Object.entries(expected)){
+  const occurrences=[...uncommented.matchAll(new RegExp(`--radius-${name}\\s*:\\s*([^;]+)`, "g"))];
+  if(occurrences.length!==1||occurrences[0][1].trim()!==value){
+   errors.push(`theme.css: --radius-${name} must be declared exactly once as ${value}`);
+  }
+ }
+ for(const name of ["panel","overlay"]){
+  if(!uncommented.includes(`--shadow-${name}:`)){
+   errors.push(`theme.css: --shadow-${name} is missing`);
+  }
+ }
+}
 
 // Component-owned selectors must not be duplicated in the global override.
 // Responsive composition rules (e.g. .media-preview{margin:4px} inside a
 // media query) are intentionally allowed: they own layout, not geometry.
 const system=readFileSync(join(cssRoot,"visualSystem.css"),"utf8");
+if(/--(?:radius|shadow)-(?:xs|sm|md|lg|xl|pill|panel|overlay)\s*:/.test(system)){
+ errors.push("visualSystem.css: shared tokens must be defined only in theme.css");
+}
 const ownership=[
  ".menu",".menu-item",".command-panel",".command-row",".row-more-menu",
  ".org-card",".org-tabs-nav",".org-tab",".media-preview",".dropzone",
