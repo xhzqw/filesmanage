@@ -142,14 +142,21 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  }
  return <AppShell user={user} onLogout={onLogout}>
   <div className="panels"><aside className="sidebar"><h2>文档管理</h2><p>文件夹</p>
-   {status==="loading"&&<p>正在加载目录…</p>}
-   {status==="failed"&&<p role="alert" className="error">获取目录失败，请刷新重试</p>}
-   {status==="ready"&&<FolderTree items={folders} selected={selected?.id||""} isAdmin={user.isAdmin}
+   {/* The tree stays mounted across reloadKey cycles (an upload commit, a folder
+       change, an edit save): unmounting it would drop keyboard focus and the
+       expand state, so the previous folders keep rendering while the fresh tree
+       loads and only the first load shows the loading/error states. */}
+   {folders.length===0&&status==="loading"&&<p>正在加载目录…</p>}
+   {folders.length===0&&status==="failed"&&<p role="alert" className="error">获取目录失败，请刷新重试</p>}
+   {folders.length>0&&<FolderTree items={folders} selected={selected?.id||""} isAdmin={user.isAdmin}
     onRenameFolder={folder=>runFolderAction(folder,"rename")}
     onMoveFolder={openMove}
     onDeleteFolder={folder=>runFolderAction(folder,"delete")}
     onManageGrants={folder=>setGrantFolder(folder)}
-    onManagePolicy={folder=>setPolicyFolder(folder)}/>}</aside>
+    onManagePolicy={folder=>setPolicyFolder(folder)}/>}
+   {folders.length>0&&status==="loading"&&<p className="hint">正在刷新目录…</p>}
+   {folders.length>0&&status==="failed"&&<p role="alert" className="error">目录刷新失败，以下为上次数据。</p>}
+   </aside>
    <main className="work">
    {moveMessage&&<p role="status" className="notice">{moveMessage}</p>}
    {/* The work area is gated on the resolved folder, not on the tree load
