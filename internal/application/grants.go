@@ -7,11 +7,13 @@ import (
 	"time"
 )
 
-// Grant use cases. Managing grants is an administrative capability in this
-// slice (SPEC §2.5 manage_acl, default admin only); listing requires list on
-// the folder.
+// Grant use cases. Managing AND inspecting other subjects' ACLs requires
+// manage_acl (system admin only until scoped delegation is implemented).
 
 func (s *Service) ListGrants(ctx context.Context, u domain.User, folderID string) ([]domain.ACL, error) {
+	if !u.IsAdmin {
+		return nil, domain.ErrForbidden
+	}
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -20,11 +22,6 @@ func (s *Service) ListGrants(ctx context.Context, u domain.User, folderID string
 	folder, err := s.activeFolder(ctx, tx, folderID)
 	if err != nil {
 		return nil, err
-	}
-	if !u.IsAdmin {
-		if err = s.require(ctx, tx, u, folder.ID, domain.ActionList); err != nil {
-			return nil, err
-		}
 	}
 	return tx.ListGrants(ctx, folder.ID)
 }
@@ -101,11 +98,12 @@ func (s *Service) RevokeGrant(ctx context.Context, u domain.User, grantID string
 	}
 	audit(ctx, tx, u, "acl.revoke", "folder", grant.FolderID, "success",
 		map[string]any{"grantId": grantID, "subjectKind": grant.SubjectKind, "subjectId": grant.SubjectID})
-	// Authorisation just changed: drop every cached read so the next
-	// request sees the new scope (PE04).
+	if err = tx.Commit(ctx); err != nil {
+		return err
+	}
+	// Never invalidate before an uncommitted revocation becomes visible.
 	s.bumpACLEpoch()
-
-	return tx.Commit(ctx)
+	return nil
 }
 
 func (s *Service) assertSubjectExists(ctx context.Context, repo domainSubjectProbe, kind, id string) error {

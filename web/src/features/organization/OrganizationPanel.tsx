@@ -4,6 +4,8 @@ import {errorCode,errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
 import type {User} from "../../entities/user/model";
 import "./organization.css";
+import {useSearchParams} from "react-router-dom";
+import {PermissionsPanel} from "./PermissionsPanel";
 
 type LoadState="loading"|"ready"|"failed";
 type Tone="info"|"error";
@@ -121,7 +123,14 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  const[notice,setNotice]=useState<Notice|null>(null);
 
  // 视图与筛选状态：默认 Tab 1 为部门成员，Tab 2 为工作组管理
- const[activeTab,setActiveTab]=useState<"members"|"groups">("members");
+ const[queryParams,setQueryParams]=useSearchParams();
+ const activeTab=queryParams.get("tab")==="permissions"?"permissions":queryParams.get("tab")==="groups"?"groups":"members";
+ const setActiveTab=(tab:"members"|"groups"|"permissions")=>setQueryParams(old=>{
+  const next=new URLSearchParams(old);
+  next.set("tab",tab);
+  if(tab!=="permissions"){next.delete("view");next.delete("folder");}
+  return next;
+ });
  const[selectedDepartment,setSelectedDepartment]=useState("");
  const[deptQuery,setDeptQuery]=useState("");
  const[expanded,setExpanded]=useState<Set<string>>(()=>new Set<string>());
@@ -653,21 +662,22 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  return <div className="work-body">
   {/* 顶部工具栏：指标摘要与全局快捷创建 */}
   <div className="toolbar">
-   <span className="toolbar-hint">账号 {users.length} · 部门 {departments.length} · 工作组 {groups.length}</span>
+   <span className="toolbar-hint">{activeTab==="permissions"?"按资源目录管理直接授权 · 仅系统管理员":`账号 ${users.length} · 部门 ${departments.length} · 工作组 ${groups.length}`}</span>
+   {activeTab!=="permissions"&&<>
    <button type="button" onClick={()=>{setNotice(null);setCreateDepartmentOpen(true);}}>
     <IconPlus/>新建部门
    </button>
    <button type="button" className="primary" onClick={()=>{setNotice(null);setCreateGroupOpen(true);}}>
     <IconPlus/>创建工作组
-   </button>
+   </button></>}
   </div>
 
   {notice&&<p role={notice.tone==="error"?"alert":"status"} className={"notice"+(notice.tone==="error"?" error":"")}>{notice.text}</p>}
 
   {/* 双栏主工作台：左侧组织架构树 + 右侧主工作区卡片 */}
-  <div className="org-workbench">
+  <div className={"org-workbench"+(activeTab==="permissions"?" org-permissions-workbench":"")}>
    {/* 左侧：组织架构树卡片 */}
-   <section className="org-card org-dept-card" aria-label="组织架构树">
+   {activeTab!=="permissions"&&<section className="org-card org-dept-card" aria-label="组织架构树">
     <div className="org-card-header">
      <h3 className="org-card-title">
       <IconBuilding/>
@@ -746,9 +756,9 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
       </ul>
      </div>
     </>}
-   </section>
+   </section>}
 
-   {/* 右侧：主工作区卡片（Tab 1: 部门成员 / Tab 2: 工作组管理） */}
+   {/* 右侧：组织工作区 */}
    <section className="org-card org-stage-card" aria-label="组织管理主工作区">
     <div className="org-tabs-bar" role="tablist" aria-label="组织管理视图">
      <div className="org-tabs-nav">
@@ -766,16 +776,21 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
        <span>工作组管理</span>
        <span className="org-tab-badge">{groups.length}</span>
       </button>
+      <button type="button" role="tab" aria-selected={activeTab==="permissions"}
+       className={"org-tab"+(activeTab==="permissions"?" active":"")}
+       onClick={()=>setActiveTab("permissions")}>权限管理</button>
      </div>
 
      {/* 当前部门范围标识 */}
-     <div className="org-scope-badge">
+     {activeTab!=="permissions"&&<div className="org-scope-badge">
       <span className="org-scope-dot" aria-hidden="true"/>
       <span>范围：{scopeLabel}</span>
       {selectedDepartment!==""&&<button type="button" className="org-scope-reset"
        title="清除部门筛选，显示全体" onClick={()=>setSelectedDepartment("")}>✕</button>}
-     </div>
+     </div>}
     </div>
+
+    {activeTab==="permissions"&&<PermissionsPanel users={users} groups={groups}/>}
 
     {/* Tab 1: 部门成员 */}
     {activeTab==="members"&&<div className="org-tab-stage">

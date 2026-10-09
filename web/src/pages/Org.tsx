@@ -6,7 +6,7 @@ export function Org({user,onLogout}:{user:User;onLogout:()=>void}){
  return <AppShell user={user} onLogout={onLogout}>
   <div className="panels">
    <main className="work">
-    <div className="breadcrumb">组织管理</div>
+    <div className="breadcrumb">组织与权限</div>
     <OrganizationPanel isAdmin={user.isAdmin} currentUserId={user.id}/>
    </main>
   </div>

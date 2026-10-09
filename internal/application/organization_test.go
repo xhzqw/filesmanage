@@ -123,6 +123,23 @@ func TestGroupGrantTakesEffectImmediately(t *testing.T) {
 	if len(visible) != 1 || visible[0].ID != "folder_market" {
 		t.Fatalf("member must see granted folder on next request, got %v", visible)
 	}
+	if err = s.RemoveWorkgroupMember(ctx, admin, group.ID, "u_user"); err != nil {
+		t.Fatal(err)
+	}
+	visible, err = s.Folders(ctx, user)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(visible) != 0 {
+		t.Fatalf("removed member must immediately lose grant, got %v", visible)
+	}
+	if err = s.AddWorkgroupMember(ctx, admin, group.ID, "u_user"); err != nil {
+		t.Fatal(err)
+	}
+	visible, err = s.Folders(ctx, user)
+	if err != nil || len(visible) != 1 {
+		t.Fatalf("re-added member must regain grant immediately: %v %+v", err, visible)
+	}
 	if err = s.RevokeGrant(ctx, admin, grant.ID); err != nil {
 		t.Fatal(err)
 	}

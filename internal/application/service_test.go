@@ -340,6 +340,12 @@ func TestGrantsAdminOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("admin grant failed: %v", err)
 	}
+	if _, err = s.ListGrants(ctx, user, "folder_root"); !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("user with list grant must not inspect other subjects' ACLs: %v", err)
+	}
+	if grants, readErr := s.ListGrants(ctx, admin, "folder_root"); readErr != nil || len(grants) == 0 {
+		t.Fatalf("admin should inspect direct grants: %v %+v", readErr, grants)
+	}
 	if err = s.RevokeGrant(ctx, user, grant.ID); !errors.Is(err, domain.ErrForbidden) {
 		t.Fatalf("non-admin revoke must be denied: %v", err)
 	}

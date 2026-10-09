@@ -27,7 +27,7 @@ const NAV=[
  {to:"/stats",label:"统计"},
  {to:"/approvals",label:"审批"},
  {to:"/trash",label:"回收站"},
- {to:"/org",label:"组织管理"},
+ {to:"/org",label:"组织与权限"},
 ];
 
 // The single shell shared by every authenticated page (DESIGN-SYSTEM-v1 §3.1,

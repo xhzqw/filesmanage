@@ -294,7 +294,11 @@ func (s *Service) AddWorkgroupMember(ctx context.Context, actor domain.User, gro
 	}
 	audit(ctx, tx, actor, "workgroup.member_add", "workgroup", groupID, "success",
 		map[string]any{"userId": userID, "login": target.Login})
-	return tx.Commit(ctx)
+	if err = tx.Commit(ctx); err != nil {
+		return err
+	}
+	s.bumpACLEpoch()
+	return nil
 }
 
 func (s *Service) RemoveWorkgroupMember(ctx context.Context, actor domain.User, groupID, userID string) error {
@@ -313,5 +317,9 @@ func (s *Service) RemoveWorkgroupMember(ctx context.Context, actor domain.User, 
 		return mapError(err)
 	}
 	audit(ctx, tx, actor, "workgroup.member_remove", "workgroup", groupID, "success", map[string]any{"userId": userID})
-	return tx.Commit(ctx)
+	if err = tx.Commit(ctx); err != nil {
+		return err
+	}
+	s.bumpACLEpoch()
+	return nil
 }

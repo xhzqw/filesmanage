@@ -6,7 +6,6 @@ import{folderApi}from "../features/folders/api";
 import{FolderTree,ancestorPath}from "../features/folders/FolderTree";
 import{NewFolderForm}from "../features/folders/NewFolderForm";
 import{FolderActions}from "../features/folders/FolderActions";
-import{GrantDialog}from "../features/folders/GrantDialog";
 import{folderMoveBusy,folderMoveCanSubmit,folderMoveFailure,folderMoveFailed,folderMoveIdle,folderMoveInvalidTarget,folderMovePickTarget,folderMoveSubmitStarted,type FolderMoveState}from "../features/folders/moveFolderFlow";
 import{fileApi}from "../features/documents/api";
 import{FileTable}from "../features/documents/FileTable";
@@ -53,9 +52,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  const[folders,setFolders]=useState<Folder[]>([]);
  const[status,setStatus]=useState("loading");
  const[reloadKey,setReloadKey]=useState(0);
- // Grant/policy dialogs are scoped to the folder the tree menu acted on, which
- // is not necessarily the currently selected folder.
- const[grantFolder,setGrantFolder]=useState<Folder|null>(null);
+ // Approval policy is scoped to the folder the tree menu acted on.
  const[policyFolder,setPolicyFolder]=useState<Folder|null>(null);
  // Rename/delete from the tree menu reuse FolderActions' own dialogs: the bar
  // follows the right-clicked folder until the selection moves again.
@@ -86,10 +83,9 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
    .catch(()=>{if(valid)setStatus("failed");});
   return()=>{valid=false;};
  },[reloadKey]);
- // Only admins may manage grants and policies; both dialogs consume the
- // admin-only listings, loaded lazily when a dialog opens.
+ // Approval policy dialog consumes the admin-only subject listing on demand.
  useEffect(()=>{
-  if((!grantFolder&&!policyFolder)||!user.isAdmin)return;
+  if(!policyFolder||!user.isAdmin)return;
   let valid=true;
   organizationApi.users()
    .then(users=>{
@@ -98,7 +94,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
    })
    .catch(()=>{if(valid)setSubjects([]);});
   return()=>{valid=false;};
- },[grantFolder,policyFolder,user.isAdmin]);
+ },[policyFolder,user.isAdmin]);
  const visibleRoots=folders.filter(f=>f.parentId===null||!folders.some(p=>p.id===f.parentId));
  const selected=folders.find(f=>f.id===requested)??visibleRoots[0];
  // The page resolves the selected folder's approval policy and hands the flag
@@ -223,7 +219,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
     onRenameFolder={folder=>runFolderAction(folder,"rename")}
     onMoveFolder={openMove}
     onDeleteFolder={folder=>runFolderAction(folder,"delete")}
-    onManageGrants={folder=>setGrantFolder(folder)}
+    onManageGrants={folder=>navigate("/org?tab=permissions&view=folder&folder="+encodeURIComponent(folder.id))}
     onManagePolicy={folder=>setPolicyFolder(folder)}/>}
    {folders.length>0&&status==="loading"&&<p className="hint">正在刷新目录…</p>}
    {folders.length>0&&status==="failed"&&<p role="alert" className="error">目录刷新失败，以下为上次数据。</p>}
@@ -245,7 +241,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
      <FolderBreadcrumb folders={folders} folder={selected}/>
      <div ref={actionsRef} className="folder-actions-slot">
       <FolderActions folder={actionsFolder??selected} isAdmin={user.isAdmin} onChanged={()=>setReloadKey(k=>k+1)}
-       onManageGrants={()=>setGrantFolder(actionsFolder??selected)} onManagePolicy={()=>setPolicyFolder(actionsFolder??selected)}/>
+       onManageGrants={()=>navigate("/org?tab=permissions&view=folder&folder="+encodeURIComponent((actionsFolder??selected).id))} onManagePolicy={()=>setPolicyFolder(actionsFolder??selected)}/>
      </div>
    </div>}
    {moveMessage&&<p role="status" className="notice">{moveMessage}</p>}
@@ -255,7 +251,6 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
    </DropZone>}
    {!selected&&status!=="loading"&&<p className="empty">当前账号没有可访问的目录，请联系管理员授权。</p>}
    </main></div>
-   {grantFolder&&<GrantDialog folder={grantFolder} subjects={subjects} onClose={()=>setGrantFolder(null)}/>}
    {policyFolder&&<PolicyDialog folder={policyFolder} approvers={subjects} onClose={()=>setPolicyFolder(null)}/>}
    {editingId&&<FileEditorBridge fileId={editingId} requiresApproval={requiresApproval}
     onClose={()=>setEditingId(null)} onSaved={()=>setReloadKey(k=>k+1)}/>}

@@ -1,0 +1,44 @@
+/* Resource ACL workspace: dense docked panels, independent scroll regions. */
+.org-workbench.org-permissions-workbench{grid-template-columns:minmax(0,1fr)}
+.org-permissions-workbench .org-stage-card{min-width:0}
+.perm-workspace{display:grid;grid-template-columns:240px minmax(0,1fr);flex:1;min-height:0;overflow:hidden}
+.perm-browser{display:flex;flex-direction:column;min-width:0;min-height:0;border-right:1px solid var(--border-hairline)}
+.perm-browser-title{display:flex;justify-content:space-between;align-items:center;background:var(--surface-header);border-bottom:1px solid var(--border-hairline);padding:4px 8px;font-weight:600;font-size:12px;min-height:34px}
+.perm-browser-search{display:flex;flex-direction:column;gap:3px;padding:8px;font-size:11px;color:var(--text-secondary);border-bottom:1px solid var(--border-hairline)}
+.perm-browser-search input{width:100%;min-width:0;height:28px;font-size:12px}
+.perm-browser-scroll{overflow:auto;flex:1;min-height:0;padding:3px 0}
+.perm-browser-scroll ul{list-style:none;margin:0;padding:0}
+.perm-tree-row{display:flex;align-items:center;min-height:28px;font-size:12px}
+.perm-tree-row.selected{background:var(--surface-row-selected);box-shadow:inset 2px 0 var(--brand-cyan)}
+.perm-tree-row:hover{background:var(--surface-row-hover)}
+.perm-tree-toggle,.perm-tree-spacer{width:22px;min-width:22px;min-height:26px;background:transparent;border:0;padding:0;color:var(--text-secondary)}
+.perm-tree-name{border:0;background:transparent;text-align:left;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-primary);padding:5px 2px}
+.perm-tree-info{margin:0 8px;font-size:11px}
+.perm-more{width:100%;min-height:28px;border:0;background:transparent;color:var(--brand-blue);font-size:12px}
+.perm-result{display:flex;flex-direction:column;gap:2px;align-items:start;width:100%;min-height:34px;background:transparent;border:0;border-bottom:1px solid var(--border-hairline);padding:5px 10px;font-size:12px;text-align:left}
+.perm-result:hover{background:var(--surface-row-hover)}
+.perm-result small{font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.perm-detail{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:auto}
+.perm-detail-heading{min-height:38px;display:flex;gap:8px;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid var(--border-hairline);font-size:12px}
+.perm-detail-heading>div{display:flex;gap:10px;align-items:center;min-width:0}
+.perm-path{color:var(--text-secondary);text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
+.perm-section-title{font-weight:600;font-size:12px;background:var(--surface-header);border-top:1px solid var(--border-hairline);border-bottom:1px solid var(--border-hairline);padding:7px 10px}
+.perm-hint{font-size:11px;color:var(--text-secondary);padding:7px 10px;margin:0}
+.perm-grants-scroller{max-height:38vh;min-height:100px;overflow:auto}
+.perm-table{width:100%;border-collapse:collapse;font-size:12px}
+.perm-table th,.perm-table td{text-align:left;border-bottom:1px solid var(--border-hairline);padding:7px 10px;vertical-align:middle}
+.perm-table th{font-size:11px;color:var(--text-secondary);background:var(--surface-header);position:sticky;top:0}
+.perm-table td small{display:block;font-size:10px;color:var(--text-secondary)}
+.perm-form{padding:9px 10px;display:flex;flex-direction:column;gap:10px;font-size:12px}
+.perm-form-row{display:flex;gap:10px;flex-wrap:wrap}
+.perm-form-row label{min-width:155px;flex:1;display:flex;flex-direction:column;gap:4px}
+.perm-form-row input,.perm-form-row select{width:100%;height:29px;min-width:0;font-size:12px}
+.perm-form fieldset{border:1px solid var(--border-hairline);padding:8px 10px;margin:0}
+.perm-form legend{font-size:12px;font-weight:600}
+.perm-action-grid{display:flex;flex-wrap:wrap;gap:8px 12px}
+.perm-action-grid label{display:inline-flex;gap:5px;align-items:center;white-space:nowrap}
+.perm-form-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.perm-form-actions .hint{margin-right:auto}
+.perm-review{border:1px solid var(--border-strong);background:var(--surface-header);padding:10px;font-size:12px}
+.perm-review p{margin:5px 0}
+@media(max-width:850px){.perm-workspace{grid-template-columns:minmax(0,1fr);overflow:auto}.perm-browser{height:210px;border-right:0;border-bottom:1px solid var(--border-hairline)}.perm-detail{overflow:visible}.perm-grants-scroller{max-height:300px}}
