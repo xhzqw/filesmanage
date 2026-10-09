@@ -2377,9 +2377,23 @@ paths:
       - Organization
       security:
       - cookieSession: []
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        description: Enable keyset paging with 1–200 records; default 100 if only cursor is supplied.
+        schema:
+          type: integer
+          minimum: 1
+      - name: cursor
+        in: query
+        required: false
+        description: Last returned ID from nextCursor; use with limit.
+        schema:
+          type: string
       responses:
         '200':
-          description: Users in the tenant.
+          description: Legacy no-query array (capped at 1000), or {items,nextCursor} when paged.
           content:
             application/json:
               schema:
@@ -2390,12 +2404,30 @@ paths:
                     enum:
                     - true
                   data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/User'
+                    oneOf:
+                    - type: array
+                      items:
+                        $ref: '#/components/schemas/User'
+                    - type: object
+                      properties:
+                        items:
+                          type: array
+                          items:
+                            $ref: '#/components/schemas/User'
+                        nextCursor:
+                          type: string
+                      required:
+                      - items
+                      - nextCursor
                 required:
                 - ok
                 - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '401':
           description: E_AUTH — missing or expired session
           content:
@@ -2705,9 +2737,23 @@ paths:
       - Organization
       security:
       - cookieSession: []
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        description: Enable keyset paging with 1–200 records; default 100 if only cursor is supplied.
+        schema:
+          type: integer
+          minimum: 1
+      - name: cursor
+        in: query
+        required: false
+        description: Last returned ID from nextCursor; use with limit.
+        schema:
+          type: string
       responses:
         '200':
-          description: Workgroups.
+          description: Legacy no-query array (capped at 1000), or {items,nextCursor} when paged.
           content:
             application/json:
               schema:
@@ -2718,12 +2764,30 @@ paths:
                     enum:
                     - true
                   data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Workgroup'
+                    oneOf:
+                    - type: array
+                      items:
+                        $ref: '#/components/schemas/Workgroup'
+                    - type: object
+                      properties:
+                        items:
+                          type: array
+                          items:
+                            $ref: '#/components/schemas/Workgroup'
+                        nextCursor:
+                          type: string
+                      required:
+                      - items
+                      - nextCursor
                 required:
                 - ok
                 - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '401':
           description: E_AUTH — missing or expired session
           content:
