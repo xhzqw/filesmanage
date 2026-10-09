@@ -91,7 +91,7 @@ export function SessionDevices({user,onLogout}:{user:User;onLogout:()=>void}){
       <div className="sessions-panel-heading"><div><h2 id="sessions-activity">最近安全操作</h2><p>保留在服务端的最近 30 条登录和会话撤销记录。</p></div></div>
       {activity.length===0?<p className="sessions-empty">暂无相关操作记录。</p>:
        <ul className="sessions-audit">{activity.map((event,i)=><li key={i}>
-        <div><strong>{activityLabels[event.type]??"安全操作"}</strong>
+        <div><strong>{event.type==="auth.login"&&event.outcome==="denied"?"登录失败":(activityLabels[event.type]??"安全操作")}</strong>
         {event.count!==undefined&&event.count>0?<span> · {event.count} 个会话</span>:null}
         <p>{event.device||"账号操作"}{event.address?" · "+event.address:""}</p></div>
         <time>{dateTime(event.occurredAt)}</time>

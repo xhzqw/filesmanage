@@ -5,7 +5,7 @@ export type DeviceSession={
  expiresAt:string;current:boolean;
 };
 export type AuthActivity={
- type:string;device:string;address:string;count?:number;occurredAt:string;
+ type:string;outcome:string;device:string;address:string;count?:number;occurredAt:string;
 };
 export const sessionApi={
  list:()=>request<DeviceSession[]>("/me/sessions"),

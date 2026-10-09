@@ -19,6 +19,7 @@ type SessionRow struct {
 
 type AuthActivity struct {
 	Type       string    `json:"type"`
+	Outcome    string    `json:"outcome"`
 	Device     string    `json:"device"`
 	Address    string    `json:"address"`
 	Count      int       `json:"count,omitempty"`

@@ -66,7 +66,7 @@ func (r *Repository) RevokeOtherSessions(ctx context.Context, userID, currentHas
 	return tag.RowsAffected(), nil
 }
 func (r *Repository) ListOwnAuthActivity(ctx context.Context, userID string) ([]ports.AuthActivity, error) {
-	rows, err := r.Q.Query(ctx, `SELECT event_type,
+	rows, err := r.Q.Query(ctx, `SELECT event_type,outcome,
  coalesce(details->>'device',''),coalesce(details->>'ip',''),coalesce((details->>'count')::integer,0),created_at
  FROM audit_events WHERE actor_id=$1 AND event_type IN
  ('auth.login','auth.logout','auth.session_revoke','auth.sessions_revoke')
@@ -78,7 +78,7 @@ func (r *Repository) ListOwnAuthActivity(ctx context.Context, userID string) ([]
 	items := make([]ports.AuthActivity, 0, 12)
 	for rows.Next() {
 		var row ports.AuthActivity
-		if err = rows.Scan(&row.Type, &row.Device, &row.Address, &row.Count, &row.OccurredAt); err != nil {
+		if err = rows.Scan(&row.Type, &row.Outcome, &row.Device, &row.Address, &row.Count, &row.OccurredAt); err != nil {
 			return nil, err
 		}
 		items = append(items, row)

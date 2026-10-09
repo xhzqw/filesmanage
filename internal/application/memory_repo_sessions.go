@@ -72,7 +72,7 @@ func (r *memoryRepo) ListOwnAuthActivity(_ context.Context, userID string) ([]po
 		if event.ActorID != userID || !strings.HasPrefix(event.EventType, "auth.") {
 			continue
 		}
-		item := ports.AuthActivity{Type: event.EventType, OccurredAt: time.Now()}
+		item := ports.AuthActivity{Type: event.EventType, Outcome: event.Outcome, OccurredAt: time.Now()}
 		if v, ok := event.Details["device"].(string); ok {
 			item.Device = v
 		}

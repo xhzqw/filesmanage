@@ -659,9 +659,10 @@ SESSION_DEVICE = obj({
 }, required=["id", "device", "address", "createdAt", "lastSeenAt", "expiresAt", "current"])
 SESSION_ACTIVITY = obj({
     "type": string("auth.login, auth.logout, auth.session_revoke or auth.sessions_revoke"),
+    "outcome": string("success or denied"),
     "device": string(), "address": string(), "count": integer(),
     "occurredAt": {"type": "string", "format": "date-time"}
-}, required=["type", "device", "address", "occurredAt"])
+}, required=["type", "outcome", "device", "address", "occurredAt"])
 add("GET", "/api/me/sessions", operation("List own active login devices", "Auth", "listOwnSessions",
     security=SESSION, responses=dict([json_ok(arr(SESSION_DEVICE), "At most 50 own sessions; includes current marker."),
         resp("401", ERR["401"]), resp("403", ERR["403"]), resp("503", ERR["503"])]), auth_note=MUST_CHANGE))

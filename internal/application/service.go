@@ -310,6 +310,16 @@ func (s *Service) Login(ctx context.Context, login, password string) (string, do
 		return "", domain.User{}, err
 	}
 	if bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
+		// Failed logins for known accounts are attributable without ever
+		// persisting submitted passwords or raw User-Agent values.
+		meta := metadataOf(ctx)
+		if err = auditRequired(ctx, tx, u, "auth.login", "user", u.ID, "denied",
+			map[string]any{"device": meta.device, "ip": meta.address}); err != nil {
+			return "", domain.User{}, err
+		}
+		if err = tx.Commit(ctx); err != nil {
+			return "", domain.User{}, err
+		}
 		return "", domain.User{}, ErrInvalidCredentials
 	}
 	token, err := newSessionToken()
@@ -381,8 +391,12 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 	owner := principal.User.ID
 	if store, ok := tx.(ports.SessionInventory); ok {
 		owner, err = store.SessionOwner(ctx, HashToken(token))
-		if errors.Is(err, ports.ErrRowMissing) { return ErrUnauthorized }
-		if err != nil { return err }
+		if errors.Is(err, ports.ErrRowMissing) {
+			return ErrUnauthorized
+		}
+		if err != nil {
+			return err
+		}
 	}
 	if err = tx.RevokeSession(ctx, HashToken(token)); err != nil {
 		if errors.Is(err, ports.ErrRowMissing) {
@@ -393,7 +407,9 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 	}
 	if owner != "" {
 		if err = auditRequired(ctx, tx, domain.User{ID: owner}, "auth.logout", "session",
-			HashToken(token)[:24], "success", map[string]any{}); err != nil { return err }
+			HashToken(token)[:24], "success", map[string]any{}); err != nil {
+			return err
+		}
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return err
