@@ -19,17 +19,17 @@ type Folder struct {
 }
 
 type File struct {
-	ID, FolderID, Name      string
-	UploadedBy              string
-	ContentType             string
-	CurrentVersionSeq       *int
-	SizeBytes               int64
-	Sha256                  string
-	UpdatedAt               time.Time
-	DeletedAt               *time.Time
+	ID, FolderID, Name string
+	UploadedBy         string
+	ContentType        string
+	CurrentVersionSeq  *int
+	SizeBytes          int64
+	Sha256             string
+	UpdatedAt          time.Time
+	DeletedAt          *time.Time
 	// Snippet is a search projection only (SPEC §10.3): a bounded plain-text
 	// window around the match, rendered with safe text nodes plus <mark>.
-	Snippet                 string
+	Snippet string
 }
 
 type FileVersion struct {
@@ -89,6 +89,7 @@ type AuditEvent struct {
 type PermissionAuditRecord struct {
 	ID         int64          `json:"id"`
 	ActorID    string         `json:"actorId"`
+	RequestID  string         `json:"requestId"`
 	EventType  string         `json:"eventType"`
 	TargetKind string         `json:"targetKind"`
 	TargetID   string         `json:"targetId"`

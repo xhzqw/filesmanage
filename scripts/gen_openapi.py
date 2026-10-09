@@ -434,10 +434,11 @@ schema("PermissionExplanation", obj({
              "effectiveActions", "sources", "evaluatedAt"]))
 
 schema("PermissionAuditEntry", obj({
-    "id": integer(), "actorId": string(), "eventType": string(), "targetKind": string(),
+    "id": integer(), "actorId": string(), "requestId": string(),
+    "eventType": string(), "targetKind": string(),
     "targetId": string(), "outcome": string(), "details": {"type": "object"},
     "createdAt": timestamp(),
-}, required=["id", "actorId", "eventType", "targetKind", "targetId", "outcome", "details", "createdAt"]))
+}, required=["id", "actorId", "requestId", "eventType", "targetKind", "targetId", "outcome", "details", "createdAt"]))
 
 schema("PermissionAuditPage", obj({
     "items": arr(ref("PermissionAuditEntry")), "nextCursor": string(),

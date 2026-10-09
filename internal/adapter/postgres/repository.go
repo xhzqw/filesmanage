@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"filesmanage/internal/domain"
 	"filesmanage/internal/ports"
+	"fmt"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -973,7 +973,7 @@ func (r *Repository) ListPermissionAudit(ctx context.Context, beforeID int64, li
 	if limit < 1 || limit > 101 || beforeID < 0 {
 		return nil, domain.ErrInvalidInput
 	}
-	rows, err := r.Q.Query(ctx, `SELECT id,coalesce(actor_id,''),event_type,target_kind,target_id,outcome,
+	rows, err := r.Q.Query(ctx, `SELECT id,coalesce(actor_id,''),request_id,event_type,target_kind,target_id,outcome,
 	  details,created_at FROM audit_events
 	  WHERE ($1::bigint=0 OR id<$1)
 	  AND event_type IN ('acl.create','acl.revoke','workgroup.member_add','workgroup.member_remove',
@@ -987,7 +987,7 @@ func (r *Repository) ListPermissionAudit(ctx context.Context, beforeID int64, li
 	for rows.Next() {
 		var item domain.PermissionAuditRecord
 		var details []byte
-		if err = rows.Scan(&item.ID, &item.ActorID, &item.EventType, &item.TargetKind,
+		if err = rows.Scan(&item.ID, &item.ActorID, &item.RequestID, &item.EventType, &item.TargetKind,
 			&item.TargetID, &item.Outcome, &details, &item.CreatedAt); err != nil {
 			return nil, err
 		}

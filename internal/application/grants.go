@@ -68,8 +68,10 @@ func (s *Service) CreateGrant(ctx context.Context, u domain.User, folderID strin
 	if err = tx.InsertGrant(ctx, grant); err != nil {
 		return domain.ACL{}, mapError(err)
 	}
-	audit(ctx, tx, u, "acl.create", "folder", folder.ID, "success",
-		map[string]any{"grantId": grant.ID, "subjectKind": req.SubjectKind, "subjectId": req.SubjectID, "actions": actionNames(req.Actions)})
+	if err = auditRequired(ctx, tx, u, "acl.create", "folder", folder.ID, "success",
+		map[string]any{"before": nil, "after": grantAuditState(grant)}); err != nil {
+		return domain.ACL{}, err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return domain.ACL{}, err
 	}
@@ -96,8 +98,10 @@ func (s *Service) RevokeGrant(ctx context.Context, u domain.User, grantID string
 	if err = tx.DeleteGrant(ctx, grantID); err != nil {
 		return mapError(err)
 	}
-	audit(ctx, tx, u, "acl.revoke", "folder", grant.FolderID, "success",
-		map[string]any{"grantId": grantID, "subjectKind": grant.SubjectKind, "subjectId": grant.SubjectID})
+	if err = auditRequired(ctx, tx, u, "acl.revoke", "folder", grant.FolderID, "success",
+		map[string]any{"before": grantAuditState(grant), "after": nil}); err != nil {
+		return err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return err
 	}

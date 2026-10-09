@@ -1,12 +1,12 @@
 package application
 
 import (
-	"encoding/json"
-	"fmt"
 	"context"
+	"encoding/json"
 	"errors"
 	"filesmanage/internal/domain"
 	"filesmanage/internal/ports"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -122,8 +122,10 @@ func (s *Service) CreateShare(ctx context.Context, u domain.User, draft ShareDra
 	if err = tx.CreateShare(ctx, share); err != nil {
 		return domain.Share{}, mapError(err)
 	}
-	audit(ctx, tx, u, "share.create", draft.ResourceKind, draft.ResourceID, "success",
-		map[string]any{"shareId": share.ID, "recipientKind": draft.RecipientKind, "recipientId": draft.RecipientID})
+	if err = auditRequired(ctx, tx, u, "share.create", draft.ResourceKind, draft.ResourceID, "success",
+		map[string]any{"before": nil, "after": shareAuditState(share)}); err != nil {
+		return domain.Share{}, err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return domain.Share{}, err
 	}
@@ -150,7 +152,12 @@ func (s *Service) RevokeShare(ctx context.Context, u domain.User, shareID string
 	if err = tx.RevokeShare(ctx, shareID); err != nil {
 		return err
 	}
-	audit(ctx, tx, u, "share.revoke", "share", shareID, "success", nil)
+	prior := shareAuditState(share)
+	share.RevokedAt = new(time.Time)
+	if err = auditRequired(ctx, tx, u, "share.revoke", "share", shareID, "success",
+		map[string]any{"before": prior, "after": shareAuditState(share)}); err != nil {
+		return err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return err
 	}
@@ -492,14 +499,14 @@ func (s *Service) Stats(ctx context.Context, u domain.User, filter SearchFilter)
 // so two users (or two scopes) never share an entry.
 func statsCacheKey(u domain.User, filter SearchFilter) string {
 	raw, err := json.Marshal(struct {
-		UserID             string
-		Admin              bool
-		FolderID           string
-		IncludeDescendant  bool
-		Uploader           string
-		MimePrefix         string
-		From               *time.Time
-		To                 *time.Time
+		UserID            string
+		Admin             bool
+		FolderID          string
+		IncludeDescendant bool
+		Uploader          string
+		MimePrefix        string
+		From              *time.Time
+		To                *time.Time
 	}{u.ID, u.IsAdmin, filter.FolderID, filter.IncludeDescendant, filter.Uploader,
 		filter.MimePrefix, filter.From, filter.To})
 	if err != nil {

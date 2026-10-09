@@ -558,7 +558,9 @@ func (r *memoryRepo) InsertBlob(_ context.Context, b domain.Blob) error {
 	return nil
 }
 
-func (r *memoryRepo) HasActiveApprovalPolicy(context.Context, string) (bool, error) { return false, nil }
+func (r *memoryRepo) HasActiveApprovalPolicy(context.Context, string) (bool, error) {
+	return false, nil
+}
 
 func (r *memoryRepo) AppendVersion(_ context.Context, v domain.FileVersion) error {
 	r.mu.Lock()
@@ -895,7 +897,7 @@ func (r *memoryRepo) ListPermissionAudit(_ context.Context, beforeID int64, limi
 			"user.create", "user.disable", "user.enable", "user.password_reset",
 			"share.create", "share.revoke":
 			out = append(out, domain.PermissionAuditRecord{
-				ID: id, ActorID: e.ActorID, EventType: e.EventType,
+				ID: id, ActorID: e.ActorID, RequestID: e.RequestID, EventType: e.EventType,
 				TargetKind: e.TargetKind, TargetID: e.TargetID,
 				Outcome: e.Outcome, Details: e.Details,
 			})

@@ -18,7 +18,24 @@ const EVENTS:Record<string,string>={
  "user.password_reset":"重置登录密码",
  "share.create":"新增共享","share.revoke":"撤销共享",
 };
-const DETAIL_KEYS=new Set(["grantId","subjectKind","subjectId","actions","userId","groupId","disabled","recipientId"]);
+const DETAIL_KEYS=new Set(["grantId","subjectKind","subjectId","actions","userId","groupId","disabled","recipientId","reason"]);
+const AUDIT_FIELDS=new Set(["grantId","shareId","folderId","resourceKind","resourceId","subjectKind",
+ "subjectId","recipientKind","recipientId","actions","scopeOnly","includeDescendants",
+ "expiresAt","revoked","disabled","member","isAdmin","departmentId","mustChangePassword","sessionsRevoked"]);
+const auditState=(raw:unknown)=>{
+ if(raw===null)return "无";
+ if(!raw||typeof raw!=="object"||Array.isArray(raw))return "—";
+ return Object.entries(raw).filter(([k])=>AUDIT_FIELDS.has(k))
+  .map(([k,v])=>k+"："+(v===null?"无":Array.isArray(v)?v.join("、"):String(v))).join("；")||"—";
+};
+const auditDetails=(details:Record<string,unknown>)=>{
+ if("before" in details||"after" in details){
+  const prefix=details.userId?"用户 "+String(details.userId)+" · ":"";
+  return prefix+auditState(details.before)+" → "+auditState(details.after);
+ }
+ return Object.entries(details).filter(([key])=>DETAIL_KEYS.has(key))
+  .map(([key,value])=>key+"："+(Array.isArray(value)?value.join("、"):String(value))).join(" · ")||"—";
+};
 const labelActions=(actions:string[])=>actions.map(a=>ACTIONS[a]??a).join("、");
 
 // The service returns authoritative allowed actions and the applied sources
@@ -119,15 +136,15 @@ export function PermissionAudit({users}:{users:User[]}){
   {busy&&<p role="status" className="hint">正在读取审计记录…</p>}
   {error&&<p role="alert" className="notice error">{error}</p>}
   {!busy&&<div className="perm-audit-scroll">
-   <table className="perm-table"><thead><tr><th>时间</th><th>变更</th><th>操作人</th><th>资源</th><th>摘要</th><th>结果</th></tr></thead>
+   <table className="perm-table"><thead><tr><th>时间</th><th>变更</th><th>操作人</th><th>资源</th><th>变更前 → 变更后</th><th>结果</th><th>请求追踪</th></tr></thead>
     <tbody>{page.items.map(item=><tr key={item.id}>
      <td>{item.createdAt?new Date(item.createdAt).toLocaleString("zh-CN"):"—"}</td>
      <td>{EVENTS[item.eventType]??item.eventType}</td>
      <td>{names.get(item.actorId)??item.actorId}</td>
      <td>{item.targetKind} · {item.targetId}</td>
-     <td className="perm-audit-detail">{Object.entries(item.details??{}).filter(([key])=>DETAIL_KEYS.has(key))
-      .map(([key,value])=>key+"："+(Array.isArray(value)?value.join("、"):String(value))).join(" · ")||"—"}</td>
-     <td>{item.outcome==="success"?"成功":item.outcome}</td>
+     <td className="perm-audit-detail">{auditDetails(item.details??{})}</td>
+     <td>{item.outcome==="success"?"成功":item.outcome==="denied"?"拒绝":item.outcome}</td>
+     <td><code title={item.requestId}>{item.requestId||"—"}</code></td>
     </tr>)}</tbody>
    </table>
    {page.items.length===0&&<p className="empty">暂无权限变更审计记录。</p>}

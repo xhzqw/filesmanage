@@ -77,8 +77,12 @@ func (s *Service) CreateUser(ctx context.Context, actor domain.User, draft UserD
 	if err = tx.CreateUser(ctx, user, string(hash)); err != nil {
 		return domain.User{}, mapError(err)
 	}
-	audit(ctx, tx, actor, "user.create", "user", user.ID, "success",
-		map[string]any{"login": user.Login, "displayName": user.DisplayName, "departmentId": user.DepartmentID, "isAdmin": user.IsAdmin})
+	if err = auditRequired(ctx, tx, actor, "user.create", "user", user.ID, "success",
+		map[string]any{"before": nil, "after": map[string]any{
+			"isAdmin": user.IsAdmin, "departmentId": user.DepartmentID, "mustChangePassword": true,
+		}}); err != nil {
+		return domain.User{}, err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return domain.User{}, err
 	}
@@ -122,8 +126,13 @@ func (s *Service) SetUserDisabled(ctx context.Context, actor domain.User, userID
 	if err = tx.SetUserDisabled(ctx, userID, disabled); err != nil {
 		return mapError(err)
 	}
-	audit(ctx, tx, actor, map[bool]string{true: "user.disable", false: "user.enable"}[disabled], "user", userID, "success",
-		map[string]any{"login": target.Login})
+	if err = auditRequired(ctx, tx, actor, map[bool]string{true: "user.disable", false: "user.enable"}[disabled],
+		"user", userID, "success", map[string]any{
+			"before": map[string]any{"disabled": target.DisabledAt != nil},
+			"after":  map[string]any{"disabled": disabled},
+		}); err != nil {
+		return err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return err
 	}
@@ -161,7 +170,13 @@ func (s *Service) ResetUserPassword(ctx context.Context, actor domain.User, user
 	if err = tx.ForcePasswordChange(ctx, userID); err != nil {
 		return err
 	}
-	audit(ctx, tx, actor, "user.password_reset", "user", userID, "success", map[string]any{"login": target.Login})
+	if err = auditRequired(ctx, tx, actor, "user.password_reset", "user", userID, "success",
+		map[string]any{
+			"before": map[string]any{"mustChangePassword": target.MustChangePassword},
+			"after":  map[string]any{"mustChangePassword": true, "sessionsRevoked": true},
+		}); err != nil {
+		return err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return err
 	}
@@ -291,15 +306,18 @@ func (s *Service) AddWorkgroupMember(ctx context.Context, actor domain.User, gro
 	if _, err = tx.WorkgroupByID(ctx, groupID); err != nil {
 		return notFoundOr(err)
 	}
-	target, err := tx.UserByID(ctx, userID)
+	_, err = tx.UserByID(ctx, userID)
 	if err != nil {
 		return notFoundOr(err)
 	}
 	if err = tx.AddWorkgroupMember(ctx, groupID, userID); err != nil {
 		return mapError(err)
 	}
-	audit(ctx, tx, actor, "workgroup.member_add", "workgroup", groupID, "success",
-		map[string]any{"userId": userID, "login": target.Login})
+	if err = auditRequired(ctx, tx, actor, "workgroup.member_add", "workgroup", groupID, "success",
+		map[string]any{"userId": userID, "before": map[string]any{"member": false},
+			"after": map[string]any{"member": true}}); err != nil {
+		return err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return err
 	}
@@ -322,7 +340,11 @@ func (s *Service) RemoveWorkgroupMember(ctx context.Context, actor domain.User, 
 	if err = tx.RemoveWorkgroupMember(ctx, groupID, userID); err != nil {
 		return mapError(err)
 	}
-	audit(ctx, tx, actor, "workgroup.member_remove", "workgroup", groupID, "success", map[string]any{"userId": userID})
+	if err = auditRequired(ctx, tx, actor, "workgroup.member_remove", "workgroup", groupID, "success",
+		map[string]any{"userId": userID, "before": map[string]any{"member": true},
+			"after": map[string]any{"member": false}}); err != nil {
+		return err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return err
 	}

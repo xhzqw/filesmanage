@@ -5557,6 +5557,8 @@ components:
           type: integer
         actorId:
           type: string
+        requestId:
+          type: string
         eventType:
           type: string
         targetKind:
@@ -5573,6 +5575,7 @@ components:
       required:
       - id
       - actorId
+      - requestId
       - eventType
       - targetKind
       - targetId

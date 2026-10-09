@@ -18,7 +18,7 @@ export type PermissionExplanation={
  effectiveActions:string[];sources:PermissionSource[];evaluatedAt:string;
 };
 export type PermissionAuditRow={
- id:number;actorId:string;eventType:string;targetKind:string;targetId:string;
+ id:number;actorId:string;requestId:string;eventType:string;targetKind:string;targetId:string;
  outcome:string;details:Record<string,unknown>;createdAt:string;
 };
 export type PermissionAuditPage={items:PermissionAuditRow[];nextCursor:string};

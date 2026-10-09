@@ -1,8 +1,6 @@
 package application
 
 import (
-	"sync"
-	"sync/atomic"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -10,12 +8,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"filesmanage/internal/domain"
 	"filesmanage/internal/ports"
+	"fmt"
 	"golang.org/x/crypto/bcrypt"
 	"io"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -30,10 +30,10 @@ var (
 // obtained from the unit of work; blob bytes are staged outside transactions
 // and only referenced inside them.
 type Service struct {
-	uow    ports.UnitOfWork
-	blobs  ports.BlobStore
-	office OfficeConfig
-	now    func() time.Time
+	uow     ports.UnitOfWork
+	blobs   ports.BlobStore
+	office  OfficeConfig
+	now     func() time.Time
 	stats   statsCache
 	search  searchCache
 	session sessionCache
@@ -434,12 +434,35 @@ func allActions() map[domain.Action]bool {
 
 // audit records a best-effort event inside the caller's transaction.
 func audit(ctx context.Context, repo ports.Repository, actor domain.User, eventType, targetKind, targetID, outcome string, details map[string]any) {
-	_ = repo.RecordAudit(ctx, domain.AuditEvent{
+	_ = auditRequired(ctx, repo, actor, eventType, targetKind, targetID, outcome, details)
+}
+
+// Audit correlation IDs come only from server-generated request context.
+// Do not accept client-supplied request IDs into this security ledger.
+type auditRequestIDKey struct{}
+
+func NewAuditRequestID() string { return newRequestID() }
+
+func WithAuditRequestID(ctx context.Context, requestID string) context.Context {
+	return context.WithValue(ctx, auditRequestIDKey{}, requestID)
+}
+
+func auditRequestID(ctx context.Context) string {
+	if requestID, ok := ctx.Value(auditRequestIDKey{}).(string); ok && requestID != "" {
+		return requestID
+	}
+	return newRequestID()
+}
+
+// auditRequired must be checked before committing an access-changing
+// transaction. Failed audit storage therefore fails closed for writes.
+func auditRequired(ctx context.Context, repo ports.Repository, actor domain.User, eventType, targetKind, targetID, outcome string, details map[string]any) error {
+	return repo.RecordAudit(ctx, domain.AuditEvent{
 		ActorID:    actor.ID,
 		EventType:  eventType,
 		TargetKind: targetKind,
 		TargetID:   targetID,
-		RequestID:  newRequestID(),
+		RequestID:  auditRequestID(ctx),
 		Outcome:    outcome,
 		Details:    details,
 	})
