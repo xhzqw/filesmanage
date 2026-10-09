@@ -132,7 +132,7 @@ async function pagedSuite() {
   const stamp = String(Date.now());
   const json = async (method, path, body) => {
     const res = await fetch(BASE + path, {
-      method, headers: { "Content-Type": "application/json", Origin: ORIGIN, Cookie: sessionCookie },
+      method, headers: { "Content-Type": "application/json", Cookie: cookie },
       body: body ? JSON.stringify(body) : undefined,
     });
     return { status: res.status, body: await res.json().catch(() => null) };
@@ -280,15 +280,15 @@ async function pagedSuite() {
   } finally {
     cdp && cdp.close();
     chrome && chrome.kill("SIGKILL");
-  }
-
-
-  await json("DELETE", `/api/folders/${bigRoot}`);
-  const trash = await json("GET", "/api/trash");
-  for (const entry of trash.body?.data ?? []) {
-    const name = String(entry.name ?? entry.oldName ?? "");
-    if (name.includes(`PG-BIG-${stamp}`) || (name.startsWith("PG-") && name.includes(stamp))) {
-      await json("DELETE", "/api/trash/" + entry.id);
+    // Cleanup is crash-safe: a mid-suite failure must not leak 305 folders into
+    // the shared dev tree (the /folders/tree endpoint caps at 500).
+    if (bigRoot) await json("DELETE", `/api/folders/${bigRoot}`);
+    const trash = await json("GET", "/api/trash");
+    for (const entry of trash.body?.data ?? []) {
+      const name = String(entry.name ?? entry.oldName ?? "");
+      if (name.includes(`PG-BIG-${stamp}`) || (name.startsWith("PG-") && name.includes(stamp))) {
+        await json("DELETE", "/api/trash/" + entry.id);
+      }
     }
   }
 }

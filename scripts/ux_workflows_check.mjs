@@ -853,21 +853,19 @@ async function g4UiSuite() {
   } finally {
     cdp && cdp.close();
     chrome && chrome.kill("SIGKILL");
-  }
-
-
-  // cleanup
-  const shares = await call("GET", "/api/shares?scope=sent");
-  for (const s of shares.body?.data ?? []) {
-    if (s.resourceName === `G4-${stamp}`) await call("DELETE", `/api/shares/${s.id}`);
-  }
-  await call("DELETE", `/api/favorites/file/${uploaded.fileId}`);
-  await call("DELETE", `/api/folders/${folderId}`);
-  const trash = await call("GET", "/api/trash");
-  for (const entry of trash.body?.data ?? []) {
-    const name = String(entry.name ?? entry.oldName ?? "");
-    if (name === `G4-${stamp}` || name.startsWith(`g4-${stamp}`)) {
-      await call("DELETE", "/api/trash/" + entry.id);
+    // Crash-safe cleanup: a mid-suite failure must not leak fixtures.
+    const shares = await call("GET", "/api/shares?scope=sent");
+    for (const s of shares.body?.data ?? []) {
+      if (s.resourceName === `G4-${stamp}`) await call("DELETE", `/api/shares/${s.id}`);
+    }
+    if (uploaded?.fileId) await call("DELETE", `/api/favorites/file/${uploaded.fileId}`);
+    if (folderId) await call("DELETE", `/api/folders/${folderId}`);
+    const trash = await call("GET", "/api/trash");
+    for (const entry of trash.body?.data ?? []) {
+      const name = String(entry.name ?? entry.oldName ?? "");
+      if (name === `G4-${stamp}` || name.startsWith(`g4-${stamp}`)) {
+        await call("DELETE", "/api/trash/" + entry.id);
+      }
     }
   }
 }
@@ -1073,18 +1071,16 @@ async function batchUiSuite() {
   } finally {
     cdp && cdp.close();
     chrome && chrome.kill("SIGKILL");
-  }
-
-
-  // cleanup
-  for (const folder of [aId, bId, cId]) {
-    if (folder) await json("DELETE", `/api/folders/${folder}`);
-  }
-  const trash = await json("GET", "/api/trash");
-  for (const entry of trash.body?.data ?? []) {
-    const name = String(entry.name ?? entry.oldName ?? "");
-    if (name.startsWith("bm-") || (name.startsWith("BM-") && name.includes(stamp))) {
-      await json("DELETE", "/api/trash/" + entry.id);
+    // Crash-safe cleanup: a mid-suite failure must not leak fixtures.
+    for (const folder of [aId, bId, cId]) {
+      if (folder) await json("DELETE", `/api/folders/${folder}`);
+    }
+    const trash = await json("GET", "/api/trash");
+    for (const entry of trash.body?.data ?? []) {
+      const name = String(entry.name ?? entry.oldName ?? "");
+      if (name.startsWith("bm-") || (name.startsWith("BM-") && name.includes(stamp))) {
+        await json("DELETE", "/api/trash/" + entry.id);
+      }
     }
   }
 }
