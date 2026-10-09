@@ -46,7 +46,7 @@ export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
     // editor validates the signature server-side.
     const DocEditor=window.DocsAPI?.DocEditor;
     if(!DocEditor)throw new Error("editor api unavailable");
-    new DocEditor("placeholder",opened.config as {token:string});
+    new DocEditor("docx-editor-target",opened.config as {token:string});
     setStatus("ready");
    })
    .catch(error=>{
@@ -69,7 +69,9 @@ export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
    {file&&<div className="breadcrumb">{file.name} · 当前 v{file.currentVersionSeq}</div>}
    {status==="loading"&&<p className="empty">正在启动文档编辑器…</p>}
    {status==="failed"&&<p role="alert" className="notice error">{message}</p>}
-   <div id="placeholder" ref={holder} className="office-holder"/>
+   <div id="placeholder" ref={holder} className="office-holder">
+    <div id="docx-editor-target"/>
+   </div>
   </div>
  </AppShell>;
 }

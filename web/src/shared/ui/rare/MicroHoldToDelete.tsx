@@ -23,6 +23,7 @@ export function MicroHoldToDelete({
 }: MicroHoldToDeleteProps) {
   const [progress, setProgress] = useState(0);
   const [armed, setArmed] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
   const rafRef = useRef<number | null>(null);
   const startedAtRef = useRef(0);
   const holdingRef = useRef(false);
@@ -35,6 +36,7 @@ export function MicroHoldToDelete({
       rafRef.current = null;
     }
     holdingRef.current = false;
+    btnRef.current?.setAttribute("data-armed", "false");
     setArmed(false);
     setProgress(0);
     if (physicalResetTimerRef.current !== null) {
@@ -55,6 +57,7 @@ export function MicroHoldToDelete({
     hadPhysicalPressRef.current = true;
     holdingRef.current = true;
     startedAtRef.current = performance.now();
+    btnRef.current?.setAttribute("data-armed", "true");
     setArmed(true);
     function tick(now: number) {
       const p = Math.min(Math.max((now - startedAtRef.current) / duration, 0), 1);
@@ -101,6 +104,7 @@ export function MicroHoldToDelete({
 
   return (
     <button
+      ref={btnRef}
       type="button"
       className="micro-hold"
       data-tone={tone}

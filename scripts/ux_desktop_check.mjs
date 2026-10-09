@@ -1237,11 +1237,14 @@ async function main() {
         const table=document.querySelector('table.file-table');
         const box=document.querySelector('.table');
         const tr=document.querySelector('tbody tr[data-id]');
+        const diag=[...tr.children].map(td=>({cls:td.className,h:getComputedStyle(td).height,offH:td.offsetHeight,pad:getComputedStyle(td).padding,lh:getComputedStyle(td).lineHeight,dis:getComputedStyle(td).display,kids:[...td.children].map(c=>({tag:c.tagName,cls:c.className,h:getComputedStyle(c).height,offH:c.offsetHeight}))}));
         return {cols:table.querySelectorAll('colgroup col').length,
                 layout:getComputedStyle(table).tableLayout,
                 row:getComputedStyle(tr).height,
                 overflowX:box.scrollWidth-box.clientWidth,
-                sticky:getComputedStyle(table.querySelector('thead th')).position};})()`);
+                sticky:getComputedStyle(table.querySelector('thead th')).position,
+                diag};})()`);
+      console.log("DIAG_PW02:", JSON.stringify(grid.diag));
       check("PW-02 fixed 7-column grid, 32px rows, sticky header, no horizontal overflow",
         grid.cols === 7 && grid.layout === "fixed" && grid.row === "32px"
         && grid.sticky === "sticky" && grid.overflowX <= 1,
