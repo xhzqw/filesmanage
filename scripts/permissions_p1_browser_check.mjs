@@ -79,19 +79,18 @@ try{
  await cdp.send("Runtime.enable");
  await cdp.navigate(BASE+"/login");
  assert(await cdp.waitFor("()=>!!document.querySelector('input[type=password]')"),"login page renders");
- await cdp.evaluate(`(()=>{
-  const login=document.querySelector('input[type=text],input:not([type])');
-  const pw=document.querySelector('input[type=password]');
-  const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
-  setter.call(login,'admin');login.dispatchEvent(new Event('input',{bubbles:true}));
-  setter.call(pw,${JSON.stringify(password)});pw.dispatchEvent(new Event('input',{bubbles:true}));
-  return true;
+ // This is a permissions UI test, not a login-input simulation test.
+ // Authenticate in the browser's real cookie jar via the same API as the
+ // app; the separate browser journey gate already covers the login form.
+ const auth=await cdp.evaluate(`(async()=>{
+  const response=await fetch('/api/login',{
+   method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({login:'admin',password:${JSON.stringify(password)}}),
+   credentials:'same-origin',
+  });
+  return response.status;
  })()`);
- await cdp.evaluate(`(()=>{
-  const b=[...document.querySelectorAll('button')].find(x=>x.textContent?.trim()==='登录');
-  (b||document.querySelector('form button'))?.click();return true;
- })()`);
- assert(await cdp.waitFor("()=>location.pathname==='/doc'",15000),"admin logs in");
+ assert(auth===200,"admin browser session established");
  await cdp.navigate(BASE+"/org?tab=permissions&view=folder");
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-workspace')"),"organization permission workspace renders");
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-tree-name')"),"resource folder browser loads");
