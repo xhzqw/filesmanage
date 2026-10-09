@@ -118,9 +118,9 @@ function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(folder:R
     {searchState==="loading"&&<p className="hint">正在搜索…</p>}
     {searchState==="failed"&&<p role="alert" className="notice error">{searchError}</p>}
     {searchState==="ready"&&searchPage.items.length===0&&<p className="hint">没有匹配的目录</p>}
-    {searchPage.items.map(f=><button type="button" key={f.id} className="perm-result" onClick={()=>onSelect(f)}>
+    {searchState==="ready"&&searchPage.items.map(f=><button type="button" key={f.id} className="perm-result" onClick={()=>onSelect(f)}>
      <span>{f.name}</span><small>{f.path||"资源目录"}</small></button>)}
-    {searchPage.nextCursor&&<button type="button" className="perm-more" disabled={moreSearch} onClick={()=>void loadMoreSearch()}>加载更多结果</button>}
+    {searchState==="ready"&&searchPage.nextCursor&&<button type="button" className="perm-more" disabled={moreSearch} onClick={()=>void loadMoreSearch()}>加载更多结果</button>}
    </>:<>
     {loading[""]&&<p className="hint">正在读取资源目录…</p>}
     {errors[""]&&<p role="alert" className="notice error">{errors[""]} <button type="button" onClick={()=>void load("")}>重试</button></p>}
@@ -133,9 +133,14 @@ function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(folder:R
  </aside>;
 }
 
-export function PermissionsPanel({users,groups}:{users:User[];groups:Group[]}){
+export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUsers,onRetryGroups}:{
+ users:User[];groups:Group[];usersState:LoadState;groupsState:LoadState;
+ onRetryUsers:()=>void;onRetryGroups:()=>void;
+}){
  const [params,setParams]=useSearchParams();
  const folderId=params.get("folder")??"";
+ const currentFolderRef=useRef(folderId);
+ currentFolderRef.current=folderId;
  const [selectedName,setSelectedName]=useState<{id:string;name:string}|null>(null);
  const [grants,setGrants]=useState<DirectGrant[]>([]);
  const [state,setState]=useState<LoadState>("ready");
@@ -148,9 +153,18 @@ export function PermissionsPanel({users,groups}:{users:User[];groups:Group[]}){
  const [scopeOnly,setScopeOnly]=useState(true);
  const [expiresAt,setExpiresAt]=useState("");
  const [submitState,setSubmitState]=useState<"edit"|"review"|"saving">("edit");
+ const [reviewFolderId,setReviewFolderId]=useState("");
  const [revokeTarget,setRevokeTarget]=useState<DirectGrant|null>(null);
  const [revokeBusy,setRevokeBusy]=useState(false);
  const [revokeError,setRevokeError]=useState("");
+
+ // URL navigation is independent of ResourceBrowser selection (back/forward,
+ // deep links). Never reuse a confirmation or grant subject across resources.
+ useEffect(()=>{
+  setSubmitState("edit");setReviewFolderId("");
+  setSubjectId("");setActions(["list"]);setScopeOnly(true);setExpiresAt("");
+  setRevokeTarget(null);setRevokeError("");
+ },[folderId]);
 
  useEffect(()=>{
   if(!folderId){setGrants([]);setState("ready");return;}
@@ -173,6 +187,7 @@ export function PermissionsPanel({users,groups}:{users:User[];groups:Group[]}){
   groups.forEach(g=>out.set("group:"+g.id,g.name));
   return out;
  },[users,groups]);
+ const subjectSourceState=subjectKind==="user"?usersState:groupsState;
  const displayActions=(xs:string[])=>xs.map(x=>LABELS.get(x)??x).join("、");
  const reload=()=>setRefresh(x=>x+1);
  function selectFolder(folder:ResourceFolder){
@@ -182,8 +197,9 @@ export function PermissionsPanel({users,groups}:{users:User[];groups:Group[]}){
  }
  async function submit(event:FormEvent<HTMLFormElement>){
   event.preventDefault();
-  if(!folderId||!subjectId||!actions.length||submitState==="saving")return;
-  if(submitState!=="review"){setSubmitState("review");return;}
+  if(!folderId||!subjectId||!actions.length||submitState==="saving"||subjectSourceState!=="ready")return;
+  if(submitState!=="review"){setReviewFolderId(folderId);setSubmitState("review");return;}
+  if(reviewFolderId!==folderId){setSubmitState("edit");return;}
   const parsed=expiresAt?Date.parse(expiresAt):null;
   if(parsed!==null&&(!Number.isFinite(parsed)||parsed<=Date.now())){
    setNotice({text:"到期时间必须晚于当前时间",error:true});return;
@@ -192,22 +208,27 @@ export function PermissionsPanel({users,groups}:{users:User[];groups:Group[]}){
   try{
    await permissionsApi.create(folderId,{subjectKind,subjectId,actions,scopeOnly,
     ...(parsed!==null?{expiresAt:new Date(parsed).toISOString()}:{})});
+   if(currentFolderRef.current!==folderId)return;
    setNotice({text:"直接授权已提交，请以刷新后的服务端记录为准。",error:false});
    setSubjectId("");setExpiresAt("");setActions(["list"]);setScopeOnly(true);
    reload();
   }catch(e){
+   if(currentFolderRef.current!==folderId)return;
    setNotice({text:errorCode(e)==="E_NETWORK"
     ?"网络中断，提交结果未知。请刷新列表核实，避免重复授权。"
     :errorCopy(e,"授权失败"),error:true});
-  }finally{setSubmitState("edit");}
+  }finally{if(currentFolderRef.current===folderId)setSubmitState("edit");}
  }
  async function revoke(){
   if(!revokeTarget||revokeBusy)return;
+  const revokeFolder=folderId;
   setRevokeBusy(true);setRevokeError("");
   try{
    await permissionsApi.revoke(revokeTarget.id);
+   if(currentFolderRef.current!==revokeFolder)return;
    setRevokeTarget(null);setNotice({text:"直接授权已撤销，已重新读取服务端记录。",error:false});reload();
   }catch(e){
+   if(currentFolderRef.current!==revokeFolder)return;
    setRevokeError(errorCode(e)==="E_NETWORK"
     ?"网络中断，撤销结果未知。关闭弹窗并刷新授权后确认。"
     :errorCopy(e,"撤销失败"));
@@ -235,11 +256,14 @@ export function PermissionsPanel({users,groups}:{users:User[];groups:Group[]}){
     </div>}
     <div className="perm-section-title">新增直接授权</div>
     <form className="perm-form" onSubmit={submit} onChange={()=>{if(submitState==="review")setSubmitState("edit");}}>
+     {usersState==="failed"&&<p role="alert" className="notice error">读取用户列表失败。<button type="button" className="secondary-action" onClick={onRetryUsers}>重试用户列表</button></p>}
+     {groupsState==="failed"&&<p role="alert" className="notice error">读取工作组列表失败。<button type="button" className="secondary-action" onClick={onRetryGroups}>重试工作组列表</button></p>}
+     {subjectSourceState==="loading"&&<p role="status" className="hint">正在读取可授权主体…</p>}
      <div className="perm-form-row">
       <label>主体类型<select value={subjectKind} onChange={e=>{setSubjectKind(e.target.value as "user"|"group");setSubjectId("");}}>
        <option value="group">工作组</option><option value="user">用户</option></select></label>
       <label>查找主体<input type="search" value={subjectQuery} onChange={e=>{setSubjectQuery(e.target.value);setSubjectId("");}} placeholder="按名称或账号筛选"/></label>
-      <label>授权给<select value={subjectId} required onChange={e=>setSubjectId(e.target.value)}>
+      <label>授权给<select value={subjectId} required disabled={subjectSourceState!=="ready"} onChange={e=>setSubjectId(e.target.value)}>
        <option value="">请选择</option>{candidates.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
      </div>
      <fieldset><legend>允许执行的文件动作</legend><div className="perm-action-grid">
@@ -258,7 +282,7 @@ export function PermissionsPanel({users,groups}:{users:User[];groups:Group[]}){
      </div>}
      <div className="perm-form-actions"><span className="hint">授权效果以服务端判定为准。</span>
       {submitState==="review"&&<button type="button" className="secondary-action" onClick={()=>setSubmitState("edit")}>返回修改</button>}
-      <button type="submit" className="primary" disabled={submitState==="saving"||!subjectId||!actions.length||state!=="ready"}>
+      <button type="submit" className="primary" disabled={submitState==="saving"||!subjectId||!actions.length||state!=="ready"||subjectSourceState!=="ready"}>
        {submitState==="saving"?"提交中…":submitState==="review"?"确认添加授权":"预览授权"}</button>
      </div>
     </form>

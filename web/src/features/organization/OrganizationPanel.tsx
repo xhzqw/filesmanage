@@ -790,7 +790,10 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
      </div>}
     </div>
 
-    {activeTab==="permissions"&&<PermissionsPanel users={users} groups={groups}/>}
+    {activeTab==="permissions"&&<PermissionsPanel users={users} groups={groups}
+     usersState={usersState} groupsState={groupsState}
+     onRetryUsers={()=>setUsersToken(token=>token+1)}
+     onRetryGroups={()=>setGroupsToken(token=>token+1)}/>}
 
     {/* Tab 1: 部门成员 */}
     {activeTab==="members"&&<div className="org-tab-stage">
