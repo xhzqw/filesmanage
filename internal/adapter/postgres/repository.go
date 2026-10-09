@@ -329,6 +329,23 @@ func (r *Repository) RenameFile(ctx context.Context, id, name string) error {
 	return nil
 }
 
+// MoveFile reparents an active file. The partial unique index
+// uq_file_active_name(folder_id,name) rejects a live name collision in the
+// target, which surfaces as E_NAME_CONFLICT exactly like a rename.
+func (r *Repository) MoveFile(ctx context.Context, id, folderID string) error {
+	tag, err := r.Q.Exec(ctx, "UPDATE files SET folder_id=$2,updated_at=now() WHERE id=$1 AND deleted_at IS NULL", id, folderID)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return domain.ErrNameConflict
+		}
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ports.ErrRowMissing
+	}
+	return nil
+}
+
 // FolderSubtreeIncludingDeleted returns the folder and all descendants, deleted
 // or not, shallow first, so a trashed subtree can be revived wholesale.
 func (r *Repository) FolderSubtreeIncludingDeleted(ctx context.Context, id string) ([]domain.Folder, error) {

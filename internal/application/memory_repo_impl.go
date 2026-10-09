@@ -412,6 +412,18 @@ func (r *memoryRepo) RenameFile(_ context.Context, id, name string) error {
 	return nil
 }
 
+func (r *memoryRepo) MoveFile(_ context.Context, id, folderID string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	f, ok := r.files[id]
+	if !ok || f.DeletedAt != nil {
+		return ports.ErrRowMissing
+	}
+	f.FolderID = folderID
+	r.files[id] = f
+	return nil
+}
+
 func (r *memoryRepo) CreateFileWithFirstVersion(_ context.Context, f domain.File, v domain.FileVersion) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

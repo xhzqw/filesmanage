@@ -705,6 +705,8 @@ GET /api/approvals、POST /api/approvals/:id/decide、GET /api/search。
 | POST | /api/files/:id/lock/renew | 持有效 token | 续租 |
 | GET | /api/files/:id/metadata | 有效 preview/list | 可见文件元数据 |
 | GET | /api/files/:id/bytes-meta | 有效 preview | 编码/行尾/checksum 元数据 |
+| POST | /api/files/:id/move | 来源 move + 目标 upload | 单文件移动（CAS + 幂等 + 审计） |
+| POST | /api/moves/preflight | 已登录 | 移动前只读预检（UX 提示，非授权证明） |
 
 ### 9.3 新增 API 请求响应示例
 ```json
@@ -741,6 +743,23 @@ POST /api/files/f_xxx/save
 ```
 成功返回 versionSeq、新 SHA-256、大小、lockReleased；需审批返回 pending,approvalId；
 409 返回机器可判断的 E_LOCKED/E_VERSION_CONFLICT/E_APPROVAL_PENDING。
+```json
+POST /api/files/f_xxx/move
+{ "targetFolderId": "fd_target", "expectedFolderId": "fd_source", "idempotencyKey": "opaque-client-key" }
+```
+成功 200：`{"ok":true,"data":{"fileId":"f_xxx","fromFolderId":"fd_source","toFolderId":"fd_target","status":"committed"}}`；
+稳定 file id、版本历史与内容哈希不变，新增 file.move 审计事件，权限 epoch 缓存失效。
+`expectedFolderId` 是 CAS 守卫，与当前所在目录不一致返回 409 E_VERSION_CONFLICT（不静默移动）；
+目标为自身所在目录返回 409 E_MOVE_CONFLICT；目标不存在/已删除/不可见返回 404 E_NOT_FOUND；
+目标已有同名文件返回 409 E_NAME_CONFLICT；来源无 move 或目标无 upload 返回 403 E_FORBIDDEN。
+相同 idempotencyKey 重放返回同一 `{fileId,fromFolderId,toFolderId}`，不重复移动、不重复审计。
+```json
+POST /api/moves/preflight
+{ "resources": [{"kind":"file","id":"f_1"}], "targetFolderId": "fd_target", "mode": "all_or_nothing" }
+```
+成功 200：`{"ok":true,"data":{"status":"ready","candidateRevision":"opaque-revision","allowedCount":1,"conflicts":[],"warnings":["目标目录继承权限将重新评估"],"sourceSummary":"研发部 / 项目A","targetSummary":"研发部 / 项目B"}}`；
+冲突时 status 为 conflict/forbidden，conflicts 逐项 `{id,code,message?}`，code 与提交路径一致。
+预检为只读 UX 检查：不写任何数据、不加锁，`candidateRevision` 不是授权令牌，提交仍在事务内重验全部条件。
 
 ### 9.4 查询、安全与异常响应规则
 所有 query `folder,resourceId,user,dept` 必须在服务端验证是否存在和调用者可见；
@@ -777,6 +796,25 @@ rollbackTargetSeq、rollbackFromSeq、sha256、versionSeq、createdAt、createdB
 幂等请求用唯一 (user_id,file_id,idempotencyKey) 追踪结果；重试返回相同 versionSeq/approvalId，
 不能用“同一个目标版本”代替幂等键（用户以后可能合法再次回滚到 v1）。
 所有错误使用已有标准 JSON error 和 requestId；禁止返回 200 但业务失败的混合语义。
+
+### 9.6 文件移动与预检（COMPLEX-WORKFLOWS §3，G3 后端）
+提交：POST /api/files/:id/move，请求 `{targetFolderId,expectedFolderId,idempotencyKey}`。
+- 单事务内重验来源目录 `move`、目标目录 `upload`、目标存在且未删除、目标内名称唯一与文件活跃状态；
+  `expectedFolderId` 与当前目录不一致返回 409 E_VERSION_CONFLICT；目标为自身所在目录返回 409 E_MOVE_CONFLICT。
+- 成功保持稳定 file id、版本历史与内容哈希；写入 `file.move` 审计事件；提交后按现有权限 epoch 失效缓存，
+  搜索/关注/共享范围在下一个请求重算。
+- 幂等：以 (user_id,file_id,idempotencyKey) 记录 `{fileId,fromFolderId,toFolderId}`，与 save/rollback 同一机制；
+  重放返回相同结果，不产生第二次移动或审计行。批量移动与目录移动（POST /api/folders/:id/move）复用同一机制，
+  批量上限在实现前以 ADR 明确。
+
+预检：POST /api/moves/preflight，请求 `{resources:[{kind,id}],targetFolderId,mode}`，只读，不写任何数据、不加锁。
+- status：`ready`（全部可移动）/`conflict`（重名、不存在、已在目标等）/`forbidden`（权限不足）；
+  conflicts 逐项 `{id,code,message?}`，code 使用与提交一致的标准错误码（E_FORBIDDEN/E_NAME_CONFLICT/
+  E_NOT_FOUND/E_MOVE_CONFLICT/E_BAD）。
+- `candidateRevision` 为不透明串，不是授权令牌；提交路径在事务内重验全部条件，预检结果只作 UX 提示。
+- `sourceSummary`/`targetSummary` 仅包含调用方可见的目录名，不可见祖先处截断，不泄露隐藏路径或名称；
+  目标对调用方不可见时返回 404 E_NOT_FOUND，与“不存在”不可区分（SAFE-04）。
+- mode 仅支持 `all_or_nothing`；任一资源冲突时提交不得产生部分写入。
 
 ---
 

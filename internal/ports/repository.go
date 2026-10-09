@@ -45,6 +45,7 @@ type Repository interface {
 	FileByID(context.Context, string) (domain.File, error)
 	FileByNameInFolder(context.Context, string, string) (domain.File, error)
 	RenameFile(context.Context, string, string) error
+	MoveFile(context.Context, string, string) error
 	CreateFileWithFirstVersion(context.Context, domain.File, domain.FileVersion) error
 	InsertBlob(context.Context, domain.Blob) error
 	HasActiveApprovalPolicy(context.Context, string) (bool, error)

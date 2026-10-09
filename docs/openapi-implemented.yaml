@@ -1365,6 +1365,148 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/{id}/move:
+    post:
+      summary: Move a file to another folder (CAS + idempotent)
+      operationId: moveFile
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File id.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoveFileRequest'
+      responses:
+        '200':
+          description: File moved in one transaction; id, version history and content hash unchanged.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      fileId:
+                        type: string
+                      fromFolderId:
+                        type: string
+                      toFolderId:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                        - committed
+                    required:
+                    - fileId
+                    - fromFolderId
+                    - toFolderId
+                    - status
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN / E_PASSWORD_CHANGE_REQUIRED — authorization denied or first-login password change pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT (live name in target), E_VERSION_CONFLICT (stale expectedFolderId) or E_MOVE_CONFLICT
+            (target is the current folder)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      description: Rejected with 403 E_PASSWORD_CHANGE_REQUIRED until the forced first-login password change completes.
+  /api/moves/preflight:
+    post:
+      summary: Read-only preflight for a candidate move
+      operationId: preflightMoves
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovePreflightRequest'
+      responses:
+        '200':
+          description: Preflight verdict; UX only, never an authorization proof.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/MovePreflightResult'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN / E_PASSWORD_CHANGE_REQUIRED — authorization denied or first-login password change pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      description: Rejected with 403 E_PASSWORD_CHANGE_REQUIRED until the forced first-login password change completes.
   /api/users:
     get:
       summary: List users
@@ -4779,6 +4921,93 @@ components:
           type: string
       required:
       - name
+    MoveFileRequest:
+      type: object
+      properties:
+        targetFolderId:
+          type: string
+          description: Destination folder id.
+        expectedFolderId:
+          type: string
+          description: 'CAS guard: the file''s current folder; a mismatch yields 409 E_VERSION_CONFLICT.'
+        idempotencyKey:
+          type: string
+          description: Replay-safe move key; a repeat returns the recorded result.
+      required:
+      - targetFolderId
+    MovePreflightRequest:
+      type: object
+      properties:
+        resources:
+          type: array
+          items:
+            type: object
+            properties:
+              kind:
+                type: string
+                enum:
+                - file
+              id:
+                type: string
+            required:
+            - kind
+            - id
+          description: Resources under preflight.
+        targetFolderId:
+          type: string
+          description: Candidate destination folder id.
+        mode:
+          type: string
+          enum:
+          - all_or_nothing
+      required:
+      - resources
+      - targetFolderId
+    MovePreflightResult:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - ready
+          - conflict
+          - forbidden
+        candidateRevision:
+          type: string
+          description: Opaque per-call revision; never an authorization token.
+        allowedCount:
+          type: integer
+          description: Resources that would move cleanly.
+        conflicts:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              code:
+                type: string
+                description: Stable envelope code the commit would answer.
+              message:
+                type: string
+        warnings:
+          type: array
+          items:
+            type: string
+        sourceSummary:
+          type: string
+          description: Visible source folder paths only; hidden ancestors truncate the path.
+        targetSummary:
+          type: string
+          description: Visible target folder path only; hidden ancestors truncate the path.
+      required:
+      - status
+      - candidateRevision
+      - allowedCount
+      - conflicts
+      - warnings
+      - sourceSummary
+      - targetSummary
     CreateUserRequest:
       type: object
       properties:

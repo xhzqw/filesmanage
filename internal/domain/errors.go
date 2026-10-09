@@ -13,5 +13,6 @@ var (
 	ErrLocked          = errors.New("file is locked by another editor")
 	ErrApprovalPending = errors.New("an approval request is already pending")
 	ErrParentMissing   = errors.New("original parent folder no longer exists")
+	ErrMoveConflict    = errors.New("move target conflicts with the current location")
 	ErrConflict        = errors.New("conflicting state")
 )

@@ -145,7 +145,7 @@ Status totals: **123 PASS / 2 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 | AG12 | AG12 CAD Worker 停滞/排队不能拖垮普通登录、列表 p95。 | **PASS** | pe12_cad_saturation.py 7/7（x0.93–x1.14，预算 1.25） |
 | AG13 | AG13 Office iframe 断线后锁和会话可根据 TTL 与 callback 机制恢复。 | **PASS** | office session TTL + callback 恢复测试 |
 | AG14 | AG14 文件被修改和用户切换时旧前端请求不会错误覆盖最新状态。 | **PASS** | pt_samples_e2e.py PT10 A/B 409；cursor/baseSeq 竞态修复 |
-| AG15 | AG15 新 API 具备 auth、service、port、repo、数据与负向测试可追溯记录。 | **PASS** | docs/openapi-implemented.yaml（66 端点）+ 本矩阵逐 ID 追溯 |
+| AG15 | AG15 新 API 具备 auth、service、port、repo、数据与负向测试可追溯记录。 | **PASS** | docs/openapi-implemented.yaml（68 端点）+ 本矩阵逐 ID 追溯 |
 | AG16 | B8 质量门禁：Plain Text checksum、并发/越权/回收站/CSV、Go/TS 编译、AG01–AG16 架构 CI 与 PE01–PE18 性能指标，失败不得自行降低门槛。 | **PASS** | check_architecture.py 负向规则自测（注入跨层导入即失败） |
 
 ## PE — 性能指标

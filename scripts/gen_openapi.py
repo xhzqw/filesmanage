@@ -379,6 +379,28 @@ schema("RollbackFileRequest", obj({
 
 schema("RenameFileRequest", obj({"name": string()}, required=["name"]))
 
+schema("MoveFileRequest", obj({
+    "targetFolderId": string("Destination folder id."),
+    "expectedFolderId": string("CAS guard: the file's current folder; a mismatch yields 409 E_VERSION_CONFLICT."),
+    "idempotencyKey": string("Replay-safe move key; a repeat returns the recorded result."),
+}, required=["targetFolderId"]))
+
+schema("MovePreflightRequest", obj({
+    "resources": arr(obj({"kind": string(enum=["file"]), "id": string()}, required=["kind", "id"]), "Resources under preflight."),
+    "targetFolderId": string("Candidate destination folder id."),
+    "mode": string(enum=["all_or_nothing"]),
+}, required=["resources", "targetFolderId"]))
+
+schema("MovePreflightResult", obj({
+    "status": string(enum=["ready", "conflict", "forbidden"]),
+    "candidateRevision": string("Opaque per-call revision; never an authorization token."),
+    "allowedCount": integer("Resources that would move cleanly."),
+    "conflicts": arr(obj({"id": string(), "code": string("Stable envelope code the commit would answer."), "message": string()})),
+    "warnings": arr(string()),
+    "sourceSummary": string("Visible source folder paths only; hidden ancestors truncate the path."),
+    "targetSummary": string("Visible target folder path only; hidden ancestors truncate the path."),
+}, required=["status", "candidateRevision", "allowedCount", "conflicts", "warnings", "sourceSummary", "targetSummary"]))
+
 schema("CreateUserRequest", obj({
     "login": string(max_length=80),
     "displayName": string(),
@@ -609,6 +631,20 @@ add("POST", "/api/files/{id}/rollback", operation("Roll back to an earlier versi
     request={"application/json": {"schema": ref("RollbackFileRequest")}},
     responses=dict([json_ok(obj({"fileId": string(), "versionSeq": integer("The new appended version."), "sha256": string(), "size": integer(), "status": {"type": "string", "enum": ["committed"]}}, required=["fileId", "versionSeq", "sha256", "size", "status"]), "New version appended with the target content; history preserved."),
                     resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"]), resp("409", ERR["409"])])))
+
+add("POST", "/api/files/{id}/move", operation("Move a file to another folder (CAS + idempotent)", "Files", "moveFile", security=SESSION,
+    params=[id_param("id", "File id.")],
+    request={"application/json": {"schema": ref("MoveFileRequest")}},
+    responses=dict([json_ok(obj({"fileId": string(), "fromFolderId": string(), "toFolderId": string(), "status": {"type": "string", "enum": ["committed"]}}, required=["fileId", "fromFolderId", "toFolderId", "status"]), "File moved in one transaction; id, version history and content hash unchanged."),
+                    resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"]),
+                    resp("409", "Conflict — E_NAME_CONFLICT (live name in target), E_VERSION_CONFLICT (stale expectedFolderId) or E_MOVE_CONFLICT (target is the current folder)")]),
+    auth_note=MUST_CHANGE))
+
+add("POST", "/api/moves/preflight", operation("Read-only preflight for a candidate move", "Files", "preflightMoves", security=SESSION,
+    request={"application/json": {"schema": ref("MovePreflightRequest")}},
+    responses=dict([json_ok(ref("MovePreflightResult"), "Preflight verdict; UX only, never an authorization proof."),
+                    resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"])]),
+    auth_note=MUST_CHANGE))
 
 add("DELETE", "/api/files/{id}", operation("Delete a file into the trash", "Files", "deleteFile", security=SESSION,
     params=[id_param("id", "File id.")],
