@@ -41,10 +41,10 @@ function FileTypeIcon({name}:{name:string}){
  const kind=CAD_EXT.has(ext)?"cad":IMAGE_EXT.test(ext)?"image":DOC_EXT.test(ext)?"doc":"file";
  return <svg className="file-type-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
   stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-  {kind==="cad"?<path d="M3 8.6V6.4l2.2-2.2h4.2l2.2 2.2h7.2v10.4H3z"/><path d="M7 13.6l2.6-3.1 2 2.3 2-2.5 3.4 3.3"/>:null}
-  {kind==="image"?<rect x="3.4" y="4.6" width="17.2" height="14.8" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M4.6 17.2l4.4-4.4 3 3 3-2.6 4.4 4.2"/>:null}
-  {kind==="doc"?<path d="M6.6 3.6h6.4l4.4 4.4v12.4H6.6z"/><path d="M13 3.6v4.4h4.4"/>:null}
-  {kind==="file"?<path d="M6.6 3.6h6.4l4.4 4.4v12.4H6.6z"/>:null}
+  {kind==="cad"?<><path d="M3 8.6V6.4l2.2-2.2h4.2l2.2 2.2h7.2v10.4H3z"/><path d="M7 13.6l2.6-3.1 2 2.3 2-2.5 3.4 3.3"/></>:null}
+  {kind==="image"?<><rect x="3.4" y="4.6" width="17.2" height="14.8" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M4.6 17.2l4.4-4.4 3 3 3-2.6 4.4 4.2"/></>:null}
+  {kind==="doc"?<><path d="M6.6 3.6h6.4l4.4 4.4v12.4H6.6z"/><path d="M13 3.6v4.4h4.4"/></>:null}
+  {kind==="file"?<><path d="M6.6 3.6h6.4l4.4 4.4v12.4H6.6z"/></>:null}
  </svg>;
 }
 
