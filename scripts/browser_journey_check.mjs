@@ -271,7 +271,20 @@ async function main() {
       const btn=[...row.querySelectorAll('button')].find(b=>b.textContent?.trim()==='恢复');
       if(!btn)return 'no-restore-button';
       btn.click();
-      await new Promise(r=>setTimeout(r,2500));
+      // The restore dialog defaults to the original parent and confirms there.
+      const dialogReady=await new Promise(resolve=>{
+        const deadline=Date.now()+15000;
+        const timer=setInterval(()=>{
+          const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('恢复 —'));
+          if(d&&d.textContent?.includes('确认恢复')){clearInterval(timer);resolve(d);}
+          else if(Date.now()>deadline){clearInterval(timer);resolve(null);}
+        },200);
+      });
+      if(!dialogReady)return 'no-restore-dialog';
+      const confirm=[...dialogReady.querySelectorAll('button')].find(b=>b.textContent?.trim()==='确认恢复');
+      if(!confirm)return 'no-confirm-button';
+      confirm.click();
+      await new Promise(r=>setTimeout(r,3000));
       const still=[...document.querySelectorAll('tbody tr')].some(tr=>tr.textContent?.includes('journey-${stamp}.txt'));
       return still?'still-in-trash':'left-trash';
     })()`);
