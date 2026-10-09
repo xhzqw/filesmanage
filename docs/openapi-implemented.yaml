@@ -295,6 +295,9 @@ paths:
                         type:
                           type: string
                           description: auth.login, auth.logout, auth.session_revoke or auth.sessions_revoke
+                        outcome:
+                          type: string
+                          description: success or denied
                         device:
                           type: string
                         address:
@@ -306,6 +309,7 @@ paths:
                           format: date-time
                       required:
                       - type
+                      - outcome
                       - device
                       - address
                       - occurredAt
