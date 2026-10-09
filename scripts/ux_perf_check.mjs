@@ -118,7 +118,9 @@ function percentile(values, p) {
 // contract proposes a target — an advisory comparison that never fails a check.
 function measure(id, label, values, options = {}) {
   const proposedMs = options.proposedMs ?? null;
-  const samples = values.filter((v) => Number.isFinite(v));
+  // Frame-series samples can read slightly negative when the frame timestamp
+  // predates the dispatch clock read; clamp instead of reporting impossible latency.
+  const samples = values.filter((v) => Number.isFinite(v)).map((v) => Math.max(0, v));
   if (samples.length === 0) {
     console.log(`MEASURE ${id} ${label} n=0 (no samples)`);
     measurements.push({ id, label, n: 0, p50: null, p95: null, proposedMs, note: options.note ?? "" });
@@ -582,8 +584,10 @@ async function perf02Suite(cdp) {
       if (items.length === 0) emptyMenus++;
       seenItems = items;
       // Close through the menu's own keyboard contract, then confirm it is gone:
-      // an unclosed menu would silently turn the next sample into a no-op.
-      menu.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, which: 27, bubbles: true, cancelable: true }));
+      // an unclosed menu would silently turn the next sample into a no-op. The
+      // menu can already be gone (the next contextmenu replaces it), which is a
+      // closed state, not a stuck one.
+      if (menu) menu.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, which: 27, bubbles: true, cancelable: true }));
       const closed = await P.poll(() => !menuOf(), 3000);
       if (!closed.ok) { stuck++; break; }
     }
