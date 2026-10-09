@@ -105,7 +105,7 @@ function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(folder:R
      {errors[folder.id]&&<p role="alert" className="perm-tree-info">{errors[folder.id]} <button type="button" onClick={()=>void load(folder.id)}>重试</button></p>}
      <ul>{rows(folder.id,depth+1,nextAncestors)}</ul>
      {pages[folder.id]?.nextCursor&&<button type="button" className="perm-more" disabled={loading[folder.id]}
-      onClick={()=>void load(folder.id,pages[folder.id].nextCursor)}>加载更多</button>}
+      onClick={()=>void load(folder.id,pages[folder.id]?.nextCursor??"")}>加载更多</button>}
     </>}
    </li>;
   });
@@ -127,7 +127,7 @@ function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(folder:R
     {pages[""]?.items.length===0&&<p className="hint">没有目录</p>}
     <ul className="perm-tree">{rows("",0,new Set())}</ul>
     {pages[""]?.nextCursor&&<button type="button" className="perm-more" disabled={loading[""]}
-     onClick={()=>void load("",pages[""].nextCursor)}>加载更多根目录</button>}
+     onClick={()=>void load("",pages[""]?.nextCursor??"")}>加载更多根目录</button>}
    </>}
   </div>
  </aside>;
