@@ -4,6 +4,7 @@ import {assessEditable,encodeEditedText,type EditAssessment}from "./safeEdit";
 import {errorCode,errorCopy}from "../../shared/errors";
 import {newIdempotencyKey}from "../../shared/ids";
 import type{FileItem}from"../../entities/file/model";
+import {Dialog}from"../../shared/ui/Dialog";
 
 // Lock-aware plain-text editor. The dialog acquires the server-side edit lock
 // before the user types, saves with the live token, and releases on close.
@@ -110,9 +111,8 @@ export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileIte
   }finally{setBusy(false);}
  }
 
- return <dialog open className="dialog editor-dialog" onKeyDown={event=>{if(event.key==="Escape"){event.preventDefault();requestClose();}}}>
+ return <Dialog open title={`编辑 ${file.name}`} onClose={requestClose} closeGuard={()=>!busy} className="dialog editor-dialog">
   <form onSubmit={submit}>
-   <h3>编辑 {file.name}</h3>
    <p className="hint">{requiresApproval?"该目录的修改需要审批：提交后由审批人通过才生成新版本。":"保存将创建新的不可变版本；当前为 v"+baseSeq+"。"}</p>
    {status==="loading"&&<p className="empty">正在加载内容…</p>}
    {status==="failed"&&<p role="alert" className="notice error">{message||"无法读取文件内容。"}</p>}
@@ -141,5 +141,5 @@ export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileIte
     </>}
    </div>
   </form>
- </dialog>;
+ </Dialog>;
 }

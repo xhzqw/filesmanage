@@ -2,22 +2,25 @@ import {useState,type FormEvent} from "react";
 import type {Folder} from "../../entities/folder/model";
 import {folderApi} from "./api";
 import {errorCopy} from "../../shared/errors";
+import {Dialog} from "../../shared/ui/Dialog";
 
 export function FolderActions({folder,onChanged,isAdmin,onManageGrants,onManagePolicy}:{folder:Folder;onChanged:()=>void;isAdmin:boolean;onManageGrants:()=>void;onManagePolicy:()=>void}){
  const[message,setMessage]=useState("");
  const[renaming,setRenaming]=useState(false);
  const[renameValue,setRenameValue]=useState(folder.name);
+ const[renameBusy,setRenameBusy]=useState(false);
 
  async function submitRename(event:FormEvent<HTMLFormElement>){
   event.preventDefault();
-  setMessage("");
+  if(renameBusy)return;
+  setMessage("");setRenameBusy(true);
   try{
    await folderApi.rename(folder.id,renameValue.trim());
    setRenaming(false);
    onChanged();
   }catch(error){
    setMessage(errorCopy(error,"重命名失败"));
-  }
+  }finally{setRenameBusy(false);}
  }
 
  async function remove(){
@@ -37,17 +40,16 @@ export function FolderActions({folder,onChanged,isAdmin,onManageGrants,onManageP
   {isAdmin&&<button type="button" onClick={onManagePolicy}>审批策略</button>}
   <button type="button" className="danger" onClick={remove}>删除目录</button>
   {message&&<span role="alert" className="notice error">{message}</span>}
-  {renaming&&<dialog open className="dialog">
+  {renaming&&<Dialog open title="重命名目录" onClose={()=>setRenaming(false)} closeGuard={()=>!renameBusy} className="dialog">
    <form onSubmit={submitRename}>
-    <h3>重命名目录</h3>
     <label htmlFor="folder-rename-input">新名称</label>
     <input id="folder-rename-input" value={renameValue} maxLength={200}
-     onChange={e=>setRenameValue(e.target.value)} required/>
+     onChange={e=>setRenameValue(e.target.value)} required disabled={renameBusy}/>
     <div className="dialog-actions">
-     <button type="button" className="secondary-action" onClick={()=>setRenaming(false)}>取消</button>
-     <button type="submit" className="primary">保存</button>
+     <button type="button" className="secondary-action" onClick={()=>setRenaming(false)} disabled={renameBusy}>取消</button>
+     <button type="submit" className="primary" disabled={renameBusy}>{renameBusy?"保存中…":"保存"}</button>
     </div>
    </form>
-  </dialog>}
+  </Dialog>}
  </div>;
 }

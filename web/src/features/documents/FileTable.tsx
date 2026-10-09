@@ -3,6 +3,7 @@ import type {FileItem} from "../../entities/file/model";
 import {fileApi,formatSize,uploadFile} from "./api";
 import {errorCode} from "../../shared/errors";
 import {newIdempotencyKey} from "../../shared/ids";
+import {Dialog} from "../../shared/ui/Dialog";
 
 type SortKey="updated_desc"|"name_asc"|"name_desc"|"size_desc";
 
@@ -26,6 +27,7 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
  const[uploading,setUploading]=useState(false);
  const[renaming,setRenaming]=useState<FileItem|null>(null);
  const[renameValue,setRenameValue]=useState("");
+ const[renameBusy,setRenameBusy]=useState(false);
 
  useEffect(()=>{
   let valid=true;
@@ -87,8 +89,9 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
 
  async function submitRename(event:FormEvent<HTMLFormElement>){
   event.preventDefault();
-  if(!renaming)return;
+  if(!renaming||renameBusy)return;
   announce("","info");
+  setRenameBusy(true);
   try{
    const updated=await fileApi.rename(renaming.id,renameValue);
    setItems(prev=>prev.map(f=>f.id===updated.id?updated:f));
@@ -96,7 +99,7 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
    announce("重命名成功","info");
   }catch(error){
    announce(errorCode(error)==="E_NAME_CONFLICT"?"目标名称已存在":"重命名失败：名称冲突或无权操作","error");
-  }
+  }finally{setRenameBusy(false);}
  }
 
  return <div className="work-body">
@@ -137,16 +140,15 @@ export function FileTable({folder,folderName,onEdit,reloadKey}:{folder:string;fo
    </table>
   </div>
   {hasMore&&<button type="button" className="secondary-action" onClick={loadMore}>加载更多</button>}
-  {renaming&&<dialog open className="dialog">
+  {renaming&&<Dialog open title="重命名文件" onClose={()=>setRenaming(null)} closeGuard={()=>!renameBusy} className="dialog">
    <form onSubmit={submitRename}>
-    <h3>重命名文件</h3>
     <label htmlFor="rename-input">新名称</label>
-    <input id="rename-input" value={renameValue} maxLength={200} onChange={e=>setRenameValue(e.target.value)} required/>
+    <input id="rename-input" value={renameValue} maxLength={200} onChange={e=>setRenameValue(e.target.value)} required disabled={renameBusy}/>
     <div className="dialog-actions">
-     <button type="button" className="secondary-action" onClick={()=>setRenaming(null)}>取消</button>
-     <button type="submit" className="primary">保存</button>
+     <button type="button" className="secondary-action" onClick={()=>setRenaming(null)} disabled={renameBusy}>取消</button>
+     <button type="submit" className="primary" disabled={renameBusy}>{renameBusy?"保存中…":"保存"}</button>
     </div>
    </form>
-  </dialog>}
+  </Dialog>}
  </div>;
 }

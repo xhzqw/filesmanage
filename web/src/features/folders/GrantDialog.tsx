@@ -2,6 +2,7 @@ import {useEffect,useState,type FormEvent} from "react";
 import type {Folder} from "../../entities/folder/model";
 import {folderApi} from "./api";
 import {errorCopy} from "../../shared/errors";
+import {Dialog} from "../../shared/ui/Dialog";
 
 const ACTION_LABELS:Record<string,string>={
  list:"查看列表",
@@ -30,6 +31,7 @@ export function GrantDialog({folder,onClose,subjects}:{folder:Folder;onClose:()=
  const[actions,setActions]=useState<string[]>(["list"]);
  const[scopeOnly,setScopeOnly]=useState(false);
  const[message,setMessage]=useState("");
+ const[busy,setBusy]=useState(false);
 
  useEffect(()=>{
   let valid=true;
@@ -41,8 +43,8 @@ export function GrantDialog({folder,onClose,subjects}:{folder:Folder;onClose:()=
 
  async function submit(event:FormEvent<HTMLFormElement>){
   event.preventDefault();
-  if(subjectId===""||actions.length===0)return;
-  setMessage("");
+  if(subjectId===""||actions.length===0||busy)return;
+  setMessage("");setBusy(true);
   try{
    await folderApi.createGrant(folder.id,subjectKind,subjectId,actions,scopeOnly);
    const refreshed=await folderApi.grants(folder.id);
@@ -50,59 +52,59 @@ export function GrantDialog({folder,onClose,subjects}:{folder:Folder;onClose:()=
    setSubjectId("");
   }catch(error){
    setMessage(errorCopy(error,"授权失败"));
-  }
+  }finally{setBusy(false);}
  }
 
  async function revoke(grantId:string){
-  setMessage("");
+  if(busy)return;
+  setMessage("");setBusy(true);
   try{
    await folderApi.revokeGrant(grantId);
    setGrants(prev=>prev.filter(g=>g.id!==grantId));
   }catch(error){
    setMessage(errorCopy(error,"撤销失败"));
-  }
+  }finally{setBusy(false);}
  }
 
- return <dialog open className="dialog grant-dialog">
+ return <Dialog open title={`目录授权 — ${folder.name}`} onClose={onClose} closeGuard={()=>!busy} className="dialog grant-dialog">
   <form onSubmit={submit}>
-   <h3>目录授权 — {folder.name}</h3>
    <div className="grant-existing">
     {grants.length===0&&<p className="hint">当前没有显式授权（管理员不受限）。</p>}
     {grants.map(g=><div key={g.id} className="grant-row">
      <span>{g.subjectKind==="user"?"用户":"工作组"} {g.subjectId}</span>
      <span>{g.actions.map(a=>ACTION_LABELS[a]??a).join("、")}{g.scopeOnly?"（仅本目录）":""}</span>
-     <button type="button" className="danger" onClick={()=>revoke(g.id)}>撤销</button>
+     <button type="button" className="danger" onClick={()=>revoke(g.id)} disabled={busy}>撤销</button>
     </div>)}
    </div>
    <div className="grant-form">
     <label htmlFor="subject-kind">主体类型</label>
-    <select id="subject-kind" value={subjectKind} onChange={e=>{setSubjectKind(e.target.value as "user"|"group");setSubjectId("");}}>
+    <select id="subject-kind" value={subjectKind} onChange={e=>{setSubjectKind(e.target.value as "user"|"group");setSubjectId("");}} disabled={busy}>
      <option value="user">用户</option>
      <option value="group">工作组</option>
     </select>
     <label htmlFor="subject-id">主体</label>
-    <select id="subject-id" value={subjectId} onChange={e=>setSubjectId(e.target.value)} required>
+    <select id="subject-id" value={subjectId} onChange={e=>setSubjectId(e.target.value)} required disabled={busy}>
      <option value="">请选择</option>
      {subjects.map(s=><option key={s.id} value={s.id}>{s.displayName}{s.login?`（${s.login}）`:""}</option>)}
     </select>
     <fieldset>
      <legend>动作</legend>
      {ACTION_KEYS.map(key=><label key={key} className="checkbox-label">
-      <input type="checkbox" checked={actions.includes(key)}
+      <input type="checkbox" checked={actions.includes(key)} disabled={busy}
        onChange={e=>setActions(prev=>e.target.checked?[...prev,key]:prev.filter(a=>a!==key))}/>
       {ACTION_LABELS[key]}
      </label>)}
     </fieldset>
     <label className="checkbox-label">
-     <input type="checkbox" checked={scopeOnly} onChange={e=>setScopeOnly(e.target.checked)}/>
+     <input type="checkbox" checked={scopeOnly} onChange={e=>setScopeOnly(e.target.checked)} disabled={busy}/>
      仅本目录（不向子目录继承）
     </label>
    </div>
    {message&&<p role="alert" className="notice error">{message}</p>}
    <div className="dialog-actions">
-    <button type="button" className="secondary-action" onClick={onClose}>关闭</button>
-    <button type="submit" className="primary" disabled={subjectId===""||actions.length===0}>添加授权</button>
+    <button type="button" className="secondary-action" onClick={onClose} disabled={busy}>关闭</button>
+    <button type="submit" className="primary" disabled={busy||subjectId===""||actions.length===0}>{busy?"提交中…":"添加授权"}</button>
    </div>
   </form>
- </dialog>;
+ </Dialog>;
 }
