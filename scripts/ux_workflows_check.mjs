@@ -895,7 +895,7 @@ async function batchUiSuite() {
     form.set("folderId", folder);
     form.set("file", new Blob([`bm ${name} ${stamp}\n`]), name);
     form.set("idempotencyKey", `${folder}-${name}-${stamp}`);
-    return (await (await fetch(`${BASE}/api/files`, { method: "POST", headers: { Origin: BASE, Cookie: cookie }, body: form })).json()).data;
+    return (await (await fetch(`${BASE}/api/files`, { method: "POST", headers: { Origin: BASE, Cookie: sessionCookie }, body: form })).json()).data;
   };
   const f1 = await upload(aId, "bm-1.txt");
   const f2 = await upload(aId, "bm-2.txt");
