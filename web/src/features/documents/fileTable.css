@@ -28,7 +28,23 @@
 
 .file-cell-wrap{display:flex;align-items:center;gap:var(--space-1);min-width:0;height:100%}
 .file-cell-wrap .file-name{flex:1 1 auto}
-.file-type-icon{flex:none;color:var(--text-tertiary)}
+.file-type-icon{flex:none}
+.file-icon-cad{color:#0284c7}
+.file-icon-word{color:#2563eb}
+.file-icon-sheet{color:#16a34a}
+.file-icon-slide{color:#ea580c}
+.file-icon-pdf{color:#dc2626}
+.file-icon-image{color:#7c3aed}
+.file-icon-media{color:#e11d48}
+.file-icon-archive{color:#d97706}
+.file-icon-code{color:#0d9488}
+.file-icon-text{color:#64748b}
+.file-icon-file{color:#94a3b8}
+
+.filter-label{color:var(--text-secondary);display:inline-flex;align-items:center;gap:var(--space-1);font-size:11px;white-space:nowrap}
+.filter-label select{height:var(--height-control);padding:0 var(--space-1);font-size:12px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--surface-panel);color:var(--text-primary)}
+.filter-clear-btn{height:var(--height-control);padding:0 var(--space-2);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);background:var(--surface-panel);color:var(--text-secondary);font-size:11px;cursor:pointer;display:inline-flex;align-items:center}
+.filter-clear-btn:hover{background:var(--surface-row-hover);color:var(--brand-blue);border-color:var(--border-selected)}
 
 .file-table tbody td.row-actions{display:table-cell;vertical-align:middle;text-align:center}
 .actions-cell-wrap{display:flex;align-items:center;justify-content:center;gap:var(--space-1);height:100%}

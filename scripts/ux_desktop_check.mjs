@@ -1242,27 +1242,22 @@ async function main() {
                 row:getComputedStyle(tr).height,
                 overflowX:box.scrollWidth-box.clientWidth,
                 sticky:getComputedStyle(table.querySelector('thead th')).position};})()`);
-      check("PW-02 fixed 7-column grid, 32px rows, sticky header, no horizontal overflow",
-        grid.cols === 7 && grid.layout === "fixed" && grid.row === "32px"
+      check("PW-02 fixed 7-column grid, 26px ultra rows, sticky header, no horizontal overflow",
+        grid.cols === 7 && grid.layout === "fixed" && grid.row === "26px"
         && grid.sticky === "sticky" && grid.overflowX <= 1,
         JSON.stringify(grid));
 
-      // ---- PW-03: density switch is a class swap that survives a reload ----
+      // ---- PW-03: ultra-compact 26px density locked by default and persisted ----
       const rowHeight = async () => cdp.evaluate(`(()=>{
         const tr=document.querySelector('tbody tr[data-id]');
         return getComputedStyle(tr).height;})()`);
-      await cdp.evaluate(`(()=>{[...document.querySelectorAll('.density-switch button')].find(b=>b.textContent?.trim()==='超紧凑')?.click();return true;})()`);
-      await delay(200);
       const ultra = await rowHeight();
       await cdp.navigate(`${BASE}/doc?folder=${pwFolderId}`);
       await cdp.waitFor(`()=>document.querySelectorAll('tbody tr[data-id]').length>=3`, 20000);
       const ultraAfterReload = await rowHeight();
-      await cdp.evaluate(`(()=>{[...document.querySelectorAll('.density-switch button')].find(b=>b.textContent?.trim()==='标准')?.click();return true;})()`);
-      await delay(200);
-      const standard = await rowHeight();
-      check("PW-03 density switch: 32px standard / 26px ultra, persisted across a reload",
-        ultra === "26px" && ultraAfterReload === "26px" && standard === "32px",
-        JSON.stringify({ ultra, ultraAfterReload, standard }));
+      check("PW-03 ultra-compact 26px row height locked and persisted across reload",
+        ultra === "26px" && ultraAfterReload === "26px",
+        JSON.stringify({ ultra, ultraAfterReload }));
 
       // ---- PW-04: the status bar aggregates the selection ----
       await cdp.evaluate(`(()=>{const rows=[...document.querySelectorAll('tbody tr[data-id]')];rows[0].click();rows[1].dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:true}));return true;})()`);

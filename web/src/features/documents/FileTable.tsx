@@ -26,41 +26,116 @@ const SORT_LABELS:Record<SortKey,string>={
 
 const SORT_KEYS:SortKey[]=["updated_desc","name_asc","name_desc","size_desc"];
 
-// Extension classes for the type icon: CAD geometry, raster images and the
-// document/text family the workbench edits or previews.
-const CAD_EXT=new Set(["dwg","dxf","stl","step","stp","iges","igs","obj","3mf"]);
-const IMAGE_EXT=/^(png|jpe?g|gif|webp|bmp|tiff?)$/;
-const DOC_EXT=/^(pdf|docx?|xlsx?|pptx?|md|txt|csv|json|xml|ya?ml|log)$/;
+type FileKind = "cad" | "word" | "sheet" | "slide" | "pdf" | "image" | "media" | "archive" | "code" | "text" | "file";
+export type FileCategory = "all" | "cad" | "doc" | "image" | "media" | "archive" | "code" | "other";
 
-// Spec §4.1: a 14px thin-line type icon ahead of the name. The extension picks
-// the glyph - CAD drawing, raster image, document, generic file - and the icon
-// is always currentColor and aria-hidden, so it never carries meaning the name
-// does not and never enters the accessibility tree (VIS-11).
+const CAD_EXT = new Set(["dwg", "dxf", "stl", "step", "stp", "iges", "igs", "obj", "3mf", "ply", "gcode"]);
+const WORD_EXT = new Set(["doc", "docx", "wps", "odt", "rtf"]);
+const SHEET_EXT = new Set(["xls", "xlsx", "csv", "tsv", "et"]);
+const SLIDE_EXT = new Set(["ppt", "pptx", "dps", "key"]);
+const IMAGE_EXT = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "tiff", "tif", "psd"]);
+const MEDIA_EXT = new Set(["mp4", "mkv", "avi", "mov", "webm", "flv", "mp3", "wav", "flac", "aac", "ogg"]);
+const ARCHIVE_EXT = new Set(["zip", "rar", "7z", "tar", "gz", "bz2", "xz"]);
+const CODE_EXT = new Set(["json", "xml", "yaml", "yml", "js", "ts", "jsx", "tsx", "html", "css", "py", "go", "sh", "sql", "c", "cpp", "h", "java", "rs"]);
+const TEXT_EXT = new Set(["txt", "md", "markdown", "log"]);
+
+export function classifyFile(name: string): { kind: FileKind; category: FileCategory } {
+ const dot = name.lastIndexOf(".");
+ const ext = dot > 0 && dot < name.length - 1 ? name.slice(dot + 1).toLowerCase() : "";
+ if (CAD_EXT.has(ext)) return { kind: "cad", category: "cad" };
+ if (ext === "pdf") return { kind: "pdf", category: "doc" };
+ if (WORD_EXT.has(ext)) return { kind: "word", category: "doc" };
+ if (SHEET_EXT.has(ext)) return { kind: "sheet", category: "doc" };
+ if (SLIDE_EXT.has(ext)) return { kind: "slide", category: "doc" };
+ if (IMAGE_EXT.has(ext)) return { kind: "image", category: "image" };
+ if (MEDIA_EXT.has(ext)) return { kind: "media", category: "media" };
+ if (ARCHIVE_EXT.has(ext)) return { kind: "archive", category: "archive" };
+ if (CODE_EXT.has(ext)) return { kind: "code", category: "code" };
+ if (TEXT_EXT.has(ext)) return { kind: "text", category: "doc" };
+ return { kind: "file", category: "other" };
+}
+
+// 14px semantic file glyph: distinct vector shape & category color, aria-hidden (VIS-11)
 function FileTypeIcon({name}:{name:string}){
- const dot=name.lastIndexOf(".");
- const ext=dot>0&&dot<name.length-1?name.slice(dot+1).toLowerCase():"";
- const kind=CAD_EXT.has(ext)?"cad":IMAGE_EXT.test(ext)?"image":DOC_EXT.test(ext)?"doc":"file";
- return <svg className="file-type-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
-  stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-  {kind==="cad"?<><path d="M3 8.6V6.4l2.2-2.2h4.2l2.2 2.2h7.2v10.4H3z"/><path d="M7 13.6l2.6-3.1 2 2.3 2-2.5 3.4 3.3"/></>:null}
-  {kind==="image"?<><rect x="3.4" y="4.6" width="17.2" height="14.8" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="M4.6 17.2l4.4-4.4 3 3 3-2.6 4.4 4.2"/></>:null}
-  {kind==="doc"?<><path d="M6.6 3.6h6.4l4.4 4.4v12.4H6.6z"/><path d="M13 3.6v4.4h4.4"/></>:null}
-  {kind==="file"?<><path d="M6.6 3.6h6.4l4.4 4.4v12.4H6.6z"/></>:null}
+ const {kind} = classifyFile(name);
+ return <svg className={"file-type-icon file-icon-"+kind} width="14" height="14" viewBox="0 0 24 24" fill="none"
+  stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+  {kind==="cad"&&(
+   <>
+    <path d="M12 2.5L3.5 7.5v9l8.5 5 8.5-5v-9L12 2.5z"/>
+    <path d="M12 12l8.5-4.8M12 12L3.5 7.2M12 12v9.5"/>
+   </>
+  )}
+  {kind==="word"&&(
+   <>
+    <path d="M4 2.5h9l6 6V20a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 20V4A1.5 1.5 0 0 1 4 2.5z"/>
+    <path d="M13 2.5V8.5h6"/>
+    <path d="M7 12.5h7M7 16h5"/>
+   </>
+  )}
+  {kind==="sheet"&&(
+   <>
+    <path d="M4 2.5h9l6 6V20a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 20V4A1.5 1.5 0 0 1 4 2.5z"/>
+    <path d="M13 2.5V8.5h6"/>
+    <path d="M6 12h10M6 16h10M11 12v7"/>
+   </>
+  )}
+  {kind==="slide"&&(
+   <>
+    <rect x="3" y="3.5" width="18" height="13" rx="1.5"/>
+    <path d="M8 20.5l4-4 4 4M12 16.5v4"/>
+    <path d="M7 8h5M7 11h8"/>
+   </>
+  )}
+  {kind==="pdf"&&(
+   <>
+    <path d="M4 2.5h9l6 6V20a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 20V4A1.5 1.5 0 0 1 4 2.5z"/>
+    <path d="M13 2.5V8.5h6"/>
+    <path d="M7 13.5a1.5 1.5 0 0 0 3 0c0-1-1.5-1.5-1.5-1.5s1.5-.5 1.5-1.5a1.5 1.5 0 0 0-3 0v4.5"/>
+   </>
+  )}
+  {kind==="image"&&(
+   <>
+    <rect x="3" y="3.5" width="18" height="15" rx="2"/>
+    <circle cx="8" cy="8.5" r="1.5"/>
+    <path d="M4.5 16.5l5-5 3.5 3.5 3-2.5 3.5 3.5"/>
+   </>
+  )}
+  {kind==="media"&&(
+   <>
+    <rect x="2.5" y="3.5" width="19" height="15" rx="2"/>
+    <path d="M10 8.5l5 2.5-5 2.5V8.5z"/>
+   </>
+  )}
+  {kind==="archive"&&(
+   <>
+    <path d="M4 4h16v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4z"/>
+    <path d="M10 4v10M14 4v10M10 7h4M10 10h4M10 13h4"/>
+   </>
+  )}
+  {kind==="code"&&(
+   <>
+    <path d="M8.5 7.5L4 12l4.5 4.5M15.5 7.5L20 12l-4.5 4.5M13.5 5.5l-3 13"/>
+   </>
+  )}
+  {kind==="text"&&(
+   <>
+    <path d="M4 2.5h11l5 5V20a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 20V4A1.5 1.5 0 0 1 4 2.5z"/>
+    <path d="M15 2.5V7.5h5"/>
+    <path d="M6 12h8M6 15h6"/>
+   </>
+  )}
+  {kind==="file"&&(
+   <>
+    <path d="M4 2.5h11l5 5V20a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 20V4A1.5 1.5 0 0 1 4 2.5z"/>
+    <path d="M15 2.5V7.5h5"/>
+   </>
+  )}
  </svg>;
 }
 
-// VIS-05 row density (Precision Workbench 2.0 §1.1/§3.1): a pure presentation
-// choice persisted per browser so it survives navigation. The switch only
-// swaps a class on the table below — the selection, sort, keyboard model and
-// loaded pages are untouched in both modes.
-type Density="default"|"compact";
-
-const DENSITY_KEY="filesmanage.file-density";
-
-function readDensity():Density{
- try{return localStorage.getItem(DENSITY_KEY)==="compact"?"compact":"default";}
- catch{return "default";}   // blocked storage (private mode) must not blank the page
-}
+// Locked ultra-compact density (26px rows): permanent high-density layout
+type Density="compact";
 
 // Internal file→folder move gesture (DESKTOP-INTERACTION-v1 §7.2, DI-17). The
 // folder tree is a sibling feature and neither feature may import the other
@@ -120,7 +195,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const[message,setMessage]=useState("");
  const[messageTone,setMessageTone]=useState<"info"|"error">("info");
  const[sort,setSort]=useState<SortKey>("updated_desc");
- const[density,setDensity]=useState<Density>(readDensity);
+ const[categoryFilter,setCategoryFilter]=useState<FileCategory>("all");
+ const[density]=useState<Density>("compact");
  const[cursor,setCursor]=useState("");
  const[hasMore,setHasMore]=useState(false);
  const[renaming,setRenaming]=useState<FileItem|null>(null);
@@ -230,12 +306,6 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   setMessageTone(tone);
  }
 
- // VIS-05: the switch only swaps a class on the table below — the selection,
- // sort, keyboard model and loaded pages are untouched.
- function chooseDensity(next:Density){
-  setDensity(next);
-  localStorage.setItem(DENSITY_KEY,next);
- }
 
  // The toggle is optimistic because the endpoint is idempotent in both
  // directions; a failed write restores the previous local state instead of
@@ -290,13 +360,29 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   setHasMore(page.nextCursor!=="");
  }
 
+ const visibleItems=useMemo(()=>{
+  if(categoryFilter==="all")return items;
+  return items.filter(item=>classifyFile(item.name).category===categoryFilter);
+ },[items,categoryFilter]);
+
+ const categoryCounts=useMemo(()=>{
+  const map:Record<FileCategory,number>={
+   all:items.length,cad:0,doc:0,image:0,media:0,archive:0,code:0,other:0,
+  };
+  for(const item of items){
+   const cat=classifyFile(item.name).category;
+   map[cat]=(map[cat]??0)+1;
+  }
+  return map;
+ },[items]);
+
  function visibleRange(fromId:string,toId:string):string[]{
-  const from=items.findIndex(i=>i.id===fromId);
-  const to=items.findIndex(i=>i.id===toId);
+  const from=visibleItems.findIndex(i=>i.id===fromId);
+  const to=visibleItems.findIndex(i=>i.id===toId);
   if(from<0||to<0)return[toId];
   const low=Math.min(from,to);
   const high=Math.max(from,to);
-  return items.slice(low,high+1).map(i=>i.id);
+  return visibleItems.slice(low,high+1).map(i=>i.id);
  }
 
  function onRowClick(event:MouseEvent<HTMLTableRowElement>,item:FileItem){
@@ -342,8 +428,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  // anchor to the first row so a following Shift range has a base.
  function toggleSelectAllLoaded(){
   if(allLoadedSelected){setSelectedIds(new Set<string>());setAnchorId(null);return;}
-  setSelectedIds(new Set(items.map(i=>i.id)));
-  setAnchorId(items[0]?.id??null);
+  setSelectedIds(new Set(visibleItems.map(i=>i.id)));
+  setAnchorId(visibleItems[0]?.id??null);
  }
 
  function focusRow(id:string){
@@ -412,9 +498,9 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  }
 
  function moveFocus(index:number,extend:boolean){
-  if(items.length===0)return;
-  const next=Math.max(0,Math.min(items.length-1,index));
-  const target=items[next];
+  if(visibleItems.length===0)return;
+  const next=Math.max(0,Math.min(visibleItems.length-1,index));
+  const target=visibleItems[next];
   if(!target)return;
   if(extend&&anchorId){
    setSelectedIds(new Set(visibleRange(anchorId,target.id)));
@@ -427,9 +513,9 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  }
 
  function onGridKeyDown(event:KeyboardEvent<HTMLTableSectionElement>){
-  if(items.length===0)return;
-  const index=focusedId?items.findIndex(i=>i.id===focusedId):-1;
-  const current=index>=0?items[index]:null;
+  if(visibleItems.length===0)return;
+  const index=focusedId?visibleItems.findIndex(i=>i.id===focusedId):-1;
+  const current=index>=0?visibleItems[index]:null;
   switch(event.key){
    case "ArrowDown":
     event.preventDefault();moveFocus(index+1,event.shiftKey);break;
@@ -438,7 +524,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    case "Home":
     event.preventDefault();moveFocus(0,event.shiftKey);break;
    case "End":
-    event.preventDefault();moveFocus(items.length-1,event.shiftKey);break;
+    event.preventDefault();moveFocus(visibleItems.length-1,event.shiftKey);break;
    case " ":
     if(!current)return;
     event.preventDefault();
@@ -461,12 +547,12 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    case "Delete":
     if(selectedIds.size===0)return;
     event.preventDefault();
-    setPendingDelete(items.filter(i=>selectedIds.has(i.id)));
+    setPendingDelete(visibleItems.filter(i=>selectedIds.has(i.id)));
     break;
    case "F2":
     if(selectedIds.size!==1)return;
     event.preventDefault();
-    {const only=items.find(i=>selectedIds.has(i.id));if(only){setRenaming(only);setRenameValue(only.name);}}
+    {const only=visibleItems.find(i=>selectedIds.has(i.id));if(only){setRenaming(only);setRenameValue(only.name);}}
     break;
    case "F10":
     // Shift+F10 is the keyboard equivalent of a right-click on the focused
@@ -482,7 +568,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    default:
     if((event.metaKey||event.ctrlKey)&&(event.key==="a"||event.key==="A")){
      event.preventDefault();
-     setSelectedIds(new Set(items.map(i=>i.id)));
+     setSelectedIds(new Set(visibleItems.map(i=>i.id)));
     }
   }
  }
@@ -623,9 +709,9 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   void reload().catch(()=>announce("操作已提交，但列表刷新失败，请手动刷新后核对","error"));
  }
 
- const selection=items.filter(i=>selectedIds.has(i.id));
+ const selection=visibleItems.filter(i=>selectedIds.has(i.id));
  const selectedBytes=selection.reduce((sum,file)=>sum+file.sizeBytes,0);
- const allLoadedSelected=items.length>0&&items.every(i=>selectedIds.has(i.id));
+ const allLoadedSelected=visibleItems.length>0&&visibleItems.every(i=>selectedIds.has(i.id));
 
  // The work area is not a move target: an internal drag over it is a cancel
  // ("拖回来源", §7.2) and it must not light up the upload zone either, so its
@@ -637,21 +723,35 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   onDragLeave={suppressInternalDrag}
   onDrop={suppressInternalDrag}>
   <div className="toolbar">
-   {/* Order matters: VIS-03 focuses the sort select and presses Tab once,
-       expecting the first grid row. Every tabbable control therefore sits
-       ahead of the select (and the header select-all box is tabIndex -1,
-       with Ctrl+A covering the same action), so that Tab still lands there. */}
-   <span className="density-switch" role="group" aria-label="行密度">
-    <span className="density-title">密度</span>
-    <button type="button" aria-pressed={density==="default"} onClick={()=>chooseDensity("default")}>标准</button>
-    <button type="button" aria-pressed={density==="compact"} onClick={()=>chooseDensity("compact")}>超紧凑</button>
-   </span>
    {/* The input allows multiple files: it feeds the same batch queue as a
        drop (WF-27), so it no longer locks while one upload is in flight. */}
    <label className="upload-button">
     上传文件
     <input type="file" multiple onChange={onUpload}/>
    </label>
+   <label className="filter-label">类型
+    <select aria-label="文件类型筛选" value={categoryFilter} onChange={e=>{
+     setCategoryFilter(e.target.value as FileCategory);
+     setSelectedIds(new Set<string>());
+     setFocusedId(null);
+     setAnchorId(null);
+    }}>
+     <option value="all">全部类型 ({categoryCounts.all})</option>
+     <option value="cad">CAD / 3D 图纸 ({categoryCounts.cad})</option>
+     <option value="doc">办公文档 ({categoryCounts.doc})</option>
+     <option value="image">图片文件 ({categoryCounts.image})</option>
+     <option value="media">音视频 ({categoryCounts.media})</option>
+     <option value="archive">压缩包 ({categoryCounts.archive})</option>
+     <option value="code">代码与数据 ({categoryCounts.code})</option>
+     <option value="other">其他文件 ({categoryCounts.other})</option>
+    </select>
+   </label>
+   {categoryFilter!=="all"&&<button type="button" className="filter-clear-btn" onClick={()=>{
+    setCategoryFilter("all");
+    setSelectedIds(new Set<string>());
+    setFocusedId(null);
+    setAnchorId(null);
+   }} title="清除筛选">重置</button>}
    <label className="sort-label">排序
     <select aria-label="排序方式" value={sort} onChange={e=>setSort(e.target.value as SortKey)}>
      {SORT_KEYS.map(key=><option key={key} value={key}>{SORT_LABELS[key]}</option>)}
@@ -667,7 +767,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   </div>}
   {message&&<p role="status" className={"notice "+messageTone}>{message}</p>}
   <div className="table" onClick={event=>{if(!(event.target as HTMLElement).closest("tr")){setSelectedIds(new Set<string>());setAnchorId(null);}}}>
-   <table role="grid" aria-label={folderName+" 文件列表"} className={"file-table"+(density==="compact"?" file-table-ultra":"")}>
+   <table role="grid" aria-label={folderName+" 文件列表"} className="file-table file-table-ultra">
     <colgroup><col className="col-select"/><col className="col-name"/><col className="col-size"/><col className="col-version"/><col className="col-hash"/><col className="col-date"/><col className="col-actions"/></colgroup>
     <thead><tr>
      <th className="col-select" scope="col"><input type="checkbox" tabIndex={-1} checked={allLoadedSelected} onChange={toggleSelectAllLoaded} aria-label="选择当前已加载的文件"/></th>
@@ -686,7 +786,17 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       <span className="empty-title">目录为空</span>
       <span className="empty-hint">上传第一个文件开始使用。</span>
      </td></tr>}
-     {status==="ready"&&items.map((item,index)=><tr key={item.id} data-id={item.id}
+     {status==="ready"&&items.length>0&&visibleItems.length===0&&<tr><td colSpan={7} className="empty">
+      <span className="empty-title">无匹配文件</span>
+      <span className="empty-hint">当前目录下没有属于该类型的文件。</span>
+      <button type="button" className="secondary-action" style={{marginTop:6}} onClick={()=>{
+       setCategoryFilter("all");
+       setSelectedIds(new Set<string>());
+       setFocusedId(null);
+       setAnchorId(null);
+      }}>清除筛选（显示全部 {items.length} 个文件）</button>
+     </td></tr>}
+     {status==="ready"&&visibleItems.map((item,index)=><tr key={item.id} data-id={item.id}
       tabIndex={focusedId===item.id||(focusedId===null&&index===0)?0:-1}
       aria-selected={selectedIds.has(item.id)}
       className={(selectedIds.has(item.id)?"selected":"")+(focusedId===item.id?" focused":"")+(draggingIds.has(item.id)?" drag-source":"")}
@@ -748,7 +858,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   <footer className="status-bar">
    <span>已选 <span className="status-strong">{selectedIds.size}</span> 项{selectedIds.size>0&&<> / <span className="status-strong">{formatSize(selectedBytes)}</span></>}</span>
    <span className="status-sep" aria-hidden="true">│</span>
-   <span>共 <span className="status-strong">{items.length}</span> 个项目</span>
+   <span>共 <span className="status-strong">{categoryFilter==="all"?items.length:`${visibleItems.length}/${items.length}`}</span> 个项目</span>
    <span className="status-sep" aria-hidden="true">│</span>
    <span>延迟 <span className="status-strong">{latencyMs===null?"—":latencyMs+" ms"}</span></span>
    <span className="status-spacer"/>
