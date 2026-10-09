@@ -26,8 +26,7 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
   <div className="login-card">
    <div className="brand-lockup">
     <BrandLogo size={48} className="login-logo"/>
-    <h1 className="system-name">文档管理系统</h1>
-    <p className="organization-line">中晟生物科技 · 医疗器械规范合规平台</p>
+    <h1 className="system-name">中晟生物科技</h1>
    </div>
    <form onSubmit={submit}>
     <label htmlFor="username">账号</label>
@@ -48,9 +47,6 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
     {error&&<div role="alert" className="error">{error}</div>}
     <button className="primary" disabled={busy} type="submit">{busy?"验证中…":"登录"}</button>
    </form>
-   <div className="rare-attribution">
-     Precision Workbench · 微交互动效由 <a href="https://rareui.com" target="_blank" rel="noopener noreferrer">Rare UI</a> 驱动
-   </div>
   </div>
  </main>;
 }

@@ -24,8 +24,7 @@ export function FirstSignIn({onSuccess,onExit}:{onSuccess:(u:User)=>void;onExit:
     <section className="login-card" aria-label="首次登录安全设置">
       <div className="brand-lockup">
         <BrandLogo size={48} className="login-logo"/>
-        <h1 className="system-name">文档管理系统</h1>
-        <p className="organization-line">中晟生物科技 · 医疗器械规范合规平台</p>
+        <h1 className="system-name">中晟生物科技</h1>
       </div>
       <h2 className="page-purpose">首次登录安全设置</h2>
       <p>首次登录必须更新初始凭据，完成前不能访问业务目录。</p>
