@@ -54,17 +54,27 @@ func TestLoginLimiterAccountAndIPBudgets(t *testing.T) {
 func TestLoginLimiterParallelCapacityAndBounds(t *testing.T) {
 	l := newLoginLimiter()
 	for i := 0; i < maxConcurrentLogins; i++ {
-		if !l.acquire() { t.Fatal("slot rejected too early") }
+		if !l.acquire() {
+			t.Fatal("slot rejected too early")
+		}
 	}
-	if l.acquire() { t.Fatal("parallel cap was exceeded") }
+	if l.acquire() {
+		t.Fatal("parallel cap was exceeded")
+	}
 	l.release()
-	if !l.acquire() { t.Fatal("released slot cannot be reused") }
-	if retrySeconds(1100*time.Millisecond) != 2 { t.Fatal("retry seconds must round up") }
-	if wait := l.allow("malformed", "user"); wait <= 0 { t.Fatal("invalid socket peer should fail closed") }
+	if !l.acquire() {
+		t.Fatal("released slot cannot be reused")
+	}
+	if retrySeconds(1100*time.Millisecond) != 2 {
+		t.Fatal("retry seconds must round up")
+	}
+	if wait := l.allow("malformed", "user"); wait <= 0 {
+		t.Fatal("invalid socket peer should fail closed")
+	}
 
 	// Many account names cannot make the table grow without limit.
 	for i := 0; i < loginLimitEntries; i++ {
-		key := "x"+string(rune(0x1000+i))
+		key := "x" + string(rune(0x1000+i))
 		l.allow("127.0.0.1:4000", key)
 		// IP limiter stops CPU work, but new account identities after the first
 		// 30 requests are not stored.
@@ -76,38 +86,38 @@ func TestLoginLimiterParallelCapacityAndBounds(t *testing.T) {
 
 func TestAuthDependencyFailuresAreNotInvalidCredentials(t *testing.T) {
 	t.Setenv("FILESMANAGE_LAN_ALLOW_CIDRS", "127.0.0.1/32")
-	r := New(application.New(logoutTestUOW{beginErr: errors.New("db offline")},nil), false, t.TempDir())
+	r := New(application.New(logoutTestUOW{beginErr: errors.New("db offline")}, nil), false, t.TempDir())
 	for _, tc := range []struct{ method, path, body string }{
 		{http.MethodPost, "/api/login", `{"login":"admin","password":"valid-length-password"}`},
 		{http.MethodGet, "/api/me", ""},
 	} {
-		req:=httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
-		req.RemoteAddr="127.0.0.1:30000"
-		req.Header.Set("Content-Type","application/json")
-		req.AddCookie(&http.Cookie{Name:"fm_session",Value:"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"})
-		rec:=httptest.NewRecorder()
-		r.ServeHTTP(rec,req)
-		if rec.Code!=http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(),"E_DEPENDENCY"){
-			t.Fatalf("%s: status=%d body=%s",tc.path,rec.Code,rec.Body.String())
+		req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+		req.RemoteAddr = "127.0.0.1:30000"
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(&http.Cookie{Name: "fm_session", Value: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"})
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), "E_DEPENDENCY") {
+			t.Fatalf("%s: status=%d body=%s", tc.path, rec.Code, rec.Body.String())
 		}
 	}
 }
 
 func TestLoginRateLimitReturnsRetryAfter(t *testing.T) {
 	t.Setenv("FILESMANAGE_LAN_ALLOW_CIDRS", "127.0.0.1/32")
-	r:=New(application.New(logoutTestUOW{beginErr: errors.New("db offline")},nil),false,t.TempDir())
-	for attempt:=1;attempt<=loginAccountAttempts+1;attempt++{
-		req:=httptest.NewRequest(http.MethodPost,"/api/login",strings.NewReader(`{"login":"probe","password":"wrong-password"}`))
-		req.RemoteAddr="127.0.0.1:30001"
-		req.Header.Set("Content-Type","application/json")
-		rec:=httptest.NewRecorder()
-		r.ServeHTTP(rec,req)
-		if attempt<=loginAccountAttempts&&rec.Code!=http.StatusServiceUnavailable{
-			t.Fatalf("attempt %d unexpectedly rejected with %d",attempt,rec.Code)
+	r := New(application.New(logoutTestUOW{beginErr: errors.New("db offline")}, nil), false, t.TempDir())
+	for attempt := 1; attempt <= loginAccountAttempts+1; attempt++ {
+		req := httptest.NewRequest(http.MethodPost, "/api/login", strings.NewReader(`{"login":"probe","password":"wrong-password"}`))
+		req.RemoteAddr = "127.0.0.1:30001"
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		r.ServeHTTP(rec, req)
+		if attempt <= loginAccountAttempts && rec.Code != http.StatusServiceUnavailable {
+			t.Fatalf("attempt %d unexpectedly rejected with %d", attempt, rec.Code)
 		}
-		if attempt==loginAccountAttempts+1 {
-			if rec.Code!=http.StatusTooManyRequests || rec.Header().Get("Retry-After")=="" || !strings.Contains(rec.Body.String(),"E_RATE_LIMIT"){
-				t.Fatalf("missing 429 and Retry-After: code=%d header=%q body=%s",rec.Code,rec.Header().Get("Retry-After"),rec.Body.String())
+		if attempt == loginAccountAttempts+1 {
+			if rec.Code != http.StatusTooManyRequests || rec.Header().Get("Retry-After") == "" || !strings.Contains(rec.Body.String(), "E_RATE_LIMIT") {
+				t.Fatalf("missing 429 and Retry-After: code=%d header=%q body=%s", rec.Code, rec.Header().Get("Retry-After"), rec.Body.String())
 			}
 		}
 	}
@@ -117,21 +127,29 @@ type logoutTestTx struct {
 	ports.Repository
 	revokeErr error
 }
+
 func (tx logoutTestTx) RevokeSession(context.Context, string) error { return tx.revokeErr }
-func (logoutTestTx) Commit(context.Context) error { return nil }
-func (logoutTestTx) Rollback(context.Context) error { return nil }
-type logoutTestUOW struct { revokeErr error; beginErr error }
+func (logoutTestTx) Commit(context.Context) error                   { return nil }
+func (logoutTestTx) Rollback(context.Context) error                 { return nil }
+
+type logoutTestUOW struct {
+	revokeErr error
+	beginErr  error
+}
+
 func (u logoutTestUOW) Begin(context.Context) (ports.Tx, error) {
-	if u.beginErr != nil { return nil, u.beginErr }
-	return logoutTestTx{revokeErr:u.revokeErr}, nil
+	if u.beginErr != nil {
+		return nil, u.beginErr
+	}
+	return logoutTestTx{revokeErr: u.revokeErr}, nil
 }
 
 func TestLogoutOnlyClearsCookieAfterConfirmedRevocation(t *testing.T) {
 	t.Setenv("FILESMANAGE_LAN_ALLOW_CIDRS", "127.0.0.1/32")
 	for _, tc := range []struct {
-		name string
-		err error
-		want int
+		name    string
+		err     error
+		want    int
 		cleared bool
 	}{
 		{"db error", errors.New("connection lost"), http.StatusServiceUnavailable, false},
@@ -139,16 +157,22 @@ func TestLogoutOnlyClearsCookieAfterConfirmedRevocation(t *testing.T) {
 		{"normal", nil, http.StatusOK, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			r := New(application.New(logoutTestUOW{revokeErr:tc.err},nil),false,t.TempDir())
+			r := New(application.New(logoutTestUOW{revokeErr: tc.err}, nil), false, t.TempDir())
 			req := httptest.NewRequest(http.MethodPost, "/api/logout", nil)
-			req.RemoteAddr="127.0.0.1:50001"
-			req.AddCookie(&http.Cookie{Name:"fm_session",Value:"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"})
-			rec:=httptest.NewRecorder()
-			r.ServeHTTP(rec,req)
-			if rec.Code!=tc.want { t.Fatalf("status=%d want=%d body=%s", rec.Code,tc.want,rec.Body.String()) }
-			setCookie:=rec.Header().Get("Set-Cookie")
-			if (setCookie!="")!=tc.cleared { t.Fatalf("unexpected cookie mutation: %q",setCookie) }
-			if !tc.cleared && !strings.Contains(rec.Body.String(),"E_LOGOUT_FAILED") { t.Fatalf("missing error: %s",rec.Body.String()) }
+			req.RemoteAddr = "127.0.0.1:50001"
+			req.AddCookie(&http.Cookie{Name: "fm_session", Value: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"})
+			rec := httptest.NewRecorder()
+			r.ServeHTTP(rec, req)
+			if rec.Code != tc.want {
+				t.Fatalf("status=%d want=%d body=%s", rec.Code, tc.want, rec.Body.String())
+			}
+			setCookie := rec.Header().Get("Set-Cookie")
+			if (setCookie != "") != tc.cleared {
+				t.Fatalf("unexpected cookie mutation: %q", setCookie)
+			}
+			if !tc.cleared && !strings.Contains(rec.Body.String(), "E_LOGOUT_FAILED") {
+				t.Fatalf("missing error: %s", rec.Body.String())
+			}
 		})
 	}
 }

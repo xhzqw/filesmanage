@@ -11,30 +11,32 @@ import (
 // Budgets are per server process and use the socket peer rather than a
 // client-supplied forwarding header. Reverse proxies need their own IP limits.
 const (
-	loginIPAttempts = 30
-	loginIPWindow = 5 * time.Minute
+	loginIPAttempts      = 30
+	loginIPWindow        = 5 * time.Minute
 	loginAccountAttempts = 10
-	loginAccountWindow = 10 * time.Minute
-	loginLimitEntries = 4096
-	maxConcurrentLogins = 8
+	loginAccountWindow   = 10 * time.Minute
+	loginLimitEntries    = 4096
+	maxConcurrentLogins  = 8
 )
+
 type loginWindow struct {
 	start time.Time
 	count int
 }
 type loginLimiter struct {
-	mu sync.Mutex
-	byIP map[string]loginWindow
+	mu        sync.Mutex
+	byIP      map[string]loginWindow
 	byAccount map[string]loginWindow
-	sem chan struct{}
-	now func() time.Time
+	sem       chan struct{}
+	now       func() time.Time
 }
+
 func newLoginLimiter() *loginLimiter {
 	return &loginLimiter{
-		byIP: make(map[string]loginWindow),
+		byIP:      make(map[string]loginWindow),
 		byAccount: make(map[string]loginWindow),
-		sem: make(chan struct{}, maxConcurrentLogins),
-		now: time.Now,
+		sem:       make(chan struct{}, maxConcurrentLogins),
+		now:       time.Now,
 	}
 }
 func checkLoginWindow(entries map[string]loginWindow, key string, now time.Time, window time.Duration, max int) time.Duration {
@@ -57,6 +59,7 @@ func pruneLoginWindows(entries map[string]loginWindow, now time.Time, window tim
 		}
 	}
 }
+
 // allow atomically reserves both budgets. Names are digested to avoid storing
 // raw login names. When the bounded table fills up, new keys fail closed.
 func (l *loginLimiter) allow(remoteAddr, login string) time.Duration {
@@ -72,10 +75,14 @@ func (l *loginLimiter) allow(remoteAddr, login string) time.Duration {
 	pruneLoginWindows(l.byIP, now, loginIPWindow)
 	pruneLoginWindows(l.byAccount, now, loginAccountWindow)
 	if len(l.byIP) >= loginLimitEntries {
-		if _, known := l.byIP[ip]; !known { return loginIPWindow }
+		if _, known := l.byIP[ip]; !known {
+			return loginIPWindow
+		}
 	}
 	if len(l.byAccount) >= loginLimitEntries {
-		if _, known := l.byAccount[account]; !known { return loginAccountWindow }
+		if _, known := l.byAccount[account]; !known {
+			return loginAccountWindow
+		}
 	}
 	if wait := checkLoginWindow(l.byIP, ip, now, loginIPWindow, loginIPAttempts); wait > 0 {
 		return wait
@@ -92,6 +99,8 @@ func (l *loginLimiter) acquire() bool {
 }
 func (l *loginLimiter) release() { <-l.sem }
 func retrySeconds(wait time.Duration) int {
-	if wait <= 0 { return 1 }
+	if wait <= 0 {
+		return 1
+	}
 	return int((wait + time.Second - 1) / time.Second)
 }
