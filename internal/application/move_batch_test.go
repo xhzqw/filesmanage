@@ -193,7 +193,7 @@ func TestMoveFilesBatchMissingFileAndTarget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	before := totalAudit(repo)
+	before := countAudit(repo, "file.move")
 	result, err := s.MoveFilesBatch(ctx, admin, []string{uploaded.FileID, "file_missing"}, target.ID, "all_or_nothing", "")
 	if err != nil {
 		t.Fatal(err)
@@ -228,7 +228,7 @@ func TestMoveFilesBatchMissingFileAndTarget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if file.FolderID != "folder_root" || totalAudit(repo) != before {
+	if file.FolderID != "folder_root" || countAudit(repo, "file.move") != before {
 		t.Fatal("a batch with a missing file or target must not move anything or write audit rows")
 	}
 }
