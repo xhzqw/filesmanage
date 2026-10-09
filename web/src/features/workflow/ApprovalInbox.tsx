@@ -1,7 +1,7 @@
 import {useEffect,useState} from "react";
 import {workflowApi} from "./api";
 import type {Approval} from "./api";
-import {errorCopy} from "../../shared/errors";
+import {errorCode,errorCopy} from "../../shared/errors";
 import type {User} from "../../entities/user/model";
 
 const STATE_LABELS:Record<string,string>={
@@ -22,6 +22,9 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
  const[mine,setMine]=useState<Approval[]>([]);
  const[status,setStatus]=useState("loading");
  const[message,setMessage]=useState("");
+ const[drafts,setDrafts]=useState<Record<string,string>>({});
+ const[busyId,setBusyId]=useState("");
+ const[reloadToken,setReloadToken]=useState(0);
 
  useEffect(()=>{
   let valid=true;
@@ -33,17 +36,37 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
    })
    .catch(()=>{if(valid)setStatus("failed");});
   return()=>{valid=false;};
- },[message]);
+ },[reloadToken]);
 
- async function act(id:string,action:"approve"|"reject"|"cancel",comment:string){
-  setMessage("");
+ // Per-decision comment (WF-31): the comment ships with the decision, one
+ // in-flight decision blocks every row so a second click cannot double-submit,
+ // a 409 state change reloads the list instead of trusting a stale outcome,
+ // and a non-committed result never reads as 已通过/已拒绝.
+ async function act(id:string,action:"approve"|"reject"|"cancel"){
+  if(busyId!=="")return;
+  setMessage("");setBusyId(id);
   try{
-   if(action==="approve")await workflowApi.approve(id,comment);
-   if(action==="reject")await workflowApi.reject(id,comment);
-   if(action==="cancel")await workflowApi.cancel(id);
-   setMessage(action==="approve"?"已通过并生成新版本":action==="reject"?"已拒绝，当前版本不变":"已撤回申请");
+   if(action==="approve"){
+    const result=await workflowApi.approve(id,drafts[id]??"");
+    setMessage(result.status==="committed"?"已通过并生成新版本":"审批已受理，尚未生成新版本");
+   }else if(action==="reject"){
+    await workflowApi.reject(id,drafts[id]??"");
+    setMessage("已拒绝，当前版本不变");
+   }else{
+    await workflowApi.cancel(id);
+    setMessage("已撤回申请");
+   }
+   setReloadToken(token=>token+1);
   }catch(error){
-   setMessage(errorCopy(error,"操作失败"));
+   const code=errorCode(error);
+   if(code==="E_VERSION_CONFLICT"||code==="E_APPROVAL_PENDING"){
+    setMessage("审批状态已变化，请刷新");
+    setReloadToken(token=>token+1);
+   }else{
+    setMessage(errorCopy(error,"操作失败"));
+   }
+  }finally{
+   setBusyId("");
   }
  }
 
@@ -65,8 +88,12 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
       <td>v{a.baseSeq}</td>
       <td>{a.createdAt.replace("T"," ").slice(0,16)}</td>
       <td className="row-actions">
-       <button type="button" className="primary" onClick={()=>act(a.id,"approve","同意")}>通过</button>
-       <button type="button" className="danger" onClick={()=>act(a.id,"reject","内容需修改")}>拒绝</button>
+       <input aria-label={`审批意见 — ${a.fileName}`} placeholder="审批意见（可选）" value={drafts[a.id]??""}
+        style={{minWidth:"180px"}} disabled={busyId!==""}
+        onChange={e=>setDrafts(prev=>({...prev,[a.id]:e.target.value}))}/>
+       {busyId===a.id&&<span className="toolbar-hint">处理中…</span>}
+       <button type="button" className="primary" disabled={busyId!==""} onClick={()=>act(a.id,"approve")}>通过</button>
+       <button type="button" className="danger" disabled={busyId!==""} onClick={()=>act(a.id,"reject")}>拒绝</button>
       </td>
      </tr>)}
     </tbody>
@@ -84,7 +111,7 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
       <td>{STATE_LABELS[a.state]??a.state}</td>
       <td>{a.approverName}</td>
       <td>{a.decisionComment||"—"}</td>
-      <td>{a.state==="pending"&&<button type="button" onClick={()=>act(a.id,"cancel","")}>撤回</button>}</td>
+      <td>{a.state==="pending"&&<button type="button" disabled={busyId!==""} onClick={()=>act(a.id,"cancel")}>撤回</button>}</td>
      </tr>)}
     </tbody>
    </table>

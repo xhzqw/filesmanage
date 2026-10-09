@@ -1,32 +1,23 @@
 import {useEffect,useState} from "react";
 import type {TrashEntry} from "../../entities/trash/model";
 import {trashApi} from "./api";
-import {errorCopy} from "../../shared/errors";
+import {RestoreDialog} from "./RestoreDialog";
 
 export function TrashList({onRestored}:{onRestored:()=>void}){
  const[entries,setEntries]=useState<TrashEntry[]>([]);
  const[status,setStatus]=useState("loading");
  const[message,setMessage]=useState("");
- const[busy,setBusy]=useState("");
+ const[restoring,setRestoring]=useState<TrashEntry|null>(null);
+ const[reloadToken,setReloadToken]=useState(0);
 
  useEffect(()=>{
   let valid=true;
+  setStatus("loading");
   trashApi.list()
    .then(data=>{if(valid){setEntries(data);setStatus("ready");}})
    .catch(()=>{if(valid)setStatus("failed");});
   return()=>{valid=false;};
- },[]);
-
- async function restore(entry:TrashEntry){
-  setBusy(entry.id);setMessage("");
-  try{
-   await trashApi.restore(entry.id,"","");
-   setEntries(prev=>prev.filter(e=>e.id!==entry.id));
-   onRestored();
-  }catch(error){
-   setMessage(errorCopy(error,"恢复失败"));
-  }finally{setBusy("");}
- }
+ },[reloadToken]);
 
  return <div className="work-body">
   <div className="toolbar"><span className="toolbar-hint">回收站中的资源仍保留完整版本历史，恢复后 ID 与版本不变。</span></div>
@@ -43,11 +34,15 @@ export function TrashList({onRestored}:{onRestored:()=>void}){
       <td>{entry.folderId?`目录${entry.subtreeCount?"（含 "+entry.subtreeCount+" 个子项）":""}`:"文件"}</td>
       <td>{entry.deletedByName}</td>
       <td>{entry.deletedAt.replace("T"," ").slice(0,16)}</td>
-      <td><button type="button" disabled={busy===entry.id}
-       onClick={()=>restore(entry)}>{busy===entry.id?"恢复中…":"恢复"}</button></td>
+      <td><button type="button" disabled={restoring!==null}
+       onClick={()=>{setMessage("");setRestoring(entry);}}>恢复</button></td>
      </tr>)}
     </tbody>
    </table>
   </div>
+  {restoring&&<RestoreDialog entry={restoring}
+   onClose={()=>setRestoring(null)}
+   onReload={()=>setReloadToken(token=>token+1)}
+   onRestored={()=>{setRestoring(null);setReloadToken(token=>token+1);onRestored();}}/>}
  </div>;
 }

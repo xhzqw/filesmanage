@@ -34,6 +34,13 @@ export const fileApi={
  submitForApproval:(id:string,baseSeq:number,data:string)=>
   request<{status:string;approvalId:string;expectedCurrentSeq:number}>("/files/"+id+"/save",
    {method:"POST",body:JSON.stringify({baseSeq,data})}),
+ // Rollback appends a new immutable version (SPEC §9.5): targetSeq selects the
+ // source version, expectedCurrentSeq is the CAS basis, and the edit lock plus
+ // idempotency key keep concurrent rollbacks from double-applying. A 202 reply
+ // carries status "pending" (approval-routed) and must not read as committed.
+ rollback:(id:string,targetSeq:number,expectedCurrentSeq:number,lockToken:string,reason:string,idempotencyKey:string)=>
+  request<{status:string;versionSeq?:number;approvalId?:string;rollbackTargetSeq?:number}>("/files/"+id+"/rollback",
+   {method:"POST",body:JSON.stringify({targetSeq,expectedCurrentSeq,lockToken,reason,idempotencyKey})}),
  openOfficeSession:(id:string)=>request<OfficeSessionData>("/files/"+id+"/office/session",{method:"POST",body:"{}"}),
  derivativeStatus:(id:string)=>request<{found:boolean;state:string;format:string;class:string;engine:string;note:string;outputKind?:string;outputSize?:number;outputSha256?:string;errorCode?:string}>("/files/"+id+"/derivative"),
  requestDerivative:(id:string)=>request<{derivativeId:string;state:string;sourceFormat:string;outputKind:string;converter:string}>("/files/"+id+"/derivative",{method:"POST",body:"{}"}),

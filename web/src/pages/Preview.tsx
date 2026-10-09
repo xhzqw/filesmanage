@@ -1,6 +1,7 @@
 import {useEffect,useState} from "react";
 import {useParams} from "react-router-dom";
 import {fileApi} from "../features/documents/api";
+import {RollbackDialog} from "../features/documents/RollbackDialog";
 import type {PreviewData,FileVersion} from "../entities/file/model";
 import type {User} from "../entities/user/model";
 import {AppShell} from "../shared/ui/AppShell";
@@ -24,6 +25,10 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const[preview,setPreview]=useState<PreviewData|null>(null);
  const[versions,setVersions]=useState<FileVersion[]>([]);
  const[status,setStatus]=useState("loading");
+ const[notice,setNotice]=useState("");
+ const[rollback,setRollback]=useState<FileVersion|null>(null);
+ const[reloadToken,setReloadToken]=useState(0);
+ const currentSeq=versions.at(-1)?.versionSeq??1;
 
  useEffect(()=>{
   let valid=true;
@@ -35,7 +40,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
    })
    .catch(()=>{if(valid)setStatus("failed");});
   return()=>{valid=false;};
- },[id]);
+ },[id,reloadToken]);
 
  return <AppShell user={user} onLogout={onLogout}>
   <div className="panels">
@@ -43,7 +48,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
     {status==="loading"&&<p className="empty">正在加载预览…</p>}
     {status==="failed"&&<p role="alert" className="notice error">无法读取该文件：不存在或没有预览权限。</p>}
     {status==="ready"&&preview&&<>
-     <div className="breadcrumb">{preview.name} · {preview.size} 字节 · v{versions.at(-1)?.versionSeq??1}</div>
+     <div className="breadcrumb">{preview.name} · {preview.size} 字节 · v{currentSeq}</div>
      <div className="toolbar">
       <a className="primary" href={"/api/files/"+preview.fileId+"/bytes"} download={preview.name}>下载原始字节</a>
       {preview.name.toLowerCase().endsWith(".docx")&&
@@ -58,9 +63,10 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
      <div className="toolbar">
       <span className="toolbar-hint">编码 {preview.byteMeta.encoding} · 行尾 {preview.byteMeta.eol} · BOM {preview.byteMeta.hasBom?"有":"无"} · 末尾换行 {preview.byteMeta.endsWithNewline?"有":"无"}</span>
      </div>
+     {notice&&<p role="status" className="notice">{notice}</p>}
      <div className="table">
       <table>
-       <thead><tr><th>版本</th><th>动作</th><th>大小</th><th>校验值</th><th>创建人</th><th>时间</th></tr></thead>
+       <thead><tr><th>版本</th><th>动作</th><th>大小</th><th>校验值</th><th>创建人</th><th>时间</th><th>操作</th></tr></thead>
        <tbody>
         {versions.map(v=><tr key={v.versionSeq}>
          <td>v{v.versionSeq}</td>
@@ -69,6 +75,8 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
          <td className="hash" title={v.sha256}>{v.sha256.slice(0,12)}…</td>
          <td>{v.createdBy}</td>
          <td>{v.createdAt.replace("T"," ").slice(0,16)}</td>
+         <td><button type="button" disabled={v.versionSeq===currentSeq}
+          onClick={()=>{setNotice("");setRollback(v);}}>{v.versionSeq===currentSeq?"当前版本":"回滚到此版本"}</button></td>
         </tr>)}
        </tbody>
       </table>
@@ -77,5 +85,11 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
     </>}
    </main>
   </div>
+  {rollback&&<RollbackDialog fileId={id} currentSeq={currentSeq} version={rollback}
+   onClose={()=>setRollback(null)}
+   onCommitted={newSeq=>{setRollback(null);setNotice(newSeq>0?`已回滚，新版本为 v${newSeq}`:"已回滚，版本列表已刷新");setReloadToken(token=>token+1);}}
+   onPending={()=>{setRollback(null);setNotice("已提交待审批，当前生效版本未变。");}}
+   onConflict={()=>{setRollback(null);setNotice("文件已被其他人修改，请刷新后重试");setReloadToken(token=>token+1);}}
+   onRefresh={()=>setReloadToken(token=>token+1)}/>}
  </AppShell>;
 }
