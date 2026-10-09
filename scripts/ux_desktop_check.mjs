@@ -651,7 +651,8 @@ async function main() {
       sel = await selectedNames();
       const labels2 = await menuLabels();
       check("DI-05 right-click on an unselected row becomes a single selection",
-        sel.length === 1 && Array.isArray(labels2) && labels2.length === 5, JSON.stringify({ sel, labels2 }));
+        sel.length === 1 && Array.isArray(labels2) && labels2.length === 6
+        && labels2.every(l => /打开|编辑|重命名|移动到…|下载|删除/.test(l)), JSON.stringify({ sel, labels2 }));
 
       // menu keyboard: Escape closes and focus returns to the row
       await cdp.key("Escape", "Escape", 27);
