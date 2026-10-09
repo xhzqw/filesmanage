@@ -104,7 +104,7 @@ func (c *sessionCache) get(token string, now time.Time, epoch uint64) (domain.Au
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	entry, ok := c.entries[token]
-	if !ok || !entry.expireAt.After(now) || entry.epoch != epoch {
+	if !ok || !entry.expireAt.After(now) || !entry.value.ExpiresAt.After(now) || entry.epoch != epoch {
 		return domain.Authenticated{}, false
 	}
 	return entry.value, true
@@ -122,7 +122,13 @@ func (c *sessionCache) put(token string, value domain.Authenticated, now time.Ti
 			return
 		}
 	}
-	c.entries[token] = sessionEntry{value: value, expireAt: now.Add(c.ttl), epoch: epoch}
+	expires := now.Add(c.ttl)
+	if value.ExpiresAt.Before(expires) {
+		expires = value.ExpiresAt
+	}
+	if expires.After(now) {
+		c.entries[token] = sessionEntry{value: value, expireAt: expires, epoch: epoch}
+	}
 }
 
 func (c *sessionCache) drop(token string) {
@@ -408,6 +414,7 @@ func (s *Service) ChangePassword(ctx context.Context, sessionToken, oldPassword,
 	// The repository revokes the user other sessions with the password change;
 	// drop the cached copies so that revocation is visible at once. The acting
 	// session is re-cached on its next request.
+	s.bumpACLEpoch()
 	s.session.dropUser(u.ID)
 	u.MustChangePassword = false
 	return u, nil
