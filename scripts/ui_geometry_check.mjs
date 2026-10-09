@@ -96,10 +96,18 @@ async function inspectCompact(page,width){
    headerRight:rect(".header-right"),sidebar:rect(".sidebar"),
    work:rect(".work"),table:rect(".table"),org:rect(".org-workbench"),
    dialog:rect("dialog.dialog[open]"),
-   menu:rect(".header nav.open")};
+   menu:rect(".header nav.open"),
+   overflowing:[...document.querySelectorAll("body *")].filter(el=>{
+    const r=el.getBoundingClientRect(),s=getComputedStyle(el);
+    return r.right>innerWidth+3&&r.width>10&&s.position!=="fixed";
+   }).slice(0,7).map(el=>({
+    selector:el.tagName.toLowerCase()+"."+String(el.className||"").slice(0,64),
+    right:Math.round(el.getBoundingClientRect().right),
+    width:Math.round(el.getBoundingClientRect().width),
+   }))};
  })()`);
  check(`${page} ${width}px document fits`,report.htmlWidth<=report.width+2,
-  `scroll=${report.htmlWidth} viewport=${report.width}`);
+  `scroll=${report.htmlWidth} viewport=${report.width} outliers=${JSON.stringify(report.overflowing)}`);
  check(`${page} ${width}px exact layout viewport`,report.width===width,
   `layout=${report.width} target=${width}`);
  check(`${page} ${width}px header contents fit`,
