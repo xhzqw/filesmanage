@@ -340,7 +340,7 @@ async function uploadFixture(folderId, name, content) {
       method: "POST", headers: { Origin: ORIGIN, Cookie: sessionCookie }, body: form,
     });
     const body = await res.json().catch(() => null);
-    if (res.status === 200 && body?.ok && body.data?.fileId) return body.data;
+    if ((res.status === 200 || res.status === 201) && body?.ok && body.data?.fileId) return body.data;
     last = `${res.status} ${JSON.stringify(body)}`;
     if (attempt < 2) await delay(300);
   }
