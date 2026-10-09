@@ -697,12 +697,12 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       onDragStart={event=>onRowDragStart(event,item)}
       onDragEnd={onRowDragEnd}>
       <td className="col-select"><input type="checkbox" checked={selectedIds.has(item.id)} aria-label={"选择 "+item.name} onClick={event=>event.stopPropagation()} onChange={event=>onCheckToggle(event,item)}/></td>
-      <td className="col-name"><FileTypeIcon name={item.name}/><span className="file-name" title={item.name}>{item.name}</span></td>
+      <td className="col-name"><div className="file-cell-wrap"><FileTypeIcon name={item.name}/><span className="file-name" title={item.name}>{item.name}</span></div></td>
       <td className="col-size num">{formatSize(item.sizeBytes)}</td>
       <td className="col-version"><span className="version-badge">v{item.currentVersionSeq}</span></td>
       <td className="col-hash hash" title={item.sha256}>{item.sha256.slice(0,8)}</td>
       <td className="col-date date">{item.updatedAt.replace("T"," ").slice(0,16)}</td>
-      <td className="row-actions col-actions" onClick={event=>event.stopPropagation()}>
+      <td className="row-actions col-actions" onClick={event=>event.stopPropagation()}><div className="actions-cell-wrap">
        <button type="button" onClick={()=>navigate("/preview/"+item.id)}>打开</button>
        <a href={"/api/files/"+item.id+"/bytes"} download={item.name}>下载</a>
        <button type="button" onClick={()=>onEdit(item.id)}>编辑</button>
@@ -712,7 +712,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
         disabled={favoritesState!=="ready"||favoriteBusy!==""}
         title={favoritesState==="failed"?"关注状态加载失败，请刷新后重试":undefined}
         onClick={()=>toggleFavorite(item)}>{favoriteIds.has(item.id)?"已关注":"关注"}</button>
-      </td>
+      </div></td>
      </tr>)}
     </tbody>
    </table>
