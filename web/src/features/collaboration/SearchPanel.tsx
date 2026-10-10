@@ -6,7 +6,8 @@ import type {FileItem} from "../../entities/file/model";
 import type {Folder} from "../../entities/folder/model";
 import {FolderPicker} from "../../shared/ui/FolderPicker";
 import {Dialog} from "../../shared/ui/Dialog";
-import {readSearchPresets,saveSearchPreset,writeSearchPresets,type SearchPresetFields} from "./searchPresets";
+import {readSearchPresets,writeSearchPresets,type SearchPresetFields} from "./searchPresets";
+import {searchPresetsApi} from "./searchPresetsApi";
 import "./search.css";
 
 // The API caps the authorized total at 1001, which the UI renders as "1000+"
@@ -66,17 +67,39 @@ export function SearchPanel({userId}:{userId:string}){
  const[folders,setFolders]=useState<Folder[]>([]);
  const[treeState,setTreeState]=useState<"loading"|"ready"|"failed">("loading");
  const[treeToken,setTreeToken]=useState(0);
- const[presets,setPresets]=useState(()=>readSearchPresets(userId));
+ const[presets,setPresets]=useState<Awaited<ReturnType<typeof searchPresetsApi.list>>>([]);
  const[presetName,setPresetName]=useState("");
  const[showPresets,setShowPresets]=useState(false);
- useEffect(()=>{setPresets(readSearchPresets(userId));setPresetName("");},[userId]);
- function savePreset(){
+ const[presetBusy,setPresetBusy]=useState(false);
+ const[presetError,setPresetError]=useState("");
+ useEffect(()=>{
+  let active=true;setPresets([]);setPresetName("");setPresetError("");
+  void (async()=>{
+   try{
+    let remote=await searchPresetsApi.list();
+    // One-time import of older browser-only presets, without replacing
+    // existing server records from other devices.
+    const legacy=readSearchPresets(userId).filter(p=>!remote.some(r=>r.name===p.name));
+    for(const item of legacy.slice(0,Math.max(0,12-remote.length))){
+     if(!active)return;
+     remote=await searchPresetsApi.save(item.name,item.fields);
+    }
+    writeSearchPresets(userId,[]);
+    if(active)setPresets(remote);
+   }catch{if(active)setPresetError("无法读取云端搜索预设，请重试");}
+  })();
+  return()=>{active=false;};
+ },[userId]);
+ async function savePreset(){
   const title=presetName.trim();
-  if(!title){setMessage("请输入预设名称");return;}
+  if(!title||presetBusy)return;
+  setPresetBusy(true);setPresetError("");
   const fields:SearchPresetFields={q,category,tag,uploader,type,sort,limit:pageSize,scope,folder,from,to};
-  const saved=saveSearchPreset(presets,title,fields);
-  writeSearchPresets(userId,saved);
-  setPresets(saved);setPresetName("");setMessage(`已保存筛选：${title}`);
+  try{
+   setPresets(await searchPresetsApi.save(title,fields));
+   setPresetName("");setMessage(`已同步搜索条件：${title}`);
+  }catch{setPresetError("保存失败或已达到 12 条限制");}
+  finally{setPresetBusy(false);}
  }
  function loadPreset(preset:SearchPresetFields){
   setQ(preset.q);setCategory(preset.category);setTag(preset.tag);setUploader(preset.uploader);
@@ -85,9 +108,14 @@ export function SearchPanel({userId}:{userId:string}){
   epochRef.current++;setQuery(null);setItems([]);setStatus("idle");
   setMessage("预设已加载，点击搜索或应用筛选执行");
  }
- function deletePreset(id:string){
-  const updated=presets.filter(p=>p.id!==id);
-  writeSearchPresets(userId,updated);setPresets(updated);
+ async function deletePreset(id:string){
+  if(presetBusy)return;
+  setPresetBusy(true);setPresetError("");
+  try{
+   await searchPresetsApi.remove(id);
+   setPresets(await searchPresetsApi.list());
+  }catch{setPresetError("删除失败，请重试");}
+  finally{setPresetBusy(false);}
  }
  useEffect(()=>{
   if(!pickerOpen)return;
@@ -211,11 +239,12 @@ export function SearchPanel({userId}:{userId:string}){
    {message&&<span className="error" role="alert">{message}</span>}
   </form>
   {showPresets&&<div className="search-presets" aria-label="已保存搜索条件">
+   {presetError&&<span className="error" role="alert">{presetError}</span>}
    <RareInput aria-label="预设名称" placeholder="给当前筛选命名…" maxLength={48} value={presetName} onChange={e=>setPresetName(e.target.value)}/>
-   <RareButton type="button" onClick={savePreset} disabled={!presetName.trim()}>保存当前条件</RareButton>
+   <RareButton type="button" onClick={()=>void savePreset()} disabled={!presetName.trim()||presetBusy}>保存当前条件</RareButton>
    {presets.map(preset=><div className="search-preset-item" key={preset.id}>
     <RareButton type="button" title="载入搜索条件" onClick={()=>loadPreset(preset.fields)}>{preset.name}</RareButton>
-    <RareButton type="button" aria-label={"删除预设 "+preset.name} onClick={()=>deletePreset(preset.id)}>×</RareButton>
+    <RareButton type="button" aria-label={"删除预设 "+preset.name} onClick={()=>void deletePreset(preset.name)}>×</RareButton>
    </div>)}
    {presets.length===0&&<span className="hint">暂无预设（最多 12 项）</span>}
   </div>}

@@ -18,6 +18,7 @@ type Repository interface {
 	Ping(context.Context) error
 	ResumableUploadRepository
 	ApprovalActivityStore
+	SearchPresetStore
 
 	// Identity and sessions.
 	UserByLogin(context.Context, string) (domain.User, string, error)

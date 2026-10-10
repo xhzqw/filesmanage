@@ -214,7 +214,7 @@ schema("VersionCompareInfo",obj({"seq":integer(),"sha256":string(),"sizeBytes":i
 schema("VersionComparison",obj({
  "left":ref("VersionCompareInfo"),"right":ref("VersionCompareInfo"),
  "mode":string(enum=["identical","metadata","large","text"]),
- "detail":string(enum=["office_parts"]),
+ "detail":string(enum=["office_parts","office_semantic"]),
  "lines":arr(ref("VersionComparisonLine")),"added":integer(),"removed":integer(),
 },required=["left","right","mode","lines","added","removed"]))
 schema("ReviewComment",obj({
@@ -1048,6 +1048,20 @@ add("DELETE", "/api/files/{id}/lock", operation("Release a held edit lock", "Wor
     params=[id_param("id", "File id.")],
     request={"application/json": {"schema": ref("LockTokenRequest")}},
     responses=dict([json_ok(obj({"released": string()}, required=["released"]), "Released file id."), resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"]), resp("409", ERR["409"])])))
+
+schema("SearchPreset",obj({"name":string(max_length=48),"fields":obj({
+ "q":string(),"category":string(),"tag":string(),"uploader":string(),"type":string(),
+ "sort":string(),"limit":integer(),"scope":string(),"folder":string(),"from":string(),"to":string()
+ },required=["q","category","tag","uploader","type","sort","limit","scope","folder","from","to"]),"createdAt":timestamp()},
+ required=["name","fields"]))
+add("GET","/api/search/presets",operation("List current user's synced saved search criteria","Search","listSearchPresets",security=SESSION,
+ responses=dict([json_ok(arr(ref("SearchPreset")),"Personal presets; no document results stored."),resp("401",ERR["401"])])))
+add("POST","/api/search/presets",operation("Create or replace a saved search (maximum 12 per user)","Search","saveSearchPreset",security=SESSION,
+ request={"application/json":{"schema":ref("SearchPreset")}},
+ responses=dict([json_ok(arr(ref("SearchPreset")),"Updated per-user presets."),resp("400",ERR["400"]),resp("401",ERR["401"])])))
+add("DELETE","/api/search/presets/{name}",operation("Delete own saved search","Search","deleteSearchPreset",security=SESSION,
+ params=[{"name":"name","in":"path","required":True,"schema":string(max_length=48)}],
+ responses=dict([json_ok(obj({"deleted":boolean()},required=["deleted"]),"Deleted matching own preset."),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("404",ERR["404"])])))
 
 add("GET","/api/files/download-zip",operation("Download an authorized bounded ZIP of current file versions","Files","downloadFilesZip",security=SESSION,
  params=[query("ids","1-30 unique comma-separated file IDs, max 512 MiB original bytes")],

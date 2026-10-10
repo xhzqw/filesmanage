@@ -5,6 +5,7 @@ import type {FileItem} from "../../entities/file/model";
 import type {Folder} from "../../entities/folder/model";
 import {fileApi,formatSize} from "./api";
 import {useUploadStore} from "./uploadStore";
+import {downloadZip,type ZipProgress} from "./zipDownload";
 import {batchConflict,batchExcluded,batchFailed,batchMoveInvalidTarget,batchPickTarget,batchSubmitStarted,batchSucceeded,failed,fileMoveInvalidTarget,openBatch,openFlow,pickTarget,preflightConflict,preflightReady,preflightStarted,submitStarted,succeeded,type BatchMoveFlow,type MoveFlow,type MovePreflight}from"./moveFileFlow";
 import {errorCode,errorCopy} from "../../shared/errors";
 import {request} from "../../shared/http";
@@ -211,6 +212,9 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  // lives only while the row menu is open and is never business state.
  const[rowMenu,setRowMenu]=useState<{targets:FileItem[];point:MenuPoint|null;anchor:HTMLElement|null}|null>(null);
  const[deleteBusy,setDeleteBusy]=useState(false);
+ const[zipProgress,setZipProgress]=useState<ZipProgress|null>(null);
+ const zipController=useRef<AbortController|null>(null);
+ useEffect(()=>()=>zipController.current?.abort(),[]);
  const[deleteFailures,setDeleteFailures]=useState<Record<string,string>>({});
  function openDelete(targets:FileItem[]){
   setDeleteFailures({});
@@ -368,17 +372,21 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  }
 
 
-  function batchDownload(files:FileItem[]){
-   if(files.length===0)return;
+  async function batchDownload(files:FileItem[]){
+   if(files.length===0||zipController.current)return;
    if(files.length>30){announce("单次最多打包 30 个文件，请分批下载","error");return;}
    if(files.reduce((sum,file)=>sum+file.sizeBytes,0)>512*1024*1024){
     announce("打包原始文件最多 512 MiB，请分批下载","error");return;
    }
-   const a=document.createElement("a");
-   a.href="/api/files/download-zip?"+new URLSearchParams({ids:files.map(f=>f.id).join(",")}).toString();
-   a.download="files.zip";
-   document.body.appendChild(a);a.click();a.remove();
-   announce("正在准备 ZIP 下载，请检查浏览器下载列表","info");
+   const controller=new AbortController();zipController.current=controller;
+   try{
+    await downloadZip(files.map(f=>f.id),controller.signal,setZipProgress);
+    announce("ZIP 已准备好，浏览器正在保存文件","info");
+    setZipProgress(null);
+   }catch(error){
+    if(controller.signal.aborted){setZipProgress(null);announce("ZIP 下载已取消","info");}
+    else{const message=errorCopy(error,"ZIP 下载失败");setZipProgress({phase:"failed",bytes:0,error:message});announce(message,"error");}
+   }finally{if(zipController.current===controller)zipController.current=null;}
   }
 
   const visibleItems=useMemo(()=>{
@@ -767,7 +775,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     </label>
     {newFolderSlot}
     <div className="batch-actions-group">
-     <RareButton type="button" className="batch-btn" disabled={selectedIds.size===0} onClick={()=>batchDownload(selection)} title={selectedIds.size===0?"勾选文件后可批量下载":"批量下载已勾选文件"}>批量下载</RareButton>
+     <RareButton type="button" className="batch-btn" disabled={selectedIds.size===0||zipController.current!==null} onClick={()=>void batchDownload(selection)} title={selectedIds.size===0?"勾选文件后可批量下载":"批量下载已勾选文件"}>批量下载</RareButton>
      <RareButton type="button" className="batch-btn" disabled={selectedIds.size===0} onClick={()=>startMoveSelection(selection)} title={selectedIds.size===0?"勾选文件后可批量移动":"批量移动已勾选文件"}>批量移动</RareButton>
      <RareButton type="button" className="batch-btn danger" disabled={selectedIds.size===0} onClick={()=>openDelete(selection)} title={selectedIds.size===0?"勾选文件后可批量删除":"批量删除已勾选文件"}>批量删除</RareButton>
     </div>
@@ -801,6 +809,13 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     </div>
    </div>
   </div>
+  {zipProgress&&<div className="zip-download-status" role="status">
+   <span>{zipProgress.phase==="preparing"?"正在鉴权并准备 ZIP…":zipProgress.phase==="receiving"?`ZIP 已接收 ${formatSize(zipProgress.bytes)}（压缩总量未知）`:zipProgress.phase==="saving"?"准备保存 ZIP…":zipProgress.error}</span>
+   {zipProgress.phase!=="failed"&&<span className="zip-progress-track" aria-label="正在下载 ZIP"><span/></span>}
+   <RareButton type="button" onClick={()=>{if(zipProgress.phase==="failed")setZipProgress(null);else zipController.current?.abort();}}>
+    {zipProgress.phase==="failed"?"关闭":"取消"}
+   </RareButton>
+  </div>}
   {message&&<p role="status" className={"notice "+messageTone}>{message}</p>}
   <div className="table" onClick={event=>{if(!(event.target as HTMLElement).closest("tr")){setSelectedIds(new Set<string>());setAnchorId(null);}}}>
    <table role="grid" aria-label={folderName+" 文件列表"} className="file-table file-table-ultra">

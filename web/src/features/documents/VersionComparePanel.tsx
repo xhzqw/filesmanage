@@ -74,6 +74,7 @@ export function VersionComparePanel({fileId,versions}:{fileId:string;versions:Fi
     <span>v{result.right.seq} · {result.right.sizeBytes.toLocaleString()} B</span>
     {result.mode==="text"&&<strong>+{result.added} / −{result.removed} 行</strong>}
    </div>
+   {result.detail==="office_semantic"&&<p className="hint">语义差异：DOCX 按可提取段落、XLSX 按工作表及单元格值比较；不涵盖样式、公式重新计算或排版。</p>}
    {result.detail==="office_parts"&&<p className="hint">Office 部件差异：比较文档内部部件的名称、大小和 CRC32，不能代表段落文字或页面版式完全一致。</p>}
    {result.mode==="text"&&<div className="file-compare-quicknav">
     <span>{changes.length} 处变更</span>

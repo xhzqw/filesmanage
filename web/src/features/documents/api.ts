@@ -3,7 +3,7 @@ import {postMultipart} from "../../shared/uploadClient";
 import type {FileItem, FileVersion, PreviewData, FileMetadata} from "../../entities/file/model";
 
 export type CompareDiffLine={kind:"equal"|"added"|"removed";left?:number;right?:number;text:string};
-export type VersionComparison={left:{seq:number;sha256:string;sizeBytes:number};right:{seq:number;sha256:string;sizeBytes:number};mode:"identical"|"metadata"|"large"|"text";detail?:"office_parts";lines:CompareDiffLine[];added:number;removed:number};
+export type VersionComparison={left:{seq:number;sha256:string;sizeBytes:number};right:{seq:number;sha256:string;sizeBytes:number};mode:"identical"|"metadata"|"large"|"text";detail?:"office_parts"|"office_semantic";lines:CompareDiffLine[];added:number;removed:number};
 export type FileReviewComment={id:number;fileId:string;versionSeq:number;lineNumber?:number;body:string;authorId:string;authorName:string;createdAt:string;resolvedAt?:string;resolvedBy?:string};
 export type ReviewCommentPage={items:FileReviewComment[];nextCursor:string};
 export type FilePage={items:FileItem[];nextCursor:string};

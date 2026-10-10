@@ -23,6 +23,7 @@ type memoryRepo struct {
 	approvals                  []domain.Approval
 	approvalEvents             []domain.ApprovalEvent
 	approvalNotifications      []domain.ApprovalNotification
+	searchPresets              map[string]map[string]domain.SearchPreset
 	approvalNotificationOwners []string
 	locks                      map[string]domain.EditLock
 	officeSessions             []domain.OfficeSession
@@ -70,6 +71,7 @@ type memorySession struct {
 func newMemoryRepo() *memoryRepo {
 	return &memoryRepo{
 		users:        map[string]memoryUser{},
+		searchPresets:map[string]map[string]domain.SearchPreset{},
 		sessions:     map[string]memorySession{},
 		folders:      map[string]domain.Folder{},
 		files:        map[string]domain.File{},

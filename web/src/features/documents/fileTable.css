@@ -2,6 +2,11 @@
    six-column grid (select/name/size/version/date/actions) built only on
    the shared token layer. */
 .batch-delete-failure{font-size:11px;color:var(--status-danger);overflow-wrap:anywhere}
+.zip-download-status{display:flex;align-items:center;gap:9px;min-height:32px;padding:5px 10px;font-size:12px;min-width:0;color:var(--text-secondary)}
+.zip-download-status>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.zip-progress-track{position:relative;flex:1 1 60px;max-width:180px;height:3px;background:var(--border-hairline);border-radius:var(--radius-pill);overflow:hidden}
+.zip-progress-track>span{position:absolute;left:0;top:0;bottom:0;width:35%;background:var(--brand-blue);animation:zip-progress 1.2s ease-in-out infinite alternate}
+@keyframes zip-progress{from{transform:translateX(0)}to{transform:translateX(180%)}}
 .file-table{table-layout:fixed;width:100%}
 .file-table th{padding:0 8px;height:var(--height-table-header)}
 .file-table tbody tr{height:var(--height-row-ultra, 26px)}
