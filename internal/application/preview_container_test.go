@@ -87,9 +87,48 @@ func TestContainerPreviewRejectsSpoofAndCorruption(t *testing.T) {
 	if _, err := containerSummary([]byte("PKbad")); err == nil {
 		t.Fatal("invalid archive accepted")
 	}
-	res, err := inspectZIP(bytes.NewReader([]byte("PK")), maxContainerBytes+1, "big.xlsx")
-	if err != nil || res.Kind != "spreadsheet" || !res.Truncated {
-		t.Fatalf("expected bounded spreadsheet response: %+v %v", res, err)
+	data := makePreviewZIP(t, map[string]string{"readme.txt": "safe"})
+	res, err := inspectZIP(bytes.NewReader(data), int64(len(data)), "valid.zip")
+	if err != nil || res.Kind != "archive" || len(res.Entries) != 1 {
+		t.Fatalf("expected archive directory response: %+v %v", res, err)
+	}
+}
+
+// A ZIP larger than the previous 32 MB limit is indexed without reading
+// the stored payload. It should use only central directory and EOCD bytes.
+type countedZIPReader struct {
+	*bytes.Reader
+	readBytes int64
+}
+
+func (r *countedZIPReader) Read(p []byte) (int, error) {
+	n, e := r.Reader.Read(p)
+	r.readBytes += int64(n)
+	return n, e
+}
+func TestLargeZIPCentralDirectoryWithoutPayloadRead(t *testing.T) {
+	var buf bytes.Buffer
+	z := zip.NewWriter(&buf)
+	w, err := z.CreateHeader(&zip.FileHeader{Name: "large.bin", Method: zip.Store})
+	if err != nil {
+		t.Fatal(err)
+	}
+	block := make([]byte, 1<<20)
+	for i := 0; i < 35; i++ {
+		if _, err = w.Write(block); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err = z.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reader := &countedZIPReader{Reader: bytes.NewReader(buf.Bytes())}
+	result, err := inspectZIP(reader, int64(buf.Len()), "big.zip")
+	if err != nil || len(result.Entries) != 1 || result.Entries[0].Size != 35<<20 {
+		t.Fatalf("large zip not indexed: %+v %v", result, err)
+	}
+	if reader.readBytes > 512<<10 {
+		t.Fatalf("read %d bytes, expected directory-only access", reader.readBytes)
 	}
 }
 func TestStructuredPreviewACL(t *testing.T) {

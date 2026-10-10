@@ -3,6 +3,7 @@ package application
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/binary"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -10,13 +11,14 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // Container previews are deliberately bounded and read-only. Untrusted ZIP
 // members are NEVER extracted to disk or returned as executable markup.
-const maxContainerBytes = 32 << 20
 const maxArchiveItems = 200
 const maxZIPEntries = 1500
+const maxCentralDirectoryBytes = 4 << 20
 const maxOfficeXMLBytes = 512 << 10
 const maxOfficeTextLines = 180
 
@@ -54,6 +56,10 @@ func containerSummary(data []byte) (*StructuredPreview, error) {
 	if err != nil {
 		return nil, err
 	}
+	return summarizeZIP(zr)
+}
+
+func summarizeZIP(zr *zip.Reader) (*StructuredPreview, error) {
 	if len(zr.File) > maxZIPEntries {
 		return &StructuredPreview{Kind: "archive", Note: "文件条目过多，预览仅显示前 200 项", Truncated: true}, nil
 	}
@@ -342,23 +348,65 @@ func sheetCellLines(raw []byte, shared []string) ([]string, error) {
 	}
 }
 
-// ZIP content is an adapter only for stored containers. Other signatures,
-// unsupported containers (RAR/7z) and media remain in their existing paths.
+// A seek-only BlobStore stream need not implement ReaderAt. The adapter
+// serializes positional reads and never materializes the compressed payload.
+type seekZIPReaderAt struct {
+	mu     sync.Mutex
+	reader io.ReadSeeker
+}
+
+func (r *seekZIPReaderAt) ReadAt(p []byte, off int64) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, err := r.reader.Seek(off, io.SeekStart); err != nil {
+		return 0, err
+	}
+	return io.ReadFull(r.reader, p)
+}
+
+// Validate the bounded EOCD tail BEFORE zip.NewReader constructs its index.
+// ZIP64, multi-disk and oversized directories receive an explicit fallback.
+func zipIndexBounds(reader io.ReaderAt, size int64) (int, bool, error) {
+	if size < 22 {
+		return 0, false, errors.New("invalid zip size")
+	}
+	tailSize := min(size, int64(65557))
+	tail := make([]byte, int(tailSize))
+	if _, err := reader.ReadAt(tail, size-tailSize); err != nil {
+		return 0, false, err
+	}
+	for at := len(tail) - 22; at >= 0; at-- {
+		if !bytes.Equal(tail[at:at+4], []byte("PK\x05\x06")) || at+22+int(binary.LittleEndian.Uint16(tail[at+20:at+22])) != len(tail) {
+			continue
+		}
+		disks := binary.LittleEndian.Uint16(tail[at+4 : at+6])
+		count := binary.LittleEndian.Uint16(tail[at+10 : at+12])
+		length := binary.LittleEndian.Uint32(tail[at+12 : at+16])
+		if disks != 0 || count == 0xffff || length == 0xffffffff ||
+			binary.LittleEndian.Uint16(tail[at+6:at+8]) != 0 {
+			return 0, false, errors.New("split/zip64 archive not supported")
+		}
+		return int(count), count > maxZIPEntries || length > maxCentralDirectoryBytes, nil
+	}
+	return 0, false, errors.New("ZIP central directory missing")
+}
+
+// ZIP content is an adapter only for stored containers. Even a multi-gigabyte
+// archive is indexed from its small footer, not read into server memory.
 func inspectZIP(reader io.ReadSeeker, size int64, name string) (*StructuredPreview, error) {
-	if size > maxContainerBytes {
-		return &StructuredPreview{Kind: containerKindHint(name), Note: fmt.Sprintf("文件超过 %d MB 的在线结构预览限制，请下载后查看", maxContainerBytes>>20), Truncated: true}, nil
-	}
-	if _, err := reader.Seek(0, io.SeekStart); err != nil {
-		return nil, err
-	}
-	data, err := io.ReadAll(io.LimitReader(reader, maxContainerBytes+1))
+	positioned := &seekZIPReaderAt{reader: reader}
+	count, limited, err := zipIndexBounds(positioned, size)
 	if err != nil {
 		return nil, err
 	}
-	if len(data) > maxContainerBytes {
-		return &StructuredPreview{Kind: containerKindHint(name), Note: "文件超过安全读取上限", Truncated: true}, nil
+	if limited {
+		return &StructuredPreview{Kind: containerKindHint(name), Note: fmt.Sprintf("压缩包包含 %d 项或中央目录过大，已暂停预览以保护服务器", count), Truncated: true}, nil
 	}
-	return containerSummary(data)
+	zr, err := zip.NewReader(positioned, size)
+	if err != nil {
+		return nil, err
+	}
+	return summarizeZIP(zr)
 }
 func containerKindHint(name string) string {
 	switch extensionOf(name) {

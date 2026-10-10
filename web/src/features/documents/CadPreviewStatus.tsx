@@ -11,11 +11,28 @@ export function CadPreviewStatus({fileId}:{fileId:string}){
  const [failure,setFailure]=useState("");
  const [reload,setReload]=useState(0);
  useEffect(()=>{
-  let active=true;setStatus("loading");
-  fileApi.derivativeStatus(fileId).then(data=>{
-   if(active){setInfo(data);setStatus("ready");}
-  }).catch(error=>{if(active){setFailure(errorCopy(error,"无法读取转换状态"));setStatus("failed");}});
-  return()=>{active=false;};
+  let active=true;
+  let timer:ReturnType<typeof setTimeout>|undefined;
+  setStatus("loading");
+  setInfo(null);
+  const poll=async()=>{
+   try{
+    const data=await fileApi.derivativeStatus(fileId);
+    if(!active)return;
+    setInfo(data);setStatus("ready");
+    if(data.found&&(data.state==="queued"||data.state==="running")){
+     timer=setTimeout(()=>{
+      if(document.visibilityState==="hidden"){
+       timer=setTimeout(poll,3500);
+      }else{void poll();}
+     },3500);
+    }
+   }catch(error){
+    if(active){setFailure(errorCopy(error,"无法读取转换状态"));setStatus("failed");}
+   }
+  };
+  void poll();
+  return()=>{active=false;if(timer!==undefined)clearTimeout(timer);};
  },[fileId,reload]);
  const state=info?.state;
  const unsupported=info?.class==="licensed"||info?.class==="unverified";

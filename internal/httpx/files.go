@@ -171,6 +171,30 @@ func (h *Handler) previewMedia(c *gin.Context) {
 	http.ServeContent(c.Writer, c.Request, "", media.ModTime, media.Reader)
 }
 
+// A derived PDF is permission-gated as a preview; it never requires/grants
+// original-file download rights. Every request re-evaluates the current ACL.
+func (h *Handler) previewOfficePDF(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	pdf, err := h.S.OfficePDFPreview(c.Request.Context(), u, c.Param("id"))
+	if err != nil {
+		if err == application.ErrPreviewUnsupported {
+			c.JSON(415, gin.H{"ok": false, "error": gin.H{"code": "E_PREVIEW_UNSUPPORTED"}})
+			return
+		}
+		respondError(c, err)
+		return
+	}
+	c.Header("Content-Disposition", "inline")
+	c.Header("Cache-Control", "private, no-store")
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Header("Cross-Origin-Resource-Policy", "same-origin")
+	c.Header("Content-Security-Policy", "sandbox")
+	c.Data(200, "application/pdf", pdf)
+}
+
 func (h *Handler) saveFile(c *gin.Context) {
 	u, ok := h.auth(c)
 	if !ok {

@@ -826,6 +826,14 @@ add("GET", "/api/files/{id}/preview/media", operation("Stream passive media prev
                "404": {"description": ERR["404"]}, "415": {"description": "Unsupported or unsafe inline format."},
                "416": {"description": "Unsatisfiable media Range."}}))
 
+add("GET", "/api/files/{id}/preview/office-pdf", operation("Isolated Office-to-PDF layout preview (preview ACL only)", "Files", "previewOfficePDF", security=SESSION,
+    params=[id_param("id", "File id.")],
+    responses={"200": {"description": "Bounded, isolated, read-only OOXML layout rendering; ephemeral PDF (no store).",
+                        "content": {"application/pdf": {"schema": {"type": "string", "format": "binary"}}}},
+               "401": {"description": ERR["401"]}, "403": {"description": ERR["403"]},
+               "404": {"description": ERR["404"]}, "415": {"description": "Unsupported or unsafe Office input."},
+               "500": {"description": "Isolated conversion unavailable; client should use textual fallback."}}))
+
 add("POST", "/api/files/{id}/save", operation("Save new file content (new version, idempotent)", "Files", "saveFile", security=SESSION,
     params=[id_param("id", "File id.")],
     request={"application/json": {"schema": ref("SaveFileRequest")}},

@@ -4,6 +4,7 @@ import {Link,useNavigate,useParams} from "react-router-dom";
 import {fileApi,formatSize} from "../features/documents/api";
 import {MediaPreview} from "../features/documents/MediaPreview";
 import {StructuredFilePreview} from "../features/documents/StructuredFilePreview";
+import {OfficeLayoutPreview} from "../features/documents/OfficeLayoutPreview";
 import {CadPreviewStatus} from "../features/documents/CadPreviewStatus";
 import {resolvePreviewAdapter,ADAPTER_TITLES} from "../features/documents/previewAdapters";
 import {FileEditor} from "../features/documents/FileEditor";
@@ -173,7 +174,9 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
           sandbox="allow-scripts allow-downloads" referrerPolicy="no-referrer"/>
          <p>若浏览器不支持内嵌 PDF，可使用上方的「下载」。</p>
         </div>:
-       preview.structured&&["archive","spreadsheet","presentation","document"].includes(adapter)?
+       preview.structured&&["spreadsheet","presentation","document"].includes(adapter)?
+        <OfficeLayoutPreview fileId={preview.fileId} sha={preview.sha256} structured={preview.structured}/>:
+       preview.structured&&adapter==="archive"?
         <StructuredFilePreview value={preview.structured}/>:
        adapter==="cad"?
         <CadPreviewStatus fileId={preview.fileId}/>:
