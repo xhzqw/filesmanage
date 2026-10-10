@@ -88,7 +88,31 @@ try{
  assert.equal(feedback.dot,true,"status badge should have decorative, hidden dot");
  assert.equal(feedback.round,true,"status badge should use rounded design-system geometry");
  assert.ok(["info","success","warning","danger"].includes(feedback.tone),"status badge has tokenized tone");
+ const memberGeometry=await ev(`(()=>{
+   const table=document.querySelector('#org-panel-members .org-table-container');
+   const card=document.querySelector('#org-panel-members .org-create-user-card');
+   const row=table?.querySelector('tbody tr');
+   const fields=[...document.querySelectorAll('.org-create-form .org-field')];
+   const btn=document.querySelector('.org-create-form button[type="submit"]');
+   const form=document.querySelector('.org-create-form');
+   const a=table?.getBoundingClientRect(),b=card?.getBoundingClientRect();
+   return {tableHeight:a?.height,blankGap:a&&b?Math.round(b.top-a.bottom):null,
+      rowHeight:row?.getBoundingClientRect().height,
+      rowFont:row?parseFloat(getComputedStyle(row).fontSize):null,
+      fields:fields.length,formGrid:form?getComputedStyle(form).display:null,
+      fieldWidths:fields.map(f=>Math.round(f.getBoundingClientRect().width)),
+      buttonHeight:btn?.getBoundingClientRect().height};
+ })()`);
+ assert.ok(memberGeometry.tableHeight>180,"members table should remain legible and scrollable");
+ assert.ok(memberGeometry.rowHeight>=44,"members table rows should not collapse into ultra-compact density");
+ assert.ok(memberGeometry.rowFont>=13,"members table font must be readable");
+ assert.ok(memberGeometry.blankGap!==null&&memberGeometry.blankGap>=0&&memberGeometry.blankGap<=40,
+   "creation card should follow table without a large empty flex spacer");
+ assert.equal(memberGeometry.formGrid,"grid","member creation is a structured field grid");
+ assert.equal(memberGeometry.fields,4);
+ assert.ok(memberGeometry.fieldWidths.every(w=>w>=140),"creation fields must have useful widths");
+ assert.ok(memberGeometry.buttonHeight>=34,"create action needs a comfortable target");
 
- console.log("RARE_UI_READONLY_PASS: menu toggle, Escape, modal focus scope, tabs, badges");
+ console.log("RARE_UI_READONLY_PASS: menu, modal, tabs, badges, organization legibility");
 }catch(e){console.error("RARE_UI_READONLY_FAIL",e.message);process.exitCode=1;}
 finally{ws?.close();chrome.kill("SIGTERM");}

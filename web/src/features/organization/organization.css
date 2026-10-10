@@ -346,7 +346,9 @@
   flex-direction:column;
   flex:1;
   min-height:0;
-  overflow:hidden;
+  overflow-y:auto;
+  overflow-x:hidden;
+  background:var(--surface-canvas);
 }
 
 /* 筛选与搜索工具条 */
@@ -355,11 +357,12 @@
   align-items:center;
   justify-content:space-between;
   gap:var(--space-2);
-  padding:var(--space-2) var(--space-3);
+  padding:var(--space-3) var(--space-4);
   border-bottom:1px solid var(--border-hairline);
   background:var(--surface-panel);
   flex:none;
   flex-wrap:wrap;
+  min-height:54px;
 }
 
 .org-filter-left{
@@ -376,7 +379,8 @@
   display:flex;
   align-items:center;
   min-width:240px;
-  max-width:320px;
+  width:clamp(240px,28vw,380px);
+  max-width:100%;
 }
 
 .org-scope-badge{
@@ -417,18 +421,20 @@
 
 /* 规范化数据表格 */
 .org-table-container{
-  flex:1;
+  flex:none;
   min-width:0;
   max-width:100%;
   overflow:auto;
   min-height:0;
+  max-height:min(56vh,570px);
   contain:paint;
+  background:var(--surface-panel);
 }
 
 .org-table-container table{
   width:100%;
   border-collapse:collapse;
-  font-size:12px;
+  font-size:13px;
 }
 
 .org-table-container thead th{
@@ -437,16 +443,18 @@
   z-index:2;
   background:var(--surface-header);
   border-bottom:1px solid var(--border-hairline);
-  padding:0 var(--space-3);
-  height:var(--height-table-header);
+  padding:0 var(--space-4);
+  height:40px;
   text-align:left;
+  font-size:12px;
+  letter-spacing:.012em;
   font-weight:600;
   color:var(--text-secondary);
   white-space:nowrap;
 }
 
 .org-table-container tbody tr{
-  height:var(--height-row-standard);
+  height:46px;
   border-bottom:1px solid var(--border-hairline);
   transition:background-color .1s ease;
 }
@@ -456,7 +464,7 @@
 }
 
 .org-table-container tbody td{
-  padding:0 var(--space-3);
+  padding:7px var(--space-4);
   vertical-align:middle;
 }
 
@@ -467,27 +475,28 @@
 }
 
 .org-avatar{
-  width:22px;
-  height:22px;
-  border-radius:var(--radius-xs);
+  width:30px;
+  height:30px;
+  border-radius:var(--radius-md);
   background:var(--brand-cyan-muted);
   color:var(--brand-blue);
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  font-size:11px;
+  font-size:13px;
   font-weight:600;
   flex:none;
 }
 
 .org-user-name{
-  font-weight:500;
+  font-weight:600;
+  font-size:13px;
   color:var(--text-primary);
 }
 
 .org-user-login{
   font-family:var(--font-mono);
-  font-size:11px;
+  font-size:12px;
   color:var(--text-secondary);
   background:var(--surface-header);
   padding:1px 4px;
@@ -496,7 +505,7 @@
 
 .org-dept-tag{
   display:inline-block;
-  font-size:11px;
+  font-size:12px;
   color:var(--text-secondary);
 }
 
@@ -517,14 +526,14 @@
 }
 
 .row-actions button{
-  height:24px;
-  min-height:24px;
+  height:30px;
+  min-height:30px;
   padding:0 var(--space-2);
   font-size:12px;
   border:1px solid transparent;
   background:transparent;
   color:var(--brand-blue);
-  border-radius:var(--radius-xs);
+  border-radius:var(--radius-sm);
 }
 .row-actions button:hover{
   background:var(--surface-subtle);
@@ -550,11 +559,16 @@
   color:var(--text-tertiary);
 }
 
-/* 快速添加成员卡片 */
+/* Quick create is a real task card, not a cramped footer pinned beneath
+   a giant flex-spacer. Long tables scroll independently; short tables don't
+   steal the entire available workbench height. */
 .org-create-user-card{
-  border-top:1px solid var(--border-hairline);
-  background:var(--surface-header);
-  padding:var(--space-2) var(--space-3);
+  border:1px solid var(--border-hairline);
+  border-radius:var(--radius-lg);
+  background:var(--surface-panel);
+  box-shadow:var(--shadow-panel);
+  padding:var(--space-4);
+  margin:var(--space-4);
   flex:none;
 }
 
@@ -562,47 +576,57 @@
   display:flex;
   align-items:center;
   justify-content:space-between;
-  margin-bottom:var(--space-2);
+  margin-bottom:var(--space-4);
   flex-wrap:wrap;
-  gap:var(--space-1);
+  gap:var(--space-2);
 }
 
 .org-create-user-title{
-  font-size:12px;
-  font-weight:600;
+  font-size:15px;
+  font-weight:650;
   color:var(--brand-navy);
   display:inline-flex;
   align-items:center;
-  gap:var(--space-1);
+  gap:var(--space-2);
 }
 
 .org-create-form{
-  display:flex;
-  align-items:flex-end;
-  gap:var(--space-2);
-  flex-wrap:wrap;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr)) minmax(160px,1fr) auto;
+  align-items:end;
+  gap:var(--space-3);
 }
 
 .org-field{
   display:flex;
   flex-direction:column;
-  gap:2px;
+  min-width:0;
+  gap:var(--space-2);
 }
 
 .org-field-label{
-  font-size:11px;
+  font-size:12px;
   color:var(--text-secondary);
-  font-weight:500;
+  font-weight:600;
 }
 
-.org-field input,.org-field select{
-  height:var(--height-control);
+.org-create-form .org-field input,.org-create-form .org-field select{
+  width:100%;
+  min-width:0;
+  height:36px;
   border:1px solid var(--border-subtle);
   border-radius:var(--radius-sm);
   background:var(--surface-panel);
-  padding:0 var(--space-2);
-  font-size:12px;
+  padding:0 var(--space-3);
+  font-size:13px;
   color:var(--text-primary);
+}
+.org-create-form>.rare-button{
+  min-height:36px;
+  height:36px;
+  padding:0 var(--space-4);
+  font-size:13px;
+  white-space:nowrap;
 }
 .org-field input:focus,.org-field select:focus{
   outline:1px solid var(--border-focus);
@@ -831,4 +855,21 @@
 }
 @media(max-width:700px){
   .org-table-container table{min-width:640px}
+}
+
+/* Organization readability and accessible touch targets */
+.org-tab-stage .org-table-container .row-actions{display:flex;gap:var(--space-1);align-items:center}
+.org-tab-stage .org-table-container .row-actions .rare-button{white-space:nowrap}
+@media(max-width:1280px){
+  .org-create-form{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .org-create-form>.rare-button{justify-self:start;min-width:140px}
+}
+@media(max-width:700px){
+  .org-filter-bar{padding:var(--space-3)}
+  .org-member-search-wrap{min-width:0;width:100%}
+  .org-filter-left{min-width:0}
+  .org-create-user-card{margin:var(--space-3);padding:var(--space-3)}
+  .org-create-form{grid-template-columns:minmax(0,1fr)}
+  .org-create-form>.rare-button{width:100%}
+  .org-table-container{max-height:48vh}
 }
