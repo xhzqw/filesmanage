@@ -45,7 +45,7 @@ export function RestoreDialog({entry,onClose,onRestored,onReload}:{
     setTreeState("ready");
     const current=entry.oldParentId?trailOf(data,entry.oldParentId):[];
     const original=entry.oldParentTrail??[];
-    const same=original.length>0&&current.length===original.length&&current.every((v,i)=>v.id===original[i].id&&v.name===original[i].name);
+    const same=original.length>0&&current.length===original.length&&current.every((v,i)=>v.id===original[i]?.id&&v.name===original[i]?.name);
     setLocationChanged(!same);
     setExplicitChoice(false);
     if(same&&entry.oldParentId){

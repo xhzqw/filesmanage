@@ -121,9 +121,11 @@ func (s *Service) DeleteFolder(ctx context.Context, u domain.User, folderID stri
 		return domain.TrashEntry{}, 0, err
 	}
 	var originalTrail []domain.TrashPathPart
-	if folder.ParentID!=nil {
-		originalTrail,err=snapshotTrashPath(ctx,tx,*folder.ParentID)
-		if err!=nil{return domain.TrashEntry{},0,err}
+	if folder.ParentID != nil {
+		originalTrail, err = snapshotTrashPath(ctx, tx, *folder.ParentID)
+		if err != nil {
+			return domain.TrashEntry{}, 0, err
+		}
 	}
 	subtree, err := tx.FolderSubtree(ctx, folder.ID)
 	if err != nil {
@@ -143,7 +145,7 @@ func (s *Service) DeleteFolder(ctx context.Context, u domain.User, folderID stri
 		return domain.TrashEntry{}, 0, err
 	}
 	entry := domain.TrashEntry{
-		ID: NewID("trash"), FolderID: &folder.ID, OldParentID: folder.ParentID, OldParentTrail:originalTrail,
+		ID: NewID("trash"), FolderID: &folder.ID, OldParentID: folder.ParentID, OldParentTrail: originalTrail,
 		OldName: folder.Name, DeletedBy: u.ID, DeletedAt: s.now(), SubtreeCount: len(subtree),
 	}
 	if err = tx.InsertTrashEntry(ctx, entry); err != nil {

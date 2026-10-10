@@ -52,10 +52,14 @@ func (r *Repository) PageTrashEntries(ctx context.Context, q ports.TrashQuery) (
 	for rows.Next() {
 		var t domain.TrashEntry
 		var snapshot []byte
-		if err = rows.Scan(&t.ID, &t.FileID, &t.FolderID, &t.OldParentID, &t.OldName, &t.DeletedBy, &t.DeletedName, &t.DeletedAt, &t.RestoredAt, &t.PurgedAt,&snapshot); err != nil {
+		if err = rows.Scan(&t.ID, &t.FileID, &t.FolderID, &t.OldParentID, &t.OldName, &t.DeletedBy, &t.DeletedName, &t.DeletedAt, &t.RestoredAt, &t.PurgedAt, &snapshot); err != nil {
 			return nil, err
 		}
-		if len(snapshot)>0 {if err=json.Unmarshal(snapshot,&t.OldParentTrail);err!=nil{return nil,err}}
+		if len(snapshot) > 0 {
+			if err = json.Unmarshal(snapshot, &t.OldParentTrail); err != nil {
+				return nil, err
+			}
+		}
 		out = append(out, t)
 	}
 	return out, rows.Err()

@@ -98,11 +98,13 @@ func trashPayload(t domain.TrashEntry) gin.H {
 	if t.OldParentID != nil {
 		payload["oldParentId"] = *t.OldParentID
 	}
-	if len(t.OldParentTrail)>0 {
-		payload["oldParentTrail"]=t.OldParentTrail
-		parts:=make([]string,0,len(t.OldParentTrail))
-		for _,part:=range t.OldParentTrail {parts=append(parts,part.Name)}
-		payload["oldParentPath"]="/"+strings.Join(parts,"/")
+	if len(t.OldParentTrail) > 0 {
+		payload["oldParentTrail"] = t.OldParentTrail
+		parts := make([]string, 0, len(t.OldParentTrail))
+		for _, part := range t.OldParentTrail {
+			parts = append(parts, part.Name)
+		}
+		payload["oldParentPath"] = "/" + strings.Join(parts, "/")
 	}
 	if t.SubtreeCount > 0 {
 		payload["subtreeCount"] = t.SubtreeCount

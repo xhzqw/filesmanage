@@ -25,7 +25,9 @@ func (h *Handler) listTrash(c *gin.Context) {
 		}
 		data := make([]gin.H, 0, len(entries))
 		for _, entry := range entries {
-			if entry.DeletedBy!=u.ID {entry.OldParentTrail=nil}
+			if entry.DeletedBy != u.ID {
+				entry.OldParentTrail = nil
+			}
 			data = append(data, trashPayload(entry))
 		}
 		c.JSON(200, gin.H{"ok": true, "data": data})
@@ -67,7 +69,9 @@ func (h *Handler) listTrash(c *gin.Context) {
 	}
 	data := make([]gin.H, 0, len(page.Items))
 	for _, entry := range page.Items {
-		if entry.DeletedBy!=u.ID {entry.OldParentTrail=nil}
+		if entry.DeletedBy != u.ID {
+			entry.OldParentTrail = nil
+		}
 		data = append(data, trashPayload(entry))
 	}
 	c.JSON(200, gin.H{"ok": true, "data": gin.H{"items": data, "hasMore": page.HasMore}})
@@ -88,7 +92,7 @@ func (h *Handler) restoreTrash(c *gin.Context) {
 		return
 	}
 	entry, err := h.S.RestoreFromTrash(c.Request.Context(), u, c.Param("id"), application.RestoreRequest{
-		DestinationFolderID:req.DestinationFolderID,NewName:req.NewName,ConfirmDestination:req.ConfirmDestination,
+		DestinationFolderID: req.DestinationFolderID, NewName: req.NewName, ConfirmDestination: req.ConfirmDestination,
 	})
 	if err != nil {
 		respondError(c, err)

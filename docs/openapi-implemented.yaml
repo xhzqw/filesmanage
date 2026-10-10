@@ -5515,6 +5515,22 @@ components:
         oldParentId:
           type: string
           description: Original parent folder id.
+        oldParentPath:
+          type: string
+          description: Deletion-time folder path, shown only to the deleting actor when a snapshot exists.
+        oldParentTrail:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+            required:
+            - id
+            - name
+          description: Deletion-time ancestor identities and names; absent for legacy rows or other viewers.
         subtreeCount:
           type: integer
           description: Folders swept into the trash entry.
@@ -6670,6 +6686,9 @@ components:
         newName:
           type: string
           description: Rename on restore; empty keeps the old name.
+        confirmDestination:
+          type: boolean
+          description: Explicit target selection required when original ancestry has changed since deletion.
     EditorCallback:
       type: object
       properties:

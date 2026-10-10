@@ -91,36 +91,48 @@ func TestRestoreToAnotherFolderWithNewName(t *testing.T) {
 
 func stringPointer(value string) *string { return &value }
 
-func TestRestoreRequiresLocationChoiceAfterAncestorRename(t *testing.T){
- s,repo:=testService(t)
- ctx:=context.Background()
- admin:=domain.User{ID:"u_admin",IsAdmin:true}
- folder,err:=s.CreateFolder(ctx,admin,"folder_market","历史设计目录")
- if err!=nil{t.Fatal(err)}
- deleted,_,err:=s.DeleteFolder(ctx,admin,folder.ID)
- if err!=nil{t.Fatal(err)}
- if len(deleted.OldParentTrail)!=2 || deleted.OldParentTrail[1].Name!="市场部" {
-  t.Fatalf("deletion snapshot must retain ancestors: %+v",deleted.OldParentTrail)
- }
- if _,err=s.RenameFolder(ctx,admin,"folder_market","已移动的设计部");err!=nil{t.Fatal(err)}
- if _,err=s.RestoreFromTrash(ctx,admin,deleted.ID,RestoreRequest{});!errors.Is(err,domain.ErrParentMissing){
-  t.Fatalf("changed ancestor must require explicit destination: %v",err)
- }
- if _,err=s.RestoreFromTrash(ctx,admin,deleted.ID,RestoreRequest{DestinationFolderID:"folder_root",ConfirmDestination:true});err!=nil{t.Fatal(err)}
- restored,err:=repo.FolderByID(ctx,folder.ID)
- if err!=nil||restored.DeletedAt!=nil||restored.ParentID==nil||*restored.ParentID!="folder_root"{
-  t.Fatalf("explicit restore target not applied: %+v %v",restored,err)
- }
+func TestRestoreRequiresLocationChoiceAfterAncestorRename(t *testing.T) {
+	s, repo := testService(t)
+	ctx := context.Background()
+	admin := domain.User{ID: "u_admin", IsAdmin: true}
+	folder, err := s.CreateFolder(ctx, admin, "folder_market", "历史设计目录")
+	if err != nil {
+		t.Fatal(err)
+	}
+	deleted, _, err := s.DeleteFolder(ctx, admin, folder.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(deleted.OldParentTrail) != 2 || deleted.OldParentTrail[1].Name != "市场部" {
+		t.Fatalf("deletion snapshot must retain ancestors: %+v", deleted.OldParentTrail)
+	}
+	if _, err = s.RenameFolder(ctx, admin, "folder_market", "已移动的设计部"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.RestoreFromTrash(ctx, admin, deleted.ID, RestoreRequest{}); !errors.Is(err, domain.ErrParentMissing) {
+		t.Fatalf("changed ancestor must require explicit destination: %v", err)
+	}
+	if _, err = s.RestoreFromTrash(ctx, admin, deleted.ID, RestoreRequest{DestinationFolderID: "folder_root", ConfirmDestination: true}); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := repo.FolderByID(ctx, folder.ID)
+	if err != nil || restored.DeletedAt != nil || restored.ParentID == nil || *restored.ParentID != "folder_root" {
+		t.Fatalf("explicit restore target not applied: %+v %v", restored, err)
+	}
 }
 
-func TestRestoreCannotUseAnotherUsersTrashID(t *testing.T){
- s,repo:=testService(t)
- ctx:=context.Background()
- now:=time.Now()
- fid:="owned_by_admin"
- repo.files[fid]=domain.File{ID:fid,FolderID:"folder_market",Name:"private.txt",DeletedAt:&now}
- entry:=domain.TrashEntry{ID:"foreign_entry",FileID:&fid,OldParentID:stringPointer("folder_market"),OldName:"private.txt",DeletedBy:"u_admin",DeletedAt:now}
- if err:=repo.InsertTrashEntry(ctx,entry);err!=nil{t.Fatal(err)}
- _,err:=s.RestoreFromTrash(ctx,domain.User{ID:"u_user"},entry.ID,RestoreRequest{DestinationFolderID:"folder_market",ConfirmDestination:true})
- if !errors.Is(err,domain.ErrNotFound){t.Fatalf("foreign trash ID must be hidden: %v",err)}
+func TestRestoreCannotUseAnotherUsersTrashID(t *testing.T) {
+	s, repo := testService(t)
+	ctx := context.Background()
+	now := time.Now()
+	fid := "owned_by_admin"
+	repo.files[fid] = domain.File{ID: fid, FolderID: "folder_market", Name: "private.txt", DeletedAt: &now}
+	entry := domain.TrashEntry{ID: "foreign_entry", FileID: &fid, OldParentID: stringPointer("folder_market"), OldName: "private.txt", DeletedBy: "u_admin", DeletedAt: now}
+	if err := repo.InsertTrashEntry(ctx, entry); err != nil {
+		t.Fatal(err)
+	}
+	_, err := s.RestoreFromTrash(ctx, domain.User{ID: "u_user"}, entry.ID, RestoreRequest{DestinationFolderID: "folder_market", ConfirmDestination: true})
+	if !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("foreign trash ID must be hidden: %v", err)
+	}
 }

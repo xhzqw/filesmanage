@@ -62,24 +62,24 @@ type ACL struct {
 }
 
 type TrashEntry struct {
-	ID           string
-	FileID       *string
-	FolderID     *string
-	OldParentID  *string
+	ID             string
+	FileID         *string
+	FolderID       *string
+	OldParentID    *string
 	OldParentTrail []TrashPathPart
-	OldName      string
-	DeletedBy    string
-	DeletedName  string
-	DeletedAt    time.Time
-	RestoredAt   *time.Time
-	PurgedAt     *time.Time
-	SubtreeCount int
+	OldName        string
+	DeletedBy      string
+	DeletedName    string
+	DeletedAt      time.Time
+	RestoredAt     *time.Time
+	PurgedAt       *time.Time
+	SubtreeCount   int
 }
 
 // TrashPathPart preserves both identity and name of an ancestor as observed
 // when the resource was deleted. It is not a live filesystem lookup.
 type TrashPathPart struct {
-	ID string `json:"id"`
+	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 

@@ -23,7 +23,7 @@ func (s *Service) ListTrash(ctx context.Context, u domain.User) ([]domain.TrashE
 type RestoreRequest struct {
 	DestinationFolderID string
 	NewName             string
-	ConfirmDestination bool
+	ConfirmDestination  bool
 }
 
 // RestoreFromTrash revives a trashed file or folder subtree. Files restore
@@ -44,19 +44,25 @@ func (s *Service) RestoreFromTrash(ctx context.Context, u domain.User, entryID s
 		return domain.TrashEntry{}, domain.ErrNotFound
 	}
 	if !u.IsAdmin {
-		allowed,checkErr:=tx.TrashEntryRestorable(ctx,entry.ID,u.ID)
-		if checkErr!=nil{return domain.TrashEntry{},checkErr}
-		if !allowed{return domain.TrashEntry{},domain.ErrNotFound}
-	}
-	if len(entry.OldParentTrail)>0 && !req.ConfirmDestination {
-		if entry.OldParentID==nil{return domain.TrashEntry{},domain.ErrParentMissing}
-		current,readErr:=snapshotTrashPath(ctx,tx,*entry.OldParentID)
-		if readErr!=nil || !sameTrashPath(entry.OldParentTrail,current) {
-			return domain.TrashEntry{},domain.ErrParentMissing
+		allowed, checkErr := tx.TrashEntryRestorable(ctx, entry.ID, u.ID)
+		if checkErr != nil {
+			return domain.TrashEntry{}, checkErr
+		}
+		if !allowed {
+			return domain.TrashEntry{}, domain.ErrNotFound
 		}
 	}
-	if req.ConfirmDestination && req.DestinationFolderID==""{
-		return domain.TrashEntry{},domain.ErrInvalidInput
+	if len(entry.OldParentTrail) > 0 && !req.ConfirmDestination {
+		if entry.OldParentID == nil {
+			return domain.TrashEntry{}, domain.ErrParentMissing
+		}
+		current, readErr := snapshotTrashPath(ctx, tx, *entry.OldParentID)
+		if readErr != nil || !sameTrashPath(entry.OldParentTrail, current) {
+			return domain.TrashEntry{}, domain.ErrParentMissing
+		}
+	}
+	if req.ConfirmDestination && req.DestinationFolderID == "" {
+		return domain.TrashEntry{}, domain.ErrInvalidInput
 	}
 	if entry.FileID != nil {
 		if err = s.restoreFileFromTrash(ctx, tx, u, entry, req); err != nil {
@@ -73,7 +79,7 @@ func (s *Service) RestoreFromTrash(ctx context.Context, u domain.User, entryID s
 		return domain.TrashEntry{}, err
 	}
 	audit(ctx, tx, u, "trash.restore", "trash", entry.ID, "success",
-		map[string]any{"oldName": entry.OldName, "destination": req.DestinationFolderID, "newName": req.NewName, "explicitDestination":req.ConfirmDestination})
+		map[string]any{"oldName": entry.OldName, "destination": req.DestinationFolderID, "newName": req.NewName, "explicitDestination": req.ConfirmDestination})
 	if err = tx.Commit(ctx); err != nil {
 		return domain.TrashEntry{}, err
 	}
