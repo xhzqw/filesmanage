@@ -28,8 +28,20 @@ for(const [path,name] of [
  ["web/src/features/folders/FolderActions.tsx","Menu"],
  ["web/src/pages/SessionDevices.tsx","Dialog"],
  ["web/src/features/organization/OrganizationPanel.tsx","RareTabs"],
+ ["web/src/features/organization/OrganizationPanel.tsx","RareBadge"],
+ ["web/src/features/organization/PermissionsPanel.tsx","RareNotice"],
+ ["web/src/features/trash/TrashList.tsx","RareNotice"],
 ]){
  if(!readFileSync(join(root,path),"utf8").includes(`<${name} `))errors.push(`${path}: must render shared ${name}`);
+}
+// A shared feedback style must never be redefined in a feature stylesheet.
+const organizationCss=readFileSync(join(root,"web/src/features/organization/organization.css"),"utf8");
+if(/\.org-badge(?:-success|-warning|-disabled|-admin|-dot)?\s*\{/.test(organizationCss)){
+ errors.push("organization.css: semantic badges must be owned by RareFeedback");
+}
+const sharedExports=readFileSync(join(root,"web/src/shared/ui/rare/index.ts"),"utf8");
+for(const symbol of ["RareBadge","RareNotice"]){
+ if(!sharedExports.includes(symbol))errors.push(`rare/index.ts: ${symbol} is not exported`);
 }
 if(errors.length){
  for(const error of errors)console.error("COMPONENT_GOVERNANCE_FAIL",error);

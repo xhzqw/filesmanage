@@ -1,4 +1,4 @@
-import {RareButton} from "../../shared/ui/rare";
+import {RareButton,RareNotice} from "../../shared/ui/rare";
 import {useEffect,useState} from "react";
 import type {TrashEntry} from "../../entities/trash/model";
 import {trashApi} from "./api";
@@ -81,7 +81,7 @@ export function TrashList({onRestored}:{onRestored:()=>void}){
 
  return <div className="work-body">
   <div className="toolbar"><span className="toolbar-hint">回收站中的资源仍保留完整版本历史，恢复后 ID 与版本不变。</span></div>
-  {message&&<p role={messageTone==="error"?"alert":"status"} className={"notice"+(messageTone==="error"?" error":"")}>{message}</p>}
+  {message&&<RareNotice tone={messageTone==="error"?"danger":"success"}>{message}</RareNotice>}
   <div className="table">
    <table>
     <thead><tr><th scope="col">名称</th><th scope="col">类型</th><th scope="col">删除人</th><th scope="col">删除时间</th><th scope="col">操作</th></tr></thead>
@@ -97,7 +97,7 @@ export function TrashList({onRestored}:{onRestored:()=>void}){
       <td className="row-actions">
        <RareButton type="button" disabled={restoring!==null||purgeTarget!==null}
         onClick={()=>{setMessage("");setRestoring(entry);}}>恢复</RareButton>
-       {isAdmin&&<RareButton type="button" className="danger" disabled={restoring!==null||purgeTarget!==null}
+       {isAdmin&&<RareButton type="button" tone="danger" className="danger" disabled={restoring!==null||purgeTarget!==null}
         onClick={()=>askPurge(entry)}>永久删除</RareButton>}
       </td>
      </tr>)}
@@ -110,19 +110,19 @@ export function TrashList({onRestored}:{onRestored:()=>void}){
    onRestored={()=>{setRestoring(null);setReloadToken(token=>token+1);onRestored();}}/>}
   {purgeTarget&&<Dialog open title="永久删除确认" onClose={()=>setPurgeTarget(null)} closeGuard={()=>!purgeBusy}
    initialFocus={purgeStage==="final"?"#purge-back":"#purge-cancel"} className="dialog">
-   <p role="alert" className="notice error">永久删除不可逆：资源及其全部版本历史将被永久移除，无法恢复，也不会保留在回收站中。</p>
+   <RareNotice tone="danger">永久删除不可逆：资源及其全部版本历史将被永久移除，无法恢复，也不会保留在回收站中。</RareNotice>
    <p>名称：{purgeTarget.oldName}</p>
    <p>类型：{purgeTarget.folderId?`目录${purgeTarget.subtreeCount?`（含 ${purgeTarget.subtreeCount} 个子项）`:""}`:"文件"}</p>
    <p>删除人：{purgeTarget.deletedByName}；删除时间：{purgeTarget.deletedAt.replace("T"," ").slice(0,16)}</p>
    {purgeStage==="impact"&&<p className="hint">继续后仍会要求再次确认才会执行；如需保留可恢复的途径，请取消并让该资源继续留在回收站。</p>}
-   {purgeStage==="final"&&<p role="alert" className="notice error">再次确认：将永久移除「{purgeTarget.oldName}」及其版本历史，此操作无法撤销。</p>}
-   {purgeMessage&&<p role="alert" className="notice error">{purgeMessage}</p>}
+   {purgeStage==="final"&&<RareNotice tone="danger">再次确认：将永久移除「{purgeTarget.oldName}」及其版本历史，此操作无法撤销。</RareNotice>}
+   {purgeMessage&&<RareNotice tone="danger">{purgeMessage}</RareNotice>}
    <div className="dialog-actions">
     {purgeUnknown&&<RareButton type="button" className="secondary-action" disabled={purgeBusy}
      onClick={()=>{setReloadToken(token=>token+1);setPurgeTarget(null);}}>刷新回收站</RareButton>}
     <RareButton type="button" id="purge-cancel" className="secondary-action" onClick={()=>setPurgeTarget(null)} disabled={purgeBusy}>取消</RareButton>
     {purgeStage==="impact"
-     ?<RareButton type="button" className="primary" disabled={purgeBusy} onClick={()=>setPurgeStage("final")}>继续（下一步）</RareButton>
+     ?<RareButton type="button" tone="primary" className="primary" disabled={purgeBusy} onClick={()=>setPurgeStage("final")}>继续（下一步）</RareButton>
      :<>
       <RareButton type="button" id="purge-back" className="secondary-action" disabled={purgeBusy} onClick={()=>setPurgeStage("impact")}>返回</RareButton>
       {/* 长按确认取代第三次点击：误触不会立刻销毁版本历史（spec §6.3） */}

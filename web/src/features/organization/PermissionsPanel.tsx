@@ -1,4 +1,4 @@
-import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
+import {RareButton,RareInput,RareNotice,RareSelect} from "../../shared/ui/rare";
 import {useEffect,useMemo,useRef,useState,type FormEvent,type ReactNode} from "react";
 import {Link,useSearchParams} from "react-router-dom";
 import type {User} from "../../entities/user/model";
@@ -118,7 +118,7 @@ function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(folder:R
   <div className="perm-browser-scroll">
    {needle?<>
     {searchState==="loading"&&<p className="hint">正在搜索…</p>}
-    {searchState==="failed"&&<p role="alert" className="notice error">{searchError}</p>}
+    {searchState==="failed"&&<RareNotice tone="danger">{searchError}</RareNotice>}
     {searchState==="ready"&&searchPage.items.length===0&&<p className="hint">没有匹配的目录</p>}
     {searchState==="ready"&&searchPage.items.map(f=><RareButton type="button" key={f.id}
      className={"perm-result"+(selected===f.id?" selected":"")} aria-current={selected===f.id?"true":undefined}
@@ -127,7 +127,7 @@ function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(folder:R
     {searchState==="ready"&&searchPage.nextCursor&&<RareButton type="button" className="perm-more" disabled={moreSearch} onClick={()=>void loadMoreSearch()}>加载更多结果</RareButton>}
    </>:<>
     {loading[""]&&<p className="hint">正在读取资源目录…</p>}
-    {errors[""]&&<p role="alert" className="notice error">{errors[""]} <RareButton type="button" onClick={()=>void load("")}>重试</RareButton></p>}
+    {errors[""]&&<RareNotice tone="danger">{errors[""]} <RareButton type="button" onClick={()=>void load("")}>重试</RareButton></RareNotice>}
     {pages[""]?.items.length===0&&<p className="hint">没有目录</p>}
     <ul className="perm-tree">{rows("",0,new Set())}</ul>
     {pages[""]?.nextCursor&&<RareButton type="button" className="perm-more" disabled={loading[""]}
@@ -262,14 +262,14 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
     </div>
     <div className="perm-section-title">直接授权记录{state==="ready"&&<span className="perm-subtle">{grants.length} 条</span>}</div>
     <p className="perm-hint">显示的仅是当前目录直接 ACL；继承与共享可能仍赋予相同动作，不代表最终有效权限。</p>
-    {notice&&<p role={notice.error?"alert":"status"} className={"notice"+(notice.error?" error":"")}>{notice.text}</p>}
+    {notice&&<RareNotice tone={notice.error?"danger":"success"}>{notice.text}</RareNotice>}
     {state==="loading"&&<p role="status" className="hint">正在读取直接授权…</p>}
-    {state==="failed"&&<p className="notice error" role="alert">读取失败，不能编辑该目录的授权。</p>}
+    {state==="failed"&&<RareNotice tone="danger">读取失败，不能编辑该目录的授权。</RareNotice>}
     {state==="ready"&&<div className="perm-grants-scroller"><table className="perm-table"><thead><tr><th>授权主体</th><th>动作</th><th>范围</th><th>到期</th><th>操作</th></tr></thead>
      <tbody>{grants.map(g=><tr key={g.id}><td>{names.get(g.subjectKind+":"+g.subjectId)??g.subjectId}<small>{g.subjectKind==="user"?"用户":"工作组"}</small></td>
       <td>{displayActions(g.actions)}</td><td>{g.scopeOnly?"仅当前目录":"包括子目录"}</td>
       <td>{g.expiresAt?new Date(g.expiresAt).toLocaleString("zh-CN"):"不过期"}</td>
-      <td><RareButton type="button" className="danger" onClick={()=>{setRevokeError("");setRevokeTarget(g);}}>撤销</RareButton></td></tr>)}</tbody></table>
+      <td><RareButton type="button" tone="danger" className="danger" onClick={()=>{setRevokeError("");setRevokeTarget(g);}}>撤销</RareButton></td></tr>)}</tbody></table>
      {grants.length===0&&<p className="empty">没有直接授权；可能仍存在父目录继承或共享权限。</p>}
     </div>}
     <PermissionInsights folderId={folderId} users={users} usersState={usersState} refreshToken={refresh}/>
@@ -278,8 +278,8 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
    if((event.target as HTMLElement).classList.contains("perm-risk-consent"))return;
    if(submitState==="review"){setSubmitState("edit");setRiskAcknowledged(false);}
   }}>
-     {usersState==="failed"&&<p role="alert" className="notice error">读取用户列表失败。<RareButton type="button" className="secondary-action" onClick={onRetryUsers}>重试用户列表</RareButton></p>}
-     {groupsState==="failed"&&<p role="alert" className="notice error">读取工作组列表失败。<RareButton type="button" className="secondary-action" onClick={onRetryGroups}>重试工作组列表</RareButton></p>}
+     {usersState==="failed"&&<RareNotice tone="danger">读取用户列表失败。<RareButton type="button" className="secondary-action" onClick={onRetryUsers}>重试用户列表</RareButton></RareNotice>}
+     {groupsState==="failed"&&<RareNotice tone="danger">读取工作组列表失败。<RareButton type="button" className="secondary-action" onClick={onRetryGroups}>重试工作组列表</RareButton></RareNotice>}
      {subjectSourceState==="loading"&&<p role="status" className="hint">正在读取可授权主体…</p>}
      <div className="perm-form-row">
       <label>主体类型<RareSelect value={subjectKind} onChange={e=>{setSubjectKind(e.target.value as "user"|"group");setSubjectId("");}}>
@@ -316,7 +316,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
      </div>}
      <div className="perm-form-actions"><span className="hint">授权效果以服务端判定为准。</span>
       {submitState==="review"&&<RareButton type="button" className="secondary-action" onClick={()=>{setSubmitState("edit");setRiskAcknowledged(false);}}>返回修改</RareButton>}
-      <RareButton type="submit" className="primary" disabled={submitState==="saving"||!subjectId||!actions.length||state!=="ready"||subjectSourceState!=="ready"||(submitState==="review"&&needsRiskConsent&&!riskAcknowledged)}>
+      <RareButton type="submit" tone="primary" className="primary" loading={submitState==="saving"} disabled={submitState==="saving"||!subjectId||!actions.length||state!=="ready"||subjectSourceState!=="ready"||(submitState==="review"&&needsRiskConsent&&!riskAcknowledged)}>
        {submitState==="saving"?"提交中…":submitState==="review"?"确认添加授权":"预览授权"}</RareButton>
      </div>
     </form>
@@ -327,9 +327,9 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
    {revokeTarget&&<>
     <p>确定撤销 {names.get(revokeTarget.subjectKind+":"+revokeTarget.subjectId)??revokeTarget.subjectId} 的「{displayActions(revokeTarget.actions)}」直接授权？</p>
     <p className="hint">只撤销这一条记录。工作组、父目录及共享仍可能赋予相同权限。</p>
-    {revokeError&&<p role="alert" className="notice error">{revokeError}</p>}
+    {revokeError&&<RareNotice tone="danger">{revokeError}</RareNotice>}
     <div className="dialog-actions"><RareButton type="button" className="secondary-action" disabled={revokeBusy} onClick={()=>setRevokeTarget(null)}>取消</RareButton>
-     <RareButton type="button" className="danger" disabled={revokeBusy} onClick={()=>void revoke()}>{revokeBusy?"撤销中…":"确认撤销"}</RareButton></div>
+     <RareButton type="button" tone="danger" className="danger" loading={revokeBusy} onClick={()=>void revoke()}>{revokeBusy?"撤销中…":"确认撤销"}</RareButton></div>
    </>}
   </Dialog>
  </div>;

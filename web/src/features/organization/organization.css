@@ -508,64 +508,6 @@
   gap:var(--space-1);
 }
 
-.org-badge{
-  display:inline-flex;
-  align-items:center;
-  gap:4px;
-  padding:1px 6px;
-  border-radius:var(--radius-xs);
-  border:1px solid var(--border-hairline);
-  background:var(--surface-header);
-  font-size:11px;
-  line-height:16px;
-  white-space:nowrap;
-  color:var(--text-secondary);
-}
-
-.org-badge-dot{
-  width:5px;
-  height:5px;
-  border-radius:50%;
-  display:inline-block;
-}
-
-.org-badge-success{
-  color:var(--status-success);
-  background:var(--surface-header);
-  border-color:var(--border-hairline);
-}
-.org-badge-success .org-badge-dot{
-  background:var(--status-success);
-}
-
-.org-badge-warning{
-  color:var(--status-warning);
-  background:var(--surface-header);
-  border-color:var(--border-hairline);
-}
-.org-badge-warning .org-badge-dot{
-  background:var(--status-warning);
-}
-
-.org-badge-disabled{
-  color:var(--status-danger);
-  background:var(--surface-danger-soft);
-  border-color:var(--status-danger);
-}
-.org-badge-disabled .org-badge-dot{
-  background:var(--status-danger);
-}
-
-.org-badge-admin{
-  color:var(--brand-blue);
-  background:var(--surface-row-selected);
-  border-color:var(--border-selected);
-  font-weight:500;
-}
-.org-badge-admin .org-badge-dot{
-  background:var(--brand-blue);
-}
-
 /* 表格行操作按钮：轻量次要按钮，告别粗硬黑框 */
 .row-actions{
   display:inline-flex;

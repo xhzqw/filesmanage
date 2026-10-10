@@ -6,3 +6,6 @@ export { MicroHoldToDelete } from "./MicroHoldToDelete";
 export {RareButton,RareInput,RareSelect,RareTextarea} from "./RareControls";
 export type {RareButtonProps} from "./RareControls";
 export {RareTabs} from "./RareTabs";
+
+export {RareBadge,RareNotice} from "./RareFeedback";
+export type {RareBadgeProps,RareNoticeProps,RareFeedbackTone} from "./RareFeedback";

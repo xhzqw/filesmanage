@@ -1,5 +1,5 @@
 import {RareTabs} from "../../shared/ui/rare/RareTabs";
-import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
+import {RareBadge,RareButton,RareInput,RareNotice,RareSelect} from "../../shared/ui/rare";
 import {useEffect,useMemo,useRef,useState,type FormEvent,type KeyboardEvent,type ReactNode} from "react";
 import {organizationApi,type Department,type Workgroup} from "./api";
 import {errorCode,errorCopy} from "../../shared/errors";
@@ -677,12 +677,12 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    <RareButton type="button" onClick={()=>{setNotice(null);setCreateDepartmentOpen(true);}}>
     <IconPlus/>新建部门
    </RareButton>
-   <RareButton type="button" className="primary" onClick={()=>{setNotice(null);setCreateGroupOpen(true);}}>
+   <RareButton type="button" className="primary" tone="primary" onClick={()=>{setNotice(null);setCreateGroupOpen(true);}}>
     <IconPlus/>创建工作组
    </RareButton></>}
   </div>
 
-  {notice&&<p role={notice.tone==="error"?"alert":"status"} className={"notice"+(notice.tone==="error"?" error":"")}>{notice.text}</p>}
+  {notice&&<RareNotice tone={notice.tone==="error"?"danger":"info"}>{notice.text}</RareNotice>}
 
   {/* 双栏主工作台：左侧组织架构树 + 右侧主工作区卡片 */}
   <div className={"org-workbench"+((activeTab==="permissions"||activeTab==="roles")?" org-permissions-workbench":"")}>
@@ -702,7 +702,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
 
     {departmentsState==="loading"&&<p className="hint" style={{padding:"8px 12px"}}>正在读取部门…</p>}
     {departmentsState==="failed"&&<div style={{padding:"8px 12px"}}>
-     <p role="alert" className="notice error">读取部门列表失败，部门树与筛选暂不可用。</p>
+     <RareNotice tone="danger">读取部门列表失败，部门树与筛选暂不可用。</RareNotice>
      <RareButton type="button" className="secondary-action" onClick={()=>setDepartmentsToken(token=>token+1)}>重试</RareButton>
     </div>}
 
@@ -832,7 +832,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
       <span className="toolbar-hint">显示 {Math.min(memberLimit,filteredMembers.length)} / {filteredMembers.length} 位成员</span>
      </div>
 
-     {notice&&notice.tone==="error"&&usersState==="failed"&&<p role="alert" className="notice error">{notice.text}</p>}
+     {notice&&notice.tone==="error"&&usersState==="failed"&&<RareNotice tone="danger">{notice.text}</RareNotice>}
 
      {/* 成员数据表格 */}
      <div className="org-table-container">
@@ -862,19 +862,19 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
          </td>
          <td>
           <span className="org-badges">
-           {user.isAdmin&&<span className="org-badge org-badge-admin"><span className="org-badge-dot"/>系统管理员</span>}
-           {user.disabled===true&&<span className="org-badge org-badge-disabled"
-            title="账号已禁用：无法登录，现有会话已失效；其工作组与授权记录仍保留。"><span className="org-badge-dot"/>已禁用</span>}
-           {user.mustChangePassword&&<span className="org-badge org-badge-warning"
-            title="该账号下次登录必须修改密码（初始密码或刚被重置）。"><span className="org-badge-dot"/>待改密</span>}
-           {user.disabled!==true&&!user.mustChangePassword&&<span className="org-badge org-badge-success"><span className="org-badge-dot"/>正常</span>}
+           {user.isAdmin&&<RareBadge tone="info" dot>系统管理员</RareBadge>}
+           {user.disabled===true&&<RareBadge tone="danger" dot
+            title="账号已禁用：无法登录，现有会话已失效；其工作组与授权记录仍保留。">已禁用</RareBadge>}
+           {user.mustChangePassword&&<RareBadge tone="warning" dot
+            title="该账号下次登录必须修改密码（初始密码或刚被重置）。">待改密</RareBadge>}
+           {user.disabled!==true&&!user.mustChangePassword&&<RareBadge tone="success" dot>正常</RareBadge>}
           </span>
          </td>
          <td className="row-actions">
           <RareButton type="button" onClick={()=>{setNotice(null);setResetTarget(user);}}>重置密码</RareButton>
           {user.id===currentUserId
            ?<RareButton type="button" disabled title="不能对当前登录账号执行禁用">禁用</RareButton>
-           :<RareButton type="button" className={user.disabled===true?"org-btn-enable":"danger"}
+           :<RareButton type="button" tone={user.disabled===true?"neutral":"danger"} className={user.disabled===true?"org-btn-enable":"danger"}
              onClick={()=>{setNotice(null);setStateTarget(user);}}>{user.disabled===true?"启用":"禁用"}</RareButton>}
          </td>
         </tr>)}
@@ -923,7 +923,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
          {departmentOptions.map(option=><option key={option.id} value={option.id}>{option.label}</option>)}
         </RareSelect>
        </div>
-       <RareButton className="primary" type="submit" disabled={!canCreateUser}>创建用户</RareButton>
+       <RareButton className="primary" tone="primary" type="submit" disabled={!canCreateUser}>创建用户</RareButton>
       </form>
      </div>
     </div>}
@@ -952,7 +952,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
 
       {groupsState==="loading"&&<p className="hint" style={{padding:"8px 12px"}}>正在读取工作组…</p>}
       {groupsState==="failed"&&<div style={{padding:"8px 12px"}}>
-       <p role="alert" className="notice error">读取工作组列表失败。</p>
+       <RareNotice tone="danger">读取工作组列表失败。</RareNotice>
        <RareButton type="button" className="secondary-action" onClick={()=>setGroupsToken(t=>t+1)}>重试</RareButton>
       </div>}
 
@@ -1015,9 +1015,9 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
              <span className="org-member-card-name">{member.displayName}</span>
              <code className="org-member-card-login">{loginOf(member)}</code>
             </div>
-            {member.disabled===true&&<span className="org-badge org-badge-disabled"><span className="org-badge-dot"/>已禁用</span>}
+            {member.disabled===true&&<RareBadge tone="danger" dot>已禁用</RareBadge>}
            </div>
-           <RareButton type="button" className="danger org-action-btn"
+           <RareButton type="button" tone="danger" className="danger org-action-btn"
             onClick={()=>{setNotice(null);setRemoveTarget(member);}}>移除</RareButton>
           </div>)}
           {groupMembers.length===0&&<p className="empty" style={{gridColumn:"1/-1"}}>该工作组暂无成员，可在下方添加成员。</p>}
@@ -1133,13 +1133,13 @@ function ResetPasswordDialog({target,department,onClose,onSubmit}:{
     <p className="hint">已输入的新密码将被丢弃，不会提交给服务端。</p>
     <div className="dialog-actions">
      <RareButton type="button" className="secondary-action" onClick={()=>setConfirmDiscard(false)} disabled={busy}>继续编辑</RareButton>
-     <RareButton type="button" className="danger" onClick={onClose} disabled={busy}>放弃并关闭</RareButton>
+     <RareButton type="button" tone="danger" className="danger" onClick={onClose} disabled={busy}>放弃并关闭</RareButton>
     </div>
    </>
    :result
     ?<>
-     <p role={result.tone==="error"?"alert":"status"} className={"notice"+(result.tone==="error"?" error":"")}>{result.text}</p>
-     <div className="dialog-actions"><RareButton type="button" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
+     <RareNotice tone={result.tone==="error"?"danger":"success"}>{result.text}</RareNotice>
+     <div className="dialog-actions"><RareButton type="button" tone="primary" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
     </>
     :<form onSubmit={submit}>
      <p>账号：{loginOf(target)||"—"}</p>
@@ -1152,7 +1152,7 @@ function ResetPasswordDialog({target,department,onClose,onSubmit}:{
      <p className="hint">至少 16 个字符（客户端只校验长度，密码策略以服务端判定为准）。</p>
      <div className="dialog-actions">
       <RareButton type="button" className="secondary-action" onClick={requestClose} disabled={busy}>取消</RareButton>
-      <RareButton type="submit" className="primary" disabled={busy||password.length<16}>{busy?"重置中…":"确认重置密码"}</RareButton>
+      <RareButton type="submit" tone="primary" className="primary" loading={busy} disabled={busy||password.length<16}>{busy?"重置中…":"确认重置密码"}</RareButton>
      </div>
     </form>}
  </Dialog>;
@@ -1180,8 +1180,8 @@ function SetDisabledDialog({target,department,onClose,onSubmit}:{
  return <Dialog open title={disabling?"禁用账号":"启用账号"} onClose={onClose} closeGuard={()=>!busy} className="org-dialog">
   {result
    ?<>
-    <p role={result.tone==="error"?"alert":"status"} className={"notice"+(result.tone==="error"?" error":"")}>{result.text}</p>
-    <div className="dialog-actions"><RareButton type="button" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
+    <RareNotice tone={result.tone==="error"?"danger":"success"}>{result.text}</RareNotice>
+    <div className="dialog-actions"><RareButton type="button" tone="primary" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
    </>
    :<form onSubmit={event=>{event.preventDefault();run();}}>
     <p>账号：{loginOf(target)||"—"}（{target.displayName}）</p>
@@ -1192,7 +1192,7 @@ function SetDisabledDialog({target,department,onClose,onSubmit}:{
      :"影响：启用后该账号可再次登录，并恢复原有的工作组与授权（最终生效权限由服务端判定）。"}</p>
     <div className="dialog-actions">
      <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</RareButton>
-     <RareButton type="submit" className={disabling?"danger":"primary"} disabled={busy}>
+     <RareButton type="submit" tone={disabling?"danger":"primary"} className={disabling?"danger":"primary"} loading={busy}>
       {busy?(disabling?"禁用中…":"启用中…"):(disabling?"确认禁用":"确认启用")}
      </RareButton>
     </div>
@@ -1222,8 +1222,8 @@ function RemoveMemberDialog({member,groupName,department,onClose,onSubmit}:{
  return <Dialog open title="移除工作组成员" onClose={onClose} closeGuard={()=>!busy} className="org-dialog">
   {result
    ?<>
-    <p role={result.tone==="error"?"alert":"status"} className={"notice"+(result.tone==="error"?" error":"")}>{result.text}</p>
-    <div className="dialog-actions"><RareButton type="button" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
+    <RareNotice tone={result.tone==="error"?"danger":"success"}>{result.text}</RareNotice>
+    <div className="dialog-actions"><RareButton type="button" tone="primary" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
    </>
    :<form onSubmit={event=>{event.preventDefault();run();}}>
     <p>工作组：{groupName||"—"}</p>
@@ -1232,7 +1232,7 @@ function RemoveMemberDialog({member,groupName,department,onClose,onSubmit}:{
     <p>影响：移除后该账号不再通过本工作组获得授权；直接授予该账号的权限不受影响，最终生效权限由服务端判定。之后可以重新加入。</p>
     <div className="dialog-actions">
      <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</RareButton>
-     <RareButton type="submit" className="danger" disabled={busy}>{busy?"移除中…":"确认移除"}</RareButton>
+     <RareButton type="submit" tone="danger" loading={busy}>{busy?"移除中…":"确认移除"}</RareButton>
     </div>
    </form>}
  </Dialog>;
@@ -1259,8 +1259,8 @@ function CreateUserConfirmDialog({draft,department,onClose,onSubmit}:{
  return <Dialog open title="创建账号确认" onClose={onClose} closeGuard={()=>!busy} className="org-dialog">
   {result
    ?<>
-    <p role={result.tone==="error"?"alert":"status"} className={"notice"+(result.tone==="error"?" error":"")}>{result.text}</p>
-    <div className="dialog-actions"><RareButton type="button" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
+    <RareNotice tone={result.tone==="error"?"danger":"success"}>{result.text}</RareNotice>
+    <div className="dialog-actions"><RareButton type="button" tone="primary" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
    </>
    :<form onSubmit={event=>{event.preventDefault();run();}}>
     <p>账号：{draft.login}</p>
@@ -1270,7 +1270,7 @@ function CreateUserConfirmDialog({draft,department,onClose,onSubmit}:{
     <p className="hint">取消不会清空表单内容，可以修改后再提交。</p>
     <div className="dialog-actions">
      <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>返回修改</RareButton>
-     <RareButton type="submit" className="primary" disabled={busy}>{busy?"创建中…":"确认创建"}</RareButton>
+     <RareButton type="submit" tone="primary" loading={busy}>{busy?"创建中…":"确认创建"}</RareButton>
     </div>
    </form>}
  </Dialog>;
@@ -1301,8 +1301,8 @@ function CreateDepartmentDialog({options,defaultParentId,listAvailable,onClose,o
  return <Dialog open title="新建部门" onClose={onClose} closeGuard={()=>!busy} className="org-dialog">
   {result
    ?<>
-    <p role={result.tone==="error"?"alert":"status"} className={"notice"+(result.tone==="error"?" error":"")}>{result.text}</p>
-    <div className="dialog-actions"><RareButton type="button" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
+    <RareNotice tone={result.tone==="error"?"danger":"success"}>{result.text}</RareNotice>
+    <div className="dialog-actions"><RareButton type="button" tone="primary" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
    </>
    :<form onSubmit={run}>
     <label htmlFor="org-new-department">部门名称</label>
@@ -1319,7 +1319,7 @@ function CreateDepartmentDialog({options,defaultParentId,listAvailable,onClose,o
      :"部门列表不可用，只能创建顶层部门。"}名称最多 80 个字符；成员与工作组需要另行指派。</p>
     <div className="dialog-actions">
      <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</RareButton>
-     <RareButton type="submit" className="primary" disabled={busy||name.trim()===""}>{busy?"创建中…":"创建部门"}</RareButton>
+     <RareButton type="submit" tone="primary" className="primary" loading={busy} disabled={busy||name.trim()===""}>{busy?"创建中…":"创建部门"}</RareButton>
     </div>
    </form>}
  </Dialog>;
@@ -1350,8 +1350,8 @@ function CreateGroupDialog({options,defaultDepartmentId,listAvailable,onClose,on
  return <Dialog open title="创建工作组" onClose={onClose} closeGuard={()=>!busy} className="org-dialog">
   {result
    ?<>
-    <p role={result.tone==="error"?"alert":"status"} className={"notice"+(result.tone==="error"?" error":"")}>{result.text}</p>
-    <div className="dialog-actions"><RareButton type="button" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
+    <RareNotice tone={result.tone==="error"?"danger":"success"}>{result.text}</RareNotice>
+    <div className="dialog-actions"><RareButton type="button" tone="primary" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
    </>
    :<form onSubmit={run}>
     <label htmlFor="org-new-group">工作组名称</label>
@@ -1368,7 +1368,7 @@ function CreateGroupDialog({options,defaultDepartmentId,listAvailable,onClose,on
      :"部门列表不可用，只能创建不指定部门的工作组。"}名称最多 80 个字符；成员在创建后于“添加成员”中维护。</p>
     <div className="dialog-actions">
      <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</RareButton>
-     <RareButton type="submit" className="primary" disabled={busy||name.trim()===""}>{busy?"创建中…":"创建工作组"}</RareButton>
+     <RareButton type="submit" tone="primary" className="primary" loading={busy} disabled={busy||name.trim()===""}>{busy?"创建中…":"创建工作组"}</RareButton>
     </div>
    </form>}
  </Dialog>;

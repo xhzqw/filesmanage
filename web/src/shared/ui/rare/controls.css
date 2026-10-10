@@ -67,3 +67,15 @@
 .rare-input[aria-invalid="true"],.rare-select[aria-invalid="true"],.rare-textarea[aria-invalid="true"]{
   border-color:var(--status-danger);
 }
+
+
+/* Explicit density only changes the native control's height. Feature layouts
+   retain width/padding ownership until their legacy rules are migrated. */
+.rare-button[data-density="standard"]{height:32px;min-height:32px}
+.rare-input[data-density="standard"]:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.rare-select[data-density="standard"]{height:32px;min-height:32px}
+.rare-button[data-rare-loading="true"]{cursor:progress}
+.rare-button[data-rare-loading="true"]:disabled{opacity:.72}
+.rare-input[aria-invalid="true"]:focus-visible,.rare-select[aria-invalid="true"]:focus-visible,
+.rare-textarea[aria-invalid="true"]:focus-visible{outline-color:var(--status-danger)}
+.rare-button[data-rare-intent]{border-radius:var(--radius-sm)}

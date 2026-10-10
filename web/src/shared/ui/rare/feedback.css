@@ -1,0 +1,25 @@
+/* Semantic feedback primitives: all material/geometry is defined here.
+   No per-feature copies of status color/border/dot rules. */
+.rare-badge{
+  display:inline-flex;align-items:center;gap:var(--space-1);
+  min-height:18px;box-sizing:border-box;
+  padding:1px 7px;border-radius:var(--radius-pill);
+  border:1px solid var(--border-hairline);
+  background:var(--surface-header);color:var(--text-secondary);
+  font-size:11px;line-height:16px;font-weight:550;white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+}
+.rare-badge-dot{flex:none;width:6px;height:6px;border-radius:50%;background:currentColor}
+.rare-badge[data-rare-badge-tone="info"]{color:var(--brand-blue);background:var(--surface-row-selected);border-color:var(--border-selected)}
+.rare-badge[data-rare-badge-tone="success"]{color:var(--status-success);background:var(--surface-success-soft);border-color:var(--status-success)}
+.rare-badge[data-rare-badge-tone="warning"]{color:var(--status-warning);background:var(--surface-warning-soft);border-color:var(--status-warning)}
+.rare-badge[data-rare-badge-tone="danger"]{color:var(--status-danger);background:var(--surface-danger-soft);border-color:var(--status-danger)}
+.rare-notice{
+  margin:0;padding:var(--space-2) var(--space-3);min-width:0;
+  border:1px solid var(--border-hairline);border-left:3px solid var(--brand-blue);
+  border-radius:var(--radius-sm);background:var(--brand-cyan-muted);
+  color:var(--brand-blue);font-size:12px;line-height:1.5;
+}
+.rare-notice[data-rare-notice-tone="success"]{background:var(--surface-success-soft);color:var(--status-success);border-left-color:var(--status-success)}
+.rare-notice[data-rare-notice-tone="warning"]{background:var(--surface-warning-soft);color:var(--status-warning);border-left-color:var(--status-warning)}
+.rare-notice[data-rare-notice-tone="danger"]{background:var(--surface-danger-soft);color:var(--status-danger);border-left-color:var(--status-danger)}

@@ -49,6 +49,8 @@
   --surface-row-hover:#F0F7FF;     /* 极轻微蓝行悬停底色 */
   --surface-row-selected:#E2EFFE;  /* 明确选中的蓝白高亮底 */
   --surface-active:#DBEAFE;        /* 按下/激活态底色 */
+  --surface-success-soft:#E8F7ED; /* 轻量正反馈，不承担单独的语义 */
+  --surface-warning-soft:#FFF3E7; /* 警告只作辅助，文本传递语义 */
   --surface-danger-soft:#FDECEF;     /* 错误通知底色: tokenised so the one
                                       surface a measured pair depends on is
                                       governed like every other colour */

@@ -81,6 +81,14 @@ try{
  await sleep(150);
  const tab=await ev(`(()=>({selected:document.querySelector('[role=tab][aria-selected=true]')?.id,focused:document.activeElement?.id,controls:document.querySelector('[role=tab][aria-selected=true]')?.getAttribute('aria-controls')}))()`);
  assert.deepEqual(tab,{selected:"org-tab-groups",focused:"org-tab-groups",controls:"org-panel-groups"});
- console.log("RARE_UI_READONLY_PASS: menu toggle, Escape, modal focus scope, tabs");
+ await send("Input.dispatchKeyEvent",{type:"rawKeyDown",key:"ArrowLeft",code:"ArrowLeft",windowsVirtualKeyCode:37});
+ await send("Input.dispatchKeyEvent",{type:"keyUp",key:"ArrowLeft",code:"ArrowLeft",windowsVirtualKeyCode:37});
+ await wait("!!document.querySelector('.org-badges .rare-badge[data-rare-badge-tone]')");
+ const feedback=await ev(`(()=>{const el=document.querySelector('.org-badges .rare-badge[data-rare-badge-tone]');const style=getComputedStyle(el);return {tone:el.dataset.rareBadgeTone,dot:!!el.querySelector('.rare-badge-dot[aria-hidden="true"]'),round:parseFloat(style.borderTopLeftRadius)>=7}})()`);
+ assert.equal(feedback.dot,true,"status badge should have decorative, hidden dot");
+ assert.equal(feedback.round,true,"status badge should use rounded design-system geometry");
+ assert.ok(["info","success","warning","danger"].includes(feedback.tone),"status badge has tokenized tone");
+
+ console.log("RARE_UI_READONLY_PASS: menu toggle, Escape, modal focus scope, tabs, badges");
 }catch(e){console.error("RARE_UI_READONLY_FAIL",e.message);process.exitCode=1;}
 finally{ws?.close();chrome.kill("SIGTERM");}
