@@ -13,14 +13,10 @@ import{FileTable}from "../features/documents/FileTable";
 import{DropZone}from "../features/documents/DropZone";
 import{FileEditor}from "../features/documents/FileEditor";
 import{workflowApi}from "../features/workflow/api";
-import{PolicyDialog}from "../features/workflow/PolicyDialog";
-import{organizationApi}from "../features/organization/api";
 import{AppShell}from "../shared/ui/AppShell";
 import{Dialog}from "../shared/ui/Dialog";
 import{FolderPicker}from "../shared/ui/FolderPicker";
 import type {FileItem} from "../entities/file/model";
-
-type Subject={id:string;displayName:string;login?:string};
 
 // The sidebar width is a user preference, not layout state (SPEC §3.1: 240px
 // default, 180~360px draggable): read once per mount, written back on every
@@ -53,14 +49,11 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  const[folders,setFolders]=useState<Folder[]>([]);
  const[status,setStatus]=useState("loading");
  const[reloadKey,setReloadKey]=useState(0);
- // Approval policy is scoped to the folder the tree menu acted on.
- const[policyFolder,setPolicyFolder]=useState<Folder|null>(null);
  // Rename/delete from the tree menu reuse FolderActions' own dialogs: the bar
  // follows the right-clicked folder until the selection moves again.
  const[actionsFolder,setActionsFolder]=useState<Folder|null>(null);
  const[actionRequest,setActionRequest]=useState<{folderId:string;action:"rename"|"delete";id:number}|null>(null);
  const nextActionId=useRef(0);
- const[subjects,setSubjects]=useState<Subject[]>([]);
  const[requiresApproval,setRequiresApproval]=useState(false);
  const[editingId,setEditingId]=useState<string|null>(null);
  // Folder move (AUD-02/WF-04) is dialog-scoped: the source is the right-clicked
@@ -85,18 +78,6 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
    .catch(()=>{if(valid)setStatus("failed");});
   return()=>{valid=false;};
  },[reloadKey]);
- // Approval policy dialog consumes the admin-only subject listing on demand.
- useEffect(()=>{
-  if(!policyFolder||!user.isAdmin)return;
-  let valid=true;
-  organizationApi.users()
-   .then(users=>{
-    if(!valid)return;
-    setSubjects(users.filter(u=>!u.disabled).map(u=>({id:u.id,displayName:u.displayName,login:u.login})));
-   })
-   .catch(()=>{if(valid)setSubjects([]);});
-  return()=>{valid=false;};
- },[policyFolder,user.isAdmin]);
  const visibleRoots=folders.filter(f=>f.parentId===null||!folders.some(p=>p.id===f.parentId));
  const selected=folders.find(f=>f.id===requested)??visibleRoots[0];
  // The page resolves the selected folder's approval policy and hands the flag
@@ -213,7 +194,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
     onMoveFolder={openMove}
     onDeleteFolder={folder=>runFolderAction(folder,"delete")}
     onManageGrants={folder=>navigate("/org?tab=permissions&view=folder&folder="+encodeURIComponent(folder.id))}
-    onManagePolicy={folder=>setPolicyFolder(folder)}/>}
+/>}
    {folders.length>0&&status==="loading"&&<p className="hint">正在刷新目录…</p>}
    {folders.length>0&&status==="failed"&&<p role="alert" className="error">目录刷新失败，以下为上次数据。</p>}
    </div>
@@ -234,7 +215,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
      <FolderBreadcrumb folders={folders} folder={selected}/>
      <div className="folder-actions-slot">
       <FolderActions folder={actionsFolder??selected} actionRequest={actionRequest} onActionHandled={()=>setActionRequest(null)} isAdmin={user.isAdmin} onChanged={()=>setReloadKey(k=>k+1)}
-       onManageGrants={()=>navigate("/org?tab=permissions&view=folder&folder="+encodeURIComponent((actionsFolder??selected).id))} onManagePolicy={()=>setPolicyFolder(actionsFolder??selected)}/>
+       onManageGrants={()=>navigate("/org?tab=permissions&view=folder&folder="+encodeURIComponent((actionsFolder??selected).id))}/>
      </div>
    </div>}
    {moveMessage&&<p role="status" className="notice">{moveMessage}</p>}
@@ -244,7 +225,6 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
    </DropZone>}
    {!selected&&status!=="loading"&&<p className="empty">当前账号没有可访问的目录，请联系管理员授权。</p>}
    </main></div>
-   {policyFolder&&<PolicyDialog folder={policyFolder} approvers={subjects} onClose={()=>setPolicyFolder(null)}/>}
    {editingId&&<FileEditorBridge fileId={editingId} requiresApproval={requiresApproval}
     onClose={()=>setEditingId(null)} onSaved={()=>setReloadKey(k=>k+1)}/>}
    {/* The FolderPicker is a panel, so it lives inside the shared modal Dialog;

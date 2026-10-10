@@ -1,0 +1,19 @@
+.approval-content{flex:none;min-width:0;overflow:visible}
+.approval-workspace{grid-template-columns:268px minmax(0,1fr);min-height:340px;max-height:min(68dvh,620px)}
+.approval-detail{min-width:0;min-height:0;overflow:auto;background:var(--surface-panel)}
+.approval-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 18px;border-bottom:1px solid var(--border-hairline)}
+.approval-heading h2{margin:0;font-size:15px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.approval-state{flex:none;color:var(--text-secondary);font-size:12px}
+.approval-editor{padding:18px;max-width:560px;display:flex;flex-direction:column;gap:12px}
+.approval-form{display:flex;flex-direction:column;gap:18px}
+.approval-field{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:600;min-width:0}
+.approval-field .rare-select-root{display:flex;width:100%;min-width:0}
+.approval-field .rare-select{min-height:36px}
+.approval-toggle{display:inline-flex;align-items:center;align-self:flex-start;gap:9px;cursor:pointer;font-size:13px;white-space:nowrap}
+.approval-toggle input[type=checkbox]{width:16px;height:16px;flex:none;margin:0}
+.approval-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;padding-top:12px;border-top:1px solid var(--border-hairline)}
+.approval-actions .secondary-action{margin-right:auto}
+.approval-confirm-text{font-size:12px;color:var(--status-danger);margin-right:auto}
+@media(max-width:760px){.approval-workspace{grid-template-columns:minmax(0,1fr);max-height:none}
+.approval-workspace .perm-browser{min-height:180px;max-height:260px;border-right:0;border-bottom:1px solid var(--border-hairline)}
+.approval-editor{padding:14px}}

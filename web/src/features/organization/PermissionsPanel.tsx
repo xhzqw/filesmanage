@@ -21,7 +21,7 @@ const EMPTY_PAGE:FolderPage={items:[],nextCursor:""};
 
 // Directory resource tree, not the department hierarchy. Every expansion and
 // search is a keyset page from the server, not a browser-side full-tree query.
-function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(folder:ResourceFolder)=>void}){
+export function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(folder:ResourceFolder)=>void}){
  const [pages,setPages]=useState<Record<string,FolderPage>>({});
  const [loading,setLoading]=useState<Record<string,boolean>>({"":true});
  const [errors,setErrors]=useState<Record<string,string>>({});

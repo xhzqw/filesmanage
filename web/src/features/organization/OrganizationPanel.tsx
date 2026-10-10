@@ -8,6 +8,7 @@ import type {User} from "../../entities/user/model";
 import "./organization.css";
 import {useSearchParams} from "react-router-dom";
 import {PermissionsPanel} from "./PermissionsPanel";
+import {ApprovalPoliciesPanel} from "./ApprovalPoliciesPanel";
 import {RoleBindingsPanel,DelegatedRolesWorkspace} from "./RoleWorkspace";
 
 type LoadState="loading"|"ready"|"failed";
@@ -128,11 +129,12 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
 
  // 视图与筛选状态：默认 Tab 1 为部门成员，Tab 2 为工作组管理
  const[queryParams,setQueryParams]=useSearchParams();
- const activeTab=queryParams.get("tab")==="roles"?"roles":queryParams.get("tab")==="permissions"?"permissions":queryParams.get("tab")==="groups"?"groups":"members";
- const setActiveTab=(tab:"members"|"groups"|"permissions"|"roles")=>setQueryParams(old=>{
+ const activeTab=queryParams.get("tab")==="approvals"&&isAdmin?"approvals":queryParams.get("tab")==="roles"?"roles":queryParams.get("tab")==="permissions"?"permissions":queryParams.get("tab")==="groups"?"groups":"members";
+ const setActiveTab=(tab:"members"|"groups"|"permissions"|"roles"|"approvals")=>setQueryParams(old=>{
   const next=new URLSearchParams(old);
   next.set("tab",tab);
-  if(tab!=="permissions"){next.delete("view");next.delete("folder");}
+  if(tab!=="permissions")next.delete("view");
+  if(tab!=="permissions"&&tab!=="approvals")next.delete("folder");
   return next;
  });
  const[selectedDepartment,setSelectedDepartment]=useState("");
@@ -668,9 +670,9 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   });
  }
 
- return <div className={"work-body"+(activeTab==="permissions"?" org-compact-permissions":"")}>
+ return <div className={"work-body"+((activeTab==="permissions"||activeTab==="approvals")?" org-compact-permissions":"")}>
   {/* 顶部工具栏：指标摘要与全局快捷创建 */}
-  {activeTab!=="permissions"&&activeTab!=="roles"&&<div className="toolbar">
+  {activeTab!=="permissions"&&activeTab!=="roles"&&activeTab!=="approvals"&&<div className="toolbar">
    <span className="toolbar-hint">{`账号 ${users.length} · 部门 ${departments.length} · 工作组 ${groups.length}`}</span>
    <RareButton type="button" onClick={()=>{setNotice(null);setCreateDepartmentOpen(true);}}>
     <IconPlus/>新建部门
@@ -683,9 +685,9 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   {notice&&<RareNotice tone={notice.tone==="error"?"danger":"info"}>{notice.text}</RareNotice>}
 
   {/* 双栏主工作台：左侧组织架构树 + 右侧主工作区卡片 */}
-  <div className={"org-workbench"+((activeTab==="permissions"||activeTab==="roles")?" org-permissions-workbench":"")}>
+  <div className={"org-workbench"+((activeTab==="permissions"||activeTab==="roles"||activeTab==="approvals")?" org-permissions-workbench":"")}>
    {/* 左侧：组织架构树卡片 */}
-   {activeTab!=="permissions"&&activeTab!=="roles"&&<section className="org-card org-dept-card" aria-label="组织架构树">
+   {activeTab!=="permissions"&&activeTab!=="roles"&&activeTab!=="approvals"&&<section className="org-card org-dept-card" aria-label="组织架构树">
     <div className="org-card-header">
      <h3 className="org-card-title">
       <IconBuilding/>
@@ -787,13 +789,15 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
       <RareButton type="button" role="tab" aria-selected={activeTab==="permissions"} tabIndex={activeTab==="permissions"?0:-1} id="org-tab-permissions" aria-controls="org-panel-permissions"
        className={"org-tab"+(activeTab==="permissions"?" active":"")}
        onClick={()=>setActiveTab("permissions")}>权限管理</RareButton>
+      {isAdmin&&<RareButton type="button" role="tab" aria-selected={activeTab==="approvals"} tabIndex={activeTab==="approvals"?0:-1} id="org-tab-approvals" aria-controls="org-panel-approvals"
+       className={"org-tab"+(activeTab==="approvals"?" active":"")} onClick={()=>setActiveTab("approvals")}>审批策略</RareButton>}
       <RareButton type="button" role="tab" aria-selected={activeTab==="roles"} tabIndex={activeTab==="roles"?0:-1} id="org-tab-roles" aria-controls="org-panel-roles"
        className={"org-tab"+(activeTab==="roles"?" active":"")}
        onClick={()=>setActiveTab("roles")}>管理角色</RareButton>
      </RareTabs>
 
      {/* 当前部门范围标识 */}
-     {activeTab!=="permissions"&&activeTab!=="roles"&&<div className="org-scope-badge">
+     {activeTab!=="permissions"&&activeTab!=="roles"&&activeTab!=="approvals"&&<div className="org-scope-badge">
       <span className="org-scope-dot" aria-hidden="true"/>
       <span>范围：{scopeLabel}</span>
       {selectedDepartment!==""&&<RareButton type="button" className="org-scope-reset"
@@ -805,6 +809,8 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
      usersState={usersState} groupsState={groupsState}
      onRetryUsers={()=>setUsersToken(token=>token+1)}
      onRetryGroups={()=>setGroupsToken(token=>token+1)}/></div>}
+    {activeTab==="approvals"&&<div className="rare-tab-panel" role="tabpanel" id="org-panel-approvals" aria-labelledby="org-tab-approvals">
+     <ApprovalPoliciesPanel users={users} usersState={usersState} onRetryUsers={()=>setUsersToken(token=>token+1)}/></div>}
     {activeTab==="roles"&&<div className="rare-tab-panel" role="tabpanel" id="org-panel-roles" aria-labelledby="org-tab-roles"><RoleBindingsPanel users={users}/></div>}
 
     {/* Tab 1: 部门成员 */}

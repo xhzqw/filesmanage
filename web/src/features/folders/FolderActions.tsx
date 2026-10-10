@@ -6,7 +6,7 @@ import {errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
 import {Menu,type MenuItem} from "../../shared/ui/Menu";
 
-export function FolderActions({folder,actionRequest,onActionHandled,onChanged,isAdmin,onManageGrants,onManagePolicy}:{folder:Folder;actionRequest?:{folderId:string;action:"rename"|"delete";id:number}|null;onActionHandled?:()=>void;onChanged:()=>void;isAdmin:boolean;onManageGrants:()=>void;onManagePolicy:()=>void}){
+export function FolderActions({folder,actionRequest,onActionHandled,onChanged,isAdmin,onManageGrants}:{folder:Folder;actionRequest?:{folderId:string;action:"rename"|"delete";id:number}|null;onActionHandled?:()=>void;onChanged:()=>void;isAdmin:boolean;onManageGrants:()=>void}){
  const[message,setMessage]=useState("");
  const[renaming,setRenaming]=useState(false);
  const[renameValue,setRenameValue]=useState(folder.name);
@@ -51,7 +51,6 @@ export function FolderActions({folder,actionRequest,onActionHandled,onChanged,is
  ];
  return <div className="folder-actions">
   {isAdmin&&<RareButton type="button" className="ghost-action-btn" onClick={onManageGrants}>授权管理</RareButton>}
-  {isAdmin&&<RareButton type="button" className="ghost-action-btn" onClick={onManagePolicy}>审批策略</RareButton>}
   <div className="folder-more-wrapper">
    <RareButton ref={moreRef} type="button" className="ghost-more-btn" aria-label="更多目录操作"
     aria-haspopup="menu" aria-expanded={moreOpen} onClick={()=>setMoreOpen(v=>!v)}>···</RareButton>

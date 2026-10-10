@@ -1193,7 +1193,7 @@ async function main() {
       const treeMenu = await cdp.waitFor(`()=>document.querySelector('[role=menu]')!==null`, 5000);
       const treeLabels = await cdp.evaluate(`(()=>{const m=document.querySelector('[role=menu]');return m?[...m.querySelectorAll('[role=menuitem]')].map(b=>b.textContent?.trim()):null;})()`);
       check("tree node menu opens with admin entries",
-        treeMenu === true && Array.isArray(treeLabels) && treeLabels.includes("重命名目录") && treeLabels.includes("授权管理") && treeLabels.includes("审批策略") && treeLabels.includes("删除目录"),
+        treeMenu === true && Array.isArray(treeLabels) && treeLabels.includes("重命名目录") && treeLabels.includes("授权管理") && !treeLabels.includes("审批策略") && treeLabels.includes("删除目录"),
         JSON.stringify(treeLabels));
       await cdp.evaluate(`(()=>{const item=[...document.querySelectorAll('[role=menuitem]')].find(b=>b.textContent?.trim()==='重命名目录');item?.click();return Boolean(item);})()`);
       const renameOpen = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('重命名目录'));return d?d.querySelector('input')?.value===false?false:Boolean(d):false;}`, 6000);

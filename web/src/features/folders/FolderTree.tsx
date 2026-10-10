@@ -124,7 +124,7 @@ function FolderGlyph({expanded}:{expanded:boolean}){
  </svg>;
 }
 
-export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFolder,onDeleteFolder,onManageGrants,onManagePolicy}:{
+export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFolder,onDeleteFolder,onManageGrants}:{
  items:Folder[];
  selected:string;
  // Admin-only entries are hidden for non-admins instead of being offered and
@@ -137,7 +137,6 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
  onMoveFolder?:(folder:Folder)=>void;
  onDeleteFolder?:(folder:Folder)=>void;
  onManageGrants?:(folder:Folder)=>void;
- onManagePolicy?:(folder:Folder)=>void;
 }){
  const[expanded,setExpanded]=useState<Set<string>>(()=>new Set<string>(DEFAULT_EXPANDED));
  const[focusedId,setFocusedId]=useState<string|null>(null);
@@ -686,7 +685,6 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
   ];
   if(isAdmin){
    items.push({id:"grants",label:"授权管理",onSelect:()=>onManageGrants?.(folder)});
-   items.push({id:"policy",label:"审批策略",onSelect:()=>onManagePolicy?.(folder)});
   }
   items.push({id:"delete",label:"删除目录",danger:true,onSelect:()=>onDeleteFolder?.(folder)});
   return items;

@@ -26,12 +26,19 @@ export const RareSelect=forwardRef<HTMLSelectElement,RareSelectProps>(function R
  const visible=options.filter(o=>o.search.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
  function positionMenu(){
   const rect=button.current?.getBoundingClientRect();if(!rect)return;
-  const below=window.innerHeight-rect.bottom-8;
-  const above=below<150&&rect.top>below;
-  const maxHeight=Math.min(240,Math.max(110,above?rect.top-12:below));
-  const width=Math.min(Math.max(200,rect.width),window.innerWidth-16);
-  setPosition({top:above?Math.max(8,rect.top-maxHeight-5):rect.bottom+5,
-   left:Math.min(rect.left,Math.max(8,window.innerWidth-width-8)),width,maxHeight});
+  const modal=button.current?.closest("dialog[open]");
+  const bounds=modal?.getBoundingClientRect();
+  const topEdge=bounds?bounds.top+8:8;
+  const bottomEdge=bounds?bounds.bottom-8:window.innerHeight-8;
+  const leftEdge=bounds?bounds.left+8:8;
+  const rightEdge=bounds?bounds.right-8:window.innerWidth-8;
+  const below=Math.max(0,bottomEdge-rect.bottom-5);
+  const aboveSpace=Math.max(0,rect.top-topEdge-5);
+  const above=below<150&&aboveSpace>below;
+  const maxHeight=Math.min(240,above?aboveSpace:below);
+  const width=Math.min(Math.max(200,rect.width),rightEdge-leftEdge);
+  setPosition({top:above?rect.top-maxHeight-5:rect.bottom+5,
+   left:Math.max(leftEdge,Math.min(rect.left,rightEdge-width)),width,maxHeight:Math.max(0,maxHeight)});
  }
  function show(){if(disabled)return;setQuery("");setActive(Math.max(0,options.findIndex(o=>o.value===selected)));positionMenu();setOpen(true);}
  function close(focus=false){setOpen(false);setQuery("");if(focus)button.current?.focus();}
@@ -90,7 +97,7 @@ export const RareSelect=forwardRef<HTMLSelectElement,RareSelectProps>(function R
     </button>)}
     {!visible.length&&<p className="rare-select-empty">没有匹配项</p>}
    </div>
-  </div>,document.body)}
+  </div>,button.current?.closest('dialog[open]')??document.body)}
  </span>;
 });
 RareSelect.displayName="RareSelect";

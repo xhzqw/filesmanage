@@ -29,7 +29,7 @@
 .rare-select-root>.rare-select{display:flex;align-items:center;gap:8px;justify-content:space-between;width:100%;min-height:var(--height-control);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:0 9px;background:var(--surface-panel);text-align:left;cursor:pointer;line-height:1.2}
 .rare-select-root>.rare-select:hover:not(:disabled){background:var(--surface-row-hover);border-color:var(--border-strong)}
 .rare-select-root>.rare-select:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px;box-shadow:none}
-.rare-select-root>.rare-select[aria-expanded="true"]{border-color:var(--border-focus);box-shadow:0 0 0 1px var(--border-focus);outline:none}
+.rare-select-root>.rare-select[aria-expanded="true"]{border-color:var(--border-focus);box-shadow:none}
 .rare-select-root>.rare-select:disabled{cursor:not-allowed;opacity:.55}
 .rare-select-label{display:block;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
 .rare-select-label.placeholder{color:var(--text-tertiary)}

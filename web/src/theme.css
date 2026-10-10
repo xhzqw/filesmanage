@@ -552,11 +552,14 @@ tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions 
 /* ================= 对话框 / 菜单 ================= */
 .dialog{border:1px solid var(--border-subtle);border-radius:var(--radius-xl);box-shadow:var(--shadow-overlay);padding:var(--space-4);min-width:380px;background:var(--surface-panel);color:var(--text-primary)}
 .dialog::backdrop{background:#0d2a4a44}
+.dialog:focus-visible{outline:none}
 .dialog form{display:grid;gap:var(--space-3)}
 .dialog h3{margin:0;color:var(--brand-navy);font-size:13px}
 .dialog-title{margin:0;color:var(--brand-navy);font-size:14px;font-weight:600}
 .restore-dialog,.rollback-dialog{min-width:480px}
 .dialog input,.dialog select,.dialog textarea{border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:0 var(--space-2);height:var(--height-control);width:100%}
+.dialog input[type="checkbox"],.dialog input[type="radio"]{width:16px;height:16px;min-width:16px;padding:0;flex:none;margin:0}
+.dialog .checkbox-label{display:inline-flex;align-items:center;justify-content:flex-start;justify-self:start;gap:8px;width:fit-content;white-space:nowrap}
 .dialog textarea{height:auto;padding:var(--space-2)}
 .dialog-actions{display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-1);flex-wrap:wrap}
 .preview-text{background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-sm);padding:var(--space-3);margin:0;overflow:auto;flex:1;white-space:pre-wrap;font-family:var(--font-mono);font-size:12px}

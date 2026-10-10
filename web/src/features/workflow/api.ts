@@ -1,4 +1,5 @@
 import {request} from "../../shared/http";
+import {approvalPolicyApi} from "../../entities/approval/api";
 
 export type Approval={
  id:string;
@@ -26,7 +27,7 @@ export const workflowApi={
  approve:(id:string,comment:string)=>request<{fileId:string;versionSeq:number;status:string}>("/approvals/"+id+"/approve",{method:"POST",body:JSON.stringify({comment})}),
  reject:(id:string,comment:string)=>request<{rejected:string}>("/approvals/"+id+"/reject",{method:"POST",body:JSON.stringify({comment})}),
  cancel:(id:string)=>request<{cancelled:string}>("/approvals/"+id+"/cancel",{method:"POST"}),
- policy:(folderId:string)=>request<{configured:boolean;approverId?:string;enabled?:boolean}>("/folders/"+folderId+"/approval-policy"),
- setPolicy:(folderId:string,approverId:string,enabled:boolean)=>request<{configured:boolean;approverId:string;enabled:boolean}>("/folders/"+folderId+"/approval-policy",{method:"PUT",body:JSON.stringify({approverId,enabled})}),
- clearPolicy:(folderId:string)=>request<{configured:boolean}>("/folders/"+folderId+"/approval-policy",{method:"DELETE"}),
+ policy:approvalPolicyApi.get,
+ setPolicy:approvalPolicyApi.set,
+ clearPolicy:approvalPolicyApi.clear,
 };

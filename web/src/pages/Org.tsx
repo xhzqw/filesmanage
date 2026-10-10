@@ -5,7 +5,7 @@ import{useSearchParams}from "react-router-dom";
 
 export function Org({user,onLogout}:{user:User;onLogout:()=>void}){
  const [params]=useSearchParams();
- const compactPermissions=params.get("tab")==="permissions";
+ const compactPermissions=params.get("tab")==="permissions"||params.get("tab")==="approvals";
  return <AppShell user={user} onLogout={onLogout}>
   <div className="panels">
    <main className={"work"+(compactPermissions?" work-compact-permissions":"")}>
