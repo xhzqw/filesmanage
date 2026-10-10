@@ -167,6 +167,7 @@ async function main() {
     // viewer should cease submitting geometry until the scene changes.
     await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: `(()=>{
       window.__cadDrawCalls=0;
+      window.__cadDeletedBuffers=0;
       for(const Ctor of [window.WebGLRenderingContext,window.WebGL2RenderingContext]){
        if(!Ctor)continue;
        for(const method of ["drawArrays","drawElements","drawArraysInstanced","drawElementsInstanced"]){
@@ -175,6 +176,13 @@ async function main() {
         Ctor.prototype[method]=function(...args){
          window.__cadDrawCalls++;
          return original.apply(this,args);
+        };
+       }
+       const dispose=Ctor.prototype.deleteBuffer;
+       if(typeof dispose==="function"){
+        Ctor.prototype.deleteBuffer=function(...args){
+         window.__cadDeletedBuffers++;
+         return dispose.apply(this,args);
         };
        }
       }
@@ -246,6 +254,33 @@ async function main() {
       await delay(300);
       const highlight = await cdp.evaluate(`(()=>{const b=[...document.querySelectorAll('.toolbar[aria-label="装配零件"] label button')][0];return b?b.className:null;})()`);
       check("MOD02 selection highlight", String(highlight).includes("on"), String(highlight));
+
+      // Context loss must still surface after the loading effect is cleaned
+      // up. React Router navigation must also release real GPU geometry.
+      await cdp.evaluate(`(()=>{
+       document.querySelector('.viewer-stage canvas')?.dispatchEvent(
+        new Event('webglcontextlost',{cancelable:true}));
+       return true;
+      })()`);
+      await delay(180);
+      const lost=await cdp.evaluate(`(()=>{
+       const n=document.querySelector('.notice.error');
+       return !!n?.textContent?.includes('WebGL')&&!!n.querySelector('a[href*="/bytes"]');
+      })()`);
+      check("MOD07 WebGL context loss explains recovery",lost,String(lost));
+      const beforeDispose=await cdp.evaluate("(()=>window.__cadDeletedBuffers)()");
+      await cdp.evaluate(`(()=>{
+       [...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='返回文件')?.click();
+       return true;
+      })()`);
+      await delay(550);
+      const cleanup=await cdp.evaluate(`(()=>({
+       path:location.pathname,canvases:document.querySelectorAll('.viewer-stage canvas').length,
+       deletedBuffers:window.__cadDeletedBuffers,
+      }))()`);
+      check("MOD08 route exit detaches canvas and frees GPU geometry",
+       cleanup.path==='/preview/${fileId}'&&cleanup.canvases===0&&
+       cleanup.deletedBuffers>beforeDispose,JSON.stringify(cleanup));
     }
   } finally {
     cdp && cdp.close();
