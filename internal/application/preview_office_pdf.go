@@ -103,8 +103,10 @@ func renderOfficeSandbox(ctx context.Context, source []byte, ext string) ([]byte
 	// writable persistent host path is the disposable work dir.
 	args := []string{
 		"--unshare-all", "--die-with-parent", "--new-session", "--cap-drop", "ALL",
-		"--ro-bind", "/usr", "/usr", "--ro-bind", "/lib", "/lib", "--ro-bind", "/lib64", "/lib64",
-		"--dir", "/etc", "--ro-bind", "/etc/fonts", "/etc/fonts",
+		"--ro-bind", "/usr", "/usr", "--ro-bind", "/bin", "/bin",
+		"--ro-bind", "/lib", "/lib", "--ro-bind", "/lib64", "/lib64",
+		"--dir", "/etc", "--ro-bind", "/etc/libreoffice", "/etc/libreoffice",
+		"--ro-bind", "/etc/fonts", "/etc/fonts",
 		"--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
 		"--bind", work, "/work", "--chdir", "/work",
 		"--setenv", "HOME", "/work", "--setenv", "TMPDIR", "/tmp",

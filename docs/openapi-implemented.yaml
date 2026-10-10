@@ -1899,6 +1899,59 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/{id}/preview/office-pdf:
+    get:
+      summary: Isolated Office-to-PDF layout preview (preview ACL only)
+      operationId: previewOfficePDF
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File id.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Bounded, isolated, read-only OOXML layout rendering; ephemeral PDF (no store).
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '415':
+          description: Unsupported or unsafe Office input.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          description: Isolated conversion unavailable; client should use textual fallback.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/files/{id}/save:
     post:
       summary: Save new file content (new version, idempotent)
