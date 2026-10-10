@@ -46,7 +46,8 @@ const sendScript=`(()=>{
   }
   return originalFetch(resource,init);
  };
- const stats=window.__mshPerf={started:false,finished:false,duration:0,maxLag:0,ticks:0,bytes:mesh.byteLength,
+ const stats=window.__mshPerf={started:false,finished:false,duration:0,startedAt:0,finishedAt:0,
+  maxLag:0,ticks:0,bytes:mesh.byteLength,
   transferMs:0,longTasks:[]};
  if(typeof PerformanceObserver!=="undefined"){
   const observer=new PerformanceObserver(list=>{
@@ -73,7 +74,8 @@ const sendScript=`(()=>{
  NativeWorker.prototype.postMessage=function(message,...rest){
   if(message?.buffer instanceof ArrayBuffer){
    stats.started=true;
-   const started=performance.now();
+    const started=performance.now();
+    stats.startedAt=Math.round(started);
    let previous=started;
    const interval=setInterval(()=>{
     const now=performance.now();
@@ -83,6 +85,7 @@ const sendScript=`(()=>{
    finishWorker=()=>{
     clearInterval(interval);
     const finish=performance.now();
+    stats.finishedAt=Math.round(finish);
     stats.maxLag=Math.max(stats.maxLag,finish-previous-16);
     stats.duration=Math.round(finish-started);
     stats.finished=true;
