@@ -71,7 +71,7 @@ func (r *Repository) CreateUser(ctx context.Context, u domain.User, passwordHash
 		department = &u.DepartmentID
 	}
 	_, err := r.Q.Exec(ctx,
-		"INSERT INTO users(id,login,display_name,password_hash,is_admin,must_change_password,department_id) VALUES($1,$2,$3,$4,$5,true,$6)",
+		"INSERT INTO users(id,login,display_name,password_hash,is_admin,must_change_password,department_id) VALUES($1,$2,$3,$4,$5,false,$6)",
 		u.ID, u.Login, u.DisplayName, passwordHash, u.IsAdmin, department)
 	if isUniqueViolation(err) {
 		return domain.ErrNameConflict
@@ -83,7 +83,7 @@ func (r *Repository) CreateUser(ctx context.Context, u domain.User, passwordHash
 }
 
 func (r *Repository) SetUserPassword(ctx context.Context, userID, passwordHash string) error {
-	tag, err := r.Q.Exec(ctx, "UPDATE users SET password_hash=$2 WHERE id=$1", userID, passwordHash)
+	tag, err := r.Q.Exec(ctx, "UPDATE users SET password_hash=$2,must_change_password=false WHERE id=$1", userID, passwordHash)
 	if err != nil {
 		return err
 	}

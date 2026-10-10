@@ -99,29 +99,6 @@ func TestNewEngineEnforcesAllowlistOnRoutes(t *testing.T) {
 	}
 }
 
-func TestAuthPasswordChangeGate(t *testing.T) {
-	for _, tc := range []struct {
-		name    string
-		pending bool
-		want    int
-	}{
-		{"normal", false, http.StatusOK},
-		{"first-sign-in", true, http.StatusForbidden},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			rec := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(rec)
-			allowed := requireChangedPassword(c, domain.User{MustChangePassword: tc.pending})
-			if allowed == tc.pending || rec.Code != tc.want {
-				t.Fatalf("gate allowed=%v status=%d pending=%v, want status=%d", allowed, rec.Code, tc.pending, tc.want)
-			}
-			if tc.pending && !strings.Contains(rec.Body.String(), "E_PASSWORD_CHANGE_REQUIRED") {
-				t.Fatalf("missing pending-password error: %s", rec.Body.String())
-			}
-		})
-	}
-}
-
 // TestShareRecipientPayloadKeepsOnlyThePublicFields locks the WF-21 wire shape:
 // a picker row carries an id plus a display label and nothing else — in
 // particular no login, department, admin or disabled fields.

@@ -9,7 +9,6 @@ import{CommandSpotlight}from "../features/collaboration/CommandSpotlight";
 import{useSession}from "./session";
 import{Login}from "../pages/Login";
 import{Documents}from "../pages/Documents";
-import{FirstSignIn}from "../pages/FirstSignIn";
 import{Preview}from "../pages/Preview";
 import{Trash}from "../pages/Trash";
 import{Org}from "../pages/Org";
@@ -25,12 +24,12 @@ export function App(){
  useEffect(()=>{let valid=true;authApi.me().then(u=>{if(valid)setUser(u)}).catch(()=>{if(valid)setUser(null)}).finally(()=>{if(valid)setLoading(false)});return()=>{valid=false}},[setLoading,setUser]);
  useEffect(()=>subscribeSessionIssues(issue=>{
   if(issue==="expired"){setUser(null);setLogoutError("");}
-  else useSession.setState(state=>({user:state.user?{...state.user,mustChangePassword:true}:null}));
+  else void authApi.me().then(setUser).catch(()=>{});
  }),[setUser]);
  useEffect(()=>{
-  if(!user || user.mustChangePassword)return;
+  if(!user)return;
   return connectSessionEvents(setUser);
- },[user?.id,user?.mustChangePassword,setUser]);
+ },[user?.id,setUser]);
  async function logout(){
   if(logoutPending.current)return;
   logoutPending.current=true;
@@ -41,7 +40,6 @@ export function App(){
  }
  const feedback=logoutError?<div className="auth-feedback" role="alert"><span>{logoutError}</span><RareButton type="button" onClick={()=>void logout()}>重试退出</RareButton></div>:null;
  if(loading)return <main className="login-bg">正在检查会话…</main>;
- if(user?.mustChangePassword)return <>{feedback}<Routes><Route path="/first-sign-in" element={<FirstSignIn onSuccess={setUser} onExit={logout}/>}/><Route path="*" element={<Navigate to="/first-sign-in" replace/>}/></Routes></>;
  return <>{feedback}<Routes><Route path="/login" element={user?<Navigate to="/doc" replace/>:<Login onSuccess={setUser}/>}/>
   <Route path="/doc" element={user?<Documents user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
   <Route path="/account/sessions" element={user?<SessionDevices user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>

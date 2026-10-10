@@ -75,7 +75,6 @@ export function PermissionInsights({folderId,users,usersState,refreshToken}:{
   {error&&<p role="alert" className="notice error">{error}</p>}
   {result&&result.folderId===folderId&&result.subjectId===activeUser&&<>
    {result.subjectDisabled&&<p className="notice">该账号已禁用，没有可使用的文件权限。</p>}
-   {result.subjectRequiresPasswordChange&&<p className="notice">该账号尚未完成首次密码修改，目前不能执行文件操作。</p>}
    <div className="perm-effective"><strong>当前有效动作</strong>
     {result.effectiveActions.length===0?<span>无（默认拒绝）</span>
      :result.effectiveActions.map(a=><span key={a} className="perm-action-token">{ACTIONS[a]??a}</span>)}

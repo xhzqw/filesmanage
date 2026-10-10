@@ -12,7 +12,8 @@ function walk(dir){
  for(const entry of readdirSync(dir,{withFileTypes:true})){
   const path=join(dir,entry.name);
   if(entry.isDirectory()){walk(path);continue;}
-  if(!entry.name.endsWith(".tsx")||path.endsWith("/rare/RareControls.tsx"))continue;
+  // RareSelect owns its hidden native select, trigger and portaled options.
+  if(!entry.name.endsWith(".tsx")||path.endsWith("/rare/RareControls.tsx")||path.endsWith("/rare/RareSelect.tsx"))continue;
   checked++;
   const source=readFileSync(path,"utf8");
   const native=/<(button|input|select|textarea)(?=[\s/>])/g;

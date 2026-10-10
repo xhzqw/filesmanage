@@ -15,7 +15,7 @@ type Tone="info"|"error";
 type Notice={text:string;tone:Tone};
 type DialogResult={ok:string}|{error:string};
 type DeptRow={department:Department;depth:number};
-type StatusFilter="all"|"normal"|"warning"|"disabled"|"admin";
+type StatusFilter="all"|"normal"|"disabled"|"admin";
 
 const MAX_DEPTH=32;
 const CANDIDATE_CAP=50;
@@ -58,7 +58,7 @@ function departmentLabelOf(byId:Map<string,Department>,id:string|undefined):stri
 function mutationCopy(error:unknown,fallback:string):string{
  const code=errorCode(error);
  if(code==="E_NETWORK")return "网络中断，无法确认操作是否已提交；请以列表最新状态为准。";
- if(code==="E_PASSWORD_POLICY")return "服务端密码策略拒绝了该密码：请使用 16–128 个字符的新初始密码。";
+ if(code==="E_PASSWORD_POLICY")return "密码必须为 16–128 个字符。";
  if(code==="E_FORBIDDEN")return "没有执行该操作的权限（服务端拒绝）。";
  if(code==="E_NOT_FOUND")return "服务端已找不到该记录（账号可能已删除或状态已变化），列表已重新读取。";
  if(code==="E_BAD")return "服务端拒绝了本次请求（参数无效或不允许该状态变更）。";
@@ -308,8 +308,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    }else if(activeDeptIds&&!activeDeptIds.has(user.departmentId??"")){
     return false;
    }
-   if(statusFilter==="normal"&&(user.disabled===true||user.mustChangePassword))return false;
-   if(statusFilter==="warning"&&!user.mustChangePassword)return false;
+   if(statusFilter==="normal"&&user.disabled===true)return false;
    if(statusFilter==="disabled"&&user.disabled!==true)return false;
    if(statusFilter==="admin"&&!user.isAdmin)return false;
    if(needle==="")return true;
@@ -480,9 +479,9 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    return{error:mutationCopy(error,"创建账号失败")};
   }
   setNewUser({login:"",displayName:"",password:"",departmentId:""});
-  setNotice({tone:"info",text:`已创建账号 ${login}（${displayName}），首次登录必须修改初始密码。`});
+  setNotice({tone:"info",text:`已创建账号 ${login}（${displayName}），可使用设置的密码直接登录。`});
   await refreshUsers(`已创建账号 ${login}，但用户列表刷新失败，请点击列表中的重试。`);
-  return{ok:`已创建账号 ${login}（${displayName}），首次登录必须修改初始密码。`};
+  return{ok:`已创建账号 ${login}（${displayName}），可直接登录。`};
  }
 
  async function resetPassword(password:string):Promise<DialogResult>{
@@ -496,9 +495,9 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
     await refreshUsers(`重置 ${loginOf(target)} 密码的结果未确认，用户列表刷新失败，请重试。`);
    return{error:mutationCopy(error,"重置密码失败")};
   }
-  setNotice({tone:"info",text:`已重置 ${loginOf(target)} 的初始密码；其全部会话已失效，下次登录必须修改密码。`});
+  setNotice({tone:"info",text:`已重置 ${loginOf(target)} 的密码；全部旧会话已失效，新密码可直接登录。`});
   await refreshUsers(`已重置 ${loginOf(target)} 的密码，但用户列表刷新失败，请点击列表中的重试。`);
-  return{ok:`已重置 ${loginOf(target)} 的初始密码；服务端已失效其全部登录会话，下次登录必须修改密码。`};
+  return{ok:`已重置 ${loginOf(target)} 的密码；全部旧会话已失效。`};
  }
 
  async function applyDisabled():Promise<DialogResult>{
@@ -823,7 +822,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
         value={statusFilter} onChange={e=>setStatusFilter(e.target.value as StatusFilter)}>
         <option value="all">全部状态</option>
         <option value="normal">正常</option>
-        <option value="warning">待改密</option>
         <option value="disabled">已禁用</option>
         <option value="admin">系统管理员</option>
        </RareSelect>
@@ -865,9 +863,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
            {user.isAdmin&&<RareBadge tone="info" dot>系统管理员</RareBadge>}
            {user.disabled===true&&<RareBadge tone="danger" dot
             title="账号已禁用：无法登录，现有会话已失效；其工作组与授权记录仍保留。">已禁用</RareBadge>}
-           {user.mustChangePassword&&<RareBadge tone="warning" dot
-            title="该账号下次登录必须修改密码（初始密码或刚被重置）。">待改密</RareBadge>}
-           {user.disabled!==true&&!user.mustChangePassword&&<RareBadge tone="success" dot>正常</RareBadge>}
+           {user.disabled!==true&&<RareBadge tone="success" dot>正常</RareBadge>}
           </span>
          </td>
          <td className="row-actions">
@@ -897,7 +893,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
         <IconPlus/>
         <span>快速添加新成员</span>
        </div>
-       <span className="hint">初始密码需 ≥16 位；首次登录需自行修改</span>
+       <span className="hint">密码至少 16 位，创建后即可登录</span>
       </div>
       <form className="inline-form org-form org-create-form" onSubmit={submitCreateUser}>
        <div className="org-field">
@@ -1145,8 +1141,8 @@ function ResetPasswordDialog({target,department,onClose,onSubmit}:{
      <p>账号：{loginOf(target)||"—"}</p>
      <p>部门：{department}</p>
      {target.disabled===true&&<p className="hint">该账号当前已禁用：重置密码不会启用账号。</p>}
-     <p className="hint">提交后服务端立即失效该账号的全部登录会话，并要求其下次登录修改密码。</p>
-     <label htmlFor="org-reset-password">新初始密码</label>
+     <p className="hint">提交后该账号的全部登录会话立即失效，可使用新密码直接登录。</p>
+     <label htmlFor="org-reset-password">新密码</label>
      <RareInput id="org-reset-password" type="password" autoComplete="new-password" value={password}
       onChange={event=>setPassword(event.target.value)} disabled={busy}/>
      <p className="hint">至少 16 个字符（客户端只校验长度，密码策略以服务端判定为准）。</p>
@@ -1186,7 +1182,7 @@ function SetDisabledDialog({target,department,onClose,onSubmit}:{
    :<form onSubmit={event=>{event.preventDefault();run();}}>
     <p>账号：{loginOf(target)||"—"}（{target.displayName}）</p>
     <p>部门：{department}</p>
-    <p>当前状态：{target.disabled===true?"已禁用":target.mustChangePassword?"待改密":"正常"}</p>
+    <p>当前状态：{target.disabled===true?"已禁用":"正常"}</p>
     <p>{disabling
      ?"影响：禁用后该账号立即无法登录，现有登录会话立即失效；其工作组与授权记录保留，启用后恢复。该操作写入审计日志。"
      :"影响：启用后该账号可再次登录，并恢复原有的工作组与授权（最终生效权限由服务端判定）。"}</p>
@@ -1266,7 +1262,7 @@ function CreateUserConfirmDialog({draft,department,onClose,onSubmit}:{
     <p>账号：{draft.login}</p>
     <p>姓名：{draft.displayName}</p>
     <p>部门：{department}</p>
-    <p className="hint">初始密码按表单输入提交，不会在界面回显；该账号为普通账号，首次登录必须修改初始密码。</p>
+    <p className="hint">密码不会在界面回显；创建后该账号可直接使用此密码登录。</p>
     <p className="hint">取消不会清空表单内容，可以修改后再提交。</p>
     <div className="dialog-actions">
      <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>返回修改</RareButton>

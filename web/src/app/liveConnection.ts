@@ -37,7 +37,6 @@ export function connectSessionEvents(onIdentity:(user:User|null)=>void):()=>void
     try{data=JSON.parse(event.data) as {type?:string}}catch{return}
     switch(data.type){
      case "session.revoked":onIdentity(null);break;
-     case "session.password_change_required":validateSession();break;
      case "session.changed":
       window.dispatchEvent(new Event("filesmanage:sessions-changed"));
       validateSession();break;

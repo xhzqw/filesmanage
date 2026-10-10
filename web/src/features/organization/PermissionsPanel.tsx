@@ -34,6 +34,10 @@ function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(folder:R
  const busyParents=useRef(new Set<string>());
  const searchRef=useRef(0);
  const requestSerial=useRef<Record<string,number>>({});
+ const selectedRef=useRef(selected);
+ const selectRef=useRef(onSelect);
+ selectedRef.current=selected;
+ selectRef.current=onSelect;
 
  async function load(parentId:string,cursor=""){
   if(busyParents.current.has(parentId))return;
@@ -48,6 +52,16 @@ function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(folder:R
    setPages(old=>({...old,[parentId]:cursor
     ?{items:[...(old[parentId]?.items??[]),...page.items],nextCursor:page.nextCursor}
     :page}));
+   // Show an actionable permission overview immediately on first entry.
+   // Respect explicit folder URLs and user choices during an in-flight load.
+   if(parentId===""&&!cursor&&!selectedRef.current&&page.items.length){
+    const first=page.items[0];
+    selectRef.current(first);
+    if(first.hasChildren){
+     setExpanded(old=>new Set(old).add(first.id));
+     void load(first.id);
+    }
+   }
   }catch(e){
    if(requestSerial.current[parentId]===generation)setErrors(old=>({...old,[parentId]:errorCopy(e,"目录读取失败")}));
   }finally{
@@ -99,6 +113,10 @@ function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(folder:R
      {folder.hasChildren?<RareButton type="button" className="perm-tree-toggle" aria-expanded={open}
       aria-label={(open?"折叠":"展开")+folder.name} onClick={()=>toggle(folder)}>{open?"▾":"▸"}</RareButton>
       :<span className="perm-tree-spacer" aria-hidden="true"/>}
+     <svg className="perm-folder-glyph" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+       strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+       <path d="M3 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+     </svg>
      <RareButton type="button" className="perm-tree-name" aria-current={selected===folder.id?"true":undefined}
       onClick={()=>onSelect(folder)} title={folder.name}>{folder.name}</RareButton>
     </div>
@@ -282,10 +300,10 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
      {groupsState==="failed"&&<RareNotice tone="danger">读取工作组列表失败。<RareButton type="button" className="secondary-action" onClick={onRetryGroups}>重试工作组列表</RareButton></RareNotice>}
      {subjectSourceState==="loading"&&<p role="status" className="hint">正在读取可授权主体…</p>}
      <div className="perm-form-row">
-      <label>主体类型<RareSelect value={subjectKind} onChange={e=>{setSubjectKind(e.target.value as "user"|"group");setSubjectId("");}}>
+      <label>主体类型<RareSelect value={subjectKind} onChange={e=>{setSubjectKind(e.target.value as "user"|"group");setSubjectId("");setSubmitState("edit");}}>
        <option value="group">工作组</option><option value="user">用户</option></RareSelect></label>
       <label>查找主体<RareInput type="search" value={subjectQuery} onChange={e=>{setSubjectQuery(e.target.value);setSubjectId("");}} placeholder="按名称或账号筛选"/></label>
-      <label>授权给<RareSelect value={subjectId} required disabled={subjectSourceState!=="ready"} onChange={e=>setSubjectId(e.target.value)}>
+      <label>授权给<RareSelect value={subjectId} required disabled={subjectSourceState!=="ready"} onChange={e=>{setSubjectId(e.target.value);setSubmitState("edit");}}>
        <option value="">请选择</option>{candidates.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</RareSelect></label>
      </div>
      {subjectSourceState==="ready"&&candidates.length===50&&
@@ -295,7 +313,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
        onChange={e=>setActions(old=>e.target.checked?[...old,key]:old.filter(x=>x!==key))}/>{label}</label>)}
      </div></fieldset>
      <div className="perm-form-row">
-      <label>生效范围<RareSelect value={scopeOnly?"only":"subtree"} onChange={e=>setScopeOnly(e.target.value==="only")}>
+      <label>生效范围<RareSelect value={scopeOnly?"only":"subtree"} onChange={e=>{setScopeOnly(e.target.value==="only");setSubmitState("edit");}}>
        <option value="only">仅当前目录（默认）</option><option value="subtree">包括全部子目录</option></RareSelect></label>
       <label>到期时间（可选）<RareInput type="datetime-local" value={expiresAt} onChange={e=>setExpiresAt(e.target.value)}/></label>
      </div>

@@ -8,9 +8,13 @@
 .tree-search{width:100%;height:var(--height-control);padding:0 var(--space-2);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);font-size:12px}
 .tree-search-hint{margin:0;color:var(--text-secondary);font-size:11px}
 .tree-chevron-spacer{display:inline-block;width:16px;min-width:16px;height:16px;flex:none}
-.tree-folder-icon{width:14px;min-width:14px;height:14px;min-height:14px;flex:none;margin-right:5px;color:var(--brand-blue);opacity:.85;transition:color .12s linear,opacity .12s linear}
+.tree-folder-icon{width:14px;min-width:14px;height:14px;min-height:14px;flex:none;margin-right:5px;color:var(--folder-stroke,#C28B21);fill:var(--folder-fill,#FFF0C9);opacity:1;transition:color .12s linear,opacity .12s linear}
 .tree-row:hover .tree-folder-icon{opacity:1}
-.tree-row.on .tree-folder-icon{color:var(--brand-blue);opacity:1}
+.tree-row.on .tree-folder-icon{color:var(--folder-stroke,#C28B21);opacity:1}
+/* One selection surface, no stacked left borders, guide rails or underline. */
+.tree-row.on{box-shadow:none}
+.tree-row::before,.tree .tree-row.on::before{display:none}
+.spring-rail-host{display:none}
 .tree-note{display:flex;align-items:center;gap:var(--space-2);min-height:24px;color:var(--text-secondary);font-size:11px}
 .tree-note-error{color:var(--status-danger)}
 .tree-note .secondary-action{padding:0;font-size:11px}

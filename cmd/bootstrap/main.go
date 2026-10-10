@@ -67,7 +67,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if _, err = tx.Exec(ctx, "INSERT INTO users(id,login,display_name,password_hash,is_admin,must_change_password) VALUES($1,$2,$3,$4,true,true)", "u_admin", "admin", "系统管理员", string(h)); err != nil {
+	if _, err = tx.Exec(ctx, "INSERT INTO users(id,login,display_name,password_hash,is_admin,must_change_password) VALUES($1,$2,$3,$4,true,false)", "u_admin", "admin", "系统管理员", string(h)); err != nil {
 		log.Fatal(err)
 	}
 	departments := [][2]string{{"dept_market", "市场部"}, {"dept_rd", "研发部"}}
@@ -95,7 +95,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if _, err = tx.Exec(ctx, "INSERT INTO users(id,login,display_name,password_hash,department_id,must_change_password) VALUES($1,$2,$3,$4,$5,true)", role[0], role[0], role[1], string(unusable), role[2]); err != nil {
+		if _, err = tx.Exec(ctx, "INSERT INTO users(id,login,display_name,password_hash,department_id,must_change_password) VALUES($1,$2,$3,$4,$5,false)", role[0], role[0], role[1], string(unusable), role[2]); err != nil {
 			log.Fatal(err)
 		}
 		if role[3] != "" {

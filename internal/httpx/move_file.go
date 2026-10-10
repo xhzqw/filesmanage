@@ -15,10 +15,6 @@ func (h *Handler) moveFile(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if u.MustChangePassword {
-		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
-		return
-	}
 	var req struct {
 		TargetFolderID   string
 		ExpectedFolderID string
@@ -46,10 +42,6 @@ func (h *Handler) moveFile(c *gin.Context) {
 func (h *Handler) moveFilesBatch(c *gin.Context) {
 	u, ok := h.auth(c)
 	if !ok {
-		return
-	}
-	if u.MustChangePassword {
-		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
 		return
 	}
 	var req struct {
@@ -87,10 +79,6 @@ func (h *Handler) moveFilesBatch(c *gin.Context) {
 func (h *Handler) preflightMoves(c *gin.Context) {
 	u, ok := h.auth(c)
 	if !ok {
-		return
-	}
-	if u.MustChangePassword {
-		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
 		return
 	}
 	var req struct {

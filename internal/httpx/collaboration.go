@@ -75,10 +75,6 @@ func (h *Handler) shareRecipients(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if u.MustChangePassword {
-		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
-		return
-	}
 	limit := 0
 	if raw := c.Query("limit"); raw != "" {
 		parsed, err := strconvAtoi(raw)

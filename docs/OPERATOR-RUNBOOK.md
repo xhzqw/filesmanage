@@ -30,8 +30,8 @@ ssh root@192.168.1.22 'cat /root/repository77/filesmanage-v21/.secrets/admin.pas
 
 安全边界：会话 Cookie 为 `fm_session`（HttpOnly + SameSite=Strict，24h）；LAN 白名单
 `FILESMANAGE_LAN_ALLOW_CIDRS` 默认 `127.0.0.1/32,::1/128,192.168.1.0/24`，按**套接字对端地址**
-校验（不信任转发头）；非白名单对端一律 403 `E_NETWORK`。首次登录强制改密，未改密前除
-登录/改密/退出外的业务端点全部 403 `E_PASSWORD_CHANGE_REQUIRED`。
+校验（不信任转发头）；非白名单对端一律 403 `E_NETWORK`。首次登录不强制修改密码，
+管理员创建的账号可立即凭所设置的密码使用业务功能；建议运维妥善分发凭据并按需轮换。
 
 ## 1.1 从零搭建一个新环境（clean clone 之后）
 
@@ -69,7 +69,7 @@ FILESMANAGE_ALLOW_BOOTSTRAP=new-empty-database \
   BOOTSTRAP_ADMIN_PASSWORD_FILE=.secrets/bootstrap.password \
   go run ./cmd/bootstrap
 
-# 5) 初始口令归档为 admin 口令，首次登录强制修改
+# 5) 初始口令归档为 admin 口令（登录后不强制轮换）
 mv .secrets/bootstrap.password .secrets/admin.password
 ```
 

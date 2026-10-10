@@ -83,13 +83,12 @@ func (s *Service) ExplainFolderPermissions(ctx context.Context, actor domain.Use
 	result := PermissionExplanation{
 		SubjectKind: "user", SubjectID: subject.ID, FolderID: folderID,
 		SubjectDisabled: subject.DisabledAt != nil,
-		SubjectRequiresPasswordChange: subject.MustChangePassword,
+		SubjectRequiresPasswordChange: false,
 		EffectiveActions: []domain.Action{}, Sources: []PermissionSource{},
 		EvaluatedAt: s.now().UTC(),
 	}
-	// Neither a disabled account nor a first-sign-in account can use business
-	// operations. Do not present hypothetical ACLs as currently usable rights.
-	if result.SubjectDisabled || result.SubjectRequiresPasswordChange {
+	// Only disabled accounts lack exercisable actions. Password rotation is optional.
+	if result.SubjectDisabled {
 		return result, nil
 	}
 	allowed, sources, err := s.resolveActionsWithSources(ctx, tx, subject, folderID, true)

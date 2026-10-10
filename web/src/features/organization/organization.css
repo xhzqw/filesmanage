@@ -197,15 +197,7 @@
   color:var(--brand-blue);
   font-weight:600;
 }
-.tree .tree-row.on::before{
-  content:"";
-  position:absolute;
-  left:0;
-  top:0;
-  bottom:0;
-  width:3px;
-  background:var(--brand-blue);
-}
+.tree .tree-row.on::before{display:none}
 
 .org-tree-chevron{
   width:18px;
@@ -320,9 +312,10 @@
   background:var(--surface-row-selected);
   color:var(--brand-blue);
   font-weight:600;
-  box-shadow:inset 0 -2px 0 var(--border-selected);
 }
 
+.org-field>.rare-select-root{width:100%}
+.org-filter-left>.rare-select-root{min-width:112px}
 .org-tab-icon{
   display:inline-flex;
   align-items:center;

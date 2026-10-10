@@ -105,8 +105,7 @@ type UserDraft struct {
 	Password     string
 }
 
-// CreateUser issues a new account. The first login must change the issued
-// password (must_change_password defaults true in the schema).
+// CreateUser issues a usable credential without mandatory first-login rotation.
 func (s *Service) CreateUser(ctx context.Context, actor domain.User, draft UserDraft) (domain.User, error) {
 	if err := s.requireAdmin(actor); err != nil {
 		return domain.User{}, err
@@ -138,15 +137,14 @@ func (s *Service) CreateUser(ctx context.Context, actor domain.User, draft UserD
 	user := domain.User{
 		ID: NewID("u"), Login: draft.Login, DisplayName: draft.DisplayName,
 		IsAdmin: draft.IsAdmin, DepartmentID: draft.DepartmentID,
-		// Schema default: issued credentials must be changed on first login.
-		MustChangePassword: true,
+		MustChangePassword: false,
 	}
 	if err = tx.CreateUser(ctx, user, string(hash)); err != nil {
 		return domain.User{}, mapError(err)
 	}
 	if err = auditRequired(ctx, tx, actor, "user.create", "user", user.ID, "success",
 		map[string]any{"before": nil, "after": map[string]any{
-			"isAdmin": user.IsAdmin, "departmentId": user.DepartmentID, "mustChangePassword": true,
+			"isAdmin": user.IsAdmin, "departmentId": user.DepartmentID, "mustChangePassword": false,
 		}}); err != nil {
 		return domain.User{}, err
 	}
@@ -211,7 +209,7 @@ func (s *Service) SetUserDisabled(ctx context.Context, actor domain.User, userID
 }
 
 // ResetUserPassword issues a new credential for an account and kills its
-// sessions; the next login must change it again.
+// sessions; the new credential can be used immediately.
 func (s *Service) ResetUserPassword(ctx context.Context, actor domain.User, userID, newPassword string) error {
 	if err := s.requireAdmin(actor); err != nil {
 		return err
@@ -235,13 +233,10 @@ func (s *Service) ResetUserPassword(ctx context.Context, actor domain.User, user
 	if err = tx.SetUserPassword(ctx, userID, string(hash)); err != nil {
 		return mapError(err)
 	}
-	if err = tx.ForcePasswordChange(ctx, userID); err != nil {
-		return err
-	}
 	if err = auditRequired(ctx, tx, actor, "user.password_reset", "user", userID, "success",
 		map[string]any{
 			"before": map[string]any{"mustChangePassword": target.MustChangePassword},
-			"after":  map[string]any{"mustChangePassword": true, "sessionsRevoked": true},
+			"after":  map[string]any{"mustChangePassword": false, "sessionsRevoked": true},
 		}); err != nil {
 		return err
 	}

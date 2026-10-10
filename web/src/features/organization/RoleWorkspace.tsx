@@ -3,7 +3,7 @@ import {useEffect,useState,type FormEvent} from "react";
 import type {User} from "../../entities/user/model";
 import {request} from "../../shared/http";
 import {errorCopy} from "../../shared/errors";
-import {permissionsApi,type DirectGrant} from "./permissionsApi";
+import {permissionsApi,type DirectGrant,type ResourceFolder} from "./permissionsApi";
 import {PermissionAudit} from "./PermissionInsights";
 
 export type ManagementRole={
@@ -33,12 +33,27 @@ export function RoleBindingsPanel({users}:{users:User[]}){
  const[userId,setUserId]=useState("");
  const[role,setRole]=useState<ManagementRole["role"]>("auditor");
  const[scopeId,setScopeId]=useState("");
+ const[folderQuery,setFolderQuery]=useState("");
+ const[folderOptions,setFolderOptions]=useState<ResourceFolder[]>([]);
+ const[folderLoad,setFolderLoad]=useState<"loading"|"ready"|"failed">("loading");
  const[actions,setActions]=useState<string[]>(["list"]);
  const[expires,setExpires]=useState("");
  const[review,setReview]=useState(false);
  const[confirmRevoke,setConfirmRevoke]=useState("");
  useEffect(()=>{let live=true;roleAPI.list().then(v=>{if(live)setItems(v);})
   .catch(e=>{if(live)setError(errorCopy(e,"读取管理角色失败"));});return()=>{live=false};},[load]);
+ useEffect(()=>{
+  if(role!=="permission_admin")return;
+  let live=true;
+  setFolderLoad("loading");
+  const timer=window.setTimeout(()=>{
+   const query=folderQuery.trim();
+   const search=query?permissionsApi.search(query):permissionsApi.children("");
+   search.then(page=>{if(live){setFolderOptions(page.items);setFolderLoad("ready");}})
+    .catch(()=>{if(live){setFolderOptions([]);setFolderLoad("failed");}});
+  },folderQuery?250:0);
+  return()=>{live=false;window.clearTimeout(timer);};
+ },[folderQuery,role,load]);
  const userName=(id:string)=>users.find(u=>u.id===id)?.displayName??id;
  const valid=Boolean(userId)&& (role==="auditor"||Boolean(scopeId.trim())&&actions.length>0);
  async function create(e:FormEvent){
@@ -49,7 +64,7 @@ export function RoleBindingsPanel({users}:{users:User[]}){
    await roleAPI.create({userId,role,scopeId:role==="auditor"?"":scopeId.trim(),
     allowedActions:role==="auditor"?[]:actions,
     ...(expires?{expiresAt:new Date(expires).toISOString()}:{})});
-   setLoad(n=>n+1);setUserId("");setScopeId("");setReview(false);
+   setLoad(n=>n+1);setUserId("");setScopeId("");setFolderQuery("");setReview(false);
   }catch(e){setError(errorCopy(e,"分配角色失败"));}
   finally{setBusy(false);}
  }
@@ -79,15 +94,24 @@ export function RoleBindingsPanel({users}:{users:User[]}){
   <div className="perm-section-title">新增角色委派</div>
   <form className="perm-form" onSubmit={create} onChange={()=>setReview(false)}>
    <div className="perm-form-row">
-    <label>委派给账号<RareSelect required value={userId} onChange={e=>setUserId(e.target.value)}>
+    <label>委派给账号<RareSelect required value={userId} onChange={e=>{setUserId(e.target.value);setReview(false);}}>
      <option value="">请选择</option>{users.filter(u=>!u.isAdmin&&!u.disabled).map(u=>
       <option key={u.id} value={u.id}>{u.displayName}（{u.login}）</option>)}
     </RareSelect></label>
-    <label>管理角色<RareSelect value={role} onChange={e=>setRole(e.target.value as ManagementRole["role"])}>
+    <label>管理角色<RareSelect value={role} onChange={e=>{setRole(e.target.value as ManagementRole["role"]);setReview(false);}}>
      <option value="auditor">只读审计员</option><option value="permission_admin">目录权限管理员</option>
     </RareSelect></label>
-    {role==="permission_admin"&&<label>授权目录 ID<RareInput required value={scopeId}
-     onChange={e=>setScopeId(e.target.value)} placeholder="使用资源目录的 ID"/></label>}
+    {role==="permission_admin"&&<>
+     <label>查找授权目录<RareInput type="search" value={folderQuery} placeholder="按目录名称搜索"
+      onChange={e=>{setFolderQuery(e.target.value);setReview(false);}}/></label>
+     <label>授权目录<RareSelect required value={scopeId} disabled={folderLoad!=="ready"}
+      onChange={e=>{setScopeId(e.target.value);setReview(false);}}>
+      <option value="">{folderLoad==="loading"?"正在读取目录…":folderLoad==="failed"?"目录加载失败":"请选择目录"}</option>
+      {scopeId&&!folderOptions.some(f=>f.id===scopeId)&&<option value={scopeId}>{scopeId}（已选目录）</option>}
+      {folderOptions.map(f=><option key={f.id} value={f.id}>{f.path||f.name}</option>)}
+     </RareSelect>
+     {folderLoad==="failed"&&<span className="perm-hint" role="alert">目录读取失败，请修改搜索词后重试。</span>}
+    </>}
     <label>过期时间（可选）<RareInput type="datetime-local" value={expires} onChange={e=>setExpires(e.target.value)}/></label>
    </div>
    {role==="permission_admin"&&<fieldset><legend>允许管理的 ACL 动作</legend>

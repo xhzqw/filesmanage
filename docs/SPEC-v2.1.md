@@ -1175,7 +1175,7 @@ INIT-02 使用独立创建的 PostgreSQL 数据库/DB 账号、新 BLOB_DIR、�
 INIT-03 新公司“中晟生物科技”从零生成岗位身份、部门、组、目录树、授权、真实 DOCX/视频/TXT/CAD 样本，以及回收站/分享/关注/统计/导出的全新初始场景；不得照搬旧业务记录。
 INIT-04 区分新 PostgreSQL schema migrations（首建、后续升级）与已取消的旧 SQLite 数据 ETL。schema migrations 必须持续保留，不能因为不迁移旧数据而省去 DDL、FK、备份与回退。
 INIT-05 实际生产 bootstrap 与 DEV/TEST seed 分开：受控 bootstrap 只在经核实的空新库执行一次，创建管理员与基本组织；bootstrap-demo 显式启用才添加安全演示文件。不得对非空库重复清表。
-INIT-06 管理员首次口令由安全部署输入或 secret 产生，不沿用旧版口令、不把 demo 默认密码写入仓库，首次登录强制修改；测试攻击性 fixtures 不进入正式库。
+INIT-06 管理员首次口令由安全部署输入或 secret 产生，不沿用旧版口令、不把 demo 默认密码写入仓库；首次登录不强制改密，管理员仍可自行轮换凭据；测试攻击性 fixtures 不进入正式库。
 INIT-07 初始化步骤具备幂等/恢复、执行版本记录、Blob checksum manifest、失败补偿与空库校验；服务重启或 redeploy 不会重置新创建的账户或文件。
 INIT-08 验收需证实新旧数据库路径隔离、初始数据全部为新生成、旧目录未写/未删除、新 Postgres 重启后数据持久化。旧 Node 49/49 是行为参考，不是新数据导入证据。
 INIT-09 用户说“旧的都不要”是“不带旧数据到新系统”，不代表授权清除旧磁盘文件；物理清理需要另外明确目标和确认。

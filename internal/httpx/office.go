@@ -17,10 +17,6 @@ func (h *Handler) openOfficeSession(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if u.MustChangePassword {
-		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
-		return
-	}
 	view, err := h.S.OpenOfficeSession(c.Request.Context(), u, c.Param("id"))
 	if err != nil {
 		respondError(c, err)

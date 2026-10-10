@@ -14,10 +14,6 @@ func (h *Handler) explainPermissions(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if u.MustChangePassword {
-		c.JSON(http.StatusForbidden, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
-		return
-	}
 	var input struct {
 		SubjectKind string `json:"subjectKind"`
 		SubjectID   string `json:"subjectId"`
@@ -39,10 +35,6 @@ func (h *Handler) explainPermissions(c *gin.Context) {
 func (h *Handler) permissionAudit(c *gin.Context) {
 	u, ok := h.auth(c)
 	if !ok {
-		return
-	}
-	if u.MustChangePassword {
-		c.JSON(http.StatusForbidden, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
 		return
 	}
 	limit := 30

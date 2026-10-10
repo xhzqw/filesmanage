@@ -1,5 +1,6 @@
-import {forwardRef,type ButtonHTMLAttributes,type InputHTMLAttributes,type SelectHTMLAttributes,type TextareaHTMLAttributes} from "react";
+import {forwardRef,type ButtonHTMLAttributes,type InputHTMLAttributes,type TextareaHTMLAttributes} from "react";
 import "./controls.css";
+export {RareSelect} from "./RareSelect";
 
 // Preserve native DOM semantics and native size/input types. Contextual layout
 // owns width; Rare owns semantic intent, density, feedback and focus states.
@@ -34,16 +35,6 @@ export const RareInput=forwardRef<HTMLInputElement,RareInputProps>(function Rare
     className={"rare-input"+(className?" "+className:"")}/>;
 });
 RareInput.displayName="RareInput";
-
-export type RareSelectProps=SelectHTMLAttributes<HTMLSelectElement>&FormState;
-export const RareSelect=forwardRef<HTMLSelectElement,RareSelectProps>(function RareSelect(
-  {className="",density="compact",invalid,...props},ref){
-  return <select {...props} ref={ref}
-    aria-invalid={invalid??props["aria-invalid"]}
-    data-density={density} data-rare-control="select"
-    className={"rare-select"+(className?" "+className:"")}/>;
-});
-RareSelect.displayName="RareSelect";
 
 export type RareTextareaProps=TextareaHTMLAttributes<HTMLTextAreaElement>&FormState;
 export const RareTextarea=forwardRef<HTMLTextAreaElement,RareTextareaProps>(function RareTextarea(

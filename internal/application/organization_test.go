@@ -33,8 +33,8 @@ func TestOrganizationManagementIsAdminOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("admin create user failed: %v", err)
 	}
-	if !created.MustChangePassword {
-		t.Fatal("issued credentials must force a change on first login")
+	if created.MustChangePassword {
+		t.Fatal("new account must be usable without forced password rotation")
 	}
 	users, err := s.ListUsers(ctx, admin)
 	if err != nil || len(users) != 3 {
@@ -78,8 +78,8 @@ func TestResetUserPasswordRevokesCachedSession(t *testing.T) {
 		t.Fatalf("cached session survived password reset: %v", err)
 	}
 	_, user, err := s.Login(ctx, "user1", "replacement-credential-0001")
-	if err != nil || !user.MustChangePassword {
-		t.Fatalf("replacement credential must force first sign-in: user=%+v err=%v", user, err)
+	if err != nil || user.MustChangePassword {
+		t.Fatalf("replacement credential must allow normal sign-in: user=%+v err=%v", user, err)
 	}
 }
 

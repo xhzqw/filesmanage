@@ -19,10 +19,6 @@ func (h *Handler) uploadFile(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if u.MustChangePassword {
-		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
-		return
-	}
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadBytes)
 	header, err := c.FormFile("file")
 	if err != nil {
@@ -55,10 +51,6 @@ func (h *Handler) uploadFile(c *gin.Context) {
 func (h *Handler) listFiles(c *gin.Context) {
 	u, ok := h.auth(c)
 	if !ok {
-		return
-	}
-	if u.MustChangePassword {
-		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
 		return
 	}
 	folderID := c.Query("folder")
@@ -181,10 +173,6 @@ func (h *Handler) saveFile(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if u.MustChangePassword {
-		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
-		return
-	}
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 64<<20)
 	var req struct {
 		Data           string
@@ -242,10 +230,6 @@ func (h *Handler) rollbackFile(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if u.MustChangePassword {
-		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
-		return
-	}
 	var req struct {
 		TargetSeq          int
 		ExpectedCurrentSeq int
@@ -279,10 +263,6 @@ func (h *Handler) rollbackFile(c *gin.Context) {
 func (h *Handler) deleteFile(c *gin.Context) {
 	u, ok := h.auth(c)
 	if !ok {
-		return
-	}
-	if u.MustChangePassword {
-		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
 		return
 	}
 	entry, err := h.S.DeleteFile(c.Request.Context(), u, c.Param("id"))

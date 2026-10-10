@@ -14,10 +14,6 @@ func (h *Handler) createFolder(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if u.MustChangePassword {
-		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
-		return
-	}
 	var req struct {
 		ParentID string
 		Name     string
@@ -37,10 +33,6 @@ func (h *Handler) createFolder(c *gin.Context) {
 func (h *Handler) renameFolder(c *gin.Context) {
 	u, ok := h.auth(c)
 	if !ok {
-		return
-	}
-	if u.MustChangePassword {
-		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
 		return
 	}
 	var req struct {
@@ -63,10 +55,6 @@ func (h *Handler) moveFolder(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if u.MustChangePassword {
-		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
-		return
-	}
 	var req struct {
 		TargetParentID string
 	}
@@ -87,10 +75,6 @@ func (h *Handler) deleteFolder(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if u.MustChangePassword {
-		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
-		return
-	}
 	entry, folders, err := h.S.DeleteFolder(c.Request.Context(), u, c.Param("id"))
 	if err != nil {
 		respondError(c, err)
@@ -106,10 +90,6 @@ func (h *Handler) deleteFolder(c *gin.Context) {
 func (h *Handler) folderChildren(c *gin.Context) {
 	u, ok := h.auth(c)
 	if !ok {
-		return
-	}
-	if u.MustChangePassword {
-		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
 		return
 	}
 	limit, ok := folderPageLimit(c)
@@ -133,10 +113,6 @@ func (h *Handler) folderChildren(c *gin.Context) {
 func (h *Handler) searchFolders(c *gin.Context) {
 	u, ok := h.auth(c)
 	if !ok {
-		return
-	}
-	if u.MustChangePassword {
-		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_PASSWORD_CHANGE_REQUIRED"}})
 		return
 	}
 	limit, ok := folderPageLimit(c)

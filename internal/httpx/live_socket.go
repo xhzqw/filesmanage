@@ -120,10 +120,6 @@ func (h *Handler) streamLiveEvents(req *http.Request, ws *websocket.Conn, userID
 		if err != nil {
 			return send(map[string]any{"type": "server.unavailable"})
 		}
-		if authenticated.User.MustChangePassword {
-			send(map[string]any{"type": "session.password_change_required"})
-			return false
-		}
 		h.S.TouchActiveSession(req.Context(), token)
 		return true
 	}

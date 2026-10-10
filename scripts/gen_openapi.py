@@ -125,7 +125,7 @@ schema("SessionUser", obj({
     "id": string(),
     "displayName": string(),
     "isAdmin": boolean(),
-    "mustChangePassword": boolean("True until the first forced password change completes."),
+    "mustChangePassword": boolean("Deprecated compatibility field; always false for active accounts."),
 }, required=["id", "displayName", "isAdmin", "mustChangePassword"]))
 
 schema("User", obj({
@@ -565,7 +565,7 @@ SOURCE_TOKEN = [{"officeSourceToken": []}]
 ERR = {
     "400": "E_BAD — malformed request body or parameters",
     "401": "E_AUTH — missing or expired session",
-    "403": "E_FORBIDDEN / E_PASSWORD_CHANGE_REQUIRED — authorization denied or first-login password change pending",
+    "403": "E_FORBIDDEN — authorization denied",
     "404": "E_NOT_FOUND",
     "409": "Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING",
     "410": "Resource permanently removed",
@@ -575,7 +575,7 @@ ERR = {
     "503": "E_DEPENDENCY — database unavailable",
 }
 
-MUST_CHANGE = "Rejected with 403 E_PASSWORD_CHANGE_REQUIRED until the forced first-login password change completes."
+MUST_CHANGE = ""  # No forced first-login credential rotation.
 
 
 def resp(code, desc, schema_value=None):
@@ -681,9 +681,9 @@ add("DELETE", "/api/me/sessions/{id}", operation("Revoke a single other session 
 # RFC 6455 upgrade: same-origin, Cookie-authenticated, outbound JSON events.
 add("GET", "/api/events/ws", operation("Subscribe to live session events (WebSocket)", "Auth",
     "sessionEventsWebSocket", security=SESSION,
-    responses={"101": {"description": "Switching Protocols: WebSocket JSON events (connection.ready, connection.heartbeat, session.changed, session.revoked, session.password_change_required, server.unavailable)."},
+    responses={"101": {"description": "Switching Protocols: WebSocket JSON events (connection.ready, connection.heartbeat, session.changed, session.revoked, server.unavailable)."},
                "401": {"description": ERR["401"]},
-               "403": {"description": "E_ORIGIN or E_PASSWORD_CHANGE_REQUIRED"},
+               "403": {"description": "E_ORIGIN"},
                "426": {"description": "E_UPGRADE_REQUIRED — WebSocket Upgrade required"},
                "503": {"description": "E_LIVE_CAPACITY — live connection limit reached"}},
     auth_note="Origin must match Host, scheme and port; uses HttpOnly cookie, no URL token. Browser clients connect via ws:// on HTTP or wss:// on HTTPS. Up to 128 live connections per server process and 12-second heartbeat. Server-to-client JSON messages only; each event revalidates the session. Existing HTTP APIs remain authoritative."))
@@ -1147,9 +1147,8 @@ def build():
                 "- Authentication is the HttpOnly `fm_session` cookie (SameSite=Strict).\n"
                 "- Mutating requests require an Origin header matching the Host when sent by a\n"
                 "  browser (E_ORIGIN otherwise).\n"
-                "- `mustChangePassword` sessions may only call /api/login, /api/me,\n"
-                "  /api/me/password and /api/logout; every other business route answers 403\n"
-                "  E_PASSWORD_CHANGE_REQUIRED.\n"
+                "- Issued account credentials can be used at first login; changing passwords\n"
+                "  remains available but is not mandatory.\n"
                 "- Admin-only capability (user/department/workgroup management) is enforced in\n"
                 "  the application layer and answers 403 E_FORBIDDEN for non-admins.\n"
                 "- Socket peers outside FILESMANAGE_LAN_ALLOW_CIDRS are refused with 403\n"

@@ -41,7 +41,7 @@ func (u authGateTestUOW) Begin(context.Context) (ports.Tx, error) {
 	return &authGateTestTx{user: u.user}, nil
 }
 
-func TestFirstSignInCannotBypassBusinessAPI(t *testing.T) {
+func TestPasswordRotationDoesNotBlockBusinessAPI(t *testing.T) {
 	t.Setenv("FILESMANAGE_LAN_ALLOW_CIDRS", "127.0.0.1/32")
 	for _, tc := range []struct {
 		name string
@@ -50,8 +50,8 @@ func TestFirstSignInCannotBypassBusinessAPI(t *testing.T) {
 		want int
 	}{
 		{"pending /me allowed", "/api/me", domain.User{ID: "u_new", MustChangePassword: true}, http.StatusOK},
-		{"pending admin cannot list users", "/api/users", domain.User{ID: "u_admin", IsAdmin: true, MustChangePassword: true}, http.StatusForbidden},
-		{"pending member cannot list folders", "/api/folders/tree", domain.User{ID: "u_new", MustChangePassword: true}, http.StatusForbidden},
+		{"legacy flag admin can list users", "/api/users", domain.User{ID: "u_admin", IsAdmin: true, MustChangePassword: true}, http.StatusOK},
+		{"legacy flag member can list folders", "/api/folders/tree", domain.User{ID: "u_new", MustChangePassword: true}, http.StatusOK},
 		{"active admin can list users", "/api/users", domain.User{ID: "u_admin", IsAdmin: true}, http.StatusOK},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

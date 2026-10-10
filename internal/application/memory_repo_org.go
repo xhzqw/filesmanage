@@ -61,7 +61,7 @@ func (r *memoryRepo) CreateUser(_ context.Context, u domain.User, passwordHash s
 	if _, exists := r.users[u.ID]; exists {
 		return domain.ErrConflict
 	}
-	u.MustChangePassword = true
+	u.MustChangePassword = false
 	r.users[u.ID] = memoryUser{user: u, hash: passwordHash}
 	r.users[u.Login] = memoryUser{user: u, hash: passwordHash}
 	return nil
@@ -75,6 +75,7 @@ func (r *memoryRepo) SetUserPassword(_ context.Context, userID, passwordHash str
 		return ports.ErrRowMissing
 	}
 	entry.hash = passwordHash
+	entry.user.MustChangePassword = false
 	r.users[userID] = entry
 	r.users[entry.user.Login] = entry
 	for hash, session := range r.sessions {

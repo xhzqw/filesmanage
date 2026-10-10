@@ -1,5 +1,5 @@
 // Unified API error contract: stable server code, HTTP status and optional retry window.
-export type SessionIssue="expired"|"password_change_required";
+export type SessionIssue="expired";
 let issueListener:((issue:SessionIssue)=>void)|null=null;
 // Transport remains independent of React and Zustand.
 export function subscribeSessionIssues(listener:(issue:SessionIssue)=>void):()=>void{
@@ -10,8 +10,6 @@ export function subscribeSessionIssues(listener:(issue:SessionIssue)=>void):()=>
 export function reportSessionIssue(status:number,code:string,url:string):void{
  if(status===401&&code==="E_AUTH"&&url!=="/login"&&url!=="/logout"&&url!=="/me"){
   issueListener?.("expired");
- }else if(status===403&&code==="E_PASSWORD_CHANGE_REQUIRED"){
-  issueListener?.("password_change_required");
  }
 }
 export async function reportSessionResponse(res:Response,url:string):Promise<void>{
