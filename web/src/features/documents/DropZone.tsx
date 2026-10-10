@@ -142,7 +142,7 @@ export function DropZone({folderId,disabled,onCommitted,children}:{folderId:stri
       <div className="upload-item-actions">
        {task.status==="interrupted"&&<>
         <label className="upload-resume-picker">选择原文件
-         <input type="file" aria-label={`重新选择 ${task.sourceName??task.name}`} onChange={event=>{
+         <RareInput type="file" aria-label={`重新选择 ${task.sourceName??task.name}`} onChange={event=>{
           const file=event.currentTarget.files?.[0];if(file)void attach(task.queueId,file);
           event.currentTarget.value="";
          }}/>
