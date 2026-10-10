@@ -27,14 +27,14 @@ type CompareVersionInfo struct {
 	Size   int64  `json:"sizeBytes"`
 }
 type VersionComparison struct {
-	Left    CompareVersionInfo `json:"left"`
-	Right   CompareVersionInfo `json:"right"`
-	Mode    string             `json:"mode"`
-	Detail  string             `json:"detail,omitempty"`
-	SemanticChanges []SemanticChange `json:"semanticChanges,omitempty"`
-	Lines   []CompareLine      `json:"lines"`
-	Added   int                `json:"added"`
-	Removed int                `json:"removed"`
+	Left            CompareVersionInfo `json:"left"`
+	Right           CompareVersionInfo `json:"right"`
+	Mode            string             `json:"mode"`
+	Detail          string             `json:"detail,omitempty"`
+	SemanticChanges []SemanticChange   `json:"semanticChanges,omitempty"`
+	Lines           []CompareLine      `json:"lines"`
+	Added           int                `json:"added"`
+	Removed         int                `json:"removed"`
 }
 
 // CompareVersions does not provide raw historical bytes. It requires preview
@@ -131,10 +131,11 @@ func (s *Service) CompareVersions(ctx context.Context, u domain.User, fileID str
 		return out, err
 	}
 	if office && semanticA != "" && semanticB != "" {
-		if changes,ok:=OfficeSemanticChanges(strings.Split(semanticA,"\n"),strings.Split(semanticB,"\n"),strings.ToLower(filepath.Ext(file.Name)));ok{
-			a=semanticA;b=semanticB
-			out.Detail="office_semantic"
-			out.SemanticChanges=changes
+		if changes, ok := OfficeSemanticChanges(strings.Split(semanticA, "\n"), strings.Split(semanticB, "\n"), strings.ToLower(filepath.Ext(file.Name))); ok {
+			a = semanticA
+			b = semanticB
+			out.Detail = "office_semantic"
+			out.SemanticChanges = changes
 		}
 	}
 	aa := strings.Split(a, "\n")

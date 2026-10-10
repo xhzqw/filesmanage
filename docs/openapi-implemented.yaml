@@ -4262,6 +4262,47 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
   /api/files/download-zip:
+    head:
+      summary: Preflight an authorized bounded ZIP without starting a download
+      operationId: inspectFilesZip
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: ids
+        in: query
+        required: false
+        description: 1-30 unique file IDs; no ZIP payload
+        schema:
+          type: string
+      responses:
+        '204':
+          description: All selected files authorized; X-Zip-Files and X-Zip-Original-Bytes response headers.
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
     get:
       summary: Download an authorized bounded ZIP of current file versions
       operationId: downloadFilesZip
@@ -6662,6 +6703,29 @@ components:
       - seq
       - sha256
       - sizeBytes
+    OfficeSemanticChange:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum:
+          - added
+          - removed
+          - changed
+        section:
+          type: string
+        key:
+          type: string
+        before:
+          type: string
+        after:
+          type: string
+      required:
+      - kind
+      - section
+      - key
+      - before
+      - after
     VersionComparison:
       type: object
       properties:
@@ -6681,6 +6745,10 @@ components:
           enum:
           - office_parts
           - office_semantic
+        semanticChanges:
+          type: array
+          items:
+            $ref: '#/components/schemas/OfficeSemanticChange'
         lines:
           type: array
           items:
