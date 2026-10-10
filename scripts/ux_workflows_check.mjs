@@ -16,6 +16,7 @@
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
+import {assertIsolatedFixtures} from "./ux_fixture_guard.mjs";
 
 const args = process.argv.slice(2);
 const opt = (name, fallback) => {
@@ -26,6 +27,8 @@ const BASE = opt("base", "http://127.0.0.1:18091").replace(/\/+$/, "");
 const PASSWORD_FILE = opt("password-file", ".secrets/admin.password");
 const PORT = Number(opt("port", "9361"));
 const ORIGIN = BASE;
+
+assertIsolatedFixtures({base:BASE,args,explicitBase:args.includes("--base")});
 
 const password = readFileSync(PASSWORD_FILE, "utf8").trim();
 const stamp = String(Date.now());

@@ -22,6 +22,7 @@ node scripts/ui_style_governance_check.mjs
 
 echo "== ui: Rare component ownership gate =="
 node scripts/ui_component_governance_check.mjs
+node --test scripts/ux_fixture_guard.test.mjs
 
 echo "== go: build server and worker =="
 go build -o .bin/server ./cmd/server

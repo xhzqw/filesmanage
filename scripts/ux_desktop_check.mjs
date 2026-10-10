@@ -21,6 +21,7 @@
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
+import {assertIsolatedFixtures} from "./ux_fixture_guard.mjs";
 
 const args = process.argv.slice(2);
 const opt = (name, fallback) => {
@@ -31,25 +32,7 @@ const BASE = opt("base", "http://127.0.0.1:18091").replace(/\/+$/, "");
 const PASSWORD_FILE = opt("password-file", ".secrets/admin.password");
 const PORT = Number(opt("port", "9360"));
 
-// This harness CREATES folders, uploads files and PURGES trash. Never run it
-// against the LAN dev database or a casually overridden production endpoint.
-// A dedicated database and separate server port are required.
-const fixtureDb = process.env.FILESMANAGE_UX_FIXTURE_DB || "";
-const fixtureUrl = process.env.DATABASE_URL || "";
-const databaseName = (() => {
-  try { return decodeURIComponent(new URL(fixtureUrl).pathname.slice(1)); }
-  catch { return ""; }
-})();
-const target = new URL(BASE);
-if (!args.includes("--isolated-fixtures") ||
-    !/^filesmanage_[a-z0-9_]*test$/.test(fixtureDb) ||
-    fixtureDb !== databaseName ||
-    !["localhost","127.0.0.1"].includes(target.hostname) ||
-    target.port === "18091" || !args.includes("--base")) {
-  console.error("UX_DESKTOP_REFUSED: destructive fixtures require --isolated-fixtures, an explicit non-18091 localhost --base, and FILESMANAGE_UX_FIXTURE_DB matching DATABASE_URL's dedicated *_test database.");
-  process.exit(2);
-}
-
+assertIsolatedFixtures({base:BASE,args,explicitBase:args.includes("--base")});
 
 const password = readFileSync(PASSWORD_FILE, "utf8").trim();
 const stamp = String(Date.now());

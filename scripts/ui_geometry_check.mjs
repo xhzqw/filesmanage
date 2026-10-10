@@ -6,11 +6,13 @@ import {mkdtempSync,readFileSync,rmSync} from "node:fs";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {setTimeout as delay} from "node:timers/promises";
+import {assertIsolatedFixtures} from "./ux_fixture_guard.mjs";
 
 const BASE=(process.env.FILESMANAGE_BASE||"http://127.0.0.1:18091").replace(/\/$/,"");
 if(!["127.0.0.1","localhost","::1"].includes(new URL(BASE).hostname)){
  throw Error("geometry acceptance only runs against the target host loopback");
 }
+assertIsolatedFixtures({base:BASE,args:process.argv.slice(2),explicitBase:Boolean(process.env.FILESMANAGE_BASE)});
 const password=readFileSync(process.env.FILESMANAGE_ADMIN_PASSWORD_FILE||".secrets/admin.password","utf8").trim();
 const temp=mkdtempSync(join(tmpdir(),"fm-geometry-"));
 const port=9500+Math.floor(Math.random()*300);
