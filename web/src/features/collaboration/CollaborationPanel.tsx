@@ -1,12 +1,13 @@
 import {RareButton,RareInput} from "../../shared/ui/rare";
 import {useEffect,useMemo,useState} from "react";
 import {Link} from "react-router-dom";
-import {collaborationApi,formatBytes,type Favorite,type Share} from "./api";
+import {collaborationApi,type Favorite,type Share} from "./api";
 import {ShareDialog,type ShareResource} from "./ShareDialog";
 import {errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
 import type {FileItem} from "../../entities/file/model";
 import type {Folder} from "../../entities/folder/model";
+import "./collaborationLayout.css";
 
 // Bounded page over the loaded folder tree; the filter narrows the remainder
 // instead of rendering an unbounded list (DESKTOP-INTERACTION-v1 §5/§9).
@@ -23,7 +24,7 @@ type PickRow={folder:Folder;depth:number;path:string};
 // write is submitted to the server, which stays the authority on recipients,
 // actions and expiry.
 export function CollaborationPanel(){
- const[tab,setTab]=useState<"received"|"sent"|"favorites">("received");
+ const[tab,setTab]=useState<"received"|"sent"|"favorites">("favorites");
  const[shares,setShares]=useState<Share[]>([]);
  const[favorites,setFavorites]=useState<Favorite[]>([]);
  const[status,setStatus]=useState("loading");
@@ -159,7 +160,7 @@ export function CollaborationPanel(){
 
  function openCreate(){
   setTab("favorites");
-  say("请在上方选择要分享的资源（目录或文件），然后点击「分享」。");
+  setMessage("");
  }
 
  function pickFolder(id:string){
@@ -230,20 +231,18 @@ export function CollaborationPanel(){
   refresh();
  }
 
- return <div className="work-body">
-  <div className="toolbar">
-   <RareButton type="button" className={tab==="received"?"on":""} onClick={()=>setTab("received")}>与我共享</RareButton>
-   <RareButton type="button" className={tab==="sent"?"on":""} onClick={()=>setTab("sent")}>我共享的</RareButton>
-   <RareButton type="button" className={tab==="favorites"?"on":""} onClick={()=>setTab("favorites")}>我的关注</RareButton>
-   <RareButton type="button" className="primary" onClick={openCreate}>创建分享</RareButton>
-   <span className="toolbar-hint">分享仅传递 查看列表/预览/下载，不含写操作</span>
+ return <div className="work-body collab-root">
+  <div className="toolbar collab-tabs"><div className="collab-tablist" role="tablist" aria-label="共享与关注">
+   <RareButton type="button" role="tab" aria-selected={tab==="favorites"} className={tab==="favorites"?"on":""} onClick={()=>setTab("favorites")}>关注</RareButton>
+   <RareButton type="button" role="tab" aria-selected={tab==="received"} className={tab==="received"?"on":""} onClick={()=>setTab("received")}>与我共享</RareButton>
+   <RareButton type="button" role="tab" aria-selected={tab==="sent"} className={tab==="sent"?"on":""} onClick={()=>setTab("sent")}>我共享的</RareButton>
+   </div>
+   <RareButton type="button" className="primary collab-create-action" onClick={openCreate}>创建分享</RareButton>
   </div>
   {message&&<p role="status" className={"notice"+(messageTone==="error"?" error":"")}>{message}</p>}
-  {tab==="favorites"&&<section className="share-workbench" aria-label="创建分享或关注">
-   <div className="share-workbench-head">
-    <h3>创建分享 / 关注</h3>
-    <p className="hint">选择「目录」或「文件」，或直接使用下方关注列表的「分享」。前端列表只作提示，最终授权由服务端判定。</p>
-   </div>
+  <div className={"collab-workspace"+(tab==="favorites"?" with-picker":"")}>
+  {tab==="favorites"&&<section className="share-workbench" aria-label="选择关注或分享资源">
+   <div className="share-workbench-head"><h3>选择资源</h3></div>
    {treeState==="loading"&&<p className="hint">正在读取目录…</p>}
    {treeState==="failed"&&<>
     <p role="alert" className="notice error">获取目录失败，请稍后重试。</p>
@@ -256,7 +255,7 @@ export function CollaborationPanel(){
      <RareButton type="button" className={pickKind==="file"?"on":""} aria-pressed={pickKind==="file"} disabled={pickBusy}
       onClick={()=>{setPickKind("file");setFileId("");}}>文件</RareButton>
     </div>
-    <label htmlFor="share-picker-filter">{pickKind==="folder"?"选择目录":"选择文件所在目录"}</label>
+    <label htmlFor="share-picker-filter" className="share-picker-label">{pickKind==="folder"?"目录":"文件所在目录"}</label>
     <RareInput id="share-picker-filter" type="search" value={filter} placeholder="按名称或可见路径筛选"
      autoComplete="off" disabled={pickBusy} onChange={event=>setFilter(event.target.value)}/>
     {rows.length===0
@@ -286,11 +285,8 @@ export function CollaborationPanel(){
       </RareButton>)}
      </div>}
     </>}
-    <p className="share-chosen" aria-live="polite">已选资源：
-     {chosen===null
-      ?<span className="share-chosen-none">尚未选择</span>
-      :<strong>{chosen.name}</strong>}
-     {chosen!==null&&<span className="share-chosen-none">（{chosen.kind==="file"?"文件":"目录"}）</span>}
+    <p className="share-chosen" aria-live="polite"><span>已选：</span>
+     {chosen===null?<span className="share-chosen-none">无</span>:<strong title={chosen.name}>{chosen.name}</strong>}
     </p>
     <div className="share-workbench-actions">
      <RareButton type="button" className="secondary-action" disabled={pickBusy||chosen===null}
@@ -303,7 +299,13 @@ export function CollaborationPanel(){
     </div>
    </>}
   </section>}
-  <div className="table">
+  <div className="table collab-results">
+   <div className="collab-results-head">
+    <strong>{tab==="favorites"?"我的关注":tab==="received"?"与我共享":"我共享的"}</strong>
+    <span className="collab-results-count">{status==="ready"?(tab==="favorites"?favorites.length:shares.length)+" 项":""}</span>
+    <RareButton type="button" className="secondary-action" onClick={refresh}>刷新</RareButton>
+   </div>
+   <div className="collab-table-scroll">
    {tab==="favorites"?<table>
     <thead><tr><th scope="col">资源</th><th scope="col">类型</th><th scope="col">状态</th><th scope="col">关注时间</th><th scope="col">操作</th></tr></thead>
     <tbody>
@@ -340,8 +342,9 @@ export function CollaborationPanel(){
      </tr>)}
     </tbody>
    </table>}
+   </div>
   </div>
-  <p className="hint">{formatBytes(0)==="0 B"?"":" "}统计与导出请前往「统计」页。</p>
+  </div>
   {shareTarget&&<ShareDialog resource={shareTarget} onClose={()=>setShareTarget(null)} onCreated={createdShare}/>}
   {revokeTarget&&<Dialog open title="撤销分享确认" onClose={()=>setRevokeTarget(null)} closeGuard={()=>!revokeBusy} className="dialog">
    <p className="hint">撤销后该分享立即失效；下一次列表与搜索读取不会返回基于该分享的内容，最终授权仍由服务端判定。</p>

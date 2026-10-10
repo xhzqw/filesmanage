@@ -1,0 +1,88 @@
+/* Collaboration workbench: desktop-first split, independent scroll regions.
+   An all-width vertical stack is explicitly disallowed by AGENTS.md. */
+.collab-root{container:collaboration / inline-size;min-width:0;min-height:0;overflow:hidden}
+.collab-root .collab-tabs{
+  box-sizing:border-box;display:flex;align-items:center;gap:8px;
+  min-width:0;flex-wrap:wrap;flex:none;padding:4px 8px;
+}
+.collab-tablist{display:inline-flex;align-items:center;flex-wrap:wrap;gap:4px;min-width:0}
+.collab-tabs .collab-create-action{margin-left:auto;flex:none}
+.collab-workspace{
+ display:grid;grid-template-columns:minmax(0,1fr);gap:8px;
+ flex:1;min-width:0;min-height:0;margin:7px;
+}
+.collab-workspace.with-picker{grid-template-columns:minmax(270px,300px) minmax(0,1fr)}
+.collab-root .share-workbench{
+ display:flex;flex-direction:column;gap:9px;min-width:0;min-height:0;
+ padding:12px;margin:0;max-height:100%;overflow:hidden;box-shadow:none;
+ border-color:var(--border-hairline);
+}
+.collab-root .share-workbench-head{display:flex;align-items:center;flex:none;min-height:23px}
+.collab-root .share-workbench-head h3{font-size:13px;color:var(--text-primary);font-weight:650}
+.collab-root .share-kind-switch{flex:none;gap:4px}
+.collab-root .share-kind-switch .rare-button{min-height:28px;padding:0 10px}
+.collab-root .share-picker-label{color:var(--text-secondary);font-size:11px;flex:none}
+.collab-root #share-picker-filter{box-sizing:border-box;width:100%;height:30px;min-height:30px;flex:none;font-size:12px}
+.collab-root .share-picker-list{
+ display:flex;flex-direction:column;flex:1 1 140px;min-height:65px;max-height:none;
+ gap:2px;overflow-x:hidden;overflow-y:auto;padding:4px;scrollbar-gutter:stable;
+}
+.collab-root .share-picker-row{
+ display:flex;flex:none;align-items:center;justify-content:flex-start;flex-wrap:nowrap;
+ width:100%;min-width:0;min-height:30px;height:auto;max-width:100%;
+ text-align:left;font-size:12px;line-height:1.3;gap:7px;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.collab-root .share-picker-row .share-option-name{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.collab-root .share-picker-row .share-option-detail{flex:none;font-size:10px}
+.collab-root .share-list-empty{font-size:12px;padding:10px 4px;text-align:left}
+.collab-root .share-chosen{
+ display:flex;align-items:center;gap:5px;min-width:0;min-height:32px;
+ margin-top:auto;padding:6px 9px;flex:none;font-size:12px;
+}
+.collab-root .share-chosen>span{flex:none;color:var(--text-secondary)}
+.collab-root .share-chosen>strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.collab-root .share-workbench-actions{
+ display:flex;align-items:center;justify-content:flex-end;gap:5px;flex:none;
+ flex-wrap:wrap;min-width:0;
+}
+.collab-root .share-workbench-actions .rare-button{min-height:28px;padding:0 8px;font-size:12px}
+.collab-workspace .collab-results{
+ display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;
+ box-sizing:border-box;width:100%;max-width:100%;margin:0;overflow:hidden;
+}
+.collab-results-head{
+ display:flex;align-items:center;gap:10px;flex:none;
+ min-height:39px;padding:4px 12px;border-bottom:1px solid var(--border-hairline);
+}
+.collab-results-head strong{font-size:13px;font-weight:650}
+.collab-results-count{font-size:11px;color:var(--text-tertiary)}
+.collab-results-head .secondary-action{margin-left:auto;min-height:26px;padding:0 6px}
+.collab-table-scroll{flex:1;min-height:0;min-width:0;overflow:auto}
+.collab-table-scroll table{width:100%;min-width:665px;table-layout:fixed}
+.collab-workspace:not(.with-picker) .collab-table-scroll table{min-width:900px}
+.collab-table-scroll td:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0}
+.collab-table-scroll td:first-child a{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.collab-table-scroll .row-actions{white-space:nowrap}
+.collab-table-scroll th:first-child{width:34%}
+.collab-table-scroll th:nth-child(2){width:9%}
+.collab-table-scroll th:nth-child(3){width:18%}
+.collab-table-scroll th:nth-child(4){width:20%}
+.collab-table-scroll th:last-child{width:19%}
+.collab-workspace:not(.with-picker) .collab-table-scroll th:first-child{width:22%}
+.collab-workspace:not(.with-picker) .collab-table-scroll th:nth-child(2){width:8%}
+.collab-workspace:not(.with-picker) .collab-table-scroll th:nth-child(3){width:17%}
+.collab-workspace:not(.with-picker) .collab-table-scroll th:nth-child(4){width:20%}
+.collab-workspace:not(.with-picker) .collab-table-scroll th:nth-child(5){width:11%}
+.collab-workspace:not(.with-picker) .collab-table-scroll th:nth-child(6){width:12%}
+.collab-workspace:not(.with-picker) .collab-table-scroll th:last-child{width:10%}
+@container collaboration (max-width:840px){
+ .collab-workspace.with-picker{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(210px,40%) minmax(220px,1fr)}
+ .collab-root .share-workbench{padding:8px 10px}
+ .collab-root .share-picker-list{min-height:55px}
+}
+@container collaboration (max-width:550px){
+ .collab-root .share-chosen{margin-top:0}
+ .collab-root .share-workbench-actions{justify-content:flex-start}
+ .collab-tabs .collab-create-action{margin-left:0}
+}

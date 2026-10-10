@@ -744,6 +744,26 @@ async function g4UiSuite() {
     await cdp.navigate(`${BASE}/workspace`);
     const panelReady = await cdp.waitFor(`()=>document.body.textContent?.includes('创建分享')`, 20000);
     check("collaboration panel offers 创建分享", Boolean(panelReady), String(panelReady));
+    // User-facing default and geometry: the primary list must not sit below
+    // a full-width creator or a centered directory picker on desktop.
+    const collaborationLayout = await cdp.evaluate(`(()=>{
+      const tabs=document.querySelector('.collab-tablist');
+      const first=tabs?.querySelector('[role=tab]');
+      const left=document.querySelector('.collab-workspace .share-workbench');
+      const right=document.querySelector('.collab-workspace .collab-results');
+      if(!left||!right)return {ready:false};
+      const a=left.getBoundingClientRect(),b=right.getBoundingClientRect();
+      return {ready:true,first:first?.textContent?.trim(),selected:first?.getAttribute('aria-selected'),
+        left:a.left,right:b.left,sameRow:Math.abs(a.top-b.top)<3,
+        mainVisible:b.top<innerHeight-70,
+        viewportOverflow:document.documentElement.scrollWidth-document.documentElement.clientWidth};
+    })()`);
+    check("collaboration defaults to 关注 with left resource picker and right results",
+      collaborationLayout.ready&&collaborationLayout.first==="关注"
+      &&collaborationLayout.selected==="true"&&collaborationLayout.sameRow
+      &&collaborationLayout.right>collaborationLayout.left
+      &&collaborationLayout.mainVisible&&collaborationLayout.viewportOverflow<=1,
+      JSON.stringify(collaborationLayout));
     await cdp.evaluate(`(()=>{[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='创建分享')?.click();return true;})()`);
     // the panel switches to its inline workbench: filter the visible tree, pick the fixture folder
     const benchReady = await cdp.waitFor(`()=>document.querySelector('#share-picker-filter')!==null`, 10000);
