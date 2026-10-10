@@ -109,7 +109,7 @@ export function RoleBindingsPanel({users}:{users:User[]}){
       <option value="">{folderLoad==="loading"?"正在读取目录…":folderLoad==="failed"?"目录加载失败":"请选择目录"}</option>
       {scopeId&&!folderOptions.some(f=>f.id===scopeId)&&<option value={scopeId}>{scopeId}（已选目录）</option>}
       {folderOptions.map(f=><option key={f.id} value={f.id}>{f.path||f.name}</option>)}
-     </RareSelect>
+     </RareSelect></label>
      {folderLoad==="failed"&&<span className="perm-hint" role="alert">目录读取失败，请修改搜索词后重试。</span>}
     </>}
     <label>过期时间（可选）<RareInput type="datetime-local" value={expires} onChange={e=>setExpires(e.target.value)}/></label>
