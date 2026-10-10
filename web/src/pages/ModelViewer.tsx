@@ -7,6 +7,7 @@ import type {FileItem} from "../entities/file/model";
 import type {User} from "../entities/user/model";
 import {AppShell} from "../shared/ui/AppShell";
 import {parseDxf} from "../features/modelViewer/dxf";
+import type {MshGeometry} from "../features/modelViewer/mshParser";
 
 type DerivativeInfo={
  found:boolean;
@@ -153,7 +154,8 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
      dxfRoot.current=parsed.object;
      setLayers(parsed.layers);
     }else if(format==="msh"){
-     const parsed=parseMsh(new TextDecoder().decode(buffer),THREE);
+     const parsed=await parseMshInWorker(buffer,abort.signal,THREE);
+     if(!valid)return;
      object=parsed.group;
      mshRoot.current=parsed.group;
      setParts(parsed.parts);
@@ -451,92 +453,57 @@ async function loadParser(
  }
 }
 
-// parseMsh reads a gmsh MSH 2.2 ASCII mesh and recovers the assembly: nodes
-// are shared between triangles, so triangles joined through a common node are
-// one solid. Each connected component becomes a named part with its own
-// geometry and bounding box (MC02/MOD02).
+// The Worker runs the expensive MSH 2.2 component graph and normal expansion.
+// The UI thread only constructs THREE objects from transferred typed buffers.
 type MshPart={name:string;visible:boolean;size:[number,number,number];triangles:number};
 
-function parseMsh(text:string,THREE:typeof import("three")):{group:import("three").Group;parts:MshPart[]}{
- const section=(name:string):string[]=>{
-  const start=text.indexOf("$"+name);
-  if(start<0)return [];
-  const end=text.indexOf("$End"+name,start);
-  return text.slice(start,end<0?text.length:end).split("\n").slice(1);
- };
- const nodes=new Map<number,[number,number,number]>();
- for(const line of section("Nodes")){
-  const f=line.trim().split(/\s+/);
-  if(f.length<4||(f[0]??"").startsWith("$"))continue;
-  const tag=Number(f[0]);
-  if(Number.isFinite(tag))nodes.set(tag,[Number(f[1])||0,Number(f[2])||0,Number(f[3])||0]);
- }
- // Triangles are stored as node tags: the last three fields of an MSH 2.2
- // element line are the node tags, whatever the preceding tag count is.
- const tris:number[][]=[];
- for(const line of section("Elements")){
-  const f=line.trim().split(/\s+/);
-  if(f.length<4||(f[0]??"").startsWith("$")||f[1]!=="2")continue;   // 2 = triangle
-  const tags=f.slice(f.length-3).map(Number);
-  if(tags.length!==3||!tags.every(tag=>nodes.has(tag)))continue;
-  tris.push(tags);
- }
- // Union-find over node tags: triangles sharing a node are one solid.
- const parent=new Map<number,number>();
- const find=(x:number):number=>{
-  let root=x;
-  for(;;){
-   const next=parent.get(root);
-   if(next===undefined||next===root)break;
-   root=next;
-  }
-  let cursor=x;
-  while(cursor!==root){
-   const next=parent.get(cursor);
-   if(next===undefined)break;
-   parent.set(cursor,root);
-   cursor=next;
-  }
-  return root;
- };
- const union=(a:number,b:number)=>{
-  const ra=find(a),rb=find(b);
-  if(ra!==rb)parent.set(ra,rb);
- };
- for(const tag of nodes.keys())parent.set(tag,tag);
- for(const tri of tris)union(tri[0]??0,tri[1]??0);
- for(const tri of tris)union(tri[1]??0,tri[2]??0);
- const groups=new Map<number,number[][]>();
- for(const tri of tris){
-  const root=find(tri[0]??0);
-  const list=groups.get(root);
-  if(list)list.push(tri);else groups.set(root,[tri]);
- }
- // Largest component first so the primary solid is 组件 1.
- const ordered=[...groups.values()].sort((a,b)=>b.length-a.length);
- const group=new THREE.Group();
- const parts:MshPart[]=ordered.map((component,partIndex)=>{
-  const positions=new Float32Array(component.length*9);
-  component.forEach((tri,k)=>{
-   tri.forEach((tag,vertex)=>{
-    const coord=nodes.get(tag);
-    if(!coord)return;
-    positions[k*9+vertex*3]=coord[0];
-    positions[k*9+vertex*3+1]=coord[1];
-    positions[k*9+vertex*3+2]=coord[2];
-   });
-  });
-  const geometry=new THREE.BufferGeometry();
-  geometry.setAttribute("position",new THREE.BufferAttribute(positions,3));
-  geometry.computeVertexNormals();
-  const mesh=new THREE.Mesh(geometry,new THREE.MeshPhongMaterial({color:0x2f7fd0,shininess:40,specular:0x22406b}));
-  mesh.name="\u7ec4\u4ef6 "+(partIndex+1);
-  group.add(mesh);
-  geometry.computeBoundingBox();
-  const box=geometry.boundingBox;
-  const size=box?box.getSize(new THREE.Vector3()):new THREE.Vector3();
-  return{name:mesh.name,visible:true,size:[size.x,size.y,size.z] as [number,number,number],triangles:component.length};
+async function parseMshInWorker(
+ buffer:ArrayBuffer,signal:AbortSignal,THREE:typeof import("three"),
+):Promise<{group:import("three").Group;parts:MshPart[]}>{
+ if(signal.aborted)throw new DOMException("Aborted","AbortError");
+ const worker=new Worker(new URL("../features/modelViewer/mshWorker.ts",import.meta.url),{type:"module"});
+ type Reply={ok:boolean;data?:MshGeometry;tooLarge?:boolean;error?:string};
+ const result=await new Promise<MshGeometry>((resolve,reject)=>{
+  const close=()=>{
+   signal.removeEventListener("abort",onAbort);
+   worker.terminate();
+  };
+  const onAbort=()=>{close();reject(new DOMException("Aborted","AbortError"));};
+  signal.addEventListener("abort",onAbort,{once:true});
+  worker.onerror=()=>{close();reject(Error("MSH 解析线程运行失败"));};
+  worker.onmessage=(event:MessageEvent<Reply>)=>{
+   close();
+   if(!event.data.ok||!event.data.data){
+    reject(event.data.tooLarge?new ModelSizeLimitError():Error(event.data.error??"网格解析失败"));
+    return;
+   }
+   resolve(event.data.data);
+  };
+  worker.postMessage({buffer},[buffer]);
  });
+ if(signal.aborted)throw new DOMException("Aborted","AbortError");
+ const group=new THREE.Group();
+ const parts:MshPart[]=[];
+ try{
+  for(let index=0;index<result.parts.length;index++){
+   const part=result.parts[index];
+   const geometry=new THREE.BufferGeometry();
+   geometry.setAttribute("position",new THREE.BufferAttribute(part.positions,3));
+   geometry.setAttribute("normal",new THREE.BufferAttribute(part.normals,3));
+   const bounds=part.bounds;
+   geometry.boundingBox=new THREE.Box3(
+    new THREE.Vector3(bounds[0],bounds[1],bounds[2]),
+    new THREE.Vector3(bounds[3],bounds[4],bounds[5]),
+   );
+   const mesh=new THREE.Mesh(geometry,new THREE.MeshPhongMaterial({
+    color:0x2f7fd0,shininess:40,specular:0x22406b,
+   }));
+   mesh.name="组件 "+(index+1);
+   group.add(mesh);
+   parts.push({name:mesh.name,visible:true,triangles:part.triangles,
+    size:[bounds[3]-bounds[0],bounds[4]-bounds[1],bounds[5]-bounds[2]]});
+  }
+ }catch(error){disposeModelResources(group);throw error;}
  return{group,parts};
 }
 

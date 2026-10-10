@@ -171,3 +171,21 @@
 - 远端 `mc02_assembly_check.mjs` 使用真实 WebGL draw 调用计数验证
   静态模型 750ms 后不持续绘制，以及零件隐藏操作能触发绘制；
   同时维持两实体装配、显示/隐藏、恢复视图和高亮的视觉回归。
+
+## 13. V9 大型 MSH 网格 CPU 与 UI 线程隔离
+
+- Gmsh 2.2 ASCII 的节点读取、三角形连通分量、法线及坐标展开在
+  独立 Web Worker 中完成。节点 ID 映射到稠密索引，按需扩容的
+  Uint32Array 存储三角形，采用路径压缩 + 按大小合并的并查集，
+  组件输出 Float32Array 顶点/法线，避免主线程处理多层 JS 数组。
+- 每个零件只分配一次精确长度几何缓冲区，经 Transferable
+  ArrayBuffer 交给主线程；主线程只封装 BufferGeometry、Material
+  和 Box3，再交给既有 viewer 渲染。零件按三角形数量降序排序，
+  保持 MC02 的装配顺序、交互及坐标/法线精度。
+- 大模型 Worker 可在路由退出时立即 terminate；节点超过
+  300 万、总单元超过 600 万或三角形超过 200 万时拒绝内联预览，
+  不改变下载原件的权限和路径。上限错误显示大模型保护文案。
+- 远端 `node --experimental-strip-types scripts/msh_parser_perf_check.mjs`
+  使用 120,000 三角形/2 个独立装配组件验证真实数据分组、法线、
+  尺寸、格式拒绝和执行时限。真实浏览器的 MC02 仍负责 STEP→
+  MSH 转换、GPU 资源回收及高亮等回归。
