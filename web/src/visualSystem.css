@@ -61,6 +61,35 @@ input[type="checkbox"],input[type="radio"]{border-radius:var(--radius-xs)}
   background:var(--surface-panel);
 }
 .work-body{min-height:0}
+/* Align the folder context with the file toolbar and table. Generic panel
+   styling previously added margins/borders to children of a fixed 32px bar,
+   creating the detached, overflowing permission-action capsule. */
+.work .folder-context-bar{
+  box-sizing:border-box;width:calc(100% - 14px);max-width:calc(100% - 14px);
+  height:auto;min-height:36px;max-height:none;
+  margin:6px 7px 0;padding:4px 8px;
+  flex-wrap:wrap;gap:5px 10px;
+  border:1px solid var(--border-hairline);border-radius:var(--radius-md);
+}
+.work .folder-context-bar .breadcrumb{
+  flex:1 1 140px;min-width:0;max-width:100%;
+  margin:0;padding:0;min-height:0;border:0;border-radius:0;
+  background:transparent;
+}
+.work .folder-context-bar .folder-actions-slot{
+  min-width:0;max-width:100%;margin-left:auto;
+}
+.work .folder-context-bar .folder-actions{
+  height:auto;min-height:26px;max-width:100%;
+  margin:0;padding:0;gap:4px;flex-wrap:wrap;
+  border:0;border-radius:0;background:transparent;
+}
+.work .folder-context-bar .ghost-action-btn{
+  height:26px;min-height:26px;padding:0 8px;
+}
+@media(max-width:820px){
+  .work .folder-context-bar{width:calc(100% - 8px);max-width:calc(100% - 8px);margin:4px 4px 0}
+}
 .table{
   min-height:0;
   min-width:0;

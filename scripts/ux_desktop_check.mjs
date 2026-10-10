@@ -1258,6 +1258,39 @@ async function main() {
         && grid.sticky === "sticky" && grid.overflowX <= 1,
         JSON.stringify(grid));
 
+
+      // ---- PW-02b: sidebar-constrained pane keeps the file controls in bounds ----
+      // Reproduce a narrow document pane on a desktop viewport without changing
+      // the viewport itself. Viewport-only @media rules cannot pass this check.
+      const paneLayout = await cdp.evaluate(`(()=>{
+        const panels=document.querySelector('.panels');
+        const pane=document.querySelector('.work-body');
+        const toolbar=document.querySelector('.file-toolbar');
+        const context=document.querySelector('.folder-context-bar');
+        const grid=document.querySelector('.work-body>.table');
+        const original=panels.style.cssText;
+        panels.style.width='720px';
+        panels.style.flex='none';
+        const within=(child,host)=>{
+          const a=child.getBoundingClientRect(),b=host.getBoundingClientRect();
+          return a.left>=b.left-1&&a.right<=b.right+1
+            &&a.top>=b.top-1&&a.bottom<=b.bottom+1;
+        };
+        try{
+          const children=[...toolbar.querySelectorAll('.toolbar-actions,.toolbar-views,.rare-select-root,.filter-search-wrap')];
+          const actions=context.querySelector('.folder-actions-slot');
+          return {paneWidth:Math.round(pane.getBoundingClientRect().width),
+                  toolbarInside:within(toolbar,pane),
+                  controlsInside:children.every(child=>within(child,toolbar)),
+                  actionsInside:!actions||within(actions,context),
+                  tableOverflow:grid.scrollWidth-grid.clientWidth};
+        }finally{panels.style.cssText=original;}
+      })()`);
+      check("PW-02b narrow file pane keeps toolbars, Rare selects and grid inside their panels",
+        paneLayout.paneWidth < 560 && paneLayout.toolbarInside
+        && paneLayout.controlsInside && paneLayout.actionsInside && paneLayout.tableOverflow <= 1,
+        JSON.stringify(paneLayout));
+
       // ---- PW-03: ultra-compact 26px density locked by default and persisted ----
       const rowHeight = async () => cdp.evaluate(`(()=>{
         const tr=document.querySelector('tbody tr[data-id]');
