@@ -10,6 +10,8 @@ import (
 // SVG, HTML, and XML are not served as active inline documents.
 func BrowserMedia(header []byte) (renderer, mime string) {
 	switch {
+	case bytes.HasPrefix(header, []byte("%PDF-1.")), bytes.HasPrefix(header, []byte("%PDF-2.")):
+		return "pdf", "application/pdf"
 	case bytes.HasPrefix(header, []byte("\x89PNG\r\n\x1a\n")):
 		return "image", "image/png"
 	case len(header) >= 3 && bytes.Equal(header[:3], []byte{0xff, 0xd8, 0xff}):

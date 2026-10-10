@@ -241,7 +241,7 @@ const PRIMARY_FINDERS = {
   trash: `(()=>[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='恢复')||null)()`,
   org: `(()=>[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='创建工作组')||null)()`,
   approvals: `(()=>[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='通过')||null)()`,
-  preview: `(()=>[...document.querySelectorAll('a')].find(a=>a.textContent?.trim()==='下载原始字节')||null)()`,
+  preview: `(()=>document.querySelector('.file-workbench-actions button.primary')||null)()`,
 };
 
 const PRIMARY_LABELS = {
@@ -249,7 +249,7 @@ const PRIMARY_LABELS = {
   trash: "恢复",
   org: "创建工作组",
   approvals: "通过",
-  preview: "下载原始字节",
+  preview: "下载",
 };
 
 // One real-key press (rawKeyDown + keyUp) through the CDP Input domain.
@@ -647,7 +647,7 @@ async function main() {
     { name: "trash", path: "/trash", wait: `()=>[...document.querySelectorAll('button')].some(b=>b.textContent?.trim()==='恢复')` },
     { name: "org", path: "/org", wait: `()=>!!document.querySelector('input[aria-label="新账号"]')` },
     { name: "approvals", path: "/approvals", wait: `()=>[...document.querySelectorAll('button')].some(b=>b.textContent?.trim()==='通过')` },
-    { name: "preview", path: `/preview/${previewFile.fileId}`, wait: `()=>document.body.textContent?.includes('下载原始字节')` },
+    { name: "preview", path: `/preview/${previewFile.fileId}`, wait: `()=>!!document.querySelector('[role="tablist"][data-rare-tabs]')` },
   ];
 
   mkdirSync(EVIDENCE_DIR, { recursive: true });

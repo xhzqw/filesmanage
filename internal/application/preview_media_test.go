@@ -19,6 +19,8 @@ func TestBrowserMediaSignatures(t *testing.T) {
 		name, renderer, mime string
 		data                 []byte
 	}{
+		{"pdf", "pdf", "application/pdf", []byte("%PDF-1.7\n1 0 obj\n<<>>\nendobj\n")},
+		{"pdf-2", "pdf", "application/pdf", []byte("%PDF-2.0\n1 0 obj\n<<>>\nendobj\n")},
 		{"png", "image", "image/png", append([]byte("\x89PNG\r\n\x1a\n"), bytes.Repeat([]byte{0}, 32)...)},
 		{"jpeg", "image", "image/jpeg", []byte{0xff, 0xd8, 0xff, 0xe0}},
 		{"gif", "image", "image/gif", []byte("GIF89a")},
@@ -33,6 +35,8 @@ func TestBrowserMediaSignatures(t *testing.T) {
 		{"svg", "unsupported", "", []byte("<svg onload='alert(1)'/>")},
 		{"html", "unsupported", "", []byte("<script>alert(1)</script>")},
 		{"fake-png", "unsupported", "", []byte("not really a PNG")},
+		{"pdf-spoof", "unsupported", "", []byte("<html>%PDF-1.7</html>")},
+		{"pdf-invalid-version", "unsupported", "", []byte("%PDF-9.0\n")},
 		{"heic", "unsupported", "", []byte("\x00\x00\x00\x18ftypheic\x00\x00\x00\x00")},
 		{"truncated-mp4", "unsupported", "", []byte("\x00\x00\x00\x18ftypisom")},
 	}

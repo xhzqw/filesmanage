@@ -112,7 +112,11 @@ func looksTextual(name, contentType string) bool {
 		return true
 	}
 	switch extensionOf(name) {
-	case ".txt", ".md", ".csv", ".log", ".json", ".xml", ".yaml", ".yml", ".ini", ".toml":
+	case ".txt", ".md", ".markdown", ".csv", ".tsv", ".log", ".json", ".jsonl",
+		".xml", ".yaml", ".yml", ".ini", ".toml", ".conf", ".cfg",
+		".js", ".jsx", ".ts", ".tsx", ".css", ".scss", ".html", ".htm",
+		".py", ".go", ".rs", ".java", ".sql", ".sh", ".bash", ".ps1",
+		".c", ".cpp", ".h", ".hpp", ".gcode", ".srt", ".vtt":
 		return true
 	}
 	return false

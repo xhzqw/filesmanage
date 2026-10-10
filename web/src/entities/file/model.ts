@@ -33,7 +33,7 @@ export type PreviewData={
  size:number;
  sha256:string;
  textual:boolean;
- renderer?:"text"|"image"|"video"|"audio"|"unsupported";
+ renderer?:"text"|"image"|"video"|"audio"|"pdf"|"unsupported";
  mediaType?:string;
  truncated:boolean;
  content:string;

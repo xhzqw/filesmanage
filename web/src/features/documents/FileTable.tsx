@@ -944,7 +944,7 @@ function pathOf(folders:Folder[],id:string):string{
 // currently shown unlocks "确认移动". The server stays the authority — the
 // commit re-verifies permissions, the target's active state, name uniqueness
 // and the CAS folder.
-function MoveDialog({file,presetTargetId,onClose,onMoved,onReload}:{
+export function MoveDialog({file,presetTargetId,onClose,onMoved,onReload}:{
  file:FileItem;
  // The folder a drop preselected; "" means the menu entry opened this dialog.
  // It only seeds the candidate — the preflight and the commit below are the
