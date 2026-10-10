@@ -131,7 +131,7 @@ try{
   "--headless=new","--no-sandbox","--disable-dev-shm-usage",
   "--use-angle=swiftshader","--enable-unsafe-swiftshader",
   "--remote-debugging-port="+port,"--user-data-dir="+profile,"--window-size=1440,900","about:blank",
- ],{stdio:"ignore"});
+ ],{stdio:"ignore",detached:true});
  let tab;
  for(let n=0;n<80&&!tab;n++){
   await delay(120);
@@ -187,10 +187,14 @@ try{
 }finally{
  ws?.close();
  if(browser){
-  browser.kill("SIGKILL");
+  // Chrome spawns render/GPU processes that can keep writing the profile
+  // after the browser process exits; terminate the entire test process group.
+  try{process.kill(-browser.pid,"SIGKILL");}
+  catch(error){if(error?.code!=="ESRCH")throw error;}
   if(browser.exitCode===null){
    await Promise.race([new Promise(resolve=>browser.once("close",resolve)),delay(3000)]);
   }
  }
- rmSync(profile,{recursive:true,force:true,maxRetries:15,retryDelay:100});
+ await delay(250);
+ rmSync(profile,{recursive:true,force:true,maxRetries:50,retryDelay:100});
 }
