@@ -1,4 +1,4 @@
-import {RareButton,RareInput} from "../../shared/ui/rare";
+import {RareBadge,RareButton,RareInput} from "../../shared/ui/rare";
 import {useEffect,useMemo,useState} from "react";
 import {Link} from "react-router-dom";
 import {collaborationApi,type Favorite,type Share} from "./api";
@@ -315,7 +315,9 @@ export function CollaborationPanel(){
      {status==="ready"&&favorites.map(f=><tr key={f.id}>
       <td>{f.kind==="file"?<Link to={"/preview/"+f.fileId}>{f.resourceName}</Link>:<Link to={"/doc?folder="+f.folderId}>{f.resourceName}</Link>}</td>
       <td>{f.kind==="file"?"文件":"目录"}</td>
-      <td>{f.unavailable?"已删除或不可访问":"正常"}</td>
+      <td>{f.unavailable
+       ?<RareBadge tone="danger" dot title="资源已删除、失效或当前账号无权访问">已删除或不可访问</RareBadge>
+       :<RareBadge tone="success" dot>正常</RareBadge>}</td>
       <td>{f.createdAt.replace("T"," ").slice(0,16)}</td>
       <td className="row-actions">
        <RareButton type="button" disabled={f.unavailable}

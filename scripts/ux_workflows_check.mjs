@@ -744,6 +744,12 @@ async function g4UiSuite() {
     await cdp.navigate(`${BASE}/workspace`);
     const panelReady = await cdp.waitFor(`()=>document.body.textContent?.includes('创建分享')`, 20000);
     check("collaboration panel offers 创建分享", Boolean(panelReady), String(panelReady));
+    const favoriteStatusBadge = await cdp.waitFor(`()=>{
+      const row=[...document.querySelectorAll('.collab-results tbody tr')].find(r=>r.textContent?.includes(${JSON.stringify(`g4-${stamp}.txt`)}));
+      const badge=row?.querySelector('.rare-badge[data-rare-badge-tone=success]');
+      return badge?.textContent?.trim()==='正常';
+    }`,10000);
+    check("favorite status uses semantic RareBadge with text and success tone",favoriteStatusBadge===true,String(favoriteStatusBadge));
     // User-facing default and geometry: the primary list must not sit below
     // a full-width creator or a centered directory picker on desktop.
     const collaborationLayout = await cdp.evaluate(`(()=>{
