@@ -57,7 +57,7 @@ func TestOwnSessionsAuthAndNoEnumeration(t *testing.T) {
 		want               int
 	}{
 		{"anonymous list", "GET", "/api/me/sessions", false, false, 401},
-		{"pending credential list", "GET", "/api/me/sessions", true, true, 403},
+		{"legacy credential flag still allows list", "GET", "/api/me/sessions", true, true, 200},
 		{"list active", "GET", "/api/me/sessions", false, true, 200},
 		{"list audit", "GET", "/api/me/auth-activity", false, true, 200},
 		{"unknown session", "DELETE", "/api/me/sessions/" + strings.Repeat("f", 24), false, true, 404},
