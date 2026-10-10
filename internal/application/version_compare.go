@@ -11,6 +11,7 @@ import (
 
 const compareMaxBytes int64 = 256 << 10
 const compareMaxLines = 350
+
 var errUnsupportedOfficeParts = errors.New("unsupported office package layout")
 
 type CompareLine struct {
@@ -65,12 +66,15 @@ func (s *Service) CompareVersions(ctx context.Context, u domain.User, fileID str
 		out.Mode = "identical"
 		return out, nil
 	}
-	office:=looksOfficePackage(file.Name)
-	if !office&&!looksTextual(file.Name, file.ContentType) {
+	office := looksOfficePackage(file.Name)
+	if !office && !looksTextual(file.Name, file.ContentType) {
 		return out, nil
 	}
-	maxBytes:=compareMaxBytes
-	if office{maxBytes=compareMaxOfficeArchiveBytes;out.Detail="office_parts"}
+	maxBytes := compareMaxBytes
+	if office {
+		maxBytes = compareMaxOfficeArchiveBytes
+		out.Detail = "office_parts"
+	}
 	if left.SizeBytes > maxBytes || right.SizeBytes > maxBytes {
 		out.Mode = "large"
 		return out, nil
@@ -89,22 +93,34 @@ func (s *Service) CompareVersions(ctx context.Context, u domain.User, fileID str
 		if err != nil {
 			return "", err
 		}
-		if int64(len(data)) > maxBytes{return "",domain.ErrInvalidInput}
-		if office{
-			parts,ok:=OfficePartLines(data)
-			if !ok{return "",errUnsupportedOfficeParts}
-			return strings.Join(parts,"\n"),nil
+		if int64(len(data)) > maxBytes {
+			return "", domain.ErrInvalidInput
 		}
-		if !utf8.Valid(data){return "",domain.ErrInvalidInput}
+		if office {
+			parts, ok := OfficePartLines(data)
+			if !ok {
+				return "", errUnsupportedOfficeParts
+			}
+			return strings.Join(parts, "\n"), nil
+		}
+		if !utf8.Valid(data) {
+			return "", domain.ErrInvalidInput
+		}
 		return strings.ReplaceAll(strings.ReplaceAll(string(data), "\r\n", "\n"), "\r", "\n"), nil
 	}
 	a, err := read(left.BlobID)
-	if errors.Is(err,errUnsupportedOfficeParts){out.Detail="";return out,nil}
+	if errors.Is(err, errUnsupportedOfficeParts) {
+		out.Detail = ""
+		return out, nil
+	}
 	if err != nil {
 		return out, err
 	}
 	b, err := read(right.BlobID)
-	if errors.Is(err,errUnsupportedOfficeParts){out.Detail="";return out,nil}
+	if errors.Is(err, errUnsupportedOfficeParts) {
+		out.Detail = ""
+		return out, nil
+	}
 	if err != nil {
 		return out, err
 	}
