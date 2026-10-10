@@ -54,5 +54,31 @@
 .file-versions-table{overflow-x:auto;margin:12px}
 .file-versions-table table{width:100%}
 .file-current-version{color:var(--brand-blue);font-size:10px;border:1px solid var(--border-hairline);border-radius:var(--radius-pill);padding:1px 6px;margin-left:6px}
+.file-compare,.file-review{padding:14px 16px;min-width:0}
+.file-compare-controls,.file-review-header{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.file-compare-controls label,.file-review-header label{display:flex;flex-direction:column;gap:5px;font-size:12px;min-width:125px}
+.file-compare-arrow{align-self:center;color:var(--text-secondary)}
+.file-compare-result{margin-top:13px;border:1px solid var(--border-hairline);border-radius:var(--radius-md);overflow:hidden}
+.file-compare-stats{display:flex;gap:12px;flex-wrap:wrap;padding:9px 11px;border-bottom:1px solid var(--border-hairline);background:var(--surface-header);font-size:11px;color:var(--text-secondary)}
+.file-compare-stats strong{color:var(--text-primary)}
+.file-compare-lines{overflow:auto;max-height:65vh;font-family:var(--font-mono);font-size:11px;line-height:1.65}
+.file-diff-line{display:grid;grid-template-columns:40px 40px 24px minmax(0,1fr);min-width:300px;white-space:pre}
+.file-diff-line.added{background:var(--status-success-muted,#ebf7ee)}
+.file-diff-line.removed{background:var(--status-danger-muted,#fff0f0)}
+.file-diff-number{color:var(--text-tertiary);padding:0 5px;text-align:right;user-select:none;border-right:1px solid var(--border-hairline)}
+.file-diff-sign{text-align:center;user-select:none}
+.file-diff-text{padding:0 8px;white-space:pre-wrap;overflow-wrap:anywhere}
+.file-review-header{justify-content:space-between;margin-bottom:12px}
+.file-review-form{display:flex;flex-direction:column;gap:8px;max-width:850px}
+.file-review-actions{display:flex;gap:9px;justify-content:space-between}
+.file-review-actions .rare-input{max-width:220px}
+.file-review-list{display:grid;gap:8px;margin-top:14px}
+.file-review-item{padding:12px 14px;border:1px solid var(--border-hairline);border-radius:var(--radius-md)}
+.file-review-item header{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:11px;color:var(--text-secondary)}
+.file-review-item header strong{color:var(--text-primary)}
+.file-review-item p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;margin:9px 0}
+.file-review-open,.file-review-resolved{padding:2px 7px;border:1px solid var(--border-hairline);border-radius:var(--radius-pill)}
+.file-review-resolved{color:var(--text-tertiary)}
+@media(max-width:760px){.file-workbench-tabs{overflow-x:auto;white-space:nowrap;padding:0 4px}.file-workbench-tabs .rare-button{flex:none}.file-compare,.file-review{padding:10px}}
 .file-workbench-error{padding:20px}
 @media(max-width:820px){.file-preview-page{padding:8px}.file-workbench-header{padding:12px}.file-workbench-actions{justify-content:flex-start}.file-properties{grid-template-columns:1fr}.file-workbench-tabs .rare-button{padding:0 10px}.file-pdf-stage iframe{height:58vh}}

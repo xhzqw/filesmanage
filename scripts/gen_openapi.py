@@ -207,6 +207,23 @@ schema("UpdateFileBusinessMetadata", obj({
     "tags": arr(string()),
 }, required=["category","description","tags"]))
 
+schema("VersionComparisonLine",obj({
+ "kind":string(enum=["equal","added","removed"]), "left":integer(), "right":integer(), "text":string(),
+},required=["kind","text"]))
+schema("VersionCompareInfo",obj({"seq":integer(),"sha256":string(),"sizeBytes":integer()},required=["seq","sha256","sizeBytes"]))
+schema("VersionComparison",obj({
+ "left":ref("VersionCompareInfo"),"right":ref("VersionCompareInfo"),
+ "mode":string(enum=["identical","metadata","large","text"]),
+ "lines":arr(ref("VersionComparisonLine")),"added":integer(),"removed":integer(),
+},required=["left","right","mode","lines","added","removed"]))
+schema("ReviewComment",obj({
+ "id":integer(),"fileId":string(),"versionSeq":integer(),"lineNumber":integer(),
+ "body":string(),"authorId":string(),"authorName":string(),"createdAt":timestamp(),
+ "resolvedAt":timestamp(),"resolvedBy":string(),
+},required=["id","fileId","versionSeq","body","authorId","createdAt"]))
+schema("ReviewCommentPage",obj({"items":arr(ref("ReviewComment")),"nextCursor":string()},required=["items","nextCursor"]))
+schema("CreateReviewComment",obj({"version":integer(),"lineNumber":integer(),"body":string(max_length=2000)},required=["version","body"]))
+
 schema("FileMeta", obj({"file": ref("File"), "versions": arr(ref("FileVersion"))}, required=["file", "versions"]))
 
 schema("FilePage", obj({"items": arr(ref("File")), "nextCursor": string("Opaque keyset cursor; empty when the page is the last one.")}, required=["items", "nextCursor"]))
@@ -826,6 +843,20 @@ add("PUT", "/api/files/{id}/metadata", operation("Update business metadata (modi
     params=[id_param("id","File ID")],
     request={"application/json":{"schema":ref("UpdateFileBusinessMetadata")}},
     responses=dict([json_ok(ref("FileBusinessMetadata"),"Updated and audited classification."),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+
+add("GET","/api/files/{id}/versions/compare",operation("Compare two immutable file versions (preview permission)","Files","compareFileVersions",security=SESSION,
+ params=[id_param("id","File ID"),query("left","First version",integer(minimum=1),required=True),query("right","Second version",integer(minimum=1),required=True)],
+ responses=dict([json_ok(ref("VersionComparison"),"Bounded text diff or binary metadata comparison."),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+add("GET","/api/files/{id}/review-comments",operation("List version-anchored review comments","Files","listFileReviewComments",security=SESSION,
+ params=[id_param("id","File ID"),query("version","Version sequence",integer(minimum=1),required=True),query("cursor","Numeric descending ID cursor"),query("limit","Page size",integer(minimum=1))],
+ responses=dict([json_ok(ref("ReviewCommentPage"),"Visible comments."),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+add("POST","/api/files/{id}/review-comments",operation("Add a review comment on a file version","Files","createFileReviewComment",security=SESSION,
+ params=[id_param("id","File ID")],
+ request={"application/json":{"schema":ref("CreateReviewComment")}},
+ responses=dict([resp("201","Created",obj({"ok":boolean(),"data":ref("ReviewComment")},required=["ok","data"])),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+add("POST","/api/files/{id}/review-comments/{cid}/resolve",operation("Resolve a comment (author/admin/modify)","Files","resolveFileReviewComment",security=SESSION,
+ params=[id_param("id","File ID"),id_param("cid","Review comment ID")],
+ responses=dict([json_ok(obj({"resolved":integer()},required=["resolved"]),"Resolved comment."),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
 
 add("PATCH", "/api/files/{id}", operation("Rename a file", "Files", "renameFile", security=SESSION,
     params=[id_param("id", "File id.")],

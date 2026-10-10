@@ -9,6 +9,8 @@ import {CadPreviewStatus} from "../features/documents/CadPreviewStatus";
 import {resolvePreviewAdapter,ADAPTER_TITLES} from "../features/documents/previewAdapters";
 import {FileEditor} from "../features/documents/FileEditor";
 import {FileMetadataEditor} from "../features/documents/FileMetadataEditor";
+import {VersionComparePanel} from "../features/documents/VersionComparePanel";
+import {FileReviewPanel} from "../features/documents/FileReviewPanel";
 import {MoveDialog} from "../features/documents/FileTable";
 import {RollbackDialog} from "../features/documents/RollbackDialog";
 import {ShareDialog} from "../features/collaboration/ShareDialog";
@@ -21,7 +23,7 @@ import type {User} from "../entities/user/model";
 import {AppShell} from "../shared/ui/AppShell";
 import "./previewWorkbench.css";
 
-type Tab="preview"|"details"|"versions";
+type Tab="preview"|"details"|"versions"|"compare"|"review";
 const ACTION_LABELS:Record<string,string>={upload:"上传",edit:"编辑",rollback:"回滚",restore:"恢复"};
 const CAD_EXTENSIONS=[".stl",".obj",".glb",".gltf",".step",".stp",".iges",".igs",".dxf",".dwg",".3mf",".ply"];
 function isCadName(name:string){return CAD_EXTENSIONS.some(ext=>name.toLowerCase().endsWith(ext));}
@@ -159,7 +161,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
      </header>
      {(notice||error)&&<p role={error?"alert":"status"} className={"notice"+(error?" error":"")}>{error||notice}</p>}
      <RareTabs className="file-workbench-tabs" label="文件详情">
-      {([["preview","预览"],["details","文件信息"],["versions","版本历史 ("+versions.length+")"]] as const).map(([value,label])=>
+      {([["preview","预览"],["details","文件信息"],["versions","版本历史 ("+versions.length+")"],["compare","版本对比"],["review","审查批注"]] as const).map(([value,label])=>
        <RareButton key={value} type="button" id={"file-tab-"+value} role="tab"
         aria-selected={tab===value} tabIndex={tab===value?0:-1}
         aria-controls={"file-panel-"+value} onClick={()=>setTab(value)}>{label}</RareButton>)}
@@ -215,6 +217,12 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
         <div><dt>字节标记 / 末尾换行</dt><dd>{preview.byteMeta.hasBom?"包含 BOM":"无 BOM"} / {preview.byteMeta.endsWithNewline?"有":"无"}</dd></div>
        </>}
       </dl>
+     </section>}
+     {tab==="compare"&&<section id="file-panel-compare" role="tabpanel" aria-labelledby="file-tab-compare" className="file-workbench-panel">
+      <VersionComparePanel fileId={id} versions={versions}/>
+     </section>}
+     {tab==="review"&&<section id="file-panel-review" role="tabpanel" aria-labelledby="file-tab-review" className="file-workbench-panel">
+      <FileReviewPanel fileId={id} versions={versions}/>
      </section>}
      {tab==="versions"&&<section id="file-panel-versions" role="tabpanel" aria-labelledby="file-tab-versions" className="file-workbench-panel file-versions-panel">
       <div className="file-section-caption"><strong>版本记录</strong><span>所有历史均保留 · 回滚会创建新版本</span></div>

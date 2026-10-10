@@ -34,6 +34,7 @@ type memoryRepo struct {
 	files          map[string]domain.File
 	fileText       map[string]memoryFileText
 	fileMetadata   map[string]domain.FileMetadata
+	reviewComments []domain.FileReviewComment
 	versions       map[string][]domain.FileVersion
 	blobs          map[string]domain.Blob
 	grants         map[string]domain.ACL

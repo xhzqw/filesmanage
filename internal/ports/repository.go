@@ -63,6 +63,10 @@ type Repository interface {
 	NextVersionSeq(context.Context, string) (int, error)
 	VersionsByFile(context.Context, string) ([]domain.FileVersion, error)
 	VersionBySeq(context.Context, string, int) (domain.FileVersion, error)
+	ReviewComments(context.Context, string, int, int64, int) ([]domain.FileReviewComment, error)
+	ReviewCommentByID(context.Context, int64) (domain.FileReviewComment, error)
+	InsertReviewComment(context.Context, domain.FileReviewComment) (domain.FileReviewComment, error)
+	ResolveReviewComment(context.Context, int64, string) (bool, error)
 	BlobBySha(context.Context, string) (domain.Blob, error)
 	BlobByID(context.Context, string) (domain.Blob, error)
 	SetBlobState(context.Context, string, string) error

@@ -2,6 +2,10 @@ import {request} from "../../shared/http";
 import {postMultipart} from "../../shared/uploadClient";
 import type {FileItem, FileVersion, PreviewData, FileMetadata} from "../../entities/file/model";
 
+export type CompareDiffLine={kind:"equal"|"added"|"removed";left?:number;right?:number;text:string};
+export type VersionComparison={left:{seq:number;sha256:string;sizeBytes:number};right:{seq:number;sha256:string;sizeBytes:number};mode:"identical"|"metadata"|"large"|"text";lines:CompareDiffLine[];added:number;removed:number};
+export type FileReviewComment={id:number;fileId:string;versionSeq:number;lineNumber?:number;body:string;authorId:string;authorName:string;createdAt:string;resolvedAt?:string;resolvedBy?:string};
+export type ReviewCommentPage={items:FileReviewComment[];nextCursor:string};
 export type FilePage={items:FileItem[];nextCursor:string};
 
 export type OfficeSessionData={
@@ -26,6 +30,10 @@ export const fileApi={
 	preview:(id:string)=>request<PreviewData>("/files/"+id+"/preview"),
 	mediaUrl:(id:string,sha:string)=>"/api/files/"+encodeURIComponent(id)+"/preview/media?v="+encodeURIComponent(sha),
  versions:(id:string)=>request<FileVersion[]>("/files/"+id+"/versions"),
+ compareVersions:(id:string,left:number,right:number)=>request<VersionComparison>("/files/"+id+"/versions/compare?"+new URLSearchParams({left:String(left),right:String(right)})),
+ reviewComments:(id:string,version:number,cursor="")=>request<ReviewCommentPage>("/files/"+id+"/review-comments?"+new URLSearchParams({version:String(version),limit:"30",cursor})),
+ addReviewComment:(id:string,body:{version:number;body:string;lineNumber?:number})=>request<FileReviewComment>("/files/"+id+"/review-comments",{method:"POST",body:JSON.stringify(body)}),
+ resolveReviewComment:(id:string,commentId:number)=>request<{resolved:number}>("/files/"+id+"/review-comments/"+commentId+"/resolve",{method:"POST"}),
  rename:(id:string,name:string)=>request<FileItem>("/files/"+id,{method:"PATCH",body:JSON.stringify({name})}),
  remove:(id:string)=>request<{id:string;oldName:string}>("/files/"+id,{method:"DELETE"}),
  lockStatus:(id:string)=>request<{locked:boolean;ownerName?:string;baseSeq?:number;expiresAt?:string}>("/files/"+id+"/lock"),
