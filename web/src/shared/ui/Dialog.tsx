@@ -1,4 +1,4 @@
-import {useEffect,useId,useRef,type ReactNode}from "react";
+import {useEffect,useId,useRef,type ReactNode,type KeyboardEvent}from "react";
 
 // Real modal dialog primitive (DESIGN-SYSTEM-v1 §4.2 / DESKTOP-INTERACTION §4.1).
 // Built on the native <dialog>.showModal() top layer: the background is inert,
@@ -71,7 +71,28 @@ export function Dialog({open,title,onClose,closeGuard,initialFocus,className,chi
   if(previous&&previous.isConnected)previous.focus();
  }
 
- return <dialog ref={node} className={"dialog "+(className??"")} aria-labelledby={titleId}>
+ function onDialogKeyDown(event:KeyboardEvent<HTMLDialogElement>){
+  if(event.key!=="Tab")return;
+  // Browsers may move focus to the document when a modal contains only one
+  // tabbable element. Explicit boundaries also handle hidden/disabled fields.
+  const dialog=node.current;
+  if(!dialog)return;
+  const candidates=Array.from(dialog.querySelectorAll<HTMLElement>(
+   'input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]),a[href],[tabindex]:not([tabindex="-1"])'
+  )).filter(el=>el.tabIndex>=0&&el.getClientRects().length>0);
+  if(!candidates.length){event.preventDefault();dialog.focus();return;}
+  const first=candidates[0]!;
+  const last=candidates[candidates.length-1]!;
+  if(event.shiftKey&&(document.activeElement===first||!dialog.contains(document.activeElement))){
+   event.preventDefault();last.focus();return;
+  }
+  if(!event.shiftKey&&(document.activeElement===last||!dialog.contains(document.activeElement))){
+   event.preventDefault();first.focus();
+  }
+ }
+
+ return <dialog ref={node} className={"dialog "+(className??"")} aria-labelledby={titleId}
+  onKeyDown={onDialogKeyDown} tabIndex={-1}>
   <h2 id={titleId} className="dialog-title">{title}</h2>
   {children}
  </dialog>;
