@@ -4,6 +4,7 @@ import {workflowApi} from "./api";
 import {errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
 import type {Folder} from "../../entities/folder/model";
+import "./policyDialog.css";
 
 export type Approver={id:string;displayName:string;login?:string};
 
