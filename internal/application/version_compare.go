@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"filesmanage/internal/domain"
 	"io"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 const compareMaxBytes int64 = 256 << 10
 const compareMaxLines = 350
+var errUnsupportedOfficeParts = errors.New("unsupported office package layout")
 
 type CompareLine struct {
 	Kind  string `json:"kind"`
@@ -90,17 +92,19 @@ func (s *Service) CompareVersions(ctx context.Context, u domain.User, fileID str
 		if int64(len(data)) > maxBytes{return "",domain.ErrInvalidInput}
 		if office{
 			parts,ok:=OfficePartLines(data)
-			if !ok{return "",domain.ErrInvalidInput}
+			if !ok{return "",errUnsupportedOfficeParts}
 			return strings.Join(parts,"\n"),nil
 		}
 		if !utf8.Valid(data){return "",domain.ErrInvalidInput}
 		return strings.ReplaceAll(strings.ReplaceAll(string(data), "\r\n", "\n"), "\r", "\n"), nil
 	}
 	a, err := read(left.BlobID)
+	if errors.Is(err,errUnsupportedOfficeParts){out.Detail="";return out,nil}
 	if err != nil {
 		return out, err
 	}
 	b, err := read(right.BlobID)
+	if errors.Is(err,errUnsupportedOfficeParts){out.Detail="";return out,nil}
 	if err != nil {
 		return out, err
 	}

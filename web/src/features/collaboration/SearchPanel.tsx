@@ -210,7 +210,7 @@ export function SearchPanel({userId}:{userId:string}){
    <RareButton type="button" aria-expanded={showPresets} onClick={()=>setShowPresets(v=>!v)}>搜索预设 {presets.length}</RareButton>
    {message&&<span className="error" role="alert">{message}</span>}
   </form>
-  <div className={"search-workbench"  {showPresets&&<div className="search-presets" aria-label="已保存搜索条件">
+  {showPresets&&<div className="search-presets" aria-label="已保存搜索条件">
    <RareInput aria-label="预设名称" placeholder="给当前筛选命名…" maxLength={48} value={presetName} onChange={e=>setPresetName(e.target.value)}/>
    <RareButton type="button" onClick={savePreset} disabled={!presetName.trim()}>保存当前条件</RareButton>
    {presets.map(preset=><div className="search-preset-item" key={preset.id}>
@@ -219,7 +219,7 @@ export function SearchPanel({userId}:{userId:string}){
    </div>)}
    {presets.length===0&&<span className="hint">暂无预设（最多 12 项）</span>}
   </div>}
-+(showAdvanced?" with-filters":"")}>
+  <div className={"search-workbench"+(showAdvanced?" with-filters":"")}>
    {showAdvanced&&<aside className="search-filters" aria-label="高级搜索条件">
     <div className="search-filter-heading"><strong>筛选条件</strong><RareButton type="button" onClick={()=>setShowAdvanced(false)}>收起</RareButton></div>
     <label>范围<RareSelect aria-label="搜索范围" value={scope} onChange={e=>setScope(e.target.value as "all"|"current"|"descendants")}>

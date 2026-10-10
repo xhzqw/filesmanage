@@ -33,6 +33,14 @@ func(s *Service) OpenDownloadBatch(ctx context.Context,u domain.User,ids []strin
   total+=item.Size
   files=append(files,item)
  }
+ // One audit event for a prepared bundle; a failed audit closes the
+ // prepared readers and prevents any response bytes from being served.
+ tx,err:=s.uow.Begin(ctx)
+ if err!=nil{cleanup();return nil,nil,err}
+ defer tx.Rollback(ctx)
+ if err=auditRequired(ctx,tx,u,"file.download-zip","file_batch",ids[0],"success",
+  map[string]any{"count":len(ids),"originalBytes":total});err!=nil{cleanup();return nil,nil,err}
+ if err=tx.Commit(ctx);err!=nil{cleanup();return nil,nil,err}
  return files,cleanup,nil
 }
 

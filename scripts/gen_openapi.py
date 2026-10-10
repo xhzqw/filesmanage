@@ -214,6 +214,7 @@ schema("VersionCompareInfo",obj({"seq":integer(),"sha256":string(),"sizeBytes":i
 schema("VersionComparison",obj({
  "left":ref("VersionCompareInfo"),"right":ref("VersionCompareInfo"),
  "mode":string(enum=["identical","metadata","large","text"]),
+ "detail":string(enum=["office_parts"]),
  "lines":arr(ref("VersionComparisonLine")),"added":integer(),"removed":integer(),
 },required=["left","right","mode","lines","added","removed"]))
 schema("ReviewComment",obj({
