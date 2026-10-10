@@ -2,7 +2,6 @@ package httpx
 
 import (
 	"filesmanage/internal/application"
-	"filesmanage/internal/domain"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"net/http/httptest"
