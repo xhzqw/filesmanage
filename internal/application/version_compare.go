@@ -81,30 +81,58 @@ func (s *Service) CompareVersions(ctx context.Context, u domain.User, fileID str
 	}
 	read := func(blobID string) (string, string, error) {
 		blob, err := tx.BlobByID(ctx, blobID)
-		if err != nil {return "", "", err}
-		reader, err := s.blobs.Open(blob.StorageKey)
-		if err != nil {return "", "", err}
-		defer reader.Close()
-		data, err := io.ReadAll(io.LimitReader(reader,maxBytes+1))
-		if err != nil {return "", "", err}
-		if int64(len(data))>maxBytes {return "", "", domain.ErrInvalidInput}
-		if office {
-			parts,ok:=OfficePartLines(data)
-			if !ok{return "", "",errUnsupportedOfficeParts}
-			semantic,valid:=OfficeSemanticLines(data,file.Name)
-			if valid{return strings.Join(parts,"\n"),strings.Join(semantic,"\n"),nil}
-			return strings.Join(parts,"\n"),"",nil
+		if err != nil {
+			return "", "", err
 		}
-		if !utf8.Valid(data){return "", "",domain.ErrInvalidInput}
-		return strings.ReplaceAll(strings.ReplaceAll(string(data),"\r\n","\n"),"\r","\n"),"",nil
+		reader, err := s.blobs.Open(blob.StorageKey)
+		if err != nil {
+			return "", "", err
+		}
+		defer reader.Close()
+		data, err := io.ReadAll(io.LimitReader(reader, maxBytes+1))
+		if err != nil {
+			return "", "", err
+		}
+		if int64(len(data)) > maxBytes {
+			return "", "", domain.ErrInvalidInput
+		}
+		if office {
+			parts, ok := OfficePartLines(data)
+			if !ok {
+				return "", "", errUnsupportedOfficeParts
+			}
+			semantic, valid := OfficeSemanticLines(data, file.Name)
+			if valid {
+				return strings.Join(parts, "\n"), strings.Join(semantic, "\n"), nil
+			}
+			return strings.Join(parts, "\n"), "", nil
+		}
+		if !utf8.Valid(data) {
+			return "", "", domain.ErrInvalidInput
+		}
+		return strings.ReplaceAll(strings.ReplaceAll(string(data), "\r\n", "\n"), "\r", "\n"), "", nil
 	}
-	a,semanticA,err:=read(left.BlobID)
-	if errors.Is(err,errUnsupportedOfficeParts){out.Detail="";return out,nil}
-	if err!=nil{return out,err}
-	b,semanticB,err:=read(right.BlobID)
-	if errors.Is(err,errUnsupportedOfficeParts){out.Detail="";return out,nil}
-	if err!=nil{return out,err}
-	if office&&semanticA!=""&&semanticB!=""{a=semanticA;b=semanticB;out.Detail="office_semantic"}
+	a, semanticA, err := read(left.BlobID)
+	if errors.Is(err, errUnsupportedOfficeParts) {
+		out.Detail = ""
+		return out, nil
+	}
+	if err != nil {
+		return out, err
+	}
+	b, semanticB, err := read(right.BlobID)
+	if errors.Is(err, errUnsupportedOfficeParts) {
+		out.Detail = ""
+		return out, nil
+	}
+	if err != nil {
+		return out, err
+	}
+	if office && semanticA != "" && semanticB != "" {
+		a = semanticA
+		b = semanticB
+		out.Detail = "office_semantic"
+	}
 	aa := strings.Split(a, "\n")
 	bb := strings.Split(b, "\n")
 	if len(aa) > compareMaxLines || len(bb) > compareMaxLines {

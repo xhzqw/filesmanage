@@ -70,21 +70,21 @@ type memorySession struct {
 
 func newMemoryRepo() *memoryRepo {
 	return &memoryRepo{
-		users:        map[string]memoryUser{},
-		searchPresets:map[string]map[string]domain.SearchPreset{},
-		sessions:     map[string]memorySession{},
-		folders:      map[string]domain.Folder{},
-		files:        map[string]domain.File{},
-		fileMetadata: map[string]domain.FileMetadata{},
-		versions:     map[string][]domain.FileVersion{},
-		blobs:        map[string]domain.Blob{},
-		grants:       map[string]domain.ACL{},
-		roleBindings: map[string]domain.ManagementRoleBinding{},
-		workgroups:   map[string][]string{},
-		idempotency:  map[string][]byte{},
-		groupMembers: map[string][]string{},
-		policies:     map[string]domain.ApprovalPolicy{},
-		locks:        map[string]domain.EditLock{},
+		users:         map[string]memoryUser{},
+		searchPresets: map[string]map[string]domain.SearchPreset{},
+		sessions:      map[string]memorySession{},
+		folders:       map[string]domain.Folder{},
+		files:         map[string]domain.File{},
+		fileMetadata:  map[string]domain.FileMetadata{},
+		versions:      map[string][]domain.FileVersion{},
+		blobs:         map[string]domain.Blob{},
+		grants:        map[string]domain.ACL{},
+		roleBindings:  map[string]domain.ManagementRoleBinding{},
+		workgroups:    map[string][]string{},
+		idempotency:   map[string][]byte{},
+		groupMembers:  map[string][]string{},
+		policies:      map[string]domain.ApprovalPolicy{},
+		locks:         map[string]domain.EditLock{},
 	}
 }
 

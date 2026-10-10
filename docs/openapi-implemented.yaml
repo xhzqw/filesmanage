@@ -4129,6 +4129,138 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/search/presets:
+    get:
+      summary: List current user's synced saved search criteria
+      operationId: listSearchPresets
+      tags:
+      - Search
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Personal presets; no document results stored.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SearchPreset'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      summary: Create or replace a saved search (maximum 12 per user)
+      operationId: saveSearchPreset
+      tags:
+      - Search
+      security:
+      - cookieSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchPreset'
+      responses:
+        '200':
+          description: Updated per-user presets.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SearchPreset'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/search/presets/{name}:
+    delete:
+      summary: Delete own saved search
+      operationId: deleteSearchPreset
+      tags:
+      - Search
+      security:
+      - cookieSession: []
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 48
+      responses:
+        '200':
+          description: Deleted matching own preset.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      deleted:
+                        type: boolean
+                    required:
+                    - deleted
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/files/download-zip:
     get:
       summary: Download an authorized bounded ZIP of current file versions
@@ -6548,6 +6680,7 @@ components:
           type: string
           enum:
           - office_parts
+          - office_semantic
         lines:
           type: array
           items:
@@ -8052,3 +8185,52 @@ components:
       - key
       - status
       - url
+    SearchPreset:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 48
+        fields:
+          type: object
+          properties:
+            q:
+              type: string
+            category:
+              type: string
+            tag:
+              type: string
+            uploader:
+              type: string
+            type:
+              type: string
+            sort:
+              type: string
+            limit:
+              type: integer
+            scope:
+              type: string
+            folder:
+              type: string
+            from:
+              type: string
+            to:
+              type: string
+          required:
+          - q
+          - category
+          - tag
+          - uploader
+          - type
+          - sort
+          - limit
+          - scope
+          - folder
+          - from
+          - to
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - name
+      - fields
