@@ -4187,16 +4187,30 @@ paths:
       parameters:
       - name: scope
         in: query
-        required: false
-        description: mine = created by me; tome = targeting me; empty = both.
+        required: true
+        description: 'received: active shares targeting current user/groups; sent: created by administrator.'
         schema:
           type: string
           enum:
-          - mine
-          - tome
+          - received
+          - sent
+      - name: limit
+        in: query
+        required: false
+        description: Opt-in keyset paging, 1–100; omitting it returns the legacy array.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+      - name: cursor
+        in: query
+        required: false
+        description: Opaque cursor, only valid with limit.
+        schema:
+          type: string
       responses:
         '200':
-          description: Shares.
+          description: Legacy array or paged items and nextCursor when limit is present.
           content:
             application/json:
               schema:
@@ -4207,12 +4221,30 @@ paths:
                     enum:
                     - true
                   data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Share'
+                    oneOf:
+                    - type: array
+                      items:
+                        $ref: '#/components/schemas/Share'
+                    - type: object
+                      properties:
+                        items:
+                          type: array
+                          items:
+                            $ref: '#/components/schemas/Share'
+                        nextCursor:
+                          type: string
+                      required:
+                      - items
+                      - nextCursor
                 required:
                 - ok
                 - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '401':
           description: E_AUTH — missing or expired session
           content:
@@ -4415,9 +4447,24 @@ paths:
       - Collaboration
       security:
       - cookieSession: []
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        description: Opt-in keyset paging, 1–100; omitting it returns the legacy array.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+      - name: cursor
+        in: query
+        required: false
+        description: Opaque cursor, only valid with limit.
+        schema:
+          type: string
       responses:
         '200':
-          description: Favorites of the caller.
+          description: Legacy array or paged items and nextCursor. Unreadable resource names are masked.
           content:
             application/json:
               schema:
@@ -4428,12 +4475,30 @@ paths:
                     enum:
                     - true
                   data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Favorite'
+                    oneOf:
+                    - type: array
+                      items:
+                        $ref: '#/components/schemas/Favorite'
+                    - type: object
+                      properties:
+                        items:
+                          type: array
+                          items:
+                            $ref: '#/components/schemas/Favorite'
+                        nextCursor:
+                          type: string
+                      required:
+                      - items
+                      - nextCursor
                 required:
                 - ok
                 - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '401':
           description: E_AUTH — missing or expired session
           content:

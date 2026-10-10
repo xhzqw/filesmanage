@@ -284,8 +284,12 @@ func (s *Service) ListFavorites(ctx context.Context, u domain.User) ([]domain.Fa
 	}
 	defer tx.Rollback(ctx)
 	items, err := tx.ListFavorites(ctx, u.ID)
-	if err != nil { return nil, err }
-	if err := s.markUnavailableFavorites(ctx, tx, u, items); err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
+	if err := s.markUnavailableFavorites(ctx, tx, u, items); err != nil {
+		return nil, err
+	}
 	return items, nil
 }
 
@@ -309,8 +313,12 @@ func (s *Service) SetFavorite(ctx context.Context, u domain.User, kind, resource
 			}
 		} else {
 			folder, fErr := s.activeFolder(ctx, tx, resourceID)
-			if fErr != nil { return fErr }
-			if err = s.require(ctx, tx, u, folder.ID, domain.ActionList); err != nil { return err }
+			if fErr != nil {
+				return fErr
+			}
+			if err = s.require(ctx, tx, u, folder.ID, domain.ActionList); err != nil {
+				return err
+			}
 		}
 	}
 	fileID, folderID := "", ""

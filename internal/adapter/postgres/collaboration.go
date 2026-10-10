@@ -25,7 +25,11 @@ func scanShare(row rowScanner) (domain.Share, error) {
 		return domain.Share{}, err
 	}
 	s.Actions = toActions(actions)
-	if s.FileID != nil { s.ResourceName = fileName } else { s.ResourceName = folderName }
+	if s.FileID != nil {
+		s.ResourceName = fileName
+	} else {
+		s.ResourceName = folderName
+	}
 	return s, nil
 }
 

@@ -12,12 +12,21 @@ import (
 
 // Pagination is opt-in to keep the existing array response compatible with
 // older clients. The cursor cannot be supplied without the paged response.
-func collaborationPageLimit(c *gin.Context)(int,bool,bool){
- raw:=c.Query("limit")
- if raw==""{if c.Query("cursor")!=""{c.JSON(400,gin.H{"ok":false,"error":gin.H{"code":"E_BAD"}});return 0,false,false};return 0,false,true}
- n,err:=strconvAtoi(raw)
- if err!=nil||n<1||n>100{c.JSON(400,gin.H{"ok":false,"error":gin.H{"code":"E_BAD"}});return 0,false,false}
- return n,true,true
+func collaborationPageLimit(c *gin.Context) (int, bool, bool) {
+	raw := c.Query("limit")
+	if raw == "" {
+		if c.Query("cursor") != "" {
+			c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+			return 0, false, false
+		}
+		return 0, false, true
+	}
+	n, err := strconvAtoi(raw)
+	if err != nil || n < 1 || n > 100 {
+		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+		return 0, false, false
+	}
+	return n, true, true
 }
 
 func (h *Handler) listShares(c *gin.Context) {
@@ -25,15 +34,24 @@ func (h *Handler) listShares(c *gin.Context) {
 	if !ok {
 		return
 	}
-	limit,paged,valid:=collaborationPageLimit(c)
- if !valid{return}
- if paged{
-  page,err:=h.S.ListSharesPage(c.Request.Context(),u,c.Query("scope"),c.Query("cursor"),limit)
-  if err!=nil{respondError(c,err);return}
-  items:=make([]gin.H,0,len(page.Items));for _,item:=range page.Items{items=append(items,sharePayload(item))}
-  c.JSON(200,gin.H{"ok":true,"data":gin.H{"items":items,"nextCursor":page.NextCursor}});return
- }
- shares, err := h.S.ListShares(c.Request.Context(), u, c.Query("scope"))
+	limit, paged, valid := collaborationPageLimit(c)
+	if !valid {
+		return
+	}
+	if paged {
+		page, err := h.S.ListSharesPage(c.Request.Context(), u, c.Query("scope"), c.Query("cursor"), limit)
+		if err != nil {
+			respondError(c, err)
+			return
+		}
+		items := make([]gin.H, 0, len(page.Items))
+		for _, item := range page.Items {
+			items = append(items, sharePayload(item))
+		}
+		c.JSON(200, gin.H{"ok": true, "data": gin.H{"items": items, "nextCursor": page.NextCursor}})
+		return
+	}
+	shares, err := h.S.ListShares(c.Request.Context(), u, c.Query("scope"))
 	if err != nil {
 		respondError(c, err)
 		return
@@ -120,15 +138,24 @@ func (h *Handler) listFavorites(c *gin.Context) {
 	if !ok {
 		return
 	}
-	limit,paged,valid:=collaborationPageLimit(c)
- if !valid{return}
- if paged{
-  page,err:=h.S.ListFavoritesPage(c.Request.Context(),u,c.Query("cursor"),limit)
-  if err!=nil{respondError(c,err);return}
-  items:=make([]gin.H,0,len(page.Items));for _,item:=range page.Items{items=append(items,favoritePayload(item))}
-  c.JSON(200,gin.H{"ok":true,"data":gin.H{"items":items,"nextCursor":page.NextCursor}});return
- }
- favorites, err := h.S.ListFavorites(c.Request.Context(), u)
+	limit, paged, valid := collaborationPageLimit(c)
+	if !valid {
+		return
+	}
+	if paged {
+		page, err := h.S.ListFavoritesPage(c.Request.Context(), u, c.Query("cursor"), limit)
+		if err != nil {
+			respondError(c, err)
+			return
+		}
+		items := make([]gin.H, 0, len(page.Items))
+		for _, item := range page.Items {
+			items = append(items, favoritePayload(item))
+		}
+		c.JSON(200, gin.H{"ok": true, "data": gin.H{"items": items, "nextCursor": page.NextCursor}})
+		return
+	}
+	favorites, err := h.S.ListFavorites(c.Request.Context(), u)
 	if err != nil {
 		respondError(c, err)
 		return
