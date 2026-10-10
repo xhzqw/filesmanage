@@ -54,8 +54,8 @@ function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(folder:R
     :page}));
    // Show an actionable permission overview immediately on first entry.
    // Respect explicit folder URLs and user choices during an in-flight load.
-   if(parentId===""&&!cursor&&!selectedRef.current&&page.items.length){
-    const first=page.items[0];
+   const first=page.items[0];
+   if(parentId===""&&!cursor&&!selectedRef.current&&first){
     selectRef.current(first);
     if(first.hasChildren){
      setExpanded(old=>new Set(old).add(first.id));
