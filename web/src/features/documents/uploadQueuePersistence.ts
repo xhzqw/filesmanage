@@ -1,5 +1,5 @@
-import type {UploadTask} from "../features/documents/uploadQueue";
-import {sha256Chunk,sha256Fallback} from "./sha256Chunk";
+import type {UploadTask} from "./uploadQueue";
+import {sha256Chunk,sha256Fallback} from "../../shared/sha256Chunk";
 
 // Browser storage holds only small task metadata; never store file bytes.
 // Cap tasks, age and record length to bound storage and stale-session leakage.

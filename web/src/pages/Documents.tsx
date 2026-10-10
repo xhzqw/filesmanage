@@ -221,7 +221,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
      </div>
    </div>}
    {moveMessage&&<p role="status" className="notice">{moveMessage}</p>}
-   {selected&&<DropZone folderId={selected.id} onCommitted={()=>setReloadKey(k=>k+1)}>
+   {selected&&<DropZone folderId={selected.id} userId={user.id} onCommitted={()=>setReloadKey(k=>k+1)}>
      <FileTable folder={selected.id} folderName={selected.name} onEdit={setEditingId} reloadKey={reloadKey}
       newFolderSlot={<NewFolderForm parentId={selected.id} onCreated={()=>setReloadKey(k=>k+1)}/>}/>
    </DropZone>}

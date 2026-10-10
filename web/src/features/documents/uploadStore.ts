@@ -2,8 +2,7 @@ import{create}from"zustand";
 import{errorCode}from"../../shared/errors";
 import{uploadFileWithProgress}from"../../shared/uploadClient";
 import{uploadResumable,resumableThreshold,resumableMaxFile}from"../../shared/resumableUpload";
-import {useSession} from "../../app/session";
-import {fingerprintFile,readUploadTasks,storeUploadTasks} from "../../shared/uploadQueuePersistence";
+import {fingerprintFile,readUploadTasks,storeUploadTasks} from "./uploadQueuePersistence";
 import{
  enqueue,markUploading,markProgress,markServerProcessing,markCommitted,markFailed,markCancelled,
  cancelTask,retryTask,renameTask,skipTask,
@@ -29,7 +28,7 @@ export type UploadState={
  // Bumped only by a commit into currentFolderId; the queue consumer watches it
  // and runs its onCommitted reload (WF-28).
  reloadTick:number;
- setCurrentFolder:(folderId:string)=>void;
+ setCurrentFolder:(folderId:string,userId:string)=>void;
  enqueueFiles:(files:File[],targetFolderId:string)=>void;
  cancel:(queueId:string)=>void;
  retry:(queueId:string)=>void;
@@ -65,7 +64,7 @@ export const useUploadStore=create<UploadState>((set,get)=>({
  tasks:[],
  currentFolderId:"",
  reloadTick:0,
- setCurrentFolder:folderId=>{const id=useSession.getState().user?.id;if(id)hydrateForUser(id);if(get().currentFolderId!==folderId)set({currentFolderId:folderId});},
+ setCurrentFolder:(folderId,userId)=>{if(userId)hydrateForUser(userId);if(get().currentFolderId!==folderId)set({currentFolderId:folderId});},
  enqueueFiles:(files,targetFolderId)=>{
   // An empty target is "no writable folder", never a folder id.
   if(targetFolderId===""||files.length===0)return;
@@ -115,8 +114,7 @@ export const useUploadStore=create<UploadState>((set,get)=>({
 
 // One bounded per-user metadata cache. The original bytes are never persisted.
 useUploadStore.subscribe(state=>{
- const userId=useSession.getState().user?.id;
- if(userId&&activeUserId===userId)storeUploadTasks(userId,state.tasks);
+ if(activeUserId)storeUploadTasks(activeUserId,state.tasks);
 });
 
 // Sequential pump. It re-reads the queue every pass, so an item enqueued while

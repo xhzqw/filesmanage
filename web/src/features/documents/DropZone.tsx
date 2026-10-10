@@ -24,7 +24,7 @@ function dropOnTextEntry(event:DragEvent<HTMLDivElement>):boolean{
 // zone last reported (WF-28). No window-level listeners are registered: every
 // handler is scoped to this subtree, so a drop over a text input elsewhere
 // never uploads.
-export function DropZone({folderId,disabled,onCommitted,children}:{folderId:string;disabled?:boolean;onCommitted:()=>void;children:ReactNode}){
+export function DropZone({folderId,userId,disabled,onCommitted,children}:{folderId:string;userId:string;disabled?:boolean;onCommitted:()=>void;children:ReactNode}){
  const tasks=useUploadStore(state=>state.tasks);
  const reloadTick=useUploadStore(state=>state.reloadTick);
  const setCurrentFolder=useUploadStore(state=>state.setCurrentFolder);
@@ -44,9 +44,9 @@ export function DropZone({folderId,disabled,onCommitted,children}:{folderId:stri
  // reloads this list, and make "no zone is visible" explicit on unmount
  // (WF-28; the empty value is never a folder id).
  useEffect(()=>{
-  setCurrentFolder(folderId);
-  return()=>setCurrentFolder("");
- },[folderId,setCurrentFolder]);
+  setCurrentFolder(folderId,userId);
+  return()=>setCurrentFolder("",userId);
+ },[folderId,userId,setCurrentFolder]);
 
  // The store bumps reloadTick for a commit into the folder above; the tick
  // already present at mount is skipped because the table re-reads on mount.
