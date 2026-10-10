@@ -54,7 +54,9 @@ func ExtractText(name, contentType string, data []byte) string {
 	if len(data) == 0 {
 		return ""
 	}
-	if strings.HasSuffix(strings.ToLower(name), ".pdf") { return pdfTextLayer(data) }
+	if strings.HasSuffix(strings.ToLower(name), ".pdf") {
+		return pdfTextLayer(data)
+	}
 	if len(data) > indexTextLimit {
 		data = data[:indexTextLimit]
 	}
@@ -91,17 +93,21 @@ func (s *Service) ReindexFile(ctx context.Context, fileID string) {
 		return
 	}
 	defer reader.Close()
-	readLimit:=int64(indexTextLimit)
-	if strings.HasSuffix(strings.ToLower(file.Name),".pdf") {
-		if blob.SizeBytes>maxPDFIndexSource {return}
-		readLimit=maxPDFIndexSource
+	readLimit := int64(indexTextLimit)
+	if strings.HasSuffix(strings.ToLower(file.Name), ".pdf") {
+		if blob.SizeBytes > maxPDFIndexSource {
+			return
+		}
+		readLimit = maxPDFIndexSource
 	}
 	data, err := io.ReadAll(io.LimitReader(reader, readLimit+1))
 	if err != nil {
 		return
 	}
 	_ = version
-	if strings.HasSuffix(strings.ToLower(file.Name),".pdf") && int64(len(data))>readLimit {return}
+	if strings.HasSuffix(strings.ToLower(file.Name), ".pdf") && int64(len(data)) > readLimit {
+		return
+	}
 	text := ExtractText(file.Name, file.ContentType, data)
 	s.storeFileText(ctx, fileID, currentSeq(file), text, SpaceCJK(text))
 }

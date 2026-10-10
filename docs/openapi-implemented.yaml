@@ -1218,6 +1218,81 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/audit/documents:
+    get:
+      summary: Document activity audit (admin/global auditor)
+      operationId: documentAudit
+      tags:
+      - Audit
+      security:
+      - cookieSession: []
+      parameters:
+      - name: cursor
+        in: query
+        required: false
+        description: Descending numeric audit ID
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        description: Rows per page, 1-100 (default 30).
+        schema:
+          type: integer
+          minimum: 1
+      - name: fileId
+        in: query
+        required: false
+        description: Exact target file ID.
+        schema:
+          type: string
+      - name: actorId
+        in: query
+        required: false
+        description: Exact actor ID.
+        schema:
+          type: string
+      - name: event
+        in: query
+        required: false
+        description: Event type prefix, e.g. file.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Filtered document lifecycle events.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PermissionAuditPage'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/roles/me:
     get:
       summary: Read current management roles
@@ -1730,6 +1805,117 @@ paths:
                 required:
                 - ok
                 - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/{id}/metadata:
+    get:
+      summary: Read business metadata of an accessible file
+      operationId: fileMetadata
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Current business classification.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/FileBusinessMetadata'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    put:
+      summary: Update business metadata (modify permission)
+      operationId: setFileMetadata
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateFileBusinessMetadata'
+      responses:
+        '200':
+          description: Updated and audited classification.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/FileBusinessMetadata'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '401':
           description: E_AUTH — missing or expired session
           content:
@@ -4722,6 +4908,18 @@ paths:
         schema:
           type: string
           format: date-time
+      - name: category
+        in: query
+        required: false
+        description: Exact business category.
+        schema:
+          type: string
+      - name: tag
+        in: query
+        required: false
+        description: Exact document tag.
+        schema:
+          type: string
       - name: cursor
         in: query
         required: false
@@ -5485,6 +5683,48 @@ components:
       - action
       - createdBy
       - createdAt
+    FileBusinessMetadata:
+      type: object
+      properties:
+        fileId:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        updatedBy:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - fileId
+      - category
+      - description
+      - tags
+      - updatedBy
+      - updatedAt
+    UpdateFileBusinessMetadata:
+      type: object
+      properties:
+        category:
+          type: string
+          maxLength: 80
+        description:
+          type: string
+          maxLength: 2000
+        tags:
+          type: array
+          items:
+            type: string
+      required:
+      - category
+      - description
+      - tags
     FileMeta:
       type: object
       properties:

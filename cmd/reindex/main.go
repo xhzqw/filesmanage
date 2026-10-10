@@ -26,7 +26,8 @@ func (a blobStoreAdapter) Open(key string) (io.ReadSeekCloser, error) {
 // indexing existed, and the ops recovery path after index corruption.
 //
 // Usage (on the target host):
-//   DATABASE_URL=postgres://... FILESMANAGE_BLOB_DIR=.blobs ./filesmanage-reindex
+//
+//	DATABASE_URL=postgres://... FILESMANAGE_BLOB_DIR=.blobs ./filesmanage-reindex
 func main() {
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
@@ -48,11 +49,13 @@ func main() {
 	}
 	service := application.New(postgres.New(pool), blobStoreAdapter{store: blob.New(blobDir)})
 	var indexed int
-	if len(os.Args)>1 && os.Args[1]=="--pdf-only" {
-		indexed,err=service.ReindexPDFs(ctx,100)
-	} else if len(os.Args)==1 {
-		indexed,err=service.ReindexAllFiles(ctx,200)
-	} else {log.Fatal("usage: reindex [--pdf-only]")}
+	if len(os.Args) > 1 && os.Args[1] == "--pdf-only" {
+		indexed, err = service.ReindexPDFs(ctx, 100)
+	} else if len(os.Args) == 1 {
+		indexed, err = service.ReindexAllFiles(ctx, 200)
+	} else {
+		log.Fatal("usage: reindex [--pdf-only]")
+	}
 	if err != nil {
 		log.Fatal("reindex failed after ", indexed, " files: ", err)
 	}
