@@ -156,11 +156,13 @@ export function FluidOrb({
       gl.STATIC_DRAW
     );
 
-    let rafId: number;
+    let rafId: number | null = null;
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const start = performance.now();
 
     function render(now: number) {
-      if (!gl || !canvas) return;
+      rafId = null;
+      if (!gl || !canvas || document.hidden) return;
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.useProgram(prog);
 
@@ -169,19 +171,27 @@ export function FluidOrb({
       gl.vertexAttribPointer(posAttr, 2, gl.FLOAT, false, 0, 0);
 
       gl.uniform2f(resUni, canvas.width, canvas.height);
-      gl.uniform1f(timeUni, (now - start) * 0.001);
+      gl.uniform1f(timeUni, motion.matches ? 0 : (now - start) * 0.001);
 
       const [r, g, b] = hexToRgb(color);
       gl.uniform3f(colUni, r, g, b);
 
       gl.drawArrays(gl.TRIANGLES, 0, 6);
-      rafId = requestAnimationFrame(render);
+      if (!motion.matches) rafId = requestAnimationFrame(render);
     }
 
-    rafId = requestAnimationFrame(render);
+    function syncFrame() {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = document.hidden ? null : requestAnimationFrame(render);
+    }
+    document.addEventListener("visibilitychange", syncFrame);
+    motion.addEventListener("change", syncFrame);
+    syncFrame();
 
     return () => {
-      cancelAnimationFrame(rafId);
+      document.removeEventListener("visibilitychange", syncFrame);
+      motion.removeEventListener("change", syncFrame);
+      if (rafId !== null) cancelAnimationFrame(rafId);
       if (gl) {
         gl.deleteBuffer(buf);
         gl.deleteProgram(prog);

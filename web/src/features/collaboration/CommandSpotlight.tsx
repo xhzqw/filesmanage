@@ -1,5 +1,6 @@
 import {RareInput} from "../../shared/ui/rare";
-import {useCallback,useEffect,useMemo,useRef,useState,type KeyboardEvent,type MouseEvent} from "react";
+import {Dialog} from "../../shared/ui/Dialog";
+import {useCallback,useEffect,useMemo,useRef,useState,type KeyboardEvent} from "react";
 import {useNavigate} from "react-router-dom";
 import {collaborationApi,formatBytes} from "./api";
 // Size formatting: features/documents owns formatSize, but a feature may not
@@ -59,15 +60,12 @@ export function CommandSpotlight(){
   // Request sequence: every revision bumps it, so a response that lands after a
   // newer query started is discarded instead of overwriting the newer rows.
   const epochRef=useRef(0);
-  const restoreRef=useRef<HTMLElement|null>(null);
 
   const openPalette=useCallback(()=>{
     // A native <dialog> lives in the top layer: it paints above every z-index
     // and makes the document inert, so a palette opened on top of one would
     // have no caret, no keys and no way out.
     if(document.querySelector("dialog[open]")!==null)return;
-    const owner=document.activeElement;
-    restoreRef.current=owner instanceof HTMLElement?owner:null;
     // Opening starts from the empty query, which IS the recently-modified list,
     // so no keyword from a previous visit survives into a fresh one.
     setQuery("");
@@ -79,12 +77,7 @@ export function CommandSpotlight(){
 
   const closePalette=useCallback(()=>{
     setOpen(false);
-    // The palette owns focus while open, so the saved element is still the one
-    // that opened it; returning focus there is part of closing, not an extra
-    // navigation side effect.
-    const owner=restoreRef.current;
-    restoreRef.current=null;
-    owner?.focus();
+    // Native Dialog restores focus after the top layer closes.
   },[]);
 
   // The header trigger is a window event because the shell lives in shared/ui
@@ -235,15 +228,10 @@ export function CommandSpotlight(){
     }
   }
 
-  function onOverlayMouseDown(event:MouseEvent<HTMLDivElement>){
-    // Only the scrim itself closes: a selection drag that ends on the panel
-    // must not dismiss the palette mid-choose.
-    if(event.target===event.currentTarget)closePalette();
-  }
-
   if(!open)return null;
-  return <div className="command-overlay" onMouseDown={onOverlayMouseDown}>
-   <div className="command-panel" role="dialog" aria-label="快速指令台" onKeyDown={onPanelKeyDown}>
+  return <Dialog open title="快速指令台" className="command-panel command-native-dialog"
+    initialFocus=".command-input" onClose={closePalette}>
+   <div className="command-content" onKeyDown={onPanelKeyDown}>
     <div className="command-input-row">
      <CommandSearchIcon/>
      <RareInput ref={inputRef} className="command-input" type="text" value={query}
@@ -276,5 +264,5 @@ export function CommandSpotlight(){
      })}
     </ul>:null}
    </div>
-  </div>;
+  </Dialog>;
 }

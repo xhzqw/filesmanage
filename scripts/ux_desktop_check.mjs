@@ -15,7 +15,8 @@
 // suite that crashes records one extra FAIL line naming it while the remaining
 // suites still run.
 //
-// Usage: node scripts/ux_desktop_check.mjs [--base http://127.0.0.1:18091]
+// Usage: FILESMANAGE_UX_FIXTURE_DB=filesmanage_ux_test DATABASE_URL=postgres://.../filesmanage_ux_test
+//        node scripts/ux_desktop_check.mjs --isolated-fixtures --base http://127.0.0.1:18092
 //        [--password-file .secrets/admin.password] [--port 9360]
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -29,6 +30,26 @@ const opt = (name, fallback) => {
 const BASE = opt("base", "http://127.0.0.1:18091").replace(/\/+$/, "");
 const PASSWORD_FILE = opt("password-file", ".secrets/admin.password");
 const PORT = Number(opt("port", "9360"));
+
+// This harness CREATES folders, uploads files and PURGES trash. Never run it
+// against the LAN dev database or a casually overridden production endpoint.
+// A dedicated database and separate server port are required.
+const fixtureDb = process.env.FILESMANAGE_UX_FIXTURE_DB || "";
+const fixtureUrl = process.env.DATABASE_URL || "";
+const databaseName = (() => {
+  try { return decodeURIComponent(new URL(fixtureUrl).pathname.slice(1)); }
+  catch { return ""; }
+})();
+const target = new URL(BASE);
+if (!args.includes("--isolated-fixtures") ||
+    !/^filesmanage_[a-z0-9_]*test$/.test(fixtureDb) ||
+    fixtureDb !== databaseName ||
+    !["localhost","127.0.0.1"].includes(target.hostname) ||
+    target.port === "18091" || !args.includes("--base")) {
+  console.error("UX_DESKTOP_REFUSED: destructive fixtures require --isolated-fixtures, an explicit non-18091 localhost --base, and FILESMANAGE_UX_FIXTURE_DB matching DATABASE_URL's dedicated *_test database.");
+  process.exit(2);
+}
+
 
 const password = readFileSync(PASSWORD_FILE, "utf8").trim();
 const stamp = String(Date.now());
@@ -285,13 +306,12 @@ async function pagedSuite(cookie) {
     chrome && chrome.kill("SIGKILL");
     // Cleanup is crash-safe: a mid-suite failure must not leak 305 folders into
     // the shared dev tree (the /folders/tree endpoint caps at 500).
-    if (bigRoot) await json("DELETE", `/api/folders/${bigRoot}`);
-    const trash = await json("GET", "/api/trash");
-    for (const entry of trash.body?.data ?? []) {
-      const name = String(entry.name ?? entry.oldName ?? "");
-      if (name.includes(`PG-BIG-${stamp}`) || (name.startsWith("PG-") && name.includes(stamp))) {
-        await json("DELETE", "/api/trash/" + entry.id);
-      }
+    if (bigRoot) {
+      const deleted = await json("DELETE", `/api/folders/${bigRoot}`);
+      const trashId = deleted.body?.data?.trashId;
+      if (deleted.status !== 200 || !trashId) throw Error("PAGED cleanup could not prove ownership of trash ID");
+      const purged = await json("DELETE", "/api/trash/" + encodeURIComponent(trashId));
+      if (purged.status !== 200) throw Error("PAGED cleanup purge failed");
     }
   }
 }
@@ -504,13 +524,12 @@ async function editorsSuite(cookie) {
     chrome && chrome.kill("SIGKILL");
     // Crash-safe fixture cleanup (PAGED discipline): a mid-suite failure must
     // not leak the folder or its files into the shared dev tree.
-    if (folderId) await json("DELETE", `/api/folders/${folderId}`);
-    const trash = await json("GET", "/api/trash");
-    for (const entry of trash.body?.data ?? []) {
-      const name = String(entry.name ?? entry.oldName ?? "");
-      if (name.includes(`UX-G4-EDITORS-${suiteStamp}`) || name.includes(`e-${suiteStamp}`)) {
-        await json("DELETE", "/api/trash/" + entry.id);
-      }
+    if (folderId) {
+      const deleted = await json("DELETE", `/api/folders/${folderId}`);
+      const trashId = deleted.body?.data?.trashId;
+      if (deleted.status !== 200 || !trashId) throw Error("EDITORS cleanup could not prove ownership of trash ID");
+      const purged = await json("DELETE", "/api/trash/" + encodeURIComponent(trashId));
+      if (purged.status !== 200) throw Error("EDITORS cleanup purge failed");
     }
   }
 }
@@ -1364,40 +1383,21 @@ async function main() {
   const attempt = async (fn) => {
     try { await fn(); } catch (err) { cleanupErrors.push(String(err?.message ?? err)); }
   };
-  const purgeTrash = async (match) => {
-    const trash = await json("GET", "/api/trash");
-    for (const entry of trash.body?.data ?? []) {
-      const name = String(entry.name ?? entry.oldName ?? "");
-      if (match(name)) await json("DELETE", "/api/trash/" + entry.id);
+  const removeFixture = async (folderId) => {
+    if (!folderId) return;
+    const deleted = await json("DELETE", `/api/folders/${encodeURIComponent(folderId)}`);
+    if (deleted.status === 404) return; // already deleted by its own test
+    const trashId = deleted.body?.data?.trashId;
+    if (deleted.status !== 200 || typeof trashId !== "string" || !trashId.startsWith("trash_")) {
+      throw Error("fixture cleanup refused: delete did not return an owned trashId");
     }
+    const purged = await json("DELETE", "/api/trash/" + encodeURIComponent(trashId));
+    if (purged.status !== 200) throw Error("fixture cleanup purge failed: " + purged.status);
   };
-  await attempt(async () => {
-    await json("DELETE", `/api/folders/${dlgFolderId}`);
-    await purgeTrash((name) => name.includes("UX-G1-DIALOG-" + stamp));
-  });
-  await attempt(async () => {
-    await json("DELETE", `/api/folders/${shellFolderId}`);
-    await purgeTrash((name) => name.includes("UX-G1-SHELL-" + stamp));
-  });
-  await attempt(async () => {
-    await json("DELETE", `/api/folders/${selFolderId}`);
-    await purgeTrash((name) => name.includes("UX-G2-SELECT-" + stamp));
-  });
-  await attempt(async () => {
-    for (const id of [gId, c1Id, c2Id, pId]) {
-      if (id) await json("DELETE", `/api/folders/${id}`);
-    }
-    await purgeTrash((name) => name.includes("G2树") && name.includes(stamp));
-  });
-  await attempt(async () => {
-    await json("DELETE", `/api/folders/${pwFolderId}`);
-    await json("DELETE", `/api/folders/${pwEmptyFolderId}`);
-    await purgeTrash((name) => name.includes("UX-G4-PW-") || name.startsWith("pw-0"));
-  });
-  await attempt(async () => {
-    await json("DELETE", `/api/folders/${menuFolderId}`);
-    await purgeTrash((name) => name.includes("UX-G3-MENU-" + stamp) || name.startsWith("m-0") || name === "dropped.txt");
-  });
+  for (const id of [dlgFolderId,shellFolderId,selFolderId,gId,c1Id,c2Id,pId,
+                    pwFolderId,pwEmptyFolderId,menuFolderId]) {
+    await attempt(()=>removeFixture(id));
+  }
 
   const failed = results.filter((r) => !r.ok);
   console.log(`SUMMARY pass=${results.length - failed.length} total=${results.length}`);

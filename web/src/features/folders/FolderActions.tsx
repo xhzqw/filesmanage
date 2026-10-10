@@ -64,7 +64,7 @@ export function FolderActions({folder,actionRequest,onActionHandled,onChanged,is
    <p className="hint">目录「{folder.name}」及其子目录、文件将进入回收站，可按权限恢复。</p>
    <div className="dialog-actions">
     <RareButton type="button" className="secondary-action" disabled={removeBusy} onClick={()=>setDeleting(false)}>取消</RareButton>
-    <RareButton type="button" className="danger" disabled={removeBusy} onClick={()=>void remove()}>{removeBusy?"删除中…":"确认删除"}</RareButton>
+    <RareButton type="button" tone="danger" className="danger" disabled={removeBusy} onClick={()=>void remove()}>{removeBusy?"删除中…":"确认删除"}</RareButton>
    </div>
   </Dialog>}
   {renaming&&<Dialog open title="重命名目录" onClose={()=>setRenaming(false)} closeGuard={()=>!renameBusy} className="dialog">
@@ -74,7 +74,7 @@ export function FolderActions({folder,actionRequest,onActionHandled,onChanged,is
      onChange={e=>setRenameValue(e.target.value)} required disabled={renameBusy}/>
     <div className="dialog-actions">
      <RareButton type="button" className="secondary-action" onClick={()=>setRenaming(false)} disabled={renameBusy}>取消</RareButton>
-     <RareButton type="submit" className="primary" disabled={renameBusy}>{renameBusy?"保存中…":"保存"}</RareButton>
+     <RareButton type="submit" tone="primary" className="primary" disabled={renameBusy}>{renameBusy?"保存中…":"保存"}</RareButton>
     </div>
    </form>
   </Dialog>}

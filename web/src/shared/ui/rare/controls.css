@@ -29,3 +29,41 @@
 .rare-tabs [role="tab"]{transition:color .12s ease,background-color .12s ease,box-shadow .18s cubic-bezier(.22,1,.36,1)}
 .rare-tabs [role="tab"][aria-selected="true"]{color:var(--brand-blue)}
 @media(prefers-reduced-motion:reduce){.rare-tabs [role="tab"]{transition:none}}
+
+
+/* An explicit tone has one canonical material/contrast contract. Legacy class
+   names may coexist during migration, but cannot redefine explicit intent. */
+.rare-button[data-rare-intent="primary"]{
+  background:var(--brand-blue);border-color:var(--brand-navy);color:var(--text-inverse);
+  font-weight:600;
+}
+.rare-button[data-rare-intent="primary"]:hover:not(:disabled){
+  background:var(--color-action-hover);border-color:var(--brand-navy);
+}
+.rare-button[data-rare-intent="neutral"]{
+  background:var(--surface-panel);color:var(--text-primary);border-color:var(--border-subtle);
+}
+.rare-button[data-rare-intent="neutral"]:hover:not(:disabled){background:var(--surface-row-hover)}
+.rare-button[data-rare-intent="danger"]{
+  background:var(--surface-danger-soft);color:var(--status-danger);border-color:var(--status-danger);
+}
+.rare-button[data-rare-intent="danger"]:hover:not(:disabled){
+  background:var(--status-danger);color:var(--text-inverse);
+}
+.rare-button[data-rare-intent="ghost"]{
+  background:transparent;border-color:transparent;color:var(--text-secondary);
+}
+.rare-button[data-rare-intent="ghost"]:hover:not(:disabled){
+  background:var(--surface-row-hover);color:var(--brand-blue);
+}
+/* Inputs preserve their native types and page-specific widths; ownership of
+   base geometry, disabled states and focus is central. */
+:where(.rare-input:not([type="checkbox"]):not([type="radio"]):not([type="file"])),
+:where(.rare-select),:where(.rare-textarea){
+  border:1px solid var(--border-subtle);border-radius:var(--radius-sm);
+  background:var(--surface-panel);color:var(--text-primary);
+}
+.rare-input:disabled,.rare-select:disabled,.rare-textarea:disabled{opacity:.55;cursor:not-allowed}
+.rare-input[aria-invalid="true"],.rare-select[aria-invalid="true"],.rare-textarea[aria-invalid="true"]{
+  border-color:var(--status-danger);
+}

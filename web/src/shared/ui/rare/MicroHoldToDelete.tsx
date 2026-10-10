@@ -30,6 +30,11 @@ export function MicroHoldToDelete({
   const holdingRef = useRef(false);
   const hadPhysicalPressRef = useRef(false);
   const physicalResetTimerRef = useRef<number | null>(null);
+  // Assistive-tech virtual clicks cannot express a hold. Require two distinct
+  // activations at least duration apart, never a one-click destructive commit.
+  const [confirmStage, setConfirmStage] = useState(false);
+  const firstClickAtRef = useRef(0);
+  const confirmResetTimerRef = useRef<number | null>(null);
 
   function cancel() {
     if (rafRef.current !== null) {
@@ -68,6 +73,8 @@ export function MicroHoldToDelete({
         return;
       }
       // filled: commit once, then reset — the parent closes its own dialog
+      setConfirmStage(false);
+      if (confirmResetTimerRef.current !== null) window.clearTimeout(confirmResetTimerRef.current);
       rafRef.current = null;
       holdingRef.current = false;
       setArmed(false);
@@ -86,11 +93,21 @@ export function MicroHoldToDelete({
   }
 
   function handleClick() {
-    if (disabled) return;
-    // Synthetic click (e.g. tests or automation calling button.click() without pointerdown)
-    if (!holdingRef.current && !hadPhysicalPressRef.current) {
-      onConfirm();
+    if (disabled || holdingRef.current || hadPhysicalPressRef.current) return;
+    const now = performance.now();
+    if (!confirmStage || now - firstClickAtRef.current > 5000) {
+      firstClickAtRef.current = now;
+      setConfirmStage(true);
+      if (confirmResetTimerRef.current !== null) window.clearTimeout(confirmResetTimerRef.current);
+      confirmResetTimerRef.current = window.setTimeout(() => setConfirmStage(false), 5000);
+      return;
     }
+    // Neither a synthetic click nor an assistive-tech activation can bypass
+    // the deliberate confirmation interval. Rapid double-clicks are ignored.
+    if (now - firstClickAtRef.current < duration) return;
+    if (confirmResetTimerRef.current !== null) window.clearTimeout(confirmResetTimerRef.current);
+    setConfirmStage(false);
+    onConfirm();
   }
 
   // unmount mid-hold must not leave a loop running against a dead button
@@ -98,6 +115,7 @@ export function MicroHoldToDelete({
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       if (physicalResetTimerRef.current !== null) window.clearTimeout(physicalResetTimerRef.current);
+      if (confirmResetTimerRef.current !== null) window.clearTimeout(confirmResetTimerRef.current);
     };
   }, []);
 
@@ -115,7 +133,8 @@ export function MicroHoldToDelete({
       style={{ ["--hold"]: progress } as CSSProperties}
       disabled={disabled}
       title={title ?? ("长按 " + duration + "ms 确认")}
-      aria-label={label}
+      aria-label={confirmStage ? "再次激活以确认"+label : label+"：按住"+duration+"毫秒确认，辅助技术可分两次激活"}
+      aria-description={confirmStage ? "请再次激活确认；两次操作至少间隔"+duration+"毫秒" : undefined}
       onPointerDown={start}
       onPointerUp={cancel}
       onPointerLeave={cancel}
@@ -126,7 +145,7 @@ export function MicroHoldToDelete({
       onClick={handleClick}
     >
       <span className="micro-hold-fill" style={{ width: progress + "%" }} aria-hidden="true" />
-      <span className="micro-hold-label">{armed ? countdown : label}</span>
+      <span className="micro-hold-label" aria-live="polite">{armed ? countdown : confirmStage ? "再次确认" : label}</span>
     </RareButton>
   );
 }

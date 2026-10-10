@@ -74,7 +74,7 @@ export function Menu({open,onClose,items,anchor,label,point}:{
   if(!open)return;
   function onPointerDown(event:PointerEvent){
    const menu=node.current;
-   if(menu&&event.target instanceof Node&&menu.contains(event.target))return;
+   if(event.target instanceof Node && (menu?.contains(event.target) || anchor?.contains(event.target)))return;
    // Restore focus only while the menu still holds it, so a click landing on
    // another control keeps that control as the focus target.
    const hadFocus=menu!==null&&menu.contains(document.activeElement);
@@ -120,9 +120,11 @@ export function Menu({open,onClose,items,anchor,label,point}:{
    case "End":
     event.preventDefault();focusEdge(false);break;
    case "Escape":
-   case "Tab":
-    // Tab must never leak focus into the page behind a non-modal menu.
     event.preventDefault();closeMenu(true);break;
+   case "Tab":
+    // Non-modal menus should close as the browser continues its natural
+    // forward/backward Tab navigation. Do not refocus the trigger.
+    onClose();break;
   }
  }
 

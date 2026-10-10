@@ -11,7 +11,8 @@ export type RareButtonProps=ButtonHTMLAttributes<HTMLButtonElement> & {
 export const RareButton=forwardRef<HTMLButtonElement,RareButtonProps>(function RareButton(
   {className="",tone,density,...props},ref){
   const detected=tone??(/\bprimary\b|\bprimary-btn\b/.test(className)?"primary":/\bdanger\b/.test(className)?"danger":/\bghost\b|\bsecondary-action\b|\baction-link\b/.test(className)?"ghost":"neutral");
-  return <button {...props} ref={ref} data-rare-control="button" data-rare-tone={detected} data-density={density??"compact"}
+  return <button {...props} ref={ref} data-rare-control="button" data-rare-tone={detected}
+    data-rare-intent={tone} data-density={density??"compact"}
     className={"rare-button"+(className?" "+className:"")}/>;
 });
 RareButton.displayName="RareButton";
