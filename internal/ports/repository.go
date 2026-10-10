@@ -35,6 +35,7 @@ type Repository interface {
 	MoveFolder(context.Context, string, *string) error
 	SoftDeleteFolder(context.Context, string) error
 	RestoreFolder(context.Context, string) error
+	RestoreFolderTo(context.Context, string, string, string) error
 	SoftDeleteFilesUnderFolders(context.Context, []string) error
 	RestoreFilesUnderFolders(context.Context, []string) error
 	CountFilesInFolders(context.Context, []string) (int, error)
@@ -56,6 +57,7 @@ type Repository interface {
 	SetFileContentType(context.Context, string, string) error
 	SoftDeleteFile(context.Context, string) error
 	RestoreFile(context.Context, string) error
+	RestoreFileTo(context.Context, string, string, string) error
 	NextVersionSeq(context.Context, string) (int, error)
 	VersionsByFile(context.Context, string) ([]domain.FileVersion, error)
 	VersionBySeq(context.Context, string, int) (domain.FileVersion, error)
@@ -82,6 +84,7 @@ type Repository interface {
 	// Trash.
 	InsertTrashEntry(context.Context, domain.TrashEntry) error
 	ListTrashEntries(context.Context, string) ([]domain.TrashEntry, error)
+	PageTrashEntries(context.Context, TrashQuery) ([]domain.TrashEntry, error)
 	TrashEntryByID(context.Context, string) (domain.TrashEntry, error)
 	MarkTrashRestored(context.Context, string) error
 	MarkTrashPurged(context.Context, string) error
@@ -198,6 +201,13 @@ const MaxFolderPage = 200
 // (GET /api/search). The service asks for one lookahead row beyond the page to
 // detect a next page, so the repository accepts MaxSearchPage+1.
 const MaxSearchPage = 200
+
+// TrashQuery is a bounded, permission-scoped server-side search.
+type TrashQuery struct {
+	UserID, Search, Kind, DeletedBy, Sort string
+	From time.Time
+	Offset, Limit int
+}
 
 // FolderChildQuery is the keyset-paginated children read behind
 // GET /api/folders/children. ParentID "" addresses the caller's visible roots,

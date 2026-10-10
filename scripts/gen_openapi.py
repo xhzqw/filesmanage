@@ -1098,8 +1098,20 @@ add("GET", "/api/exports/files.csv", operation("Stream authorized CSV export", "
                "401": {"description": ERR["401"]}, "403": {"description": ERR["403"]}}))
 
 # --- Trash ---
+TRASH_PAGE = obj({"items": arr(ref("TrashEntry")), "hasMore": {"type": "boolean"}}, required=["items", "hasMore"])
+TRASH_PARAMS = [
+    query("search", "Case-insensitive literal substring of the original name (max 120 characters)."),
+    query("kind", "Resource kind.", {"type": "string", "enum": ["all", "file", "folder"]}),
+    query("deletedBy", "Case-insensitive fragment of the deleter display name or login (max 80 characters)."),
+    query("from", "Deletion timestamp lower bound (RFC3339).", {"type": "string", "format": "date-time"}),
+    query("sort", "Deletion order.", {"type": "string", "enum": ["recent", "oldest", "name"]}),
+    query("offset", "Offset into filtered visible records.", {"type": "integer", "minimum": 0, "maximum": 100000}),
+    query("limit", "Page size (defaults to 40 with a query string).", {"type": "integer", "minimum": 1, "maximum": 100}),
+]
 add("GET", "/api/trash", operation("List trash entries visible to the caller", "Trash", "listTrash", security=SESSION,
-    responses=dict([json_ok(arr(ref("TrashEntry")), "Trash entries."), resp("401", ERR["401"]), resp("403", ERR["403"])])))
+    params=TRASH_PARAMS,
+    responses=dict([json_ok({"oneOf": [arr(ref("TrashEntry")), TRASH_PAGE]}, "Legacy array without query string; filtered page when query parameters are supplied."),
+                    resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"])])))
 
 add("POST", "/api/trash/{id}/restore", operation("Restore a trash entry", "Trash", "restoreTrash", security=SESSION,
     params=[id_param("id", "Trash entry id.")],

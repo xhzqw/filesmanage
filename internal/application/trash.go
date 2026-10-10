@@ -87,12 +87,14 @@ func (s *Service) restoreFileFromTrash(ctx context.Context, tx ports.Repository,
 	if err = s.require(ctx, tx, u, parent.ID, domain.ActionUpload); err != nil {
 		return err
 	}
+	name := file.Name
 	if req.NewName != "" {
-		if err = s.renameFileForRestore(ctx, tx, file.ID, req.NewName); err != nil {
-			return err
-		}
+		if err = validateFileName(req.NewName); err != nil { return err }
+		name = req.NewName
 	}
-	if err = tx.RestoreFile(ctx, file.ID); err != nil {
+	// Name, folder, and deleted state change in one statement. Renaming a
+	// deleted row through the active-only RenameFile API cannot work.
+	if err = tx.RestoreFileTo(ctx, file.ID, parent.ID, name); err != nil {
 		return mapError(err)
 	}
 	return nil
@@ -121,14 +123,19 @@ func (s *Service) restoreFolderFromTrash(ctx context.Context, tx ports.Repositor
 	if err = s.require(ctx, tx, u, parent.ID, domain.ActionUpload); err != nil {
 		return err
 	}
-	if req.NewName != "" && req.NewName != root.Name {
-		if err = tx.RenameFolder(ctx, root.ID, req.NewName); err != nil {
-			return mapError(err)
-		}
+	name := root.Name
+	if req.NewName != "" {
+		if err = validateFileName(req.NewName); err != nil { return err }
+		name = req.NewName
 	}
 	ids := make([]string, 0, len(subtree))
-	for _, folder := range subtree {
-		if err = tx.RestoreFolder(ctx, folder.ID); err != nil {
+	for i, folder := range subtree {
+		if i == 0 {
+			err = tx.RestoreFolderTo(ctx, folder.ID, parent.ID, name)
+		} else {
+			err = tx.RestoreFolder(ctx, folder.ID)
+		}
+		if err != nil {
 			return mapError(err)
 		}
 		ids = append(ids, folder.ID)
