@@ -205,8 +205,8 @@ const MaxSearchPage = 200
 // TrashQuery is a bounded, permission-scoped server-side search.
 type TrashQuery struct {
 	UserID, Search, Kind, DeletedBy, Sort string
-	From time.Time
-	Offset, Limit int
+	From                                  time.Time
+	Offset, Limit                         int
 }
 
 // FolderChildQuery is the keyset-paginated children read behind

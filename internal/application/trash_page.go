@@ -10,14 +10,15 @@ import (
 
 // TrashPage applies filters before pagination, retaining repository visibility.
 type TrashPage struct {
-	Items []domain.TrashEntry
+	Items   []domain.TrashEntry
 	HasMore bool
 }
 type TrashFilters struct {
 	Search, Kind, DeletedBy, Sort string
-	From time.Time
-	Offset, Limit int
+	From                          time.Time
+	Offset, Limit                 int
 }
+
 func (s *Service) PageTrash(ctx context.Context, u domain.User, f TrashFilters) (TrashPage, error) {
 	f.Search = strings.TrimSpace(f.Search)
 	f.DeletedBy = strings.TrimSpace(f.DeletedBy)
@@ -28,14 +29,20 @@ func (s *Service) PageTrash(ctx context.Context, u domain.User, f TrashFilters) 
 		return TrashPage{}, domain.ErrInvalidInput
 	}
 	tx, err := s.uow.Begin(ctx)
-	if err != nil { return TrashPage{}, err }
+	if err != nil {
+		return TrashPage{}, err
+	}
 	defer tx.Rollback(ctx)
 	items, err := tx.PageTrashEntries(ctx, ports.TrashQuery{
-		UserID:u.ID, Search:f.Search, Kind:f.Kind, DeletedBy:f.DeletedBy,
-		Sort:f.Sort, From:f.From, Offset:f.Offset, Limit:f.Limit+1,
+		UserID: u.ID, Search: f.Search, Kind: f.Kind, DeletedBy: f.DeletedBy,
+		Sort: f.Sort, From: f.From, Offset: f.Offset, Limit: f.Limit + 1,
 	})
-	if err != nil { return TrashPage{}, err }
+	if err != nil {
+		return TrashPage{}, err
+	}
 	more := len(items) > f.Limit
-	if more { items = items[:f.Limit] }
-	return TrashPage{Items:items,HasMore:more},nil
+	if more {
+		items = items[:f.Limit]
+	}
+	return TrashPage{Items: items, HasMore: more}, nil
 }

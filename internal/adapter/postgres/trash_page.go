@@ -1,23 +1,30 @@
 package postgres
 
 import (
- "context"
- "filesmanage/internal/domain"
- "filesmanage/internal/ports"
+	"context"
+	"filesmanage/internal/domain"
+	"filesmanage/internal/ports"
 )
 
-func (r *Repository) PageTrashEntries(ctx context.Context, q ports.TrashQuery) ([]domain.TrashEntry,error) {
- if q.Limit<1 || q.Limit>101 || q.Offset<0 || q.Offset>100000 { return nil,domain.ErrInvalidInput }
- order:="t.deleted_at DESC,t.id DESC"
- switch q.Sort {
- case "","recent":
- case "oldest": order="t.deleted_at ASC,t.id ASC"
- case "name": order="lower(t.old_name) ASC,t.id ASC"
- default: return nil,domain.ErrInvalidInput
- }
- var from any
- if !q.From.IsZero() { from=q.From }
- sql:=`WITH RECURSIVE chains(entry_id,folder_id) AS (
+func (r *Repository) PageTrashEntries(ctx context.Context, q ports.TrashQuery) ([]domain.TrashEntry, error) {
+	if q.Limit < 1 || q.Limit > 101 || q.Offset < 0 || q.Offset > 100000 {
+		return nil, domain.ErrInvalidInput
+	}
+	order := "t.deleted_at DESC,t.id DESC"
+	switch q.Sort {
+	case "", "recent":
+	case "oldest":
+		order = "t.deleted_at ASC,t.id ASC"
+	case "name":
+		order = "lower(t.old_name) ASC,t.id ASC"
+	default:
+		return nil, domain.ErrInvalidInput
+	}
+	var from any
+	if !q.From.IsZero() {
+		from = q.From
+	}
+	sql := `WITH RECURSIVE chains(entry_id,folder_id) AS (
  SELECT id,old_parent_id FROM trash_entries WHERE old_parent_id IS NOT NULL
  UNION ALL SELECT c.entry_id,f.parent_id FROM chains c JOIN folders f ON f.id=c.folder_id WHERE f.parent_id IS NOT NULL
  ), permitted AS (
@@ -34,15 +41,19 @@ func (r *Repository) PageTrashEntries(ctx context.Context, q ports.TrashQuery) (
  AND ($3='' OR $3='all' OR ($3='file' AND t.file_id IS NOT NULL) OR ($3='folder' AND t.folder_id IS NOT NULL))
  AND ($4='' OR strpos(lower(coalesce(u.display_name,'')),lower($4))>0 OR strpos(lower(coalesce(u.login,'')),lower($4))>0)
  AND ($5::timestamptz IS NULL OR t.deleted_at >= $5)
- ORDER BY `+order+` LIMIT $6 OFFSET $7`
- rows,err:=r.Q.Query(ctx,sql,q.UserID,q.Search,q.Kind,q.DeletedBy,from,q.Limit,q.Offset)
- if err!=nil{return nil,err}
- defer rows.Close()
- out:=make([]domain.TrashEntry,0,q.Limit)
- for rows.Next(){
-  var t domain.TrashEntry
-  if err=rows.Scan(&t.ID,&t.FileID,&t.FolderID,&t.OldParentID,&t.OldName,&t.DeletedBy,&t.DeletedName,&t.DeletedAt,&t.RestoredAt,&t.PurgedAt);err!=nil{return nil,err}
-  out=append(out,t)
- }
- return out,rows.Err()
+ ORDER BY ` + order + ` LIMIT $6 OFFSET $7`
+	rows, err := r.Q.Query(ctx, sql, q.UserID, q.Search, q.Kind, q.DeletedBy, from, q.Limit, q.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]domain.TrashEntry, 0, q.Limit)
+	for rows.Next() {
+		var t domain.TrashEntry
+		if err = rows.Scan(&t.ID, &t.FileID, &t.FolderID, &t.OldParentID, &t.OldName, &t.DeletedBy, &t.DeletedName, &t.DeletedAt, &t.RestoredAt, &t.PurgedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
 }

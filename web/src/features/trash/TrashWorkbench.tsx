@@ -178,7 +178,7 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
    <table className="trash-table">
     <colgroup><col className="trash-col-check"/><col/><col className="trash-col-type"/><col className="trash-col-person"/><col className="trash-col-time"/><col className="trash-col-actions"/></colgroup>
     <thead><tr>
-     <th scope="col"><input type="checkbox" aria-label="全选当前页" checked={allSelected} disabled={locked||entries.length===0} onChange={e=>setSelected(new Set(e.target.checked?entries.map(item=>item.id):[]))}/></th>
+     <th scope="col"><RareInput type="checkbox" aria-label="全选当前页" checked={allSelected} disabled={locked||entries.length===0} onChange={e=>setSelected(new Set(e.target.checked?entries.map(item=>item.id):[]))}/></th>
      <th scope="col">名称 / 原位置</th><th scope="col">类型</th><th scope="col">删除人</th><th scope="col">删除时间</th><th scope="col">操作</th>
     </tr></thead>
     <tbody>
@@ -186,7 +186,7 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
      {status==="failed"&&<tr><td colSpan={6} className="trash-empty"><span role="alert">加载失败</span> <RareButton type="button" onClick={refresh}>重试</RareButton></td></tr>}
      {status==="ready"&&entries.length===0&&<tr><td colSpan={6} className="trash-empty">{offset>0?"当前页无记录，请返回上一页":"没有符合条件的记录"}</td></tr>}
      {status==="ready"&&entries.map(entry=><tr key={entry.id}>
-      <td><input type="checkbox" aria-label={`选择 ${entry.oldName}`} checked={selected.has(entry.id)} disabled={locked} onChange={e=>chooseOne(entry.id,e.target.checked)}/></td>
+      <td><RareInput type="checkbox" aria-label={`选择 ${entry.oldName}`} checked={selected.has(entry.id)} disabled={locked} onChange={e=>chooseOne(entry.id,e.target.checked)}/></td>
       <td><div className="trash-resource"><EntryIcon folder={!!entry.folderId}/><div className="trash-resource-text"><strong title={entry.oldName}>{entry.oldName}</strong><small title={visibleParentPath(entry,byId)}>{visibleParentPath(entry,byId)}</small></div></div></td>
       <td>{entry.folderId?`目录${entry.subtreeCount?` · ${entry.subtreeCount} 子项`:""}`:"文件"}</td>
       <td className="trash-muted">{entry.deletedByName||"—"}</td>

@@ -89,7 +89,9 @@ func (s *Service) restoreFileFromTrash(ctx context.Context, tx ports.Repository,
 	}
 	name := file.Name
 	if req.NewName != "" {
-		if err = validateFileName(req.NewName); err != nil { return err }
+		if err = validateFileName(req.NewName); err != nil {
+			return err
+		}
 		name = req.NewName
 	}
 	// Name, folder, and deleted state change in one statement. Renaming a
@@ -125,7 +127,9 @@ func (s *Service) restoreFolderFromTrash(ctx context.Context, tx ports.Repositor
 	}
 	name := root.Name
 	if req.NewName != "" {
-		if err = validateFileName(req.NewName); err != nil { return err }
+		if err = validateFileName(req.NewName); err != nil {
+			return err
+		}
 		name = req.NewName
 	}
 	ids := make([]string, 0, len(subtree))

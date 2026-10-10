@@ -19,32 +19,46 @@ func (h *Handler) listTrash(c *gin.Context) {
 	// The new workbench always sends paging parameters and receives a page.
 	if c.Request.URL.RawQuery == "" {
 		entries, err := h.S.ListTrash(c.Request.Context(), u)
-		if err != nil { respondError(c, err); return }
+		if err != nil {
+			respondError(c, err)
+			return
+		}
 		data := make([]gin.H, 0, len(entries))
-		for _, entry := range entries { data = append(data, trashPayload(entry)) }
-		c.JSON(200, gin.H{"ok":true,"data":data})
+		for _, entry := range entries {
+			data = append(data, trashPayload(entry))
+		}
+		c.JSON(200, gin.H{"ok": true, "data": data})
 		return
 	}
 	limit, offset := 40, 0
 	if raw := c.Query("limit"); raw != "" {
 		var err error
 		limit, err = strconv.Atoi(raw)
-		if err != nil { c.JSON(400, gin.H{"ok":false,"error":gin.H{"code":"E_BAD"}}); return }
+		if err != nil {
+			c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+			return
+		}
 	}
 	if raw := c.Query("offset"); raw != "" {
 		var err error
 		offset, err = strconv.Atoi(raw)
-		if err != nil { c.JSON(400, gin.H{"ok":false,"error":gin.H{"code":"E_BAD"}}); return }
+		if err != nil {
+			c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+			return
+		}
 	}
 	var from time.Time
 	if raw := c.Query("from"); raw != "" {
 		var err error
 		from, err = time.Parse(time.RFC3339, raw)
-		if err != nil { c.JSON(400, gin.H{"ok":false,"error":gin.H{"code":"E_BAD"}}); return }
+		if err != nil {
+			c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+			return
+		}
 	}
 	page, err := h.S.PageTrash(c.Request.Context(), u, application.TrashFilters{
-		Search:c.Query("search"),Kind:c.Query("kind"),DeletedBy:c.Query("deletedBy"),
-		Sort:c.Query("sort"),From:from,Offset:offset,Limit:limit,
+		Search: c.Query("search"), Kind: c.Query("kind"), DeletedBy: c.Query("deletedBy"),
+		Sort: c.Query("sort"), From: from, Offset: offset, Limit: limit,
 	})
 	if err != nil {
 		respondError(c, err)
@@ -54,7 +68,7 @@ func (h *Handler) listTrash(c *gin.Context) {
 	for _, entry := range page.Items {
 		data = append(data, trashPayload(entry))
 	}
-	c.JSON(200, gin.H{"ok": true, "data": gin.H{"items":data,"hasMore":page.HasMore}})
+	c.JSON(200, gin.H{"ok": true, "data": gin.H{"items": data, "hasMore": page.HasMore}})
 }
 
 func (h *Handler) restoreTrash(c *gin.Context) {

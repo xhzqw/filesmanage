@@ -4914,9 +4914,65 @@ paths:
       - Trash
       security:
       - cookieSession: []
+      parameters:
+      - name: search
+        in: query
+        required: false
+        description: Case-insensitive literal substring of the original name (max 120 characters).
+        schema:
+          type: string
+      - name: kind
+        in: query
+        required: false
+        description: Resource kind.
+        schema:
+          type: string
+          enum:
+          - all
+          - file
+          - folder
+      - name: deletedBy
+        in: query
+        required: false
+        description: Case-insensitive fragment of the deleter display name or login (max 80 characters).
+        schema:
+          type: string
+      - name: from
+        in: query
+        required: false
+        description: Deletion timestamp lower bound (RFC3339).
+        schema:
+          type: string
+          format: date-time
+      - name: sort
+        in: query
+        required: false
+        description: Deletion order.
+        schema:
+          type: string
+          enum:
+          - recent
+          - oldest
+          - name
+      - name: offset
+        in: query
+        required: false
+        description: Offset into filtered visible records.
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 100000
+      - name: limit
+        in: query
+        required: false
+        description: Page size (defaults to 40 with a query string).
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
       responses:
         '200':
-          description: Trash entries.
+          description: Legacy array without query string; filtered page when query parameters are supplied.
           content:
             application/json:
               schema:
@@ -4927,12 +4983,30 @@ paths:
                     enum:
                     - true
                   data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/TrashEntry'
+                    oneOf:
+                    - type: array
+                      items:
+                        $ref: '#/components/schemas/TrashEntry'
+                    - type: object
+                      properties:
+                        items:
+                          type: array
+                          items:
+                            $ref: '#/components/schemas/TrashEntry'
+                        hasMore:
+                          type: boolean
+                      required:
+                      - items
+                      - hasMore
                 required:
                 - ok
                 - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
         '401':
           description: E_AUTH — missing or expired session
           content:
