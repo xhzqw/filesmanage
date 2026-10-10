@@ -60,7 +60,9 @@ const sendScript=`(()=>{
    },16);
    this.addEventListener("message",()=>{
     clearInterval(interval);
-    stats.duration=Math.round(performance.now()-started);
+    const finish=performance.now();
+    stats.maxLag=Math.max(stats.maxLag,finish-previous-16);
+    stats.duration=Math.round(finish-started);
     stats.finished=true;
    },{once:true});
   }
@@ -144,7 +146,7 @@ try{
  const measurement=await expression("(()=>window.__mshPerf)()");
  check(ready&&result!=null,"large MSH rendered with interactive toolbar",true);
  check(measurement.started&&measurement.finished,"actual MSH Web Worker dispatched and completed",measurement);
- check(measurement.ticks>0&&measurement.maxLag<220,
+ check(measurement.ticks>=Math.max(2,measurement.duration/16*0.45)&&measurement.maxLag<220,
   "main browser event loop remains responsive while worker parses",
   {maxLagMs:measurement.maxLag,ticks:measurement.ticks,workerMs:measurement.duration});
  const parts=await expression(`(()=>{
@@ -155,6 +157,12 @@ try{
   "120k triangles retain two exact assembly bounds",parts);
  console.log("MSH_LARGE_BROWSER_PASS triangles=120000 parts=2 worker_ms="+measurement.duration);
 }finally{
- ws?.close();browser?.kill("SIGKILL");
- rmSync(profile,{recursive:true,force:true});
+ ws?.close();
+ if(browser){
+  browser.kill("SIGKILL");
+  if(browser.exitCode===null){
+   await Promise.race([new Promise(resolve=>browser.once("close",resolve)),delay(3000)]);
+  }
+ }
+ rmSync(profile,{recursive:true,force:true,maxRetries:15,retryDelay:100});
 }
