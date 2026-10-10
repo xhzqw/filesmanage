@@ -1,6 +1,7 @@
 import{create}from"zustand";
 import{errorCode}from"../../shared/errors";
 import{uploadFileWithProgress}from"../../shared/uploadClient";
+import{uploadResumable,resumableThreshold,resumableMaxFile}from"../../shared/resumableUpload";
 import{
  enqueue,markUploading,markProgress,markServerProcessing,markCommitted,markFailed,markCancelled,
  cancelTask,retryTask,renameTask,skipTask,
@@ -89,7 +90,8 @@ async function pump(){
    inFlight.set(next.queueId,controller);
    useUploadStore.setState(state=>({tasks:markUploading(state.tasks,next.queueId)}));
    try{
-    const reply=await uploadFileWithProgress(next.targetFolderId,next.file,next.idempotencyKey,{
+    const uploader=next.file.size>=resumableThreshold&&next.file.size<=resumableMaxFile?uploadResumable:uploadFileWithProgress;
+    const reply=await uploader(next.targetFolderId,next.file,next.idempotencyKey,{
      signal:controller.signal,
      // Byte progress is not success: when every byte is on the wire the item
      // moves to server-processing and only the committed envelope resolves it

@@ -35,6 +35,7 @@ type memoryRepo struct {
 	fileText       map[string]memoryFileText
 	fileMetadata   map[string]domain.FileMetadata
 	reviewComments []domain.FileReviewComment
+	resumableUploads map[string]domain.ResumableUpload
 	versions       map[string][]domain.FileVersion
 	blobs          map[string]domain.Blob
 	grants         map[string]domain.ACL

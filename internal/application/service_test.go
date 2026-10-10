@@ -16,6 +16,7 @@ import (
 // memoryBlob is an in-memory ports.BlobStore keyed by content digest.
 type memoryBlob struct {
 	data map[string][]byte
+ resumable map[string][]byte
 }
 
 func newMemoryBlob() *memoryBlob { return &memoryBlob{data: map[string][]byte{}} }

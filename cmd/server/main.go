@@ -29,6 +29,9 @@ func (a blobStoreAdapter) SweepStaging(maxAge time.Duration) (int, error) {
 func (a blobStoreAdapter) Open(key string) (io.ReadSeekCloser, error) {
 	return a.store.Open(key)
 }
+func(a blobStoreAdapter) AppendResumable(id string,offset int64,data []byte)error{return a.store.AppendResumable(id,offset,data)}
+func(a blobStoreAdapter) OpenResumable(id string)(io.ReadCloser,int64,error){return a.store.OpenResumable(id)}
+func(a blobStoreAdapter) RemoveResumable(id string)error{return a.store.RemoveResumable(id)}
 
 func isLoopbackAddr(addr string) bool {
 	host := addr
@@ -97,6 +100,11 @@ func main() {
 	} else if swept > 0 {
 		log.Printf("staging sweep removed %d orphaned upload(s)", swept)
 	}
+	if swept,err:=store.store.SweepResumable(48*time.Hour);err!=nil{log.Printf("resumable sweep: %v",err)}else if swept>0{log.Printf("resumable sweep removed %d expired file(s)",swept)}
+	go func(){
+		tick:=time.NewTicker(time.Hour);defer tick.Stop()
+		for range tick.C{if _,err:=store.store.SweepResumable(48*time.Hour);err!=nil{log.Printf("resumable cleanup: %v",err)}}
+	}()
 	service := application.New(postgres.New(pool), store).WithOffice(application.OfficeConfig{
 		EditorURL:     os.Getenv("FILESMANAGE_OFFICE_URL"),
 		Secret:        os.Getenv("FILESMANAGE_OFFICE_SECRET"),

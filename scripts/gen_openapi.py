@@ -224,6 +224,13 @@ schema("ReviewComment",obj({
 schema("ReviewCommentPage",obj({"items":arr(ref("ReviewComment")),"nextCursor":string()},required=["items","nextCursor"]))
 schema("CreateReviewComment",obj({"version":integer(),"lineNumber":integer(),"body":string(max_length=2000)},required=["version","body"]))
 
+schema("ResumableStatus",obj({
+ "id":string(),"received":integer(),"size":integer(),"state":string(enum=["open","committed","cancelled"]),
+ "expiresAt":timestamp(),"result":obj({"fileId":string(),"versionSeq":integer(),"sha256":string(),"size":integer(),"name":string(),"folderId":string(),"dedup":boolean()}),
+},required=["id","received","size","state","expiresAt"]))
+schema("ResumableStart",obj({"folderId":string(),"name":string(),"size":integer(minimum=1),
+ "contentType":string(),"idempotencyKey":string(),"sha256":string()},required=["folderId","name","size","idempotencyKey"]))
+
 schema("FileMeta", obj({"file": ref("File"), "versions": arr(ref("FileVersion"))}, required=["file", "versions"]))
 
 schema("FilePage", obj({"items": arr(ref("File")), "nextCursor": string("Opaque keyset cursor; empty when the page is the last one.")}, required=["items", "nextCursor"]))
@@ -824,6 +831,23 @@ add("POST", "/api/files", operation("Upload a file (multipart, idempotent)", "Fi
         "fileId": string(), "versionSeq": integer(), "sha256": string(), "size": integer(), "name": string(), "folderId": string(), "deduplicated": boolean(),
     }, required=["fileId", "versionSeq", "sha256", "size", "name", "folderId", "deduplicated"])}, required=["ok", "data"])),
                     resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"]), resp("409", ERR["409"]), resp("413", ERR["413"])])))
+
+add("POST","/api/uploads/resumable",operation("Start/resume a private upload (max 1 GiB)","Files","startResumable",security=SESSION,
+ request={"application/json":{"schema":ref("ResumableStart")}},
+ responses=dict([resp("201","Open or replayed upload session",obj({"ok":boolean(),"data":ref("ResumableStatus")},required=["ok","data"])),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("409",ERR["409"])])))
+add("GET","/api/uploads/resumable/{id}",operation("Read server-confirmed upload offset","Files","resumableStatus",security=SESSION,
+ params=[id_param("id","Private upload session ID")],
+ responses=dict([json_ok(ref("ResumableStatus"),"Resume only from this offset."),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+add("PATCH","/api/uploads/resumable/{id}",operation("Append one verified 4 MiB chunk at current offset","Files","resumableChunk",security=SESSION,
+ params=[id_param("id","Private upload ID")],
+ request={"application/octet-stream":{"schema":{"type":"string","format":"binary"}}},
+ responses=dict([json_ok(ref("ResumableStatus"),"Committed byte offset after durable fsync."),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"]),resp("413",ERR["413"])])))
+add("POST","/api/uploads/resumable/{id}/complete",operation("Verify and commit assembled upload as first immutable version","Files","finishResumable",security=SESSION,
+ params=[id_param("id","Private upload ID")],
+ responses=dict([json_ok(obj({"fileId":string(),"versionSeq":integer(),"sha256":string(),"size":integer(),"name":string(),"folderId":string(),"deduplicated":boolean()}),"Committed upload, replay safe."),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
+add("DELETE","/api/uploads/resumable/{id}",operation("Cancel private uncommitted upload","Files","cancelResumable",security=SESSION,
+ params=[id_param("id","Private upload ID")],
+ responses=dict([json_ok(obj({"cancelled":string()}),"Cancelled; pending spool cleaned."),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
 
 add("GET", "/api/files", operation("List files in a folder (keyset pagination)", "Files", "listFiles", security=SESSION,
     params=[query("folder", "Folder id; empty lists across authorized scope.", required=True),
