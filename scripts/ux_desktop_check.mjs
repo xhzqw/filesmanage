@@ -1356,14 +1356,21 @@ async function main() {
         Boolean(empty) && emptyShape?.w === 16 && emptyShape?.hidden === "true" && emptyShape?.toy === false,
         JSON.stringify(emptyShape));
 
-      // ---- PW-11: Tab from the sort select still lands on the first grid row ----
+      // ---- PW-11: Keyboard traverses the actual toolbar controls, then grid ----
       await cdp.navigate(`${BASE}/doc?folder=${pwFolderId}`);
       await cdp.waitFor(`()=>document.querySelectorAll('tbody tr[data-id]').length>=3`, 20000);
       await cdp.evaluate(`(()=>{document.querySelector('select[aria-label="排序方式"]')?.focus();return true;})()`);
-      await cdp.key("Tab", "Tab", 9);
-      const landed = await cdp.evaluate(`(()=>{const a=document.activeElement;return {tag:a?.tagName,row:Boolean(a?.closest?.('tbody tr[data-id]'))};})()`);
-      check("PW-11 one Tab from the sort select reaches the first grid row",
-        landed.row === true, JSON.stringify(landed));
+      const focusSteps=[];
+      for(let step=0;step<3;step++){
+        await cdp.key("Tab", "Tab", 9);
+        focusSteps.push(await cdp.evaluate(`(()=>{
+          const a=document.activeElement;
+          return {label:a?.getAttribute('aria-label'),row:Boolean(a?.closest?.('tbody tr[data-id]'))};})()`));
+      }
+      check("PW-11 Tab reaches type and search filters before the first grid row",
+        focusSteps[0]?.label==="文件类型筛选"&&
+        focusSteps[1]?.label==="当前目录内过滤"&&focusSteps[2]?.row===true,
+        JSON.stringify(focusSteps));
 
       // ---- PW-12: the header select-all box stays out of the tab order ----
       const selectAll = await cdp.evaluate(`(()=>{const i=document.querySelector('thead input[type=checkbox]');return i?i.getAttribute('tabindex'):null;})()`);
