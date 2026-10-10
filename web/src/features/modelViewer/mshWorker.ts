@@ -5,7 +5,8 @@ self.onmessage=(event:MessageEvent<{buffer:ArrayBuffer}>)=>{
   const result=parseMshAssembly(event.data.buffer);
   const transfer:Transferable[]=[];
   for(const part of result.parts)transfer.push(part.positions.buffer,part.normals.buffer);
-  self.postMessage({ok:true,data:result},transfer);
+  (self as unknown as {postMessage:(value:unknown,transfer:Transferable[])=>void})
+   .postMessage({ok:true,data:result},transfer);
  }catch(error){
   self.postMessage({
    ok:false,tooLarge:error instanceof MshLimitError,
