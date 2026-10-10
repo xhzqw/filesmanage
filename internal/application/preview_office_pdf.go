@@ -112,7 +112,7 @@ func renderOfficeSandbox(ctx context.Context, source []byte, ext string) ([]byte
 		"--bind", work, "/work", "--chdir", "/work",
 		"--setenv", "HOME", "/work", "--setenv", "TMPDIR", "/tmp",
 		"--setenv", "XDG_CONFIG_HOME", "/work/config",
-		"--setenv", "SAL_USE_VCLPLUGIN", "gen",
+		"--setenv", "SAL_USE_VCLPLUGIN", "svp",
 		"--setenv", "FONTCONFIG_FILE", "/etc/fonts/fonts.conf",
 		"/usr/bin/soffice", "-env:UserInstallation=file:///work/profile",
 		"--headless", "--nologo", "--nodefault", "--norestore",
