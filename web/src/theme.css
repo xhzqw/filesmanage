@@ -80,6 +80,21 @@
                                       surface, the spec's #B45309 only 4.58:1) */
   --status-danger:#B91C1C;         /* 冲突/删除/严重警告 */
 
+  /* Semantic file-class glyph colors: visual continuity during Rare migration. */
+  --file-icon-cad:#0284c7;
+  --file-icon-word:#2563eb;
+  --file-icon-sheet:#16a34a;
+  --file-icon-slide:#ea580c;
+  --file-icon-pdf:#dc2626;
+  --file-icon-image:#7c3aed;
+  --file-icon-media:#e11d48;
+  --file-icon-archive:#d97706;
+  --file-icon-code:#0d9488;
+  --file-icon-text:#64748b;
+  --file-icon-file:#94a3b8;
+  --color-star-hover:#d97706;
+  --surface-media-video:#111827;
+
   /* ================= 几何与紧凑度标尺 (Compact Metrics) ================= */
   --radius-xs:4px;                 /* 紧凑标签/复选框 */
   --radius-sm:7px;                 /* 按钮/输入框/行条 */

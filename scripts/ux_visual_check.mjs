@@ -80,7 +80,7 @@ const VIEWPORTS = [
   { name: "1920x1080", width: 1920, height: 1080 },
 ];
 
-const NAV_LABELS = ["文档管理", "提要", "共享/关注", "统计", "审批", "回收站", "组织管理"];
+const NAV_LABELS = ["文档管理", "提要", "共享/关注", "统计", "审批", "回收站", "组织与权限"];
 
 // ---------------------------------------------------------------------------
 // VIS-01/06 static governance (DESIGN-SYSTEM-v1 §2/§5, UX-ACCEPTANCE §1.2 S):
@@ -846,17 +846,22 @@ async function main() {
       reportDocPair(await vis(cdp, { op: "boundary", pair: { id: "select-border", kind: "border", sel: "select" } }));
       reportDocPair(await vis(cdp, { op: "focusRing", id: "focus-ring-input", sel: "input:not([type=file])" }));
 
-      // the row focus ring: a real Tab from the sort select lands on the first
-      // grid row (tabindex 0 while nothing is focused), which is the only way
-      // :focus-visible honestly engages on a row
+      // The V3 toolbar includes type + name filters. Follow all three Tab
+      // stops to reach the first grid row and engage the keyboard focus ring.
       await cdp.evaluate(`(()=>{const s=document.querySelector('select[aria-label="排序方式"]');s?.focus();return Boolean(s);})()`);
-      await keyPress(cdp, "Tab", "Tab", 9);
+      const tabStops=[];
+      for(let i=0;i<3;i++){
+        await keyPress(cdp, "Tab", "Tab", 9);
+        tabStops.push(await cdp.evaluate(`(()=>{const a=document.activeElement;return {tag:a?.tagName,label:a?.getAttribute('aria-label')??null};})()`));
+      }
       await delay(150);
       const tabLanded = await cdp.evaluate(`(()=>{const a=document.activeElement;return a&&a.tagName==='TR'?{row:true,focusVisible:a.matches(':focus-visible')}:{row:false,tag:a?a.tagName:'none'};})()`);
-      if (tabLanded.row) {
+      const correctOrder=tabStops[0]?.label==="文件类型筛选"&&tabStops[1]?.label==="当前目录内过滤";
+      check("VIS-03 doc: keyboard traverses V3 filters before the grid",correctOrder,JSON.stringify(tabStops));
+      if (tabLanded.row && correctOrder) {
         reportDocPair(await vis(cdp, { op: "boundary", pair: { id: "focus-ring-row", kind: "outline", sel: "tbody tr[data-id]" } }));
       } else {
-        docPairs.push({ id: "focus-ring-row", kind: "outline", skipped: true, reason: "Tab from the sort select did not reach a grid row: " + JSON.stringify(tabLanded) });
+        docPairs.push({ id: "focus-ring-row", kind: "outline", skipped: true, reason: "Tab through V3 toolbar did not reach a grid row: " + JSON.stringify({tabLanded,tabStops}) });
         check("VIS-03 doc: focus-ring-row boundary contrast >= 3:1", false, JSON.stringify(tabLanded));
       }
 
@@ -912,8 +917,20 @@ async function main() {
 
       // rename dialog: primary button label, dialog title, accessible name,
       // then a real E_NAME_CONFLICT for the error notice
-      await cdp.evaluate(`(()=>{const row=${keepRow};const btn=row&&[...row.querySelectorAll('.row-actions button')].find(b=>b.textContent?.trim()==='重命名');btn?.click();return Boolean(btn);})()`);
-      const renameOpen = await cdp.waitFor(`()=>{const d=document.querySelector('dialog.dialog');return Boolean(d?.open);}`, 8000);
+      const renameMenuTrigger=await cdp.evaluate(`(()=>{
+        const row=${keepRow};
+        const btn=row?.querySelector('.more-trigger');
+        if(!btn)return false;btn.click();return true;})()`);
+      const renameMenu=renameMenuTrigger && await cdp.waitFor(
+        `()=>[...document.querySelectorAll('[role="menuitem"]')].some(b=>b.querySelector('.menu-label')?.textContent?.trim()==='重命名')`,5000);
+      if(renameMenu){
+        await cdp.evaluate(`(()=>{
+          const b=[...document.querySelectorAll('[role="menuitem"]')].find(
+            b=>b.querySelector('.menu-label')?.textContent?.trim()==='重命名');
+          b?.click();return Boolean(b);})()`);
+      }
+      const renameOpen = renameMenu && await cdp.waitFor(
+        `()=>document.querySelector('dialog.dialog:modal .dialog-title')?.textContent==='重命名文件'`,8000);
       if (renameOpen) {
         stateEvidence.dialogName = await vis(cdp, { op: "dialog" });
         check("VIS-11 /doc: dialog exposes its accessible name",

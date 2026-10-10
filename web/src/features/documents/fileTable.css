@@ -32,17 +32,17 @@
 }
 .file-mobile-actions:hover{background:var(--surface-row-hover)}
 .file-type-icon{flex:none}
-.file-icon-cad{color:#0284c7}
-.file-icon-word{color:#2563eb}
-.file-icon-sheet{color:#16a34a}
-.file-icon-slide{color:#ea580c}
-.file-icon-pdf{color:#dc2626}
-.file-icon-image{color:#7c3aed}
-.file-icon-media{color:#e11d48}
-.file-icon-archive{color:#d97706}
-.file-icon-code{color:#0d9488}
-.file-icon-text{color:#64748b}
-.file-icon-file{color:#94a3b8}
+.file-icon-cad{color:var(--file-icon-cad)}
+.file-icon-word{color:var(--file-icon-word)}
+.file-icon-sheet{color:var(--file-icon-sheet)}
+.file-icon-slide{color:var(--file-icon-slide)}
+.file-icon-pdf{color:var(--file-icon-pdf)}
+.file-icon-image{color:var(--file-icon-image)}
+.file-icon-media{color:var(--file-icon-media)}
+.file-icon-archive{color:var(--file-icon-archive)}
+.file-icon-code{color:var(--file-icon-code)}
+.file-icon-text{color:var(--file-icon-text)}
+.file-icon-file{color:var(--file-icon-file)}
 
 /* ---- 第 2 行：工具栏 (高度 30px) ---- */
 .file-toolbar{
@@ -55,7 +55,7 @@
 .upload-button.primary-btn{
   display:inline-flex;align-items:center;gap:4px;
   height:24px;line-height:24px;padding:0 var(--space-2);font-size:12px;font-weight:500;
-  background:var(--brand-blue);color:#fff;border-radius:var(--radius-xs);
+  background:var(--brand-blue);color:var(--text-inverse);border-radius:var(--radius-xs);
   cursor:pointer;user-select:none;border:1px solid var(--brand-blue);
   transition:background-color .1s ease;
 }
@@ -137,7 +137,7 @@ table.file-table tbody tr:focus-within .actions-hover-group{
   color:var(--brand-star, #f59e0b) !important;
 }
 .action-star-btn.favorited:hover{
-  color:#d97706 !important;
+  color:var(--color-star-hover) !important;
 }
 .action-star-btn:disabled{
   opacity:0.4;cursor:not-allowed;
