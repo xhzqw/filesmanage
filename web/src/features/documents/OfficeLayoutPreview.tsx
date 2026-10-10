@@ -16,7 +16,7 @@ export function OfficeLayoutPreview({fileId,sha,structured}:{
   let active=true;
   const controller=new AbortController();
   let blobURL="";
-  setUrl("");setStatus("loading");
+  setUrl("");setStatus("loading");setMode("pages");
   (async()=>{
    try {
     const res=await fetch("/api/files/"+encodeURIComponent(fileId)+"/preview/office-pdf?v="+encodeURIComponent(sha),{
@@ -27,7 +27,7 @@ export function OfficeLayoutPreview({fileId,sha,structured}:{
     if(declared>32*1024*1024)throw new Error("converted preview too large");
     const bytes=await res.arrayBuffer();
     if(bytes.byteLength>32*1024*1024)throw new Error("converted preview too large");
-    if(!active)return;
+    if(!active || controller.signal.aborted)return;
     blobURL=URL.createObjectURL(new Blob([bytes],{type:"application/pdf"}));
     setUrl(blobURL);setStatus("ready");
    }catch(error){
