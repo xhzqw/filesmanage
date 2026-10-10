@@ -23,7 +23,7 @@ func (r *Repository) CreateResumableUpload(ctx context.Context, u domain.Resumab
 	if count >= 3 || reserved+u.ExpectedSize > 2*int64(1<<30) {
 		return domain.ErrInvalidInput
 	}
-	_, err := r.Q.Exec(ctx, `INSERT INTO resumable_uploads(id,owner_id,folder_id,file_name,content_type,expected_size,expected_sha256,operation_key)
+	_, err = r.Q.Exec(ctx, `INSERT INTO resumable_uploads(id,owner_id,folder_id,file_name,content_type,expected_size,expected_sha256,operation_key)
  VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, u.ID, u.OwnerID, u.FolderID, u.FileName, u.ContentType, u.ExpectedSize, u.ExpectedSHA256, u.OperationKey)
 	if isUniqueViolation(err) {
 		return domain.ErrVersionConflict
