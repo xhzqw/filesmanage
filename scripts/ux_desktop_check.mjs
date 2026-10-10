@@ -117,7 +117,7 @@ class CDP {
 
 const CTRL = 2, SHIFT = 8;
 
-const NAV_LABELS = ["文档管理", "提要", "共享/关注", "统计", "审批", "回收站", "组织管理"];
+const NAV_LABELS = ["文档管理", "提要", "共享/关注", "统计", "审批", "回收站", "组织与权限"];
 
 // The shell login check must exercise a real logged-out login page: the
 // browser session from the previous suite is revoked first.
@@ -721,12 +721,21 @@ async function main() {
       check("test folder files listed", Boolean(rowsReady), String(rowsReady));
 
       // ---- rename dialog: real modal, focus inside, trap, escape, focus restore ----
-      const opened = await cdp.evaluate(`(()=>{
-        const btn=[...document.querySelectorAll('.row-actions button')].find(b=>b.textContent?.trim()==='重命名');
-        if(!btn)return 'no rename button';
-        btn.dataset.triggerMarker='1';
-        btn.focus();btn.click();return true;})()`);
-      check("rename dialog opened from the row action", opened === true, String(opened));
+      // Renaming is now owned by the file action Menu (no inline row button).
+      const trigger = await cdp.evaluate(`(()=>{
+        const row=[...document.querySelectorAll('tbody tr[data-id]')].find(r=>r.textContent?.includes('g1-plain.txt'));
+        const btn=row?.querySelector('.more-trigger');
+        if(!btn)return 'no row action trigger';
+        btn.dataset.triggerMarker='1';btn.focus();btn.click();return true;})()`);
+      const menuReady = await cdp.waitFor(`()=>[...document.querySelectorAll('[role="menuitem"]')].some(
+        b=>b.querySelector('.menu-label')?.textContent?.trim()==='重命名')`,5000);
+      const selectedRename = menuReady && await cdp.evaluate(`(()=>{
+        const item=[...document.querySelectorAll('[role="menuitem"]')].find(
+          b=>b.querySelector('.menu-label')?.textContent?.trim()==='重命名');
+        if(!item)return false;item.click();return true;})()`);
+      const opened = Boolean(trigger===true&&menuReady&&selectedRename&&await cdp.waitFor(
+        `()=>document.querySelector('dialog.dialog:modal .dialog-title')?.textContent==='重命名文件'`,5000));
+      check("rename dialog opened from the row action menu", opened, JSON.stringify({trigger,menuReady,selectedRename}));
       const modal = await cdp.evaluate(`(()=>{
         const d=document.querySelector('dialog.dialog');
         if(!d)return 'no dialog element';
@@ -847,12 +856,12 @@ async function main() {
 
       const routes = [
         { path: "/doc", active: "文档管理" },
-        { path: "/search", active: "搜索" },
+        { path: "/search", active: "提要" },
         { path: "/workspace", active: "共享/关注" },
         { path: "/stats", active: "统计" },
         { path: "/approvals", active: "审批" },
         { path: "/trash", active: "回收站" },
-        { path: "/org", active: "组织管理" },
+        { path: "/org", active: "组织与权限" },
         { path: `/preview/${shellFile.fileId}`, active: null },
       ];
       for (const route of routes) {
@@ -967,8 +976,8 @@ async function main() {
       sel = await selectedNames();
       const total = await rowCount();
       check("DI-08 Ctrl+A selects the loaded page", sel.length === total && total === 8, `selected=${sel.length} rows=${total}`);
-      const bar = await cdp.evaluate(`(()=>document.querySelector('.selection-bar')?.textContent||'')()`);
-      check("DI-08 selection bar reports the loaded-page scope", bar.includes("已选择 8 项") && bar.includes("当前加载页"), bar);
+      const bar = await cdp.evaluate(`(()=>document.querySelector('footer.status-bar')?.textContent||'')()`);
+      check("DI-08 status bar reports the loaded-page scope", bar.includes("已选 8 项") && bar.includes("共 8 个文件"), bar);
 
       // DI-07: F2 rename scope; Delete inside the input must not delete the file
       await cdp.key("Escape", "Escape", 27);
@@ -1219,7 +1228,7 @@ async function main() {
       const pwReady = await cdp.waitFor(`()=>document.querySelectorAll('tbody tr[data-id]').length>=3`, 20000);
       check("PW-00 fixture folder renders its three files", Boolean(pwReady), String(pwReady));
 
-      // ---- PW-01: docked shell geometry (spec §3.1) ----
+      // ---- PW-01: V3 docked shell geometry (8px gaps for rounded cards) ----
       const shell = await cdp.evaluate(`(()=>{
         const header=document.querySelector('header.header');
         const sidebar=document.querySelector('aside.sidebar');
@@ -1229,9 +1238,9 @@ async function main() {
                 sidebar:sidebar.getBoundingClientRect().width,
                 panelsPad:getComputedStyle(panels).padding,
                 panelsGap:getComputedStyle(panels).gap};})()`);
-      check("PW-01 header is 40px with a 1px seam and the sidebar is 240px flush",
+      check("PW-01 V3 header is 40px and panels have the consistent 8px gap",
         shell.header === "40px" && shell.headerBorder === "1px" && Math.round(shell.sidebar) === 240
-        && shell.panelsPad === "0px" && (shell.panelsGap === "normal" || shell.panelsGap === "0px"),
+        && shell.panelsPad === "0px" && shell.panelsGap === "8px",
         JSON.stringify(shell));
 
       // ---- PW-02: the six-column fixed grid never overflows ----
@@ -1319,8 +1328,16 @@ async function main() {
       // ---- PW-09: hold-to-confirm starts on press and cancels on release ----
       await cdp.navigate(`${BASE}/doc?folder=${pwFolderId}`);
       await cdp.waitFor(`()=>document.querySelectorAll('tbody tr[data-id]').length>=3`, 20000);
-      await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr[data-id]')].find(r=>r.textContent?.includes('pw-01.txt'));[...row.querySelectorAll('.row-actions button')].find(b=>b.textContent?.trim()==='删除')?.click();return true;})()`);
-      const deleteOpen = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('删除确认'));return Boolean(d);}`, 8000);
+      const deleteTrigger=await cdp.evaluate(`(()=>{
+        const row=[...document.querySelectorAll('tbody tr[data-id]')].find(r=>r.textContent?.includes('pw-01.txt'));
+        const button=row?.querySelector('.more-trigger');if(!button)return false;
+        button.click();return true;})()`);
+      const deleteMenu=await cdp.waitFor(`()=>[...document.querySelectorAll('[role="menuitem"]')].some(b=>b.querySelector('.menu-label')?.textContent?.trim()==='删除')`,5000);
+      const deleteSelected=deleteMenu&&await cdp.evaluate(`(()=>{
+        const button=[...document.querySelectorAll('[role="menuitem"]')].find(b=>b.querySelector('.menu-label')?.textContent?.trim()==='删除');
+        button?.click();return Boolean(button);})()`);
+      const deleteOpen=deleteTrigger&&deleteSelected&&await cdp.waitFor(
+        `()=>[...document.querySelectorAll('dialog.dialog')].some(x=>x.open&&x.textContent?.includes('删除确认'))`,8000);
       check("PW-09a delete confirmation dialog opens", Boolean(deleteOpen), String(deleteOpen));
       const armed = await cdp.evaluate(`(()=>{const b=document.querySelector('dialog.dialog .micro-hold');b?.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,cancelable:true}));return {found:Boolean(b),armed:b?.getAttribute('data-armed'),width:getComputedStyle(b).width,height:getComputedStyle(b).height};})()`);
       await delay(120);
