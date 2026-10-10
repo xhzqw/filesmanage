@@ -278,7 +278,7 @@ async function main() {
        gpuContextLost:window.__cadLastContext?.isContextLost?.()??false,
       }))()`);
       check("MOD08 route exit detaches canvas and frees GPU geometry",
-       cleanup.path==='/preview/${fileId}'&&cleanup.canvases===0&&
+       cleanup.path==='/preview/'+fileId&&cleanup.canvases===0&&
        cleanup.gpuContextLost===true,JSON.stringify({...cleanup,deletedBefore:beforeDispose}));
 
       // Reopen the real model to independently validate the WebGL loss path.
