@@ -33,6 +33,15 @@ export async function downloadZip(
  const blob=new Blob(chunks,{type:"application/zip"});
  // A ZIP is complete only after the stream ends (central directory received).
  if(blob.size<22)throw new Error("压缩包不完整");
+ // A truncated HTTP stream can end without an error after ZIP headers have
+ // already been sent. Require the central-directory end record before saving.
+ // The server writes archives without comments, so EOCD occupies the last 22B.
+ const tail=new Uint8Array(await blob.slice(-22).arrayBuffer());
+ if(tail[0]!==0x50||tail[1]!==0x4b||tail[2]!==0x05||tail[3]!==0x06){
+  throw new Error("ZIP 数据未完整接收，已阻止保存损坏的压缩包");
+ }
+ const count=tail[10]!+tail[11]!*256;
+ if(count!==ids.length)throw new Error("ZIP 条目数量不匹配，已阻止保存");
  const objectUrl=URL.createObjectURL(blob);
  try{
   const a=document.createElement("a");a.href=objectUrl;a.download="文件打包.zip";

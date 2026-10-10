@@ -40,7 +40,7 @@ func OfficeSemanticLines(data []byte,name string)([]string,bool){
      if len(lines)>compareMaxLines{return nil,false}
     }
    case xml.CharData:
-    if inText&&text.Len()<8192{text.Write([]byte(t))}
+    if inText{if text.Len()+len(t)>8192{return nil,false};text.Write([]byte(t))}
    }
   }
   return lines,len(lines)>0
@@ -59,7 +59,7 @@ func OfficeSemanticLines(data []byte,name string)([]string,bool){
     case xml.EndElement:
      if t.Name.Local=="t"{inText=false}
      if t.Name.Local=="si"{if len(shared)>=5000{return nil,false};shared=append(shared,b.String());inSI=false}
-    case xml.CharData:if inText&&b.Len()<8192{b.Write([]byte(t))}
+    case xml.CharData:if inText{if b.Len()+len(t)>8192{return nil,false};b.Write([]byte(t))}
     }
    }
   }
