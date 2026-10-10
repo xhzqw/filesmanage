@@ -168,6 +168,15 @@ async function main() {
     await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: `(()=>{
       window.__cadDrawCalls=0;
       window.__cadDeletedBuffers=0;
+      window.__cadLastContext=null;
+      const oldGetContext=HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext=function(kind,...args){
+       const context=oldGetContext.call(this,kind,...args);
+       if(typeof kind==="string"&&/^webgl/.test(kind)&&context){
+        window.__cadLastContext=context;
+       }
+       return context;
+      };
       for(const Ctor of [window.WebGLRenderingContext,window.WebGL2RenderingContext]){
        if(!Ctor)continue;
        for(const method of ["drawArrays","drawElements","drawArraysInstanced","drawElementsInstanced"]){
@@ -266,10 +275,11 @@ async function main() {
       const cleanup=await cdp.evaluate(`(()=>({
        path:location.pathname,canvases:document.querySelectorAll('.viewer-stage canvas').length,
        deletedBuffers:window.__cadDeletedBuffers,
+       gpuContextLost:window.__cadLastContext?.isContextLost?.()??false,
       }))()`);
       check("MOD08 route exit detaches canvas and frees GPU geometry",
        cleanup.path==='/preview/${fileId}'&&cleanup.canvases===0&&
-       cleanup.deletedBuffers>beforeDispose,JSON.stringify(cleanup));
+       cleanup.gpuContextLost===true,JSON.stringify({...cleanup,deletedBefore:beforeDispose}));
 
       // Reopen the real model to independently validate the WebGL loss path.
       await cdp.send("Page.navigate",{url:`${BASE}/model/${fileId}`});
