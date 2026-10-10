@@ -131,8 +131,9 @@ function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(folder:R
   });
  }
  return <aside className="perm-browser" aria-label="资源目录">
-  <div className="perm-browser-title">资源目录 <RareButton type="button" className="secondary-action" onClick={()=>void load("")}>刷新</RareButton></div>
-  <label className="perm-browser-search">按名称搜索目录<RareInput type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="查找资源目录"/></label>
+  <div className="perm-browser-title"><div><strong>资源目录</strong><small>选择目录管理访问权限</small></div>
+   <RareButton type="button" className="secondary-action" onClick={()=>void load("")}>刷新</RareButton></div>
+  <label className="perm-browser-search"><span>搜索目录</span><RareInput type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="输入目录名称"/></label>
   <div className="perm-browser-scroll">
    {needle?<>
     {searchState==="loading"&&<p className="hint">正在搜索…</p>}
@@ -273,25 +274,34 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
   {auditView?<PermissionAudit users={users}/>:<div className="perm-workspace">
   <ResourceBrowser selected={folderId} onSelect={selectFolder}/>
   <section className="perm-detail" aria-label="目录权限">
-   {!folderId?<div className="empty">请选择左侧资源目录，查看或配置直接授权。</div>:<>
+   {!folderId?<div className="perm-empty-state"><strong>选择一个资源目录</strong><p>从左侧目录树选择需要管理的目录，然后查看直接授权、实际有效权限和新增授权。</p></div>:<>
     <div className="perm-detail-heading">
-     <div><strong>目录权限</strong><span className="perm-path" title={folderId}>{selectedName?.id===folderId?selectedName.name:folderId}</span></div>
-     <div><Link to={"/doc?folder="+encodeURIComponent(folderId)}>返回文档目录</Link> <RareButton type="button" className="secondary-action" onClick={reload}>刷新授权</RareButton></div>
+     <div className="perm-heading-copy"><span className="perm-eyebrow">当前资源</span><h2 className="perm-path" title={selectedName?.id===folderId?selectedName.name:folderId}>{selectedName?.id===folderId?selectedName.name:folderId}</h2>
+      <span className="perm-resource-description">配置此目录的直接访问权限，或检查用户实际可执行的操作。</span></div>
+     <div className="perm-heading-actions"><Link to={"/doc?folder="+encodeURIComponent(folderId)}>在文档中打开</Link>
+      <RareButton type="button" className="secondary-action" onClick={reload}>刷新授权</RareButton></div>
     </div>
-    <div className="perm-section-title">直接授权记录{state==="ready"&&<span className="perm-subtle">{grants.length} 条</span>}</div>
-    <p className="perm-hint">显示的仅是当前目录直接 ACL；继承与共享可能仍赋予相同动作，不代表最终有效权限。</p>
+    <div className="perm-detail-layout">
+     <div className="perm-inspection-column">
+      <section className="perm-card perm-card-grants" aria-label="直接授权记录">
+       <div className="perm-section-title"><span>直接授权记录</span>{state==="ready"&&<span className="perm-count">{grants.length} 条</span>}</div>
+       <p className="perm-hint">这里显示直接写入当前目录的授权。继承授权和共享权限请通过下方的有效权限检查确认。</p>
     {notice&&<RareNotice tone={notice.error?"danger":"success"}>{notice.text}</RareNotice>}
     {state==="loading"&&<p role="status" className="hint">正在读取直接授权…</p>}
     {state==="failed"&&<RareNotice tone="danger">读取失败，不能编辑该目录的授权。</RareNotice>}
-    {state==="ready"&&<div className="perm-grants-scroller"><table className="perm-table"><thead><tr><th>授权主体</th><th>动作</th><th>范围</th><th>到期</th><th>操作</th></tr></thead>
+    {state==="ready"&&<div className="perm-grants-scroller">{grants.length>0?<table className="perm-table"><thead><tr><th>授权主体</th><th>动作</th><th>范围</th><th>到期</th><th>操作</th></tr></thead>
      <tbody>{grants.map(g=><tr key={g.id}><td>{names.get(g.subjectKind+":"+g.subjectId)??g.subjectId}<small>{g.subjectKind==="user"?"用户":"工作组"}</small></td>
       <td>{displayActions(g.actions)}</td><td>{g.scopeOnly?"仅当前目录":"包括子目录"}</td>
       <td>{g.expiresAt?new Date(g.expiresAt).toLocaleString("zh-CN"):"不过期"}</td>
       <td><RareButton type="button" tone="danger" className="danger" onClick={()=>{setRevokeError("");setRevokeTarget(g);}}>撤销</RareButton></td></tr>)}</tbody></table>
-     {grants.length===0&&<p className="empty">没有直接授权；可能仍存在父目录继承或共享权限。</p>}
+     :<div className="perm-empty-grants"><strong>暂无直接授权</strong><p>可在右侧为用户或工作组添加授权；当前目录仍可能存在继承或共享权限。</p></div>}
     </div>}
+      </section>
     <PermissionInsights folderId={folderId} users={users} usersState={usersState} refreshToken={refresh}/>
-    <div className="perm-section-title">新增直接授权</div>
+     </div>
+     <section className="perm-card perm-compose-card" aria-label="新增直接授权">
+      <div className="perm-section-title">新增直接授权</div>
+      <p className="perm-hint">选择授权对象与可执行的操作。提交前会展示确认摘要，敏感操作需再次确认。</p>
   <form className="perm-form" onSubmit={submit} onChange={event=>{
    if((event.target as HTMLElement).classList.contains("perm-risk-consent"))return;
    if(submitState==="review"){setSubmitState("edit");setRiskAcknowledged(false);}
@@ -338,6 +348,8 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
        {submitState==="saving"?"提交中…":submitState==="review"?"确认添加授权":"预览授权"}</RareButton>
      </div>
     </form>
+     </section>
+    </div>
    </>}
   </section>
   </div>}

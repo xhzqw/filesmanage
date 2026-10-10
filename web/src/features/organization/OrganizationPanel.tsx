@@ -670,16 +670,15 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
 
  return <div className="work-body">
   {/* 顶部工具栏：指标摘要与全局快捷创建 */}
-  <div className="toolbar">
-   <span className="toolbar-hint">{activeTab==="permissions"?"按资源目录管理直接授权":activeTab==="roles"?"管理角色 · 授权范围与职责":`账号 ${users.length} · 部门 ${departments.length} · 工作组 ${groups.length}`}</span>
-   {activeTab!=="permissions"&&activeTab!=="roles"&&<>
+  {activeTab!=="permissions"&&activeTab!=="roles"&&<div className="toolbar">
+   <span className="toolbar-hint">{`账号 ${users.length} · 部门 ${departments.length} · 工作组 ${groups.length}`}</span>
    <RareButton type="button" onClick={()=>{setNotice(null);setCreateDepartmentOpen(true);}}>
     <IconPlus/>新建部门
    </RareButton>
    <RareButton type="button" className="primary" tone="primary" onClick={()=>{setNotice(null);setCreateGroupOpen(true);}}>
     <IconPlus/>创建工作组
-   </RareButton></>}
-  </div>
+   </RareButton>
+  </div>}
 
   {notice&&<RareNotice tone={notice.tone==="error"?"danger":"info"}>{notice.text}</RareNotice>}
 
