@@ -61,14 +61,21 @@ type ExportRow struct {
 	UpdatedAt    time.Time
 }
 
+// CollaborationCursor is the stable descending keyset (created_at, id).
+// A zero ID requests the first page; limit always includes the lookahead row.
+type CollaborationCursor struct { CreatedAt time.Time; ID string }
+
 // CollaborationStore covers sharing, favorites, search, stats and export.
 type CollaborationStore interface {
 	ListSharesForSubject(context.Context, string, []string) ([]domain.Share, error)
 	ListSharesCreatedBy(context.Context, string) ([]domain.Share, error)
+	PageSharesForSubject(context.Context, string, []string, CollaborationCursor, int) ([]domain.Share, error)
+	PageSharesCreatedBy(context.Context, string, CollaborationCursor, int) ([]domain.Share, error)
 	ShareByID(context.Context, string) (domain.Share, error)
 	CreateShare(context.Context, domain.Share) error
 	RevokeShare(context.Context, string) error
 	ListFavorites(context.Context, string) ([]domain.Favorite, error)
+	PageFavorites(context.Context, string, CollaborationCursor, int) ([]domain.Favorite, error)
 	FavoriteExists(context.Context, string, string, string) (bool, error)
 	AddFavorite(context.Context, domain.Favorite) error
 	RemoveFavorite(context.Context, string, string, string) error

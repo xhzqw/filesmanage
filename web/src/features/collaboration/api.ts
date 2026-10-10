@@ -43,13 +43,16 @@ export type SearchPage={items:FileItem[];total:number;nextCursor:string};
 export type Workgroup={id:string;name:string;departmentId:string|null};
 
 export type FilePage={items:FileItem[];nextCursor:string};
+export type CollaborationPage<T>={items:T[];nextCursor:string};
 
 export const collaborationApi={
  shares:(scope:"received"|"sent")=>request<Share[]>("/shares?scope="+scope),
+ sharesPage:(scope:"received"|"sent",cursor="")=>request<CollaborationPage<Share>>("/shares?"+new URLSearchParams({scope,limit:"50",...(cursor?{cursor}:{})}).toString()),
  createShare:(body:{resourceKind:string;resourceId:string;recipientKind:string;recipientId:string;actions:string[];includeDescendants:boolean;expiresAt?:string})=>
   request<Share>("/shares",{method:"POST",body:JSON.stringify(body)}),
  revokeShare:(id:string)=>request<{revoked:string}>("/shares/"+id,{method:"DELETE"}),
  favorites:()=>request<Favorite[]>("/favorites"),
+ favoritesPage:(cursor="")=>request<CollaborationPage<Favorite>>("/favorites?"+new URLSearchParams({limit:"50",...(cursor?{cursor}:{})}).toString()),
  setFavorite:(kind:string,id:string,on:boolean)=>request<{id:string;favorited:boolean}>("/favorites/"+kind+"/"+id,{method:on?"PUT":"DELETE"}),
  // Recipient and resource sources for the share wizard and the resource picker.
  // /users and /groups are admin-only on the server: a denied read is surfaced by
@@ -57,7 +60,7 @@ export const collaborationApi={
  users:()=>request<User[]>("/users"),
  groups:()=>request<Workgroup[]>("/groups"),
  folderTree:()=>request<Folder[]>("/folders/tree"),
- folderFiles:(folderId:string)=>request<FilePage>("/files?"+new URLSearchParams({folder:folderId,sort:"updated_desc",limit:"50"}).toString()),
+ folderFiles:(folderId:string,cursor="")=>request<FilePage>("/files?"+new URLSearchParams({folder:folderId,sort:"updated_desc",limit:"50",...(cursor?{cursor}:{})}).toString()),
  // The opaque cursor is passed back verbatim; a missing or empty cursor asks for
  // the first page and nextCursor==="" means the server's last page (WF-30).
  search:(params:{folder?:string;scope?:string;q?:string;uploader?:string;type?:string;from?:string;to?:string;sort?:string;limit?:number;cursor?:string})=>{

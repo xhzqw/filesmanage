@@ -1,5 +1,5 @@
 import {RareBadge,RareButton,RareInput} from "../../shared/ui/rare";
-import {useEffect,useMemo,useState} from "react";
+import {useEffect,useMemo,useRef,useState} from "react";
 import {Link} from "react-router-dom";
 import {collaborationApi,type Favorite,type Share} from "./api";
 import {ShareDialog,type ShareResource} from "./ShareDialog";
@@ -9,10 +9,9 @@ import type {FileItem} from "../../entities/file/model";
 import type {Folder} from "../../entities/folder/model";
 import "./collaborationLayout.css";
 
-// Bounded page over the loaded folder tree; the filter narrows the remainder
-// instead of rendering an unbounded list (DESKTOP-INTERACTION-v1 §5/§9).
+// Progressive directory rendering over the authorized tree: every row remains
+// reachable by scrolling through pages or filtering, without a silent cut-off.
 const PICKER_PAGE=100;
-const MAX_DEPTH=32;
 
 type PickRow={folder:Folder;depth:number;path:string};
 
@@ -30,6 +29,15 @@ export function CollaborationPanel(){
  const[status,setStatus]=useState("loading");
  const[message,setMessage]=useState("");
  const[messageTone,setMessageTone]=useState<"info"|"error">("info");
+ const[nextCursor,setNextCursor]=useState("");
+ const[moreStatus,setMoreStatus]=useState<"idle"|"loading"|"failed">("idle");
+ const pageEpoch=useRef(0);
+ const pageBusy=useRef(false);
+ const[folderShownLimit,setFolderShownLimit]=useState(PICKER_PAGE);
+ const[fileCursor,setFileCursor]=useState("");
+ const[fileMoreState,setFileMoreState]=useState<"idle"|"loading"|"failed">("idle");
+ const fileEpoch=useRef(0);
+ const fileBusy=useRef(false);
  // Write revision: a successful create/revoke/favorite reloads the active list
  // even when the same result text is announced twice in a row.
  const[revision,setRevision]=useState(0);
@@ -53,18 +61,41 @@ export function CollaborationPanel(){
 
  useEffect(()=>{
   let valid=true;
-  setStatus("loading");
+  const epoch=++pageEpoch.current;
+  pageBusy.current=false;
+  setStatus("loading");setNextCursor("");setMoreStatus("idle");
   if(tab==="favorites"){
-   collaborationApi.favorites()
-    .then(data=>{if(valid){setFavorites(data);setStatus("ready");}})
-    .catch(()=>{if(valid)setStatus("failed");});
+   collaborationApi.favoritesPage()
+    .then(page=>{if(valid&&epoch===pageEpoch.current){setFavorites(page.items);setNextCursor(page.nextCursor);setStatus("ready");}})
+    .catch(()=>{if(valid&&epoch===pageEpoch.current)setStatus("failed");});
   }else{
-   collaborationApi.shares(tab)
-    .then(data=>{if(valid){setShares(data);setStatus("ready");}})
-    .catch(()=>{if(valid)setStatus("failed");});
+   collaborationApi.sharesPage(tab)
+    .then(page=>{if(valid&&epoch===pageEpoch.current){setShares(page.items);setNextCursor(page.nextCursor);setStatus("ready");}})
+    .catch(()=>{if(valid&&epoch===pageEpoch.current)setStatus("failed");});
   }
-  return()=>{valid=false;};
+  return()=>{valid=false;pageEpoch.current++;};
  },[tab,revision]);
+
+ async function loadMore(){
+  if(!nextCursor||pageBusy.current||status!=="ready")return;
+  const cursor=nextCursor,epoch=pageEpoch.current,activeTab=tab;
+  pageBusy.current=true;setMoreStatus("loading");
+  try{
+   if(activeTab==="favorites"){
+    const page=await collaborationApi.favoritesPage(cursor);
+    if(epoch!==pageEpoch.current)return;
+    setFavorites(old=>{const seen=new Set(old.map(f=>f.id));return old.concat(page.items.filter(f=>!seen.has(f.id)));});
+    setNextCursor(page.nextCursor);
+   }else{
+    const page=await collaborationApi.sharesPage(activeTab,cursor);
+    if(epoch!==pageEpoch.current)return;
+    setShares(old=>{const seen=new Set(old.map(f=>f.id));return old.concat(page.items.filter(f=>!seen.has(f.id)));});
+    setNextCursor(page.nextCursor);
+   }
+   setMoreStatus("idle");
+  }catch{if(epoch===pageEpoch.current)setMoreStatus("failed");}
+  finally{if(epoch===pageEpoch.current)pageBusy.current=false;}
+ }
 
  // The visible tree is read through the shared client so this feature stays
  // independent of the folders module (the architecture gate forbids
@@ -89,11 +120,26 @@ export function CollaborationPanel(){
   }
   let valid=true;
   setFiles([]);setFilesState("loading");
+  const epoch=++fileEpoch.current;
+  fileBusy.current=false;setFileCursor("");setFileMoreState("idle");
   collaborationApi.folderFiles(folderId)
-   .then(page=>{if(valid){setFiles(page.items);setFilesState("ready");}})
-   .catch(()=>{if(valid){setFiles([]);setFilesState("failed");}});
-  return()=>{valid=false;};
+   .then(page=>{if(valid&&epoch===fileEpoch.current){setFiles(page.items);setFileCursor(page.nextCursor);setFilesState("ready");}})
+   .catch(()=>{if(valid&&epoch===fileEpoch.current){setFiles([]);setFilesState("failed");}});
+  return()=>{valid=false;fileEpoch.current++;};
  },[folderId,pickKind]);
+
+ async function loadFilesMore(){
+  if(pickKind!=="file"||!folderId||!fileCursor||fileBusy.current||filesState!=="ready")return;
+  fileBusy.current=true;const epoch=fileEpoch.current,cursor=fileCursor;
+  setFileMoreState("loading");
+  try{
+   const page=await collaborationApi.folderFiles(folderId,cursor);
+   if(epoch!==fileEpoch.current)return;
+   setFiles(old=>{const seen=new Set(old.map(f=>f.id));return old.concat(page.items.filter(f=>!seen.has(f.id)));});
+   setFileCursor(page.nextCursor);setFileMoreState("idle");
+  }catch{if(epoch===fileEpoch.current)setFileMoreState("failed");}
+  finally{if(epoch===fileEpoch.current)fileBusy.current=false;}
+ }
 
  // Flat order with depth from visible parents only: a folder whose parent is
  // outside the visible set renders as a root, and hidden ancestors are never
@@ -118,19 +164,24 @@ export function CollaborationPanel(){
    return chain;
   };
   const out:PickRow[]=[];
-  const walk=(parentId:string,depth:number)=>{
-   if(depth>MAX_DEPTH)return;
-   for(const folder of childrenOf.get(parentId)??[]){
-    out.push({folder,depth,path:chainOf(folder.id).map(item=>item.name).join(" / ")});
-    walk(folder.id,depth+1);
+  const pending=(childrenOf.get("")??[]).slice().reverse().map(folder=>({folder,depth:0}));
+  const visited=new Set<string>();
+  while(pending.length){
+   const next=pending.pop()!;
+   if(visited.has(next.folder.id))continue;
+   visited.add(next.folder.id);
+   out.push({folder:next.folder,depth:next.depth,path:chainOf(next.folder.id).map(item=>item.name).join(" / ")});
+   for(const child of (childrenOf.get(next.folder.id)??[]).slice().reverse()){
+    pending.push({folder:child,depth:next.depth+1});
    }
-  };
-  walk("",0);
+  }
   return out;
  },[folders]);
 
  const keyword=filter.trim().toLowerCase();
- const shownFolders=(keyword===""?rows:rows.filter(row=>row.path.toLowerCase().includes(keyword))).slice(0,PICKER_PAGE);
+ useEffect(()=>{setFolderShownLimit(PICKER_PAGE);},[filter]);
+ const matchingFolders=keyword===""?rows:rows.filter(row=>row.path.toLowerCase().includes(keyword));
+ const shownFolders=matchingFolders.slice(0,folderShownLimit);
  const browseFolder=folders.find(folder=>folder.id===folderId);
  const chosenFile=files.find(file=>file.id===fileId);
  const chosen:ShareResource|null=pickKind==="folder"
@@ -268,12 +319,12 @@ export function CollaborationPanel(){
        style={{paddingLeft:String(8+Math.min(row.depth,8)*14)+"px"}} disabled={pickBusy}
        title={row.path} onClick={()=>pickFolder(row.folder.id)}>{row.folder.name}</RareButton>)}
      </div>}
-    {rows.length>PICKER_PAGE&&keyword===""&&<p className="hint">目录较多，仅显示前 {PICKER_PAGE} 个，请先按名称筛选。</p>}
+    {matchingFolders.length>folderShownLimit&&<RareButton type="button" className="secondary-action" disabled={pickBusy} onClick={()=>setFolderShownLimit(n=>n+PICKER_PAGE)}>加载更多目录（已显示 {shownFolders.length}/{matchingFolders.length}）</RareButton>}
     {pickKind==="file"&&<>
      {folderId===""&&<p className="hint">请先选择文件所在的目录。</p>}
      {filesState==="loading"&&<p className="hint">正在读取文件…</p>}
      {filesState==="failed"&&<p role="alert" className="notice error">获取文件失败，请重新选择目录或稍后重试。</p>}
-     {filesState==="ready"&&files.length>0&&<p className="hint">目录「{browseFolder?.name??folderId}」中的文件（最多显示 50 个）。</p>}
+     {filesState==="ready"&&files.length>0&&<p className="hint">目录「{browseFolder?.name??folderId}」 · 已显示 {files.length} 个文件</p>}
      {filesState==="ready"&&files.length===0&&<p className="share-list-empty">该目录没有文件。</p>}
      {filesState==="ready"&&files.length>0&&<div role="radiogroup" aria-label="选择文件" className="share-picker-list">
       {files.map(file=><RareButton key={file.id} type="button" role="radio" aria-checked={fileId===file.id}
@@ -284,6 +335,8 @@ export function CollaborationPanel(){
        <span className="share-option-detail">{file.updatedAt.replace("T"," ").slice(0,16)}</span>
       </RareButton>)}
      </div>}
+     {fileCursor&&filesState==="ready"&&<RareButton type="button" className="secondary-action" disabled={fileMoreState==="loading"||pickBusy} onClick={()=>void loadFilesMore()}>{fileMoreState==="loading"?"加载中…":fileMoreState==="failed"?"重试加载文件":"加载更多文件"}</RareButton>}
+     {fileMoreState==="failed"&&<span role="alert" className="hint">后续文件读取失败，已加载的文件仍可选择。</span>}
     </>}
     <p className="share-chosen" aria-live="polite"><span>已选：</span>
      {chosen===null?<span className="share-chosen-none">无</span>:<strong title={chosen.name}>{chosen.name}</strong>}
@@ -302,7 +355,7 @@ export function CollaborationPanel(){
   <div className="table collab-results">
    <div className="collab-results-head">
     <strong>{tab==="favorites"?"我的关注":tab==="received"?"与我共享":"我共享的"}</strong>
-    <span className="collab-results-count">{status==="ready"?(tab==="favorites"?favorites.length:shares.length)+" 项":""}</span>
+    <span className="collab-results-count">{status==="ready"?"已加载 "+(tab==="favorites"?favorites.length:shares.length)+" 项"+(nextCursor?" · 还有更多":""):""}</span>
     <RareButton type="button" className="secondary-action" onClick={refresh}>刷新</RareButton>
    </div>
    <div className="collab-table-scroll">
@@ -313,7 +366,7 @@ export function CollaborationPanel(){
      {status==="failed"&&<tr><td colSpan={5} className="empty" role="alert">获取关注列表失败，请刷新重试。</td></tr>}
      {status==="ready"&&favorites.length===0&&<tr><td colSpan={5} className="empty">没有关注内容。</td></tr>}
      {status==="ready"&&favorites.map(f=><tr key={f.id}>
-      <td>{f.kind==="file"?<Link to={"/preview/"+f.fileId}>{f.resourceName}</Link>:<Link to={"/doc?folder="+f.folderId}>{f.resourceName}</Link>}</td>
+      <td>{f.unavailable?<span className="collab-unavailable-name" title="当前资源不能访问">{f.resourceName||"不可访问的资源"}</span>:f.kind==="file"?<Link to={"/preview/"+f.fileId}>{f.resourceName}</Link>:<Link to={"/doc?folder="+f.folderId}>{f.resourceName}</Link>}</td>
       <td>{f.kind==="file"?"文件":"目录"}</td>
       <td>{f.unavailable
        ?<RareBadge tone="danger" dot title="资源已删除、失效或当前账号无权访问">已删除或不可访问</RareBadge>
@@ -345,6 +398,11 @@ export function CollaborationPanel(){
     </tbody>
    </table>}
    </div>
+   {(nextCursor||moreStatus==="failed")&&<div className="collab-pagination">
+    <span>已加载 {tab==="favorites"?favorites.length:shares.length} 项</span>
+    <RareButton type="button" className="secondary-action" disabled={moreStatus==="loading"} onClick={()=>void loadMore()}>{moreStatus==="loading"?"加载中…":moreStatus==="failed"?"重试加载":"加载更多"}</RareButton>
+    {moreStatus==="failed"&&<span role="alert">读取后续记录失败，已加载内容不受影响。</span>}
+   </div>}
   </div>
   </div>
   {shareTarget&&<ShareDialog resource={shareTarget} onClose={()=>setShareTarget(null)} onCreated={createdShare}/>}

@@ -283,7 +283,10 @@ func (s *Service) ListFavorites(ctx context.Context, u domain.User) ([]domain.Fa
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
-	return tx.ListFavorites(ctx, u.ID)
+	items, err := tx.ListFavorites(ctx, u.ID)
+	if err != nil { return nil, err }
+	if err := s.markUnavailableFavorites(ctx, tx, u, items); err != nil { return nil, err }
+	return items, nil
 }
 
 // SetFavorite adds or removes a favorite idempotently.
@@ -296,18 +299,18 @@ func (s *Service) SetFavorite(ctx context.Context, u domain.User, kind, resource
 		return err
 	}
 	defer tx.Rollback(ctx)
-	// The resource must be visible to the caller before it can be favorited.
-	if kind == "file" {
-		if _, err = s.visibleFile(ctx, tx, u, resourceID, domain.ActionPreview); err != nil {
-			return err
-		}
-	} else {
-		folder, fErr := s.activeFolder(ctx, tx, resourceID)
-		if fErr != nil {
-			return fErr
-		}
-		if err = s.require(ctx, tx, u, folder.ID, domain.ActionList); err != nil {
-			return err
+	// Adding requires current access. Removing one's own saved favorite is
+	// allowed even after deletion or permission revocation, otherwise stale
+	// entries would be impossible to clean up from the UI.
+	if on {
+		if kind == "file" {
+			if _, err = s.visibleFile(ctx, tx, u, resourceID, domain.ActionPreview); err != nil {
+				return err
+			}
+		} else {
+			folder, fErr := s.activeFolder(ctx, tx, resourceID)
+			if fErr != nil { return fErr }
+			if err = s.require(ctx, tx, u, folder.ID, domain.ActionList); err != nil { return err }
 		}
 	}
 	fileID, folderID := "", ""

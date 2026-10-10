@@ -17,13 +17,15 @@ const shareSelect = "SELECT s.id,s.file_id,s.folder_id,s.recipient_kind,s.recipi
 func scanShare(row rowScanner) (domain.Share, error) {
 	var s domain.Share
 	var actions []string
+	var fileName, folderName string
 	err := row.Scan(&s.ID, &s.FileID, &s.FolderID, &s.RecipientKind, &s.RecipientID, &actions,
 		&s.IncludeDescendants, &s.ExpiresAt, &s.RevokedAt, &s.CreatedBy, &s.CreatedAt,
-		&s.ResourceName, &s.ResourceName, &s.RecipientName)
+		&fileName, &folderName, &s.RecipientName)
 	if err != nil {
 		return domain.Share{}, err
 	}
 	s.Actions = toActions(actions)
+	if s.FileID != nil { s.ResourceName = fileName } else { s.ResourceName = folderName }
 	return s, nil
 }
 

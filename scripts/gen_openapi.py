@@ -1038,8 +1038,10 @@ add("GET", "/api/formats/cad", operation("CAD format support matrix", "CAD", "fo
 
 # --- Collaboration ---
 add("GET", "/api/shares", operation("List shares involving the caller", "Collaboration", "listShares", security=SESSION,
-    params=[query("scope", "mine = created by me; tome = targeting me; empty = both.", {"type": "string", "enum": ["mine", "tome"]})],
-    responses=dict([json_ok(arr(ref("Share")), "Shares."), resp("401", ERR["401"]), resp("403", ERR["403"])])))
+    params=[query("scope", "received: active shares targeting current user/groups; sent: created by administrator.", {"type": "string", "enum": ["received", "sent"]}, required=True),
+            query("limit", "Opt-in keyset paging, 1–100; omitting it returns the legacy array.", {"type": "integer", "minimum": 1, "maximum": 100}),
+            query("cursor", "Opaque cursor, only valid with limit.")],
+    responses=dict([json_ok({"oneOf": [arr(ref("Share")), obj({"items": arr(ref("Share")), "nextCursor": string()},required=["items","nextCursor"])]}, "Legacy array or paged items and nextCursor when limit is present."), resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"])])))
 
 add("POST", "/api/shares", operation("Share a file or folder", "Collaboration", "createShare", security=SESSION,
     request={"application/json": {"schema": ref("CreateShareRequest")}},
@@ -1062,7 +1064,9 @@ add("GET", "/api/share-recipients", operation("List share recipients (minimal pi
     auth_note=MUST_CHANGE))
 
 add("GET", "/api/favorites", operation("List favorites", "Collaboration", "listFavorites", security=SESSION,
-    responses=dict([json_ok(arr(ref("Favorite")), "Favorites of the caller."), resp("401", ERR["401"]), resp("403", ERR["403"])])))
+    params=[query("limit", "Opt-in keyset paging, 1–100; omitting it returns the legacy array.", {"type": "integer", "minimum": 1, "maximum": 100}),
+            query("cursor", "Opaque cursor, only valid with limit.")],
+    responses=dict([json_ok({"oneOf": [arr(ref("Favorite")), obj({"items": arr(ref("Favorite")), "nextCursor": string()},required=["items","nextCursor"])]}, "Legacy array or paged items and nextCursor. Unreadable resource names are masked."), resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"])])))
 
 add("PUT", "/api/favorites/{kind}/{id}", operation("Add a favorite", "Collaboration", "setFavoriteOn", security=SESSION,
     params=[{"name": "kind", "in": "path", "required": True, "schema": {"type": "string", "enum": ["file", "folder"]}, "description": "Resource kind."}, id_param("id", "Resource id.")],

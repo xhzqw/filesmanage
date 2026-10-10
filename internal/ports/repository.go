@@ -160,10 +160,13 @@ type Repository interface {
 	// Collaboration: shares, favorites, search, stats and export.
 	ListSharesForSubject(context.Context, string, []string) ([]domain.Share, error)
 	ListSharesCreatedBy(context.Context, string) ([]domain.Share, error)
+	PageSharesForSubject(context.Context, string, []string, CollaborationCursor, int) ([]domain.Share, error)
+	PageSharesCreatedBy(context.Context, string, CollaborationCursor, int) ([]domain.Share, error)
 	ShareByID(context.Context, string) (domain.Share, error)
 	CreateShare(context.Context, domain.Share) error
 	RevokeShare(context.Context, string) error
 	ListFavorites(context.Context, string) ([]domain.Favorite, error)
+	PageFavorites(context.Context, string, CollaborationCursor, int) ([]domain.Favorite, error)
 	FavoriteExists(context.Context, string, string, string) (bool, error)
 	AddFavorite(context.Context, domain.Favorite) error
 	RemoveFavorite(context.Context, string, string, string) error

@@ -76,6 +76,10 @@
 .collab-workspace:not(.with-picker) .collab-table-scroll th:nth-child(5){width:11%}
 .collab-workspace:not(.with-picker) .collab-table-scroll th:nth-child(6){width:12%}
 .collab-workspace:not(.with-picker) .collab-table-scroll th:last-child{width:10%}
+.collab-workspace .collab-unavailable-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary)}
+.collab-pagination{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;flex:none;padding:6px 12px;border-top:1px solid var(--border-hairline);font-size:11px;color:var(--text-secondary)}
+.collab-pagination .rare-button{min-height:27px}
+.collab-root .share-workbench>.secondary-action{align-self:flex-start;flex:none;min-height:27px;font-size:12px}
 @container collaboration (max-width:840px){
  .collab-workspace.with-picker{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(210px,40%) minmax(220px,1fr)}
  .collab-root .share-workbench{padding:8px 10px}
