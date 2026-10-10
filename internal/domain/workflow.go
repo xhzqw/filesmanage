@@ -8,6 +8,7 @@ type ApprovalPolicy struct {
 	FolderID   string
 	ApproverID string
 	Enabled    bool
+	ApproverChain []string
 }
 
 // Approval is a pending or decided modification request. The proposed bytes
@@ -18,6 +19,8 @@ type Approval struct {
 	FileID             string
 	RequesterID        string
 	ApproverID         string
+	ApproverChain      []string
+	StepIndex          int
 	PayloadBlobID      string
 	BaseSeq            int
 	Action             string

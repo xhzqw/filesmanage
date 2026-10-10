@@ -9,6 +9,9 @@ export type Approval={
  requesterName:string;
  approverId:string;
  approverName:string;
+ approverIds:string[];
+ stepIndex:number;
+ stepTotal:number;
  baseSeq:number;
  action:"edit"|"rollback";
  state:"pending"|"approved"|"rejected"|"cancelled"|"conflicted";

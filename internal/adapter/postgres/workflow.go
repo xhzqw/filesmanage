@@ -16,8 +16,8 @@ import (
 func (r *Repository) ApprovalPolicyFor(ctx context.Context, folderID string) (domain.ApprovalPolicy, bool, error) {
 	var p domain.ApprovalPolicy
 	err := r.Q.QueryRow(ctx,
-		"SELECT folder_id,approver_id,enabled FROM approval_policies WHERE folder_id=$1", folderID).
-		Scan(&p.FolderID, &p.ApproverID, &p.Enabled)
+		"SELECT folder_id,approver_id,enabled,approver_chain FROM approval_policies WHERE folder_id=$1", folderID).
+		Scan(&p.FolderID, &p.ApproverID, &p.Enabled, &p.ApproverChain)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.ApprovalPolicy{}, false, nil
@@ -29,9 +29,9 @@ func (r *Repository) ApprovalPolicyFor(ctx context.Context, folderID string) (do
 
 func (r *Repository) UpsertApprovalPolicy(ctx context.Context, p domain.ApprovalPolicy) error {
 	_, err := r.Q.Exec(ctx,
-		`INSERT INTO approval_policies(id,folder_id,approver_id,enabled) VALUES($1,$2,$3,$4)
-		 ON CONFLICT (folder_id) DO UPDATE SET approver_id=EXCLUDED.approver_id,enabled=EXCLUDED.enabled`,
-		newID("policy"), p.FolderID, p.ApproverID, p.Enabled)
+		`INSERT INTO approval_policies(id,folder_id,approver_id,enabled,approver_chain) VALUES($1,$2,$3,$4,$5)
+		 ON CONFLICT (folder_id) DO UPDATE SET approver_id=EXCLUDED.approver_id,enabled=EXCLUDED.enabled,approver_chain=EXCLUDED.approver_chain`,
+		newID("policy"), p.FolderID, p.ApproverID, p.Enabled, p.ApproverChain)
 	if isForeignKeyViolation(err) {
 		return domain.ErrInvalidInput
 	}
@@ -45,20 +45,20 @@ func (r *Repository) ClearApprovalPolicy(ctx context.Context, folderID string) e
 
 // ---------- approvals ----------
 
-const approvalSelect = "SELECT a.id,a.file_id,a.requester_id,a.approver_id,a.payload_blob_id,a.base_seq,a.action,a.rollback_target_seq,a.state,coalesce(a.reason,''),coalesce(a.decision_comment,''),a.created_at,a.decided_at,coalesce(f.name,''),b.sha256,b.size_bytes,coalesce(rq.display_name,''),coalesce(ap.display_name,'') FROM approvals a LEFT JOIN files f ON f.id=a.file_id LEFT JOIN blobs b ON b.id=a.payload_blob_id LEFT JOIN users rq ON rq.id=a.requester_id LEFT JOIN users ap ON ap.id=a.approver_id"
+const approvalSelect = "SELECT a.id,a.file_id,a.requester_id,a.approver_id,a.payload_blob_id,a.base_seq,a.action,a.rollback_target_seq,a.state,coalesce(a.reason,''),coalesce(a.decision_comment,''),a.created_at,a.decided_at,coalesce(f.name,''),b.sha256,b.size_bytes,coalesce(rq.display_name,''),coalesce(ap.display_name,''),a.approver_chain,a.step_index FROM approvals a LEFT JOIN files f ON f.id=a.file_id LEFT JOIN blobs b ON b.id=a.payload_blob_id LEFT JOIN users rq ON rq.id=a.requester_id LEFT JOIN users ap ON ap.id=a.approver_id"
 
 func scanApproval(row rowScanner) (domain.Approval, error) {
 	var a domain.Approval
 	err := row.Scan(&a.ID, &a.FileID, &a.RequesterID, &a.ApproverID, &a.PayloadBlobID, &a.BaseSeq, &a.Action,
 		&a.RollbackTargetSeq, &a.State, &a.Reason, &a.DecisionComment, &a.CreatedAt, &a.DecidedAt,
-		&a.FileName, &a.PayloadSha256, &a.PayloadSize, &a.RequesterName, &a.ApproverName)
+		&a.FileName, &a.PayloadSha256, &a.PayloadSize, &a.RequesterName, &a.ApproverName, &a.ApproverChain, &a.StepIndex)
 	return a, err
 }
 
 func (r *Repository) CreateApproval(ctx context.Context, a domain.Approval) error {
 	_, err := r.Q.Exec(ctx,
-		"INSERT INTO approvals(id,file_id,requester_id,approver_id,payload_blob_id,base_seq,action,rollback_target_seq,state,reason) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
-		a.ID, a.FileID, a.RequesterID, a.ApproverID, a.PayloadBlobID, a.BaseSeq, a.Action, a.RollbackTargetSeq, a.State, a.Reason)
+		"INSERT INTO approvals(id,file_id,requester_id,approver_id,payload_blob_id,base_seq,action,rollback_target_seq,state,reason,approver_chain,step_index) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
+		a.ID, a.FileID, a.RequesterID, a.ApproverID, a.PayloadBlobID, a.BaseSeq, a.Action, a.RollbackTargetSeq, a.State, a.Reason, a.ApproverChain, a.StepIndex)
 	if isUniqueViolation(err) {
 		return domain.ErrApprovalPending
 	}
@@ -135,6 +135,13 @@ func (r *Repository) DecideApproval(ctx context.Context, id, state, comment stri
 		return false, err
 	}
 	return tag.RowsAffected() == 1, nil
+}
+
+// Optimistic single-step advance; another approver or cancellation cannot win
+// the same step. The caller commits this update with its audit event.
+func (r *Repository) AdvanceApproval(ctx context.Context,id string,step int,nextID string)(bool,error){
+ tag,err:=r.Q.Exec(ctx,"UPDATE approvals SET step_index=$2+1,approver_id=$3 WHERE id=$1 AND state='pending' AND step_index=$2 AND approver_id=approver_chain[$2+1]",id,step,nextID)
+ if err!=nil{return false,err};return tag.RowsAffected()==1,nil
 }
 
 // ---------- edit locks ----------

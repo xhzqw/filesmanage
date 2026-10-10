@@ -262,6 +262,7 @@ schema("Approval", obj({
     "requesterName": string(),
     "approverId": string(),
     "approverName": string(),
+    "approverIds":arr(string()),"stepIndex":integer(),"stepTotal":integer(),
     "baseSeq": integer("Version the pending change is based on."),
     "action": string(enum=["edit", "rollback"]),
     "state": string(enum=["pending", "approved", "rejected", "cancelled"]),

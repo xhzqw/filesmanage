@@ -116,10 +116,9 @@ func (h *Handler) approveApproval(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	c.JSON(200, gin.H{"ok": true, "data": gin.H{
-		"fileId": result.FileID, "versionSeq": result.VersionSeq,
-		"sha256": result.Sha256, "status": "committed",
-	}})
+	status:="committed"
+	if result.VersionSeq==0{status="pending"}
+	c.JSON(200,gin.H{"ok":true,"data":gin.H{"fileId":result.FileID,"versionSeq":result.VersionSeq,"sha256":result.Sha256,"status":status}})
 }
 
 func (h *Handler) rejectApproval(c *gin.Context) {
@@ -165,7 +164,7 @@ func (h *Handler) getApprovalPolicy(c *gin.Context) {
 		return
 	}
 	c.JSON(200, gin.H{"ok": true, "data": gin.H{
-		"configured": true, "approverId": policy.ApproverID, "enabled": policy.Enabled,
+		"configured": true, "approverId": policy.ApproverID, "approverIds":policy.ApproverChain, "enabled": policy.Enabled,
 	}})
 }
 
@@ -176,17 +175,20 @@ func (h *Handler) setApprovalPolicy(c *gin.Context) {
 	}
 	var req struct {
 		ApproverID string
+		ApproverIDs []string
 		Enabled    bool
 	}
-	if c.ShouldBindJSON(&req) != nil || req.ApproverID == "" {
+	if c.ShouldBindJSON(&req) != nil || (req.ApproverID == "" && len(req.ApproverIDs)==0) {
 		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
 		return
 	}
-	if err := h.S.SetApprovalPolicy(c.Request.Context(), u, c.Param("id"), req.ApproverID, req.Enabled); err != nil {
+	chain:=req.ApproverIDs
+	if len(chain)==0{chain=[]string{req.ApproverID}}
+	if err := h.S.SetApprovalChainPolicy(c.Request.Context(), u, c.Param("id"), chain, req.Enabled); err != nil {
 		respondError(c, err)
 		return
 	}
-	c.JSON(200, gin.H{"ok": true, "data": gin.H{"configured": true, "approverId": req.ApproverID, "enabled": req.Enabled}})
+	c.JSON(200, gin.H{"ok": true, "data": gin.H{"configured": true, "approverId": chain[0], "approverIds":chain, "enabled": req.Enabled}})
 }
 
 func (h *Handler) clearApprovalPolicy(c *gin.Context) {

@@ -49,7 +49,7 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
   try{
    if(action==="approve"){
     const result=await workflowApi.approve(id,drafts[id]??"");
-    setMessage(result.status==="committed"?"已通过并生成新版本":"审批已受理，尚未生成新版本");
+    setMessage(result.status==="committed"?"已通过并生成新版本":"本级审批已通过，已转交下一级；当前版本不变");
    }else if(action==="reject"){
     await workflowApi.reject(id,drafts[id]??"");
     setMessage("已拒绝，当前版本不变");
@@ -86,7 +86,7 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
       <td><a href={"/preview/"+a.fileId}>{a.fileName}</a></td>
       <td>{a.requesterName}</td>
       <td>{ACTION_LABELS[a.action]??a.action}{a.rollbackTargetSeq?` → v${a.rollbackTargetSeq}`:""}</td>
-      <td>v{a.baseSeq}</td>
+      <td>v{a.baseSeq} · 第 {a.stepIndex+1}/{a.stepTotal} 级</td>
       <td>{a.createdAt.replace("T"," ").slice(0,16)}</td>
       <td className="row-actions">
        <RareInput aria-label={`审批意见 — ${a.fileName}`} placeholder="审批意见（可选）" value={drafts[a.id]??""}
@@ -110,7 +110,7 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
       <td><a href={"/preview/"+a.fileId}>{a.fileName}</a></td>
       <td>{ACTION_LABELS[a.action]??a.action}</td>
       <td>{STATE_LABELS[a.state]??a.state}</td>
-      <td>{a.approverName}</td>
+      <td>{a.approverName} · {a.stepIndex+1}/{a.stepTotal} 级</td>
       <td>{a.decisionComment||"—"}</td>
       <td>{a.state==="pending"&&<RareButton type="button" disabled={busyId!==""} onClick={()=>act(a.id,"cancel")}>撤回</RareButton>}</td>
      </tr>)}

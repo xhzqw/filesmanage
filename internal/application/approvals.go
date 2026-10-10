@@ -61,7 +61,7 @@ func (s *Service) SubmitEdit(ctx context.Context, u domain.User, fileID string, 
 		return domain.Approval{}, err
 	}
 	approval := domain.Approval{
-		ID: NewID("appr"), FileID: file.ID, RequesterID: u.ID, ApproverID: policy.ApproverID,
+		ID: NewID("appr"), FileID: file.ID, RequesterID: u.ID, ApproverID: policy.ApproverID, ApproverChain:policy.ApproverChain,
 		PayloadBlobID: blob.ID, BaseSeq: baseSeq, Action: domain.VersionActionEdit,
 		State: domain.ApprovalPending, Reason: reason,
 	}
@@ -113,7 +113,7 @@ func (s *Service) SubmitRollback(ctx context.Context, u domain.User, fileID stri
 		return domain.Approval{}, domain.ErrVersionConflict
 	}
 	approval := domain.Approval{
-		ID: NewID("appr"), FileID: file.ID, RequesterID: u.ID, ApproverID: policy.ApproverID,
+		ID: NewID("appr"), FileID: file.ID, RequesterID: u.ID, ApproverID: policy.ApproverID, ApproverChain:policy.ApproverChain,
 		PayloadBlobID: target.BlobID, BaseSeq: expectedCurrentSeq, Action: domain.VersionActionRollback,
 		RollbackTargetSeq: new(targetSeq), State: domain.ApprovalPending, Reason: reason,
 	}
@@ -159,6 +159,18 @@ func (s *Service) Approve(ctx context.Context, actor domain.User, approvalID, co
 			_ = tx.Commit(ctx)
 		}
 		return SaveResult{}, domain.ErrVersionConflict
+	}
+	// Non-final approvals advance the chain without publishing bytes.
+	if approval.StepIndex+1<len(approval.ApproverChain){
+		nextID:=approval.ApproverChain[approval.StepIndex+1]
+		won,err:=tx.AdvanceApproval(ctx,approval.ID,approval.StepIndex,nextID)
+		if err!=nil{return SaveResult{},err}
+		if !won{return SaveResult{},domain.ErrVersionConflict}
+		if err=auditRequired(ctx,tx,actor,"approval.step_approved","file",approval.FileID,"success",map[string]any{
+			"approvalId":approval.ID,"step":approval.StepIndex+1,"nextApproverId":nextID,"comment":comment,
+		});err!=nil{return SaveResult{},err}
+		if err=tx.Commit(ctx);err!=nil{return SaveResult{},err}
+		return SaveResult{FileID:approval.FileID},nil
 	}
 	target, err := tx.VersionBySeq(ctx, approval.FileID, currentSeq(file))
 	if err != nil {

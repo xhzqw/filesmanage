@@ -9,6 +9,7 @@ func approvalPayload(a domain.Approval) gin.H {
 	payload := gin.H{
 		"id": a.ID, "fileId": a.FileID, "fileName": a.FileName,
 		"requesterId": a.RequesterID, "requesterName": a.RequesterName,
+		"approverIds":a.ApproverChain,"stepIndex":a.StepIndex,"stepTotal":len(a.ApproverChain),
 		"approverId": a.ApproverID, "approverName": a.ApproverName,
 		"baseSeq": a.BaseSeq, "action": a.Action, "state": a.State,
 		"reason": a.Reason, "decisionComment": a.DecisionComment,

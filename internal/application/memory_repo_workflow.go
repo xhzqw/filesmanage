@@ -23,6 +23,7 @@ func (r *memoryRepo) UpsertApprovalPolicy(_ context.Context, p domain.ApprovalPo
 	if _, ok := r.users[p.ApproverID]; !ok {
 		return domain.ErrInvalidInput
 	}
+	for _,id:=range p.ApproverChain{if _,ok:=r.users[id];!ok{return domain.ErrInvalidInput}}
 	r.policies[p.FolderID] = p
 	return nil
 }
@@ -108,6 +109,18 @@ func (r *memoryRepo) DecideApproval(_ context.Context, id, state, comment string
 		}
 	}
 	return false, ports.ErrRowMissing
+}
+
+func (r *memoryRepo) AdvanceApproval(_ context.Context,id string,step int,nextID string)(bool,error){
+ r.mu.Lock();defer r.mu.Unlock()
+ for i:=range r.approvals{
+  a:=&r.approvals[i]
+  if a.ID!=id{continue}
+  if a.State!=domain.ApprovalPending||a.StepIndex!=step||a.ApproverID!=a.ApproverChain[step]{return false,nil}
+  a.StepIndex++;a.ApproverID=nextID
+  return true,nil
+ }
+ return false,ports.ErrRowMissing
 }
 
 func (r *memoryRepo) LockByFileID(_ context.Context, fileID string) (domain.EditLock, error) {

@@ -24,6 +24,7 @@ type ApprovalStore interface {
 	// DecideApproval flips a pending request to its terminal state and reports
 	// whether this caller won the transition (false = concurrent decider won).
 	DecideApproval(context.Context, string, string, string) (bool, error)
+	AdvanceApproval(context.Context, string, int, string) (bool, error)
 }
 
 type EditLockStore interface {

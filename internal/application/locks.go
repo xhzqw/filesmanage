@@ -33,6 +33,12 @@ func (s *Service) ApprovalPolicy(ctx context.Context, u domain.User, folderID st
 }
 
 func (s *Service) SetApprovalPolicy(ctx context.Context, actor domain.User, folderID, approverID string, enabled bool) error {
+ return s.SetApprovalChainPolicy(ctx,actor,folderID,[]string{approverID},enabled)
+}
+func (s *Service) SetApprovalChainPolicy(ctx context.Context, actor domain.User, folderID string, chain []string, enabled bool) error {
+ if len(chain)<1||len(chain)>5{return domain.ErrInvalidInput}
+ seen:=map[string]bool{}
+ for _,id:=range chain{if id==""||seen[id]{return domain.ErrInvalidInput};seen[id]=true}
 	if err := s.requireAdmin(actor); err != nil {
 		return err
 	}
@@ -45,19 +51,17 @@ func (s *Service) SetApprovalPolicy(ctx context.Context, actor domain.User, fold
 	if err != nil {
 		return err
 	}
-	approver, err := tx.UserByID(ctx, approverID)
-	if err != nil {
-		return notFoundOr(err)
+	for _,id:=range chain{
+		approver,err:=tx.UserByID(ctx,id)
+		if err!=nil{return notFoundOr(err)}
+		if approver.DisabledAt!=nil{return domain.ErrInvalidInput}
 	}
-	if approver.DisabledAt != nil {
-		return domain.ErrInvalidInput
-	}
-	policy := domain.ApprovalPolicy{FolderID: folder.ID, ApproverID: approverID, Enabled: enabled}
+	policy := domain.ApprovalPolicy{FolderID: folder.ID, ApproverID: chain[0],ApproverChain:chain, Enabled: enabled}
 	if err = tx.UpsertApprovalPolicy(ctx, policy); err != nil {
 		return mapError(err)
 	}
 	audit(ctx, tx, actor, "approval_policy.set", "folder", folder.ID, "success",
-		map[string]any{"approverId": approverID, "enabled": enabled})
+		map[string]any{"approverIds": chain, "enabled": enabled})
 	return tx.Commit(ctx)
 }
 
