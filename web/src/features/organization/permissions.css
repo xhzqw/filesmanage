@@ -110,7 +110,10 @@
 /* Permissions are a content-sized editor, not a full-screen document canvas.
  * Do not stretch a one-row ACL and a short form to the viewport height.
  * Keep long resource trees independently scrollable instead of growing the page. */
-.work.work-compact-permissions{align-self:flex-start}
+.work.work-compact-permissions{
+ align-self:flex-start;width:100%;max-height:calc(100dvh - 85px);
+ overflow-x:hidden;overflow-y:auto
+}
 .org-compact-permissions{flex:none;min-height:0}
 .org-compact-permissions .org-workbench.org-permissions-workbench{
  flex:none;grid-template-rows:auto;align-items:start
