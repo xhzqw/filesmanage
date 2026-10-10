@@ -2,6 +2,8 @@ import{create}from"zustand";
 import{errorCode}from"../../shared/errors";
 import{uploadFileWithProgress}from"../../shared/uploadClient";
 import{uploadResumable,resumableThreshold,resumableMaxFile}from"../../shared/resumableUpload";
+import {useSession} from "../../app/session";
+import {fingerprintFile,readUploadTasks,storeUploadTasks} from "../../shared/uploadQueuePersistence";
 import{
  enqueue,markUploading,markProgress,markServerProcessing,markCommitted,markFailed,markCancelled,
  cancelTask,retryTask,renameTask,skipTask,
@@ -33,6 +35,7 @@ export type UploadState={
  retry:(queueId:string)=>void;
  rename:(queueId:string,name:string)=>void;
  skip:(queueId:string)=>void;
+ attach:(queueId:string,file:File)=>Promise<void>;
 };
 
 // queueId → the AbortController of its in-flight XHR, so 取消 on an uploading
@@ -43,6 +46,16 @@ const inFlight=new Map<string,AbortController>();
 // a second enqueue/retry only wakes it, and each pass re-reads the queue, so an
 // item added while an upload is in flight is picked up in order.
 let pumping=false;
+let activeUserId="";
+function hydrateForUser(userId:string){
+ if(activeUserId===userId)return;
+ activeUserId=userId;
+ const tasks=readUploadTasks(userId).map(saved=>({
+  ...saved,file:null,status:"interrupted" as const,
+  error:undefined,progress:undefined,serverProcessing:false,
+ }));
+ useUploadStore.setState({tasks});
+}
 
 // One queue for every entry point (WF-27): the drop zone and the toolbar file
 // input in FileTable enqueue here and share the same items, statuses, per-item
@@ -52,11 +65,17 @@ export const useUploadStore=create<UploadState>((set,get)=>({
  tasks:[],
  currentFolderId:"",
  reloadTick:0,
- setCurrentFolder:folderId=>{if(get().currentFolderId!==folderId)set({currentFolderId:folderId});},
+ setCurrentFolder:folderId=>{const id=useSession.getState().user?.id;if(id)hydrateForUser(id);if(get().currentFolderId!==folderId)set({currentFolderId:folderId});},
  enqueueFiles:(files,targetFolderId)=>{
   // An empty target is "no writable folder", never a folder id.
   if(targetFolderId===""||files.length===0)return;
+  const previous=new Set(get().tasks.map(t=>t.queueId));
   set({tasks:enqueue(get().tasks,files,targetFolderId)});
+  for(const task of get().tasks.filter(t=>!previous.has(t.queueId)&&t.file&&t.size>=resumableThreshold&&t.size<=resumableMaxFile)){
+   void fingerprintFile(task.file!).then(fingerprint=>{
+    useUploadStore.setState(state=>({tasks:state.tasks.map(t=>t.queueId===task.queueId?{...t,fingerprint}:t)}));
+   }).catch(()=>{});
+  }
   void pump();
  },
  // A queued item is cancelled in state; an uploading one can only be aborted
@@ -67,13 +86,38 @@ export const useUploadStore=create<UploadState>((set,get)=>({
   if(!task)return;
   if(task.status==="uploading"){inFlight.get(queueId)?.abort();return;}
   if(task.status==="queued")set({tasks:cancelTask(get().tasks,queueId)});
+  if(task.status==="interrupted")set({tasks:get().tasks.filter(item=>item.queueId!==queueId)});
  },
  // Retry/rename go through the pure transitions, which keep the idempotency
  // key for a retry and mint a fresh one for a rename (§5.1).
  retry:queueId=>{set({tasks:retryTask(get().tasks,queueId)});void pump();},
  rename:(queueId,name)=>{set({tasks:renameTask(get().tasks,queueId,name)});void pump();},
+ attach:async(queueId,file)=>{
+  const task=get().tasks.find(t=>t.queueId===queueId&&t.status==="interrupted");
+  if(!task)return;
+  const matches=file.name===(task.sourceName??task.name)&&file.size===task.size&&
+   file.lastModified===task.lastModified&&file.type===(task.fileType??"");
+  if(!matches){
+   set({tasks:get().tasks.map(t=>t.queueId===queueId?{...t,error:"文件名、大小、修改时间或格式与原文件不符"}:t)});
+   return;
+  }
+  const fingerprint=await fingerprintFile(file).catch(()=>"");
+  if(!fingerprint||fingerprint!==task.fingerprint){
+   set({tasks:get().tasks.map(t=>t.queueId===queueId?{...t,error:"文件内容校验不匹配，已阻止续传"}:t)});
+   return;
+  }
+  const chosen=task.name===file.name?file:new File([file],task.name,{type:file.type,lastModified:file.lastModified});
+  set({tasks:get().tasks.map(t=>t.queueId===queueId?{...t,file:chosen,status:"queued",error:undefined}:t)});
+  void pump();
+ },
  skip:queueId=>{set({tasks:skipTask(get().tasks,queueId)});},
 }));
+
+// One bounded per-user metadata cache. The original bytes are never persisted.
+useUploadStore.subscribe(state=>{
+ const userId=useSession.getState().user?.id;
+ if(userId&&activeUserId===userId)storeUploadTasks(userId,state.tasks);
+});
 
 // Sequential pump. It re-reads the queue every pass, so an item enqueued while
 // an upload is in flight is picked up in order. The store, not a component,
@@ -84,8 +128,9 @@ async function pump(){
  pumping=true;
  try{
   for(;;){
-   const next=useUploadStore.getState().tasks.find(task=>task.status==="queued");
+   const next=useUploadStore.getState().tasks.find(task=>task.status==="queued"&&task.file!==null);
    if(!next)break;
+   if(!next.file)continue;
    const controller=new AbortController();
    inFlight.set(next.queueId,controller);
    useUploadStore.setState(state=>({tasks:markUploading(state.tasks,next.queueId)}));

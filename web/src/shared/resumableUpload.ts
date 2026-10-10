@@ -50,7 +50,7 @@ export async function uploadResumable(folder:string,file:File,operationKey:strin
  if(file.size<1||file.size>resumableMaxFile)throw new ApiError("E_BAD",400,undefined,"文件大小不支持分块上传");
  const signal=handlers.signal;
  const storageKey=await operationIdentity(folder,file);
- const key=cachedKey(storageKey)||operationKey||newIdempotencyKey();
+ const key=operationKey||cachedKey(storageKey)||newIdempotencyKey();
  saveKey(storageKey,key);
  let session:UploadSession|undefined;
  const path=(id:string)=>"/uploads/resumable/"+encodeURIComponent(id);

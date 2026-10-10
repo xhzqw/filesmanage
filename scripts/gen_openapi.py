@@ -261,6 +261,17 @@ schema("TrashEntry", obj({
     "subtreeCount": integer("Folders swept into the trash entry."),
 }, required=["id", "oldName", "deletedBy", "deletedByName", "deletedAt"]))
 
+schema("ApprovalEvent", obj({
+ "id":integer(),"approvalId":string(),"actorId":string(),"actorName":string(),
+ "kind":string(enum=["submitted","advanced","approved","rejected","cancelled","conflicted"]),
+ "stepIndex":integer(),"comment":string(),"createdAt":timestamp(),
+},required=["id","approvalId","actorId","actorName","kind","stepIndex","comment","createdAt"]))
+schema("ApprovalNotification", obj({
+ "id":integer(),"approvalId":string(),"fileName":string(),
+ "kind":string(enum=["submitted","advanced","approved","rejected","cancelled","conflicted"]),
+ "stepIndex":integer(),"createdAt":timestamp(),"read":boolean(),
+},required=["id","approvalId","fileName","kind","stepIndex","createdAt","read"]))
+
 schema("Approval", obj({
     "id": string(),
     "fileId": string(),
@@ -1045,6 +1056,15 @@ add("GET", "/api/files/{id}/lock", operation("Lock status", "Workflow", "lockSta
 add("GET", "/api/approvals", operation("List approvals visible to the caller", "Workflow", "listApprovals", security=SESSION,
     params=[query("scope", "mine = requested by me; pending = awaiting my decision; empty = both.", {"type": "string", "enum": ["mine", "pending"]})],
     responses=dict([json_ok(arr(ref("Approval")), "Approvals."), resp("401", ERR["401"]), resp("403", ERR["403"])])))
+
+add("GET","/api/approvals/{id}/history",operation("Read immutable per-step approval activity (participant or admin)","Workflow","approvalHistory",security=SESSION,
+ params=[id_param("id","Approval ID")],
+ responses=dict([json_ok(arr(ref("ApprovalEvent")),"Ordered approval events."),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+add("GET","/api/approvals/notifications",operation("Read the authenticated user's newest 100 approval notifications","Workflow","approvalNotifications",security=SESSION,
+ responses=dict([json_ok(arr(ref("ApprovalNotification")),"Recipient-scoped, newest first."),resp("401",ERR["401"])])))
+add("POST","/api/approvals/notifications/{id}/read",operation("Mark own approval notification read (idempotent)","Workflow","readApprovalNotification",security=SESSION,
+ params=[id_param("id","Notification ID")],
+ responses=dict([json_ok(obj({"read":integer()}),"Recipient-owned receipt."),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("404",ERR["404"])])))
 
 add("POST", "/api/approvals/{id}/approve", operation("Approve a pending change", "Workflow", "approveApproval", security=SESSION,
     params=[id_param("id", "Approval id.")],

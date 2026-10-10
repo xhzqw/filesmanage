@@ -33,6 +33,7 @@ export function DropZone({folderId,disabled,onCommitted,children}:{folderId:stri
  const retry=useUploadStore(state=>state.retry);
  const rename=useUploadStore(state=>state.rename);
  const skip=useUploadStore(state=>state.skip);
+ const attach=useUploadStore(state=>state.attach);
  const[dragging,setDragging]=useState(false);
  const[renamingId,setRenamingId]=useState<string|null>(null);
  const[renameValue,setRenameValue]=useState("");
@@ -132,12 +133,22 @@ export function DropZone({folderId,disabled,onCommitted,children}:{folderId:stri
       </div>
       <span className="upload-item-status">
        {task.status==="queued"&&"排队中"}
+       {task.status==="interrupted"&&<span className="upload-item-error">{task.error||"刷新后待重新选择原文件"}</span>}
        {task.status==="uploading"&&(processing?"服务端处理中…":sent?`上传中 ${percent}%`:"上传中…")}
        {task.status==="committed"&&(task.result?`${task.result.deduplicated?"内容已存在，当前为":"已生成"} v${task.result.versionSeq}`:"")}
        {task.status==="failed"&&<span className="upload-item-error">{task.error}</span>}
        {task.status==="cancelled"&&<span title="取消只保证本地中断请求；服务端已提交的结果无法撤销">已取消</span>}
       </span>
       <div className="upload-item-actions">
+       {task.status==="interrupted"&&<>
+        <label className="upload-resume-picker">选择原文件
+         <input type="file" aria-label={`重新选择 ${task.sourceName??task.name}`} onChange={event=>{
+          const file=event.currentTarget.files?.[0];if(file)void attach(task.queueId,file);
+          event.currentTarget.value="";
+         }}/>
+        </label>
+        <RareButton type="button" onClick={()=>cancel(task.queueId)}>移除</RareButton>
+       </>}
        {task.status==="queued"&&<RareButton type="button" onClick={()=>cancel(task.queueId)}>取消</RareButton>}
        {task.status==="uploading"&&<RareButton type="button" title="取消只中断本地请求；服务端已提交的结果无法撤销" onClick={()=>cancel(task.queueId)}>取消</RareButton>}
        {task.status==="failed"&&<>

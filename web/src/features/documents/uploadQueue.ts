@@ -18,7 +18,7 @@ import type{UploadProgress}from"../../shared/uploadClient";
 // committed a result" (§5.1); a client-side `validating` state still has no
 // representation here, so status is reported honestly rather than faked.
 
-export type UploadStatus="queued"|"uploading"|"committed"|"failed"|"cancelled";
+export type UploadStatus="queued"|"uploading"|"committed"|"failed"|"cancelled"|"interrupted";
 
 export type UploadResult={fileId:string;versionSeq:number;deduplicated:boolean};
 
@@ -31,7 +31,11 @@ export type UploadTask={
  status:UploadStatus;
  error?:string;
  result?:UploadResult;
- file:File;
+ file:File|null;
+ sourceName?:string;
+ fileType?:string;
+ lastModified?:number;
+ fingerprint?:string;
  progress?:UploadProgress;
  serverProcessing?:boolean;
 };
@@ -57,6 +61,7 @@ export function enqueue(tasks:UploadTask[],files:File[],targetFolderId:string):U
   idempotencyKey:newIdempotencyKey(),
   status:"queued",
   file,
+  sourceName:file.name,fileType:file.type,lastModified:file.lastModified,
  }));
  return tasks.concat(added);
 }
@@ -120,7 +125,7 @@ export function retryTask(tasks:UploadTask[],queueId:string):UploadTask[]{
 // new operation identity, so it gets a fresh idempotency key (§5.1, WF-25).
 export function renameTask(tasks:UploadTask[],queueId:string,name:string):UploadTask[]{
  return tasks.map(task=>task.queueId===queueId&&task.status!=="committed"
-  ?{...task,name,file:renameFile(task.file,name),idempotencyKey:newIdempotencyKey(),status:"queued",error:undefined,progress:undefined,serverProcessing:false}
+  ?{...task,name,file:task.file?renameFile(task.file,name):null,idempotencyKey:newIdempotencyKey(),status:task.file?"queued":"interrupted",error:undefined,progress:undefined,serverProcessing:false}
   :task);
 }
 

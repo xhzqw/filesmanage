@@ -21,6 +21,9 @@ type memoryRepo struct {
 	groupMembers   map[string][]string
 	policies       map[string]domain.ApprovalPolicy
 	approvals      []domain.Approval
+	approvalEvents []domain.ApprovalEvent
+	approvalNotifications []domain.ApprovalNotification
+	approvalNotificationOwners []string
 	locks          map[string]domain.EditLock
 	officeSessions []domain.OfficeSession
 	saveEvents     []domain.OfficeSaveEvent

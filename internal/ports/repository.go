@@ -17,6 +17,7 @@ var ErrRowMissing = errors.New("row missing")
 type Repository interface {
 	Ping(context.Context) error
 	ResumableUploadRepository
+	ApprovalActivityStore
 
 	// Identity and sessions.
 	UserByLogin(context.Context, string) (domain.User, string, error)
