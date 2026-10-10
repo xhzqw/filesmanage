@@ -486,7 +486,7 @@ async function parseMshInWorker(
  const parts:MshPart[]=[];
  try{
   for(let index=0;index<result.parts.length;index++){
-   const part=result.parts[index];
+   const part=result.parts[index]!;
    const geometry=new THREE.BufferGeometry();
    geometry.setAttribute("position",new THREE.BufferAttribute(part.positions,3));
    geometry.setAttribute("normal",new THREE.BufferAttribute(part.normals,3));
