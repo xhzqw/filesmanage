@@ -31,3 +31,27 @@ Badge `tone`: neutral / info / success / warning / danger，`dot` 只表示视�
 
 每次修改必须在目标机运行 `bash scripts/build.sh --with-tests`，并运行不修改业务数据的 `node scripts/rare_ui_readonly_check.mjs`。
 所有可能创建/永久删除验收文件的 UX 脚本，仅允许使用专用的 `*_test` 数据库和独立端口，不能在 18091 的共享业务数据上执行。
+
+
+## 独立 UX 破坏性回归环境（仅目标机）
+
+`scripts/ux_isolated_lab.sh setup` 创建或恢复 `filesmanage_ux_test`，从当前 migration 初始化空白测试数据，
+独立口令写入远端 root-only 实验目录，并启动仅监听 `127.0.0.1:18092` 的 QA 实例；**不复用真实业务数据库、
+Blob 存储或管理员密码，不丢弃任何数据库**。再次运行会检验保存的 PID 及 `/proc/<pid>/environ` 中的实际数据库、
+监听地址和 Blob 路径，验证失败时不允许运行变更性测试。
+
+命令（只能 SSH 进入目标机后执行）：
+
+```bash
+bash scripts/ux_isolated_lab.sh setup
+bash scripts/ux_isolated_lab.sh status
+bash scripts/ux_isolated_lab.sh run ux_desktop_check
+bash scripts/ux_isolated_lab.sh run ux_visual_check
+bash scripts/ux_isolated_lab.sh run ux_workflows_check
+bash scripts/ux_isolated_lab.sh run ux_perf_check
+bash scripts/ux_isolated_lab.sh run ui_geometry_check
+bash scripts/ux_isolated_lab.sh stop
+```
+
+脚本 **不** 删除测试数据库与证据，方便失败后独立审查。若人工清理，请明确核对测试库名和目标目录；
+任何将生产端口或共享数据混入此实验室的做法都应拒绝执行。
