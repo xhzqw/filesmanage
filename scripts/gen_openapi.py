@@ -431,6 +431,7 @@ schema("OfficeSession", obj({
 schema("ApprovalPolicy", obj({
     "configured": boolean(),
     "approverId": string("Present when configured."),
+    "approverIds":arr(string(),desc="Ordered approval chain (1-5 people)."),
     "enabled": boolean("Present when configured."),
 }, required=["configured"]))
 
@@ -570,7 +571,7 @@ schema("LockTokenRequest", obj({"lockToken": string()}, required=["lockToken"]))
 
 schema("ApprovalDecisionRequest", obj({"comment": string("Optional decision note recorded in the audit trail.")}))
 
-schema("SetApprovalPolicyRequest", obj({"approverId": string(), "enabled": boolean()}, required=["approverId", "enabled"]))
+schema("SetApprovalPolicyRequest", obj({"approverId": string(), "approverIds":arr(string()), "enabled": boolean()}, required=["enabled"]))
 
 schema("CreateShareRequest", obj({
     "resourceKind": string(enum=["file", "folder"]),
@@ -1068,7 +1069,7 @@ add("GET", "/api/folders/{id}/approval-policy", operation("Read folder approval 
 add("PUT", "/api/folders/{id}/approval-policy", operation("Set folder approval policy", "Workflow", "setApprovalPolicy", security=SESSION,
     params=[id_param("id", "Folder id.")],
     request={"application/json": {"schema": ref("SetApprovalPolicyRequest")}},
-    responses=dict([json_ok(obj({"configured": {"type": "boolean", "enum": [True]}, "approverId": string(), "enabled": boolean()}, required=["configured", "approverId", "enabled"]), "Saved policy."),
+    responses=dict([json_ok(obj({"configured": {"type": "boolean", "enum": [True]}, "approverId": string(), "approverIds":arr(string()), "enabled": boolean()}, required=["configured", "approverId", "approverIds", "enabled"]), "Saved policy."),
                     resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"])])))
 
 add("DELETE", "/api/folders/{id}/approval-policy", operation("Clear folder approval policy", "Workflow", "clearApprovalPolicy", security=SESSION,

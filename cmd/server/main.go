@@ -100,10 +100,15 @@ func main() {
 	} else if swept > 0 {
 		log.Printf("staging sweep removed %d orphaned upload(s)", swept)
 	}
-	if swept,err:=store.store.SweepResumable(48*time.Hour);err!=nil{log.Printf("resumable sweep: %v",err)}else if swept>0{log.Printf("resumable sweep removed %d expired file(s)",swept)}
+	cleanupResumable:=func(){
+		if swept,err:=store.store.SweepResumable(48*time.Hour);err!=nil{log.Printf("resumable sweep: %v",err)}else if swept>0{log.Printf("resumable sweep removed %d expired file(s)",swept)}
+		ctx,cancel:=context.WithTimeout(context.Background(),15*time.Second);defer cancel()
+		if deleted,err:=postgres.New(pool).PruneExpiredResumableUploads(ctx);err!=nil{log.Printf("resumable session cleanup: %v",err)}else if deleted>0{log.Printf("pruned %d expired upload sessions",deleted)}
+	}
+	cleanupResumable()
 	go func(){
 		tick:=time.NewTicker(time.Hour);defer tick.Stop()
-		for range tick.C{if _,err:=store.store.SweepResumable(48*time.Hour);err!=nil{log.Printf("resumable cleanup: %v",err)}}
+		for range tick.C{cleanupResumable()}
 	}()
 	service := application.New(postgres.New(pool), store).WithOffice(application.OfficeConfig{
 		EditorURL:     os.Getenv("FILESMANAGE_OFFICE_URL"),

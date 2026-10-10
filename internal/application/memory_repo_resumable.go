@@ -3,6 +3,9 @@ import("context";"filesmanage/internal/domain";"filesmanage/internal/ports";"tim
 func(r *memoryRepo) CreateResumableUpload(_ context.Context,u domain.ResumableUpload)error{
  r.mu.Lock();defer r.mu.Unlock()
  for _,v:=range r.resumableUploads{if v.OwnerID==u.OwnerID&&v.OperationKey==u.OperationKey{return domain.ErrVersionConflict}}
+ count:=0;var reserved int64
+ for _,v:=range r.resumableUploads{if v.OwnerID==u.OwnerID&&v.State=="open"&&v.ExpiresAt.After(time.Now()){count++;reserved+=v.ExpectedSize}}
+ if count>=3||reserved+u.ExpectedSize>2*int64(1<<30){return domain.ErrInvalidInput}
  if r.resumableUploads==nil{r.resumableUploads=map[string]domain.ResumableUpload{}}
  u.ExpiresAt=time.Now().Add(24*time.Hour)
  r.resumableUploads[u.ID]=u;return nil
