@@ -64,7 +64,7 @@ export async function downloadZip(
   const reader=res.body.getReader();
   const chunks:Uint8Array<ArrayBuffer>[]=[];
   let received=0;
-  let tail=new Uint8Array(0);
+  let tail:Uint8Array<ArrayBufferLike>=new Uint8Array(0);
   try{
    for(;;){
     const {done,value}=await reader.read();
