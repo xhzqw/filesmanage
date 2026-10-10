@@ -101,8 +101,12 @@ export async function uploadResumable(folder:string,file:File,operationKey:strin
   return result;
  }catch(err){
   if(signal?.aborted){
-   clearKey(storageKey);
-   if(session)void requestUpload(path(session.id),"DELETE",undefined,{}).catch(()=>undefined);
+   // Identity changes stop local I/O, but must retain the previous user's
+   // durable server offset for a later explicit recovery with the same file.
+   if(signal.reason!=="identity.changed"){
+    clearKey(storageKey);
+    if(session)void requestUpload(path(session.id),"DELETE",undefined,{}).catch(()=>undefined);
+   }
    throw new ApiError("E_CANCELLED",0);
   }
   throw err;

@@ -28,6 +28,7 @@ export type UploadState={
  // Bumped only by a commit into currentFolderId; the queue consumer watches it
  // and runs its onCommitted reload (WF-28).
  reloadTick:number;
+ bindUser:(userId:string)=>void;
  setCurrentFolder:(folderId:string,userId:string)=>void;
  enqueueFiles:(files:File[],targetFolderId:string)=>void;
  cancel:(queueId:string)=>void;
@@ -46,14 +47,22 @@ const inFlight=new Map<string,AbortController>();
 // item added while an upload is in flight is picked up in order.
 let pumping=false;
 let activeUserId="";
-function hydrateForUser(userId:string){
+let identityEpoch=0;
+
+// Explicit identity boundary: never allow a still-running task from the
+// previous principal to mutate the next principal's queue or progress.
+function bindUser(userId:string){
  if(activeUserId===userId)return;
+ if(activeUserId)storeUploadTasks(activeUserId,useUploadStore.getState().tasks);
+ identityEpoch++;
+ for(const controller of inFlight.values())controller.abort("identity.changed");
+ inFlight.clear();
  activeUserId=userId;
- const tasks=readUploadTasks(userId).map(saved=>({
+ const tasks=userId?readUploadTasks(userId).map(saved=>({
   ...saved,file:null,status:"interrupted" as const,
   error:undefined,progress:undefined,serverProcessing:false,
- }));
- useUploadStore.setState({tasks});
+ })):[];
+ useUploadStore.setState({tasks,currentFolderId:""});
 }
 
 // One queue for every entry point (WF-27): the drop zone and the toolbar file
@@ -64,14 +73,21 @@ export const useUploadStore=create<UploadState>((set,get)=>({
  tasks:[],
  currentFolderId:"",
  reloadTick:0,
- setCurrentFolder:(folderId,userId)=>{if(userId)hydrateForUser(userId);if(get().currentFolderId!==folderId)set({currentFolderId:folderId});},
+ bindUser,
+ setCurrentFolder:(folderId,userId)=>{
+  if(folderId)bindUser(userId);
+  else if(activeUserId!==userId)return; // late unmount from an older account
+  if(get().currentFolderId!==folderId)set({currentFolderId:folderId});
+ },
  enqueueFiles:(files,targetFolderId)=>{
   // An empty target is "no writable folder", never a folder id.
   if(targetFolderId===""||files.length===0)return;
   const previous=new Set(get().tasks.map(t=>t.queueId));
+  const epoch=identityEpoch;
   set({tasks:enqueue(get().tasks,files,targetFolderId)});
   for(const task of get().tasks.filter(t=>!previous.has(t.queueId)&&t.file&&t.size>=resumableThreshold&&t.size<=resumableMaxFile)){
    void fingerprintFile(task.file!).then(fingerprint=>{
+    if(epoch!==identityEpoch)return;
     useUploadStore.setState(state=>({tasks:state.tasks.map(t=>t.queueId===task.queueId?{...t,fingerprint}:t)}));
    }).catch(()=>{});
   }
@@ -100,7 +116,9 @@ export const useUploadStore=create<UploadState>((set,get)=>({
    set({tasks:get().tasks.map(t=>t.queueId===queueId?{...t,error:"文件名、大小、修改时间或格式与原文件不符"}:t)});
    return;
   }
+  const epoch=identityEpoch;
   const fingerprint=await fingerprintFile(file).catch(()=>"");
+  if(epoch!==identityEpoch||!get().tasks.some(t=>t.queueId===queueId&&t.status==="interrupted"))return;
   if(!fingerprint||fingerprint!==task.fingerprint){
    set({tasks:get().tasks.map(t=>t.queueId===queueId?{...t,error:"文件内容校验不匹配，已阻止续传"}:t)});
    return;
@@ -129,8 +147,10 @@ async function pump(){
    const next=useUploadStore.getState().tasks.find(task=>task.status==="queued"&&task.file!==null);
    if(!next)break;
    if(!next.file)continue;
+   const epoch=identityEpoch;
    const controller=new AbortController();
    inFlight.set(next.queueId,controller);
+   if(epoch!==identityEpoch)continue;
    useUploadStore.setState(state=>({tasks:markUploading(state.tasks,next.queueId)}));
    try{
     const uploader=next.file.size>=resumableThreshold&&next.file.size<=resumableMaxFile?uploadResumable:uploadFileWithProgress;
@@ -140,12 +160,14 @@ async function pump(){
      // moves to server-processing and only the committed envelope resolves it
      // (COMPLEX-WORKFLOWS-v1 §5.1).
      onProgress:progress=>{
+      if(epoch!==identityEpoch)return;
       useUploadStore.setState(state=>{
        const withBytes=markProgress(state.tasks,next.queueId,progress);
        return {tasks:progress.total>0&&progress.loaded>=progress.total?markServerProcessing(withBytes,next.queueId):withBytes};
       });
      },
     });
+    if(epoch!==identityEpoch)continue;
     useUploadStore.setState(state=>{
      const tasks=markCommitted(state.tasks,next.queueId,{fileId:reply.fileId,versionSeq:reply.versionSeq,deduplicated:reply.deduplicated});
      // WF-28: the queue survives a folder switch, so only a commit into the
@@ -153,10 +175,11 @@ async function pump(){
      return next.targetFolderId===state.currentFolderId?{tasks,reloadTick:state.reloadTick+1}:{tasks};
     });
    }catch(error){
+    if(epoch!==identityEpoch)continue;
     useUploadStore.setState(state=>({tasks:errorCode(error)==="E_CANCELLED"?
      markCancelled(state.tasks,next.queueId):markFailed(state.tasks,next.queueId,failureCopy(error))}));
    }finally{
-    inFlight.delete(next.queueId);
+    if(inFlight.get(next.queueId)===controller)inFlight.delete(next.queueId);
    }
   }
  }finally{

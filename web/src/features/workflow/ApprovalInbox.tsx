@@ -1,5 +1,6 @@
 import {RareButton,RareInput} from "../../shared/ui/rare";
 import {useEffect,useState} from "react";
+import {useLocation} from "react-router-dom";
 import {workflowApi} from "./api";
 import type {Approval} from "./api";
 import {errorCode,errorCopy} from "../../shared/errors";
@@ -28,7 +29,10 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
  const[drafts,setDrafts]=useState<Record<string,string>>({});
  const[busyId,setBusyId]=useState("");
  const[reloadToken,setReloadToken]=useState(0);
+ const[activeList,setActiveList]=useState<"inbox"|"mine">("inbox");
  const[selected,setSelected]=useState("");
+ const location=useLocation();
+ useEffect(()=>{const id=new URLSearchParams(location.search).get("item");setSelected(id&&id.length<=128?id:"");},[location.search]);
  const[events,setEvents]=useState<ApprovalEvent[]>([]);
  const[historyError,setHistoryError]=useState("");
  const[notifications,setNotifications]=useState<ApprovalNotification[]>([]);
@@ -41,7 +45,8 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
   const timer=window.setInterval(()=>void refresh(),20000);
   const onLive=()=>{void refresh();setReloadToken(n=>n+1);};
   window.addEventListener("filesmanage:approvals-changed",onLive);
-  return()=>{active=false;window.clearInterval(timer);window.removeEventListener("filesmanage:approvals-changed",onLive);};
+  window.addEventListener("filesmanage:approval-notifications-read",refresh);
+  return()=>{active=false;window.clearInterval(timer);window.removeEventListener("filesmanage:approvals-changed",onLive);window.removeEventListener("filesmanage:approval-notifications-read",refresh);};
  },[reloadToken]);
  useEffect(()=>{
   if(!selected){setEvents([]);return;}
@@ -53,7 +58,7 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
  async function readNote(note:ApprovalNotification){
   setSelected(note.approvalId);
   if(!note.read){
-   try{await approvalActivityApi.read(note.id);setNotifications(items=>items.map(item=>item.id===note.id?{...item,read:true}:item));}
+   try{await approvalActivityApi.read(note.id);setNotifications(items=>items.map(item=>item.id===note.id?{...item,read:true}:item));window.dispatchEvent(new Event("filesmanage:approval-notifications-read"));}
    catch{setNoticeError("标记已读失败");}
   }
  }
@@ -107,11 +112,14 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
  if(status!=="ready")return <p className="empty">{status==="loading"?"正在加载审批…":"获取审批列表失败"}</p>;
 
  return <div className="work-body">
-  <div className="toolbar"><span className="toolbar-hint">待我审批 {inbox.length} · 我发起的 {mine.length} · 未读通知 {unread}</span></div>
+  <div className="toolbar approval-tabs" role="tablist" aria-label="审批分类">
+   <RareButton type="button" role="tab" aria-selected={activeList==="inbox"} onClick={()=>setActiveList("inbox")}>待我审批 {inbox.length}</RareButton>
+   <RareButton type="button" role="tab" aria-selected={activeList==="mine"} onClick={()=>setActiveList("mine")}>我发起的 {mine.length}</RareButton>
+  </div>
   {message&&<p role="status" className="notice">{message}</p>}
   <div className="approval-workbench">
    <div className="approval-main">
-  <section className="table">
+  {activeList==="inbox"&&<section className="table">
    <h3>待我审批</h3>
    <table>
     <thead><tr><th scope="col">文件</th><th scope="col">申请人</th><th scope="col">类型</th><th scope="col">基准版本</th><th scope="col">申请时间</th><th scope="col">操作</th></tr></thead>
@@ -135,8 +143,8 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
      </tr>)}
     </tbody>
    </table>
-  </section>
-  <section className="table">
+  </section>}
+  {activeList==="mine"&&<section className="table">
    <h3>我发起的</h3>
    <table>
     <thead><tr><th scope="col">文件</th><th scope="col">类型</th><th scope="col">状态</th><th scope="col">审批人</th><th scope="col">意见</th><th scope="col">操作</th></tr></thead>
@@ -145,16 +153,17 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
      {mine.map(a=><tr key={a.id}>
       <td><a href={"/preview/"+a.fileId}>{a.fileName}</a></td>
       <td>{ACTION_LABELS[a.action]??a.action}</td>
-      <td>{STATE_LABELS[a.state]??a.state}</td>
+      <td><span className="approval-status" data-state={a.state}>{STATE_LABELS[a.state]??a.state}</span></td>
       <td>{a.approverName} · {a.stepIndex+1}/{a.stepTotal} 级</td>
       <td>{a.decisionComment||"—"}</td>
       <td className="row-actions"><RareButton type="button" onClick={()=>setSelected(a.id)}>历史</RareButton>{a.state==="pending"&&<RareButton type="button" disabled={busyId!==""} onClick={()=>act(a.id,"cancel")}>撤回</RareButton>}</td>
      </tr>)}
     </tbody>
    </table>
-  </section>
+  </section>}
    </div>
    <aside className="approval-side" aria-label="审批通知与时间线">
+    {!selected&&<>
     <div className="approval-side-heading"><h3>站内通知 {unread>0?`（${unread} 未读）`:""}</h3><RareButton type="button" onClick={()=>setShowAllNotes(v=>!v)}>{showAllNotes?"收起":"更多"}</RareButton></div>
     {noticeError&&<p role="alert" className="notice error">{noticeError}</p>}
     {notifications.length===0&&<p className="empty">暂无通知</p>}
@@ -164,6 +173,7 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
      </div>
      <RareButton type="button" onClick={()=>void readNote(n)}>{n.read?"查看":"查看并已读"}</RareButton>
     </div>)}
+    </>}
     {selected&&<section aria-label="审批时间线">
      <div className="approval-side-heading"><h3>审批时间线</h3><RareButton type="button" onClick={()=>setSelected("")}>关闭</RareButton></div>
      {historyError&&<p role="alert" className="notice error">{historyError}</p>}

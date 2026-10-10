@@ -1,3 +1,10 @@
+.approval-tabs{display:flex;flex:none;align-items:center;gap:4px;padding:3px 7px;min-height:36px}
+.approval-tabs>.rare-button{font-size:12px;min-height:27px;border:1px solid transparent;border-radius:var(--radius-sm);color:var(--text-secondary);background:transparent}
+.approval-tabs>.rare-button[aria-selected=true]{color:var(--brand-blue);background:var(--brand-cyan-muted);border-color:var(--border-hairline);font-weight:650}
+.approval-status{display:inline-flex;align-items:center;white-space:nowrap;border:1px solid var(--border-hairline);border-radius:var(--radius-pill);padding:2px 7px;font-size:11px;font-weight:600;color:var(--text-secondary);background:var(--surface-subtle)}
+.approval-status[data-state="pending"]{color:var(--status-warning);background:var(--surface-warning-soft)}
+.approval-status[data-state="approved"]{color:var(--status-success);background:var(--surface-success-soft)}
+.approval-status[data-state="rejected"],.approval-status[data-state="conflicted"]{color:var(--status-danger);background:var(--surface-danger-soft)}
 .approval-workbench{display:grid;grid-template-columns:minmax(0,1fr) minmax(270px,340px);align-items:start;gap:10px;padding:6px;min-width:0}
 .approval-workbench>.approval-main{min-width:0}
 .approval-main .table{min-width:0;overflow:auto;margin-bottom:10px}

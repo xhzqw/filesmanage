@@ -1,5 +1,6 @@
 import {RareButton} from "./rare";
-import {useRef,useState,type ReactNode} from "react";
+import {useContext,useRef,useState,type ReactNode} from "react";
+import {ShellAccessories} from "./ShellAccessories";
 import {Link,useLocation,useNavigate} from "react-router-dom";
 import {Menu} from "./Menu";
 
@@ -45,6 +46,7 @@ export function AppShell({user,onLogout,product,actions,children}:{user:ShellUse
  const[accountOpen,setAccountOpen]=useState(false);
  const accountRef=useRef<HTMLButtonElement>(null);
  const navigate=useNavigate();
+ const notificationSlot=useContext(ShellAccessories);
 
  return <div className="shell">
   <header className="header">
@@ -61,6 +63,7 @@ export function AppShell({user,onLogout,product,actions,children}:{user:ShellUse
      <span>全局搜索</span>
      <span className="command-keys"><kbd>Ctrl</kbd><kbd>K</kbd></span>
     </RareButton>
+    {notificationSlot}
     <div className="account-dropdown-wrapper">
      <RareButton ref={accountRef} type="button" className="account-trigger" aria-label="当前登录用户" aria-haspopup="true" aria-expanded={accountOpen}
       onClick={()=>setAccountOpen(v=>!v)}>
