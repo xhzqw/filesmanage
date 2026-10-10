@@ -29,9 +29,13 @@ func (a blobStoreAdapter) SweepStaging(maxAge time.Duration) (int, error) {
 func (a blobStoreAdapter) Open(key string) (io.ReadSeekCloser, error) {
 	return a.store.Open(key)
 }
-func(a blobStoreAdapter) AppendResumable(id string,offset int64,data []byte)error{return a.store.AppendResumable(id,offset,data)}
-func(a blobStoreAdapter) OpenResumable(id string)(io.ReadCloser,int64,error){return a.store.OpenResumable(id)}
-func(a blobStoreAdapter) RemoveResumable(id string)error{return a.store.RemoveResumable(id)}
+func (a blobStoreAdapter) AppendResumable(id string, offset int64, data []byte) error {
+	return a.store.AppendResumable(id, offset, data)
+}
+func (a blobStoreAdapter) OpenResumable(id string) (io.ReadCloser, int64, error) {
+	return a.store.OpenResumable(id)
+}
+func (a blobStoreAdapter) RemoveResumable(id string) error { return a.store.RemoveResumable(id) }
 
 func isLoopbackAddr(addr string) bool {
 	host := addr
@@ -100,15 +104,27 @@ func main() {
 	} else if swept > 0 {
 		log.Printf("staging sweep removed %d orphaned upload(s)", swept)
 	}
-	cleanupResumable:=func(){
-		if swept,err:=store.store.SweepResumable(48*time.Hour);err!=nil{log.Printf("resumable sweep: %v",err)}else if swept>0{log.Printf("resumable sweep removed %d expired file(s)",swept)}
-		ctx,cancel:=context.WithTimeout(context.Background(),15*time.Second);defer cancel()
-		if deleted,err:=postgres.New(pool).PruneExpiredResumableUploads(ctx);err!=nil{log.Printf("resumable session cleanup: %v",err)}else if deleted>0{log.Printf("pruned %d expired upload sessions",deleted)}
+	cleanupResumable := func() {
+		if swept, err := store.store.SweepResumable(48 * time.Hour); err != nil {
+			log.Printf("resumable sweep: %v", err)
+		} else if swept > 0 {
+			log.Printf("resumable sweep removed %d expired file(s)", swept)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		if deleted, err := postgres.New(pool).PruneExpiredResumableUploads(ctx); err != nil {
+			log.Printf("resumable session cleanup: %v", err)
+		} else if deleted > 0 {
+			log.Printf("pruned %d expired upload sessions", deleted)
+		}
 	}
 	cleanupResumable()
-	go func(){
-		tick:=time.NewTicker(time.Hour);defer tick.Stop()
-		for range tick.C{cleanupResumable()}
+	go func() {
+		tick := time.NewTicker(time.Hour)
+		defer tick.Stop()
+		for range tick.C {
+			cleanupResumable()
+		}
 	}()
 	service := application.New(postgres.New(pool), store).WithOffice(application.OfficeConfig{
 		EditorURL:     os.Getenv("FILESMANAGE_OFFICE_URL"),

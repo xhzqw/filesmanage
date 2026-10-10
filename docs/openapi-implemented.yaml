@@ -1657,6 +1657,312 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/uploads/resumable:
+    post:
+      summary: Start/resume a private upload (max 1 GiB)
+      operationId: startResumable
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResumableStart'
+      responses:
+        '201':
+          description: Open or replayed upload session
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/ResumableStatus'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/uploads/resumable/{id}:
+    get:
+      summary: Read server-confirmed upload offset
+      operationId: resumableStatus
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Private upload session ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Resume only from this offset.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/ResumableStatus'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    patch:
+      summary: Append one verified 4 MiB chunk at current offset
+      operationId: resumableChunk
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Private upload ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Committed byte offset after durable fsync.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/ResumableStatus'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '413':
+          description: E_TOO_LARGE — body exceeds the upload limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    delete:
+      summary: Cancel private uncommitted upload
+      operationId: cancelResumable
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Private upload ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Cancelled; pending spool cleaned.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      cancelled:
+                        type: string
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/uploads/resumable/{id}/complete:
+    post:
+      summary: Verify and commit assembled upload as first immutable version
+      operationId: finishResumable
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Private upload ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Committed upload, replay safe.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      fileId:
+                        type: string
+                      versionSeq:
+                        type: integer
+                      sha256:
+                        type: string
+                      size:
+                        type: integer
+                      name:
+                        type: string
+                      folderId:
+                        type: string
+                      deduplicated:
+                        type: boolean
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/files/{id}:
     get:
       summary: File metadata with version history
@@ -4181,11 +4487,16 @@ paths:
                         - true
                       approverId:
                         type: string
+                      approverIds:
+                        type: array
+                        items:
+                          type: string
                       enabled:
                         type: boolean
                     required:
                     - configured
                     - approverId
+                    - approverIds
                     - enabled
                 required:
                 - ok
@@ -6120,6 +6431,68 @@ components:
       required:
       - version
       - body
+    ResumableStatus:
+      type: object
+      properties:
+        id:
+          type: string
+        received:
+          type: integer
+        size:
+          type: integer
+        state:
+          type: string
+          enum:
+          - open
+          - committed
+          - cancelled
+        expiresAt:
+          type: string
+          format: date-time
+        result:
+          type: object
+          properties:
+            fileId:
+              type: string
+            versionSeq:
+              type: integer
+            sha256:
+              type: string
+            size:
+              type: integer
+            name:
+              type: string
+            folderId:
+              type: string
+            dedup:
+              type: boolean
+      required:
+      - id
+      - received
+      - size
+      - state
+      - expiresAt
+    ResumableStart:
+      type: object
+      properties:
+        folderId:
+          type: string
+        name:
+          type: string
+        size:
+          type: integer
+          minimum: 1
+        contentType:
+          type: string
+        idempotencyKey:
+          type: string
+        sha256:
+          type: string
+      required:
+      - folderId
+      - name
+      - size
+      - idempotencyKey
     FileMeta:
       type: object
       properties:
@@ -6257,6 +6630,14 @@ components:
           type: string
         approverName:
           type: string
+        approverIds:
+          type: array
+          items:
+            type: string
+        stepIndex:
+          type: integer
+        stepTotal:
+          type: integer
         baseSeq:
           type: integer
           description: Version the pending change is based on.
@@ -6750,6 +7131,11 @@ components:
         approverId:
           type: string
           description: Present when configured.
+        approverIds:
+          type: array
+          items:
+            type: string
+          description: Ordered approval chain (1-5 people).
         enabled:
           type: boolean
           description: Present when configured.
@@ -7335,10 +7721,13 @@ components:
       properties:
         approverId:
           type: string
+        approverIds:
+          type: array
+          items:
+            type: string
         enabled:
           type: boolean
       required:
-      - approverId
       - enabled
     CreateShareRequest:
       type: object
