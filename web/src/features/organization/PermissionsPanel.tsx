@@ -289,7 +289,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
       <td>{displayActions(g.actions)}</td><td>{g.scopeOnly?"仅当前目录":"包括子目录"}</td>
       <td>{g.expiresAt?new Date(g.expiresAt).toLocaleString("zh-CN"):"不过期"}</td>
       <td><RareButton type="button" tone="danger" className="danger" onClick={()=>{setRevokeError("");setRevokeTarget(g);}}>撤销</RareButton></td></tr>)}</tbody></table>
-     :<div className="perm-empty-grants"><strong>暂无直接授权</strong><p>可在右侧为用户或工作组添加授权；当前目录仍可能存在继承或共享权限。</p></div>}
+     :<div className="perm-empty-grants"><strong>暂无直接授权</strong><p>可在右侧添加授权。</p></div>}
     </div>}
       </section>
     <PermissionInsights folderId={folderId} users={users} usersState={usersState} refreshToken={refresh}/>

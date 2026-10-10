@@ -1,11 +1,14 @@
 import type{User}from "../entities/user/model";
 import{OrganizationPanel}from "../features/organization/OrganizationPanel";
 import{AppShell}from "../shared/ui/AppShell";
+import{useSearchParams}from "react-router-dom";
 
 export function Org({user,onLogout}:{user:User;onLogout:()=>void}){
+ const [params]=useSearchParams();
+ const compactPermissions=params.get("tab")==="permissions";
  return <AppShell user={user} onLogout={onLogout}>
   <div className="panels">
-   <main className="work">
+   <main className={"work"+(compactPermissions?" work-compact-permissions":"")}>
     <div className="breadcrumb">组织与权限</div>
     <OrganizationPanel isAdmin={user.isAdmin} currentUserId={user.id}/>
    </main>

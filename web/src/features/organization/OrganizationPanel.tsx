@@ -668,7 +668,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   });
  }
 
- return <div className="work-body">
+ return <div className={"work-body"+(activeTab==="permissions"?" org-compact-permissions":"")}>
   {/* 顶部工具栏：指标摘要与全局快捷创建 */}
   {activeTab!=="permissions"&&activeTab!=="roles"&&<div className="toolbar">
    <span className="toolbar-hint">{`账号 ${users.length} · 部门 ${departments.length} · 工作组 ${groups.length}`}</span>

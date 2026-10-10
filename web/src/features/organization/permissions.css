@@ -50,19 +50,19 @@
 .perm-detail-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(370px,.78fr);align-items:start;gap:12px;padding:12px;flex:1;min-height:0;min-width:0;overflow:hidden}
 .perm-inspection-column{display:flex;flex-direction:column;gap:14px;min-width:0;min-height:0;overflow:auto;padding:1px 2px 2px}
 .perm-card{display:flex;flex-direction:column;min-width:0;flex:none;background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-md);box-shadow:var(--shadow-panel);overflow:hidden}
-.perm-card-grants{min-height:235px}
+.perm-card-grants{min-height:0}
 .perm-compose-card{min-height:0;max-height:100%;flex:none;overflow:auto}
 .perm-section-title{display:flex;gap:9px;align-items:center;justify-content:flex-start;font-weight:650;font-size:14px;color:var(--text-primary);background:var(--surface-header);border-bottom:1px solid var(--border-hairline);padding:10px 15px;min-height:42px}
 .perm-count{background:var(--surface-row-selected);border-radius:var(--radius-sm);font-size:12px;color:var(--brand-blue);padding:2px 7px;font-weight:600}
 .perm-hint{font-size:12px;color:var(--text-secondary);line-height:1.55;padding:13px 17px;margin:0}
-.perm-grants-scroller{max-height:45vh;min-height:110px;min-width:0;max-width:100%;overflow:auto}
+.perm-grants-scroller{max-height:45vh;min-height:0;min-width:0;max-width:100%;overflow:auto}
 .perm-table{width:100%;border-collapse:collapse;font-size:13px}
 .perm-table th,.perm-table td{text-align:left;border-bottom:1px solid var(--border-hairline);padding:12px 11px;vertical-align:middle;line-height:1.4}
 .perm-table th{font-size:12px;white-space:nowrap;color:var(--text-secondary);background:var(--surface-subtle);position:sticky;top:0}
 .perm-table td small{display:block;font-size:11px;color:var(--text-secondary);margin-top:3px}
 .perm-table tbody tr:last-child td{border-bottom:0}
 .perm-table .danger{min-height:30px;white-space:nowrap}
-.perm-empty-grants{display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;gap:8px;min-height:135px;padding:20px}
+.perm-empty-grants{display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;gap:4px;min-height:78px;padding:12px}
 .perm-empty-grants strong{font-size:14px;color:var(--text-primary)}
 .perm-empty-grants p{font-size:12px;color:var(--text-secondary);line-height:1.6;max-width:310px;margin:0}
 .perm-empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:24px;text-align:center;gap:10px}
@@ -107,6 +107,31 @@
 .perm-audit-scroll{overflow:auto;min-width:0;min-height:0;flex:1}
 .perm-audit-detail{max-width:300px;overflow-wrap:anywhere;font-size:12px}
 
+/* Permissions are a content-sized editor, not a full-screen document canvas.
+ * Do not stretch a one-row ACL and a short form to the viewport height.
+ * Keep long resource trees independently scrollable instead of growing the page. */
+.work.work-compact-permissions{align-self:flex-start}
+.org-compact-permissions{flex:none;min-height:0}
+.org-compact-permissions .org-workbench.org-permissions-workbench{
+ flex:none;grid-template-rows:auto;align-items:start
+}
+.org-compact-permissions .org-stage-card{align-self:start;height:auto;min-height:0}
+.org-compact-permissions .rare-tab-panel,
+.org-compact-permissions .perm-content-root{flex:none;min-height:0;overflow:visible}
+.org-compact-permissions .perm-workspace{
+ flex:none;min-height:0;align-items:start;overflow:visible
+}
+.org-compact-permissions .perm-browser{
+ align-self:start;max-height:min(65vh,560px);overflow:hidden;
+ border-bottom:1px solid var(--border-hairline);border-bottom-right-radius:var(--radius-sm)
+}
+.org-compact-permissions .perm-browser-scroll{flex:0 1 auto;max-height:min(48vh,435px);min-height:0}
+.org-compact-permissions .perm-detail{min-height:0;overflow:visible}
+.org-compact-permissions .perm-detail-layout{flex:none;min-height:0;overflow:visible}
+.org-compact-permissions .perm-inspection-column{min-height:0;overflow:visible}
+.org-compact-permissions .perm-compose-card{max-height:none;overflow:visible}
+.org-compact-permissions .perm-audit{flex:none;max-height:75vh;min-height:260px}
+
 @media(max-width:1380px){
  .perm-detail-layout{grid-template-columns:minmax(0,1fr);overflow:auto;align-content:start}
  .perm-inspection-column{overflow:visible}
@@ -122,6 +147,9 @@
 }
 @media(max-width:700px){
  .perm-workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(180px,33%) minmax(0,1fr);margin:5px}
+ .org-compact-permissions .perm-workspace{grid-template-rows:auto auto}
+ .org-compact-permissions .perm-browser{max-height:220px;border-right:0}
+ .org-compact-permissions .perm-browser-scroll{max-height:140px}
  .perm-browser{border-right:0;border-bottom:1px solid var(--border-hairline)}
  .perm-browser-title{min-height:44px}
  .perm-browser-title small{display:none}
