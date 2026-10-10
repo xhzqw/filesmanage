@@ -223,6 +223,8 @@ schema("TrashEntry", obj({
     "fileId": string("Set for deleted files."),
     "folderId": string("Set for deleted folders."),
     "oldParentId": string("Original parent folder id."),
+    "oldParentPath": string("Deletion-time folder path, shown only to the deleting actor when a snapshot exists."),
+    "oldParentTrail": arr(obj({"id": string(), "name": string()}, required=["id", "name"]), "Deletion-time ancestor identities and names; absent for legacy rows or other viewers."),
     "subtreeCount": integer("Folders swept into the trash entry."),
 }, required=["id", "oldName", "deletedBy", "deletedByName", "deletedAt"]))
 
@@ -546,7 +548,8 @@ schema("CreateShareRequest", obj({
     "expiresAt": timestamp(),
 }, required=["resourceKind", "resourceId", "recipientKind", "recipientId", "actions"]))
 
-schema("RestoreTrashRequest", obj({"destinationFolderId": string("Restore target; empty keeps the original parent."), "newName": string("Rename on restore; empty keeps the old name.")}))
+schema("RestoreTrashRequest", obj({"destinationFolderId": string("Restore target; empty keeps the original parent."), "newName": string("Rename on restore; empty keeps the old name."),
+    "confirmDestination": boolean("Explicit target selection required when original ancestry has changed since deletion.")}))
 
 schema("EditorCallback", obj({
     "key": string("Document key from the editor config."),

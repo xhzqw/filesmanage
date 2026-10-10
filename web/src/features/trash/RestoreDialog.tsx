@@ -25,6 +25,8 @@ export function RestoreDialog({entry,onClose,onRestored,onReload}:{
  const[treeState,setTreeState]=useState<"loading"|"ready"|"failed">("loading");
  const[stage,setStage]=useState<"loading"|"pick"|"confirm"|"rename">("loading");
  const[targetId,setTargetId]=useState("");
+ const[locationChanged,setLocationChanged]=useState(false);
+ const[explicitChoice,setExplicitChoice]=useState(false);
  const[newName,setNewName]=useState(entry.oldName);
  const[busy,setBusy]=useState(false);
  const[message,setMessage]=useState("");
@@ -41,7 +43,12 @@ export function RestoreDialog({entry,onClose,onRestored,onReload}:{
     if(!valid)return;
     setFolders(data);
     setTreeState("ready");
-    if(entry.oldParentId&&data.some(f=>f.id===entry.oldParentId)){
+    const current=entry.oldParentId?trailOf(data,entry.oldParentId):[];
+    const original=entry.oldParentTrail??[];
+    const same=original.length>0&&current.length===original.length&&current.every((v,i)=>v.id===original[i].id&&v.name===original[i].name);
+    setLocationChanged(!same);
+    setExplicitChoice(false);
+    if(same&&entry.oldParentId){
      setTargetId(entry.oldParentId);
      setStage("confirm");
     }else{
@@ -51,7 +58,7 @@ export function RestoreDialog({entry,onClose,onRestored,onReload}:{
    })
    .catch(()=>{if(valid)setTreeState("failed");});
   return()=>{valid=false;};
- },[entry.oldParentId,reloadToken]);
+ },[entry.oldParentId,entry.oldParentTrail,reloadToken]);
 
  // Flat tree order with depth from visible parents only: a folder whose
  // parent is outside the visible set renders as a root, and hidden ancestors
@@ -87,7 +94,7 @@ export function RestoreDialog({entry,onClose,onRestored,onReload}:{
   // default resolution and its authority over the final name.
   const renamed=newName.trim()!==entry.oldName?newName.trim():"";
   try{
-   await trashApi.restore(entry.id,targetId,renamed);
+   await trashApi.restore(entry.id,targetId,renamed,explicitChoice);
    onRestored();
   }catch(error){
    const code=errorCode(error);
@@ -95,8 +102,8 @@ export function RestoreDialog({entry,onClose,onRestored,onReload}:{
     setStage("rename");
     setMessage(errorCopy(error,"名称已存在，请更换"));
    }else if(code==="E_PARENT_MISSING"){
-    // Stay on the confirm step: the target is gone, so offer the picker.
-    setMessage(errorCopy(error,"原位置已不存在，请选择目标目录"));
+    setLocationChanged(true);setExplicitChoice(false);setTargetId("");setStage("pick");
+    setMessage(errorCopy(error,"原目录位置已变化，请重新选择恢复目录"));
    }else if(code==="E_NETWORK"){
     // The request outcome is unknown: never claim the restore completed.
     setUnknown(true);
@@ -116,7 +123,8 @@ export function RestoreDialog({entry,onClose,onRestored,onReload}:{
    <RareButton type="button" className="secondary-action" onClick={()=>setReloadToken(token=>token+1)} disabled={busy}>重试</RareButton>
   </>}
   {treeState==="ready"&&stage==="pick"&&<>
-   <p className="hint">{entry.oldParentId?"原位置已不存在或不可访问，请选择目标目录。":"请选择目标目录。"}</p>
+   <p className="hint">{locationChanged?"原目录已变化、不可访问，或缺少历史路径记录。请选择恢复位置。":"请选择恢复位置。"}</p>
+   {entry.oldParentPath&&<p className="hint">删除时所在目录：{entry.oldParentPath}</p>}
    {rows.length===0&&<p className="empty">没有可选择的目标目录。</p>}
    <div role="radiogroup" aria-label="选择目标目录" className="group-list" style={{maxHeight:"220px",overflow:"auto"}}>
     {rows.map(({folder,depth})=><RareButton key={folder.id} type="button" role="radio"
@@ -124,17 +132,19 @@ export function RestoreDialog({entry,onClose,onRestored,onReload}:{
      className={targetId===folder.id?"on":""}
      style={{paddingLeft:String(8+Math.min(depth,8)*14)+"px"}}
      disabled={busy}
-     onClick={()=>setTargetId(folder.id)}>{folder.name}</RareButton>)}
+     onClick={()=>{setTargetId(folder.id);setExplicitChoice(true);}}>{folder.name}</RareButton>)}
    </div>
   </>}
   {treeState==="ready"&&stage==="confirm"&&<>
    <p>类型：{entry.folderId?`目录${entry.subtreeCount?`（含 ${entry.subtreeCount} 个子项）`:""}`:"文件"}</p>
    <p>名称：{entry.oldName}</p>
-   <p>原位置：{originalPath||"原位置已不存在"}</p>
+   <p>删除时位置：{entry.oldParentPath||"历史位置未记录"}</p>
+   {originalPath&&<p>目前位置：{originalPath}</p>}
    <p>目标位置：{targetPath}</p>
   </>}
   {treeState==="ready"&&stage==="rename"&&<>
    <p>目标位置：{targetPath}</p>
+   <RareButton type="button" className="secondary-action" disabled={busy} onClick={()=>setStage("pick")}>更改目标目录</RareButton>
    <label htmlFor="restore-name">新名称</label>
    <RareInput id="restore-name" value={newName} onChange={e=>setNewName(e.target.value)} disabled={busy}/>
    <p className="hint">仅当名称与原名不同时才会提交新名称，服务端保留最终命名权。</p>
@@ -167,4 +177,22 @@ function pathOf(folders:Folder[],id:string):string{
   current=parentId!==null?byId.get(parentId):undefined;
  }
  return names.join(" / ");
+}
+
+// A complete ancestor trail is required: inaccessible or removed ancestors
+// are not treated as a matching location.
+function trailOf(folders:Folder[],id:string):{id:string;name:string}[]{
+ const byId=new Map(folders.map(f=>[f.id,f]));
+ const out:{id:string;name:string}[]=[];
+ const visited=new Set<string>();
+ let current:string|null=id;
+ while(current){
+  if(visited.has(current)||out.length>=64)return [];
+  visited.add(current);
+  const folder=byId.get(current);
+  if(!folder)return [];
+  out.unshift({id:folder.id,name:folder.name});
+  current=folder.parentId;
+ }
+ return out;
 }

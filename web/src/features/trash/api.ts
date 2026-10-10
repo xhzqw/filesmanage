@@ -19,8 +19,8 @@ export const trashApi={
   if(filters.sort!=="recent")params.set("sort",filters.sort);
   return request<TrashPage>("/trash?"+params.toString());
  },
- restore:(id:string,destinationFolderId:string,newName:string)=>{
-  const body:{destinationFolderId:string;newName:string}={destinationFolderId,newName};
+ restore:(id:string,destinationFolderId:string,newName:string,confirmDestination=false)=>{
+  const body={destinationFolderId,newName,confirmDestination};
   return request<TrashEntry>("/trash/"+id+"/restore",{method:"POST",body:JSON.stringify(body)});
  },
  // Permanent delete is admin-only server-side; the UI gates the entry point and

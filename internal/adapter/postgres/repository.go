@@ -884,9 +884,15 @@ func (r *Repository) DeleteGrant(ctx context.Context, id string) error {
 // ---------- trash ----------
 
 func (r *Repository) InsertTrashEntry(ctx context.Context, t domain.TrashEntry) error {
+	var snapshot any
+	if len(t.OldParentTrail)>0 {
+		encoded,err:=json.Marshal(t.OldParentTrail)
+		if err!=nil{return err}
+		snapshot=string(encoded)
+	}
 	_, err := r.Q.Exec(ctx,
-		"INSERT INTO trash_entries(id,file_id,folder_id,old_parent_id,old_name,deleted_by) VALUES($1,$2,$3,$4,$5,$6)",
-		t.ID, t.FileID, t.FolderID, t.OldParentID, t.OldName, t.DeletedBy)
+		"INSERT INTO trash_entries(id,file_id,folder_id,old_parent_id,old_name,deleted_by,old_parent_trail) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb)",
+		t.ID, t.FileID, t.FolderID, t.OldParentID, t.OldName, t.DeletedBy,snapshot)
 	return err
 }
 
@@ -902,7 +908,7 @@ func (r *Repository) ListTrashEntries(ctx context.Context, userID string) ([]dom
 			" WHERE (g.expires_at IS NULL OR g.expires_at>now()) AND 'upload'=ANY(g.actions)"+
 			" AND ((g.subject_kind='user' AND g.subject_id=$1)"+
 			" OR (g.subject_kind='group' AND g.subject_id IN (SELECT group_id FROM workgroup_members WHERE user_id=$1)))"+
-			") SELECT t.id,t.file_id,t.folder_id,t.old_parent_id,t.old_name,t.deleted_by,coalesce(u.display_name,''),t.deleted_at,t.restored_at,t.purged_at"+
+			") SELECT t.id,t.file_id,t.folder_id,t.old_parent_id,t.old_name,t.deleted_by,coalesce(u.display_name,''),t.deleted_at,t.restored_at,t.purged_at,t.old_parent_trail"+
 			" FROM trash_entries t LEFT JOIN users u ON u.id=t.deleted_by"+
 			" WHERE t.restored_at IS NULL AND t.purged_at IS NULL AND (t.deleted_by=$1 OR t.id IN (SELECT entry_id FROM permitted))"+
 			" ORDER BY t.deleted_at DESC LIMIT 500", userID)
@@ -913,9 +919,11 @@ func (r *Repository) ListTrashEntries(ctx context.Context, userID string) ([]dom
 	out := make([]domain.TrashEntry, 0)
 	for rows.Next() {
 		var t domain.TrashEntry
-		if err := rows.Scan(&t.ID, &t.FileID, &t.FolderID, &t.OldParentID, &t.OldName, &t.DeletedBy, &t.DeletedName, &t.DeletedAt, &t.RestoredAt, &t.PurgedAt); err != nil {
+		var snapshot []byte
+		if err := rows.Scan(&t.ID, &t.FileID, &t.FolderID, &t.OldParentID, &t.OldName, &t.DeletedBy, &t.DeletedName, &t.DeletedAt, &t.RestoredAt, &t.PurgedAt,&snapshot); err != nil {
 			return nil, err
 		}
+		if len(snapshot)>0 {if err:=json.Unmarshal(snapshot,&t.OldParentTrail);err!=nil{return nil,err}}
 		out = append(out, t)
 	}
 	return out, rows.Err()
@@ -923,13 +931,15 @@ func (r *Repository) ListTrashEntries(ctx context.Context, userID string) ([]dom
 
 func (r *Repository) TrashEntryByID(ctx context.Context, id string) (domain.TrashEntry, error) {
 	var t domain.TrashEntry
+	var snapshot []byte
 	err := r.Q.QueryRow(ctx,
-		"SELECT t.id,t.file_id,t.folder_id,t.old_parent_id,t.old_name,t.deleted_by,coalesce(u.display_name,''),t.deleted_at,t.restored_at,t.purged_at "+
+		"SELECT t.id,t.file_id,t.folder_id,t.old_parent_id,t.old_name,t.deleted_by,coalesce(u.display_name,''),t.deleted_at,t.restored_at,t.purged_at,t.old_parent_trail "+
 			"FROM trash_entries t LEFT JOIN users u ON u.id=t.deleted_by WHERE t.id=$1", id).
-		Scan(&t.ID, &t.FileID, &t.FolderID, &t.OldParentID, &t.OldName, &t.DeletedBy, &t.DeletedName, &t.DeletedAt, &t.RestoredAt, &t.PurgedAt)
+		Scan(&t.ID, &t.FileID, &t.FolderID, &t.OldParentID, &t.OldName, &t.DeletedBy, &t.DeletedName, &t.DeletedAt, &t.RestoredAt, &t.PurgedAt,&snapshot)
 	if err != nil {
 		return domain.TrashEntry{}, err
 	}
+	if len(snapshot)>0 {if err=json.Unmarshal(snapshot,&t.OldParentTrail);err!=nil{return domain.TrashEntry{},err}}
 	return t, nil
 }
 

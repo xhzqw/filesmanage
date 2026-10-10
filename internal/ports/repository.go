@@ -86,6 +86,9 @@ type Repository interface {
 	ListTrashEntries(context.Context, string) ([]domain.TrashEntry, error)
 	PageTrashEntries(context.Context, TrashQuery) ([]domain.TrashEntry, error)
 	TrashEntryByID(context.Context, string) (domain.TrashEntry, error)
+	// Only the deleting actor or a caller entitled to upload into the old
+	// parent may restore a known trash ID (subject to destination permission).
+	TrashEntryRestorable(context.Context, string, string) (bool, error)
 	MarkTrashRestored(context.Context, string) error
 	MarkTrashPurged(context.Context, string) error
 

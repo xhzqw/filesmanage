@@ -422,7 +422,9 @@ func (s *Service) DeleteFile(ctx context.Context, u domain.User, fileID string) 
 	if err = tx.SoftDeleteFile(ctx, file.ID); err != nil {
 		return domain.TrashEntry{}, err
 	}
-	entry := domain.TrashEntry{ID: NewID("trash"), FileID: &file.ID, OldParentID: &file.FolderID, OldName: file.Name, DeletedBy: u.ID, DeletedAt: s.now()}
+	trail,err:=snapshotTrashPath(ctx,tx,file.FolderID)
+	if err!=nil {return domain.TrashEntry{},err}
+	entry := domain.TrashEntry{ID: NewID("trash"), FileID: &file.ID, OldParentID: &file.FolderID, OldParentTrail:trail, OldName: file.Name, DeletedBy: u.ID, DeletedAt: s.now()}
 	if err = tx.InsertTrashEntry(ctx, entry); err != nil {
 		return domain.TrashEntry{}, err
 	}

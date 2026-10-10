@@ -66,6 +66,7 @@ type TrashEntry struct {
 	FileID       *string
 	FolderID     *string
 	OldParentID  *string
+	OldParentTrail []TrashPathPart
 	OldName      string
 	DeletedBy    string
 	DeletedName  string
@@ -73,6 +74,13 @@ type TrashEntry struct {
 	RestoredAt   *time.Time
 	PurgedAt     *time.Time
 	SubtreeCount int
+}
+
+// TrashPathPart preserves both identity and name of an ancestor as observed
+// when the resource was deleted. It is not a live filesystem lookup.
+type TrashPathPart struct {
+	ID string `json:"id"`
+	Name string `json:"name"`
 }
 
 type AuditEvent struct {

@@ -34,6 +34,8 @@ function EntryIcon({folder}:{folder:boolean}){
 }
 
 function visibleParentPath(entry:TrashEntry,byId:Map<string,Folder>):string{
+ if(entry.oldParentPath)return entry.oldParentPath;
+ if(!entry.oldParentTrail?.length)return "历史路径未记录 · 恢复时请选择位置";
  if(!entry.oldParentId)return "原位置不可用";
  const parts:string[]=[];
  let id:string|null|undefined=entry.oldParentId;
@@ -116,6 +118,10 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
   setBusy(true);setNotice(null);
   let ok=0;const errors:string[]=[];
   for(const entry of selectedRows){
+   if(!entry.oldParentTrail?.length){
+    errors.push(entry.oldName+"：历史位置未记录，请单独选择恢复目录");
+    continue;
+   }
    try{await trashApi.restore(entry.id,"","");ok++;}
    catch(error){
     errors.push(entry.oldName+"："+errorCopy(error,"恢复失败"));

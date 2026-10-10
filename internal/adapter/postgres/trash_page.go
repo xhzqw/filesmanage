@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"filesmanage/internal/domain"
 	"filesmanage/internal/ports"
 )
@@ -33,7 +34,7 @@ func (r *Repository) PageTrashEntries(ctx context.Context, q ports.TrashQuery) (
  AND ((g.subject_kind='user' AND g.subject_id=$1)
  OR (g.subject_kind='group' AND g.subject_id IN (SELECT group_id FROM workgroup_members WHERE user_id=$1)))
  )
- SELECT t.id,t.file_id,t.folder_id,t.old_parent_id,t.old_name,t.deleted_by,coalesce(u.display_name,''),t.deleted_at,t.restored_at,t.purged_at
+ SELECT t.id,t.file_id,t.folder_id,t.old_parent_id,t.old_name,t.deleted_by,coalesce(u.display_name,''),t.deleted_at,t.restored_at,t.purged_at,t.old_parent_trail
  FROM trash_entries t LEFT JOIN users u ON u.id=t.deleted_by
  WHERE t.restored_at IS NULL AND t.purged_at IS NULL
  AND (t.deleted_by=$1 OR t.id IN (SELECT entry_id FROM permitted))
@@ -50,9 +51,11 @@ func (r *Repository) PageTrashEntries(ctx context.Context, q ports.TrashQuery) (
 	out := make([]domain.TrashEntry, 0, q.Limit)
 	for rows.Next() {
 		var t domain.TrashEntry
-		if err = rows.Scan(&t.ID, &t.FileID, &t.FolderID, &t.OldParentID, &t.OldName, &t.DeletedBy, &t.DeletedName, &t.DeletedAt, &t.RestoredAt, &t.PurgedAt); err != nil {
+		var snapshot []byte
+		if err = rows.Scan(&t.ID, &t.FileID, &t.FolderID, &t.OldParentID, &t.OldName, &t.DeletedBy, &t.DeletedName, &t.DeletedAt, &t.RestoredAt, &t.PurgedAt,&snapshot); err != nil {
 			return nil, err
 		}
+		if len(snapshot)>0 {if err=json.Unmarshal(snapshot,&t.OldParentTrail);err!=nil{return nil,err}}
 		out = append(out, t)
 	}
 	return out, rows.Err()
