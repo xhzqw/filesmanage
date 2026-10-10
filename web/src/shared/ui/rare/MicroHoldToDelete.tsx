@@ -1,3 +1,4 @@
+import {RareButton} from "./RareControls";
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 
 // spec 6.3: 26x64px hard-edged hold-to-confirm for destructive commits (recycle bin purge, sensitive
@@ -103,7 +104,7 @@ export function MicroHoldToDelete({
   const countdown = ((duration - progress * duration) / 1000).toFixed(1);
 
   return (
-    <button
+    <RareButton
       ref={btnRef}
       type="button"
       className="micro-hold"
@@ -126,6 +127,6 @@ export function MicroHoldToDelete({
     >
       <span className="micro-hold-fill" style={{ width: progress + "%" }} aria-hidden="true" />
       <span className="micro-hold-label">{armed ? countdown : label}</span>
-    </button>
+    </RareButton>
   );
 }
