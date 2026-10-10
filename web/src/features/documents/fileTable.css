@@ -1,6 +1,7 @@
 /* Precision Workbench 2.0 high-density DataGrid (spec §4): a fixed-layout
    six-column grid (select/name/size/version/date/actions) built only on
    the shared token layer. */
+.batch-delete-failure{font-size:11px;color:var(--status-danger);overflow-wrap:anywhere}
 .file-table{table-layout:fixed;width:100%}
 .file-table th{padding:0 8px;height:var(--height-table-header)}
 .file-table tbody tr{height:var(--height-row-ultra, 26px)}

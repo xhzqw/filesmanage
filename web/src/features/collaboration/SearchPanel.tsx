@@ -1,8 +1,11 @@
 import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
-import {useEffect,useRef,useState,type FormEvent} from "react";
+import {useEffect,useMemo,useRef,useState,type FormEvent} from "react";
 import {Link} from "react-router-dom";
 import {collaborationApi,formatBytes} from "./api";
 import type {FileItem} from "../../entities/file/model";
+import type {Folder} from "../../entities/folder/model";
+import {FolderPicker} from "../../shared/ui/FolderPicker";
+import {Dialog} from "../../shared/ui/Dialog";
 import "./search.css";
 
 // The API caps the authorized total at 1001, which the UI renders as "1000+"
@@ -33,7 +36,13 @@ function Highlighted({text,query}:{text:string;query:string}){
   :<span key={index}>{part.value}</span>)}</>;
 }
 
-type Query={q:string;category:string;tag:string;uploader:string;type:string;sort:string;limit:number};
+type Query={q:string;category:string;tag:string;uploader:string;type:string;sort:string;limit:number;folder:string;scope:string;from:string;to:string};
+function boundaryDate(value:string,end:boolean):string{return value?new Date(value+"T"+(end?"23:59:59":"00:00:00")).toISOString():"";}
+function csvField(value:string|number):string{
+ const raw=String(value);
+ const protectedValue=/^[=+@\-\t\r]/.test(raw)?"\u0027"+raw:raw;
+ return "\""+protectedValue.replaceAll("\"","\"\"")+"\"";
+}
 
 // Full-text search workbench (SPEC C13/§10, WF-30): query plus uploader/type/
 // sort filters, authorized results with snippets and safe highlighting, and
@@ -46,6 +55,40 @@ export function SearchPanel(){
  const[type,setType]=useState("");
  const[sort,setSort]=useState("updated_desc");
  const[pageSize,setPageSize]=useState<number>(DEFAULT_PAGE_SIZE);
+ const[showAdvanced,setShowAdvanced]=useState(false);
+ const[scope,setScope]=useState<"all"|"current"|"descendants">("all");
+ const[folder,setFolder]=useState("");
+ const[from,setFrom]=useState("");
+ const[to,setTo]=useState("");
+ const[pickerOpen,setPickerOpen]=useState(false);
+ const[candidate,setCandidate]=useState("");
+ const[folders,setFolders]=useState<Folder[]>([]);
+ const[treeState,setTreeState]=useState<"loading"|"ready"|"failed">("loading");
+ const[treeToken,setTreeToken]=useState(0);
+ useEffect(()=>{
+  if(!pickerOpen)return;
+  let active=true;setTreeState("loading");
+  collaborationApi.folderTree().then(value=>{if(active){setFolders(value);setTreeState("ready");}})
+   .catch(()=>{if(active)setTreeState("failed");});
+  return()=>{active=false;};
+ },[pickerOpen,treeToken]);
+ const currentFolder=useMemo(()=>folders.find(item=>item.id===folder),[folders,folder]);
+ function exportLoaded(){
+  if(status!=="ready"||items.length===0)return;
+  // Only the loaded, authorized rows are exported. This is not a server-wide
+  // export and deliberately cannot leak items beyond the current cursor page.
+  const lines=[["文件名","大小（字节）","上传人","版本","修改时间","目录ID"],...items.map(file=>
+   [file.name,file.sizeBytes,file.uploadedBy,file.currentVersionSeq,file.updatedAt,file.folderId])];
+  const csv="\uFEFF"+lines.map(cols=>cols.map(csvField).join(",")).join("\r\n");
+  const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  const link=document.createElement("a");link.href=url;link.download="检索结果-已加载.csv";
+  document.body.append(link);link.click();link.remove();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+ }
+ function clearFilters(){
+  setQ("");setCategory("");setTag("");setUploader("");setType("");setScope("all");setFolder("");
+  setFrom("");setTo("");setSort("updated_desc");setPageSize(DEFAULT_PAGE_SIZE);
+  epochRef.current++;moreBusyRef.current=false;setQuery(null);setItems([]);setNextCursor("");setTotal(0);setStatus("idle");setMessage("");
+ }
  const[query,setQuery]=useState<Query|null>(null);
  const[items,setItems]=useState<FileItem[]>([]);
  const[total,setTotal]=useState(0);
@@ -85,15 +128,16 @@ export function SearchPanel(){
  function submit(event:FormEvent){
   event.preventDefault();
   setMessage("");
-  if(!q.trim()){
-   setMessage("请输入检索关键词");
-   return;
+  if(from&&to&&from>to){setMessage("开始日期不能晚于结束日期");return;}
+  if(scope!=="all"&&!folder){setMessage("请先选择搜索目录");return;}
+  if(!q.trim()&&!category.trim()&&!tag.trim()&&!uploader.trim()&&!type.trim()&&!from&&!to&&scope==="all"){
+   setMessage("请输入关键词或至少设置一个筛选条件");return;
   }
   // Invalidate the previous revision before React commits, so a page request
   // that resolves in the gap between render and effect cannot append old rows.
   epochRef.current++;
   moreBusyRef.current=false;
-  setQuery({q:q.trim(),category:category.trim(),tag:tag.trim(),uploader:uploader.trim(),type:type.trim(),sort,limit:pageSize});
+  setQuery({q:q.trim(),category:category.trim(),tag:tag.trim(),uploader:uploader.trim(),type:type.trim(),sort,limit:pageSize,folder:scope==="all"?"":folder,scope:scope==="descendants"?"descendants":"",from:boundaryDate(from,false),to:boundaryDate(to,true)});
  }
 
  // Appends the server's next page. The cursor is the only append authority: rows
@@ -133,32 +177,45 @@ export function SearchPanel(){
  const limitReached=!hasMore&&(capped||items.length<total);
 
  return <div className="work-body">
-  <form className="toolbar search-bar" onSubmit={submit} role="search">
-   <label htmlFor="search-q">关键词</label>
-   <RareInput id="search-q" value={q} onChange={event=>setQ(event.target.value)} placeholder="文件名或正文，如：预算" size={28}/>
-   <label htmlFor="search-category">分类</label>
-   <RareInput id="search-category" value={category} onChange={event=>setCategory(event.target.value)} placeholder="如：工程图纸" size={12}/>
-   <label htmlFor="search-tag">标签</label>
-   <RareInput id="search-tag" value={tag} onChange={event=>setTag(event.target.value)} placeholder="如：待审核" size={10}/>
-   <label htmlFor="search-uploader">上传人</label>
-   <RareInput id="search-uploader" value={uploader} onChange={event=>setUploader(event.target.value)} size={12}/>
-   <label htmlFor="search-type">类型</label>
-   <RareInput id="search-type" value={type} onChange={event=>setType(event.target.value)} placeholder="text/" size={10}/>
-   <label className="sort-label" htmlFor="search-sort">排序
-    <RareSelect id="search-sort" value={sort} onChange={event=>setSort(event.target.value)}>
-     <option value="updated_desc">修改时间</option>
-     <option value="name_asc">名称</option>
-     <option value="size_desc">大小</option>
-    </RareSelect>
-   </label>
-   <label className="sort-label" htmlFor="search-limit">每页
-    <RareSelect id="search-limit" value={pageSize} onChange={event=>setPageSize(Number(event.target.value))}>
-     {PAGE_SIZES.map(size=><option key={size} value={size}>{size} 条</option>)}
-    </RareSelect>
-   </label>
-   <RareButton className="primary" type="submit">检索</RareButton>
-   {message?<span className="error">{message}</span>:null}
+  <form id="advanced-search-form" className="toolbar search-bar search-primary" onSubmit={submit} role="search">
+   <RareInput id="search-q" type="search" aria-label="文件名或正文关键词" value={q} onChange={event=>setQ(event.target.value)} placeholder="搜索文件名或正文…" maxLength={200}/>
+   <RareButton type="submit" className="primary">搜索</RareButton>
+   <RareButton type="button" aria-expanded={showAdvanced} onClick={()=>setShowAdvanced(v=>!v)}>高级筛选</RareButton>
+   <RareButton type="button" onClick={clearFilters}>重置</RareButton>
+   <RareButton type="button" disabled={status!=="ready"||items.length===0} onClick={exportLoaded}>导出已加载 {items.length} 条</RareButton>
+   {message&&<span className="error" role="alert">{message}</span>}
   </form>
+  <div className={"search-workbench"+(showAdvanced?" with-filters":"")}>
+   {showAdvanced&&<aside className="search-filters" aria-label="高级搜索条件">
+    <div className="search-filter-heading"><strong>筛选条件</strong><RareButton type="button" onClick={()=>setShowAdvanced(false)}>收起</RareButton></div>
+    <label>范围<RareSelect aria-label="搜索范围" value={scope} onChange={e=>setScope(e.target.value as "all"|"current"|"descendants")}>
+     <option value="all">全部可访问</option><option value="current">指定目录</option><option value="descendants">包含子目录</option>
+    </RareSelect></label>
+    {scope!=="all"&&<div className="search-folder-select">
+     <span title={currentFolder?.name??""}>{folder?(currentFolder?.name??"所选目录"):"未选择目录"}</span>
+     <RareButton type="button" onClick={()=>{setCandidate(folder);setPickerOpen(true);}}>选择目录</RareButton>
+    </div>}
+    <label>分类<RareInput id="search-category" value={category} onChange={e=>setCategory(e.target.value)} placeholder="如：工程图纸" maxLength={80}/></label>
+    <label>标签<RareInput id="search-tag" value={tag} onChange={e=>setTag(e.target.value)} placeholder="精确标签" maxLength={80}/></label>
+    <label>上传人 ID<RareInput id="search-uploader" value={uploader} onChange={e=>setUploader(e.target.value)} placeholder="上传人 ID" maxLength={100}/></label>
+    <label>格式<RareSelect aria-label="文件格式筛选" value={type} onChange={e=>setType(e.target.value)}>
+     <option value="">全部格式</option><option value="application/pdf">PDF</option><option value="image/">图片</option>
+     <option value="video/">视频</option><option value="audio/">音频</option><option value="text/">纯文本</option>
+     <option value="application/vnd.">Office / 结构化文档</option>
+    </RareSelect></label>
+    <div className="search-date-range">
+     <label>修改开始<RareInput type="date" aria-label="修改开始日期" value={from} onChange={e=>setFrom(e.target.value)}/></label>
+     <label>修改结束<RareInput type="date" aria-label="修改结束日期" value={to} onChange={e=>setTo(e.target.value)}/></label>
+    </div>
+    <label>排序<RareSelect id="search-sort" value={sort} onChange={e=>setSort(e.target.value)}>
+     <option value="updated_desc">最近修改</option><option value="name_asc">名称 A→Z</option><option value="size_desc">大小降序</option>
+    </RareSelect></label>
+    <label>每页<RareSelect id="search-limit" value={pageSize} onChange={e=>setPageSize(Number(e.target.value))}>
+     {PAGE_SIZES.map(size=><option key={size} value={size}>{size} 条</option>)}
+    </RareSelect></label>
+    <RareButton type="submit" form="advanced-search-form" className="primary">应用筛选</RareButton>
+   </aside>}
+   <div className="search-results">
 
   {status==="loading"?<p className="notice" role="status">检索中…</p>:null}
   {status==="failed"?<>
@@ -194,6 +251,14 @@ export function SearchPanel(){
     </RareButton>
    </div>:null}
   </div>:null}
-  {status==="idle"?<p className="empty">输入关键词开始检索。中文按相邻子串匹配，标题与正文都会参与。</p>:null}
+  {status==="idle"?<p className="empty">输入关键词或使用高级筛选检索有权限访问的文件。</p>:null}
+   </div>
+  </div>
+  {pickerOpen&&<Dialog open title="选择检索目录" onClose={()=>setPickerOpen(false)}>
+   {treeState==="loading"?<p className="empty">正在读取目录…</p>:treeState==="failed"?<div role="alert" className="notice error">目录读取失败 <RareButton type="button" onClick={()=>setTreeToken(v=>v+1)}>重试</RareButton></div>
+    :<FolderPicker open title="选择检索目录" folders={folders} selectedId={candidate} onSelect={setCandidate} onClose={()=>setPickerOpen(false)}
+     footer={<><RareButton type="button" onClick={()=>setPickerOpen(false)}>取消</RareButton>
+      <RareButton type="button" className="primary" disabled={!candidate} onClick={()=>{setFolder(candidate);setPickerOpen(false);}}>确定</RareButton></>}/>}
+  </Dialog>}
  </div>;
 }

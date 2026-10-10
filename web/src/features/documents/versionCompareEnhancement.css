@@ -1,0 +1,8 @@
+.file-compare-quicknav{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:5px 8px;border-bottom:1px solid var(--border-hairline)}
+.file-compare-quicknav>span{font-size:11px;color:var(--text-secondary);margin-right:auto}
+.file-compare-quicknav .rare-button{min-height:24px;font-size:11px}
+.file-diff-fold{display:block;padding:6px 12px;text-align:center;font-size:11px;color:var(--text-secondary);background:var(--surface-subtle);border-top:1px solid var(--border-hairline);border-bottom:1px solid var(--border-hairline)}
+.file-diff-line.active-change{outline:2px solid var(--brand-blue);outline-offset:-2px}
+.file-compare-hashes{display:flex;flex-wrap:wrap;gap:6px 20px;padding:8px;color:var(--text-secondary);font-size:11px;min-width:0}
+.file-compare-hashes>span{display:flex;flex-direction:column;min-width:0}
+.file-compare-hashes code{font-size:10px;word-break:break-all;user-select:text}

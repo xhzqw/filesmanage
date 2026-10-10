@@ -211,6 +211,12 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  // lives only while the row menu is open and is never business state.
  const[rowMenu,setRowMenu]=useState<{targets:FileItem[];point:MenuPoint|null;anchor:HTMLElement|null}|null>(null);
  const[deleteBusy,setDeleteBusy]=useState(false);
+ const[deleteFailures,setDeleteFailures]=useState<Record<string,string>>({});
+ function openDelete(targets:FileItem[]){
+  setDeleteFailures({});
+  setPendingDelete(targets);
+ }
+ function closeDelete(){setPendingDelete([]);setDeleteFailures({});}
  // WF-01: the file being moved through the single-file CAS endpoint.
  const[moving,setMoving]=useState<FileItem|null>(null);
  // WF-07/WF-08/ADR-UX-02: the multi-selection being moved through the
@@ -568,7 +574,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    case "Delete":
     if(selectedIds.size===0)return;
     event.preventDefault();
-    setPendingDelete(visibleItems.filter(i=>selectedIds.has(i.id)));
+    openDelete(visibleItems.filter(i=>selectedIds.has(i.id)));
     break;
    case "F2":
     if(selectedIds.size!==1)return;
@@ -622,7 +628,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   }else if(targets.length>1){
    items.push({id:"move-batch",label:"移动到…",onSelect:()=>startMoveSelection(targets)});
   }
-  items.push({id:"delete",label:"删除",hint:"Delete",danger:true,onSelect:()=>setPendingDelete(targets)});
+  items.push({id:"delete",label:"删除",hint:"Delete",danger:true,onSelect:()=>openDelete(targets)});
   return items;
  }
 
@@ -658,20 +664,28 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   const targets=pendingDelete;
   if(targets.length===0||deleteBusy)return;
   setDeleteBusy(true);
-  const failed:string[]=[];
+  const failed:FileItem[]=[];
+  const reasons:Record<string,string>={};
+  const removedIds=new Set<string>();
   for(const target of targets){
-   try{await fileApi.remove(target.id);}catch{failed.push(target.name);}
+   try{
+    await fileApi.remove(target.id);
+    removedIds.add(target.id);
+   }catch(error){
+    failed.push(target);
+    reasons[target.id]=errorCopy(error,"无法删除，请确认权限和文件状态");
+   }
   }
   setDeleteBusy(false);
-  setPendingDelete([]);
+  setDeleteFailures(reasons);
+  setPendingDelete(failed);
   setSelectedIds(prev=>{
    const next=new Set(prev);
-   for(const target of targets)next.delete(target.id);
+   for(const id of removedIds)next.delete(id);
    return next;
   });
-  const removed=targets.filter(t=>!failed.includes(t.name)).map(t=>t.name);
-  if(removed.length>0)announce(`已移入回收站：${removed.join("、")}`,"info");
-  if(failed.length>0)announce(`删除失败：${failed.join("、")}，请重试`,"error");
+  if(removedIds.size)announce(`已移入回收站 ${removedIds.size} 项`,"info");
+  if(failed.length)announce(`另有 ${failed.length} 项失败，请在弹窗内查看原因并重试`,"error");
   try{
    await reload();
   }catch{
@@ -754,7 +768,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     <div className="batch-actions-group">
      <RareButton type="button" className="batch-btn" disabled={selectedIds.size===0} onClick={()=>batchDownload(selection)} title={selectedIds.size===0?"勾选文件后可批量下载":"批量下载已勾选文件"}>批量下载</RareButton>
      <RareButton type="button" className="batch-btn" disabled={selectedIds.size===0} onClick={()=>startMoveSelection(selection)} title={selectedIds.size===0?"勾选文件后可批量移动":"批量移动已勾选文件"}>批量移动</RareButton>
-     <RareButton type="button" className="batch-btn danger" disabled={selectedIds.size===0} onClick={()=>setPendingDelete(selection)} title={selectedIds.size===0?"勾选文件后可批量删除":"批量删除已勾选文件"}>批量删除</RareButton>
+     <RareButton type="button" className="batch-btn danger" disabled={selectedIds.size===0} onClick={()=>openDelete(selection)} title={selectedIds.size===0?"勾选文件后可批量删除":"批量删除已勾选文件"}>批量删除</RareButton>
     </div>
    </div>
    <div className="toolbar-views">
@@ -872,16 +886,16 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     </div>
    </form>
   </Dialog>}
-  {pendingDelete.length>0&&<Dialog open title="删除确认" onClose={()=>setPendingDelete([])} closeGuard={()=>!deleteBusy} className="dialog">
+  {pendingDelete.length>0&&<Dialog open title={Object.keys(deleteFailures).length?"删除部分失败":"删除确认"} onClose={closeDelete} closeGuard={()=>!deleteBusy} className="dialog">
    <form onSubmit={event=>{event.preventDefault();confirmDelete();}}>
-    <p className="hint">以下资源将进入回收站，可恢复。此操作可按服务端规则撤销。</p>
+    <p className="hint">以下 {pendingDelete.length} 项将移入回收站。按文件逐项处理，失败项可单独重试。</p>
     <ul className="delete-list">
-     {pendingDelete.slice(0,8).map(item=><li key={item.id}>{item.name}</li>)}
+     {pendingDelete.slice(0,8).map(item=><li key={item.id}>{item.name}{deleteFailures[item.id]&&<span className="batch-delete-failure"> · {deleteFailures[item.id]}</span>}</li>)}
      {pendingDelete.length>8&&<li>…等共 {pendingDelete.length} 项</li>}
     </ul>
     <div className="dialog-actions">
-     <RareButton type="button" className="secondary-action" onClick={()=>setPendingDelete([])} disabled={deleteBusy}>取消</RareButton>
-     <MicroHoldToDelete label={deleteBusy?"删除中…":"确认删除"} tone="danger" disabled={deleteBusy} onConfirm={confirmDelete}/>
+     <RareButton type="button" className="secondary-action" onClick={closeDelete} disabled={deleteBusy}>关闭</RareButton>
+     <MicroHoldToDelete label={deleteBusy?"删除中…":Object.keys(deleteFailures).length?"重试失败项":"确认删除"} tone="danger" disabled={deleteBusy} onConfirm={confirmDelete}/>
     </div>
    </form>
   </Dialog>}
