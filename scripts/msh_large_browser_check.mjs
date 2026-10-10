@@ -46,7 +46,18 @@ const sendScript=`(()=>{
   }
   return originalFetch(resource,init);
  };
- const stats=window.__mshPerf={started:false,finished:false,duration:0,maxLag:0,ticks:0,bytes:mesh.byteLength};
+ const stats=window.__mshPerf={started:false,finished:false,duration:0,maxLag:0,ticks:0,bytes:mesh.byteLength,
+  transferMs:0,longTasks:[]};
+ if(typeof PerformanceObserver!=="undefined"){
+  const observer=new PerformanceObserver(list=>{
+   for(const entry of list.getEntries()){
+    if(stats.longTasks.length<20)stats.longTasks.push({
+     startMs:Math.round(entry.startTime),durationMs:Math.round(entry.duration),
+    });
+   }
+  });
+  observer.observe({entryTypes:["longtask"]});
+ }
  let finishWorker=()=>{};
  const NativeWorker=window.Worker;
  // Register the measurement callback in the constructor. The app assigns
@@ -77,7 +88,10 @@ const sendScript=`(()=>{
     stats.finished=true;
    };
   }
-  return oldPost.call(this,message,...rest);
+  const sendStart=performance.now();
+  const value=oldPost.call(this,message,...rest);
+  if(message?.buffer instanceof ArrayBuffer)stats.transferMs=Math.round(performance.now()-sendStart);
+  return value;
  };
 })()`;
 
