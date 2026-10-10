@@ -370,14 +370,15 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
 
   function batchDownload(files:FileItem[]){
    if(files.length===0)return;
-   files.forEach(file=>{
-    const a=document.createElement("a");
-    a.href="/api/files/"+file.id+"/bytes";
-    a.download=file.name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-   });
+   if(files.length>30){announce("单次最多打包 30 个文件，请分批下载","error");return;}
+   if(files.reduce((sum,file)=>sum+file.sizeBytes,0)>512*1024*1024){
+    announce("打包原始文件最多 512 MiB，请分批下载","error");return;
+   }
+   const a=document.createElement("a");
+   a.href="/api/files/download-zip?"+new URLSearchParams({ids:files.map(f=>f.id).join(",")}).toString();
+   a.download="files.zip";
+   document.body.appendChild(a);a.click();a.remove();
+   announce("正在准备 ZIP 下载，请检查浏览器下载列表","info");
   }
 
   const visibleItems=useMemo(()=>{

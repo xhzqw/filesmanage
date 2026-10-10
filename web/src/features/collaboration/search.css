@@ -11,6 +11,11 @@
 .search-primary{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 9px;min-height:42px}
 .search-primary #search-q{flex:1 1 240px;width:auto;max-width:620px;min-width:120px}
 .search-primary .rare-button{white-space:nowrap}
+.search-presets{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:5px 8px;padding:7px 9px;border:1px solid var(--border-hairline);border-radius:var(--radius-md);background:var(--surface-panel)}
+.search-presets>.rare-input{flex:0 1 200px;min-width:125px}
+.search-preset-item{display:inline-flex;align-items:center;gap:1px;border:1px solid var(--border-hairline);border-radius:var(--radius-sm);max-width:215px;min-width:0}
+.search-preset-item .rare-button:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.search-preset-item .rare-button:last-child{flex:none;color:var(--status-danger)}
 .search-workbench{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;padding:8px;min-width:0;min-height:0;align-items:start}
 .search-workbench.with-filters{grid-template-columns:230px minmax(0,1fr)}
 .search-results{min-width:0;overflow:hidden}

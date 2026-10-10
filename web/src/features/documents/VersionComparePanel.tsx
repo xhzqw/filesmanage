@@ -74,6 +74,7 @@ export function VersionComparePanel({fileId,versions}:{fileId:string;versions:Fi
     <span>v{result.right.seq} · {result.right.sizeBytes.toLocaleString()} B</span>
     {result.mode==="text"&&<strong>+{result.added} / −{result.removed} 行</strong>}
    </div>
+   {result.detail==="office_parts"&&<p className="hint">Office 部件差异：比较文档内部部件的名称、大小和 CRC32，不能代表段落文字或页面版式完全一致。</p>}
    {result.mode==="text"&&<div className="file-compare-quicknav">
     <span>{changes.length} 处变更</span>
     <RareButton type="button" disabled={changes.length===0} onClick={()=>focusChange(-1)}>上一处</RareButton>
@@ -86,7 +87,7 @@ export function VersionComparePanel({fileId,versions}:{fileId:string;versions:Fi
    </div>}
    {result.mode==="identical"?<p className="empty">内容完全一致（SHA-256 相同）。</p>
     :result.mode==="metadata"?<p className="empty">此格式不支持文本差异，两个版本的内容哈希不同。</p>
-    :result.mode==="large"?<p className="empty">内容存在差异，但文本超过对比上限（256 KB 或 350 行），不展示不完整的差异。</p>
+    :result.mode==="large"?<p className="empty">内容存在差异，但文件超过安全对比上限（文本 256 KB；Office 压缩包 8 MiB；最多 350 项），不展示不完整的差异。</p>
     :<div className="file-compare-lines" role="table" aria-label="版本文本差异">
      {display.map(entry=>entry.kind==="fold"
       ?<div key={"fold-"+entry.start} className="file-diff-fold" role="row">省略 {entry.count} 行未变化内容</div>

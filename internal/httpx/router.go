@@ -129,6 +129,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.GET("/files/:id/metadata", h.fileMetadata)
 	api.PUT("/files/:id/metadata", h.setFileMetadata)
 	api.PATCH("/files/:id", h.renameFile)
+	api.GET("/files/download-zip", h.downloadFilesZip)
 	api.GET("/files/:id/bytes", h.downloadFile)
 	api.GET("/files/:id/preview", h.previewFile)
 	api.GET("/files/:id/preview/media", h.previewMedia)

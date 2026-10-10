@@ -26,6 +26,7 @@ type VersionComparison struct {
 	Left    CompareVersionInfo `json:"left"`
 	Right   CompareVersionInfo `json:"right"`
 	Mode    string             `json:"mode"`
+	Detail  string             `json:"detail,omitempty"`
 	Lines   []CompareLine      `json:"lines"`
 	Added   int                `json:"added"`
 	Removed int                `json:"removed"`
@@ -62,10 +63,13 @@ func (s *Service) CompareVersions(ctx context.Context, u domain.User, fileID str
 		out.Mode = "identical"
 		return out, nil
 	}
-	if !looksTextual(file.Name, file.ContentType) {
+	office:=looksOfficePackage(file.Name)
+	if !office&&!looksTextual(file.Name, file.ContentType) {
 		return out, nil
 	}
-	if left.SizeBytes > compareMaxBytes || right.SizeBytes > compareMaxBytes {
+	maxBytes:=compareMaxBytes
+	if office{maxBytes=compareMaxOfficeArchiveBytes;out.Detail="office_parts"}
+	if left.SizeBytes > maxBytes || right.SizeBytes > maxBytes {
 		out.Mode = "large"
 		return out, nil
 	}
@@ -79,13 +83,17 @@ func (s *Service) CompareVersions(ctx context.Context, u domain.User, fileID str
 			return "", err
 		}
 		defer reader.Close()
-		data, err := io.ReadAll(io.LimitReader(reader, compareMaxBytes+1))
+		data, err := io.ReadAll(io.LimitReader(reader, maxBytes+1))
 		if err != nil {
 			return "", err
 		}
-		if int64(len(data)) > compareMaxBytes || !utf8.Valid(data) {
-			return "", domain.ErrInvalidInput
+		if int64(len(data)) > maxBytes{return "",domain.ErrInvalidInput}
+		if office{
+			parts,ok:=OfficePartLines(data)
+			if !ok{return "",domain.ErrInvalidInput}
+			return strings.Join(parts,"\n"),nil
 		}
+		if !utf8.Valid(data){return "",domain.ErrInvalidInput}
 		return strings.ReplaceAll(strings.ReplaceAll(string(data), "\r\n", "\n"), "\r", "\n"), nil
 	}
 	a, err := read(left.BlobID)

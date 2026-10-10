@@ -6,6 +6,7 @@ import type {FileItem} from "../../entities/file/model";
 import type {Folder} from "../../entities/folder/model";
 import {FolderPicker} from "../../shared/ui/FolderPicker";
 import {Dialog} from "../../shared/ui/Dialog";
+import {readSearchPresets,saveSearchPreset,writeSearchPresets,type SearchPresetFields} from "./searchPresets";
 import "./search.css";
 
 // The API caps the authorized total at 1001, which the UI renders as "1000+"
@@ -47,7 +48,7 @@ function csvField(value:string|number):string{
 // Full-text search workbench (SPEC C13/§10, WF-30): query plus uploader/type/
 // sort filters, authorized results with snippets and safe highlighting, and
 // cursor paging that appends strictly by the server's nextCursor (DI-16 §9).
-export function SearchPanel(){
+export function SearchPanel({userId}:{userId:string}){
  const[q,setQ]=useState("");
  const[category,setCategory]=useState("");
  const[tag,setTag]=useState("");
@@ -65,6 +66,29 @@ export function SearchPanel(){
  const[folders,setFolders]=useState<Folder[]>([]);
  const[treeState,setTreeState]=useState<"loading"|"ready"|"failed">("loading");
  const[treeToken,setTreeToken]=useState(0);
+ const[presets,setPresets]=useState(()=>readSearchPresets(userId));
+ const[presetName,setPresetName]=useState("");
+ const[showPresets,setShowPresets]=useState(false);
+ useEffect(()=>{setPresets(readSearchPresets(userId));setPresetName("");},[userId]);
+ function savePreset(){
+  const title=presetName.trim();
+  if(!title){setMessage("请输入预设名称");return;}
+  const fields:SearchPresetFields={q,category,tag,uploader,type,sort,limit:pageSize,scope,folder,from,to};
+  const saved=saveSearchPreset(presets,title,fields);
+  writeSearchPresets(userId,saved);
+  setPresets(saved);setPresetName("");setMessage(`已保存筛选：${title}`);
+ }
+ function loadPreset(preset:SearchPresetFields){
+  setQ(preset.q);setCategory(preset.category);setTag(preset.tag);setUploader(preset.uploader);
+  setType(preset.type);setSort(preset.sort);setPageSize(preset.limit);setScope(preset.scope);
+  setFolder(preset.folder);setFrom(preset.from);setTo(preset.to);setShowAdvanced(true);
+  epochRef.current++;setQuery(null);setItems([]);setStatus("idle");
+  setMessage("预设已加载，点击搜索或应用筛选执行");
+ }
+ function deletePreset(id:string){
+  const updated=presets.filter(p=>p.id!==id);
+  writeSearchPresets(userId,updated);setPresets(updated);
+ }
  useEffect(()=>{
   if(!pickerOpen)return;
   let active=true;setTreeState("loading");
@@ -183,9 +207,19 @@ export function SearchPanel(){
    <RareButton type="button" aria-expanded={showAdvanced} onClick={()=>setShowAdvanced(v=>!v)}>高级筛选</RareButton>
    <RareButton type="button" onClick={clearFilters}>重置</RareButton>
    <RareButton type="button" disabled={status!=="ready"||items.length===0} onClick={exportLoaded}>导出已加载 {items.length} 条</RareButton>
+   <RareButton type="button" aria-expanded={showPresets} onClick={()=>setShowPresets(v=>!v)}>搜索预设 {presets.length}</RareButton>
    {message&&<span className="error" role="alert">{message}</span>}
   </form>
-  <div className={"search-workbench"+(showAdvanced?" with-filters":"")}>
+  <div className={"search-workbench"  {showPresets&&<div className="search-presets" aria-label="已保存搜索条件">
+   <RareInput aria-label="预设名称" placeholder="给当前筛选命名…" maxLength={48} value={presetName} onChange={e=>setPresetName(e.target.value)}/>
+   <RareButton type="button" onClick={savePreset} disabled={!presetName.trim()}>保存当前条件</RareButton>
+   {presets.map(preset=><div className="search-preset-item" key={preset.id}>
+    <RareButton type="button" title="载入搜索条件" onClick={()=>loadPreset(preset.fields)}>{preset.name}</RareButton>
+    <RareButton type="button" aria-label={"删除预设 "+preset.name} onClick={()=>deletePreset(preset.id)}>×</RareButton>
+   </div>)}
+   {presets.length===0&&<span className="hint">暂无预设（最多 12 项）</span>}
+  </div>}
++(showAdvanced?" with-filters":"")}>
    {showAdvanced&&<aside className="search-filters" aria-label="高级搜索条件">
     <div className="search-filter-heading"><strong>筛选条件</strong><RareButton type="button" onClick={()=>setShowAdvanced(false)}>收起</RareButton></div>
     <label>范围<RareSelect aria-label="搜索范围" value={scope} onChange={e=>setScope(e.target.value as "all"|"current"|"descendants")}>

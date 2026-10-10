@@ -1048,6 +1048,10 @@ add("DELETE", "/api/files/{id}/lock", operation("Release a held edit lock", "Wor
     request={"application/json": {"schema": ref("LockTokenRequest")}},
     responses=dict([json_ok(obj({"released": string()}, required=["released"]), "Released file id."), resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"]), resp("409", ERR["409"])])))
 
+add("GET","/api/files/download-zip",operation("Download an authorized bounded ZIP of current file versions","Files","downloadFilesZip",security=SESSION,
+ params=[query("ids","1-30 unique comma-separated file IDs, max 512 MiB original bytes")],
+ responses=dict([("200",{"description":"Streaming application/zip attachment, after every item is authorized.","content":{"application/zip":{"schema":{"type":"string","format":"binary"}}}}),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+
 add("GET", "/api/files/{id}/lock", operation("Lock status", "Workflow", "lockStatus", security=SESSION,
     params=[id_param("id", "File id.")],
     responses=dict([json_ok(ref("LockStatus"), "Lock state."), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"])])))
