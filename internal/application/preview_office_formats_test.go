@@ -44,6 +44,9 @@ func TestOfficePDFRealSpreadsheetAndPresentation(t *testing.T) {
 	if _, err := exec.LookPath("soffice"); err != nil {
 		t.Skip("soffice unavailable")
 	}
+	if _, err := exec.LookPath("pdftotext"); err != nil {
+		t.Skip("pdftotext unavailable")
+	}
 	service, _ := testService(t)
 	admin := domain.User{ID: "u_admin", Login: "admin", IsAdmin: true}
 	cases := []struct {
@@ -69,6 +72,15 @@ func TestOfficePDFRealSpreadsheetAndPresentation(t *testing.T) {
 			}
 			if len(pdf) < 500 || !strings.HasPrefix(string(pdf[:8]), "%PDF-") {
 				t.Fatalf("invalid PDF length/signature: %d", len(pdf))
+			}
+			cmd := exec.Command("pdftotext", "-layout", "-", "-")
+			cmd.Stdin = bytes.NewReader(pdf)
+			text, err := cmd.Output()
+			if err != nil {
+				t.Fatalf("PDF content extraction failed: %v", err)
+			}
+			if !strings.Contains(string(text), tc.term) {
+				t.Fatalf("converted PDF does not contain visible content %q", tc.term)
 			}
 		})
 	}
