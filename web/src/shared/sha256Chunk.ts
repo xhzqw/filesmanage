@@ -11,6 +11,7 @@ const K=new Uint32Array([
  0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
 ]);
 function rotate(x:number,n:number){return(x>>>n)|(x<<(32-n));}
+function word(data:Uint32Array,index:number):number{return data[index]??0;}
 export function sha256Fallback(data:Uint8Array):string{
  const H=new Uint32Array([0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]);
  const paddedLength=Math.ceil((data.length+9)/64)*64;
@@ -23,23 +24,23 @@ export function sha256Fallback(data:Uint8Array):string{
  for(let offset=0;offset<paddedLength;offset+=64){
   for(let i=0;i<16;i++)w[i]=view.getUint32(offset+i*4,false);
   for(let i=16;i<64;i++){
-   const a=w[i-15],b=w[i-2];
+   const a=word(w,i-15),b=word(w,i-2);
    const s0=rotate(a,7)^rotate(a,18)^(a>>>3);
    const s1=rotate(b,17)^rotate(b,19)^(b>>>10);
-   w[i]=(w[i-16]+s0+w[i-7]+s1)>>>0;
+   w[i]=(word(w,i-16)+s0+word(w,i-7)+s1)>>>0;
   }
-  let [a,b,c,d,e,f,g,h]=H;
+  let a=word(H,0),b=word(H,1),c=word(H,2),d=word(H,3),e=word(H,4),f=word(H,5),g=word(H,6),h=word(H,7);
   for(let i=0;i<64;i++){
    const s1=rotate(e,6)^rotate(e,11)^rotate(e,25);
    const ch=(e&f)^(~e&g);
-   const t1=(h+s1+ch+K[i]+w[i])>>>0;
+   const t1=(h+s1+ch+word(K,i)+word(w,i))>>>0;
    const s0=rotate(a,2)^rotate(a,13)^rotate(a,22);
    const maj=(a&b)^(a&c)^(b&c);
    const t2=(s0+maj)>>>0;
    h=g;g=f;f=e;e=(d+t1)>>>0;d=c;c=b;b=a;a=(t1+t2)>>>0;
   }
-  H[0]=(H[0]+a)>>>0;H[1]=(H[1]+b)>>>0;H[2]=(H[2]+c)>>>0;H[3]=(H[3]+d)>>>0;
-  H[4]=(H[4]+e)>>>0;H[5]=(H[5]+f)>>>0;H[6]=(H[6]+g)>>>0;H[7]=(H[7]+h)>>>0;
+  H[0]=(word(H,0)+a)>>>0;H[1]=(word(H,1)+b)>>>0;H[2]=(word(H,2)+c)>>>0;H[3]=(word(H,3)+d)>>>0;
+  H[4]=(word(H,4)+e)>>>0;H[5]=(word(H,5)+f)>>>0;H[6]=(word(H,6)+g)>>>0;H[7]=(word(H,7)+h)>>>0;
  }
  return [...H].map(x=>x.toString(16).padStart(8,"0")).join("");
 }
