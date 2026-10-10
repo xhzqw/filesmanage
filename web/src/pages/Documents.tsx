@@ -7,6 +7,7 @@ import{folderApi}from "../features/folders/api";
 import{FolderTree,ancestorPath}from "../features/folders/FolderTree";
 import{NewFolderForm}from "../features/folders/NewFolderForm";
 import{FolderActions}from "../features/folders/FolderActions";
+import{QuickGrantsDialog}from "../features/organization/QuickGrantsDialog";
 import{folderMoveBusy,folderMoveCanSubmit,folderMoveFailure,folderMoveFailed,folderMoveIdle,folderMoveInvalidTarget,folderMovePickTarget,folderMoveSubmitStarted,type FolderMoveState}from "../features/folders/moveFolderFlow";
 import{fileApi}from "../features/documents/api";
 import{FileTable}from "../features/documents/FileTable";
@@ -49,6 +50,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  const[folders,setFolders]=useState<Folder[]>([]);
  const[status,setStatus]=useState("loading");
  const[reloadKey,setReloadKey]=useState(0);
+ const[grantsFolder,setGrantsFolder]=useState<Folder|null>(null);
  // Rename/delete from the tree menu reuse FolderActions' own dialogs: the bar
  // follows the right-clicked folder until the selection moves again.
  const[actionsFolder,setActionsFolder]=useState<Folder|null>(null);
@@ -193,7 +195,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
     onRenameFolder={folder=>runFolderAction(folder,"rename")}
     onMoveFolder={openMove}
     onDeleteFolder={folder=>runFolderAction(folder,"delete")}
-    onManageGrants={folder=>navigate("/org?tab=permissions&view=folder&folder="+encodeURIComponent(folder.id))}
+    onManageGrants={folder=>setGrantsFolder(folder)}
 />}
    {folders.length>0&&status==="loading"&&<p className="hint">正在刷新目录…</p>}
    {folders.length>0&&status==="failed"&&<p role="alert" className="error">目录刷新失败，以下为上次数据。</p>}
@@ -215,7 +217,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
      <FolderBreadcrumb folders={folders} folder={selected}/>
      <div className="folder-actions-slot">
       <FolderActions folder={actionsFolder??selected} actionRequest={actionRequest} onActionHandled={()=>setActionRequest(null)} isAdmin={user.isAdmin} onChanged={()=>setReloadKey(k=>k+1)}
-       onManageGrants={()=>navigate("/org?tab=permissions&view=folder&folder="+encodeURIComponent((actionsFolder??selected).id))}/>
+       onManageGrants={()=>setGrantsFolder(actionsFolder??selected)}/>
      </div>
    </div>}
    {moveMessage&&<p role="status" className="notice">{moveMessage}</p>}
@@ -225,6 +227,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
    </DropZone>}
    {!selected&&status!=="loading"&&<p className="empty">当前账号没有可访问的目录，请联系管理员授权。</p>}
    </main></div>
+   {grantsFolder&&<QuickGrantsDialog folder={grantsFolder} onClose={()=>setGrantsFolder(null)}/>}
    {editingId&&<FileEditorBridge fileId={editingId} requiresApproval={requiresApproval}
     onClose={()=>setEditingId(null)} onSaved={()=>setReloadKey(k=>k+1)}/>}
    {/* The FolderPicker is a panel, so it lives inside the shared modal Dialog;

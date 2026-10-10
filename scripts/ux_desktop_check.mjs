@@ -1203,6 +1203,30 @@ async function main() {
       await cdp.key("Escape", "Escape", 27);
       await delay(300);
 
+
+      // Quick direct grants must stay on /doc, use the modal top layer,
+      // and never silently replace full organization permission management.
+      const grantsBefore=await cdp.evaluate('location.pathname+location.search');
+      await cdp.evaluate(`(()=>{const button=[...document.querySelectorAll('.folder-actions button')].find(x=>x.textContent?.trim()==='授权管理');button?.click();return !!button;})()`);
+      const quickOpen=await cdp.waitFor(`()=>!!document.querySelector('dialog.quick-grants-dialog[open] .quick-grants-form')`,6000);
+      const quickGeometry=await cdp.evaluate(`(()=>{
+        const d=document.querySelector('dialog.quick-grants-dialog[open]');
+        if(!d)return null;
+        const r=d.getBoundingClientRect();
+        return {width:r.width,viewport:innerWidth,checkboxes:d.querySelectorAll('.quick-grants-actions-grid input[type=checkbox]').length,
+          noRouteChange:location.pathname+location.search===${JSON.stringify(grantsBefore)},
+          readOnlyAtOpen:!d.querySelector('.quick-grants-review')};
+      })()`);
+      check("directory authorization opens a bounded quick modal without navigation",
+        quickOpen===true&&quickGeometry?.checkboxes===9&&quickGeometry?.width<=quickGeometry?.viewport
+        &&quickGeometry?.noRouteChange&&quickGeometry?.readOnlyAtOpen,JSON.stringify(quickGeometry));
+      await cdp.evaluate(`(()=>{const btn=document.querySelector('.quick-grants-fields .rare-select');btn?.click();return !!btn;})()`);
+      const grantSelect=await cdp.waitFor(`()=>!!document.querySelector('dialog.quick-grants-dialog .rare-select-menu')`,3000);
+      check("quick authorization RareSelect stays inside modal top layer",grantSelect===true,String(grantSelect));
+      await cdp.evaluate(`(()=>{document.querySelector('dialog.quick-grants-dialog .quick-grants-close')?.click();return true;})()`);
+      const grantsClosed=await cdp.waitFor(`()=>!document.querySelector('dialog.quick-grants-dialog[open]')`,3500);
+      check("closing quick authorization preserves document location",grantsClosed===true
+        &&await cdp.evaluate(`location.pathname+location.search===${JSON.stringify(grantsBefore)}`),String(grantsClosed));
       // DI-17: synthetic drop with a real DataTransfer uploads into the folder
       const dropped = await cdp.evaluate(`(async ()=>{
         const dt=new DataTransfer();
