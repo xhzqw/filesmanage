@@ -163,6 +163,22 @@ async function main() {
     cdp = await CDP.connect(target.webSocketDebuggerUrl);
     await cdp.send("Page.enable");
     await cdp.send("Runtime.enable");
+    // Count real GPU draw calls, not requestAnimationFrame callbacks. An idle
+    // viewer should cease submitting geometry until the scene changes.
+    await cdp.send("Page.addScriptToEvaluateOnNewDocument", { source: `(()=>{
+      window.__cadDrawCalls=0;
+      for(const Ctor of [window.WebGLRenderingContext,window.WebGL2RenderingContext]){
+       if(!Ctor)continue;
+       for(const method of ["drawArrays","drawElements","drawArraysInstanced","drawElementsInstanced"]){
+        const original=Ctor.prototype[method];
+        if(typeof original!=="function")continue;
+        Ctor.prototype[method]=function(...args){
+         window.__cadDrawCalls++;
+         return original.apply(this,args);
+        };
+       }
+      }
+    })()` });
     await cdp.send("Network.setCookie", { name: "fm_session", value: cookieValue, domain: new URL(BASE).hostname, path: "/" });
     const loaded = new Promise((resolve) => {
       const timer = setInterval(() => {
@@ -193,6 +209,13 @@ async function main() {
     check("MC02 assembly part tree rendered", Array.isArray(panel) && panel.length > 0,
           JSON.stringify(panel));
     if (Array.isArray(panel) && panel.length) {
+      await delay(750);
+      const idleStart=await cdp.evaluate("(()=>window.__cadDrawCalls)()");
+      await delay(750);
+      const idleEnd=await cdp.evaluate("(()=>window.__cadDrawCalls)()");
+      check("MOD08 idle CAD canvas stops GPU draw calls",
+        Number.isFinite(idleStart)&&idleEnd-idleStart<=4,
+        `draw calls during 750ms idle=${idleEnd-idleStart}`);
       const boxes = panel.map((p) => p.hint.split("·")[0].trim()).sort();
       const want = ["10.00×10.00×10.00", "5.00×5.00×5.00"].sort();
       check("MC02 two parts with the true bounding boxes",
@@ -205,6 +228,10 @@ async function main() {
       await delay(600);
       const hidden = await cdp.screenshot();
       check("MOD02 per-part visibility changes the render", hidden !== before, "pixels changed");
+      const afterChange=await cdp.evaluate("(()=>window.__cadDrawCalls)()");
+      check("MOD08 changed parts invalidate and redraw",
+        Number.isFinite(afterChange)&&afterChange>idleEnd,
+        `draw calls added=${afterChange-idleEnd}`);
       const state = await cdp.evaluate(`(()=>{const boxes=[...document.querySelectorAll('.toolbar[aria-label="装配零件"] input[type=checkbox]')];return boxes.map(b=>b.checked);})()`);
       check("MOD02 part hidden in the tree", JSON.stringify(state) === "[true,false]", JSON.stringify(state));
 

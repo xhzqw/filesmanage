@@ -47,9 +47,27 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
  const[selectedPart,setSelectedPart]=useState(-1);
  const mshRoot=useRef<import("three").Group|null>(null);
  const dxfRoot=useRef<import("three").Group|null>(null);
+ const started=useRef(false);
+ const controls=useRef<ViewerControls|null>(null);
+ const[view,setView]=useState({axes:false,grid:true,projection:"perspective" as "perspective"|"orthographic"});
+
+ // React Router can keep this component mounted while /model/:id changes.
+ // Drop the previous GPU scene and restart loading for the new document.
+ useEffect(()=>{
+  started.current=false;
+  return ()=>{
+   controls.current?.dispose();
+   controls.current=null;
+   mshRoot.current=null;
+   dxfRoot.current=null;
+  };
+ },[id]);
 
  useEffect(()=>{
   let valid=true;
+  setStatus("loading");setMessage("");setInfo(null);setFileMeta(null);
+  setMetrics(null);setLayers([]);setParts([]);setSelectedPart(-1);
+  setUnit("unknown");setView({axes:false,grid:true,projection:"perspective"});
   const run=async()=>{
    try{
     let data=await fileApi.derivativeStatus(id);
@@ -100,22 +118,22 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
   return()=>{valid=false;};
  },[id]);
 
- // One-shot mount: the ref guard keeps the scene alive when `status` flips to
- // ready; teardown runs only on real unmount so the canvas is never removed
- // by a dependency change.
- const started=useRef(false);
- const controls=useRef<ViewerControls|null>(null);
- const[view,setView]=useState({axes:false,grid:true,projection:"perspective" as "perspective"|"orthographic"});
- useEffect(()=>()=>{controls.current?.dispose();controls.current=null;},[]);
+ // Parsing can outlive navigation. Every asynchronous boundary checks the
+ // effect's lifetime; a parsed but unmounted scene owns disposable geometry.
  useEffect(()=>{
   if(status!=="loading-model"||started.current)return;
   started.current=true;
   let valid=true;
+  const abort=new AbortController();
+  let pendingObject:import("three").Object3D|null=null;
   (async()=>{
-   try{
-    const THREE=await import("three");
-    const {OrbitControls}=await import("three/examples/jsm/controls/OrbitControls.js");
-    const res=await fetch("/api/files/"+id+"/derivative/bytes",{credentials:"same-origin"});
+    try{
+     const THREE=await import("three");
+     const {OrbitControls}=await import("three/examples/jsm/controls/OrbitControls.js");
+     if(!valid)return;
+     const res=await fetch("/api/files/"+id+"/derivative/bytes",{
+      credentials:"same-origin",signal:abort.signal,
+     });
     if(!res.ok){await reportSessionResponse(res,"/files/derivative/bytes");throw new Error("derivative fetch failed");}
     // MOD07: a mesh too large for a browser tab is refused up front with an
     // actionable error and a download entry instead of hanging the page.
@@ -124,10 +142,10 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
      if(valid)setStatus("too-large");
      return;
     }
-    const buffer=await res.arrayBuffer();
-    if(!valid)return;
+     const buffer=await readBoundedModel(res,abort.signal);
+     if(!valid)return;
     const format=(info?.outputKind??info?.format??"stl").toLowerCase();
-    setUnit(declaredUnit(buffer,format));
+     setUnit(declaredUnit(buffer,format));
     let object:import("three").Object3D;
     if(format==="dxf"){
      const parsed=parseDxf(new TextDecoder().decode(buffer),THREE);
@@ -146,15 +164,31 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
      const parse=await loadParser(format,THREE,resolveUrl);
      object=await parse(buffer);
     }
-    controls.current=mountScene(THREE,OrbitControls,holder.current!,object,setMetrics,()=>{
-     if(valid){setStatus("webgl-lost");setMessage("浏览器 WebGL 上下文已丢失（通常是 GPU 资源被系统回收）");}
-    });
-    setStatus("ready");
-   }catch(error){
-    if(valid){setStatus("failed");setMessage(errorCopy(error,"模型加载失败"));}
-   }
-  })();
- },[status,id,info?.outputKind,info?.format]);
+     pendingObject=object;
+     if(!valid)return;
+     let mountedControls:ViewerControls|null=null;
+     mountedControls=mountScene(THREE,OrbitControls,holder.current!,object,setMetrics,()=>{
+      // The loading effect is cleaned up as soon as status becomes ready.
+      // Scene lifetime instead belongs to controls.current (until navigation).
+      if(controls.current===mountedControls){
+       setStatus("webgl-lost");
+       setMessage("浏览器 WebGL 上下文已丢失（通常是 GPU 资源被系统回收）");
+      }
+     });
+     controls.current=mountedControls;
+     pendingObject=null;
+     setStatus("ready");
+    }catch(error){
+     if(valid){
+      if(error instanceof ModelSizeLimitError)setStatus("too-large");
+      else {setStatus("failed");setMessage(errorCopy(error,"模型加载失败"));}
+     }
+    }finally{
+     if(pendingObject)disposeModelResources(pendingObject);
+    }
+   })();
+   return()=>{valid=false;abort.abort();};
+  },[status,id,info?.outputKind,info?.format]);
 
  return <AppShell user={user} onLogout={onLogout} product="模型预览" actions={<button type="button" onClick={()=>navigate("/preview/"+id)}>返回文件</button>}>
   <div className="panels">
@@ -165,9 +199,10 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
       <input type="checkbox" checked={layer.visible} onChange={event=>{
        setLayers(layers.map(item=>item.name===layer.name?{...item,visible:event.target.checked}:item));
        // Toggle visibility straight on the drawing's layer group.
-       dxfRoot.current?.children.forEach(child=>{
-        if(child.userData.layer===layer.name)child.visible=event.target.checked;
-       });
+        dxfRoot.current?.children.forEach(child=>{
+         if(child.userData.layer===layer.name)child.visible=event.target.checked;
+        });
+        controls.current?.invalidate();
       }}/>
       {layer.name}
      </label>)}
@@ -179,6 +214,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
         setParts(parts.map((item,i)=>i===index?{...item,visible:event.target.checked}:item));
         const child=mshRoot.current?.children[index];
         if(child)child.visible=event.target.checked;
+        controls.current?.invalidate();
        }}/>
        <button type="button" className={selectedPart===index?"on":""} onClick={()=>{
         setSelectedPart(selectedPart===index?-1:index);
@@ -190,6 +226,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
          if(!material||!material.emissive)return;
          material.emissive.setHex(i===(selectedPart===index?-1:index)?0x1b4f8a:0x000000);
         });
+        controls.current?.invalidate();
        }}>{part.name}</button>
        <span className="toolbar-hint">{part.size.map(v=>v.toFixed(2)).join("×")} · {part.triangles}△</span>
       </label>
@@ -200,8 +237,9 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
       mshRoot.current?.children.forEach(child=>{
        child.visible=true;
        const material=(child as import("three").Mesh).material as import("three").MeshPhongMaterial|undefined;
-       material?.emissive?.setHex(0x000000);
-      });
+        material?.emissive?.setHex(0x000000);
+       });
+       controls.current?.invalidate();
      }}>全部显示</button>
     </div>}
     {status==="unsupported"&&<p className="empty">{info?.note??"该格式当前不支持在线预览"}</p>}
@@ -235,6 +273,67 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
 
 type MeshParser=(buffer:ArrayBuffer)=>Promise<import("three").Object3D>;
 type MTLLoaderType=import("three/examples/jsm/loaders/MTLLoader.js").MTLLoader;
+
+class ModelSizeLimitError extends Error{}
+
+// HTTP Content-Length is optional and untrusted. Refuse an oversized *stream*
+// before its bytes can accumulate in RAM, even for chunked transfer responses.
+// Cancellation also releases a reader when the user navigates away.
+async function readBoundedModel(response:Response,signal:AbortSignal):Promise<ArrayBuffer>{
+ if(!response.body){
+  const data=await response.arrayBuffer();
+  if(data.byteLength>MAX_INLINE_MODEL_BYTES)throw new ModelSizeLimitError();
+  return data;
+ }
+ const reader=response.body.getReader();
+ const chunks:Uint8Array[]=[];
+ let size=0;
+ try{
+  for(;;){
+   if(signal.aborted)throw new DOMException("Aborted","AbortError");
+   const {value,done}=await reader.read();
+   if(done)break;
+   if(!value)continue;
+   size+=value.byteLength;
+   if(size>MAX_INLINE_MODEL_BYTES)throw new ModelSizeLimitError();
+   chunks.push(value);
+  }
+ }finally{
+  reader.releaseLock();
+  if(size>MAX_INLINE_MODEL_BYTES||signal.aborted)void response.body.cancel().catch(()=>{});
+ }
+ const result=new Uint8Array(size);
+ let offset=0;
+ for(const chunk of chunks){result.set(chunk,offset);offset+=chunk.byteLength;}
+ return result.buffer;
+}
+
+// Object3D.remove() never frees GPU buffers. Dispose each shared geometry,
+// material and texture exactly once, including material texture maps.
+function disposeModelResources(root:import("three").Object3D):void{
+ const geometries=new Set<import("three").BufferGeometry>();
+ const materials=new Set<import("three").Material>();
+ const textures=new Set<import("three").Texture>();
+ root.traverse(node=>{
+  const mesh=node as import("three").Mesh;
+  if(mesh.geometry?.isBufferGeometry)geometries.add(mesh.geometry);
+  if(mesh.material){
+   for(const material of Array.isArray(mesh.material)?mesh.material:[mesh.material]){
+    if(material?.isMaterial)materials.add(material);
+   }
+  }
+ });
+ for(const material of materials){
+  for(const value of Object.values(material as unknown as Record<string,unknown>)){
+   if(value&&typeof value==="object"&&"isTexture" in value&&value.isTexture===true){
+    textures.add(value as import("three").Texture);
+   }
+  }
+ }
+ for(const geometry of geometries)geometry.dispose();
+ for(const texture of textures)texture.dispose();
+ for(const material of materials)material.dispose();
+}
 
 // declaredUnit reports the only unit the system can honestly state: 3MF
 // declares it in its model XML, every other mesh format (STL/OBJ/glTF/PLY)
@@ -445,6 +544,7 @@ function parseMsh(text:string,THREE:typeof import("three")):{group:import("three
 // MOD01/MOD07). mountScene returns it so the React layer stays declarative.
 type ViewerControls={
  dispose:()=>void;
+ invalidate:()=>void;
  resetView:()=>void;
  toggleAxes:()=>boolean;
  toggleGrid:()=>boolean;
@@ -476,8 +576,10 @@ function mountScene(
  );
  let camera:import("three").PerspectiveCamera|import("three").OrthographicCamera=persp;
  const renderer=new THREE.WebGLRenderer({antialias:true});
+ // A 3×–4× density screen can multiply GPU render-target memory by 9–16.
+ // Clamp the canvas to 2×, preserving sharpness without unbounded allocation.
+ renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
  renderer.setSize(holder.clientWidth,holder.clientHeight);
- renderer.setPixelRatio(window.devicePixelRatio);
  holder.appendChild(renderer.domElement);
  // Annotated so the projection swap can rebind controls to either camera type.
  let controls:typeof OrbitControls.prototype=new OrbitControls(camera,renderer.domElement);
@@ -496,14 +598,11 @@ function mountScene(
  axes.visible=false;
  scene.add(axes);
 
- object.traverse(child=>{
-  const mesh=child as import("three").Mesh;
-  if(mesh.isMesh){
-   mesh.material=new THREE.MeshPhongMaterial({color:0x2f7fd0,shininess:40,specular:0x22406b});
-  }
- });
+ // Preserve source materials (including OBJ/3MF/glTF texture maps), rather
+ // than replacing them with an allocated blue material on every mesh.
  scene.add(object);
 
+ let invalidate=()=>{};
  const frame=()=>{
   // Damping residue from a drag would be re-applied on the next update() and
   // pull the camera away from the reset pose, so flush it first: one update
@@ -514,6 +613,7 @@ function mountScene(
   camera.position.set(radius*2.2,radius*1.8,radius*2.2);
   controls.target.set(0,0,0);
   controls.update();
+  invalidate();
  };
  frame();
  let triangles=0,vertices=0;
@@ -540,10 +640,26 @@ function mountScene(
  if(components===0&&triangles>0)components=1;
  setMetrics({triangles,vertices,size:[size.x,size.y,size.z],components});
 
- let raf=0;
- const animate=()=>{raf=requestAnimationFrame(animate);controls.update();renderer.render(scene,camera);};
- animate();
+ // Render only when the model/camera changes. A constantly running WebGL
+ // loop burns GPU even on an idle document tab. OrbitControls emits a change
+ // while dragging or damping, allowing frames until movement settles.
+ let raf=0,needsFrame=true,disposed=false,contextLost=false;
+ const requestFrame=()=>{
+  if(!raf&&!disposed&&!contextLost&&!document.hidden)raf=requestAnimationFrame(draw);
+ };
+ const draw=()=>{
+  raf=0;
+  if(disposed||contextLost||document.hidden)return;
+  const moving=controls.update();
+  if(needsFrame||moving)renderer.render(scene,camera);
+  needsFrame=false;
+  if(moving)requestFrame();
+ };
+ invalidate=()=>{needsFrame=true;requestFrame();};
+ controls.addEventListener("change",invalidate);
+ invalidate();
  const onResize=()=>{
+  if(disposed)return;
   const next=holder.clientWidth/Math.max(holder.clientHeight,1);
   persp.aspect=next;
   persp.updateProjectionMatrix();
@@ -551,43 +667,69 @@ function mountScene(
   ortho.right=frustum*next;
   ortho.updateProjectionMatrix();
   renderer.setSize(holder.clientWidth,holder.clientHeight);
+  invalidate();
  };
  window.addEventListener("resize",onResize);
+ const resizeObserver=new ResizeObserver(onResize);
+ resizeObserver.observe(holder);
+ const onVisibilityChange=()=>{
+  if(document.hidden){cancelAnimationFrame(raf);raf=0;}
+  else invalidate();
+ };
+ document.addEventListener("visibilitychange",onVisibilityChange);
 
  // MOD07: a lost WebGL context is surfaced as an actionable error instead of a
  // silently frozen canvas. preventDefault keeps the restore path available.
  const onLost=(event:Event)=>{
   event.preventDefault();
+  contextLost=true;
+  cancelAnimationFrame(raf);
+  raf=0;
   if(onContextLost)onContextLost();
  };
  renderer.domElement.addEventListener("webglcontextlost",onLost);
 
  return {
+  invalidate,
   resetView:frame,
   toggleAxes:()=>{
    axes.visible=!axes.visible;
+   invalidate();
    return axes.visible;
   },
   toggleGrid:()=>{
    grid.visible=!grid.visible;
+   invalidate();
    return grid.visible;
   },
   toggleProjection:()=>{
    const next=camera===persp?ortho:persp;
    next.position.copy(camera.position);
+   controls.removeEventListener("change",invalidate);
    controls.dispose();
    camera=next;
    controls=new OrbitControls(camera,renderer.domElement);
    controls.enableDamping=true;
    controls.target.set(0,0,0);
+   controls.addEventListener("change",invalidate);
    controls.update();
+   invalidate();
    return camera===ortho?"orthographic":"perspective";
   },
   dispose:()=>{
+   if(disposed)return;
+   disposed=true;
    cancelAnimationFrame(raf);
    window.removeEventListener("resize",onResize);
+   resizeObserver.disconnect();
+   document.removeEventListener("visibilitychange",onVisibilityChange);
    renderer.domElement.removeEventListener("webglcontextlost",onLost);
+   controls.removeEventListener("change",invalidate);
    controls.dispose();
+   disposeModelResources(object);
+   disposeModelResources(grid);
+   disposeModelResources(axes);
+   scene.remove(object,grid,axes);
    // forceContextLoss releases the GPU context immediately rather than waiting
    // for the GC to finalise the canvas (MOD08).
    renderer.dispose();

@@ -156,3 +156,18 @@
   ModelViewer 模块；模型解析器和 Three.js 本身继续按格式动态导入。
   文件首页无需下载 CAD 预览代码。通过远端 Vite 构建产物的
   拆包检查和原有真实 CAD 业务回归验收。
+
+## 12. V8 CAD 场景资源与按需渲染
+
+- 静态模型不能常驻 GPU 60 FPS：OrbitControls 实际变化、图层、
+  装配零件可见性、选择、投影与画布尺寸变化时才调度渲染；
+  阻止后台标签页提交帧，并在页面恢复时刷新。
+- Viewer 卸载或切换模型 ID 时必须清理 scene 中去重后的 BufferGeometry、
+  Material 和 Texture、网格坐标辅助资源、OrbitControls、ResizeObserver、
+  事件监听器、未完成下载和 WebGL 上下文。不得改写模型的源材质或
+  平白为每个 mesh 再分配材质； glTF/OBJ 的源贴图应保留。
+- 模型字节同时检查声明长度和实际分片累计长度，无长度头和分块
+  传输也不能绕过 256 MiB 的浏览器内联预览保护。
+- 远端 `mc02_assembly_check.mjs` 使用真实 WebGL draw 调用计数验证
+  静态模型 750ms 后不持续绘制，以及零件隐藏操作能触发绘制；
+  同时维持两实体装配、显示/隐藏、恢复视图和高亮的视觉回归。
