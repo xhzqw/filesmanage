@@ -47,8 +47,19 @@ const sendScript=`(()=>{
   return originalFetch(resource,init);
  };
  const stats=window.__mshPerf={started:false,finished:false,duration:0,maxLag:0,ticks:0,bytes:mesh.byteLength};
- const oldPost=Worker.prototype.postMessage;
- Worker.prototype.postMessage=function(message,...rest){
+ let finishWorker=()=>{};
+ const NativeWorker=window.Worker;
+ // Register the measurement callback in the constructor. The app assigns
+ // worker.onmessage later; measuring there would wrongly include expensive
+ // main-thread Three.js scene upload before our callback runs.
+ window.Worker=class extends NativeWorker{
+  constructor(...args){
+   super(...args);
+   this.addEventListener("message",()=>finishWorker(),{once:true});
+  }
+ };
+ const oldPost=NativeWorker.prototype.postMessage;
+ NativeWorker.prototype.postMessage=function(message,...rest){
   if(message?.buffer instanceof ArrayBuffer){
    stats.started=true;
    const started=performance.now();
@@ -58,13 +69,13 @@ const sendScript=`(()=>{
     stats.maxLag=Math.max(stats.maxLag,now-previous-16);
     previous=now;stats.ticks++;
    },16);
-   this.addEventListener("message",()=>{
+   finishWorker=()=>{
     clearInterval(interval);
     const finish=performance.now();
     stats.maxLag=Math.max(stats.maxLag,finish-previous-16);
     stats.duration=Math.round(finish-started);
     stats.finished=true;
-   },{once:true});
+   };
   }
   return oldPost.call(this,message,...rest);
  };
