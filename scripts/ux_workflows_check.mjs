@@ -824,39 +824,51 @@ async function g4UiSuite() {
     console.log("DEBUG manualInput:", typeof manualInput, JSON.stringify(manualInput));
     check("WF-29 manual folder-ID input is gone", manualInput === false, String(manualInput));
 
-    // ---- ACL-01..05: grant dialog recipient sources + expiry ----
-    await cdp.navigate(`${BASE}/doc?folder=${folderId}`);
-    const treeReady2 = await cdp.waitFor(`()=>document.querySelector('li[data-folder-id="${folderId}"]')!==null`, 20000);
-    check("fixture folder in the tree", Boolean(treeReady2), String(treeReady2));
-    await cdp.evaluate(`(()=>{const li=document.querySelector('li[data-folder-id="${folderId}"]');li?.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:80,clientY:300}));return Boolean(li);})()`);
-    await cdp.waitFor(`()=>document.querySelector('[role=menu]')!==null`);
-    await cdp.evaluate(`(()=>{const item=[...document.querySelectorAll('[role=menuitem]')].find(b=>b.textContent?.trim()==='授权管理');item?.click();return Boolean(item);})()`);
-    const grantOpen = await cdp.waitFor(`()=>[...document.querySelectorAll('dialog.dialog')].some(d=>d.open&&d.textContent?.includes('目录授权'))`, 10000);
-    check("ACL grant dialog opens", grantOpen === true, String(grantOpen));
+    // ---- ACL-01..05: V3 organization PermissionsPanel is inline, not a modal ----
+    // The real URL carries the selected folder. This avoids a brittle
+    // context-menu implementation detail while exercising the same ACL editor.
+    await cdp.navigate(`${BASE}/org?tab=permissions&folder=${encodeURIComponent(folderId)}`);
+    const grantOpen = await cdp.waitFor(`()=>{
+      const panel=document.querySelector('#org-panel-permissions');
+      return Boolean(panel?.querySelector('.perm-form select')&&panel.textContent?.includes('新增直接授权'));
+    }`,15000);
+    check("ACL permission workbench opens for the selected folder",
+      grantOpen===true,String(grantOpen));
     const kindOptions = await cdp.evaluate(`(()=>{
-      const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('目录授权'));
-      const selects=[...d.querySelectorAll('select')];
-      return {kinds:selects.length?[...selects[0].options].map(o=>o.value):[],subjects:selects.length>1?[...selects[1].options].map(o=>o.textContent?.trim()).slice(0,4):[]};})()`);
-    check("ACL subject kinds are user/group", JSON.stringify(kindOptions.kinds) === JSON.stringify(["user", "group"]), JSON.stringify(kindOptions));
-    // switch to group: the list must show groups, not user ids
-    await cdp.evaluate(`(()=>{
-      const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('目录授权'));
-      const selects=[...d.querySelectorAll('select')];
-      selects[0].value='group';selects[0].dispatchEvent(new Event('change',{bubbles:true}));
+      const form=document.querySelector('#org-panel-permissions .perm-form');
+      const selects=[...form.querySelectorAll('select')];
+      return {kinds:selects.length?[...selects[0].options].map(o=>o.value):[],
+        subjects:selects.length>1?[...selects[1].options].map(o=>o.textContent?.trim()).slice(0,4):[],
+        selectedFolder:document.querySelector('.perm-detail-heading .perm-path')?.textContent?.trim()};
+    })()`);
+    check("ACL subject kinds are user/group",
+      JSON.stringify(kindOptions.kinds)===JSON.stringify(["group","user"]) &&
+      kindOptions.selectedFolder.length>0,JSON.stringify(kindOptions));
+
+    const userSource = await cdp.evaluate(`(()=>{
+      const selects=[...document.querySelectorAll('.perm-form select')];
+      const set=Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype,'value').set;
+      set.call(selects[0],'user');selects[0].dispatchEvent(new Event('change',{bubbles:true}));
       return true;})()`);
-    await delay(600);
-    const groupOptions = await cdp.evaluate(`(()=>{
-      const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('目录授权'));
-      const selects=[...d.querySelectorAll('select')];
-      return selects.length>1?[...selects[1].options].map(o=>o.textContent?.trim()):[];})()`);
+    await delay(450);
+    const userOptions = await cdp.evaluate(`(()=>[...document.querySelectorAll('.perm-form select')[1].options].map(o=>o.textContent?.trim()))()`);
+    check("ACL-01 user kind lists real user accounts",
+      userSource===true && userOptions.length>=2 && userOptions.some(o=>o&&!o.includes("请选择")),JSON.stringify(userOptions.slice(0,6)));
+
+    await cdp.evaluate(`(()=>{
+      const selects=[...document.querySelectorAll('.perm-form select')];
+      const set=Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype,'value').set;
+      set.call(selects[0],'group');selects[0].dispatchEvent(new Event('change',{bubbles:true}));
+      return true;})()`);
+    await delay(450);
+    const groupOptions = await cdp.evaluate(`(()=>[...document.querySelectorAll('.perm-form select')[1].options].map(o=>o.textContent?.trim()))()`);
     check("ACL-01 group kind lists real workgroups",
-      Array.isArray(groupOptions) && groupOptions.length >= 1 && groupOptions.some(o => o && !o.startsWith("grp_")),
+      Array.isArray(groupOptions) && groupOptions.length>=2 &&
+      groupOptions.some(o=>o&&o!=="请选择"&&!o.startsWith("grp_")),
       JSON.stringify(groupOptions));
-    const expiryPresent = await cdp.evaluate(`(()=>{
-      const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('目录授权'));
-      if(!d)return false;
-      return [...d.querySelectorAll('input')].some(i=>i.type==='datetime-local');})()`);
-    check("ACL-05 expiry control present", expiryPresent === true, String(expiryPresent));
+    const expiryPresent = await cdp.evaluate(`(()=>Boolean(document.querySelector(
+      '#org-panel-permissions .perm-form input[type="datetime-local"]')))()`);
+    check("ACL-05 expiry control present",expiryPresent===true,String(expiryPresent));
   } finally {
     cdp && cdp.close();
     chrome && chrome.kill("SIGKILL");
