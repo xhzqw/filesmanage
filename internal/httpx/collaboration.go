@@ -290,6 +290,8 @@ func parseSearchFilter(c *gin.Context) (application.SearchFilter, error) {
 		FolderID:          c.Query("folder"),
 		IncludeDescendant: c.Query("scope") == "descendants",
 		Query:             c.Query("q"),
+		Category:          c.Query("category"),
+		Tag:               c.Query("tag"),
 		Uploader:          c.Query("uploader"),
 		MimePrefix:        c.Query("type"),
 		Sort:              c.Query("sort"),

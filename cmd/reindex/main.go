@@ -47,7 +47,12 @@ func main() {
 		log.Fatal("DB unavailable: ", err)
 	}
 	service := application.New(postgres.New(pool), blobStoreAdapter{store: blob.New(blobDir)})
-	indexed, err := service.ReindexAllFiles(ctx, 200)
+	var indexed int
+	if len(os.Args)>1 && os.Args[1]=="--pdf-only" {
+		indexed,err=service.ReindexPDFs(ctx,100)
+	} else if len(os.Args)==1 {
+		indexed,err=service.ReindexAllFiles(ctx,200)
+	} else {log.Fatal("usage: reindex [--pdf-only]")}
 	if err != nil {
 		log.Fatal("reindex failed after ", indexed, " files: ", err)
 	}

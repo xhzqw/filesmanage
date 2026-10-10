@@ -1,6 +1,6 @@
 import {request} from "../../shared/http";
 import {postMultipart} from "../../shared/uploadClient";
-import type {FileItem, FileVersion, PreviewData} from "../../entities/file/model";
+import type {FileItem, FileVersion, PreviewData, FileMetadata} from "../../entities/file/model";
 
 export type FilePage={items:FileItem[];nextCursor:string};
 
@@ -21,6 +21,8 @@ export const fileApi={
   return request<FilePage>("/files?"+query.toString());
  },
  meta:(id:string)=>request<{file:FileItem;versions:FileVersion[]}>("/files/"+id),
+ metadata:(id:string)=>request<FileMetadata>("/files/"+id+"/metadata"),
+ setMetadata:(id:string,body:{category:string;description:string;tags:string[]})=>request<FileMetadata>("/files/"+id+"/metadata",{method:"PUT",body:JSON.stringify(body)}),
 	preview:(id:string)=>request<PreviewData>("/files/"+id+"/preview"),
 	mediaUrl:(id:string,sha:string)=>"/api/files/"+encodeURIComponent(id)+"/preview/media?v="+encodeURIComponent(sha),
  versions:(id:string)=>request<FileVersion[]>("/files/"+id+"/versions"),

@@ -6,6 +6,7 @@ import {errorCode,errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
 import {permissionsApi,type DirectGrant,type FolderPage,type ResourceFolder} from "./permissionsApi";
 import {PermissionAudit,PermissionInsights} from "./PermissionInsights";
+import {DocumentActivityPanel} from "./DocumentActivityPanel";
 import "./permissions.css";
 
 type Group={id:string;name:string};
@@ -163,6 +164,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
  const [params,setParams]=useSearchParams();
  const folderId=params.get("folder")??"";
  const auditView=params.get("view")==="audit";
+ const documentAuditView=params.get("view")==="document-audit";
  const currentFolderRef=useRef(folderId);
  currentFolderRef.current=folderId;
  const [selectedName,setSelectedName]=useState<{id:string;name:string}|null>(null);
@@ -263,12 +265,14 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
  }
  return <div className="perm-content-root">
   <nav className="perm-subnav" aria-label="权限管理功能">
-   <RareButton type="button" className={!auditView?"active":""} aria-current={!auditView?"page":undefined}
+   <RareButton type="button" className={!auditView&&!documentAuditView?"active":""} aria-current={!auditView&&!documentAuditView?"page":undefined}
     onClick={()=>setParams(old=>{const next=new URLSearchParams(old);next.set("view","folder");return next;})}>目录授权与有效权限</RareButton>
    <RareButton type="button" className={auditView?"active":""} aria-current={auditView?"page":undefined}
     onClick={()=>{setRevokeTarget(null);setParams(old=>{const next=new URLSearchParams(old);next.set("view","audit");return next;});}}>权限变更审计</RareButton>
+   <RareButton type="button" className={documentAuditView?"active":""} aria-current={documentAuditView?"page":undefined}
+    onClick={()=>setParams(old=>{const next=new URLSearchParams(old);next.set("view","document-audit");return next;})}>文档活动审计</RareButton>
   </nav>
-  {auditView?<PermissionAudit users={users}/>:<div className="perm-workspace">
+  {documentAuditView?<DocumentActivityPanel/>:auditView?<PermissionAudit users={users}/>:<div className="perm-workspace">
   <ResourceBrowser selected={folderId} onSelect={selectFolder}/>
   <section className="perm-detail" aria-label="目录权限">
    {!folderId?<div className="perm-empty-state"><strong>选择一个资源目录</strong><p>从左侧目录树选择需要管理的目录，然后查看直接授权、实际有效权限和新增授权。</p></div>:<>

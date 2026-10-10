@@ -14,6 +14,8 @@ type FileSearchQuery struct {
 	FolderID          string
 	IncludeDescendant bool
 	Query             string
+	Category          string
+	Tag               string
 	Uploader          string
 	MimePrefix        string
 	From              *time.Time

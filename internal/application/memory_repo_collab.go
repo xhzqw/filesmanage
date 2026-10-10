@@ -155,6 +155,15 @@ func (r *memoryRepo) SearchFiles(_ context.Context, q ports.FileSearchQuery) ([]
 		if q.FolderID != "" && f.FolderID != q.FolderID {
 			continue
 		}
+		if q.Category!="" || q.Tag!="" {
+			meta,ok:=r.fileMetadata[f.ID]
+			if !ok||(q.Category!=""&&meta.Category!=q.Category){continue}
+			if q.Tag!="" {
+				found:=false
+				for _,tag:=range meta.Tags{if tag==q.Tag{found=true;break}}
+				if !found{continue}
+			}
+		}
 		if q.Query != "" && !strings.Contains(lowerASCII(f.Name), lowerASCII(q.Query)) {
 			continue
 		}

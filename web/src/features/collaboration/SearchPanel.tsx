@@ -33,13 +33,15 @@ function Highlighted({text,query}:{text:string;query:string}){
   :<span key={index}>{part.value}</span>)}</>;
 }
 
-type Query={q:string;uploader:string;type:string;sort:string;limit:number};
+type Query={q:string;category:string;tag:string;uploader:string;type:string;sort:string;limit:number};
 
 // Full-text search workbench (SPEC C13/§10, WF-30): query plus uploader/type/
 // sort filters, authorized results with snippets and safe highlighting, and
 // cursor paging that appends strictly by the server's nextCursor (DI-16 §9).
 export function SearchPanel(){
  const[q,setQ]=useState("");
+ const[category,setCategory]=useState("");
+ const[tag,setTag]=useState("");
  const[uploader,setUploader]=useState("");
  const[type,setType]=useState("");
  const[sort,setSort]=useState("updated_desc");
@@ -91,7 +93,7 @@ export function SearchPanel(){
   // that resolves in the gap between render and effect cannot append old rows.
   epochRef.current++;
   moreBusyRef.current=false;
-  setQuery({q:q.trim(),uploader:uploader.trim(),type:type.trim(),sort,limit:pageSize});
+  setQuery({q:q.trim(),category:category.trim(),tag:tag.trim(),uploader:uploader.trim(),type:type.trim(),sort,limit:pageSize});
  }
 
  // Appends the server's next page. The cursor is the only append authority: rows
@@ -134,6 +136,10 @@ export function SearchPanel(){
   <form className="toolbar search-bar" onSubmit={submit} role="search">
    <label htmlFor="search-q">关键词</label>
    <RareInput id="search-q" value={q} onChange={event=>setQ(event.target.value)} placeholder="文件名或正文，如：预算" size={28}/>
+   <label htmlFor="search-category">分类</label>
+   <RareInput id="search-category" value={category} onChange={event=>setCategory(event.target.value)} placeholder="如：工程图纸" size={12}/>
+   <label htmlFor="search-tag">标签</label>
+   <RareInput id="search-tag" value={tag} onChange={event=>setTag(event.target.value)} placeholder="如：待审核" size={10}/>
    <label htmlFor="search-uploader">上传人</label>
    <RareInput id="search-uploader" value={uploader} onChange={event=>setUploader(event.target.value)} size={12}/>
    <label htmlFor="search-type">类型</label>

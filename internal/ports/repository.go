@@ -46,6 +46,8 @@ type Repository interface {
 	// Files, versions and blobs.
 	ListFiles(context.Context, FileQuery) ([]domain.File, error)
 	FileByID(context.Context, string) (domain.File, error)
+	FileMetadataByID(context.Context, string) (domain.FileMetadata, error)
+	UpsertFileMetadata(context.Context, domain.FileMetadata) error
 	FileByNameInFolder(context.Context, string, string) (domain.File, error)
 	RenameFile(context.Context, string, string) error
 	MoveFile(context.Context, string, string) error
@@ -177,10 +179,12 @@ type Repository interface {
 	FileSharesForSubject(context.Context, string, []string, string) ([]domain.Share, error)
 	UpsertFileText(context.Context, string, int, string, string) error
 	FileIDsMissingText(context.Context, int) ([]string, error)
+	PDFFileIDsAfter(context.Context, string, int) ([]string, error)
 
 	// Audit and idempotency.
 	RecordAudit(context.Context, domain.AuditEvent) error
 	ListPermissionAudit(context.Context, int64, int) ([]domain.PermissionAuditRecord, error)
+	ListDocumentAudit(context.Context, domain.DocumentAuditFilter) ([]domain.PermissionAuditRecord, error)
 	IdempotencyGet(context.Context, string, string, string) ([]byte, bool, error)
 	IdempotencyPut(context.Context, string, string, string, []byte) error
 }

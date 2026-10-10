@@ -371,6 +371,8 @@ type SearchFilter struct {
 	FolderID          string
 	IncludeDescendant bool
 	Query             string
+	Category          string
+	Tag               string
 	Uploader          string
 	MimePrefix        string
 	From              *time.Time
@@ -445,6 +447,8 @@ func searchCacheKey(u domain.User, filter SearchFilter) string {
 		UserID            string
 		Admin             bool
 		Query             string
+		Category          string
+		Tag               string
 		FolderID          string
 		IncludeDescendant bool
 		Uploader          string
@@ -454,7 +458,7 @@ func searchCacheKey(u domain.User, filter SearchFilter) string {
 		Sort              string
 		Cursor            string
 		Limit             int
-	}{u.ID, u.IsAdmin, filter.Query, filter.FolderID, filter.IncludeDescendant,
+	}{u.ID, u.IsAdmin, filter.Query, filter.Category, filter.Tag, filter.FolderID, filter.IncludeDescendant,
 		filter.Uploader, filter.MimePrefix, filter.From, filter.To, filter.Sort, filter.Cursor, filter.Limit})
 	if err != nil {
 		return NewID("search-uncacheable")
@@ -471,6 +475,7 @@ func searchQuery(u domain.User, groups []string, filter SearchFilter) ports.File
 	return ports.FileSearchQuery{
 		UserID: u.ID, GroupIDs: groups, FolderID: filter.FolderID,
 		IncludeDescendant: filter.IncludeDescendant, Query: filter.Query,
+		Category: filter.Category, Tag: filter.Tag,
 		// The tsvector index is built from the CJK-spaced text; the query is
 		// spaced the same way so phraseto_tsquery keeps adjacency (SPEC §10.2).
 		TextQuery: SpaceCJK(filter.Query),

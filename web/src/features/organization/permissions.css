@@ -104,6 +104,9 @@
 .perm-audit{display:flex;flex-direction:column;min-width:0;min-height:0;flex:1;background:var(--surface-panel);margin:10px;border:1px solid var(--border-hairline);border-radius:var(--radius-md);overflow:hidden}
 .perm-audit-header{display:flex;gap:12px;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-hairline);padding:16px;font-size:15px}
 .perm-audit-header .hint{margin:6px 0 0;font-size:12px}
+.document-audit-filter{display:flex;align-items:flex-end;flex-wrap:wrap;gap:7px;padding:9px 12px;border-bottom:1px solid var(--border-hairline)}
+.document-audit-filter label{display:flex;flex:1 1 155px;max-width:260px;min-width:0;flex-direction:column;gap:3px;font-size:11px}
+.document-audit-filter .rare-button{min-height:30px}
 .perm-audit-scroll{overflow:auto;min-width:0;min-height:0;flex:1}
 .perm-audit-detail{max-width:300px;overflow-wrap:anywhere;font-size:12px}
 

@@ -306,6 +306,14 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	if needsCTE {
 		cte = scopeCTE
 	}
+	if q.Category != "" {
+		where = append(where, "EXISTS(SELECT 1 FROM file_metadata md WHERE md.file_id=f.id AND md.category="+ph.next()+")")
+		args = append(args, q.Category)
+	}
+	if q.Tag != "" {
+		where = append(where, "EXISTS(SELECT 1 FROM file_metadata md WHERE md.file_id=f.id AND "+ph.next()+"=ANY(md.tags))")
+		args = append(args, q.Tag)
+	}
 	// Two-phase read: a narrow pre-sort over the matching ids carries the exact
 	// window count, and only the page's rows join versions and the wide text
 	// index (SPEC §10.2/READ-07). Joining file_text first would drag 100k wide

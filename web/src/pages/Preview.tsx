@@ -8,6 +8,7 @@ import {OfficeLayoutPreview} from "../features/documents/OfficeLayoutPreview";
 import {CadPreviewStatus} from "../features/documents/CadPreviewStatus";
 import {resolvePreviewAdapter,ADAPTER_TITLES} from "../features/documents/previewAdapters";
 import {FileEditor} from "../features/documents/FileEditor";
+import {FileMetadataEditor} from "../features/documents/FileMetadataEditor";
 import {MoveDialog} from "../features/documents/FileTable";
 import {RollbackDialog} from "../features/documents/RollbackDialog";
 import {ShareDialog} from "../features/collaboration/ShareDialog";
@@ -199,6 +200,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
      </section>}
      {tab==="details"&&<section id="file-panel-details" role="tabpanel" aria-labelledby="file-tab-details" className="file-workbench-panel file-details-panel">
       <h2>文件属性</h2>
+      <FileMetadataEditor fileId={id}/>
       <dl className="file-properties">
        <div><dt>文件名</dt><dd>{preview.name}</dd></div>
        <div><dt>文件类型</dt><dd>{fileExtension(preview.name)} · {preview.contentType||"未知"}</dd></div>

@@ -198,6 +198,15 @@ schema("FileVersion", obj({
     "reason": string(),
 }, required=["versionSeq", "sha256", "sizeBytes", "action", "createdBy", "createdAt"]))
 
+schema("FileBusinessMetadata", obj({
+    "fileId": string(), "category": string(), "description": string(),
+    "tags": arr(string()), "updatedBy": string(), "updatedAt": timestamp(),
+}, required=["fileId","category","description","tags","updatedBy","updatedAt"]))
+schema("UpdateFileBusinessMetadata", obj({
+    "category": string(max_length=80), "description": string(max_length=2000),
+    "tags": arr(string()),
+}, required=["category","description","tags"]))
+
 schema("FileMeta", obj({"file": ref("File"), "versions": arr(ref("FileVersion"))}, required=["file", "versions"]))
 
 schema("FilePage", obj({"items": arr(ref("File")), "nextCursor": string("Opaque keyset cursor; empty when the page is the last one.")}, required=["items", "nextCursor"]))
@@ -765,6 +774,12 @@ add("GET", "/api/permissions/audit", operation("Read paged permission-change aud
                     resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"])]),
     auth_note=MUST_CHANGE))
 
+add("GET", "/api/audit/documents", operation("Document activity audit (admin/global auditor)", "Audit", "documentAudit", security=SESSION,
+    params=[query("cursor","Descending numeric audit ID"), query("limit","Rows per page, 1-100 (default 30).", integer(minimum=1)),
+            query("fileId","Exact target file ID."), query("actorId","Exact actor ID."),
+            query("event","Event type prefix, e.g. file.")],
+    responses=dict([json_ok(ref("PermissionAuditPage"),"Filtered document lifecycle events."),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"])])))
+
 add("GET", "/api/roles/me", operation("Read current management roles", "Roles", "myRoles", security=SESSION,
     responses=dict([json_ok(arr(ref("ManagementRoleBinding")), "Current user's active management roles."),
                     resp("401", ERR["401"]),resp("403", ERR["403"])])))
@@ -803,6 +818,14 @@ add("GET", "/api/files", operation("List files in a folder (keyset pagination)",
 add("GET", "/api/files/{id}", operation("File metadata with version history", "Files", "fileMeta", security=SESSION,
     params=[id_param("id", "File id.")],
     responses=dict([json_ok(ref("FileMeta"), "File and its full version history."), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"])])))
+
+add("GET", "/api/files/{id}/metadata", operation("Read business metadata of an accessible file", "Files", "fileMetadata", security=SESSION,
+    params=[id_param("id","File ID")],
+    responses=dict([json_ok(ref("FileBusinessMetadata"),"Current business classification."),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+add("PUT", "/api/files/{id}/metadata", operation("Update business metadata (modify permission)", "Files", "setFileMetadata", security=SESSION,
+    params=[id_param("id","File ID")],
+    request={"application/json":{"schema":ref("UpdateFileBusinessMetadata")}},
+    responses=dict([json_ok(ref("FileBusinessMetadata"),"Updated and audited classification."),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
 
 add("PATCH", "/api/files/{id}", operation("Rename a file", "Files", "renameFile", security=SESSION,
     params=[id_param("id", "File id.")],
@@ -1090,7 +1113,7 @@ SEARCH_PARAMS = [
 ]
 
 add("GET", "/api/search", operation("Full-text search over authorized files", "Search", "searchFiles", security=SESSION,
-    params=SEARCH_PARAMS + [query("cursor", "Opaque keyset cursor from nextCursor; an unparseable value restarts at the first page instead of failing the read (WF-30).")],
+    params=SEARCH_PARAMS + [query("category","Exact business category."),query("tag","Exact document tag."),query("cursor", "Opaque keyset cursor from nextCursor; an unparseable value restarts at the first page instead of failing the read (WF-30).")],
     responses=dict([json_ok(ref("SearchResult"), "Authorized matches with snippets, the authorized total and the cursor for the next page."), resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"])])))
 
 add("GET", "/api/stats", operation("Aggregate statistics over authorized files", "Search", "statsFiles", security=SESSION,

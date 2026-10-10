@@ -1,3 +1,5 @@
+export type FileMetadata={fileId:string;category:string;description:string;tags:string[];updatedBy:string;updatedAt:string};
+
 export type FileItem={
  id:string;
  folderId:string;

@@ -22,6 +22,7 @@ export type PermissionAuditRow={
  outcome:string;details:Record<string,unknown>;createdAt:string;
 };
 export type PermissionAuditPage={items:PermissionAuditRow[];nextCursor:string};
+export type DocumentAuditFilter={fileId?:string;actorId?:string;event?:string;cursor?:string};
 
 export const permissionsApi={
  children:(parentId:string,cursor="")=>request<FolderPage>(
@@ -37,4 +38,5 @@ export const permissionsApi={
  }),
  audit:(cursor="")=>request<PermissionAuditPage>(
   "/permissions/audit?"+new URLSearchParams({limit:"30",cursor}).toString()),
+ documentAudit:(filter:DocumentAuditFilter)=>request<PermissionAuditPage>("/audit/documents?"+new URLSearchParams({limit:"30",fileId:filter.fileId??"",actorId:filter.actorId??"",event:filter.event??"",cursor:filter.cursor??""}).toString()),
 };
