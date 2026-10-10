@@ -31,6 +31,9 @@ func TestBoundedZipDownloadPreflightsAllPermissions(t *testing.T) {
 		t.Fatalf("wrong ZIP inputs %+v", result)
 	}
 	closeAll()
+	bytes,err:=s.InspectDownloadBatch(ctx,admin,[]string{a.FileID,b.FileID})
+ if err!=nil||bytes!=9{t.Fatalf("preflight %d %v",bytes,err)}
+ if _,err=s.InspectDownloadBatch(ctx,noAccess,[]string{a.FileID,b.FileID});!errors.Is(err,domain.ErrForbidden){t.Fatalf("preflight ACL %v",err)}
 	if _, _, err = s.OpenDownloadBatch(ctx, noAccess, []string{a.FileID, b.FileID}); !errors.Is(err, domain.ErrForbidden) {
 		t.Fatalf("unauthorized ZIP %v", err)
 	}

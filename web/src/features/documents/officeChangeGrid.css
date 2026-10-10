@@ -1,0 +1,26 @@
+.office-change-grid{display:grid;grid-template-columns:minmax(135px,170px) minmax(0,1fr);min-width:0;max-height:65vh;gap:0;font-size:12px}
+.office-change-grid.single-section{grid-template-columns:minmax(0,1fr)}
+.office-change-sections{display:flex;flex-direction:column;gap:2px;border-right:1px solid var(--border-hairline);padding:7px;min-width:0;overflow:auto}
+.office-change-sections .rare-button{display:flex;justify-content:space-between;gap:7px;max-width:100%;padding:4px 7px;min-height:27px;text-align:left;border-radius:var(--radius-sm)}
+.office-change-sections .rare-button.active{background:var(--surface-selected);color:var(--brand-blue)}
+.office-change-sections .rare-button span{color:var(--text-tertiary);font-variant-numeric:tabular-nums}
+.office-change-content{min-width:0;display:flex;flex-direction:column;overflow:hidden}
+.office-change-heading{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;gap:8px;border-bottom:1px solid var(--border-hairline)}
+.office-change-heading strong{font-size:12px}
+.office-change-heading span{font-size:11px;color:var(--text-secondary)}
+.office-change-scroll{overflow:auto;min-width:0}
+.office-change-table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:410px}
+.office-change-table thead th{background:var(--surface-header);font-size:11px;color:var(--text-secondary);height:29px;text-align:left}
+.office-change-table th,.office-change-table td{padding:6px 9px;border-bottom:1px solid var(--border-hairline);vertical-align:top;overflow-wrap:anywhere}
+.office-change-table thead th:first-child{width:85px}
+.office-change-table thead th:last-child{width:65px}
+.office-change-table tbody th{font-weight:500;color:var(--text-secondary);font-family:var(--font-mono);font-size:11px}
+.office-change-table tbody td{white-space:pre-wrap}
+.office-change-table .office-before{color:var(--text-secondary)}
+.office-change-table .office-after{color:var(--text-primary)}
+.office-change-status{display:inline-block;padding:2px 6px;font-size:10px;white-space:nowrap;border-radius:var(--radius-sm);font-weight:600}
+.office-change-status.added{color:var(--status-success);background:var(--status-success-muted)}
+.office-change-status.removed{color:var(--status-danger);background:var(--status-danger-muted)}
+.office-change-status.changed{color:var(--status-warning);background:var(--status-warning-muted)}
+.office-changes-empty{padding:13px;font-size:12px;color:var(--text-secondary)}
+@container (max-width:640px){.office-change-grid{grid-template-columns:minmax(0,1fr);max-height:none}.office-change-sections{flex-direction:row;overflow:auto;border-right:0;border-bottom:1px solid var(--border-hairline)}}

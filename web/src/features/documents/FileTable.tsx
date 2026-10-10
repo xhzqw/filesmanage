@@ -375,14 +375,15 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   async function batchDownload(files:FileItem[]){
    if(files.length===0||zipController.current)return;
    if(files.length>30){announce("单次最多打包 30 个文件，请分批下载","error");return;}
-   if(files.reduce((sum,file)=>sum+file.sizeBytes,0)>512*1024*1024){
+   const originalBytes=files.reduce((sum,file)=>sum+file.sizeBytes,0);
+   if(originalBytes>512*1024*1024){
     announce("打包原始文件最多 512 MiB，请分批下载","error");return;
    }
    const controller=new AbortController();zipController.current=controller;
    try{
-    await downloadZip(files.map(f=>f.id),controller.signal,setZipProgress);
-    announce("ZIP 已准备好，浏览器正在保存文件","info");
-    setZipProgress(null);
+    const outcome=await downloadZip(files.map(f=>f.id),originalBytes,controller.signal,setZipProgress);
+    if(outcome==="handoff")announce("已交由浏览器下载管理器，进度和取消请在浏览器下载列表操作","info");
+    else{announce("ZIP 已准备好，浏览器正在保存文件","info");setZipProgress(null);}
    }catch(error){
     if(controller.signal.aborted){setZipProgress(null);announce("ZIP 下载已取消","info");}
     else{const message=errorCopy(error,"ZIP 下载失败");setZipProgress({phase:"failed",bytes:0,error:message});announce(message,"error");}
@@ -810,10 +811,10 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    </div>
   </div>
   {zipProgress&&<div className="zip-download-status" role="status">
-   <span>{zipProgress.phase==="preparing"?"正在鉴权并准备 ZIP…":zipProgress.phase==="receiving"?`ZIP 已接收 ${formatSize(zipProgress.bytes)}（压缩总量未知）`:zipProgress.phase==="saving"?"准备保存 ZIP…":zipProgress.error}</span>
-   {zipProgress.phase!=="failed"&&<span className="zip-progress-track" aria-label="正在下载 ZIP"><span/></span>}
-   <RareButton type="button" onClick={()=>{if(zipProgress.phase==="failed")setZipProgress(null);else zipController.current?.abort();}}>
-    {zipProgress.phase==="failed"?"关闭":"取消"}
+   <span>{zipProgress.phase==="preparing"?"正在鉴权并准备 ZIP…":zipProgress.phase==="receiving"?`ZIP 已接收 ${formatSize(zipProgress.bytes)}（压缩总量未知）`:zipProgress.phase==="saving"?"准备保存 ZIP…":zipProgress.phase==="handoff"?"已交由浏览器下载管理器（可在下载列表查看进度及取消）":zipProgress.error}</span>
+   {zipProgress.phase!=="failed"&&zipProgress.phase!=="handoff"&&<span className="zip-progress-track" aria-label="正在下载 ZIP"><span/></span>}
+   <RareButton type="button" onClick={()=>{if(zipProgress.phase==="failed"||zipProgress.phase==="handoff")setZipProgress(null);else zipController.current?.abort();}}>
+    {zipProgress.phase==="failed"||zipProgress.phase==="handoff"?"关闭":"取消"}
    </RareButton>
   </div>}
   {message&&<p role="status" className={"notice "+messageTone}>{message}</p>}

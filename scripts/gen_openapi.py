@@ -211,10 +211,15 @@ schema("VersionComparisonLine",obj({
  "kind":string(enum=["equal","added","removed"]), "left":integer(), "right":integer(), "text":string(),
 },required=["kind","text"]))
 schema("VersionCompareInfo",obj({"seq":integer(),"sha256":string(),"sizeBytes":integer()},required=["seq","sha256","sizeBytes"]))
+schema("OfficeSemanticChange",obj({
+ "kind":string(enum=["added","removed","changed"]),
+ "section":string(),"key":string(),"before":string(),"after":string()
+},required=["kind","section","key","before","after"]))
 schema("VersionComparison",obj({
  "left":ref("VersionCompareInfo"),"right":ref("VersionCompareInfo"),
  "mode":string(enum=["identical","metadata","large","text"]),
  "detail":string(enum=["office_parts","office_semantic"]),
+ "semanticChanges":arr(ref("OfficeSemanticChange")),
  "lines":arr(ref("VersionComparisonLine")),"added":integer(),"removed":integer(),
 },required=["left","right","mode","lines","added","removed"]))
 schema("ReviewComment",obj({
@@ -1063,6 +1068,10 @@ add("DELETE","/api/search/presets/{name}",operation("Delete own saved search","S
  params=[{"name":"name","in":"path","required":True,"schema":string(max_length=48)}],
  responses=dict([json_ok(obj({"deleted":boolean()},required=["deleted"]),"Deleted matching own preset."),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("404",ERR["404"])])))
 
+add("HEAD","/api/files/download-zip",operation("Preflight an authorized bounded ZIP without starting a download","Files","inspectFilesZip",security=SESSION,
+ params=[query("ids","1-30 unique file IDs; no ZIP payload")],
+ responses={"204":{"description":"All selected files authorized; X-Zip-Files and X-Zip-Original-Bytes response headers."},
+ "400":ERR["400"],"401":ERR["401"],"403":ERR["403"],"404":ERR["404"]}))
 add("GET","/api/files/download-zip",operation("Download an authorized bounded ZIP of current file versions","Files","downloadFilesZip",security=SESSION,
  params=[query("ids","1-30 unique comma-separated file IDs, max 512 MiB original bytes")],
  responses=dict([("200",{"description":"Streaming application/zip attachment, after every item is authorized.","content":{"application/zip":{"schema":{"type":"string","format":"binary"}}}}),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))

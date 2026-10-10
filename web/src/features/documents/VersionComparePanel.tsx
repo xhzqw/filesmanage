@@ -3,6 +3,7 @@ import {RareButton,RareSelect} from "../../shared/ui/rare";
 import {errorCopy} from "../../shared/errors";
 import {fileApi,type VersionComparison} from "./api";
 import type {FileVersion} from "../../entities/file/model";
+import {OfficeChangeGrid} from "./OfficeChangeGrid";
 import "./versionCompareEnhancement.css";
 
 type DisplayLine={kind:"line";index:number}|{kind:"fold";start:number;count:number};
@@ -72,11 +73,11 @@ export function VersionComparePanel({fileId,versions}:{fileId:string;versions:Fi
    <div className="file-compare-stats">
     <span>v{result.left.seq} · {result.left.sizeBytes.toLocaleString()} B</span>
     <span>v{result.right.seq} · {result.right.sizeBytes.toLocaleString()} B</span>
-    {result.mode==="text"&&<strong>+{result.added} / −{result.removed} 行</strong>}
+    {result.mode==="text"&&<strong>{result.detail==="office_semantic"?`${result.semanticChanges?.length??0} 处变化`:`+${result.added} / −${result.removed} 行`}</strong>}
    </div>
    {result.detail==="office_semantic"&&<p className="hint">语义差异：DOCX 按可提取段落、XLSX 按工作表及单元格值比较；不涵盖样式、公式重新计算或排版。</p>}
    {result.detail==="office_parts"&&<p className="hint">Office 部件差异：比较文档内部部件的名称、大小和 CRC32，不能代表段落文字或页面版式完全一致。</p>}
-   {result.mode==="text"&&<div className="file-compare-quicknav">
+   {result.mode==="text"&&result.detail!=="office_semantic"&&<div className="file-compare-quicknav">
     <span>{changes.length} 处变更</span>
     <RareButton type="button" disabled={changes.length===0} onClick={()=>focusChange(-1)}>上一处</RareButton>
     <RareButton type="button" disabled={changes.length===0} onClick={()=>focusChange(1)}>下一处</RareButton>
@@ -89,6 +90,7 @@ export function VersionComparePanel({fileId,versions}:{fileId:string;versions:Fi
    {result.mode==="identical"?<p className="empty">内容完全一致（SHA-256 相同）。</p>
     :result.mode==="metadata"?<p className="empty">此格式不支持文本差异，两个版本的内容哈希不同。</p>
     :result.mode==="large"?<p className="empty">内容存在差异，但文件超过安全对比上限（文本 256 KB；Office 压缩包 8 MiB；最多 350 项），不展示不完整的差异。</p>
+    :result.detail==="office_semantic"&&result.semanticChanges?<OfficeChangeGrid key={`${fileId}-${left}-${right}`} changes={result.semanticChanges}/>
     :<div className="file-compare-lines" role="table" aria-label="版本文本差异">
      {display.map(entry=>entry.kind==="fold"
       ?<div key={"fold-"+entry.start} className="file-diff-fold" role="row">省略 {entry.count} 行未变化内容</div>

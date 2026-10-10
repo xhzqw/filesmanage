@@ -5,6 +5,7 @@ import (
 	"errors"
 	"filesmanage/internal/domain"
 	"io"
+	"path/filepath"
 	"strings"
 	"unicode/utf8"
 )
@@ -30,6 +31,7 @@ type VersionComparison struct {
 	Right   CompareVersionInfo `json:"right"`
 	Mode    string             `json:"mode"`
 	Detail  string             `json:"detail,omitempty"`
+	SemanticChanges []SemanticChange `json:"semanticChanges,omitempty"`
 	Lines   []CompareLine      `json:"lines"`
 	Added   int                `json:"added"`
 	Removed int                `json:"removed"`
@@ -129,9 +131,11 @@ func (s *Service) CompareVersions(ctx context.Context, u domain.User, fileID str
 		return out, err
 	}
 	if office && semanticA != "" && semanticB != "" {
-		a = semanticA
-		b = semanticB
-		out.Detail = "office_semantic"
+		if changes,ok:=OfficeSemanticChanges(strings.Split(semanticA,"\n"),strings.Split(semanticB,"\n"),strings.ToLower(filepath.Ext(file.Name)));ok{
+			a=semanticA;b=semanticB
+			out.Detail="office_semantic"
+			out.SemanticChanges=changes
+		}
 	}
 	aa := strings.Split(a, "\n")
 	bb := strings.Split(b, "\n")

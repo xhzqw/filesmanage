@@ -14,6 +14,21 @@ const MaxZipBytes int64 = 512 << 20
 // file is missing, forbidden or exceeds limits, not one byte is served.
 // Each OpenDownload independently authorizes the current version.
 func (s *Service) OpenDownloadBatch(ctx context.Context, u domain.User, ids []string) ([]Download, func(), error) {
+ return s.prepareDownloadBatch(ctx,u,ids,true)
+}
+
+// InspectDownloadBatch validates the exact same ACL/limits without creating an
+// audit event. The actual GET must repeat all checks and audit the transfer.
+func (s *Service) InspectDownloadBatch(ctx context.Context,u domain.User,ids []string)(int64,error){
+ files,cleanup,err:=s.prepareDownloadBatch(ctx,u,ids,false)
+ if err!=nil{return 0,err}
+ defer cleanup()
+ var total int64
+ for _,item:=range files{total+=item.Size}
+ return total,nil
+}
+
+func (s *Service) prepareDownloadBatch(ctx context.Context, u domain.User, ids []string, audit bool) ([]Download, func(), error) {
 	if len(ids) == 0 || len(ids) > MaxZipFiles {
 		return nil, nil, domain.ErrInvalidInput
 	}
@@ -46,6 +61,7 @@ func (s *Service) OpenDownloadBatch(ctx context.Context, u domain.User, ids []st
 		total += item.Size
 		files = append(files, item)
 	}
+	if !audit{return files,cleanup,nil}
 	// One audit event for a prepared bundle; a failed audit closes the
 	// prepared readers and prevents any response bytes from being served.
 	tx, err := s.uow.Begin(ctx)
