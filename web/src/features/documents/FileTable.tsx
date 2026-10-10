@@ -1,3 +1,4 @@
+import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
 import {useEffect,useMemo,useRef,useState,type ChangeEvent,type DragEvent,type FormEvent,type KeyboardEvent,type MouseEvent,type ReactNode}from "react";
 import {useNavigate}from "react-router-dom";
 import type {FileItem} from "../../entities/file/model";
@@ -747,23 +748,23 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     <label className="upload-button primary-btn">
      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>
      <span>上传文件</span>
-     <input type="file" multiple onChange={onUpload}/>
+     <RareInput type="file" multiple onChange={onUpload}/>
     </label>
     {newFolderSlot}
     <div className="batch-actions-group">
-     <button type="button" className="batch-btn" disabled={selectedIds.size===0} onClick={()=>batchDownload(selection)} title={selectedIds.size===0?"勾选文件后可批量下载":"批量下载已勾选文件"}>批量下载</button>
-     <button type="button" className="batch-btn" disabled={selectedIds.size===0} onClick={()=>startMoveSelection(selection)} title={selectedIds.size===0?"勾选文件后可批量移动":"批量移动已勾选文件"}>批量移动</button>
-     <button type="button" className="batch-btn danger" disabled={selectedIds.size===0} onClick={()=>setPendingDelete(selection)} title={selectedIds.size===0?"勾选文件后可批量删除":"批量删除已勾选文件"}>批量删除</button>
+     <RareButton type="button" className="batch-btn" disabled={selectedIds.size===0} onClick={()=>batchDownload(selection)} title={selectedIds.size===0?"勾选文件后可批量下载":"批量下载已勾选文件"}>批量下载</RareButton>
+     <RareButton type="button" className="batch-btn" disabled={selectedIds.size===0} onClick={()=>startMoveSelection(selection)} title={selectedIds.size===0?"勾选文件后可批量移动":"批量移动已勾选文件"}>批量移动</RareButton>
+     <RareButton type="button" className="batch-btn danger" disabled={selectedIds.size===0} onClick={()=>setPendingDelete(selection)} title={selectedIds.size===0?"勾选文件后可批量删除":"批量删除已勾选文件"}>批量删除</RareButton>
     </div>
    </div>
    <div className="toolbar-views">
     <label className="sort-label">排序
-     <select aria-label="排序方式" value={sort} onChange={e=>setSort(e.target.value as SortKey)}>
+     <RareSelect aria-label="排序方式" value={sort} onChange={e=>setSort(e.target.value as SortKey)}>
       {SORT_KEYS.map(key=><option key={key} value={key}>{SORT_LABELS[key]}</option>)}
-     </select>
+     </RareSelect>
     </label>
     <label className="filter-label">类型
-     <select aria-label="文件类型筛选" value={categoryFilter} onChange={e=>{
+     <RareSelect aria-label="文件类型筛选" value={categoryFilter} onChange={e=>{
       setCategoryFilter(e.target.value as FileCategory);
       setSelectedIds(new Set<string>());
       setFocusedId(null);
@@ -777,10 +778,10 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       <option value="archive">压缩包 ({categoryCounts.archive})</option>
       <option value="code">代码与数据 ({categoryCounts.code})</option>
       <option value="other">其他文件 ({categoryCounts.other})</option>
-     </select>
+     </RareSelect>
     </label>
     <div className="filter-search-wrap">
-     <input type="search" className="filter-search-input" placeholder="过滤当前目录…" aria-label="当前目录内过滤"
+     <RareInput type="search" className="filter-search-input" placeholder="过滤当前目录…" aria-label="当前目录内过滤"
       value={nameFilter} onChange={e=>setNameFilter(e.target.value)}/>
     </div>
    </div>
@@ -790,7 +791,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    <table role="grid" aria-label={folderName+" 文件列表"} className="file-table file-table-ultra">
     <colgroup><col className="col-select"/><col className="col-name"/><col className="col-size"/><col className="col-version"/><col className="col-date"/><col className="col-actions"/></colgroup>
     <thead><tr>
-     <th className="col-select" scope="col"><input type="checkbox" tabIndex={-1} checked={allLoadedSelected} onChange={toggleSelectAllLoaded} aria-label="选择当前已加载的文件"/></th>
+     <th className="col-select" scope="col"><RareInput type="checkbox" tabIndex={-1} checked={allLoadedSelected} onChange={toggleSelectAllLoaded} aria-label="选择当前已加载的文件"/></th>
      <th className="col-name" scope="col">文件名</th>
      <th className="col-size" scope="col">大小</th>
      <th className="col-version" scope="col">版本</th>
@@ -808,12 +809,12 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
      {status==="ready"&&items.length>0&&visibleItems.length===0&&<tr><td colSpan={6} className="empty">
       <span className="empty-title">无匹配文件</span>
       <span className="empty-hint">当前目录下没有属于该类型的文件。</span>
-      <button type="button" className="secondary-action" style={{marginTop:6}} onClick={()=>{
+      <RareButton type="button" className="secondary-action" style={{marginTop:6}} onClick={()=>{
        setCategoryFilter("all");
        setSelectedIds(new Set<string>());
        setFocusedId(null);
        setAnchorId(null);
-      }}>清除筛选（显示全部 {items.length} 个文件）</button>
+      }}>清除筛选（显示全部 {items.length} 个文件）</RareButton>
      </td></tr>}
      {status==="ready"&&visibleItems.map((item,index)=><tr key={item.id} data-id={item.id}
       tabIndex={focusedId===item.id||(focusedId===null&&index===0)?0:-1}
@@ -825,26 +826,26 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       onDoubleClick={()=>navigate("/preview/"+item.id)}
       onDragStart={event=>onRowDragStart(event,item)}
       onDragEnd={onRowDragEnd}>
-      <td className="col-select"><input type="checkbox" checked={selectedIds.has(item.id)} aria-label={"选择 "+item.name} onClick={event=>event.stopPropagation()} onChange={event=>onCheckToggle(event,item)}/></td>
+      <td className="col-select"><RareInput type="checkbox" checked={selectedIds.has(item.id)} aria-label={"选择 "+item.name} onClick={event=>event.stopPropagation()} onChange={event=>onCheckToggle(event,item)}/></td>
       <td className="col-name"><div className="file-cell-wrap">
        <FileTypeIcon name={item.name}/><span className="file-name" title={item.name}>{item.name}</span>
-       <button type="button" className="file-mobile-actions" aria-label={"操作 "+item.name}
+       <RareButton type="button" className="file-mobile-actions" aria-label={"操作 "+item.name}
         title={"文件操作："+item.name} aria-haspopup="menu"
-        onClick={event=>{event.stopPropagation();openRowMenu(item,event.currentTarget);}}>···</button>
+        onClick={event=>{event.stopPropagation();openRowMenu(item,event.currentTarget);}}>···</RareButton>
       </div></td>
       <td className="col-size num">{formatSize(item.sizeBytes)}</td>
       <td className="col-version"><span className="version-badge">v{item.currentVersionSeq}</span></td>
       <td className="col-date date">{item.updatedAt.replace("T"," ").slice(0,16)}</td>
       <td className="row-actions col-actions" onClick={event=>event.stopPropagation()}><div className="actions-cell-wrap">
        <div className="actions-hover-group">
-        <button type="button" className="action-link" onClick={()=>navigate("/preview/"+item.id)}>打开</button>
+        <RareButton type="button" className="action-link" onClick={()=>navigate("/preview/"+item.id)}>打开</RareButton>
         <a href={"/api/files/"+item.id+"/bytes"} download={item.name} className="action-link">下载</a>
-        <button type="button" className="action-link" onClick={()=>onEdit(item.id)}>编辑</button>
-        <button type="button" className="action-link more-trigger"
+        <RareButton type="button" className="action-link" onClick={()=>onEdit(item.id)}>编辑</RareButton>
+        <RareButton type="button" className="action-link more-trigger"
          aria-label={"更多操作："+item.name} aria-haspopup="menu"
-         onClick={event=>openRowMenu(item,event.currentTarget)}>···</button>
+         onClick={event=>openRowMenu(item,event.currentTarget)}>···</RareButton>
        </div>
-       <button type="button"
+       <RareButton type="button"
         className={"action-star-btn"+(favoriteIds.has(item.id)?" favorited":"")}
         aria-label={favoriteIds.has(item.id)?"已收藏":"收藏"}
         title={favoritesState==="failed"?"收藏状态加载失败，请刷新重试":favoriteIds.has(item.id)?"已收藏（点击取消）":"收藏"}
@@ -854,20 +855,20 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
         </svg>
         <span className="sr-only">{favoriteIds.has(item.id)?"已收藏":"收藏"}</span>
-       </button>
+       </RareButton>
       </div></td>
      </tr>)}
     </tbody>
    </table>
   </div>
-  {hasMore&&<button type="button" className="secondary-action" onClick={loadMore}>加载更多</button>}
+  {hasMore&&<RareButton type="button" className="secondary-action" onClick={loadMore}>加载更多</RareButton>}
   {renaming&&<Dialog open title="重命名文件" onClose={()=>setRenaming(null)} closeGuard={()=>!renameBusy} className="dialog">
    <form onSubmit={submitRename}>
     <label htmlFor="rename-input">新名称</label>
-    <input id="rename-input" value={renameValue} maxLength={200} onChange={e=>setRenameValue(e.target.value)} required disabled={renameBusy}/>
+    <RareInput id="rename-input" value={renameValue} maxLength={200} onChange={e=>setRenameValue(e.target.value)} required disabled={renameBusy}/>
     <div className="dialog-actions">
-     <button type="button" className="secondary-action" onClick={()=>setRenaming(null)} disabled={renameBusy}>取消</button>
-     <button type="submit" className="primary" disabled={renameBusy}>{renameBusy?"保存中…":"保存"}</button>
+     <RareButton type="button" className="secondary-action" onClick={()=>setRenaming(null)} disabled={renameBusy}>取消</RareButton>
+     <RareButton type="submit" className="primary" disabled={renameBusy}>{renameBusy?"保存中…":"保存"}</RareButton>
     </div>
    </form>
   </Dialog>}
@@ -879,7 +880,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
      {pendingDelete.length>8&&<li>…等共 {pendingDelete.length} 项</li>}
     </ul>
     <div className="dialog-actions">
-     <button type="button" className="secondary-action" onClick={()=>setPendingDelete([])} disabled={deleteBusy}>取消</button>
+     <RareButton type="button" className="secondary-action" onClick={()=>setPendingDelete([])} disabled={deleteBusy}>取消</RareButton>
      <MicroHoldToDelete label={deleteBusy?"删除中…":"确认删除"} tone="danger" disabled={deleteBusy} onConfirm={confirmDelete}/>
     </div>
    </form>
@@ -1069,8 +1070,8 @@ function MoveDialog({file,presetTargetId,onClose,onMoved,onReload}:{
   {tree==="failed"&&<>
    <p role="alert" className="notice error">获取目录失败，请稍后重试。</p>
    <div className="dialog-actions">
-    <button type="button" className="secondary-action" onClick={close} disabled={busy}>取消</button>
-    <button type="button" className="secondary-action" onClick={()=>setTreeToken(token=>token+1)} disabled={busy}>重试</button>
+    <RareButton type="button" className="secondary-action" onClick={close} disabled={busy}>取消</RareButton>
+    <RareButton type="button" className="secondary-action" onClick={()=>setTreeToken(token=>token+1)} disabled={busy}>重试</RareButton>
    </div>
   </>}
   {tree==="ready"&&<FolderPicker
@@ -1089,11 +1090,11 @@ function MoveDialog({file,presetTargetId,onClose,onMoved,onReload}:{
     {preflight?.warnings.map((warning,index)=><p className="hint" key={index}>{warning}</p>)}
    </>}
    footer={needsRefresh
-    ?<button type="button" className="secondary-action" onClick={()=>{onReload();onClose();}} disabled={busy}>刷新查看状态</button>
+    ?<RareButton type="button" className="secondary-action" onClick={()=>{onReload();onClose();}} disabled={busy}>刷新查看状态</RareButton>
     :<>
-     <button type="button" className="secondary-action" onClick={close} disabled={busy}>取消</button>
-     <button type="button" className="secondary-action" onClick={check} disabled={!canCheck}>{flow.state==="validating"?"检查中…":"检查并继续"}</button>
-     <button type="button" className="primary" onClick={submit} disabled={!canConfirm}>{flow.state==="submitting"?"移动中…":"确认移动"}</button>
+     <RareButton type="button" className="secondary-action" onClick={close} disabled={busy}>取消</RareButton>
+     <RareButton type="button" className="secondary-action" onClick={check} disabled={!canCheck}>{flow.state==="validating"?"检查中…":"检查并继续"}</RareButton>
+     <RareButton type="button" className="primary" onClick={submit} disabled={!canConfirm}>{flow.state==="submitting"?"移动中…":"确认移动"}</RareButton>
     </>}
   />}
  </Dialog>;
@@ -1210,8 +1211,8 @@ function BatchMoveDialog({files,presetTargetId,onClose,onMoved,onReload}:{
   {tree==="failed"&&<>
    <p role="alert" className="notice error">获取目录失败，请稍后重试。</p>
    <div className="dialog-actions">
-    <button type="button" className="secondary-action" onClick={close} disabled={busy}>取消</button>
-    <button type="button" className="secondary-action" onClick={()=>setTreeToken(token=>token+1)} disabled={busy}>重试</button>
+    <RareButton type="button" className="secondary-action" onClick={close} disabled={busy}>取消</RareButton>
+    <RareButton type="button" className="secondary-action" onClick={()=>setTreeToken(token=>token+1)} disabled={busy}>重试</RareButton>
    </div>
   </>}
   {tree==="ready"&&<FolderPicker
@@ -1237,12 +1238,12 @@ function BatchMoveDialog({files,presetTargetId,onClose,onMoved,onReload}:{
      <p className="hint" role="status">已排除全部问题文件，没有可提交的项。请关闭后重新选择要移动的文件。</p>}
    </>}
    footer={needsRefresh
-    ?<button type="button" className="secondary-action" onClick={()=>{onReload();onClose();}} disabled={busy}>刷新查看状态</button>
+    ?<RareButton type="button" className="secondary-action" onClick={()=>{onReload();onClose();}} disabled={busy}>刷新查看状态</RareButton>
     :<>
-     <button type="button" className="secondary-action" onClick={close} disabled={busy}>取消</button>
+     <RareButton type="button" className="secondary-action" onClick={close} disabled={busy}>取消</RareButton>
      {flow.state==="conflict"&&pendingIds.length>0&&
-      <button type="button" className="secondary-action" onClick={excludeConflicts} disabled={busy}>排除问题项并重试</button>}
-     <button type="button" className="primary" onClick={submit} disabled={!canSubmit}>{busy?"移动中…":"确认移动"}</button>
+      <RareButton type="button" className="secondary-action" onClick={excludeConflicts} disabled={busy}>排除问题项并重试</RareButton>}
+     <RareButton type="button" className="primary" onClick={submit} disabled={!canSubmit}>{busy?"移动中…":"确认移动"}</RareButton>
     </>}
   />}
  </Dialog>;

@@ -1,3 +1,4 @@
+import {RareButton,RareInput} from "../../shared/ui/rare";
 import {useEffect,useId,useLayoutEffect,useMemo,useRef,useState,type CSSProperties,type DragEvent,type KeyboardEvent,type ReactNode}from "react";
 import {Link,useNavigate}from "react-router-dom";
 import type{Folder}from"../../entities/folder/model";
@@ -703,16 +704,16 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
   if(level.status==="error")
    return <li role="none" className="tree-note" style={style}>
     <span role="alert" className="tree-note-error">子目录加载失败</span>
-    <button type="button" className="secondary-action tree-retry" tabIndex={-1}
+    <RareButton type="button" className="secondary-action tree-retry" tabIndex={-1}
      title="重新加载该目录的子目录（键盘：方向键→）"
-     onClick={()=>retryLevel(parentId)}>重试</button>
+     onClick={()=>retryLevel(parentId)}>重试</RareButton>
    </li>;
   if(level.items.length===0)
    return <li role="none" className="tree-note hint" style={style}>{parentId===""?"没有可访问的目录。":"没有子目录"}</li>;
   if(level.nextCursor!=="")
    return <li role="none" className="tree-note" style={style}>
-    <button type="button" className="secondary-action tree-more" tabIndex={-1}
-     onClick={()=>loadLevel(parentId,level.nextCursor,"append")}>加载更多</button>
+    <RareButton type="button" className="secondary-action tree-more" tabIndex={-1}
+     onClick={()=>loadLevel(parentId,level.nextCursor,"append")}>加载更多</RareButton>
    </li>;
   return null;
  }
@@ -756,8 +757,8 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
     onDragLeave={event=>onRowDragLeave(event,entry)}
     onDrop={event=>onRowDrop(event,entry)}>
     {canExpand
-     ?<button type="button" aria-expanded={isExpanded} aria-label={isExpanded?"折叠":"展开"} tabIndex={-1}
-       onClick={event=>{event.stopPropagation();toggle(entry.id);}}><span aria-hidden="true">▸</span></button>
+     ?<RareButton type="button" aria-expanded={isExpanded} aria-label={isExpanded?"折叠":"展开"} tabIndex={-1}
+       onClick={event=>{event.stopPropagation();toggle(entry.id);}}><span aria-hidden="true">▸</span></RareButton>
      :<span className="tree-chevron-spacer" aria-hidden="true"/>}
     <FolderGlyph expanded={isExpanded}/>
     <Link to={"/doc?folder="+encodeURIComponent(entry.id)} tabIndex={-1}
@@ -777,7 +778,7 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
       (results are already trimmed to listable paths), a small tree filters the
       page's authorized list in memory. */}
   <div className="tree-head" role="search">
-   <input id={searchId} className="tree-search" type="search" value={query} autoComplete="off"
+   <RareInput id={searchId} className="tree-search" type="search" value={query} autoComplete="off"
     placeholder="搜索目录" aria-label="搜索目录" aria-describedby={searchHintId}
     onChange={event=>setQuery(event.target.value)} onKeyDown={onSearchKeyDown}/>
    <p id={searchHintId} className="tree-search-hint">

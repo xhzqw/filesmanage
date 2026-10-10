@@ -20,6 +20,9 @@ fi
 echo "== ui: component geometry governance gate =="
 node scripts/ui_style_governance_check.mjs
 
+echo "== ui: Rare component ownership gate =="
+node scripts/ui_component_governance_check.mjs
+
 echo "== go: build server and worker =="
 go build -o .bin/server ./cmd/server
 go build -o .bin/worker ./cmd/worker

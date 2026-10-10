@@ -1,3 +1,4 @@
+import {RareButton,RareInput} from "../../shared/ui/rare";
 import {useEffect,useState} from "react";
 import {workflowApi} from "./api";
 import type {Approval} from "./api";
@@ -88,12 +89,12 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
       <td>v{a.baseSeq}</td>
       <td>{a.createdAt.replace("T"," ").slice(0,16)}</td>
       <td className="row-actions">
-       <input aria-label={`审批意见 — ${a.fileName}`} placeholder="审批意见（可选）" value={drafts[a.id]??""}
+       <RareInput aria-label={`审批意见 — ${a.fileName}`} placeholder="审批意见（可选）" value={drafts[a.id]??""}
         style={{minWidth:"180px"}} disabled={busyId!==""}
         onChange={e=>setDrafts(prev=>({...prev,[a.id]:e.target.value}))}/>
        {busyId===a.id&&<span className="toolbar-hint">处理中…</span>}
-       <button type="button" className="primary" disabled={busyId!==""} onClick={()=>act(a.id,"approve")}>通过</button>
-       <button type="button" className="danger" disabled={busyId!==""} onClick={()=>act(a.id,"reject")}>拒绝</button>
+       <RareButton type="button" className="primary" disabled={busyId!==""} onClick={()=>act(a.id,"approve")}>通过</RareButton>
+       <RareButton type="button" className="danger" disabled={busyId!==""} onClick={()=>act(a.id,"reject")}>拒绝</RareButton>
       </td>
      </tr>)}
     </tbody>
@@ -111,7 +112,7 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
       <td>{STATE_LABELS[a.state]??a.state}</td>
       <td>{a.approverName}</td>
       <td>{a.decisionComment||"—"}</td>
-      <td>{a.state==="pending"&&<button type="button" disabled={busyId!==""} onClick={()=>act(a.id,"cancel")}>撤回</button>}</td>
+      <td>{a.state==="pending"&&<RareButton type="button" disabled={busyId!==""} onClick={()=>act(a.id,"cancel")}>撤回</RareButton>}</td>
      </tr>)}
     </tbody>
    </table>

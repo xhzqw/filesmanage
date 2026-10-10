@@ -1,3 +1,4 @@
+import {RareButton} from "../../shared/ui/rare";
 import {useState} from "react";
 import {fileApi} from "./api";
 import "./mediaPreview.css";
@@ -23,11 +24,11 @@ export function MediaPreview({fileId,sha256,name,kind,mime}:{fileId:string;sha25
   return <section className="media-preview" aria-label="图片预览">
    <div className="media-tools">
     <span className="media-tools-label">图片预览 {naturalSize?"· "+naturalSize.width+" × "+naturalSize.height:""}</span>
-    <button type="button" disabled={error} aria-pressed={fit} onClick={()=>{setFit(true);setZoom(1);}}>适应窗口</button>
-    <button type="button" disabled={error} aria-pressed={!fit&&zoom===1} onClick={()=>{setFit(false);setZoom(1);}}>原始尺寸</button>
-    <button type="button" disabled={error} aria-label="缩小" onClick={()=>{setFit(false);setZoom(value=>Math.max(0.25,Math.round((value-0.25)*100)/100));}}>−</button>
+    <RareButton type="button" disabled={error} aria-pressed={fit} onClick={()=>{setFit(true);setZoom(1);}}>适应窗口</RareButton>
+    <RareButton type="button" disabled={error} aria-pressed={!fit&&zoom===1} onClick={()=>{setFit(false);setZoom(1);}}>原始尺寸</RareButton>
+    <RareButton type="button" disabled={error} aria-label="缩小" onClick={()=>{setFit(false);setZoom(value=>Math.max(0.25,Math.round((value-0.25)*100)/100));}}>−</RareButton>
     <span aria-live="polite">{fit?"自适应":Math.round(zoom*100)+"%"}</span>
-    <button type="button" disabled={error} aria-label="放大" onClick={()=>{setFit(false);setZoom(value=>Math.min(4,Math.round((value+0.25)*100)/100));}}>＋</button>
+    <RareButton type="button" disabled={error} aria-label="放大" onClick={()=>{setFit(false);setZoom(value=>Math.min(4,Math.round((value+0.25)*100)/100));}}>＋</RareButton>
    </div>
    {error?failed:<div className="media-image-stage">
     <img src={src} alt={name} onError={()=>setError(true)}

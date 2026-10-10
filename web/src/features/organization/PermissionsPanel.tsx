@@ -1,3 +1,4 @@
+import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
 import {useEffect,useMemo,useRef,useState,type FormEvent,type ReactNode} from "react";
 import {Link,useSearchParams} from "react-router-dom";
 import type {User} from "../../entities/user/model";
@@ -95,42 +96,42 @@ function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(folder:R
    const nextAncestors=new Set(ancestors).add(folder.id);
    return <li key={folder.id}>
     <div className={"perm-tree-row"+(selected===folder.id?" selected":"")} style={{paddingLeft:depth*14+6}}>
-     {folder.hasChildren?<button type="button" className="perm-tree-toggle" aria-expanded={open}
-      aria-label={(open?"折叠":"展开")+folder.name} onClick={()=>toggle(folder)}>{open?"▾":"▸"}</button>
+     {folder.hasChildren?<RareButton type="button" className="perm-tree-toggle" aria-expanded={open}
+      aria-label={(open?"折叠":"展开")+folder.name} onClick={()=>toggle(folder)}>{open?"▾":"▸"}</RareButton>
       :<span className="perm-tree-spacer" aria-hidden="true"/>}
-     <button type="button" className="perm-tree-name" aria-current={selected===folder.id?"true":undefined}
-      onClick={()=>onSelect(folder)} title={folder.name}>{folder.name}</button>
+     <RareButton type="button" className="perm-tree-name" aria-current={selected===folder.id?"true":undefined}
+      onClick={()=>onSelect(folder)} title={folder.name}>{folder.name}</RareButton>
     </div>
     {open&&<>
      {loading[folder.id]&&<p className="hint perm-tree-info">正在读取…</p>}
-     {errors[folder.id]&&<p role="alert" className="perm-tree-info">{errors[folder.id]} <button type="button" onClick={()=>void load(folder.id)}>重试</button></p>}
+     {errors[folder.id]&&<p role="alert" className="perm-tree-info">{errors[folder.id]} <RareButton type="button" onClick={()=>void load(folder.id)}>重试</RareButton></p>}
      <ul>{rows(folder.id,depth+1,nextAncestors)}</ul>
-     {pages[folder.id]?.nextCursor&&<button type="button" className="perm-more" disabled={loading[folder.id]}
-      onClick={()=>void load(folder.id,pages[folder.id]?.nextCursor??"")}>加载更多</button>}
+     {pages[folder.id]?.nextCursor&&<RareButton type="button" className="perm-more" disabled={loading[folder.id]}
+      onClick={()=>void load(folder.id,pages[folder.id]?.nextCursor??"")}>加载更多</RareButton>}
     </>}
    </li>;
   });
  }
  return <aside className="perm-browser" aria-label="资源目录">
-  <div className="perm-browser-title">资源目录 <button type="button" className="secondary-action" onClick={()=>void load("")}>刷新</button></div>
-  <label className="perm-browser-search">按名称搜索目录<input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="查找资源目录"/></label>
+  <div className="perm-browser-title">资源目录 <RareButton type="button" className="secondary-action" onClick={()=>void load("")}>刷新</RareButton></div>
+  <label className="perm-browser-search">按名称搜索目录<RareInput type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="查找资源目录"/></label>
   <div className="perm-browser-scroll">
    {needle?<>
     {searchState==="loading"&&<p className="hint">正在搜索…</p>}
     {searchState==="failed"&&<p role="alert" className="notice error">{searchError}</p>}
     {searchState==="ready"&&searchPage.items.length===0&&<p className="hint">没有匹配的目录</p>}
-    {searchState==="ready"&&searchPage.items.map(f=><button type="button" key={f.id}
+    {searchState==="ready"&&searchPage.items.map(f=><RareButton type="button" key={f.id}
      className={"perm-result"+(selected===f.id?" selected":"")} aria-current={selected===f.id?"true":undefined}
      onClick={()=>onSelect(f)}>
-     <span>{f.name}</span><small>{f.path||"资源目录"}</small></button>)}
-    {searchState==="ready"&&searchPage.nextCursor&&<button type="button" className="perm-more" disabled={moreSearch} onClick={()=>void loadMoreSearch()}>加载更多结果</button>}
+     <span>{f.name}</span><small>{f.path||"资源目录"}</small></RareButton>)}
+    {searchState==="ready"&&searchPage.nextCursor&&<RareButton type="button" className="perm-more" disabled={moreSearch} onClick={()=>void loadMoreSearch()}>加载更多结果</RareButton>}
    </>:<>
     {loading[""]&&<p className="hint">正在读取资源目录…</p>}
-    {errors[""]&&<p role="alert" className="notice error">{errors[""]} <button type="button" onClick={()=>void load("")}>重试</button></p>}
+    {errors[""]&&<p role="alert" className="notice error">{errors[""]} <RareButton type="button" onClick={()=>void load("")}>重试</RareButton></p>}
     {pages[""]?.items.length===0&&<p className="hint">没有目录</p>}
     <ul className="perm-tree">{rows("",0,new Set())}</ul>
-    {pages[""]?.nextCursor&&<button type="button" className="perm-more" disabled={loading[""]}
-     onClick={()=>void load("",pages[""]?.nextCursor??"")}>加载更多根目录</button>}
+    {pages[""]?.nextCursor&&<RareButton type="button" className="perm-more" disabled={loading[""]}
+     onClick={()=>void load("",pages[""]?.nextCursor??"")}>加载更多根目录</RareButton>}
    </>}
   </div>
  </aside>;
@@ -246,10 +247,10 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
  }
  return <div className="perm-content-root">
   <nav className="perm-subnav" aria-label="权限管理功能">
-   <button type="button" className={!auditView?"active":""} aria-current={!auditView?"page":undefined}
-    onClick={()=>setParams(old=>{const next=new URLSearchParams(old);next.set("view","folder");return next;})}>目录授权与有效权限</button>
-   <button type="button" className={auditView?"active":""} aria-current={auditView?"page":undefined}
-    onClick={()=>{setRevokeTarget(null);setParams(old=>{const next=new URLSearchParams(old);next.set("view","audit");return next;});}}>权限变更审计</button>
+   <RareButton type="button" className={!auditView?"active":""} aria-current={!auditView?"page":undefined}
+    onClick={()=>setParams(old=>{const next=new URLSearchParams(old);next.set("view","folder");return next;})}>目录授权与有效权限</RareButton>
+   <RareButton type="button" className={auditView?"active":""} aria-current={auditView?"page":undefined}
+    onClick={()=>{setRevokeTarget(null);setParams(old=>{const next=new URLSearchParams(old);next.set("view","audit");return next;});}}>权限变更审计</RareButton>
   </nav>
   {auditView?<PermissionAudit users={users}/>:<div className="perm-workspace">
   <ResourceBrowser selected={folderId} onSelect={selectFolder}/>
@@ -257,7 +258,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
    {!folderId?<div className="empty">请选择左侧资源目录，查看或配置直接授权。</div>:<>
     <div className="perm-detail-heading">
      <div><strong>目录权限</strong><span className="perm-path" title={folderId}>{selectedName?.id===folderId?selectedName.name:folderId}</span></div>
-     <div><Link to={"/doc?folder="+encodeURIComponent(folderId)}>返回文档目录</Link> <button type="button" className="secondary-action" onClick={reload}>刷新授权</button></div>
+     <div><Link to={"/doc?folder="+encodeURIComponent(folderId)}>返回文档目录</Link> <RareButton type="button" className="secondary-action" onClick={reload}>刷新授权</RareButton></div>
     </div>
     <div className="perm-section-title">直接授权记录{state==="ready"&&<span className="perm-subtle">{grants.length} 条</span>}</div>
     <p className="perm-hint">显示的仅是当前目录直接 ACL；继承与共享可能仍赋予相同动作，不代表最终有效权限。</p>
@@ -268,7 +269,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
      <tbody>{grants.map(g=><tr key={g.id}><td>{names.get(g.subjectKind+":"+g.subjectId)??g.subjectId}<small>{g.subjectKind==="user"?"用户":"工作组"}</small></td>
       <td>{displayActions(g.actions)}</td><td>{g.scopeOnly?"仅当前目录":"包括子目录"}</td>
       <td>{g.expiresAt?new Date(g.expiresAt).toLocaleString("zh-CN"):"不过期"}</td>
-      <td><button type="button" className="danger" onClick={()=>{setRevokeError("");setRevokeTarget(g);}}>撤销</button></td></tr>)}</tbody></table>
+      <td><RareButton type="button" className="danger" onClick={()=>{setRevokeError("");setRevokeTarget(g);}}>撤销</RareButton></td></tr>)}</tbody></table>
      {grants.length===0&&<p className="empty">没有直接授权；可能仍存在父目录继承或共享权限。</p>}
     </div>}
     <PermissionInsights folderId={folderId} users={users} usersState={usersState} refreshToken={refresh}/>
@@ -277,26 +278,26 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
    if((event.target as HTMLElement).classList.contains("perm-risk-consent"))return;
    if(submitState==="review"){setSubmitState("edit");setRiskAcknowledged(false);}
   }}>
-     {usersState==="failed"&&<p role="alert" className="notice error">读取用户列表失败。<button type="button" className="secondary-action" onClick={onRetryUsers}>重试用户列表</button></p>}
-     {groupsState==="failed"&&<p role="alert" className="notice error">读取工作组列表失败。<button type="button" className="secondary-action" onClick={onRetryGroups}>重试工作组列表</button></p>}
+     {usersState==="failed"&&<p role="alert" className="notice error">读取用户列表失败。<RareButton type="button" className="secondary-action" onClick={onRetryUsers}>重试用户列表</RareButton></p>}
+     {groupsState==="failed"&&<p role="alert" className="notice error">读取工作组列表失败。<RareButton type="button" className="secondary-action" onClick={onRetryGroups}>重试工作组列表</RareButton></p>}
      {subjectSourceState==="loading"&&<p role="status" className="hint">正在读取可授权主体…</p>}
      <div className="perm-form-row">
-      <label>主体类型<select value={subjectKind} onChange={e=>{setSubjectKind(e.target.value as "user"|"group");setSubjectId("");}}>
-       <option value="group">工作组</option><option value="user">用户</option></select></label>
-      <label>查找主体<input type="search" value={subjectQuery} onChange={e=>{setSubjectQuery(e.target.value);setSubjectId("");}} placeholder="按名称或账号筛选"/></label>
-      <label>授权给<select value={subjectId} required disabled={subjectSourceState!=="ready"} onChange={e=>setSubjectId(e.target.value)}>
-       <option value="">请选择</option>{candidates.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+      <label>主体类型<RareSelect value={subjectKind} onChange={e=>{setSubjectKind(e.target.value as "user"|"group");setSubjectId("");}}>
+       <option value="group">工作组</option><option value="user">用户</option></RareSelect></label>
+      <label>查找主体<RareInput type="search" value={subjectQuery} onChange={e=>{setSubjectQuery(e.target.value);setSubjectId("");}} placeholder="按名称或账号筛选"/></label>
+      <label>授权给<RareSelect value={subjectId} required disabled={subjectSourceState!=="ready"} onChange={e=>setSubjectId(e.target.value)}>
+       <option value="">请选择</option>{candidates.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</RareSelect></label>
      </div>
      {subjectSourceState==="ready"&&candidates.length===50&&
       <p className="perm-hint">最多显示前 50 个匹配主体，请继续输入关键词缩小范围。</p>}
      <fieldset><legend>允许执行的文件动作</legend><div className="perm-action-grid">
-      {ACTIONS.map(([key,label])=><label key={key}><input type="checkbox" checked={actions.includes(key)}
+      {ACTIONS.map(([key,label])=><label key={key}><RareInput type="checkbox" checked={actions.includes(key)}
        onChange={e=>setActions(old=>e.target.checked?[...old,key]:old.filter(x=>x!==key))}/>{label}</label>)}
      </div></fieldset>
      <div className="perm-form-row">
-      <label>生效范围<select value={scopeOnly?"only":"subtree"} onChange={e=>setScopeOnly(e.target.value==="only")}>
-       <option value="only">仅当前目录（默认）</option><option value="subtree">包括全部子目录</option></select></label>
-      <label>到期时间（可选）<input type="datetime-local" value={expiresAt} onChange={e=>setExpiresAt(e.target.value)}/></label>
+      <label>生效范围<RareSelect value={scopeOnly?"only":"subtree"} onChange={e=>setScopeOnly(e.target.value==="only")}>
+       <option value="only">仅当前目录（默认）</option><option value="subtree">包括全部子目录</option></RareSelect></label>
+      <label>到期时间（可选）<RareInput type="datetime-local" value={expiresAt} onChange={e=>setExpiresAt(e.target.value)}/></label>
      </div>
      {submitState==="review"&&<div className="perm-review" role="status">
       <strong>请核对授权摘要</strong>
@@ -307,16 +308,16 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
        <p className="perm-risk-warning" role="alert">高影响权限：{displayActions(riskyActions)}。{scopeOnly
         ?"将允许主体在当前目录执行这些操作。"
         :"还会作用于所有子目录，后续新增的子目录也在授权范围内。"}{expiresAt?"":"此授权没有到期时间。"}</p>
-       <label className="perm-risk-confirm"><input className="perm-risk-consent" type="checkbox"
+       <label className="perm-risk-confirm"><RareInput className="perm-risk-consent" type="checkbox"
         checked={riskAcknowledged} onChange={e=>setRiskAcknowledged(e.target.checked)}/>
         我已核对资源目录、授权主体、操作范围和期限，确认授予以上高影响权限
        </label>
       </>}
      </div>}
      <div className="perm-form-actions"><span className="hint">授权效果以服务端判定为准。</span>
-      {submitState==="review"&&<button type="button" className="secondary-action" onClick={()=>{setSubmitState("edit");setRiskAcknowledged(false);}}>返回修改</button>}
-      <button type="submit" className="primary" disabled={submitState==="saving"||!subjectId||!actions.length||state!=="ready"||subjectSourceState!=="ready"||(submitState==="review"&&needsRiskConsent&&!riskAcknowledged)}>
-       {submitState==="saving"?"提交中…":submitState==="review"?"确认添加授权":"预览授权"}</button>
+      {submitState==="review"&&<RareButton type="button" className="secondary-action" onClick={()=>{setSubmitState("edit");setRiskAcknowledged(false);}}>返回修改</RareButton>}
+      <RareButton type="submit" className="primary" disabled={submitState==="saving"||!subjectId||!actions.length||state!=="ready"||subjectSourceState!=="ready"||(submitState==="review"&&needsRiskConsent&&!riskAcknowledged)}>
+       {submitState==="saving"?"提交中…":submitState==="review"?"确认添加授权":"预览授权"}</RareButton>
      </div>
     </form>
    </>}
@@ -327,8 +328,8 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
     <p>确定撤销 {names.get(revokeTarget.subjectKind+":"+revokeTarget.subjectId)??revokeTarget.subjectId} 的「{displayActions(revokeTarget.actions)}」直接授权？</p>
     <p className="hint">只撤销这一条记录。工作组、父目录及共享仍可能赋予相同权限。</p>
     {revokeError&&<p role="alert" className="notice error">{revokeError}</p>}
-    <div className="dialog-actions"><button type="button" className="secondary-action" disabled={revokeBusy} onClick={()=>setRevokeTarget(null)}>取消</button>
-     <button type="button" className="danger" disabled={revokeBusy} onClick={()=>void revoke()}>{revokeBusy?"撤销中…":"确认撤销"}</button></div>
+    <div className="dialog-actions"><RareButton type="button" className="secondary-action" disabled={revokeBusy} onClick={()=>setRevokeTarget(null)}>取消</RareButton>
+     <RareButton type="button" className="danger" disabled={revokeBusy} onClick={()=>void revoke()}>{revokeBusy?"撤销中…":"确认撤销"}</RareButton></div>
    </>}
   </Dialog>
  </div>;

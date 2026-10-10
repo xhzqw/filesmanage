@@ -1,3 +1,4 @@
+import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
 import {useEffect,useState,type FormEvent} from "react";
 import type {User} from "../../entities/user/model";
 import {request} from "../../shared/http";
@@ -70,28 +71,28 @@ export function RoleBindingsPanel({users}:{users:User[]}){
     <td>{b.allowedActions.map(actionName).join("、")||"只读"}</td>
     <td>{b.expiresAt?new Date(b.expiresAt).toLocaleString():"不过期"}</td>
     <td>{confirmRevoke===b.id
-     ?<><button className="danger" type="button" disabled={busy} onClick={()=>void revoke(b.id)}>确认撤销</button>
-        <button type="button" onClick={()=>setConfirmRevoke("")}>取消</button></>
-     :<button className="danger" type="button" onClick={()=>setConfirmRevoke(b.id)}>撤销</button>}</td>
+     ?<><RareButton className="danger" type="button" disabled={busy} onClick={()=>void revoke(b.id)}>确认撤销</RareButton>
+        <RareButton type="button" onClick={()=>setConfirmRevoke("")}>取消</RareButton></>
+     :<RareButton className="danger" type="button" onClick={()=>setConfirmRevoke(b.id)}>撤销</RareButton>}</td>
    </tr>)}</tbody>
   </table>{items.length===0&&<p className="empty">暂无委派角色。</p>}</div>
   <div className="perm-section-title">新增角色委派</div>
   <form className="perm-form" onSubmit={create} onChange={()=>setReview(false)}>
    <div className="perm-form-row">
-    <label>委派给账号<select required value={userId} onChange={e=>setUserId(e.target.value)}>
+    <label>委派给账号<RareSelect required value={userId} onChange={e=>setUserId(e.target.value)}>
      <option value="">请选择</option>{users.filter(u=>!u.isAdmin&&!u.disabled).map(u=>
       <option key={u.id} value={u.id}>{u.displayName}（{u.login}）</option>)}
-    </select></label>
-    <label>管理角色<select value={role} onChange={e=>setRole(e.target.value as ManagementRole["role"])}>
+    </RareSelect></label>
+    <label>管理角色<RareSelect value={role} onChange={e=>setRole(e.target.value as ManagementRole["role"])}>
      <option value="auditor">只读审计员</option><option value="permission_admin">目录权限管理员</option>
-    </select></label>
-    {role==="permission_admin"&&<label>授权目录 ID<input required value={scopeId}
+    </RareSelect></label>
+    {role==="permission_admin"&&<label>授权目录 ID<RareInput required value={scopeId}
      onChange={e=>setScopeId(e.target.value)} placeholder="使用资源目录的 ID"/></label>}
-    <label>过期时间（可选）<input type="datetime-local" value={expires} onChange={e=>setExpires(e.target.value)}/></label>
+    <label>过期时间（可选）<RareInput type="datetime-local" value={expires} onChange={e=>setExpires(e.target.value)}/></label>
    </div>
    {role==="permission_admin"&&<fieldset><legend>允许管理的 ACL 动作</legend>
     <div className="perm-action-grid">{ACTIONS.map(([key,name])=><label key={key}>
-     <input type="checkbox" checked={actions.includes(key)}
+     <RareInput type="checkbox" checked={actions.includes(key)}
       onChange={e=>setActions(old=>e.target.checked?[...old,key]:old.filter(x=>x!==key))}/>{name}
     </label>)}</div>
    </fieldset>}
@@ -99,7 +100,7 @@ export function RoleBindingsPanel({users}:{users:User[]}){
     范围 {role==="auditor"?"全局审计":scopeId}；动作 {actions.map(actionName).join("、")}。
     委派不附带文件读取权限。</p>}
    <div className="perm-form-actions">
-    <button type="submit" className="primary" disabled={!valid||busy}>{busy?"提交中…":review?"确认委派":"预览委派"}</button>
+    <RareButton type="submit" className="primary" disabled={!valid||busy}>{busy?"提交中…":review?"确认委派":"预览委派"}</RareButton>
    </div>
   </form>
  </section>;
@@ -149,32 +150,32 @@ export function DelegatedRolesWorkspace(){
   {permissionRoles.length>0&&<section className="perm-detail" style={{padding:16}}>
    <div className="perm-section-title">委派目录 ACL 管理</div>
    <p className="perm-hint">只能维护所选目录的直接授权。角色自身不赋予浏览或下载文件的权限。</p>
-   <label>管理目录<select value={folder} onChange={e=>setFolder(e.target.value)}>
+   <label>管理目录<RareSelect value={folder} onChange={e=>setFolder(e.target.value)}>
     {permissionRoles.map(r=><option key={r.id} value={r.scopeId}>{r.scopeId}</option>)}
-   </select></label>
+   </RareSelect></label>
    {chosen&&<><p>可授权动作：{chosen.allowedActions.map(actionName).join("、")}</p>
     <table className="perm-table"><thead><tr><th>主体 ID</th><th>动作</th><th>范围</th><th>到期</th><th>操作</th></tr></thead>
      <tbody>{grants.map(g=><tr key={g.id}><td>{g.subjectId}</td><td>{g.actions.map(actionName).join("、")}</td>
       <td>{g.scopeOnly?"仅本目录":"包含子目录"}</td><td>{g.expiresAt||"不过期"}</td>
       <td>{g.scopeOnly&&g.actions.every(a=>chosen.allowedActions.includes(a))&&
         (!chosen.expiresAt||Boolean(g.expiresAt&&new Date(g.expiresAt)<=new Date(chosen.expiresAt)))&&
-        <button className="danger" type="button" onClick={()=>void revoke(g.id)}>
+        <RareButton className="danger" type="button" onClick={()=>void revoke(g.id)}>
          {revokeTarget===g.id?"确认撤销":"撤销"}
-        </button>}</td>
+        </RareButton>}</td>
      </tr>)}</tbody>
     </table>
     <form className="perm-form" onSubmit={create} onChange={()=>setConfirm("")}>
      <p className="perm-hint">请输入已知的目标账号 ID。不得填写自己的 ID；所有范围检查以服务端为准。</p>
      <div className="perm-form-row">
-      <label>目标用户 ID<input required value={subject} onChange={e=>setSubject(e.target.value)}/></label>
-      <label>动作<select value={effectiveAction}
-       onChange={e=>setAction(e.target.value)}>{chosen.allowedActions.map(a=><option value={a} key={a}>{actionName(a)}</option>)}</select></label>
+      <label>目标用户 ID<RareInput required value={subject} onChange={e=>setSubject(e.target.value)}/></label>
+      <label>动作<RareSelect value={effectiveAction}
+       onChange={e=>setAction(e.target.value)}>{chosen.allowedActions.map(a=><option value={a} key={a}>{actionName(a)}</option>)}</RareSelect></label>
       <label>授权到期时间{chosen.expiresAt?"（必填且不能晚于委派到期）":"（可选）"}
-       <input type="datetime-local" required={Boolean(chosen.expiresAt)} value={expiry} onChange={e=>setExpiry(e.target.value)}/></label>
+       <RareInput type="datetime-local" required={Boolean(chosen.expiresAt)} value={expiry} onChange={e=>setExpiry(e.target.value)}/></label>
      </div>
      {confirm&&<p className="perm-review">确认向 {subject} 授予 {actionName(effectiveAction)}，仅当前目录。</p>}
-     <button type="button" className="secondary-action" onClick={()=>setRefresh(v=>v+1)}>刷新</button>
-     <button className="primary" type="submit" disabled={!subject}>{confirm?"确认授权":"预览授权"}</button>
+     <RareButton type="button" className="secondary-action" onClick={()=>setRefresh(v=>v+1)}>刷新</RareButton>
+     <RareButton className="primary" type="submit" disabled={!subject}>{confirm?"确认授权":"预览授权"}</RareButton>
     </form>
    </>}
   </section>}

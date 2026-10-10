@@ -1,3 +1,4 @@
+import {RareButton,RareInput} from "../shared/ui/rare";
 import {useEffect,useRef,useState,type FormEvent} from "react";
 import {useNavigate,useParams} from "react-router-dom";
 import {fileApi} from "../features/documents/api";
@@ -192,13 +193,13 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
    return()=>{valid=false;abort.abort();};
   },[status,id,info?.outputKind,info?.format]);
 
- return <AppShell user={user} onLogout={onLogout} product="模型预览" actions={<button type="button" onClick={()=>navigate("/preview/"+id)}>返回文件</button>}>
+ return <AppShell user={user} onLogout={onLogout} product="模型预览" actions={<RareButton type="button" onClick={()=>navigate("/preview/"+id)}>返回文件</RareButton>}>
   <div className="panels">
    <main className="work">
     <div className="breadcrumb">模型预览 · {info?.format?.toUpperCase()??""} · {info?.class==="converted"?"服务端已转换":info?.format?.toLowerCase()==="dxf"?"二维工程图":"浏览器原生渲染"}</div>
     {layers.length>0&&<div className="toolbar" role="group" aria-label="图层">
      {layers.map(layer=><label key={layer.name} className="sort-label">
-      <input type="checkbox" checked={layer.visible} onChange={event=>{
+      <RareInput type="checkbox" checked={layer.visible} onChange={event=>{
        setLayers(layers.map(item=>item.name===layer.name?{...item,visible:event.target.checked}:item));
        // Toggle visibility straight on the drawing's layer group.
         dxfRoot.current?.children.forEach(child=>{
@@ -212,13 +213,13 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
     {parts.length>0&&<div className="toolbar" role="group" aria-label="装配零件">
      {parts.map((part,index)=>(
       <label key={part.name} className="sort-label">
-       <input type="checkbox" checked={part.visible} onChange={event=>{
+       <RareInput type="checkbox" checked={part.visible} onChange={event=>{
         setParts(parts.map((item,i)=>i===index?{...item,visible:event.target.checked}:item));
         const child=mshRoot.current?.children[index];
         if(child)child.visible=event.target.checked;
         controls.current?.invalidate();
        }}/>
-       <button type="button" className={selectedPart===index?"on":""} onClick={()=>{
+       <RareButton type="button" className={selectedPart===index?"on":""} onClick={()=>{
         setSelectedPart(selectedPart===index?-1:index);
         // Selecting a part highlights it; everything else returns to the base
         // material so only one part is ever emphasised (MOD02).
@@ -229,11 +230,11 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
          material.emissive.setHex(i===(selectedPart===index?-1:index)?0x1b4f8a:0x000000);
         });
         controls.current?.invalidate();
-       }}>{part.name}</button>
+       }}>{part.name}</RareButton>
        <span className="toolbar-hint">{part.size.map(v=>v.toFixed(2)).join("×")} · {part.triangles}△</span>
       </label>
      ))}
-     <button type="button" onClick={()=>{
+     <RareButton type="button" onClick={()=>{
       setParts(parts.map(item=>({...item,visible:true})));
       setSelectedPart(-1);
       mshRoot.current?.children.forEach(child=>{
@@ -242,7 +243,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
         material?.emissive?.setHex(0x000000);
        });
        controls.current?.invalidate();
-     }}>全部显示</button>
+     }}>全部显示</RareButton>
     </div>}
     {status==="unsupported"&&<p className="empty">{info?.note??"该格式当前不支持在线预览"}</p>}
     {status==="converting"&&<p className="empty">模型转换中（Worker 处理），请稍后刷新…</p>}
@@ -251,10 +252,10 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
     {status==="too-large"&&<p role="alert" className="notice error">模型过大，浏览器内联渲染已取消 · <a href={"/api/files/"+id+"/bytes"}>下载原件</a></p>}
     {status==="loading-model"&&<p className="empty">正在加载几何数据…</p>}
     {status==="ready"&&<div className="toolbar" role="group" aria-label="视图控制">
-     <button type="button" onClick={()=>controls.current?.resetView()}>重置视角</button>
-     <button type="button" className={view.axes?"on":""} aria-pressed={view.axes} onClick={()=>setView(v=>({...v,axes:controls.current?.toggleAxes()??v.axes}))}>坐标轴</button>
-     <button type="button" className={view.grid?"on":""} aria-pressed={view.grid} onClick={()=>setView(v=>({...v,grid:controls.current?.toggleGrid()??v.grid}))}>网格</button>
-     <button type="button" className={view.projection==="orthographic"?"on":""} aria-pressed={view.projection==="orthographic"} onClick={()=>setView(v=>({...v,projection:controls.current?.toggleProjection()??v.projection}))}>{view.projection==="orthographic"?"正交投影":"透视投影"}</button>
+     <RareButton type="button" onClick={()=>controls.current?.resetView()}>重置视角</RareButton>
+     <RareButton type="button" className={view.axes?"on":""} aria-pressed={view.axes} onClick={()=>setView(v=>({...v,axes:controls.current?.toggleAxes()??v.axes}))}>坐标轴</RareButton>
+     <RareButton type="button" className={view.grid?"on":""} aria-pressed={view.grid} onClick={()=>setView(v=>({...v,grid:controls.current?.toggleGrid()??v.grid}))}>网格</RareButton>
+     <RareButton type="button" className={view.projection==="orthographic"?"on":""} aria-pressed={view.projection==="orthographic"} onClick={()=>setView(v=>({...v,projection:controls.current?.toggleProjection()??v.projection}))}>{view.projection==="orthographic"?"正交投影":"透视投影"}</RareButton>
     </div>}
     <div className="viewer-stage" ref={holder}/>
     {metrics&&<div className="toolbar"><span className="toolbar-hint">三角形 {metrics.triangles} · 顶点 {metrics.vertices} · 拖拽旋转 / 滚轮缩放 / 右键平移 · 工具栏可重置视角、切换坐标轴 / 网格 / 投影</span></div>}

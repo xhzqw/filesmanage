@@ -1,3 +1,4 @@
+import {RareButton} from "../shared/ui/rare";
 import{useEffect,useRef,useState,type KeyboardEvent as ReactKeyboardEvent,type PointerEvent as ReactPointerEvent}from "react";
 import{Link,useLocation,useNavigate}from "react-router-dom";
 import type{User}from "../entities/user/model";
@@ -268,11 +269,11 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
       <p>目标目录：{moveTargetFolder?movePath(folders,moveTargetFolder.id):"未选择"}</p>
      </div>}
      footer={<div className="dialog-actions">
-      {move.unknown&&<button type="button" className="secondary-action" disabled={moveBusy}
-       onClick={()=>setReloadKey(k=>k+1)}>刷新查看状态</button>}
-      <button type="button" className="secondary-action" disabled={moveBusy} onClick={closeMove}>取消</button>
-      <button type="button" className="primary" disabled={moveBusy||!moveCanSubmit}
-       onClick={submitMove}>{moveBusy?"移动中…":"确认移动"}</button>
+      {move.unknown&&<RareButton type="button" className="secondary-action" disabled={moveBusy}
+       onClick={()=>setReloadKey(k=>k+1)}>刷新查看状态</RareButton>}
+      <RareButton type="button" className="secondary-action" disabled={moveBusy} onClick={closeMove}>取消</RareButton>
+      <RareButton type="button" className="primary" disabled={moveBusy||!moveCanSubmit}
+       onClick={submitMove}>{moveBusy?"移动中…":"确认移动"}</RareButton>
      </div>}/>
    </Dialog>}
   </AppShell>;

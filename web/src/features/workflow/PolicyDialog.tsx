@@ -1,3 +1,4 @@
+import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
 import {useEffect,useState,type FormEvent} from "react";
 import {workflowApi} from "./api";
 import {errorCopy} from "../../shared/errors";
@@ -57,19 +58,19 @@ export function PolicyDialog({folder,approvers,onClose}:{folder:Folder;approvers
   <form onSubmit={submit}>
    <p className="hint">启用后，该目录下文件的修改与回滚必须先经审批人同意才会生成新版本。</p>
    <label htmlFor="policy-approver">审批人</label>
-   <select id="policy-approver" value={approverId} onChange={e=>setApproverId(e.target.value)} required disabled={busy}>
+   <RareSelect id="policy-approver" value={approverId} onChange={e=>setApproverId(e.target.value)} required disabled={busy}>
     <option value="">请选择</option>
     {approvers.map(a=><option key={a.id} value={a.id}>{a.displayName}{a.login?`（${a.login}）`:""}</option>)}
-   </select>
+   </RareSelect>
    <label className="checkbox-label">
-    <input type="checkbox" checked={enabled} onChange={e=>setEnabled(e.target.checked)} disabled={busy}/>
+    <RareInput type="checkbox" checked={enabled} onChange={e=>setEnabled(e.target.checked)} disabled={busy}/>
     启用审批
    </label>
    {message&&<p role="alert" className="notice error">{message}</p>}
    <div className="dialog-actions">
-    {configured&&<button type="button" className="secondary-action" onClick={clear} disabled={busy}>移除策略</button>}
-    <button type="button" className="secondary-action" onClick={onClose} disabled={busy}>关闭</button>
-    <button type="submit" className="primary" disabled={busy||approverId===""}>{busy?"保存中…":"保存策略"}</button>
+    {configured&&<RareButton type="button" className="secondary-action" onClick={clear} disabled={busy}>移除策略</RareButton>}
+    <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>关闭</RareButton>
+    <RareButton type="submit" className="primary" disabled={busy||approverId===""}>{busy?"保存中…":"保存策略"}</RareButton>
    </div>
   </form>
  </Dialog>;

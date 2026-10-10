@@ -1,3 +1,4 @@
+import {RareButton} from "../shared/ui/rare";
 import {useEffect,useState} from "react";
 import {useParams} from "react-router-dom";
 import {fileApi,formatSize} from "../features/documents/api";
@@ -79,8 +80,8 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
          <td className="hash" title={v.sha256}>{v.sha256.slice(0,12)}…</td>
          <td>{v.createdBy}</td>
          <td>{v.createdAt.replace("T"," ").slice(0,16)}</td>
-         <td><button type="button" disabled={v.versionSeq===currentSeq}
-          onClick={()=>{setNotice("");setRollback(v);}}>{v.versionSeq===currentSeq?"当前版本":"回滚到此版本"}</button></td>
+         <td><RareButton type="button" disabled={v.versionSeq===currentSeq}
+          onClick={()=>{setNotice("");setRollback(v);}}>{v.versionSeq===currentSeq?"当前版本":"回滚到此版本"}</RareButton></td>
         </tr>)}
        </tbody>
       </table>

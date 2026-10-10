@@ -1,8 +1,10 @@
-import {useEffect,useRef,useState,type FormEvent} from "react";
+import {RareButton,RareInput} from "../../shared/ui/rare";
+import {useRef,useState,type FormEvent} from "react";
 import type {Folder} from "../../entities/folder/model";
 import {folderApi} from "./api";
 import {errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
+import {Menu,type MenuItem} from "../../shared/ui/Menu";
 
 export function FolderActions({folder,onChanged,isAdmin,onManageGrants,onManagePolicy}:{folder:Folder;onChanged:()=>void;isAdmin:boolean;onManageGrants:()=>void;onManagePolicy:()=>void}){
  const[message,setMessage]=useState("");
@@ -10,18 +12,9 @@ export function FolderActions({folder,onChanged,isAdmin,onManageGrants,onManageP
  const[renameValue,setRenameValue]=useState(folder.name);
  const[renameBusy,setRenameBusy]=useState(false);
  const[moreOpen,setMoreOpen]=useState(false);
- const moreRef=useRef<HTMLDivElement>(null);
-
- useEffect(()=>{
-  if(!moreOpen)return;
-  function onDocClick(e:Event){
-   if(moreRef.current&&!moreRef.current.contains(e.target as Node)){
-    setMoreOpen(false);
-   }
-  }
-  document.addEventListener("mousedown",onDocClick);
-  return()=>document.removeEventListener("mousedown",onDocClick);
- },[moreOpen]);
+ const moreRef=useRef<HTMLButtonElement>(null);
+ const[deleting,setDeleting]=useState(false);
+ const[removeBusy,setRemoveBusy]=useState(false);
 
  async function submitRename(event:FormEvent<HTMLFormElement>){
   event.preventDefault();
@@ -37,35 +30,41 @@ export function FolderActions({folder,onChanged,isAdmin,onManageGrants,onManageP
  }
 
  async function remove(){
-  if(!window.confirm(`删除目录将同时收起其全部子目录与文件进入回收站。确定删除「${folder.name}」？`))return;
-  setMessage("");
-  try{
-   await folderApi.remove(folder.id);
-   onChanged();
-  }catch(error){
-   setMessage(errorCopy(error,"删除失败"));
-  }
+  setMessage("");setRemoveBusy(true);
+  try{await folderApi.remove(folder.id);setDeleting(false);onChanged();}
+  catch(error){setMessage(errorCopy(error,"删除失败"));}
+  finally{setRemoveBusy(false);}
  }
-
+ const menuItems:MenuItem[]=[
+  {id:"rename",label:"重命名目录",onSelect:()=>{setRenaming(true);setRenameValue(folder.name);}},
+  {id:"delete",label:"删除目录",danger:true,onSelect:()=>setDeleting(true)}
+ ];
  return <div className="folder-actions">
-  {isAdmin&&<button type="button" className="ghost-action-btn" onClick={onManageGrants}>授权管理</button>}
-  {isAdmin&&<button type="button" className="ghost-action-btn" onClick={onManagePolicy}>审批策略</button>}
-  <div className="folder-more-wrapper" ref={moreRef}>
-   <button type="button" className="ghost-more-btn" aria-label="更多目录操作" aria-expanded={moreOpen} onClick={()=>setMoreOpen(v=>!v)}>···</button>
-   <div className={"folder-more-menu"+(moreOpen?" open":"")} role="menu">
-    <button type="button" role="menuitem" onClick={()=>{setMoreOpen(false);setRenaming(true);setRenameValue(folder.name);}}>重命名目录</button>
-    <button type="button" role="menuitem" className="danger" onClick={()=>{setMoreOpen(false);remove();}}>删除目录</button>
-   </div>
+  {isAdmin&&<RareButton type="button" className="ghost-action-btn" onClick={onManageGrants}>授权管理</RareButton>}
+  {isAdmin&&<RareButton type="button" className="ghost-action-btn" onClick={onManagePolicy}>审批策略</RareButton>}
+  <div className="folder-more-wrapper">
+   <RareButton ref={moreRef} type="button" className="ghost-more-btn" aria-label="更多目录操作"
+    aria-haspopup="menu" aria-expanded={moreOpen} onClick={()=>setMoreOpen(v=>!v)}>···</RareButton>
+   <Menu open={moreOpen} label={"目录操作："+folder.name} items={menuItems}
+    anchor={moreRef.current} onClose={()=>setMoreOpen(false)}/>
   </div>
   {message&&<span role="alert" className="notice error">{message}</span>}
+  {deleting&&<Dialog open title="删除目录确认" className="dialog"
+   onClose={()=>{if(!removeBusy)setDeleting(false);}} closeGuard={()=>!removeBusy}>
+   <p className="hint">目录「{folder.name}」及其子目录、文件将进入回收站，可按权限恢复。</p>
+   <div className="dialog-actions">
+    <RareButton type="button" className="secondary-action" disabled={removeBusy} onClick={()=>setDeleting(false)}>取消</RareButton>
+    <RareButton type="button" className="danger" disabled={removeBusy} onClick={()=>void remove()}>{removeBusy?"删除中…":"确认删除"}</RareButton>
+   </div>
+  </Dialog>}
   {renaming&&<Dialog open title="重命名目录" onClose={()=>setRenaming(false)} closeGuard={()=>!renameBusy} className="dialog">
    <form onSubmit={submitRename}>
     <label htmlFor="folder-rename-input">新名称</label>
-    <input id="folder-rename-input" value={renameValue} maxLength={200}
+    <RareInput id="folder-rename-input" value={renameValue} maxLength={200}
      onChange={e=>setRenameValue(e.target.value)} required disabled={renameBusy}/>
     <div className="dialog-actions">
-     <button type="button" className="secondary-action" onClick={()=>setRenaming(false)} disabled={renameBusy}>取消</button>
-     <button type="submit" className="primary" disabled={renameBusy}>{renameBusy?"保存中…":"保存"}</button>
+     <RareButton type="button" className="secondary-action" onClick={()=>setRenaming(false)} disabled={renameBusy}>取消</RareButton>
+     <RareButton type="submit" className="primary" disabled={renameBusy}>{renameBusy?"保存中…":"保存"}</RareButton>
     </div>
    </form>
   </Dialog>}

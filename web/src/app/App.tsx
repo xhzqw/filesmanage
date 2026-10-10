@@ -1,3 +1,4 @@
+import {RareButton} from "../shared/ui/rare";
 import{lazy,Suspense,useEffect,useRef,useState}from "react";
 import{Navigate,Route,Routes}from "react-router-dom";
 import{authApi}from "../features/auth/api";
@@ -38,7 +39,7 @@ export function App(){
   catch{setLogoutError("退出未完成，服务器未确认会话已注销。请检查网络后重试。");}
   finally{logoutPending.current=false;}
  }
- const feedback=logoutError?<div className="auth-feedback" role="alert"><span>{logoutError}</span><button type="button" onClick={()=>void logout()}>重试退出</button></div>:null;
+ const feedback=logoutError?<div className="auth-feedback" role="alert"><span>{logoutError}</span><RareButton type="button" onClick={()=>void logout()}>重试退出</RareButton></div>:null;
  if(loading)return <main className="login-bg">正在检查会话…</main>;
  if(user?.mustChangePassword)return <>{feedback}<Routes><Route path="/first-sign-in" element={<FirstSignIn onSuccess={setUser} onExit={logout}/>}/><Route path="*" element={<Navigate to="/first-sign-in" replace/>}/></Routes></>;
  return <>{feedback}<Routes><Route path="/login" element={user?<Navigate to="/doc" replace/>:<Login onSuccess={setUser}/>}/>

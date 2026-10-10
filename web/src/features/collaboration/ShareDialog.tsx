@@ -1,3 +1,4 @@
+import {RareButton,RareInput} from "../../shared/ui/rare";
 import {useEffect,useMemo,useState,type FormEvent} from "react";
 import {collaborationApi,type Workgroup} from "./api";
 import {errorCode,errorCopy} from "../../shared/errors";
@@ -134,21 +135,21 @@ export function ShareDialog({resource,onClose,onCreated}:{
    <fieldset className="share-fieldset">
     <legend>接收方类型</legend>
     <div className="share-kind-switch" role="group" aria-label="接收方类型">
-     <button type="button" className={recipientKind==="user"?"on":""} aria-pressed={recipientKind==="user"}
-      disabled={busy} onClick={()=>{setRecipientKind("user");setRecipientId("");}}>用户</button>
-     <button type="button" className={recipientKind==="group"?"on":""} aria-pressed={recipientKind==="group"}
-      disabled={busy} onClick={()=>{setRecipientKind("group");setRecipientId("");}}>工作组</button>
+     <RareButton type="button" className={recipientKind==="user"?"on":""} aria-pressed={recipientKind==="user"}
+      disabled={busy} onClick={()=>{setRecipientKind("user");setRecipientId("");}}>用户</RareButton>
+     <RareButton type="button" className={recipientKind==="group"?"on":""} aria-pressed={recipientKind==="group"}
+      disabled={busy} onClick={()=>{setRecipientKind("group");setRecipientId("");}}>工作组</RareButton>
     </div>
    </fieldset>
    {recipients==="loading"&&<p className="hint">正在读取接收方…</p>}
    {recipients==="denied"&&<p role="alert" className="notice error">当前账号无法读取用户/工作组列表（服务端仅对管理员开放），暂时不能选择接收方。</p>}
    {recipients==="failed"&&<>
     <p role="alert" className="notice error">接收方列表加载失败。</p>
-    <button type="button" className="secondary-action" disabled={busy} onClick={()=>setRecipientToken(token=>token+1)}>重试</button>
+    <RareButton type="button" className="secondary-action" disabled={busy} onClick={()=>setRecipientToken(token=>token+1)}>重试</RareButton>
    </>}
    {recipients==="ready"&&<>
     <label htmlFor="share-recipient-search">接收方（{recipientKind==="user"?"用户":"工作组"}）</label>
-    <input id="share-recipient-search" type="search" value={query} placeholder="按姓名或账号筛选"
+    <RareInput id="share-recipient-search" type="search" value={query} placeholder="按姓名或账号筛选"
      autoComplete="off" disabled={busy} onChange={event=>setQuery(event.target.value)}
      onKeyDown={event=>{
       if(event.key!=="Enter")return;
@@ -160,13 +161,13 @@ export function ShareDialog({resource,onClose,onCreated}:{
      }}/>
     <div role="radiogroup" aria-label={"选择"+(recipientKind==="user"?"用户":"工作组")} className="share-recipient-list">
      {shown.length===0&&<p className="share-list-empty">没有匹配的接收方。</p>}
-     {shown.map(item=><button key={item.id} type="button" role="radio" aria-checked={recipientId===item.id}
+     {shown.map(item=><RareButton key={item.id} type="button" role="radio" aria-checked={recipientId===item.id}
       className={"share-option"+(recipientId===item.id?" on":"")} disabled={busy}
       onClick={()=>setRecipientId(item.id)}>
       <span className="share-option-kind">{recipientKind==="user"?"用户":"工作组"}</span>
       <span className="share-option-name">{item.name}</span>
       {item.detail!==""&&<span className="share-option-detail">{item.detail}</span>}
-     </button>)}
+     </RareButton>)}
     </div>
     {candidates.length>shown.length&&<p className="hint">匹配 {candidates.length} 条，仅显示前 {RECIPIENT_PAGE} 条，请继续输入以缩小范围。</p>}
    </>}
@@ -174,7 +175,7 @@ export function ShareDialog({resource,onClose,onCreated}:{
     <legend>权限动作</legend>
     <div className="share-actions">
      {SHARE_ACTION_KEYS.map(key=><label key={key} className="checkbox-label">
-      <input type="checkbox" checked={actions.includes(key)} disabled={busy}
+      <RareInput type="checkbox" checked={actions.includes(key)} disabled={busy}
        onChange={event=>setActions(prev=>event.target.checked?[...prev,key]:prev.filter(item=>item!==key))}/>
       {SHARE_ACTIONS[key]??key}
      </label>)}
@@ -182,20 +183,20 @@ export function ShareDialog({resource,onClose,onCreated}:{
    </fieldset>
    {resource.kind==="folder"
     ?<label className="checkbox-label">
-     <input type="checkbox" checked={includeDescendants} disabled={busy}
+     <RareInput type="checkbox" checked={includeDescendants} disabled={busy}
       onChange={event=>setIncludeDescendants(event.target.checked)}/>
      继承到子目录
     </label>
     :<p className="hint">文件分享不涉及子目录继承。</p>}
    <label htmlFor="share-expiry">有效期（留空表示长期有效）</label>
-   <input id="share-expiry" type="datetime-local" value={expiresLocal} disabled={busy}
+   <RareInput id="share-expiry" type="datetime-local" value={expiresLocal} disabled={busy}
     onChange={event=>setExpiresLocal(event.target.value)}/>
    {expiryError!==""&&<p role="alert" className="notice error">{expiryError}</p>}
    {message&&<p role="alert" className="notice error">{message}</p>}
    {recipientOk&&<p className="hint">将分享给{recipientKind==="user"?"用户":"工作组"}「{recipientName}」。</p>}
    <div className="dialog-actions">
-    <button type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</button>
-    <button type="submit" className="primary" disabled={!canSubmit}>{busy?"创建中…":"创建分享"}</button>
+    <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</RareButton>
+    <RareButton type="submit" className="primary" disabled={!canSubmit}>{busy?"创建中…":"创建分享"}</RareButton>
    </div>
   </form>
  </Dialog>;

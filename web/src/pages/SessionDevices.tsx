@@ -1,7 +1,9 @@
+import {RareButton} from "../shared/ui/rare";
 import {useCallback,useEffect,useState} from "react";
 import {Link} from "react-router-dom";
 import type {User} from "../entities/user/model";
 import {AppShell} from "../shared/ui/AppShell";
+import {Dialog} from "../shared/ui/Dialog";
 import {sessionApi,type DeviceSession,type AuthActivity} from "../features/auth/sessionsApi";
 import "./SessionDevices.css";
 
@@ -64,15 +66,15 @@ export function SessionDevices({user,onLogout}:{user:User;onLogout:()=>void}){
     <div className="sessions-page">
      <div className="sessions-heading">
       <div><h1>登录设备与安全</h1><p>管理你自己的登录会话。撤销后，其他设备将通过实时通知或下次请求退出。</p></div>
-      <button type="button" className="sessions-btn" onClick={()=>void refresh()} disabled={loading||busy}>刷新</button>
+      <RareButton type="button" className="sessions-btn" onClick={()=>void refresh()} disabled={loading||busy}>刷新</RareButton>
      </div>
      {error&&<p className="sessions-alert" role="alert">{error}</p>}
      {notice&&<p className="sessions-notice" role="status">{notice}</p>}
      <section className="sessions-panel" aria-labelledby="sessions-title">
       <div className="sessions-panel-heading">
        <div><h2 id="sessions-title">活跃登录会话</h2><p>最多显示最近 50 条；仅展示你自己的会话。</p></div>
-       <button type="button" className="sessions-btn sessions-danger" disabled={busy||others.length===0}
-        onClick={()=>setConfirm("others")}>退出其他所有设备</button>
+       <RareButton type="button" className="sessions-btn sessions-danger" disabled={busy||others.length===0}
+        onClick={()=>setConfirm("others")}>退出其他所有设备</RareButton>
       </div>
       {loading?<p className="sessions-empty">加载设备中…</p>:
        sessions.length===0?<p className="sessions-empty">暂无可用的登录会话。</p>:
@@ -83,8 +85,8 @@ export function SessionDevices({user,onLogout}:{user:User;onLogout:()=>void}){
          <div className="sessions-device-meta">来源 IP：{row.address||"未记录"} · 登录于 {dateTime(row.createdAt)}</div>
          <div className="sessions-device-meta">最近活动：{dateTime(row.lastSeenAt)} · 到期：{dateTime(row.expiresAt)}</div>
         </div>
-        {!row.current&&<button type="button" className="sessions-btn sessions-danger" disabled={busy}
-          onClick={()=>setConfirm(row.id)}>退出此设备</button>}
+        {!row.current&&<RareButton type="button" className="sessions-btn sessions-danger" disabled={busy}
+          onClick={()=>setConfirm(row.id)}>退出此设备</RareButton>}
        </li>)}</ul>}
      </section>
      <section className="sessions-panel" aria-labelledby="sessions-activity">
@@ -100,17 +102,15 @@ export function SessionDevices({user,onLogout}:{user:User;onLogout:()=>void}){
     </div>
    </main>
   </div>
-  {confirm!==null&&<div className="sessions-confirm-backdrop" role="presentation">
-    <div className="sessions-confirm" role="dialog" aria-modal="true" aria-labelledby="session-confirm-title">
-     <h2 id="session-confirm-title">{confirm==="others"?"退出其他所有设备？":"退出这台设备？"}</h2>
+  {confirm!==null&&<Dialog open title={confirm==="others"?"退出其他所有设备？":"退出这台设备？"}
+    onClose={()=>{if(!busy)setConfirm(null);}} closeGuard={()=>!busy} className="sessions-confirm">
      <p>撤销操作会立即在服务器生效，受影响的设备需要重新登录。当前设备不会被退出。</p>
      <div className="sessions-confirm-actions">
-      <button type="button" className="sessions-btn" onClick={()=>setConfirm(null)} disabled={busy}>取消</button>
-      <button type="button" className="sessions-btn sessions-danger" onClick={()=>void execute()} disabled={busy}>
+      <RareButton type="button" className="sessions-btn" onClick={()=>setConfirm(null)} disabled={busy}>取消</RareButton>
+      <RareButton type="button" className="sessions-btn sessions-danger" onClick={()=>void execute()} disabled={busy}>
        {busy?"正在撤销…":"确认退出"}
-      </button>
+      </RareButton>
      </div>
-    </div>
-   </div>}
+   </Dialog>}
  </AppShell>;
 }

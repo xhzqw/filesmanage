@@ -1,3 +1,5 @@
+import {RareTabs} from "../../shared/ui/rare/RareTabs";
+import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
 import {useEffect,useMemo,useRef,useState,type FormEvent,type KeyboardEvent,type ReactNode} from "react";
 import {organizationApi,type Department,type Workgroup} from "./api";
 import {errorCode,errorCopy} from "../../shared/errors";
@@ -648,18 +650,18 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
     onFocus={event=>{if(event.target===event.currentTarget)setFocusedId(department.id);}}>
     <div className={"tree-row "+(isSelected?"on":"")} style={{paddingLeft:`${depth*16+14}px`}}>
      {hasChildren
-      ?<button type="button" className={"org-tree-chevron"+(isOpen?" open":"")}
+      ?<RareButton type="button" className={"org-tree-chevron"+(isOpen?" open":"")}
         aria-label={(isOpen?"折叠":"展开")+" "+department.name} tabIndex={-1}
         onClick={e=>{e.stopPropagation();toggle(department.id);}}>
         <IconChevron open={isOpen}/>
-       </button>
+       </RareButton>
       :<span className="org-tree-chevron-spacer" aria-hidden="true"/>}
      <span className="org-tree-icon" aria-hidden="true"><IconFolder/></span>
-     <button type="button" className="org-node-label" tabIndex={-1}
+     <RareButton type="button" className="org-node-label" tabIndex={-1}
       title={fullPathOf(deptById,department.id)+"｜含子部门 "+String(count)+" 人"}
       onClick={()=>setSelectedDepartment(department.id)}>
       {department.name}
-     </button>
+     </RareButton>
      <span className="org-node-count">（{count}）</span>
     </div>
     {isOpen&&<ul role="group">{renderDeptNodes(department.id,depth+1)}</ul>}
@@ -672,12 +674,12 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   <div className="toolbar">
    <span className="toolbar-hint">{activeTab==="permissions"?"按资源目录管理直接授权":activeTab==="roles"?"管理角色 · 授权范围与职责":`账号 ${users.length} · 部门 ${departments.length} · 工作组 ${groups.length}`}</span>
    {activeTab!=="permissions"&&activeTab!=="roles"&&<>
-   <button type="button" onClick={()=>{setNotice(null);setCreateDepartmentOpen(true);}}>
+   <RareButton type="button" onClick={()=>{setNotice(null);setCreateDepartmentOpen(true);}}>
     <IconPlus/>新建部门
-   </button>
-   <button type="button" className="primary" onClick={()=>{setNotice(null);setCreateGroupOpen(true);}}>
+   </RareButton>
+   <RareButton type="button" className="primary" onClick={()=>{setNotice(null);setCreateGroupOpen(true);}}>
     <IconPlus/>创建工作组
-   </button></>}
+   </RareButton></>}
   </div>
 
   {notice&&<p role={notice.tone==="error"?"alert":"status"} className={"notice"+(notice.tone==="error"?" error":"")}>{notice.text}</p>}
@@ -692,22 +694,22 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
       <span>组织架构</span>
       <span className="org-count-pill">{departments.length} 部门</span>
      </h3>
-     <button type="button" className="org-header-btn" title="新建部门"
+     <RareButton type="button" className="org-header-btn" title="新建部门"
       onClick={()=>{setNotice(null);setCreateDepartmentOpen(true);}}>
       <IconPlus/>新建
-     </button>
+     </RareButton>
     </div>
 
     {departmentsState==="loading"&&<p className="hint" style={{padding:"8px 12px"}}>正在读取部门…</p>}
     {departmentsState==="failed"&&<div style={{padding:"8px 12px"}}>
      <p role="alert" className="notice error">读取部门列表失败，部门树与筛选暂不可用。</p>
-     <button type="button" className="secondary-action" onClick={()=>setDepartmentsToken(token=>token+1)}>重试</button>
+     <RareButton type="button" className="secondary-action" onClick={()=>setDepartmentsToken(token=>token+1)}>重试</RareButton>
     </div>}
 
     {departmentsReady&&<>
      <div className="org-search-box">
       <IconSearch/>
-      <input id="org-dept-search" className="org-search" type="search" autoComplete="off"
+      <RareInput id="org-dept-search" className="org-search" type="search" autoComplete="off"
        value={deptQuery} onChange={event=>setDeptQuery(event.target.value)} placeholder="按部门名称查找"/>
      </div>
 
@@ -716,11 +718,11 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
        ?<p className="hint">没有匹配的部门。</p>
        :<ul className="org-hits">
         {deptHits.items.map(d=><li key={d.id}>
-         <button type="button" aria-label={"选择部门 "+fullPathOf(deptById,d.id)}
+         <RareButton type="button" aria-label={"选择部门 "+fullPathOf(deptById,d.id)}
           onClick={()=>revealDepartment(d.id)}>
           <span className="org-hit-name">{d.name}</span>
           <span className="hint">{ancestorPathOf(deptById,d.id)||"顶层部门"}</span>
-         </button>
+         </RareButton>
         </li>)}
        </ul>}
       {deptHits.truncated&&<p className="hint">结果较多，仅显示前 {deptHits.items.length} 个，请细化关键词。</p>}
@@ -734,11 +736,11 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
         <div className={"tree-row "+(selectedDepartment===""?"on":"")} style={{paddingLeft:"10px"}}>
          <span className="org-tree-chevron-spacer" aria-hidden="true"/>
          <span className="org-tree-icon" aria-hidden="true"><IconBuilding/></span>
-         <button type="button" className="org-node-label" tabIndex={-1}
+         <RareButton type="button" className="org-node-label" tabIndex={-1}
           title={"全体组织｜共 "+String(users.length)+" 人"}
           onClick={()=>setSelectedDepartment("")}>
           全体组织
-         </button>
+         </RareButton>
          <span className="org-node-count">（{users.length}）</span>
         </div>
        </li>
@@ -753,11 +755,11 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
         <div className={"tree-row "+(selectedDepartment==="__unassigned警"||selectedDepartment==="__unassigned"?"on":"")} style={{paddingLeft:"10px"}}>
          <span className="org-tree-chevron-spacer" aria-hidden="true"/>
          <span className="org-tree-icon" aria-hidden="true"><IconUsers/></span>
-         <button type="button" className="org-node-label" tabIndex={-1}
+         <RareButton type="button" className="org-node-label" tabIndex={-1}
           title={"未分配部门｜共 "+String(unassignedCount)+" 人"}
           onClick={()=>setSelectedDepartment("__unassigned")}>
           未分配部门
-         </button>
+         </RareButton>
          <span className="org-node-count">（{unassignedCount}）</span>
         </div>
        </li>}
@@ -768,64 +770,64 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
 
    {/* 右侧：组织工作区 */}
    <section className="org-card org-stage-card" aria-label="组织管理主工作区">
-    <div className="org-tabs-bar" role="tablist" aria-label="组织管理视图">
-     <div className="org-tabs-nav">
-      <button type="button" role="tab" aria-selected={activeTab==="members"}
+    <div className="org-tabs-bar">
+     <RareTabs className="org-tabs-nav" label="组织管理视图">
+      <RareButton type="button" role="tab" aria-selected={activeTab==="members"} tabIndex={activeTab==="members"?0:-1} id="org-tab-members" aria-controls="org-panel-members"
        className={"org-tab"+(activeTab==="members"?" active":"")}
        onClick={()=>setActiveTab("members")}>
        <span className="org-tab-icon"><IconUsers/></span>
        <span>部门成员</span>
        <span className="org-tab-badge">{filteredMembers.length}</span>
-      </button>
-      <button type="button" role="tab" aria-selected={activeTab==="groups"}
+      </RareButton>
+      <RareButton type="button" role="tab" aria-selected={activeTab==="groups"} tabIndex={activeTab==="groups"?0:-1} id="org-tab-groups" aria-controls="org-panel-groups"
        className={"org-tab"+(activeTab==="groups"?" active":"")}
        onClick={()=>setActiveTab("groups")}>
        <span className="org-tab-icon"><IconGroup/></span>
        <span>工作组管理</span>
        <span className="org-tab-badge">{groups.length}</span>
-      </button>
-      <button type="button" role="tab" aria-selected={activeTab==="permissions"}
+      </RareButton>
+      <RareButton type="button" role="tab" aria-selected={activeTab==="permissions"} tabIndex={activeTab==="permissions"?0:-1} id="org-tab-permissions" aria-controls="org-panel-permissions"
        className={"org-tab"+(activeTab==="permissions"?" active":"")}
-       onClick={()=>setActiveTab("permissions")}>权限管理</button>
-      <button type="button" role="tab" aria-selected={activeTab==="roles"}
+       onClick={()=>setActiveTab("permissions")}>权限管理</RareButton>
+      <RareButton type="button" role="tab" aria-selected={activeTab==="roles"} tabIndex={activeTab==="roles"?0:-1} id="org-tab-roles" aria-controls="org-panel-roles"
        className={"org-tab"+(activeTab==="roles"?" active":"")}
-       onClick={()=>setActiveTab("roles")}>管理角色</button>
-     </div>
+       onClick={()=>setActiveTab("roles")}>管理角色</RareButton>
+     </RareTabs>
 
      {/* 当前部门范围标识 */}
      {activeTab!=="permissions"&&activeTab!=="roles"&&<div className="org-scope-badge">
       <span className="org-scope-dot" aria-hidden="true"/>
       <span>范围：{scopeLabel}</span>
-      {selectedDepartment!==""&&<button type="button" className="org-scope-reset"
-       title="清除部门筛选，显示全体" onClick={()=>setSelectedDepartment("")}>✕</button>}
+      {selectedDepartment!==""&&<RareButton type="button" className="org-scope-reset"
+       title="清除部门筛选，显示全体" onClick={()=>setSelectedDepartment("")}>✕</RareButton>}
      </div>}
     </div>
 
-    {activeTab==="permissions"&&<PermissionsPanel users={users} groups={groups}
+    {activeTab==="permissions"&&<div className="rare-tab-panel" role="tabpanel" id="org-panel-permissions" aria-labelledby="org-tab-permissions"><PermissionsPanel users={users} groups={groups}
      usersState={usersState} groupsState={groupsState}
      onRetryUsers={()=>setUsersToken(token=>token+1)}
-     onRetryGroups={()=>setGroupsToken(token=>token+1)}/>}
-    {activeTab==="roles"&&<RoleBindingsPanel users={users}/>}
+     onRetryGroups={()=>setGroupsToken(token=>token+1)}/></div>}
+    {activeTab==="roles"&&<div className="rare-tab-panel" role="tabpanel" id="org-panel-roles" aria-labelledby="org-tab-roles"><RoleBindingsPanel users={users}/></div>}
 
     {/* Tab 1: 部门成员 */}
-    {activeTab==="members"&&<div className="org-tab-stage">
+    {activeTab==="members"&&<div className="org-tab-stage" role="tabpanel" id="org-panel-members" aria-labelledby="org-tab-members">
      {/* 搜索与筛选条 */}
      <div className="org-filter-bar">
       <div className="org-filter-left">
        <div className="org-member-search-wrap">
         <IconSearch/>
-        <input className="org-search" type="search" aria-label="搜索成员" autoComplete="off"
+        <RareInput className="org-search" type="search" aria-label="搜索成员" autoComplete="off"
          placeholder="按姓名或账号搜索成员" value={memberQuery} onChange={event=>setMemberQuery(event.target.value)}/>
        </div>
-       <select className="org-select" aria-label="按状态筛选"
+       <RareSelect className="org-select" aria-label="按状态筛选"
         value={statusFilter} onChange={e=>setStatusFilter(e.target.value as StatusFilter)}>
         <option value="all">全部状态</option>
         <option value="normal">正常</option>
         <option value="warning">待改密</option>
         <option value="disabled">已禁用</option>
         <option value="admin">系统管理员</option>
-       </select>
-       {usersState==="failed"&&<button type="button" className="secondary-action" onClick={()=>setUsersToken(token=>token+1)}>重新读取用户</button>}
+       </RareSelect>
+       {usersState==="failed"&&<RareButton type="button" className="secondary-action" onClick={()=>setUsersToken(token=>token+1)}>重新读取用户</RareButton>}
       </div>
       <span className="toolbar-hint">显示 {Math.min(memberLimit,filteredMembers.length)} / {filteredMembers.length} 位成员</span>
      </div>
@@ -869,11 +871,11 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
           </span>
          </td>
          <td className="row-actions">
-          <button type="button" onClick={()=>{setNotice(null);setResetTarget(user);}}>重置密码</button>
+          <RareButton type="button" onClick={()=>{setNotice(null);setResetTarget(user);}}>重置密码</RareButton>
           {user.id===currentUserId
-           ?<button type="button" disabled title="不能对当前登录账号执行禁用">禁用</button>
-           :<button type="button" className={user.disabled===true?"org-btn-enable":"danger"}
-             onClick={()=>{setNotice(null);setStateTarget(user);}}>{user.disabled===true?"启用":"禁用"}</button>}
+           ?<RareButton type="button" disabled title="不能对当前登录账号执行禁用">禁用</RareButton>
+           :<RareButton type="button" className={user.disabled===true?"org-btn-enable":"danger"}
+             onClick={()=>{setNotice(null);setStateTarget(user);}}>{user.disabled===true?"启用":"禁用"}</RareButton>}
          </td>
         </tr>)}
         {filteredMembers.length===0&&<tr><td colSpan={5} className="empty">{memberTableEmpty}</td></tr>}
@@ -882,9 +884,9 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
      </div>
      {filteredMembers.length>memberLimit&&<div className="org-list-more">
       <span className="hint">已显示 {memberLimit} / {filteredMembers.length} 位成员</span>
-      <button type="button" onClick={()=>setMemberLimit(limit=>limit+MEMBER_DISPLAY_STEP)}>
+      <RareButton type="button" onClick={()=>setMemberLimit(limit=>limit+MEMBER_DISPLAY_STEP)}>
        显示更多成员
-      </button>
+      </RareButton>
      </div>}
 
 
@@ -900,34 +902,34 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
       <form className="inline-form org-form org-create-form" onSubmit={submitCreateUser}>
        <div className="org-field">
         <label className="org-field-label" htmlFor="org-new-login">新账号</label>
-        <input id="org-new-login" aria-label="新账号" placeholder="新账号" value={newUser.login}
+        <RareInput id="org-new-login" aria-label="新账号" placeholder="新账号" value={newUser.login}
          onChange={event=>setNewUser(prev=>({...prev,login:event.target.value}))}/>
        </div>
        <div className="org-field">
         <label className="org-field-label" htmlFor="org-new-name">姓名</label>
-        <input id="org-new-name" aria-label="姓名" placeholder="姓名" value={newUser.displayName}
+        <RareInput id="org-new-name" aria-label="姓名" placeholder="姓名" value={newUser.displayName}
          onChange={event=>setNewUser(prev=>({...prev,displayName:event.target.value}))}/>
        </div>
        <div className="org-field">
         <label className="org-field-label" htmlFor="org-new-pwd">初始密码</label>
-        <input id="org-new-pwd" aria-label="初始密码" placeholder="初始密码（≥16 位）" type="password" autoComplete="new-password" value={newUser.password}
+        <RareInput id="org-new-pwd" aria-label="初始密码" placeholder="初始密码（≥16 位）" type="password" autoComplete="new-password" value={newUser.password}
          onChange={event=>setNewUser(prev=>({...prev,password:event.target.value}))}/>
        </div>
        <div className="org-field">
         <label className="org-field-label" htmlFor="org-new-dept">部门</label>
-        <select id="org-new-dept" className="org-select" aria-label="部门" value={newUser.departmentId}
+        <RareSelect id="org-new-dept" className="org-select" aria-label="部门" value={newUser.departmentId}
          onChange={event=>setNewUser(prev=>({...prev,departmentId:event.target.value}))}>
          <option value="">未分配部门</option>
          {departmentOptions.map(option=><option key={option.id} value={option.id}>{option.label}</option>)}
-        </select>
+        </RareSelect>
        </div>
-       <button className="primary" type="submit" disabled={!canCreateUser}>创建用户</button>
+       <RareButton className="primary" type="submit" disabled={!canCreateUser}>创建用户</RareButton>
       </form>
      </div>
     </div>}
 
     {/* Tab 2: 工作组管理（Master-Detail 双栏结构） */}
-    {activeTab==="groups"&&<div className="org-groups-stage">
+    {activeTab==="groups"&&<div className="org-groups-stage" role="tabpanel" id="org-panel-groups" aria-labelledby="org-tab-groups">
      {/* 左侧：工作组卡片列表 */}
      <div className="org-group-list-col">
       <div className="org-card-header">
@@ -936,22 +938,22 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
         <span>工作组列表</span>
         <span className="org-count-pill">{groups.length}</span>
        </h4>
-       <button type="button" className="org-header-btn" title="创建工作组"
+       <RareButton type="button" className="org-header-btn" title="创建工作组"
         onClick={()=>{setNotice(null);setCreateGroupOpen(true);}}>
         <IconPlus/>新建
-       </button>
+       </RareButton>
       </div>
 
       <div className="org-search-box">
        <IconSearch/>
-       <input className="org-search" type="search" placeholder="搜索工作组..."
+       <RareInput className="org-search" type="search" placeholder="搜索工作组..."
         value={groupQuery} onChange={e=>setGroupQuery(e.target.value)}/>
       </div>
 
       {groupsState==="loading"&&<p className="hint" style={{padding:"8px 12px"}}>正在读取工作组…</p>}
       {groupsState==="failed"&&<div style={{padding:"8px 12px"}}>
        <p role="alert" className="notice error">读取工作组列表失败。</p>
-       <button type="button" className="secondary-action" onClick={()=>setGroupsToken(t=>t+1)}>重试</button>
+       <RareButton type="button" className="secondary-action" onClick={()=>setGroupsToken(t=>t+1)}>重试</RareButton>
       </div>}
 
       {groupsReady&&groups.length===0&&<p className="empty" style={{padding:"16px 12px"}}>暂无工作组，可点上方“新建”创建。</p>}
@@ -960,7 +962,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
        {filteredGroups.slice(0,groupLimit).map(group=>{
         const isSelected=group.id===selectedGroup;
         return <li key={group.id}>
-         <button type="button" className={"org-group-card"+(isSelected?" active":"")}
+         <RareButton type="button" className={"org-group-card"+(isSelected?" active":"")}
           aria-pressed={isSelected} onClick={()=>setSelectedGroup(group.id)}>
           <div className="org-group-card-header">
            <span className="org-group-name">{group.name}</span>
@@ -971,14 +973,14 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
             {group.departmentId?departmentLabel(group.departmentId):"公共工作组"}
            </span>
           </div>
-         </button>
+         </RareButton>
         </li>;
        })}
        {filteredGroups.length===0&&<li className="empty">没有匹配的工作组。</li>}
       </ul>}
       {filteredGroups.length>groupLimit&&<div className="org-list-more">
        <span className="hint">已显示 {groupLimit} / {filteredGroups.length} 个工作组</span>
-       <button type="button" onClick={()=>setGroupLimit(limit=>limit+GROUP_DISPLAY_STEP)}>显示更多工作组</button>
+       <RareButton type="button" onClick={()=>setGroupLimit(limit=>limit+GROUP_DISPLAY_STEP)}>显示更多工作组</RareButton>
       </div>}
      </div>
 
@@ -1001,7 +1003,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
         <div className="org-group-section">
          <div className="org-section-header">
           <h5>组内成员（{groupMembers.length}）</h5>
-          {membersState==="failed"&&<button type="button" className="secondary-action" onClick={()=>setMembersToken(t=>t+1)}>重试</button>}
+          {membersState==="failed"&&<RareButton type="button" className="secondary-action" onClick={()=>setMembersToken(t=>t+1)}>重试</RareButton>}
          </div>
 
          {membersState==="loading"&&<p className="hint">正在读取工作组成员…</p>}
@@ -1015,17 +1017,17 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
             </div>
             {member.disabled===true&&<span className="org-badge org-badge-disabled"><span className="org-badge-dot"/>已禁用</span>}
            </div>
-           <button type="button" className="danger org-action-btn"
-            onClick={()=>{setNotice(null);setRemoveTarget(member);}}>移除</button>
+           <RareButton type="button" className="danger org-action-btn"
+            onClick={()=>{setNotice(null);setRemoveTarget(member);}}>移除</RareButton>
           </div>)}
           {groupMembers.length===0&&<p className="empty" style={{gridColumn:"1/-1"}}>该工作组暂无成员，可在下方添加成员。</p>}
          </div>}
          {membersState==="ready"&&groupMembers.length>groupMemberLimit&&
           <div className="org-list-more">
            <span className="hint">已显示 {groupMemberLimit} / {groupMembers.length} 位工作组成员</span>
-           <button type="button" onClick={()=>setGroupMemberLimit(n=>n+MEMBER_DISPLAY_STEP)}>
+           <RareButton type="button" onClick={()=>setGroupMemberLimit(n=>n+MEMBER_DISPLAY_STEP)}>
             显示更多组内成员
-           </button>
+           </RareButton>
           </div>}
         </div>
 
@@ -1041,7 +1043,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
           :<>
            <div className="org-search-box" style={{border:"1px solid var(--border-hairline)",borderRadius:"var(--radius-sm)",padding:"0 var(--space-2)"}}>
             <IconSearch/>
-            <input className="org-search" type="search" aria-label="搜索可加入的账号" autoComplete="off"
+            <RareInput className="org-search" type="search" aria-label="搜索可加入的账号" autoComplete="off"
              placeholder="按姓名或账号搜索可加入的账号" value={candidateQuery} onChange={event=>setCandidateQuery(event.target.value)}
              style={{border:"0"}}/>
            </div>
@@ -1056,9 +1058,9 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
               </div>
               <span className="org-dept-pill">{departmentLabel(user.departmentId)}</span>
              </div>
-             <button type="button" className="primary org-action-btn" onClick={()=>addMember(user)} disabled={addBusy!==""}>
+             <RareButton type="button" className="primary org-action-btn" onClick={()=>addMember(user)} disabled={addBusy!==""}>
               {addBusy===user.id?"加入中…":"加入"}
-             </button>
+             </RareButton>
             </div>)}
             {candidates.length===0&&<p className="empty" style={{gridColumn:"1/-1"}}>{candidateEmpty}</p>}
            </div>
@@ -1130,14 +1132,14 @@ function ResetPasswordDialog({target,department,onClose,onSubmit}:{
    ?<>
     <p className="hint">已输入的新密码将被丢弃，不会提交给服务端。</p>
     <div className="dialog-actions">
-     <button type="button" className="secondary-action" onClick={()=>setConfirmDiscard(false)} disabled={busy}>继续编辑</button>
-     <button type="button" className="danger" onClick={onClose} disabled={busy}>放弃并关闭</button>
+     <RareButton type="button" className="secondary-action" onClick={()=>setConfirmDiscard(false)} disabled={busy}>继续编辑</RareButton>
+     <RareButton type="button" className="danger" onClick={onClose} disabled={busy}>放弃并关闭</RareButton>
     </div>
    </>
    :result
     ?<>
      <p role={result.tone==="error"?"alert":"status"} className={"notice"+(result.tone==="error"?" error":"")}>{result.text}</p>
-     <div className="dialog-actions"><button type="button" className="primary" onClick={onClose} autoFocus>关闭</button></div>
+     <div className="dialog-actions"><RareButton type="button" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
     </>
     :<form onSubmit={submit}>
      <p>账号：{loginOf(target)||"—"}</p>
@@ -1145,12 +1147,12 @@ function ResetPasswordDialog({target,department,onClose,onSubmit}:{
      {target.disabled===true&&<p className="hint">该账号当前已禁用：重置密码不会启用账号。</p>}
      <p className="hint">提交后服务端立即失效该账号的全部登录会话，并要求其下次登录修改密码。</p>
      <label htmlFor="org-reset-password">新初始密码</label>
-     <input id="org-reset-password" type="password" autoComplete="new-password" value={password}
+     <RareInput id="org-reset-password" type="password" autoComplete="new-password" value={password}
       onChange={event=>setPassword(event.target.value)} disabled={busy}/>
      <p className="hint">至少 16 个字符（客户端只校验长度，密码策略以服务端判定为准）。</p>
      <div className="dialog-actions">
-      <button type="button" className="secondary-action" onClick={requestClose} disabled={busy}>取消</button>
-      <button type="submit" className="primary" disabled={busy||password.length<16}>{busy?"重置中…":"确认重置密码"}</button>
+      <RareButton type="button" className="secondary-action" onClick={requestClose} disabled={busy}>取消</RareButton>
+      <RareButton type="submit" className="primary" disabled={busy||password.length<16}>{busy?"重置中…":"确认重置密码"}</RareButton>
      </div>
     </form>}
  </Dialog>;
@@ -1179,7 +1181,7 @@ function SetDisabledDialog({target,department,onClose,onSubmit}:{
   {result
    ?<>
     <p role={result.tone==="error"?"alert":"status"} className={"notice"+(result.tone==="error"?" error":"")}>{result.text}</p>
-    <div className="dialog-actions"><button type="button" className="primary" onClick={onClose} autoFocus>关闭</button></div>
+    <div className="dialog-actions"><RareButton type="button" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
    </>
    :<form onSubmit={event=>{event.preventDefault();run();}}>
     <p>账号：{loginOf(target)||"—"}（{target.displayName}）</p>
@@ -1189,10 +1191,10 @@ function SetDisabledDialog({target,department,onClose,onSubmit}:{
      ?"影响：禁用后该账号立即无法登录，现有登录会话立即失效；其工作组与授权记录保留，启用后恢复。该操作写入审计日志。"
      :"影响：启用后该账号可再次登录，并恢复原有的工作组与授权（最终生效权限由服务端判定）。"}</p>
     <div className="dialog-actions">
-     <button type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</button>
-     <button type="submit" className={disabling?"danger":"primary"} disabled={busy}>
+     <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</RareButton>
+     <RareButton type="submit" className={disabling?"danger":"primary"} disabled={busy}>
       {busy?(disabling?"禁用中…":"启用中…"):(disabling?"确认禁用":"确认启用")}
-     </button>
+     </RareButton>
     </div>
    </form>}
  </Dialog>;
@@ -1221,7 +1223,7 @@ function RemoveMemberDialog({member,groupName,department,onClose,onSubmit}:{
   {result
    ?<>
     <p role={result.tone==="error"?"alert":"status"} className={"notice"+(result.tone==="error"?" error":"")}>{result.text}</p>
-    <div className="dialog-actions"><button type="button" className="primary" onClick={onClose} autoFocus>关闭</button></div>
+    <div className="dialog-actions"><RareButton type="button" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
    </>
    :<form onSubmit={event=>{event.preventDefault();run();}}>
     <p>工作组：{groupName||"—"}</p>
@@ -1229,8 +1231,8 @@ function RemoveMemberDialog({member,groupName,department,onClose,onSubmit}:{
     <p>部门：{department}</p>
     <p>影响：移除后该账号不再通过本工作组获得授权；直接授予该账号的权限不受影响，最终生效权限由服务端判定。之后可以重新加入。</p>
     <div className="dialog-actions">
-     <button type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</button>
-     <button type="submit" className="danger" disabled={busy}>{busy?"移除中…":"确认移除"}</button>
+     <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</RareButton>
+     <RareButton type="submit" className="danger" disabled={busy}>{busy?"移除中…":"确认移除"}</RareButton>
     </div>
    </form>}
  </Dialog>;
@@ -1258,7 +1260,7 @@ function CreateUserConfirmDialog({draft,department,onClose,onSubmit}:{
   {result
    ?<>
     <p role={result.tone==="error"?"alert":"status"} className={"notice"+(result.tone==="error"?" error":"")}>{result.text}</p>
-    <div className="dialog-actions"><button type="button" className="primary" onClick={onClose} autoFocus>关闭</button></div>
+    <div className="dialog-actions"><RareButton type="button" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
    </>
    :<form onSubmit={event=>{event.preventDefault();run();}}>
     <p>账号：{draft.login}</p>
@@ -1267,8 +1269,8 @@ function CreateUserConfirmDialog({draft,department,onClose,onSubmit}:{
     <p className="hint">初始密码按表单输入提交，不会在界面回显；该账号为普通账号，首次登录必须修改初始密码。</p>
     <p className="hint">取消不会清空表单内容，可以修改后再提交。</p>
     <div className="dialog-actions">
-     <button type="button" className="secondary-action" onClick={onClose} disabled={busy}>返回修改</button>
-     <button type="submit" className="primary" disabled={busy}>{busy?"创建中…":"确认创建"}</button>
+     <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>返回修改</RareButton>
+     <RareButton type="submit" className="primary" disabled={busy}>{busy?"创建中…":"确认创建"}</RareButton>
     </div>
    </form>}
  </Dialog>;
@@ -1300,24 +1302,24 @@ function CreateDepartmentDialog({options,defaultParentId,listAvailable,onClose,o
   {result
    ?<>
     <p role={result.tone==="error"?"alert":"status"} className={"notice"+(result.tone==="error"?" error":"")}>{result.text}</p>
-    <div className="dialog-actions"><button type="button" className="primary" onClick={onClose} autoFocus>关闭</button></div>
+    <div className="dialog-actions"><RareButton type="button" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
    </>
    :<form onSubmit={run}>
     <label htmlFor="org-new-department">部门名称</label>
-    <input id="org-new-department" value={name} maxLength={80} disabled={busy}
+    <RareInput id="org-new-department" value={name} maxLength={80} disabled={busy}
      onChange={event=>setName(event.target.value)}/>
     <label htmlFor="org-new-department-parent">上级部门</label>
-    <select id="org-new-department-parent" className="org-select" value={parentId} disabled={busy}
+    <RareSelect id="org-new-department-parent" className="org-select" value={parentId} disabled={busy}
      onChange={event=>setParentId(event.target.value)}>
      <option value="">（顶层部门）</option>
      {options.map(option=><option key={option.id} value={option.id}>{option.label}</option>)}
-    </select>
+    </RareSelect>
     <p className="hint">{listAvailable
      ?"默认挂在部门树当前筛选的部门下（未选择时为顶层部门），可更改。"
      :"部门列表不可用，只能创建顶层部门。"}名称最多 80 个字符；成员与工作组需要另行指派。</p>
     <div className="dialog-actions">
-     <button type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</button>
-     <button type="submit" className="primary" disabled={busy||name.trim()===""}>{busy?"创建中…":"创建部门"}</button>
+     <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</RareButton>
+     <RareButton type="submit" className="primary" disabled={busy||name.trim()===""}>{busy?"创建中…":"创建部门"}</RareButton>
     </div>
    </form>}
  </Dialog>;
@@ -1349,24 +1351,24 @@ function CreateGroupDialog({options,defaultDepartmentId,listAvailable,onClose,on
   {result
    ?<>
     <p role={result.tone==="error"?"alert":"status"} className={"notice"+(result.tone==="error"?" error":"")}>{result.text}</p>
-    <div className="dialog-actions"><button type="button" className="primary" onClick={onClose} autoFocus>关闭</button></div>
+    <div className="dialog-actions"><RareButton type="button" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
    </>
    :<form onSubmit={run}>
     <label htmlFor="org-new-group">工作组名称</label>
-    <input id="org-new-group" value={name} maxLength={80} disabled={busy}
+    <RareInput id="org-new-group" value={name} maxLength={80} disabled={busy}
      onChange={event=>setName(event.target.value)}/>
     <label htmlFor="org-new-group-department">所属部门</label>
-    <select id="org-new-group-department" className="org-select" value={departmentId} disabled={busy}
+    <RareSelect id="org-new-group-department" className="org-select" value={departmentId} disabled={busy}
      onChange={event=>setDepartmentId(event.target.value)}>
      <option value="">（不指定部门）</option>
      {options.map(option=><option key={option.id} value={option.id}>{option.label}</option>)}
-    </select>
+    </RareSelect>
     <p className="hint">{listAvailable
      ?"默认使用部门树当前筛选的部门（未选择时留空），可更改。"
      :"部门列表不可用，只能创建不指定部门的工作组。"}名称最多 80 个字符；成员在创建后于“添加成员”中维护。</p>
     <div className="dialog-actions">
-     <button type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</button>
-     <button type="submit" className="primary" disabled={busy||name.trim()===""}>{busy?"创建中…":"创建工作组"}</button>
+     <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</RareButton>
+     <RareButton type="submit" className="primary" disabled={busy||name.trim()===""}>{busy?"创建中…":"创建工作组"}</RareButton>
     </div>
    </form>}
  </Dialog>;

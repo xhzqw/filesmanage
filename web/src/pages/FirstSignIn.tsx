@@ -1,3 +1,4 @@
+import {RareButton,RareInput} from "../shared/ui/rare";
 import {useState,type FormEvent} from "react";
 import type {User} from "../entities/user/model";
 import {authApi} from "../features/auth/api";
@@ -30,15 +31,15 @@ export function FirstSignIn({onSuccess,onExit}:{onSuccess:(u:User)=>void;onExit:
       <p>首次登录必须更新初始凭据，完成前不能访问业务目录。</p>
       <form onSubmit={submit}>
         <label htmlFor="previous">原凭据</label>
-        <input type="password" id="previous" autoComplete="current-password" value={currentValue} onChange={e=>setCurrent(e.target.value)} required/>
+        <RareInput type="password" id="previous" autoComplete="current-password" value={currentValue} onChange={e=>setCurrent(e.target.value)} required/>
         <label htmlFor="replacement">新凭据（至少16字符）</label>
-        <input type="password" id="replacement" autoComplete="new-password" value={newValue} onChange={e=>setNew(e.target.value)} minLength={16} required/>
+        <RareInput type="password" id="replacement" autoComplete="new-password" value={newValue} onChange={e=>setNew(e.target.value)} minLength={16} required/>
         <label htmlFor="confirmation">再次填写新凭据</label>
-        <input type="password" id="confirmation" autoComplete="new-password" value={verify} onChange={e=>setVerify(e.target.value)} required/>
+        <RareInput type="password" id="confirmation" autoComplete="new-password" value={verify} onChange={e=>setVerify(e.target.value)} required/>
         {message&&<p role="alert" className="error">{message}</p>}
-        <button className="primary" type="submit" disabled={busy}>{busy?"正在保存…":"更新并进入系统"}</button>
+        <RareButton className="primary" type="submit" disabled={busy}>{busy?"正在保存…":"更新并进入系统"}</RareButton>
       </form>
-      <button className="secondary-action" type="button" onClick={onExit}>退出登录</button>
+      <RareButton className="secondary-action" type="button" onClick={onExit}>退出登录</RareButton>
     </section>
   </main>;
 }

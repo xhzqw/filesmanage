@@ -1,10 +1,11 @@
+import {RareButton,RareInput} from "../../shared/ui/rare";
 import{useEffect,useRef,useState,type DragEvent,type FormEvent,type ReactNode}from"react";
 import{formatSize}from"./api";
 import{useUploadStore}from"./uploadStore";
 import"./dropZone.css";
 
 // DESKTOP-INTERACTION-v1 §7.1: a drop onto a text-entry surface must not be
-// hijacked into an upload. The file <input> is intentionally allowed through so
+// hijacked into an upload. The file <RareInput> is intentionally allowed through so
 // dropping on the existing upload button still enqueues.
 function dropOnTextEntry(event:DragEvent<HTMLDivElement>):boolean{
  const el=event.target as HTMLElement|null;
@@ -137,12 +138,12 @@ export function DropZone({folderId,disabled,onCommitted,children}:{folderId:stri
        {task.status==="cancelled"&&<span title="取消只保证本地中断请求；服务端已提交的结果无法撤销">已取消</span>}
       </span>
       <div className="upload-item-actions">
-       {task.status==="queued"&&<button type="button" onClick={()=>cancel(task.queueId)}>取消</button>}
-       {task.status==="uploading"&&<button type="button" title="取消只中断本地请求；服务端已提交的结果无法撤销" onClick={()=>cancel(task.queueId)}>取消</button>}
+       {task.status==="queued"&&<RareButton type="button" onClick={()=>cancel(task.queueId)}>取消</RareButton>}
+       {task.status==="uploading"&&<RareButton type="button" title="取消只中断本地请求；服务端已提交的结果无法撤销" onClick={()=>cancel(task.queueId)}>取消</RareButton>}
        {task.status==="failed"&&<>
-        <button type="button" onClick={()=>retry(task.queueId)}>重试</button>
-        <button type="button" onClick={()=>{setRenamingId(task.queueId);setRenameValue(task.name);}}>改名重试</button>
-        <button type="button" onClick={()=>skip(task.queueId)}>跳过</button>
+        <RareButton type="button" onClick={()=>retry(task.queueId)}>重试</RareButton>
+        <RareButton type="button" onClick={()=>{setRenamingId(task.queueId);setRenameValue(task.name);}}>改名重试</RareButton>
+        <RareButton type="button" onClick={()=>skip(task.queueId)}>跳过</RareButton>
        </>}
       </div>
       {task.status==="uploading"&&<div
@@ -156,9 +157,9 @@ export function DropZone({folderId,disabled,onCommitted,children}:{folderId:stri
        <div className="upload-progress-fill" style={sent?{width:percent+"%"}:undefined}/>
       </div>}
       {renamingId===task.queueId&&<form className="upload-rename" onSubmit={submitRename}>
-       <input aria-label="新文件名" value={renameValue} maxLength={200} onChange={e=>setRenameValue(e.target.value)} autoFocus required/>
-       <button type="submit" className="primary">确认改名</button>
-       <button type="button" className="secondary-action" onClick={()=>setRenamingId(null)}>取消</button>
+       <RareInput aria-label="新文件名" value={renameValue} maxLength={200} onChange={e=>setRenameValue(e.target.value)} autoFocus required/>
+       <RareButton type="submit" className="primary">确认改名</RareButton>
+       <RareButton type="button" className="secondary-action" onClick={()=>setRenamingId(null)}>取消</RareButton>
       </form>}
      </li>;
     })}

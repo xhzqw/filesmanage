@@ -1,3 +1,4 @@
+import {RareButton} from "./rare";
 import {useEffect,useLayoutEffect,useRef,useState,type KeyboardEvent}from "react";
 import "./menu.css";
 
@@ -145,7 +146,7 @@ export function Menu({open,onClose,items,anchor,label,point}:{
   style={{left:position?position.left:0,top:position?position.top:0,opacity:position?1:0}}
   onKeyDown={onKeyDown}
   onContextMenu={event=>event.preventDefault()}>
-  {items.map(item=><button key={item.id} type="button" role="menuitem"
+  {items.map(item=><RareButton key={item.id} type="button" role="menuitem"
    className={"menu-item"+(item.danger?" danger":"")}
    disabled={item.disabled}
    aria-disabled={item.disabled?true:undefined}
@@ -153,7 +154,7 @@ export function Menu({open,onClose,items,anchor,label,point}:{
    onClick={()=>onItemSelect(item)}>
    <span className="menu-label">{item.label}</span>
    {item.hint&&<span className="menu-hint">{item.hint}</span>}
-  </button>)}
+  </RareButton>)}
  </div>;
 }
 

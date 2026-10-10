@@ -1,3 +1,4 @@
+import {RareButton,RareTextarea} from "../../shared/ui/rare";
 import {useEffect,useState,type FormEvent}from "react";
 import {fileApi,formatSize}from "./api";
 import {assessEditable,encodeEditedText,type EditAssessment}from "./safeEdit";
@@ -123,21 +124,21 @@ export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileIte
    {editable&&<>
     <p className="hint">字节保真：UTF-8 · {editable.eol==="crlf"?"CRLF":"LF"} 换行 · {editable.hasBom?"含 BOM":"无 BOM"}，保存时按原始字节特征写回。</p>
     <label htmlFor="editor-content">内容</label>
-    <textarea id="editor-content" value={content} rows={16} onChange={e=>setContent(e.target.value)}/>
+    <RareTextarea id="editor-content" value={content} rows={16} onChange={e=>setContent(e.target.value)}/>
    </>}
    {message&&status!=="failed"&&<p role="alert" className="notice error">{message}</p>}
    {pending&&<p role="alert" className="notice error">有未保存的修改，放弃后将丢失本次编辑。</p>}
    <div className="dialog-actions">
     {pending===null&&<>
-     <button type="button" className="secondary-action" onClick={requestClose} disabled={busy}>关闭</button>
-     {lockPending&&<button type="button" className="secondary-action" onClick={requestReload} disabled={busy}>重新加载</button>}
-     {editable&&<button type="submit" className="primary" disabled={busy||(!requiresApproval&&lockToken==="")}>
+     <RareButton type="button" className="secondary-action" onClick={requestClose} disabled={busy}>关闭</RareButton>
+     {lockPending&&<RareButton type="button" className="secondary-action" onClick={requestReload} disabled={busy}>重新加载</RareButton>}
+     {editable&&<RareButton type="submit" className="primary" disabled={busy||(!requiresApproval&&lockToken==="")}>
       {busy?"保存中…":requiresApproval?"提交审批":"保存新版本"}
-     </button>}
+     </RareButton>}
     </>}
     {pending!==null&&<>
-     <button type="button" className="danger" onClick={()=>{if(pending==="close")onClose();else setReloadToken(token=>token+1);}}>放弃修改</button>
-     <button type="button" className="secondary-action" onClick={()=>setPending(null)}>继续编辑</button>
+     <RareButton type="button" className="danger" onClick={()=>{if(pending==="close")onClose();else setReloadToken(token=>token+1);}}>放弃修改</RareButton>
+     <RareButton type="button" className="secondary-action" onClick={()=>setPending(null)}>继续编辑</RareButton>
     </>}
    </div>
   </form>

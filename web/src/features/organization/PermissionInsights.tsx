@@ -1,3 +1,4 @@
+import {RareButton,RareSelect} from "../../shared/ui/rare";
 import {useEffect,useMemo,useRef,useState} from "react";
 import type {User} from "../../entities/user/model";
 import {errorCopy} from "../../shared/errors";
@@ -63,11 +64,11 @@ export function PermissionInsights({folderId,users,usersState,refreshToken}:{
   <div className="perm-section-title">有效权限解释 <span className="perm-subtle">服务端实时计算 · 只读</span></div>
   <p className="perm-hint">检查用户在当前目录的实际动作及来源；包含工作组、祖先 ACL 和目录共享，文件级分享不在此视图内。</p>
   <div className="perm-insight-picker">
-   <label>检查用户<select aria-label="检查用户的有效权限" value={activeUser} disabled={usersState!=="ready"} onChange={e=>setSubjectId(e.target.value)}>
+   <label>检查用户<RareSelect aria-label="检查用户的有效权限" value={activeUser} disabled={usersState!=="ready"} onChange={e=>setSubjectId(e.target.value)}>
     <option value="">请选择用户</option>
     {users.map(u=><option key={u.id} value={u.id}>{u.displayName}{u.login?"（"+u.login+"）":""}{u.disabled?" · 已禁用":""}</option>)}
-   </select></label>
-   <button type="button" className="secondary-action" disabled={!activeUser||busy} onClick={()=>setGeneration(n=>n+1)}>重新计算</button>
+   </RareSelect></label>
+   <RareButton type="button" className="secondary-action" disabled={!activeUser||busy} onClick={()=>setGeneration(n=>n+1)}>重新计算</RareButton>
   </div>
   {usersState==="failed"&&<p role="alert" className="hint">用户列表读取失败，请先在授权表单处重试。</p>}
   {busy&&<p role="status" className="hint">正在计算有效权限…</p>}
@@ -130,9 +131,9 @@ export function PermissionAudit({users}:{users:User[]}){
  return <section className="perm-audit" aria-label="权限审计">
   <div className="perm-audit-header"><div><strong>权限变更审计</strong>
    <p className="hint">仅管理员可见，按事件顺序倒序显示授权、分享、工作组及账号启停操作。</p></div>
-   <button type="button" className="secondary-action" disabled={busy} onClick={()=>{
+   <RareButton type="button" className="secondary-action" disabled={busy} onClick={()=>{
     queryGeneration.current++;setVersion(v=>v+1);
-   }}>刷新</button></div>
+   }}>刷新</RareButton></div>
   {busy&&<p role="status" className="hint">正在读取审计记录…</p>}
   {error&&<p role="alert" className="notice error">{error}</p>}
   {!busy&&<div className="perm-audit-scroll">
@@ -148,8 +149,8 @@ export function PermissionAudit({users}:{users:User[]}){
     </tr>)}</tbody>
    </table>
    {page.items.length===0&&<p className="empty">暂无权限变更审计记录。</p>}
-   {page.nextCursor&&<button className="perm-more" type="button" disabled={moreBusy} onClick={()=>void more()}>
-    {moreBusy?"正在加载…":"加载更多"}</button>}
+   {page.nextCursor&&<RareButton className="perm-more" type="button" disabled={moreBusy} onClick={()=>void more()}>
+    {moreBusy?"正在加载…":"加载更多"}</RareButton>}
   </div>}
  </section>;
 }

@@ -1,3 +1,4 @@
+import {RareButton,RareInput} from "../shared/ui/rare";
 import {useState,type FormEvent} from "react";
 import type {User} from "../entities/user/model";
 import {authApi} from "../features/auth/api";
@@ -44,20 +45,20 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
     <label htmlFor="username">账号</label>
     <div className="input-wrap">
      <svg className="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/></svg>
-     <input id="username" autoComplete="username" required placeholder="请输入账号 / 工号" value={login} onChange={e=>setLogin(e.target.value)}/>
+     <RareInput id="username" autoComplete="username" required placeholder="请输入账号 / 工号" value={login} onChange={e=>setLogin(e.target.value)}/>
     </div>
     <label htmlFor="password">密码</label>
     <div className="input-wrap">
      <svg className="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-     <input id="password" type="password" autoComplete="current-password" required placeholder="请输入登录密码" value={password} onChange={e=>setPassword(e.target.value)}/>
+     <RareInput id="password" type="password" autoComplete="current-password" required placeholder="请输入登录密码" value={password} onChange={e=>setPassword(e.target.value)}/>
     </div>
     <div className="form-extras">
-     <label className="remember"><input type="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)}/>记住账号</label>
-     <button type="button" className="forgot" onClick={()=>setResetHint(v=>!v)}>忘记密码？</button>
+     <label className="remember"><RareInput type="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)}/>记住账号</label>
+     <RareButton type="button" className="forgot" onClick={()=>setResetHint(v=>!v)}>忘记密码？</RareButton>
     </div>
     {resetHint&&<p className="reset-hint">本系统不提供自助重置，请联系系统管理员处理。</p>}
     {error&&<div role="alert" className="error">{error}</div>}
-    <button className="primary" disabled={busy} type="submit">{busy?"验证中…":"登录"}</button>
+    <RareButton className="primary" disabled={busy} type="submit">{busy?"验证中…":"登录"}</RareButton>
    </form>
   </div>
  </main>;

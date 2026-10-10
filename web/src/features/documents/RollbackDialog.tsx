@@ -1,3 +1,4 @@
+import {RareButton,RareInput} from "../../shared/ui/rare";
 import {useEffect,useRef,useState,type FormEvent}from"react";
 import {fileApi}from"./api";
 import {errorCode,errorCopy}from"../../shared/errors";
@@ -84,11 +85,11 @@ export function RollbackDialog({fileId,currentSeq,version,onClose,onCommitted,on
    <p>来源版本 v{version.versionSeq}（{version.createdBy} · {version.createdAt.replace("T"," ").slice(0,16)}） · 当前版本 v{currentSeq}</p>
    <p className="hint">回滚将生成新版本，不删除历史；审批目录的回滚先经审批人通过后生效。</p>
    <label htmlFor="rollback-reason">回滚原因（必填）</label>
-   <input id="rollback-reason" value={reason} onChange={e=>setReason(e.target.value)} disabled={busy} required/>
+   <RareInput id="rollback-reason" value={reason} onChange={e=>setReason(e.target.value)} disabled={busy} required/>
    {message&&<p role="alert" className="notice error">{message}</p>}
    <div className="dialog-actions">
-    {unknown&&<button type="button" className="secondary-action" onClick={onRefresh} disabled={busy}>刷新查看状态</button>}
-    <button type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</button>
+    {unknown&&<RareButton type="button" className="secondary-action" onClick={onRefresh} disabled={busy}>刷新查看状态</RareButton>}
+    <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</RareButton>
     {/* 长按确认是刻意的指针路径；表单 onSubmit 仍让回车直接提交 */}
     <MicroHoldToDelete label="确认回滚" tone="brand" disabled={busy||reason.trim()===""} onConfirm={()=>submit()}/>
    </div>

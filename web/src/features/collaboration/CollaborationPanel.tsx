@@ -1,3 +1,4 @@
+import {RareButton,RareInput} from "../../shared/ui/rare";
 import {useEffect,useMemo,useState} from "react";
 import {Link} from "react-router-dom";
 import {collaborationApi,formatBytes,type Favorite,type Share} from "./api";
@@ -231,10 +232,10 @@ export function CollaborationPanel(){
 
  return <div className="work-body">
   <div className="toolbar">
-   <button type="button" className={tab==="received"?"on":""} onClick={()=>setTab("received")}>与我共享</button>
-   <button type="button" className={tab==="sent"?"on":""} onClick={()=>setTab("sent")}>我共享的</button>
-   <button type="button" className={tab==="favorites"?"on":""} onClick={()=>setTab("favorites")}>我的关注</button>
-   <button type="button" className="primary" onClick={openCreate}>创建分享</button>
+   <RareButton type="button" className={tab==="received"?"on":""} onClick={()=>setTab("received")}>与我共享</RareButton>
+   <RareButton type="button" className={tab==="sent"?"on":""} onClick={()=>setTab("sent")}>我共享的</RareButton>
+   <RareButton type="button" className={tab==="favorites"?"on":""} onClick={()=>setTab("favorites")}>我的关注</RareButton>
+   <RareButton type="button" className="primary" onClick={openCreate}>创建分享</RareButton>
    <span className="toolbar-hint">分享仅传递 查看列表/预览/下载，不含写操作</span>
   </div>
   {message&&<p role="status" className={"notice"+(messageTone==="error"?" error":"")}>{message}</p>}
@@ -246,27 +247,27 @@ export function CollaborationPanel(){
    {treeState==="loading"&&<p className="hint">正在读取目录…</p>}
    {treeState==="failed"&&<>
     <p role="alert" className="notice error">获取目录失败，请稍后重试。</p>
-    <button type="button" className="secondary-action" disabled={pickBusy} onClick={()=>setTreeToken(token=>token+1)}>重试</button>
+    <RareButton type="button" className="secondary-action" disabled={pickBusy} onClick={()=>setTreeToken(token=>token+1)}>重试</RareButton>
    </>}
    {treeState==="ready"&&<>
     <div className="share-kind-switch" role="group" aria-label="资源类型">
-     <button type="button" className={pickKind==="folder"?"on":""} aria-pressed={pickKind==="folder"} disabled={pickBusy}
-      onClick={()=>{setPickKind("folder");setFileId("");}}>目录</button>
-     <button type="button" className={pickKind==="file"?"on":""} aria-pressed={pickKind==="file"} disabled={pickBusy}
-      onClick={()=>{setPickKind("file");setFileId("");}}>文件</button>
+     <RareButton type="button" className={pickKind==="folder"?"on":""} aria-pressed={pickKind==="folder"} disabled={pickBusy}
+      onClick={()=>{setPickKind("folder");setFileId("");}}>目录</RareButton>
+     <RareButton type="button" className={pickKind==="file"?"on":""} aria-pressed={pickKind==="file"} disabled={pickBusy}
+      onClick={()=>{setPickKind("file");setFileId("");}}>文件</RareButton>
     </div>
     <label htmlFor="share-picker-filter">{pickKind==="folder"?"选择目录":"选择文件所在目录"}</label>
-    <input id="share-picker-filter" type="search" value={filter} placeholder="按名称或可见路径筛选"
+    <RareInput id="share-picker-filter" type="search" value={filter} placeholder="按名称或可见路径筛选"
      autoComplete="off" disabled={pickBusy} onChange={event=>setFilter(event.target.value)}/>
     {rows.length===0
      ?<p className="share-list-empty">当前账号没有可访问的目录。</p>
      :<div role="radiogroup" aria-label={pickKind==="folder"?"选择目录":"选择文件所在目录"} className="share-picker-list">
       {shownFolders.length===0&&<p className="share-list-empty">没有匹配的目录。</p>}
-      {shownFolders.map(row=><button key={row.folder.id} type="button" role="radio"
+      {shownFolders.map(row=><RareButton key={row.folder.id} type="button" role="radio"
        aria-checked={folderId===row.folder.id}
        className={"share-picker-row"+(folderId===row.folder.id?" on":"")}
        style={{paddingLeft:String(8+Math.min(row.depth,8)*14)+"px"}} disabled={pickBusy}
-       title={row.path} onClick={()=>pickFolder(row.folder.id)}>{row.folder.name}</button>)}
+       title={row.path} onClick={()=>pickFolder(row.folder.id)}>{row.folder.name}</RareButton>)}
      </div>}
     {rows.length>PICKER_PAGE&&keyword===""&&<p className="hint">目录较多，仅显示前 {PICKER_PAGE} 个，请先按名称筛选。</p>}
     {pickKind==="file"&&<>
@@ -276,13 +277,13 @@ export function CollaborationPanel(){
      {filesState==="ready"&&files.length>0&&<p className="hint">目录「{browseFolder?.name??folderId}」中的文件（最多显示 50 个）。</p>}
      {filesState==="ready"&&files.length===0&&<p className="share-list-empty">该目录没有文件。</p>}
      {filesState==="ready"&&files.length>0&&<div role="radiogroup" aria-label="选择文件" className="share-picker-list">
-      {files.map(file=><button key={file.id} type="button" role="radio" aria-checked={fileId===file.id}
+      {files.map(file=><RareButton key={file.id} type="button" role="radio" aria-checked={fileId===file.id}
        className={"share-picker-row"+(fileId===file.id?" on":"")} disabled={pickBusy}
        onClick={()=>setFileId(file.id)}>
        <span className="share-option-kind">文件</span>
        <span className="share-option-name" title={file.name}>{file.name}</span>
        <span className="share-option-detail">{file.updatedAt.replace("T"," ").slice(0,16)}</span>
-      </button>)}
+      </RareButton>)}
      </div>}
     </>}
     <p className="share-chosen" aria-live="polite">已选资源：
@@ -292,13 +293,13 @@ export function CollaborationPanel(){
      {chosen!==null&&<span className="share-chosen-none">（{chosen.kind==="file"?"文件":"目录"}）</span>}
     </p>
     <div className="share-workbench-actions">
-     <button type="button" className="secondary-action" disabled={pickBusy||chosen===null}
-      onClick={()=>{setFileId("");setFolderId("");}}>清除选择</button>
-     <button type="button" disabled={pickBusy||chosen===null||chosenFavorited} onClick={favoriteChosen}>
+     <RareButton type="button" className="secondary-action" disabled={pickBusy||chosen===null}
+      onClick={()=>{setFileId("");setFolderId("");}}>清除选择</RareButton>
+     <RareButton type="button" disabled={pickBusy||chosen===null||chosenFavorited} onClick={favoriteChosen}>
       {chosenFavorited?"已关注":"关注"}
-     </button>
-     <button type="button" className="primary" disabled={pickBusy||chosen===null}
-      onClick={()=>{if(chosen)setShareTarget(chosen);}}>分享…</button>
+     </RareButton>
+     <RareButton type="button" className="primary" disabled={pickBusy||chosen===null}
+      onClick={()=>{if(chosen)setShareTarget(chosen);}}>分享…</RareButton>
     </div>
    </>}
   </section>}
@@ -315,10 +316,10 @@ export function CollaborationPanel(){
       <td>{f.unavailable?"已删除或不可访问":"正常"}</td>
       <td>{f.createdAt.replace("T"," ").slice(0,16)}</td>
       <td className="row-actions">
-       <button type="button" disabled={f.unavailable}
+       <RareButton type="button" disabled={f.unavailable}
         title={f.unavailable?"资源已删除或不可访问，无法分享":undefined}
-        onClick={()=>shareFavorite(f)}>分享</button>
-       <button type="button" onClick={()=>unfavorite(f.kind==="file"?f.fileId??"":f.folderId??"",f.kind)}>取消关注</button>
+        onClick={()=>shareFavorite(f)}>分享</RareButton>
+       <RareButton type="button" onClick={()=>unfavorite(f.kind==="file"?f.fileId??"":f.folderId??"",f.kind)}>取消关注</RareButton>
       </td>
      </tr>)}
     </tbody>
@@ -335,7 +336,7 @@ export function CollaborationPanel(){
       <td>{s.actions.join("、")}</td>
       <td>{s.includeDescendants?"是":"否"}</td>
       <td>{s.expiresAt?s.expiresAt.slice(0,10):"长期"}</td>
-      <td className="row-actions">{tab==="sent"&&!s.revoked&&<button type="button" className="danger" onClick={()=>askRevoke(s)}>撤销</button>}</td>
+      <td className="row-actions">{tab==="sent"&&!s.revoked&&<RareButton type="button" className="danger" onClick={()=>askRevoke(s)}>撤销</RareButton>}</td>
      </tr>)}
     </tbody>
    </table>}
@@ -350,8 +351,8 @@ export function CollaborationPanel(){
    <p>继承子目录：{revokeTarget.includeDescendants?"是":"否"}；截止：{revokeTarget.expiresAt?revokeTarget.expiresAt.slice(0,10):"长期"}</p>
    {revokeMessage&&<p role="alert" className="notice error">{revokeMessage}</p>}
    <div className="dialog-actions">
-    <button type="button" className="secondary-action" onClick={()=>setRevokeTarget(null)} disabled={revokeBusy}>取消</button>
-    <button type="button" className="danger" onClick={confirmRevoke} disabled={revokeBusy}>{revokeBusy?"撤销中…":"确认撤销"}</button>
+    <RareButton type="button" className="secondary-action" onClick={()=>setRevokeTarget(null)} disabled={revokeBusy}>取消</RareButton>
+    <RareButton type="button" className="danger" onClick={confirmRevoke} disabled={revokeBusy}>{revokeBusy?"撤销中…":"确认撤销"}</RareButton>
    </div>
   </Dialog>}
  </div>;

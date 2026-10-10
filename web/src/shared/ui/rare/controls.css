@@ -1,0 +1,31 @@
+/* Rare Workbench controls: material and geometry follow the system's tokens.
+   Keep selector specificity below contextual business states; native DOM stays intact. */
+.rare-button{position:relative;transition:background-color .12s ease,border-color .12s ease,color .12s ease,transform .16s cubic-bezier(.22,1,.36,1)}
+.rare-button:active:not(:disabled){transform:scale(.985)}
+.rare-button[data-density="standard"]{min-height:32px}
+.rare-button:focus-visible,.rare-input:focus-visible,.rare-select:focus-visible,.rare-textarea:focus-visible{
+  outline:1px solid var(--border-focus);outline-offset:1px;
+  box-shadow:0 0 0 3px rgba(2,160,234,.16);
+}
+.rare-button[data-tone="danger"]:focus-visible{outline-color:var(--status-danger)}
+.rare-button[aria-busy="true"]{cursor:progress}
+/* Text-like secondary actions remain low-emphasis in toolbars, but in modal
+   footers both actions must be recognizable, consistent rounded controls. */
+.dialog-actions .rare-button.secondary-action,
+.sessions-confirm-actions .rare-button.secondary-action{
+  text-decoration:none;color:var(--text-primary);background:var(--surface-panel);
+  border:1px solid var(--border-subtle);padding:0 var(--space-3);
+  min-height:var(--height-control);border-radius:var(--radius-sm);
+}
+.dialog-actions .rare-button.secondary-action:hover,
+.sessions-confirm-actions .rare-button.secondary-action:hover{
+  background:var(--surface-row-hover);color:var(--brand-blue);
+}
+/* Consistent feedback across feature panels and dialogs without altering
+   native accessibility semantics or adding expensive perpetual animation. */
+.rare-button[data-tone="primary"]:not(:disabled):active{filter:brightness(.97)}
+@media(prefers-reduced-motion:reduce){.rare-button,.rare-button:active:not(:disabled){transform:none;transition:none}}
+.rare-tab-panel{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;overflow:hidden}
+.rare-tabs [role="tab"]{transition:color .12s ease,background-color .12s ease,box-shadow .18s cubic-bezier(.22,1,.36,1)}
+.rare-tabs [role="tab"][aria-selected="true"]{color:var(--brand-blue)}
+@media(prefers-reduced-motion:reduce){.rare-tabs [role="tab"]{transition:none}}

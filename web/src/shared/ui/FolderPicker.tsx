@@ -1,3 +1,4 @@
+import {RareButton,RareInput} from "./rare";
 import {useEffect,useId,useMemo,useRef,useState,type KeyboardEvent,type ReactNode}from "react";
 import "./folderPicker.css";
 
@@ -291,15 +292,15 @@ export function FolderPicker({open,title,folders,selectedId,onSelect,onClose,inv
     <div className={"folder-picker-row"+(isCandidate?" candidate":"")+(reason?" invalid":"")}
      style={{paddingLeft:String(depth*16)+"px"}}>
      {children.length>0
-      ?<button type="button" className="folder-picker-chevron" tabIndex={-1}
+      ?<RareButton type="button" className="folder-picker-chevron" tabIndex={-1}
        aria-label={isOpen?"折叠":"展开"}
        onClick={()=>{focusRow(folder.id);toggle(folder.id);}}>
        <span aria-hidden="true">{isOpen?"▾":"▸"}</span>
-      </button>
+      </RareButton>
       :<span className="folder-picker-chevron-spacer" aria-hidden="true"/>}
-     <button type="button" className="folder-picker-name" tabIndex={-1} title={folder.name}
+     <RareButton type="button" className="folder-picker-name" tabIndex={-1} title={folder.name}
       aria-disabled={reason?true:undefined}
-      onClick={()=>{focusRow(folder.id);choose(folder);}}>{folder.name}</button>
+      onClick={()=>{focusRow(folder.id);choose(folder);}}>{folder.name}</RareButton>
      {reason&&<span className="folder-picker-reason">{reason}</span>}
     </div>
     {isOpen&&children.length>0&&<ul role="group">{branch(folder.id,depth+1)}</ul>}
@@ -311,7 +312,7 @@ export function FolderPicker({open,title,folders,selectedId,onSelect,onClose,inv
  return <div ref={panel} className="folder-picker" role="group" aria-label={title}
   onKeyDown={onPanelKeyDown}>
   <div className="folder-picker-search-row">
-   <input ref={search} className="folder-picker-search" type="search" value={query}
+   <RareInput ref={search} className="folder-picker-search" type="search" value={query}
     placeholder="搜索目录名或可见路径" aria-label="搜索目标目录" aria-describedby={hintId}
     autoComplete="off" disabled={busy}
     onChange={event=>setQuery(event.target.value)}
@@ -330,7 +331,7 @@ export function FolderPicker({open,title,folders,selectedId,onSelect,onClose,inv
       const reason=reasonOf(row.folder);
       const isCandidate=row.folder.id===selectedId;
       return <li key={row.folder.id}>
-       <button type="button"
+       <RareButton type="button"
         className={"folder-picker-result"+(isCandidate?" candidate":"")+(reason?" invalid":"")}
         aria-disabled={reason?true:undefined}
         onClick={()=>chooseResult(row.folder)}>
@@ -338,7 +339,7 @@ export function FolderPicker({open,title,folders,selectedId,onSelect,onClose,inv
         <span className="folder-picker-result-path">{row.path}</span>
         {isCandidate&&<span className="folder-picker-result-flag">当前候选</span>}
         {reason&&<span className="folder-picker-reason">{reason}</span>}
-       </button>
+       </RareButton>
       </li>;
      })}
     </ul>

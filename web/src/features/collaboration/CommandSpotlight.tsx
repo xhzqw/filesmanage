@@ -1,3 +1,4 @@
+import {RareInput} from "../../shared/ui/rare";
 import {useCallback,useEffect,useMemo,useRef,useState,type KeyboardEvent,type MouseEvent} from "react";
 import {useNavigate} from "react-router-dom";
 import {collaborationApi,formatBytes} from "./api";
@@ -245,7 +246,7 @@ export function CommandSpotlight(){
    <div className="command-panel" role="dialog" aria-label="快速指令台" onKeyDown={onPanelKeyDown}>
     <div className="command-input-row">
      <CommandSearchIcon/>
-     <input ref={inputRef} className="command-input" type="text" value={query}
+     <RareInput ref={inputRef} className="command-input" type="text" value={query}
       onChange={event=>setQuery(event.target.value)}
       placeholder="快速搜索" aria-label="快速指令台检索" autoComplete="off"/>
     </div>

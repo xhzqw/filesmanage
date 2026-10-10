@@ -1,3 +1,4 @@
+import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
 import {useEffect,useMemo,useState} from "react";
 import {request} from "../../shared/http";
 import type {Folder} from "../../entities/folder/model";
@@ -80,21 +81,21 @@ export function StatsPanel(){
  return <div className="work-body">
   <div className="toolbar">
    <label className="sort-label">范围
-    <select value={scope} onChange={e=>setScope(e.target.value as "current"|"descendants"|"all")}>
+    <RareSelect value={scope} onChange={e=>setScope(e.target.value as "current"|"descendants"|"all")}>
      <option value="current">当前目录</option>
      <option value="descendants">包含子目录</option>
      <option value="all">我可访问的全部</option>
-    </select>
+    </RareSelect>
    </label>
    <div className="stats-folder">
     <span className="stats-folder-label">目录</span>
     <span className={"stats-folder-path"+(folder!==""&&scope!=="all"?" chosen":"")} aria-live="polite">{folderText}</span>
-    <button type="button" disabled={scope==="all"} onClick={openPicker}>选择目录</button>
-    {folder!==""&&<button type="button" className="secondary-action" onClick={()=>setFolder("")}>清除</button>}
+    <RareButton type="button" disabled={scope==="all"} onClick={openPicker}>选择目录</RareButton>
+    {folder!==""&&<RareButton type="button" className="secondary-action" onClick={()=>setFolder("")}>清除</RareButton>}
     {scope==="all"&&<span className="hint">“我可访问的全部”不需要选择目录</span>}
    </div>
    <label className="sort-label">类型
-    <input value={kind} onChange={e=>setKind(e.target.value)} placeholder="如 text / 留空"/>
+    <RareInput value={kind} onChange={e=>setKind(e.target.value)} placeholder="如 text / 留空"/>
    </label>
    <a className="primary" href={collaborationApi.exportUrl(filters)}>导出 CSV</a>
   </div>
@@ -142,8 +143,8 @@ export function StatsPanel(){
    {treeState==="failed"&&<>
     <p role="alert" className="notice error">获取目录失败，请重试。</p>
     <div className="dialog-actions">
-     <button type="button" className="secondary-action" onClick={closePicker}>取消</button>
-     <button type="button" className="primary" onClick={()=>setTreeToken(token=>token+1)}>重试</button>
+     <RareButton type="button" className="secondary-action" onClick={closePicker}>取消</RareButton>
+     <RareButton type="button" className="primary" onClick={()=>setTreeToken(token=>token+1)}>重试</RareButton>
     </div>
    </>}
    {treeState==="ready"&&<FolderPicker open title="选择统计目录" folders={folders}
@@ -152,8 +153,8 @@ export function StatsPanel(){
     onClose={closePicker}
     detail={<p className="hint">应用后统计范围：{scope==="descendants"?"所选目录及其子目录":"仅所选目录"}</p>}
     footer={<div className="dialog-actions">
-     <button type="button" className="secondary-action" onClick={closePicker}>取消</button>
-     <button type="button" className="primary" disabled={candidate===""} onClick={applyFolder}>应用</button>
+     <RareButton type="button" className="secondary-action" onClick={closePicker}>取消</RareButton>
+     <RareButton type="button" className="primary" disabled={candidate===""} onClick={applyFolder}>应用</RareButton>
     </div>}/>}
   </Dialog>}
  </div>;

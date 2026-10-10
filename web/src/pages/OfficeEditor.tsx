@@ -1,3 +1,4 @@
+import {RareButton} from "../shared/ui/rare";
 import {useEffect,useRef,useState} from "react";
 import {useParams} from "react-router-dom";
 import {fileApi} from "../features/documents/api";
@@ -64,7 +65,7 @@ export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
   window.location.href="/preview/"+id;
  }
 
- return <AppShell user={user} onLogout={onLogout} product="文档编辑" actions={<button type="button" onClick={close}>结束编辑</button>}>
+ return <AppShell user={user} onLogout={onLogout} product="文档编辑" actions={<RareButton type="button" onClick={close}>结束编辑</RareButton>}>
   <div className="office-stage">
    {file&&<div className="breadcrumb">{file.name} · 当前 v{file.currentVersionSeq}</div>}
    {status==="loading"&&<p className="empty">正在启动文档编辑器…</p>}

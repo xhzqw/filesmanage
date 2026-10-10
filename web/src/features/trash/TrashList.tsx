@@ -1,3 +1,4 @@
+import {RareButton} from "../../shared/ui/rare";
 import {useEffect,useState} from "react";
 import type {TrashEntry} from "../../entities/trash/model";
 import {trashApi} from "./api";
@@ -94,10 +95,10 @@ export function TrashList({onRestored}:{onRestored:()=>void}){
       <td>{entry.deletedByName}</td>
       <td>{entry.deletedAt.replace("T"," ").slice(0,16)}</td>
       <td className="row-actions">
-       <button type="button" disabled={restoring!==null||purgeTarget!==null}
-        onClick={()=>{setMessage("");setRestoring(entry);}}>恢复</button>
-       {isAdmin&&<button type="button" className="danger" disabled={restoring!==null||purgeTarget!==null}
-        onClick={()=>askPurge(entry)}>永久删除</button>}
+       <RareButton type="button" disabled={restoring!==null||purgeTarget!==null}
+        onClick={()=>{setMessage("");setRestoring(entry);}}>恢复</RareButton>
+       {isAdmin&&<RareButton type="button" className="danger" disabled={restoring!==null||purgeTarget!==null}
+        onClick={()=>askPurge(entry)}>永久删除</RareButton>}
       </td>
      </tr>)}
     </tbody>
@@ -117,13 +118,13 @@ export function TrashList({onRestored}:{onRestored:()=>void}){
    {purgeStage==="final"&&<p role="alert" className="notice error">再次确认：将永久移除「{purgeTarget.oldName}」及其版本历史，此操作无法撤销。</p>}
    {purgeMessage&&<p role="alert" className="notice error">{purgeMessage}</p>}
    <div className="dialog-actions">
-    {purgeUnknown&&<button type="button" className="secondary-action" disabled={purgeBusy}
-     onClick={()=>{setReloadToken(token=>token+1);setPurgeTarget(null);}}>刷新回收站</button>}
-    <button type="button" id="purge-cancel" className="secondary-action" onClick={()=>setPurgeTarget(null)} disabled={purgeBusy}>取消</button>
+    {purgeUnknown&&<RareButton type="button" className="secondary-action" disabled={purgeBusy}
+     onClick={()=>{setReloadToken(token=>token+1);setPurgeTarget(null);}}>刷新回收站</RareButton>}
+    <RareButton type="button" id="purge-cancel" className="secondary-action" onClick={()=>setPurgeTarget(null)} disabled={purgeBusy}>取消</RareButton>
     {purgeStage==="impact"
-     ?<button type="button" className="primary" disabled={purgeBusy} onClick={()=>setPurgeStage("final")}>继续（下一步）</button>
+     ?<RareButton type="button" className="primary" disabled={purgeBusy} onClick={()=>setPurgeStage("final")}>继续（下一步）</RareButton>
      :<>
-      <button type="button" id="purge-back" className="secondary-action" disabled={purgeBusy} onClick={()=>setPurgeStage("impact")}>返回</button>
+      <RareButton type="button" id="purge-back" className="secondary-action" disabled={purgeBusy} onClick={()=>setPurgeStage("impact")}>返回</RareButton>
       {/* 长按确认取代第三次点击：误触不会立刻销毁版本历史（spec §6.3） */}
       <MicroHoldToDelete label="确认永久删除" tone="danger" disabled={purgeBusy} onConfirm={confirmPurge}/>
      </>}

@@ -1,3 +1,4 @@
+import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
 import {useEffect,useRef,useState,type FormEvent} from "react";
 import {Link} from "react-router-dom";
 import {collaborationApi,formatBytes} from "./api";
@@ -132,31 +133,31 @@ export function SearchPanel(){
  return <div className="work-body">
   <form className="toolbar search-bar" onSubmit={submit} role="search">
    <label htmlFor="search-q">关键词</label>
-   <input id="search-q" value={q} onChange={event=>setQ(event.target.value)} placeholder="文件名或正文，如：预算" size={28}/>
+   <RareInput id="search-q" value={q} onChange={event=>setQ(event.target.value)} placeholder="文件名或正文，如：预算" size={28}/>
    <label htmlFor="search-uploader">上传人</label>
-   <input id="search-uploader" value={uploader} onChange={event=>setUploader(event.target.value)} size={12}/>
+   <RareInput id="search-uploader" value={uploader} onChange={event=>setUploader(event.target.value)} size={12}/>
    <label htmlFor="search-type">类型</label>
-   <input id="search-type" value={type} onChange={event=>setType(event.target.value)} placeholder="text/" size={10}/>
+   <RareInput id="search-type" value={type} onChange={event=>setType(event.target.value)} placeholder="text/" size={10}/>
    <label className="sort-label" htmlFor="search-sort">排序
-    <select id="search-sort" value={sort} onChange={event=>setSort(event.target.value)}>
+    <RareSelect id="search-sort" value={sort} onChange={event=>setSort(event.target.value)}>
      <option value="updated_desc">修改时间</option>
      <option value="name_asc">名称</option>
      <option value="size_desc">大小</option>
-    </select>
+    </RareSelect>
    </label>
    <label className="sort-label" htmlFor="search-limit">每页
-    <select id="search-limit" value={pageSize} onChange={event=>setPageSize(Number(event.target.value))}>
+    <RareSelect id="search-limit" value={pageSize} onChange={event=>setPageSize(Number(event.target.value))}>
      {PAGE_SIZES.map(size=><option key={size} value={size}>{size} 条</option>)}
-    </select>
+    </RareSelect>
    </label>
-   <button className="primary" type="submit">检索</button>
+   <RareButton className="primary" type="submit">检索</RareButton>
    {message?<span className="error">{message}</span>:null}
   </form>
 
   {status==="loading"?<p className="notice" role="status">检索中…</p>:null}
   {status==="failed"?<>
    <p role="alert" className="notice error">检索失败，请稍后重试。</p>
-   <button type="button" className="secondary-action" onClick={()=>setReloadToken(token=>token+1)}>重试</button>
+   <RareButton type="button" className="secondary-action" onClick={()=>setReloadToken(token=>token+1)}>重试</RareButton>
   </>:null}
   {status==="ready"?<div className="table">
    <div className="search-total">已显示 {items.length} / 共 {capped?TOTAL_CAP+"+":total} 个结果 · 每页最多 {loadedLimit} 条（仅显示你有权访问的文件）{limitReached?<> · 已达本次检索可浏览的上限，请添加筛选条件缩小范围</>:null}</div>
@@ -182,9 +183,9 @@ export function SearchPanel(){
    )}
    {hasMore?<div className="search-more">
     {moreStatus==="failed"?<span className="error" role="alert">加载下一页失败。</span>:null}
-    <button type="button" className="secondary-action" disabled={moreStatus==="loading"} onClick={loadMore}>
+    <RareButton type="button" className="secondary-action" disabled={moreStatus==="loading"} onClick={loadMore}>
      {moreStatus==="loading"?"加载中…":moreStatus==="failed"?"重试加载":"加载更多"}
-    </button>
+    </RareButton>
    </div>:null}
   </div>:null}
   {status==="idle"?<p className="empty">输入关键词开始检索。中文按相邻子串匹配，标题与正文都会参与。</p>:null}

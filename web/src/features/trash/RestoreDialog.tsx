@@ -1,3 +1,4 @@
+import {RareButton,RareInput} from "../../shared/ui/rare";
 import {useEffect,useMemo,useState}from"react";
 import {request}from"../../shared/http";
 import type {Folder}from"../../entities/folder/model";
@@ -112,18 +113,18 @@ export function RestoreDialog({entry,onClose,onRestored,onReload}:{
   {stage==="loading"&&treeState==="loading"&&<p className="empty">正在读取目录…</p>}
   {treeState==="failed"&&<>
    <p role="alert" className="notice error">获取目录失败，无法确认原位置是否可用。</p>
-   <button type="button" className="secondary-action" onClick={()=>setReloadToken(token=>token+1)} disabled={busy}>重试</button>
+   <RareButton type="button" className="secondary-action" onClick={()=>setReloadToken(token=>token+1)} disabled={busy}>重试</RareButton>
   </>}
   {treeState==="ready"&&stage==="pick"&&<>
    <p className="hint">{entry.oldParentId?"原位置已不存在或不可访问，请选择目标目录。":"请选择目标目录。"}</p>
    {rows.length===0&&<p className="empty">没有可选择的目标目录。</p>}
    <div role="radiogroup" aria-label="选择目标目录" className="group-list" style={{maxHeight:"220px",overflow:"auto"}}>
-    {rows.map(({folder,depth})=><button key={folder.id} type="button" role="radio"
+    {rows.map(({folder,depth})=><RareButton key={folder.id} type="button" role="radio"
      aria-checked={targetId===folder.id}
      className={targetId===folder.id?"on":""}
      style={{paddingLeft:String(8+Math.min(depth,8)*14)+"px"}}
      disabled={busy}
-     onClick={()=>setTargetId(folder.id)}>{folder.name}</button>)}
+     onClick={()=>setTargetId(folder.id)}>{folder.name}</RareButton>)}
    </div>
   </>}
   {treeState==="ready"&&stage==="confirm"&&<>
@@ -135,19 +136,19 @@ export function RestoreDialog({entry,onClose,onRestored,onReload}:{
   {treeState==="ready"&&stage==="rename"&&<>
    <p>目标位置：{targetPath}</p>
    <label htmlFor="restore-name">新名称</label>
-   <input id="restore-name" value={newName} onChange={e=>setNewName(e.target.value)} disabled={busy}/>
+   <RareInput id="restore-name" value={newName} onChange={e=>setNewName(e.target.value)} disabled={busy}/>
    <p className="hint">仅当名称与原名不同时才会提交新名称，服务端保留最终命名权。</p>
   </>}
   {message&&<p role="alert" className="notice error">{message}</p>}
   <div className="dialog-actions">
-   {unknown&&<button type="button" className="secondary-action" onClick={onReload} disabled={busy}>刷新查看状态</button>}
-   <button type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</button>
-   {treeState==="ready"&&stage==="pick"&&<button type="button" className="primary" disabled={busy||targetId===""} onClick={()=>setStage("confirm")}>使用所选目录</button>}
+   {unknown&&<RareButton type="button" className="secondary-action" onClick={onReload} disabled={busy}>刷新查看状态</RareButton>}
+   <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</RareButton>
+   {treeState==="ready"&&stage==="pick"&&<RareButton type="button" className="primary" disabled={busy||targetId===""} onClick={()=>setStage("confirm")}>使用所选目录</RareButton>}
    {treeState==="ready"&&stage==="confirm"&&<>
-    <button type="button" className="secondary-action" onClick={()=>setStage("pick")} disabled={busy}>更改目标目录</button>
-    <button type="button" className="primary" onClick={submit} disabled={busy||targetId===""}>{busy?"恢复中…":"确认恢复"}</button>
+    <RareButton type="button" className="secondary-action" onClick={()=>setStage("pick")} disabled={busy}>更改目标目录</RareButton>
+    <RareButton type="button" className="primary" onClick={submit} disabled={busy||targetId===""}>{busy?"恢复中…":"确认恢复"}</RareButton>
    </>}
-   {treeState==="ready"&&stage==="rename"&&<button type="button" className="primary" onClick={submit} disabled={busy||newName.trim()===""}>{busy?"恢复中…":"以新名称恢复"}</button>}
+   {treeState==="ready"&&stage==="rename"&&<RareButton type="button" className="primary" onClick={submit} disabled={busy||newName.trim()===""}>{busy?"恢复中…":"以新名称恢复"}</RareButton>}
   </div>
  </Dialog>;
 }
