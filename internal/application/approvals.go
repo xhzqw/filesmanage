@@ -61,14 +61,16 @@ func (s *Service) SubmitEdit(ctx context.Context, u domain.User, fileID string, 
 		return domain.Approval{}, err
 	}
 	approval := domain.Approval{
-		ID: NewID("appr"), FileID: file.ID, RequesterID: u.ID, ApproverID: policy.ApproverID, ApproverChain:policy.ApproverChain,
+		ID: NewID("appr"), FileID: file.ID, RequesterID: u.ID, ApproverID: policy.ApproverID, ApproverChain: policy.ApproverChain,
 		PayloadBlobID: blob.ID, BaseSeq: baseSeq, Action: domain.VersionActionEdit,
 		State: domain.ApprovalPending, Reason: reason,
 	}
 	if err = tx.CreateApproval(ctx, approval); err != nil {
 		return domain.Approval{}, mapError(err)
 	}
-	if err=s.approvalEvent(ctx,tx,approval,u,"submitted",reason,approval.ApproverID);err!=nil{return domain.Approval{},err}
+	if err = s.approvalEvent(ctx, tx, approval, u, "submitted", reason, approval.ApproverID); err != nil {
+		return domain.Approval{}, err
+	}
 	audit(ctx, tx, u, "approval.request", "file", file.ID, "success",
 		map[string]any{"approvalId": approval.ID, "baseSeq": baseSeq, "action": approval.Action})
 	if err = tx.Commit(ctx); err != nil {
@@ -115,14 +117,16 @@ func (s *Service) SubmitRollback(ctx context.Context, u domain.User, fileID stri
 		return domain.Approval{}, domain.ErrVersionConflict
 	}
 	approval := domain.Approval{
-		ID: NewID("appr"), FileID: file.ID, RequesterID: u.ID, ApproverID: policy.ApproverID, ApproverChain:policy.ApproverChain,
+		ID: NewID("appr"), FileID: file.ID, RequesterID: u.ID, ApproverID: policy.ApproverID, ApproverChain: policy.ApproverChain,
 		PayloadBlobID: target.BlobID, BaseSeq: expectedCurrentSeq, Action: domain.VersionActionRollback,
 		RollbackTargetSeq: new(targetSeq), State: domain.ApprovalPending, Reason: reason,
 	}
 	if err = tx.CreateApproval(ctx, approval); err != nil {
 		return domain.Approval{}, mapError(err)
 	}
-	if err=s.approvalEvent(ctx,tx,approval,u,"submitted",reason,approval.ApproverID);err!=nil{return domain.Approval{},err}
+	if err = s.approvalEvent(ctx, tx, approval, u, "submitted", reason, approval.ApproverID); err != nil {
+		return domain.Approval{}, err
+	}
 	audit(ctx, tx, u, "approval.request", "file", file.ID, "success",
 		map[string]any{"approvalId": approval.ID, "targetSeq": targetSeq, "action": approval.Action})
 	if err = tx.Commit(ctx); err != nil {
@@ -160,23 +164,35 @@ func (s *Service) Approve(ctx context.Context, actor domain.User, approvalID, co
 		if won, _ := tx.DecideApproval(ctx, approvalID, domain.ApprovalConflicted, comment); won {
 			audit(ctx, tx, actor, "approval.conflict", "file", approval.FileID, "success",
 				map[string]any{"approvalId": approvalID})
-			if err=s.approvalEvent(ctx,tx,approval,actor,"conflicted",comment,approval.RequesterID);err==nil&&tx.Commit(ctx)==nil{s.notifyApprovalChanges(approval.RequesterID)}
+			if err = s.approvalEvent(ctx, tx, approval, actor, "conflicted", comment, approval.RequesterID); err == nil && tx.Commit(ctx) == nil {
+				s.notifyApprovalChanges(approval.RequesterID)
+			}
 		}
 		return SaveResult{}, domain.ErrVersionConflict
 	}
 	// Non-final approvals advance the chain without publishing bytes.
-	if approval.StepIndex+1<len(approval.ApproverChain){
-		nextID:=approval.ApproverChain[approval.StepIndex+1]
-		won,err:=tx.AdvanceApproval(ctx,approval.ID,approval.StepIndex,nextID)
-		if err!=nil{return SaveResult{},err}
-		if !won{return SaveResult{},domain.ErrVersionConflict}
-		if err=auditRequired(ctx,tx,actor,"approval.step_approved","file",approval.FileID,"success",map[string]any{
-			"approvalId":approval.ID,"step":approval.StepIndex+1,"nextApproverId":nextID,"comment":comment,
-		});err!=nil{return SaveResult{},err}
-		if err=s.approvalEvent(ctx,tx,approval,actor,"advanced",comment,nextID,approval.RequesterID);err!=nil{return SaveResult{},err}
-		if err=tx.Commit(ctx);err!=nil{return SaveResult{},err}
-		s.notifyApprovalChanges(nextID,approval.RequesterID)
-		return SaveResult{FileID:approval.FileID},nil
+	if approval.StepIndex+1 < len(approval.ApproverChain) {
+		nextID := approval.ApproverChain[approval.StepIndex+1]
+		won, err := tx.AdvanceApproval(ctx, approval.ID, approval.StepIndex, nextID)
+		if err != nil {
+			return SaveResult{}, err
+		}
+		if !won {
+			return SaveResult{}, domain.ErrVersionConflict
+		}
+		if err = auditRequired(ctx, tx, actor, "approval.step_approved", "file", approval.FileID, "success", map[string]any{
+			"approvalId": approval.ID, "step": approval.StepIndex + 1, "nextApproverId": nextID, "comment": comment,
+		}); err != nil {
+			return SaveResult{}, err
+		}
+		if err = s.approvalEvent(ctx, tx, approval, actor, "advanced", comment, nextID, approval.RequesterID); err != nil {
+			return SaveResult{}, err
+		}
+		if err = tx.Commit(ctx); err != nil {
+			return SaveResult{}, err
+		}
+		s.notifyApprovalChanges(nextID, approval.RequesterID)
+		return SaveResult{FileID: approval.FileID}, nil
 	}
 	target, err := tx.VersionBySeq(ctx, approval.FileID, currentSeq(file))
 	if err != nil {
@@ -214,7 +230,9 @@ func (s *Service) Approve(ctx context.Context, actor domain.User, approvalID, co
 	result := SaveResult{FileID: approval.FileID, VersionSeq: next, Sha256: approval.PayloadSha256, Size: approval.PayloadSize}
 	audit(ctx, tx, actor, "approval.approve", "file", approval.FileID, "success",
 		map[string]any{"approvalId": approvalID, "versionSeq": next, "requesterId": approval.RequesterID})
-	if err=s.approvalEvent(ctx,tx,approval,actor,"approved",comment,approval.RequesterID);err!=nil{return SaveResult{},err}
+	if err = s.approvalEvent(ctx, tx, approval, actor, "approved", comment, approval.RequesterID); err != nil {
+		return SaveResult{}, err
+	}
 	_ = target
 	if err = tx.Commit(ctx); err != nil {
 		return SaveResult{}, err
@@ -255,8 +273,12 @@ func (s *Service) Reject(ctx context.Context, actor domain.User, approvalID, com
 	}
 	audit(ctx, tx, actor, "approval.reject", "file", approval.FileID, "success",
 		map[string]any{"approvalId": approvalID, "requesterId": approval.RequesterID})
-	if err=s.approvalEvent(ctx,tx,approval,actor,"rejected",comment,approval.RequesterID);err!=nil{return err}
-	if err=tx.Commit(ctx);err!=nil{return err}
+	if err = s.approvalEvent(ctx, tx, approval, actor, "rejected", comment, approval.RequesterID); err != nil {
+		return err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return err
+	}
 	s.notifyApprovalChanges(approval.RequesterID)
 	return nil
 }
@@ -290,8 +312,12 @@ func (s *Service) CancelApproval(ctx context.Context, actor domain.User, approva
 	}
 	audit(ctx, tx, actor, "approval.cancel", "file", approval.FileID, "success",
 		map[string]any{"approvalId": approvalID})
-	if err=s.approvalEvent(ctx,tx,approval,actor,"cancelled","",approval.ApproverID);err!=nil{return err}
-	if err=tx.Commit(ctx);err!=nil{return err}
+	if err = s.approvalEvent(ctx, tx, approval, actor, "cancelled", "", approval.ApproverID); err != nil {
+		return err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return err
+	}
 	s.notifyApprovalChanges(approval.ApproverID)
 	return nil
 }

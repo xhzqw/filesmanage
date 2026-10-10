@@ -4178,6 +4178,144 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/approvals/{id}/history:
+    get:
+      summary: Read immutable per-step approval activity (participant or admin)
+      operationId: approvalHistory
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Approval ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Ordered approval events.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ApprovalEvent'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/approvals/notifications:
+    get:
+      summary: Read the authenticated user's newest 100 approval notifications
+      operationId: approvalNotifications
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Recipient-scoped, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ApprovalNotification'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/approvals/notifications/{id}/read:
+    post:
+      summary: Mark own approval notification read (idempotent)
+      operationId: readApprovalNotification
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Notification ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Recipient-owned receipt.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      read:
+                        type: integer
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/approvals/{id}/approve:
     post:
       summary: Approve a pending change
@@ -6613,6 +6751,75 @@ components:
       - deletedBy
       - deletedByName
       - deletedAt
+    ApprovalEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        approvalId:
+          type: string
+        actorId:
+          type: string
+        actorName:
+          type: string
+        kind:
+          type: string
+          enum:
+          - submitted
+          - advanced
+          - approved
+          - rejected
+          - cancelled
+          - conflicted
+        stepIndex:
+          type: integer
+        comment:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - id
+      - approvalId
+      - actorId
+      - actorName
+      - kind
+      - stepIndex
+      - comment
+      - createdAt
+    ApprovalNotification:
+      type: object
+      properties:
+        id:
+          type: integer
+        approvalId:
+          type: string
+        fileName:
+          type: string
+        kind:
+          type: string
+          enum:
+          - submitted
+          - advanced
+          - approved
+          - rejected
+          - cancelled
+          - conflicted
+        stepIndex:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        read:
+          type: boolean
+      required:
+      - id
+      - approvalId
+      - fileName
+      - kind
+      - stepIndex
+      - createdAt
+      - read
     Approval:
       type: object
       properties:
