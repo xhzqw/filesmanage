@@ -44,8 +44,14 @@ export async function downloadZip(
  let writer:FileWriter|undefined;
  if(large&&window.isSecureContext&&typeof picker==="function"){
   // Picker must be initiated before the first await to retain user activation.
-  const file=await picker({suggestedName:"文件打包.zip",types:[{description:"ZIP 压缩包",accept:{"application/zip":[".zip"]}}]});
-  writer=await file.createWritable();
+  try{
+   const file=await picker.call(window,{suggestedName:"文件打包.zip",types:[{description:"ZIP 压缩包",accept:{"application/zip":[".zip"]}}]});
+   writer=await file.createWritable();
+  }catch(error){
+   // User cancellation must not start a different download implicitly.
+   if(error instanceof DOMException&&error.name==="AbortError")throw error;
+   // Policy-blocked/not-implemented pickers fall back to native download.
+  }
  }
  if(large&&!writer){
   // The HTTP LAN origin is not a secure context for File System Access.
