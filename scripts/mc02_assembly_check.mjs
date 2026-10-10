@@ -255,19 +255,8 @@ async function main() {
       const highlight = await cdp.evaluate(`(()=>{const b=[...document.querySelectorAll('.toolbar[aria-label="装配零件"] label button')][0];return b?b.className:null;})()`);
       check("MOD02 selection highlight", String(highlight).includes("on"), String(highlight));
 
-      // Context loss must still surface after the loading effect is cleaned
-      // up. React Router navigation must also release real GPU geometry.
-      await cdp.evaluate(`(()=>{
-       document.querySelector('.viewer-stage canvas')?.dispatchEvent(
-        new Event('webglcontextlost',{cancelable:true}));
-       return true;
-      })()`);
-      await delay(180);
-      const lost=await cdp.evaluate(`(()=>{
-       const n=document.querySelector('.notice.error');
-       return !!n?.textContent?.includes('WebGL')&&!!n.querySelector('a[href*="/bytes"]');
-      })()`);
-      check("MOD07 WebGL context loss explains recovery",lost,String(lost));
+      // Verify ordinary route exit *before* context-loss injection. Otherwise
+      // the browser may reclaim buffers during the loss event itself.
       const beforeDispose=await cdp.evaluate("(()=>window.__cadDeletedBuffers)()");
       await cdp.evaluate(`(()=>{
        [...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='返回文件')?.click();
@@ -281,6 +270,29 @@ async function main() {
       check("MOD08 route exit detaches canvas and frees GPU geometry",
        cleanup.path==='/preview/${fileId}'&&cleanup.canvases===0&&
        cleanup.deletedBuffers>beforeDispose,JSON.stringify(cleanup));
+
+      // Reopen the real model to independently validate the WebGL loss path.
+      await cdp.send("Page.navigate",{url:`${BASE}/model/${fileId}`});
+      let reopened=false;
+      for(let n=0;n<60&&!reopened;n++){
+       await delay(250);
+       reopened=Boolean(await cdp.evaluate(`(()=>!!document.querySelector(
+        '.viewer-stage canvas')&&!!document.querySelector('.toolbar[aria-label="视图控制"]'))()`).catch(()=>false));
+      }
+      check("MOD08 scene can reopen after GPU teardown",reopened,String(reopened));
+      if(reopened){
+       await cdp.evaluate(`(()=>{
+        document.querySelector('.viewer-stage canvas')?.dispatchEvent(
+         new Event('webglcontextlost',{cancelable:true}));
+        return true;
+       })()`);
+       await delay(180);
+       const lost=await cdp.evaluate(`(()=>{
+        const n=document.querySelector('.notice.error');
+        return !!n?.textContent?.includes('WebGL')&&!!n.querySelector('a[href*="/bytes"]');
+       })()`);
+       check("MOD07 WebGL context loss explains recovery",lost,String(lost));
+      }
     }
   } finally {
     cdp && cdp.close();
