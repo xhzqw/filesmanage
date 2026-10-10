@@ -1,12 +1,12 @@
 import {RareButton,RareInput} from "../../shared/ui/rare";
-import {useRef,useState,type FormEvent} from "react";
+import {useEffect,useRef,useState,type FormEvent} from "react";
 import type {Folder} from "../../entities/folder/model";
 import {folderApi} from "./api";
 import {errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
 import {Menu,type MenuItem} from "../../shared/ui/Menu";
 
-export function FolderActions({folder,onChanged,isAdmin,onManageGrants,onManagePolicy}:{folder:Folder;onChanged:()=>void;isAdmin:boolean;onManageGrants:()=>void;onManagePolicy:()=>void}){
+export function FolderActions({folder,actionRequest,onActionHandled,onChanged,isAdmin,onManageGrants,onManagePolicy}:{folder:Folder;actionRequest?:{folderId:string;action:"rename"|"delete";id:number}|null;onActionHandled?:()=>void;onChanged:()=>void;isAdmin:boolean;onManageGrants:()=>void;onManagePolicy:()=>void}){
  const[message,setMessage]=useState("");
  const[renaming,setRenaming]=useState(false);
  const[renameValue,setRenameValue]=useState(folder.name);
@@ -15,6 +15,16 @@ export function FolderActions({folder,onChanged,isAdmin,onManageGrants,onManageP
  const moreRef=useRef<HTMLButtonElement>(null);
  const[deleting,setDeleting]=useState(false);
  const[removeBusy,setRemoveBusy]=useState(false);
+ const handledActionId=useRef(0);
+ useEffect(()=>{
+  if(!actionRequest||actionRequest.folderId!==folder.id||handledActionId.current===actionRequest.id)return;
+  handledActionId.current=actionRequest.id;
+  onActionHandled?.();
+  if(actionRequest.action==="rename"){
+   setRenameValue(folder.name);
+   setRenaming(true);
+  }else setDeleting(true);
+ },[actionRequest,folder.id,folder.name]);
 
  async function submitRename(event:FormEvent<HTMLFormElement>){
   event.preventDefault();

@@ -58,7 +58,8 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  // Rename/delete from the tree menu reuse FolderActions' own dialogs: the bar
  // follows the right-clicked folder until the selection moves again.
  const[actionsFolder,setActionsFolder]=useState<Folder|null>(null);
- const actionsRef=useRef<HTMLDivElement>(null);
+ const[actionRequest,setActionRequest]=useState<{folderId:string;action:"rename"|"delete";id:number}|null>(null);
+ const nextActionId=useRef(0);
  const[subjects,setSubjects]=useState<Subject[]>([]);
  const[requiresApproval,setRequiresApproval]=useState(false);
  const[editingId,setEditingId]=useState<string|null>(null);
@@ -158,19 +159,10 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  // The actions bar follows the right-clicked tree node only until the
  // selection moves again; navigation restores it to the selected folder.
  useEffect(()=>{setActionsFolder(null);},[selected?.id]);
- // Rename/delete from the tree menu reuse FolderActions' own dialogs instead
- // of duplicating them: the bar switches to the target folder and its matching
- // button is triggered programmatically (first button renames, last deletes).
+ // Tree context actions are explicit React intents: never click hidden DOM.
  function runFolderAction(folder:Folder,action:"rename"|"delete"){
   setActionsFolder(folder);
-  requestAnimationFrame(()=>{
-   const buttons=actionsRef.current?.querySelectorAll<HTMLButtonElement>(".folder-actions button");
-   if(!buttons||buttons.length===0)return;
-   const target=action==="rename"
-    ? Array.from(buttons).find(b=>b.textContent?.includes("重命名"))
-    : Array.from(buttons).find(b=>b.textContent?.includes("删除"));
-   target?.click();
-  });
+  setActionRequest({folderId:folder.id,action,id:++nextActionId.current});
  }
  // Pointer capture keeps the drag alive once the cursor leaves the 4px hit area
  // (SPEC §3.1), so the width tracks the pointer instead of the handle.
@@ -240,8 +232,8 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
        breadcrumb bar used to take. */}
    {selected&&<div className="folder-context-bar">
      <FolderBreadcrumb folders={folders} folder={selected}/>
-     <div ref={actionsRef} className="folder-actions-slot">
-      <FolderActions folder={actionsFolder??selected} isAdmin={user.isAdmin} onChanged={()=>setReloadKey(k=>k+1)}
+     <div className="folder-actions-slot">
+      <FolderActions folder={actionsFolder??selected} actionRequest={actionRequest} onActionHandled={()=>setActionRequest(null)} isAdmin={user.isAdmin} onChanged={()=>setReloadKey(k=>k+1)}
        onManageGrants={()=>navigate("/org?tab=permissions&view=folder&folder="+encodeURIComponent((actionsFolder??selected).id))} onManagePolicy={()=>setPolicyFolder(actionsFolder??selected)}/>
      </div>
    </div>}
