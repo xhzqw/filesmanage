@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"filesmanage/internal/domain"
@@ -119,17 +120,16 @@ func renderOfficeSandbox(ctx context.Context, source []byte, ext string) ([]byte
 	}
 	cmd := exec.CommandContext(convertCtx, "/usr/bin/bwrap", args...)
 	cmd.WaitDelay = 2 * time.Second
-	// Discard unbounded subprocess diagnostics rather than buffering attacker-
-	// controlled stderr/stdout. Exit status is enough for the safe fallback.
-	cmd.Stdout = io.Discard
-	cmd.Stderr = io.Discard
+	log := &limitedOfficeLog{}
+	cmd.Stdout = log
+	cmd.Stderr = log
 	if err = cmd.Run(); err != nil {
-		return nil, fmt.Errorf("isolated office render failed: %w", err)
+		return nil, fmt.Errorf("isolated office render failed: %w (%s)", err, log.String())
 	}
 	pdfFile := filepath.Join(work, "out", "source.pdf")
 	stat, err := os.Stat(pdfFile)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("office output unavailable: %w (%s)", err, log.String())
 	}
 	if stat.Size() < 8 || stat.Size() > maxOfficePDFBytes {
 		return nil, errors.New("converted PDF outside preview limits")
@@ -142,4 +142,25 @@ func renderOfficeSandbox(ctx context.Context, source []byte, ext string) ([]byte
 		return nil, errors.New("converted file is not PDF")
 	}
 	return pdf, nil
+}
+
+type limitedOfficeLog struct {
+	mu   sync.Mutex
+	data []byte
+}
+
+func (l *limitedOfficeLog) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	n := len(p)
+	if len(l.data) < 4096 {
+		l.data = append(l.data, p[:min(n, 4096-len(l.data))]...)
+	}
+	return n, nil
+}
+
+func (l *limitedOfficeLog) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return string(l.data)
 }
