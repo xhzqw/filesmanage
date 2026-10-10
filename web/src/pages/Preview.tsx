@@ -3,6 +3,9 @@ import {useEffect,useState,type FormEvent} from "react";
 import {Link,useNavigate,useParams} from "react-router-dom";
 import {fileApi,formatSize} from "../features/documents/api";
 import {MediaPreview} from "../features/documents/MediaPreview";
+import {StructuredFilePreview} from "../features/documents/StructuredFilePreview";
+import {CadPreviewStatus} from "../features/documents/CadPreviewStatus";
+import {resolvePreviewAdapter,ADAPTER_TITLES} from "../features/documents/previewAdapters";
 import {FileEditor} from "../features/documents/FileEditor";
 import {MoveDialog} from "../features/documents/FileTable";
 import {RollbackDialog} from "../features/documents/RollbackDialog";
@@ -51,6 +54,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const[wrapText,setWrapText]=useState(true);
  const[reloadToken,setReloadToken]=useState(0);
  const currentSeq=Math.max(file?.currentVersionSeq??1,...versions.map(v=>v.versionSeq));
+ const adapter=preview?resolvePreviewAdapter(preview):"unsupported";
  const canManage=file!==null;
 
  useEffect(()=>{
@@ -159,7 +163,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
         aria-controls={"file-panel-"+value} onClick={()=>setTab(value)}>{label}</RareButton>)}
      </RareTabs>
      {tab==="preview"&&<section id="file-panel-preview" role="tabpanel" aria-labelledby="file-tab-preview" className="file-workbench-panel">
-      <div className="file-section-caption"><strong>文件预览</strong><span>{preview.renderer==="pdf"?"PDF 文档":preview.renderer==="image"?"图片":preview.renderer==="video"?"视频":preview.renderer==="audio"?"音频":preview.textual?"文本 / 代码":"文件"}</span></div>
+      <div className="file-section-caption"><strong>文件预览</strong><span>{ADAPTER_TITLES[adapter]}</span></div>
       {(preview.renderer==="image"||preview.renderer==="video"||preview.renderer==="audio")?
        <MediaPreview key={preview.fileId+preview.sha256} fileId={preview.fileId} sha256={preview.sha256}
         name={preview.name} kind={preview.renderer} mime={preview.mediaType??""}/>:
@@ -169,6 +173,10 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
           sandbox="allow-scripts allow-downloads" referrerPolicy="no-referrer"/>
          <p>若浏览器不支持内嵌 PDF，可使用上方的「下载」。</p>
         </div>:
+       preview.structured&&["archive","spreadsheet","presentation","document"].includes(adapter)?
+        <StructuredFilePreview value={preview.structured}/>:
+       adapter==="cad"?
+        <CadPreviewStatus fileId={preview.fileId}/>:
        preview.textual?
         <div className="file-text-stage">
          <div className="file-text-tools"><span>{preview.truncated?"已显示文件前 256 KB":"文件内容"}</span>

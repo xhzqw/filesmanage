@@ -28,6 +28,7 @@ type Preview struct {
 	Renderer    string
 	MediaType   string
 	RawBase64   string
+	Structured  *StructuredPreview
 }
 
 var ErrPreviewUnsupported = errors.New("inline preview format not supported")
@@ -181,6 +182,16 @@ func (s *Service) Preview(ctx context.Context, u domain.User, fileID string) (Pr
 	if preview.Renderer != "unsupported" {
 		preview.Textual = false
 		preview.ByteMeta = AnalyzeBytes(nil, blob.SizeBytes, blob.Sha256)
+		return preview, nil
+	}
+	if isZIPHeader(header[:n]) {
+		preview.Textual = false
+		preview.ByteMeta = AnalyzeBytes(nil, blob.SizeBytes, blob.Sha256)
+		preview.Structured, err = inspectZIP(reader, blob.SizeBytes, file.Name)
+		if err != nil {
+			preview.Structured = &StructuredPreview{Kind: "archive", Note: "压缩包结构损坏或无法读取；请下载后使用可信工具检查"}
+		}
+		preview.Renderer = preview.Structured.Kind
 		return preview, nil
 	}
 	if !preview.Textual {

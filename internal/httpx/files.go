@@ -138,6 +138,9 @@ func (h *Handler) previewFile(c *gin.Context) {
 		"truncated": preview.Truncated, "content": preview.Content, "byteMeta": preview.ByteMeta,
 		"renderer": preview.Renderer, "mediaType": preview.MediaType,
 	}
+	if preview.Structured != nil {
+		data["structured"] = preview.Structured
+	}
 	if preview.Textual {
 		data["rawBase64"] = preview.RawBase64
 	}

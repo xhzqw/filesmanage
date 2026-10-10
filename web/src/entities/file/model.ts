@@ -33,7 +33,8 @@ export type PreviewData={
  size:number;
  sha256:string;
  textual:boolean;
- renderer?:"text"|"image"|"video"|"audio"|"pdf"|"unsupported";
+ renderer?:"text"|"image"|"video"|"audio"|"pdf"|"archive"|"spreadsheet"|"presentation"|"document"|"unsupported";
+ structured?:StructuredPreview;
  mediaType?:string;
  truncated:boolean;
  content:string;
@@ -50,4 +51,12 @@ export type PreviewData={
   endsWithNewline:boolean;
   printable:boolean;
  };
+};
+
+export type StructuredPreview={
+ kind:"archive"|"spreadsheet"|"presentation"|"document";
+ entries:{name:string;size:number;directory:boolean}[];
+ sections:{title:string;lines:string[]}[];
+ truncated:boolean;
+ note:string;
 };
