@@ -1934,6 +1934,284 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/{id}/versions/compare:
+    get:
+      summary: Compare two immutable file versions (preview permission)
+      operationId: compareFileVersions
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      - name: left
+        in: query
+        required: true
+        description: First version
+        schema:
+          type: integer
+          minimum: 1
+      - name: right
+        in: query
+        required: true
+        description: Second version
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Bounded text diff or binary metadata comparison.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/VersionComparison'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/{id}/review-comments:
+    get:
+      summary: List version-anchored review comments
+      operationId: listFileReviewComments
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      - name: version
+        in: query
+        required: true
+        description: Version sequence
+        schema:
+          type: integer
+          minimum: 1
+      - name: cursor
+        in: query
+        required: false
+        description: Numeric descending ID cursor
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        description: Page size
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Visible comments.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/ReviewCommentPage'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      summary: Add a review comment on a file version
+      operationId: createFileReviewComment
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReviewComment'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/ReviewComment'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/{id}/review-comments/{cid}/resolve:
+    post:
+      summary: Resolve a comment (author/admin/modify)
+      operationId: resolveFileReviewComment
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        description: Review comment ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Resolved comment.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      resolved:
+                        type: integer
+                    required:
+                    - resolved
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/files/{id}/bytes:
     get:
       summary: Download file content (Range supported)
@@ -5725,6 +6003,123 @@ components:
       - category
       - description
       - tags
+    VersionComparisonLine:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum:
+          - equal
+          - added
+          - removed
+        left:
+          type: integer
+        right:
+          type: integer
+        text:
+          type: string
+      required:
+      - kind
+      - text
+    VersionCompareInfo:
+      type: object
+      properties:
+        seq:
+          type: integer
+        sha256:
+          type: string
+        sizeBytes:
+          type: integer
+      required:
+      - seq
+      - sha256
+      - sizeBytes
+    VersionComparison:
+      type: object
+      properties:
+        left:
+          $ref: '#/components/schemas/VersionCompareInfo'
+        right:
+          $ref: '#/components/schemas/VersionCompareInfo'
+        mode:
+          type: string
+          enum:
+          - identical
+          - metadata
+          - large
+          - text
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/VersionComparisonLine'
+        added:
+          type: integer
+        removed:
+          type: integer
+      required:
+      - left
+      - right
+      - mode
+      - lines
+      - added
+      - removed
+    ReviewComment:
+      type: object
+      properties:
+        id:
+          type: integer
+        fileId:
+          type: string
+        versionSeq:
+          type: integer
+        lineNumber:
+          type: integer
+        body:
+          type: string
+        authorId:
+          type: string
+        authorName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        resolvedAt:
+          type: string
+          format: date-time
+        resolvedBy:
+          type: string
+      required:
+      - id
+      - fileId
+      - versionSeq
+      - body
+      - authorId
+      - createdAt
+    ReviewCommentPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReviewComment'
+        nextCursor:
+          type: string
+      required:
+      - items
+      - nextCursor
+    CreateReviewComment:
+      type: object
+      properties:
+        version:
+          type: integer
+        lineNumber:
+          type: integer
+        body:
+          type: string
+          maxLength: 2000
+      required:
+      - version
+      - body
     FileMeta:
       type: object
       properties:
