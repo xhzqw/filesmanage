@@ -61,8 +61,7 @@ export function PermissionInsights({folderId,users,usersState,refreshToken}:{
   return()=>{live=false;};
  },[folderId,activeUser,generation,refreshToken]);
  return <section className="perm-insight perm-card" aria-label="有效权限解释">
-  <div className="perm-section-title">有效权限解释 <span className="perm-subtle">服务端实时计算 · 只读</span></div>
-  <p className="perm-hint">检查用户在当前目录的实际动作及来源；包含工作组、祖先 ACL 和目录共享，文件级分享不在此视图内。</p>
+  <div className="perm-section-title">有效权限 <span className="perm-subtle">只读</span></div>
   <div className="perm-insight-picker">
    <label>检查用户<RareSelect aria-label="检查用户的有效权限" value={activeUser} disabled={usersState!=="ready"} onChange={e=>setSubjectId(e.target.value)}>
     <option value="">请选择用户</option>
@@ -70,7 +69,7 @@ export function PermissionInsights({folderId,users,usersState,refreshToken}:{
    </RareSelect></label>
    <RareButton type="button" className="secondary-action" disabled={!activeUser||busy} onClick={()=>setGeneration(n=>n+1)}>重新计算</RareButton>
   </div>
-  {!activeUser&&usersState==="ready"&&<div className="perm-insight-empty">选择一名用户，即可查看其在该目录最终可执行的操作及全部授权来源。</div>}
+  {!activeUser&&usersState==="ready"&&<div className="perm-insight-empty">选择用户后显示有效权限。</div>}
   {usersState==="failed"&&<p role="alert" className="hint">用户列表读取失败，请先在授权表单处重试。</p>}
   {busy&&<p role="status" className="hint">正在计算有效权限…</p>}
   {error&&<p role="alert" className="notice error">{error}</p>}
@@ -93,7 +92,6 @@ export function PermissionInsights({folderId,users,usersState,refreshToken}:{
     </div>)}
     {result.sources.length===0&&<p className="hint">没有正在生效的授权来源。</p>}
    </div>
-   <p className="perm-hint">计算时间：{new Date(result.evaluatedAt).toLocaleString("zh-CN")}。文件操作会再次由服务端鉴权。</p>
   </>}
  </section>;
 }

@@ -2,32 +2,33 @@ import {Children,forwardRef,isValidElement,useEffect,useId,useMemo,useRef,useSta
 import {createPortal} from "react-dom";
 
 type Choice={value:string;label:ReactNode;search:string;disabled:boolean};
+type RareSelectProps=SelectHTMLAttributes<HTMLSelectElement>&{searchable?:boolean};
 
 // Owned listbox: styling a native <select> cannot style its OS popup.
 // Keep a non-focusable select for forms/ref compatibility; use a portaled
 // keyboard-operable listbox so overflow panels do not clip the menu.
-export const RareSelect=forwardRef<HTMLSelectElement,SelectHTMLAttributes<HTMLSelectElement>>(function RareSelect(
- {className="",children,value,defaultValue,onChange,disabled,required,id,name,style,onBlur,onFocus,...rest},ref){
+export const RareSelect=forwardRef<HTMLSelectElement,RareSelectProps>(function RareSelect(
+ {className="",children,value,defaultValue,onChange,disabled,required,id,name,style,onBlur,onFocus,searchable:enableSearch,...rest},ref){
  const uid=useId(),buttonId=id??uid,menuId=uid+"-menu";
  const button=useRef<HTMLButtonElement>(null),menu=useRef<HTMLDivElement>(null);
  const searchRef=useRef<HTMLInputElement>(null);
  const [open,setOpen]=useState(false),[query,setQuery]=useState("");
  const [ownValue,setOwnValue]=useState(String(defaultValue??""));
  const [active,setActive]=useState(0);
- const [position,setPosition]=useState({top:0,left:0,width:200,maxHeight:300});
+ const [position,setPosition]=useState({top:0,left:0,width:200,maxHeight:240});
  const options=useMemo(()=>Children.toArray(children).filter(isValidElement).filter(o=>o.type==="option").map(o=>{
   const props=o.props as {value?:string|number;children?:ReactNode;disabled?:boolean};
   return {value:String(props.value??""),label:props.children,search:String(props.children??""),disabled:!!props.disabled};
  }),[children]);
  const selected=String(value??ownValue);
  const current=options.find(o=>o.value===selected);
- const searchable=options.length>10;
+ const searchable=enableSearch??options.length>10;
  const visible=options.filter(o=>o.search.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
  function positionMenu(){
   const rect=button.current?.getBoundingClientRect();if(!rect)return;
   const below=window.innerHeight-rect.bottom-8;
-  const above=below<180&&rect.top>below;
-  const maxHeight=Math.min(320,Math.max(120,above?rect.top-12:below));
+  const above=below<150&&rect.top>below;
+  const maxHeight=Math.min(240,Math.max(110,above?rect.top-12:below));
   const width=Math.min(Math.max(200,rect.width),window.innerWidth-16);
   setPosition({top:above?Math.max(8,rect.top-maxHeight-5):rect.bottom+5,
    left:Math.min(rect.left,Math.max(8,window.innerWidth-width-8)),width,maxHeight});

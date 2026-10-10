@@ -131,7 +131,7 @@ function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(folder:R
   });
  }
  return <aside className="perm-browser" aria-label="资源目录">
-  <div className="perm-browser-title"><div><strong>资源目录</strong><small>选择目录管理访问权限</small></div>
+  <div className="perm-browser-title"><div><strong>资源目录</strong></div>
    <RareButton type="button" className="secondary-action" onClick={()=>void load("")}>刷新</RareButton></div>
   <label className="perm-browser-search"><span>搜索目录</span><RareInput type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="输入目录名称"/></label>
   <div className="perm-browser-scroll">
@@ -172,7 +172,6 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
  const [notice,setNotice]=useState<{text:string;error:boolean}|null>(null);
  const [subjectKind,setSubjectKind]=useState<"user"|"group">("group");
  const [subjectId,setSubjectId]=useState("");
- const [subjectQuery,setSubjectQuery]=useState("");
  const [actions,setActions]=useState<string[]>(["list"]);
  const [scopeOnly,setScopeOnly]=useState(true);
  const [expiresAt,setExpiresAt]=useState("");
@@ -200,12 +199,10 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
   return()=>{live=false;};
  },[folderId,refresh]);
  const candidates=useMemo(()=>{
-  const q=subjectQuery.trim().toLowerCase();
-  const rows=subjectKind==="user"
+  return subjectKind==="user"
    ?users.filter(u=>!u.disabled).map(u=>({id:u.id,name:u.displayName+(u.login?`（${u.login}）`:"")}))
    :groups.map(g=>({id:g.id,name:g.name}));
-  return rows.filter(r=>!q||r.name.toLowerCase().includes(q)).slice(0,50);
- },[users,groups,subjectKind,subjectQuery]);
+ },[users,groups,subjectKind]);
  const names=useMemo(()=>{
   const out=new Map<string,string>();
   users.forEach(u=>out.set("user:"+u.id,u.displayName));
@@ -276,8 +273,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
   <section className="perm-detail" aria-label="目录权限">
    {!folderId?<div className="perm-empty-state"><strong>选择一个资源目录</strong><p>从左侧目录树选择需要管理的目录，然后查看直接授权、实际有效权限和新增授权。</p></div>:<>
     <div className="perm-detail-heading">
-     <div className="perm-heading-copy"><span className="perm-eyebrow">当前资源</span><h2 className="perm-path" title={selectedName?.id===folderId?selectedName.name:folderId}>{selectedName?.id===folderId?selectedName.name:folderId}</h2>
-      <span className="perm-resource-description">配置此目录的直接访问权限，或检查用户实际可执行的操作。</span></div>
+     <div className="perm-heading-copy"><h2 className="perm-path" title={selectedName?.id===folderId?selectedName.name:folderId}>{selectedName?.id===folderId?selectedName.name:folderId}</h2></div>
      <div className="perm-heading-actions"><Link to={"/doc?folder="+encodeURIComponent(folderId)}>在文档中打开</Link>
       <RareButton type="button" className="secondary-action" onClick={reload}>刷新授权</RareButton></div>
     </div>
@@ -285,7 +281,6 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
      <div className="perm-inspection-column">
       <section className="perm-card perm-card-grants" aria-label="直接授权记录">
        <div className="perm-section-title"><span>直接授权记录</span>{state==="ready"&&<span className="perm-count">{grants.length} 条</span>}</div>
-       <p className="perm-hint">这里显示直接写入当前目录的授权。继承授权和共享权限请通过下方的有效权限检查确认。</p>
     {notice&&<RareNotice tone={notice.error?"danger":"success"}>{notice.text}</RareNotice>}
     {state==="loading"&&<p role="status" className="hint">正在读取直接授权…</p>}
     {state==="failed"&&<RareNotice tone="danger">读取失败，不能编辑该目录的授权。</RareNotice>}
@@ -301,7 +296,6 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
      </div>
      <section className="perm-card perm-compose-card" aria-label="新增直接授权">
       <div className="perm-section-title">新增直接授权</div>
-      <p className="perm-hint">选择授权对象与可执行的操作。提交前会展示确认摘要，敏感操作需再次确认。</p>
   <form className="perm-form" onSubmit={submit} onChange={event=>{
    if((event.target as HTMLElement).classList.contains("perm-risk-consent"))return;
    if(submitState==="review"){setSubmitState("edit");setRiskAcknowledged(false);}
@@ -312,26 +306,23 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
      <div className="perm-form-row">
       <label>主体类型<RareSelect value={subjectKind} onChange={e=>{setSubjectKind(e.target.value as "user"|"group");setSubjectId("");setSubmitState("edit");}}>
        <option value="group">工作组</option><option value="user">用户</option></RareSelect></label>
-      <label>查找主体<RareInput type="search" value={subjectQuery} onChange={e=>{setSubjectQuery(e.target.value);setSubjectId("");}} placeholder="按名称或账号筛选"/></label>
-      <label>授权给<RareSelect value={subjectId} required disabled={subjectSourceState!=="ready"} onChange={e=>{setSubjectId(e.target.value);setSubmitState("edit");}}>
-       <option value="">请选择</option>{candidates.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</RareSelect></label>
+      <label>授权对象<RareSelect searchable aria-label="授权对象，可在下拉列表内搜索" value={subjectId} required disabled={subjectSourceState!=="ready"} onChange={e=>{setSubjectId(e.target.value);setSubmitState("edit");}}>
+       <option value="">选择{subjectKind==="user"?"用户":"工作组"}</option>{candidates.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</RareSelect></label>
      </div>
-     {subjectSourceState==="ready"&&candidates.length===50&&
-      <p className="perm-hint">最多显示前 50 个匹配主体，请继续输入关键词缩小范围。</p>}
-     <fieldset><legend>允许执行的文件动作</legend><div className="perm-action-grid">
+     <fieldset className="perm-action-fieldset"><legend>操作权限</legend><div className="perm-action-grid">
       {ACTIONS.map(([key,label])=><label key={key}><RareInput type="checkbox" checked={actions.includes(key)}
        onChange={e=>setActions(old=>e.target.checked?[...old,key]:old.filter(x=>x!==key))}/>{label}</label>)}
      </div></fieldset>
      <div className="perm-form-row">
-      <label>生效范围<RareSelect value={scopeOnly?"only":"subtree"} onChange={e=>{setScopeOnly(e.target.value==="only");setSubmitState("edit");}}>
-       <option value="only">仅当前目录（默认）</option><option value="subtree">包括全部子目录</option></RareSelect></label>
-      <label>到期时间（可选）<RareInput type="datetime-local" value={expiresAt} onChange={e=>setExpiresAt(e.target.value)}/></label>
+      <label>作用范围<RareSelect value={scopeOnly?"only":"subtree"} onChange={e=>{setScopeOnly(e.target.value==="only");setSubmitState("edit");}}>
+       <option value="only">仅当前目录</option><option value="subtree">包含子目录</option></RareSelect></label>
+      <label>到期时间<RareInput type="datetime-local" value={expiresAt} onChange={e=>setExpiresAt(e.target.value)}/></label>
      </div>
      {submitState==="review"&&<div className="perm-review" role="status">
       <strong>请核对授权摘要</strong>
-      <p>资源目录：{selectedName?.id===folderId?selectedName.name:folderId}</p>
-      <p>主体：{names.get(subjectKind+":"+subjectId)??subjectId}（{subjectKind==="user"?"用户":"工作组"}）；动作：{displayActions(actions)}</p>
-      <p>范围：{scopeOnly?"仅当前目录":"当前及全部子目录"}；到期：{expiresAt||"不过期"}</p>
+       <p><strong>目录：</strong>{selectedName?.id===folderId?selectedName.name:folderId}</p>
+       <p><strong>对象：</strong>{names.get(subjectKind+":"+subjectId)??subjectId} · <strong>权限：</strong>{displayActions(actions)}</p>
+       <p><strong>范围：</strong>{scopeOnly?"当前目录":"包含子目录"} · <strong>到期：</strong>{expiresAt||"不限"}</p>
       {needsRiskConsent&&<>
        <p className="perm-risk-warning" role="alert">高影响权限：{displayActions(riskyActions)}。{scopeOnly
         ?"将允许主体在当前目录执行这些操作。"
@@ -342,7 +333,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
        </label>
       </>}
      </div>}
-     <div className="perm-form-actions"><span className="hint">授权效果以服务端判定为准。</span>
+     <div className="perm-form-actions">
       {submitState==="review"&&<RareButton type="button" className="secondary-action" onClick={()=>{setSubmitState("edit");setRiskAcknowledged(false);}}>返回修改</RareButton>}
       <RareButton type="submit" tone="primary" className="primary" loading={submitState==="saving"} disabled={submitState==="saving"||!subjectId||!actions.length||state!=="ready"||subjectSourceState!=="ready"||(submitState==="review"&&needsRiskConsent&&!riskAcknowledged)}>
        {submitState==="saving"?"提交中…":submitState==="review"?"确认添加授权":"预览授权"}</RareButton>
