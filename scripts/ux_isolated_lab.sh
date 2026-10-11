@@ -116,7 +116,20 @@ case "$ACTION" in
   fi
   suite="${2:-}"
   case "$suite" in
-   ux_desktop_check|ux_visual_check|ux_workflows_check|ux_perf_check|ux_approval_check|ux_rare_tables_check)
+   ux_workflows_check)
+    # The finale is self-contained; rerun its browser/auth chain without
+    # repeating the destructive move/rollback fixtures after a flaky finish.
+    if [[ "$#" -eq 2 ]]; then
+     extra=()
+    elif [[ "$#" -eq 4 && "${3:-}" == "--suite" && "${4:-}" == "finale" ]]; then
+     extra=(--suite finale)
+    else
+     echo "LAB_REFUSED: only --suite finale is supported" >&2; exit 2
+    fi
+    DATABASE_URL="$TEST_DSN" FILESMANAGE_UX_FIXTURE_DB="$TEST_DB" \
+     node "scripts/$suite.mjs" --isolated-fixtures --base "$BASE" --password-file "$PASS_FILE" "${extra[@]}"
+    ;;
+   ux_desktop_check|ux_visual_check|ux_perf_check|ux_approval_check|ux_rare_tables_check)
     DATABASE_URL="$TEST_DSN" FILESMANAGE_UX_FIXTURE_DB="$TEST_DB" \
      node "scripts/$suite.mjs" --isolated-fixtures --base "$BASE" --password-file "$PASS_FILE"
     ;;

@@ -1275,12 +1275,17 @@ async function finaleSuite() {
         [...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='登录')?.click();return true;})()`);
       return cdp.waitFor(`()=>location.pathname==='/doc'||location.pathname==='/first-sign-in'`, 20000);
     };
-    await loginUi("admin", password);
+    const finaleAuthenticated=await loginUi("admin", password);
+    const finaleLoginState=await cdp.evaluate(`(()=>({path:location.pathname,login:!!document.querySelector('input[type=password]')}))()`);
+    check("finale admin session navigated to workspace",finaleAuthenticated===true&&finaleLoginState.path==="/doc",JSON.stringify(finaleLoginState));
+    if(!finaleAuthenticated||finaleLoginState.path!=="/doc")throw Error("finale browser has no authenticated workspace session");
 
     // ---- UI: search 加载更多 ----
     await cdp.navigate(`${BASE}/search`);
     const searchReady = await cdp.waitFor(`()=>document.querySelector('#search-q')!==null`, 20000);
-    check("search page ready", Boolean(searchReady), String(searchReady));
+    const searchPageState=await cdp.evaluate(`(()=>({path:location.pathname,title:document.title,login:!!document.querySelector('input[type=password]'),error:document.querySelector('[role=alert]')?.textContent?.slice(0,120)||''}))()`);
+    check("search page ready", Boolean(searchReady), JSON.stringify(searchPageState));
+    if(!searchReady)throw Error("search page not ready after navigation: "+JSON.stringify(searchPageState));
     await cdp.evaluate(`(()=>{
       const q=document.querySelector('#search-q');
       const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
@@ -1370,6 +1375,8 @@ async function finaleSuite() {
 }
 
 async function main() {
+  const selectedSuite=opt("suite","all");
+  if(!["all","finale"].includes(selectedSuite))throw new Error("only all or finale are supported suite modes");
   const loginRes = await fetch(`${BASE}/api/login`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ login: "admin", password }),
@@ -1390,12 +1397,14 @@ async function main() {
     try { await fn(); }
     catch (err) { check(`${label} suite completed`, false, String(err?.message ?? err)); }
   };
-  await runSuite("MOVE", moveSuite);
-  await runSuite("MOVEUI", moveUiSuite);
-  await runSuite("WORKFLOW", workflowSuite);
-  await runSuite("SAFE-EDIT", safeEditSuite);
-  await runSuite("G4UI", g4UiSuite);
-  await runSuite("BATCHUI", batchUiSuite);
+  if(selectedSuite==="all"){
+   await runSuite("MOVE", moveSuite);
+   await runSuite("MOVEUI", moveUiSuite);
+   await runSuite("WORKFLOW", workflowSuite);
+   await runSuite("SAFE-EDIT", safeEditSuite);
+   await runSuite("G4UI", g4UiSuite);
+   await runSuite("BATCHUI", batchUiSuite);
+  }
   await runSuite("FINALE", finaleSuite);
 
   const failed = results.filter((r) => !r.ok);
@@ -1404,7 +1413,7 @@ async function main() {
     console.error("UX_WORKFLOWS_FAILED: " + failed.map((f) => f.name).join(", "));
     process.exit(1);
   }
-  console.log("UX_WORKFLOWS_PASS");
+  console.log(selectedSuite==="all"?"UX_WORKFLOWS_PASS":"UX_WORKFLOWS_FINALE_PASS");
 }
 
 main().catch((err) => {
