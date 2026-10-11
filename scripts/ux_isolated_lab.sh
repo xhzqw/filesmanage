@@ -116,7 +116,7 @@ case "$ACTION" in
   fi
   suite="${2:-}"
   case "$suite" in
-   ux_desktop_check|ux_visual_check|ux_workflows_check|ux_perf_check|ux_approval_check)
+   ux_desktop_check|ux_visual_check|ux_workflows_check|ux_perf_check|ux_approval_check|ux_rare_tables_check)
     DATABASE_URL="$TEST_DSN" FILESMANAGE_UX_FIXTURE_DB="$TEST_DB" \
      node "scripts/$suite.mjs" --isolated-fixtures --base "$BASE" --password-file "$PASS_FILE"
     ;;
@@ -139,7 +139,7 @@ case "$ACTION" in
   fi
   ;;
  *)
-  echo "usage: scripts/ux_isolated_lab.sh [setup|status|run <ux_desktop_check|ux_visual_check|ux_workflows_check|ux_perf_check|ux_approval_check|ui_geometry_check>|stop]" >&2
+  echo "usage: scripts/ux_isolated_lab.sh [setup|status|run <ux_desktop_check|ux_visual_check|ux_workflows_check|ux_perf_check|ux_approval_check|ux_rare_tables_check|ui_geometry_check>|stop]" >&2
   exit 2
   ;;
 esac
