@@ -1216,6 +1216,48 @@ async function finaleSuite() {
   tform.set("idempotencyKey", "wf-target-" + stamp);
   await fetch(`${BASE}/api/files`, { method: "POST", headers: { Origin: BASE, Cookie: sessionCookie }, body: tform });
 
+  // Relevance must be ranked *at the server* over the complete authorized
+  // match set, not client-side over page one. Mix old exact name, newer title
+  // matches and newest body-only hits, then walk every 2-row cursor boundary.
+  const rankTerm="zzrank"+stamp;
+  const rankSeed=[
+    {name:rankTerm,body:"name-only",tier:0},
+    ...[1,2,3].map(i=>({name:"title-"+i+"-"+rankTerm+".txt",body:"ordinary",tier:1})),
+    ...[1,2,3].map(i=>({name:"body-"+i+"-"+stamp+".txt",body:"full text "+rankTerm,tier:2})),
+  ];
+  const rankIds=new Map();
+  for(const [i,item] of rankSeed.entries()){
+    const form=new FormData();
+    form.set("folderId",targetId);
+    form.set("file",new Blob([item.body],{type:"text/plain"}),item.name);
+    form.set("idempotencyKey","rank-"+stamp+"-"+i);
+    const response=await fetch(`${BASE}/api/files`,{method:"POST",headers:{Origin:BASE,Cookie:sessionCookie},body:form});
+    const body=await response.json().catch(()=>null);
+    if(response.status!==201)throw Error("relevance fixture upload failed: "+JSON.stringify(body));
+    rankIds.set(body?.data?.fileId,item.tier);
+  }
+  let rankCursor="",rankPages=0;
+  const ranked=[];
+  for(;rankPages<8;rankPages++){
+    const qs=new URLSearchParams({q:rankTerm,sort:"relevance",folder:targetId,limit:"2"});
+    if(rankCursor)qs.set("cursor",rankCursor);
+    const result=await json("GET","/api/search?"+qs.toString());
+    if(result.status!==200)throw Error("ranked search failed "+JSON.stringify(result.body));
+    check("RANK relevance total stable across pages "+(rankPages+1),result.body?.data?.total===7,String(result.body?.data?.total));
+    ranked.push(...(result.body?.data?.items??[]));
+    rankCursor=result.body?.data?.nextCursor??"";
+    if(!rankCursor)break;
+  }
+  const ranks=ranked.map(item=>rankIds.get(item.id));
+  check("RANK exact title content tiers remain ordered across page cursors",
+    ranked.length===7&&new Set(ranked.map(item=>item.id)).size===7&&
+    ranks.join(",")==="0,1,1,1,2,2,2",
+    JSON.stringify({ranks,names:ranked.map(item=>item.name),pages:rankPages+1}));
+  const latest=await json("GET","/api/search?"+new URLSearchParams({q:rankTerm,sort:"updated_desc",folder:targetId,limit:"2"}));
+  check("RANK explicit newest sort overrides relevance",
+    latest.status===200&&(latest.body?.data?.items??[]).every(item=>rankIds.get(item.id)===2),
+    JSON.stringify(latest.body?.data?.items?.map(item=>item.name)));
+
   // G2: the same resumable operation must survive two distinct authenticated
   // HTTP sessions without re-uploading the first chunk. The final replay must
   // return the same file and never create a second version. All bytes live in
