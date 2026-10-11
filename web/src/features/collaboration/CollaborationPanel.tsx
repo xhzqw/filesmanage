@@ -1,4 +1,4 @@
-import {RareBadge,RareButton,RareInput} from "../../shared/ui/rare";
+import {RareBadge,RareButton,RareDataTable,RareInput,RareRowActions} from "../../shared/ui/rare";
 import {useEffect,useMemo,useRef,useState} from "react";
 import {Link} from "react-router-dom";
 import {collaborationApi,type Favorite,type Share} from "./api";
@@ -437,44 +437,45 @@ export function CollaborationPanel(){
     <RareButton type="button" className="secondary-action" onClick={refresh}>刷新</RareButton>
    </div>
    <div className="collab-table-scroll">
-   {tab==="favorites"?<table>
-    <thead><tr><th scope="col">资源</th><th scope="col">类型</th><th scope="col">状态</th><th scope="col">关注时间</th><th scope="col">操作</th></tr></thead>
+   {tab==="favorites"?<RareDataTable className="collab-favorites-table">
+    <thead><tr><th scope="col">资源</th><th className="collab-optional" scope="col">类型</th><th scope="col">状态</th><th className="collab-optional" scope="col">关注时间</th><th scope="col">操作</th></tr></thead>
     <tbody>
      {status==="loading"&&<tr><td colSpan={5} className="empty">正在加载…</td></tr>}
      {status==="failed"&&<tr><td colSpan={5} className="empty" role="alert">获取关注列表失败，请刷新重试。</td></tr>}
      {status==="ready"&&favorites.length===0&&<tr><td colSpan={5} className="empty">没有关注内容。</td></tr>}
      {status==="ready"&&favorites.map(f=><tr key={f.id}>
-      <td>{f.unavailable?<span className="collab-unavailable-name" title="当前资源不能访问">{f.resourceName||"不可访问的资源"}</span>:f.kind==="file"?<Link to={"/preview/"+f.fileId}>{f.resourceName}</Link>:<Link to={"/doc?folder="+f.folderId}>{f.resourceName}</Link>}</td>
-      <td>{f.kind==="file"?"文件":"目录"}</td>
+      <td>{f.unavailable?<span className="collab-unavailable-name" title="当前资源不能访问">{f.resourceName||"不可访问的资源"}</span>:f.kind==="file"?<Link to={"/preview/"+f.fileId}>{f.resourceName}</Link>:<Link to={"/doc?folder="+f.folderId}>{f.resourceName}</Link>}<span className="collab-mobile-meta">{f.kind==="file"?"文件":"目录"} · {f.createdAt.slice(0,10)}</span></td>
+      <td className="collab-optional">{f.kind==="file"?"文件":"目录"}</td>
       <td>{f.unavailable
        ?<RareBadge tone="danger" dot title="资源已删除、失效或当前账号无权访问">已删除或不可访问</RareBadge>
        :<RareBadge tone="success" dot>正常</RareBadge>}</td>
-      <td>{f.createdAt.replace("T"," ").slice(0,16)}</td>
-      <td className="row-actions">
+      <td className="collab-optional rare-data-date">{f.createdAt.replace("T"," ").slice(0,16)}</td>
+      <td className="collab-action-cell"><RareRowActions>
        <RareButton type="button" disabled={f.unavailable}
         title={f.unavailable?"资源已删除或不可访问，无法分享":undefined}
         onClick={()=>shareFavorite(f)}>分享</RareButton>
        <RareButton type="button" onClick={()=>unfavorite(f.kind==="file"?f.fileId??"":f.folderId??"",f.kind)}>取消关注</RareButton>
-      </td>
+      </RareRowActions></td>
      </tr>)}
     </tbody>
-   </table>:<table>
-    <thead><tr><th scope="col">资源</th><th scope="col">类型</th><th scope="col">接收方/来源</th><th scope="col">权限</th><th scope="col">继承子目录</th><th scope="col">截止</th><th scope="col">操作</th></tr></thead>
+   </RareDataTable>:<RareDataTable className="collab-shares-table">
+    <thead><tr><th scope="col">资源</th><th className="collab-optional" scope="col">类型</th><th className="collab-optional" scope="col">接收方/来源</th><th className="collab-optional" scope="col">权限</th><th className="collab-optional" scope="col">继承子目录</th><th className="collab-optional" scope="col">截止</th><th scope="col">状态</th><th scope="col">操作</th></tr></thead>
     <tbody>
-     {status==="loading"&&<tr><td colSpan={7} className="empty">正在加载…</td></tr>}
-     {status==="failed"&&<tr><td colSpan={7} className="empty" role="alert">获取分享列表失败，请刷新重试。</td></tr>}
-     {status==="ready"&&shares.length===0&&<tr><td colSpan={7} className="empty">没有{tab==="received"?"收到的":"发出的"}分享。</td></tr>}
+     {status==="loading"&&<tr><td colSpan={8} className="empty">正在加载…</td></tr>}
+     {status==="failed"&&<tr><td colSpan={8} className="empty" role="alert">获取分享列表失败，请刷新重试。</td></tr>}
+     {status==="ready"&&shares.length===0&&<tr><td colSpan={8} className="empty">没有{tab==="received"?"收到的":"发出的"}分享。</td></tr>}
      {status==="ready"&&shares.map(s=><tr key={s.id}>
-      <td>{s.resourceKind==="file"?<Link to={"/preview/"+s.resourceId}>{s.resourceName}</Link>:<Link to={"/doc?folder="+s.resourceId}>{s.resourceName}</Link>}</td>
-      <td>{s.resourceKind==="file"?"文件":"目录"}</td>
-      <td>{tab==="received"?s.recipientName:(s.recipientName||"—")}</td>
-      <td>{s.actions.join("、")}</td>
-      <td>{s.includeDescendants?"是":"否"}</td>
-      <td>{s.expiresAt?s.expiresAt.slice(0,10):"长期"}</td>
-      <td className="row-actions">{tab==="sent"&&!s.revoked&&<RareButton type="button" className="danger" onClick={()=>askRevoke(s)}>撤销</RareButton>}</td>
+      <td>{s.resourceKind==="file"?<Link to={"/preview/"+s.resourceId}>{s.resourceName}</Link>:<Link to={"/doc?folder="+s.resourceId}>{s.resourceName}</Link>}<span className="collab-mobile-meta">{s.resourceKind==="file"?"文件":"目录"} · {s.recipientName||"—"} · {s.actions.join("、")}</span></td>
+      <td className="collab-optional">{s.resourceKind==="file"?"文件":"目录"}</td>
+      <td className="collab-optional">{tab==="received"?s.recipientName:(s.recipientName||"—")}</td>
+      <td className="collab-optional">{s.actions.join("、")}</td>
+      <td className="collab-optional">{s.includeDescendants?"是":"否"}</td>
+      <td className="collab-optional">{s.expiresAt?s.expiresAt.slice(0,10):"长期"}</td>
+      <td><RareBadge tone={s.revoked?"danger":s.expiresAt&&Date.parse(s.expiresAt)<=Date.now()?"warning":"success"} dot>{s.revoked?"已撤销":s.expiresAt&&Date.parse(s.expiresAt)<=Date.now()?"已过期":"有效"}</RareBadge></td>
+      <td className="collab-action-cell"><RareRowActions>{tab==="sent"&&!s.revoked&&<RareButton type="button" className="danger" onClick={()=>askRevoke(s)}>撤销</RareButton>}</RareRowActions></td>
      </tr>)}
     </tbody>
-   </table>}
+   </RareDataTable>}
    </div>
    {(nextCursor||moreStatus==="failed")&&<div className="collab-pagination">
     <span>已加载 {tab==="favorites"?favorites.length:shares.length} 项</span>

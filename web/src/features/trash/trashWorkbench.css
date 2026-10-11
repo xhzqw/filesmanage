@@ -19,13 +19,13 @@
 .trash-notice .rare-button{margin-left:auto;padding:0 7px;min-height:22px}
 .trash-selection{display:flex;align-items:center;gap:8px;min-height:35px;padding:4px 9px;background:var(--surface-row-selected);border-radius:var(--radius-sm)}
 .trash-selection>span{font-weight:600;margin-right:6px}
-.trash-table-scroll{flex:1;min-height:0;min-width:0;overflow:auto;border:1px solid var(--border-hairline);border-radius:var(--radius-sm);background:var(--surface-panel)}
+.trash-table-scroll{flex:1;min-height:0;min-width:0;overflow:auto;border:1px solid var(--border-hairline);border-radius:var(--radius-sm);background:var(--surface-panel);container:trash-grid / inline-size}
 .trash-table{width:100%;min-width:790px;border-collapse:collapse;table-layout:fixed;font-size:12px}
-.trash-table .trash-col-check{width:38px}
-.trash-table .trash-col-type{width:128px}
-.trash-table .trash-col-person{width:132px}
-.trash-table .trash-col-time{width:158px}
-.trash-table .trash-col-actions{width:115px}
+.trash-table th:first-child{width:38px}
+.trash-table th:nth-child(3){width:128px}
+.trash-table th:nth-child(4){width:132px}
+.trash-table th:nth-child(5){width:158px}
+.trash-table th:last-child{width:115px}
 .trash-table thead{position:sticky;top:0;z-index:2;background:var(--surface-header)}
 .trash-table th{font-weight:600;text-align:left;white-space:nowrap;color:var(--text-secondary);height:33px}
 .trash-table th,.trash-table td{padding:5px 9px;border-bottom:1px solid var(--border-hairline);vertical-align:middle}
@@ -41,6 +41,7 @@
 .trash-resource-text{display:flex;flex-direction:column;gap:2px;min-width:0}
 .trash-resource-text strong{font-weight:550;font-size:12.5px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .trash-resource-text small{font-size:11px;font-weight:400;color:var(--text-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.trash-resource-text .trash-mobile-meta{display:none}
 .trash-muted{color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .trash-row-actions{display:flex;justify-content:flex-end;align-items:center;gap:3px}
 .trash-row-actions>.rare-button{min-height:25px;padding:1px 7px;border:0;background:transparent}
@@ -52,4 +53,12 @@
 .trash-danger-note{color:var(--status-danger);background:var(--surface-danger-soft);padding:9px 11px;border-radius:var(--radius-sm)}
 .trash-purge-summary{overflow-wrap:anywhere;max-height:100px;overflow:auto}
 @media(max-width:1000px){.trash-filters{grid-template-columns:minmax(170px,1fr) repeat(2,minmax(120px,145px)) auto;grid-auto-flow:row}.trash-filters>.rare-select-root:nth-of-type(3){grid-column:2}}
+@container trash-grid (max-width:790px){
+ .trash-table{min-width:0}
+ .trash-table :is(th,td):nth-child(3),.trash-table :is(th,td):nth-child(4),.trash-table :is(th,td):nth-child(5){display:none}
+ .trash-table td{height:52px;padding:4px 6px}
+ .trash-table th:last-child{width:107px}
+ .trash-resource{gap:6px}
+ .trash-resource-text .trash-mobile-meta{display:block}
+}
 @media(max-width:680px){.trash-workbench{padding:8px}.trash-filters{grid-template-columns:minmax(150px,1fr) minmax(120px,1fr) auto;gap:6px}.trash-selection{flex-wrap:wrap}}

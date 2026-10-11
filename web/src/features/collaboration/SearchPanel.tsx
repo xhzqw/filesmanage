@@ -1,4 +1,4 @@
-import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
+import {RareButton,RareDataTable,RareInput,RareSelect} from "../../shared/ui/rare";
 import {useEffect,useMemo,useRef,useState,type FormEvent} from "react";
 import {Link} from "react-router-dom";
 import {collaborationApi,formatBytes} from "./api";
@@ -288,24 +288,25 @@ export function SearchPanel({userId}:{userId:string}){
   {status==="ready"?<div className="table">
    <div className="search-total">已显示 {items.length} / 共 {capped?TOTAL_CAP+"+":total} 个结果 · 每页最多 {loadedLimit} 条（仅显示你有权访问的文件）{limitReached?<> · 已达本次检索可浏览的上限，请添加筛选条件缩小范围</>:null}</div>
    {items.length===0?<p className="empty">没有匹配的文件。换个关键词，或确认你有该内容的预览权限。</p>:(
-    <table>
-     <thead><tr><th scope="col">文件名</th><th scope="col">大小</th><th scope="col">上传人</th><th scope="col">版本</th><th scope="col">修改日期</th><th scope="col">所在目录</th></tr></thead>
+    <RareDataTable className="search-data-table">
+     <thead><tr><th scope="col">文件名</th><th className="search-secondary" scope="col">大小</th><th className="search-secondary" scope="col">上传人</th><th className="search-secondary" scope="col">版本</th><th className="search-secondary" scope="col">修改日期</th><th scope="col">所在目录</th></tr></thead>
      <tbody>
       {items.map(file=><tr key={file.id}>
        <td>
-        <Link to={"/preview/"+file.id}>{file.name}</Link>
+        <Link to={"/preview/"+file.id} title={file.name}>{file.name}</Link>
+        <div className="search-mobile-meta">{formatBytes(file.sizeBytes)} · v{file.currentVersionSeq} · {file.uploadedBy} · {new Date(file.updatedAt).toLocaleDateString("zh-CN")}</div>
         {file.snippet?<div className="snippet"><Highlighted text={file.snippet} query={query?.q??""}/></div>:null}
        </td>
-       <td>{formatBytes(file.sizeBytes)}</td>
-       <td>{file.uploadedBy}</td>
-       <td>v{file.currentVersionSeq}</td>
-       <td>{new Date(file.updatedAt).toLocaleString("zh-CN")}</td>
+       <td className="search-secondary">{formatBytes(file.sizeBytes)}</td>
+       <td className="search-secondary">{file.uploadedBy}</td>
+       <td className="search-secondary">v{file.currentVersionSeq}</td>
+       <td className="search-secondary rare-data-date">{new Date(file.updatedAt).toLocaleString("zh-CN")}</td>
        {/* Every search hit sits in a folder inside the caller's visible scope
            (postgres.collaboration scopeFolderSQL), so the target is listable. */}
        <td><Link to={"/doc?folder="+file.folderId} aria-label={"在目录中打开 "+file.name}>打开</Link></td>
       </tr>)}
      </tbody>
-    </table>
+    </RareDataTable>
    )}
    {hasMore?<div className="search-more">
     {moreStatus==="failed"?<span className="error" role="alert">加载下一页失败。</span>:null}

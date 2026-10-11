@@ -5,7 +5,7 @@ import {request} from "../../shared/http";
 import {errorCode,errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
 import {Menu} from "../../shared/ui/Menu";
-import {MicroHoldToDelete,RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
+import {MicroHoldToDelete,RareButton,RareDataTable,RareInput,RareRowActions,RareSelect} from "../../shared/ui/rare";
 import {trashApi} from "./api";
 import {RestoreDialog} from "./RestoreDialog";
 import "./trashWorkbench.css";
@@ -181,8 +181,7 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
    <RareButton type="button" disabled={locked} onClick={()=>setSelected(new Set())}>取消选择</RareButton>
   </div>}
   <div className="trash-table-scroll">
-   <table className="trash-table">
-    <colgroup><col className="trash-col-check"/><col/><col className="trash-col-type"/><col className="trash-col-person"/><col className="trash-col-time"/><col className="trash-col-actions"/></colgroup>
+   <RareDataTable className="trash-table">
     <thead><tr>
      <th scope="col"><RareInput type="checkbox" aria-label="全选当前页" checked={allSelected} disabled={locked||entries.length===0} onChange={e=>setSelected(new Set(e.target.checked?entries.map(item=>item.id):[]))}/></th>
      <th scope="col">名称 / 原位置</th><th scope="col">类型</th><th scope="col">删除人</th><th scope="col">删除时间</th><th scope="col">操作</th>
@@ -193,17 +192,17 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
      {status==="ready"&&entries.length===0&&<tr><td colSpan={6} className="trash-empty">{offset>0?"当前页无记录，请返回上一页":"没有符合条件的记录"}</td></tr>}
      {status==="ready"&&entries.map(entry=><tr key={entry.id}>
       <td><RareInput type="checkbox" aria-label={`选择 ${entry.oldName}`} checked={selected.has(entry.id)} disabled={locked} onChange={e=>chooseOne(entry.id,e.target.checked)}/></td>
-      <td><div className="trash-resource"><EntryIcon folder={!!entry.folderId}/><div className="trash-resource-text"><strong title={entry.oldName}>{entry.oldName}</strong><small title={visibleParentPath(entry,byId)}>{visibleParentPath(entry,byId)}</small></div></div></td>
+      <td><div className="trash-resource"><EntryIcon folder={!!entry.folderId}/><div className="trash-resource-text"><strong title={entry.oldName}>{entry.oldName}</strong><small title={visibleParentPath(entry,byId)}>{visibleParentPath(entry,byId)}</small><small className="trash-mobile-meta">{entry.folderId?"目录":"文件"} · {entry.deletedByName||"—"} · {dateLabel(entry.deletedAt)}</small></div></div></td>
       <td>{entry.folderId?`目录${entry.subtreeCount?` · ${entry.subtreeCount} 子项`:""}`:"文件"}</td>
       <td className="trash-muted">{entry.deletedByName||"—"}</td>
       <td className="trash-muted">{dateLabel(entry.deletedAt)}</td>
-      <td><div className="trash-row-actions">
+      <td><RareRowActions className="trash-row-actions">
        <RareButton type="button" disabled={locked} onClick={()=>{setNotice(null);setRestoring(entry);}}>恢复</RareButton>
        {isAdmin&&<RareButton type="button" aria-label={`更多操作：${entry.oldName}`} title="更多操作" disabled={locked} onClick={e=>setMenu({entry,anchor:e.currentTarget})}>···</RareButton>}
-      </div></td>
+      </RareRowActions></td>
      </tr>)}
     </tbody>
-   </table>
+   </RareDataTable>
   </div>
   <div className="trash-footer"><span>每页 {PAGE_SIZE} 项 · 第 {Math.floor(offset/PAGE_SIZE)+1} 页</span><span className="trash-heading-spacer"/>
    <RareButton type="button" disabled={locked||status!=="ready"||offset===0} onClick={()=>setOffset(v=>Math.max(0,v-PAGE_SIZE))}>上一页</RareButton>

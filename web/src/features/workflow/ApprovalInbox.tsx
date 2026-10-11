@@ -1,4 +1,4 @@
-import {RareButton,RareInput,RareSelect,RareTabs,RareTextarea} from "../../shared/ui/rare";
+import {RareBadge,RareButton,RareDataTable,RareInput,RareRowActions,RareSelect,RareTabs,RareTextarea} from "../../shared/ui/rare";
 import {Dialog} from "../../shared/ui/Dialog";
 import {useEffect,useState} from "react";
 import {useLocation} from "react-router-dom";
@@ -21,6 +21,10 @@ const ACTION_LABELS:Record<string,string>={
  edit:"内容修改",
  rollback:"版本回滚",
 };
+const STATE_TONES={
+ pending:"warning",approved:"success",rejected:"danger",
+ cancelled:"neutral",conflicted:"danger",
+} as const;
 
 export function ApprovalInbox({currentUser}:{currentUser:User}){
  const[inbox,setInbox]=useState<Approval[]>([]);
@@ -160,7 +164,7 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
   <div className={"approval-workbench"+(sideOpen?" side-open":"")}>
    <div className="approval-main" id={"approval-panel-"+activeList} role="tabpanel" aria-labelledby={"approval-tab-"+activeList}>
     <section className="table approval-data">
-     <table className="approval-table">
+     <RareDataTable className="approval-table">
       <thead>{activeList==="inbox"
        ?<tr><th scope="col">文件</th><th className="approval-optional" scope="col">申请人</th>
         <th className="approval-optional" scope="col">类型</th><th className="approval-optional" scope="col">基准版本</th>
@@ -179,11 +183,11 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
         <td className="approval-optional">{ACTION_LABELS[a.action]??a.action}{a.rollbackTargetSeq?" → v"+a.rollbackTargetSeq:""}</td>
         <td className="approval-optional">v{a.baseSeq} · 第 {a.stepIndex+1}/{a.stepTotal} 级</td>
         <td className="approval-optional approval-date">{formatTime(a.createdAt)}</td>
-        <td className="approval-actions"><div className="approval-action-buttons">
+        <td className="approval-actions"><RareRowActions className="approval-action-buttons">
          <RareButton type="button" onClick={()=>showHistory(a.id)}>历史</RareButton>
          <RareButton type="button" className="primary" disabled={!!busyId} onClick={()=>openDecision(a,"approve")}>通过</RareButton>
          <RareButton type="button" disabled={!!busyId} onClick={()=>openDecision(a,"reject")}>拒绝</RareButton>
-        </div></td>
+        </RareRowActions></td>
        </tr>)}
       </>:<>
        {visibleMine.length===0&&<tr><td colSpan={6} className="empty">{search||stateFilter!=="all"?"没有匹配的审批":"没有发起过审批"}</td></tr>}
@@ -192,16 +196,16 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
          <span className="approval-mobile-meta">{ACTION_LABELS[a.action]??a.action} · {a.approverName} · 第 {a.stepIndex+1}/{a.stepTotal} 级</span>
         </td>
         <td className="approval-optional">{ACTION_LABELS[a.action]??a.action}</td>
-        <td className="approval-status-col"><span className="approval-status" data-state={a.state}>{STATE_LABELS[a.state]??a.state}</span></td>
+        <td className="approval-status-col"><RareBadge className="approval-status" tone={STATE_TONES[a.state]} dot>{STATE_LABELS[a.state]??a.state}</RareBadge></td>
         <td className="approval-optional">{a.approverName} · {a.stepIndex+1}/{a.stepTotal} 级</td>
         <td className="approval-optional approval-comment" title={a.decisionComment||undefined}>{a.decisionComment||"—"}</td>
-        <td className="approval-actions"><div className="approval-action-buttons">
+        <td className="approval-actions"><RareRowActions className="approval-action-buttons">
          <RareButton type="button" onClick={()=>showHistory(a.id)}>历史</RareButton>
          {a.state==="pending"&&<RareButton type="button" disabled={!!busyId} onClick={()=>openDecision(a,"cancel")}>撤回</RareButton>}
-        </div></td>
+        </RareRowActions></td>
        </tr>)}
       </>}</tbody>
-     </table>
+     </RareDataTable>
     </section>
    </div>
    <aside className="approval-side" aria-label="审批通知与时间线">
