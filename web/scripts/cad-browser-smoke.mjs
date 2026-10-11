@@ -50,7 +50,18 @@ function mount(drawing=false,layout="Model"){
    "10","500","20","500","11","510","21","500",
    "0","ENDSEC","0","EOF",
   ].join("\n");
-  const source=layout==="PLOT"?[
+  const source=layout==="DIM"?[
+   "0","SECTION","2","HEADER","9","$INSUNITS","70","4","0","ENDSEC",
+   "0","SECTION","2","TABLES","0","TABLE","2","DIMSTYLE",
+   "0","DIMSTYLE","2","ANNOTATED","40","1","41","2",
+   "140","3","271","2",
+   "0","ENDTAB","0","ENDSEC",
+   "0","SECTION","2","ENTITIES",
+   "0","DIMENSION","8","DIM","2","*ABSENT","3","ANNOTATED",
+   "70","0","10","5","20","12",
+   "13","5","23","5","14","35","24","5","50","0","1","<>",
+   "0","ENDSEC","0","EOF",
+  ].join("\n"):layout==="PLOT"?[
    "0","SECTION","2","HEADER","9","$INSUNITS","70","4","0","ENDSEC",
    "0","SECTION","2","ENTITIES",
    "0","LINE","8","FRAME","410","PLOT","67","1","10","0","20","0","11","40","21","0",
@@ -78,7 +89,9 @@ function mount(drawing=false,layout="Model"){
    "0","ENDSEC","0","EOF",
   ].join("\n"):dxf;
   actualDrawing=parseDxf(source,THREE,layout);
-  if(actualDrawing.skipped.length)throw Error(actualDrawing.skipped.join(","));
+  if(actualDrawing.skipped.length&&!(layout==="DIM"&&
+   actualDrawing.skipped.every(message=>message.includes("DIMENSION:")&&message.includes("近似重建"))))
+   throw Error(actualDrawing.skipped.join(","));
   object=actualDrawing.object;
  }
  controls=mountEngineeringScene(THREE,OrbitControls,holder,object,drawing,m=>{metrics=m;},
@@ -90,6 +103,11 @@ window.__cad={
   width:holder.querySelector("canvas")?.getBoundingClientRect().width??0,
   drawingLayers:actualDrawing?.layers.length??0,
   drawingLayout:actualDrawing?.layout??null,layoutCount:actualDrawing?.layouts.length??0,
+  dimensionSprites:actualDrawing?.object.children.reduce((sum,g)=>sum+
+   g.children.filter(n=>n.isSprite).length,0)??0,
+  dimensionSegments:actualDrawing?.object.children.reduce((sum,g)=>sum+
+   g.children.filter(n=>n.isLineSegments).reduce((inner,n)=>
+    inner+n.geometry.getAttribute("position").count/2,0),0)??0,
   projectedViewports:actualDrawing?.viewports.projected??0,
   projectedHatches:actualDrawing?.object.children.reduce((sum,g)=>sum+
    g.children.filter(n=>n.name==="VIEWPORT_HATCH").length,0)??0,
@@ -107,6 +125,7 @@ window.__cad={
  projected:()=>mount(true,"P1"),
  frozen:()=>mount(true,"P2"),
  plot:()=>mount(true,"PLOT"),
+ dimension:()=>mount(true,"DIM"),
  png:()=>controls.exportPng()?.startsWith("data:image/png;base64,")??false,
  printPreview:()=>printableSheetHtml(controls.exportPng(),"A3","A1").includes("@page{size:A3 landscape"),
  vectorPlot:()=>{
@@ -240,6 +259,13 @@ try{
  assert.deepEqual(printPage.size,[40,20],"mm-authored browser drawing must preserve 1:1 millimetre extent");
  assert(printPage.physical&&printPage.svg&&printPage.title,
   "real Chrome must produce a physical-size SVG engineering plot");
+ const fallbackDimension=await cdp.eval("(()=>{window.__cad.dimension();return window.__cad.state})()");
+ assert(fallbackDimension.dimensionSprites>0,
+  "Chrome must create a visible glyph for a supported missing-block dimension");
+ assert(fallbackDimension.dimensionSegments>=5,
+  "Chrome must render dimension line, extension lines and arrow outlines");
+ assert.equal(await cdp.eval("window.__cad.png()"),true,
+  "fallback dimension linework must remain renderable in actual WebGL");
  await cdp.send("Emulation.setDeviceMetricsOverride",{width:500,height:700,deviceScaleFactor:1,mobile:false});
  await delay(400);
  const narrow=await cdp.eval("window.__cad.state.width");

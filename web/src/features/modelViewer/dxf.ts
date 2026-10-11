@@ -11,6 +11,8 @@ import {parseHatchPaths} from "./hatch2d";
 import {clipHatchPattern} from "./hatchPattern2d";
 import {cadFontFamily,decodeCadText,type CadTextStyle} from "./cadText2d";
 import {clipUvPolygon,createPaperViewport,type UvPoint,type ValidViewport} from "./paperViewport2d";
+import {buildDimensionFallback,DEFAULT_DIM_STYLE,parseDimensionStyle,
+ type DimensionPair,type DimensionStyle} from "./dimension2d";
 
 export type DxfParseResult={
  object:THREE.Group;
@@ -103,27 +105,43 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
  const layerTrueColors=new Map<string,number>();
  const layerHandles=new Map<string,string>();
  const textStyles=new Map<string,CadTextStyle>();
+ const dimensionStyles=new Map<string,DimensionStyle>();
  let unit="unknown";
  let section="";
  let table="";
  let pendingLayer="";
  let pendingLayerHandle="";
  let pendingStyle="";
+ let dimensionStyleRecords:DimensionPair[]=[];
+ let collectingDimension=false;
+ const flushDimensionStyle=()=>{
+  if(!collectingDimension)return;
+  const name=dimensionStyleRecords.find(pair=>pair.code===2)?.value.trim().toUpperCase();
+  if(name)dimensionStyles.set(name,parseDimensionStyle(dimensionStyleRecords));
+  dimensionStyleRecords=[];collectingDimension=false;
+ };
  let sectionPending=false;
  let tablePending=false;
  let unitPending=false;
  for(const pair of records){
   if(pair.code===0){
+   flushDimensionStyle();
    if(pair.value==="SECTION"){sectionPending=true;continue;}
    if(pair.value==="ENDSEC"){section="";continue;}
    if(pair.value==="TABLE"){tablePending=true;continue;}
    if(pair.value==="LAYER"&&table==="LAYER"){pendingLayer="";pendingLayerHandle="";continue;}
    if(pair.value==="STYLE"&&table==="STYLE"){pendingStyle="";continue;}
+   if(pair.value==="DIMSTYLE"&&table==="DIMSTYLE"){
+    dimensionStyleRecords=[];collectingDimension=true;continue;
+   }
    if(pair.value==="ENDTAB"){table="";pendingLayer="";continue;}
    continue;
   }
   if(pair.code===2&&sectionPending){section=pair.value.trim();sectionPending=false;continue;}
   if(pair.code===2&&tablePending){table=pair.value.trim();tablePending=false;continue;}
+  if(collectingDimension&&section==="TABLES"&&table==="DIMSTYLE"){
+   dimensionStyleRecords.push(pair);continue;
+  }
   if(section==="HEADER"){
    if(pair.code===9)unitPending=pair.value.trim()==="$INSUNITS";
    else if(unitPending&&pair.code===70){unit=UNITS[Number(pair.value)]??"unknown";unitPending=false;}
@@ -159,6 +177,7 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
    }
   }
  }
+ flushDimensionStyle();
  const layerColor=(name:string)=>layerColors.get(name)??7;
 
  // Pass 2 — entities.
@@ -519,10 +538,34 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
    skipped.add("LIMIT: 图元展开预算");return;
   }
   if(e.invisible)return;
-  if(e.type==="DIMENSION"){
+ if(e.type==="DIMENSION"){
    if(!e.blockName||!blocks.has(e.blockName)){
-    skipped.add("DIMENSION: 缺少可显示图块");return;
+    const styleName=e.raw.find(pair=>pair.code===3)?.value.trim().toUpperCase()??"STANDARD";
+    const style=dimensionStyles.get(styleName)??DEFAULT_DIM_STYLE;
+    const outcome=buildDimensionFallback(e.raw,style);
+    if("error" in outcome){
+     skipped.add("DIMENSION: "+outcome.error+"（缺少表示图块）");return;
+    }
+    const previousColor=currentColor;
+    currentColor=entityColor(e);
+    for(const [a,b] of outcome.segments)line(a.x,a.y,b.x,b.y,e.layer);
+    if(outcome.label){
+     const value=outcome.label;
+     const dimensionText=emptyEntity("TEXT");
+     dimensionText.layer=e.layer;
+     dimensionText.points=[{x:value.point.x,y:value.point.y,bulge:0}];
+     dimensionText.text=value.text;
+     dimensionText.height=value.height;
+     dimensionText.a0=value.rotation;
+     label(dimensionText);
+    }
+    currentColor=previousColor;
+    skipped.add("DIMENSION: 匿名图块缺失，线性尺寸近似重建（非精确样式）");
+    return;
    }
+   const textOverride=e.raw.find(pair=>pair.code===1)?.value;
+   if(textOverride&&textOverride!=="<>"&&textOverride!==" ")
+    skipped.add("DIMENSION: 显式文字覆盖与匿名图块内容可能不一致");
    // Group 2 points to a graphical BLOCK; group 10 is its definition point,
    // not the graphical block insertion origin.
    commit({...e,type:"INSERT",points:[{x:0,y:0,bulge:0}],
@@ -896,7 +939,7 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
     break;
    }
    case 1:entity.text+=pair.value;break;
-   case 3:entity.text=pair.value+entity.text;break;
+   case 3:if(entity.type!=="DIMENSION")entity.text=pair.value+entity.text;break;
   }
   entity.raw.push(pair);
  }

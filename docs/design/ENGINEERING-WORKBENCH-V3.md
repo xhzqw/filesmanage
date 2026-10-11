@@ -161,6 +161,32 @@ This document records validated capability instead of marking unimplemented work
   dimensions, page overflow, declared-unit requirements and injection
   safety; headless Chrome verifies print SVG generation using the real scene.
 
+## Delivered in V3.8 DIMENSION style and fallback increment
+
+- DIMSTYLE table records are interpreted for the bounded rotated and aligned
+  linear dimension fallback: annotation scale, arrow size, extension offset,
+  extension beyond, text height/gap, decimal precision, linear measurement
+  factor and rounding. The graphical DIMENSION anonymous BLOCK always wins
+  when present. Its definition point must never be interpreted as insertion.
+- If the anonymous representation is absent, **only** well-defined 2D
+  linear/aligned dimensions with complete extension origins, dimension line
+  position and valid supported style settings are reconstructed. The visible
+  compatibility notice explicitly labels the result as an approximation.
+  Geometry includes witness lines, dimension line, open arrowheads and
+  browser-font text. These are not CAD-kernel-accurate arrow blocks/glyphs.
+- Group 1 explicit dimension text supports numeric placeholder replacement
+  (\`<>\`) and a single space suppresses labels. If a valid representation
+  BLOCK exists but a separate text override is specified, a fidelity warning
+  is shown rather than replacing its authoritative graphics.
+- Angular, radial, diameter and ordinate dimensions, unsupported planes,
+  tolerances/extreme style values and missing definition data are refused as
+  unsafe fallback and never invented. Exact DIMSTYLE and true SHX precision
+  remain a separate milestone.
+- Synthetic DXF tests cover valid/invalid DIMSTYLE, line placement, visible
+  glyphs, text overrides, missing points, tolerance refusal and
+  authoritative representation blocks. Headless Chrome WebGL regression
+  verifies actual renderable fallback linework and a glyph sprite.
+
 ## Deliberately unsupported or approximate
 
 | Capability | Current truth | Next gate |
@@ -170,7 +196,7 @@ This document records validated capability instead of marking unimplemented work
 | True assembly hierarchy | Imported hierarchy where provided; MSH mesh groups otherwise | Stable instance IDs and assembly tree |
 | 3D measurement | Mesh-coordinate approximate straight distance | Exact B-Rep edge/face measurements |
 | DXF SPLINE/NURBS | Knots/degree/weights supported; fit-point-only interpolation not supported | Fit-point solver, discontinuous curve fidelity |
-| DXF DIMENSION | Anonymous representation BLOCK when present | Full DIMSTYLE overrides and absent-block fallback |
+| DXF DIMENSION | Anonymous representation BLOCK when present; missing-block 2D rotated/aligned linear reconstruction with explicit approximation notice | Exact DIMSTYLE variants, tolerance/precision, radial/angular/ordinate reconstruction, faithful dimension fonts/arrows |
 | DXF HATCH | Solid fills and bounded pattern-family strokes clipped against closed polyline contours, with holes | Edge-boundary paths, gradients, advanced hatch styles and exact plot fidelity |
 | DXF paper space, XREF | Layout isolation and bounded 2D XY orthographic VIEWPORT composition, PNG fit-to-page, and SVG physically-scaled paper geometry for supported mm-only sheets | Full 3D perspective/tilted view, complex clipping, exact CAD text/font plot, XREF, printer calibration |
 | DXF arc/ellipse | Tessellated preview | Analytic segment and center/angle snap records |

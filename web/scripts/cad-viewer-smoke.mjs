@@ -184,6 +184,72 @@ const missing=parseDxf([
 ].join("\n"),THREE);
 assert(missing.skipped.some(value=>value.startsWith("DIMENSION")));
 
+// Missing anonymous DIMENSION blocks must not erase ordinary engineering
+// dimensions. The fallback is explicitly approximate, restricted to complete
+// rotated/aligned linear definitions and supported DIMSTYLE settings.
+const linearDimension=[
+ "0","SECTION","2","HEADER","9","$INSUNITS","70","4","0","ENDSEC",
+ "0","SECTION","2","TABLES","0","TABLE","2","DIMSTYLE",
+ "0","DIMSTYLE","2","CUSTOM","40","1","41","2","42","0.5",
+ "44","1","140","3","147","0.5","271","1","144","1",
+ "0","ENDTAB","0","ENDSEC",
+ "0","SECTION","2","ENTITIES",
+ "0","DIMENSION","8","DIM","2","*MISSING","3","CUSTOM",
+ "70","0","10","0","20","8",
+ "13","0","23","0","14","20","24","0","50","0","1","L=<>",
+ "0","ENDSEC","0","EOF",
+].join("\n");
+const dimensionFallback=parseDxf(linearDimension,THREE);
+assert(dimensionFallback.skipped.some(message=>message.includes("近似重建")));
+const dimensionModule=await transform(readFileSync(new URL("../src/features/modelViewer/dimension2d.ts",import.meta.url),"utf8"),
+ {loader:"ts",format:"esm",target:"es2022"});
+const {buildDimensionFallback,parseDimensionStyle}=await import("data:text/javascript;base64,"+
+ Buffer.from(dimensionModule.code).toString("base64"));
+const dimStyle=parseDimensionStyle([{code:40,value:"1"},{code:140,value:"3"},
+ {code:271,value:"1"},{code:147,value:"0.5"},{code:144,value:"1"}]);
+const dimensionValues=[
+ {code:70,value:"0"},{code:10,value:"0"},{code:20,value:"8"},
+ {code:13,value:"0"},{code:23,value:"0"},{code:14,value:"20"},
+ {code:24,value:"0"},{code:50,value:"0"},{code:1,value:"L=<>"}
+];
+const dimensionGeometry=buildDimensionFallback(dimensionValues,dimStyle);
+assert(!dimensionGeometry.error);
+assert.equal(dimensionGeometry.label.text,"L=20.0");
+assert.equal(dimensionGeometry.label.height,3);
+assert.equal(dimensionGeometry.measured,20);
+assert.equal(buildDimensionFallback(dimensionValues.map(v=>v.code===1?{...v,value:" "}:v),
+ dimStyle).label,null,"a single space suppresses dimension text");
+assert.equal(buildDimensionFallback(dimensionValues.map(v=>v.code===70?{...v,value:"3"}:v),
+ dimStyle).error.includes("无安全回退"),true);
+const dimensionLayer=dimensionFallback.object.children.find(node=>node.name==="DIM");
+assert(dimensionLayer);
+const dimensionWires=dimensionLayer.children.find(node=>node.isLineSegments);
+assert(dimensionWires.geometry.getAttribute("position").count>=12,
+ "fallback draws dimension line, witness lines, and arrow outlines");
+const dimensionSprite=dimensionLayer.children.find(node=>node.isSprite);
+assert(dimensionSprite&&dimensionSprite.scale.y>0);
+const measuredNodes=Array.from(dimensionWires.geometry.getAttribute("position").array);
+assert(measuredNodes.includes(20)&&measuredNodes.includes(8),
+ "dimension line uses user-supplied coordinates and offset");
+const alignedFallback=parseDxf(linearDimension
+ .replace("70\n0\n10\n0\n20\n8","70\n1\n10\n0\n20\n8")
+ .replace("50\n0\n1\nL=<>","1\n<>"),THREE);
+assert(alignedFallback.skipped.some(message=>message.includes("近似重建")));
+const disallowed=parseDxf(linearDimension.replace("70\n0\n10\n0\n20\n8","70\n2\n10\n0\n20\n8"),THREE);
+assert(disallowed.skipped.some(message=>message.includes("角度")));
+assert.equal(disallowed.object.children.length,0);
+const toleranced=parseDxf(linearDimension.replace("271\n1","71\n1\n271\n1"),THREE);
+assert(toleranced.skipped.some(message=>message.includes("公差")));
+assert.equal(toleranced.object.children.length,0);
+const missingWitnessPoint=parseDxf(linearDimension.replace("14\n20\n24\n0","14\n20"),THREE);
+assert(missingWitnessPoint.skipped.some(message=>message.includes("定义点不足")));
+// Existing representation graphics remain authoritative: no fallback line
+// should be added or graphics displaced when the anonymous block is valid.
+const overriddenGraphic=parseDxf(engineeringDxf.replace("10\n999\n20\n999",
+ "1\nOVERRIDE\n10\n999\n20\n999"),THREE);
+assert(overriddenGraphic.skipped.some(message=>message.includes("覆盖")));
+assert(overriddenGraphic.object.children.some(node=>node.name==="DIM"));
+
 // Legacy POLYLINE/VERTEX runs must remain separate across BLOCK definitions
 // and model-space entities (old global polyline accumulator corrupted them).
 const legacy=[
