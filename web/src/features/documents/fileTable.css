@@ -287,6 +287,10 @@ table.file-table-ultra tbody td:not(.empty){height:26px;padding:0 8px}
 @container file-list (max-width:560px){
  table.file-table-ultra tbody tr{height:42px}
  table.file-table-ultra tbody td:not(.empty){height:42px;padding:0 5px}
+ /* Override the explicit table-cell display contract in the base grid. */
+ table.file-table-ultra tbody td.col-size,
+ table.file-table-ultra tbody td.col-version,
+ table.file-table-ultra tbody td.col-date{display:none}
 }
 .density-switch{display:inline-flex;align-items:center;gap:var(--space-1);font-size:11px;color:var(--text-tertiary)}
 .density-title{color:var(--text-tertiary);white-space:nowrap}
