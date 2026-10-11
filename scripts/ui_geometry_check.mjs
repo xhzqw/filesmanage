@@ -186,6 +186,34 @@ try{
  await send("Page.enable");
  await send("Runtime.enable");
  await navigate("/login",".login-card");
+ // Verify the *rendered* input text inset, not merely that an icon exists:
+ // the card's input padding shorthand previously overrode the icon spacing.
+ for(const width of [1440,900,390]){
+  await compactViewport(width);
+  await navigate("/login",".login-card");
+  const loginFields=await evaluate(`(()=>{
+   const fields=[...document.querySelectorAll(".login-card .input-wrap")].map(wrap=>{
+    const icon=wrap.querySelector(".input-icon"),input=wrap.querySelector("input");
+    if(!icon||!input)return null;
+    const ir=input.getBoundingClientRect(),gr=icon.getBoundingClientRect();
+    const inset=parseFloat(getComputedStyle(input).paddingLeft);
+    return {name:input.id,inset,gap:Math.round((ir.left+inset-gr.right)*10)/10,
+     inputRight:ir.right};
+   });
+   const cr=document.querySelector(".login-card")?.getBoundingClientRect();
+   return {width:innerWidth,scrollWidth:document.documentElement.scrollWidth,
+    cardLeft:cr?.left,cardRight:cr?.right,fields};
+  })()`);
+  check(`login ${width}px icon/text do not overlap`,
+   loginFields.fields.length===2&&loginFields.fields.every(f=>f&&f.gap>=7&&f.inset>=32),
+   JSON.stringify(loginFields.fields));
+  check(`login ${width}px card fits viewport`,
+   loginFields.width===width&&loginFields.scrollWidth<=width+2&&
+   loginFields.cardLeft>=-1&&loginFields.cardRight<=width+1,
+   JSON.stringify(loginFields));
+ }
+ await send("Emulation.clearDeviceMetricsOverride");
+ await navigate("/login",".login-card");
  const loggedIn=await evaluate(`(async()=>{
   const r=await fetch("/api/login",{method:"POST",credentials:"same-origin",
    headers:{"Content-Type":"application/json"},

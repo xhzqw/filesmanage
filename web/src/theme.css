@@ -604,7 +604,9 @@ tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions 
 .page-purpose{font-size:15px;color:var(--text-primary);margin:var(--space-3) 0 var(--space-1)}
 .input-wrap{position:relative}
 .input-icon{position:absolute;left:var(--space-2);top:50%;transform:translateY(-50%);color:var(--text-tertiary);pointer-events:none}
-.input-wrap input{padding-left:30px}
+/* Reserve space for the leading icon. Must outrank the login card's
+   input:not() shorthand padding, otherwise text/placeholder overlays it. */
+.login-card .input-wrap input:not([type="checkbox"]):not([type="radio"]){padding-left:36px}
 .input-wrap input:focus{outline:1px solid var(--border-focus);outline-offset:0;border-color:var(--border-focus);box-shadow:0 0 0 3px rgba(2,160,234,.16)}
 .form-extras{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);font-size:12px}
 .form-extras .remember{display:inline-flex;align-items:center;gap:6px;flex:none;white-space:nowrap;line-height:1.25;font-weight:400;color:var(--text-secondary);cursor:pointer}
