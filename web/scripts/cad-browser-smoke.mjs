@@ -39,6 +39,11 @@ function mount(drawing=false,layout="Model"){
    "92","2","72","0","73","1","93","4",
    "10","10","20","10","10","30","20","10",
    "10","30","20","30","10","10","20","30","97","0",
+   "0","HATCH","8","PATTERN","70","0","75","0","91","1",
+   "92","2","72","0","73","1","93","4",
+   "10","50","20","10","10","90","20","10",
+   "10","90","20","30","10","50","20","30","97","0",
+   "78","1","53","45","43","50","44","10","45","0","46","3","79","0",
    "0","LINE","8","SHEET","410","A1","67","1",
    "10","500","20","500","11","510","21","500",
    "0","ENDSEC","0","EOF",
@@ -63,6 +68,7 @@ window.__cad={
  grid:()=>controls.toggleGrid(),
  drawing:()=>mount(true),
  sheet:()=>mount(true,"A1"),
+ png:()=>controls.exportPng()?.startsWith("data:image/png;base64,")??false,
  dispose:()=>{controls.dispose();return holder.querySelectorAll("canvas").length;},
 };
 `;
@@ -161,13 +167,15 @@ try{
  const drawing=await cdp.eval("(()=>{window.__cad.drawing();return window.__cad.state})()");
  assert.equal(drawing.canvases,1,"scene replacement must not leak a canvas");
  assert(drawing.metrics.triangles>0,"solid HATCH produces real mesh triangles");
- assert.equal(drawing.drawingLayers,3,"DIMENSION, NURBS and HATCH DXF layers must render");
+ assert.equal(drawing.drawingLayers,4,"DIMENSION, NURBS, solid and patterned HATCH must render");
  assert(drawing.metrics.size[0]>=100,"dimension and spline linework must retain actual drawing scale");
+ assert.equal(await cdp.eval("window.__cad.png()"),true,"drawing can export a PNG preview");
  const sheet=await cdp.eval("(()=>{window.__cad.sheet();return window.__cad.state})()");
  assert.equal(sheet.canvases,1,"layout switching must dispose the old canvas");
  assert.equal(sheet.drawingLayout,"A1");
  assert.equal(sheet.drawingLayers,1,"model-space elements must not leak into a paper layout");
  assert(sheet.metrics.size[0]<30,"paper layout must be fitted independently");
+ assert.equal(await cdp.eval("window.__cad.png()"),true,"paper layout can export independently");
  assert.equal(await cdp.eval("window.__cad.dispose()"),0,"dispose must remove WebGL canvas");
  console.log("CAD_BROWSER_PASS Chrome WebGL: 3D navigation, DXF DIMENSION/NURBS/HATCH, isolated paper layout, resize and disposal");
 }finally{

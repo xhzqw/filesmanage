@@ -69,6 +69,28 @@ This document records validated capability instead of marking unimplemented work
 - Chrome WebGL regression renders a real HATCH mesh with DXF labels/curves
   and verifies that paper-only entities do not leak into Model Space.
 
+## Delivered in V3.4 engineering drawing increment
+
+- HATCH pattern-family lines are evaluated from DXF angle (53), family base
+  (43/44), offset vector (45/46), dash counts (79) and lengths (49). Generated
+  strokes are clipped against the actual even-odd polyline boundary including
+  holes. Unsupported gradients, complex edge contours and excessive line
+  density are explicitly reported. This is a geometry-preview subset, not
+  plot-perfect reproduction of every Autodesk hatch style.
+- STYLE table (text font file, width factor, fixed height) and TEXT entity
+  style, scale, rotation and common engineering glyph codes are interpreted.
+  No arbitrary external font paths are fetched; SHX uses a marked browser-font
+  approximation rather than claiming faithful glyph metrics.
+- Paper VIEWPORT entities with rectangular geometry display their frame.
+  Model-space projection, nonrectangular clipping and frozen layer overrides
+  remain unsupported and are reported, not silently invented.
+- Each selected Model/Paper layout can be exported as a PNG of the visible
+  preview at browser resolution. This is **not** CAD scale-controlled plotting
+  or a replacement for the original source drawing.
+- DXF and Chromium regression covers hatch line/negative-offset/dash
+  clipping, common text symbols, STYLE fallback, viewport framing, view
+  selection and PNG capture. Geometry/resource safety limits remain active.
+
 ## Deliberately unsupported or approximate
 
 | Capability | Current truth | Next gate |
@@ -78,11 +100,11 @@ This document records validated capability instead of marking unimplemented work
 | True assembly hierarchy | Imported hierarchy where provided; MSH mesh groups otherwise | Stable instance IDs and assembly tree |
 | 3D measurement | Mesh-coordinate approximate straight distance | Exact B-Rep edge/face measurements |
 | DXF SPLINE/NURBS | Knots/degree/weights supported; fit-point-only interpolation not supported | Fit-point solver, discontinuous curve fidelity |
-| DXF DIMENSION | Anonymous representation BLOCK when present | Style/text override fidelity and absent-block fallback |
-| DXF HATCH | Solid closed-polyline contours, concave shapes and nested holes/islands; translucent preview only | Edge-boundary paths, pattern/gradient fidelity, exact print styles |
-| DXF paper space, XREF | Model and named paper-layout entity isolation via groups 410/67; VIEWPORT composition and XREF unsupported | True layout viewports, plot settings and secured resource resolution |
+| DXF DIMENSION | Anonymous representation BLOCK when present | Full DIMSTYLE overrides and absent-block fallback |
+| DXF HATCH | Solid fills and bounded pattern-family strokes clipped against closed polyline contours, with holes | Edge-boundary paths, gradients, advanced hatch styles and exact plot fidelity |
+| DXF paper space, XREF | Model and named paper layout isolation, rectangular VIEWPORT frame only; PNG of current preview | True viewport model projection/clipping, CAD print scale, XREF resource handling |
 | DXF arc/ellipse | Tessellated preview | Analytic segment and center/angle snap records |
-| DXF text | Canvas glyph approximation, not CAD SHX exact rendering | Font and text-style resolver |
+| DXF text | STYLE lookup, width/rotation, Unicode symbols; Canvas font fallback | True SHX metrics, advanced MTEXT formatting, annotation scales |
 | 2D/3D annotations and version diff | Not yet implemented | Version-bound review domain and permissions |
 
 ## Release constraints

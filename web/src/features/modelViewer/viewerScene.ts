@@ -10,6 +10,7 @@ export type ViewerControls={
  toggleAxes:()=>boolean;toggleGrid:()=>boolean;toggleEdges:()=>boolean;
  toggleProjection:()=>"perspective"|"orthographic";
  toggleMeasure:()=>boolean;clearMeasurement:()=>void;
+ exportPng:()=>string|null;
 };
 
 /** A Y-up solids viewport or an orthographic XY drawing sheet. */
@@ -327,6 +328,16 @@ export function mountEngineeringScene(
  resetView();updateGrid();invalidate();
  return{
   invalidate,resetView,focusObject,
+  exportPng:()=>{
+   if(disposed||lost)return null;
+   // Render and read in the same task: WebGL's default drawing buffer is
+   // cleared between frames. This exports only the currently visible view,
+   // not a vector/scale-accurate CAD plot.
+   try{
+    renderer.render(scene,camera);
+    return renderer.domElement.toDataURL("image/png");
+   }catch{return null;}
+  },
   setStandardView:(name)=>{if(drawing)return;if(name!=="iso")switchCamera(ortho);setPose(name);},
   toggleAxes:()=>{axes.visible=!axes.visible;invalidate();return axes.visible;},
   toggleGrid:()=>{gridVisible=!gridVisible;grid.visible=gridVisible;if(gridVisible)updateGrid();invalidate();return gridVisible;},

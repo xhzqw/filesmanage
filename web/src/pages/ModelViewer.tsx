@@ -284,6 +284,15 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
        </div>
        <RareButton type="button" className={view.measure?"on":""} aria-pressed={view.measure}
         onClick={()=>setView(v=>({...v,measure:controls.current?.toggleMeasure()??v.measure}))}>测距</RareButton>
+       {drawing&&<RareButton type="button" onClick={()=>{
+        const image=controls.current?.exportPng();
+        if(!image)return;
+        const anchor=document.createElement("a");
+        anchor.href=image;
+        anchor.download="drawing-"+id.replace(/[^a-zA-Z0-9_-]/g,"").slice(0,60)+"-"+
+         activeLayout.replace(/[^\p{L}\p{N}_-]/gu,"_").slice(0,50)+".png";
+        anchor.click();
+       }}>导出当前图纸 PNG</RareButton>}
       </div>}
       {status==="ready"&&!drawing&&<div className="cad-viewcube" role="group" aria-label="方向导航立方体">
        <div className="cad-viewcube-body" style={{transform:"rotateX("+cube.pitch+"deg) rotateY("+(-cube.yaw)+"deg)"}}>
@@ -373,7 +382,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
        <div><span>格式</span><strong>{info?.format?.toUpperCase()??"-"}</strong></div>
        <div><span>源校验</span><strong title={fileMeta?.sha256}>{fileMeta?.sha256?.slice(0,10)??"-"}…</strong></div>
        {info?.note&&<p className="cad-notice">{info.note}</p>}
-       {skipped.length>0&&<p className="cad-notice">未绘制实体：{skipped.join("、")}</p>}
+       {skipped.length>0&&<p className="cad-notice">兼容性提示：{skipped.join("、")}</p>}
       </section>}
      </aside>}
     </div>

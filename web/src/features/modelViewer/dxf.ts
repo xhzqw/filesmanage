@@ -8,6 +8,8 @@
 import type * as THREE from "three";
 import {sampleSpline} from "./nurbs2d";
 import {parseHatchPaths} from "./hatch2d";
+import {clipHatchPattern} from "./hatchPattern2d";
+import {cadFontFamily,decodeCadText,type CadTextStyle} from "./cadText2d";
 
 export type DxfParseResult={
  object:THREE.Group;
@@ -75,13 +77,19 @@ type Entity={
  layout:string;
  paperSpace:boolean;
  raw:Pair[];
+ textStyle:string;
+ textWidthFactor:number;
+ hAlign:number;
+ vAlign:number;
+ viewportId:number;
 };
 
 function emptyEntity(type:string):Entity{
  return {type,layer:"0",points:[],end:null,radius:0,a0:0,a1:360,closed:false,height:2.5,text:"",
   blockName:"",scaleX:1,scaleY:1,rotation:0,major:null,ratio:1,parameterStart:0,parameterEnd:Math.PI*2,
   degree:3,knots:[],weights:[],splineControls:[],invisible:false,colorIndex:256,trueColor:null,
-  layout:"",paperSpace:false,raw:[]};
+  layout:"",paperSpace:false,raw:[],textStyle:"STANDARD",textWidthFactor:1,
+  hAlign:0,vAlign:0,viewportId:0};
 }
 
 export function parseDxf(text:string,THREE:typeof import("three"),requestedLayout="Model"):DxfParseResult{
@@ -91,10 +99,12 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
  const layerColors=new Map<string,number>();
  const hiddenLayers=new Set<string>();
  const layerTrueColors=new Map<string,number>();
+ const textStyles=new Map<string,CadTextStyle>();
  let unit="unknown";
  let section="";
  let table="";
  let pendingLayer="";
+ let pendingStyle="";
  let sectionPending=false;
  let tablePending=false;
  let unitPending=false;
@@ -104,6 +114,7 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
    if(pair.value==="ENDSEC"){section="";continue;}
    if(pair.value==="TABLE"){tablePending=true;continue;}
    if(pair.value==="LAYER"&&table==="LAYER"){pendingLayer="";continue;}
+   if(pair.value==="STYLE"&&table==="STYLE"){pendingStyle="";continue;}
    if(pair.value==="ENDTAB"){table="";pendingLayer="";continue;}
    continue;
   }
@@ -122,6 +133,19 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
    }
    if(pair.code===420&&pendingLayer)layerTrueColors.set(pendingLayer,Number(pair.value)&0xffffff);
    if(pair.code===70&&pendingLayer&&(Number(pair.value)&1)!==0)hiddenLayers.add(pendingLayer);
+  }
+  if(section==="TABLES"&&table==="STYLE"){
+   if(pair.code===2){
+    pendingStyle=pair.value.trim().toUpperCase();
+    if(pendingStyle&&!textStyles.has(pendingStyle))
+     textStyles.set(pendingStyle,{fontFile:"",widthFactor:1,fixedHeight:0});
+   }
+   const style=textStyles.get(pendingStyle);
+   if(style){
+    if(pair.code===3)style.fontFile=pair.value.trim();
+    if(pair.code===41)style.widthFactor=Number(pair.value);
+    if(pair.code===40)style.fixedHeight=Number(pair.value);
+   }
   }
  }
  const layerColor=(name:string)=>layerColors.get(name)??7;
@@ -230,19 +254,26 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
    previous=next;
   }
  };
- const label=(text:string,x:number,y:number,h:number,layer:string)=>{
+ const label=(e:Entity)=>{
+  const point=e.points[0];
+  if(!point)return;
+  const x=point.x,y=point.y,layer=e.layer;
+  const style=textStyles.get(e.textStyle.toUpperCase());
+  const h=(e.height>0?e.height:style?.fixedHeight)||2.5;
   if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(h)||h<=0)return;
-  const content=text.replace(/\\P/g,"\n").replace(/\{\\[^;]*;/g,"").replace(/[{}]/g,"").slice(0,400);
+  const content=decodeCadText(e.text);
   const rows=content.split("\n").slice(0,8);
   if(!content.trim())return;
   const canvas=document.createElement("canvas");
   const context=canvas.getContext("2d");
   if(!context){skipped.add("TEXT");return;}
   const fontSize=60;
-  context.font="500 "+fontSize+"px Arial, 'Microsoft YaHei', sans-serif";
+  const font=cadFontFamily(style);
+  if(font.approximate)skipped.add("TEXT: SHX 字体使用浏览器字体近似显示");
+  context.font="500 "+fontSize+"px "+font.family;
   canvas.width=Math.min(4096,Math.ceil(Math.max(20,...rows.map(row=>context.measureText(row).width))+12));
   canvas.height=Math.ceil((fontSize+12)*rows.length);
-  context.font="500 "+fontSize+"px Arial, 'Microsoft YaHei', sans-serif";
+  context.font="500 "+fontSize+"px "+font.family;
   context.textBaseline="top";
   const resolved=actualLayer(layer);
   context.fillStyle="#"+currentColor.toString(16).padStart(6,"0");
@@ -252,16 +283,32 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
   const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,transparent:true,depthWrite:false}));
   const sx=Math.hypot(activeTransform.a,activeTransform.b);
   const sy=Math.hypot(activeTransform.c,activeTransform.d);
-  sprite.scale.set(canvas.width/fontSize*h*sx,canvas.height/fontSize*h*sy,1);
+  const widthFactor=e.textWidthFactor*(style?.widthFactor??1);
+  sprite.scale.set(canvas.width/fontSize*h*sx*Math.max(.05,Math.min(widthFactor,20)),
+   canvas.height/fontSize*h*sy,1);
   const origin=transformed(x,y);
-  sprite.position.set(origin.x+sprite.scale.x/2,origin.y+sprite.scale.y/2,0);
-  (sprite.material as THREE.SpriteMaterial).rotation=Math.atan2(activeTransform.b,activeTransform.a);
+  const anchor=e.end&&e.type==="TEXT"&&e.hAlign!==0
+   ?transformed(e.end.x,e.end.y):origin;
+  sprite.position.set(anchor.x+(e.hAlign===1?0:e.hAlign===2?-sprite.scale.x/2:sprite.scale.x/2),
+   anchor.y+(e.vAlign===2?0:e.vAlign===3?-sprite.scale.y/2:sprite.scale.y/2),0);
+  (sprite.material as THREE.SpriteMaterial).rotation=Math.atan2(activeTransform.b,activeTransform.a)+
+   (e.a0*Math.PI/180);
   groupFor(resolved).add(sprite);
  };
 
  const drawHatch=(e:Entity)=>{
   const parsed=parseHatchPaths(e.raw);
   if(parsed.error){skipped.add("HATCH: "+parsed.error);return;}
+  if(!parsed.solid){
+   const result=clipHatchPattern(parsed.rings,parsed.patterns);
+   if(result.error){skipped.add("HATCH: "+result.error);return;}
+   // Every clipping operation occurs in DXF document coordinates, before
+   // parent BLOCK transforms. line() performs inheritance and batching.
+   for(const stroke of result.strokes){
+    line(stroke.x1,stroke.y1,stroke.x2,stroke.y2,e.layer);
+   }
+   return;
+  }
   type Ring={points:THREE.Vector2[];area:number;parent:number;depth:number};
   const polygonArea=(p:THREE.Vector2[])=>p.reduce((sum,a,i)=>{
    const b=p[(i+1)%p.length]!;
@@ -456,8 +503,29 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
    }
    case "TEXT":
    case "MTEXT":{
-    const c=e.points[0];
-    if(c)label(e.text,c.x,c.y,e.height,e.layer);
+    label(e);
+    break;
+   }
+   case "VIEWPORT":{
+    if(e.viewportId<=1)break; // viewport #1 is the paper view itself.
+    const center=e.points[0];
+    const height=e.raw.some(pair=>pair.code===40)?e.radius:0;
+    const aspect=e.raw.some(pair=>pair.code===41)?e.scaleX:0;
+    if(!e.paperSpace&&!e.layout){skipped.add("VIEWPORT: 未指定图纸空间");break;}
+    if(!center||![center.x,center.y,height,aspect].every(Number.isFinite)||
+       height<=0||aspect<=0||height*aspect>1e12){
+     skipped.add("VIEWPORT: 边界尺寸无效");break;
+    }
+    const hw=height*aspect/2,hh=height/2;
+    const vertices=[
+     {x:center.x-hw,y:center.y-hh},{x:center.x+hw,y:center.y-hh},
+     {x:center.x+hw,y:center.y+hh},{x:center.x-hw,y:center.y+hh},
+    ];
+    for(let i=0;i<4;i++){
+     const a=vertices[i]!,b=vertices[(i+1)%4]!;
+     line(a.x,a.y,b.x,b.y,e.layer);
+    }
+    skipped.add("VIEWPORT: 只显示边框，模型投影与裁切尚不支持");
     break;
    }
    case "SECTION":
@@ -542,6 +610,7 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
   if(!entity.type)continue;
   switch(pair.code){
    case 8:entity.layer=pair.value.trim()||"0";break;
+   case 7:if(entity.type==="TEXT"||entity.type==="MTEXT")entity.textStyle=pair.value.trim()||"STANDARD";break;
    case 410:entity.layout=pair.value.trim();break;
    case 67:entity.paperSpace=Number(pair.value)===1;break;
    case 2:if(entity.type==="INSERT"||entity.type==="DIMENSION")entity.blockName=pair.value.trim();break;
@@ -573,6 +642,8 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
     break;
    case 41:
     if(entity.type==="INSERT")entity.scaleX=Number(pair.value);
+    if(entity.type==="VIEWPORT")entity.scaleX=Number(pair.value);
+    if(entity.type==="TEXT")entity.textWidthFactor=Number(pair.value);
     if(entity.type==="ELLIPSE")entity.parameterStart=Number(pair.value);
     if(entity.type==="SPLINE")entity.weights.push(Number(pair.value));
     break;
@@ -583,6 +654,9 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
    case 51:entity.a1=Number(pair.value);break;
    case 70:entity.closed=(Number.parseInt(pair.value,10)&1)===1;break;
    case 71:if(entity.type==="SPLINE")entity.degree=Number(pair.value);break;
+   case 72:if(entity.type==="TEXT")entity.hAlign=Number(pair.value);break;
+   case 73:if(entity.type==="TEXT")entity.vAlign=Number(pair.value);break;
+   case 69:if(entity.type==="VIEWPORT")entity.viewportId=Number(pair.value);break;
    case 60:entity.invisible=Number(pair.value)===1;break;
    case 62:entity.colorIndex=Number(pair.value);break;
    case 420:entity.trueColor=Number(pair.value)&0xffffff;break;

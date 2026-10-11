@@ -265,4 +265,60 @@ assert.deepEqual(sheetLayout.layers.map(l=>l.name),["P"]);
 const fallbackLayout=parseDxf(layoutFixture,THREE,"Paper Space");
 assert.deepEqual(fallbackLayout.layers.map(l=>l.name),["Q"]);
 
+// Hatch line families use DXF angle/base/offset and are clipped to actual
+// polygon rings. Holes must remain white in a dense cross-section pattern.
+const patternDxf=[
+ "0","SECTION","2","ENTITIES",
+ "0","HATCH","8","PATTERN","70","0","75","0","91","2",
+ "92","2","72","0","73","1","93","4",
+ "10","0","20","0","10","10","20","0","10","10","20","10","10","0","20","10","97","0",
+ "92","2","72","0","73","1","93","4",
+ "10","3","20","3","10","7","20","3","10","7","20","7","10","3","20","7","97","0",
+ "78","1","53","0","43","0","44","0","45","0","46","2","79","0",
+ "0","ENDSEC","0","EOF",
+].join("\n");
+const patternedHatch=parseDxf(patternDxf,THREE);
+assert.deepEqual(patternedHatch.skipped,[]);
+const strokes=Array.from(patternedHatch.object.children[0].children[0].geometry.getAttribute("position").array);
+assert(strokes.length>=30&&strokes.length<400);
+for(let j=0;j<strokes.length;j+=6){
+ const midX=(strokes[j]+strokes[j+3])/2,midY=(strokes[j+1]+strokes[j+4])/2;
+ assert(midX<3||midX>7||midY<3||midY>7,"pattern may not paint inside hole");
+}
+// Negative offsets must produce the same bounded families, not no lines.
+const negativeOffset=parseDxf(patternDxf.replace("46\n2\n79","46\n-2\n79"),THREE);
+assert.deepEqual(negativeOffset.skipped,[]);
+assert(negativeOffset.object.children[0].children[0].geometry.getAttribute("position").count>0);
+const dashed=parseDxf(patternDxf.replace("79\n0","79\n2\n49\n2\n49\n-1"),THREE);
+assert.deepEqual(dashed.skipped,[]);
+assert(dashed.object.children[0].children[0].geometry.getAttribute("position").count>0);
+
+// Style records affect TEXT sprite width and rotation. SHX remains an honest
+// fallback warning, and common AutoCAD symbolic escapes become Unicode.
+const textDxf=[
+ "0","SECTION","2","TABLES","0","TABLE","2","STYLE",
+ "0","STYLE","2","ANNOTATION","3","romans.shx","41","0.8",
+ "0","ENDTAB","0","ENDSEC",
+ "0","SECTION","2","ENTITIES",
+ "0","TEXT","8","NOTES","7","ANNOTATION","10","10","20","20",
+ "40","3","41","1.5","50","30","1","%%c25 %%d %%p",
+ "0","VIEWPORT","8","FRAME","410","A1","67","1","69","2",
+ "10","100","20","50","40","20","41","2",
+ "0","ENDSEC","0","EOF",
+].join("\n");
+const textResult=parseDxf(textDxf,THREE);
+assert(textResult.skipped.some(value=>value.includes("SHX")));
+const note=textResult.object.children[0].children.find(item=>item.isSprite);
+assert(note);
+assert(note.scale.x>4&&note.material.rotation>0.5);
+const paperResult=parseDxf(textDxf,THREE,"A1");
+assert(paperResult.skipped.some(value=>value.includes("VIEWPORT")));
+const frame=paperResult.object.children[0].children[0].geometry.getAttribute("position").array;
+assert.deepEqual([frame[0],frame[1],frame[3],frame[4]],[80,40,120,40]);
+const cadTextJs=await transform(readFileSync(new URL("../src/features/modelViewer/cadText2d.ts",import.meta.url),"utf8"),
+ {loader:"ts",format:"esm",target:"es2022"});
+const {decodeCadText}=await import("data:text/javascript;base64,"+Buffer.from(cadTextJs.code).toString("base64"));
+assert.equal(decodeCadText("%%c25 %%d %%p"),"⌀25 ° ±");
+assert.equal(decodeCadText("A\\PB\\U+00B0"),"A\nB°");
+
 console.log("CAD regression passed: DXF geometry, nested blocks, dimension graphics, rational NURBS, ACI/TrueColor and 2D snaps");
