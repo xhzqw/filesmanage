@@ -23,5 +23,5 @@ func(h *Handler)readLifecycleNotification(c *gin.Context){
  id,err:=strconv.ParseInt(c.Param("id"),10,64)
  if err!=nil{respondError(c,domain.ErrInvalidInput);return}
  if err=h.S.ReadLifecycleNotification(c.Request.Context(),u,id);err!=nil{respondError(c,err);return}
- c.JSON(200,gin.H{"ok":true,"data":gin.H{"read":id})
+ c.JSON(200,gin.H{"ok":true,"data":gin.H{"read":id}})
 }
