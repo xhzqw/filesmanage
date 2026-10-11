@@ -2129,6 +2129,123 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/{id}/lifecycle:
+    get:
+      summary: Read lifecycle release, archive and due-date status
+      operationId: fileLifecycle
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Lifecycle with visibility-scoped canManage.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/FileLifecycle'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    put:
+      summary: Release current version or archive/unarchive or update due date
+      operationId: setFileLifecycle
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetFileLifecycle'
+      responses:
+        '200':
+          description: CAS/version-checked, audited state.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/FileLifecycle'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/files/{id}/metadata:
     get:
       summary: Read business metadata of an accessible file
@@ -8253,6 +8370,73 @@ components:
       - key
       - status
       - url
+    FileLifecycle:
+      type: object
+      properties:
+        fileId:
+          type: string
+        state:
+          type: string
+          enum:
+          - draft
+          - released
+          - archived
+        publishedSeq:
+          type: integer
+        publishedAt:
+          type: string
+          format: date-time
+        publishedBy:
+          type: string
+        dueAt:
+          type: string
+          format: date-time
+        dueStatus:
+          type: string
+          enum:
+          - none
+          - soon
+          - overdue
+          - scheduled
+        note:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        canManage:
+          type: boolean
+      required:
+      - fileId
+      - state
+      - publishedSeq
+      - publishedAt
+      - publishedBy
+      - dueStatus
+      - note
+      - updatedAt
+      - canManage
+    SetFileLifecycle:
+      type: object
+      properties:
+        action:
+          type: string
+          enum:
+          - publish
+          - archive
+          - unarchive
+          - set_due
+        expectedVersionSeq:
+          type: integer
+          minimum: 1
+        dueAt:
+          type: string
+          format: date-time
+        note:
+          type: string
+          maxLength: 200
+      required:
+      - action
+      - expectedVersionSeq
     SearchPreset:
       type: object
       properties:

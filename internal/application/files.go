@@ -466,12 +466,16 @@ func (s *Service) visibleFile(ctx context.Context, repo ports.Repository, u doma
 		}
 	}
 	// Archived documents are read-only. This guard applies to normal file
- // mutations (including edit locks, metadata, rename, move, deletion).
- if action==domain.ActionModify||action==domain.ActionDelete||action==domain.ActionRename||action==domain.ActionMove{
-  life,e:=repo.FileLifecycleByID(ctx,fileID)
-  if e!=nil&&!errors.Is(e,ports.ErrRowMissing){return domain.File{},e}
-  if e==nil&&life.State=="archived"{return domain.File{},domain.ErrConflict}
- }
+	// mutations (including edit locks, metadata, rename, move, deletion).
+	if action == domain.ActionModify || action == domain.ActionDelete || action == domain.ActionRename || action == domain.ActionMove {
+		life, e := repo.FileLifecycleByID(ctx, fileID)
+		if e != nil && !errors.Is(e, ports.ErrRowMissing) {
+			return domain.File{}, e
+		}
+		if e == nil && life.State == "archived" {
+			return domain.File{}, domain.ErrConflict
+		}
+	}
 	return file, nil
 }
 
