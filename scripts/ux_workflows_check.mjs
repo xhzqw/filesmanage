@@ -1407,6 +1407,22 @@ async function finaleSuite() {
     check("G2 folder switch keeps queued task destinations on their original folder",
       (await cdp.evaluate(`(()=>[...document.querySelectorAll('.upload-item')].filter(x=>x.textContent?.includes('g2-queue-')).every(x=>x.querySelector('.upload-item-target')?.textContent==='其他目录'))()`))===true);
 
+    // ---- G2 phase 3: terminal queue history is removable and never hides
+    // actionable uploads. The earlier ten tiny files are deliberately kept
+    // across SPA navigation until this final explicit cleanup. ----
+    const uploadsSettled=await cdp.waitFor(`()=>{
+      const rows=[...document.querySelectorAll('.upload-item')];
+      return rows.length===10&&rows.every(row=>row.classList.contains('committed')||row.classList.contains('failed')||row.classList.contains('cancelled'));
+    }`,45000);
+    const taskStates=await cdp.evaluate(`(()=>[...document.querySelectorAll('.upload-item')].map(x=>x.classList.contains('committed')?'committed':x.classList.contains('failed')?'failed':x.classList.contains('cancelled')?'cancelled':'pending'))()`);
+    check("G2 upload history finishes without losing pending files",uploadsSettled===true&&taskStates.length===10,JSON.stringify(taskStates));
+    const expectedOutstanding=taskStates.filter(state=>state==="failed").length;
+    const clearButton=await cdp.evaluate(`(()=>{const button=document.querySelector('button[aria-label^="清除 "]');if(!button)return false;button.click();return true;})()`);
+    await delay(250);
+    const remaining=await cdp.evaluate(`(()=>[...document.querySelectorAll('.upload-item')].map(x=>({failed:x.classList.contains('failed'),interrupted:x.classList.contains('interrupted')})))()`);
+    check("G2 clear finished history preserves failures while dropping successes",
+      clearButton===true&&remaining.length===expectedOutstanding&&remaining.every(item=>item.failed||item.interrupted),JSON.stringify({before:taskStates,remaining}));
+
     // A tree context operation must relinquish the header after its modal
     // closes; otherwise the header silently keeps targeting the right-clicked
     // folder even while the file list shows another folder.
@@ -1433,21 +1449,6 @@ async function finaleSuite() {
     const fallback=await cdp.waitFor(`()=>new URLSearchParams(location.search).get('folder')===${JSON.stringify(root.id)}`,16000);
     check("G2 deleting selected folder navigates to surviving parent",fallback===true,String(await cdp.evaluate(`(()=>location.pathname+location.search)()`)));
 
-    // ---- G2 phase 3: terminal queue history is removable and never hides
-    // actionable uploads. The earlier ten tiny files are deliberately kept
-    // across SPA navigation until this final explicit cleanup. ----
-    const uploadsSettled=await cdp.waitFor(`()=>{
-      const rows=[...document.querySelectorAll('.upload-item')];
-      return rows.length===10&&rows.every(row=>row.classList.contains('committed')||row.classList.contains('failed')||row.classList.contains('cancelled'));
-    }`,45000);
-    const taskStates=await cdp.evaluate(`(()=>[...document.querySelectorAll('.upload-item')].map(x=>x.classList.contains('committed')?'committed':x.classList.contains('failed')?'failed':x.classList.contains('cancelled')?'cancelled':'pending'))()`);
-    check("G2 upload history finishes without losing pending files",uploadsSettled===true&&taskStates.length===10,JSON.stringify(taskStates));
-    const expectedOutstanding=taskStates.filter(state=>state==="failed").length;
-    const clearButton=await cdp.evaluate(`(()=>{const button=document.querySelector('button[aria-label^="清除 "]');if(!button)return false;button.click();return true;})()`);
-    await delay(250);
-    const remaining=await cdp.evaluate(`(()=>[...document.querySelectorAll('.upload-item')].map(x=>({failed:x.classList.contains('failed'),interrupted:x.classList.contains('interrupted')})))()`);
-    check("G2 clear finished history preserves failures while dropping successes",
-      clearButton===true&&remaining.length===expectedOutstanding&&remaining.every(item=>item.failed||item.interrupted),JSON.stringify({before:taskStates,remaining}));
   } finally {
     cdp && cdp.close();
     chrome && chrome.kill("SIGKILL");
