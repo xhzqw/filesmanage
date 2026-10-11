@@ -145,7 +145,7 @@ async function run(){
   await cdp.eval("(()=>{[...document.querySelectorAll('.file-table .empty button')].find(b=>b.textContent?.includes('清除筛选'))?.click();return true;})()");
   await cdp.wait("()=>[...document.querySelectorAll('.file-table tbody tr')].some(r=>r.textContent?.includes("+JSON.stringify(fileName)+"))");
   check("file explorer "+width+"px reset clears filename and category filters",
-   await cdp.eval("(()=>document.querySelector('input[aria-label="当前已加载文件名过滤"]')?.value==='')()"));
+   await cdp.eval(`(()=>document.querySelector('input[aria-label="当前已加载文件名过滤"]')?.value==='')()`));
   await cdp.goto("/preview/"+fileId,"#file-tab-versions");
   await cdp.eval("(()=>{document.querySelector('#file-tab-versions').click();return true;})()");
   await cdp.wait("()=>document.querySelectorAll('.file-versions-table tbody tr').length===2");
