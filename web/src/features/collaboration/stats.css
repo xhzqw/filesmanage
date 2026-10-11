@@ -40,7 +40,7 @@
 .stats-month>strong{height:20px;color:var(--text-secondary);font-size:10px;font-weight:600;align-content:end}
 .stats-month>span{font-size:11px;color:var(--text-tertiary)}
 .stats-month-column{height:140px;width:min(35px,80%);display:flex;align-items:flex-end;background:var(--surface-header);border-radius:var(--radius-xs);overflow:hidden}
-.stats-month-column>div{width:100%;background:var(--brand-blue);border-radius:var(--radius-xs) var(--radius-xs) 0 0;transition:height .2s ease}
+.stats-month-column>div{width:100%;background:var(--brand-blue);border-radius:var(--radius-xs);transition:height .2s ease}
 .stats-no-data{min-height:140px;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:12px;text-align:center}
 .stats-panel-foot,.stats-footer{font-size:11px;color:var(--text-tertiary)}
 .stats-panel-foot{margin-top:var(--space-2)}
