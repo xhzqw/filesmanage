@@ -883,7 +883,7 @@ schema("FileLifecycle",obj({
  "fileId":string(),"state":string(enum=["draft","released","archived"]),
  "publishedSeq":integer(),"publishedAt":timestamp(),"publishedBy":string(),
  "dueAt":timestamp(),"dueStatus":string(enum=["none","soon","overdue","scheduled"]),
- "note":string(),"updatedAt":timestamp(),"canManage":boolean()
+ "note":string(),"updatedAt":timestamp(),"canManage":boolean(),
  "retentionUntil":timestamp(),
 },required=["fileId","state","publishedSeq","publishedAt","publishedBy","dueStatus","note","updatedAt","canManage"]))
 schema("SetFileLifecycle",obj({
