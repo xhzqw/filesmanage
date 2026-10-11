@@ -1,4 +1,5 @@
-import {RareButton,RareInput} from "../../shared/ui/rare";
+import {RareButton,RareInput,RareSelect,RareTabs,RareTextarea} from "../../shared/ui/rare";
+import {Dialog} from "../../shared/ui/Dialog";
 import {useEffect,useState} from "react";
 import {useLocation} from "react-router-dom";
 import {workflowApi} from "./api";
@@ -26,13 +27,18 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
  const[mine,setMine]=useState<Approval[]>([]);
  const[status,setStatus]=useState("loading");
  const[message,setMessage]=useState("");
- const[drafts,setDrafts]=useState<Record<string,string>>({});
+ const[decision,setDecision]=useState<{approval:Approval;action:"approve"|"reject"|"cancel"}|null>(null);
+ const[comment,setComment]=useState("");
+ const[decisionError,setDecisionError]=useState("");
  const[busyId,setBusyId]=useState("");
  const[reloadToken,setReloadToken]=useState(0);
  const[activeList,setActiveList]=useState<"inbox"|"mine">("inbox");
+ const[search,setSearch]=useState("");
+ const[stateFilter,setStateFilter]=useState("all");
+ const[sideOpen,setSideOpen]=useState(false);
  const[selected,setSelected]=useState("");
  const location=useLocation();
- useEffect(()=>{const id=new URLSearchParams(location.search).get("item");setSelected(id&&id.length<=128?id:"");},[location.search]);
+ useEffect(()=>{const id=new URLSearchParams(location.search).get("item");const target=id&&id.length<=128?id:"";setSelected(target);if(target)setSideOpen(true);},[location.search]);
  const[events,setEvents]=useState<ApprovalEvent[]>([]);
  const[historyError,setHistoryError]=useState("");
  const[notifications,setNotifications]=useState<ApprovalNotification[]>([]);
@@ -56,7 +62,7 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
   return()=>{active=false;};
  },[selected,reloadToken]);
  async function readNote(note:ApprovalNotification){
-  setSelected(note.approvalId);
+  setSelected(note.approvalId);setSideOpen(true);
   if(!note.read){
    try{await approvalActivityApi.read(note.id);setNotifications(items=>items.map(item=>item.id===note.id?{...item,read:true}:item));window.dispatchEvent(new Event("filesmanage:approval-notifications-read"));}
    catch{setNoticeError("标记已读失败");}
@@ -86,83 +92,120 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
   setMessage("");setBusyId(id);
   try{
    if(action==="approve"){
-    const result=await workflowApi.approve(id,drafts[id]??"");
+    const result=await workflowApi.approve(id,comment);
     setMessage(result.status==="committed"?"已通过并生成新版本":"本级审批已通过，已转交下一级；当前版本不变");
    }else if(action==="reject"){
-    await workflowApi.reject(id,drafts[id]??"");
+    await workflowApi.reject(id,comment);
     setMessage("已拒绝，当前版本不变");
    }else{
     await workflowApi.cancel(id);
     setMessage("已撤回申请");
    }
+   setDecision(null);setComment("");
    setReloadToken(token=>token+1);
   }catch(error){
    const code=errorCode(error);
    if(code==="E_VERSION_CONFLICT"||code==="E_APPROVAL_PENDING"){
-    setMessage("审批状态已变化，请刷新");
+    setDecision(null);setMessage("审批状态已变化，请刷新");
     setReloadToken(token=>token+1);
    }else{
-    setMessage(errorCopy(error,"操作失败"));
+    setDecisionError(errorCopy(error,"操作失败"));
    }
   }finally{
    setBusyId("");
   }
  }
 
- if(status!=="ready")return <p className="empty">{status==="loading"?"正在加载审批…":"获取审批列表失败"}</p>;
 
- return <div className="work-body">
-  <div className="toolbar approval-tabs" role="tablist" aria-label="审批分类">
-   <RareButton type="button" role="tab" aria-selected={activeList==="inbox"} onClick={()=>setActiveList("inbox")}>待我审批 {inbox.length}</RareButton>
-   <RareButton type="button" role="tab" aria-selected={activeList==="mine"} onClick={()=>setActiveList("mine")}>我发起的 {mine.length}</RareButton>
+ function openDecision(approval:Approval,action:"approve"|"reject"|"cancel"){
+  setComment("");setDecisionError("");setDecision({approval,action});
+ }
+ function showHistory(id:string){setSelected(id);setSideOpen(true);}
+ const matches=(a:Approval)=>{
+  const text=search.trim().toLocaleLowerCase();
+  return !text||[a.fileName,a.requesterName,a.approverName,a.reason].some(v=>v.toLocaleLowerCase().includes(text));
+ };
+ const visibleInbox=inbox.filter(matches).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+ const visibleMine=mine.filter(a=>matches(a)&&(stateFilter==="all"||a.state===stateFilter))
+  .sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+ const decisionTitle=decision?.action==="approve"?"通过审批":decision?.action==="reject"?"拒绝审批":"撤回申请";
+ const formatTime=(v:string)=>v.replace("T"," ").slice(0,16);
+
+ if(status!=="ready")return <div className="approval-load" role="status">
+  {status==="loading"?"正在加载审批…":<>获取审批列表失败 <RareButton type="button" onClick={()=>setReloadToken(n=>n+1)}>重试</RareButton></>}
+ </div>;
+
+ return <div className="work-body approval-page">
+  <div className="approval-toolbar">
+   <RareTabs className="approval-tabs" label="审批分类">
+    {(["inbox","mine"] as const).map(tab=><RareButton type="button" key={tab} id={"approval-tab-"+tab}
+     role="tab" aria-selected={activeList===tab} tabIndex={activeList===tab?0:-1}
+     aria-controls={activeList===tab?"approval-panel-"+tab:undefined}
+     onClick={()=>setActiveList(tab)}>{tab==="inbox"?"待我审批":"我发起的"}
+     <span className="approval-tab-count">{tab==="inbox"?inbox.length:mine.length}</span></RareButton>)}
+   </RareTabs>
+   <div className="approval-filters">
+    <RareInput aria-label="搜索审批" type="search" placeholder="搜索文件或人员" value={search} onChange={e=>setSearch(e.target.value)}/>
+    {activeList==="mine"&&<RareSelect aria-label="审批状态" value={stateFilter} onChange={e=>setStateFilter(e.target.value)}>
+     <option value="all">全部状态</option>
+     {Object.entries(STATE_LABELS).map(([key,label])=><option key={key} value={key}>{label}</option>)}
+    </RareSelect>}
+    <RareButton type="button" disabled={!!busyId} onClick={()=>setReloadToken(n=>n+1)}>刷新</RareButton>
+    <RareButton type="button" className="approval-mobile-notes" onClick={()=>setSideOpen(v=>!v)}>
+     动态{unread>0?" "+unread:""}
+    </RareButton>
+   </div>
   </div>
-  {message&&<p role="status" className="notice">{message}</p>}
-  <div className="approval-workbench">
-   <div className="approval-main">
-  {activeList==="inbox"&&<section className="table">
-   <h3>待我审批</h3>
-   <table>
-    <thead><tr><th scope="col">文件</th><th scope="col">申请人</th><th scope="col">类型</th><th scope="col">基准版本</th><th scope="col">申请时间</th><th scope="col">操作</th></tr></thead>
-    <tbody>
-     {inbox.length===0&&<tr><td colSpan={6} className="empty">没有待处理的审批。</td></tr>}
-     {inbox.map(a=><tr key={a.id}>
-      <td><a href={"/preview/"+a.fileId}>{a.fileName}</a></td>
-      <td>{a.requesterName}</td>
-      <td>{ACTION_LABELS[a.action]??a.action}{a.rollbackTargetSeq?` → v${a.rollbackTargetSeq}`:""}</td>
-      <td>v{a.baseSeq} · 第 {a.stepIndex+1}/{a.stepTotal} 级</td>
-      <td>{a.createdAt.replace("T"," ").slice(0,16)}</td>
-      <td className="row-actions">
-       <RareInput aria-label={`审批意见 — ${a.fileName}`} placeholder="审批意见（可选）" value={drafts[a.id]??""}
-        style={{minWidth:"180px"}} disabled={busyId!==""}
-        onChange={e=>setDrafts(prev=>({...prev,[a.id]:e.target.value}))}/>
-       {busyId===a.id&&<span className="toolbar-hint">处理中…</span>}
-       <RareButton type="button" onClick={()=>setSelected(a.id)}>历史</RareButton>
-       <RareButton type="button" className="primary" disabled={busyId!==""} onClick={()=>act(a.id,"approve")}>通过</RareButton>
-       <RareButton type="button" className="danger" disabled={busyId!==""} onClick={()=>act(a.id,"reject")}>拒绝</RareButton>
-      </td>
-     </tr>)}
-    </tbody>
-   </table>
-  </section>}
-  {activeList==="mine"&&<section className="table">
-   <h3>我发起的</h3>
-   <table>
-    <thead><tr><th scope="col">文件</th><th scope="col">类型</th><th scope="col">状态</th><th scope="col">审批人</th><th scope="col">意见</th><th scope="col">操作</th></tr></thead>
-    <tbody>
-     {mine.length===0&&<tr><td colSpan={6} className="empty">没有发起过审批。</td></tr>}
-     {mine.map(a=><tr key={a.id}>
-      <td><a href={"/preview/"+a.fileId}>{a.fileName}</a></td>
-      <td>{ACTION_LABELS[a.action]??a.action}</td>
-      <td><span className="approval-status" data-state={a.state}>{STATE_LABELS[a.state]??a.state}</span></td>
-      <td>{a.approverName} · {a.stepIndex+1}/{a.stepTotal} 级</td>
-      <td>{a.decisionComment||"—"}</td>
-      <td className="row-actions"><RareButton type="button" onClick={()=>setSelected(a.id)}>历史</RareButton>{a.state==="pending"&&<RareButton type="button" disabled={busyId!==""} onClick={()=>act(a.id,"cancel")}>撤回</RareButton>}</td>
-     </tr>)}
-    </tbody>
-   </table>
-  </section>}
+  {message&&<div role="status" className="approval-notice">{message}</div>}
+  <div className={"approval-workbench"+(sideOpen?" side-open":"")}>
+   <div className="approval-main" id={"approval-panel-"+activeList} role="tabpanel" aria-labelledby={"approval-tab-"+activeList}>
+    <section className="table approval-data">
+     <table className="approval-table">
+      <thead>{activeList==="inbox"
+       ?<tr><th scope="col">文件</th><th className="approval-optional" scope="col">申请人</th>
+        <th className="approval-optional" scope="col">类型</th><th className="approval-optional" scope="col">基准版本</th>
+        <th className="approval-optional" scope="col">申请时间</th><th scope="col" className="approval-actions-col">操作</th></tr>
+       :<tr><th scope="col">文件</th><th className="approval-optional" scope="col">类型</th>
+        <th scope="col" className="approval-status-col">状态</th><th className="approval-optional" scope="col">审批人</th>
+        <th className="approval-optional" scope="col">意见</th><th scope="col" className="approval-actions-col">操作</th></tr>}
+      </thead>
+      <tbody>{activeList==="inbox"?<>
+       {visibleInbox.length===0&&<tr><td colSpan={6} className="empty">{search?"没有匹配的审批":"没有待处理的审批"}</td></tr>}
+       {visibleInbox.map(a=><tr key={a.id}>
+        <td className="approval-file"><a className="approval-file-name" href={"/preview/"+encodeURIComponent(a.fileId)} title={a.fileName}>{a.fileName}</a>
+         <span className="approval-mobile-meta">{a.requesterName} · {ACTION_LABELS[a.action]??a.action} · 第 {a.stepIndex+1}/{a.stepTotal} 级</span>
+        </td>
+        <td className="approval-optional">{a.requesterName}</td>
+        <td className="approval-optional">{ACTION_LABELS[a.action]??a.action}{a.rollbackTargetSeq?" → v"+a.rollbackTargetSeq:""}</td>
+        <td className="approval-optional">v{a.baseSeq} · 第 {a.stepIndex+1}/{a.stepTotal} 级</td>
+        <td className="approval-optional approval-date">{formatTime(a.createdAt)}</td>
+        <td className="approval-actions"><div className="approval-action-buttons">
+         <RareButton type="button" onClick={()=>showHistory(a.id)}>历史</RareButton>
+         <RareButton type="button" className="primary" disabled={!!busyId} onClick={()=>openDecision(a,"approve")}>通过</RareButton>
+         <RareButton type="button" disabled={!!busyId} onClick={()=>openDecision(a,"reject")}>拒绝</RareButton>
+        </div></td>
+       </tr>)}
+      </>:<>
+       {visibleMine.length===0&&<tr><td colSpan={6} className="empty">{search||stateFilter!=="all"?"没有匹配的审批":"没有发起过审批"}</td></tr>}
+       {visibleMine.map(a=><tr key={a.id}>
+        <td className="approval-file"><a className="approval-file-name" href={"/preview/"+encodeURIComponent(a.fileId)} title={a.fileName}>{a.fileName}</a>
+         <span className="approval-mobile-meta">{ACTION_LABELS[a.action]??a.action} · {a.approverName} · 第 {a.stepIndex+1}/{a.stepTotal} 级</span>
+        </td>
+        <td className="approval-optional">{ACTION_LABELS[a.action]??a.action}</td>
+        <td className="approval-status-col"><span className="approval-status" data-state={a.state}>{STATE_LABELS[a.state]??a.state}</span></td>
+        <td className="approval-optional">{a.approverName} · {a.stepIndex+1}/{a.stepTotal} 级</td>
+        <td className="approval-optional approval-comment" title={a.decisionComment||undefined}>{a.decisionComment||"—"}</td>
+        <td className="approval-actions"><div className="approval-action-buttons">
+         <RareButton type="button" onClick={()=>showHistory(a.id)}>历史</RareButton>
+         {a.state==="pending"&&<RareButton type="button" disabled={!!busyId} onClick={()=>openDecision(a,"cancel")}>撤回</RareButton>}
+        </div></td>
+       </tr>)}
+      </>}</tbody>
+     </table>
+    </section>
    </div>
    <aside className="approval-side" aria-label="审批通知与时间线">
+    <RareButton type="button" className="approval-side-close" onClick={()=>setSideOpen(false)}>关闭面板</RareButton>
     {!selected&&<>
     <div className="approval-side-heading"><h3>站内通知 {unread>0?`（${unread} 未读）`:""}</h3><RareButton type="button" onClick={()=>setShowAllNotes(v=>!v)}>{showAllNotes?"收起":"更多"}</RareButton></div>
     {noticeError&&<p role="alert" className="notice error">{noticeError}</p>}
@@ -186,5 +229,21 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
     </section>}
    </aside>
   </div>
+  {decision&&<Dialog open title={decisionTitle} onClose={()=>{if(!busyId)setDecision(null);}}
+   closeGuard={()=>!busyId} initialFocus={decision.action==="cancel"?undefined:"#approval-decision-comment"} className="approval-decision-dialog">
+   <p className="approval-decision-file" title={decision.approval.fileName}>{decision.approval.fileName}</p>
+   {decision.action!=="cancel"&&<label htmlFor="approval-decision-comment" className="approval-decision-label">
+    审批意见（可选）
+    <RareTextarea id="approval-decision-comment" rows={3} value={comment} disabled={!!busyId}
+     placeholder="填写审批意见" onChange={e=>setComment(e.target.value)}/>
+   </label>}
+   {decisionError&&<p className="approval-error" role="alert">{decisionError}</p>}
+   <div className="dialog-actions">
+    <RareButton type="button" disabled={!!busyId} onClick={()=>setDecision(null)}>取消</RareButton>
+    <RareButton type="button" className={decision.action==="approve"?"primary":decision.action==="reject"?"danger":""}
+     disabled={!!busyId} aria-busy={!!busyId} onClick={()=>void act(decision.approval.id,decision.action)}>
+     {busyId?"处理中…":decisionTitle}</RareButton>
+   </div>
+  </Dialog>}
  </div>;
 }

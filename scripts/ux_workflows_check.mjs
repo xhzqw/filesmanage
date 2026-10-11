@@ -292,11 +292,16 @@ async function workflowSuite() {
     });
     check("approval-routed save returns 202 pending", submit.status === 202, String(submit.status));
     await cdp.navigate(`${BASE}/approvals`);
-    const pendingRow = await cdp.waitFor(`()=>[...document.querySelectorAll('tbody tr')].some(tr=>tr.textContent?.includes(${JSON.stringify(APPROVE_NAME)})&&/待审批|pending/.test(tr.textContent||''))`, 20000);
+    const pendingRow = await cdp.waitFor(`()=>[...document.querySelectorAll('.approval-table tbody tr')].some(tr=>tr.textContent?.includes(${JSON.stringify(APPROVE_NAME)}))`, 20000);
     check("approval inbox lists the pending decision", Boolean(pendingRow), String(pendingRow));
-    await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr')].find(tr=>tr.textContent?.includes(${JSON.stringify(APPROVE_NAME)}));const input=row.querySelector('input[aria-label]');const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;set.call(input,'G4 冒烟审批意见');input.dispatchEvent(new Event('input',{bubbles:true}));return true;})()`);
-    await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr')].find(tr=>tr.textContent?.includes(${JSON.stringify(APPROVE_NAME)}));[...row.querySelectorAll('button')].find(b=>b.textContent?.trim()==='通过')?.click();return true;})()`);
-    const decided = await cdp.waitFor(`()=>{const rows=[...document.querySelectorAll('tbody tr')];return rows.some(tr=>tr.textContent?.includes(${JSON.stringify(APPROVE_NAME)})&&tr.textContent?.includes('G4 冒烟审批意见'));}`, 20000);
+    await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('.approval-table tbody tr')].find(tr=>tr.textContent?.includes(${JSON.stringify(APPROVE_NAME)}));[...row.querySelectorAll('button')].find(b=>b.textContent?.trim()==='通过')?.click();return true;})()`);
+    const approvalDialog = await cdp.waitFor(`()=>Boolean(document.querySelector('dialog.approval-decision-dialog[open] textarea'))`, 10000);
+    check("WF-31 decision opens the comment dialog", approvalDialog === true, String(approvalDialog));
+    await cdp.evaluate(`(()=>{const input=document.querySelector('dialog.approval-decision-dialog[open] textarea');const set=Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value').set;set.call(input,'G4 冒烟审批意见');input.dispatchEvent(new Event('input',{bubbles:true}));return true;})()`);
+    await cdp.evaluate(`(()=>{const dialog=document.querySelector('dialog.approval-decision-dialog[open]');[...dialog.querySelectorAll('button')].find(b=>b.textContent?.trim()==='通过审批')?.click();return true;})()`);
+    await cdp.waitFor(`()=>Boolean(document.querySelector('#approval-tab-mine'))`, 20000);
+    await cdp.evaluate(`(()=>{document.querySelector('#approval-tab-mine')?.click();return true;})()`);
+    const decided = await cdp.waitFor(`()=>{const rows=[...document.querySelectorAll('.approval-table tbody tr')];return rows.some(tr=>tr.textContent?.includes(${JSON.stringify(APPROVE_NAME)})&&tr.textContent?.includes('G4 冒烟审批意见'));}`, 20000);
     check("WF-31 custom comment ships with the decision", decided === true, String(decided));
     const afterApprove = await json("GET", `/api/files/${v2file.fileId}`);
     check("approval commits the new version",
