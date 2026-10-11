@@ -1389,6 +1389,14 @@ async function finaleSuite() {
     const queueGeometry=await cdp.evaluate(`(()=>{const list=document.querySelector('.upload-queue-list'),pane=document.querySelector('.work-body>.table'),r=list.getBoundingClientRect();return {count:list.children.length,height:r.height,scrollHeight:list.scrollHeight,overflow:document.documentElement.scrollWidth-innerWidth,paneHeight:pane?.getBoundingClientRect().height,expand:document.querySelector('.upload-queue-header button')?.getAttribute('aria-expanded')};})()`);
     check("G2 ten upload rows scroll inside bounded dock without squeezing the file list",
       queueGeometry.count===10&&queueGeometry.height<=225&&queueGeometry.scrollHeight>queueGeometry.height&&queueGeometry.overflow<=2&&queueGeometry.paneHeight>=110&&queueGeometry.expand==="true",JSON.stringify(queueGeometry));
+    for(const width of [390,760,1366]){
+      await cdp.send("Emulation.setDeviceMetricsOverride",{width,height:840,deviceScaleFactor:1,mobile:false});
+      await delay(100);
+      const geometry=await cdp.evaluate(`(()=>{const list=document.querySelector('.upload-queue-list'),work=document.querySelector('.work-body>.table'),queue=document.querySelector('.upload-queue'),r=queue.getBoundingClientRect();return {width:innerWidth,pageOverflow:document.documentElement.scrollWidth-innerWidth,queueRight:r.right,queueWidth:r.width,listHeight:list.getBoundingClientRect().height,listOverflow:list.scrollWidth-list.clientWidth,paneHeight:work.getBoundingClientRect().height,buttonVisible:document.querySelector('.upload-queue-header button').getBoundingClientRect().width>0};})()`);
+      check("G2 upload dock "+width+"px fits the pane and retains the file list",
+        geometry.pageOverflow<=2&&geometry.queueRight<=width+2&&geometry.queueWidth>150&&geometry.listHeight<=225&&geometry.listOverflow<=2&&geometry.paneHeight>105&&geometry.buttonVisible,JSON.stringify(geometry));
+    }
+    await cdp.send("Emulation.clearDeviceMetricsOverride");
     await cdp.evaluate(`(()=>{document.querySelector('.upload-queue-header button').click();return true;})()`);
     check("G2 upload dock can collapse without losing tasks",
       await cdp.evaluate(`(()=>!document.querySelector('.upload-queue-list')&&document.querySelector('.upload-queue-header button')?.getAttribute('aria-expanded')==='false')()`));
