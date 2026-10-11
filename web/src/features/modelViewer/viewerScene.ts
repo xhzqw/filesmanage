@@ -1,10 +1,12 @@
 import type * as Three from "three";
+import {createDrawingSnapIndex,type DrawingSegment} from "./snap2d";
 
-export type StandardView="iso"|"front"|"right"|"top";
+export type StandardView="iso"|"front"|"back"|"left"|"right"|"top"|"bottom";
 export type ViewerMetrics={triangles:number;vertices:number;size:[number,number,number];components:number};
 export type ViewerControls={
  dispose:()=>void;invalidate:()=>void;resetView:()=>void;
  setStandardView:(view:StandardView)=>void;
+ focusObject:(object:Three.Object3D)=>void;
  toggleAxes:()=>boolean;toggleGrid:()=>boolean;toggleEdges:()=>boolean;
  toggleProjection:()=>"perspective"|"orthographic";
  toggleMeasure:()=>boolean;clearMeasurement:()=>void;
@@ -16,6 +18,7 @@ export function mountEngineeringScene(
  OrbitControls:typeof import("three/examples/jsm/controls/OrbitControls.js").OrbitControls,
  holder:HTMLDivElement,object:Three.Object3D,drawing:boolean,
  setMetrics:(m:ViewerMetrics)=>void,onContextLost:()=>void,onMeasure:(m:number|null)=>void,
+ onCameraDirection:(yaw:number,pitch:number)=>void=()=>{},
 ):ViewerControls{
  const scene=new THREE.Scene();
  scene.background=new THREE.Color(drawing?0xffffff:0xf0f5fa);
@@ -25,6 +28,26 @@ export function mountEngineeringScene(
  object.position.sub(center);
  const diameter=Math.max(size.x,size.y,size.z,.00001),radius=diameter/2;
  scene.add(object);
+ // Build the index in world coordinates *after* the model has been centered.
+ // For a very large drawing, skip the index rather than freeze the UI while
+ // allocating millions of snap entries; free-space measurement still works.
+ const drawingSegments:DrawingSegment[]=[];
+ if(drawing){
+  object.updateMatrixWorld(true);
+  object.traverse(node=>{
+   if(!(node as Three.LineSegments).isLineSegments||drawingSegments.length>350000)return;
+   const line=node as Three.LineSegments;
+   const positions=line.geometry.getAttribute("position");
+   if(!positions)return;
+   const a=new THREE.Vector3(),b=new THREE.Vector3();
+   for(let i=0;i+1<positions.count&&drawingSegments.length<=350000;i+=2){
+    a.fromBufferAttribute(positions,i).applyMatrix4(line.matrixWorld);
+    b.fromBufferAttribute(positions,i+1).applyMatrix4(line.matrixWorld);
+    drawingSegments.push({x1:a.x,y1:a.y,x2:b.x,y2:b.y});
+   }
+  });
+ }
+ const drawingSnap=drawing&&drawingSegments.length<=350000?createDrawingSnapIndex(drawingSegments):null;
  if(!drawing){
   scene.add(new THREE.HemisphereLight(0xe9f4ff,0x90a6bb,2));
   const lights:[number,number,number,number,number][]=[
@@ -83,6 +106,15 @@ export function mountEngineeringScene(
  const distance=Math.max(radius*3.5,radius/Math.tan(21*Math.PI/180)*1.35);
  let raf=0,dirty=true,disposed=false,lost=false;
  const invalidate=()=>{dirty=true;if(!raf&&!document.hidden&&!disposed&&!lost)raf=requestAnimationFrame(draw);};
+ let lastDirection="";
+ const cameraDirection=()=>{
+  if(drawing)return;
+  const vector=camera.position.clone().sub(controls.target).normalize();
+  const yaw=Math.atan2(vector.x,vector.z)*180/Math.PI;
+  const pitch=Math.atan2(vector.y,Math.hypot(vector.x,vector.z))*180/Math.PI;
+  const key=Math.round(yaw)+":"+Math.round(pitch);
+  if(key!==lastDirection){lastDirection=key;onCameraDirection(yaw,pitch);}
+ };
  const setupControls=()=>{
   controls.enableDamping=true;controls.dampingFactor=.09;
   controls.screenSpacePanning=true;controls.enableRotate=!drawing;
@@ -90,35 +122,78 @@ export function mountEngineeringScene(
   controls.minZoom=.015;controls.maxZoom=150;
   if(drawing)controls.mouseButtons.LEFT=THREE.MOUSE.PAN;
   controls.addEventListener("change",invalidate);
+  controls.addEventListener("change",cameraDirection);
  };
  setupControls();
  const switchCamera=(next:Three.OrthographicCamera|Three.PerspectiveCamera)=>{
   if(camera===next)return;
   const target=controls.target.clone(),position=camera.position.clone();
-  controls.removeEventListener("change",invalidate);controls.dispose();
+  const distanceToTarget=Math.max(position.distanceTo(target),near);
+  // Preserve visible model scale when changing projection. Copying camera
+  // positions alone makes ortho/ perspective toggle appear to jump.
+  if(next===ortho){
+   const visibleHeight=2*distanceToTarget*Math.tan(THREE.MathUtils.degToRad(persp.fov/2));
+   ortho.zoom=THREE.MathUtils.clamp(2*halfHeight()/visibleHeight,.015,150);
+   ortho.updateProjectionMatrix();
+  }else{
+   const visibleHeight=2*halfHeight()/Math.max(ortho.zoom,.015);
+   const distance=visibleHeight/(2*Math.tan(THREE.MathUtils.degToRad(persp.fov/2)));
+   const direction=position.clone().sub(target).normalize();
+   position.copy(target).addScaledVector(direction,distance);
+  }
+  controls.removeEventListener("change",invalidate);
+  controls.removeEventListener("change",cameraDirection);
+  controls.dispose();
   camera=next;camera.position.copy(position);
   controls=new OrbitControls(camera,renderer.domElement);
-  setupControls();controls.target.copy(target);controls.update();
+  setupControls();setMeasureNavigation();controls.target.copy(target);controls.update();
  };
  const setPose=(name:StandardView)=>{
   viewName=name;
   const direction:Record<StandardView,[number,number,number]>={
-   iso:[1.5,1.25,1.5],front:[0,0,1],right:[1,0,0],top:[0,1,0],
+   iso:[1.5,1.25,1.5],front:[0,0,1],back:[0,0,-1],
+   left:[-1,0,0],right:[1,0,0],top:[0,1,0],bottom:[0,-1,0],
   };
   const d=direction[name],v=new THREE.Vector3(...d).normalize();
-  camera.up.set(0,name==="top"?0:1,name==="top"?-1:0);
-  camera.position.copy(controls.target).addScaledVector(v,distance);
+  camera.up.set(0,(name==="top"||name==="bottom")?0:1,name==="top"?-1:name==="bottom"?1:0);
+  // Keep the current zoom for changing views; fit remains an explicit action.
+  const currentDistance=Math.max(camera.position.distanceTo(controls.target),near*2);
+  camera.position.copy(controls.target).addScaledVector(v,currentDistance);
   controls.update();invalidate();
+  cameraDirection();
  };
  const fit=()=>{
   controls.enableDamping=false;controls.update();controls.enableDamping=true;
   ortho.zoom=1;ortho.updateProjectionMatrix();
-  controls.target.set(0,0,0);setPose(viewName);
+  controls.target.set(0,0,0);
+  camera.position.set(0,0,distance);
+  setPose(viewName);
+ };
+ const focusObject=(target:Three.Object3D)=>{
+  target.updateWorldMatrix(true,true);
+  const selected=new THREE.Box3().setFromObject(target);
+  if(selected.isEmpty())return;
+  const extent=selected.getSize(new THREE.Vector3());
+  const center=selected.getCenter(new THREE.Vector3());
+  const previous=controls.target.clone();
+  const direction=camera.position.clone().sub(previous).normalize();
+  controls.target.copy(center);
+  if(camera===ortho){
+   const height=Math.max(extent.y,extent.x/Math.max(aspect(),.1),extent.z*.2,diameter*.001);
+   ortho.zoom=THREE.MathUtils.clamp(2*halfHeight()/(height*1.3),.015,150);
+   ortho.updateProjectionMatrix();
+   camera.position.copy(center).addScaledVector(direction,Math.max(distance*.5,near*10));
+  }else{
+   const span=Math.max(extent.x,extent.y,extent.z,diameter*.001);
+   const required=span/(2*Math.tan(THREE.MathUtils.degToRad(persp.fov/2)))*1.5;
+   camera.position.copy(center).addScaledVector(direction,Math.max(required,near*10));
+  }
+  controls.update();invalidate();
  };
  const resetView=()=>{
   switchCamera(drawing?ortho:persp);
   axes.visible=false;
-  if(measuring){measuring=false;controls.enabled=true;}
+  if(measuring){measuring=false;setMeasureNavigation();}
   clearMeasurement();
   viewName=drawing?"front":"iso";fit();
  };
@@ -156,7 +231,27 @@ export function mountEngineeringScene(
  const markers=new THREE.Group();scene.add(markers);
  const raycaster=new THREE.Raycaster(),cursor=new THREE.Vector2();
  const measurePlane=new THREE.Plane(new THREE.Vector3(0,0,1),0);
+ const snapMarker=new THREE.Mesh(new THREE.RingGeometry(.65,1,20),
+  new THREE.MeshBasicMaterial({color:0x087ca4,depthTest:false,depthWrite:false,side:THREE.DoubleSide}));
+ snapMarker.visible=false;snapMarker.renderOrder=21;scene.add(snapMarker);
  let measuring=false,first:Three.Vector3|null=null,press:{x:number;y:number}|null=null;
+ const positionOnDrawing=(event:PointerEvent)=>{
+  const rect=renderer.domElement.getBoundingClientRect();
+  cursor.set((event.clientX-rect.left)/Math.max(rect.width,1)*2-1,-(event.clientY-rect.top)/Math.max(rect.height,1)*2+1);
+  raycaster.setFromCamera(cursor,camera);
+  const position=raycaster.ray.intersectPlane(measurePlane,new THREE.Vector3());
+  if(!position)return null;
+  const unitPerPixel=2*halfHeight()/Math.max(ortho.zoom*holder.clientHeight,1);
+  const snap=drawingSnap?.find(position.x,position.y,unitPerPixel*12);
+  if(snap)position.set(snap.x,snap.y,0);
+  return{position,snap,unitPerPixel};
+ };
+ const setMeasureNavigation=()=>{
+  // Measuring must NOT disable camera navigation: left click picks a point,
+  // left drag pans, right drag rotates in 3D, and the wheel still zooms.
+  controls.mouseButtons.LEFT=measuring?THREE.MOUSE.PAN:(drawing?THREE.MOUSE.PAN:THREE.MOUSE.ROTATE);
+  controls.mouseButtons.RIGHT=measuring&&!drawing?THREE.MOUSE.ROTATE:THREE.MOUSE.PAN;
+ };
  const clearMeasurement=()=>{
   for(const item of [...markers.children]){
    markers.remove(item);
@@ -167,6 +262,17 @@ export function mountEngineeringScene(
   first=null;onMeasure(null);invalidate();
  };
  const onDown=(event:PointerEvent)=>{if(measuring&&event.button===0)press={x:event.clientX,y:event.clientY};};
+ const onMove=(event:PointerEvent)=>{
+  if(!drawing||!measuring||!drawingSnap)return;
+  const candidate=positionOnDrawing(event);
+  snapMarker.visible=Boolean(candidate?.snap);
+  if(candidate?.snap){
+   snapMarker.position.copy(candidate.position);
+   snapMarker.position.z=.00001;
+   snapMarker.scale.setScalar(candidate.unitPerPixel*7);
+  }
+  invalidate();
+ };
  const onUp=(event:PointerEvent)=>{
   if(!measuring||!press||event.button!==0)return;
   const start=press;press=null;
@@ -174,7 +280,7 @@ export function mountEngineeringScene(
   const rect=renderer.domElement.getBoundingClientRect();
   cursor.set((event.clientX-rect.left)/Math.max(rect.width,1)*2-1,-(event.clientY-rect.top)/Math.max(rect.height,1)*2+1);
   raycaster.setFromCamera(cursor,camera);
-  const point=drawing?raycaster.ray.intersectPlane(measurePlane,new THREE.Vector3()):
+  const point=drawing?positionOnDrawing(event)?.position:
    raycaster.intersectObject(object,true).find(hit=>(hit.object as Three.Mesh).isMesh)?.point;
   if(!point)return;
   const mark=new THREE.Mesh(new THREE.SphereGeometry(Math.max(radius*.012,.000001),8,8),
@@ -193,6 +299,9 @@ export function mountEngineeringScene(
  };
  renderer.domElement.addEventListener("pointerdown",onDown);
  renderer.domElement.addEventListener("pointerup",onUp);
+ renderer.domElement.addEventListener("pointermove",onMove);
+ const onLeave=()=>{if(snapMarker.visible){snapMarker.visible=false;invalidate();}};
+ renderer.domElement.addEventListener("pointerleave",onLeave);
  const draw=()=>{
   raf=0;if(disposed||lost||document.hidden)return;
   const moving=controls.update();
@@ -217,13 +326,13 @@ export function mountEngineeringScene(
  renderer.domElement.addEventListener("webglcontextlost",onLost);
  resetView();updateGrid();invalidate();
  return{
-  invalidate,resetView,
+  invalidate,resetView,focusObject,
   setStandardView:(name)=>{if(drawing)return;if(name!=="iso")switchCamera(ortho);setPose(name);},
   toggleAxes:()=>{axes.visible=!axes.visible;invalidate();return axes.visible;},
   toggleGrid:()=>{gridVisible=!gridVisible;grid.visible=gridVisible;if(gridVisible)updateGrid();invalidate();return gridVisible;},
   toggleEdges:()=>{outlineVisible=!outlineVisible;outlines.forEach(edge=>{edge.visible=outlineVisible;});invalidate();return outlineVisible;},
   toggleProjection:()=>{if(!drawing)switchCamera(camera===persp?ortho:persp);invalidate();return camera===ortho?"orthographic":"perspective";},
-  toggleMeasure:()=>{measuring=!measuring;controls.enabled=!measuring;if(!measuring)clearMeasurement();return measuring;},
+  toggleMeasure:()=>{measuring=!measuring;setMeasureNavigation();if(!measuring){snapMarker.visible=false;clearMeasurement();}return measuring;},
   clearMeasurement,
   dispose:()=>{
    if(disposed)return;disposed=true;cancelAnimationFrame(raf);observer.disconnect();
@@ -231,8 +340,14 @@ export function mountEngineeringScene(
    renderer.domElement.removeEventListener("webglcontextlost",onLost);
    renderer.domElement.removeEventListener("pointerdown",onDown);
    renderer.domElement.removeEventListener("pointerup",onUp);
-   controls.removeEventListener("change",invalidate);controls.dispose();
+   renderer.domElement.removeEventListener("pointermove",onMove);
+   renderer.domElement.removeEventListener("pointerleave",onLeave);
+   controls.removeEventListener("change",invalidate);
+   controls.removeEventListener("change",cameraDirection);
+   controls.dispose();
    clearMeasurement();
+   snapMarker.geometry.dispose();
+   (snapMarker.material as Three.Material).dispose();
    for(const item of grid.children){
     const helper=item as Three.GridHelper;helper.geometry.dispose();
     if(Array.isArray(helper.material))helper.material.forEach(m=>m.dispose());else helper.material.dispose();

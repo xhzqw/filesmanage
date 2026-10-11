@@ -41,6 +41,10 @@ echo "== acceptance matrix gate =="
 python3 scripts/gen_acceptance_matrix.py --check
 
 if [ "${1:-}" = "--with-tests" ]; then
+  echo "== cad: DXF geometry / snap regression =="
+  node web/scripts/cad-viewer-smoke.mjs
+  echo "== cad: isolated Chrome WebGL viewport regression =="
+  node web/scripts/cad-browser-smoke.mjs
   echo "== go: full test suite =="
   go test ./...
   echo "== migrations: checksum re-verify =="

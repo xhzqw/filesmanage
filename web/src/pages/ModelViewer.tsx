@@ -55,6 +55,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
  const started=useRef(false);
  const controls=useRef<ViewerControls|null>(null);
  const[view,setView]=useState({axes:false,grid:true,edges:true,measure:false,projection:"perspective" as "perspective"|"orthographic"});
+ const[cube,setCube]=useState({yaw:45,pitch:26});
  const drawing=(info?.outputKind??info?.format??"").toLowerCase()==="dxf";
 
  // React Router can keep this component mounted while /model/:id changes.
@@ -75,6 +76,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
   setMetrics(null);setLayers([]);setParts([]);setSelectedPart(-1);
   setUnit("unknown");setMeasure(null);setSkipped([]);
   setView({axes:false,grid:true,edges:true,measure:false,projection:"perspective"});
+  setCube({yaw:45,pitch:26});
   const run=async()=>{
    try{
     let data=await fileApi.derivativeStatus(id);
@@ -184,7 +186,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
        setStatus("webgl-lost");
        setMessage("浏览器 WebGL 上下文已丢失（通常是 GPU 资源被系统回收）");
       }
-     },setMeasure);
+     },setMeasure,(yaw,pitch)=>setCube({yaw,pitch}));
      controls.current=mountedControls;
      setView({axes:false,grid:format!=="dxf",edges:format!=="dxf",measure:false,
       projection:format==="dxf"?"orthographic":"perspective"});
@@ -226,11 +228,11 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
         setView(v=>({...v,axes:false,measure:false,projection:drawing?"orthographic":"perspective"}));
        }}>适合窗口</RareButton>
        {!drawing&&<div className="cad-toolgroup" role="group" aria-label="标准视角">
-        {(["iso","front","right","top"] as const).map((name,index)=>
+        {(["iso","front","back","left","right","top","bottom"] as const).map((name,index)=>
          <RareButton key={name} type="button" onClick={()=>{
           controls.current?.setStandardView(name);
           setView(v=>({...v,projection:name==="iso"?v.projection:"orthographic"}));
-         }}>{["等轴","前","右","俯"][index]}</RareButton>)}
+         }}>{["等轴","前","后","左","右","俯","仰"][index]}</RareButton>)}
        </div>}
        <div className="cad-toolgroup" role="group" aria-label="辅助显示">
         <RareButton type="button" className={view.grid?"on":""} aria-pressed={view.grid}
@@ -247,13 +249,37 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
        <RareButton type="button" className={view.measure?"on":""} aria-pressed={view.measure}
         onClick={()=>setView(v=>({...v,measure:controls.current?.toggleMeasure()??v.measure}))}>测距</RareButton>
       </div>}
+      {status==="ready"&&!drawing&&<div className="cad-viewcube" role="group" aria-label="方向导航立方体">
+       <div className="cad-viewcube-body" style={{transform:"rotateX("+cube.pitch+"deg) rotateY("+(-cube.yaw)+"deg)"}}>
+        {(["front","back","left","right","top","bottom"] as const).map((direction,index)=>
+         <RareButton type="button" key={direction} className={"cad-cubeface cad-cubeface-"+direction}
+          aria-label={["前视图","后视图","左视图","右视图","俯视图","仰视图"][index]}
+          onClick={()=>{
+           controls.current?.setStandardView(direction);
+           setView(v=>({...v,projection:"orthographic"}));
+          }}>{["前","后","左","右","上","下"][index]}</RareButton>)}
+       </div>
+      </div>}
       {status==="ready"&&<div className="cad-hint">
-       {view.measure?"依次点击两点测量距离":drawing?"左键平移 · 滚轮缩放":"左键旋转 · 右键平移 · 滚轮缩放"}
+       {view.measure?(drawing?"靠近端点/中点/线段点击测量 · 可拖动画布 · 滚轮缩放":"点击模型两点测量网格近似距离 · 左键平移 / 右键旋转"):
+        drawing?"左键平移 · 滚轮缩放":"左键旋转 · 右键平移 · 滚轮缩放"}
       </div>}
      </section>
      {status==="ready"&&<aside className="cad-inspector" aria-label="工程文件属性">
       {layers.length>0&&<section className="cad-inspector-section">
        <h3>图层 <span>{layers.filter(item=>item.visible).length}/{layers.length}</span></h3>
+       <div className="cad-quick-actions" role="group" aria-label="批量显示图层">
+        <RareButton type="button" onClick={()=>{
+         setLayers(current=>current.map(item=>({...item,visible:true})));
+         dxfRoot.current?.children.forEach(child=>{child.visible=true;});
+         controls.current?.invalidate();
+        }}>全部显示</RareButton>
+        <RareButton type="button" onClick={()=>{
+         setLayers(current=>current.map(item=>({...item,visible:false})));
+         dxfRoot.current?.children.forEach(child=>{child.visible=false;});
+         controls.current?.invalidate();
+        }}>全部隐藏</RareButton>
+       </div>
        <div className="cad-layer-list" role="group" aria-label="图层可见性">
         {layers.map(layer=><label className="cad-layer" key={layer.name}>
          <RareInput type="checkbox" checked={layer.visible} onChange={event=>{
@@ -282,6 +308,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
           });
           controls.current?.invalidate();
          }}>{part.name}</RareButton>
+         <RareButton type="button" onClick={()=>{const child=mshRoot.current?.children[index];if(child)controls.current?.focusObject(child);}}>定位</RareButton>
         </div>)}
        </div>
        <RareButton type="button" onClick={()=>{
@@ -297,6 +324,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
       {view.measure&&<section className="cad-inspector-section">
        <h3>测量</h3>
        <strong className="cad-measure">{measure===null?"请选择两个点":measure.toLocaleString("zh-CN",{maximumFractionDigits:4})+" "+(unit==="unknown"?(drawing?"绘图单位":"模型单位"):unit)}</strong>
+       <span className="cad-precision-note">{drawing?"按二维绘图坐标计算，曲线捕捉基于预览离散线段":"基于三角网格的近似距离，非 CAD 曲面精确测量"}</span>
        <RareButton type="button" onClick={()=>controls.current?.clearMeasurement()}>清除测量</RareButton>
       </section>}
       {metrics&&<section className="cad-inspector-section cad-properties">
@@ -305,7 +333,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
        <div><span>单位</span><strong>{unit==="unknown"?"未声明":unit}</strong></div>
        <div><span>尺寸</span><strong>{(drawing?metrics.size.slice(0,2):metrics.size).map(v=>Number(v.toPrecision(5))).join(" × ")}</strong></div>
        {!drawing&&<div><span>三角面</span><strong>{metrics.triangles.toLocaleString()}</strong></div>}
-       {!drawing&&<div><span>组件</span><strong>{metrics.components}</strong></div>}
+       {!drawing&&<div><span>网格组</span><strong title="网格组数量不等于原始 CAD 装配零件数量">{metrics.components}</strong></div>}
        <div><span>格式</span><strong>{info?.format?.toUpperCase()??"-"}</strong></div>
        <div><span>源校验</span><strong title={fileMeta?.sha256}>{fileMeta?.sha256?.slice(0,10)??"-"}…</strong></div>
        {info?.note&&<p className="cad-notice">{info.note}</p>}

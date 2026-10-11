@@ -53,10 +53,19 @@ type Entity={
  closed:boolean;
  height:number;
  text:string;
+ blockName:string;
+ scaleX:number;
+ scaleY:number;
+ rotation:number;
+ major:Point|null;
+ ratio:number;
+ parameterStart:number;
+ parameterEnd:number;
 };
 
 function emptyEntity(type:string):Entity{
- return {type,layer:"0",points:[],end:null,radius:0,a0:0,a1:360,closed:false,height:2.5,text:""};
+ return {type,layer:"0",points:[],end:null,radius:0,a0:0,a1:360,closed:false,height:2.5,text:"",
+  blockName:"",scaleX:1,scaleY:1,rotation:0,major:null,ratio:1,parameterStart:0,parameterEnd:Math.PI*2};
 }
 
 export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResult{
@@ -102,6 +111,25 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
  const segmentBuffers=new Map<string,number[]>();
  const layerOrder:string[]=[];
  const skipped=new Set<string>();
+ type Affine={a:number;b:number;c:number;d:number;x:number;y:number};
+ const identity:Affine={a:1,b:0,c:0,d:1,x:0,y:0};
+ const multiply=(outer:Affine,inner:Affine):Affine=>({
+  a:outer.a*inner.a+outer.c*inner.b,
+  b:outer.b*inner.a+outer.d*inner.b,
+  c:outer.a*inner.c+outer.c*inner.d,
+  d:outer.b*inner.c+outer.d*inner.d,
+  x:outer.a*inner.x+outer.c*inner.y+outer.x,
+  y:outer.b*inner.x+outer.d*inner.y+outer.y,
+ });
+ const transformed=(x:number,y:number)=>({
+  x:activeTransform.a*x+activeTransform.c*y+activeTransform.x,
+  y:activeTransform.b*x+activeTransform.d*y+activeTransform.y,
+ });
+ const blocks=new Map<string,{base:Point;items:Entity[]}>();
+ let activeTransform:Affine=identity;
+ let inheritedLayer="0";
+ const blockStack=new Set<string>();
+ const actualLayer=(name:string)=>name==="0"?inheritedLayer:name;
 
  const groupFor=(name:string)=>{
   let group=layerGroups.get(name);
@@ -118,10 +146,11 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
  };
  const line=(x1:number,y1:number,x2:number,y2:number,layer:string)=>{
   if(![x1,y1,x2,y2].every(v=>Number.isFinite(v)&&Math.abs(v)<1e12))return;
-  groupFor(layer);
-  let coordinates=segmentBuffers.get(layer);
-  if(!coordinates){coordinates=[];segmentBuffers.set(layer,coordinates);}
-  coordinates.push(x1,y1,0,x2,y2,0);
+  const a=transformed(x1,y1),b=transformed(x2,y2),resolved=actualLayer(layer);
+  groupFor(resolved);
+  let coordinates=segmentBuffers.get(resolved);
+  if(!coordinates){coordinates=[];segmentBuffers.set(resolved,coordinates);}
+  coordinates.push(a.x,a.y,0,b.x,b.y,0);
  };
  const arc=(x:number,y:number,r:number,from:number,to:number,layer:string)=>{
   if(![x,y,r,from,to].every(Number.isFinite)||r<=0)return;
@@ -170,17 +199,50 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
   canvas.height=Math.ceil((fontSize+12)*rows.length);
   context.font="500 "+fontSize+"px Arial, 'Microsoft YaHei', sans-serif";
   context.textBaseline="top";
-  context.fillStyle="#"+aciColor(layerColor(layer)).toString(16).padStart(6,"0");
+  const resolved=actualLayer(layer);
+  context.fillStyle="#"+aciColor(layerColor(resolved)).toString(16).padStart(6,"0");
   rows.forEach((row,index)=>context.fillText(row,4,index*(fontSize+12)));
   const texture=new THREE.CanvasTexture(canvas);
   texture.colorSpace=THREE.SRGBColorSpace;
   const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,transparent:true,depthWrite:false}));
-  sprite.scale.set(canvas.width/fontSize*h,canvas.height/fontSize*h,1);
-  sprite.position.set(x+sprite.scale.x/2,y+sprite.scale.y/2,0);
-  groupFor(layer).add(sprite);
+  const sx=Math.hypot(activeTransform.a,activeTransform.b);
+  const sy=Math.hypot(activeTransform.c,activeTransform.d);
+  sprite.scale.set(canvas.width/fontSize*h*sx,canvas.height/fontSize*h*sy,1);
+  const origin=transformed(x,y);
+  sprite.position.set(origin.x+sprite.scale.x/2,origin.y+sprite.scale.y/2,0);
+  (sprite.material as THREE.SpriteMaterial).rotation=Math.atan2(activeTransform.b,activeTransform.a);
+  groupFor(resolved).add(sprite);
  };
 
  const commit=(e:Entity)=>{
+  if(e.type==="INSERT"){
+   const def=blocks.get(e.blockName);
+   if(!def){skipped.add("INSERT: "+(e.blockName||"未命名图块"));return;}
+   if(blockStack.has(e.blockName)||blockStack.size>=8){
+    skipped.add("INSERT: 循环或嵌套过深");return;
+   }
+   const pos=e.points[0]??{x:0,y:0,bulge:0};
+   const angle=e.rotation*Math.PI/180;
+   const cos=Math.cos(angle),sin=Math.sin(angle);
+   const local:Affine={
+    a:cos*e.scaleX,b:sin*e.scaleX,c:-sin*e.scaleY,d:cos*e.scaleY,
+    x:pos.x-cos*e.scaleX*def.base.x+sin*e.scaleY*def.base.y,
+    y:pos.y-sin*e.scaleX*def.base.x-cos*e.scaleY*def.base.y,
+   };
+   if(!Object.values(local).every(v=>Number.isFinite(v)&&Math.abs(v)<1e12)){
+    skipped.add("INSERT: 非法变换");return;
+   }
+   const previous=activeTransform,previousLayer=inheritedLayer;
+   activeTransform=multiply(previous,local);
+   inheritedLayer=actualLayer(e.layer);
+   blockStack.add(e.blockName);
+   try{for(const part of def.items)commit(part);}
+   finally{
+    blockStack.delete(e.blockName);
+    activeTransform=previous;inheritedLayer=previousLayer;
+   }
+   return;
+  }
   // POLYLINE geometry arrives as separate VERTEX entities; accumulate them and
   // emit on SEQEND. LWPOLYLINE carries its vertices inline.
   if(e.type==="VERTEX"){
@@ -216,7 +278,35 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
    }
    case "ARC":{
     const c=e.points[0];
-    if(c&&e.radius>0)arc(c.x,c.y,e.radius,e.a0,e.a1||360,e.layer);
+    if(c&&e.radius>0)arc(c.x,c.y,e.radius,e.a0,e.a1,e.layer);
+    break;
+   }
+   case "ELLIPSE":{
+    const center=e.points[0],major=e.major;
+    if(!center||!major||!Number.isFinite(e.ratio)||e.ratio<=0||e.ratio>1||!Number.isFinite(e.parameterStart)||!Number.isFinite(e.parameterEnd)){
+     skipped.add("ELLIPSE: 无效几何");break;
+    }
+    let end=e.parameterEnd;
+    while(end<=e.parameterStart)end+=Math.PI*2;
+    if(end-e.parameterStart>Math.PI*2+1e-6){skipped.add("ELLIPSE: 无效参数区间");break;}
+    const count=Math.max(24,Math.min(192,Math.ceil((end-e.parameterStart)*32)));
+    const sample=(t:number)=>{
+     const sin=Math.sin(t),cos=Math.cos(t);
+     return {x:center.x+major.x*cos-major.y*e.ratio*sin,
+      y:center.y+major.y*cos+major.x*e.ratio*sin};
+    };
+    let start=sample(e.parameterStart);
+    for(let i=1;i<=count;i++){
+     const next=sample(e.parameterStart+(end-e.parameterStart)*i/count);
+     line(start.x,start.y,next.x,next.y,e.layer);start=next;
+    }
+    break;
+   }
+   case "POINT":{
+    const c=e.points[0];if(!c)break;
+    const d=Math.max(e.height*.08,.04);
+    line(c.x-d,c.y,c.x+d,c.y,e.layer);
+    line(c.x,c.y-d,c.x,c.y+d,e.layer);
     break;
    }
    case "LWPOLYLINE":
@@ -256,47 +346,99 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
  let polyVerts:Point[]=[];
  let polyLayer="0";
  let polyClosed=false;
- let inEntities=false;
  let sectionNamePending=false;
+ let currentSection="";
+ let blockHeader=false;
+ let currentBlock:{name:string;base:Point;items:Entity[]}|null=null;
+ const modelEntities:Entity[]=[];
+ const finishEntity=()=>{
+  if(!entity.type)return;
+  if(currentSection==="ENTITIES")modelEntities.push(entity);
+  else if(currentSection==="BLOCKS"&&currentBlock)currentBlock.items.push(entity);
+ };
  for(const pair of records){
   if(pair.code===0){
-   if(inEntities&&entity.type)commit(entity);
+   finishEntity();
    entity=emptyEntity("");
-   if(pair.value==="SECTION"){sectionNamePending=true;inEntities=false;continue;}
-   if(pair.value==="ENDSEC"){inEntities=false;continue;}
-   if(inEntities)entity=emptyEntity(pair.value);
+   if(pair.value==="SECTION"){sectionNamePending=true;currentSection="";continue;}
+   if(pair.value==="ENDSEC"){currentSection="";continue;}
+   if(currentSection==="BLOCKS"&&pair.value==="BLOCK"){
+    currentBlock={name:"",base:{x:0,y:0,bulge:0},items:[]};
+    blockHeader=true;continue;
+   }
+   if(currentSection==="BLOCKS"&&pair.value==="ENDBLK"){
+    if(currentBlock?.name)blocks.set(currentBlock.name,{base:currentBlock.base,items:currentBlock.items});
+    currentBlock=null;blockHeader=false;continue;
+   }
+   if(currentSection==="ENTITIES"||(currentSection==="BLOCKS"&&currentBlock)){
+    blockHeader=false;
+    entity=emptyEntity(pair.value);
+   }
    continue;
   }
   if(sectionNamePending&&pair.code===2){
-   inEntities=pair.value.trim()==="ENTITIES";
+   currentSection=pair.value.trim();
    sectionNamePending=false;continue;
   }
-  if(!inEntities)continue;
+  if(blockHeader&&currentBlock){
+   if(pair.code===2)currentBlock.name=pair.value.trim();
+   if(pair.code===10)currentBlock.base.x=Number(pair.value);
+   if(pair.code===20)currentBlock.base.y=Number(pair.value);
+   continue;
+  }
+  if(currentSection!=="ENTITIES"&&currentSection!=="BLOCKS")continue;
   if(!entity.type)continue;
   switch(pair.code){
    case 8:entity.layer=pair.value.trim()||"0";break;
+   case 2:if(entity.type==="INSERT"||entity.type==="DIMENSION")entity.blockName=pair.value.trim();break;
    case 10:entity.points.push({x:Number(pair.value),y:0,bulge:0});break;
    case 20:{
     const last=entity.points[entity.points.length-1];
     if(last)last.y=Number(pair.value);
     break;
    }
-   case 11:entity.end={x:Number(pair.value),y:0,bulge:0};break;
-   case 21:if(entity.end)entity.end.y=Number(pair.value);break;
-   case 40:entity.radius=Number(pair.value);if(entity.type==="TEXT"||entity.type==="MTEXT")entity.height=Number(pair.value);break;
-   case 50:entity.a0=Number(pair.value);break;
+   case 11:
+    if(entity.type==="ELLIPSE")entity.major={x:Number(pair.value),y:0,bulge:0};
+    else entity.end={x:Number(pair.value),y:0,bulge:0};
+    break;
+   case 21:
+    if(entity.type==="ELLIPSE"&&entity.major)entity.major.y=Number(pair.value);
+    else if(entity.end)entity.end.y=Number(pair.value);
+    break;
+   case 40:
+    if(entity.type==="ELLIPSE")entity.ratio=Number(pair.value);
+    else {
+     entity.radius=Number(pair.value);
+     if(entity.type==="TEXT"||entity.type==="MTEXT")entity.height=Number(pair.value);
+    }
+    break;
+   case 41:
+    if(entity.type==="INSERT")entity.scaleX=Number(pair.value);
+    if(entity.type==="ELLIPSE")entity.parameterStart=Number(pair.value);
+    break;
+   case 50:
+    if(entity.type==="INSERT")entity.rotation=Number(pair.value);
+    else entity.a0=Number(pair.value);
+    break;
    case 51:entity.a1=Number(pair.value);break;
    case 70:entity.closed=(Number.parseInt(pair.value,10)&1)===1;break;
    case 42:{
-    const last=entity.points[entity.points.length-1];
-    if(last)last.bulge=Number(pair.value);
+    if(entity.type==="INSERT")entity.scaleY=Number(pair.value);
+    else if(entity.type==="ELLIPSE")entity.parameterEnd=Number(pair.value);
+    else{
+     const last=entity.points[entity.points.length-1];
+     if(last)last.bulge=Number(pair.value);
+    }
     break;
    }
    case 1:entity.text+=pair.value;break;
    case 3:entity.text=pair.value+entity.text;break;
   }
  }
- if(inEntities&&entity.type)commit(entity);
+ finishEntity();
+ // BLOCK definitions may occur after model-space entities. Resolve references
+ // only after collecting the entire file, including forward references.
+ for(const item of modelEntities)commit(item);
 
  // One draw call per layer for linework instead of one per DXF segment.
  for(const [layer,coordinates] of segmentBuffers){

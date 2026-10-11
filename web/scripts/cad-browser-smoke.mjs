@@ -1,0 +1,159 @@
+#!/usr/bin/env node
+// Remote-only synthetic CAD viewport smoke. Exercises real WebGL/OrbitControls
+// without modifying the application DB or opening a production route.
+import assert from "node:assert/strict";
+import {build} from "esbuild";
+import {spawn} from "node:child_process";
+import {createServer} from "node:http";
+import {mkdtempSync} from "node:fs";
+import {rm} from "node:fs/promises";
+import {tmpdir} from "node:os";
+import path from "node:path";
+import {setTimeout as delay} from "node:timers/promises";
+
+const root=path.resolve("web");
+const source=String.raw`
+import * as THREE from "three";
+import {OrbitControls} from "three/examples/jsm/controls/OrbitControls.js";
+import {mountEngineeringScene} from "./src/features/modelViewer/viewerScene.ts";
+const holder=document.getElementById("stage");
+let controls=null,metrics=null,lastCamera=null;
+const callback=(yaw,pitch)=>{lastCamera={yaw,pitch};};
+function mount(drawing=false){
+ if(controls)controls.dispose();
+ const object=drawing?new THREE.Group():new THREE.Mesh(new THREE.BoxGeometry(10,10,10),new THREE.MeshPhongMaterial({color:0x467fa8}));
+ if(drawing){
+  const geometry=new THREE.BufferGeometry().setFromPoints([
+   new THREE.Vector3(0,0,0),new THREE.Vector3(100,0,0),
+   new THREE.Vector3(100,0,0),new THREE.Vector3(100,50,0),
+  ]);
+  object.add(new THREE.LineSegments(geometry,new THREE.LineBasicMaterial({color:0x27425b})));
+ }
+ controls=mountEngineeringScene(THREE,OrbitControls,holder,object,drawing,m=>{metrics=m;},
+  ()=>{throw Error("WebGL context unexpectedly lost");},()=>{},callback);
+}
+mount();
+window.__cad={
+ get state(){return {metrics,camera:lastCamera,canvases:holder.querySelectorAll("canvas").length,
+  width:holder.querySelector("canvas")?.getBoundingClientRect().width??0};},
+ view:name=>controls.setStandardView(name),
+ projection:()=>controls.toggleProjection(),
+ measure:()=>controls.toggleMeasure(),
+ focus:()=>{const mesh=holder.querySelector("canvas");return Boolean(mesh)&&Boolean(controls.resetView());},
+ grid:()=>controls.toggleGrid(),
+ drawing:()=>mount(true),
+ dispose:()=>{controls.dispose();return holder.querySelectorAll("canvas").length;},
+};
+`;
+const result=await build({stdin:{contents:source,resolveDir:root,sourcefile:"cad-browser-fixture.ts"},
+ bundle:true,write:false,format:"iife",platform:"browser",target:"es2022",logLevel:"silent"});
+const bundle=result.outputFiles[0]?.text;
+assert(bundle,"browser fixture bundle should exist");
+const html=`<!doctype html><html><head><meta charset="utf-8"><style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden}
+#stage{width:100vw;height:100vh}
+</style></head><body><div id="stage"></div><script>${bundle}</script></body></html>`;
+const server=createServer((req,res)=>{
+ res.writeHead(200,{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"});
+ res.end(html);
+});
+await new Promise(resolve=>server.listen(0,"127.0.0.1",resolve));
+const address=server.address();
+assert(address&&typeof address!=="string");
+const directory=mkdtempSync(path.join(tmpdir(),"cad-v3-chrome-"));
+const port=19410+Math.floor(Math.random()*800);
+const chrome=spawn("/usr/bin/google-chrome",[
+ "--headless=new",`--remote-debugging-port=${port}`,
+ `--user-data-dir=${directory}`,"--no-sandbox","--no-first-run",
+ "--disable-dev-shm-usage","--use-angle=swiftshader","--enable-unsafe-swiftshader",
+ "--window-size=1366,768","about:blank",
+],{stdio:"ignore",detached:true});
+
+class CDP{
+ constructor(ws){
+  this.ws=ws;this.sequence=1;this.pending=new Map();
+  ws.addEventListener("message",event=>{
+   const message=JSON.parse(event.data);
+   const handler=this.pending.get(message.id);
+   if(!handler)return;
+   this.pending.delete(message.id);
+   if(message.error)handler.reject(Error(message.error.message));
+   else handler.resolve(message.result);
+  });
+ }
+ async send(method,params={}){
+  const id=this.sequence++;
+  return new Promise((resolve,reject)=>{
+   this.pending.set(id,{resolve,reject});
+   this.ws.send(JSON.stringify({id,method,params}));
+  });
+ }
+ async eval(expression){
+  const response=await this.send("Runtime.evaluate",{expression,returnByValue:true,awaitPromise:true});
+  if(response.exceptionDetails)throw Error("CAD browser JS exception: "+JSON.stringify(response.exceptionDetails).slice(0,400));
+  return response.result.value;
+ }
+}
+let cdp=null;
+try{
+ let target=null;
+ for(let i=0;i<65&&!target;i++){
+  await delay(200);
+  try{
+   const tabs=await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+   target=tabs.find(tab=>tab.type==="page");
+  }catch{/* Chrome still starting */}
+ }
+ assert(target,"headless Chrome failed to start");
+ const ws=new WebSocket(target.webSocketDebuggerUrl);
+ await new Promise((resolve,reject)=>{
+  ws.addEventListener("open",resolve,{once:true});
+  ws.addEventListener("error",reject,{once:true});
+ });
+ cdp=new CDP(ws);
+ await cdp.send("Page.enable");
+ await cdp.send("Runtime.enable");
+ await cdp.send("Page.navigate",{url:`http://127.0.0.1:${address.port}`});
+ let state=null;
+ for(let i=0;i<80;i++){
+  await delay(250);
+  const data=await cdp.eval("window.__cad?.state??null");
+  if(data?.canvases===1){state=data;break;}
+ }
+ assert(state,"CAD fixture did not mount");
+ assert.equal(state.metrics.triangles,12);
+ assert.equal(state.canvases,1);
+ assert(state.width>1000);
+ const right=await cdp.eval("(()=>{window.__cad.view('right');return window.__cad.state.camera})()");
+ assert(Math.abs(right.yaw-90)<2,"right view camera points toward +X");
+ const top=await cdp.eval("(()=>{window.__cad.view('top');return window.__cad.state.camera})()");
+ assert(top.pitch>85,"top view camera points down +Y");
+ assert.equal(await cdp.eval("window.__cad.projection()"),"perspective");
+ const projectionDirection=await cdp.eval("window.__cad.state.camera");
+ assert(projectionDirection.pitch>85,"projection toggle must preserve the camera direction");
+ assert.equal(await cdp.eval("window.__cad.measure()"),true);
+ assert.equal(await cdp.eval("window.__cad.measure()"),false);
+ await cdp.send("Emulation.setDeviceMetricsOverride",{width:820,height:600,deviceScaleFactor:1,mobile:false});
+ await delay(650);
+ const width=await cdp.eval("window.__cad.state.width");
+ assert(width>=800&&width<=830,"viewport must resize with container");
+ const drawing=await cdp.eval("(()=>{window.__cad.drawing();return window.__cad.state})()");
+ assert.equal(drawing.canvases,1,"scene replacement must not leak a canvas");
+ assert.equal(drawing.metrics.triangles,0);
+ assert.equal(await cdp.eval("window.__cad.dispose()"),0,"dispose must remove WebGL canvas");
+ console.log("CAD_BROWSER_PASS Chrome WebGL: 3D rendering, six-axis camera, projection, measurement, responsive resize, 2D replacement, disposal");
+}finally{
+ cdp?.ws.close();
+ // Chrome forks GPU/network/storage children; killing only the browser PID
+ // leaves processes writing into the profile while it is being removed.
+ try{if(chrome.pid)process.kill(-chrome.pid,"SIGKILL");}
+ catch{chrome.kill("SIGKILL");}
+ if(chrome.exitCode===null){
+  await Promise.race([
+   new Promise(resolve=>chrome.once("exit",resolve)),
+   delay(5000),
+  ]);
+ }
+ await new Promise(resolve=>server.close(resolve));
+ await rm(directory,{recursive:true,force:true,maxRetries:25,retryDelay:200});
+}
