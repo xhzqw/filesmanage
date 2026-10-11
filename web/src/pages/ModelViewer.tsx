@@ -7,6 +7,7 @@ import {reportSessionResponse} from "../shared/http";
 import type {User} from "../entities/user/model";
 import {AppShell} from "../shared/ui/AppShell";
 import {parseDxf} from "../features/modelViewer/dxf";
+import {printCurrentSheet,type SheetSize} from "../features/modelViewer/printSheet";
 import type {MshGeometry} from "../features/modelViewer/mshParser";
 import {mountEngineeringScene,type ViewerControls,type ViewerMetrics} from "../features/modelViewer/viewerScene";
 import "../features/modelViewer/viewer.css";
@@ -297,6 +298,15 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
          activeLayout.replace(/[^\p{L}\p{N}_-]/gu,"_").slice(0,50)+".png";
         anchor.click();
        }}>导出当前图纸 PNG</RareButton>}
+       {drawing&&activeLayout!=="Model"&&(["A4","A3"] as const).map((paper:SheetSize)=>
+        <RareButton key={paper} type="button" title="适合纸张打印当前图像，非CAD精确比例出图" onClick={()=>{
+         const snapshot=controls.current?.exportPng();
+         if(!snapshot)return;
+         if(!printCurrentSheet(snapshot,paper,activeLayout))
+          setMessage("浏览器阻止了打印预览，请允许弹出窗口");
+        }}>{paper}打印</RareButton>)}
+       {drawing&&message.startsWith("浏览器阻止了打印")&&
+        <span className="cad-print-error" role="alert">{message}</span>}
       </div>}
       {status==="ready"&&!drawing&&<div className="cad-viewcube" role="group" aria-label="方向导航立方体">
        <div className="cad-viewcube-body" style={{transform:"rotateX("+cube.pitch+"deg) rotateY("+(-cube.yaw)+"deg)"}}>

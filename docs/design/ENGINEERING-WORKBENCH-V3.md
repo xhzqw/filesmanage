@@ -114,6 +114,28 @@ This document records validated capability instead of marking unimplemented work
   rejection of tilted/perspective views. Remote headless Chrome exercises a
   rendered projected paper layout across desktop/narrow viewport sizes.
 
+## Delivered in V3.6 engineering sheet composition increment
+
+- Rectangular XY orthographic VIEWPORTs can now project model-space HATCH
+  triangles and rasterized TEXT/MTEXT glyphs in addition to linework.
+  Filled geometry is intersected with the paper viewport rectangle before
+  rasterization, and text quads interpolate UVs across clipped edges.
+  This is an approximation for CAD text, especially SHX glyph metrics.
+- Group 331 frozen-layer references are resolved through the DXF LAYER table
+  handle (group 5), including tables that put the handle before the name.
+  Filtering is applied per VIEWPORT. An unknown handle yields a compatibility
+  notice instead of silently painting potentially hidden content.
+- A3/A4 landscape **fit-to-page raster print preview** is available for
+  selected paper layouts. It uses the current WebGL drawing snapshot and
+  physically sized browser print media; it is not a CAD plotter, does not
+  guarantee 1:1 or 1:N source units on paper, and is not a vector PDF.
+- Projection memory is bounded for source line segments, HATCH vertices,
+  annotation textures and clipped triangles. Original source GPU resources
+  are disposed after collecting non-destructive drawing data.
+- Geometry regressions verify clipping area, glyph UV extents, frozen-layer
+  handle resolution and missing-handle warnings. Headless Chrome verifies
+  fill/glyph composition, frozen layer isolation and print page template.
+
 ## Deliberately unsupported or approximate
 
 | Capability | Current truth | Next gate |
@@ -125,7 +147,7 @@ This document records validated capability instead of marking unimplemented work
 | DXF SPLINE/NURBS | Knots/degree/weights supported; fit-point-only interpolation not supported | Fit-point solver, discontinuous curve fidelity |
 | DXF DIMENSION | Anonymous representation BLOCK when present | Full DIMSTYLE overrides and absent-block fallback |
 | DXF HATCH | Solid fills and bounded pattern-family strokes clipped against closed polyline contours, with holes | Edge-boundary paths, gradients, advanced hatch styles and exact plot fidelity |
-| DXF paper space, XREF | Layout isolation and bounded 2D XY orthographic VIEWPORT linework projection/clipping; PNG of current preview | Full 3D perspective/tilted view, sprite/filled-region composition, complex clipping, frozen layers, CAD print scale, XREF |
+| DXF paper space, XREF | Layout isolation and bounded 2D XY orthographic VIEWPORT lines, raster glyphs and solid HATCH composition, frozen layers by handle; PNG/A3/A4 fit-to-page output | Full 3D perspective/tilted view, complex clipping, CAD print scale, XREF |
 | DXF arc/ellipse | Tessellated preview | Analytic segment and center/angle snap records |
 | DXF text | STYLE lookup, width/rotation, Unicode symbols; Canvas font fallback | True SHX metrics, advanced MTEXT formatting, annotation scales |
 | 2D/3D annotations and version diff | Not yet implemented | Version-bound review domain and permissions |

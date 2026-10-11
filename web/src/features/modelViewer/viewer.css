@@ -15,6 +15,7 @@
 .cad-toolbar>button{background:rgba(255,255,255,.96);box-shadow:0 2px 12px rgba(15,39,92,.07)}
 .cad-toolbar button{height:27px;min-height:27px;white-space:nowrap;border-radius:var(--radius-sm);padding:0 9px;font-size:11px}
 .cad-toolbar button.on{color:var(--brand-blue);background:var(--surface-row-selected);border-color:var(--border-selected)}
+.cad-print-error{pointer-events:none;background:var(--surface-panel);color:var(--status-warning);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:5px 8px;font-size:11px}
 .cad-viewcube{position:absolute;z-index:3;top:64px;right:16px;width:84px;height:84px;perspective:360px;pointer-events:auto}
 .cad-viewcube-body{position:absolute;left:9px;top:9px;width:66px;height:66px;transform-style:preserve-3d;transition:transform .12s ease-out}
 .cad-viewcube .cad-cubeface{position:absolute;left:0;top:0;display:flex;align-items:center;justify-content:center;width:66px;height:66px;min-height:66px;padding:0;border-radius:var(--radius-xs);font-size:13px;font-weight:700;color:var(--brand-navy);background:rgba(219,234,247,.97);border:1px solid var(--border-subtle);backface-visibility:hidden;box-shadow:none}

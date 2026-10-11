@@ -10,7 +10,7 @@ import {sampleSpline} from "./nurbs2d";
 import {parseHatchPaths} from "./hatch2d";
 import {clipHatchPattern} from "./hatchPattern2d";
 import {cadFontFamily,decodeCadText,type CadTextStyle} from "./cadText2d";
-import {createPaperViewport} from "./paperViewport2d";
+import {clipUvPolygon,createPaperViewport,type UvPoint,type ValidViewport} from "./paperViewport2d";
 
 export type DxfParseResult={
  object:THREE.Group;
@@ -101,11 +101,13 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
  const layerColors=new Map<string,number>();
  const hiddenLayers=new Set<string>();
  const layerTrueColors=new Map<string,number>();
+ const layerHandles=new Map<string,string>();
  const textStyles=new Map<string,CadTextStyle>();
  let unit="unknown";
  let section="";
  let table="";
  let pendingLayer="";
+ let pendingLayerHandle="";
  let pendingStyle="";
  let sectionPending=false;
  let tablePending=false;
@@ -115,7 +117,7 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
    if(pair.value==="SECTION"){sectionPending=true;continue;}
    if(pair.value==="ENDSEC"){section="";continue;}
    if(pair.value==="TABLE"){tablePending=true;continue;}
-   if(pair.value==="LAYER"&&table==="LAYER"){pendingLayer="";continue;}
+   if(pair.value==="LAYER"&&table==="LAYER"){pendingLayer="";pendingLayerHandle="";continue;}
    if(pair.value==="STYLE"&&table==="STYLE"){pendingStyle="";continue;}
    if(pair.value==="ENDTAB"){table="";pendingLayer="";continue;}
    continue;
@@ -127,7 +129,14 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
    else if(unitPending&&pair.code===70){unit=UNITS[Number(pair.value)]??"unknown";unitPending=false;}
   }
   if(section==="TABLES"&&table==="LAYER"){
-   if(pair.code===2)pendingLayer=pair.value.trim();
+   if(pair.code===2){
+    pendingLayer=pair.value.trim();
+    if(pendingLayer&&pendingLayerHandle)layerHandles.set(pendingLayerHandle,pendingLayer);
+   }
+   if(pair.code===5){
+    pendingLayerHandle=pair.value.trim().toUpperCase();
+    if(pendingLayer&&pendingLayerHandle)layerHandles.set(pendingLayerHandle,pendingLayer);
+   }
    if(pair.code===62&&pendingLayer){
     const index=Number.parseInt(pair.value,10);
     layerColors.set(pendingLayer,Math.abs(index)||7);
@@ -175,48 +184,81 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
  });
  const blocks=new Map<string,{base:Point;items:Entity[]}>();
  type SourceStroke={x1:number;y1:number;x2:number;y2:number;layer:string;color:number};
- let modelStrokes:SourceStroke[]|null=null;
+ type SourceFill={layer:string;color:number;opacity:number;triangles:{x:number;y:number}[]};
+ type SourceLabel={layer:string;color:number;opacity:number;center:{x:number;y:number};
+  width:number;height:number;rotation:number;image:HTMLCanvasElement};
+ type ModelContents={strokes:SourceStroke[];fills:SourceFill[];labels:SourceLabel[]};
+ let modelContents:ModelContents|null=null;
  let modelWarning=false;
- const getModelStrokes=():SourceStroke[]=>{
-  if(modelStrokes)return modelStrokes;
-  modelStrokes=[];
+ let modelFillVertices=0;
+ const getModelContents=():ModelContents=>{
+  if(modelContents)return modelContents;
+  modelContents={strokes:[],fills:[],labels:[]};
   // Paper-space projection is opt-in, bounded and performed once per parse.
   // A second full DXF parse is intentionally refused for enormous documents.
   if(text.length>12_000_000||records.length>250000){
    skipped.add("VIEWPORT: 文件过大，未投影模型空间");
-   return modelStrokes;
+   return modelContents;
   }
   let source:DxfParseResult|null=null;
   try{
    source=parseDxf(text,THREE,"Model");
    if(source.skipped.length)modelWarning=true;
    source.object.traverse(node=>{
-    const lines=node as THREE.LineSegments;
-    if(!lines.isLineSegments)return;
-    const positions=lines.geometry.getAttribute("position");
     const parent=node.parent as THREE.Group|null;
     const layer=parent?.userData.layer;
-    if(!positions||typeof layer!=="string"||parent?.visible===false)return;
-    if(modelStrokes!.length+Math.floor(positions.count/2)>180000){
-     skipped.add("VIEWPORT: 模型线段超过投影预算");
-     modelStrokes=[];
-     throw new Error("viewport segment budget");
+    if(typeof layer!=="string"||parent?.visible===false)return;
+    const lines=node as THREE.LineSegments;
+    if(lines.isLineSegments){
+     const positions=lines.geometry.getAttribute("position");
+     if(!positions)return;
+     if(modelContents!.strokes.length+Math.floor(positions.count/2)>180000)
+      throw new Error("model geometry budget");
+     const material=lines.material as THREE.LineBasicMaterial;
+     const color=material.color?.getHex()??aciColor(7);
+     for(let k=0;k+1<positions.count;k+=2){
+      modelContents!.strokes.push({
+       x1:positions.getX(k),y1:positions.getY(k),
+       x2:positions.getX(k+1),y2:positions.getY(k+1),layer,color,
+      });
+     }
+     return;
     }
-    const material=lines.material as THREE.LineBasicMaterial;
-    const color=material.color?.getHex()??aciColor(7);
-    for(let k=0;k+1<positions.count;k+=2){
-     modelStrokes!.push({
-      x1:positions.getX(k),y1:positions.getY(k),
-      x2:positions.getX(k+1),y2:positions.getY(k+1),layer,color,
-     });
+    const mesh=node as THREE.Mesh;
+    if(mesh.isMesh&&mesh.name==="HATCH"){
+     const position=mesh.geometry.getAttribute("position");
+     if(!position)return;
+     const triangles:SourceFill["triangles"]=[];
+     if(position.count>20000||modelFillVertices+position.count>45000||
+        modelContents!.fills.length>=1200)
+      throw new Error("model geometry budget");
+     modelFillVertices+=position.count;
+     for(let k=0;k<position.count;k++)
+      triangles.push({x:position.getX(k),y:position.getY(k)});
+     const material=mesh.material as THREE.MeshBasicMaterial;
+     modelContents!.fills.push({layer,color:material.color.getHex(),opacity:material.opacity,triangles});
+     return;
     }
+    const sprite=node as THREE.Sprite;
+    if(sprite.isSprite){
+     const material=sprite.material as THREE.SpriteMaterial;
+     const image=material.map?.image;
+     if(!image||typeof image!=="object"||!("getContext" in image)||
+        modelContents!.labels.length>=400){
+      modelWarning=true;return;
+     }
+     modelContents!.labels.push({layer,color:material.color.getHex(),opacity:material.opacity,
+      center:{x:sprite.position.x,y:sprite.position.y},width:sprite.scale.x,
+      height:sprite.scale.y,rotation:material.rotation,image:image as HTMLCanvasElement});
+     return;
+    }
+    if(mesh.isMesh)modelWarning=true;
    });
-   if(source.object.children.some(group=>group.children.some(node=>!(node as THREE.LineSegments).isLineSegments)))
-    modelWarning=true;
   }catch(error){
-   if(!(error instanceof Error&&error.message==="viewport segment budget"))
+   if(!(error instanceof Error&&error.message==="model geometry budget"))
     skipped.add("VIEWPORT: 模型空间解析失败");
-   modelStrokes=[];
+   else skipped.add("VIEWPORT: 模型实体超出投影预算");
+   modelContents={strokes:[],fills:[],labels:[]};
   }finally{
    source?.object.traverse(node=>{
     const item=node as THREE.Mesh|THREE.LineSegments|THREE.Sprite;
@@ -231,8 +273,8 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
     }
    });
   }
-  if(modelWarning)skipped.add("VIEWPORT: 模型含未投影的文字、填充或不支持实体");
-  return modelStrokes;
+  if(modelWarning)skipped.add("VIEWPORT: 模型含无法精确显示的实体");
+  return modelContents;
  };
  let activeTransform:Affine=identity;
  let inheritedLayer="0";
@@ -436,6 +478,42 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
   }
  };
 
+ // Clip projected model fills and text glyphs as real triangles with UVs.
+ let composedTriangles=0;
+ const projectFilled=(polygons:UvPoint[][],projection:ValidViewport,layer:string,
+  color:number,opacity:number,image?:HTMLCanvasElement,z=-0.0001)=>{
+  const coords:number[]=[],uvs:number[]=[];
+  for(const polygon of polygons){
+   const mapped=polygon.map(point=>({...projection.project(point),u:point.u,v:point.v}));
+   const clipped=clipUvPolygon(mapped,projection.bounds);
+   if(clipped.length<3)continue;
+   if(composedTriangles+clipped.length-2>100000){
+    skipped.add("VIEWPORT: 填充/文字裁切三角形预算已满");break;
+   }
+   composedTriangles+=clipped.length-2;
+   for(let i=1;i+1<clipped.length;i++){
+    for(const point of [clipped[0]!,clipped[i]!,clipped[i+1]!]){
+     coords.push(point.x,point.y,z);
+     uvs.push(point.u,point.v);
+    }
+   }
+  }
+  if(!coords.length)return false;
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute("position",new THREE.Float32BufferAttribute(coords,3));
+  geometry.setAttribute("uv",new THREE.Float32BufferAttribute(uvs,2));
+  const texture=image?new THREE.CanvasTexture(image):null;
+  if(texture)texture.colorSpace=THREE.SRGBColorSpace;
+  const mesh=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({
+   map:texture,color,transparent:true,opacity,side:THREE.DoubleSide,
+   depthWrite:false,depthTest:true,
+  }));
+  mesh.name=image?"VIEWPORT_TEXT":"VIEWPORT_HATCH";
+  mesh.renderOrder=image?1:-1;
+  groupFor(layer).add(mesh);
+  return true;
+ };
+
  const commit=(e:Entity)=>{
   if(++visitedEntities>MAX_ENTITIES||emittedSegments>=MAX_SEGMENTS){
    skipped.add("LIMIT: 图元展开预算");return;
@@ -592,12 +670,20 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
      line(a.x,a.y,b.x,b.y,e.layer);
     }
     if(e.raw.some(pair=>pair.code===68&&Number(pair.value)===0))break;
-    // Nonrectangular boundary handle, frozen-layer handles and perspective
-    // viewports require a real CAD layout kernel. Never paint guessed content.
+    // Nonrectangular boundaries and perspective need a CAD layout kernel.
+    // Standard viewport-frozen layer handles (331) are resolved below.
     const flags=Number(e.raw.find(pair=>pair.code===90)?.value??0);
-    if((flags&(0x10000|0x20000|1))!==0||e.raw.some(pair=>pair.code===340||pair.code===331||pair.code===441)){
-     skipped.add("VIEWPORT: 透视、复杂边界或冻结图层未投影");break;
+    if((flags&(0x10000|0x20000|1))!==0||e.raw.some(pair=>pair.code===340||pair.code===441)){
+     skipped.add("VIEWPORT: 透视或复杂边界未投影");break;
     }
+    const frozen=new Set<string>(),frozenHandles=e.raw.filter(pair=>pair.code===331);
+    let unresolvedFrozen=false;
+    for(const entry of frozenHandles){
+     const name=layerHandles.get(entry.value.trim().toUpperCase());
+     if(!name){unresolvedFrozen=true;break;}
+     frozen.add(name);
+    }
+    if(unresolvedFrozen){skipped.add("VIEWPORT: 冻结图层句柄无法解析");break;}
     const pick=(code:number)=>e.raw.find(pair=>pair.code===code);
     const viewX=pick(12),viewY=pick(22),viewHeight=pick(45);
     if(!viewX||!viewY||!viewHeight){
@@ -627,21 +713,44 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
     if(!projection){skipped.add("VIEWPORT: 投影比例或中心参数无效");break;}
     if(blockStack.size){skipped.add("VIEWPORT: 图块内嵌套视口尚不支持");break;}
     const previousColor=currentColor;
-    // A single pass over the normalized model geometry, clipped to the paper
-    // viewport. Layer identity and effective source color remain intact.
-    let projectedLines=0;
-    for(const stroke of getModelStrokes()){
+    // Model entities are normalized once and reused for each viewport.
+    const model=getModelContents();
+    let projectedItems=0;
+    for(const stroke of model.strokes){
      if(emittedSegments>=MAX_SEGMENTS)break;
+     if(frozen.has(stroke.layer))continue;
      const start=projection.project({x:stroke.x1,y:stroke.y1});
      const end=projection.project({x:stroke.x2,y:stroke.y2});
      const clipped=projection.clip({x1:start.x,y1:start.y,x2:end.x,y2:end.y});
      if(!clipped)continue;
      currentColor=stroke.color;
      line(clipped.x1,clipped.y1,clipped.x2,clipped.y2,stroke.layer);
-     projectedLines++;
+     projectedItems++;
+    }
+    for(const fill of model.fills){
+     if(frozen.has(fill.layer))continue;
+     const polygons:UvPoint[][]=[];
+     for(let i=0;i+2<fill.triangles.length;i+=3)
+      polygons.push(fill.triangles.slice(i,i+3).map(point=>({...point,u:0,v:0})));
+     if(projectFilled(polygons,projection,fill.layer,fill.color,fill.opacity))
+      projectedItems++;
+    }
+    for(const label of model.labels){
+     if(frozen.has(label.layer)||!Number.isFinite(label.width)||!Number.isFinite(label.height))continue;
+     // SpriteMaterial rotation acts about the glyph quad's center.
+     const c=Math.cos(label.rotation),s=Math.sin(label.rotation);
+     const corners:[number,number,number,number][]=[
+      [-.5,-.5,0,0],[.5,-.5,1,0],[.5,.5,1,1],[-.5,.5,0,1],
+     ];
+     const quad:UvPoint[]=corners.map(([x,y,u,v])=>{
+      const xx=x*label.width,yy=y*label.height;
+      return{x:label.center.x+c*xx-s*yy,y:label.center.y+s*xx+c*yy,u,v};
+     });
+     if(projectFilled([quad],projection,label.layer,label.color,label.opacity,label.image,.0001))
+      projectedItems++;
     }
     currentColor=previousColor;
-    if(projectedLines>0)viewportProjected++;
+    if(projectedItems>0)viewportProjected++;
     else skipped.add("VIEWPORT: 当前范围内没有可投影的模型线段");
     break;
    }

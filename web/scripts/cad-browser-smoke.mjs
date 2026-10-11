@@ -17,6 +17,7 @@ import * as THREE from "three";
 import {OrbitControls} from "three/examples/jsm/controls/OrbitControls.js";
 import {mountEngineeringScene} from "./src/features/modelViewer/viewerScene.ts";
 import {parseDxf} from "./src/features/modelViewer/dxf.ts";
+import {printableSheetHtml} from "./src/features/modelViewer/printSheet.ts";
 const holder=document.getElementById("stage");
 let controls=null,metrics=null,lastCamera=null;
 let actualDrawing=null;
@@ -48,11 +49,20 @@ function mount(drawing=false,layout="Model"){
    "10","500","20","500","11","510","21","500",
    "0","ENDSEC","0","EOF",
   ].join("\n");
-  const source=layout==="P1"?[
+  const source=(layout==="P1"||layout==="P2")?[
+   "0","SECTION","2","TABLES","0","TABLE","2","LAYER",
+   "0","LAYER","5","AC","2","FILL","62","3",
+   "0","ENDTAB","0","ENDSEC",
    "0","SECTION","2","ENTITIES",
    "0","LINE","8","CUT","62","1","10","-20","20","10","11","60","21","10",
-   "0","VIEWPORT","8","FRAME","410","P1","67","1","69","2",
+   "0","HATCH","8","FILL","70","1","75","0","91","1",
+   "92","2","72","0","73","1","93","4",
+   "10","-10","20","-10","10","50","20","-10",
+   "10","50","20","30","10","-10","20","30","97","0",
+   "0","TEXT","8","LABEL","10","-4","20","10","40","5","1","NOTE",
+   "0","VIEWPORT","8","FRAME","410",layout,"67","1","69","2",
    "10","100","20","50","40","40","41","20",
+   ...(layout==="P2"?["331","AC"]:[]),
    "12","20","22","10","45","20","51","0",
    "0","ENDSEC","0","EOF",
   ].join("\n"):dxf;
@@ -70,6 +80,10 @@ window.__cad={
   drawingLayers:actualDrawing?.layers.length??0,
   drawingLayout:actualDrawing?.layout??null,layoutCount:actualDrawing?.layouts.length??0,
   projectedViewports:actualDrawing?.viewports.projected??0,
+  projectedHatches:actualDrawing?.object.children.reduce((sum,g)=>sum+
+   g.children.filter(n=>n.name==="VIEWPORT_HATCH").length,0)??0,
+  projectedText:actualDrawing?.object.children.reduce((sum,g)=>sum+
+   g.children.filter(n=>n.name==="VIEWPORT_TEXT").length,0)??0,
   projectedSegments:actualDrawing?.object.children.find(g=>g.name==="CUT")?.
    children.find(g=>g.isLineSegments)?.geometry.getAttribute("position").count??0};},
  view:name=>controls.setStandardView(name),
@@ -80,7 +94,9 @@ window.__cad={
  drawing:()=>mount(true),
  sheet:()=>mount(true,"A1"),
  projected:()=>mount(true,"P1"),
+ frozen:()=>mount(true,"P2"),
  png:()=>controls.exportPng()?.startsWith("data:image/png;base64,")??false,
+ printPreview:()=>printableSheetHtml(controls.exportPng(),"A3","A1").includes("@page{size:A3 landscape"),
  dispose:()=>{controls.dispose();return holder.querySelectorAll("canvas").length;},
 };
 `;
@@ -191,10 +207,18 @@ try{
  const projected=await cdp.eval("(()=>{window.__cad.projected();return window.__cad.state})()");
  assert.equal(projected.canvases,1,"projected sheet must not leak WebGL canvases");
  assert.equal(projected.drawingLayout,"P1");
- assert.equal(projected.drawingLayers,2,"projected paper sheet contains frame and model source layer");
+ assert.equal(projected.drawingLayers,4,"paper sheet contains projected lines, fill and annotations");
  assert.equal(projected.projectedViewports,1,"paper viewport completeness is surfaced");
  assert.equal(projected.projectedSegments,2,"clipped model line must render in paper viewport");
+ assert.equal(projected.projectedHatches,1,"solid fill projected as clipped triangles");
+ assert.equal(projected.projectedText,1,"raster engineering text projected as clipped textured geometry");
  assert(projected.metrics.size[0]>=39&&projected.metrics.size[0]<=41);
+ assert.equal(await cdp.eval("window.__cad.printPreview()"),true,"A3 paper preview applies physical paper dimensions");
+ const frozen=await cdp.eval("(()=>{window.__cad.frozen();return window.__cad.state})()");
+ assert.equal(frozen.canvases,1);
+ assert.equal(frozen.projectedHatches,0,"viewport-specific frozen layer excludes only that layer");
+ assert.equal(frozen.projectedText,1);
+ assert.equal(frozen.projectedSegments,2);
  await cdp.send("Emulation.setDeviceMetricsOverride",{width:500,height:700,deviceScaleFactor:1,mobile:false});
  await delay(400);
  const narrow=await cdp.eval("window.__cad.state.width");

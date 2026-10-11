@@ -12,6 +12,36 @@ export type PaperViewport={
  twistRadians:number;
 };
 export type Rect2={minX:number;minY:number;maxX:number;maxY:number};
+export type UvPoint=Point2&{u:number;v:number};
+/** Sutherland-Hodgman clipping, interpolating texture UVs along edges. */
+export function clipUvPolygon(vertices:readonly UvPoint[],bounds:Rect2):UvPoint[]{
+ let result=[...vertices];
+ const edges=[
+  {coordinate:"x" as const,bound:bounds.minX,keepAbove:true},
+  {coordinate:"x" as const,bound:bounds.maxX,keepAbove:false},
+  {coordinate:"y" as const,bound:bounds.minY,keepAbove:true},
+  {coordinate:"y" as const,bound:bounds.maxY,keepAbove:false},
+ ];
+ for(const edge of edges){
+  const input=result;result=[];
+  for(let i=0;i<input.length;i++){
+   const a=input[i]!,b=input[(i+1)%input.length]!;
+   const inside=(p:UvPoint)=>edge.keepAbove?p[edge.coordinate]>=edge.bound:p[edge.coordinate]<=edge.bound;
+   const ain=inside(a),bin=inside(b);
+   if(ain!==bin){
+    const denominator=b[edge.coordinate]-a[edge.coordinate];
+    if(Math.abs(denominator)>1e-15){
+     const t=(edge.bound-a[edge.coordinate])/denominator;
+     result.push({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,
+      u:a.u+(b.u-a.u)*t,v:a.v+(b.v-a.v)*t});
+    }
+   }
+   if(bin)result.push(b);
+  }
+  if(result.length===0)break;
+ }
+ return result;
+}
 export type ValidViewport={project:(p:Point2)=>Point2;clip:(segment:Segment2)=>Segment2|null;bounds:Rect2};
 export function createPaperViewport(spec:PaperViewport):ValidViewport|null{
  const numbers=[spec.paperCenter.x,spec.paperCenter.y,spec.paperHeight,spec.aspect,

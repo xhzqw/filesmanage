@@ -371,4 +371,73 @@ assert(tilted.skipped.some(value=>value.includes("倾斜")));
 const perspective=parseDxf(viewportFixture.replace("51\n0","90\n1\n51\n0"),THREE,"A1");
 assert(perspective.skipped.some(value=>value.includes("透视")));
 
+// Paper viewport composition must clip BOTH filled meshes and texture glyphs.
+// Frozen layer handles are allowed to precede DXF layer names in TABLES.
+const paperObjects=[
+ "0","SECTION","2","TABLES","0","TABLE","2","LAYER",
+ "0","LAYER","5","AB","2","STEEL","62","1",
+ "0","LAYER","5","CD","2","ANNO","62","7",
+ "0","ENDTAB","0","ENDSEC",
+ "0","SECTION","2","ENTITIES",
+ "0","HATCH","8","STEEL","70","1","75","0","91","1",
+ "92","2","72","0","73","1","93","4",
+ "10","-10","20","-10","10","50","20","-10",
+ "10","50","20","30","10","-10","20","30","97","0",
+ "0","LINE","8","STEEL","10","-20","20","10","11","60","21","10",
+ "0","TEXT","8","ANNO","10","-4","20","10","40","5","1","NOTE",
+ "0","VIEWPORT","8","FRAME","410","PAPER","67","1","69","2",
+ "10","100","20","50","40","40","41","20",
+ "12","20","22","10","45","20","51","0",
+ "0","ENDSEC","0","EOF",
+].join("\n");
+const composed=parseDxf(paperObjects,THREE,"PAPER");
+assert.deepEqual(composed.skipped,[]);
+assert.deepEqual(composed.layers.map(v=>v.name),["FRAME","STEEL","ANNO"]);
+assert.deepEqual(composed.viewports,{total:1,projected:1});
+const hatchGroup=composed.object.children.find(g=>g.name==="STEEL");
+const projectedFill=hatchGroup.children.find(n=>n.name==="VIEWPORT_HATCH");
+assert(projectedFill&&projectedFill.isMesh);
+const coords=projectedFill.geometry.getAttribute("position").array;
+let hatchArea=0;
+for(let i=0;i+8<coords.length;i+=9)
+ hatchArea+=Math.abs((coords[i+3]-coords[i])*(coords[i+7]-coords[i+1])-
+  (coords[i+4]-coords[i+1])*(coords[i+6]-coords[i]))/2;
+assert(Math.abs(hatchArea-800)<.01,"fill triangles must be clipped to 40×20 paper viewport");
+const textGroup=composed.object.children.find(g=>g.name==="ANNO");
+const projectedText=textGroup.children.find(n=>n.name==="VIEWPORT_TEXT");
+assert(projectedText?.isMesh);
+const uv=projectedText.geometry.getAttribute("uv");
+assert(uv.count>=3);
+assert(Array.from(uv.array).every(value=>value>=-1e-6&&value<=1+1e-6));
+const textVertices=projectedText.geometry.getAttribute("position");
+for(let i=0;i<textVertices.count;i++){
+ assert(textVertices.getX(i)>=80-1e-5&&textVertices.getX(i)<=120+1e-5);
+ assert(textVertices.getY(i)>=40-1e-5&&textVertices.getY(i)<=60+1e-5);
+}
+// Inject the frozen handle immediately before the VIEWPORT's view center.
+const frozenDrawing=parseDxf(paperObjects.replace("12\n20\n22\n10\n45","331\nAB\n12\n20\n22\n10\n45"),
+ THREE,"PAPER");
+assert.deepEqual(frozenDrawing.skipped,[]);
+assert.deepEqual(frozenDrawing.layers.map(v=>v.name),["FRAME","ANNO"]);
+assert.deepEqual(frozenDrawing.viewports,{total:1,projected:1});
+const unknownFrozen=parseDxf(paperObjects.replace("12\n20\n22\n10\n45","331\nUNKNOWN\n12\n20\n22\n10\n45"),
+ THREE,"PAPER");
+assert(unknownFrozen.skipped.some(value=>value.includes("冻结图层句柄")));
+assert.deepEqual(unknownFrozen.viewports,{total:1,projected:0});
+
+// Print previews size the raster sheet in millimeters without claiming
+// exact CAD plot scale. Untrusted layout labels must not inject HTML.
+const printCode=await transform(readFileSync(new URL("../src/features/modelViewer/printSheet.ts",import.meta.url),"utf8"),
+ {loader:"ts",format:"esm",target:"es2022"});
+const {printableSheetHtml}=await import("data:text/javascript;base64,"+Buffer.from(printCode.code).toString("base64"));
+const samplePng="data:image/png;base64,iVBORw0KGgo=";
+const a4=printableSheetHtml(samplePng,"A4","A1 <script>");
+assert(a4.includes("@page{size:A4 landscape;margin:0}"));
+assert(a4.includes("width:297mm;height:210mm"));
+assert(a4.includes("A1 &lt;script&gt;"));
+assert(!a4.includes("<script>"));
+const a3=printableSheetHtml(samplePng,"A3","A2");
+assert(a3.includes("width:420mm;height:297mm"));
+assert.throws(()=>printableSheetHtml("https://evil.invalid/image.png","A4","x"),/无效/);
+
 console.log("CAD regression passed: DXF geometry, nested blocks, dimension graphics, rational NURBS, ACI/TrueColor and 2D snaps");
