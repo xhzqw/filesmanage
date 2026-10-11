@@ -142,7 +142,10 @@ func (r *memoryRepo) ForcePasswordChange(_ context.Context, userID string) error
 }
 
 func (r *memoryRepo) ListDepartments(context.Context) ([]domain.Department, error) {
-	return []domain.Department{{ID: "dept_seed", Name: "种子部门"}}, nil
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	rows := append([]domain.Department{{ID: "dept_seed", Name: "种子部门"}}, r.departments...)
+	return rows, nil
 }
 
 func (r *memoryRepo) CreateDepartment(_ context.Context, d domain.Department) error {
