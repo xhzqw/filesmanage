@@ -48,6 +48,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
  const[layers,setLayers]=useState<{name:string;visible:boolean}[]>([]);
  const[layouts,setLayouts]=useState<string[]>([]);
  const[activeLayout,setActiveLayout]=useState("Model");
+ const[paperViewports,setPaperViewports]=useState({total:0,projected:0});
  // Assembly parts recovered from a converted mesh (MC02/MOD02): the MSH keeps
  // shared node indices, so connected components are the solids.
  const[parts,setParts]=useState<{name:string;visible:boolean;size:[number,number,number];triangles:number}[]>([]);
@@ -78,6 +79,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
   let valid=true;
   setStatus("loading");setMessage("");setInfo(null);setFileMeta(null);
   setMetrics(null);setLayers([]);setLayouts([]);setActiveLayout("Model");
+  setPaperViewports({total:0,projected:0});
   setParts([]);setSelectedPart(-1);
   setUnit("unknown");setMeasure(null);setSkipped([]);
   setView({axes:false,grid:true,edges:true,measure:false,projection:"perspective"});
@@ -171,6 +173,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
      setUnit(parsed.unit);
      setLayouts(parsed.layouts);
      setActiveLayout(parsed.layout);
+     setPaperViewports(parsed.viewports);
      // Each layout has different paper-space coordinates, geometry and bounds.
      // Dispose the previous renderer and remount a freshly scoped drawing;
      // do not use visibility-only switching (it retains the wrong fit/units).
@@ -189,6 +192,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
        },setMeasure);
       controls.current=mounted;
       setLayers(next.layers);setSkipped(next.skipped);
+      setPaperViewports(next.viewports);
       setActiveLayout(next.layout);setMeasure(null);
       setView({axes:false,grid:false,edges:false,measure:false,projection:"orthographic"});
      };
@@ -375,7 +379,9 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
       {metrics&&<section className="cad-inspector-section cad-properties">
        <h3>文件属性</h3>
        <div><span>版本</span><strong>v{fileMeta?.versionSeq??"-"}</strong></div>
-       <div><span>单位</span><strong>{unit==="unknown"?"未声明":unit}</strong></div>
+      <div><span>单位</span><strong>{unit==="unknown"?"未声明":unit}</strong></div>
+      {drawing&&paperViewports.total>0&&<div><span>纸空间视口</span>
+       <strong>{paperViewports.projected}/{paperViewports.total} 已投影</strong></div>}
        <div><span>尺寸</span><strong>{(drawing?metrics.size.slice(0,2):metrics.size).map(v=>Number(v.toPrecision(5))).join(" × ")}</strong></div>
        {!drawing&&<div><span>三角面</span><strong>{metrics.triangles.toLocaleString()}</strong></div>}
        {!drawing&&<div><span>网格组</span><strong title="网格组数量不等于原始 CAD 装配零件数量">{metrics.components}</strong></div>}

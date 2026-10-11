@@ -48,7 +48,15 @@ function mount(drawing=false,layout="Model"){
    "10","500","20","500","11","510","21","500",
    "0","ENDSEC","0","EOF",
   ].join("\n");
-  actualDrawing=parseDxf(dxf,THREE,layout);
+  const source=layout==="P1"?[
+   "0","SECTION","2","ENTITIES",
+   "0","LINE","8","CUT","62","1","10","-20","20","10","11","60","21","10",
+   "0","VIEWPORT","8","FRAME","410","P1","67","1","69","2",
+   "10","100","20","50","40","40","41","20",
+   "12","20","22","10","45","20","51","0",
+   "0","ENDSEC","0","EOF",
+  ].join("\n"):dxf;
+  actualDrawing=parseDxf(source,THREE,layout);
   if(actualDrawing.skipped.length)throw Error(actualDrawing.skipped.join(","));
   object=actualDrawing.object;
  }
@@ -60,7 +68,10 @@ window.__cad={
  get state(){return {metrics,camera:lastCamera,canvases:holder.querySelectorAll("canvas").length,
   width:holder.querySelector("canvas")?.getBoundingClientRect().width??0,
   drawingLayers:actualDrawing?.layers.length??0,
-  drawingLayout:actualDrawing?.layout??null,layoutCount:actualDrawing?.layouts.length??0};},
+  drawingLayout:actualDrawing?.layout??null,layoutCount:actualDrawing?.layouts.length??0,
+  projectedViewports:actualDrawing?.viewports.projected??0,
+  projectedSegments:actualDrawing?.object.children.find(g=>g.name==="CUT")?.
+   children.find(g=>g.isLineSegments)?.geometry.getAttribute("position").count??0};},
  view:name=>controls.setStandardView(name),
  projection:()=>controls.toggleProjection(),
  measure:()=>controls.toggleMeasure(),
@@ -68,6 +79,7 @@ window.__cad={
  grid:()=>controls.toggleGrid(),
  drawing:()=>mount(true),
  sheet:()=>mount(true,"A1"),
+ projected:()=>mount(true,"P1"),
  png:()=>controls.exportPng()?.startsWith("data:image/png;base64,")??false,
  dispose:()=>{controls.dispose();return holder.querySelectorAll("canvas").length;},
 };
@@ -176,8 +188,19 @@ try{
  assert.equal(sheet.drawingLayers,1,"model-space elements must not leak into a paper layout");
  assert(sheet.metrics.size[0]<30,"paper layout must be fitted independently");
  assert.equal(await cdp.eval("window.__cad.png()"),true,"paper layout can export independently");
+ const projected=await cdp.eval("(()=>{window.__cad.projected();return window.__cad.state})()");
+ assert.equal(projected.canvases,1,"projected sheet must not leak WebGL canvases");
+ assert.equal(projected.drawingLayout,"P1");
+ assert.equal(projected.drawingLayers,2,"projected paper sheet contains frame and model source layer");
+ assert.equal(projected.projectedViewports,1,"paper viewport completeness is surfaced");
+ assert.equal(projected.projectedSegments,2,"clipped model line must render in paper viewport");
+ assert(projected.metrics.size[0]>=39&&projected.metrics.size[0]<=41);
+ await cdp.send("Emulation.setDeviceMetricsOverride",{width:500,height:700,deviceScaleFactor:1,mobile:false});
+ await delay(400);
+ const narrow=await cdp.eval("window.__cad.state.width");
+ assert(narrow>=490&&narrow<=505,"projected paper layout remains responsive in narrow viewport");
  assert.equal(await cdp.eval("window.__cad.dispose()"),0,"dispose must remove WebGL canvas");
- console.log("CAD_BROWSER_PASS Chrome WebGL: 3D navigation, DXF DIMENSION/NURBS/HATCH, isolated paper layout, resize and disposal");
+ console.log("CAD_BROWSER_PASS Chrome WebGL: 3D navigation, real paper VIEWPORT line projection, DXF geometry, responsive sizes and disposal");
 }finally{
  cdp?.ws.close();
  // Chrome forks GPU/network/storage children; killing only the browser PID

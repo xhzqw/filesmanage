@@ -303,7 +303,7 @@ const textDxf=[
  "0","TEXT","8","NOTES","7","ANNOTATION","10","10","20","20",
  "40","3","41","1.5","50","30","1","%%c25 %%d %%p",
  "0","VIEWPORT","8","FRAME","410","A1","67","1","69","2",
- "10","100","20","50","40","20","41","2",
+ "10","100","20","50","40","40","41","20",
  "0","ENDSEC","0","EOF",
 ].join("\n");
 const textResult=parseDxf(textDxf,THREE);
@@ -320,5 +320,55 @@ const cadTextJs=await transform(readFileSync(new URL("../src/features/modelViewe
 const {decodeCadText}=await import("data:text/javascript;base64,"+Buffer.from(cadTextJs.code).toString("base64"));
 assert.equal(decodeCadText("%%c25 %%d %%p"),"⌀25 ° ±");
 assert.equal(decodeCadText("A\\PB\\U+00B0"),"A\nB°");
+
+// Rectangular paper VIEWPORTs project *model* linework at correct 2D scale.
+// Paper framing and model linework retain their own layer/ACI colors.
+const viewportFixture=[
+ "0","SECTION","2","ENTITIES",
+ "0","LINE","8","CUT","62","1","410","Model",
+ "10","-20","20","10","11","60","21","10",
+ "0","LINE","8","OFFSET","62","5","410","Model",
+ "10","0","20","1000","11","40","21","1000",
+ "0","VIEWPORT","8","FRAME","410","A1","67","1","69","2",
+ "10","100","20","50","40","40","41","20",
+ "12","20","22","10","45","20","51","0",
+ "0","ENDSEC","0","EOF",
+].join("\n");
+const projected=parseDxf(viewportFixture,THREE,"A1");
+assert.deepEqual(projected.skipped,[]);
+assert.deepEqual(projected.viewports,{total:1,projected:1});
+assert.deepEqual(projected.layers.map(l=>l.name),["FRAME","CUT"]);
+const frameLayer=projected.object.children.find(l=>l.name==="FRAME");
+const cutLayer=projected.object.children.find(l=>l.name==="CUT");
+assert(frameLayer&&cutLayer);
+assert.equal(cutLayer.children[0].material.color.getHex(),0xc72e32);
+const projectedCoords=Array.from(cutLayer.children[0].geometry.getAttribute("position").array);
+assert.deepEqual(projectedCoords,[80,50,0,120,50,0],
+ "model line must be clipped to rectangular paper viewport");
+const rotated=parseDxf(viewportFixture
+ .replace("12\n20\n22\n10","12\n0\n22\n0\n17\n20\n27\n10")
+ .replace("51\n0","51\n"+Math.PI/2),THREE,"A1");
+assert.deepEqual(rotated.skipped,[]);
+const rotatedLine=rotated.object.children.find(l=>l.name==="CUT");
+assert(rotatedLine);
+const rotatedCoords=Array.from(rotatedLine.children[0].geometry.getAttribute("position").array);
+assert(rotatedCoords.every(Number.isFinite));
+assert(Math.abs(rotatedCoords[0]-100)<.001&&Math.abs(rotatedCoords[3]-100)<.001,
+ "90 degree view twist must map horizontal model lines to vertical paper lines");
+assert(rotatedCoords.every((value,index)=>index%3!==1||(value>=40&&value<=60)),
+ "twisted viewport line must be clipped to paper height");
+// DCS center is relative to the WCS target, not an absolute world coordinate.
+const targeted=parseDxf(viewportFixture.replace("12\n20\n22\n10","12\n0\n22\n0\n17\n20\n27\n10"),THREE,"A1");
+assert.deepEqual(targeted.skipped,[]);
+const targetedLine=targeted.object.children.find(l=>l.name==="CUT");
+assert.deepEqual(Array.from(targetedLine.children[0].geometry.getAttribute("position").array),
+ [80,50,0,120,50,0]);
+const incomplete=parseDxf(viewportFixture.replace("45\n20","45\n0"),THREE,"A1");
+assert(incomplete.skipped.some(value=>value.includes("投影比例")));
+assert.deepEqual(incomplete.viewports,{total:1,projected:0});
+const tilted=parseDxf(viewportFixture.replace("51\n0","16\n0.2\n26\n0\n36\n0.98\n51\n0"),THREE,"A1");
+assert(tilted.skipped.some(value=>value.includes("倾斜")));
+const perspective=parseDxf(viewportFixture.replace("51\n0","90\n1\n51\n0"),THREE,"A1");
+assert(perspective.skipped.some(value=>value.includes("透视")));
 
 console.log("CAD regression passed: DXF geometry, nested blocks, dimension graphics, rational NURBS, ACI/TrueColor and 2D snaps");

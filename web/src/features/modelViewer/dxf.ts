@@ -10,6 +10,7 @@ import {sampleSpline} from "./nurbs2d";
 import {parseHatchPaths} from "./hatch2d";
 import {clipHatchPattern} from "./hatchPattern2d";
 import {cadFontFamily,decodeCadText,type CadTextStyle} from "./cadText2d";
+import {createPaperViewport} from "./paperViewport2d";
 
 export type DxfParseResult={
  object:THREE.Group;
@@ -18,6 +19,7 @@ export type DxfParseResult={
  unit:string;
  layouts:string[];
  layout:string;
+ viewports:{total:number;projected:number};
 };
 
 // DXF ACI 7 means black on white paper (and white on dark model space).
@@ -172,6 +174,66 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
   y:activeTransform.b*x+activeTransform.d*y+activeTransform.y,
  });
  const blocks=new Map<string,{base:Point;items:Entity[]}>();
+ type SourceStroke={x1:number;y1:number;x2:number;y2:number;layer:string;color:number};
+ let modelStrokes:SourceStroke[]|null=null;
+ let modelWarning=false;
+ const getModelStrokes=():SourceStroke[]=>{
+  if(modelStrokes)return modelStrokes;
+  modelStrokes=[];
+  // Paper-space projection is opt-in, bounded and performed once per parse.
+  // A second full DXF parse is intentionally refused for enormous documents.
+  if(text.length>12_000_000||records.length>250000){
+   skipped.add("VIEWPORT: 文件过大，未投影模型空间");
+   return modelStrokes;
+  }
+  let source:DxfParseResult|null=null;
+  try{
+   source=parseDxf(text,THREE,"Model");
+   if(source.skipped.length)modelWarning=true;
+   source.object.traverse(node=>{
+    const lines=node as THREE.LineSegments;
+    if(!lines.isLineSegments)return;
+    const positions=lines.geometry.getAttribute("position");
+    const parent=node.parent as THREE.Group|null;
+    const layer=parent?.userData.layer;
+    if(!positions||typeof layer!=="string"||parent?.visible===false)return;
+    if(modelStrokes!.length+Math.floor(positions.count/2)>180000){
+     skipped.add("VIEWPORT: 模型线段超过投影预算");
+     modelStrokes=[];
+     throw new Error("viewport segment budget");
+    }
+    const material=lines.material as THREE.LineBasicMaterial;
+    const color=material.color?.getHex()??aciColor(7);
+    for(let k=0;k+1<positions.count;k+=2){
+     modelStrokes!.push({
+      x1:positions.getX(k),y1:positions.getY(k),
+      x2:positions.getX(k+1),y2:positions.getY(k+1),layer,color,
+     });
+    }
+   });
+   if(source.object.children.some(group=>group.children.some(node=>!(node as THREE.LineSegments).isLineSegments)))
+    modelWarning=true;
+  }catch(error){
+   if(!(error instanceof Error&&error.message==="viewport segment budget"))
+    skipped.add("VIEWPORT: 模型空间解析失败");
+   modelStrokes=[];
+  }finally{
+   source?.object.traverse(node=>{
+    const item=node as THREE.Mesh|THREE.LineSegments|THREE.Sprite;
+    if(!("material" in item))return;
+    if("geometry" in item)item.geometry?.dispose();
+    const materials=Array.isArray(item.material)?item.material:[item.material];
+    for(const material of materials){
+     if(!material)continue;
+     const sprite=material as THREE.SpriteMaterial;
+     sprite.map?.dispose();
+     material.dispose();
+    }
+   });
+  }
+  if(modelWarning)skipped.add("VIEWPORT: 模型含未投影的文字、填充或不支持实体");
+  return modelStrokes;
+ };
  let activeTransform:Affine=identity;
  let inheritedLayer="0";
  let inheritedColor:number|null=null;
@@ -180,6 +242,7 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
  let emittedSegments=0;
  let visitedEntities=0;
  const MAX_ENTITIES=200000;
+ let viewportTotal=0,viewportProjected=0;
  const blockStack=new Set<string>();
  const actualLayer=(name:string)=>name==="0"?inheritedLayer:name;
  const hatchBudget=120000;
@@ -508,12 +571,15 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
    }
    case "VIEWPORT":{
     if(e.viewportId<=1)break; // viewport #1 is the paper view itself.
+    viewportTotal++;
     const center=e.points[0];
-    const height=e.raw.some(pair=>pair.code===40)?e.radius:0;
-    const aspect=e.raw.some(pair=>pair.code===41)?e.scaleX:0;
+    // AcDbViewport DXF 40=paper width, 41=paper height (NOT aspect).
+    const width=e.raw.some(pair=>pair.code===40)?e.radius:0;
+    const height=e.raw.some(pair=>pair.code===41)?e.scaleX:0;
+    const aspect=width/height;
     if(!e.paperSpace&&!e.layout){skipped.add("VIEWPORT: 未指定图纸空间");break;}
-    if(!center||![center.x,center.y,height,aspect].every(Number.isFinite)||
-       height<=0||aspect<=0||height*aspect>1e12){
+    if(!center||![center.x,center.y,width,height].every(Number.isFinite)||
+       width<=0||height<=0||width>1e12){
      skipped.add("VIEWPORT: 边界尺寸无效");break;
     }
     const hw=height*aspect/2,hh=height/2;
@@ -525,7 +591,58 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
      const a=vertices[i]!,b=vertices[(i+1)%4]!;
      line(a.x,a.y,b.x,b.y,e.layer);
     }
-    skipped.add("VIEWPORT: 只显示边框，模型投影与裁切尚不支持");
+    if(e.raw.some(pair=>pair.code===68&&Number(pair.value)===0))break;
+    // Nonrectangular boundary handle, frozen-layer handles and perspective
+    // viewports require a real CAD layout kernel. Never paint guessed content.
+    const flags=Number(e.raw.find(pair=>pair.code===90)?.value??0);
+    if((flags&(0x10000|0x20000|1))!==0||e.raw.some(pair=>pair.code===340||pair.code===331||pair.code===441)){
+     skipped.add("VIEWPORT: 透视、复杂边界或冻结图层未投影");break;
+    }
+    const pick=(code:number)=>e.raw.find(pair=>pair.code===code);
+    const viewX=pick(12),viewY=pick(22),viewHeight=pick(45);
+    if(!viewX||!viewY||!viewHeight){
+     skipped.add("VIEWPORT: 缺少模型视图中心或高度，仅绘制边框");break;
+    }
+    // This implementation supports a top-down planar XY orthographic view
+    // only; reject tilted views instead of projecting their XY coordinates.
+    const direction=[Number(pick(16)?.value??0),Number(pick(26)?.value??0),
+     Number(pick(36)?.value??1)];
+    if(direction.some(n=>!Number.isFinite(n))||
+       Math.abs(direction[0]!)>1e-6||Math.abs(direction[1]!)>1e-6||
+       Math.abs(direction[2]!-1)>1e-6){
+     skipped.add("VIEWPORT: 三维倾斜视图尚不支持");break;
+    }
+    // DCS view center (12/22) is relative to WCS target (17/27) and
+    // rotated by view twist (51, radians) before projection.
+    const twist=Number(pick(51)?.value??0);
+    const targetX=Number(pick(17)?.value??0),targetY=Number(pick(27)?.value??0);
+    const dx=Number(viewX.value),dy=Number(viewY.value);
+    const projection=createPaperViewport({
+     paperCenter:{x:center.x,y:center.y},paperHeight:height,aspect,
+     viewCenter:{x:targetX+Math.cos(twist)*dx-Math.sin(twist)*dy,
+      y:targetY+Math.sin(twist)*dx+Math.cos(twist)*dy},
+     viewHeight:Number(viewHeight.value),
+     twistRadians:twist,
+    });
+    if(!projection){skipped.add("VIEWPORT: 投影比例或中心参数无效");break;}
+    if(blockStack.size){skipped.add("VIEWPORT: 图块内嵌套视口尚不支持");break;}
+    const previousColor=currentColor;
+    // A single pass over the normalized model geometry, clipped to the paper
+    // viewport. Layer identity and effective source color remain intact.
+    let projectedLines=0;
+    for(const stroke of getModelStrokes()){
+     if(emittedSegments>=MAX_SEGMENTS)break;
+     const start=projection.project({x:stroke.x1,y:stroke.y1});
+     const end=projection.project({x:stroke.x2,y:stroke.y2});
+     const clipped=projection.clip({x1:start.x,y1:start.y,x2:end.x,y2:end.y});
+     if(!clipped)continue;
+     currentColor=stroke.color;
+     line(clipped.x1,clipped.y1,clipped.x2,clipped.y2,stroke.layer);
+     projectedLines++;
+    }
+    currentColor=previousColor;
+    if(projectedLines>0)viewportProjected++;
+    else skipped.add("VIEWPORT: 当前范围内没有可投影的模型线段");
     break;
    }
    case "SECTION":
@@ -700,5 +817,6 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
  }
 
  const layers=layerOrder.map(name=>({name,visible:layerGroups.get(name)?.visible??true}));
- return {object:root,layers,skipped:Array.from(skipped),unit,layouts,layout};
+ return {object:root,layers,skipped:Array.from(skipped),unit,layouts,layout,
+  viewports:{total:viewportTotal,projected:viewportProjected}};
 }

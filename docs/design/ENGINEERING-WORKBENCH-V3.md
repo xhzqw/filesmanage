@@ -91,6 +91,29 @@ This document records validated capability instead of marking unimplemented work
   clipping, common text symbols, STYLE fallback, viewport framing, view
   selection and PNG capture. Geometry/resource safety limits remain active.
 
+## Delivered in V3.5 bounded paper-space projection increment
+
+- VIEWPORT fields 40/41 are parsed as **paper width/height**, not height and
+  aspect ratio. Group 45 remains model-space view height. View twist (51)
+  is interpreted in **radians**. The WCS target (17/27) and DCS view center
+  (12/22) are combined with the twist to locate the model view correctly.
+- Normal XY-oriented, orthographic, rectangular paper viewports now render
+  the existing model linework into the paper rectangle at the corresponding
+  scale, clipped with Liang-Barsky and preserving source layer/color.
+- The drawing inspector reports projected versus total VIEWPORT count.
+  Complex boundary / per-viewport frozen layers, off/perspective viewports,
+  tilted view direction and invalid geometry are not silently projected.
+- The projected model subset is limited to line segments, including linework
+  sampled from supported DXF analytic curves and block geometry. TEXT sprites,
+  HATCH meshes and unsupported 3D or complex entities are **not** transplanted
+  into the viewport; a compatibility notice is shown when incomplete.
+- Parsing the model geometry for paper projection is cached per layout parse;
+  input size and projected-segment budgets cap memory and render work.
+- Geometry regression tests check paper width/height interpretation, 2D
+  scale, clipping, 90-degree twist, nonzero WCS target, source ACI colors and
+  rejection of tilted/perspective views. Remote headless Chrome exercises a
+  rendered projected paper layout across desktop/narrow viewport sizes.
+
 ## Deliberately unsupported or approximate
 
 | Capability | Current truth | Next gate |
@@ -102,7 +125,7 @@ This document records validated capability instead of marking unimplemented work
 | DXF SPLINE/NURBS | Knots/degree/weights supported; fit-point-only interpolation not supported | Fit-point solver, discontinuous curve fidelity |
 | DXF DIMENSION | Anonymous representation BLOCK when present | Full DIMSTYLE overrides and absent-block fallback |
 | DXF HATCH | Solid fills and bounded pattern-family strokes clipped against closed polyline contours, with holes | Edge-boundary paths, gradients, advanced hatch styles and exact plot fidelity |
-| DXF paper space, XREF | Model and named paper layout isolation, rectangular VIEWPORT frame only; PNG of current preview | True viewport model projection/clipping, CAD print scale, XREF resource handling |
+| DXF paper space, XREF | Layout isolation and bounded 2D XY orthographic VIEWPORT linework projection/clipping; PNG of current preview | Full 3D perspective/tilted view, sprite/filled-region composition, complex clipping, frozen layers, CAD print scale, XREF |
 | DXF arc/ellipse | Tessellated preview | Analytic segment and center/angle snap records |
 | DXF text | STYLE lookup, width/rotation, Unicode symbols; Canvas font fallback | True SHX metrics, advanced MTEXT formatting, annotation scales |
 | 2D/3D annotations and version diff | Not yet implemented | Version-bound review domain and permissions |
