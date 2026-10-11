@@ -1199,6 +1199,23 @@ async function finaleSuite() {
   const mk = async (name) => (await json("POST", "/api/folders", { name, parentId: root.id })).body?.data?.id;
   const folderId = await mk(`WF-SMOKE-${stamp}`);
 
+  // ---- fixture: 60 files sharing a search token ----
+  const TOKEN = `zzq${stamp}`;
+  for (let i = 0; i < 60; i++) {
+    const form = new FormData();
+    form.set("folderId", folderId);
+    form.set("file", new Blob([`${TOKEN} body ${i}\n`]), `${TOKEN}-${String(i).padStart(3, "0")}.txt`);
+    form.set("idempotencyKey", `${TOKEN}-${i}-${stamp}`);
+    await fetch(`${BASE}/api/files`, { method: "POST", headers: { Origin: BASE, Cookie: sessionCookie }, body: form });
+  }
+  // a second folder with one file for the drag target
+  const targetId = await mk(`WF-TARGET-${stamp}`);
+  const tform = new FormData();
+  tform.set("folderId", targetId);
+  tform.set("file", new Blob([`target ${stamp}\n`]), "wf-target.txt");
+  tform.set("idempotencyKey", "wf-target-" + stamp);
+  await fetch(`${BASE}/api/files`, { method: "POST", headers: { Origin: BASE, Cookie: sessionCookie }, body: tform });
+
   // G2: the same resumable operation must survive two distinct authenticated
   // HTTP sessions without re-uploading the first chunk. The final replay must
   // return the same file and never create a second version. All bytes live in
@@ -1206,7 +1223,7 @@ async function finaleSuite() {
   const resumeBytes=Buffer.from(`G2 network reconnect ${stamp}\n`);
   const sum=b=>createHash("sha256").update(b).digest("hex");
   const resumeBody={
-    folderId,name:`g2-resume-${stamp}.bin`,contentType:"application/octet-stream",
+    folderId:targetId,name:`g2-resume-${stamp}.bin`,contentType:"application/octet-stream",
     size:resumeBytes.length,sha256:sum(resumeBytes),idempotencyKey:`g2-resume-${stamp}`,
   };
   const begin=await json("POST","/api/uploads/resumable",resumeBody);
@@ -1255,22 +1272,6 @@ async function finaleSuite() {
     finished.data?.versionSeq===1&&finished.data?.sha256===sum(resumeBytes),
     JSON.stringify({first:finished.status,replay:replay.status,fileId:finished.data?.fileId}));
 
-  // ---- fixture: 60 files sharing a search token ----
-  const TOKEN = `zzq${stamp}`;
-  for (let i = 0; i < 60; i++) {
-    const form = new FormData();
-    form.set("folderId", folderId);
-    form.set("file", new Blob([`${TOKEN} body ${i}\n`]), `${TOKEN}-${String(i).padStart(3, "0")}.txt`);
-    form.set("idempotencyKey", `${TOKEN}-${i}-${stamp}`);
-    await fetch(`${BASE}/api/files`, { method: "POST", headers: { Origin: BASE, Cookie: sessionCookie }, body: form });
-  }
-  // a second folder with one file for the drag target
-  const targetId = await mk(`WF-TARGET-${stamp}`);
-  const tform = new FormData();
-  tform.set("folderId", targetId);
-  tform.set("file", new Blob([`target ${stamp}\n`]), "wf-target.txt");
-  tform.set("idempotencyKey", "wf-target-" + stamp);
-  await fetch(`${BASE}/api/files`, { method: "POST", headers: { Origin: BASE, Cookie: sessionCookie }, body: tform });
 
   // ---- API: search cursor ----
   let r = await json("GET", `/api/search?q=${TOKEN}&limit=50`);
