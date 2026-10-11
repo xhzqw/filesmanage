@@ -2246,6 +2246,149 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/lifecycle/ledger:
+    get:
+      summary: Page through ACL-visible lifecycle entries
+      operationId: lifecycleLedger
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: cursor
+        in: query
+        required: false
+        description: Opaque file ID cursor
+        schema:
+          type: string
+      - name: state
+        in: query
+        required: false
+        description: released or archived
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        description: Candidate window 1-50
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: ACL-filtered candidate window.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/LifecycleLedgerPage'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/lifecycle/notifications:
+    get:
+      summary: List current due-date notices scoped to publisher
+      operationId: lifecycleNotifications
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Current ACL-visible reminders.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LifecycleNotification'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/lifecycle/notifications/{id}/read:
+    post:
+      summary: Mark own lifecycle notice as read
+      operationId: readLifecycleNotification
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Notification ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Marked read.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      read:
+                        type: integer
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/files/{id}/metadata:
     get:
       summary: Read business metadata of an accessible file
@@ -8405,6 +8548,9 @@ components:
           format: date-time
         canManage:
           type: boolean
+        retentionUntil:
+          type: string
+          format: date-time
       required:
       - fileId
       - state
@@ -8434,9 +8580,90 @@ components:
         note:
           type: string
           maxLength: 200
+        retentionDays:
+          type: integer
+          minimum: 0
       required:
       - action
       - expectedVersionSeq
+    LifecycleLedgerRow:
+      type: object
+      properties:
+        fileId:
+          type: string
+        fileName:
+          type: string
+        folderId:
+          type: string
+        state:
+          type: string
+          enum:
+          - released
+          - archived
+        publishedSeq:
+          type: integer
+        dueAt:
+          type: string
+          format: date-time
+        retentionUntil:
+          type: string
+          format: date-time
+        dueStatus:
+          type: string
+          enum:
+          - none
+          - soon
+          - overdue
+          - scheduled
+      required:
+      - fileId
+      - fileName
+      - folderId
+      - state
+      - publishedSeq
+      - dueStatus
+    LifecycleLedgerPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LifecycleLedgerRow'
+        nextCursor:
+          type: string
+      required:
+      - items
+      - nextCursor
+    LifecycleNotification:
+      type: object
+      properties:
+        id:
+          type: integer
+        fileId:
+          type: string
+        fileName:
+          type: string
+        kind:
+          type: string
+          enum:
+          - soon
+          - overdue
+        dueAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        read:
+          type: boolean
+      required:
+      - id
+      - fileId
+      - fileName
+      - kind
+      - dueAt
+      - createdAt
+      - read
     SearchPreset:
       type: object
       properties:

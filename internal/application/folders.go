@@ -132,7 +132,11 @@ func (s *Service) DeleteFolder(ctx context.Context, u domain.User, folderID stri
 		return domain.TrashEntry{}, 0, err
 	}
 	ids := folderIDs(subtree)
-	if protected,e:=tx.HasProtectedLifecycleInFolders(ctx,ids,s.now());e!=nil{return domain.TrashEntry{},0,e}else if protected{return domain.TrashEntry{},0,domain.ErrConflict}
+	if protected, e := tx.HasProtectedLifecycleInFolders(ctx, ids, s.now()); e != nil {
+		return domain.TrashEntry{}, 0, e
+	} else if protected {
+		return domain.TrashEntry{}, 0, domain.ErrConflict
+	}
 	for _, member := range subtree {
 		if err = tx.SoftDeleteFolder(ctx, member.ID); err != nil {
 			return domain.TrashEntry{}, 0, err

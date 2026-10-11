@@ -194,7 +194,13 @@ func (s *Service) PurgeTrashEntry(ctx context.Context, u domain.User, entryID st
 	if entry.PurgedAt != nil {
 		return domain.ErrNotFound
 	}
-	if entry.FileID!=nil{if life,e:=tx.FileLifecycleByID(ctx,*entry.FileID);e==nil&&(life.State=="archived"||(life.RetentionUntil!=nil&&life.RetentionUntil.After(s.now()))){return domain.ErrConflict}else if e!=nil&&!errors.Is(e,ports.ErrRowMissing){return e}}
+	if entry.FileID != nil {
+		if life, e := tx.FileLifecycleByID(ctx, *entry.FileID); e == nil && (life.State == "archived" || (life.RetentionUntil != nil && life.RetentionUntil.After(s.now()))) {
+			return domain.ErrConflict
+		} else if e != nil && !errors.Is(e, ports.ErrRowMissing) {
+			return e
+		}
+	}
 	if err = tx.MarkTrashPurged(ctx, entry.ID); err != nil {
 		return err
 	}

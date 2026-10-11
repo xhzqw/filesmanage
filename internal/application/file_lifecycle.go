@@ -17,7 +17,7 @@ type LifecycleDraft struct {
 	ExpectedVersionSeq int        `json:"expectedVersionSeq"`
 	DueAt              *time.Time `json:"dueAt,omitempty"`
 	Note               string     `json:"note"`
-	RetentionDays int `json:"retentionDays,omitempty"`
+	RetentionDays      int        `json:"retentionDays,omitempty"`
 }
 type LifecycleView struct {
 	domain.FileLifecycle
@@ -62,8 +62,12 @@ func (s *Service) FileLifecycle(ctx context.Context, u domain.User, id string) (
 }
 func (s *Service) SetFileLifecycle(ctx context.Context, u domain.User, id string, draft LifecycleDraft) (LifecycleView, error) {
 	draft.Note = strings.TrimSpace(draft.Note)
-	if draft.RetentionDays!=0&&draft.RetentionDays!=30&&draft.RetentionDays!=90&&draft.RetentionDays!=365&&draft.RetentionDays!=730{return LifecycleView{},domain.ErrInvalidInput}
-	if draft.Action!="archive"&&draft.RetentionDays!=0{return LifecycleView{},domain.ErrInvalidInput}
+	if draft.RetentionDays != 0 && draft.RetentionDays != 30 && draft.RetentionDays != 90 && draft.RetentionDays != 365 && draft.RetentionDays != 730 {
+		return LifecycleView{}, domain.ErrInvalidInput
+	}
+	if draft.Action != "archive" && draft.RetentionDays != 0 {
+		return LifecycleView{}, domain.ErrInvalidInput
+	}
 	if draft.ExpectedVersionSeq < 1 || !utf8.ValidString(draft.Note) || utf8.RuneCountInString(draft.Note) > lifecycleMaxNote {
 		return LifecycleView{}, domain.ErrInvalidInput
 	}
@@ -126,13 +130,20 @@ func (s *Service) SetFileLifecycle(ctx context.Context, u domain.User, id string
 		}
 		switch draft.Action {
 		case "archive":
-			if draft.RetentionDays>0{until:=s.now().UTC().AddDate(0,0,draft.RetentionDays);if value.RetentionUntil==nil||value.RetentionUntil.Before(until){value.RetentionUntil=&until}}
+			if draft.RetentionDays > 0 {
+				until := s.now().UTC().AddDate(0, 0, draft.RetentionDays)
+				if value.RetentionUntil == nil || value.RetentionUntil.Before(until) {
+					value.RetentionUntil = &until
+				}
+			}
 			if value.State == "archived" {
 				return LifecycleView{}, domain.ErrConflict
 			}
 			value.State = "archived"
 		case "unarchive":
-			if value.RetentionUntil!=nil&&value.RetentionUntil.After(s.now()){return LifecycleView{},domain.ErrConflict}
+			if value.RetentionUntil != nil && value.RetentionUntil.After(s.now()) {
+				return LifecycleView{}, domain.ErrConflict
+			}
 			if value.State != "archived" {
 				return LifecycleView{}, domain.ErrConflict
 			}
