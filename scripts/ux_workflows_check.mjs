@@ -1365,6 +1365,55 @@ async function finaleSuite() {
     await delay(400);
     const stillThere = await cdp.evaluate(`(()=>[...document.querySelectorAll('tbody tr[data-id]')].length>=2)()`);
     check("DI-17 cancelling the drop changes nothing", stillThere === true, String(stillThere));
+
+    // ---- G2: upload is OS-file-only, with bounded queue geometry ----
+    const dragPolicy=await cdp.evaluate(`(()=>{
+      const zone=document.querySelector('.dropzone');
+      const text=new DataTransfer();text.setData('text/plain','selected editor text');
+      const textOver=new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:text});
+      zone.dispatchEvent(textOver);
+      const fileDrop=new DataTransfer();
+      for(let i=0;i<10;i++)fileDrop.items.add(new File(['G2 queue '+i],${JSON.stringify("g2-queue-"+stamp+"-")}+i+'.txt',{type:'text/plain'}));
+      const fileOver=new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:fileDrop});
+      zone.dispatchEvent(fileOver);
+      const input=zone.querySelector('input[aria-label="当前已加载文件名过滤"]');
+      const inputOver=new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:fileDrop});
+      input?.dispatchEvent(inputOver);
+      window.__g2files=fileDrop;
+      return {textPrevented:textOver.defaultPrevented,filePrevented:fileOver.defaultPrevented,inputPrevented:inputOver.defaultPrevented};
+    })()`);
+    check("G2 upload drop accepts OS files but leaves text and inputs alone",
+      !dragPolicy.textPrevented&&dragPolicy.filePrevented&&!dragPolicy.inputPrevented,JSON.stringify(dragPolicy));
+    await cdp.evaluate(`(()=>{document.querySelector('.dropzone').dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:window.__g2files}));return true;})()`);
+    await cdp.waitFor(`()=>document.querySelectorAll('.upload-queue-list .upload-item').length>=10`,18000);
+    const queueGeometry=await cdp.evaluate(`(()=>{const list=document.querySelector('.upload-queue-list'),pane=document.querySelector('.work-body>.table'),r=list.getBoundingClientRect();return {count:list.children.length,height:r.height,scrollHeight:list.scrollHeight,overflow:document.documentElement.scrollWidth-innerWidth,paneHeight:pane?.getBoundingClientRect().height,expand:document.querySelector('.upload-queue-header button')?.getAttribute('aria-expanded')};})()`);
+    check("G2 ten upload rows scroll inside bounded dock without squeezing the file list",
+      queueGeometry.count===10&&queueGeometry.height<=225&&queueGeometry.scrollHeight>queueGeometry.height&&queueGeometry.overflow<=2&&queueGeometry.paneHeight>=110&&queueGeometry.expand==="true",JSON.stringify(queueGeometry));
+    await cdp.evaluate(`(()=>{document.querySelector('.upload-queue-header button').click();return true;})()`);
+    check("G2 upload dock can collapse without losing tasks",
+      await cdp.evaluate(`(()=>!document.querySelector('.upload-queue-list')&&document.querySelector('.upload-queue-header button')?.getAttribute('aria-expanded')==='false')()`));
+    await cdp.evaluate(`(()=>{document.querySelector('.upload-queue-header button').click();return true;})()`);
+    await cdp.evaluate(`(()=>{document.querySelector('li[data-folder-id="${targetId}"]>.tree-row').click();return true;})()`);
+    await cdp.waitFor(`()=>new URLSearchParams(location.search).get('folder')===${JSON.stringify(targetId)}`,16000);
+    await cdp.waitFor(`()=>document.querySelectorAll('.upload-item-target').length>=10`,16000);
+    check("G2 folder switch keeps queued task destinations on their original folder",
+      (await cdp.evaluate(`(()=>[...document.querySelectorAll('.upload-item')].filter(x=>x.textContent?.includes('g2-queue-')).every(x=>x.querySelector('.upload-item-target')?.textContent==='其他目录'))()`))===true);
+
+    // A tree context operation must relinquish the header after its modal
+    // closes; otherwise the header silently keeps targeting the right-clicked
+    // folder even while the file list shows another folder.
+    await cdp.navigate(`${BASE}/doc?folder=${folderId}`);
+    await cdp.waitFor(`()=>!!document.querySelector('li[data-folder-id="${targetId}"]')`,16000);
+    await cdp.evaluate(`(()=>{document.querySelector('li[data-folder-id="${targetId}"]>.tree-row').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:140,clientY:150}));return true;})()`);
+    await cdp.waitFor(`()=>!![...document.querySelectorAll('[role=menuitem]')].find(b=>b.textContent?.includes('重命名目录'))`);
+    await cdp.evaluate(`(()=>{[...document.querySelectorAll('[role=menuitem]')].find(b=>b.textContent?.includes('重命名目录'))?.click();return true;})()`);
+    await cdp.waitFor(`()=>!!document.querySelector('#folder-rename-input')`);
+    await cdp.evaluate(`(()=>{const d=document.querySelector('#folder-rename-input')?.closest('dialog');[...d.querySelectorAll('button')].find(b=>b.textContent?.trim()==='取消')?.click();return true;})()`);
+    await cdp.waitFor(`()=>!document.querySelector('#folder-rename-input')`);
+    await cdp.evaluate(`(()=>{document.querySelector('.folder-more-wrapper .ghost-more-btn')?.click();return true;})()`);
+    const currentMenu=await cdp.evaluate(`(()=>document.querySelector('[role=menu][aria-label^="目录操作："]')?.getAttribute('aria-label'))()`);
+    check("G2 cancelled tree context operation restores selected folder header",currentMenu===`目录操作：WF-SMOKE-${stamp}`,String(currentMenu));
+    await cdp.key("Escape","Escape",27);
   } finally {
     cdp && cdp.close();
     chrome && chrome.kill("SIGKILL");

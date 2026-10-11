@@ -15,6 +15,15 @@ function dropOnTextEntry(event:DragEvent<HTMLDivElement>):boolean{
  return input instanceof HTMLInputElement&&input.type!=="file";
 }
 
+// Only OS files belong to the upload gesture. Internal move, text and link
+// drags must never activate the upload pane.
+function externalFiles(transfer:DataTransfer):boolean{
+ const types=Array.from(transfer.types);
+ if(types.includes("application/x-filesmanage-files"))return false;
+ return types.includes("Files")||transfer.files.length>0||
+  Array.from(transfer.items).some(item=>item.kind==="file");
+}
+
 // Drag-and-drop upload target rendering the shared queue (DI-17, WF-24..28).
 // The queue itself lives in uploadStore, so this drop and the toolbar file
 // input in FileTable feed one queue with identical business semantics (WF-27)
@@ -35,10 +44,12 @@ export function DropZone({folderId,userId,disabled,onCommitted,children}:{folder
  const skip=useUploadStore(state=>state.skip);
  const attach=useUploadStore(state=>state.attach);
  const[dragging,setDragging]=useState(false);
+ const[queueExpanded,setQueueExpanded]=useState(true);
  const[renamingId,setRenamingId]=useState<string|null>(null);
  const[renameValue,setRenameValue]=useState("");
  const dragDepth=useRef(0);
  const seenReload=useRef(reloadTick);
+ useEffect(()=>{if(tasks.length>0)setQueueExpanded(true);},[tasks.length]);
 
  // Report the shown folder to the store so a commit into another folder never
  // reloads this list, and make "no zone is visible" explicit on unmount
@@ -61,32 +72,32 @@ export function DropZone({folderId,userId,disabled,onCommitted,children}:{folder
  const active=folderId!==""&&disabled!==true;
 
  function onDragEnter(event:DragEvent<HTMLDivElement>){
-  if(!active)return;
+  if(!active||!externalFiles(event.dataTransfer)||dropOnTextEntry(event))return;
   event.preventDefault();
   dragDepth.current+=1;
   setDragging(true);
  }
 
  function onDragOver(event:DragEvent<HTMLDivElement>){
-  if(!active)return;
+  if(!active||!externalFiles(event.dataTransfer)||dropOnTextEntry(event))return;
   event.preventDefault();
+  event.dataTransfer.dropEffect="copy";
  }
 
  // A depth counter absorbs child enter/leave flicker: the highlight only clears
  // when the pointer has actually left the whole subtree.
  function onDragLeave(event:DragEvent<HTMLDivElement>){
-  if(!active)return;
+  if(!active||!externalFiles(event.dataTransfer))return;
   event.preventDefault();
   dragDepth.current=Math.max(0,dragDepth.current-1);
   if(dragDepth.current===0)setDragging(false);
  }
 
  function onDrop(event:DragEvent<HTMLDivElement>){
-  if(!active)return;
+  if(!active||!externalFiles(event.dataTransfer)||dropOnTextEntry(event))return;
   event.preventDefault();
   dragDepth.current=0;
   setDragging(false);
-  if(dropOnTextEntry(event))return;
   enqueueFiles(Array.from(event.dataTransfer.files),folderId);
  }
 
@@ -113,11 +124,16 @@ export function DropZone({folderId,userId,disabled,onCommitted,children}:{folder
   onDrop={onDrop}
  >
   {children}
-  {tasks.length>0&&<div className="upload-queue">
-   <p className="upload-queue-summary" role="status">
-    {committed} 项完成 · {failed} 项失败{pending>0?` · ${pending} 项进行中`:""}
-   </p>
-   <ul className="upload-queue-list">
+  {tasks.length>0&&<section className="upload-queue" aria-label="上传任务">
+   <header className="upload-queue-header">
+    <span className="upload-queue-summary" role="status">
+     上传任务 · {committed} 项完成 · {failed} 项失败{pending>0?` · ${pending} 项进行中`:""}
+    </span>
+    <RareButton type="button" aria-expanded={queueExpanded} aria-controls="upload-queue-list" onClick={()=>setQueueExpanded(value=>!value)}>
+     {queueExpanded?"收起":"展开"} ({tasks.length})
+    </RareButton>
+   </header>
+   {queueExpanded&&<ul className="upload-queue-list" id="upload-queue-list">
     {tasks.map(task=>{
      const progress=task.progress;
      const processing=task.status==="uploading"&&task.serverProcessing===true;
@@ -174,7 +190,7 @@ export function DropZone({folderId,userId,disabled,onCommitted,children}:{folder
       </form>}
      </li>;
     })}
-   </ul>
-  </div>}
+   </ul>}
+  </section>}
  </div>;
 }

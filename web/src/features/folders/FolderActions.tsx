@@ -6,7 +6,7 @@ import {errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
 import {Menu,type MenuItem} from "../../shared/ui/Menu";
 
-export function FolderActions({folder,actionRequest,onActionHandled,onChanged,isAdmin,onManageGrants}:{folder:Folder;actionRequest?:{folderId:string;action:"rename"|"delete";id:number}|null;onActionHandled?:()=>void;onChanged:()=>void;isAdmin:boolean;onManageGrants:()=>void}){
+export function FolderActions({folder,actionRequest,onActionHandled,onActionComplete,onChanged,isAdmin,onManageGrants}:{folder:Folder;actionRequest?:{folderId:string;action:"rename"|"delete";id:number}|null;onActionHandled?:()=>void;onActionComplete?:()=>void;onChanged:(action:"rename"|"delete",folder:Folder)=>void;isAdmin:boolean;onManageGrants:()=>void}){
  const[message,setMessage]=useState("");
  const[renaming,setRenaming]=useState(false);
  const[renameValue,setRenameValue]=useState(folder.name);
@@ -16,6 +16,8 @@ export function FolderActions({folder,actionRequest,onActionHandled,onChanged,is
  const[deleting,setDeleting]=useState(false);
  const[removeBusy,setRemoveBusy]=useState(false);
  const handledActionId=useRef(0);
+ function finishRename(){setRenaming(false);setMessage("");onActionComplete?.();}
+ function finishDelete(){setDeleting(false);setMessage("");onActionComplete?.();}
  useEffect(()=>{
   if(!actionRequest||actionRequest.folderId!==folder.id||handledActionId.current===actionRequest.id)return;
   handledActionId.current=actionRequest.id;
@@ -32,8 +34,8 @@ export function FolderActions({folder,actionRequest,onActionHandled,onChanged,is
   setMessage("");setRenameBusy(true);
   try{
    await folderApi.rename(folder.id,renameValue.trim());
-   setRenaming(false);
-   onChanged();
+   finishRename();
+   onChanged("rename",folder);
   }catch(error){
    setMessage(errorCopy(error,"重命名失败"));
   }finally{setRenameBusy(false);}
@@ -41,7 +43,7 @@ export function FolderActions({folder,actionRequest,onActionHandled,onChanged,is
 
  async function remove(){
   setMessage("");setRemoveBusy(true);
-  try{await folderApi.remove(folder.id);setDeleting(false);onChanged();}
+  try{await folderApi.remove(folder.id);finishDelete();onChanged("delete",folder);}
   catch(error){setMessage(errorCopy(error,"删除失败"));}
   finally{setRemoveBusy(false);}
  }
@@ -59,20 +61,20 @@ export function FolderActions({folder,actionRequest,onActionHandled,onChanged,is
   </div>
   {message&&<span role="alert" className="notice error">{message}</span>}
   {deleting&&<Dialog open title="删除目录确认" className="dialog"
-   onClose={()=>{if(!removeBusy)setDeleting(false);}} closeGuard={()=>!removeBusy}>
+   onClose={()=>{if(!removeBusy)finishDelete();}} closeGuard={()=>!removeBusy}>
    <p className="hint">目录「{folder.name}」及其子目录、文件将进入回收站，可按权限恢复。</p>
    <div className="dialog-actions">
-    <RareButton type="button" className="secondary-action" disabled={removeBusy} onClick={()=>setDeleting(false)}>取消</RareButton>
+    <RareButton type="button" className="secondary-action" disabled={removeBusy} onClick={finishDelete}>取消</RareButton>
     <RareButton type="button" tone="danger" className="danger" disabled={removeBusy} onClick={()=>void remove()}>{removeBusy?"删除中…":"确认删除"}</RareButton>
    </div>
   </Dialog>}
-  {renaming&&<Dialog open title="重命名目录" onClose={()=>setRenaming(false)} closeGuard={()=>!renameBusy} className="dialog">
+  {renaming&&<Dialog open title="重命名目录" onClose={()=>{if(!renameBusy)finishRename();}} closeGuard={()=>!renameBusy} className="dialog">
    <form onSubmit={submitRename}>
     <label htmlFor="folder-rename-input">新名称</label>
     <RareInput id="folder-rename-input" value={renameValue} maxLength={200}
      onChange={e=>setRenameValue(e.target.value)} required disabled={renameBusy}/>
     <div className="dialog-actions">
-     <RareButton type="button" className="secondary-action" onClick={()=>setRenaming(false)} disabled={renameBusy}>取消</RareButton>
+     <RareButton type="button" className="secondary-action" onClick={finishRename} disabled={renameBusy}>取消</RareButton>
      <RareButton type="submit" tone="primary" className="primary" disabled={renameBusy}>{renameBusy?"保存中…":"保存"}</RareButton>
     </div>
    </form>

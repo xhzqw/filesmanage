@@ -4,11 +4,22 @@
    themselves from a bounded parent, and without it the work area grows past
    the viewport, where body{overflow:hidden} clips the status bar and the
    load-more button out of reach. */
-.dropzone{display:flex;flex-direction:column;flex:1;min-height:0;gap:0;min-width:0;border-radius:var(--radius-md)}
+.dropzone{display:flex;flex-direction:column;flex:1;min-height:0;gap:0;min-width:0;border-radius:var(--radius-md);container:uploads / inline-size}
 .dropzone.dragging{background:var(--color-row-selected);outline:2px dashed var(--color-row-selected-border);outline-offset:-4px}
-.upload-queue{background:var(--color-panel);border:1px solid var(--color-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-panel);padding:var(--space-2) var(--space-3)}
-.upload-queue-summary{margin:0 0 var(--space-2);color:var(--color-text-secondary);font-size:12px}
-.upload-queue-list{list-style:none;margin:0;padding:0;display:grid;gap:var(--space-2)}
+.upload-queue{
+ flex:0 0 auto;min-width:0;max-width:calc(100% - 14px);
+ margin:3px 7px 6px;padding:4px 8px;
+ background:var(--surface-panel);border:1px solid var(--border-hairline);
+ border-radius:var(--radius-md);box-shadow:var(--shadow-panel);
+}
+.upload-queue-header{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;min-height:28px}
+.upload-queue-header>.rare-button{flex:none;min-height:26px;height:26px;padding:0 7px;font-size:11px}
+.upload-queue-summary{min-width:0;color:var(--text-secondary);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.upload-queue-list{
+ list-style:none;margin:3px 0 0;padding:0 2px 0 0;display:grid;gap:3px;
+ max-height:min(26vh,220px);overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;
+ border-top:1px solid var(--border-hairline);
+}
 .upload-item{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;padding:var(--space-1) 0;border-bottom:1px solid var(--color-border)}
 .upload-item:last-child{border-bottom:0}
 .upload-item.committed,.upload-item.cancelled{opacity:.55}
@@ -16,9 +27,9 @@
 .upload-item-name{flex:1;min-width:0;font-weight:600;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .upload-item-size,.upload-item-target{color:var(--color-text-secondary);font-size:11px;white-space:nowrap;flex-shrink:0}
 .upload-item-target{border:1px solid var(--color-border);border-radius:var(--radius-pill);padding:0 var(--space-2)}
-.upload-item-status{color:var(--color-text-secondary);font-size:12px;white-space:nowrap}
+.upload-item-status{color:var(--color-text-secondary);font-size:12px;overflow-wrap:anywhere;min-width:0}
 .upload-item-error{color:var(--color-danger)}
-.upload-item-actions{display:flex;gap:var(--space-2);margin-left:auto}
+.upload-item-actions{display:flex;gap:var(--space-2);margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
 .upload-resume-picker{display:inline-flex;align-items:center;padding:5px 9px;border:1px solid var(--color-border-strong);border-radius:var(--radius-control);font-size:12px;cursor:pointer;background:var(--color-panel);color:var(--color-text-primary)}
 .upload-resume-picker:hover{background:var(--color-panel-subtle)}
 .upload-resume-picker:focus-within{outline:2px solid var(--color-row-selected-border);outline-offset:2px}
@@ -29,3 +40,10 @@
 .upload-progress-fill{height:100%;width:0;border-radius:inherit;background:var(--color-row-selected-border);transition:width .15s linear}
 .upload-progress.indeterminate .upload-progress-fill{width:40%;animation:upload-progress-sweep 1.2s linear infinite}
 @keyframes upload-progress-sweep{from{transform:translateX(-100%)}to{transform:translateX(260%)}}
+@container uploads (max-width:560px){
+ .upload-queue{margin-inline:5px;max-width:calc(100% - 10px)}
+ .upload-item-main{flex-basis:100%}
+ .upload-item-status{flex:1 1 110px}
+ .upload-item-actions{flex:0 1 auto}
+ .upload-queue-list{max-height:min(24vh,190px)}
+}

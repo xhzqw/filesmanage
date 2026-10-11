@@ -147,6 +147,19 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
   setActionsFolder(folder);
   setActionRequest({folderId:folder.id,action,id:++nextActionId.current});
  }
+ function folderActionChanged(action:"rename"|"delete",folder:Folder){
+  if(action==="delete"&&selected){
+   // A subtree deletion invalidates an open descendant just as it invalidates
+   // the deleted folder. Navigate to the surviving parent before reloading
+   // instead of silently rendering the root behind a stale URL.
+   const isInside=ancestorPath(folders,selected.id).some(node=>node.id===folder.id);
+   if(isInside){
+    const destination=folders.find(item=>item.id===folder.parentId)??visibleRoots[0];
+    navigate(destination?"/doc?folder="+encodeURIComponent(destination.id):"/doc",{replace:true});
+   }
+  }
+  setReloadKey(k=>k+1);
+ }
  // Pointer capture keeps the drag alive once the cursor leaves the 4px hit area
  // (SPEC §3.1), so the width tracks the pointer instead of the handle.
  function startResize(event:ReactPointerEvent<HTMLDivElement>){
@@ -216,7 +229,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
    {selected&&<div className="folder-context-bar">
      <FolderBreadcrumb folders={folders} folder={selected}/>
      <div className="folder-actions-slot">
-      <FolderActions folder={actionsFolder??selected} actionRequest={actionRequest} onActionHandled={()=>setActionRequest(null)} isAdmin={user.isAdmin} onChanged={()=>setReloadKey(k=>k+1)}
+      <FolderActions folder={actionsFolder??selected} actionRequest={actionRequest} onActionHandled={()=>setActionRequest(null)} onActionComplete={()=>setActionsFolder(null)} isAdmin={user.isAdmin} onChanged={folderActionChanged}
        onManageGrants={()=>setGrantsFolder(actionsFolder??selected)}/>
      </div>
    </div>}
