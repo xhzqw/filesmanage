@@ -135,7 +135,7 @@ func (r *memoryRepo) RemoveFavorite(_ context.Context, userID, fileID, folderID 
 // whole filter while Limit only cuts the page (WF-30).
 func (r *memoryRepo) SearchFiles(_ context.Context, q ports.FileSearchQuery) ([]domain.File, int, error) {
 	switch q.Sort {
-	case "", "updated_desc", "name_asc", "size_desc":
+	case "", "updated_desc", "name_asc", "size_desc", "relevance":
 	default:
 		return nil, 0, domain.ErrInvalidInput
 	}
@@ -164,8 +164,13 @@ func (r *memoryRepo) SearchFiles(_ context.Context, q ports.FileSearchQuery) ([]
 				if !found{continue}
 			}
 		}
-		if q.Query != "" && !strings.Contains(lowerASCII(f.Name), lowerASCII(q.Query)) {
+		nameHit := q.Query != "" && strings.Contains(lowerASCII(f.Name), lowerASCII(q.Query))
+		contentHit := q.Query != "" && strings.Contains(strings.ToLower(r.fileText[f.ID].Content), strings.ToLower(q.Query))
+		if q.Query != "" && !nameHit && !contentHit {
 			continue
+		}
+		if q.Sort == "relevance" {
+			f.SearchRank = searchFilenameRank(f.Name, q.Query)
 		}
 		// Total counts the whole filter, so it is tallied before the cursor
 		// trims the page — the same contract the SQL count query keeps.
@@ -175,11 +180,25 @@ func (r *memoryRepo) SearchFiles(_ context.Context, q ports.FileSearchQuery) ([]
 		}
 		matched = append(matched, f)
 	}
-	sortFiles(matched, q.Sort)
+	if q.Sort == "relevance" {
+		sort.Slice(matched, func(i, j int) bool {
+			a,b := matched[i],matched[j]
+			if a.SearchRank != b.SearchRank {return a.SearchRank < b.SearchRank}
+			return a.UpdatedAt.After(b.UpdatedAt) || (a.UpdatedAt.Equal(b.UpdatedAt) && a.ID > b.ID)
+		})
+	} else {
+		sortFiles(matched, q.Sort)
+	}
 	if len(matched) > q.Limit {
 		matched = matched[:q.Limit]
 	}
 	return matched, total, nil
+}
+
+func searchFilenameRank(name, query string) int {
+	if query == "" || strings.EqualFold(name, query) {return 0}
+	if strings.Contains(strings.ToLower(name), strings.ToLower(query)) {return 1}
+	return 2
 }
 
 // searchFileAfterCursor mirrors the SQL keyset predicates: each supported sort
@@ -189,6 +208,9 @@ func searchFileAfterCursor(f domain.File, q ports.FileSearchQuery) bool {
 		return true
 	}
 	switch q.Sort {
+	case "relevance":
+		if f.SearchRank != q.CursorRank {return f.SearchRank > q.CursorRank}
+		return f.UpdatedAt.Before(q.CursorTime) || (f.UpdatedAt.Equal(q.CursorTime) && f.ID < q.CursorID)
 	case "name_asc":
 		return f.Name > q.CursorName || (f.Name == q.CursorName && f.ID > q.CursorID)
 	case "size_desc":

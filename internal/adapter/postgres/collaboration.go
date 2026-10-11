@@ -388,7 +388,7 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	outerOrder := "m.updated_at DESC,m.id DESC"
 	matchedJoin := ""
 	switch q.Sort {
-	case "", "updated_desc":
+	case "", "updated_desc", "relevance":
 	case "name_asc":
 		matchedOrder = "f.name ASC,f.id ASC"
 		outerOrder = "m.name ASC,m.id ASC"
@@ -413,6 +413,21 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	if err = r.Q.QueryRow(ctx, cte+" SELECT count(*) FROM (SELECT f.id FROM files f WHERE "+strings.Join(where, " AND ")+" LIMIT "+fmt.Sprint(searchTotalCap)+") t", args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
+	// Rank is a projection of the *authorized* match, not another filter:
+	// 0 exact filename, 1 filename contains, 2 indexed text only. Allocate
+	// its bind arguments after the independent count query to keep the count
+	// and page parameter lists well formed. Explicit legacy sorts are unchanged.
+	rankExpr := "0"
+	if q.Sort == "relevance" {
+		if q.Query != "" {
+			exact := ph.next()
+			contains := ph.next()
+			args = append(args, q.Query, "%"+q.Query+"%")
+			rankExpr = "CASE WHEN lower(f.name)=lower(" + exact + ") THEN 0 WHEN f.name ILIKE " + contains + " THEN 1 ELSE 2 END"
+		}
+		matchedOrder = "search_rank ASC,f.updated_at DESC,f.id DESC"
+		outerOrder = "m.search_rank ASC,m.updated_at DESC,m.id DESC"
+	}
 	// The cursor trims only the page read, and each supported sort uses its own
 	// keyset so paging can neither skip nor duplicate rows: name_asc walks the
 	// (name,id) key ascending, size_desc the (size,id) key descending (the
@@ -421,6 +436,13 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	pageWhere := where
 	if q.CursorID != "" {
 		switch q.Sort {
+		case "relevance":
+			// Mixed ASC(rank) and DESC(time,id) cannot use a simple tuple
+			// comparator. The same rank expression is repeated so later pages
+			// cannot lose or duplicate any item at tier boundaries.
+			pageWhere = append(pageWhere, "("+rankExpr+">"+ph.next()+" OR ("+rankExpr+"="+ph.next()+
+				" AND (f.updated_at,f.id)<("+ph.next()+","+ph.next()+")))")
+			args = append(args, q.CursorRank, q.CursorRank, q.CursorTime, q.CursorID)
 		case "name_asc":
 			pageWhere = append(pageWhere, "(f.name,f.id)>("+ph.next()+","+ph.next()+")")
 			args = append(args, q.CursorName, q.CursorID)
@@ -440,12 +462,12 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	}
 	// matched carries the sort keys the outer ORDER BY references.
 	sql := with + ` matched AS (
-	  SELECT f.id,f.updated_at,f.name
+	  SELECT f.id,f.updated_at,f.name,` + rankExpr + ` AS search_rank
 	    FROM files f` + matchedJoin + `
 	   WHERE ` + strings.Join(pageWhere, " AND ") + `
 	   ORDER BY ` + matchedOrder + ` LIMIT ` + fmt.Sprint(q.Limit) + `
 	)
-	SELECT f.id,f.folder_id,f.name,f.uploaded_by,f.content_type,f.current_version_seq,v.size_bytes,v.sha256,f.updated_at,f.deleted_at,` + textColumn + `
+	SELECT f.id,f.folder_id,f.name,f.uploaded_by,f.content_type,f.current_version_seq,v.size_bytes,v.sha256,f.updated_at,f.deleted_at,` + textColumn + `,m.search_rank
 	  FROM matched m
 	  JOIN files f ON f.id=m.id
 	  LEFT JOIN file_versions v ON v.file_id=f.id AND v.seq=f.current_version_seq
@@ -473,7 +495,7 @@ func scanFileWithText(row rowScanner) (domain.File, string, error) {
 	var f domain.File
 	var content string
 	err := row.Scan(&f.ID, &f.FolderID, &f.Name, &f.UploadedBy, &f.ContentType, &f.CurrentVersionSeq,
-		&f.SizeBytes, &f.Sha256, &f.UpdatedAt, &f.DeletedAt, &content)
+		&f.SizeBytes, &f.Sha256, &f.UpdatedAt, &f.DeletedAt, &content, &f.SearchRank)
 	return f, content, err
 }
 

@@ -30,6 +30,8 @@ type File struct {
 	// Snippet is a search projection only (SPEC §10.3): a bounded plain-text
 	// window around the match, rendered with safe text nodes plus <mark>.
 	Snippet string
+	// SearchRank is an internal search-only projection, not part of filePayload.
+	SearchRank int
 }
 
 type FileVersion struct {

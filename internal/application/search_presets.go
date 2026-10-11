@@ -43,7 +43,7 @@ func validPreset(name string, raw json.RawMessage) bool {
 		if key == "scope" && str != "all" && str != "current" && str != "descendants" {
 			return false
 		}
-		if key == "sort" && str != "updated_desc" && str != "name_asc" && str != "size_desc" {
+		if key == "sort" && str != "relevance" && str != "updated_desc" && str != "name_asc" && str != "size_desc" {
 			return false
 		}
 	}

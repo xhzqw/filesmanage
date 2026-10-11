@@ -481,7 +481,7 @@ func searchQuery(u domain.User, groups []string, filter SearchFilter) ports.File
 		TextQuery: SpaceCJK(filter.Query),
 		Uploader:  filter.Uploader, MimePrefix: filter.MimePrefix,
 		From: filter.From, To: filter.To, Sort: filter.Sort,
-		CursorTime: cursor.Time, CursorName: cursor.Name, CursorID: cursor.ID, CursorSize: cursor.Size,
+		CursorTime: cursor.Time, CursorRank: cursor.Rank, CursorName: cursor.Name, CursorID: cursor.ID, CursorSize: cursor.Size,
 		// One lookahead row beyond the page tells the service whether more
 		// matches exist (WF-30), the same convention the file list uses.
 		Limit: filter.Limit + 1,

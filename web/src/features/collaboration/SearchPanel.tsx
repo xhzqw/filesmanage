@@ -56,7 +56,7 @@ export function SearchPanel({userId}:{userId:string}){
  const[tag,setTag]=useState("");
  const[uploader,setUploader]=useState("");
  const[type,setType]=useState("");
- const[sort,setSort]=useState("updated_desc");
+ const[sort,setSort]=useState("relevance");
  const[pageSize,setPageSize]=useState<number>(DEFAULT_PAGE_SIZE);
  const[showAdvanced,setShowAdvanced]=useState(false);
  const[scope,setScope]=useState<"all"|"current"|"descendants">("all");
@@ -141,7 +141,7 @@ export function SearchPanel({userId}:{userId:string}){
  function clearFilters(){
   cancelPendingSearch();
   setQ("");setCategory("");setTag("");setUploader("");setType("");setScope("all");setFolder("");
-  setFrom("");setTo("");setSort("updated_desc");setPageSize(DEFAULT_PAGE_SIZE);
+  setFrom("");setTo("");setSort("relevance");setPageSize(DEFAULT_PAGE_SIZE);
   epochRef.current++;moreBusyRef.current=false;setQuery(null);setItems([]);setNextCursor("");setTotal(0);setStatus("idle");setMessage("");
  }
  const[query,setQuery]=useState<Query|null>(null);
@@ -315,7 +315,7 @@ export function SearchPanel({userId}:{userId:string}){
      <label>修改结束<RareInput type="date" aria-label="修改结束日期" value={to} onChange={e=>setTo(e.target.value)}/></label>
     </div>
     <label>排序<RareSelect id="search-sort" value={sort} onChange={e=>setSort(e.target.value)}>
-     <option value="updated_desc">最近修改</option><option value="name_asc">名称 A→Z</option><option value="size_desc">大小降序</option>
+     <option value="relevance">最佳匹配</option><option value="updated_desc">最近修改</option><option value="name_asc">名称 A→Z</option><option value="size_desc">大小降序</option>
     </RareSelect></label>
     <label>每页<RareSelect id="search-limit" value={pageSize} onChange={e=>setPageSize(Number(e.target.value))}>
      {PAGE_SIZES.map(size=><option key={size} value={size}>{size} 条</option>)}

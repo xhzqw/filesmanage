@@ -27,6 +27,7 @@ type FileSearchQuery struct {
 	// The cursor fields carry the ordering keys of the active sort for the
 	// last row of the previous page; an empty CursorID starts at page one.
 	CursorTime time.Time
+	CursorRank int
 	CursorName string
 	CursorID   string
 	CursorSize int64

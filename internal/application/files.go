@@ -120,6 +120,7 @@ type FilePage struct {
 }
 
 type FileCursor struct {
+	Rank int
 	Time time.Time
 	ID   string
 	Name string

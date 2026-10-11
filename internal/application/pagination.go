@@ -14,6 +14,8 @@ import (
 func encodeCursor(sort string, last domain.File) string {
 	var key string
 	switch sort {
+	case "relevance":
+		key = strconv.Itoa(last.SearchRank) + "\x1f" + last.UpdatedAt.UTC().Format(time.RFC3339Nano) + "\x1f" + last.ID
 	case "name_asc", "name_desc":
 		key = last.Name + "\x1f" + last.ID
 	case "size_desc":
@@ -36,6 +38,19 @@ func DecodeFileCursor(sort, encoded string) FileCursor {
 	}
 	parts := strings.SplitN(string(raw), "\x1f", 2)
 	if len(parts) != 2 {
+		return cursor
+	}
+	if sort == "relevance" {
+		fields := strings.Split(string(raw), "\x1f")
+		if len(fields) != 3 || fields[2] == "" {
+			return cursor
+		}
+		rank, rankErr := strconv.Atoi(fields[0])
+		timestamp, timeErr := time.Parse(time.RFC3339Nano, fields[1])
+		if rankErr != nil || timeErr != nil || rank < 0 || rank > 2 {
+			return cursor
+		}
+		cursor.Rank, cursor.Time, cursor.ID = rank, timestamp, fields[2]
 		return cursor
 	}
 	cursor.ID = parts[1]
