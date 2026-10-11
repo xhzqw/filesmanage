@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Fail-closed standalone performance service on the seeded filesmanage_perf
 # database only. Never reuses the business server or the UX test database.
-# start | status | stop. No schema writes or fixture resets.
+# start | status | stop | migrate. Only 'migrate' may add missing schema
+# migrations to the isolated perf database, after stopping its server.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 umask 077
@@ -48,6 +49,15 @@ sys.exit(1)
 PY
 }
 case "$ACTION" in
+ migrate)
+  if verified_pid || ss -ltnH "sport = :$PORT" | grep -q .; then
+   echo "PERF_REFUSED: stop the isolated perf server before schema migration" >&2; exit 2
+  fi
+  python3 scripts/perf_readiness_audit.py
+  DATABASE_URL="$PERF_DSN" go run ./cmd/migrate -dir migrations
+  python3 scripts/perf_readiness_audit.py
+  echo "PERF_SCHEMA_READY: migrations applied to filesmanage_perf only"
+  ;;
  start)
   if verified_pid; then echo "PERF_READY: $BASE (verified)"; exit 0; fi
   if ss -ltnH "sport = :$PORT" | grep -q .; then
@@ -88,6 +98,6 @@ case "$ACTION" in
   echo "PERF_STOPPED: verified perf server only"
   ;;
  *)
-  echo "usage: bash scripts/perf_isolated_lab.sh [start|status|stop]" >&2; exit 2
+  echo "usage: bash scripts/perf_isolated_lab.sh [migrate|start|status|stop]" >&2; exit 2
   ;;
 esac
