@@ -50,7 +50,18 @@ function mount(drawing=false,layout="Model"){
    "10","500","20","500","11","510","21","500",
    "0","ENDSEC","0","EOF",
   ].join("\n");
-  const source=layout==="DIM"?[
+  const source=layout==="FONTS"?[
+   "0","SECTION","2","TABLES","0","TABLE","2","STYLE",
+   "0","STYLE","2","Comic Sans MS","3","comic.ttf",
+   "0","STYLE","2","ARIAL","3","arial.ttf",
+   "0","ENDTAB","0","ENDSEC",
+   "0","SECTION","2","ENTITIES",
+   "0","TEXT","8","FONTS","7","Comic Sans MS","10","0","20","0","40","5",
+   "1","ABCDEFGHJKLMNOPQRSTUVWXYZ 0123456789",
+   "0","TEXT","8","FONTS","7","ARIAL","10","0","20","15","40","5",
+   "1","ABCDEFGHJKLMNOPQRSTUVWXYZ 0123456789",
+   "0","ENDSEC","0","EOF",
+  ].join("\n"):layout==="DIM"?[
    "0","SECTION","2","HEADER","9","$INSUNITS","70","4","0","ENDSEC",
    "0","SECTION","2","TABLES","0","TABLE","2","DIMSTYLE",
    "0","DIMSTYLE","2","ANNOTATED","40","1","41","2",
@@ -89,7 +100,7 @@ function mount(drawing=false,layout="Model"){
    "0","ENDSEC","0","EOF",
   ].join("\n"):dxf;
   actualDrawing=parseDxf(source,THREE,layout);
-  if(actualDrawing.skipped.length&&!(layout==="DIM"&&
+  if(actualDrawing.skipped.length&&layout!=="FONTS"&&!(layout==="DIM"&&
    actualDrawing.skipped.every(message=>message.includes("DIMENSION:")&&message.includes("近似重建"))))
    throw Error(actualDrawing.skipped.join(","));
   object=actualDrawing.object;
@@ -126,6 +137,16 @@ window.__cad={
  frozen:()=>mount(true,"P2"),
  plot:()=>mount(true,"PLOT"),
  dimension:()=>mount(true,"DIM"),
+ fonts:()=>{
+  mount(true,"FONTS");
+  return actualDrawing.object.children.flatMap(g=>g.children.filter(n=>n.isSprite).map(n=>({
+   requested:n.userData.cadFontRequested,
+   family:n.userData.cadFontFamily,
+   approximate:n.userData.cadFontApproximate,
+   pixels:n.material.map.image.toDataURL("image/png").slice(0,2000),
+   width:n.material.map.image.width,
+  })));
+ },
  png:()=>controls.exportPng()?.startsWith("data:image/png;base64,")??false,
  printPreview:()=>printableSheetHtml(controls.exportPng(),"A3","A1").includes("@page{size:A3 landscape"),
  vectorPlot:()=>{
@@ -266,6 +287,13 @@ try{
   "Chrome must render dimension line, extension lines and arrow outlines");
  assert.equal(await cdp.eval("window.__cad.png()"),true,
   "fallback dimension linework must remain renderable in actual WebGL");
+ const fonts=await cdp.eval("window.__cad.fonts()");
+ assert.equal(fonts.length,2);
+ assert.match(fonts[0].family,/Comic Sans MS/);
+ assert.match(fonts[1].family,/Arial/);
+ assert.equal(fonts[0].approximate,true);
+ assert.notEqual(fonts[0].pixels,fonts[1].pixels,
+  "actual Chromium must rasterize a visibly different glyph set for Comic Sans vs Arial");
  await cdp.send("Emulation.setDeviceMetricsOverride",{width:500,height:700,deviceScaleFactor:1,mobile:false});
  await delay(400);
  const narrow=await cdp.eval("window.__cad.state.width");

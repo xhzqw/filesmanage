@@ -386,6 +386,32 @@ const cadTextJs=await transform(readFileSync(new URL("../src/features/modelViewe
 const {decodeCadText}=await import("data:text/javascript;base64,"+Buffer.from(cadTextJs.code).toString("base64"));
 assert.equal(decodeCadText("%%c25 %%d %%p"),"⌀25 ° ±");
 assert.equal(decodeCadText("A\\PB\\U+00B0"),"A\nB°");
+const {cadFontFamily}=await import("data:text/javascript;base64,"+Buffer.from(cadTextJs.code).toString("base64"));
+const comicFont=cadFontFamily({fontFile:"C:\\Windows\\Fonts\\comic.ttf",widthFactor:1,fixedHeight:0},"Comic Sans MS");
+const arialFont=cadFontFamily({fontFile:"arial.ttf",widthFactor:1,fixedHeight:0},"ARIAL");
+assert.match(comicFont.family,/Comic Sans MS/);
+assert.match(comicFont.family,/Z003/,"non-Windows must not silently substitute Arial for Comic Sans");
+assert(!comicFont.family.includes("Arial"),"handwriting font fallback must remain visually distinguishable");
+assert.match(arialFont.family,/Arial/);
+assert(!arialFont.family.includes("Comic"));
+assert(cadFontFamily({fontFile:"romans.shx",widthFactor:1,fixedHeight:0},"ANNOTATION").approximate);
+assert(cadFontFamily({fontFile:"uninstalled-family.ttf",widthFactor:1,fixedHeight:0},"Custom").approximate);
+const fontFixture=[
+ "0","SECTION","2","TABLES","0","TABLE","2","STYLE",
+ "0","STYLE","2","Comic Sans MS","3","comic.ttf","41","1",
+ "0","STYLE","2","ARIAL","3","arial.ttf","41","1",
+ "0","ENDTAB","0","ENDSEC",
+ "0","SECTION","2","ENTITIES",
+ "0","TEXT","8","FONTS","7","Comic Sans MS","10","0","20","0","40","4","1","ABCDEFG 123",
+ "0","TEXT","8","FONTS","7","ARIAL","10","0","20","10","40","4","1","ABCDEFG 123",
+ "0","ENDSEC","0","EOF",
+].join("\n");
+const comparedFonts=parseDxf(fontFixture,THREE);
+const fontLabels=comparedFonts.object.children[0].children.filter(child=>child.isSprite);
+assert.equal(fontLabels.length,2);
+assert.notEqual(fontLabels[0].userData.cadFontFamily,fontLabels[1].userData.cadFontFamily);
+assert.equal(fontLabels[0].userData.cadFontApproximate,true);
+assert.equal(fontLabels[1].userData.cadFontApproximate,false);
 
 // Rectangular paper VIEWPORTs project *model* linework at correct 2D scale.
 // Paper framing and model linework retain their own layer/ACI colors.

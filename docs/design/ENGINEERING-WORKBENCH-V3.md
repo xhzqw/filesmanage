@@ -187,6 +187,21 @@ This document records validated capability instead of marking unimplemented work
   authoritative representation blocks. Headless Chrome WebGL regression
   verifies actual renderable fallback linework and a glyph sprite.
 
+## Real-DXF font-mapping correction (October 2026)
+
+- DXF STYLE group 3 filenames such as \`comic.ttf\` and \`arial.ttf\`,
+  plus known STYLE names, are mapped through distinct allowlisted CSS
+  font-family chains. Previously both were painted with Arial.
+- A browser with Comic Sans MS installed uses that family. On Linux without
+  proprietary Comic Sans, a locally installed script face (e.g. Z003) is
+  selected ahead of generic cursive, rather than silently substituting Arial.
+  This is **visually distinct but only an approximation**, not Comic Sans
+  glyph-metric fidelity or a licensed-font installation.
+- Known SHX files and unknown TTF aliases remain explicitly approximate.
+  The preview does not download arbitrary font-file paths embedded in DXF.
+- Synthetic STYLE/TEXT regressions verify mapping/provenance; real headless
+  Chromium compares actual rasterized glyph images for Comic and Arial.
+
 ## Deliberately unsupported or approximate
 
 | Capability | Current truth | Next gate |

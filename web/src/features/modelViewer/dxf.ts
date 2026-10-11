@@ -392,8 +392,9 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
   const context=canvas.getContext("2d");
   if(!context){skipped.add("TEXT");return;}
   const fontSize=60;
-  const font=cadFontFamily(style);
-  if(font.approximate)skipped.add("TEXT: SHX 字体使用浏览器字体近似显示");
+  const font=cadFontFamily(style,e.textStyle);
+  if(font.approximate)
+   skipped.add("TEXT: CAD SHX/TTF 字体可能未安装，使用浏览器可用字体近似显示");
   context.font="500 "+fontSize+"px "+font.family;
   canvas.width=Math.min(4096,Math.ceil(Math.max(20,...rows.map(row=>context.measureText(row).width))+12));
   canvas.height=Math.ceil((fontSize+12)*rows.length);
@@ -405,6 +406,9 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
   const texture=new THREE.CanvasTexture(canvas);
   texture.colorSpace=THREE.SRGBColorSpace;
   const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,transparent:true,depthWrite:false}));
+  sprite.userData.cadFontFamily=font.family;
+  sprite.userData.cadFontRequested=font.requested;
+  sprite.userData.cadFontApproximate=font.approximate;
   const sx=Math.hypot(activeTransform.a,activeTransform.b);
   const sy=Math.hypot(activeTransform.c,activeTransform.d);
   const widthFactor=e.textWidthFactor*(style?.widthFactor??1);
