@@ -32,6 +32,8 @@ func respondError(c *gin.Context, err error) {
 		c.JSON(404, gin.H{"ok": false, "error": gin.H{"code": "E_NOT_FOUND"}})
 	case errors.Is(err, domain.ErrForbidden):
 		c.JSON(403, gin.H{"ok": false, "error": gin.H{"code": "E_FORBIDDEN"}})
+	case errors.Is(err, domain.ErrConflict):
+		c.JSON(409, gin.H{"ok": false, "error": gin.H{"code": "E_CONFLICT"}})
 	case errors.Is(err, domain.ErrNameConflict):
 		c.JSON(409, gin.H{"ok": false, "error": gin.H{"code": "E_NAME_CONFLICT"}})
 	case errors.Is(err, domain.ErrVersionConflict):
