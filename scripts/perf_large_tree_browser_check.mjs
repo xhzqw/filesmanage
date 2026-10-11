@@ -9,10 +9,15 @@ import {join} from "node:path";
 import {setTimeout as delay} from "node:timers/promises";
 
 const BASE="http://127.0.0.1:18094",TARGET="pf_bulk_9627",TARGET_NAME="目录 9627";
-if(process.env.FILESMANAGE_PERF_BROWSER!=="read-only"||!process.env.FILESMANAGE_PERF_PASSWORD)
- throw Error("PERF_BROWSER_REFUSED: isolated read-only mode and test password required");
+if(process.env.FILESMANAGE_PERF_BROWSER!=="read-only")
+ throw Error("PERF_BROWSER_REFUSED: explicit isolated read-only mode required");
+// The scratch-only perf principal is defined beside the existing load test.
+// Avoid a second hard-coded credential or accepting a production password.
+const fixtureDefinition=readFileSync(new URL("./loadtest.py",import.meta.url),"utf8");
+const fixturePassword=fixtureDefinition.match(/^DEFAULT_PERF_PASSWORD = "([^"\n]+)"/m)?.[1];
+assert.ok(fixturePassword,"perf fixture credential not found");
 const login=await fetch(BASE+"/api/login",{method:"POST",headers:{"Content-Type":"application/json"},
- body:JSON.stringify({login:"perf-admin",password:process.env.FILESMANAGE_PERF_PASSWORD})});
+ body:JSON.stringify({login:"perf-admin",password:fixturePassword})});
 assert.equal(login.status,200);
 const cookie=login.headers.getSetCookie().find(x=>x.startsWith("fm_session="))?.split(";")[0];
 assert.ok(cookie);
