@@ -18,6 +18,8 @@ scripts/perf_dataset.sql (isolated filesmanage_perf only). Expected 4xx
 business errors are counted separately from 5xx, which fail the run.
 """
 import argparse
+import copy
+import http.cookiejar
 import json
 import os
 import random
@@ -71,9 +73,18 @@ SEARCH_QUERIES = [
 
 
 class Client:
-    def __init__(self, base, login, password):
+    def __init__(self, base, login, password, cookies=None):
         self.base = base.rstrip("/")
-        self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor())
+        self.jar = http.cookiejar.CookieJar()
+        self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(self.jar))
+        if cookies is not None:
+            # Warm, authenticated request latency is the PERF-API-02 subject.
+            # Reuse the scratch admin's session for each independent client
+            # transport instead of generating N rapid logins that violate
+            # the production login limiter. No auth security setting changes.
+            for cookie in cookies:
+                self.jar.set_cookie(copy.copy(cookie))
+            return
         req = urllib.request.Request(self.base + "/api/login", method="POST",
                                      data=json.dumps({"login": login, "password": password}).encode())
         req.add_header("Content-Type", "application/json")
@@ -195,8 +206,8 @@ class Mix:
         return "GET", name, None
 
 
-def run_level(base, login, password, users, duration, warmup, mix, rng, db_name):
-    clients = [Client(base, login, password) for _ in range(users)]
+def run_level(base, login, password, users, duration, warmup, mix, rng, db_name, cookies):
+    clients = [Client(base, login, password, cookies=cookies) for _ in range(users)]
     population = [name for name, _ in MIX]
     weights = [w for _, w in MIX]
     results, errors, throttled, server_errors = {}, {}, {}, []
@@ -303,6 +314,11 @@ def main():
     args = parser.parse_args()
 
     probe = Client(args.base, args.login, args.password)
+    # One login for the isolated perf principal; --users represents concurrent
+    # authenticated request workers, not unique accounts or login throughput.
+    session_cookies = list(probe.jar)
+    if not session_cookies:
+        raise RuntimeError("isolated perf login produced no session cookie")
     mix = Mix(probe)
     print(f"targets: file={mix.file_id} baseSeq={mix.base_seq} hot={mix.hot} ordinary={mix.ordinary}", flush=True)
 
@@ -312,13 +328,13 @@ def main():
         for level in [int(x) for x in args.ladder.split(",") if x.strip()]:
             print(f"=== ladder level {level} users x {args.duration}s ===", flush=True)
             report = run_level(args.base, args.login, args.password, level, args.duration,
-                               min(10, args.duration), mix, random.Random(args.seed + level), args.db_name)
+                               min(10, args.duration), mix, random.Random(args.seed + level), args.db_name, session_cookies)
             runs.append(report)
             print_level(report)
     else:
         print(f"=== sustained {args.users} users x {args.duration}s (warmup {args.warmup}s) ===", flush=True)
         report = run_level(args.base, args.login, args.password, args.users, args.duration,
-                           args.warmup, mix, rng, args.db_name)
+                           args.warmup, mix, rng, args.db_name, session_cookies)
         runs.append(report)
         print_level(report)
 
