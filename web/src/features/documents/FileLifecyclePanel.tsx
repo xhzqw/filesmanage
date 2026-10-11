@@ -3,11 +3,16 @@ import {RareBadge,RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
 import {Dialog} from "../../shared/ui/Dialog";
 import {errorCopy} from "../../shared/errors";
 import {fileApi,type FileLifecycle} from "./api";
+import {request} from "../../shared/http";
 import "./fileLifecycle.css";
 
 export function FileLifecyclePanel({fileId,currentSeq,lifecycle,onUpdated}:{fileId:string;currentSeq:number;lifecycle:FileLifecycle|null;onUpdated:(value:FileLifecycle)=>void}){
  const[dueDate,setDueDate]=useState("");
  const[note,setNote]=useState("");
+ const[userQuery,setUserQuery]=useState("");
+ const[assignee,setAssignee]=useState("");
+ const[users,setUsers]=useState<{id:string;name:string}[]>([]);
+ const[userSearchError,setUserSearchError]=useState("");
  const[busy,setBusy]=useState(false);
  const[confirmArchive,setConfirmArchive]=useState(false);
  const[retentionDays,setRetentionDays]=useState(0);
@@ -17,12 +22,21 @@ export function FileLifecyclePanel({fileId,currentSeq,lifecycle,onUpdated}:{file
  const released=lifecycle?.state==="released";
  const pending=lifecycle===null;
  const retentionActive=Boolean(lifecycle?.retentionUntil&&new Date(lifecycle.retentionUntil).getTime()>Date.now());
+ useEffect(()=>{
+  if(!lifecycle?.canManage||lifecycle.state!=="released")return;
+  let live=true;
+  request<{items:{id:string;name:string}[]}>("/share-recipients?"+new URLSearchParams({kind:"user",q:userQuery,limit:"40"}))
+    .then(page=>{if(live){setUsers(page.items);setUserSearchError("");}})
+    .catch(()=>{if(live)setUserSearchError("读取负责人失败");});
+  return()=>{live=false};
+ },[fileId,lifecycle?.canManage,lifecycle?.state,userQuery]);
+ useEffect(()=>setAssignee(lifecycle?.responsibleId??lifecycle?.publishedBy??""),[fileId,lifecycle?.responsibleId,lifecycle?.publishedBy]);
  function dueUTC(){return dueDate?new Date(dueDate+"T23:59:59").toISOString():null;}
- async function update(action:"publish"|"archive"|"unarchive"|"set_due"){
+ async function update(action:"publish"|"archive"|"unarchive"|"set_due"|"assign"){
   if(busy||!lifecycle)return;
   setBusy(true);setError("");
   try{
-   const value=await fileApi.setLifecycle(fileId,{action,expectedVersionSeq:currentSeq,dueAt:dueUTC(),note:note.trim(),...(action==="archive"?{retentionDays}:{})});
+   const value=await fileApi.setLifecycle(fileId,{action,expectedVersionSeq:currentSeq,dueAt:dueUTC(),note:note.trim(),...(action==="archive"?{retentionDays}:{}),...(action==="assign"?{responsibleId:assignee}:{})});
    onUpdated(value);setConfirmArchive(false);
   }catch(e){setError(errorCopy(e,"生命周期更新失败，请确认权限或当前版本状态"));}
   finally{setBusy(false);}
@@ -43,14 +57,22 @@ export function FileLifecyclePanel({fileId,currentSeq,lifecycle,onUpdated}:{file
    {lifecycle.canManage&&<div className="file-lifecycle-form">
     <label>到期日期<RareInput type="date" aria-label="到期日期" value={dueDate} onChange={e=>setDueDate(e.target.value)} disabled={busy||isArchived}/></label>
     {!isArchived&&<label className="file-lifecycle-note">发布说明<RareInput value={note} maxLength={200} onChange={e=>setNote(e.target.value)} disabled={busy} placeholder="可选"/></label>}
+    {released&&<label>负责人查找<RareInput aria-label="查找提醒负责人" value={userQuery} onChange={e=>setUserQuery(e.target.value)} placeholder="姓名"/></label>}
+    {released&&<label>提醒负责人<RareSelect aria-label="选择提醒负责人" value={assignee} onChange={e=>setAssignee(e.target.value)} disabled={busy}>
+     <option value="">请选择</option>
+     {assignee&&!users.some(u=>u.id===assignee)&&<option value={assignee}>{assignee}</option>}
+     {users.map(u=><option key={u.id} value={u.id}>{u.name}</option>)}
+    </RareSelect></label>}
     <div className="file-lifecycle-actions">
      {!isArchived&&<RareButton type="button" className="primary" disabled={busy} onClick={()=>void update("publish")}>发布当前 v{currentSeq}</RareButton>}
      {released&&<RareButton type="button" disabled={busy} onClick={()=>void update("set_due")}>保存到期日</RareButton>}
+     {released&&<RareButton type="button" disabled={busy||!assignee} onClick={()=>void update("assign")}>分配负责人</RareButton>}
      {released&&<RareButton type="button" disabled={busy} onClick={()=>setConfirmArchive(true)}>归档</RareButton>}
      {isArchived&&<RareButton type="button" disabled={busy||retentionActive} title={retentionActive?"保留期限内不可解除归档":undefined} onClick={()=>void update("unarchive")}>解除归档</RareButton>}
     </div>
    </div>}
   </>}
+  {userSearchError&&<p role="alert" className="notice error">{userSearchError}</p>}
   {error&&<p role="alert" className="notice error">{error}</p>}
   {confirmArchive&&<Dialog open title="确认归档" onClose={()=>{if(!busy)setConfirmArchive(false);}} closeGuard={()=>!busy}>
    <p>归档后将禁止常规编辑、重命名、移动及删除。需要修改时先解除归档。</p>

@@ -8,6 +8,7 @@ type LifecycleLedgerRow struct {
 	FolderID       string     `json:"folderId"`
 	State          string     `json:"state"`
 	PublishedSeq   int        `json:"publishedSeq"`
+	ResponsibleName string   `json:"responsibleName"`
 	DueAt          *time.Time `json:"dueAt,omitempty"`
 	RetentionUntil *time.Time `json:"retentionUntil,omitempty"`
 	DueStatus      string     `json:"dueStatus"`

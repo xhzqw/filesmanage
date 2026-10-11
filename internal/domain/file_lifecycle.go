@@ -9,6 +9,7 @@ type FileLifecycle struct {
 	PublishedSeq   int        `json:"publishedSeq"`
 	PublishedAt    time.Time  `json:"publishedAt"`
 	PublishedBy    string     `json:"publishedBy"`
+	ResponsibleID  *string    `json:"responsibleId,omitempty"`
 	DueAt          *time.Time `json:"dueAt,omitempty"`
 	RetentionUntil *time.Time `json:"retentionUntil,omitempty"`
 	Note           string     `json:"note"`

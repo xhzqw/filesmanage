@@ -22,7 +22,7 @@ func (r *memoryRepo) ListLifecycleLedger(_ context.Context, after, state string,
 		if !ok || f.DeletedAt != nil || id <= after || (state != "" && l.State != state) {
 			continue
 		}
-		out = append(out, domain.LifecycleLedgerRow{FileID: id, FileName: f.Name, FolderID: f.FolderID, State: l.State, PublishedSeq: l.PublishedSeq, DueAt: l.DueAt, RetentionUntil: l.RetentionUntil})
+		responsible:=responsibleLifecycleUser(l);name:="";if u,ok:=r.users[responsible];ok{name=u.user.DisplayName};out = append(out, domain.LifecycleLedgerRow{ResponsibleName:name,FileID: id, FileName: f.Name, FolderID: f.FolderID, State: l.State, PublishedSeq: l.PublishedSeq, DueAt: l.DueAt, RetentionUntil: l.RetentionUntil})
 		if len(out) >= limit {
 			break
 		}
@@ -36,7 +36,7 @@ func (r *memoryRepo) ListLifecycleNotifications(_ context.Context, userID string
 	for _, n := range r.lifecycleNotifications {
 		life, found := r.lifecycle[n.FileID]
 		f, exists := r.files[n.FileID]
-		if !found || !exists || f.DeletedAt != nil || life.PublishedBy != userID || life.DueAt == nil || !life.DueAt.Equal(n.DueAt) {
+		if !found || !exists || f.DeletedAt != nil || responsibleLifecycleUser(life)!=userID || life.DueAt == nil || !life.DueAt.Equal(n.DueAt) {
 			continue
 		}
 		n.FileName = f.Name
@@ -54,7 +54,7 @@ func (r *memoryRepo) ReadLifecycleNotification(_ context.Context, userID string,
 	for i := range r.lifecycleNotifications {
 		n := &r.lifecycleNotifications[i]
 		life, ok := r.lifecycle[n.FileID]
-		if n.ID == id && ok && life.PublishedBy == userID {
+		if n.ID == id && ok && responsibleLifecycleUser(life)==userID {
 			n.Read = true
 			return true, nil
 		}

@@ -8,8 +8,8 @@ export type VersionComparison={left:{seq:number;sha256:string;sizeBytes:number};
 export type FileReviewComment={id:number;fileId:string;versionSeq:number;lineNumber?:number;body:string;authorId:string;authorName:string;createdAt:string;resolvedAt?:string;resolvedBy?:string};
 export type ReviewCommentPage={items:FileReviewComment[];nextCursor:string};
 export type FilePage={items:FileItem[];nextCursor:string};
-export type FileLifecycle={fileId:string;state:"draft"|"released"|"archived";publishedSeq:number;publishedAt:string;publishedBy:string;dueAt?:string;retentionUntil?:string;dueStatus:"none"|"soon"|"overdue"|"scheduled";note:string;updatedAt:string;canManage:boolean};
-export type LifecycleDraft={action:"publish"|"archive"|"unarchive"|"set_due";expectedVersionSeq:number;dueAt:string|null;note:string;retentionDays?:number};
+export type FileLifecycle={fileId:string;state:"draft"|"released"|"archived";publishedSeq:number;publishedAt:string;publishedBy:string;responsibleId?:string;dueAt?:string;retentionUntil?:string;dueStatus:"none"|"soon"|"overdue"|"scheduled";note:string;updatedAt:string;canManage:boolean};
+export type LifecycleDraft={action:"publish"|"archive"|"unarchive"|"set_due"|"assign";expectedVersionSeq:number;dueAt:string|null;note:string;retentionDays?:number;responsibleId?:string};
 
 export type OfficeSessionData={
  sessionId:string;

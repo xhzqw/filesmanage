@@ -21,6 +21,8 @@ type Repository interface {
 	SearchPresetStore
 	FileLifecycleStore
 	LifecycleWorkspaceStore
+	LifecyclePolicyStore
+	LifecycleStatisticsStore
 
 	// Identity and sessions.
 	UserByLogin(context.Context, string) (domain.User, string, error)

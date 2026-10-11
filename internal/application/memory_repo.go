@@ -39,6 +39,8 @@ type memoryRepo struct {
 	fileText                   map[string]memoryFileText
 	fileMetadata               map[string]domain.FileMetadata
 	lifecycle                  map[string]domain.FileLifecycle
+	lifecycleFolderPolicies    map[string]domain.LifecyclePolicy
+	lifecycleDepartmentPolicies map[string]domain.LifecyclePolicy
 	lifecycleNotifications     []domain.LifecycleNotification
 	reviewComments             []domain.FileReviewComment
 	resumableUploads           map[string]domain.ResumableUpload

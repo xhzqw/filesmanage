@@ -18,6 +18,7 @@ type LifecycleDraft struct {
 	DueAt              *time.Time `json:"dueAt,omitempty"`
 	Note               string     `json:"note"`
 	RetentionDays      int        `json:"retentionDays,omitempty"`
+	ResponsibleID string `json:"responsibleId,omitempty"`
 }
 type LifecycleView struct {
 	domain.FileLifecycle
@@ -62,6 +63,7 @@ func (s *Service) FileLifecycle(ctx context.Context, u domain.User, id string) (
 }
 func (s *Service) SetFileLifecycle(ctx context.Context, u domain.User, id string, draft LifecycleDraft) (LifecycleView, error) {
 	draft.Note = strings.TrimSpace(draft.Note)
+	if draft.Action!="assign"&&draft.ResponsibleID!=""{return LifecycleView{},domain.ErrInvalidInput}
 	if draft.RetentionDays != 0 && draft.RetentionDays != 30 && draft.RetentionDays != 90 && draft.RetentionDays != 365 && draft.RetentionDays != 730 {
 		return LifecycleView{}, domain.ErrInvalidInput
 	}
@@ -71,7 +73,7 @@ func (s *Service) SetFileLifecycle(ctx context.Context, u domain.User, id string
 	if draft.ExpectedVersionSeq < 1 || !utf8.ValidString(draft.Note) || utf8.RuneCountInString(draft.Note) > lifecycleMaxNote {
 		return LifecycleView{}, domain.ErrInvalidInput
 	}
-	if draft.Action != "publish" && draft.Action != "archive" && draft.Action != "unarchive" && draft.Action != "set_due" {
+	if draft.Action != "publish" && draft.Action != "archive" && draft.Action != "unarchive" && draft.Action != "set_due" && draft.Action != "assign" {
 		return LifecycleView{}, domain.ErrInvalidInput
 	}
 	if draft.DueAt != nil {
@@ -111,6 +113,14 @@ func (s *Service) SetFileLifecycle(ctx context.Context, u domain.User, id string
 		return LifecycleView{}, err
 	}
 	before := value.State
+	if draft.Action=="assign"{
+  if value.State=="draft"||value.State=="archived"||draft.ResponsibleID==""{return LifecycleView{},domain.ErrConflict}
+  target,e:=tx.UserByID(ctx,draft.ResponsibleID)
+  if e!=nil{return LifecycleView{},notFoundOr(e)}
+  if target.DisabledAt!=nil{return LifecycleView{},domain.ErrInvalidInput}
+  if _,e=s.visibleFile(ctx,tx,target,id,domain.ActionList);e!=nil{return LifecycleView{},domain.ErrForbidden}
+  value.ResponsibleID=&target.ID
+ }
 	if draft.Action == "publish" {
 		if value.State == "archived" {
 			return LifecycleView{}, domain.ErrConflict
@@ -121,6 +131,11 @@ func (s *Service) SetFileLifecycle(ctx context.Context, u domain.User, id string
 		value.PublishedBy = u.ID
 		value.DueAt = draft.DueAt
 		value.Note = draft.Note
+		if value.DueAt==nil{
+    policy,e:=s.effectiveLifecyclePolicy(ctx,tx,file.FolderID,file.UploadedBy)
+    if e!=nil{return LifecycleView{},e}
+    if policy.DueDays>0{d:=s.now().UTC().AddDate(0,0,policy.DueDays);value.DueAt=&d}
+  }
 	} else {
 		if value.State == "draft" {
 			return LifecycleView{}, domain.ErrConflict
@@ -130,6 +145,9 @@ func (s *Service) SetFileLifecycle(ctx context.Context, u domain.User, id string
 		}
 		switch draft.Action {
 		case "archive":
+			policy,e:=s.effectiveLifecyclePolicy(ctx,tx,file.FolderID,file.UploadedBy)
+   if e!=nil{return LifecycleView{},e}
+   if policy.RetentionDays>draft.RetentionDays{draft.RetentionDays=policy.RetentionDays}
 			if draft.RetentionDays > 0 {
 				until := s.now().UTC().AddDate(0, 0, draft.RetentionDays)
 				if value.RetentionUntil == nil || value.RetentionUntil.Before(until) {
@@ -176,7 +194,7 @@ func (s *Service) SetFileLifecycle(ctx context.Context, u domain.User, id string
 		return LifecycleView{}, mapError(err)
 	}
 	if err = auditRequired(ctx, tx, u, "file.lifecycle."+draft.Action, "file", id, "success", map[string]any{
-		"before": before, "after": value.State, "versionSeq": value.PublishedSeq, "dueAt": value.DueAt, "retentionUntil": value.RetentionUntil,
+		"before": before, "after": value.State, "versionSeq": value.PublishedSeq, "dueAt": value.DueAt, "retentionUntil": value.RetentionUntil, "responsibleId":value.ResponsibleID,
 	}); err != nil {
 		return LifecycleView{}, err
 	}
