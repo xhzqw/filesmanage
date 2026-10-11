@@ -155,13 +155,22 @@ func (r *memoryRepo) SearchFiles(_ context.Context, q ports.FileSearchQuery) ([]
 		if q.FolderID != "" && f.FolderID != q.FolderID {
 			continue
 		}
-		if q.Category!="" || q.Tag!="" {
-			meta,ok:=r.fileMetadata[f.ID]
-			if !ok||(q.Category!=""&&meta.Category!=q.Category){continue}
-			if q.Tag!="" {
-				found:=false
-				for _,tag:=range meta.Tags{if tag==q.Tag{found=true;break}}
-				if !found{continue}
+		if q.Category != "" || q.Tag != "" {
+			meta, ok := r.fileMetadata[f.ID]
+			if !ok || (q.Category != "" && meta.Category != q.Category) {
+				continue
+			}
+			if q.Tag != "" {
+				found := false
+				for _, tag := range meta.Tags {
+					if tag == q.Tag {
+						found = true
+						break
+					}
+				}
+				if !found {
+					continue
+				}
 			}
 		}
 		nameHit := q.Query != "" && strings.Contains(lowerASCII(f.Name), lowerASCII(q.Query))
@@ -182,8 +191,10 @@ func (r *memoryRepo) SearchFiles(_ context.Context, q ports.FileSearchQuery) ([]
 	}
 	if q.Sort == "relevance" {
 		sort.Slice(matched, func(i, j int) bool {
-			a,b := matched[i],matched[j]
-			if a.SearchRank != b.SearchRank {return a.SearchRank < b.SearchRank}
+			a, b := matched[i], matched[j]
+			if a.SearchRank != b.SearchRank {
+				return a.SearchRank < b.SearchRank
+			}
 			return a.UpdatedAt.After(b.UpdatedAt) || (a.UpdatedAt.Equal(b.UpdatedAt) && a.ID > b.ID)
 		})
 	} else {
@@ -196,8 +207,12 @@ func (r *memoryRepo) SearchFiles(_ context.Context, q ports.FileSearchQuery) ([]
 }
 
 func searchFilenameRank(name, query string) int {
-	if query == "" || strings.EqualFold(name, query) {return 0}
-	if strings.Contains(strings.ToLower(name), strings.ToLower(query)) {return 1}
+	if query == "" || strings.EqualFold(name, query) {
+		return 0
+	}
+	if strings.Contains(strings.ToLower(name), strings.ToLower(query)) {
+		return 1
+	}
 	return 2
 }
 
@@ -209,7 +224,9 @@ func searchFileAfterCursor(f domain.File, q ports.FileSearchQuery) bool {
 	}
 	switch q.Sort {
 	case "relevance":
-		if f.SearchRank != q.CursorRank {return f.SearchRank > q.CursorRank}
+		if f.SearchRank != q.CursorRank {
+			return f.SearchRank > q.CursorRank
+		}
 		return f.UpdatedAt.Before(q.CursorTime) || (f.UpdatedAt.Equal(q.CursorTime) && f.ID < q.CursorID)
 	case "name_asc":
 		return f.Name > q.CursorName || (f.Name == q.CursorName && f.ID > q.CursorID)
