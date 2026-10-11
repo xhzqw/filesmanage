@@ -152,7 +152,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
        <div className="file-workbench-title">
         <h1 title={preview.name}>{preview.name}</h1>
         <div className="file-workbench-subtitle"><span>{fileExtension(preview.name)}</span><span>{formatSize(preview.size)}</span><span>当前版本 v{currentSeq}</span>
-         {lifecycle&&<RareBadge tone={archived?"warning":lifecycle.state==="released"?"success":"neutral"} dot>{archived?"已归档":lifecycle.state==="released"?"已发布":"草稿"}</RareBadge>}
+         {lifecycle&&<RareBadge tone={archived?"warning":lifecycle.state==="released"?(lifecycle.publishedSeq===currentSeq?"success":"warning"):"neutral"} dot>{archived?"已归档":lifecycle.state==="released"?(lifecycle.publishedSeq===currentSeq?"已发布":"待发布更新"):"草稿"}</RareBadge>}
          {lifecycle?.dueStatus==="soon"&&<RareBadge tone="warning">即将到期</RareBadge>}
          {lifecycle?.dueStatus==="overdue"&&<RareBadge tone="danger">已到期</RareBadge>}</div>
        </div>

@@ -70,6 +70,7 @@ func(s *Service) SetFileLifecycle(ctx context.Context,u domain.User,id string,dr
   value.Note=draft.Note
  }else{
   if value.State=="draft"{return LifecycleView{},domain.ErrConflict}
+  if draft.Action=="archive"&&value.PublishedSeq!=draft.ExpectedVersionSeq{return LifecycleView{},domain.ErrVersionConflict}
   switch draft.Action{
   case "archive":
    if value.State=="archived"{return LifecycleView{},domain.ErrConflict}
@@ -85,6 +86,7 @@ func(s *Service) SetFileLifecycle(ctx context.Context,u domain.User,id string,dr
  if draft.Action=="publish"||draft.Action=="archive" {
   if _,pending,e:=tx.PendingApprovalForFile(ctx,id);e!=nil{return LifecycleView{},e}else if pending{return LifecycleView{},domain.ErrApprovalPending}
   if lock,e:=tx.LockByFileID(ctx,id);e==nil&&lock.ExpiresAt.After(s.now()){return LifecycleView{},domain.ErrLocked}else if e!=nil&&!errors.Is(e,ports.ErrRowMissing){return LifecycleView{},e}
+  if _,active,e:=tx.ActiveOfficeSessionForFile(ctx,id);e!=nil{return LifecycleView{},e}else if active{return LifecycleView{},domain.ErrLocked}
  }
  if err=tx.UpsertFileLifecycle(ctx,value);err!=nil{return LifecycleView{},mapError(err)}
  if err=auditRequired(ctx,tx,u,"file.lifecycle."+draft.Action,"file",id,"success",map[string]any{

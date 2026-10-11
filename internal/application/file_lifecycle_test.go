@@ -37,6 +37,21 @@ func TestFileLifecyclePublishArchiveAndReadOnly(t *testing.T){
  if err!=nil||reopened.State!="released"{t.Fatalf("unarchive %+v %v",reopened,err)}
  if _,err=s.RenameFile(ctx,admin,upload.FileID,"renamed.txt");err!=nil{t.Fatal(err)}
 }
+func TestArchiveRequiresLatestVersionPublished(t *testing.T){
+ s,_:=testService(t);ctx:=context.Background()
+ admin:=domain.User{ID:"u_admin",IsAdmin:true}
+ upload,err:=s.CommitUpload(ctx,admin,"folder_root","revised.txt","text/plain","",strings.NewReader("one"))
+ if err!=nil{t.Fatal(err)}
+ if _,err=s.SetFileLifecycle(ctx,admin,upload.FileID,LifecycleDraft{Action:"publish",ExpectedVersionSeq:1});err!=nil{t.Fatal(err)}
+ token,_,err:=s.AcquireLock(ctx,admin,upload.FileID,1);if err!=nil{t.Fatal(err)}
+ if _,err=s.Save(ctx,admin,upload.FileID,[]byte("two"),1,token,"");err!=nil{t.Fatal(err)}
+ if _,err=s.SetFileLifecycle(ctx,admin,upload.FileID,LifecycleDraft{Action:"archive",ExpectedVersionSeq:2});!errors.Is(err,domain.ErrVersionConflict){
+  t.Fatalf("archived unpublished edit %v",err)
+ }
+ if _,err=s.SetFileLifecycle(ctx,admin,upload.FileID,LifecycleDraft{Action:"publish",ExpectedVersionSeq:2});err!=nil{t.Fatal(err)}
+ if _,err=s.SetFileLifecycle(ctx,admin,upload.FileID,LifecycleDraft{Action:"archive",ExpectedVersionSeq:2});err!=nil{t.Fatal(err)}
+}
+
 func TestLifecycleDueStatus(t *testing.T){
  now:=time.Date(2026,10,11,12,0,0,0,time.UTC)
  if lifecycleDueStatus(nil,now)!="none"{t.Fatal("nil due")}
