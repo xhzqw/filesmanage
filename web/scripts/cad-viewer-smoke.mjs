@@ -139,6 +139,9 @@ assert.deepEqual(index.find(.1,.12,.5)?.kind,"endpoint");
 assert.deepEqual(index.find(5,.1,.5)?.kind,"midpoint");
 assert.deepEqual(index.find(7,.1,.5)?.kind,"nearest");
 assert.equal(index.find(70,70,.5),null);
+assert.equal(index.pick(5,.12,.5)?.length,10,"line pick exposes full source-coordinate length");
+assert.equal(index.pick(150,10.12,.5)?.length,100);
+assert.equal(index.pick(70,70,.5),null,"clicking empty paper cannot fabricate a dimension");
 assert.equal(createDrawingSnapIndex([]).find(0,0,1),null);
 
 // Rational quadratic NURBS reproduces a quarter-circle (not the simple

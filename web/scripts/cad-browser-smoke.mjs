@@ -5,13 +5,16 @@ import assert from "node:assert/strict";
 import {build} from "esbuild";
 import {spawn} from "node:child_process";
 import {createServer} from "node:http";
-import {mkdtempSync} from "node:fs";
+import {mkdtempSync,existsSync,readFileSync} from "node:fs";
 import {rm} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import path from "node:path";
 import {setTimeout as delay} from "node:timers/promises";
 
 const root=path.resolve("web");
+// Optional downloaded mechanical DXF, stored outside git.
+const samplePath="/tmp/filesmanage_public_dxf_20261011/02-机械支点零件.dxf";
+const realDxf=existsSync(samplePath)?readFileSync(samplePath,"latin1"):"";
 const source=String.raw`
 import * as THREE from "three";
 import {OrbitControls} from "three/examples/jsm/controls/OrbitControls.js";
@@ -20,7 +23,8 @@ import {parseDxf} from "./src/features/modelViewer/dxf.ts";
 import {printableSheetHtml} from "./src/features/modelViewer/printSheet.ts";
 import {buildVectorSheet} from "./src/features/modelViewer/vectorSheet.ts";
 const holder=document.getElementById("stage");
-let controls=null,metrics=null,lastCamera=null;
+const realFixture=${JSON.stringify(realDxf).replace(/</g,"\\u003c")};
+let controls=null,metrics=null,lastCamera=null,selectedLine=null;
 let actualDrawing=null;
 const callback=(yaw,pitch)=>{lastCamera={yaw,pitch};};
 function mount(drawing=false,layout="Model"){
@@ -50,7 +54,7 @@ function mount(drawing=false,layout="Model"){
    "10","500","20","500","11","510","21","500",
    "0","ENDSEC","0","EOF",
   ].join("\n");
-  const source=layout==="INK"?[
+  const source=layout==="REAL"&&realFixture?realFixture:layout==="INK"?[
    "0","SECTION","2","ENTITIES",
    "0","LINE","8","WHITE","420","16777215","10","-50","20","0","11","50","21","0",
    "0","LINE","8","CYAN","420","65535","10","0","20","-30","11","0","21","30",
@@ -105,17 +109,21 @@ function mount(drawing=false,layout="Model"){
    "0","ENDSEC","0","EOF",
   ].join("\n"):dxf;
   actualDrawing=parseDxf(source,THREE,layout);
-  if(actualDrawing.skipped.length&&layout!=="FONTS"&&!(layout==="DIM"&&
+  if(actualDrawing.skipped.length&&layout!=="REAL"&&layout!=="FONTS"&&!(layout==="DIM"&&
    actualDrawing.skipped.every(message=>message.includes("DIMENSION:")&&message.includes("近似重建"))))
    throw Error(actualDrawing.skipped.join(","));
   object=actualDrawing.object;
  }
  controls=mountEngineeringScene(THREE,OrbitControls,holder,object,drawing,m=>{metrics=m;},
-  ()=>{throw Error("WebGL context unexpectedly lost");},()=>{},callback);
+  ()=>{throw Error("WebGL context unexpectedly lost");},()=>{},callback,
+  line=>{selectedLine=line;},actualDrawing?.unit??"");
 }
 mount();
 window.__cad={
  get state(){return {metrics,camera:lastCamera,canvases:holder.querySelectorAll("canvas").length,
+  drawingFilter:holder.querySelector("canvas")?.style.filter??"",
+  selectedLength:selectedLine?.length??null,
+  annotatedLabels:holder.querySelectorAll(".cad-coordinate-ruler rect[rx]").length,
   width:holder.querySelector("canvas")?.getBoundingClientRect().width??0,
   coordinateRulers:holder.querySelectorAll(".cad-coordinate-ruler").length,
   rulerTicks:holder.querySelectorAll(".cad-coordinate-ruler text").length,
@@ -125,6 +133,7 @@ window.__cad={
    g.children.find(n=>n.isLineSegments)?.material.color.getHex()])??[],
   drawingLayers:actualDrawing?.layers.length??0,
   drawingLayout:actualDrawing?.layout??null,layoutCount:actualDrawing?.layouts.length??0,
+  dxfWarnings:actualDrawing?.skipped.length??0,
   dimensionSprites:actualDrawing?.object.children.reduce((sum,g)=>sum+
    g.children.filter(n=>n.isSprite).length,0)??0,
   dimensionSegments:actualDrawing?.object.children.reduce((sum,g)=>sum+
@@ -140,10 +149,20 @@ window.__cad={
  view:name=>controls.setStandardView(name),
  projection:()=>controls.toggleProjection(),
  measure:()=>controls.toggleMeasure(),
+ theme:()=>controls.toggleDrawingTheme(),
+ lineLabels:()=>controls.toggleLengthLabels(),
+ pickCenter:()=>{
+  const canvas=holder.querySelector("canvas"),r=canvas.getBoundingClientRect();
+  const x=r.left+r.width/2,y=r.top+r.height/2;
+  for(const name of ["pointerdown","pointerup"])
+   canvas.dispatchEvent(new PointerEvent(name,{bubbles:true,clientX:x,clientY:y,button:0}));
+  return selectedLine?.length??null;
+ },
  focus:()=>{const mesh=holder.querySelector("canvas");return Boolean(mesh)&&Boolean(controls.resetView());},
  grid:()=>controls.toggleGrid(),
  drawing:()=>mount(true),
  ink:()=>mount(true,"INK"),
+ real:()=>mount(true,"REAL"),
  sheet:()=>mount(true,"A1"),
  projected:()=>mount(true,"P1"),
  frozen:()=>mount(true,"P2"),
@@ -258,15 +277,37 @@ try{
  assert.equal(await cdp.eval("window.__cad.measure()"),true);
  assert.equal(await cdp.eval("window.__cad.measure()"),false);
  await cdp.send("Emulation.setDeviceMetricsOverride",{width:820,height:600,deviceScaleFactor:1,mobile:false});
- await delay(650);
- const width=await cdp.eval("window.__cad.state.width");
- assert(width>=800&&width<=830,"viewport must resize with container");
+ let width=0;
+ for(let attempt=0;attempt<18;attempt++){
+  await delay(150);
+  width=await cdp.eval("window.__cad.state.width");
+  if(width>=800&&width<=830)break;
+ }
+ assert(width>=800&&width<=830,
+  "viewport must resize with container (observed "+String(width)+"px)");
  const drawing=await cdp.eval("(()=>{window.__cad.drawing();return window.__cad.state})()");
  assert.equal(drawing.canvases,1,"scene replacement must not leak a canvas");
+ assert.match(drawing.drawingFilter,/invert/,"2D must default to an accessible dark CAD review workspace");
  assert(drawing.metrics.triangles>0,"solid HATCH produces real mesh triangles");
  assert.equal(drawing.drawingLayers,4,"DIMENSION, NURBS, solid and patterned HATCH must render");
  assert(drawing.metrics.size[0]>=100,"dimension and spline linework must retain actual drawing scale");
  assert.equal(await cdp.eval("window.__cad.png()"),true,"drawing can export a PNG preview");
+ await cdp.eval("window.__cad.ink()");
+ await delay(130);
+ const bounds=await cdp.eval("(()=>{const r=document.querySelector('#stage canvas').getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2}})()");
+ await cdp.send("Input.dispatchMouseEvent",{type:"mousePressed",x:bounds.x,y:bounds.y,button:"left",clickCount:1});
+ await cdp.send("Input.dispatchMouseEvent",{type:"mouseReleased",x:bounds.x,y:bounds.y,button:"left",clickCount:1});
+ await delay(160);
+ const inspected=await cdp.eval("window.__cad.state.selectedLength");
+ assert(Math.abs(inspected-100)<.01,
+  "clicking real CAD line reveals its 100-unit source length (actual "+String(inspected)+")");
+ await delay(120);
+ assert((await cdp.eval("window.__cad.state.annotatedLabels"))>0,"length is shown over selected line");
+ assert.equal(await cdp.eval("window.__cad.theme()"),false,"paper theme toggle should disable dark mode");
+ assert.equal(await cdp.eval("window.__cad.state.drawingFilter"),"none");
+ assert.equal(await cdp.eval("window.__cad.theme()"),true);
+ assert.equal(await cdp.eval("window.__cad.lineLabels()"),false);
+ assert.equal(await cdp.eval("window.__cad.lineLabels()"),true);
  await cdp.eval("window.__cad.ink()");
  await delay(120);
  const ink=await cdp.eval("window.__cad.state");
@@ -281,11 +322,11 @@ try{
  await cdp.eval("window.__cad.grid()");
  await delay(100);
  const noGrid=await cdp.eval("window.__cad.state");
- assert.equal(noGrid.rulerGridLines,1,"grid toggle hides grid while retaining the ruler boundary");
+ assert(noGrid.rulerGridLines>=3,"grid toggle shows a restrained engineering grid when requested");
  await cdp.eval("window.__cad.grid()");
  await delay(100);
  const withGrid=await cdp.eval("window.__cad.state");
- assert(withGrid.rulerGridLines>=3,"subtle grid can be toggled on with both major and minor lines");
+ assert.equal(withGrid.rulerGridLines,1,"default clean drawing hides the grid without losing rulers");
  const sheet=await cdp.eval("(()=>{window.__cad.sheet();return window.__cad.state})()");
  assert.equal(sheet.canvases,1,"layout switching must dispose the old canvas");
  assert.equal(sheet.drawingLayout,"A1");
@@ -319,7 +360,16 @@ try{
   "Chrome must render dimension line, extension lines and arrow outlines");
  assert.equal(await cdp.eval("window.__cad.png()"),true,
   "fallback dimension linework must remain renderable in actual WebGL");
- const fonts=await cdp.eval("window.__cad.fonts()");
+const fonts=await cdp.eval("window.__cad.fonts()");
+ if(realDxf){
+  const real=await cdp.eval("(()=>{window.__cad.real();return window.__cad.state})()");
+  assert(real.metrics.size[0]>1&&real.metrics.size[0]<100000,
+   "authentic mechanical DXF should have bounded XY extents");
+  assert(real.dimensionSegments>50,"authentic mechanical DXF should render substantial linework");
+  assert.match(real.drawingFilter,/invert/,"actual drawing must use dark CAD review canvas");
+  assert.equal(real.coordinateRulers,1);
+  assert.equal(await cdp.eval("window.__cad.png()"),true);
+ }
  assert.equal(fonts.length,2);
  assert.match(fonts[0].family,/Comic Sans MS/);
  assert.match(fonts[1].family,/Arial/);
@@ -327,9 +377,14 @@ try{
  assert.notEqual(fonts[0].pixels,fonts[1].pixels,
   "actual Chromium must rasterize a visibly different glyph set for Comic Sans vs Arial");
  await cdp.send("Emulation.setDeviceMetricsOverride",{width:500,height:700,deviceScaleFactor:1,mobile:false});
- await delay(400);
- const narrow=await cdp.eval("window.__cad.state.width");
- assert(narrow>=490&&narrow<=505,"projected paper layout remains responsive in narrow viewport");
+ let narrow=0;
+ for(let attempt=0;attempt<18;attempt++){
+  await delay(150);
+  narrow=await cdp.eval("window.__cad.state.width");
+  if(narrow>=490&&narrow<=505)break;
+ }
+ assert(narrow>=490&&narrow<=505,
+  "projected paper layout remains responsive in narrow viewport (observed "+String(narrow)+"px)");
  const narrowRuler=await cdp.eval("window.__cad.state");
  assert.equal(narrowRuler.coordinateRulers,1);
  assert(narrowRuler.rulerTicks>1,"narrow 500px viewport must keep coordinate ticks");

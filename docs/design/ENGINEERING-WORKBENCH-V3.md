@@ -220,6 +220,23 @@ This document records validated capability instead of marking unimplemented work
   Actual Chromium verifies ruler creation, tick legibility, grid toggling,
   layout cleanup and narrow 500px viewports.
 
+## V3.9 high-contrast mechanical drawing review
+
+- 2D DXF defaults to a dark CAD workspace to prevent white-page glare. The
+  viewer has a single-click dark / white-paper switch. Display-only inversion
+  keeps the underlying DXF materials untouched for PNG/vector plotting.
+- LineSegments2 draws approximately 2px presentation strokes where its bounded
+  overlay budget allows, instead of relying on WebGL's often hard-clamped
+  1px LineBasicMaterial. Source lines stay unchanged for snapping, editing,
+  printing and layer visibility; GPU overlays are disposed at unmount.
+- Clicking a segment gives its numeric drawing-coordinate chord length and
+  endpoints, with a visible selection marker in the XY ruler overlay.
+  A limited, optional set of representative straight-segment length labels
+  is provided; this does **not** invent dimensions or treat an arc chord
+  as a full arc's length. Unspecified source units stay explicitly unknown.
+- Original two-point snapping and geometry-based measurement remain intact.
+  Both layout remount and content width changes are browser-tested.
+
 ## Deliberately unsupported or approximate
 
 | Capability | Current truth | Next gate |

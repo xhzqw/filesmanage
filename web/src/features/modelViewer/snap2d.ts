@@ -3,14 +3,16 @@
  * mouse move for typical plans. This index is viewport-independent. */
 export type DrawingSegment={x1:number;y1:number;x2:number;y2:number};
 export type DrawingSnap={x:number;y:number;kind:"endpoint"|"midpoint"|"nearest";distance:number};
+export type DrawingPickedSegment=DrawingSegment&{length:number;distance:number};
 export type DrawingSnapIndex={
  find:(x:number,y:number,tolerance:number)=>DrawingSnap|null;
+ pick:(x:number,y:number,tolerance:number)=>DrawingPickedSegment|null;
  segmentCount:number;
 };
 
 export function createDrawingSnapIndex(segments:readonly DrawingSegment[]):DrawingSnapIndex{
  const valid=segments.filter(s=>[s.x1,s.y1,s.x2,s.y2].every(Number.isFinite));
- if(!valid.length)return{find:()=>null,segmentCount:0};
+ if(!valid.length)return{find:()=>null,pick:()=>null,segmentCount:0};
  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
  for(const s of valid){
   minX=Math.min(minX,s.x1,s.x2);maxX=Math.max(maxX,s.x1,s.x2);
@@ -32,16 +34,33 @@ export function createDrawingSnapIndex(segments:readonly DrawingSegment[]):Drawi
    if(bucket)bucket.push(i);else buckets.set(id,[i]);
   }
  }
+ const candidatesNear=(x:number,y:number,tolerance:number)=>{
+  const col=cellAt(x,minX),row=cellAt(y,minY);
+  const range=Math.min(30,Math.ceil(tolerance/cell)+1);
+  const candidates=new Set(longSegments);
+  for(let dx=-range;dx<=range;dx++)for(let dy=-range;dy<=range;dy++)
+   for(const i of buckets.get(key(col+dx,row+dy))??[])candidates.add(i);
+  return candidates;
+ };
  return{
   segmentCount:valid.length,
+  pick:(x,y,tolerance)=>{
+   if(![x,y,tolerance].every(Number.isFinite)||tolerance<=0)return null;
+   let nearest:DrawingPickedSegment|null=null;
+   for(const i of candidatesNear(x,y,tolerance)){
+    const s=valid[i]!,vx=s.x2-s.x1,vy=s.y2-s.y1;
+    const length=Math.hypot(vx,vy);
+    if(length<1e-9)continue;
+    const ratio=Math.max(0,Math.min(1,((x-s.x1)*vx+(y-s.y1)*vy)/(length*length)));
+    const distance=Math.hypot(x-s.x1-ratio*vx,y-s.y1-ratio*vy);
+    if(distance<=tolerance&&(!nearest||distance<nearest.distance))
+     nearest={...s,length,distance};
+   }
+   return nearest;
+  },
   find:(x,y,tolerance)=>{
    if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(tolerance)||tolerance<=0)return null;
-   const col=cellAt(x,minX),row=cellAt(y,minY);
-   const range=Math.min(30,Math.ceil(tolerance/cell)+1);
-   const candidates=new Set(longSegments);
-   for(let dx=-range;dx<=range;dx++)for(let dy=-range;dy<=range;dy++){
-    for(const i of buckets.get(key(col+dx,row+dy))??[])candidates.add(i);
-   }
+   const candidates=candidatesNear(x,y,tolerance);
    let best:DrawingSnap|null=null;
    let bestScore=tolerance;
    const consider=(px:number,py:number,kind:DrawingSnap["kind"])=>{

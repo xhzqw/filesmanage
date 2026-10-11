@@ -3,6 +3,7 @@
  */
 export type DrawingBounds={left:number;right:number;top:number;bottom:number};
 export type DrawingCoordinate={x:number;y:number};
+export type DrawingAnnotatedSegment={x1:number;y1:number;x2:number;y2:number;length:number};
 const niceStep=(target:number)=>{
  const unit=10**Math.floor(Math.log10(Math.max(target,1e-12)));
  const factor=target/unit;
@@ -15,7 +16,8 @@ export function mountDrawingRuler(holder:HTMLElement){
  svg.setAttribute("aria-hidden","true");
  holder.appendChild(svg);
  let previous="";
- const update=(bounds:DrawingBounds,grid:boolean,hover:DrawingCoordinate|null)=>{
+ const update=(bounds:DrawingBounds,grid:boolean,hover:DrawingCoordinate|null,
+  selected:DrawingAnnotatedSegment|null=null,labels:readonly DrawingAnnotatedSegment[]=[],unitName="")=>{
   const w=holder.clientWidth,h=holder.clientHeight;
   if(w<100||h<60||bounds.right<=bounds.left||bounds.top<=bounds.bottom||
     !Object.values(bounds).every(Number.isFinite))return;
@@ -23,7 +25,8 @@ export function mountDrawingRuler(holder:HTMLElement){
   const left=Math.ceil(bounds.left/step),right=Math.floor(bounds.right/step);
   const low=Math.ceil(bounds.bottom/step),high=Math.floor(bounds.top/step);
   const key=[w,h,bounds.left.toPrecision(9),bounds.top.toPrecision(9),unit.toPrecision(9),
-   grid,hover?label(hover.x):"",hover?label(hover.y):""].join(":");
+   grid,hover?label(hover.x):"",hover?label(hover.y):"",selected?.x1,selected?.y1,
+   selected?.x2,selected?.y2,labels.length,labels[0]?.length,unitName].join(":");
   if(previous===key)return;
   previous=key;
   svg.setAttribute("viewBox","0 0 "+w+" "+h);
@@ -47,6 +50,18 @@ export function mountDrawingRuler(holder:HTMLElement){
    (y0>=0&&y0<=h-25?"M48 "+y0+"H"+w:"");
   const pointer=hover??{x:(bounds.left+bounds.right)/2,y:(bounds.top+bounds.bottom)/2};
   const text="X "+label(pointer.x)+"  Y "+label(pointer.y);
+  const drawAnnotation=(segment:DrawingAnnotatedSegment,highlight:boolean)=>{
+   const x1=x(segment.x1),x2=x(segment.x2),y1=y(segment.y1),y2=y(segment.y2);
+   if(Math.max(x1,x2)<48||Math.min(x1,x2)>w||Math.max(y1,y2)<0||Math.min(y1,y2)>h-25)return "";
+   const cx=Math.min(w-85,Math.max(86,(x1+x2)/2)),cy=Math.min(h-45,Math.max(45,(y1+y2)/2));
+   const text=label(segment.length)+(unitName?" "+unitName:"");
+   return (highlight?'<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+
+    '" stroke="#f6ba52" stroke-width="3" stroke-linecap="round"/>':"")+
+    '<rect x="'+(cx-58)+'" y="'+(cy-23)+'" width="116" height="21" rx="5" fill="'+
+    (highlight?"#edaa3b":"#24394c")+'" fill-opacity=".96"/>'+
+    '<text x="'+cx+'" y="'+(cy-8)+'" text-anchor="middle" fill="'+
+    (highlight?"#1b2633":"#ebf3f8")+'" font-size="11" font-weight="700" font-family="ui-monospace,monospace">'+text+'</text>';
+  };
   svg.innerHTML=
    (grid?'<path d="'+light.join(" ")+'" fill="none" stroke="#ecf0f3" stroke-width=".7"/>'+
     '<path d="'+strong.join(" ")+'" fill="none" stroke="#d5dfe7" stroke-width=".9"/>'+
@@ -56,6 +71,8 @@ export function mountDrawingRuler(holder:HTMLElement){
    '<path d="M48 0V'+(h-25)+'H'+w+'" fill="none" stroke="#bccbd7" stroke-width="1"/>'+
    '<g fill="#445a6f" font-size="10" font-weight="500" font-family="system-ui,sans-serif">'+
    ticks.join("")+'<text x="10" y="'+(h-8)+'" font-weight="700">XY</text></g>'+
+   labels.map(s=>drawAnnotation(s,false)).join("")+
+   (selected?drawAnnotation(selected,true):"")+
    '<rect x="'+Math.max(52,w-250)+'" y="'+(h-25)+'" width="'+Math.min(250,w-52)+'" height="25" fill="#e9f1f7"/>'+
    '<text x="'+(w-10)+'" y="'+(h-8)+'" fill="#22384c" font-size="11" font-weight="600" text-anchor="end" font-family="monospace">'+text+'</text>';
  };

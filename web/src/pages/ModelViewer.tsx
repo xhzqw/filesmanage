@@ -7,6 +7,7 @@ import {reportSessionResponse} from "../shared/http";
 import type {User} from "../entities/user/model";
 import {AppShell} from "../shared/ui/AppShell";
 import {parseDxf} from "../features/modelViewer/dxf";
+import type {DrawingPickedSegment} from "../features/modelViewer/snap2d";
 import {printCurrentSheet,type SheetSize} from "../features/modelViewer/printSheet";
 import {openVectorPrint,type PlotScale} from "../features/modelViewer/vectorSheet";
 import type {MshGeometry} from "../features/modelViewer/mshParser";
@@ -46,6 +47,9 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
  // viewer must never silently assume millimetres (MOD04).
  const[unit,setUnit]=useState("unknown");
  const[measure,setMeasure]=useState<number|null>(null);
+ const[selectedLine,setSelectedLine]=useState<DrawingPickedSegment|null>(null);
+ const[darkDrawing,setDarkDrawing]=useState(true);
+ const[showLengths,setShowLengths]=useState(true);
  const[skipped,setSkipped]=useState<string[]>([]);
  const[layers,setLayers]=useState<{name:string;visible:boolean}[]>([]);
  const[layouts,setLayouts]=useState<string[]>([]);
@@ -87,7 +91,8 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
   setPlotScale(1);setPlotError("");
   setParts([]);setSelectedPart(-1);
   setUnit("unknown");setMeasure(null);setSkipped([]);
-  setView({axes:false,grid:true,edges:true,measure:false,projection:"perspective"});
+  setSelectedLine(null);setDarkDrawing(true);setShowLengths(true);
+  setView({axes:false,grid:false,edges:true,measure:false,projection:"perspective"});
   setCube({yaw:45,pitch:26});
   const run=async()=>{
    try{
@@ -168,6 +173,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
     const format=(info?.outputKind??info?.format??"stl").toLowerCase();
      setUnit(declaredUnit(buffer,format));
     let object:import("three").Object3D;
+    let drawingUnit="";
     if(format==="dxf"){
      const source=new TextDecoder().decode(buffer);
      const parsed=parseDxf(source,THREE);
@@ -176,6 +182,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
      setLayers(parsed.layers);
      setSkipped(parsed.skipped);
      setUnit(parsed.unit);
+     drawingUnit=parsed.unit;
      setLayouts(parsed.layouts);
      setActiveLayout(parsed.layout);
      setPaperViewports(parsed.viewports);
@@ -194,12 +201,13 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
          setStatus("webgl-lost");
          setMessage("WebGL 上下文已丢失");
         }
-       },setMeasure);
+       },setMeasure,()=>{},setSelectedLine,next.unit);
       controls.current=mounted;
       setLayers(next.layers);setSkipped(next.skipped);
       setPaperViewports(next.viewports);
       setActiveLayout(next.layout);setMeasure(null);
       setPlotError("");
+      setSelectedLine(null);setDarkDrawing(true);setShowLengths(true);
       setView({axes:false,grid:false,edges:false,measure:false,projection:"orthographic"});
      };
     }else if(format==="msh"){
@@ -225,9 +233,9 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
        setStatus("webgl-lost");
        setMessage("浏览器 WebGL 上下文已丢失（通常是 GPU 资源被系统回收）");
       }
-     },setMeasure,(yaw,pitch)=>setCube({yaw,pitch}));
+     },setMeasure,(yaw,pitch)=>setCube({yaw,pitch}),setSelectedLine,drawingUnit);
      controls.current=mountedControls;
-     setView({axes:false,grid:true,edges:format!=="dxf",measure:false,
+     setView({axes:false,grid:format!=="dxf",edges:format!=="dxf",measure:false,
       projection:format==="dxf"?"orthographic":"perspective"});
      pendingObject=null;
      setStatus("ready");
@@ -273,6 +281,14 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
         controls.current?.resetView();
         setView(v=>({...v,axes:false,measure:false,projection:drawing?"orthographic":"perspective"}));
        }}>适合窗口</RareButton>
+       {drawing&&<div className="cad-toolgroup" role="group" aria-label="二维审图显示">
+        <RareButton type="button" className={darkDrawing?"on":""} aria-pressed={darkDrawing}
+         onClick={()=>setDarkDrawing(controls.current?.toggleDrawingTheme()??darkDrawing)}>
+         {darkDrawing?"深色审图":"白纸模式"}</RareButton>
+        <RareButton type="button" className={showLengths?"on":""} aria-pressed={showLengths}
+         onClick={()=>setShowLengths(controls.current?.toggleLengthLabels()??showLengths)}>
+         线长标签</RareButton>
+       </div>}
        {!drawing&&<div className="cad-toolgroup" role="group" aria-label="标准视角">
         {(["iso","front","back","left","right","top","bottom"] as const).map((name,index)=>
          <RareButton key={name} type="button" onClick={()=>{
@@ -325,11 +341,23 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
        </div>
       </div>}
       {status==="ready"&&<div className="cad-hint">
-       {view.measure?(drawing?"靠近端点/中点/线段点击测量 · 可拖动画布 · 滚轮缩放":"点击模型两点测量网格近似距离 · 左键平移 / 右键旋转"):
-        drawing?"左键平移 · 滚轮缩放":"左键旋转 · 右键平移 · 滚轮缩放"}
+       {view.measure?(drawing?"连续点击两个点测距 · 左键拖动画布 · 滚轮缩放":"点击模型两点测量网格近似距离 · 左键平移 / 右键旋转"):
+        drawing?"点击线段查看长度 · 左键拖动平移 · 滚轮缩放":"左键旋转 · 右键平移 · 滚轮缩放"}
       </div>}
      </section>
      {status==="ready"&&<aside className="cad-inspector" aria-label="工程文件属性">
+      {drawing&&<section className="cad-inspector-section cad-dimension-panel">
+       <h3>几何审图 <span>XY</span></h3>
+       <div className="cad-dimension-value">
+        {selectedLine?selectedLine.length.toLocaleString("zh-CN",{maximumFractionDigits:4})+" "+(unit==="unknown"?"绘图单位":unit):"点击线段查看长度"}
+       </div>
+       {selectedLine&&<span className="cad-precision-note">
+        起点 ({selectedLine.x1.toPrecision(5)}, {selectedLine.y1.toPrecision(5)}) ·
+        终点 ({selectedLine.x2.toPrecision(5)}, {selectedLine.y2.toPrecision(5)})
+       </span>}
+       <span className="cad-precision-note">长度基于原始 XY 坐标；圆弧离散后的小线段不是完整弧长。未知单位不假定毫米。</span>
+       {selectedLine&&<RareButton type="button" onClick={()=>{setSelectedLine(null);controls.current?.clearLineSelection();}}>清除线段选择</RareButton>}
+      </section>}
       {drawing&&activeLayout!=="Model"&&<section className="cad-inspector-section cad-print">
        <h3>图纸比例出图</h3>
        <label className="cad-print-scale">

@@ -1,6 +1,9 @@
 import type * as Three from "three";
-import {createDrawingSnapIndex,type DrawingSegment} from "./snap2d";
-import {mountDrawingRuler,type DrawingCoordinate} from "./drawingRuler";
+import {createDrawingSnapIndex,type DrawingSegment,type DrawingPickedSegment} from "./snap2d";
+import {mountDrawingRuler,type DrawingCoordinate,type DrawingAnnotatedSegment} from "./drawingRuler";
+import {LineSegments2} from "three/examples/jsm/lines/LineSegments2.js";
+import {LineSegmentsGeometry} from "three/examples/jsm/lines/LineSegmentsGeometry.js";
+import {LineMaterial} from "three/examples/jsm/lines/LineMaterial.js";
 
 export type StandardView="iso"|"front"|"back"|"left"|"right"|"top"|"bottom";
 export type ViewerMetrics={triangles:number;vertices:number;size:[number,number,number];components:number};
@@ -11,6 +14,8 @@ export type ViewerControls={
  toggleAxes:()=>boolean;toggleGrid:()=>boolean;toggleEdges:()=>boolean;
  toggleProjection:()=>"perspective"|"orthographic";
  toggleMeasure:()=>boolean;clearMeasurement:()=>void;
+ clearLineSelection:()=>void;
+ toggleDrawingTheme:()=>boolean;toggleLengthLabels:()=>boolean;
  exportPng:()=>string|null;
 };
 
@@ -21,6 +26,8 @@ export function mountEngineeringScene(
  holder:HTMLDivElement,object:Three.Object3D,drawing:boolean,
  setMetrics:(m:ViewerMetrics)=>void,onContextLost:()=>void,onMeasure:(m:number|null)=>void,
  onCameraDirection:(yaw:number,pitch:number)=>void=()=>{},
+ onInspect:(segment:DrawingPickedSegment|null)=>void=()=>{},
+ drawingUnit="",
 ):ViewerControls{
  const scene=new THREE.Scene();
  scene.background=new THREE.Color(drawing?0xffffff:0xf0f5fa);
@@ -50,6 +57,27 @@ export function mountEngineeringScene(
   });
  }
  const drawingSnap=drawing&&drawingSegments.length<=350000?createDrawingSnapIndex(drawingSegments):null;
+ // The preview geometry is centered in the scene. Convert it back to source
+ // drawing coordinates before presenting a dimension to the user.
+ const sourceSegment=(segment:DrawingPickedSegment):DrawingPickedSegment=>({
+  ...segment,x1:segment.x1+center.x,y1:segment.y1+center.y,
+  x2:segment.x2+center.x,y2:segment.y2+center.y,
+ });
+ const lengthChoices:DrawingAnnotatedSegment[]=[];
+ if(drawing&&drawingSegments.length<=2500){
+  // 12 longest *independent* straight segments at most, never 100s of
+  // sampled circle chords masquerading as engineered dimensions.
+  for(const segment of drawingSegments){
+   const length=Math.hypot(segment.x2-segment.x1,segment.y2-segment.y1);
+   if(length<diameter*.12||lengthChoices.some(item=>
+    Math.hypot((segment.x1+segment.x2)/2+center.x-(item.x1+item.x2)/2,
+     (segment.y1+segment.y2)/2+center.y-(item.y1+item.y2)/2)<diameter*.045))continue;
+   lengthChoices.push({x1:segment.x1+center.x,y1:segment.y1+center.y,
+    x2:segment.x2+center.x,y2:segment.y2+center.y,length});
+   lengthChoices.sort((a,b)=>b.length-a.length);
+   if(lengthChoices.length>12)lengthChoices.pop();
+  }
+ }
  if(!drawing){
   scene.add(new THREE.HemisphereLight(0xe9f4ff,0x90a6bb,2));
   const lights:[number,number,number,number,number][]=[
@@ -96,6 +124,49 @@ export function mountEngineeringScene(
  holder.appendChild(renderer.domElement);
  const drawingRuler=drawing?mountDrawingRuler(holder):null;
  let pointerCoordinate:DrawingCoordinate|null=null;
+ let darkDrawing=drawing,showLineLabels=true,selectedSegment:DrawingPickedSegment|null=null;
+ const applyDrawingTheme=()=>{
+  if(!drawing)return;
+  // Display-only filter: keep original DXF materials and scale-aware plotting
+  // untouched. All CanvasText glyphs and fills invert together with lines.
+  const filter=darkDrawing?"invert(.91) hue-rotate(180deg) contrast(1.14)":"none";
+  renderer.domElement.style.filter=filter;
+  const ruler=holder.querySelector<SVGSVGElement>(".cad-coordinate-ruler");
+  if(ruler)ruler.style.filter=darkDrawing?"invert(.91) hue-rotate(180deg)":"none";
+  holder.style.background=darkDrawing?"#19232d":"#e8edf3";
+ };
+ applyDrawingTheme();
+ // WebGL LineBasicMaterial ignores requested linewidth on most drivers.
+ // Draw a GPU-accelerated 2px presentation overlay, leaving original
+ // LineSegments and layer-scoped geometries intact for DXF export/snap.
+ const lineOverlays:{source:Three.LineSegments;overlay:LineSegments2;geometry:LineSegmentsGeometry;material:LineMaterial}[]=[];
+ if(drawing){
+  let overlayBudget=0;
+  object.updateMatrixWorld(true);
+  object.traverse(node=>{
+   const source=node as Three.LineSegments;
+   if(!source.isLineSegments||!source.geometry)return;
+   const attr=source.geometry.getAttribute("position");
+   if(!attr||attr.count<2||attr.count%2!==0||overlayBudget+attr.count/2>120000)return;
+   const vertices:number[]=[];
+   const world=new THREE.Vector3();
+   for(let i=0;i<attr.count;i++){
+    world.fromBufferAttribute(attr,i).applyMatrix4(source.matrixWorld);
+    vertices.push(world.x,world.y,world.z+.00002);
+   }
+   const geometry=new LineSegmentsGeometry();
+   geometry.setPositions(vertices);
+   const base=source.material as Three.LineBasicMaterial;
+   const material=new LineMaterial({color:base.color.getHex(),linewidth:2.1,
+    depthTest:false,depthWrite:false,transparent:true,opacity:1});
+   material.resolution.set(Math.max(holder.clientWidth,1),Math.max(holder.clientHeight,1));
+   const overlay=new LineSegments2(geometry,material);
+   overlay.frustumCulled=false;overlay.renderOrder=9;
+   scene.add(overlay);
+   lineOverlays.push({source,overlay,geometry,material});
+   overlayBudget+=attr.count/2;
+  });
+ }
  const axes=new THREE.AxesHelper(radius*1.1);
  axes.position.set(-size.x/2,-size.y/2,-size.z/2);axes.visible=false;
  if(!drawing)scene.add(axes);
@@ -103,7 +174,7 @@ export function mountEngineeringScene(
  if(drawing){grid.rotation.x=Math.PI/2;grid.position.z=-Math.max(radius*.002,.000001);}
  else grid.position.y=-size.y/2-Math.max(radius*.035,.000001);
  scene.add(grid);
- let gridVisible=true,outlineVisible=true,stepLast=0;
+ let gridVisible=!drawing,outlineVisible=true,stepLast=0;
  // 2D grid is drawn by the coordinate SVG ruler in the actual XY plane,
  // rather than placing a 3D GridHelper over engineering linework.
  grid.visible=!drawing;
@@ -241,6 +312,7 @@ export function mountEngineeringScene(
   new THREE.MeshBasicMaterial({color:0x087ca4,depthTest:false,depthWrite:false,side:THREE.DoubleSide}));
  snapMarker.visible=false;snapMarker.renderOrder=21;scene.add(snapMarker);
  let measuring=false,first:Three.Vector3|null=null,press:{x:number;y:number}|null=null;
+ let inspectPress:{x:number;y:number}|null=null;
  const positionOnDrawing=(event:PointerEvent)=>{
   const rect=renderer.domElement.getBoundingClientRect();
   cursor.set((event.clientX-rect.left)/Math.max(rect.width,1)*2-1,-(event.clientY-rect.top)/Math.max(rect.height,1)*2+1);
@@ -267,7 +339,10 @@ export function mountEngineeringScene(
   }
   first=null;onMeasure(null);invalidate();
  };
- const onDown=(event:PointerEvent)=>{if(measuring&&event.button===0)press={x:event.clientX,y:event.clientY};};
+ const onDown=(event:PointerEvent)=>{
+  if(measuring&&event.button===0)press={x:event.clientX,y:event.clientY};
+  else if(drawing&&event.button===0)inspectPress={x:event.clientX,y:event.clientY};
+ };
  const onMove=(event:PointerEvent)=>{
   if(drawing){
    const rect=renderer.domElement.getBoundingClientRect();
@@ -289,6 +364,17 @@ export function mountEngineeringScene(
   invalidate();
  };
  const onUp=(event:PointerEvent)=>{
+  if(drawing&&!measuring&&inspectPress&&event.button===0){
+   const down=inspectPress;inspectPress=null;
+   if(Math.hypot(event.clientX-down.x,event.clientY-down.y)<=5){
+    const at=positionOnDrawing(event);
+    const picked=at&&drawingSnap?.pick(at.position.x,at.position.y,at.unitPerPixel*9);
+    selectedSegment=picked?sourceSegment(picked):null;
+    onInspect(selectedSegment);
+    invalidate();
+   }
+   return;
+  }
   if(!measuring||!press||event.button!==0)return;
   const start=press;press=null;
   if(Math.hypot(event.clientX-start.x,event.clientY-start.y)>4)return;
@@ -329,8 +415,11 @@ export function mountEngineeringScene(
    const h=halfHeight()/ortho.zoom,w=h*aspect(),target=controls.target;
    drawingRuler.update({left:target.x-w+center.x,right:target.x+w+center.x,
     top:target.y+h+center.y,bottom:target.y-h+center.y},
-   gridVisible,pointerCoordinate);
+   gridVisible,pointerCoordinate,selectedSegment,
+   showLineLabels?lengthChoices:[],drawingUnit==="unknown"?"绘图单位":drawingUnit);
   }
+  for(const item of lineOverlays)
+   item.overlay.visible=item.source.visible&&item.source.parent?.visible!==false;
   if(dirty||moving)renderer.render(scene,camera);
   dirty=false;
   if(moving)invalidate();
@@ -342,6 +431,7 @@ export function mountEngineeringScene(
   ortho.left=-h*aspect();ortho.right=h*aspect();ortho.top=h;ortho.bottom=-h;
   ortho.updateProjectionMatrix();
   renderer.setSize(Math.max(holder.clientWidth,1),Math.max(holder.clientHeight,1));
+  for(const item of lineOverlays)item.material.resolution.set(Math.max(holder.clientWidth,1),Math.max(holder.clientHeight,1));
   stepLast=0;invalidate();
  };
  const observer=new ResizeObserver(resize);observer.observe(holder);
@@ -365,12 +455,19 @@ export function mountEngineeringScene(
   setStandardView:(name)=>{if(drawing)return;if(name!=="iso")switchCamera(ortho);setPose(name);},
   toggleAxes:()=>{axes.visible=!axes.visible;invalidate();return axes.visible;},
   toggleGrid:()=>{gridVisible=!gridVisible;grid.visible=!drawing&&gridVisible;if(gridVisible)updateGrid();invalidate();return gridVisible;},
+  toggleDrawingTheme:()=>{darkDrawing=!darkDrawing;applyDrawingTheme();invalidate();return darkDrawing;},
+  toggleLengthLabels:()=>{showLineLabels=!showLineLabels;invalidate();return showLineLabels;},
+  clearLineSelection:()=>{selectedSegment=null;onInspect(null);invalidate();},
   toggleEdges:()=>{outlineVisible=!outlineVisible;outlines.forEach(edge=>{edge.visible=outlineVisible;});invalidate();return outlineVisible;},
   toggleProjection:()=>{if(!drawing)switchCamera(camera===persp?ortho:persp);invalidate();return camera===ortho?"orthographic":"perspective";},
   toggleMeasure:()=>{measuring=!measuring;setMeasureNavigation();if(!measuring){snapMarker.visible=false;clearMeasurement();}return measuring;},
   clearMeasurement,
   dispose:()=>{
    if(disposed)return;disposed=true;cancelAnimationFrame(raf);observer.disconnect();
+   holder.style.background="";
+   for(const item of lineOverlays){
+    scene.remove(item.overlay);item.geometry.dispose();item.material.dispose();
+   }
    drawingRuler?.dispose();
    document.removeEventListener("visibilitychange",visibility);
    renderer.domElement.removeEventListener("webglcontextlost",onLost);
