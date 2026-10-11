@@ -661,23 +661,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-  /api/folders:
-    post:
-      summary: Create a folder
-      operationId: createFolder
+  /api/folders/{id}:
+    get:
+      summary: Resolve one listable folder by id for deep links beyond the tree hint
+      operationId: folderDetail
       tags:
       - Folders
       security:
       - cookieSession: []
-      requestBody:
+      parameters:
+      - name: id
+        in: path
         required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateFolderRequest'
+        description: Exact folder id, including results outside the compatibility tree.
+        schema:
+          type: string
       responses:
-        '201':
-          description: Folder created
+        '200':
+          description: Selected folder; missing, deleted and hidden ids are indistinguishable.
           content:
             application/json:
               schema:
@@ -692,12 +693,6 @@ paths:
                 required:
                 - ok
                 - data
-        '400':
-          description: E_BAD — malformed request body or parameters
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
         '401':
           description: E_AUTH — missing or expired session
           content:
@@ -711,18 +706,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '404':
-          description: E_NOT_FOUND
+          description: E_NOT_FOUND — missing, deleted or unlistable folder
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-        '409':
-          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-  /api/folders/{id}:
     patch:
       summary: Rename a folder
       operationId: renameFolder
@@ -847,6 +835,67 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '404':
           description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/folders:
+    post:
+      summary: Create a folder
+      operationId: createFolder
+      tags:
+      - Folders
+      security:
+      - cookieSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFolderRequest'
+      responses:
+        '201':
+          description: Folder created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Folder'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
           content:
             application/json:
               schema:

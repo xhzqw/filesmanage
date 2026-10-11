@@ -7,14 +7,16 @@ import (
 )
 
 func (h *Handler) folderDetail(c *gin.Context) {
- u, ok := h.auth(c)
- if !ok { return }
- folder, err := h.S.VisibleFolder(c.Request.Context(), u, c.Param("id"))
- if err != nil {
-  respondError(c, err)
-  return
- }
- c.JSON(http.StatusOK, gin.H{"ok": true, "data": folderPayload(folder.ID, folder.Name, folder.ParentID)})
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	folder, err := h.S.VisibleFolder(c.Request.Context(), u, c.Param("id"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true, "data": folderPayload(folder.ID, folder.Name, folder.ParentID)})
 }
 
 // Folder handlers. Handlers only authenticate, validate transport input and
