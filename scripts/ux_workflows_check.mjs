@@ -240,15 +240,19 @@ async function workflowSuite() {
 
     // ---- WF-12..13: rollback appends a new version with the old content ----
     await cdp.navigate(`${BASE}/preview/${v1.fileId}`);
-    const versionsReady = await cdp.waitFor(`()=>document.querySelectorAll('.table tbody tr').length>=2`, 20000);
+    const versionsTabReady=await cdp.waitFor(`()=>!!document.querySelector('#file-tab-versions')`,20000);
+    if(!versionsTabReady)throw Error("preview did not expose the version-history tab");
+    await cdp.evaluate(`(()=>{document.querySelector('#file-tab-versions').click();return true;})()`);
+    const versionsReady = await cdp.waitFor(`()=>document.querySelectorAll('.file-versions-table tbody tr').length>=2`, 20000);
     check("preview lists both versions", Boolean(versionsReady), String(versionsReady));
-    const rollbackButtons = await cdp.evaluate(`(()=>[...document.querySelectorAll('.table tbody tr')].map(tr=>{
+    const rollbackButtons = await cdp.evaluate(`(()=>[...document.querySelectorAll('.file-versions-table tbody tr')].map(tr=>{
       const btn=[...tr.querySelectorAll('button')].find(b=>b.textContent?.trim()==='回滚到此版本');
       return btn?{seq:tr.textContent?.match(/v(\\d+)/)?.[1],disabled:btn.disabled}:null;}).filter(Boolean))()`);
     check("WF-12 rollback action offered for non-current versions",
       Array.isArray(rollbackButtons) && rollbackButtons.length === 1 && rollbackButtons[0].seq === "1" && rollbackButtons[0].disabled === false,
       JSON.stringify(rollbackButtons));
-    await cdp.evaluate(`(()=>{const rows=[...document.querySelectorAll('.table tbody tr')];const btn=[...rows[0].querySelectorAll('button')].find(b=>b.textContent?.trim()==='回滚到此版本');btn?.click();return Boolean(btn);})()`);
+    const rollbackClicked=await cdp.evaluate(`(()=>{const btn=[...document.querySelectorAll('.file-versions-table tbody tr button')].find(b=>b.textContent?.trim()==='回滚到此版本'&&!b.disabled);btn?.click();return Boolean(btn);})()`);
+    if(!rollbackClicked)throw Error("no enabled rollback action in the version-history tab");
     const rollbackOpen = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('回滚将生成新版本'));return Boolean(d);}`, 8000);
     check("WF-12 rollback dialog explains append-only semantics", rollbackOpen === true, String(rollbackOpen));
     await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('回滚将生成新版本'));const input=d.querySelector('#rollback-reason');const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;set.call(input,'G4 冒烟回滚');input.dispatchEvent(new Event('input',{bubbles:true}));return true;})()`);
@@ -257,7 +261,7 @@ async function workflowSuite() {
     // run to completion - exactly as a user would. The assertions below are unchanged.
     await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('回滚将生成新版本'));const b=[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='确认回滚');b?.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,cancelable:true}));return Boolean(b);})()`);
     await delay(1200);
-    const committed = await cdp.waitFor(`()=>{const rows=[...document.querySelectorAll('.table tbody tr')];return rows.length>=3&&rows.some(r=>r.textContent?.includes('回滚'));}`, 20000);
+    const committed = await cdp.waitFor(`()=>{const rows=[...document.querySelectorAll('.file-versions-table tbody tr')];return rows.length>=3&&rows.some(r=>r.textContent?.includes('回滚'));}`, 20000);
     check("WF-13 rollback appends a new version row", committed === true, String(committed));
     const bytes = await (await fetch(`${BASE}/api/files/${v1.fileId}/bytes`, { headers: { Cookie: sessionCookie } })).text();
     check("WF-13 rolled-back content is the source version bytes", bytes === `v1 ${stamp}\n`, JSON.stringify(bytes));
@@ -849,8 +853,8 @@ async function g4UiSuite() {
     await cdp.evaluate(`(()=>{
       const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));
       [...d.querySelectorAll('button')].find(b=>b.textContent?.trim()==='应用')?.click();return true;})()`);
-    const applied = await cdp.waitFor(`()=>{const link=document.querySelector('a.primary[href*="exports/files.csv"]');return link&&link.href.includes('folder=')?link.href:false;}`, 15000);
-    check("WF-29 export link carries the chosen folder", typeof applied === "string" && applied.includes("folder="), String(applied));
+    const applied = await cdp.waitFor(`()=>{const link=document.querySelector('a.stats-export[href*="exports/files.csv"]');return link&&link.href.includes('folder=')?link.href:false;}`, 15000);
+    check("WF-29 export link carries the chosen folder", typeof applied === "string" && new URL(applied).searchParams.get("folder") === folderId, String(applied));
     const manualInput = await cdp.evaluate(`(()=>[...document.querySelectorAll('input')].some(i=>i.placeholder==='folder_…'))()`);
     console.log("DEBUG manualInput:", typeof manualInput, JSON.stringify(manualInput));
     check("WF-29 manual folder-ID input is gone", manualInput === false, String(manualInput));
@@ -1083,16 +1087,20 @@ async function batchUiSuite() {
     const victim = await upload(aId, "bm-purge.txt");
     await json("DELETE", `/api/files/${victim.fileId}`);
     await cdp.navigate(`${BASE}/trash`);
-    const purgeBtn = await cdp.waitFor(`()=>{const row=[...document.querySelectorAll('tbody tr')].find(tr=>tr.textContent?.includes('bm-purge.txt'));const b=row?[...row.querySelectorAll('button')].find(x=>x.textContent?.trim()==='永久删除'):null;return b?true:false;}`, 20000);
+    const purgeBtn = await cdp.waitFor(`()=>{const row=[...document.querySelectorAll('.trash-table tbody tr')].find(tr=>tr.textContent?.includes('bm-purge.txt'));return Boolean(row?.querySelector('button[aria-label^="更多操作"]'));}`, 20000);
     check("purge entry visible for admin", purgeBtn === true, String(purgeBtn));
-    await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr')].find(tr=>tr.textContent?.includes('bm-purge.txt'));[...row.querySelectorAll('button')].find(x=>x.textContent?.trim()==='永久删除')?.click();return true;})()`);
-    const stage1 = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('永久删除确认'));return d?d.textContent.slice(0,60):false;}`, 8000);
-    check("purge stage 1 states the irreversible impact", typeof stage1 === "string" && stage1.includes("不可逆"), String(stage1));
-    await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('永久删除确认'));[...d.querySelectorAll('button')].find(b=>b.textContent?.trim()==='继续（下一步）')?.click();return true;})()`);
-    const stage2 = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('再次确认'));return d?true:false;}`, 8000);
+    const purgeMenuOpened=await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('.trash-table tbody tr')].find(tr=>tr.textContent?.includes('bm-purge.txt'));const b=row?.querySelector('button[aria-label^="更多操作"]');b?.click();return Boolean(b);})()`);
+    if(!purgeMenuOpened)throw Error("admin purge action missing from trash row");
+    const purgeMenu=await cdp.waitFor(`()=>!![...document.querySelectorAll('[role="menu"][aria-label="回收站操作"] [role="menuitem"]')].find(b=>b.textContent?.trim()==='永久删除')`,8000);
+    check("admin purge lives in the row action menu",purgeMenu===true,String(purgeMenu));
+    await cdp.evaluate(`(()=>{[...document.querySelectorAll('[role="menu"][aria-label="回收站操作"] [role="menuitem"]')].find(b=>b.textContent?.trim()==='永久删除')?.click();return true;})()`);
+    const stage1 = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog[open]')].find(x=>x.textContent?.includes('永久删除'));return d?d.textContent.slice(0,150):false;}`, 8000);
+    check("purge stage 1 states the irreversible impact", typeof stage1 === "string" && stage1.includes("无法撤销")&&stage1.includes("bm-purge.txt"), String(stage1));
+    await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog[open]')].find(x=>x.textContent?.includes('永久删除'));[...d.querySelectorAll('button')].find(b=>b.textContent?.trim()==='继续')?.click();return true;})()`);
+    const stage2 = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog[open]')].find(x=>x.textContent?.includes('再次确认'));return d?true:false;}`, 8000);
     check("purge requires the second confirmation", stage2 === true, String(stage2));
     // Same hold-to-confirm gesture as WF-13 (spec 6.3): press, hold past the fill, no click.
-    await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('再次确认'));const b=[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='确认永久删除');b?.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,cancelable:true}));return Boolean(b);})()`);
+    await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog[open]')].find(x=>x.textContent?.includes('再次确认'));const b=[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='确认永久删除');b?.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,cancelable:true}));return Boolean(b);})()`);
     await delay(1200);
     const purged = await cdp.waitFor(`()=>![...document.querySelectorAll('tbody tr')].some(tr=>tr.textContent?.includes('bm-purge.txt'))`, 20000);
     check("purge removes the entry from the trash", purged === true, String(purged));
@@ -1259,15 +1267,15 @@ async function finaleSuite() {
       const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
       set.call(q,${JSON.stringify(TOKEN)});
       q.dispatchEvent(new Event('input',{bubbles:true}));
-      const btn=[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='检索');
-      btn?.click();return true;})()`);
-    const firstRows = await cdp.waitFor(`()=>document.querySelectorAll('tbody tr').length>=50`, 30000);
-    check("WF-30 search renders the first page", firstRows === true, String(await cdp.evaluate(`(()=>document.querySelectorAll('tbody tr').length)()`)));
-    const moreVisible = await cdp.waitFor(`()=>[...document.querySelectorAll('button')].some(b=>b.textContent?.trim()==='加载更多')`, 15000);
+      const btn=document.querySelector('.search-primary button[type="submit"]');
+      btn?.click();return Boolean(btn);})()`);
+    const firstRows = await cdp.waitFor(`()=>document.querySelectorAll('.search-data-table tbody tr').length>=50`, 30000);
+    check("WF-30 search renders the first page", firstRows === true, String(await cdp.evaluate(`(()=>document.querySelectorAll('.search-data-table tbody tr').length)()`)));
+    const moreVisible = await cdp.waitFor(`()=>!!document.querySelector('.search-more button:not([disabled])')`, 15000);
     check("WF-30 加载更多 appears with a cursor", moreVisible === true, String(moreVisible));
-    await cdp.evaluate(`(()=>{[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='加载更多')?.click();return true;})()`);
-    const allRows = await cdp.waitFor(`()=>document.querySelectorAll('tbody tr').length>=60`, 30000);
-    const uniqueRows = await cdp.evaluate(`(()=>{const names=[...document.querySelectorAll('tbody tr')].map(tr=>tr.textContent?.slice(0,40));return {rows:names.length,unique:new Set(names).size};})()`);
+    await cdp.evaluate(`(()=>{document.querySelector('.search-more button')?.click();return true;})()`);
+    const allRows = await cdp.waitFor(`()=>document.querySelectorAll('.search-data-table tbody tr').length>=60`, 30000);
+    const uniqueRows = await cdp.evaluate(`(()=>{const names=[...document.querySelectorAll('.search-data-table tbody tr')].map(tr=>tr.querySelector('td a')?.textContent?.trim());return {rows:names.length,unique:new Set(names).size};})()`);
     check("WF-30 加载更多 appends the rest without duplicates",
       allRows === true && uniqueRows.rows === 60 && uniqueRows.unique === 60, JSON.stringify(uniqueRows));
     const countLine = await cdp.evaluate(`(()=>document.querySelector('.search-total')?.textContent||'')()`);
