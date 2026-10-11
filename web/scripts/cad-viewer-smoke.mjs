@@ -220,4 +220,49 @@ const hostile=parseDxf([
 ].join("\n"),THREE);
 assert(hostile.object.children[0]?.children[0]?.geometry.getAttribute("position").count<=768);
 
+// HATCH is a real triangulated surface with an unpainted interior hole. A
+// translucent bounding rectangle would fail both its area and hole tests.
+const hatchFixture=[
+ "0","SECTION","2","ENTITIES",
+ "0","HATCH","8","CUT","70","1","75","0","91","2",
+ "92","2","72","0","73","1","93","4",
+ "10","0","20","0","10","10","20","0",
+ "10","10","20","10","10","0","20","10","97","0",
+ "92","2","72","0","73","1","93","4",
+ "10","3","20","3","10","7","20","3",
+ "10","7","20","7","10","3","20","7","97","0",
+ "0","ENDSEC","0","EOF",
+].join("\n");
+const hatch=parseDxf(hatchFixture,THREE);
+assert.deepEqual(hatch.skipped,[]);
+const hatchMeshes=hatch.object.children[0]?.children.filter(node=>node.isMesh);
+assert.equal(hatchMeshes?.length,1);
+const positions=hatchMeshes[0].geometry.getAttribute("position");
+let filledArea=0;
+for(let i=0;i+2<positions.count;i+=3){
+ const a=positions.array,b=i*3;
+ const x1=a[b],y1=a[b+1],x2=a[b+3],y2=a[b+4],x3=a[b+6],y3=a[b+7];
+ filledArea+=Math.abs((x2-x1)*(y3-y1)-(y2-y1)*(x3-x1))/2;
+}
+assert(Math.abs(filledArea-84)<.001,"hole must remain unfilled");
+const patterned=parseDxf(hatchFixture.replace("70\n1\n75\n0","70\n0\n75\n0"),THREE);
+assert(patterned.skipped.some(item=>item.startsWith("HATCH:")));
+
+// Group 410 separates named paper-space drawings. Paper-only group 67 goes
+// to a clearly named fallback layout instead of polluting Model Space.
+const layoutFixture=[
+ "0","SECTION","2","ENTITIES",
+ "0","LINE","8","M","410","Model","10","0","20","0","11","2","21","0",
+ "0","LINE","8","P","410","A1 SHEET","67","1","10","100","20","100","11","120","21","100",
+ "0","LINE","8","Q","67","1","10","500","20","500","11","501","21","500",
+ "0","ENDSEC","0","EOF",
+].join("\n");
+const modelLayout=parseDxf(layoutFixture,THREE);
+assert.deepEqual(modelLayout.layouts,["Model","A1 SHEET","Paper Space"]);
+assert.deepEqual(modelLayout.layers.map(l=>l.name),["M"]);
+const sheetLayout=parseDxf(layoutFixture,THREE,"A1 SHEET");
+assert.deepEqual(sheetLayout.layers.map(l=>l.name),["P"]);
+const fallbackLayout=parseDxf(layoutFixture,THREE,"Paper Space");
+assert.deepEqual(fallbackLayout.layers.map(l=>l.name),["Q"]);
+
 console.log("CAD regression passed: DXF geometry, nested blocks, dimension graphics, rational NURBS, ACI/TrueColor and 2D snaps");

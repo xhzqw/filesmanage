@@ -46,12 +46,15 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
  const[measure,setMeasure]=useState<number|null>(null);
  const[skipped,setSkipped]=useState<string[]>([]);
  const[layers,setLayers]=useState<{name:string;visible:boolean}[]>([]);
+ const[layouts,setLayouts]=useState<string[]>([]);
+ const[activeLayout,setActiveLayout]=useState("Model");
  // Assembly parts recovered from a converted mesh (MC02/MOD02): the MSH keeps
  // shared node indices, so connected components are the solids.
  const[parts,setParts]=useState<{name:string;visible:boolean;size:[number,number,number];triangles:number}[]>([]);
  const[selectedPart,setSelectedPart]=useState(-1);
  const mshRoot=useRef<import("three").Group|null>(null);
  const dxfRoot=useRef<import("three").Group|null>(null);
+ const drawingSession=useRef<((layout:string)=>void)|null>(null);
  const started=useRef(false);
  const controls=useRef<ViewerControls|null>(null);
  const[view,setView]=useState({axes:false,grid:true,edges:true,measure:false,projection:"perspective" as "perspective"|"orthographic"});
@@ -67,13 +70,15 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
    controls.current=null;
    mshRoot.current=null;
    dxfRoot.current=null;
+   drawingSession.current=null;
   };
  },[id]);
 
  useEffect(()=>{
   let valid=true;
   setStatus("loading");setMessage("");setInfo(null);setFileMeta(null);
-  setMetrics(null);setLayers([]);setParts([]);setSelectedPart(-1);
+  setMetrics(null);setLayers([]);setLayouts([]);setActiveLayout("Model");
+  setParts([]);setSelectedPart(-1);
   setUnit("unknown");setMeasure(null);setSkipped([]);
   setView({axes:false,grid:true,edges:true,measure:false,projection:"perspective"});
   setCube({yaw:45,pitch:26});
@@ -157,12 +162,36 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
      setUnit(declaredUnit(buffer,format));
     let object:import("three").Object3D;
     if(format==="dxf"){
-     const parsed=parseDxf(new TextDecoder().decode(buffer),THREE);
+     const source=new TextDecoder().decode(buffer);
+     const parsed=parseDxf(source,THREE);
      object=parsed.object;
      dxfRoot.current=parsed.object;
      setLayers(parsed.layers);
      setSkipped(parsed.skipped);
      setUnit(parsed.unit);
+     setLayouts(parsed.layouts);
+     setActiveLayout(parsed.layout);
+     // Each layout has different paper-space coordinates, geometry and bounds.
+     // Dispose the previous renderer and remount a freshly scoped drawing;
+     // do not use visibility-only switching (it retains the wrong fit/units).
+     drawingSession.current=(name)=>{
+      const next=parseDxf(source,THREE,name);
+      controls.current?.dispose();
+      controls.current=null;
+      dxfRoot.current=next.object;
+      let mounted:ViewerControls|null=null;
+      mounted=mountEngineeringScene(THREE,OrbitControls,holder.current!,next.object,true,
+       setMetrics,()=>{
+        if(controls.current===mounted){
+         setStatus("webgl-lost");
+         setMessage("WebGL 上下文已丢失");
+        }
+       },setMeasure);
+      controls.current=mounted;
+      setLayers(next.layers);setSkipped(next.skipped);
+      setActiveLayout(next.layout);setMeasure(null);
+      setView({axes:false,grid:false,edges:false,measure:false,projection:"orthographic"});
+     };
     }else if(format==="msh"){
      const parsed=await parseMshInWorker(buffer,abort.signal,THREE);
      if(!valid)return;
@@ -210,6 +239,13 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
     <div className="breadcrumb cad-title">
      <strong>{drawing?"二维工程图":"三维模型"}</strong>
      <span>{info?.format?.toUpperCase()??""}{info?.class==="converted"?" · 已转换":""}</span>
+     {drawing&&status==="ready"&&layouts.length>1&&<div className="cad-layout-tabs" role="tablist" aria-label="图纸布局">
+      {layouts.map(name=><RareButton type="button" key={name} role="tab" aria-selected={activeLayout===name}
+       className={activeLayout===name?"on":""}
+       onClick={()=>{if(activeLayout!==name)drawingSession.current?.(name);}}>
+       {name==="Model"?"模型空间":name}
+      </RareButton>)}
+     </div>}
     </div>
     <div className="cad-workbench">
      <section className="cad-viewport" aria-label={drawing?"工程图查看区域":"三维模型查看区域"}>

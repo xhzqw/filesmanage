@@ -3,6 +3,9 @@
 .cad-page .cad-title{flex:none;display:flex;align-items:center;gap:10px;min-height:34px}
 .cad-title strong{color:var(--text-primary);font-size:12px;font-weight:650}
 .cad-title span{color:var(--text-secondary);font-size:11px}
+.cad-layout-tabs{margin-left:auto;display:flex;align-items:center;gap:3px;min-width:0;max-width:62%;overflow-x:auto;scrollbar-width:thin}
+.cad-layout-tabs button{flex:none;min-height:25px;height:25px;max-width:150px;padding:0 9px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cad-layout-tabs button.on{color:var(--brand-blue);background:var(--surface-row-selected);border-color:var(--border-selected)}
 .cad-workbench{flex:1;min-width:0;min-height:0;display:flex;gap:8px;padding:8px;overflow:hidden}
 .cad-viewport{position:relative;flex:1;min-width:0;min-height:340px;border:1px solid var(--border-hairline);border-radius:var(--radius-lg);overflow:hidden;background:#f0f5fa}
 .cad-viewport .viewer-stage{width:100%;height:100%;min-height:0;min-width:0;margin:0!important;box-shadow:none;border:0}
@@ -59,6 +62,7 @@
  .cad-viewcube-body{transition:none}
 }
 @media(max-width:700px){
+ .cad-layout-tabs{max-width:60%}
  .cad-workbench{flex-direction:column;overflow:hidden}
  .cad-viewport{flex:1;min-height:260px}
  .cad-inspector{flex:0 0 auto;max-width:none;min-width:0;width:100%;max-height:162px;overflow:auto}

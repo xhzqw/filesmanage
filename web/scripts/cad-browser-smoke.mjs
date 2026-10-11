@@ -21,7 +21,7 @@ const holder=document.getElementById("stage");
 let controls=null,metrics=null,lastCamera=null;
 let actualDrawing=null;
 const callback=(yaw,pitch)=>{lastCamera={yaw,pitch};};
-function mount(drawing=false){
+function mount(drawing=false,layout="Model"){
  if(controls)controls.dispose();
  let object=new THREE.Mesh(new THREE.BoxGeometry(10,10,10),new THREE.MeshPhongMaterial({color:0x467fa8}));
  if(drawing){
@@ -35,9 +35,15 @@ function mount(drawing=false){
    "0","SPLINE","8","SPLINE","71","2","72","6","73","3",
    "40","0","40","0","40","0","40","1","40","1","40","1",
    "10","0","20","0","10","50","20","80","10","100","20","0",
+   "0","HATCH","8","FILL","70","1","75","0","91","1",
+   "92","2","72","0","73","1","93","4",
+   "10","10","20","10","10","30","20","10",
+   "10","30","20","30","10","10","20","30","97","0",
+   "0","LINE","8","SHEET","410","A1","67","1",
+   "10","500","20","500","11","510","21","500",
    "0","ENDSEC","0","EOF",
   ].join("\n");
-  actualDrawing=parseDxf(dxf,THREE);
+  actualDrawing=parseDxf(dxf,THREE,layout);
   if(actualDrawing.skipped.length)throw Error(actualDrawing.skipped.join(","));
   object=actualDrawing.object;
  }
@@ -48,13 +54,15 @@ mount();
 window.__cad={
  get state(){return {metrics,camera:lastCamera,canvases:holder.querySelectorAll("canvas").length,
   width:holder.querySelector("canvas")?.getBoundingClientRect().width??0,
-  drawingLayers:actualDrawing?.layers.length??0};},
+  drawingLayers:actualDrawing?.layers.length??0,
+  drawingLayout:actualDrawing?.layout??null,layoutCount:actualDrawing?.layouts.length??0};},
  view:name=>controls.setStandardView(name),
  projection:()=>controls.toggleProjection(),
  measure:()=>controls.toggleMeasure(),
  focus:()=>{const mesh=holder.querySelector("canvas");return Boolean(mesh)&&Boolean(controls.resetView());},
  grid:()=>controls.toggleGrid(),
  drawing:()=>mount(true),
+ sheet:()=>mount(true,"A1"),
  dispose:()=>{controls.dispose();return holder.querySelectorAll("canvas").length;},
 };
 `;
@@ -152,11 +160,16 @@ try{
  assert(width>=800&&width<=830,"viewport must resize with container");
  const drawing=await cdp.eval("(()=>{window.__cad.drawing();return window.__cad.state})()");
  assert.equal(drawing.canvases,1,"scene replacement must not leak a canvas");
- assert.equal(drawing.metrics.triangles,0);
- assert.equal(drawing.drawingLayers,2,"actual DIMENSION and NURBS DXF layers must render in WebGL");
+ assert(drawing.metrics.triangles>0,"solid HATCH produces real mesh triangles");
+ assert.equal(drawing.drawingLayers,3,"DIMENSION, NURBS and HATCH DXF layers must render");
  assert(drawing.metrics.size[0]>=100,"dimension and spline linework must retain actual drawing scale");
+ const sheet=await cdp.eval("(()=>{window.__cad.sheet();return window.__cad.state})()");
+ assert.equal(sheet.canvases,1,"layout switching must dispose the old canvas");
+ assert.equal(sheet.drawingLayout,"A1");
+ assert.equal(sheet.drawingLayers,1,"model-space elements must not leak into a paper layout");
+ assert(sheet.metrics.size[0]<30,"paper layout must be fitted independently");
  assert.equal(await cdp.eval("window.__cad.dispose()"),0,"dispose must remove WebGL canvas");
- console.log("CAD_BROWSER_PASS Chrome WebGL: 3D camera/navigation, real DXF DIMENSION/NURBS render, responsive resize, disposal");
+ console.log("CAD_BROWSER_PASS Chrome WebGL: 3D navigation, DXF DIMENSION/NURBS/HATCH, isolated paper layout, resize and disposal");
 }finally{
  cdp?.ws.close();
  // Chrome forks GPU/network/storage children; killing only the browser PID

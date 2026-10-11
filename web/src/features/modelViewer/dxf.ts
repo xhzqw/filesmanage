@@ -7,12 +7,15 @@
 // palette. Anything else is reported as skipped, never silently dropped.
 import type * as THREE from "three";
 import {sampleSpline} from "./nurbs2d";
+import {parseHatchPaths} from "./hatch2d";
 
 export type DxfParseResult={
  object:THREE.Group;
  layers:{name:string;visible:boolean}[];
  skipped:string[];
  unit:string;
+ layouts:string[];
+ layout:string;
 };
 
 // DXF ACI 7 means black on white paper (and white on dark model space).
@@ -69,15 +72,19 @@ type Entity={
  invisible:boolean;
  colorIndex:number;
  trueColor:number|null;
+ layout:string;
+ paperSpace:boolean;
+ raw:Pair[];
 };
 
 function emptyEntity(type:string):Entity{
  return {type,layer:"0",points:[],end:null,radius:0,a0:0,a1:360,closed:false,height:2.5,text:"",
   blockName:"",scaleX:1,scaleY:1,rotation:0,major:null,ratio:1,parameterStart:0,parameterEnd:Math.PI*2,
-  degree:3,knots:[],weights:[],splineControls:[],invisible:false,colorIndex:256,trueColor:null};
+  degree:3,knots:[],weights:[],splineControls:[],invisible:false,colorIndex:256,trueColor:null,
+  layout:"",paperSpace:false,raw:[]};
 }
 
-export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResult{
+export function parseDxf(text:string,THREE:typeof import("three"),requestedLayout="Model"):DxfParseResult{
  const records=pairs(text);
 
  // Pass 1 — HEADER units and LAYER table.
@@ -151,6 +158,8 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
  const MAX_ENTITIES=200000;
  const blockStack=new Set<string>();
  const actualLayer=(name:string)=>name==="0"?inheritedLayer:name;
+ const hatchBudget=120000;
+ let hatchTriangles=0;
  const resolvedLayerColor=(name:string)=>layerTrueColors.get(name)??aciColor(layerColor(name));
  const entityColor=(e:Entity)=>{
   const layer=actualLayer(e.layer);
@@ -248,6 +257,73 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
   sprite.position.set(origin.x+sprite.scale.x/2,origin.y+sprite.scale.y/2,0);
   (sprite.material as THREE.SpriteMaterial).rotation=Math.atan2(activeTransform.b,activeTransform.a);
   groupFor(resolved).add(sprite);
+ };
+
+ const drawHatch=(e:Entity)=>{
+  const parsed=parseHatchPaths(e.raw);
+  if(parsed.error){skipped.add("HATCH: "+parsed.error);return;}
+  type Ring={points:THREE.Vector2[];area:number;parent:number;depth:number};
+  const polygonArea=(p:THREE.Vector2[])=>p.reduce((sum,a,i)=>{
+   const b=p[(i+1)%p.length]!;
+   return sum+a.x*b.y-b.x*a.y;
+  },0)/2;
+  const contains=(polygon:THREE.Vector2[],q:THREE.Vector2)=>{
+   let inside=false;
+   for(let i=0,j=polygon.length-1;i<polygon.length;j=i++){
+    const a=polygon[i]!,b=polygon[j]!;
+    if((a.y>q.y)!==(b.y>q.y)&&q.x<(b.x-a.x)*(q.y-a.y)/(b.y-a.y)+a.x)inside=!inside;
+   }
+   return inside;
+  };
+  const rings:Ring[]=parsed.rings.map(points=>{
+   const mapped=points.map(point=>{
+    const p=transformed(point.x,point.y);
+    return new THREE.Vector2(p.x,p.y);
+   });
+   return{points:mapped,area:Math.abs(polygonArea(mapped)),parent:-1,depth:0};
+  }).sort((a,b)=>b.area-a.area);
+  if(rings.some(r=>r.points.length<3||!Number.isFinite(r.area)||r.area<1e-9||
+       r.points.some(p=>![p.x,p.y].every(v=>Number.isFinite(v)&&Math.abs(v)<1e12)))){
+   skipped.add("HATCH: 无效或退化的边界");return;
+  }
+  for(let i=0;i<rings.length;i++){
+   const item=rings[i]!;
+   for(let j=i-1;j>=0;j--){
+    const candidate=rings[j]!;
+    if(contains(candidate.points,item.points[0]!)){
+     item.parent=j;item.depth=candidate.depth+1;break;
+    }
+   }
+  }
+  for(let i=0;i<rings.length;i++){
+   const item=rings[i]!;
+   if(item.depth%2!==0)continue;
+   const holes=rings.filter(r=>r.parent===i&&r.depth%2===1).map(r=>r.points);
+   const totalVerts=item.points.length+holes.reduce((sum,h)=>sum+h.length,0);
+   if(totalVerts>12000){skipped.add("HATCH: 三角化顶点预算超限");return;}
+   const triangles=THREE.ShapeUtils.triangulateShape(item.points,holes);
+   if(!triangles.length){skipped.add("HATCH: 无法三角化边界");continue;}
+   if(hatchTriangles+triangles.length>hatchBudget){
+    skipped.add("HATCH: 填充三角形预算超限");break;
+   }
+   hatchTriangles+=triangles.length;
+   const all=[...item.points,...holes.flat()];
+   const coordinates:number[]=[];
+   for(const face of triangles){
+    for(const index of face){
+     const v=all[index];
+     if(v)coordinates.push(v.x,v.y,-0.0001);
+    }
+   }
+   if(coordinates.length===0)continue;
+   const geometry=new THREE.BufferGeometry();
+   geometry.setAttribute("position",new THREE.Float32BufferAttribute(coordinates,3));
+   const mesh=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({
+    color:currentColor,transparent:true,opacity:.4,side:THREE.DoubleSide,depthWrite:false,
+   }));
+   mesh.name="HATCH";mesh.renderOrder=-1;
+   groupFor(actualLayer(e.layer)).add(mesh);
+  }
  };
 
  const commit=(e:Entity)=>{
@@ -362,6 +438,7 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
     }
     break;
    }
+   case "HATCH":drawHatch(e);break;
    case "LWPOLYLINE":
    case "POLYLINE":{
     if(e.points.length<2)break;
@@ -465,6 +542,8 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
   if(!entity.type)continue;
   switch(pair.code){
    case 8:entity.layer=pair.value.trim()||"0";break;
+   case 410:entity.layout=pair.value.trim();break;
+   case 67:entity.paperSpace=Number(pair.value)===1;break;
    case 2:if(entity.type==="INSERT"||entity.type==="DIMENSION")entity.blockName=pair.value.trim();break;
    case 10:
     if(entity.type==="SPLINE")entity.splineControls.push({x:Number(pair.value),y:0,bulge:0});
@@ -519,11 +598,18 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
    case 1:entity.text+=pair.value;break;
    case 3:entity.text=pair.value+entity.text;break;
   }
+  entity.raw.push(pair);
  }
  finishEntity();
  // BLOCK definitions may occur after model-space entities. Resolve references
  // only after collecting the entire file, including forward references.
- for(const item of normalizePolylines(modelEntities)){
+ const entityLayout=(e:Entity)=>{
+  if(e.layout)return e.layout.toLowerCase()==="model"?"Model":e.layout;
+  return e.paperSpace?"Paper Space":"Model";
+ };
+ const layouts=["Model",...new Set(modelEntities.map(entityLayout).filter(name=>name!=="Model"))];
+ const layout=layouts.includes(requestedLayout)?requestedLayout:"Model";
+ for(const item of normalizePolylines(modelEntities).filter(e=>entityLayout(e)===layout)){
   if(visitedEntities>=MAX_ENTITIES||emittedSegments>=MAX_SEGMENTS)break;
   commit(item);
  }
@@ -540,5 +626,5 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
  }
 
  const layers=layerOrder.map(name=>({name,visible:layerGroups.get(name)?.visible??true}));
- return {object:root,layers,skipped:Array.from(skipped),unit};
+ return {object:root,layers,skipped:Array.from(skipped),unit,layouts,layout};
 }

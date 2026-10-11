@@ -54,6 +54,21 @@ This document records validated capability instead of marking unimplemented work
 - Regression fixtures cover rational quarter circles, dimension graphical
   coordinates, nested blocks, entity colours and hostile angle values.
 
+## Delivered in V3.3 drawing and sheet increment
+
+- HATCH closed-polyline solid fills with nested hole/island rings are
+  triangulated as real geometry; rendering opacity is a preview convention,
+  not a claim of faithful CAD printing. Bulge boundaries are sampled.
+- Invalid/open boundary paths, gradient/pattern fills and unsupported edge
+  paths are reported without pretending that an entire region is solid.
+- Entity group 410 named Layout and group 67 paper-space fallback isolate
+  drawing entities. Layout tabs live in the compact CAD title bar and switch
+  to a freshly fitted, resource-disposed viewport.
+- Parsing budgets bound per-file tessellated hatch vertices and total
+  scene triangles. Synthetic geometry regression verifies true cut-out area.
+- Chrome WebGL regression renders a real HATCH mesh with DXF labels/curves
+  and verifies that paper-only entities do not leak into Model Space.
+
 ## Deliberately unsupported or approximate
 
 | Capability | Current truth | Next gate |
@@ -64,8 +79,8 @@ This document records validated capability instead of marking unimplemented work
 | 3D measurement | Mesh-coordinate approximate straight distance | Exact B-Rep edge/face measurements |
 | DXF SPLINE/NURBS | Knots/degree/weights supported; fit-point-only interpolation not supported | Fit-point solver, discontinuous curve fidelity |
 | DXF DIMENSION | Anonymous representation BLOCK when present | Style/text override fidelity and absent-block fallback |
-| DXF HATCH | Reported unsupported | Boundary and hole/solid/pattern renderer |
-| DXF paper space, XREF | Not fully supported | Layout parser and secured resource resolution |
+| DXF HATCH | Solid closed-polyline contours, concave shapes and nested holes/islands; translucent preview only | Edge-boundary paths, pattern/gradient fidelity, exact print styles |
+| DXF paper space, XREF | Model and named paper-layout entity isolation via groups 410/67; VIEWPORT composition and XREF unsupported | True layout viewports, plot settings and secured resource resolution |
 | DXF arc/ellipse | Tessellated preview | Analytic segment and center/angle snap records |
 | DXF text | Canvas glyph approximation, not CAD SHX exact rendering | Font and text-style resolver |
 | 2D/3D annotations and version diff | Not yet implemented | Version-bound review domain and permissions |
