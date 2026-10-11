@@ -4,7 +4,11 @@ import {sha256Chunk,sha256Fallback} from "../../shared/sha256Chunk";
 // Browser storage holds only small task metadata; never store file bytes.
 // Cap tasks, age and record length to bound storage and stale-session leakage.
 export const uploadCachePrefix="fm-upload-tasks-v1:";
-const maxAge=48*60*60*1000;
+// The server's resumable-upload session TTL is 24h. Persisting the browser's
+// resume hint longer would advertise an already expired upload as resumable.
+// Chunk activity can extend the server deadline, but a conservative client
+// cutoff guarantees the browser never promises more than its original window.
+export const resumeCacheMaxAge=24*60*60*1000;
 export type CachedTask={
  queueId:string;name:string;sourceName:string;size:number;fileType:string;
  lastModified:number;fingerprint:string;targetFolderId:string;idempotencyKey:string;at:number;
@@ -26,7 +30,7 @@ function isCached(x:unknown):x is CachedTask{
   typeof a.fingerprint==="string"&&/^[0-9a-f]{64}$/.test(a.fingerprint)&&
   typeof a.targetFolderId==="string"&&a.targetFolderId.length<256&&
   typeof a.idempotencyKey==="string"&&a.idempotencyKey.length<200&&
-  typeof a.at==="number"&&a.at>Date.now()-maxAge&&a.at<=Date.now()+60000;
+  typeof a.at==="number"&&a.at>Date.now()-resumeCacheMaxAge&&a.at<=Date.now()+60000;
 }
 export function readUploadTasks(userId:string):CachedTask[]{
  try{
@@ -41,7 +45,7 @@ export function storeUploadTasks(userId:string,tasks:UploadTask[]):void{
  try{
  const cache:CachedTask[]=tasks.filter(t=>t.status!=="committed"&&t.status!=="cancelled"&&
    t.size>=8*1024*1024&&t.size<=1073741824&&!!t.fingerprint&&
-   (t.cacheAt??Date.now())>Date.now()-maxAge)
+   (t.cacheAt??Date.now())>Date.now()-resumeCacheMaxAge)
    .slice(-40).map(t=>({
     queueId:t.queueId,name:t.name,sourceName:t.sourceName??t.file?.name??t.name,
     size:t.size,fileType:t.fileType??t.file?.type??"",lastModified:t.lastModified??t.file?.lastModified??0,

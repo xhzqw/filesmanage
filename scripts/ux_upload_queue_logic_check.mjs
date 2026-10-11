@@ -19,7 +19,7 @@ const row=(index,status)=>({
  queueId:"task"+index,name:"file"+index,size:8*1024*1024,
  targetFolderId:"folder_root",idempotencyKey:"key"+index,status,
  file:null,fileType:"application/octet-stream",sourceName:"file"+index,
- lastModified:123456,fingerprint:"a".repeat(64),cacheAt:Date.now()-47*60*60*1000,
+ lastModified:123456,fingerprint:"a".repeat(64),cacheAt:Date.now()-23*60*60*1000,
 });
 const history=[
  ...Array.from({length:55},(_,index)=>row(index,"committed")),
@@ -49,7 +49,7 @@ globalThis.localStorage={
  setItem:(key,value)=>storage.set(key,String(value)),
  removeItem:key=>storage.delete(key),
 };
-const stamp=Date.now()-47*60*60*1000;
+const stamp=Date.now()-23*60*60*1000;
 const resumed={...row(8,"failed"),cacheAt:stamp};
 persistence.storeUploadTasks("testuser",[resumed]);
 const key=persistence.uploadCachePrefix+"testuser";
@@ -57,6 +57,7 @@ assert.equal(JSON.parse(storage.get(key))[0].at,stamp);
 persistence.storeUploadTasks("testuser",[{...resumed,status:"uploading",progress:{loaded:12,total:24}}]);
 assert.equal(JSON.parse(storage.get(key))[0].at,stamp,"progress must not renew cache TTL");
 assert.equal(persistence.readUploadTasks("testuser")[0].at,stamp);
-persistence.storeUploadTasks("testuser",[{...resumed,cacheAt:Date.now()-49*60*60*1000}]);
+persistence.storeUploadTasks("testuser",[{...resumed,cacheAt:Date.now()-25*60*60*1000}]);
 assert.equal(storage.has(key),false,"expired resume metadata must be dropped");
-console.log("UX_QUEUE_STATE_PASS: capped history, actionable retention, folder deduplication, fixed 48h resume expiry");
+assert.equal(persistence.resumeCacheMaxAge,24*60*60*1000);
+console.log("UX_QUEUE_STATE_PASS: capped history, actionable retention, folder deduplication, server-aligned 24h resume expiry");

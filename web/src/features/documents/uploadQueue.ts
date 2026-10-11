@@ -39,7 +39,7 @@ export type UploadTask={
  progress?:UploadProgress;
  serverProcessing?:boolean;
  // Persisted large-file resume metadata expires from its original enqueue
- // time. React progress updates must not silently extend the 48-hour window.
+ // time. React progress updates must not silently extend the 24-hour window.
  cacheAt?:number;
 };
 

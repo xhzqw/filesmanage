@@ -1,10 +1,9 @@
 import {ApiError,reportSessionIssue} from "./http";
-import {newIdempotencyKey} from "./ids";
-import {sha256Chunk,sha256Fallback} from "./sha256Chunk";
+import {sha256Chunk} from "./sha256Chunk";
 
 export type ResumableUploadResult={fileId:string;versionSeq:number;sha256:string;size:number;name:string;deduplicated:boolean};
 export type ResumableProgress={loaded:number;total:number};
-type UploadSession={id:string;received:number;size:number;state:"open"|"committed"|"cancelled";expiresAt:string};
+type UploadSession={id:string;received:number;size:number;state:"open"|"committed"|"cancelled";expiresAt:string;result?:ResumableUploadResult};
 type Reply<T>={ok:boolean;data?:T;error?:{code:string;message?:string}};
 const chunkSize=2<<20;
 export const resumableThreshold=8<<20;
@@ -26,32 +25,17 @@ async function requestUpload<T>(url:string,method:string,body:BodyInit|undefined
  }
  return reply.data as T;
 }
-function cachedKey(id:string):string|null{
- try{return localStorage.getItem(id);}catch{return null;}
-}
-function saveKey(id:string,key:string):void{
- try{localStorage.setItem(id,key);}catch{}
-}
-function clearKey(id:string):void{
- try{localStorage.removeItem(id);}catch{}
-}
-// Fingerprint binds a resumable operation to the selected file, not just its
-// name. Two edge digests supplement size and lastModified without reading the
-// whole multi-GiB file into memory. Every transferred chunk is still hashed.
-async function operationIdentity(folder:string,file:File):Promise<string>{
- const first=await sha256Chunk(await file.slice(0,65536).arrayBuffer());
- const last=await sha256Chunk(await file.slice(Math.max(0,file.size-65536)).arrayBuffer());
- return "fm-resume:"+sha256Fallback(new TextEncoder().encode(
-  [folder,file.name,file.size,file.lastModified,file.type,first,last].join("|")));
-}
+// The per-user upload queue owns the single durable operation key. A separate
+// localStorage key derived only from the file would cross user/session
+// boundaries and can accidentally attach an unrelated operation. Never cache
+// a second identifier here; re-attaching is gated by the queue fingerprint.
 export async function uploadResumable(folder:string,file:File,operationKey:string,handlers:{
  onProgress?:(progress:ResumableProgress)=>void;signal?:AbortSignal;
 }):Promise<ResumableUploadResult>{
  if(file.size<1||file.size>resumableMaxFile)throw new ApiError("E_BAD",400,undefined,"文件大小不支持分块上传");
+ if(operationKey.length<8||operationKey.length>128)throw new ApiError("E_BAD",400,undefined,"无效的上传操作标识");
  const signal=handlers.signal;
- const storageKey=await operationIdentity(folder,file);
- const key=operationKey||cachedKey(storageKey)||newIdempotencyKey();
- saveKey(storageKey,key);
+ const key=operationKey;
  let session:UploadSession|undefined;
  const path=(id:string)=>"/uploads/resumable/"+encodeURIComponent(id);
  try{
@@ -61,6 +45,13 @@ export async function uploadResumable(folder:string,file:File,operationKey:strin
   }),{"Content-Type":"application/json"},signal);
   if(session.state==="cancelled")throw new ApiError("E_VERSION_CONFLICT",409);
   if(session.size!==file.size)throw new ApiError("E_VERSION_CONFLICT",409);
+  if(!Number.isSafeInteger(session.received)||session.received<0||session.received>file.size){
+   throw new ApiError("E_VERSION_CONFLICT",409,undefined,"服务端上传偏移量不合法");
+  }
+  // A previous /complete may have committed while its response was lost.
+  // Return the server's persisted result, never create a new upload.
+  if(session.state==="committed"&&session.result)return session.result;
+  if(session.state!=="open"&&session.state!=="committed")throw new ApiError("E_VERSION_CONFLICT",409);
   let offset=session.received;
   handlers.onProgress?.({loaded:offset,total:file.size});
   while(offset<file.size){
@@ -92,19 +83,22 @@ export async function uploadResumable(folder:string,file:File,operationKey:strin
   }
   const result=await requestUpload<ResumableUploadResult>(path(session.id)+"/complete","POST",undefined,{},signal)
    .catch(async err=>{
-    if(signal?.aborted)throw err;
+    if(signal?.aborted||!(err instanceof ApiError)||err.code!=="E_NETWORK")throw err;
+    // Unknown commit response: consult the durable server session before any
+    // replay. A committed response already contains the authoritative result.
     const current=await requestUpload<UploadSession>(path(session!.id),"GET",undefined,{},signal);
-    if(current.state!=="committed")throw err;
-    return requestUpload<ResumableUploadResult>(path(session!.id)+"/complete","POST",undefined,{},signal);
+    if(current.state==="committed"&&current.result)return current.result;
+    if(current.state==="open"&&current.received===file.size){
+     return requestUpload<ResumableUploadResult>(path(session!.id)+"/complete","POST",undefined,{},signal);
+    }
+    throw err;
    });
-  clearKey(storageKey);
   return result;
  }catch(err){
   if(signal?.aborted){
    // Identity changes stop local I/O, but must retain the previous user's
    // durable server offset for a later explicit recovery with the same file.
    if(signal.reason!=="identity.changed"){
-    clearKey(storageKey);
     if(session)void requestUpload(path(session.id),"DELETE",undefined,{}).catch(()=>undefined);
    }
    throw new ApiError("E_CANCELLED",0);
