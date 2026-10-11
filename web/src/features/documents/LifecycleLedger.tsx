@@ -86,7 +86,7 @@ export function LifecycleLedger({isAdmin=false}:{isAdmin?:boolean}){
    <thead><tr><th>选</th><th>文档</th><th>版本</th><th>状态</th><th>负责人</th><th>到期提醒</th><th>到期日</th><th>保留至</th></tr></thead>
    <tbody>
     {items.map(item=><tr key={item.fileId}>
-     <td><input type="checkbox" aria-label={"选择 "+item.fileName} checked={selected.includes(item.fileId)} onChange={e=>setSelected(current=>e.target.checked?(current.length>=20?current:[...current,item.fileId]):current.filter(id=>id!==item.fileId))}/></td>
+     <td><RareButton type="button" className="lifecycle-row-select" aria-pressed={selected.includes(item.fileId)} title={"选择 "+item.fileName} onClick={()=>setSelected(current=>current.includes(item.fileId)?current.filter(id=>id!==item.fileId):current.length>=20?current:[...current,item.fileId])}>{selected.includes(item.fileId)?"✓":"＋"}</RareButton></td>
      <td><Link to={"/preview/"+encodeURIComponent(item.fileId)} title={item.fileName}>{item.fileName}</Link></td>
      <td>v{item.publishedSeq}</td>
      <td><RareBadge tone={item.state==="archived"?"warning":"success"} dot>{item.state==="archived"?"已归档":"已发布"}</RareBadge></td>

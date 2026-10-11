@@ -8,4 +8,5 @@
 .lifecycle-stats{display:flex;flex-wrap:wrap;gap:10px;margin:10px 14px 0}
 .lifecycle-stats span{padding:8px 12px;font-size:12px;border:1px solid var(--border-hairline);border-radius:var(--radius-md);background:var(--surface-panel)}
 .lifecycle-stats strong{font-size:15px;margin-left:8px}
-.lifecycle-ledger td input[type=checkbox]{accent-color:var(--brand-cyan);cursor:pointer}
+.lifecycle-ledger .lifecycle-row-select{min-width:24px;width:24px;height:24px;padding:0;font-size:13px}
+.lifecycle-ledger .lifecycle-row-select[aria-pressed=true]{color:var(--brand-cyan);border-color:var(--brand-cyan)}
