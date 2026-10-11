@@ -276,10 +276,11 @@ async function workflowSuite() {
     const trashRow = await cdp.waitFor(`()=>[...document.querySelectorAll('tbody tr')].some(tr=>tr.textContent?.includes(${JSON.stringify(ROLL_NAME)}))`, 20000);
     check("trash lists the file", Boolean(trashRow), String(trashRow));
     await cdp.evaluate(`(()=>{const row=[...document.querySelectorAll('tbody tr')].find(tr=>tr.textContent?.includes(${JSON.stringify(ROLL_NAME)}));[...row.querySelectorAll('button')].find(b=>b.textContent?.trim()==='恢复')?.click();return true;})()`);
-    const restoreReady = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('恢复 —'));return d&&d.textContent?.includes('目标位置')?d.textContent:false;}`, 15000);
+    const restoreReady = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('恢复 —'));return d&&d.textContent?.includes('目前位置')?d.textContent:false;}`, 15000);
     const restoreInfo = await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('恢复 —'));return d?d.textContent:null;})()`);
-    check("WF-17 restore dialog shows original and target location",
-      typeof restoreReady === "string" && restoreInfo?.includes("原位置") && restoreInfo?.includes("目标位置"), String(restoreInfo?.slice(0, 120)));
+    check("WF-17 restore dialog shows deleted and destination location",
+      typeof restoreReady === "string" && restoreInfo?.includes("删除时位置") && restoreInfo?.includes("目前位置") && restoreInfo?.includes(ROLL_NAME),
+      String(restoreInfo?.slice(0, 150)));
     await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.textContent?.includes('恢复 —'));[...d.querySelectorAll('button')].find(b=>b.textContent?.trim()==='确认恢复')?.click();return true;})()`);
     const restored = await cdp.waitFor(`()=>![...document.querySelectorAll('tbody tr')].some(tr=>tr.textContent?.includes(${JSON.stringify(ROLL_NAME)}))`, 20000);
     check("WF-17 restore removes the file from the trash list", restored === true, String(restored));
