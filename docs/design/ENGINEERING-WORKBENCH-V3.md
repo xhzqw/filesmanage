@@ -202,6 +202,24 @@ This document records validated capability instead of marking unimplemented work
 - Synthetic STYLE/TEXT regressions verify mapping/provenance; real headless
   Chromium compares actual rasterized glyph images for Comic and Arial.
 
+## 2D white-paper contrast and coordinate ruler correction (October 2026)
+
+- 2D DXF defaults to a white sheet with dark CAD ink. ACI 7 is already dark;
+  explicit TrueColor white, near-white pen colours, cyan and yellow now pass a
+  minimum 4.5:1 paper contrast mapping for preview visibility, preserving
+  darker semantic layer colours. This changes only the rendered preview,
+  never the uploaded DXF bytes. It is not a replacement for print CTB/STB.
+- A lightweight SVG overlay renders faint zoom-adaptive XY gridlines, explicit
+  source-DXF coordinates on rulers, and a live X/Y pointer readout. Coordinates
+  account for the scene-centering offset and camera pan/zoom. Grid can be
+  toggled without losing the rulers; 3D model display is unaffected.
+- Ruler geometry is bounded, is not appended as another WebGL canvas and is
+  removed on scene disposal/layout switch. It does not become source geometry
+  or enter scale-aware vector plots.
+- Remote geometry tests cover white TrueColor and low-contrast colour pens.
+  Actual Chromium verifies ruler creation, tick legibility, grid toggling,
+  layout cleanup and narrow 500px viewports.
+
 ## Deliberately unsupported or approximate
 
 | Capability | Current truth | Next gate |

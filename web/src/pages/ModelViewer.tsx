@@ -227,7 +227,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
       }
      },setMeasure,(yaw,pitch)=>setCube({yaw,pitch}));
      controls.current=mountedControls;
-     setView({axes:false,grid:format!=="dxf",edges:format!=="dxf",measure:false,
+     setView({axes:false,grid:true,edges:format!=="dxf",measure:false,
       projection:format==="dxf"?"orthographic":"perspective"});
      pendingObject=null;
      setStatus("ready");

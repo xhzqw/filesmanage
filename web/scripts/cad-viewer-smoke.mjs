@@ -52,6 +52,25 @@ assert((linework[0]?.geometry.getAttribute("position").count??0)>8,
  "bulge must be tessellated into an arc, not a straight chord");
 assert.equal(linework[0]?.material.color.getHex(),0x253b53,
  "ACI 7 must be dark on white paper");
+const colorFixture=[
+ "0","SECTION","2","TABLES","0","TABLE","2","LAYER",
+ "0","LAYER","2","WHITE_LAYER","62","7","420","16777215",
+ "0","ENDTAB","0","ENDSEC",
+ "0","SECTION","2","ENTITIES",
+ "0","LINE","8","WHITE_LAYER","10","0","20","0","11","100","21","0",
+ "0","LINE","8","TRUE_WHITE","420","16777215","10","0","20","10","11","100","21","10",
+ "0","LINE","8","CYAN","420","65535","10","0","20","20","11","100","21","20",
+ "0","LINE","8","DARK","420","2245734","10","0","20","30","11","100","21","30",
+ "0","ENDSEC","0","EOF",
+].join("\n");
+const contrasted=parseDxf(colorFixture,THREE);
+const inkColors=new Map(contrasted.object.children.map(layer=>[
+ layer.name,layer.children.find(child=>child.isLineSegments)?.material.color.getHex(),
+]));
+assert.equal(inkColors.get("WHITE_LAYER"),0x172a3b,"white layer TrueColor must be dark ink on white paper");
+assert.equal(inkColors.get("TRUE_WHITE"),0x172a3b,"explicit white entity cannot disappear on white paper");
+assert.equal(inkColors.get("DARK"),2245734,"dark CAD ink should retain its own actual hue");
+assert.notEqual(inkColors.get("CYAN"),65535,"bright cyan must gain contrast without becoming invisible");
 assert(cut.children.some(node=>node.isSprite),"TEXT should render glyphs");
 const hidden=parsed.object.children[1];
 assert(hidden&&!hidden.visible);

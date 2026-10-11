@@ -1,5 +1,6 @@
 import type * as Three from "three";
 import {createDrawingSnapIndex,type DrawingSegment} from "./snap2d";
+import {mountDrawingRuler,type DrawingCoordinate} from "./drawingRuler";
 
 export type StandardView="iso"|"front"|"back"|"left"|"right"|"top"|"bottom";
 export type ViewerMetrics={triangles:number;vertices:number;size:[number,number,number];components:number};
@@ -93,6 +94,8 @@ export function mountEngineeringScene(
  renderer.domElement.style.cssText="display:block;width:100%;height:100%;touch-action:none";
  renderer.domElement.setAttribute("aria-label",drawing?"工程图画布":"三维模型画布");
  holder.appendChild(renderer.domElement);
+ const drawingRuler=drawing?mountDrawingRuler(holder):null;
+ let pointerCoordinate:DrawingCoordinate|null=null;
  const axes=new THREE.AxesHelper(radius*1.1);
  axes.position.set(-size.x/2,-size.y/2,-size.z/2);axes.visible=false;
  if(!drawing)scene.add(axes);
@@ -100,8 +103,10 @@ export function mountEngineeringScene(
  if(drawing){grid.rotation.x=Math.PI/2;grid.position.z=-Math.max(radius*.002,.000001);}
  else grid.position.y=-size.y/2-Math.max(radius*.035,.000001);
  scene.add(grid);
- let gridVisible=!drawing,outlineVisible=true,stepLast=0;
- grid.visible=gridVisible;
+ let gridVisible=true,outlineVisible=true,stepLast=0;
+ // 2D grid is drawn by the coordinate SVG ruler in the actual XY plane,
+ // rather than placing a 3D GridHelper over engineering linework.
+ grid.visible=!drawing;
  let controls=new OrbitControls(camera,renderer.domElement);
  let viewName:StandardView=drawing?"front":"iso";
  const distance=Math.max(radius*3.5,radius/Math.tan(21*Math.PI/180)*1.35);
@@ -204,7 +209,7 @@ export function mountEngineeringScene(
   return (r<=1?1:r<=2?2:r<=5?5:10)*b;
  };
  const updateGrid=()=>{
-  if(!gridVisible)return;
+  if(!gridVisible||drawing)return;
   const unitPerPixel=camera===ortho
    ?2*halfHeight()/Math.max(ortho.zoom*holder.clientHeight,1)
    :2*Math.max(camera.position.distanceTo(controls.target),near)*Math.tan(21*Math.PI/180)/Math.max(holder.clientHeight,1);
@@ -264,6 +269,15 @@ export function mountEngineeringScene(
  };
  const onDown=(event:PointerEvent)=>{if(measuring&&event.button===0)press={x:event.clientX,y:event.clientY};};
  const onMove=(event:PointerEvent)=>{
+  if(drawing){
+   const rect=renderer.domElement.getBoundingClientRect();
+   cursor.set((event.clientX-rect.left)/Math.max(rect.width,1)*2-1,
+    -(event.clientY-rect.top)/Math.max(rect.height,1)*2+1);
+   raycaster.setFromCamera(cursor,camera);
+   const world=raycaster.ray.intersectPlane(measurePlane,new THREE.Vector3());
+   pointerCoordinate=world?{x:world.x+center.x,y:world.y+center.y}:null;
+   invalidate();
+  }
   if(!drawing||!measuring||!drawingSnap)return;
   const candidate=positionOnDrawing(event);
   snapMarker.visible=Boolean(candidate?.snap);
@@ -301,12 +315,22 @@ export function mountEngineeringScene(
  renderer.domElement.addEventListener("pointerdown",onDown);
  renderer.domElement.addEventListener("pointerup",onUp);
  renderer.domElement.addEventListener("pointermove",onMove);
- const onLeave=()=>{if(snapMarker.visible){snapMarker.visible=false;invalidate();}};
+ const onLeave=()=>{
+  if(drawing)pointerCoordinate=null;
+  if(snapMarker.visible)snapMarker.visible=false;
+  invalidate();
+ };
  renderer.domElement.addEventListener("pointerleave",onLeave);
  const draw=()=>{
   raf=0;if(disposed||lost||document.hidden)return;
   const moving=controls.update();
   updateGrid();
+  if(drawing&&drawingRuler){
+   const h=halfHeight()/ortho.zoom,w=h*aspect(),target=controls.target;
+   drawingRuler.update({left:target.x-w+center.x,right:target.x+w+center.x,
+    top:target.y+h+center.y,bottom:target.y-h+center.y},
+   gridVisible,pointerCoordinate);
+  }
   if(dirty||moving)renderer.render(scene,camera);
   dirty=false;
   if(moving)invalidate();
@@ -340,13 +364,14 @@ export function mountEngineeringScene(
   },
   setStandardView:(name)=>{if(drawing)return;if(name!=="iso")switchCamera(ortho);setPose(name);},
   toggleAxes:()=>{axes.visible=!axes.visible;invalidate();return axes.visible;},
-  toggleGrid:()=>{gridVisible=!gridVisible;grid.visible=gridVisible;if(gridVisible)updateGrid();invalidate();return gridVisible;},
+  toggleGrid:()=>{gridVisible=!gridVisible;grid.visible=!drawing&&gridVisible;if(gridVisible)updateGrid();invalidate();return gridVisible;},
   toggleEdges:()=>{outlineVisible=!outlineVisible;outlines.forEach(edge=>{edge.visible=outlineVisible;});invalidate();return outlineVisible;},
   toggleProjection:()=>{if(!drawing)switchCamera(camera===persp?ortho:persp);invalidate();return camera===ortho?"orthographic":"perspective";},
   toggleMeasure:()=>{measuring=!measuring;setMeasureNavigation();if(!measuring){snapMarker.visible=false;clearMeasurement();}return measuring;},
   clearMeasurement,
   dispose:()=>{
    if(disposed)return;disposed=true;cancelAnimationFrame(raf);observer.disconnect();
+   drawingRuler?.dispose();
    document.removeEventListener("visibilitychange",visibility);
    renderer.domElement.removeEventListener("webglcontextlost",onLost);
    renderer.domElement.removeEventListener("pointerdown",onDown);

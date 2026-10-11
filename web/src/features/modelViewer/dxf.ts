@@ -13,6 +13,7 @@ import {cadFontFamily,decodeCadText,type CadTextStyle} from "./cadText2d";
 import {clipUvPolygon,createPaperViewport,type UvPoint,type ValidViewport} from "./paperViewport2d";
 import {buildDimensionFallback,DEFAULT_DIM_STYLE,parseDimensionStyle,
  type DimensionPair,type DimensionStyle} from "./dimension2d";
+import {readablePaperColor} from "./drawingPalette";
 
 export type DxfParseResult={
  object:THREE.Group;
@@ -308,13 +309,13 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
  const actualLayer=(name:string)=>name==="0"?inheritedLayer:name;
  const hatchBudget=120000;
  let hatchTriangles=0;
- const resolvedLayerColor=(name:string)=>layerTrueColors.get(name)??aciColor(layerColor(name));
+ const resolvedLayerColor=(name:string)=>readablePaperColor(layerTrueColors.get(name)??aciColor(layerColor(name)));
  const entityColor=(e:Entity)=>{
   const layer=actualLayer(e.layer);
-  if(e.trueColor!==null)return e.trueColor;
-  if(e.colorIndex===0)return inheritedColor??resolvedLayerColor(layer);
+  if(e.trueColor!==null)return readablePaperColor(e.trueColor);
+  if(e.colorIndex===0)return readablePaperColor(inheritedColor??resolvedLayerColor(layer));
   if(e.colorIndex===256)return resolvedLayerColor(layer);
-  return aciColor(e.colorIndex);
+  return readablePaperColor(aciColor(e.colorIndex));
  };
 
  const groupFor=(name:string)=>{

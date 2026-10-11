@@ -50,7 +50,12 @@ function mount(drawing=false,layout="Model"){
    "10","500","20","500","11","510","21","500",
    "0","ENDSEC","0","EOF",
   ].join("\n");
-  const source=layout==="FONTS"?[
+  const source=layout==="INK"?[
+   "0","SECTION","2","ENTITIES",
+   "0","LINE","8","WHITE","420","16777215","10","-50","20","0","11","50","21","0",
+   "0","LINE","8","CYAN","420","65535","10","0","20","-30","11","0","21","30",
+   "0","ENDSEC","0","EOF",
+  ].join("\n"):layout==="FONTS"?[
    "0","SECTION","2","TABLES","0","TABLE","2","STYLE",
    "0","STYLE","2","Comic Sans MS","3","comic.ttf",
    "0","STYLE","2","ARIAL","3","arial.ttf",
@@ -112,6 +117,12 @@ mount();
 window.__cad={
  get state(){return {metrics,camera:lastCamera,canvases:holder.querySelectorAll("canvas").length,
   width:holder.querySelector("canvas")?.getBoundingClientRect().width??0,
+  coordinateRulers:holder.querySelectorAll(".cad-coordinate-ruler").length,
+  rulerTicks:holder.querySelectorAll(".cad-coordinate-ruler text").length,
+  rulerGridLines:holder.querySelectorAll(".cad-coordinate-ruler path[stroke]").length,
+  rulerText:holder.querySelector(".cad-coordinate-ruler")?.textContent??"",
+  inkColors:actualDrawing?.object.children.map(g=>[g.name,
+   g.children.find(n=>n.isLineSegments)?.material.color.getHex()])??[],
   drawingLayers:actualDrawing?.layers.length??0,
   drawingLayout:actualDrawing?.layout??null,layoutCount:actualDrawing?.layouts.length??0,
   dimensionSprites:actualDrawing?.object.children.reduce((sum,g)=>sum+
@@ -132,6 +143,7 @@ window.__cad={
  focus:()=>{const mesh=holder.querySelector("canvas");return Boolean(mesh)&&Boolean(controls.resetView());},
  grid:()=>controls.toggleGrid(),
  drawing:()=>mount(true),
+ ink:()=>mount(true,"INK"),
  sheet:()=>mount(true,"A1"),
  projected:()=>mount(true,"P1"),
  frozen:()=>mount(true,"P2"),
@@ -255,6 +267,25 @@ try{
  assert.equal(drawing.drawingLayers,4,"DIMENSION, NURBS, solid and patterned HATCH must render");
  assert(drawing.metrics.size[0]>=100,"dimension and spline linework must retain actual drawing scale");
  assert.equal(await cdp.eval("window.__cad.png()"),true,"drawing can export a PNG preview");
+ await cdp.eval("window.__cad.ink()");
+ await delay(120);
+ const ink=await cdp.eval("window.__cad.state");
+ assert.equal(ink.coordinateRulers,1,"a single screen-space XY coordinate ruler must be present");
+ assert(ink.rulerTicks>=3,"CAD coordinate ticks must be legible on both axes");
+ assert.match(ink.rulerText,/XY/);
+ assert.match(ink.rulerText,/X .*Y /,"live pointer coordinate display must exist");
+ assert.equal(new Map(ink.inkColors).get("WHITE"),0x172a3b,
+  "white TrueColor DXF lines cannot disappear on white paper");
+ assert.notEqual(new Map(ink.inkColors).get("CYAN"),0x00ffff,
+  "low-contrast cyan DXF lines must be darkened for white paper");
+ await cdp.eval("window.__cad.grid()");
+ await delay(100);
+ const noGrid=await cdp.eval("window.__cad.state");
+ assert.equal(noGrid.rulerGridLines,1,"grid toggle hides grid while retaining the ruler boundary");
+ await cdp.eval("window.__cad.grid()");
+ await delay(100);
+ const withGrid=await cdp.eval("window.__cad.state");
+ assert(withGrid.rulerGridLines>=3,"subtle grid can be toggled on with both major and minor lines");
  const sheet=await cdp.eval("(()=>{window.__cad.sheet();return window.__cad.state})()");
  assert.equal(sheet.canvases,1,"layout switching must dispose the old canvas");
  assert.equal(sheet.drawingLayout,"A1");
@@ -263,6 +294,7 @@ try{
  assert.equal(await cdp.eval("window.__cad.png()"),true,"paper layout can export independently");
  const projected=await cdp.eval("(()=>{window.__cad.projected();return window.__cad.state})()");
  assert.equal(projected.canvases,1,"projected sheet must not leak WebGL canvases");
+ assert.equal(projected.coordinateRulers,1,"layout changes must not leak or duplicate SVG rulers");
  assert.equal(projected.drawingLayout,"P1");
  assert.equal(projected.drawingLayers,4,"paper sheet contains projected lines, fill and annotations");
  assert.equal(projected.projectedViewports,1,"paper viewport completeness is surfaced");
@@ -298,7 +330,12 @@ try{
  await delay(400);
  const narrow=await cdp.eval("window.__cad.state.width");
  assert(narrow>=490&&narrow<=505,"projected paper layout remains responsive in narrow viewport");
+ const narrowRuler=await cdp.eval("window.__cad.state");
+ assert.equal(narrowRuler.coordinateRulers,1);
+ assert(narrowRuler.rulerTicks>1,"narrow 500px viewport must keep coordinate ticks");
  assert.equal(await cdp.eval("window.__cad.dispose()"),0,"dispose must remove WebGL canvas");
+ assert.equal(await cdp.eval("window.__cad.state.coordinateRulers"),0,
+  "disposing viewport must remove coordinate ruler");
  console.log("CAD_BROWSER_PASS Chrome WebGL: 3D navigation, real paper VIEWPORT line projection, DXF geometry, responsive sizes and disposal");
 }finally{
  cdp?.ws.close();
