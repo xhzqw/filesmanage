@@ -2,7 +2,7 @@ import {useEffect,useRef,useState} from "react";
 import {useNavigate} from "react-router-dom";
 import {RareButton} from "../../shared/ui/rare";
 import {approvalActivityApi,type ApprovalNotification} from "./activityApi";
-import {lifecycleWorkspaceApi,type LifecycleNotice} from "../documents/lifecycleWorkspaceApi";
+import {lifecycleNotificationApi,type LifecycleNotice} from "./lifecycleNotificationApi";
 import "./notificationCenter.css";
 
 const eventLabel:Record<string,string>={submitted:"待你审批",advanced:"审批已流转",approved:"审批已通过",rejected:"审批被拒绝",cancelled:"申请已撤回",conflicted:"审批冲突"};
@@ -21,7 +21,7 @@ export function NotificationCenter(){
   let valid=true;
   async function refresh(){
    try{
-    const [items,due]=await Promise.all([approvalActivityApi.notifications(),lifecycleWorkspaceApi.notifications()]);
+    const [items,due]=await Promise.all([approvalActivityApi.notifications(),lifecycleNotificationApi.notifications()]);
     if(valid){setNotes(items);setLifecycleNotes(due);setError("");}
    }catch{if(valid)setError("通知暂时不可用");}
   }
@@ -60,7 +60,7 @@ export function NotificationCenter(){
   setLoading(true);
   if(!note.read){
    try{
-    await lifecycleWorkspaceApi.read(note.id);
+    await lifecycleNotificationApi.read(note.id);
     setLifecycleNotes(current=>current.map(n=>n.id===note.id?{...n,read:true}:n));
     window.dispatchEvent(new Event("filesmanage:lifecycle-notifications-read"));
    }catch{setError("标记已读失败，可重试");setLoading(false);return;}
