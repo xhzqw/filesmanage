@@ -327,6 +327,10 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 		where = append(where, "EXISTS(SELECT 1 FROM file_metadata md WHERE md.file_id=f.id AND "+ph.next()+"=ANY(md.tags))")
 		args = append(args, q.Tag)
 	}
+	// Save all non-keyword visibility and metadata predicates for the ranked
+	// tier reader. It must never widen a caller's authorized result scope.
+	baseWhere := append([]string(nil), where...)
+	baseArgs := append([]any(nil), args...)
 	// Two-phase read: a narrow pre-sort over the matching ids carries the exact
 	// window count, and only the page's rows join versions and the wide text
 	// index (SPEC §10.2/READ-07). Joining file_text first would drag 100k wide
@@ -342,11 +346,11 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	// Few hits take a GIN-backed ID union; broad hits retain the early-stopping
 	// ordered scan. Both paths enforce the exact same authorized folder scope,
 	// filters, sort and cursor on the outer files table.
+	selective := false
 	if q.Query != "" {
 		const candidateLimit = 256
 		pattern := "%" + q.Query + "%"
 		hanPair := exactHanPair(q.Query)
-		selective := false
 		if len([]rune(q.Query)) >= 2 {
 			var candidateCount int
 			nameCheck := "name ILIKE $1"
@@ -412,6 +416,12 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	total := 0
 	if err = r.Q.QueryRow(ctx, cte+" SELECT count(*) FROM (SELECT f.id FROM files f WHERE "+strings.Join(where, " AND ")+" LIMIT "+fmt.Sprint(searchTotalCap)+") t", args...).Scan(&total); err != nil {
 		return nil, 0, err
+	}
+	if q.Sort == "relevance" && q.Query != "" && !selective {
+		// For broad terms a global CASE+ORDER BY would sort 100k files
+		// before returning even one row. Read small, disjoint ranked tiers
+		// in precedence order and stop once the requested page is full.
+		return r.searchRelevanceTiers(ctx, q, cte, baseWhere, baseArgs, total)
 	}
 	// Rank is a projection of the *authorized* match, not another filter:
 	// 0 exact filename, 1 filename contains, 2 indexed text only. Allocate
@@ -488,6 +498,77 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 		out = append(out, f)
 	}
 	return out, total, rows.Err()
+}
+
+// searchRelevanceTiers keeps broad searches fast: sorting every authorized
+// matching file by a dynamic CASE expression would turn the 100k-file common
+// term path into a >1s global sort. Each tier is mutually exclusive and
+// ordered on the existing (updated_at,id) key, with an exact-name B-tree index
+// for the first tier. Cursor predicates only restrict its own tier; all later
+// tiers remain eligible until the lookahead-filled page is complete.
+func (r *Repository) searchRelevanceTiers(ctx context.Context, q ports.FileSearchQuery, cte string, scopeWhere []string, scopeArgs []any, total int) ([]domain.File, int, error) {
+	out := make([]domain.File, 0, q.Limit)
+	with := cte
+	if with == "" {
+		with = "WITH"
+	} else {
+		with += ","
+	}
+	for rank := 0; rank < 3 && len(out) < q.Limit; rank++ {
+		if q.CursorID != "" && rank < q.CursorRank {
+			continue
+		}
+		args := append([]any(nil), scopeArgs...)
+		ph := newPlaceholder(len(args))
+		conditions := append([]string(nil), scopeWhere...)
+		switch rank {
+		case 0: // exact filename, Unicode case-insensitive
+			conditions = append(conditions, "lower(f.name)=lower("+ph.next()+")")
+			args = append(args, q.Query)
+		case 1: // filename contains, but not exact
+			conditions = append(conditions, "f.name ILIKE "+ph.next()+" AND lower(f.name)<>lower("+ph.next()+")")
+			args = append(args, "%"+q.Query+"%", q.Query)
+		case 2: // indexed content alone; neither filename tier matched
+			conditions = append(conditions, "NOT(f.name ILIKE "+ph.next()+") AND EXISTS (SELECT 1 FROM file_text ft WHERE ft.file_id=f.id AND ft.tsv @@ phraseto_tsquery('simple', "+ph.next()+"))")
+			args = append(args, "%"+q.Query+"%", q.TextQuery)
+		}
+		if q.CursorID != "" && rank == q.CursorRank {
+			conditions = append(conditions, "(f.updated_at,f.id)<("+ph.next()+","+ph.next()+")")
+			args = append(args, q.CursorTime, q.CursorID)
+		}
+		limit := q.Limit - len(out)
+		sql := with + ` matched AS (
+		  SELECT f.id,f.updated_at FROM files f
+		  WHERE ` + strings.Join(conditions, " AND ") + `
+		  ORDER BY f.updated_at DESC,f.id DESC LIMIT ` + fmt.Sprint(limit) + `
+		)
+		SELECT f.id,f.folder_id,f.name,f.uploaded_by,f.content_type,f.current_version_seq,
+		  v.size_bytes,v.sha256,f.updated_at,f.deleted_at,coalesce(ft.content,''),` + fmt.Sprint(rank) + `::integer
+		FROM matched m
+		JOIN files f ON f.id=m.id
+		LEFT JOIN file_versions v ON v.file_id=f.id AND v.seq=f.current_version_seq
+		LEFT JOIN file_text ft ON ft.file_id=f.id
+		ORDER BY m.updated_at DESC,m.id DESC`
+		rows, err := r.Q.Query(ctx, sql, args...)
+		if err != nil {
+			return nil, 0, err
+		}
+		for rows.Next() {
+			file, content, scanErr := scanFileWithText(rows)
+			if scanErr != nil {
+				rows.Close()
+				return nil, 0, scanErr
+			}
+			file.Snippet = domain.Snippet(content, q.Query, snippetWindow)
+			out = append(out, file)
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+	return out, total, nil
 }
 
 // scanFileWithText scans a file row plus its indexed content for snippets.
