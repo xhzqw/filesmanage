@@ -595,7 +595,7 @@ tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions 
 .login-card{background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-md);padding:var(--space-8) var(--space-6);width:92%;max-width:380px;box-shadow:0 1px 2px rgba(15,39,92,.06),0 12px 32px rgba(15,39,92,.08)}
 .login-card p{color:var(--text-secondary);font-size:12px}
 .login-card form{display:grid;gap:var(--space-2);margin-top:var(--space-2)}
-.login-card input{border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:0 var(--space-3);height:var(--height-control);width:100%}
+.login-card input:not([type="checkbox"]):not([type="radio"]){border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:0 var(--space-3);height:var(--height-control);width:100%}
 .login-card label{font-weight:600;font-size:12px;color:var(--text-secondary)}
 .brand-lockup{display:grid;justify-items:center;gap:var(--space-1);text-align:center}
 .brand-lockup .login-logo{width:40px;height:40px}
@@ -607,7 +607,9 @@ tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions 
 .input-wrap input{padding-left:30px}
 .input-wrap input:focus{outline:1px solid var(--border-focus);outline-offset:0;border-color:var(--border-focus);box-shadow:0 0 0 3px rgba(2,160,234,.16)}
 .form-extras{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);font-size:12px}
-.form-extras .remember{display:inline-flex;align-items:center;gap:var(--space-1);font-weight:400;color:var(--text-secondary)}
+.form-extras .remember{display:inline-flex;align-items:center;gap:6px;flex:none;white-space:nowrap;line-height:1.25;font-weight:400;color:var(--text-secondary);cursor:pointer}
+.form-extras .remember input[type="checkbox"]{width:16px;height:16px;min-width:16px;flex:none;margin:0;padding:0;accent-color:var(--brand-blue);cursor:pointer}
+.form-extras .forgot{flex:none;margin-left:auto;white-space:nowrap}
 .forgot{background:none;border:0;color:var(--brand-blue);font-size:12px;height:auto;min-height:0;padding:2px 0;text-decoration:underline;text-underline-offset:2px}
 .forgot:hover{background:none;color:var(--color-action-hover)}
 .reset-hint{margin:0;font-size:11px;color:var(--status-warning)}
