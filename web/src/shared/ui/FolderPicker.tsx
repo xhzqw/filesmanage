@@ -1,4 +1,5 @@
 import {RareButton,RareInput} from "./rare";
+import {FolderResourceIcon} from "./ResourceIcons";
 import {useEffect,useId,useMemo,useRef,useState,type KeyboardEvent,type ReactNode}from "react";
 import "./folderPicker.css";
 
@@ -300,7 +301,7 @@ export function FolderPicker({open,title,folders,selectedId,onSelect,onClose,inv
       :<span className="folder-picker-chevron-spacer" aria-hidden="true"/>}
      <RareButton type="button" className="folder-picker-name" tabIndex={-1} title={folder.name}
       aria-disabled={reason?true:undefined}
-      onClick={()=>{focusRow(folder.id);choose(folder);}}>{folder.name}</RareButton>
+      onClick={()=>{focusRow(folder.id);choose(folder);}}><FolderResourceIcon size={16} open={isOpen}/><span className="folder-picker-name-label">{folder.name}</span></RareButton>
      {reason&&<span className="folder-picker-reason">{reason}</span>}
     </div>
     {isOpen&&children.length>0&&<ul role="group">{branch(folder.id,depth+1)}</ul>}
@@ -335,7 +336,7 @@ export function FolderPicker({open,title,folders,selectedId,onSelect,onClose,inv
         className={"folder-picker-result"+(isCandidate?" candidate":"")+(reason?" invalid":"")}
         aria-disabled={reason?true:undefined}
         onClick={()=>chooseResult(row.folder)}>
-        <span className="folder-picker-result-name">{row.folder.name}</span>
+        <FolderResourceIcon size={16}/><span className="folder-picker-result-name">{row.folder.name}</span>
         <span className="folder-picker-result-path">{row.path}</span>
         {isCandidate&&<span className="folder-picker-result-flag">当前候选</span>}
         {reason&&<span className="folder-picker-reason">{reason}</span>}

@@ -7,6 +7,7 @@ import {errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
 import type {FileItem} from "../../entities/file/model";
 import type {Folder} from "../../entities/folder/model";
+import {FileResourceIcon,FolderResourceIcon} from "../../shared/ui/ResourceIcons";
 import "./collaborationLayout.css";
 
 // Progressive directory rendering over the authorized tree: every row remains
@@ -34,6 +35,7 @@ export function CollaborationPanel(){
  const pageEpoch=useRef(0);
  const pageBusy=useRef(false);
  const[folderShownLimit,setFolderShownLimit]=useState(PICKER_PAGE);
+ const[expandedFolders,setExpandedFolders]=useState<Set<string>>(()=>new Set());
  const[fileCursor,setFileCursor]=useState("");
  const[fileMoreState,setFileMoreState]=useState<"idle"|"loading"|"failed">("idle");
  const fileEpoch=useRef(0);
@@ -178,9 +180,49 @@ export function CollaborationPanel(){
   return out;
  },[folders]);
 
+ // Build the accessible hierarchy once. Orphans are visible roots; no hidden
+ // parent is invented. Default to roots expanded, children independently fold.
+ const byFolderId=useMemo(()=>new Map(folders.map(folder=>[folder.id,folder])),[folders]);
+ const childCounts=useMemo(()=>{
+  const counts=new Map<string,number>();
+  for(const folder of folders){
+   if(folder.parentId!==null&&byFolderId.has(folder.parentId))
+    counts.set(folder.parentId,(counts.get(folder.parentId)??0)+1);
+  }
+  return counts;
+ },[folders,byFolderId]);
+ useEffect(()=>{
+  setExpandedFolders(new Set(folders.filter(folder=>folder.parentId===null||!byFolderId.has(folder.parentId)).map(folder=>folder.id)));
+ },[folders,byFolderId]);
  const keyword=filter.trim().toLowerCase();
  useEffect(()=>{setFolderShownLimit(PICKER_PAGE);},[filter]);
- const matchingFolders=keyword===""?rows:rows.filter(row=>row.path.toLowerCase().includes(keyword));
+ // Searching keeps each matching folder's visible ancestor chain. Outside
+ // search, descendants appear only under an explicitly expanded parent.
+ const matchingFolders=useMemo(()=>{
+  if(keyword!==""){
+   const visible=new Set<string>();
+   for(const row of rows){
+    if(!row.path.toLowerCase().includes(keyword))continue;
+    let current:Folder|undefined=row.folder;
+    const seen=new Set<string>();
+    while(current&&!seen.has(current.id)){
+     seen.add(current.id);visible.add(current.id);
+     current=current.parentId!==null?byFolderId.get(current.parentId):undefined;
+    }
+   }
+   return rows.filter(row=>visible.has(row.folder.id));
+  }
+  return rows.filter(row=>{
+   let parentId=row.folder.parentId;
+   const seen=new Set<string>();
+   while(parentId!==null&&byFolderId.has(parentId)){
+    if(seen.has(parentId)||!expandedFolders.has(parentId))return false;
+    seen.add(parentId);
+    parentId=byFolderId.get(parentId)!.parentId;
+   }
+   return true;
+  });
+ },[rows,keyword,expandedFolders,byFolderId]);
  const shownFolders=matchingFolders.slice(0,folderShownLimit);
  const browseFolder=folders.find(folder=>folder.id===folderId);
  const chosenFile=files.find(file=>file.id===fileId);
@@ -217,6 +259,25 @@ export function CollaborationPanel(){
  function pickFolder(id:string){
   setFolderId(id);
   setFileId("");
+  setExpandedFolders(old=>{
+   const next=new Set(old);
+   let parentId=byFolderId.get(id)?.parentId;
+   const seen=new Set<string>();
+   while(parentId!==null&&parentId!==undefined&&!seen.has(parentId)){
+    seen.add(parentId);next.add(parentId);
+    parentId=byFolderId.get(parentId)?.parentId;
+   }
+   return next;
+  });
+ }
+ function toggleFolder(id:string){
+  // A search chevron switches to browsing that branch of the real tree.
+  if(keyword)setFilter("");
+  setExpandedFolders(old=>{
+   const next=new Set(old);
+   if(next.has(id))next.delete(id);else next.add(id);
+   return next;
+  });
  }
 
  async function unfavorite(id:string,kind:string){
@@ -292,7 +353,7 @@ export function CollaborationPanel(){
   </div>
   {message&&<p role="status" className={"notice"+(messageTone==="error"?" error":"")}>{message}</p>}
   <div className={"collab-workspace"+(tab==="favorites"?" with-picker":"")}>
-  {tab==="favorites"&&<section className="share-workbench" aria-label="选择关注或分享资源">
+  {tab==="favorites"&&<section className={"share-workbench"+(pickKind==="file"?" is-file-mode":"")} aria-label="选择关注或分享资源">
    <div className="share-workbench-head"><h3>选择资源</h3></div>
    {treeState==="loading"&&<p className="hint">正在读取目录…</p>}
    {treeState==="failed"&&<>
@@ -311,13 +372,30 @@ export function CollaborationPanel(){
      autoComplete="off" disabled={pickBusy} onChange={event=>setFilter(event.target.value)}/>
     {rows.length===0
      ?<p className="share-list-empty">当前账号没有可访问的目录。</p>
-     :<div role="radiogroup" aria-label={pickKind==="folder"?"选择目录":"选择文件所在目录"} className="share-picker-list">
+     :<div role="radiogroup" aria-label={pickKind==="folder"?"选择目录":"选择文件所在目录"} className="share-picker-list share-folder-tree">
       {shownFolders.length===0&&<p className="share-list-empty">没有匹配的目录。</p>}
-      {shownFolders.map(row=><RareButton key={row.folder.id} type="button" role="radio"
-       aria-checked={folderId===row.folder.id}
-       className={"share-picker-row"+(folderId===row.folder.id?" on":"")}
-       style={{paddingLeft:String(8+Math.min(row.depth,8)*14)+"px"}} disabled={pickBusy}
-       title={row.path} onClick={()=>pickFolder(row.folder.id)}>{row.folder.name}</RareButton>)}
+      {shownFolders.map(row=>{
+       const hasChildren=(childCounts.get(row.folder.id)??0)>0;
+       const isOpen=keyword!==""||expandedFolders.has(row.folder.id);
+       const isSelected=folderId===row.folder.id;
+       return <div className="share-tree-entry" key={row.folder.id}
+        style={{paddingInlineStart:String(4+Math.min(row.depth,8)*18)+"px"}}>
+        {hasChildren
+         ?<RareButton type="button" className="share-tree-expander" disabled={pickBusy}
+           aria-label={isOpen?`折叠 ${row.folder.name}`:`展开 ${row.folder.name}`}
+           aria-expanded={isOpen} onClick={()=>toggleFolder(row.folder.id)}>
+           <svg viewBox="0 0 16 16" aria-hidden="true"><path d={isOpen?"m4.5 6 3.5 3.5L11.5 6":"m6 4.5 3.5 3.5L6 11.5"}/></svg>
+          </RareButton>
+         :<span className="share-tree-expander-spacer" aria-hidden="true"/>}
+        <RareButton type="button" role="radio" aria-checked={isSelected}
+         className={"share-picker-row"+(isSelected?" on":"")} disabled={pickBusy}
+         title={row.path} onClick={()=>pickFolder(row.folder.id)}>
+         <FolderResourceIcon open={isOpen&&hasChildren} size={16}/>
+         <span className="share-option-name">{row.folder.name}</span>
+         {isSelected&&<span className="share-picker-check" aria-hidden="true">✓</span>}
+        </RareButton>
+       </div>;
+      })}
      </div>}
     {matchingFolders.length>folderShownLimit&&<RareButton type="button" className="secondary-action" disabled={pickBusy} onClick={()=>setFolderShownLimit(n=>n+PICKER_PAGE)}>加载更多目录（已显示 {shownFolders.length}/{matchingFolders.length}）</RareButton>}
     {pickKind==="file"&&<>
@@ -330,9 +408,9 @@ export function CollaborationPanel(){
       {files.map(file=><RareButton key={file.id} type="button" role="radio" aria-checked={fileId===file.id}
        className={"share-picker-row"+(fileId===file.id?" on":"")} disabled={pickBusy}
        onClick={()=>setFileId(file.id)}>
-       <span className="share-option-kind">文件</span>
+       <FileResourceIcon size={16}/>
        <span className="share-option-name" title={file.name}>{file.name}</span>
-       <span className="share-option-detail">{file.updatedAt.replace("T"," ").slice(0,16)}</span>
+       <span className="share-option-detail">{file.updatedAt.replace("T"," ").slice(0,16)}</span>{fileId===file.id&&<span className="share-picker-check" aria-hidden="true">✓</span>}
       </RareButton>)}
      </div>}
      {fileCursor&&filesState==="ready"&&<RareButton type="button" className="secondary-action" disabled={fileMoreState==="loading"||pickBusy} onClick={()=>void loadFilesMore()}>{fileMoreState==="loading"?"加载中…":fileMoreState==="failed"?"重试加载文件":"加载更多文件"}</RareButton>}

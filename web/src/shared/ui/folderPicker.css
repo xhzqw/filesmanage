@@ -38,6 +38,11 @@
 .folder-picker-chevron-spacer{display:inline-block;align-self:stretch;width:28px;min-width:28px}
 .folder-picker-name{flex:1 1 auto;min-width:0;min-height:32px;padding:0 var(--space-1);border:0;background:transparent;color:inherit;font-size:inherit;font-weight:inherit;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .folder-picker-name:hover{background:transparent;color:var(--color-action);text-decoration:underline}
+.folder-picker-name{display:flex;align-items:center;gap:7px}
+.folder-picker-name svg,.folder-picker-result svg{flex:none}
+.folder-picker-name-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.folder-picker-result{align-items:center}
+.folder-picker-result-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .folder-picker-name[aria-disabled="true"],.folder-picker-name[aria-disabled="true"]:hover{background:transparent;color:var(--color-text-secondary);cursor:not-allowed;text-decoration:none}
 /* The reason is never hidden: a disabled row stays readable instead of only gray. */
 .folder-picker-reason{flex-basis:100%;margin-left:32px;color:var(--color-danger);font-size:12px;line-height:1.4;overflow-wrap:anywhere}

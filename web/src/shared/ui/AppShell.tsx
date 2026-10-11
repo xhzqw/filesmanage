@@ -3,6 +3,7 @@ import {useContext,useRef,useState,type ReactNode} from "react";
 import {ShellAccessories} from "./ShellAccessories";
 import {Link,useLocation,useNavigate} from "react-router-dom";
 import {Menu} from "./Menu";
+import {FolderResourceIcon} from "./ResourceIcons";
 
 // The shell only needs the display name; keeping the type structural avoids a
 // shared -> entities dependency, which the architecture gate forbids.
@@ -12,10 +13,7 @@ type ShellUser={displayName:string;isAdmin?:boolean};
 // icons. A self-drawn icon must never stand in for the corporate mark — that
 // is the imported BrandLogo's job (SPEC §18 BRAND-01/03).
 export function FolderIcon({size=16}:{size?:number}){
- return <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-  <path d="M2.5 5.5A2 2 0 0 1 4.5 3.5h4.2l2 2.4h8.8a2 2 0 0 1 2 2v9.6a2 2 0 0 1-2 2h-16a2 2 0 0 1-2 2z" fill="#F5B623"/>
-  <path d="M2.5 8.6h19" stroke="#D89A0E" strokeWidth="1.1"/>
- </svg>;
+ return <FolderResourceIcon size={size}/>;
 }
 
 // Local static asset per BRAND-07; square source, fixed box, never stretched.

@@ -40,6 +40,9 @@
   --brand-blue:#174098;            /* 工业工程蓝: 主交互/行选中/主要链接 */
   --brand-cyan:#02A0EA;            /* 激光极客亮蓝: 装饰轨/下划线/微交互 */
   --brand-cyan-muted:#E0F2FE;      /* 激光蓝微透底色 */
+  --folder-fill:#F5BF43;           /* 文件夹统一暖黄色填充 */
+  --folder-stroke:#AD7410;         /* 文件夹轮廓，浅底可辨 */
+  --folder-open-fill:#F9D47C;      /* 展开目录前缘 */
 
   /* ================= 表面与层级 (Surface & Elevation) ================= */
   --surface-canvas:#F8FAFC;        /* 工作台底衬冷白 (Slate 50) */
