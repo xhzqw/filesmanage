@@ -1305,6 +1305,17 @@ async function finaleSuite() {
     const countLine = await cdp.evaluate(`(()=>document.querySelector('.search-total')?.textContent||'')()`);
     check("WF-30 the count line reflects the loaded pages", /已显示 60/.test(countLine), String(countLine));
 
+    // ---- G2: file explorer cursor paging is not the search paging path ----
+    await cdp.navigate(`${BASE}/doc?folder=${folderId}`);
+    const firstFilePage = await cdp.waitFor(`()=>document.querySelectorAll('.file-table tbody tr[data-id]').length===50&&!!document.querySelector('.file-page-controls button')`,30000);
+    check("G2 explorer first page contains 50 files and a paging control",firstFilePage===true,String(firstFilePage));
+    const requestedMore = await cdp.evaluate(`(()=>{const button=document.querySelector('.file-page-controls button');if(!button||button.disabled)return false;button.click();button.click();return true;})()`);
+    check("G2 explorer load more accepts rapid clicks safely",requestedMore===true,String(requestedMore));
+    const allFiles = await cdp.waitFor(`()=>document.querySelectorAll('.file-table tbody tr[data-id]').length===60`,30000);
+    const filePage = await cdp.evaluate(`(()=>{const rows=[...document.querySelectorAll('.file-table tbody tr[data-id]')],ids=rows.map(r=>r.getAttribute('data-id'));return {count:rows.length,unique:new Set(ids).size,hasMore:!!document.querySelector('.file-page-controls button'),summary:document.querySelector('.status-left')?.textContent};})()`);
+    check("G2 explorer appends exactly 10 distinct files and marks the page complete",
+     allFiles===true&&filePage.count===60&&filePage.unique===60&&!filePage.hasMore&&filePage.summary?.includes("共 60 个文件"),JSON.stringify(filePage));
+
     // ---- UI: org workbench (WF-32) ----
     await cdp.navigate(`${BASE}/org`);
     const orgReady = await cdp.waitFor(`()=>document.querySelector('ul[role=tree]')!==null||document.querySelector('input[aria-label="新账号"]')!==null`, 20000);
