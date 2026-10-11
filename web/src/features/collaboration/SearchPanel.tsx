@@ -15,6 +15,7 @@ import "./search.css";
 const TOTAL_CAP=1000;
 const PAGE_SIZES=[50,100,200];
 const DEFAULT_PAGE_SIZE=50;
+const SEARCH_DEBOUNCE_MS=180;
 
 // Split the snippet into text nodes and <mark> around the query. React escapes
 // text nodes by default, so a snippet containing HTML renders literally
@@ -102,6 +103,7 @@ export function SearchPanel({userId}:{userId:string}){
   finally{setPresetBusy(false);}
  }
  function loadPreset(preset:SearchPresetFields){
+  cancelPendingSearch();
   setQ(preset.q);setCategory(preset.category);setTag(preset.tag);setUploader(preset.uploader);
   setType(preset.type);setSort(preset.sort);setPageSize(preset.limit);setScope(preset.scope);
   setFolder(preset.folder);setFrom(preset.from);setTo(preset.to);setShowAdvanced(true);
@@ -137,6 +139,7 @@ export function SearchPanel({userId}:{userId:string}){
   document.body.append(link);link.click();link.remove();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
  }
  function clearFilters(){
+  cancelPendingSearch();
   setQ("");setCategory("");setTag("");setUploader("");setType("");setScope("all");setFolder("");
   setFrom("");setTo("");setSort("updated_desc");setPageSize(DEFAULT_PAGE_SIZE);
   epochRef.current++;moreBusyRef.current=false;setQuery(null);setItems([]);setNextCursor("");setTotal(0);setStatus("idle");setMessage("");
@@ -153,6 +156,41 @@ export function SearchPanel({userId}:{userId:string}){
  // every response of an older revision, the mutex keeps 加载更多 single-flight.
  const epochRef=useRef(0);
  const moreBusyRef=useRef(false);
+ const autoSearchTimer=useRef<number|null>(null);
+ const composing=useRef(false);
+
+ function cancelPendingSearch(){
+  if(autoSearchTimer.current!==null)window.clearTimeout(autoSearchTimer.current);
+  autoSearchTimer.current=null;
+ }
+ useEffect(()=>()=>cancelPendingSearch(),[]);
+
+ function searchDraft(term:string):Query{
+  return {q:term.trim(),category:category.trim(),tag:tag.trim(),uploader:uploader.trim(),
+   type:type.trim(),sort,limit:pageSize,folder:scope==="all"?"":folder,
+   scope:scope==="descendants"?"descendants":"",from:boundaryDate(from,false),to:boundaryDate(to,true)};
+ }
+ function onKeywordChange(term:string){
+  setQ(term);
+  cancelPendingSearch();
+  // Invalidate the in-flight request synchronously at the first keystroke.
+  // It must never display a result page for an older query while the new
+  // debounce is waiting; the effect also aborts the old transport on commit.
+  epochRef.current++;
+  moreBusyRef.current=false;
+  setItems([]);setNextCursor("");setTotal(0);setMoreStatus("idle");
+  if(!term.trim()||(scope!=="all"&&!folder)||(from&&to&&from>to)||composing.current){
+   setStatus("idle");
+   setQuery(null);
+   return;
+  }
+  setMessage("");
+  setStatus("loading");
+  autoSearchTimer.current=window.setTimeout(()=>{
+   autoSearchTimer.current=null;
+   setQuery(searchDraft(term));
+  },SEARCH_DEBOUNCE_MS);
+ }
 
  // The first page of the committed query. Bumping the generation synchronously
  // on a new query (and on cleanup) discards a response still in flight, so an
@@ -160,12 +198,13 @@ export function SearchPanel({userId}:{userId:string}){
  useEffect(()=>{
   if(!query)return;
   const epoch=++epochRef.current;
+  const controller=new AbortController();
   // The new revision owns the append state: a previous revision's page request
   // is stale now, and this first page is not a 加载更多.
   moreBusyRef.current=false;
   setStatus("loading");
   setMoreStatus("idle");
-  collaborationApi.search({...query})
+  collaborationApi.search({...query},controller.signal)
    .then(page=>{
     if(epochRef.current!==epoch)return;
     setItems(page.items);
@@ -174,11 +213,12 @@ export function SearchPanel({userId}:{userId:string}){
     setStatus("ready");
    })
    .catch(()=>{if(epochRef.current===epoch)setStatus("failed");});
-  return()=>{epochRef.current++;};
+  return()=>{epochRef.current++;controller.abort();};
  },[query,reloadToken]);
 
  function submit(event:FormEvent){
   event.preventDefault();
+  cancelPendingSearch();
   setMessage("");
   if(from&&to&&from>to){setMessage("开始日期不能晚于结束日期");return;}
   if(scope!=="all"&&!folder){setMessage("请先选择搜索目录");return;}
@@ -189,7 +229,7 @@ export function SearchPanel({userId}:{userId:string}){
   // that resolves in the gap between render and effect cannot append old rows.
   epochRef.current++;
   moreBusyRef.current=false;
-  setQuery({q:q.trim(),category:category.trim(),tag:tag.trim(),uploader:uploader.trim(),type:type.trim(),sort,limit:pageSize,folder:scope==="all"?"":folder,scope:scope==="descendants"?"descendants":"",from:boundaryDate(from,false),to:boundaryDate(to,true)});
+  setQuery(searchDraft(q));
  }
 
  // Appends the server's next page. The cursor is the only append authority: rows
@@ -230,7 +270,11 @@ export function SearchPanel({userId}:{userId:string}){
 
  return <div className="work-body">
   <form id="advanced-search-form" className="toolbar search-bar search-primary" onSubmit={submit} role="search">
-   <RareInput id="search-q" type="search" aria-label="文件名或正文关键词" value={q} onChange={event=>setQ(event.target.value)} placeholder="搜索文件名或正文…" maxLength={200}/>
+   <RareInput id="search-q" type="search" aria-label="文件名或正文关键词" value={q}
+    onChange={event=>onKeywordChange(event.target.value)}
+    onCompositionStart={()=>{composing.current=true;cancelPendingSearch();}}
+    onCompositionEnd={event=>{composing.current=false;onKeywordChange(event.currentTarget.value);}}
+    placeholder="输入即搜：文件名或正文…" maxLength={200}/>
    <RareButton type="submit" className="primary">搜索</RareButton>
    <RareButton type="button" aria-expanded={showAdvanced} onClick={()=>setShowAdvanced(v=>!v)}>高级筛选</RareButton>
    <RareButton type="button" onClick={clearFilters}>重置</RareButton>

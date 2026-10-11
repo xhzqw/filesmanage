@@ -64,12 +64,12 @@ export const collaborationApi={
  folderFiles:(folderId:string,cursor="")=>request<FilePage>("/files?"+new URLSearchParams({folder:folderId,sort:"updated_desc",limit:"50",...(cursor?{cursor}:{})}).toString()),
  // The opaque cursor is passed back verbatim; a missing or empty cursor asks for
  // the first page and nextCursor==="" means the server's last page (WF-30).
- search:(params:{folder?:string;scope?:string;q?:string;category?:string;tag?:string;uploader?:string;type?:string;from?:string;to?:string;sort?:string;limit?:number;cursor?:string})=>{
+ search:(params:{folder?:string;scope?:string;q?:string;category?:string;tag?:string;uploader?:string;type?:string;from?:string;to?:string;sort?:string;limit?:number;cursor?:string},signal?:AbortSignal)=>{
   const query=new URLSearchParams();
   for(const [key,value] of Object.entries(params)){
    if(value!==undefined&&value!=="")query.set(key,String(value));
   }
-  return request<SearchPage>("/search?"+query.toString());
+  return request<SearchPage>("/search?"+query.toString(),{signal});
  },
  stats:(params:{folder?:string;scope?:string;uploader?:string;type?:string;from?:string;to?:string})=>{
   const query=new URLSearchParams();

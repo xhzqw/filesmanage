@@ -1367,9 +1367,9 @@ async function finaleSuite() {
       const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
       set.call(q,${JSON.stringify(TOKEN)});
       q.dispatchEvent(new Event('input',{bubbles:true}));
-      const btn=document.querySelector('.search-primary button[type="submit"]');
-      btn?.click();return Boolean(btn);})()`);
+      return true;})()`);
     const firstRows = await cdp.waitFor(`()=>document.querySelectorAll('.search-data-table tbody tr').length>=50`, 30000);
+    check("SEARCH-01 typing shows first page without clicking search",firstRows===true,String(firstRows));
     check("WF-30 search renders the first page", firstRows === true, String(await cdp.evaluate(`(()=>document.querySelectorAll('.search-data-table tbody tr').length)()`)));
     const moreVisible = await cdp.waitFor(`()=>!!document.querySelector('.search-more button:not([disabled])')`, 15000);
     check("WF-30 加载更多 appears with a cursor", moreVisible === true, String(moreVisible));
