@@ -4,7 +4,7 @@ import type {User} from "../entities/user/model";
 import {authApi} from "../features/auth/api";
 import {ApiError} from "../shared/http";
 import {BrandLogo} from "../shared/ui/AppShell";
-import {FluidOrb} from "../shared/ui/rare";
+import "./login-background.css";
 
 // "记住账号" keeps only the login id in this browser (never a credential);
 // there is no auto-login and no self-service reset in this system.
@@ -33,9 +33,7 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
    }
   }finally{setBusy(false);}
  }
- return <main className="login-bg">
-  <FluidOrb size={320} color="#02A0EA" style={{top:-90,left:-70}}/>
-  <FluidOrb size={320} color="#174098" style={{bottom:-100,right:-80,opacity:.12}}/>
+ return <main className="login-bg login-hero">
   <div className="login-card">
    <div className="brand-lockup">
     <BrandLogo size={48} className="login-logo"/>
