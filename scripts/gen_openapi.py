@@ -768,6 +768,13 @@ add("GET", "/api/folders/search", operation("Search visible folders by name (key
                     resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"])]),
     auth_note=MUST_CHANGE))
 
+add("GET", "/api/folders/{id}", operation("Resolve one listable folder by id for deep links beyond the tree hint", "Folders", "folderDetail", security=SESSION,
+    params=[id_param("id", "Exact folder id, including results outside the compatibility tree.")],
+    responses=dict([json_ok(ref("Folder"), "Selected folder; missing, deleted and hidden ids are indistinguishable."),
+                    resp("401", ERR["401"]), resp("403", ERR["403"]),
+                    resp("404", "E_NOT_FOUND — missing, deleted or unlistable folder")]),
+    auth_note=MUST_CHANGE))
+
 add("POST", "/api/folders", operation("Create a folder", "Folders", "createFolder", security=SESSION,
     request={"application/json": {"schema": ref("CreateFolderRequest")}},
     responses=dict([resp("201", "Folder created", obj({"ok": {"type": "boolean", "enum": [True]}, "data": ref("Folder")}, required=["ok", "data"])),

@@ -1,6 +1,6 @@
 import {RareButton} from "../shared/ui/rare";
 import {observeResourceChange,observeWindowReturn} from "../shared/resourceSync";
-import{useEffect,useRef,useState,type KeyboardEvent as ReactKeyboardEvent,type PointerEvent as ReactPointerEvent}from "react";
+import{useEffect,useMemo,useRef,useState,type KeyboardEvent as ReactKeyboardEvent,type PointerEvent as ReactPointerEvent}from "react";
 import{Link,useLocation,useNavigate}from "react-router-dom";
 import type{User}from "../entities/user/model";
 import type{Folder}from "../entities/folder/model";
@@ -49,6 +49,7 @@ function persistSidebarWidth(width:number){
 
 export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  const[folders,setFolders]=useState<Folder[]>([]);
+ const[resolvedFolder,setResolvedFolder]=useState<{id:string;folder:Folder|null}|null>(null);
  const[status,setStatus]=useState("loading");
  const[reloadKey,setReloadKey]=useState(0);
  const[grantsFolder,setGrantsFolder]=useState<Folder|null>(null);
@@ -72,7 +73,8 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  const latestWidth=useRef(sidebarWidth);
  const location=useLocation();
  const navigate=useNavigate();
- const requested=new URLSearchParams(location.search).get("folder")||"folder_root";
+ const explicitFolder=new URLSearchParams(location.search).get("folder");
+ const requested=explicitFolder||"folder_root";
  useEffect(()=>{
   const invalidate=()=>setReloadKey(value=>value+1);
   const fileChanged=observeResourceChange("file",invalidate);
@@ -88,8 +90,32 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
    .catch(()=>{if(valid)setStatus("failed");});
   return()=>{valid=false;};
  },[reloadKey]);
- const visibleRoots=folders.filter(f=>f.parentId===null||!folders.some(p=>p.id===f.parentId));
- const selected=folders.find(f=>f.id===requested)??visibleRoots[0];
+ const {folderById,visibleRoots}=useMemo(()=>{
+  const folderById=new Map(folders.map(folder=>[folder.id,folder]));
+  // The compatibility tree contains at most 500 hints. A membership index
+  // avoids O(n²) scans as its limit grows.
+  const visibleRoots=folders.filter(folder=>folder.parentId===null||!folderById.has(folder.parentId));
+  return {folderById,visibleRoots};
+ },[folders]);
+ useEffect(()=>{
+  if(!explicitFolder||folderById.has(requested)){
+   setResolvedFolder(null);
+   return;
+  }
+  let active=true;
+  setResolvedFolder(null);
+  // A paged search result or direct URL may identify a folder beyond the
+  // first 500. Resolve exactly that id; never silently display root files.
+  folderApi.get(requested)
+   .then(folder=>{if(active)setResolvedFolder({id:requested,folder});})
+   .catch(()=>{if(active)setResolvedFolder({id:requested,folder:null});});
+  return()=>{active=false;};
+ },[explicitFolder,requested,folderById,reloadKey]);
+ const linkedFolder=resolvedFolder?.id===requested?resolvedFolder.folder:null;
+ const selected=folderById.get(requested)??linkedFolder??(explicitFolder?null:visibleRoots[0]);
+ const knownFolders=useMemo(()=>linkedFolder?[...folders,linkedFolder]:folders,[folders,linkedFolder]);
+ const resolving=Boolean(explicitFolder&&!folderById.has(requested)&&resolvedFolder?.id!==requested);
+ const inaccessible=Boolean(explicitFolder&&!folderById.has(requested)&&resolvedFolder?.id===requested&&!linkedFolder);
  // The page resolves the selected folder's approval policy and hands the flag
  // to the editor, keeping feature modules independent of each other.
  useEffect(()=>{
@@ -108,7 +134,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
   return source?folderMoveInvalidTarget(folder,source,folders):null;
  }
  const moveTarget=move.targetId;
- const moveTargetFolder=folders.find(f=>f.id===moveTarget);
+ const moveTargetFolder=knownFolders.find(f=>f.id===moveTarget);
  const moveBusy=folderMoveBusy(move);
  const moveInvalid=moveTarget===""?null:moveInvalidFor(moveTargetFolder??{id:moveTarget,name:"",parentId:null});
  const moveCanSubmit=movingFolder!==null&&moveInvalid===null&&folderMoveCanSubmit(move);
@@ -116,7 +142,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  // itself, which the structure rules already forbid (COMPLEX-WORKFLOWS §2.1).
  function openMove(folder:Folder){
   setMoveMessage("");
-  const preferred=selected&&selected.id!==folder.id&&folderMoveInvalidTarget(selected,folder,folders)===null?selected.id:"";
+  const preferred=selected&&selected.id!==folder.id&&folderMoveInvalidTarget(selected,folder,knownFolders)===null?selected.id:"";
   setMovingFolder(folder);
   setMove(folderMovePickTarget(folderMoveIdle(),preferred));
  }
@@ -160,7 +186,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
    // A subtree deletion invalidates an open descendant just as it invalidates
    // the deleted folder. Navigate to the surviving parent before reloading
    // instead of silently rendering the root behind a stale URL.
-   const isInside=ancestorPath(folders,selected.id).some(node=>node.id===folder.id);
+   const isInside=ancestorPath(knownFolders,selected.id).some(node=>node.id===folder.id);
    if(isInside){
     const destination=folders.find(item=>item.id===folder.parentId)??visibleRoots[0];
     navigate(destination?"/doc?folder="+encodeURIComponent(destination.id):"/doc",{replace:true});
@@ -235,7 +261,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
        header. Docked at 24px it costs a fraction of the row the old 44px
        breadcrumb bar used to take. */}
    {selected&&<div className="folder-context-bar">
-     <FolderBreadcrumb folders={folders} folder={selected}/>
+     <FolderBreadcrumb folders={knownFolders} folder={selected}/>
      <div className="folder-actions-slot">
       <FolderActions folder={actionsFolder??selected} actionRequest={actionRequest} onActionHandled={()=>setActionRequest(null)} onActionComplete={()=>setActionsFolder(null)} isAdmin={user.isAdmin} onChanged={folderActionChanged}
        onManageGrants={()=>setGrantsFolder(actionsFolder??selected)}/>
@@ -246,7 +272,9 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
      <FileTable folder={selected.id} folderName={selected.name} onEdit={setEditingId} reloadKey={reloadKey}
       newFolderSlot={<NewFolderForm parentId={selected.id} onCreated={()=>setReloadKey(k=>k+1)}/>}/>
    </DropZone>}
-   {!selected&&status!=="loading"&&<p className="empty">当前账号没有可访问的目录，请联系管理员授权。</p>}
+   {!selected&&resolving&&<p role="status" className="empty">正在核验所选目录…</p>}
+   {!selected&&inaccessible&&<p role="alert" className="empty">目录不存在或当前账号无权访问。<Link to="/doc">返回根目录</Link></p>}
+   {!selected&&!resolving&&!inaccessible&&status!=="loading"&&<p className="empty">当前账号没有可访问的目录，请联系管理员授权。</p>}
    </main></div>
    {grantsFolder&&<QuickGrantsDialog folder={grantsFolder} onClose={()=>setGrantsFolder(null)}/>}
    {editingId&&<FileEditorBridge fileId={editingId} requiresApproval={requiresApproval}

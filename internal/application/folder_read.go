@@ -51,6 +51,29 @@ const folderPageDefault = 50
 // disabledReasonUpload is the only disabledReason these reads publish.
 const disabledReasonUpload = "没有上传权限"
 
+// VisibleFolder resolves a directory named by a bookmarked URL or a paged
+// search result. The legacy /folders/tree is capped at 500 entries and is not
+// an authorization source for deep links. Missing, deleted and unlistable
+// folders all answer ErrNotFound (SAFE-04), including for non-admin callers.
+func (s *Service) VisibleFolder(ctx context.Context, u domain.User, folderID string) (domain.Folder, error) {
+ if folderID == "" {
+  return domain.Folder{}, domain.ErrNotFound
+ }
+ tx, err := s.uow.Begin(ctx)
+ if err != nil {
+  return domain.Folder{}, err
+ }
+ defer tx.Rollback(ctx)
+ folder, err := s.activeFolder(ctx, tx, folderID)
+ if err != nil {
+  return domain.Folder{}, err
+ }
+ if err = s.requireListable(ctx, tx, u, folder.ID); err != nil {
+  return domain.Folder{}, err
+ }
+ return folder, nil
+}
+
 // FolderChildren lists one page of the caller's visible children of parentID;
 // an empty parentID addresses the visible roots, which include a listable folder
 // whose parent the caller may not list.

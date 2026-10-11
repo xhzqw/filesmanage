@@ -14,6 +14,7 @@ function folderChanged<T>(promise:Promise<T>,deleted=false):Promise<T>{
 
 export const folderApi={
  tree:()=>request<Folder[]>("/folders/tree"),
+ get:(id:string)=>request<Folder>("/folders/"+encodeURIComponent(id)),
  create:(parentId:string,name:string)=>folderChanged(request<Folder>("/folders",{method:"POST",body:JSON.stringify({parentId,name})})),
  rename:(id:string,name:string)=>folderChanged(request<Folder>("/folders/"+id,{method:"PATCH",body:JSON.stringify({name})})),
  move:(id:string,targetParentId:string)=>folderChanged(request<Folder>("/folders/"+id+"/move",{method:"POST",body:JSON.stringify({targetParentId})})),

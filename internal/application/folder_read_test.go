@@ -43,6 +43,27 @@ func folderIDsOf(items []FolderPageItem) []string {
 
 func adminUser() domain.User { return domain.User{ID: "u_admin", Login: "admin", IsAdmin: true} }
 
+func TestVisibleFolderResolvesDeepLinkWithoutLeakingHiddenFolders(t *testing.T) {
+ s, repo := testService(t)
+ admin := adminUser()
+ user := domain.User{ID:"u_user",Login:"user1"}
+ folder, err := s.VisibleFolder(t.Context(),admin,"folder_market")
+ if err != nil || folder.ID != "folder_market" || folder.Name != "市场部" {
+  t.Fatalf("admin deep link must resolve the exact folder: %+v %v",folder,err)
+ }
+ for _, id := range []string{"folder_market","folder_missing",""} {
+  if _, err = s.VisibleFolder(t.Context(),user,id); !errors.Is(err,domain.ErrNotFound) {
+   t.Fatalf("hidden/missing folder %q must be indistinguishable: %v",id,err)
+  }
+ }
+ repo.seedGrant(domain.ACL{ID:"acl_deep",FolderID:"folder_market",SubjectKind:"user",SubjectID:"u_user",Actions:[]domain.Action{domain.ActionList},ScopeOnly:true})
+ folder,err=s.VisibleFolder(t.Context(),user,"folder_market")
+ if err!=nil||folder.ID!="folder_market" {t.Fatalf("authorized direct link failed: %+v %v",folder,err)}
+ if _,err=s.VisibleFolder(t.Context(),user,"folder_root"); !errors.Is(err,domain.ErrNotFound) {
+  t.Fatalf("hidden ancestor leaked after granting child: %v",err)
+ }
+}
+
 func TestFolderChildrenListsRootsAndChildPage(t *testing.T) {
 	s, repo := testService(t)
 	admin := adminUser()
