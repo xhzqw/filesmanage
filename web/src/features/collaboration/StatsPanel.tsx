@@ -22,7 +22,7 @@ function RankRows({items,metric,onChoose}:{items:{key:string;name:string;count:n
   {items.length===0?<EmptyChart label="当前筛选下暂无数据"/>:items.map(item=>
    <div className="stats-rank-row" key={item.key}>
     <div className="stats-rank-main">
-     {onChoose?<button type="button" className="stats-rank-link" onClick={()=>onChoose(item.key)} title={"筛选："+item.name}>{item.name}<span aria-hidden="true"> ↗</span></button>
+     {onChoose?<RareButton type="button" tone="ghost" className="stats-rank-link" onClick={()=>onChoose(item.key)} title={"筛选："+item.name}>{item.name}<span aria-hidden="true"> ↗</span></RareButton>
       :<span className="stats-rank-name" title={item.name}>{item.name}</span>}
      <strong>{metricLabel(metric,item[metric])}</strong>
     </div>
