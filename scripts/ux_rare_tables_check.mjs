@@ -130,6 +130,27 @@ async function run(){
   await setInput("#search-q",fileName);
   await cdp.eval("(()=>{document.querySelector('.search-primary button[type=submit]').click();return true;})()");
   await inspect("search "+width+"px",".search-data-table",fileName,"td:first-child a","td:last-child a");
+  await cdp.goto("/org",".org-members-table");
+  await inspect("organization members "+width+"px",".org-members-table",me.displayName,".org-user-name",".org-member-actions button");
+  check("organization "+width+"px create stays in dialog",
+   !(await cdp.eval("(()=>!!document.querySelector('.org-create-user-card'))()")));
+  await cdp.eval("(()=>{document.querySelector('.org-add-member').click();return true;})()");
+  await cdp.wait("()=>!!document.querySelector('dialog.org-create-user-dialog[open] #org-new-login')");
+  const dialog=await cdp.eval("(()=>{const el=document.querySelector('dialog.org-create-user-dialog[open]');const r=el.getBoundingClientRect();return {left:r.left,right:r.right,modal:el.matches(':modal'),fields:el.querySelectorAll('.org-field').length};})()");
+  check("organization "+width+"px add member is accessible modal",
+   dialog.left>=-1&&dialog.right<=width+1&&dialog.modal&&dialog.fields===4,JSON.stringify(dialog));
+  await cdp.eval("(()=>{document.querySelector('dialog.org-create-user-dialog .dialog-actions button[type=button]').click();return true;})()");
+  await cdp.wait("()=>!document.querySelector('dialog.org-create-user-dialog[open]')");
+  await cdp.eval("(()=>{document.querySelector('#org-tab-permissions').click();return true;})()");
+  await cdp.wait("()=>!!document.querySelector('.perm-compose-card')&&!!document.querySelector('.perm-browser')");
+  const acl=await cdp.eval("(()=>{const rect=q=>{const e=document.querySelector(q),r=e?.getBoundingClientRect();return r?{left:r.left,right:r.right,width:r.width,top:r.top}:null;};return {width:innerWidth,overflow:document.documentElement.scrollWidth-innerWidth,tree:rect('.perm-browser'),inspection:rect('.perm-inspection-column'),editor:rect('.perm-compose-card')};})()");
+  check("permissions "+width+"px tree/list/editor fit the page",
+   acl.overflow<=2&&acl.tree?.right<=width+2&&acl.inspection?.right<=width+2&&acl.editor?.right<=width+2&&acl.editor?.width>140,JSON.stringify(acl));
+  await cdp.eval("(()=>{document.querySelector('#org-tab-roles').click();return true;})()");
+  await cdp.wait("()=>!!document.querySelector('.org-role-layout .org-role-editor')");
+  const roles=await cdp.eval("(()=>{const e=document.querySelector('.org-role-layout'),list=e.querySelector('.org-role-list'),edit=e.querySelector('.org-role-editor'),r=e.getBoundingClientRect();return {width:innerWidth,overflow:document.documentElement.scrollWidth-innerWidth,right:r.right,list: list.getBoundingClientRect().width,editor:edit.getBoundingClientRect().width};})()");
+  check("roles "+width+"px list/editor fit the page",
+   roles.overflow<=2&&roles.right<=width+2&&roles.list>140&&roles.editor>140,JSON.stringify(roles));
  }
  console.log("UX_RARE_TABLES_PASS checks="+seen.length);
 }
