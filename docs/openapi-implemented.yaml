@@ -2389,6 +2389,284 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/lifecycle/policy/{kind}/{id}:
+    get:
+      summary: View inherited folder or department lifecycle defaults
+      operationId: getLifecyclePolicy
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: kind
+        in: path
+        required: true
+        description: folder or department
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        description: Scope ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Lifecycle policy scope result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/LifecyclePolicyView'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    put:
+      summary: Update lifecycle defaults (administrator)
+      operationId: putLifecyclePolicy
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: kind
+        in: path
+        required: true
+        description: folder or department
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        description: Scope ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LifecyclePolicy'
+      responses:
+        '200':
+          description: Lifecycle policy scope result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      saved:
+                        type: boolean
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    delete:
+      summary: Clear policy and resume inheritance (administrator)
+      operationId: deleteLifecyclePolicy
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: kind
+        in: path
+        required: true
+        description: folder or department
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        description: Scope ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Lifecycle policy scope result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      cleared:
+                        type: boolean
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/lifecycle/statistics:
+    get:
+      summary: Aggregate active lifecycle counts (administrator)
+      operationId: lifecycleStatistics
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: All active document counts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/LifecycleStats'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/lifecycle/bulk-due:
+    post:
+      summary: Independently apply up to twenty lifecycle due dates
+      operationId: bulkLifecycleDue
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkLifecycleDue'
+      responses:
+        '200':
+          description: One status per candidate
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BulkLifecycleResult'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/files/{id}/metadata:
     get:
       summary: Read business metadata of an accessible file
@@ -8551,6 +8829,8 @@ components:
         retentionUntil:
           type: string
           format: date-time
+        responsibleId:
+          type: string
       required:
       - fileId
       - state
@@ -8571,6 +8851,7 @@ components:
           - archive
           - unarchive
           - set_due
+          - assign
         expectedVersionSeq:
           type: integer
           minimum: 1
@@ -8583,6 +8864,8 @@ components:
         retentionDays:
           type: integer
           minimum: 0
+        responsibleId:
+          type: string
       required:
       - action
       - expectedVersionSeq
@@ -8602,6 +8885,8 @@ components:
           - archived
         publishedSeq:
           type: integer
+        responsibleName:
+          type: string
         dueAt:
           type: string
           format: date-time
@@ -8664,6 +8949,93 @@ components:
       - dueAt
       - createdAt
       - read
+    LifecyclePolicy:
+      type: object
+      properties:
+        dueDays:
+          type: integer
+          minimum: 0
+        retentionDays:
+          type: integer
+          minimum: 0
+      required:
+      - dueDays
+      - retentionDays
+    LifecyclePolicyView:
+      type: object
+      properties:
+        dueDays:
+          type: integer
+        retentionDays:
+          type: integer
+        sourceKind:
+          type: string
+        sourceId:
+          type: string
+        canManage:
+          type: boolean
+      required:
+      - dueDays
+      - retentionDays
+      - sourceKind
+      - sourceId
+      - canManage
+    LifecycleStats:
+      type: object
+      properties:
+        released:
+          type: integer
+        archived:
+          type: integer
+        dueSoon:
+          type: integer
+        overdue:
+          type: integer
+        retained:
+          type: integer
+      required:
+      - released
+      - archived
+      - dueSoon
+      - overdue
+      - retained
+    BulkLifecycleDue:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              fileId:
+                type: string
+              expectedVersionSeq:
+                type: integer
+                minimum: 1
+            required:
+            - fileId
+            - expectedVersionSeq
+        dueAt:
+          type: string
+          format: date-time
+      required:
+      - items
+    BulkLifecycleResult:
+      type: object
+      properties:
+        fileId:
+          type: string
+        status:
+          type: string
+          enum:
+          - updated
+          - unavailable
+          - version_conflict
+          - conflict
+          - invalid
+      required:
+      - fileId
+      - status
     SearchPreset:
       type: object
       properties:
