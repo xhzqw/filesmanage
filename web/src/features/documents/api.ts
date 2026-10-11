@@ -8,6 +8,8 @@ export type VersionComparison={left:{seq:number;sha256:string;sizeBytes:number};
 export type FileReviewComment={id:number;fileId:string;versionSeq:number;lineNumber?:number;body:string;authorId:string;authorName:string;createdAt:string;resolvedAt?:string;resolvedBy?:string};
 export type ReviewCommentPage={items:FileReviewComment[];nextCursor:string};
 export type FilePage={items:FileItem[];nextCursor:string};
+export type FileLifecycle={fileId:string;state:"draft"|"released"|"archived";publishedSeq:number;publishedAt:string;publishedBy:string;dueAt?:string;dueStatus:"none"|"soon"|"overdue"|"scheduled";note:string;updatedAt:string;canManage:boolean};
+export type LifecycleDraft={action:"publish"|"archive"|"unarchive"|"set_due";expectedVersionSeq:number;dueAt:string|null;note:string};
 
 export type OfficeSessionData={
  sessionId:string;
@@ -26,6 +28,8 @@ export const fileApi={
   return request<FilePage>("/files?"+query.toString());
  },
  meta:(id:string)=>request<{file:FileItem;versions:FileVersion[]}>("/files/"+id),
+ lifecycle:(id:string)=>request<FileLifecycle>("/files/"+id+"/lifecycle"),
+ setLifecycle:(id:string,draft:LifecycleDraft)=>request<FileLifecycle>("/files/"+id+"/lifecycle",{method:"PUT",body:JSON.stringify(draft)}),
  metadata:(id:string)=>request<FileMetadata>("/files/"+id+"/metadata"),
  setMetadata:(id:string,body:{category:string;description:string;tags:string[]})=>request<FileMetadata>("/files/"+id+"/metadata",{method:"PUT",body:JSON.stringify(body)}),
 	preview:(id:string)=>request<PreviewData>("/files/"+id+"/preview"),

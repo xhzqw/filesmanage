@@ -19,6 +19,7 @@ type Repository interface {
 	ResumableUploadRepository
 	ApprovalActivityStore
 	SearchPresetStore
+	FileLifecycleStore
 
 	// Identity and sessions.
 	UserByLogin(context.Context, string) (domain.User, string, error)

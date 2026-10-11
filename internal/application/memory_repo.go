@@ -38,6 +38,7 @@ type memoryRepo struct {
 	files                      map[string]domain.File
 	fileText                   map[string]memoryFileText
 	fileMetadata               map[string]domain.FileMetadata
+	lifecycle                  map[string]domain.FileLifecycle
 	reviewComments             []domain.FileReviewComment
 	resumableUploads           map[string]domain.ResumableUpload
 	versions                   map[string][]domain.FileVersion
@@ -76,6 +77,7 @@ func newMemoryRepo() *memoryRepo {
 		folders:       map[string]domain.Folder{},
 		files:         map[string]domain.File{},
 		fileMetadata:  map[string]domain.FileMetadata{},
+		lifecycle:     map[string]domain.FileLifecycle{},
 		versions:      map[string][]domain.FileVersion{},
 		blobs:         map[string]domain.Blob{},
 		grants:        map[string]domain.ACL{},

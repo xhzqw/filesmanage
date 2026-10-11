@@ -879,6 +879,23 @@ add("GET", "/api/files/{id}", operation("File metadata with version history", "F
     params=[id_param("id", "File id.")],
     responses=dict([json_ok(ref("FileMeta"), "File and its full version history."), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"])])))
 
+schema("FileLifecycle",obj({
+ "fileId":string(),"state":string(enum=["draft","released","archived"]),
+ "publishedSeq":integer(),"publishedAt":timestamp(),"publishedBy":string(),
+ "dueAt":timestamp(),"dueStatus":string(enum=["none","soon","overdue","scheduled"]),
+ "note":string(),"updatedAt":timestamp(),"canManage":boolean()
+},required=["fileId","state","publishedSeq","publishedAt","publishedBy","dueStatus","note","updatedAt","canManage"]))
+schema("SetFileLifecycle",obj({
+ "action":string(enum=["publish","archive","unarchive","set_due"]),
+ "expectedVersionSeq":integer(minimum=1),"dueAt":timestamp(),"note":string(max_length=200)
+},required=["action","expectedVersionSeq"]))
+add("GET","/api/files/{id}/lifecycle",operation("Read lifecycle release, archive and due-date status","Files","fileLifecycle",security=SESSION,
+ params=[id_param("id","File ID")],
+ responses=dict([json_ok(ref("FileLifecycle"),"Lifecycle with visibility-scoped canManage."),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+add("PUT","/api/files/{id}/lifecycle",operation("Release current version or archive/unarchive or update due date","Files","setFileLifecycle",security=SESSION,
+ params=[id_param("id","File ID")],request={"application/json":{"schema":ref("SetFileLifecycle")}},
+ responses=dict([json_ok(ref("FileLifecycle"),"CAS/version-checked, audited state."),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
+
 add("GET", "/api/files/{id}/metadata", operation("Read business metadata of an accessible file", "Files", "fileMetadata", security=SESSION,
     params=[id_param("id","File ID")],
     responses=dict([json_ok(ref("FileBusinessMetadata"),"Current business classification."),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))

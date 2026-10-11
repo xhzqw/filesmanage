@@ -1,7 +1,7 @@
-import {RareButton,RareInput,RareTabs,MicroHoldToDelete} from "../shared/ui/rare";
+import {RareBadge,RareButton,RareInput,RareTabs,MicroHoldToDelete} from "../shared/ui/rare";
 import {useEffect,useState,type FormEvent} from "react";
 import {Link,useNavigate,useParams} from "react-router-dom";
-import {fileApi,formatSize} from "../features/documents/api";
+import {fileApi,formatSize,type FileLifecycle} from "../features/documents/api";
 import {MediaPreview} from "../features/documents/MediaPreview";
 import {StructuredFilePreview} from "../features/documents/StructuredFilePreview";
 import {OfficeLayoutPreview} from "../features/documents/OfficeLayoutPreview";
@@ -9,6 +9,7 @@ import {CadPreviewStatus} from "../features/documents/CadPreviewStatus";
 import {resolvePreviewAdapter,ADAPTER_TITLES} from "../features/documents/previewAdapters";
 import {FileEditor} from "../features/documents/FileEditor";
 import {FileMetadataEditor} from "../features/documents/FileMetadataEditor";
+import {FileLifecyclePanel} from "../features/documents/FileLifecyclePanel";
 import {VersionComparePanel} from "../features/documents/VersionComparePanel";
 import {FileReviewPanel} from "../features/documents/FileReviewPanel";
 import {MoveDialog} from "../features/documents/FileTable";
@@ -57,6 +58,8 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const[favoriteBusy,setFavoriteBusy]=useState(false);
  const[wrapText,setWrapText]=useState(true);
  const[reloadToken,setReloadToken]=useState(0);
+ const[lifecycle,setLifecycle]=useState<FileLifecycle|null>(null);
+ const archived=lifecycle?.state==="archived";
  const currentSeq=Math.max(file?.currentVersionSeq??1,...versions.map(v=>v.versionSeq));
  const adapter=preview?resolvePreviewAdapter(preview):"unsupported";
  const canManage=file!==null;
@@ -70,6 +73,13 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
     setPreview(data);setVersions(history);setFile(meta?.file??null);setStatus("ready");
    }).catch(err=>{if(valid){setStatus("failed");setError(errorCopy(err,"无法读取文件，请检查访问权限。"));}});
   return()=>{valid=false;};
+ },[id,reloadToken]);
+
+ useEffect(()=>{
+  let live=true;setLifecycle(null);
+  void fileApi.lifecycle(id).then(value=>{if(live)setLifecycle(value);})
+   .catch(()=>{if(live)setLifecycle(null);});
+  return()=>{live=false;};
  },[id,reloadToken]);
 
  useEffect(()=>{
@@ -141,22 +151,25 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
        <div className="file-workbench-type" aria-hidden="true">{fileExtension(preview.name).slice(0,5)}</div>
        <div className="file-workbench-title">
         <h1 title={preview.name}>{preview.name}</h1>
-        <div className="file-workbench-subtitle"><span>{fileExtension(preview.name)}</span><span>{formatSize(preview.size)}</span><span>当前版本 v{currentSeq}</span></div>
+        <div className="file-workbench-subtitle"><span>{fileExtension(preview.name)}</span><span>{formatSize(preview.size)}</span><span>当前版本 v{currentSeq}</span>
+         {lifecycle&&<RareBadge tone={archived?"warning":lifecycle.state==="released"?"success":"neutral"} dot>{archived?"已归档":lifecycle.state==="released"?"已发布":"草稿"}</RareBadge>}
+         {lifecycle?.dueStatus==="soon"&&<RareBadge tone="warning">即将到期</RareBadge>}
+         {lifecycle?.dueStatus==="overdue"&&<RareBadge tone="danger">已到期</RareBadge>}</div>
        </div>
       </div>
       <div className="file-workbench-actions" aria-label="文件操作">
        <RareButton type="button" className="primary" onClick={download}>下载</RareButton>
-       {isOfficeName(preview.name)&&<Link className="rare-button file-action-link" to={"/office/"+id}>在线编辑</Link>}
+       {isOfficeName(preview.name)&&!archived&&<Link className="rare-button file-action-link" to={"/office/"+id}>在线编辑</Link>}
        {isCadName(preview.name)&&<Link className="rare-button file-action-link" to={"/model/"+id}>3D 查看</Link>}
-       {preview.textual&&canManage&&<RareButton type="button" disabled={requiresApproval===null}
+       {preview.textual&&canManage&&!archived&&<RareButton type="button" disabled={requiresApproval===null}
         onClick={()=>setEditing(true)}>编辑内容</RareButton>}
        <RareButton type="button" disabled={!canManage||favorite===null||favoriteBusy} onClick={()=>void toggleFavorite()}>
         {favorite===null?"收藏不可用":favorite?"取消收藏":"收藏"}
        </RareButton>
-       {canManage&&<RareButton type="button" onClick={()=>{setRenameValue(preview.name);setRenaming(true);}}>重命名</RareButton>}
-       {canManage&&<RareButton type="button" onClick={()=>setMoving(true)}>移动</RareButton>}
+       {canManage&&!archived&&<RareButton type="button" onClick={()=>{setRenameValue(preview.name);setRenaming(true);}}>重命名</RareButton>}
+       {canManage&&!archived&&<RareButton type="button" onClick={()=>setMoving(true)}>移动</RareButton>}
        {canManage&&user.isAdmin&&<RareButton type="button" onClick={()=>setSharing(true)}>分享</RareButton>}
-       {canManage&&<RareButton type="button" className="file-delete-trigger" onClick={()=>setDeleting(true)}>删除</RareButton>}
+       {canManage&&!archived&&<RareButton type="button" className="file-delete-trigger" onClick={()=>setDeleting(true)}>删除</RareButton>}
       </div>
      </header>
      {(notice||error)&&<p role={error?"alert":"status"} className={"notice"+(error?" error":"")}>{error||notice}</p>}
@@ -226,6 +239,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
      </section>}
      {tab==="versions"&&<section id="file-panel-versions" role="tabpanel" aria-labelledby="file-tab-versions" className="file-workbench-panel file-versions-panel">
       <div className="file-section-caption"><strong>版本记录</strong><span>所有历史均保留 · 回滚会创建新版本</span></div>
+      <FileLifecyclePanel fileId={id} currentSeq={currentSeq} lifecycle={lifecycle} onUpdated={value=>{setLifecycle(value);announce("生命周期状态已更新");}}/>
       {versions.length===0?<p className="empty">暂无版本记录</p>:
       <div className="table file-versions-table"><table>
        <thead><tr><th scope="col">版本</th><th scope="col">操作</th><th scope="col">文件大小</th><th scope="col">创建人</th><th scope="col">时间</th><th scope="col">版本操作</th></tr></thead>
@@ -233,7 +247,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
         <td><strong>v{v.versionSeq}</strong> {v.versionSeq===currentSeq&&<span className="file-current-version">当前</span>}</td>
         <td>{ACTION_LABELS[v.action]??v.action}{v.rollbackTargetSeq?" · 来自 v"+v.rollbackTargetSeq:""}</td>
         <td>{formatSize(v.sizeBytes)}</td><td>{v.createdBy}</td><td>{versionTime(v.createdAt)}</td>
-        <td>{v.versionSeq===currentSeq?"—":<RareButton type="button" disabled={!canManage} onClick={()=>{announce("");setRollback(v);}}>回滚到此版本</RareButton>}</td>
+        <td>{v.versionSeq===currentSeq?"—":<RareButton type="button" disabled={!canManage||archived} onClick={()=>{announce("");setRollback(v);}}>回滚到此版本</RareButton>}</td>
        </tr>)}</tbody>
       </table></div>}
      </section>}
