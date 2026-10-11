@@ -1,10 +1,49 @@
-/* Stats folder scope (AUD-15/WF-29): the chosen target is shown as its visible
-   path next to the trigger, never as a raw folder ID. Component-owned styles;
-   every value comes from the semantic token layer in theme.css. */
-.stats-folder{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-1);min-width:0}
-.stats-folder-label{color:var(--color-text-secondary);font-size:11px}
-.stats-folder-path{color:var(--color-text-secondary);font-size:11px;overflow-wrap:anywhere}
-.stats-folder-path.chosen{font-weight:600;color:var(--color-text)}
-/* The trigger is inert while the range already covers everything; the disabled
-   state alone stays visually weak, so the reason is stated next to it. */
-.stats-folder button:disabled{color:var(--color-text-secondary);cursor:not-allowed}
+/* Compact Rare UI statistics workbench; no full-height tables. */
+.stats-workbench{overflow-y:auto;overflow-x:hidden;gap:var(--space-3);padding:var(--space-3);background:var(--surface-canvas);align-content:start}
+.stats-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--space-2);min-width:0}
+.stats-heading{display:flex;align-items:center;gap:var(--space-2);white-space:nowrap}
+.stats-heading strong{font-size:14px;color:var(--brand-navy)}
+.stats-heading span,.stats-field>span{font-size:11px;color:var(--text-tertiary)}
+.stats-filters{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:var(--space-2);min-width:0}
+.stats-field{display:flex;align-items:center;gap:var(--space-1)}
+.stats-field .rare-select-root{min-width:105px}
+.stats-folder-trigger{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stats-export{display:inline-flex;align-items:center;justify-content:center;min-height:var(--height-control);padding:0 var(--space-3);border:1px solid var(--brand-blue);border-radius:var(--radius-sm);background:var(--brand-blue);color:#fff;font-size:12px;font-weight:600}
+.stats-export:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px}
+.stats-export:hover{background:var(--color-action-hover)}
+.stats-scope-note{display:flex;align-items:center;gap:var(--space-2);font-size:11px;color:var(--text-secondary);min-width:0;overflow-wrap:anywhere}
+.stats-state{padding:var(--space-4);border:1px solid var(--border-hairline);border-radius:var(--radius-lg);background:var(--surface-panel);display:flex;align-items:center;gap:var(--space-2)}
+.stats-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-2)}
+.stats-summary-card{display:flex;flex-direction:column;gap:var(--space-1);min-width:0;min-height:95px;padding:var(--space-3);border:1px solid var(--border-hairline);border-radius:var(--radius-lg);background:var(--surface-panel);box-shadow:var(--shadow-panel)}
+.stats-summary-card>span{font-size:12px;color:var(--text-secondary)}
+.stats-summary-card strong{font-size:clamp(19px,1.8vw,26px);font-weight:750;color:var(--brand-navy);font-variant-numeric:tabular-nums;line-height:1.25;overflow-wrap:anywhere}
+.stats-summary-card small{font-size:11px;color:var(--text-tertiary)}
+.stats-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--space-3);align-items:stretch}
+.stats-panel{background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-lg);min-width:0;padding:var(--space-3);box-shadow:var(--shadow-panel)}
+.stats-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--space-2);margin-bottom:var(--space-3)}
+.stats-panel-head h2{font-size:13px;line-height:1.3;font-weight:700;color:var(--text-primary);margin:0}
+.stats-panel-head p{margin:3px 0 0;font-size:11px;color:var(--text-secondary)}
+.stats-metric{display:flex;gap:2px;padding:2px;border-radius:var(--radius-sm);background:var(--surface-header)}
+.stats-metric .rare-button{min-height:23px;height:23px;font-size:11px}
+.stats-rank-list{display:flex;flex-direction:column;gap:var(--space-2)}
+.stats-rank-row{min-width:0}
+.stats-rank-main{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);font-size:12px;min-width:0;margin-bottom:4px}
+.stats-rank-main strong{font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap}
+.stats-rank-name,.stats-rank-link{min-width:0;max-width:78%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stats-rank-link{display:block;border:0;background:transparent;padding:0;color:var(--brand-blue);height:auto;min-height:0;text-align:left;font-size:12px}
+.stats-rank-link:hover{text-decoration:underline}
+.stats-track{height:6px;border-radius:var(--radius-pill);overflow:hidden;background:var(--surface-header)}
+.stats-track>span{display:block;height:100%;border-radius:inherit;background:var(--brand-blue);transition:width .2s ease}
+.stats-rank-detail{display:block;margin-top:2px;color:var(--text-tertiary);font-size:10px}
+.stats-timeline{display:flex;justify-content:space-around;gap:var(--space-2);min-height:195px;overflow-x:auto;padding:var(--space-1) 0}
+.stats-month{display:flex;flex:1;min-width:48px;max-width:94px;flex-direction:column;align-items:center;gap:5px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.stats-month>strong{height:20px;color:var(--text-secondary);font-size:10px;font-weight:600;align-content:end}
+.stats-month>span{font-size:11px;color:var(--text-tertiary)}
+.stats-month-column{height:140px;width:min(35px,80%);display:flex;align-items:flex-end;background:var(--surface-header);border-radius:var(--radius-xs);overflow:hidden}
+.stats-month-column>div{width:100%;background:var(--brand-blue);border-radius:var(--radius-xs) var(--radius-xs) 0 0;transition:height .2s ease}
+.stats-no-data{min-height:140px;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:12px;text-align:center}
+.stats-panel-foot,.stats-footer{font-size:11px;color:var(--text-tertiary)}
+.stats-panel-foot{margin-top:var(--space-2)}
+.stats-footer{padding-bottom:var(--space-2)}
+@media(max-width:1050px){.stats-toolbar{align-items:flex-start}.stats-filters{justify-content:flex-start}.stats-grid{grid-template-columns:1fr}}
+@media(max-width:700px){.stats-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.stats-workbench{padding:var(--space-2)}}

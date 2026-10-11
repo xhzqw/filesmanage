@@ -506,9 +506,10 @@ func (r *Repository) Stats(ctx context.Context, q ports.StatsQuery) (domain.Stat
 	var stats domain.Stats
 	summary := cte + ` SELECT f.total_files, f.added_30, f.total_bytes, d.total_folders FROM (
 	  SELECT count(*) AS total_files,
-	         count(*) FILTER (WHERE f.updated_at>now()-interval '30 days') AS added_30,
+	         count(*) FILTER (WHERE first_version.created_at>now()-interval '30 days') AS added_30,
 	         coalesce(sum(v.size_bytes),0) AS total_bytes
 	    FROM files f LEFT JOIN file_versions v ON v.file_id=f.id AND v.seq=f.current_version_seq
+	    LEFT JOIN file_versions first_version ON first_version.file_id=f.id AND first_version.seq=1
 	   WHERE ` + predicate + `
 	) f, (
 	  SELECT count(*) AS total_folders FROM folders d
@@ -520,11 +521,15 @@ func (r *Repository) Stats(ctx context.Context, q ports.StatsQuery) (domain.Stat
 	// Breakdowns in one scan via GROUPING SETS: extension buckets, month
 	// buckets and uploader buckets come back tagged by which grouping column
 	// is present, so three GROUP BY passes collapse into one.
-	breakdown := " SELECT coalesce(nullif(lower(substring(f.name from '\\\\.([^.]*)$')),''),'(none)') AS ext," +
-		" to_char(date_trunc('month',f.updated_at),'YYYY-MM') AS mon," +
-		" f.uploaded_by, coalesce(u.display_name,'') AS uploader_name, count(*) AS n" +
-		" FROM files f LEFT JOIN users u ON u.id=f.uploaded_by" +
-		" WHERE " + predicate +
+	breakdown := ` SELECT coalesce(nullif(lower(substring(f.name from '\.([^.]+)$')),''),'无扩展名') AS ext,
+	  coalesce(to_char(date_trunc('month',first_version.created_at),'YYYY-MM'),'未记录') AS mon,
+	  f.uploaded_by, coalesce(u.display_name,'') AS uploader_name,
+	  count(*) AS n, coalesce(sum(v.size_bytes),0) AS bytes
+	  FROM files f
+	  LEFT JOIN file_versions v ON v.file_id=f.id AND v.seq=f.current_version_seq
+	  LEFT JOIN file_versions first_version ON first_version.file_id=f.id AND first_version.seq=1
+	  LEFT JOIN users u ON u.id=f.uploaded_by
+	  WHERE ` + predicate +
 		" GROUP BY GROUPING SETS ((ext),(mon),(f.uploaded_by,uploader_name))"
 	rows, err := r.Q.Query(ctx, cte+breakdown, scopeArgs...)
 	if err != nil {
@@ -533,21 +538,21 @@ func (r *Repository) Stats(ctx context.Context, q ports.StatsQuery) (domain.Stat
 	defer rows.Close()
 	for rows.Next() {
 		var ext, mon, uploaderID, uploaderName *string
-		var n int64
-		if err = rows.Scan(&ext, &mon, &uploaderID, &uploaderName, &n); err != nil {
+		var n, bytes int64
+		if err = rows.Scan(&ext, &mon, &uploaderID, &uploaderName, &n, &bytes); err != nil {
 			return domain.Stats{}, err
 		}
 		switch {
 		case ext != nil:
-			stats.ByType = append(stats.ByType, domain.TypeCount{Type: *ext, Count: n})
+			stats.ByType = append(stats.ByType, domain.TypeCount{Type: *ext, Count: n, Bytes: bytes})
 		case mon != nil:
-			stats.ByMonth = append(stats.ByMonth, domain.MonthCount{Month: *mon, Count: n})
+			stats.ByMonth = append(stats.ByMonth, domain.MonthCount{Month: *mon, Count: n, Bytes: bytes})
 		case uploaderID != nil:
 			name := ""
 			if uploaderName != nil {
 				name = *uploaderName
 			}
-			stats.ByUploader = append(stats.ByUploader, domain.UploaderCount{UploaderID: *uploaderID, UploaderName: name, Count: n})
+			stats.ByUploader = append(stats.ByUploader, domain.UploaderCount{UploaderID: *uploaderID, UploaderName: name, Count: n, Bytes: bytes})
 		}
 	}
 	if err = rows.Err(); err != nil {
@@ -560,10 +565,31 @@ func (r *Repository) Stats(ctx context.Context, q ports.StatsQuery) (domain.Stat
 		stats.ByType = stats.ByType[:20]
 	}
 	if len(stats.ByMonth) > 12 {
-		stats.ByMonth = stats.ByMonth[:12]
+		stats.ByMonth = stats.ByMonth[len(stats.ByMonth)-12:]
 	}
 	if len(stats.ByUploader) > 20 {
 		stats.ByUploader = stats.ByUploader[:20]
+	}
+	// Direct-folder ranking uses exactly the authorized file predicate.
+	folderSQL := cte + ` SELECT d.id,d.name,count(*),coalesce(sum(v.size_bytes),0)
+	   FROM files f JOIN folders d ON d.id=f.folder_id
+	   LEFT JOIN file_versions v ON v.file_id=f.id AND v.seq=f.current_version_seq
+	   WHERE ` + predicate + `
+	   GROUP BY d.id,d.name ORDER BY sum(v.size_bytes) DESC NULLS LAST,d.id LIMIT 8`
+	folderRows, err := r.Q.Query(ctx, folderSQL, scopeArgs...)
+	if err != nil {
+		return domain.Stats{}, err
+	}
+	defer folderRows.Close()
+	for folderRows.Next() {
+		var item domain.FolderCount
+		if err = folderRows.Scan(&item.FolderID, &item.FolderName, &item.Count, &item.Bytes); err != nil {
+			return domain.Stats{}, err
+		}
+		stats.ByFolder = append(stats.ByFolder, item)
+	}
+	if err = folderRows.Err(); err != nil {
+		return domain.Stats{}, err
 	}
 	return stats, nil
 }
@@ -580,10 +606,7 @@ func sortTypeCounts(items []domain.TypeCount) {
 
 func sortMonthCounts(items []domain.MonthCount) {
 	sort.Slice(items, func(i, j int) bool {
-		if items[i].Count != items[j].Count {
-			return items[i].Count > items[j].Count
-		}
-		return items[i].Month > items[j].Month
+		return items[i].Month < items[j].Month
 	})
 }
 

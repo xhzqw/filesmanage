@@ -33,9 +33,10 @@ export type Stats={
  totalFolders:number;
  totalBytes:number;
  added30Days:number;
- byType:{type:string;count:number}[];
- byMonth:{month:string;count:number}[];
- byUploader:{uploaderId:string;uploaderName:string;count:number}[];
+ byType:{type:string;count:number;bytes:number}[];
+ byMonth:{month:string;count:number;bytes:number}[];
+ byUploader:{uploaderId:string;uploaderName:string;count:number;bytes:number}[];
+ byFolder:{folderId:string;folderName:string;count:number;bytes:number}[];
 };
 
 export type SearchPage={items:FileItem[];total:number;nextCursor:string};
