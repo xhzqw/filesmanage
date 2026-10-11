@@ -32,11 +32,11 @@
 .col-hash{width:90px}
 .col-date{text-align:right}
 .col-actions{text-align:right}
-.file-table col.col-select{width:32px}
-.file-table col.col-size{width:84px}
-.file-table col.col-version{width:58px}
-.file-table col.col-date{width:140px}
-.file-table col.col-actions{width:170px}
+.file-table th.col-select{width:32px}
+.file-table th.col-size{width:84px}
+.file-table th.col-version{width:58px}
+.file-table th.col-date{width:140px}
+.file-table th.col-actions{width:170px}
 
 .file-cell-wrap{display:flex;align-items:center;gap:var(--space-1);min-width:0;height:100%}
 .file-cell-wrap .file-name{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--brand-blue);font-weight:500}
@@ -147,19 +147,17 @@
   }
 }
 @container file-list (max-width:820px){
-  .file-table col.col-actions{width:66px}
-  .file-table col.col-date{width:130px}
-  .file-table col.col-size{width:76px}
-  .file-table col.col-version{width:54px}
+  .file-table th.col-actions{width:66px}
+  .file-table th.col-date{width:130px}
+  .file-table th.col-size{width:76px}
+  .file-table th.col-version{width:54px}
   .file-table .actions-hover-group{opacity:1;pointer-events:auto}
   .file-table .actions-hover-group>.action-link:not(.more-trigger){display:none}
 }
 @container file-list (max-width:560px){
   .file-toolbar .filter-search-wrap{flex:1 1 150px}
-  /* A colgroup keeps allocating space for hidden columns in fixed-layout
-     Chrome tables. Remove it at narrow widths and size the visible headers.
-     Filename, selected state, context actions and favorite remain visible. */
-  .file-table colgroup{display:none}
+  /* Fixed column groups keep reserving width for hidden cells in Chrome.
+     Instead only the visible semantic header cells control table sizing. */
   .file-table{table-layout:fixed}
   .file-table :is(th,td).col-date,.file-table :is(th,td).col-size,.file-table :is(th,td).col-version{display:none}
   .file-table th.col-select{width:34px}

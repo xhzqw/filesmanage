@@ -870,7 +870,6 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   {message&&<p role="status" className={"notice "+messageTone}>{message}</p>}
   <div className="table" onClick={event=>{if(!(event.target as HTMLElement).closest("tr")){setSelectedIds(new Set<string>());setAnchorId(null);}}}>
    <table role="grid" aria-label={folderName+" 文件列表"} className="file-table file-table-ultra">
-    <colgroup><col className="col-select"/><col className="col-name"/><col className="col-size"/><col className="col-version"/><col className="col-date"/><col className="col-actions"/></colgroup>
     <thead><tr>
      <th className="col-select" scope="col"><RareInput type="checkbox" tabIndex={-1} checked={allLoadedSelected} onChange={toggleSelectAllLoaded} aria-label="选择当前已加载的文件"/></th>
      <th className="col-name" scope="col">文件名</th>
