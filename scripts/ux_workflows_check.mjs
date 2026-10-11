@@ -1414,6 +1414,16 @@ async function finaleSuite() {
     const currentMenu=await cdp.evaluate(`(()=>document.querySelector('[role=menu][aria-label^="目录操作："]')?.getAttribute('aria-label'))()`);
     check("G2 cancelled tree context operation restores selected folder header",currentMenu===`目录操作：WF-SMOKE-${stamp}`,String(currentMenu));
     await cdp.key("Escape","Escape",27);
+    const removable=await mk(`WF-TARGET-${stamp}-REMOVE`);
+    await cdp.navigate(`${BASE}/doc?folder=${removable}`);
+    await cdp.waitFor(`()=>new URLSearchParams(location.search).get('folder')===${JSON.stringify(removable)}&&!!document.querySelector('.folder-more-wrapper .ghost-more-btn')`);
+    await cdp.evaluate(`(()=>{document.querySelector('.folder-more-wrapper .ghost-more-btn')?.click();return true;})()`);
+    await cdp.waitFor(`()=>!![...document.querySelectorAll('[role=menuitem]')].find(b=>b.textContent?.includes('删除目录'))`);
+    await cdp.evaluate(`(()=>{[...document.querySelectorAll('[role=menuitem]')].find(b=>b.textContent?.includes('删除目录'))?.click();return true;})()`);
+    await cdp.waitFor(`()=>!![...document.querySelectorAll('dialog[open]')].find(d=>d.textContent?.includes('删除目录确认'))`);
+    await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog[open]')].find(x=>x.textContent?.includes('删除目录确认'));[...d.querySelectorAll('button')].find(b=>b.textContent?.trim()==='确认删除')?.click();return true;})()`);
+    const fallback=await cdp.waitFor(`()=>new URLSearchParams(location.search).get('folder')===${JSON.stringify(root.id)}`,16000);
+    check("G2 deleting selected folder navigates to surviving parent",fallback===true,String(await cdp.evaluate(`(()=>location.pathname+location.search)()`)));
   } finally {
     cdp && cdp.close();
     chrome && chrome.kill("SIGKILL");
