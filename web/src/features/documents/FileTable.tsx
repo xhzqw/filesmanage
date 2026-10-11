@@ -911,6 +911,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       <td className="col-select"><RareInput type="checkbox" checked={selectedIds.has(item.id)} aria-label={"选择 "+item.name} onClick={event=>event.stopPropagation()} onChange={event=>onCheckToggle(event,item)}/></td>
       <td className="col-name"><div className="file-cell-wrap">
        <FileTypeIcon name={item.name}/><span className="file-name" title={item.name}>{item.name}</span>
+       <small className="file-mobile-meta">v{item.currentVersionSeq} · {formatSize(item.sizeBytes)}</small>
        <RareButton type="button" className="file-mobile-actions" aria-label={"操作 "+item.name}
         title={"文件操作："+item.name} aria-haspopup="menu"
         onClick={event=>{event.stopPropagation();openRowMenu(item,event.currentTarget);}}>···</RareButton>
