@@ -322,16 +322,38 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	if q.Query != "" {
 		textColumn = "coalesce(ft.content,'')"
 	}
-	// Content matches run against the tsvector GIN index with the CJK-spaced
-	// phrase; the file name stays an ILIKE so name-only hits keep working for
-	// unindexed or binary formats.
+	// A combined OR with a correlated EXISTS scans all 100k files for rare
+	// names even if the name GIN index contains eight hits. Conversely, UNION
+	// over every broad name hit can cost seconds. Probe only a capped candidate
+	// population, never use it as an authorization verdict or result count.
+	// Few hits take a GIN-backed ID union; broad hits retain the early-stopping
+	// ordered scan. Both paths enforce the exact same authorized folder scope,
+	// filters, sort and cursor on the outer files table.
 	if q.Query != "" {
-		// EXISTS (not IN) lets the planner drive from the export order index
-		// with early termination on LIMIT instead of hashing the whole match
-		// set and sorting it: a broad term over 100k files drops from ~500ms
-		// to ~140ms, and selective terms still use the GIN index.
-		where = append(where, "(EXISTS (SELECT 1 FROM file_text ft WHERE ft.file_id=f.id AND ft.tsv @@ phraseto_tsquery('simple', "+ph.next()+")) OR f.name ILIKE "+ph.next()+")")
-		args = append(args, q.TextQuery, "%"+q.Query+"%")
+		const candidateLimit = 256
+		pattern := "%" + q.Query + "%"
+		selective := false
+		if len([]rune(q.Query)) >= 2 {
+			var candidateCount int
+			probe := `SELECT
+			  (SELECT count(*) FROM (SELECT 1 FROM files WHERE deleted_at IS NULL AND name ILIKE $1 LIMIT 257) names)
+			 + (SELECT count(*) FROM (SELECT 1 FROM file_text WHERE tsv @@ phraseto_tsquery('simple',$2) LIMIT 257) texts)`
+			if err = r.Q.QueryRow(ctx, probe, pattern, q.TextQuery).Scan(&candidateCount); err != nil {
+				return nil, 0, err
+			}
+			selective = candidateCount <= candidateLimit
+		}
+		if selective {
+			where = append(where, "f.id IN (SELECT named.id FROM files named WHERE named.deleted_at IS NULL AND named.name ILIKE "+
+				ph.next()+" UNION SELECT ft.file_id FROM file_text ft WHERE ft.tsv @@ phraseto_tsquery('simple', "+ph.next()+"))")
+			args = append(args, pattern, q.TextQuery)
+		} else {
+			// Ordered broad search keeps the early LIMIT and the old semantics,
+			// avoiding full UNION materialization for 100k name matches.
+			where = append(where, "(EXISTS (SELECT 1 FROM file_text ft WHERE ft.file_id=f.id AND ft.tsv @@ phraseto_tsquery('simple', "+
+				ph.next()+")) OR f.name ILIKE "+ph.next()+")")
+			args = append(args, q.TextQuery, pattern)
+		}
 	}
 	matchedOrder := "f.updated_at DESC,f.id DESC"
 	outerOrder := "m.updated_at DESC,m.id DESC"
