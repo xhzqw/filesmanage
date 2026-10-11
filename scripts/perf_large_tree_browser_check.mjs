@@ -113,7 +113,9 @@ try{
  await send("Page.navigate",{url:BASE+"/search"});
  await wait(`!!document.querySelector('#search-q')`);
  const instant=[];
- for(const [term,expected]of [["pf_bulk_9627",8],["文件",50],["qq___nonexistent_9876",0]]){
+ // Keep adjacent expected counts different so the wait can never mistake
+ // the previous query's rows for a newly rendered search result.
+ for(const [term,expected]of [["pf_bulk_9627",8],["导出",10],["预算",50],["qq___nonexistent_9876",0],["文件",50]]){
   const started=Date.now();
   await evalJS(`(()=>{const input=document.querySelector('#search-q');
     const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
