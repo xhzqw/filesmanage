@@ -1,14 +1,15 @@
 import {RareButton,RareInput} from "../shared/ui/rare";
-import {useEffect,useRef,useState,type FormEvent} from "react";
+import {useEffect,useRef,useState} from "react";
 import {useNavigate,useParams} from "react-router-dom";
 import {fileApi} from "../features/documents/api";
 import {errorCopy} from "../shared/errors";
 import {reportSessionResponse} from "../shared/http";
-import type {FileItem} from "../entities/file/model";
 import type {User} from "../entities/user/model";
 import {AppShell} from "../shared/ui/AppShell";
 import {parseDxf} from "../features/modelViewer/dxf";
 import type {MshGeometry} from "../features/modelViewer/mshParser";
+import {mountEngineeringScene,type ViewerControls,type ViewerMetrics} from "../features/modelViewer/viewerScene";
+import "../features/modelViewer/viewer.css";
 
 type DerivativeInfo={
  found:boolean;
@@ -38,10 +39,12 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
  const[info,setInfo]=useState<DerivativeInfo|null>(null);
  const[fileMeta,setFileMeta]=useState<{sha256:string;versionSeq:number}|null>(null);
  const holder=useRef<HTMLDivElement>(null);
- const[metrics,setMetrics]=useState<{triangles:number;vertices:number;size:[number,number,number];components:number}|null>(null);
+ const[metrics,setMetrics]=useState<ViewerMetrics|null>(null);
  // Mesh formats carry no unit; only 3MF declares one in its model XML. The
  // viewer must never silently assume millimetres (MOD04).
  const[unit,setUnit]=useState("unknown");
+ const[measure,setMeasure]=useState<number|null>(null);
+ const[skipped,setSkipped]=useState<string[]>([]);
  const[layers,setLayers]=useState<{name:string;visible:boolean}[]>([]);
  // Assembly parts recovered from a converted mesh (MC02/MOD02): the MSH keeps
  // shared node indices, so connected components are the solids.
@@ -51,7 +54,8 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
  const dxfRoot=useRef<import("three").Group|null>(null);
  const started=useRef(false);
  const controls=useRef<ViewerControls|null>(null);
- const[view,setView]=useState({axes:false,grid:true,projection:"perspective" as "perspective"|"orthographic"});
+ const[view,setView]=useState({axes:false,grid:true,edges:true,measure:false,projection:"perspective" as "perspective"|"orthographic"});
+ const drawing=(info?.outputKind??info?.format??"").toLowerCase()==="dxf";
 
  // React Router can keep this component mounted while /model/:id changes.
  // Drop the previous GPU scene and restart loading for the new document.
@@ -69,7 +73,8 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
   let valid=true;
   setStatus("loading");setMessage("");setInfo(null);setFileMeta(null);
   setMetrics(null);setLayers([]);setParts([]);setSelectedPart(-1);
-  setUnit("unknown");setView({axes:false,grid:true,projection:"perspective"});
+  setUnit("unknown");setMeasure(null);setSkipped([]);
+  setView({axes:false,grid:true,edges:true,measure:false,projection:"perspective"});
   const run=async()=>{
    try{
     let data=await fileApi.derivativeStatus(id);
@@ -154,6 +159,8 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
      object=parsed.object;
      dxfRoot.current=parsed.object;
      setLayers(parsed.layers);
+     setSkipped(parsed.skipped);
+     setUnit(parsed.unit);
     }else if(format==="msh"){
      const parsed=await parseMshInWorker(buffer,abort.signal,THREE);
      if(!valid)return;
@@ -170,15 +177,17 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
      pendingObject=object;
      if(!valid)return;
      let mountedControls:ViewerControls|null=null;
-     mountedControls=mountScene(THREE,OrbitControls,holder.current!,object,setMetrics,()=>{
+     mountedControls=mountEngineeringScene(THREE,OrbitControls,holder.current!,object,format==="dxf",setMetrics,()=>{
       // The loading effect is cleaned up as soon as status becomes ready.
       // Scene lifetime instead belongs to controls.current (until navigation).
       if(controls.current===mountedControls){
        setStatus("webgl-lost");
        setMessage("浏览器 WebGL 上下文已丢失（通常是 GPU 资源被系统回收）");
       }
-     });
+     },setMeasure);
      controls.current=mountedControls;
+     setView({axes:false,grid:format!=="dxf",edges:format!=="dxf",measure:false,
+      projection:format==="dxf"?"orthographic":"perspective"});
      pendingObject=null;
      setStatus("ready");
     }catch(error){
@@ -193,82 +202,117 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
    return()=>{valid=false;abort.abort();};
   },[status,id,info?.outputKind,info?.format]);
 
- return <AppShell user={user} onLogout={onLogout} product="模型预览" actions={<RareButton type="button" onClick={()=>navigate("/preview/"+id)}>返回文件</RareButton>}>
+ return <AppShell user={user} onLogout={onLogout} product={drawing?"图纸预览":"模型预览"} actions={<RareButton type="button" onClick={()=>navigate("/preview/"+id)}>返回文件</RareButton>}>
   <div className="panels">
-   <main className="work">
-    <div className="breadcrumb">模型预览 · {info?.format?.toUpperCase()??""} · {info?.class==="converted"?"服务端已转换":info?.format?.toLowerCase()==="dxf"?"二维工程图":"浏览器原生渲染"}</div>
-    {layers.length>0&&<div className="toolbar" role="group" aria-label="图层">
-     {layers.map(layer=><label key={layer.name} className="sort-label">
-      <RareInput type="checkbox" checked={layer.visible} onChange={event=>{
-       setLayers(layers.map(item=>item.name===layer.name?{...item,visible:event.target.checked}:item));
-       // Toggle visibility straight on the drawing's layer group.
-        dxfRoot.current?.children.forEach(child=>{
-         if(child.userData.layer===layer.name)child.visible=event.target.checked;
+   <main className="work cad-page">
+    <div className="breadcrumb cad-title">
+     <strong>{drawing?"二维工程图":"三维模型"}</strong>
+     <span>{info?.format?.toUpperCase()??""}{info?.class==="converted"?" · 已转换":""}</span>
+    </div>
+    <div className="cad-workbench">
+     <section className="cad-viewport" aria-label={drawing?"工程图查看区域":"三维模型查看区域"}>
+      <div className="viewer-stage" ref={holder}/>
+      {status!=="ready"&&<div className="cad-status" role={status==="failed"||status==="webgl-lost"?"alert":"status"}>
+       {status==="unsupported"?(info?.note??"该格式当前不支持在线预览"):
+        status==="converting"?"模型正在转换，请稍后重新打开":
+        status==="too-large"?"模型过大，已停止浏览器预览":
+        status==="webgl-lost"?(message||"WebGL 上下文丢失"):
+        status==="failed"?(message||"预览失败"):"正在载入几何数据…"}
+       {(status==="too-large"||status==="webgl-lost")&&<a href={"/api/files/"+id+"/bytes"}>下载原文件</a>}
+      </div>}
+      {status==="ready"&&<div className="cad-toolbar" role="group" aria-label="工程视图工具">
+       <RareButton type="button" onClick={()=>{
+        controls.current?.resetView();
+        setView(v=>({...v,axes:false,measure:false,projection:drawing?"orthographic":"perspective"}));
+       }}>适合窗口</RareButton>
+       {!drawing&&<div className="cad-toolgroup" role="group" aria-label="标准视角">
+        {(["iso","front","right","top"] as const).map((name,index)=>
+         <RareButton key={name} type="button" onClick={()=>{
+          controls.current?.setStandardView(name);
+          setView(v=>({...v,projection:name==="iso"?v.projection:"orthographic"}));
+         }}>{["等轴","前","右","俯"][index]}</RareButton>)}
+       </div>}
+       <div className="cad-toolgroup" role="group" aria-label="辅助显示">
+        <RareButton type="button" className={view.grid?"on":""} aria-pressed={view.grid}
+         onClick={()=>setView(v=>({...v,grid:controls.current?.toggleGrid()??v.grid}))}>网格</RareButton>
+        {!drawing&&<>
+         <RareButton type="button" className={view.edges?"on":""} aria-pressed={view.edges}
+          onClick={()=>setView(v=>({...v,edges:controls.current?.toggleEdges()??v.edges}))}>轮廓</RareButton>
+         <RareButton type="button" className={view.axes?"on":""} aria-pressed={view.axes}
+          onClick={()=>setView(v=>({...v,axes:controls.current?.toggleAxes()??v.axes}))}>坐标轴</RareButton>
+         <RareButton type="button" className={view.projection==="orthographic"?"on":""}
+          onClick={()=>setView(v=>({...v,projection:controls.current?.toggleProjection()??v.projection}))}>{view.projection==="orthographic"?"正交":"透视"}</RareButton>
+        </>}
+       </div>
+       <RareButton type="button" className={view.measure?"on":""} aria-pressed={view.measure}
+        onClick={()=>setView(v=>({...v,measure:controls.current?.toggleMeasure()??v.measure}))}>测距</RareButton>
+      </div>}
+      {status==="ready"&&<div className="cad-hint">
+       {view.measure?"依次点击两点测量距离":drawing?"左键平移 · 滚轮缩放":"左键旋转 · 右键平移 · 滚轮缩放"}
+      </div>}
+     </section>
+     {status==="ready"&&<aside className="cad-inspector" aria-label="工程文件属性">
+      {layers.length>0&&<section className="cad-inspector-section">
+       <h3>图层 <span>{layers.filter(item=>item.visible).length}/{layers.length}</span></h3>
+       <div className="cad-layer-list" role="group" aria-label="图层可见性">
+        {layers.map(layer=><label className="cad-layer" key={layer.name}>
+         <RareInput type="checkbox" checked={layer.visible} onChange={event=>{
+          setLayers(current=>current.map(item=>item.name===layer.name?{...item,visible:event.target.checked}:item));
+          dxfRoot.current?.children.forEach(child=>{if(child.userData.layer===layer.name)child.visible=event.target.checked;});
+          controls.current?.invalidate();
+         }}/>
+         <span title={layer.name}>{layer.name}</span>
+        </label>)}
+       </div>
+      </section>}
+      {parts.length>0&&<section className="cad-inspector-section">
+       <h3>装配零件 <span>{parts.filter(item=>item.visible).length}/{parts.length}</span></h3>
+       <div className="cad-layer-list" role="group" aria-label="装配零件可见性">
+        {parts.map((part,index)=><div className="cad-part" key={part.name}>
+         <RareInput type="checkbox" checked={part.visible} aria-label={part.name+"可见"} onChange={event=>{
+          setParts(current=>current.map((item,i)=>i===index?{...item,visible:event.target.checked}:item));
+          const child=mshRoot.current?.children[index];if(child)child.visible=event.target.checked;
+          controls.current?.invalidate();
+         }}/>
+         <RareButton type="button" className={selectedPart===index?"on":""} onClick={()=>{
+          const next=selectedPart===index?-1:index;setSelectedPart(next);
+          mshRoot.current?.children.forEach((child,i)=>{
+           const mat=(child as import("three").Mesh).material as import("three").MeshPhongMaterial|undefined;
+           mat?.emissive?.setHex(i===next?0x1b4f8a:0x000000);
+          });
+          controls.current?.invalidate();
+         }}>{part.name}</RareButton>
+        </div>)}
+       </div>
+       <RareButton type="button" onClick={()=>{
+        setParts(current=>current.map(item=>({...item,visible:true})));setSelectedPart(-1);
+        mshRoot.current?.children.forEach(child=>{
+         child.visible=true;
+         const mat=(child as import("three").Mesh).material as import("three").MeshPhongMaterial|undefined;
+         mat?.emissive?.setHex(0x000000);
         });
         controls.current?.invalidate();
-      }}/>
-      {layer.name}
-     </label>)}
-    </div>}
-    {parts.length>0&&<div className="toolbar" role="group" aria-label="装配零件">
-     {parts.map((part,index)=>(
-      <label key={part.name} className="sort-label">
-       <RareInput type="checkbox" checked={part.visible} onChange={event=>{
-        setParts(parts.map((item,i)=>i===index?{...item,visible:event.target.checked}:item));
-        const child=mshRoot.current?.children[index];
-        if(child)child.visible=event.target.checked;
-        controls.current?.invalidate();
-       }}/>
-       <RareButton type="button" className={selectedPart===index?"on":""} onClick={()=>{
-        setSelectedPart(selectedPart===index?-1:index);
-        // Selecting a part highlights it; everything else returns to the base
-        // material so only one part is ever emphasised (MOD02).
-        mshRoot.current?.children.forEach((child,i)=>{
-         const mesh=child as import("three").Mesh;
-         const material=mesh.material as import("three").MeshPhongMaterial|undefined;
-         if(!material||!material.emissive)return;
-         material.emissive.setHex(i===(selectedPart===index?-1:index)?0x1b4f8a:0x000000);
-        });
-        controls.current?.invalidate();
-       }}>{part.name}</RareButton>
-       <span className="toolbar-hint">{part.size.map(v=>v.toFixed(2)).join("×")} · {part.triangles}△</span>
-      </label>
-     ))}
-     <RareButton type="button" onClick={()=>{
-      setParts(parts.map(item=>({...item,visible:true})));
-      setSelectedPart(-1);
-      mshRoot.current?.children.forEach(child=>{
-       child.visible=true;
-       const material=(child as import("three").Mesh).material as import("three").MeshPhongMaterial|undefined;
-        material?.emissive?.setHex(0x000000);
-       });
-       controls.current?.invalidate();
-     }}>全部显示</RareButton>
-    </div>}
-    {status==="unsupported"&&<p className="empty">{info?.note??"该格式当前不支持在线预览"}</p>}
-    {status==="converting"&&<p className="empty">模型转换中（Worker 处理），请稍后刷新…</p>}
-    {status==="failed"&&<p role="alert" className="notice error">{message||"预览失败"}</p>}
-    {status==="webgl-lost"&&<p role="alert" className="notice error">{message||"预览失败"} · <a href={"/api/files/"+id+"/bytes"}>下载原件</a></p>}
-    {status==="too-large"&&<p role="alert" className="notice error">模型过大，浏览器内联渲染已取消 · <a href={"/api/files/"+id+"/bytes"}>下载原件</a></p>}
-    {status==="loading-model"&&<p className="empty">正在加载几何数据…</p>}
-    {status==="ready"&&<div className="toolbar" role="group" aria-label="视图控制">
-     <RareButton type="button" onClick={()=>controls.current?.resetView()}>重置视角</RareButton>
-     <RareButton type="button" className={view.axes?"on":""} aria-pressed={view.axes} onClick={()=>setView(v=>({...v,axes:controls.current?.toggleAxes()??v.axes}))}>坐标轴</RareButton>
-     <RareButton type="button" className={view.grid?"on":""} aria-pressed={view.grid} onClick={()=>setView(v=>({...v,grid:controls.current?.toggleGrid()??v.grid}))}>网格</RareButton>
-     <RareButton type="button" className={view.projection==="orthographic"?"on":""} aria-pressed={view.projection==="orthographic"} onClick={()=>setView(v=>({...v,projection:controls.current?.toggleProjection()??v.projection}))}>{view.projection==="orthographic"?"正交投影":"透视投影"}</RareButton>
-    </div>}
-    <div className="viewer-stage" ref={holder}/>
-    {metrics&&<div className="toolbar"><span className="toolbar-hint">三角形 {metrics.triangles} · 顶点 {metrics.vertices} · 拖拽旋转 / 滚轮缩放 / 右键平移 · 工具栏可重置视角、切换坐标轴 / 网格 / 投影</span></div>}
-    {metrics&&<div className="toolbar viewer-meta" role="group" aria-label="模型元数据">
-     <span className="toolbar-hint">来源格式 {info?.format?.toUpperCase()??"-"}{info?.class==="converted"?"（服务端转换）":""}</span>
-     <span className="toolbar-hint">版本 v{fileMeta?.versionSeq??"-"}</span>
-     <span className="toolbar-hint">源 SHA {fileMeta?.sha256?.slice(0,16)??"-"}…</span>
-     <span className="toolbar-hint">单位 {unit==="unknown"?"未知单位（不按毫米计算）":unit}</span>
-     <span className="toolbar-hint">尺寸（近似，三角化网格）{metrics.size.map(v=>v.toFixed(2)).join(" × ")}</span>
-     <span className="toolbar-hint">组件数 {metrics.components}</span>
-     {info?.outputSha256&&<span className="toolbar-hint">派生 SHA {info.outputSha256.slice(0,16)}…</span>}
-     {info?.note&&<span className="toolbar-hint">警告 {info.note}</span>}
-    </div>}
+       }}>全部显示</RareButton>
+      </section>}
+      {view.measure&&<section className="cad-inspector-section">
+       <h3>测量</h3>
+       <strong className="cad-measure">{measure===null?"请选择两个点":measure.toLocaleString("zh-CN",{maximumFractionDigits:4})+" "+(unit==="unknown"?(drawing?"绘图单位":"模型单位"):unit)}</strong>
+       <RareButton type="button" onClick={()=>controls.current?.clearMeasurement()}>清除测量</RareButton>
+      </section>}
+      {metrics&&<section className="cad-inspector-section cad-properties">
+       <h3>文件属性</h3>
+       <div><span>版本</span><strong>v{fileMeta?.versionSeq??"-"}</strong></div>
+       <div><span>单位</span><strong>{unit==="unknown"?"未声明":unit}</strong></div>
+       <div><span>尺寸</span><strong>{(drawing?metrics.size.slice(0,2):metrics.size).map(v=>Number(v.toPrecision(5))).join(" × ")}</strong></div>
+       {!drawing&&<div><span>三角面</span><strong>{metrics.triangles.toLocaleString()}</strong></div>}
+       {!drawing&&<div><span>组件</span><strong>{metrics.components}</strong></div>}
+       <div><span>格式</span><strong>{info?.format?.toUpperCase()??"-"}</strong></div>
+       <div><span>源校验</span><strong title={fileMeta?.sha256}>{fileMeta?.sha256?.slice(0,10)??"-"}…</strong></div>
+       {info?.note&&<p className="cad-notice">{info.note}</p>}
+       {skipped.length>0&&<p className="cad-notice">未绘制实体：{skipped.join("、")}</p>}
+      </section>}
+     </aside>}
+    </div>
    </main>
   </div>
  </AppShell>;
@@ -506,203 +550,4 @@ async function parseMshInWorker(
   }
  }catch(error){disposeModelResources(group);throw error;}
  return{group,parts};
-}
-
-// ViewerControls is the imperative surface the toolbar drives (SPEC §模型查看器
-// MOD01/MOD07). mountScene returns it so the React layer stays declarative.
-type ViewerControls={
- dispose:()=>void;
- invalidate:()=>void;
- resetView:()=>void;
- toggleAxes:()=>boolean;
- toggleGrid:()=>boolean;
- toggleProjection:()=>"perspective"|"orthographic";
-};
-
-function mountScene(
- THREE:typeof import("three"),
- OrbitControls:typeof import("three/examples/jsm/controls/OrbitControls.js").OrbitControls,
- holder:HTMLDivElement,
- object:import("three").Object3D,
- setMetrics:(m:{triangles:number;vertices:number;size:[number,number,number];components:number})=>void,
- onContextLost?:()=>void,
-):ViewerControls{
- const scene=new THREE.Scene();
- scene.background=new THREE.Color(0xf4f9fe);
- const aspect=holder.clientWidth/Math.max(holder.clientHeight,1);
- const persp=new THREE.PerspectiveCamera(45,aspect,0.1,100000);
- // Frame the model once: the box centre becomes the orbit target and the
- // radius drives both the perspective distance and the orthographic frustum.
- const box=new THREE.Box3().setFromObject(object);
- const size=box.getSize(new THREE.Vector3());
- const center=box.getCenter(new THREE.Vector3());
- object.position.sub(center);
- const radius=Math.max(size.x,size.y,size.z,0.001)/2;
- const frustum=radius*2.6;
- const ortho=new THREE.OrthographicCamera(
-  -frustum*aspect,frustum*aspect,frustum,-frustum,-radius*50,radius*50,
- );
- let camera:import("three").PerspectiveCamera|import("three").OrthographicCamera=persp;
- const renderer=new THREE.WebGLRenderer({antialias:true});
- // A 3×–4× density screen can multiply GPU render-target memory by 9–16.
- // Clamp the canvas to 2×, preserving sharpness without unbounded allocation.
- renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
- renderer.setSize(holder.clientWidth,holder.clientHeight);
- holder.appendChild(renderer.domElement);
- // Annotated so the projection swap can rebind controls to either camera type.
- let controls:typeof OrbitControls.prototype=new OrbitControls(camera,renderer.domElement);
- controls.enableDamping=true;
-
- scene.add(new THREE.AmbientLight(0xffffff,0.6));
- const key=new THREE.DirectionalLight(0xffffff,1.1);
- key.position.set(1,1,1);
- scene.add(key);
- const fill=new THREE.DirectionalLight(0xcfe4ff,0.5);
- fill.position.set(-1,-0.5,-1);
- scene.add(fill);
- const grid=new THREE.GridHelper(Math.max(radius*4,10),20,0x9fc2e8,0xdfe9f4);
- scene.add(grid);
- const axes=new THREE.AxesHelper(radius*1.6);
- axes.visible=false;
- scene.add(axes);
-
- // Preserve source materials (including OBJ/3MF/glTF texture maps), rather
- // than replacing them with an allocated blue material on every mesh.
- scene.add(object);
-
- let invalidate=()=>{};
- const frame=()=>{
-  // Damping residue from a drag would be re-applied on the next update() and
-  // pull the camera away from the reset pose, so flush it first: one update
-  // with damping off applies the leftover delta and zeroes it.
-  controls.enableDamping=false;
-  controls.update();
-  controls.enableDamping=true;
-  camera.position.set(radius*2.2,radius*1.8,radius*2.2);
-  controls.target.set(0,0,0);
-  controls.update();
-  invalidate();
- };
- frame();
- let triangles=0,vertices=0;
- object.traverse(child=>{
-  const mesh=child as import("three").Mesh;
-  if(mesh.isMesh&&mesh.geometry){
-   const g=mesh.geometry as import("three").BufferGeometry;
-   if(g.index)triangles+=g.index.count/3;
-   else if(g.attributes.position)triangles+=g.attributes.position.count/3;
-   if(g.attributes.position)vertices+=g.attributes.position.count;
-  }
- });
- // Components: direct children that carry geometry anywhere below them. A
- // converted STEP is one merged mesh (honest count of 1); a multi-part
- // glTF/3MF reports its parts even when the loader nests them in groups.
- let components=0;
- for(const child of object.children){
-  let carries=false;
-  child.traverse(node=>{
-   if((node as import("three").Mesh).isMesh)carries=true;
-  });
-  if(carries)components++;
- }
- if(components===0&&triangles>0)components=1;
- setMetrics({triangles,vertices,size:[size.x,size.y,size.z],components});
-
- // Render only when the model/camera changes. A constantly running WebGL
- // loop burns GPU even on an idle document tab. OrbitControls emits a change
- // while dragging or damping, allowing frames until movement settles.
- let raf=0,needsFrame=true,disposed=false,contextLost=false;
- const requestFrame=()=>{
-  if(!raf&&!disposed&&!contextLost&&!document.hidden)raf=requestAnimationFrame(draw);
- };
- const draw=()=>{
-  raf=0;
-  if(disposed||contextLost||document.hidden)return;
-  const moving=controls.update();
-  if(needsFrame||moving)renderer.render(scene,camera);
-  needsFrame=false;
-  if(moving)requestFrame();
- };
- invalidate=()=>{needsFrame=true;requestFrame();};
- controls.addEventListener("change",invalidate);
- invalidate();
- const onResize=()=>{
-  if(disposed)return;
-  const next=holder.clientWidth/Math.max(holder.clientHeight,1);
-  persp.aspect=next;
-  persp.updateProjectionMatrix();
-  ortho.left=-frustum*next;
-  ortho.right=frustum*next;
-  ortho.updateProjectionMatrix();
-  renderer.setSize(holder.clientWidth,holder.clientHeight);
-  invalidate();
- };
- window.addEventListener("resize",onResize);
- const resizeObserver=new ResizeObserver(onResize);
- resizeObserver.observe(holder);
- const onVisibilityChange=()=>{
-  if(document.hidden){cancelAnimationFrame(raf);raf=0;}
-  else invalidate();
- };
- document.addEventListener("visibilitychange",onVisibilityChange);
-
- // MOD07: a lost WebGL context is surfaced as an actionable error instead of a
- // silently frozen canvas. preventDefault keeps the restore path available.
- const onLost=(event:Event)=>{
-  event.preventDefault();
-  contextLost=true;
-  cancelAnimationFrame(raf);
-  raf=0;
-  if(onContextLost)onContextLost();
- };
- renderer.domElement.addEventListener("webglcontextlost",onLost);
-
- return {
-  invalidate,
-  resetView:frame,
-  toggleAxes:()=>{
-   axes.visible=!axes.visible;
-   invalidate();
-   return axes.visible;
-  },
-  toggleGrid:()=>{
-   grid.visible=!grid.visible;
-   invalidate();
-   return grid.visible;
-  },
-  toggleProjection:()=>{
-   const next=camera===persp?ortho:persp;
-   next.position.copy(camera.position);
-   controls.removeEventListener("change",invalidate);
-   controls.dispose();
-   camera=next;
-   controls=new OrbitControls(camera,renderer.domElement);
-   controls.enableDamping=true;
-   controls.target.set(0,0,0);
-   controls.addEventListener("change",invalidate);
-   controls.update();
-   invalidate();
-   return camera===ortho?"orthographic":"perspective";
-  },
-  dispose:()=>{
-   if(disposed)return;
-   disposed=true;
-   cancelAnimationFrame(raf);
-   window.removeEventListener("resize",onResize);
-   resizeObserver.disconnect();
-   document.removeEventListener("visibilitychange",onVisibilityChange);
-   renderer.domElement.removeEventListener("webglcontextlost",onLost);
-   controls.removeEventListener("change",invalidate);
-   controls.dispose();
-   disposeModelResources(object);
-   disposeModelResources(grid);
-   disposeModelResources(axes);
-   scene.remove(object,grid,axes);
-   // forceContextLoss releases the GPU context immediately rather than waiting
-   // for the GC to finalise the canvas (MOD08).
-   renderer.dispose();
-   renderer.forceContextLoss();
-   if(renderer.domElement.parentNode)renderer.domElement.parentNode.removeChild(renderer.domElement);
-  },
- };
 }

@@ -1,9 +1,8 @@
-// Minimal DXF reader for the 2D drawing viewer (SPEC §20.3 DRW01/DRW02).
+// Model-space DXF renderer: readable layer colours, batched segments and labels.
 //
 // Two passes: the LAYER table (name + ACI colour), then the ENTITIES section.
 // Supported: LINE, CIRCLE, ARC, LWPOLYLINE, POLYLINE/VERTEX/SEQEND and
-// TEXT/MTEXT (rendered as an insertion marker, since glyph geometry needs a
-// font). Each layer becomes a child group so the viewer can toggle visibility,
+// TEXT/MTEXT are rendered as glyph sprites. Each layer becomes a child group,
 // and layer colours come from the drawing's own ACI index — never the brand
 // palette. Anything else is reported as skipped, never silently dropped.
 import type * as THREE from "three";
@@ -12,15 +11,19 @@ export type DxfParseResult={
  object:THREE.Group;
  layers:{name:string;visible:boolean}[];
  skipped:string[];
+ unit:string;
 };
 
-const ACI:Record<number,number>={1:0xff0000,2:0xffff00,3:0x00ff00,4:0x00ffff,5:0x0000ff,6:0xff00ff,7:0xffffff};
+// DXF ACI 7 means black on white paper (and white on dark model space).
+const ACI:Record<number,number>={1:0xc72e32,2:0xa57b07,3:0x188049,4:0x087e92,5:0x235bbd,6:0x9733ad,7:0x253b53};
+const UNITS:Record<number,string>={1:"in",2:"ft",3:"mi",4:"mm",5:"cm",6:"m",7:"km",8:"µin",9:"mil",10:"yd",14:"dm"};
 
 function aciColor(code:number):number{
- if(ACI[code])return ACI[code];
+ const known=ACI[Math.abs(code)];
+ if(known!==undefined)return known;
  // Unknown ACI indices keep a stable readable hue instead of claiming to be
  // the exact CAD colour.
- return ((code*67)%0xffffff)|0;
+ return (Math.abs(code)*4127+0x334455)&0x7f7f7f;
 }
 
 type Pair={code:number;value:string};
@@ -49,30 +52,46 @@ type Entity={
  a1:number;
  closed:boolean;
  height:number;
+ text:string;
 };
 
 function emptyEntity(type:string):Entity{
- return {type,layer:"0",points:[],end:null,radius:0,a0:0,a1:360,closed:false,height:1};
+ return {type,layer:"0",points:[],end:null,radius:0,a0:0,a1:360,closed:false,height:2.5,text:""};
 }
 
 export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResult{
  const records=pairs(text);
 
- // Pass 1 — the LAYER table: name and ACI colour.
+ // Pass 1 — HEADER units and LAYER table.
  const layerColors=new Map<string,number>();
+ const hiddenLayers=new Set<string>();
+ let unit="unknown";
  let section="";
  let table="";
  let pendingLayer="";
+ let sectionPending=false;
+ let tablePending=false;
+ let unitPending=false;
  for(const pair of records){
   if(pair.code===0){
-   if(pair.value==="TABLE"){table="";}
-   else if(pair.value==="LAYER"){pendingLayer="";}
-   else if(pair.value==="ENDTAB"){table="";pendingLayer="";}
+   if(pair.value==="SECTION"){sectionPending=true;continue;}
+   if(pair.value==="ENDSEC"){section="";continue;}
+   if(pair.value==="TABLE"){tablePending=true;continue;}
+   if(pair.value==="LAYER"&&table==="LAYER"){pendingLayer="";continue;}
+   if(pair.value==="ENDTAB"){table="";pendingLayer="";continue;}
    continue;
   }
-  if(pair.code===2&&!section&&!table)section=pair.value;
-  if(pair.code===2&&table==="LAYER")pendingLayer=pair.value.trim();
-  if(pair.code===62&&pendingLayer)layerColors.set(pendingLayer,Number.parseInt(pair.value,10)||7);
+  if(pair.code===2&&sectionPending){section=pair.value.trim();sectionPending=false;continue;}
+  if(pair.code===2&&tablePending){table=pair.value.trim();tablePending=false;continue;}
+  if(section==="HEADER"){
+   if(pair.code===9)unitPending=pair.value.trim()==="$INSUNITS";
+   else if(unitPending&&pair.code===70){unit=UNITS[Number(pair.value)]??"unknown";unitPending=false;}
+  }
+  if(section==="TABLES"&&table==="LAYER"){
+   if(pair.code===2)pendingLayer=pair.value.trim();
+   if(pair.code===62&&pendingLayer)layerColors.set(pendingLayer,Number.parseInt(pair.value,10)||7);
+   if(pair.code===70&&pendingLayer&&(Number(pair.value)&1)!==0)hiddenLayers.add(pendingLayer);
+  }
  }
  const layerColor=(name:string)=>layerColors.get(name)??7;
 
@@ -80,6 +99,7 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
  const root=new THREE.Group();
  root.name="dxf";
  const layerGroups=new Map<string,THREE.Group>();
+ const segmentBuffers=new Map<string,number[]>();
  const layerOrder:string[]=[];
  const skipped=new Set<string>();
 
@@ -89,6 +109,7 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
    group=new THREE.Group();
    group.name=name;
    group.userData.layer=name;
+   group.visible=!hiddenLayers.has(name);
    layerGroups.set(name,group);
    layerOrder.push(name);
    root.add(group);
@@ -96,25 +117,67 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
   return group;
  };
  const line=(x1:number,y1:number,x2:number,y2:number,layer:string)=>{
-  const geometry=new THREE.BufferGeometry().setFromPoints([
-   new THREE.Vector3(x1,y1,0),new THREE.Vector3(x2,y2,0)]);
-  groupFor(layer).add(new THREE.Line(geometry,
-   new THREE.LineBasicMaterial({color:aciColor(layerColor(layer))})));
+  if(![x1,y1,x2,y2].every(v=>Number.isFinite(v)&&Math.abs(v)<1e12))return;
+  groupFor(layer);
+  let coordinates=segmentBuffers.get(layer);
+  if(!coordinates){coordinates=[];segmentBuffers.set(layer,coordinates);}
+  coordinates.push(x1,y1,0,x2,y2,0);
  };
  const arc=(x:number,y:number,r:number,from:number,to:number,layer:string)=>{
-  const curve=new THREE.EllipseCurve(x,y,r,r,from*Math.PI/180,to*Math.PI/180,false,0);
-  const points=curve.getPoints(64).map(p=>new THREE.Vector3(p.x,p.y,0));
-  if(points.length<2)return;
-  const geometry=new THREE.BufferGeometry().setFromPoints(points);
-  groupFor(layer).add(new THREE.Line(geometry,
-   new THREE.LineBasicMaterial({color:aciColor(layerColor(layer))})));
- };
- const marker=(x:number,y:number,h:number,layer:string)=>{
-  const s=Math.max(h,0.5)*0.6;
-  const axes:[number,number][]=[[1,0],[0,1]];
-  for(const [dx,dy] of axes){
-   line(x-dx*s,y-dy*s,x+dx*s,y+dy*s,layer);
+  if(![x,y,r,from,to].every(Number.isFinite)||r<=0)return;
+  let end=to;
+  while(end<=from)end+=360;
+  const sweep=(end-from)*Math.PI/180;
+  const divisions=Math.min(192,Math.max(24,Math.ceil(sweep*30)));
+  let px=x+r*Math.cos(from*Math.PI/180),py=y+r*Math.sin(from*Math.PI/180);
+  for(let i=1;i<=divisions;i++){
+   const angle=(from*Math.PI/180)+sweep*i/divisions;
+   const nx=x+r*Math.cos(angle),ny=y+r*Math.sin(angle);
+   line(px,py,nx,ny,layer);px=nx;py=ny;
   }
+ };
+ const polySegment=(a:Point,b:Point,layer:string)=>{
+  const theta=4*Math.atan(a.bulge);
+  const tangent=Math.tan(theta/2);
+  if(!Number.isFinite(theta)||Math.abs(theta)<1e-7||Math.abs(tangent)<1e-7){
+   line(a.x,a.y,b.x,b.y,layer);return;
+  }
+  const cx=(a.x+b.x)/2-(b.y-a.y)/(2*tangent);
+  const cy=(a.y+b.y)/2+(b.x-a.x)/(2*tangent);
+  const radius=Math.hypot(a.x-cx,a.y-cy);
+  if(!Number.isFinite(radius)||radius===0){line(a.x,a.y,b.x,b.y,layer);return;}
+  const start=Math.atan2(a.y-cy,a.x-cx);
+  const divisions=Math.min(128,Math.max(8,Math.ceil(Math.abs(theta)*24)));
+  let previous=a;
+  for(let i=1;i<=divisions;i++){
+   const angle=start+theta*i/divisions;
+   const next=i===divisions?b:{x:cx+radius*Math.cos(angle),y:cy+radius*Math.sin(angle),bulge:0};
+   line(previous.x,previous.y,next.x,next.y,layer);
+   previous=next;
+  }
+ };
+ const label=(text:string,x:number,y:number,h:number,layer:string)=>{
+  if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(h)||h<=0)return;
+  const content=text.replace(/\\P/g,"\n").replace(/\{\\[^;]*;/g,"").replace(/[{}]/g,"").slice(0,400);
+  const rows=content.split("\n").slice(0,8);
+  if(!content.trim())return;
+  const canvas=document.createElement("canvas");
+  const context=canvas.getContext("2d");
+  if(!context){skipped.add("TEXT");return;}
+  const fontSize=60;
+  context.font="500 "+fontSize+"px Arial, 'Microsoft YaHei', sans-serif";
+  canvas.width=Math.min(4096,Math.ceil(Math.max(20,...rows.map(row=>context.measureText(row).width))+12));
+  canvas.height=Math.ceil((fontSize+12)*rows.length);
+  context.font="500 "+fontSize+"px Arial, 'Microsoft YaHei', sans-serif";
+  context.textBaseline="top";
+  context.fillStyle="#"+aciColor(layerColor(layer)).toString(16).padStart(6,"0");
+  rows.forEach((row,index)=>context.fillText(row,4,index*(fontSize+12)));
+  const texture=new THREE.CanvasTexture(canvas);
+  texture.colorSpace=THREE.SRGBColorSpace;
+  const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,transparent:true,depthWrite:false}));
+  sprite.scale.set(canvas.width/fontSize*h,canvas.height/fontSize*h,1);
+  sprite.position.set(x+sprite.scale.x/2,y+sprite.scale.y/2,0);
+  groupFor(layer).add(sprite);
  };
 
  const commit=(e:Entity)=>{
@@ -162,19 +225,19 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
     for(let i=0;i+1<e.points.length;i++){
      const a=e.points[i];
      const b=e.points[i+1];
-     if(a&&b)line(a.x,a.y,b.x,b.y,e.layer);
+     if(a&&b)polySegment(a,b,e.layer);
     }
     if(e.closed&&e.points.length>2){
      const last=e.points[e.points.length-1];
      const first=e.points[0];
-     if(last&&first)line(last.x,last.y,first.x,first.y,e.layer);
+     if(last&&first)polySegment(last,first,e.layer);
     }
     break;
    }
    case "TEXT":
    case "MTEXT":{
     const c=e.points[0];
-    if(c)marker(c.x,c.y,e.height,e.layer);
+    if(c)label(e.text,c.x,c.y,e.height,e.layer);
     break;
    }
    case "SECTION":
@@ -193,12 +256,22 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
  let polyVerts:Point[]=[];
  let polyLayer="0";
  let polyClosed=false;
+ let inEntities=false;
+ let sectionNamePending=false;
  for(const pair of records){
   if(pair.code===0){
-   if(entity.type)commit(entity);
-   entity=emptyEntity(pair.value);
+   if(inEntities&&entity.type)commit(entity);
+   entity=emptyEntity("");
+   if(pair.value==="SECTION"){sectionNamePending=true;inEntities=false;continue;}
+   if(pair.value==="ENDSEC"){inEntities=false;continue;}
+   if(inEntities)entity=emptyEntity(pair.value);
    continue;
   }
+  if(sectionNamePending&&pair.code===2){
+   inEntities=pair.value.trim()==="ENTITIES";
+   sectionNamePending=false;continue;
+  }
+  if(!inEntities)continue;
   if(!entity.type)continue;
   switch(pair.code){
    case 8:entity.layer=pair.value.trim()||"0";break;
@@ -210,7 +283,7 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
    }
    case 11:entity.end={x:Number(pair.value),y:0,bulge:0};break;
    case 21:if(entity.end)entity.end.y=Number(pair.value);break;
-   case 40:entity.radius=Number(pair.value);entity.height=Number(pair.value);break;
+   case 40:entity.radius=Number(pair.value);if(entity.type==="TEXT"||entity.type==="MTEXT")entity.height=Number(pair.value);break;
    case 50:entity.a0=Number(pair.value);break;
    case 51:entity.a1=Number(pair.value);break;
    case 70:entity.closed=(Number.parseInt(pair.value,10)&1)===1;break;
@@ -219,10 +292,21 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
     if(last)last.bulge=Number(pair.value);
     break;
    }
+   case 1:entity.text+=pair.value;break;
+   case 3:entity.text=pair.value+entity.text;break;
   }
  }
- if(entity.type)commit(entity);
+ if(inEntities&&entity.type)commit(entity);
 
- const layers=layerOrder.map(name=>({name,visible:true}));
- return {object:root,layers,skipped:Array.from(skipped)};
+ // One draw call per layer for linework instead of one per DXF segment.
+ for(const [layer,coordinates] of segmentBuffers){
+  if(!coordinates.length)continue;
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute("position",new THREE.Float32BufferAttribute(coordinates,3));
+  groupFor(layer).add(new THREE.LineSegments(geometry,
+   new THREE.LineBasicMaterial({color:aciColor(layerColor(layer))})));
+ }
+
+ const layers=layerOrder.map(name=>({name,visible:layerGroups.get(name)?.visible??true}));
+ return {object:root,layers,skipped:Array.from(skipped),unit};
 }
