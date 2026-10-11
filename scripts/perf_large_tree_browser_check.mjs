@@ -107,7 +107,24 @@ try{
  await wait(`location.search.includes('pf_bulk_9626')&&document.querySelector('.folder-context-bar')?.textContent?.includes('目录 9626')`);
  const searchWallMs=Date.now()-searchStart;
  console.log("REAL_TREE_SEARCH "+JSON.stringify({searchWallMs,target:"pf_bulk_9626",scroll}));
- const report={chrome:version.product,corpusHint:tree.data.length,results,appendWallMs,searchWallMs,scroll};
+ // Verify search-to-first-visible-result through the REAL 100k-file browser
+ // workbench. No submit button click: typing alone must commit after 180ms,
+ // and the broad/no-hit cases must not display stale rows from the last term.
+ await send("Page.navigate",{url:BASE+"/search"});
+ await wait(`!!document.querySelector('#search-q')`);
+ const instant=[];
+ for(const [term,expected]of [["pf_bulk_9627",8],["文件",50],["qq___nonexistent_9876",0]]){
+  const started=Date.now();
+  await evalJS(`(()=>{const input=document.querySelector('#search-q');
+    const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
+    setter.call(input,${JSON.stringify(term)});input.dispatchEvent(new Event('input',{bubbles:true}));return true;})()`);
+  await wait(`document.querySelector('.search-total')?.textContent&&document.querySelectorAll('.search-data-table tbody tr').length===${expected}&&
+    ${expected===0?"document.querySelector('.search-results .empty')?.textContent?.includes('没有匹配')":"true"}`);
+  const measured={term,rows:expected,visibleWallMs:Date.now()-started};
+  instant.push(measured);
+  console.log("REAL_SEARCH_TYPEAHEAD "+JSON.stringify(measured));
+ }
+ const report={chrome:version.product,corpusHint:tree.data.length,results,appendWallMs,searchWallMs,scroll,instant};
  console.log("PERF_LARGE_TREE_BROWSER_PASS "+JSON.stringify(report));
 }finally{
  ws?.close();chrome.kill("SIGTERM");await delay(350);rmSync(dir,{recursive:true,force:true});
