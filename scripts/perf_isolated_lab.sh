@@ -6,9 +6,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 umask 077
 ACTION="${1:-status}"
-LAB="/root/.local/share/filesmanage-perf-test"
+PORT="${FILESMANAGE_PERF_PORT:-18093}"
+[[ "$PORT" =~ ^1809[345]$ ]] || { echo "PERF_REFUSED: port must be one of 18093-18095" >&2; exit 2; }
+LAB="/root/.local/share/filesmanage-perf-test-$PORT"
 PID_FILE="$LAB/server.pid"
-ADDR="127.0.0.1:18093"
+ADDR="127.0.0.1:$PORT"
 DB="filesmanage_perf"
 BASE="http://$ADDR"
 [[ -r .secrets/server.env ]] || { echo "PERF_REFUSED: missing remote environment" >&2; exit 2; }
@@ -29,9 +31,9 @@ verified_pid(){
  local pid
  pid="$(cat "$PID_FILE")"
  [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null || return 1
- python3 - "$pid" "$LAB/blobs" <<'PY'
+ python3 - "$pid" "$LAB/blobs" "$ADDR" <<'PY'
 import sys,urllib.parse
-pid,blobs=sys.argv[1:]
+pid,blobs,addr=sys.argv[1:]
 try:
  values=dict(part.decode("utf8",errors="replace").split("=",1)
   for part in open(f"/proc/{pid}/environ","rb").read().split(b"\0") if b"=" in part)
@@ -39,7 +41,7 @@ try:
 except (OSError,ValueError):sys.exit(1)
 dsn=urllib.parse.urlparse(values.get("DATABASE_URL",""))
 if (dsn.path=="/filesmanage_perf" and dsn.hostname in ("localhost","127.0.0.1")
- and values.get("FILESMANAGE_ADDR")=="127.0.0.1:18093"
+ and values.get("FILESMANAGE_ADDR")==addr
  and values.get("FILESMANAGE_BLOB_DIR")==blobs
  and b".bin/server" in cmd):sys.exit(0)
 sys.exit(1)
@@ -48,8 +50,8 @@ PY
 case "$ACTION" in
  start)
   if verified_pid; then echo "PERF_READY: $BASE (verified)"; exit 0; fi
-  if ss -ltnH "sport = :18093" | grep -q .; then
-   echo "PERF_REFUSED: port 18093 occupied by unverified process" >&2; exit 2
+  if ss -ltnH "sport = :$PORT" | grep -q .; then
+   echo "PERF_REFUSED: port $PORT occupied by unverified process" >&2; exit 2
   fi
   python3 scripts/perf_readiness_audit.py
   mkdir -p "$LAB/blobs"
