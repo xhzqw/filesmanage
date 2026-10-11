@@ -6,6 +6,7 @@
 // and layer colours come from the drawing's own ACI index — never the brand
 // palette. Anything else is reported as skipped, never silently dropped.
 import type * as THREE from "three";
+import {sampleSpline} from "./nurbs2d";
 
 export type DxfParseResult={
  object:THREE.Group;
@@ -61,11 +62,19 @@ type Entity={
  ratio:number;
  parameterStart:number;
  parameterEnd:number;
+ degree:number;
+ knots:number[];
+ weights:number[];
+ splineControls:Point[];
+ invisible:boolean;
+ colorIndex:number;
+ trueColor:number|null;
 };
 
 function emptyEntity(type:string):Entity{
  return {type,layer:"0",points:[],end:null,radius:0,a0:0,a1:360,closed:false,height:2.5,text:"",
-  blockName:"",scaleX:1,scaleY:1,rotation:0,major:null,ratio:1,parameterStart:0,parameterEnd:Math.PI*2};
+  blockName:"",scaleX:1,scaleY:1,rotation:0,major:null,ratio:1,parameterStart:0,parameterEnd:Math.PI*2,
+  degree:3,knots:[],weights:[],splineControls:[],invisible:false,colorIndex:256,trueColor:null};
 }
 
 export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResult{
@@ -74,6 +83,7 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
  // Pass 1 — HEADER units and LAYER table.
  const layerColors=new Map<string,number>();
  const hiddenLayers=new Set<string>();
+ const layerTrueColors=new Map<string,number>();
  let unit="unknown";
  let section="";
  let table="";
@@ -98,7 +108,12 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
   }
   if(section==="TABLES"&&table==="LAYER"){
    if(pair.code===2)pendingLayer=pair.value.trim();
-   if(pair.code===62&&pendingLayer)layerColors.set(pendingLayer,Number.parseInt(pair.value,10)||7);
+   if(pair.code===62&&pendingLayer){
+    const index=Number.parseInt(pair.value,10);
+    layerColors.set(pendingLayer,Math.abs(index)||7);
+    if(index<0)hiddenLayers.add(pendingLayer);
+   }
+   if(pair.code===420&&pendingLayer)layerTrueColors.set(pendingLayer,Number(pair.value)&0xffffff);
    if(pair.code===70&&pendingLayer&&(Number(pair.value)&1)!==0)hiddenLayers.add(pendingLayer);
   }
  }
@@ -128,8 +143,22 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
  const blocks=new Map<string,{base:Point;items:Entity[]}>();
  let activeTransform:Affine=identity;
  let inheritedLayer="0";
+ let inheritedColor:number|null=null;
+ let currentColor=aciColor(7);
+ const MAX_SEGMENTS=700000;
+ let emittedSegments=0;
+ let visitedEntities=0;
+ const MAX_ENTITIES=200000;
  const blockStack=new Set<string>();
  const actualLayer=(name:string)=>name==="0"?inheritedLayer:name;
+ const resolvedLayerColor=(name:string)=>layerTrueColors.get(name)??aciColor(layerColor(name));
+ const entityColor=(e:Entity)=>{
+  const layer=actualLayer(e.layer);
+  if(e.trueColor!==null)return e.trueColor;
+  if(e.colorIndex===0)return inheritedColor??resolvedLayerColor(layer);
+  if(e.colorIndex===256)return resolvedLayerColor(layer);
+  return aciColor(e.colorIndex);
+ };
 
  const groupFor=(name:string)=>{
   let group=layerGroups.get(name);
@@ -146,17 +175,24 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
  };
  const line=(x1:number,y1:number,x2:number,y2:number,layer:string)=>{
   if(![x1,y1,x2,y2].every(v=>Number.isFinite(v)&&Math.abs(v)<1e12))return;
+  if(emittedSegments>=MAX_SEGMENTS){skipped.add("LIMIT: 最大线段预算");return;}
   const a=transformed(x1,y1),b=transformed(x2,y2),resolved=actualLayer(layer);
+  if(![a.x,a.y,b.x,b.y].every(v=>Number.isFinite(v)&&Math.abs(v)<1e12)){
+   skipped.add("GEOMETRY: 变换越界");return;
+  }
   groupFor(resolved);
-  let coordinates=segmentBuffers.get(resolved);
-  if(!coordinates){coordinates=[];segmentBuffers.set(resolved,coordinates);}
+  // Keep geometry batched per layer AND effective entity colour.
+  const key=resolved+"\u0000"+currentColor;
+  let coordinates=segmentBuffers.get(key);
+  if(!coordinates){coordinates=[];segmentBuffers.set(key,coordinates);}
   coordinates.push(a.x,a.y,0,b.x,b.y,0);
+  emittedSegments++;
  };
  const arc=(x:number,y:number,r:number,from:number,to:number,layer:string)=>{
   if(![x,y,r,from,to].every(Number.isFinite)||r<=0)return;
-  let end=to;
-  while(end<=from)end+=360;
-  const sweep=(end-from)*Math.PI/180;
+  const full=Math.abs(to-from)>=360;
+  const deg=full?360:((to-from)%360+360)%360||360;
+  const sweep=deg*Math.PI/180;
   const divisions=Math.min(192,Math.max(24,Math.ceil(sweep*30)));
   let px=x+r*Math.cos(from*Math.PI/180),py=y+r*Math.sin(from*Math.PI/180);
   for(let i=1;i<=divisions;i++){
@@ -200,7 +236,7 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
   context.font="500 "+fontSize+"px Arial, 'Microsoft YaHei', sans-serif";
   context.textBaseline="top";
   const resolved=actualLayer(layer);
-  context.fillStyle="#"+aciColor(layerColor(resolved)).toString(16).padStart(6,"0");
+  context.fillStyle="#"+currentColor.toString(16).padStart(6,"0");
   rows.forEach((row,index)=>context.fillText(row,4,index*(fontSize+12)));
   const texture=new THREE.CanvasTexture(canvas);
   texture.colorSpace=THREE.SRGBColorSpace;
@@ -215,6 +251,20 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
  };
 
  const commit=(e:Entity)=>{
+  if(++visitedEntities>MAX_ENTITIES||emittedSegments>=MAX_SEGMENTS){
+   skipped.add("LIMIT: 图元展开预算");return;
+  }
+  if(e.invisible)return;
+  if(e.type==="DIMENSION"){
+   if(!e.blockName||!blocks.has(e.blockName)){
+    skipped.add("DIMENSION: 缺少可显示图块");return;
+   }
+   // Group 2 points to a graphical BLOCK; group 10 is its definition point,
+   // not the graphical block insertion origin.
+   commit({...e,type:"INSERT",points:[{x:0,y:0,bulge:0}],
+    scaleX:1,scaleY:1,rotation:0});
+   return;
+  }
   if(e.type==="INSERT"){
    const def=blocks.get(e.blockName);
    if(!def){skipped.add("INSERT: "+(e.blockName||"未命名图块"));return;}
@@ -232,39 +282,29 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
    if(!Object.values(local).every(v=>Number.isFinite(v)&&Math.abs(v)<1e12)){
     skipped.add("INSERT: 非法变换");return;
    }
-   const previous=activeTransform,previousLayer=inheritedLayer;
+   const previous=activeTransform,previousLayer=inheritedLayer,previousColor=inheritedColor;
+   const insertColor=entityColor(e);
    activeTransform=multiply(previous,local);
    inheritedLayer=actualLayer(e.layer);
+   inheritedColor=insertColor;
    blockStack.add(e.blockName);
-   try{for(const part of def.items)commit(part);}
+   try{
+    for(const part of def.items){
+     if(visitedEntities>=MAX_ENTITIES||emittedSegments>=MAX_SEGMENTS)break;
+     commit(part);
+    }
+   }
    finally{
     blockStack.delete(e.blockName);
-    activeTransform=previous;inheritedLayer=previousLayer;
+    activeTransform=previous;inheritedLayer=previousLayer;inheritedColor=previousColor;
    }
    return;
   }
-  // POLYLINE geometry arrives as separate VERTEX entities; accumulate them and
-  // emit on SEQEND. LWPOLYLINE carries its vertices inline.
-  if(e.type==="VERTEX"){
-   if(e.points.length){polyVerts.push(...e.points);polyLayer=e.layer;}
-   return;
-  }
-  if(e.type==="SEQEND"){
-   if(polyVerts.length>1){
-    const p=emptyEntity("POLYLINE");
-    p.points=polyVerts;
-    p.layer=polyLayer;
-    p.closed=polyClosed;
-    commit(p);
-   }
-   polyVerts=[];polyClosed=false;
-   return;
-  }
-  if(e.type==="POLYLINE"){
-   polyVerts=[];polyLayer=e.layer;polyClosed=e.closed;
-   return;
-  }
-  switch(e.type){
+  // Legacy POLYLINE/VERTEX/SEQEND is normalized per entity list before
+  // rendering, preventing nested INSERTs from corrupting another polyline.
+  const previousColor=currentColor;
+  currentColor=entityColor(e);
+  try{switch(e.type){
    case "LINE":{
     const a=e.points[0];
     const b=e.end??e.points[1];
@@ -286,9 +326,9 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
     if(!center||!major||!Number.isFinite(e.ratio)||e.ratio<=0||e.ratio>1||!Number.isFinite(e.parameterStart)||!Number.isFinite(e.parameterEnd)){
      skipped.add("ELLIPSE: 无效几何");break;
     }
-    let end=e.parameterEnd;
-    while(end<=e.parameterStart)end+=Math.PI*2;
-    if(end-e.parameterStart>Math.PI*2+1e-6){skipped.add("ELLIPSE: 无效参数区间");break;}
+    const raw=e.parameterEnd-e.parameterStart;
+    const sweep=Math.abs(raw)>=Math.PI*2?Math.PI*2:((raw%(Math.PI*2)+Math.PI*2)%(Math.PI*2))||Math.PI*2;
+    const end=e.parameterStart+sweep;
     const count=Math.max(24,Math.min(192,Math.ceil((end-e.parameterStart)*32)));
     const sample=(t:number)=>{
      const sin=Math.sin(t),cos=Math.cos(t);
@@ -307,6 +347,19 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
     const d=Math.max(e.height*.08,.04);
     line(c.x-d,c.y,c.x+d,c.y,e.layer);
     line(c.x,c.y-d,c.x,c.y+d,e.layer);
+    break;
+   }
+   case "SPLINE":{
+    const output=sampleSpline({
+     degree:e.degree,
+     controls:e.splineControls.map(p=>({x:p.x,y:p.y})),
+     knots:e.knots,weights:e.weights,
+    });
+    if(output.error){skipped.add("SPLINE: "+output.error);break;}
+    for(let i=1;i<output.points.length;i++){
+     const a=output.points[i-1]!,b=output.points[i]!;
+     line(a.x,a.y,b.x,b.y,e.layer);
+    }
     break;
    }
    case "LWPOLYLINE":
@@ -339,13 +392,33 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
     break;
    default:
     if(e.type)skipped.add(e.type);
-  }
+  }}finally{currentColor=previousColor;}
  };
 
  let entity=emptyEntity("");
- let polyVerts:Point[]=[];
- let polyLayer="0";
- let polyClosed=false;
+ const normalizePolylines=(items:Entity[]):Entity[]=>{
+  const normalized:Entity[]=[];
+  let current:Entity|null=null;
+  const flush=()=>{
+   if(current){
+    if(current.points.length>=2)normalized.push(current);
+    else skipped.add("POLYLINE: 不足两个有效顶点");
+   }
+   current=null;
+  };
+  for(const item of items){
+   if(item.type==="POLYLINE"){
+    flush();current={...item,points:[]};
+   }else if(item.type==="VERTEX"){
+    if(current)current.points.push(...item.points);
+    else skipped.add("VERTEX: 缺少 POLYLINE");
+   }else if(item.type==="SEQEND"){
+    flush();
+   }else normalized.push(item);
+  }
+  flush();
+  return normalized;
+ };
  let sectionNamePending=false;
  let currentSection="";
  let blockHeader=false;
@@ -367,7 +440,9 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
     blockHeader=true;continue;
    }
    if(currentSection==="BLOCKS"&&pair.value==="ENDBLK"){
-    if(currentBlock?.name)blocks.set(currentBlock.name,{base:currentBlock.base,items:currentBlock.items});
+    if(currentBlock?.name)blocks.set(currentBlock.name,{
+     base:currentBlock.base,items:normalizePolylines(currentBlock.items),
+    });
     currentBlock=null;blockHeader=false;continue;
    }
    if(currentSection==="ENTITIES"||(currentSection==="BLOCKS"&&currentBlock)){
@@ -391,9 +466,13 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
   switch(pair.code){
    case 8:entity.layer=pair.value.trim()||"0";break;
    case 2:if(entity.type==="INSERT"||entity.type==="DIMENSION")entity.blockName=pair.value.trim();break;
-   case 10:entity.points.push({x:Number(pair.value),y:0,bulge:0});break;
+   case 10:
+    if(entity.type==="SPLINE")entity.splineControls.push({x:Number(pair.value),y:0,bulge:0});
+    else entity.points.push({x:Number(pair.value),y:0,bulge:0});
+    break;
    case 20:{
-    const last=entity.points[entity.points.length-1];
+    const arr=entity.type==="SPLINE"?entity.splineControls:entity.points;
+    const last=arr[arr.length-1];
     if(last)last.y=Number(pair.value);
     break;
    }
@@ -407,6 +486,7 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
     break;
    case 40:
     if(entity.type==="ELLIPSE")entity.ratio=Number(pair.value);
+    else if(entity.type==="SPLINE")entity.knots.push(Number(pair.value));
     else {
      entity.radius=Number(pair.value);
      if(entity.type==="TEXT"||entity.type==="MTEXT")entity.height=Number(pair.value);
@@ -415,6 +495,7 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
    case 41:
     if(entity.type==="INSERT")entity.scaleX=Number(pair.value);
     if(entity.type==="ELLIPSE")entity.parameterStart=Number(pair.value);
+    if(entity.type==="SPLINE")entity.weights.push(Number(pair.value));
     break;
    case 50:
     if(entity.type==="INSERT")entity.rotation=Number(pair.value);
@@ -422,6 +503,10 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
     break;
    case 51:entity.a1=Number(pair.value);break;
    case 70:entity.closed=(Number.parseInt(pair.value,10)&1)===1;break;
+   case 71:if(entity.type==="SPLINE")entity.degree=Number(pair.value);break;
+   case 60:entity.invisible=Number(pair.value)===1;break;
+   case 62:entity.colorIndex=Number(pair.value);break;
+   case 420:entity.trueColor=Number(pair.value)&0xffffff;break;
    case 42:{
     if(entity.type==="INSERT")entity.scaleY=Number(pair.value);
     else if(entity.type==="ELLIPSE")entity.parameterEnd=Number(pair.value);
@@ -438,15 +523,20 @@ export function parseDxf(text:string,THREE:typeof import("three")):DxfParseResul
  finishEntity();
  // BLOCK definitions may occur after model-space entities. Resolve references
  // only after collecting the entire file, including forward references.
- for(const item of modelEntities)commit(item);
+ for(const item of normalizePolylines(modelEntities)){
+  if(visitedEntities>=MAX_ENTITIES||emittedSegments>=MAX_SEGMENTS)break;
+  commit(item);
+ }
 
  // One draw call per layer for linework instead of one per DXF segment.
- for(const [layer,coordinates] of segmentBuffers){
+ for(const [key,coordinates] of segmentBuffers){
   if(!coordinates.length)continue;
+  const boundary=key.lastIndexOf("\u0000");
+  const layer=key.slice(0,boundary),color=Number(key.slice(boundary+1));
   const geometry=new THREE.BufferGeometry();
   geometry.setAttribute("position",new THREE.Float32BufferAttribute(coordinates,3));
   groupFor(layer).add(new THREE.LineSegments(geometry,
-   new THREE.LineBasicMaterial({color:aciColor(layerColor(layer))})));
+   new THREE.LineBasicMaterial({color})));
  }
 
  const layers=layerOrder.map(name=>({name,visible:layerGroups.get(name)?.visible??true}));

@@ -3,13 +3,17 @@
 // polyline bulges and annotation glyphs.
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {transform} from "esbuild";
+import {fileURLToPath} from "node:url";
+import {build,transform} from "esbuild";
 import * as THREE from "three";
 
-// The parser's Three dependency is type-only; esbuild erases it.
-const raw=readFileSync(new URL("../src/features/modelViewer/dxf.ts",import.meta.url),"utf8");
-const compiled=await transform(raw,{loader:"ts",format:"esm",target:"es2022"});
-const {parseDxf}=await import("data:text/javascript;base64,"+Buffer.from(compiled.code).toString("base64"));
+// Bundle the parser with its pure NURBS evaluator. The Three dependency is
+// type-only and is erased; this remains a remote-only headless regression.
+const parsedBundle=await build({
+ entryPoints:[fileURLToPath(new URL("../src/features/modelViewer/dxf.ts",import.meta.url))],
+ bundle:true,write:false,format:"esm",platform:"node",target:"es2022",logLevel:"silent",
+});
+const {parseDxf}=await import("data:text/javascript;base64,"+Buffer.from(parsedBundle.outputFiles[0].text).toString("base64"));
 
 const context={
  font:"",textBaseline:"top",fillStyle:"",
@@ -118,4 +122,102 @@ assert.deepEqual(index.find(7,.1,.5)?.kind,"nearest");
 assert.equal(index.find(70,70,.5),null);
 assert.equal(createDrawingSnapIndex([]).find(0,0,1),null);
 
-console.log("CAD regression passed: DXF units/layers/bulges/glyphs/batching, nested INSERT/ELLIPSE, circular references and drawing snaps");
+// Rational quadratic NURBS reproduces a quarter-circle (not the simple
+// quadratic Bezier through these same controls).
+const splineModule=readFileSync(new URL("../src/features/modelViewer/nurbs2d.ts",import.meta.url),"utf8");
+const splineJs=await transform(splineModule,{loader:"ts",format:"esm",target:"es2022"});
+const {sampleSpline}=await import("data:text/javascript;base64,"+Buffer.from(splineJs.code).toString("base64"));
+const quarter=sampleSpline({
+ degree:2,controls:[{x:1,y:0},{x:1,y:1},{x:0,y:1}],
+ knots:[0,0,0,1,1,1],weights:[1,Math.SQRT1_2,1],
+});
+assert.equal(quarter.error,undefined);
+assert(quarter.points.length>=64);
+assert(Math.hypot(quarter.points[32].x,quarter.points[32].y)>0.9999);
+assert(Math.hypot(quarter.points[32].x,quarter.points[32].y)<1.0001);
+assert(sampleSpline({
+ degree:2,controls:[{x:0,y:0},{x:1,y:1},{x:2,y:2}],
+ knots:[0,0,2,1,1,1],weights:[],
+}).error.includes("non-monotonic"));
+assert(sampleSpline({
+ degree:2,
+ controls:[{x:0,y:0},{x:1,y:0},{x:2,y:0},{x:10,y:0},{x:11,y:0},{x:12,y:0}],
+ knots:[0,0,0,.5,.5,.5,1,1,1],weights:[],
+}).error.includes("discontinuous"),"must not draw a false bridge between disjoint NURBS runs");
+
+// The dimension representation BLOCK is drawn in its native coordinates,
+// not offset by the dimension definition point (DXF group 10).
+const engineeringDxf=[
+ "0","SECTION","2","TABLES","0","TABLE","2","LAYER",
+ "0","LAYER","2","DIM","62","7","70","0",
+ "0","ENDTAB","0","ENDSEC",
+ "0","SECTION","2","BLOCKS",
+ "0","BLOCK","2","*D1","10","0","20","0",
+ "0","LINE","8","0","62","0","10","10","20","20","11","30","21","20",
+ "0","ENDBLK","0","ENDSEC",
+ "0","SECTION","2","ENTITIES",
+ "0","DIMENSION","8","DIM","2","*D1","10","999","20","999",
+ "0","LINE","8","DIM","62","1","10","0","20","0","11","1","21","0",
+ "0","LINE","8","DIM","420","255","10","0","20","2","11","1","21","2",
+ "0","SPLINE","8","DIM","71","2","72","6","73","3",
+ "40","0","40","0","40","0","40","1","40","1","40","1",
+ "41","1","41",String(Math.SQRT1_2),"41","1",
+ "10","1","20","0","10","1","20","1","10","0","20","1",
+ "0","ENDSEC","0","EOF",
+].join("\n");
+const engineering=parseDxf(engineeringDxf,THREE);
+assert.deepEqual(engineering.skipped,[]);
+const dimLayer=engineering.object.children.find(layer=>layer.name==="DIM");
+assert(dimLayer);
+const wires=dimLayer.children.filter(node=>node.isLineSegments);
+assert.equal(wires.length,3,"ACI red, TrueColor blue and BYBLOCK layer colors must be distinct");
+const materialColors=wires.map(w=>w.material.color.getHex()).sort((a,b)=>a-b);
+assert.deepEqual(materialColors,[0x0000ff,0x253b53,0xc72e32].sort((a,b)=>a-b));
+const allCoords=wires.flatMap(w=>Array.from(w.geometry.getAttribute("position").array));
+assert(allCoords.includes(10)&&allCoords.includes(30));
+assert(!allCoords.includes(999),"dimension definition point must not displace graphics");
+const splineSegments=wires.find(w=>w.material.color.getHex()===0x253b53);
+assert(splineSegments.geometry.getAttribute("position").count>64);
+const missing=parseDxf([
+ "0","SECTION","2","ENTITIES","0","DIMENSION","2","*MISSING",
+ "0","ENDSEC","0","EOF",
+].join("\n"),THREE);
+assert(missing.skipped.some(value=>value.startsWith("DIMENSION")));
+
+// Legacy POLYLINE/VERTEX runs must remain separate across BLOCK definitions
+// and model-space entities (old global polyline accumulator corrupted them).
+const legacy=[
+ "0","SECTION","2","BLOCKS",
+ "0","BLOCK","2","POLYBLOCK","10","0","20","0",
+ "0","POLYLINE","8","0","70","0",
+ "0","VERTEX","10","1","20","1",
+ "0","VERTEX","10","2","20","1",
+ "0","SEQEND","0","ENDBLK","0","ENDSEC",
+ "0","SECTION","2","ENTITIES",
+ "0","POLYLINE","8","MODEL","70","0",
+ "0","VERTEX","10","10","20","10",
+ "0","VERTEX","10","15","20","10",
+ "0","SEQEND",
+ "0","INSERT","2","POLYBLOCK","8","COMP","10","100","20","100",
+ "0","ENDSEC","0","EOF",
+].join("\n");
+const legacyResult=parseDxf(legacy,THREE);
+assert.deepEqual(legacyResult.skipped,[]);
+const legacyModels=new Map(legacyResult.object.children.map(group=>[
+ group.name,group.children[0]?.geometry.getAttribute("position").array,
+]));
+assert.deepEqual(Array.from(legacyModels.get("MODEL")),[10,10,0,15,10,0]);
+assert.deepEqual(Array.from(legacyModels.get("COMP")),[101,101,0,102,101,0]);
+
+// Hostile finite-but-extreme angles must not cause an unbounded 360-degree
+// increment loop (nor millions of discrete arc segments).
+const hostile=parseDxf([
+ "0","SECTION","2","ENTITIES",
+ "0","ARC","10","0","20","0","40","10","50","1000000000","51","-1000000000",
+ "0","ELLIPSE","10","0","20","0","11","10","21","0","40","0.5",
+ "41","1000000000","42","-1000000000",
+ "0","ENDSEC","0","EOF",
+].join("\n"),THREE);
+assert(hostile.object.children[0]?.children[0]?.geometry.getAttribute("position").count<=768);
+
+console.log("CAD regression passed: DXF geometry, nested blocks, dimension graphics, rational NURBS, ACI/TrueColor and 2D snaps");

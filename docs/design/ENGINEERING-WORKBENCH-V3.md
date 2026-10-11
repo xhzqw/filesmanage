@@ -36,6 +36,24 @@ This document records validated capability instead of marking unimplemented work
   `web/scripts/cad-browser-smoke.mjs` (real software-WebGL Chromium scene,
   camera, resize and disposal) are included in remote `build.sh --with-tests`.
 
+## Delivered in V3.2 drawing-fidelity increment
+
+- DXF rational B-spline/NURBS evaluation: degree, knot multiplicities and
+  positive rational weights; sampling is a **rendering approximation** while
+  the source controls stay double precision. Fit-point-only and malformed
+  splines are reported, not guessed from unvalidated control geometry.
+- DIMENSION display through the DXF-provided anonymous dimension
+  representation BLOCK, including nested entities. Missing graphical blocks
+  are reported rather than generating an invented dimension.
+- Line colours: per-entity ACI, group 420 TrueColor, BYLAYER/BYBLOCK and
+  insertion-layer inheritance. Geometry batches by layer and effective colour.
+- Legacy POLYLINE/VERTEX/SEQEND is assembled independently for each BLOCK and
+  model-space list, avoiding cross-INSERT vertex contamination.
+- Malicious or corrupt DXF protection: finite-angle normalization without
+  potentially unbounded loops; bounded line and expanded-entity budgets.
+- Regression fixtures cover rational quarter circles, dimension graphical
+  coordinates, nested blocks, entity colours and hostile angle values.
+
 ## Deliberately unsupported or approximate
 
 | Capability | Current truth | Next gate |
@@ -44,8 +62,9 @@ This document records validated capability instead of marking unimplemented work
 | STEP/IGES | Converted MSH triangles | Original B-Rep topology and exact kernel queries |
 | True assembly hierarchy | Imported hierarchy where provided; MSH mesh groups otherwise | Stable instance IDs and assembly tree |
 | 3D measurement | Mesh-coordinate approximate straight distance | Exact B-Rep edge/face measurements |
-| DXF SPLINE/NURBS | Reported unsupported | Knot/weight/degree-correct evaluator |
-| DXF HATCH/DIMENSION | Reported unsupported, no invented graphical fidelity | Boundary renderer / authentic DIMENSION blocks |
+| DXF SPLINE/NURBS | Knots/degree/weights supported; fit-point-only interpolation not supported | Fit-point solver, discontinuous curve fidelity |
+| DXF DIMENSION | Anonymous representation BLOCK when present | Style/text override fidelity and absent-block fallback |
+| DXF HATCH | Reported unsupported | Boundary and hole/solid/pattern renderer |
 | DXF paper space, XREF | Not fully supported | Layout parser and secured resource resolution |
 | DXF arc/ellipse | Tessellated preview | Analytic segment and center/angle snap records |
 | DXF text | Canvas glyph approximation, not CAD SHX exact rendering | Font and text-style resolver |

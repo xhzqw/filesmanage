@@ -16,18 +16,30 @@ const source=String.raw`
 import * as THREE from "three";
 import {OrbitControls} from "three/examples/jsm/controls/OrbitControls.js";
 import {mountEngineeringScene} from "./src/features/modelViewer/viewerScene.ts";
+import {parseDxf} from "./src/features/modelViewer/dxf.ts";
 const holder=document.getElementById("stage");
 let controls=null,metrics=null,lastCamera=null;
+let actualDrawing=null;
 const callback=(yaw,pitch)=>{lastCamera={yaw,pitch};};
 function mount(drawing=false){
  if(controls)controls.dispose();
- const object=drawing?new THREE.Group():new THREE.Mesh(new THREE.BoxGeometry(10,10,10),new THREE.MeshPhongMaterial({color:0x467fa8}));
+ let object=new THREE.Mesh(new THREE.BoxGeometry(10,10,10),new THREE.MeshPhongMaterial({color:0x467fa8}));
  if(drawing){
-  const geometry=new THREE.BufferGeometry().setFromPoints([
-   new THREE.Vector3(0,0,0),new THREE.Vector3(100,0,0),
-   new THREE.Vector3(100,0,0),new THREE.Vector3(100,50,0),
-  ]);
-  object.add(new THREE.LineSegments(geometry,new THREE.LineBasicMaterial({color:0x27425b})));
+  const dxf=[
+   "0","SECTION","2","BLOCKS",
+   "0","BLOCK","2","*D1","10","0","20","0",
+   "0","LINE","8","0","10","0","20","0","11","100","21","0",
+   "0","ENDBLK","0","ENDSEC",
+   "0","SECTION","2","ENTITIES",
+   "0","DIMENSION","2","*D1","8","DIM","10","900","20","900",
+   "0","SPLINE","8","SPLINE","71","2","72","6","73","3",
+   "40","0","40","0","40","0","40","1","40","1","40","1",
+   "10","0","20","0","10","50","20","80","10","100","20","0",
+   "0","ENDSEC","0","EOF",
+  ].join("\n");
+  actualDrawing=parseDxf(dxf,THREE);
+  if(actualDrawing.skipped.length)throw Error(actualDrawing.skipped.join(","));
+  object=actualDrawing.object;
  }
  controls=mountEngineeringScene(THREE,OrbitControls,holder,object,drawing,m=>{metrics=m;},
   ()=>{throw Error("WebGL context unexpectedly lost");},()=>{},callback);
@@ -35,7 +47,8 @@ function mount(drawing=false){
 mount();
 window.__cad={
  get state(){return {metrics,camera:lastCamera,canvases:holder.querySelectorAll("canvas").length,
-  width:holder.querySelector("canvas")?.getBoundingClientRect().width??0};},
+  width:holder.querySelector("canvas")?.getBoundingClientRect().width??0,
+  drawingLayers:actualDrawing?.layers.length??0};},
  view:name=>controls.setStandardView(name),
  projection:()=>controls.toggleProjection(),
  measure:()=>controls.toggleMeasure(),
@@ -140,8 +153,10 @@ try{
  const drawing=await cdp.eval("(()=>{window.__cad.drawing();return window.__cad.state})()");
  assert.equal(drawing.canvases,1,"scene replacement must not leak a canvas");
  assert.equal(drawing.metrics.triangles,0);
+ assert.equal(drawing.drawingLayers,2,"actual DIMENSION and NURBS DXF layers must render in WebGL");
+ assert(drawing.metrics.size[0]>=100,"dimension and spline linework must retain actual drawing scale");
  assert.equal(await cdp.eval("window.__cad.dispose()"),0,"dispose must remove WebGL canvas");
- console.log("CAD_BROWSER_PASS Chrome WebGL: 3D rendering, six-axis camera, projection, measurement, responsive resize, 2D replacement, disposal");
+ console.log("CAD_BROWSER_PASS Chrome WebGL: 3D camera/navigation, real DXF DIMENSION/NURBS render, responsive resize, disposal");
 }finally{
  cdp?.ws.close();
  // Chrome forks GPU/network/storage children; killing only the browser PID
