@@ -15,6 +15,8 @@ function failureCopy(error:unknown):string{
  const code=errorCode(error);
  if(code==="E_NAME_CONFLICT")return"同名文件已存在，可改名或跳过";
  if(code==="E_FORBIDDEN")return"当前目录没有上传权限";
+ if(code==="E_NETWORK")return"连接中断，提交结果未确认；请用原任务重试核对，勿直接新建重复任务";
+ if(code==="E_VERSION_CONFLICT"||code==="E_NOT_FOUND")return"原上传会话已失效或偏移不一致；请先核对目标目录，再改名发起新任务";
  return"上传失败，可重试";
 }
 
