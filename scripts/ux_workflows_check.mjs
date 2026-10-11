@@ -14,6 +14,7 @@
 // Usage: node scripts/ux_workflows_check.mjs [--base http://127.0.0.1:18091]
 //        [--password-file .secrets/admin.password] [--port 9361]
 import { spawn } from "node:child_process";
+import {createHash} from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -1197,6 +1198,62 @@ async function finaleSuite() {
   const root = (tree.body?.data ?? []).find((f) => !f.parentId);
   const mk = async (name) => (await json("POST", "/api/folders", { name, parentId: root.id })).body?.data?.id;
   const folderId = await mk(`WF-SMOKE-${stamp}`);
+
+  // G2: the same resumable operation must survive two distinct authenticated
+  // HTTP sessions without re-uploading the first chunk. The final replay must
+  // return the same file and never create a second version. All bytes live in
+  // this isolated, cleanup-owned folder.
+  const resumeBytes=Buffer.from(`G2 network reconnect ${stamp}\n`);
+  const sum=b=>createHash("sha256").update(b).digest("hex");
+  const resumeBody={
+    folderId,name:`g2-resume-${stamp}.bin`,contentType:"application/octet-stream",
+    size:resumeBytes.length,sha256:sum(resumeBytes),idempotencyKey:`g2-resume-${stamp}`,
+  };
+  const begin=await json("POST","/api/uploads/resumable",resumeBody);
+  const uploadId=begin.body?.data?.id;
+  check("G2 resumable creates a private server upload session",
+    begin.status===201&&typeof uploadId==="string"&&begin.body?.data?.received===0,String(begin.status));
+  const cut=Math.floor(resumeBytes.length/2);
+  const chunkRequest=async(cookie,offset,body)=>{
+    const res=await fetch(`${BASE}/api/uploads/resumable/${uploadId}`,{
+      method:"PATCH",headers:{
+        Origin:BASE,Cookie:cookie,"Content-Type":"application/octet-stream",
+        "X-Chunk-Offset":String(offset),"X-Chunk-Sha256":sum(body),
+      },body,
+    });
+    return {status:res.status,data:(await res.json().catch(()=>null))?.data};
+  };
+  const firstChunk=await chunkRequest(sessionCookie,0,resumeBytes.subarray(0,cut));
+  check("G2 first upload chunk advances durable offset",firstChunk.status===200&&firstChunk.data?.received===cut,JSON.stringify(firstChunk));
+  const secondLogin=await fetch(`${BASE}/api/login`,{
+    method:"POST",headers:{"Content-Type":"application/json",Origin:BASE},
+    body:JSON.stringify({login:"admin",password}),
+  });
+  const resumeCookie=secondLogin.headers.getSetCookie().find(value=>value.startsWith("fm_session="))?.split(";")[0]??"";
+  const secondBegin=await fetch(`${BASE}/api/uploads/resumable`,{
+    method:"POST",headers:{"Content-Type":"application/json",Origin:BASE,Cookie:resumeCookie},
+    body:JSON.stringify(resumeBody),
+  });
+  const secondStatus=(await secondBegin.json().catch(()=>null))?.data;
+  check("G2 second login resumes the same upload ID and exact offset",
+    secondLogin.status===200&&secondBegin.status===201&&secondStatus?.id===uploadId&&secondStatus?.received===cut,
+    JSON.stringify({login:secondLogin.status,reopen:secondBegin.status,received:secondStatus?.received}));
+  const rejected=await chunkRequest(resumeCookie,0,resumeBytes.subarray(0,cut));
+  check("G2 stale chunk offset is rejected without rewriting bytes",rejected.status===409,String(rejected.status));
+  const lastChunk=await chunkRequest(resumeCookie,cut,resumeBytes.subarray(cut));
+  check("G2 second session completes remaining chunk",lastChunk.status===200&&lastChunk.data?.received===resumeBytes.length,JSON.stringify(lastChunk));
+  const finish=async cookie=>{
+    const res=await fetch(`${BASE}/api/uploads/resumable/${uploadId}/complete`,{
+      method:"POST",headers:{Origin:BASE,Cookie:cookie},
+    });
+    return {status:res.status,data:(await res.json().catch(()=>null))?.data};
+  };
+  const finished=await finish(resumeCookie);
+  const replay=await finish(sessionCookie);
+  check("G2 commit replay across sessions keeps one version and one file",
+    finished.status===200&&replay.status===200&&finished.data?.fileId===replay.data?.fileId&&
+    finished.data?.versionSeq===1&&finished.data?.sha256===sum(resumeBytes),
+    JSON.stringify({first:finished.status,replay:replay.status,fileId:finished.data?.fileId}));
 
   // ---- fixture: 60 files sharing a search token ----
   const TOKEN = `zzq${stamp}`;
