@@ -57,6 +57,7 @@ export function limitFinishedHistory(tasks:UploadTask[]):UploadTask[]{
  let finished=0;
  for(let index=tasks.length-1;index>=0;index--){
   const task=tasks[index];
+  if(!task)continue;
   if(isFinished(task)&&++finished>MAX_TERMINAL_HISTORY)continue;
   kept.push(task);
  }
