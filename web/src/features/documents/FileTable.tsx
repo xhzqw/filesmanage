@@ -201,6 +201,16 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const[nameFilter,setNameFilter]=useState("");
  const[cursor,setCursor]=useState("");
  const[hasMore,setHasMore]=useState(false);
+ const[loadingMore,setLoadingMore]=useState(false);
+ const[moreError,setMoreError]=useState("");
+ // A page response belongs to a particular directory/order revision. React
+ // state alone cannot prevent a late response after navigating elsewhere.
+ const listRevision=useRef(0);
+ const listKey=folder+"\u0000"+sort+"\u0000"+reloadKey;
+ const listKeyRef=useRef(listKey);
+ listKeyRef.current=listKey;
+ const pagingRef=useRef(false);
+ const completedCursor=useRef("");
  const[renaming,setRenaming]=useState<FileItem|null>(null);
  const[renameValue,setRenameValue]=useState("");
  const[renameBusy,setRenameBusy]=useState(false);
@@ -243,18 +253,26 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
 
  useEffect(()=>{
   let valid=true;
+  const revision=++listRevision.current;
+  pagingRef.current=false;
+  completedCursor.current="";
+  setLoadingMore(false);
+  setMoreError("");
   setStatus("loading");
+  setItems([]);
+  setCursor("");
+  setHasMore(false);
   const started=performance.now();
   fileApi.list(folder,sort,"",50)
    .then(page=>{
-    if(!valid)return;
+    if(!valid||revision!==listRevision.current||listKeyRef.current!==listKey)return;
     setItems(page.items);
     setHasMore(page.nextCursor!=="");
     setCursor(page.nextCursor);
     setStatus("ready");
     setLatencyMs(Math.max(0,Math.round(performance.now()-started)));
    })
-   .catch(()=>{if(valid){setStatus("failed");setLatencyMs(null);}});
+   .catch(()=>{if(valid&&revision===listRevision.current&&listKeyRef.current===listKey){setStatus("failed");setLatencyMs(null);}});
   return()=>{valid=false;};
  },[folder,sort,reloadKey]);
 
@@ -346,7 +364,13 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  }
 
  async function reload(){
+  const revision=++listRevision.current;
+  pagingRef.current=false;
+  completedCursor.current="";
+  setLoadingMore(false);
+  setMoreError("");
   const page=await fileApi.list(folder,sort,"",50);
+  if(revision!==listRevision.current||listKeyRef.current!==listKey)return;
   setItems(page.items);setHasMore(page.nextCursor!=="");setCursor(page.nextCursor);
  }
 
@@ -364,11 +388,32 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  }
 
  async function loadMore(){
-  if(!cursor)return;
-  const page=await fileApi.list(folder,sort,cursor,50);
-  setItems(prev=>[...prev,...page.items]);
-  setCursor(page.nextCursor);
-  setHasMore(page.nextCursor!=="");
+  if(status!=="ready"||!cursor||!hasMore||pagingRef.current||completedCursor.current===cursor)return;
+  const revision=listRevision.current;
+  const requestedCursor=cursor;
+  pagingRef.current=true;
+  setLoadingMore(true);
+  setMoreError("");
+  try{
+   const page=await fileApi.list(folder,sort,requestedCursor,50);
+   if(revision!==listRevision.current||listKeyRef.current!==listKey)return;
+   completedCursor.current=requestedCursor;
+   setItems(prev=>{
+    const known=new Set(prev.map(item=>item.id));
+    return [...prev,...page.items.filter(item=>!known.has(item.id))];
+   });
+   setCursor(page.nextCursor);
+   setHasMore(page.nextCursor!=="");
+  }catch(error){
+   if(revision===listRevision.current&&listKeyRef.current===listKey){
+    setMoreError(errorCopy(error,"加载下一页失败，请重试"));
+   }
+  }finally{
+   if(revision===listRevision.current&&listKeyRef.current===listKey){
+    pagingRef.current=false;
+    setLoadingMore(false);
+   }
+  }
  }
 
 
@@ -805,8 +850,13 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
      </RareSelect>
     </label>
     <div className="filter-search-wrap">
-     <RareInput type="search" className="filter-search-input" placeholder="过滤当前目录…" aria-label="当前目录内过滤"
-      value={nameFilter} onChange={e=>setNameFilter(e.target.value)}/>
+     <RareInput type="search" className="filter-search-input" placeholder="过滤已加载文件…" aria-label="当前已加载文件名过滤"
+      value={nameFilter} onChange={e=>{
+       setNameFilter(e.target.value);
+       setSelectedIds(new Set<string>());
+       setFocusedId(null);
+       setAnchorId(null);
+      }}/>
     </div>
    </div>
   </div>
@@ -838,14 +888,15 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       <span className="empty-hint">上传第一个文件开始使用。</span>
      </td></tr>}
      {status==="ready"&&items.length>0&&visibleItems.length===0&&<tr><td colSpan={6} className="empty">
-      <span className="empty-title">无匹配文件</span>
-      <span className="empty-hint">当前目录下没有属于该类型的文件。</span>
+     <span className="empty-title">无匹配文件</span>
+      <span className="empty-hint">已加载的文件中没有匹配项{hasMore?"，可继续加载后查找":""}。</span>
       <RareButton type="button" className="secondary-action" style={{marginTop:6}} onClick={()=>{
        setCategoryFilter("all");
+       setNameFilter("");
        setSelectedIds(new Set<string>());
        setFocusedId(null);
        setAnchorId(null);
-      }}>清除筛选（显示全部 {items.length} 个文件）</RareButton>
+      }}>清除筛选（显示已加载 {items.length} 个文件）</RareButton>
      </td></tr>}
      {status==="ready"&&visibleItems.map((item,index)=><tr key={item.id} data-id={item.id}
       tabIndex={focusedId===item.id||(focusedId===null&&index===0)?0:-1}
@@ -892,7 +943,11 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     </tbody>
    </table>
   </div>
-  {hasMore&&<RareButton type="button" className="secondary-action" onClick={loadMore}>加载更多</RareButton>}
+  {(hasMore||loadingMore||moreError)&&<div className="file-page-controls" role="group" aria-label="文件分页">
+   <RareButton type="button" className="secondary-action" disabled={loadingMore||status!=="ready"||!hasMore} aria-busy={loadingMore} onClick={()=>void loadMore()}>{loadingMore?"正在加载…":moreError?"重试加载":"加载更多"}</RareButton>
+   <span className="file-page-hint">{hasMore?"已加载 "+items.length+" 项 · 后面还有文件":"已显示全部 "+items.length+" 项"}</span>
+   {moreError&&<span className="file-page-error" role="alert">{moreError}</span>}
+  </div>}
   {renaming&&<Dialog open title="重命名文件" onClose={()=>setRenaming(null)} closeGuard={()=>!renameBusy} className="dialog">
    <form onSubmit={submitRename}>
     <label htmlFor="rename-input">新名称</label>
@@ -922,7 +977,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    point={rowMenu.point} onClose={()=>setRowMenu(null)}/>}
   <footer className="status-bar">
    <div className="status-left">
-    <span>已选 <span className="status-strong">{selectedIds.size}</span> 项{selectedIds.size>0&&<> / <span className="status-strong">{formatSize(selectedBytes)}</span></>} · 共 <span className="status-strong">{items.length}</span> 个文件</span>
+    <span>已选 <span className="status-strong">{selectedIds.size}</span> 项{selectedIds.size>0&&<> / <span className="status-strong">{formatSize(selectedBytes)}</span></>} · {hasMore?"已加载":"共"} <span className="status-strong">{items.length}</span> 个文件{(categoryFilter!=="all"||nameFilter.trim())&&<> · 匹配 <span className="status-strong">{visibleItems.length}</span> 项（已加载范围）</>}</span>
    </div>
    <div className="status-right">
     <span>延迟: <span className="status-strong">{latencyMs===null?"—":latencyMs+"ms"}</span> · <span className="status-build">v2.1.0</span></span>

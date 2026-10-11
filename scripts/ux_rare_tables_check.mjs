@@ -60,7 +60,7 @@ class Browser{
   throw Error("Chrome wait expired: "+predicate.slice(0,90));
  }
  async goto(path,selector){await this.send("Page.navigate",{url:BASE+path});
-  await this.wait("()=>location.pathname==="+JSON.stringify(path)+"&&!!document.querySelector("+JSON.stringify(selector)+")",24000);
+  await this.wait("()=>location.pathname==="+JSON.stringify(path.split("?")[0])+"&&!!document.querySelector("+JSON.stringify(selector)+")",24000);
  }
  close(){this.ws.close();}
 }
@@ -95,6 +95,12 @@ async function run(){
  folderId=(await api("POST","/folders",{parentId:root.id,name:stamp})).id;
  const fileName=stamp+"-active.txt",deletedName=stamp+"-deleted.txt";
  fileId=await upload(fileName);
+ const lock=await api("POST","/files/"+fileId+"/lock",{baseSeq:1});
+ await api("POST","/files/"+fileId+"/save",{
+  baseSeq:1,lockToken:lock.lockToken,
+  data:Buffer.from("SECOND RARE VERSION "+stamp+"\n").toString("base64"),
+  idempotencyKey:"ux-rare-version-"+stamp
+ });
  deletedId=await upload(deletedName);
  await api("PUT","/favorites/file/"+fileId);
  // Use a valid recipient other than the admin to verify share status.
@@ -130,6 +136,21 @@ async function run(){
   await setInput("#search-q",fileName);
   await cdp.eval("(()=>{document.querySelector('.search-primary button[type=submit]').click();return true;})()");
   await inspect("search "+width+"px",".search-data-table",fileName,"td:first-child a","td:last-child a");
+  await cdp.goto("/doc?folder="+encodeURIComponent(folderId),".file-table");
+  await cdp.wait("()=>[...document.querySelectorAll('.file-table tbody tr')].some(r=>r.textContent?.includes("+JSON.stringify(fileName)+"))");
+  const files=await cdp.eval("(()=>{const tr=[...document.querySelectorAll('.file-table tbody tr')].find(x=>x.textContent?.includes("+JSON.stringify(fileName)+"));const name=tr?.querySelector('.file-name'),menu=tr?.querySelector('.file-mobile-actions'),r=name?.getBoundingClientRect(),m=menu?.getBoundingClientRect();return {width:innerWidth,overflow:document.documentElement.scrollWidth-innerWidth,nameVisible:r?.width>35&&r.left>=0&&r.right<=innerWidth+1,menuVisible:m?.width>0&&m.left>=0&&m.right<=innerWidth+1,version:tr?.querySelector('.version-badge')?.textContent,hasGrid:!!tr?.closest('[role=grid]')};})()");
+  check("file explorer "+width+"px name, version and access to actions",files.overflow<=2&&files.nameVisible&&files.version==="v2"&&files.hasGrid&&(width>700||files.menuVisible),JSON.stringify(files));
+  await setInput('input[aria-label="当前已加载文件名过滤"]',"not-a-matching-name-"+stamp);
+  await cdp.wait("()=>!!document.querySelector('.file-table .empty-title')&&document.querySelector('.file-table .empty-title')?.textContent==='无匹配文件'");
+  await cdp.eval("(()=>{[...document.querySelectorAll('.file-table .empty button')].find(b=>b.textContent?.includes('清除筛选'))?.click();return true;})()");
+  await cdp.wait("()=>[...document.querySelectorAll('.file-table tbody tr')].some(r=>r.textContent?.includes("+JSON.stringify(fileName)+"))");
+  check("file explorer "+width+"px reset clears filename and category filters",
+   await cdp.eval("(()=>document.querySelector('input[aria-label="当前已加载文件名过滤"]')?.value==='')()"));
+  await cdp.goto("/preview/"+fileId,"#file-tab-versions");
+  await cdp.eval("(()=>{document.querySelector('#file-tab-versions').click();return true;})()");
+  await cdp.wait("()=>document.querySelectorAll('.file-versions-table tbody tr').length===2");
+  const versions=await cdp.eval("(()=>{const table=document.querySelector('.file-versions-table table'),wrap=table?.parentElement,rows=[...table.querySelectorAll('tbody tr')],rollback=rows.find(r=>r.textContent?.includes('v1'))?.querySelector('button'),r=rollback?.getBoundingClientRect();return {width:innerWidth,overflow:document.documentElement.scrollWidth-innerWidth,hasRare:table?.hasAttribute('data-rare-table'),rows:rows.length,scroll:table.scrollWidth-wrap.clientWidth,current:!!rows[0]?.querySelector('.rare-badge'),rollback:!!rollback&&!rollback.disabled&&r.width>0&&r.left>=0&&r.right<=innerWidth+1};})()");
+  check("version history "+width+"px compact Rare and rollback visible",versions.hasRare&&versions.rows===2&&versions.overflow<=2&&versions.scroll<=2&&versions.current&&versions.rollback,JSON.stringify(versions));
   await cdp.goto("/org",".org-members-table");
   await inspect("organization members "+width+"px",".org-members-table",me.displayName,".org-user-name",".org-member-actions button");
   check("organization "+width+"px create stays in dialog",

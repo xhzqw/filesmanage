@@ -1,4 +1,4 @@
-import {RareBadge,RareButton,RareInput,RareTabs,MicroHoldToDelete} from "../shared/ui/rare";
+import {RareBadge,RareButton,RareDataTable,RareInput,RareRowActions,RareTabs,MicroHoldToDelete} from "../shared/ui/rare";
 import {useEffect,useState,type FormEvent} from "react";
 import {Link,useNavigate,useParams} from "react-router-dom";
 import {fileApi,formatSize,type FileLifecycle} from "../features/documents/api";
@@ -241,15 +241,15 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
       <div className="file-section-caption"><strong>版本记录</strong><span>所有历史均保留 · 回滚会创建新版本</span></div>
       <FileLifecyclePanel fileId={id} currentSeq={currentSeq} lifecycle={lifecycle} onUpdated={value=>{setLifecycle(value);announce("生命周期状态已更新");}}/>
       {versions.length===0?<p className="empty">暂无版本记录</p>:
-      <div className="table file-versions-table"><table>
-       <thead><tr><th scope="col">版本</th><th scope="col">操作</th><th scope="col">文件大小</th><th scope="col">创建人</th><th scope="col">时间</th><th scope="col">版本操作</th></tr></thead>
+      <div className="table file-versions-table"><RareDataTable className="file-version-data" aria-label="历史版本">
+       <thead><tr><th scope="col">版本</th><th scope="col">操作</th><th scope="col" className="file-version-secondary">文件大小</th><th scope="col" className="file-version-secondary">创建人</th><th scope="col" className="file-version-secondary">时间</th><th scope="col">版本操作</th></tr></thead>
        <tbody>{versions.slice().reverse().map(v=><tr key={v.versionSeq}>
-        <td><strong>v{v.versionSeq}</strong> {v.versionSeq===currentSeq&&<span className="file-current-version">当前</span>}</td>
+        <td className="file-version-primary"><strong>v{v.versionSeq}</strong> {v.versionSeq===currentSeq&&<RareBadge tone="info">当前</RareBadge>}<small className="file-version-mobile-meta">{formatSize(v.sizeBytes)} · {versionTime(v.createdAt)}</small></td>
         <td>{ACTION_LABELS[v.action]??v.action}{v.rollbackTargetSeq?" · 来自 v"+v.rollbackTargetSeq:""}</td>
-        <td>{formatSize(v.sizeBytes)}</td><td>{v.createdBy}</td><td>{versionTime(v.createdAt)}</td>
-        <td>{v.versionSeq===currentSeq?"—":<RareButton type="button" disabled={!canManage||archived} onClick={()=>{announce("");setRollback(v);}}>回滚到此版本</RareButton>}</td>
+        <td className="file-version-secondary">{formatSize(v.sizeBytes)}</td><td className="file-version-secondary" title={v.createdBy}>{v.createdBy}</td><td className="file-version-secondary rare-data-date">{versionTime(v.createdAt)}</td>
+        <td className="file-version-operations">{v.versionSeq===currentSeq?"—":<RareRowActions><RareButton type="button" disabled={!canManage||archived} onClick={()=>{announce("");setRollback(v);}}>回滚到此版本</RareButton></RareRowActions>}</td>
        </tr>)}</tbody>
-      </table></div>}
+      </RareDataTable></div>}
      </section>}
     </div>}
    </main>

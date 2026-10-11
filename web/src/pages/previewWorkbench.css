@@ -51,8 +51,32 @@
 .file-metadata-form label:nth-child(3){grid-column:1/-1}
 .file-metadata-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:6px}
 @media(max-width:820px){.file-metadata-form{grid-template-columns:minmax(0,1fr)}}
-.file-versions-table{overflow-x:auto;margin:12px}
-.file-versions-table table{width:100%}
+.file-versions-table{overflow-x:auto;margin:8px;container:versions / inline-size}
+.file-versions-table table{width:100%;min-width:0;table-layout:fixed}
+.file-versions-table .file-version-data th:first-child{width:19%}
+.file-versions-table .file-version-data th:nth-child(2){width:20%}
+.file-versions-table .file-version-data th:nth-child(3){width:12%}
+.file-versions-table .file-version-data th:nth-child(4){width:16%}
+.file-versions-table .file-version-data th:nth-child(5){width:17%}
+.file-versions-table .file-version-data th:last-child{width:16%}
+.file-versions-table .file-version-data td{height:38px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-versions-table .file-version-primary strong{font-variant-numeric:tabular-nums}
+.file-versions-table .file-version-operations .rare-row-actions{justify-content:flex-end}
+.file-versions-table .file-version-operations .rare-button{min-height:26px;height:26px;padding:0 6px;white-space:nowrap}
+.file-versions-table .file-version-mobile-meta{display:none}
+@container versions (max-width:730px){
+ .file-versions-table .file-version-secondary{display:none}
+ .file-versions-table .file-version-data th:first-child{width:33%}
+ .file-versions-table .file-version-data th:nth-child(2){width:auto}
+ .file-versions-table .file-version-data th:last-child{width:132px}
+ .file-versions-table .file-version-mobile-meta{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary);font-size:10px}
+ .file-versions-table .file-version-data td{height:46px}
+}
+@container versions (max-width:370px){
+ .file-versions-table .file-version-data th:first-child{width:31%}
+ .file-versions-table .file-version-data th:last-child{width:115px}
+ .file-versions-table .file-version-operations .rare-button{font-size:10px;padding-inline:3px}
+}
 .file-current-version{color:var(--brand-blue);font-size:10px;border:1px solid var(--border-hairline);border-radius:var(--radius-pill);padding:1px 6px;margin-left:6px}
 .file-compare,.file-review{padding:14px 16px;min-width:0}
 .file-compare-controls,.file-review-header{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
