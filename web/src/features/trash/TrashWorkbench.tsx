@@ -3,6 +3,7 @@ import type {TrashEntry} from "../../entities/trash/model";
 import type {Folder} from "../../entities/folder/model";
 import {request} from "../../shared/http";
 import {errorCode,errorCopy} from "../../shared/errors";
+import {observeResourceChange,observeWindowReturn} from "../../shared/resourceSync";
 import {Dialog} from "../../shared/ui/Dialog";
 import {Menu} from "../../shared/ui/Menu";
 import {MicroHoldToDelete,RareButton,RareDataTable,RareInput,RareRowActions,RareSelect} from "../../shared/ui/rare";
@@ -75,6 +76,13 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
  const[purgeError,setPurgeError]=useState("");
 
  useEffect(()=>{
+  const invalidate=()=>setReload(token=>token+1);
+  const changed=observeResourceChange("trash",invalidate);
+  const returned=observeWindowReturn(invalidate);
+  return()=>{changed();returned();};
+ },[]);
+
+ useEffect(()=>{
   const timer=window.setTimeout(()=>{setOffset(0);setDebouncedSearch(search.trim());},300);
   return()=>window.clearTimeout(timer);
  },[search]);
@@ -86,7 +94,13 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
   let alive=true;
   setStatus("loading");
   trashApi.page({limit:PAGE_SIZE,offset,search:debouncedSearch,kind,deletedBy:debouncedBy,sort,from:since(period)})
-   .then(page=>{if(alive){setEntries(page.items);setHasMore(page.hasMore);setStatus("ready");setSelected(new Set());}})
+   .then(page=>{
+    if(!alive)return;
+    // Other tabs may have restored/purged the last record on this page.
+    // Never strand the user on an empty page when an earlier page exists.
+    if(page.items.length===0&&offset>0){setOffset(Math.max(0,offset-PAGE_SIZE));return;}
+    setEntries(page.items);setHasMore(page.hasMore);setStatus("ready");setSelected(new Set());
+   })
    .catch(error=>{if(alive){setStatus("failed");setNotice({text:errorCopy(error,"加载回收站失败"),error:true});}});
   return()=>{alive=false;};
  },[offset,debouncedSearch,kind,debouncedBy,period,sort,reload]);

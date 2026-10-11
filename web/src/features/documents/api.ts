@@ -1,5 +1,6 @@
 import {request} from "../../shared/http";
 import {postMultipart} from "../../shared/uploadClient";
+import {publishResourceChange} from "../../shared/resourceSync";
 import type {FileItem, FileVersion, PreviewData, FileMetadata} from "../../entities/file/model";
 
 export type CompareDiffLine={kind:"equal"|"added"|"removed";left?:number;right?:number;text:string};
@@ -19,6 +20,14 @@ export type OfficeSessionData={
  config:{token:string};
 };
 
+function changed<T>(promise:Promise<T>,fileId:string,addsTrash=false):Promise<T>{
+ return promise.then(data=>{
+  publishResourceChange({scope:"file",id:fileId});
+  if(addsTrash)publishResourceChange({scope:"trash"});
+  return data;
+ });
+}
+
 // Lock, save, rollback and editor sessions are file endpoints and therefore
 // live with the documents feature; approval inbox endpoints live in workflow.
 export const fileApi={
@@ -29,9 +38,9 @@ export const fileApi={
  },
  meta:(id:string)=>request<{file:FileItem;versions:FileVersion[]}>("/files/"+id),
  lifecycle:(id:string)=>request<FileLifecycle>("/files/"+id+"/lifecycle"),
- setLifecycle:(id:string,draft:LifecycleDraft)=>request<FileLifecycle>("/files/"+id+"/lifecycle",{method:"PUT",body:JSON.stringify(draft)}),
+ setLifecycle:(id:string,draft:LifecycleDraft)=>changed(request<FileLifecycle>("/files/"+id+"/lifecycle",{method:"PUT",body:JSON.stringify(draft)}),id),
  metadata:(id:string)=>request<FileMetadata>("/files/"+id+"/metadata"),
- setMetadata:(id:string,body:{category:string;description:string;tags:string[]})=>request<FileMetadata>("/files/"+id+"/metadata",{method:"PUT",body:JSON.stringify(body)}),
+ setMetadata:(id:string,body:{category:string;description:string;tags:string[]})=>changed(request<FileMetadata>("/files/"+id+"/metadata",{method:"PUT",body:JSON.stringify(body)}),id),
 	preview:(id:string)=>request<PreviewData>("/files/"+id+"/preview"),
 	mediaUrl:(id:string,sha:string)=>"/api/files/"+encodeURIComponent(id)+"/preview/media?v="+encodeURIComponent(sha),
  versions:(id:string)=>request<FileVersion[]>("/files/"+id+"/versions"),
@@ -39,14 +48,14 @@ export const fileApi={
  reviewComments:(id:string,version:number,cursor="")=>request<ReviewCommentPage>("/files/"+id+"/review-comments?"+new URLSearchParams({version:String(version),limit:"30",cursor})),
  addReviewComment:(id:string,body:{version:number;body:string;lineNumber?:number})=>request<FileReviewComment>("/files/"+id+"/review-comments",{method:"POST",body:JSON.stringify(body)}),
  resolveReviewComment:(id:string,commentId:number)=>request<{resolved:number}>("/files/"+id+"/review-comments/"+commentId+"/resolve",{method:"POST"}),
- rename:(id:string,name:string)=>request<FileItem>("/files/"+id,{method:"PATCH",body:JSON.stringify({name})}),
- remove:(id:string)=>request<{id:string;oldName:string}>("/files/"+id,{method:"DELETE"}),
+ rename:(id:string,name:string)=>changed(request<FileItem>("/files/"+id,{method:"PATCH",body:JSON.stringify({name})}),id),
+ remove:(id:string)=>changed(request<{id:string;oldName:string}>("/files/"+id,{method:"DELETE"}),id,true),
  lockStatus:(id:string)=>request<{locked:boolean;ownerName?:string;baseSeq?:number;expiresAt?:string}>("/files/"+id+"/lock"),
  acquireLock:(id:string,baseSeq:number)=>request<{lockToken:string;generation:number;expiresInSeconds:number}>("/files/"+id+"/lock",{method:"POST",body:JSON.stringify({baseSeq})}),
  releaseLock:(id:string,lockToken:string)=>request<{released:string}>("/files/"+id+"/lock",{method:"DELETE",body:JSON.stringify({lockToken})}),
  save:(id:string,baseSeq:number,lockToken:string,data:string,idempotencyKey:string)=>
-  request<{fileId:string;versionSeq:number;sha256:string;size:number;status:string}>("/files/"+id+"/save",
-   {method:"POST",body:JSON.stringify({baseSeq,lockToken,data,idempotencyKey})}),
+  changed(request<{fileId:string;versionSeq:number;sha256:string;size:number;status:string}>("/files/"+id+"/save",
+   {method:"POST",body:JSON.stringify({baseSeq,lockToken,data,idempotencyKey})}),id),
  submitForApproval:(id:string,baseSeq:number,data:string)=>
   request<{status:string;approvalId:string;expectedCurrentSeq:number}>("/files/"+id+"/save",
    {method:"POST",body:JSON.stringify({baseSeq,data})}),
@@ -55,14 +64,14 @@ export const fileApi={
  // idempotency key keep concurrent rollbacks from double-applying. A 202 reply
  // carries status "pending" (approval-routed) and must not read as committed.
  rollback:(id:string,targetSeq:number,expectedCurrentSeq:number,lockToken:string,reason:string,idempotencyKey:string)=>
-  request<{status:string;versionSeq?:number;approvalId?:string;rollbackTargetSeq?:number}>("/files/"+id+"/rollback",
-   {method:"POST",body:JSON.stringify({targetSeq,expectedCurrentSeq,lockToken,reason,idempotencyKey})}),
+  changed(request<{status:string;versionSeq?:number;approvalId?:string;rollbackTargetSeq?:number}>("/files/"+id+"/rollback",
+   {method:"POST",body:JSON.stringify({targetSeq,expectedCurrentSeq,lockToken,reason,idempotencyKey})}),id),
  // Move is a CAS write (COMPLEX-WORKFLOWS-v1 §3.2 B): expectedFolderId pins the
  // folder the user saw, and the idempotency key replays the recorded result
  // instead of applying a second move when a retry follows an unclear outcome.
  move:(id:string,targetFolderId:string,expectedFolderId:string,idempotencyKey:string)=>
-  request<{fileId:string;fromFolderId:string;toFolderId:string;status:string}>("/files/"+id+"/move",
-   {method:"POST",body:JSON.stringify({targetFolderId,expectedFolderId,idempotencyKey})}),
+  changed(request<{fileId:string;fromFolderId:string;toFolderId:string;status:string}>("/files/"+id+"/move",
+   {method:"POST",body:JSON.stringify({targetFolderId,expectedFolderId,idempotencyKey})}),id),
  // Batch move (WF-07/WF-08, ADR-UX-02): one all-or-nothing transaction, so
  // there is no per-file CAS basis; fileIds is the whole working set. A 200
  // answer discriminates its own outcome — status "conflict" carries the
@@ -70,7 +79,10 @@ export const fileApi={
  // retry replay the recorded result instead of moving a second time.
  moveBatch:(fileIds:string[],targetFolderId:string,idempotencyKey:string)=>
   request<{status:string;moved:{fileId:string;fromFolderId:string;toFolderId:string}[];conflicts:{id:string;code:string;message?:string}[];count:number}>("/files/move-batch",
-   {method:"POST",body:JSON.stringify({fileIds,targetFolderId,mode:"all_or_nothing",idempotencyKey})}),
+   {method:"POST",body:JSON.stringify({fileIds,targetFolderId,mode:"all_or_nothing",idempotencyKey})}).then(data=>{
+    if(data.status==="committed")for(const moved of data.moved)publishResourceChange({scope:"file",id:moved.fileId});
+    return data;
+   }),
  openOfficeSession:(id:string)=>request<OfficeSessionData>("/files/"+id+"/office/session",{method:"POST",body:"{}"}),
  derivativeStatus:(id:string)=>request<{found:boolean;state:string;format:string;class:string;engine:string;note:string;outputKind?:string;outputSize?:number;outputSha256?:string;errorCode?:string}>("/files/"+id+"/derivative"),
  requestDerivative:(id:string)=>request<{derivativeId:string;state:string;sourceFormat:string;outputKind:string;converter:string}>("/files/"+id+"/derivative",{method:"POST",body:"{}"}),

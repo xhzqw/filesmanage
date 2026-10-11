@@ -1,4 +1,5 @@
 import {RareButton} from "../shared/ui/rare";
+import {observeResourceChange,observeWindowReturn} from "../shared/resourceSync";
 import{useEffect,useRef,useState,type KeyboardEvent as ReactKeyboardEvent,type PointerEvent as ReactPointerEvent}from "react";
 import{Link,useLocation,useNavigate}from "react-router-dom";
 import type{User}from "../entities/user/model";
@@ -72,6 +73,13 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  const location=useLocation();
  const navigate=useNavigate();
  const requested=new URLSearchParams(location.search).get("folder")||"folder_root";
+ useEffect(()=>{
+  const invalidate=()=>setReloadKey(value=>value+1);
+  const fileChanged=observeResourceChange("file",invalidate);
+  const folderChanged=observeResourceChange("folder",invalidate);
+  const returned=observeWindowReturn(invalidate);
+  return()=>{fileChanged();folderChanged();returned();};
+ },[]);
  useEffect(()=>{
   let valid=true;
   setStatus("loading");

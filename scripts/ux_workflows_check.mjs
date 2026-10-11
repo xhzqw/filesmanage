@@ -284,9 +284,27 @@ async function workflowSuite() {
     check("WF-13 current seq advanced and history intact",
       meta?.file?.currentVersionSeq === 3 && (meta?.versions ?? []).length >= 3, JSON.stringify(meta?.file));
 
+    // G2: changes committed in another tab or over an API client cannot
+    // dispatch this page's local event. Returning focus must revalidate the
+    // server-side filename and prevent stale preview actions after deletion.
+    const externalName="g4-external-"+stamp+".txt";
+    const externalRename=await json("PATCH",`/api/files/${v1.fileId}`,{name:externalName});
+    await cdp.evaluate("(()=>{window.dispatchEvent(new Event('focus'));return true;})()");
+    const renamedOnReturn=await cdp.waitFor(`()=>document.querySelector('.file-workbench-title h1')?.textContent===${JSON.stringify(externalName)}`,16000);
+    check("G2 preview focus revalidates an external rename",externalRename.status===200&&renamedOnReturn===true,String(renamedOnReturn));
+    await delay(900);
+    const renameBack=await json("PATCH",`/api/files/${v1.fileId}`,{name:ROLL_NAME});
+    await cdp.evaluate("(()=>{window.dispatchEvent(new Event('focus'));return true;})()");
+    const restoredName=await cdp.waitFor(`()=>document.querySelector('.file-workbench-title h1')?.textContent===${JSON.stringify(ROLL_NAME)}`,16000);
+    check("G2 preview title returns to server name",renameBack.status===200&&restoredName===true,String(restoredName));
+
     // ---- WF-17: restore from trash through the dialog ----
     const del = await json("DELETE", `/api/files/${v1.fileId}`);
     check("file moved to trash for the restore flow", del.status === 200, String(del.status));
+    await delay(900);
+    await cdp.evaluate("(()=>{window.dispatchEvent(new Event('focus'));return true;})()");
+    const stalePreviewGone=await cdp.waitFor(`()=>!!document.querySelector('.file-workbench-error [role=alert]')&&!document.querySelector('.file-workbench-actions button')`,16000);
+    check("G2 preview removes stale content and actions after external deletion",stalePreviewGone===true,String(stalePreviewGone));
     await cdp.navigate(`${BASE}/trash`);
     const trashRow = await cdp.waitFor(`()=>[...document.querySelectorAll('tbody tr')].some(tr=>tr.textContent?.includes(${JSON.stringify(ROLL_NAME)}))`, 20000);
     check("trash lists the file", Boolean(trashRow), String(trashRow));

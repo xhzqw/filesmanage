@@ -26,6 +26,7 @@ node --test scripts/ux_fixture_guard.test.mjs
 
 echo "== ux: folder cursor and upload history state contracts =="
 node scripts/ux_upload_queue_logic_check.mjs
+node scripts/ux_resource_sync_logic_check.mjs
 
 echo "== go: build server and worker =="
 go build -o .bin/server ./cmd/server

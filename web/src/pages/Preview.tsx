@@ -18,6 +18,7 @@ import {ShareDialog} from "../features/collaboration/ShareDialog";
 import {workflowApi} from "../features/workflow/api";
 import {request} from "../shared/http";
 import {errorCopy} from "../shared/errors";
+import {observeResourceChange,observeWindowReturn} from "../shared/resourceSync";
 import {Dialog} from "../shared/ui/Dialog";
 import type {PreviewData,FileVersion,FileItem} from "../entities/file/model";
 import type {User} from "../entities/user/model";
@@ -64,9 +65,22 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const adapter=preview?resolvePreviewAdapter(preview):"unsupported";
  const canManage=file!==null;
 
+ // Other tabs, the file list and the trash can modify or remove this file.
+ // Notifications only invalidate local state; all details are refetched from
+ // the server with the current session permissions.
+ useEffect(()=>{
+  const invalidate=()=>setReloadToken(value=>value+1);
+  const changed=observeResourceChange("file",change=>{
+   if(!change.id||change.id===id)invalidate();
+  });
+  const returned=observeWindowReturn(invalidate);
+  return()=>{changed();returned();};
+ },[id]);
+
  useEffect(()=>{
   let valid=true;
   setStatus("loading");setError("");
+  setPreview(null);setFile(null);setVersions([]);
   Promise.all([fileApi.preview(id),fileApi.versions(id),fileApi.meta(id).catch(()=>null)])
    .then(([data,history,meta])=>{
     if(!valid)return;
@@ -143,7 +157,13 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
   <div className="panels">
    <main className="work file-preview-page">
     {status==="loading"&&<p className="empty" role="status">正在加载文件…</p>}
-    {status==="failed"&&<div className="file-workbench-error"><p role="alert" className="notice error">{error}</p><RareButton onClick={refresh}>重新加载</RareButton></div>}
+    {status==="failed"&&<div className="file-workbench-error"><p role="alert" className="notice error">{error}</p>
+     <div className="file-workbench-recovery-actions">
+      <RareButton onClick={refresh}>重新加载</RareButton>
+      <Link to="/doc" className="rare-button">返回文件列表</Link>
+      <Link to="/trash" className="rare-button">查看回收站</Link>
+     </div>
+    </div>}
     {status==="ready"&&preview&&<div className="file-workbench">
      <header className="file-workbench-header">
       <div className="file-workbench-heading">

@@ -1,4 +1,5 @@
 import {request} from "../../shared/http";
+import {publishResourceChange} from "../../shared/resourceSync";
 import type {TrashEntry} from "../../entities/trash/model";
 
 export type TrashFilters={
@@ -21,9 +22,18 @@ export const trashApi={
  },
  restore:(id:string,destinationFolderId:string,newName:string,confirmDestination=false)=>{
   const body={destinationFolderId,newName,confirmDestination};
-  return request<TrashEntry>("/trash/"+id+"/restore",{method:"POST",body:JSON.stringify(body)});
+  return request<TrashEntry>("/trash/"+id+"/restore",{method:"POST",body:JSON.stringify(body)}).then(data=>{
+   publishResourceChange({scope:"trash"});
+   publishResourceChange({scope:"file",id:data.fileId});
+   publishResourceChange({scope:"folder"});
+   return data;
+  });
  },
  // Permanent delete is admin-only server-side; the UI gates the entry point and
  // confirms twice before calling it (COMPLEX-WORKFLOWS §8.4).
- purge:(id:string)=>request<{purged:string}>("/trash/"+id,{method:"DELETE"}),
+ purge:(id:string)=>request<{purged:string}>("/trash/"+id,{method:"DELETE"}).then(data=>{
+  publishResourceChange({scope:"trash"});
+  publishResourceChange({scope:"file"});
+  return data;
+ }),
 };
