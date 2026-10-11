@@ -18,6 +18,7 @@ import {OrbitControls} from "three/examples/jsm/controls/OrbitControls.js";
 import {mountEngineeringScene} from "./src/features/modelViewer/viewerScene.ts";
 import {parseDxf} from "./src/features/modelViewer/dxf.ts";
 import {printableSheetHtml} from "./src/features/modelViewer/printSheet.ts";
+import {buildVectorSheet} from "./src/features/modelViewer/vectorSheet.ts";
 const holder=document.getElementById("stage");
 let controls=null,metrics=null,lastCamera=null;
 let actualDrawing=null;
@@ -49,7 +50,17 @@ function mount(drawing=false,layout="Model"){
    "10","500","20","500","11","510","21","500",
    "0","ENDSEC","0","EOF",
   ].join("\n");
-  const source=(layout==="P1"||layout==="P2")?[
+  const source=layout==="PLOT"?[
+   "0","SECTION","2","HEADER","9","$INSUNITS","70","4","0","ENDSEC",
+   "0","SECTION","2","ENTITIES",
+   "0","LINE","8","FRAME","410","PLOT","67","1","10","0","20","0","11","40","21","0",
+   "0","LINE","8","FRAME","410","PLOT","67","1","10","40","20","0","11","40","21","20",
+   "0","LINE","8","FRAME","410","PLOT","67","1","10","40","20","20","11","0","21","20",
+   "0","LINE","8","FRAME","410","PLOT","67","1","10","0","20","20","11","0","21","0",
+   "0","LINE","8","DETAIL","410","PLOT","67","1",
+   "10","5","20","5","11","35","21","5",
+   "0","ENDSEC","0","EOF",
+  ].join("\n"):(layout==="P1"||layout==="P2")?[
    "0","SECTION","2","TABLES","0","TABLE","2","LAYER",
    "0","LAYER","5","AC","2","FILL","62","3",
    "0","ENDTAB","0","ENDSEC",
@@ -95,8 +106,14 @@ window.__cad={
  sheet:()=>mount(true,"A1"),
  projected:()=>mount(true,"P1"),
  frozen:()=>mount(true,"P2"),
+ plot:()=>mount(true,"PLOT"),
  png:()=>controls.exportPng()?.startsWith("data:image/png;base64,")??false,
  printPreview:()=>printableSheetHtml(controls.exportPng(),"A3","A1").includes("@page{size:A3 landscape"),
+ vectorPlot:()=>{
+  const a4=buildVectorSheet(actualDrawing.object,{sheet:"A4",scale:1,unit:actualDrawing.unit,layout:"PLOT"});
+  return{size:a4.drawingMm,physical:a4.svg.includes('width="297mm" height="210mm"'),
+   svg:a4.svg.includes("stroke-width="),title:a4.html.includes("1:1")};
+ },
  dispose:()=>{controls.dispose();return holder.querySelectorAll("canvas").length;},
 };
 `;
@@ -219,6 +236,10 @@ try{
  assert.equal(frozen.projectedHatches,0,"viewport-specific frozen layer excludes only that layer");
  assert.equal(frozen.projectedText,1);
  assert.equal(frozen.projectedSegments,2);
+ const printPage=await cdp.eval("(()=>{window.__cad.plot();return window.__cad.vectorPlot()})()");
+ assert.deepEqual(printPage.size,[40,20],"mm-authored browser drawing must preserve 1:1 millimetre extent");
+ assert(printPage.physical&&printPage.svg&&printPage.title,
+  "real Chrome must produce a physical-size SVG engineering plot");
  await cdp.send("Emulation.setDeviceMetricsOverride",{width:500,height:700,deviceScaleFactor:1,mobile:false});
  await delay(400);
  const narrow=await cdp.eval("window.__cad.state.width");

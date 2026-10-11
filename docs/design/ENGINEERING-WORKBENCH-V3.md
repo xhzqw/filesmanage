@@ -136,6 +136,31 @@ This document records validated capability instead of marking unimplemented work
   handle resolution and missing-handle warnings. Headless Chrome verifies
   fill/glyph composition, frozen layer isolation and print page template.
 
+## Delivered in V3.7 scale-aware paper output increment
+
+- A separate 2D paper-layout print path generates physically dimensioned A3
+  (420×297 mm) and A4 (297×210 mm) **SVG** geometry directly from the
+  DXF-rendered layer coordinates. Print scales 1:1, 1:2, 1:5 and 1:10
+  preserve geometric distances by applying precisely the selected divisor;
+  unlike raster fit-to-page, nothing silently rescales an oversized sheet.
+- Scale output is enabled only when the original DXF explicitly declares
+  **millimetres** via its unit header and the user has selected a paper
+  layout. The print window instructs the user to use 100% actual size;
+  browser drivers and printer calibration can still change final output.
+- Vector lines and triangulated HATCH use drawing coordinates. Existing
+  standalone engineering text sprites are embedded as *raster glyph images*
+  at physical drawing scale: font shaping is still approximate. Clipped
+  viewport-text mesh glyphs cannot yet be faithfully exported to SVG; the
+  dedicated scale-aware output rejects the file rather than dropping them.
+- The layer visibility state is respected. Nonfinite coordinates, print
+  overflow, excessive linework/triangles/labels and unsupported geometry
+  are rejected without scaling the drawing or mutating the source.
+- Existing A3/A4 *fit-to-page PNG printing* remains available separately
+  and intentionally does not claim a geometric plot scale.
+- Synthetic geometry regressions check 1:N physical lengths, SVG sheet
+  dimensions, page overflow, declared-unit requirements and injection
+  safety; headless Chrome verifies print SVG generation using the real scene.
+
 ## Deliberately unsupported or approximate
 
 | Capability | Current truth | Next gate |
@@ -147,7 +172,7 @@ This document records validated capability instead of marking unimplemented work
 | DXF SPLINE/NURBS | Knots/degree/weights supported; fit-point-only interpolation not supported | Fit-point solver, discontinuous curve fidelity |
 | DXF DIMENSION | Anonymous representation BLOCK when present | Full DIMSTYLE overrides and absent-block fallback |
 | DXF HATCH | Solid fills and bounded pattern-family strokes clipped against closed polyline contours, with holes | Edge-boundary paths, gradients, advanced hatch styles and exact plot fidelity |
-| DXF paper space, XREF | Layout isolation and bounded 2D XY orthographic VIEWPORT lines, raster glyphs and solid HATCH composition, frozen layers by handle; PNG/A3/A4 fit-to-page output | Full 3D perspective/tilted view, complex clipping, CAD print scale, XREF |
+| DXF paper space, XREF | Layout isolation and bounded 2D XY orthographic VIEWPORT composition, PNG fit-to-page, and SVG physically-scaled paper geometry for supported mm-only sheets | Full 3D perspective/tilted view, complex clipping, exact CAD text/font plot, XREF, printer calibration |
 | DXF arc/ellipse | Tessellated preview | Analytic segment and center/angle snap records |
 | DXF text | STYLE lookup, width/rotation, Unicode symbols; Canvas font fallback | True SHX metrics, advanced MTEXT formatting, annotation scales |
 | 2D/3D annotations and version diff | Not yet implemented | Version-bound review domain and permissions |

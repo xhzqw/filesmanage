@@ -1,4 +1,4 @@
-import {RareButton,RareInput} from "../shared/ui/rare";
+import {RareButton,RareInput,RareSelect} from "../shared/ui/rare";
 import {useEffect,useRef,useState} from "react";
 import {useNavigate,useParams} from "react-router-dom";
 import {fileApi} from "../features/documents/api";
@@ -8,6 +8,7 @@ import type {User} from "../entities/user/model";
 import {AppShell} from "../shared/ui/AppShell";
 import {parseDxf} from "../features/modelViewer/dxf";
 import {printCurrentSheet,type SheetSize} from "../features/modelViewer/printSheet";
+import {openVectorPrint,type PlotScale} from "../features/modelViewer/vectorSheet";
 import type {MshGeometry} from "../features/modelViewer/mshParser";
 import {mountEngineeringScene,type ViewerControls,type ViewerMetrics} from "../features/modelViewer/viewerScene";
 import "../features/modelViewer/viewer.css";
@@ -50,6 +51,8 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
  const[layouts,setLayouts]=useState<string[]>([]);
  const[activeLayout,setActiveLayout]=useState("Model");
  const[paperViewports,setPaperViewports]=useState({total:0,projected:0});
+ const[plotScale,setPlotScale]=useState<PlotScale>(1);
+ const[plotError,setPlotError]=useState("");
  // Assembly parts recovered from a converted mesh (MC02/MOD02): the MSH keeps
  // shared node indices, so connected components are the solids.
  const[parts,setParts]=useState<{name:string;visible:boolean;size:[number,number,number];triangles:number}[]>([]);
@@ -81,6 +84,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
   setStatus("loading");setMessage("");setInfo(null);setFileMeta(null);
   setMetrics(null);setLayers([]);setLayouts([]);setActiveLayout("Model");
   setPaperViewports({total:0,projected:0});
+  setPlotScale(1);setPlotError("");
   setParts([]);setSelectedPart(-1);
   setUnit("unknown");setMeasure(null);setSkipped([]);
   setView({axes:false,grid:true,edges:true,measure:false,projection:"perspective"});
@@ -195,6 +199,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
       setLayers(next.layers);setSkipped(next.skipped);
       setPaperViewports(next.viewports);
       setActiveLayout(next.layout);setMeasure(null);
+      setPlotError("");
       setView({axes:false,grid:false,edges:false,measure:false,projection:"orthographic"});
      };
     }else if(format==="msh"){
@@ -325,6 +330,36 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
       </div>}
      </section>
      {status==="ready"&&<aside className="cad-inspector" aria-label="工程文件属性">
+      {drawing&&activeLayout!=="Model"&&<section className="cad-inspector-section cad-print">
+       <h3>图纸比例出图</h3>
+       <label className="cad-print-scale">
+        <span>打印比例</span>
+        <RareSelect aria-label="打印比例" value={String(plotScale)} onChange={event=>{
+         setPlotScale(Number(event.target.value) as PlotScale);setPlotError("");
+        }}>
+         <option value="1">1:1</option>
+         <option value="2">1:2</option>
+         <option value="5">1:5</option>
+         <option value="10">1:10</option>
+        </RareSelect>
+       </label>
+       <div className="cad-quick-actions">
+        {(["A4","A3"] as const).map(sheet=><RareButton key={sheet} type="button"
+         disabled={unit!=="mm"} onClick={()=>{
+          const root=dxfRoot.current;
+          if(!root)return;
+          try{
+           openVectorPrint(root,{sheet,scale:plotScale,unit,layout:activeLayout});
+           setPlotError("");
+          }catch(error){
+           setPlotError(error instanceof Error?error.message:"按比例出图失败");
+          }
+         }}>{sheet} 矢量打印</RareButton>)}
+       </div>
+       <span className="cad-precision-note">仅毫米 DXF · 坐标 1:{plotScale} · 打印时请选择 100% 实际大小</span>
+       {unit!=="mm"&&<p className="cad-notice">单位未明确为毫米；请使用图像打印或核实源图纸单位。</p>}
+       {plotError&&<p className="cad-notice" role="alert">{plotError}</p>}
+      </section>}
       {layers.length>0&&<section className="cad-inspector-section">
        <h3>图层 <span>{layers.filter(item=>item.visible).length}/{layers.length}</span></h3>
        <div className="cad-quick-actions" role="group" aria-label="批量显示图层">

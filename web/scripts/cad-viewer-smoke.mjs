@@ -440,4 +440,37 @@ const a3=printableSheetHtml(samplePng,"A3","A2");
 assert(a3.includes("width:420mm;height:297mm"));
 assert.throws(()=>printableSheetHtml("https://evil.invalid/image.png","A4","x"),/无效/);
 
+// V3.7 plot scale is driven by DXF drawing coordinates, never an arbitrary
+// WebGL viewport screenshot or fit-to-page transform.
+const plotCode=await transform(readFileSync(new URL("../src/features/modelViewer/vectorSheet.ts",import.meta.url),"utf8"),
+ {loader:"ts",format:"esm",target:"es2022"});
+const {buildVectorSheet}=await import("data:text/javascript;base64,"+Buffer.from(plotCode.code).toString("base64"));
+const paperMm=viewportFixture.replace("0\nSECTION\n2\nENTITIES",
+ "0\nSECTION\n2\nHEADER\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n0\nSECTION\n2\nENTITIES");
+const mmDrawing=parseDxf(paperMm,THREE,"A1");
+assert.equal(mmDrawing.unit,"mm");
+// Moving the scene for screen fit must not alter printed dimensions.
+mmDrawing.object.position.set(-150,-50,0);
+const vectorA4=buildVectorSheet(mmDrawing.object,{sheet:"A4",scale:1,unit:"mm",layout:"A1"});
+assert.equal(vectorA4.scaleLabel,"1:1");
+assert.deepEqual(vectorA4.drawingMm,[40,20]);
+assert(vectorA4.svg.includes('width="297mm" height="210mm"'));
+assert(vectorA4.svg.includes('x1="10" y1="190" x2="50" y2="190"')||
+ vectorA4.svg.includes('x1="10" y1="200" x2="50" y2="200"'),
+ "plot line coordinates should map directly to physical mm");
+assert(!vectorA4.svg.includes("preserveAspectRatio"));
+const vectorHalf=buildVectorSheet(mmDrawing.object,{sheet:"A4",scale:2,unit:"mm",layout:"A1"});
+assert.deepEqual(vectorHalf.drawingMm,[20,10]);
+assert(vectorHalf.html.includes("1:2"));
+assert.throws(()=>buildVectorSheet(mmDrawing.object,{sheet:"A4",scale:1,unit:"unknown",layout:"A1"}),/毫米/);
+assert.throws(()=>buildVectorSheet(mmDrawing.object,{sheet:"A4",scale:1,unit:"mm",layout:"Model"}),/图纸布局/);
+const overflowGroup=new THREE.Group();
+const printedLayer=new THREE.Group();printedLayer.userData.layer="CUT";
+printedLayer.add(new THREE.LineSegments(
+ new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0),new THREE.Vector3(400,0,0)]),
+ new THREE.LineBasicMaterial({color:0x253b53})));
+overflowGroup.add(printedLayer);
+assert.throws(()=>buildVectorSheet(overflowGroup,{sheet:"A4",scale:1,unit:"mm",layout:"A1"}),/超出/);
+assert.deepEqual(buildVectorSheet(overflowGroup,{sheet:"A4",scale:2,unit:"mm",layout:"A1"}).drawingMm,[200,0]);
+
 console.log("CAD regression passed: DXF geometry, nested blocks, dimension graphics, rational NURBS, ACI/TrueColor and 2D snaps");
