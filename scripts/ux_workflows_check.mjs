@@ -14,7 +14,9 @@
 // Usage: node scripts/ux_workflows_check.mjs [--base http://127.0.0.1:18091]
 //        [--password-file .secrets/admin.password] [--port 9361]
 import { spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import {assertIsolatedFixtures} from "./ux_fixture_guard.mjs";
 
@@ -32,6 +34,19 @@ assertIsolatedFixtures({base:BASE,args,explicitBase:args.includes("--base")});
 
 const password = readFileSync(PASSWORD_FILE, "utf8").trim();
 const stamp = String(Date.now());
+// Each browser suite needs an isolated Chrome profile, so it cannot reuse
+// another suite's session or cached authentication.
+const chromeProfiles = [];
+function isolatedChromeProfile(){
+  const path=mkdtempSync(join(tmpdir(),"filesmanage-wf-chrome-"));
+  chromeProfiles.push(path);
+  return path;
+}
+process.once("exit",()=>{
+  for(const path of chromeProfiles){
+    try{rmSync(path,{recursive:true,force:true,maxRetries:2});}catch{}
+  }
+});
 
 const results = [];
 const check = (name, ok, detail) => {
@@ -214,7 +229,7 @@ async function workflowSuite() {
     });
 
     chrome = spawn("/usr/bin/google-chrome", [
-      "--headless=new", `--remote-debugging-port=${PORT}`, "--no-sandbox",
+      "--headless=new", `--remote-debugging-port=${PORT}`, `--user-data-dir=${isolatedChromeProfile()}`, "--no-sandbox",
       "--disable-gpu", "--window-size=1440,900", "about:blank",
     ], { stdio: "ignore" });
     await delay(1500);
@@ -566,7 +581,7 @@ async function moveUiSuite() {
   let cdp = null;
   try {
     chrome = spawn("/usr/bin/google-chrome", [
-      "--headless=new", `--remote-debugging-port=${PORT}`, "--no-sandbox",
+      "--headless=new", `--remote-debugging-port=${PORT}`, `--user-data-dir=${isolatedChromeProfile()}`, "--no-sandbox",
       "--disable-gpu", "--window-size=1440,900", "about:blank",
     ], { stdio: "ignore" });
     await delay(1500);
@@ -713,7 +728,7 @@ async function g4UiSuite() {
   let chrome = null;
   let cdp = null;
   chrome = spawn("/usr/bin/google-chrome", [
-    "--headless=new", `--remote-debugging-port=${PORT}`, "--no-sandbox",
+    "--headless=new", `--remote-debugging-port=${PORT}`, `--user-data-dir=${isolatedChromeProfile()}`, "--no-sandbox",
     "--disable-gpu", "--window-size=1440,900", "about:blank",
   ], { stdio: "ignore" });
   try {
@@ -727,6 +742,7 @@ async function g4UiSuite() {
     await cdp.send("Emulation.setFocusEmulationEnabled", { enabled: true });
 
     await cdp.navigate(`${BASE}/login`);
+    await cdp.waitFor(`()=>!!document.querySelector('input[type=password]')`,20000);
     await cdp.evaluate(`(()=>{
       const set=(el,v)=>{const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));};
       const fields=[...document.querySelectorAll('input')];
@@ -986,7 +1002,7 @@ async function batchUiSuite() {
     r.status === 400 && r.body?.error?.code === "E_BAD" && /100/.test(r.body?.error?.message ?? ""), JSON.stringify(r.body).slice(0, 160));
 
   chrome = spawn("/usr/bin/google-chrome", [
-    "--headless=new", `--remote-debugging-port=${PORT}`, "--no-sandbox",
+    "--headless=new", `--remote-debugging-port=${PORT}`, `--user-data-dir=${isolatedChromeProfile()}`, "--no-sandbox",
     "--disable-gpu", "--window-size=1440,900", "about:blank",
   ], { stdio: "ignore" });
   try {
@@ -1000,6 +1016,7 @@ async function batchUiSuite() {
     await cdp.send("Emulation.setFocusEmulationEnabled", { enabled: true });
 
     await cdp.navigate(`${BASE}/login`);
+    await cdp.waitFor(`()=>!!document.querySelector('input[type=password]')`,20000);
     await cdp.evaluate(`(()=>{
       const set=(el,v)=>{const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));};
       const fields=[...document.querySelectorAll('input')];
@@ -1232,7 +1249,7 @@ async function finaleSuite() {
   check("WF-21 an invalid recipient kind is rejected", r.status === 400 && r.body?.error?.code === "E_BAD", JSON.stringify(r.body));
 
   chrome = spawn("/usr/bin/google-chrome", [
-    "--headless=new", `--remote-debugging-port=${PORT}`, "--no-sandbox",
+    "--headless=new", `--remote-debugging-port=${PORT}`, `--user-data-dir=${isolatedChromeProfile()}`, "--no-sandbox",
     "--disable-gpu", "--window-size=1440,900", "about:blank",
   ], { stdio: "ignore" });
   try {
@@ -1247,6 +1264,7 @@ async function finaleSuite() {
 
     const loginUi = async (user, pw) => {
       await cdp.navigate(`${BASE}/login`);
+      await cdp.waitFor(`()=>!!document.querySelector('input[type=password]')`,20000);
       await cdp.evaluate(`(()=>{
         const set=(el,v)=>{const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));};
         const fields=[...document.querySelectorAll('input')];
