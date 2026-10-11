@@ -472,7 +472,7 @@ func (s *Service) visibleFile(ctx context.Context, repo ports.Repository, u doma
 		if e != nil && !errors.Is(e, ports.ErrRowMissing) {
 			return domain.File{}, e
 		}
-		if e == nil && life.State == "archived" {
+		if e == nil && (life.State == "archived" || (action == domain.ActionDelete && life.RetentionUntil != nil && life.RetentionUntil.After(s.now()))) {
 			return domain.File{}, domain.ErrConflict
 		}
 	}

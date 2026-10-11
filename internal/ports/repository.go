@@ -20,6 +20,7 @@ type Repository interface {
 	ApprovalActivityStore
 	SearchPresetStore
 	FileLifecycleStore
+	LifecycleWorkspaceStore
 
 	// Identity and sessions.
 	UserByLogin(context.Context, string) (domain.User, string, error)

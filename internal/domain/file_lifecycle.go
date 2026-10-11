@@ -10,6 +10,7 @@ type FileLifecycle struct {
 	PublishedAt  time.Time  `json:"publishedAt"`
 	PublishedBy  string     `json:"publishedBy"`
 	DueAt        *time.Time `json:"dueAt,omitempty"`
+	RetentionUntil *time.Time `json:"retentionUntil,omitempty"`
 	Note         string     `json:"note"`
 	UpdatedAt    time.Time  `json:"updatedAt"`
 }

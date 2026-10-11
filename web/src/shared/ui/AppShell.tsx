@@ -29,6 +29,7 @@ const NAV=[
  {to:"/workspace",label:"共享/关注"},
  {to:"/stats",label:"统计"},
  {to:"/approvals",label:"审批"},
+ {to:"/lifecycle",label:"生命周期"},
  {to:"/trash",label:"回收站"},
  {to:"/org",label:"组织与权限"},
 ];

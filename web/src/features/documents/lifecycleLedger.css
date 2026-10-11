@@ -1,0 +1,14 @@
+.lifecycle-ledger{margin:10px 14px;border:1px solid var(--border-hairline);border-radius:var(--radius-lg);background:var(--surface-panel);min-width:0;overflow:hidden}
+.lifecycle-ledger-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px;border-bottom:1px solid var(--border-hairline)}
+.lifecycle-ledger-toolbar strong{font-size:13px}
+.lifecycle-ledger-controls{display:flex;align-items:center;gap:7px;min-width:0}
+.lifecycle-ledger-controls .rare-select-root{min-width:125px}
+.lifecycle-ledger-scroll{overflow:auto;min-width:0}
+.lifecycle-ledger table{border-collapse:collapse;width:100%;min-width:610px;text-align:left;font-size:12px}
+.lifecycle-ledger td,.lifecycle-ledger th{padding:10px 12px;border-bottom:1px solid var(--border-hairline)}
+.lifecycle-ledger thead th{font-size:11px;color:var(--text-secondary);background:var(--surface-header);font-weight:500}
+.lifecycle-ledger td:first-child{min-width:160px;max-width:330px;overflow-wrap:anywhere}
+.lifecycle-ledger td a{color:var(--text-primary);font-weight:550}
+.lifecycle-ledger-muted{color:var(--text-tertiary)}
+.lifecycle-ledger .lifecycle-ledger-empty{text-align:center;color:var(--text-secondary);padding:24px}
+.lifecycle-ledger-footer{display:flex;justify-content:flex-end;align-items:center;gap:12px;padding:7px 12px;color:var(--text-secondary);font-size:11px}

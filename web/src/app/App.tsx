@@ -16,6 +16,7 @@ import{Preview}from "../pages/Preview";
 import{Trash}from "../pages/Trash";
 import{Org}from "../pages/Org";
 import{Approvals}from "../pages/Approvals";
+import{Lifecycle}from "../pages/Lifecycle";
 import{OfficeEditor}from "../pages/OfficeEditor";
 import{SessionDevices}from "../pages/SessionDevices";
 import{SearchPage,WorkspacePage}from "./AppShell";
@@ -50,6 +51,7 @@ export function App(){
  <Route path="/preview/:id" element={user?<Preview user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/trash" element={user?<Trash user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/org" element={user?<Org user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
+ <Route path="/lifecycle" element={user?<Lifecycle user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/approvals" element={user?<Approvals user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/office/:id" element={user?<OfficeEditor user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/model/:id" element={user?<Suspense fallback={<main className="login-bg" role="status">正在加载 CAD 模型预览…</main>}><ModelViewer user={user} onLogout={logout}/></Suspense>:<Navigate to="/login" replace/>}/>

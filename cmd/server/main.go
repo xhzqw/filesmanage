@@ -132,6 +132,15 @@ func main() {
 		SourceBaseURL: os.Getenv("FILESMANAGE_OFFICE_SOURCE_BASE"),
 		EditorVersion: os.Getenv("FILESMANAGE_OFFICE_VERSION"),
 	})
+	// Durable due-date reminders. At startup and hourly; duplicate instances
+ // are safe because PostgreSQL enforces one notification per due date/phase.
+ remindLifecycle:=func(){
+  ctx,cancel:=context.WithTimeout(context.Background(),30*time.Second)
+  defer cancel()
+  if count,e:=postgres.New(pool).GenerateLifecycleNotifications(ctx,time.Now().UTC());e!=nil{log.Printf("lifecycle reminders failed: %v",e)}else if count>0{log.Printf("lifecycle reminders enqueued: %d",count)}
+ }
+ remindLifecycle()
+ go func(){tick:=time.NewTicker(time.Hour);defer tick.Stop();for range tick.C{remindLifecycle()}}()
 	r := httpx.New(service, secure, "web/dist")
 	log.Println("filesmanage isolated development server listening ", addr)
 	if err = r.Run(addr); err != nil {

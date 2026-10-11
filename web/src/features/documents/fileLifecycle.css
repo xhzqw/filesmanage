@@ -8,3 +8,4 @@
 .file-lifecycle-form .rare-input{height:28px}
 .file-lifecycle-actions{display:flex;flex-wrap:wrap;align-items:center;gap:5px}
 .file-lifecycle .hint{margin:8px 11px}
+.file-lifecycle-retention{display:grid;gap:5px;max-width:220px;margin:8px 0 12px;font-size:12px;color:var(--text-secondary)}

@@ -884,10 +884,12 @@ schema("FileLifecycle",obj({
  "publishedSeq":integer(),"publishedAt":timestamp(),"publishedBy":string(),
  "dueAt":timestamp(),"dueStatus":string(enum=["none","soon","overdue","scheduled"]),
  "note":string(),"updatedAt":timestamp(),"canManage":boolean()
+ "retentionUntil":timestamp(),
 },required=["fileId","state","publishedSeq","publishedAt","publishedBy","dueStatus","note","updatedAt","canManage"]))
 schema("SetFileLifecycle",obj({
  "action":string(enum=["publish","archive","unarchive","set_due"]),
- "expectedVersionSeq":integer(minimum=1),"dueAt":timestamp(),"note":string(max_length=200)
+ "expectedVersionSeq":integer(minimum=1),"dueAt":timestamp(),"note":string(max_length=200),
+ "retentionDays":integer(minimum=0)
 },required=["action","expectedVersionSeq"]))
 add("GET","/api/files/{id}/lifecycle",operation("Read lifecycle release, archive and due-date status","Files","fileLifecycle",security=SESSION,
  params=[id_param("id","File ID")],
@@ -895,6 +897,25 @@ add("GET","/api/files/{id}/lifecycle",operation("Read lifecycle release, archive
 add("PUT","/api/files/{id}/lifecycle",operation("Release current version or archive/unarchive or update due date","Files","setFileLifecycle",security=SESSION,
  params=[id_param("id","File ID")],request={"application/json":{"schema":ref("SetFileLifecycle")}},
  responses=dict([json_ok(ref("FileLifecycle"),"CAS/version-checked, audited state."),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
+
+schema("LifecycleLedgerRow",obj({
+ "fileId":string(),"fileName":string(),"folderId":string(),"state":string(enum=["released","archived"]),
+ "publishedSeq":integer(),"dueAt":timestamp(),"retentionUntil":timestamp(),
+ "dueStatus":string(enum=["none","soon","overdue","scheduled"])
+},required=["fileId","fileName","folderId","state","publishedSeq","dueStatus"]))
+schema("LifecycleLedgerPage",obj({"items":arr(ref("LifecycleLedgerRow")),"nextCursor":string()},required=["items","nextCursor"]))
+schema("LifecycleNotification",obj({
+ "id":integer(),"fileId":string(),"fileName":string(),"kind":string(enum=["soon","overdue"]),
+ "dueAt":timestamp(),"createdAt":timestamp(),"read":boolean()
+},required=["id","fileId","fileName","kind","dueAt","createdAt","read"]))
+add("GET","/api/lifecycle/ledger",operation("Page through ACL-visible lifecycle entries","Files","lifecycleLedger",security=SESSION,
+ params=[query("cursor","Opaque file ID cursor"),query("state","released or archived"),query("limit","Candidate window 1-50",integer(minimum=1))],
+ responses=dict([json_ok(ref("LifecycleLedgerPage"),"ACL-filtered candidate window."),resp("400",ERR["400"]),resp("401",ERR["401"])])))
+add("GET","/api/lifecycle/notifications",operation("List current due-date notices scoped to publisher","Files","lifecycleNotifications",security=SESSION,
+ responses=dict([json_ok(arr(ref("LifecycleNotification")),"Current ACL-visible reminders."),resp("401",ERR["401"])])))
+add("POST","/api/lifecycle/notifications/{id}/read",operation("Mark own lifecycle notice as read","Files","readLifecycleNotification",security=SESSION,
+ params=[id_param("id","Notification ID")],
+ responses=dict([json_ok(obj({"read":integer()}),"Marked read."),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("404",ERR["404"])])))
 
 add("GET", "/api/files/{id}/metadata", operation("Read business metadata of an accessible file", "Files", "fileMetadata", security=SESSION,
     params=[id_param("id","File ID")],
