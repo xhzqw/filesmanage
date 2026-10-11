@@ -92,7 +92,6 @@ async function run(){
  const tree=await api("GET","/folders/tree");
  const root=tree.find(x=>x.id==="folder_root")??tree.find(x=>!x.parentId);
  folderId=(await api("POST","/folders",{parentId:root.id,name:"UX-WF31-"+stamp})).id;
- await api("PUT","/folders/"+folderId+"/approval-policy",{approverId:me.id,enabled:true});
  const data=new FormData();
  data.set("folderId",folderId);
  data.set("file",new Blob(["rare ui approval test "+stamp+"\n"]),filename);
@@ -101,6 +100,7 @@ async function run(){
  check(uploadResponse.ok&&!!uploaded.data?.fileId,"fixture uploaded in isolated DB");
  fileId=uploaded.data.fileId;
  const token=(await api("POST","/files/"+fileId+"/lock",{baseSeq:1})).lockToken;
+ await api("PUT","/folders/"+folderId+"/approval-policy",{approverId:me.id,enabled:true});
  const changed=await api("POST","/files/"+fileId+"/save",{
   baseSeq:1,lockToken:token,data:btoa("approved content "+stamp+"\n"),
   idempotencyKey:"rare-wf31-"+stamp,
