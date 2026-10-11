@@ -25,6 +25,8 @@ cases = [
     ("name-common", "文件"),
     ("name-common", "pf_ord"),
     ("fulltext", "导出"),
+    ("chinese-rare", "边界"),
+    ("chinese-rare", "预算"),
     ("no-hit", "qq___nonexistent_9876"),
 ]
 for category, query in cases:

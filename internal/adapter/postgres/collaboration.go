@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode"
 )
 
 // ---------- shares ----------
@@ -266,6 +267,18 @@ func (p *placeholder) next() string {
 // snippetWindow is the character window around a search match (SPEC §10.3).
 const snippetWindow = 60
 
+// exactHanPair selects only two *Han* code points for the supplemental
+// bigram predicate. Other queries continue to use the original ILIKE
+// behavior: Latin case folding, punctuation, spaces and SQL wildcards are
+// not safely described by a case-sensitive Unicode bigram.
+func exactHanPair(query string) string {
+	runes := []rune(query)
+	if len(runes) == 2 && unicode.Is(unicode.Han, runes[0]) && unicode.Is(unicode.Han, runes[1]) {
+		return query
+	}
+	return ""
+}
+
 func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) ([]domain.File, int, error) {
 	// The service sends page size + 1 lookahead row, so the ceiling is
 	// MaxSearchPage+1; a plain max-size request must not fail here (WF-30).
@@ -332,21 +345,37 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	if q.Query != "" {
 		const candidateLimit = 256
 		pattern := "%" + q.Query + "%"
+		hanPair := exactHanPair(q.Query)
 		selective := false
 		if len([]rune(q.Query)) >= 2 {
 			var candidateCount int
+			nameCheck := "name ILIKE $1"
+			probeArgs := []any{pattern, q.TextQuery}
+			if hanPair != "" {
+				// pg_trgm cannot index a middle-of-name two-Han substring.
+				// GIN-accelerate a *necessary* name bigram, then recheck ILIKE
+				// to preserve exact case, Unicode and false-positive behavior.
+				nameCheck += " AND fm_search_name_bigrams(name) @> ARRAY[$3]::text[]"
+				probeArgs = append(probeArgs, hanPair)
+			}
 			probe := `SELECT
-			  (SELECT count(*) FROM (SELECT 1 FROM files WHERE deleted_at IS NULL AND name ILIKE $1 LIMIT 257) names)
+			  (SELECT count(*) FROM (SELECT 1 FROM files WHERE deleted_at IS NULL AND ` + nameCheck + ` LIMIT 257) names)
 			 + (SELECT count(*) FROM (SELECT 1 FROM file_text WHERE tsv @@ phraseto_tsquery('simple',$2) LIMIT 257) texts)`
-			if err = r.Q.QueryRow(ctx, probe, pattern, q.TextQuery).Scan(&candidateCount); err != nil {
+			if err = r.Q.QueryRow(ctx, probe, probeArgs...).Scan(&candidateCount); err != nil {
 				return nil, 0, err
 			}
 			selective = candidateCount <= candidateLimit
 		}
 		if selective {
-			where = append(where, "f.id IN (SELECT named.id FROM files named WHERE named.deleted_at IS NULL AND named.name ILIKE "+
-				ph.next()+" UNION SELECT ft.file_id FROM file_text ft WHERE ft.tsv @@ phraseto_tsquery('simple', "+ph.next()+"))")
-			args = append(args, pattern, q.TextQuery)
+			nameCheck := "named.name ILIKE " + ph.next()
+			args = append(args, pattern)
+			if hanPair != "" {
+				nameCheck += " AND fm_search_name_bigrams(named.name) @> ARRAY[" + ph.next() + "]::text[]"
+				args = append(args, hanPair)
+			}
+			where = append(where, "f.id IN (SELECT named.id FROM files named WHERE named.deleted_at IS NULL AND "+
+				nameCheck+" UNION SELECT ft.file_id FROM file_text ft WHERE ft.tsv @@ phraseto_tsquery('simple', "+ph.next()+"))")
+			args = append(args, q.TextQuery)
 		} else {
 			// Ordered broad search keeps the early LIMIT and the old semantics,
 			// avoiding full UNION materialization for 100k name matches.
