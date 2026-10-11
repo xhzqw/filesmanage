@@ -6,6 +6,7 @@ import type{Folder}from"../../entities/folder/model";
 import {Menu,type MenuItem,type MenuPoint}from"../../shared/ui/Menu";
 import {SpringActiveRail}from"../../shared/ui/rare";
 import {request}from"../../shared/http";
+import {mergeDistinctById}from"./folderPageMerge";
 import "./folderTree.css";
 
 // Internal file→folder move gesture (DESKTOP-INTERACTION-v1 §7.2, DI-17). The
@@ -520,6 +521,9 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
  // one or land under another node (levels are keyed by their own parent id).
  function loadLevel(parentId:string,cursor:string,mode:"replace"|"append"){
   const previous=requests.current.get(parentId);
+  // Repeated clicks during an in-flight append must not abort and restart the
+  // same cursor request; replacements (refreshes) are allowed to supersede it.
+  if(mode==="append"&&previous)return;
   previous?.controller.abort();
   const generation=(previous?.generation??0)+1;
   const controller=new AbortController();
@@ -543,7 +547,7 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
      const current=old.get(parentId);
      const base=mode==="append"?(current?.items??[]):[];
      const next=new Map(old);
-     next.set(parentId,{items:base.concat(page.items),status:"ready",nextCursor:page.nextCursor,mode});
+     next.set(parentId,{items:mergeDistinctById(base,page.items),status:"ready",nextCursor:page.nextCursor===cursor&&cursor!==""?"":page.nextCursor,mode});
      return next;
     });
    })

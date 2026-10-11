@@ -38,7 +38,30 @@ export type UploadTask={
  fingerprint?:string;
  progress?:UploadProgress;
  serverProcessing?:boolean;
+ // Persisted large-file resume metadata expires from its original enqueue
+ // time. React progress updates must not silently extend the 48-hour window.
+ cacheAt?:number;
 };
+
+const MAX_TERMINAL_HISTORY=40;
+export function isFinished(task:UploadTask):boolean{
+ return task.status==="committed"||task.status==="cancelled";
+}
+export function clearFinishedTasks(tasks:UploadTask[]):UploadTask[]{
+ return tasks.filter(task=>!isFinished(task));
+}
+// Retain all actionable items, including failed/interrupted uploads. Only old
+// successful or explicitly cancelled entries may be compacted.
+export function limitFinishedHistory(tasks:UploadTask[]):UploadTask[]{
+ const kept:UploadTask[]=[];
+ let finished=0;
+ for(let index=tasks.length-1;index>=0;index--){
+  const task=tasks[index];
+  if(isFinished(task)&&++finished>MAX_TERMINAL_HISTORY)continue;
+  kept.push(task);
+ }
+ return kept.reverse();
+}
 
 let seq=0;
 function nextQueueId():string{
@@ -61,7 +84,8 @@ export function enqueue(tasks:UploadTask[],files:File[],targetFolderId:string):U
   idempotencyKey:newIdempotencyKey(),
   status:"queued",
   file,
-  sourceName:file.name,fileType:file.type,lastModified:file.lastModified,
+ sourceName:file.name,fileType:file.type,lastModified:file.lastModified,
+  cacheAt:Date.now(),
  }));
  return tasks.concat(added);
 }

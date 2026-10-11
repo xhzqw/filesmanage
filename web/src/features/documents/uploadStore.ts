@@ -5,7 +5,7 @@ import{uploadResumable,resumableThreshold,resumableMaxFile}from"../../shared/res
 import {fingerprintFile,readUploadTasks,storeUploadTasks} from "./uploadQueuePersistence";
 import{
  enqueue,markUploading,markProgress,markServerProcessing,markCommitted,markFailed,markCancelled,
- cancelTask,retryTask,renameTask,skipTask,
+ cancelTask,retryTask,renameTask,skipTask,clearFinishedTasks,limitFinishedHistory,
  type UploadTask,
 }from"./uploadQueue";
 
@@ -35,6 +35,7 @@ export type UploadState={
  retry:(queueId:string)=>void;
  rename:(queueId:string,name:string)=>void;
  skip:(queueId:string)=>void;
+ clearFinished:()=>void;
  attach:(queueId:string,file:File)=>Promise<void>;
 };
 
@@ -60,6 +61,7 @@ function bindUser(userId:string){
  activeUserId=userId;
  const tasks=userId?readUploadTasks(userId).map(saved=>({
   ...saved,file:null,status:"interrupted" as const,
+  cacheAt:saved.at,
   error:undefined,progress:undefined,serverProcessing:false,
  })):[];
  useUploadStore.setState({tasks,currentFolderId:""});
@@ -100,7 +102,7 @@ export const useUploadStore=create<UploadState>((set,get)=>({
   const task=get().tasks.find(item=>item.queueId===queueId);
   if(!task)return;
   if(task.status==="uploading"){inFlight.get(queueId)?.abort();return;}
-  if(task.status==="queued")set({tasks:cancelTask(get().tasks,queueId)});
+  if(task.status==="queued")set({tasks:limitFinishedHistory(cancelTask(get().tasks,queueId))});
   if(task.status==="interrupted")set({tasks:get().tasks.filter(item=>item.queueId!==queueId)});
  },
  // Retry/rename go through the pure transitions, which keep the idempotency
@@ -128,6 +130,7 @@ export const useUploadStore=create<UploadState>((set,get)=>({
   void pump();
  },
  skip:queueId=>{set({tasks:skipTask(get().tasks,queueId)});},
+ clearFinished:()=>set(state=>({tasks:clearFinishedTasks(state.tasks)})),
 }));
 
 // One bounded per-user metadata cache. The original bytes are never persisted.
@@ -169,7 +172,7 @@ async function pump(){
     });
     if(epoch!==identityEpoch)continue;
     useUploadStore.setState(state=>{
-     const tasks=markCommitted(state.tasks,next.queueId,{fileId:reply.fileId,versionSeq:reply.versionSeq,deduplicated:reply.deduplicated});
+     const tasks=limitFinishedHistory(markCommitted(state.tasks,next.queueId,{fileId:reply.fileId,versionSeq:reply.versionSeq,deduplicated:reply.deduplicated}));
      // WF-28: the queue survives a folder switch, so only a commit into the
      // folder the page currently shows asks the page to reload its list.
      return next.targetFolderId===state.currentFolderId?{tasks,reloadTick:state.reloadTick+1}:{tasks};
@@ -177,7 +180,7 @@ async function pump(){
    }catch(error){
     if(epoch!==identityEpoch)continue;
     useUploadStore.setState(state=>({tasks:errorCode(error)==="E_CANCELLED"?
-     markCancelled(state.tasks,next.queueId):markFailed(state.tasks,next.queueId,failureCopy(error))}));
+     limitFinishedHistory(markCancelled(state.tasks,next.queueId)):markFailed(state.tasks,next.queueId,failureCopy(error))}));
    }finally{
     if(inFlight.get(next.queueId)===controller)inFlight.delete(next.queueId);
    }

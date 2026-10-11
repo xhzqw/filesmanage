@@ -39,6 +39,7 @@ export function DropZone({folderId,userId,disabled,onCommitted,children}:{folder
  const setCurrentFolder=useUploadStore(state=>state.setCurrentFolder);
  const enqueueFiles=useUploadStore(state=>state.enqueueFiles);
  const cancel=useUploadStore(state=>state.cancel);
+ const clearFinished=useUploadStore(state=>state.clearFinished);
  const retry=useUploadStore(state=>state.retry);
  const rename=useUploadStore(state=>state.rename);
  const skip=useUploadStore(state=>state.skip);
@@ -113,6 +114,7 @@ export function DropZone({folderId,userId,disabled,onCommitted,children}:{folder
  const committed=tasks.filter(task=>task.status==="committed").length;
  const failed=tasks.filter(task=>task.status==="failed").length;
  const pending=tasks.filter(task=>task.status==="queued"||task.status==="uploading").length;
+ const finished=tasks.filter(task=>task.status==="committed"||task.status==="cancelled").length;
 
  return <div
   className={"dropzone"+(dragging?" dragging":"")}
@@ -129,9 +131,12 @@ export function DropZone({folderId,userId,disabled,onCommitted,children}:{folder
     <span className="upload-queue-summary" role="status">
      上传任务 · {committed} 项完成 · {failed} 项失败{pending>0?` · ${pending} 项进行中`:""}
     </span>
-    <RareButton type="button" aria-expanded={queueExpanded} aria-controls="upload-queue-list" onClick={()=>setQueueExpanded(value=>!value)}>
-     {queueExpanded?"收起":"展开"} ({tasks.length})
-    </RareButton>
+    <div className="upload-queue-controls">
+     {finished>0&&<RareButton type="button" aria-label={"清除 "+finished+" 项已结束的上传任务"} onClick={clearFinished}>清除已结束 ({finished})</RareButton>}
+     <RareButton type="button" aria-expanded={queueExpanded} aria-controls="upload-queue-list" onClick={()=>setQueueExpanded(value=>!value)}>
+      {queueExpanded?"收起":"展开"} ({tasks.length})
+     </RareButton>
+    </div>
    </header>
    {queueExpanded&&<ul className="upload-queue-list" id="upload-queue-list">
     {tasks.map(task=>{

@@ -1386,21 +1386,21 @@ async function finaleSuite() {
       !dragPolicy.textPrevented&&dragPolicy.filePrevented&&!dragPolicy.inputPrevented,JSON.stringify(dragPolicy));
     await cdp.evaluate(`(()=>{document.querySelector('.dropzone').dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:window.__g2files}));return true;})()`);
     await cdp.waitFor(`()=>document.querySelectorAll('.upload-queue-list .upload-item').length>=10`,18000);
-    const queueGeometry=await cdp.evaluate(`(()=>{const list=document.querySelector('.upload-queue-list'),pane=document.querySelector('.work-body>.table'),r=list.getBoundingClientRect();return {count:list.children.length,height:r.height,scrollHeight:list.scrollHeight,overflow:document.documentElement.scrollWidth-innerWidth,paneHeight:pane?.getBoundingClientRect().height,expand:document.querySelector('.upload-queue-header button')?.getAttribute('aria-expanded')};})()`);
+    const queueGeometry=await cdp.evaluate(`(()=>{const list=document.querySelector('.upload-queue-list'),pane=document.querySelector('.work-body>.table'),r=list.getBoundingClientRect();return {count:list.children.length,height:r.height,scrollHeight:list.scrollHeight,overflow:document.documentElement.scrollWidth-innerWidth,paneHeight:pane?.getBoundingClientRect().height,expand:document.querySelector('.upload-queue-header button[aria-controls=upload-queue-list]')?.getAttribute('aria-expanded')};})()`);
     check("G2 ten upload rows scroll inside bounded dock without squeezing the file list",
       queueGeometry.count===10&&queueGeometry.height<=225&&queueGeometry.scrollHeight>queueGeometry.height&&queueGeometry.overflow<=2&&queueGeometry.paneHeight>=110&&queueGeometry.expand==="true",JSON.stringify(queueGeometry));
     for(const width of [390,760,1366]){
       await cdp.send("Emulation.setDeviceMetricsOverride",{width,height:840,deviceScaleFactor:1,mobile:false});
       await delay(100);
-      const geometry=await cdp.evaluate(`(()=>{const list=document.querySelector('.upload-queue-list'),work=document.querySelector('.work-body>.table'),queue=document.querySelector('.upload-queue'),r=queue.getBoundingClientRect();return {width:innerWidth,pageOverflow:document.documentElement.scrollWidth-innerWidth,queueRight:r.right,queueWidth:r.width,listHeight:list.getBoundingClientRect().height,listOverflow:list.scrollWidth-list.clientWidth,paneHeight:work.getBoundingClientRect().height,buttonVisible:document.querySelector('.upload-queue-header button').getBoundingClientRect().width>0};})()`);
+      const geometry=await cdp.evaluate(`(()=>{const list=document.querySelector('.upload-queue-list'),work=document.querySelector('.work-body>.table'),queue=document.querySelector('.upload-queue'),r=queue.getBoundingClientRect();return {width:innerWidth,pageOverflow:document.documentElement.scrollWidth-innerWidth,queueRight:r.right,queueWidth:r.width,listHeight:list.getBoundingClientRect().height,listOverflow:list.scrollWidth-list.clientWidth,paneHeight:work.getBoundingClientRect().height,buttonVisible:document.querySelector('.upload-queue-header button[aria-controls=upload-queue-list]').getBoundingClientRect().width>0};})()`);
       check("G2 upload dock "+width+"px fits the pane and retains the file list",
         geometry.pageOverflow<=2&&geometry.queueRight<=width+2&&geometry.queueWidth>150&&geometry.listHeight<=225&&geometry.listOverflow<=2&&geometry.paneHeight>105&&geometry.buttonVisible,JSON.stringify(geometry));
     }
     await cdp.send("Emulation.clearDeviceMetricsOverride");
-    await cdp.evaluate(`(()=>{document.querySelector('.upload-queue-header button').click();return true;})()`);
+    await cdp.evaluate(`(()=>{document.querySelector('.upload-queue-header button[aria-controls=upload-queue-list]').click();return true;})()`);
     check("G2 upload dock can collapse without losing tasks",
-      await cdp.evaluate(`(()=>!document.querySelector('.upload-queue-list')&&document.querySelector('.upload-queue-header button')?.getAttribute('aria-expanded')==='false')()`));
-    await cdp.evaluate(`(()=>{document.querySelector('.upload-queue-header button').click();return true;})()`);
+      await cdp.evaluate(`(()=>!document.querySelector('.upload-queue-list')&&document.querySelector('.upload-queue-header button[aria-controls=upload-queue-list]')?.getAttribute('aria-expanded')==='false')()`));
+    await cdp.evaluate(`(()=>{document.querySelector('.upload-queue-header button[aria-controls=upload-queue-list]').click();return true;})()`);
     await cdp.evaluate(`(()=>{document.querySelector('li[data-folder-id="${targetId}"]>.tree-row').click();return true;})()`);
     await cdp.waitFor(`()=>new URLSearchParams(location.search).get('folder')===${JSON.stringify(targetId)}`,16000);
     await cdp.waitFor(`()=>document.querySelectorAll('.upload-item-target').length>=10`,16000);
@@ -1432,6 +1432,22 @@ async function finaleSuite() {
     await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog[open]')].find(x=>x.textContent?.includes('删除目录确认'));[...d.querySelectorAll('button')].find(b=>b.textContent?.trim()==='确认删除')?.click();return true;})()`);
     const fallback=await cdp.waitFor(`()=>new URLSearchParams(location.search).get('folder')===${JSON.stringify(root.id)}`,16000);
     check("G2 deleting selected folder navigates to surviving parent",fallback===true,String(await cdp.evaluate(`(()=>location.pathname+location.search)()`)));
+
+    // ---- G2 phase 3: terminal queue history is removable and never hides
+    // actionable uploads. The earlier ten tiny files are deliberately kept
+    // across SPA navigation until this final explicit cleanup. ----
+    const uploadsSettled=await cdp.waitFor(`()=>{
+      const rows=[...document.querySelectorAll('.upload-item')];
+      return rows.length===10&&rows.every(row=>row.classList.contains('committed')||row.classList.contains('failed')||row.classList.contains('cancelled'));
+    }`,45000);
+    const taskStates=await cdp.evaluate(`(()=>[...document.querySelectorAll('.upload-item')].map(x=>x.classList.contains('committed')?'committed':x.classList.contains('failed')?'failed':x.classList.contains('cancelled')?'cancelled':'pending'))()`);
+    check("G2 upload history finishes without losing pending files",uploadsSettled===true&&taskStates.length===10,JSON.stringify(taskStates));
+    const expectedOutstanding=taskStates.filter(state=>state==="failed").length;
+    const clearButton=await cdp.evaluate(`(()=>{const button=document.querySelector('button[aria-label^="清除 "]');if(!button)return false;button.click();return true;})()`);
+    await delay(250);
+    const remaining=await cdp.evaluate(`(()=>[...document.querySelectorAll('.upload-item')].map(x=>({failed:x.classList.contains('failed'),interrupted:x.classList.contains('interrupted')})))()`);
+    check("G2 clear finished history preserves failures while dropping successes",
+      clearButton===true&&remaining.length===expectedOutstanding&&remaining.every(item=>item.failed||item.interrupted),JSON.stringify({before:taskStates,remaining}));
   } finally {
     cdp && cdp.close();
     chrome && chrome.kill("SIGKILL");

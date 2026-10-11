@@ -39,13 +39,14 @@ export function readUploadTasks(userId:string):CachedTask[]{
 export function storeUploadTasks(userId:string,tasks:UploadTask[]):void{
  if(!userId)return;
  try{
-  const cache:CachedTask[]=tasks.filter(t=>t.status!=="committed"&&t.status!=="cancelled"&&
-   t.size>=8*1024*1024&&t.size<=1073741824&&!!t.fingerprint)
+ const cache:CachedTask[]=tasks.filter(t=>t.status!=="committed"&&t.status!=="cancelled"&&
+   t.size>=8*1024*1024&&t.size<=1073741824&&!!t.fingerprint&&
+   (t.cacheAt??Date.now())>Date.now()-maxAge)
    .slice(-40).map(t=>({
     queueId:t.queueId,name:t.name,sourceName:t.sourceName??t.file?.name??t.name,
     size:t.size,fileType:t.fileType??t.file?.type??"",lastModified:t.lastModified??t.file?.lastModified??0,
     fingerprint:t.fingerprint!,targetFolderId:t.targetFolderId,idempotencyKey:t.idempotencyKey,
-    at:Date.now(),
+    at:t.cacheAt??Date.now(),
    }));
   if(cache.length)localStorage.setItem(uploadCachePrefix+userId,JSON.stringify(cache));
   else localStorage.removeItem(uploadCachePrefix+userId);
