@@ -1,4 +1,4 @@
-import {RareButton,RareInput,RareNotice,RareSelect} from "../../shared/ui/rare";
+import {RareBadge,RareButton,RareDataTable,RareInput,RareNotice,RareRowActions,RareSelect} from "../../shared/ui/rare";
 import {useEffect,useMemo,useRef,useState,type FormEvent,type ReactNode} from "react";
 import {Link,useSearchParams} from "react-router-dom";
 import type {User} from "../../entities/user/model";
@@ -266,7 +266,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
  return <div className="perm-content-root">
   <nav className="perm-subnav" aria-label="权限管理功能">
    <RareButton type="button" className={!auditView&&!documentAuditView?"active":""} aria-current={!auditView&&!documentAuditView?"page":undefined}
-    onClick={()=>setParams(old=>{const next=new URLSearchParams(old);next.set("view","folder");return next;})}>目录授权与有效权限</RareButton>
+    onClick={()=>setParams(old=>{const next=new URLSearchParams(old);next.set("view","folder");return next;})}>资源授权</RareButton>
    <RareButton type="button" className={auditView?"active":""} aria-current={auditView?"page":undefined}
     onClick={()=>{setRevokeTarget(null);setParams(old=>{const next=new URLSearchParams(old);next.set("view","audit");return next;});}}>权限变更审计</RareButton>
    <RareButton type="button" className={documentAuditView?"active":""} aria-current={documentAuditView?"page":undefined}
@@ -288,11 +288,11 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
     {notice&&<RareNotice tone={notice.error?"danger":"success"}>{notice.text}</RareNotice>}
     {state==="loading"&&<p role="status" className="hint">正在读取直接授权…</p>}
     {state==="failed"&&<RareNotice tone="danger">读取失败，不能编辑该目录的授权。</RareNotice>}
-    {state==="ready"&&<div className="perm-grants-scroller">{grants.length>0?<table className="perm-table"><thead><tr><th>授权主体</th><th>动作</th><th>范围</th><th>到期</th><th>操作</th></tr></thead>
-     <tbody>{grants.map(g=><tr key={g.id}><td>{names.get(g.subjectKind+":"+g.subjectId)??g.subjectId}<small>{g.subjectKind==="user"?"用户":"工作组"}</small></td>
-      <td>{displayActions(g.actions)}</td><td>{g.scopeOnly?"仅当前目录":"包括子目录"}</td>
-      <td>{g.expiresAt?new Date(g.expiresAt).toLocaleString("zh-CN"):"不过期"}</td>
-      <td><RareButton type="button" tone="danger" className="danger" onClick={()=>{setRevokeError("");setRevokeTarget(g);}}>撤销</RareButton></td></tr>)}</tbody></table>
+    {state==="ready"&&<div className="perm-grants-scroller">{grants.length>0?<RareDataTable className="perm-table perm-grants-table"><thead><tr><th>授权主体</th><th>动作</th><th className="perm-grant-optional">范围</th><th className="perm-grant-optional">到期</th><th>操作</th></tr></thead>
+     <tbody>{grants.map(g=><tr key={g.id}><td className="perm-grant-subject"><strong title={names.get(g.subjectKind+":"+g.subjectId)??g.subjectId}>{names.get(g.subjectKind+":"+g.subjectId)??g.subjectId}</strong><small>{g.subjectKind==="user"?"用户":"工作组"} · {g.scopeOnly?"仅当前目录":"包含子目录"}<span className="perm-grant-mobile-expiry">{g.expiresAt?" · "+new Date(g.expiresAt).toLocaleDateString("zh-CN"):""}</span></small></td>
+      <td className="perm-grant-actions" title={displayActions(g.actions)}>{displayActions(g.actions)}</td><td className="perm-grant-optional"><RareBadge tone={g.scopeOnly?"neutral":"info"}>{g.scopeOnly?"当前目录":"包含子目录"}</RareBadge></td>
+      <td className="perm-grant-optional rare-data-date">{g.expiresAt?new Date(g.expiresAt).toLocaleString("zh-CN"):"不过期"}</td>
+      <td className="perm-grant-controls"><RareRowActions><RareButton type="button" tone="danger" className="danger" onClick={()=>{setRevokeError("");setRevokeTarget(g);}}>撤销</RareButton></RareRowActions></td></tr>)}</tbody></RareDataTable>
      :<div className="perm-empty-grants"><strong>暂无直接授权</strong><p>可在右侧添加授权。</p></div>}
     </div>}
       </section>

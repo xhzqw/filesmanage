@@ -1,11 +1,12 @@
 import {RareTabs} from "../../shared/ui/rare/RareTabs";
-import {RareBadge,RareButton,RareInput,RareNotice,RareSelect} from "../../shared/ui/rare";
+import {RareBadge,RareButton,RareDataTable,RareInput,RareNotice,RareRowActions,RareSelect} from "../../shared/ui/rare";
 import {useEffect,useMemo,useRef,useState,type FormEvent,type KeyboardEvent,type ReactNode} from "react";
 import {organizationApi,type Department,type Workgroup} from "./api";
 import {errorCode,errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
 import type {User} from "../../entities/user/model";
 import "./organization.css";
+import "./memberWorkbench.css";
 import {useSearchParams} from "react-router-dom";
 import {PermissionsPanel} from "./PermissionsPanel";
 import {ApprovalPoliciesPanel} from "./ApprovalPoliciesPanel";
@@ -158,6 +159,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
 
  // 对话框表单状态
  const[newUser,setNewUser]=useState({login:"",displayName:"",password:"",departmentId:""});
+ const[createFormOpen,setCreateFormOpen]=useState(false);
  const[resetTarget,setResetTarget]=useState<User|null>(null);
  const[stateTarget,setStateTarget]=useState<User|null>(null);
  const[removeTarget,setRemoveTarget]=useState<User|null>(null);
@@ -587,6 +589,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   event.preventDefault();
   if(!canCreateUser)return;
   setNotice(null);
+  setCreateFormOpen(false);
   setCreateUserOpen(true);
  }
 
@@ -833,20 +836,21 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
        {usersState==="failed"&&<RareButton type="button" className="secondary-action" onClick={()=>setUsersToken(token=>token+1)}>重新读取用户</RareButton>}
       </div>
       <span className="toolbar-hint">显示 {Math.min(memberLimit,filteredMembers.length)} / {filteredMembers.length} 位成员</span>
+      <RareButton type="button" className="primary org-add-member" onClick={()=>{setNotice(null);setCreateFormOpen(true);}}><IconPlus/>新增成员</RareButton>
      </div>
 
      {notice&&notice.tone==="error"&&usersState==="failed"&&<RareNotice tone="danger">{notice.text}</RareNotice>}
 
      {/* 成员数据表格 */}
      <div className="org-table-container">
-      <table aria-label="成员列表" aria-busy={usersState==="loading"?true:undefined}>
+      <RareDataTable className="org-members-table" aria-label="成员列表" aria-busy={usersState==="loading"?true:undefined}>
        <thead>
         <tr>
-         <th scope="col" style={{width:"22%"}}>姓名</th>
-         <th scope="col" style={{width:"18%"}}>账号</th>
-         <th scope="col" style={{width:"24%"}}>部门</th>
-         <th scope="col" style={{width:"18%"}}>状态</th>
-         <th scope="col" style={{width:"18%"}}>操作</th>
+         <th scope="col">姓名</th>
+         <th className="org-member-optional" scope="col">账号</th>
+         <th className="org-member-optional" scope="col">部门</th>
+         <th scope="col">状态</th>
+         <th scope="col">操作</th>
         </tr>
        </thead>
        <tbody>
@@ -855,12 +859,13 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
           <div className="org-user-cell">
            <span className="org-avatar" aria-hidden="true">{user.displayName.slice(0,1)}</span>
            <span className="org-user-name">{user.displayName}</span>
+           <span className="org-member-mobile-meta" title={loginOf(user)}>{loginOf(user)||"—"} · {departmentLabel(user.departmentId)}</span>
           </div>
          </td>
-         <td>
+         <td className="org-member-optional">
           <code className="org-user-login">{loginOf(user)||"—"}</code>
          </td>
-         <td title={user.departmentId&&!deptById.has(user.departmentId)?user.departmentId:undefined}>
+         <td className="org-member-optional" title={user.departmentId&&!deptById.has(user.departmentId)?user.departmentId:undefined}>
           <span className="org-dept-tag">{departmentLabel(user.departmentId)}</span>
          </td>
          <td>
@@ -871,17 +876,17 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
            {user.disabled!==true&&<RareBadge tone="success" dot>正常</RareBadge>}
           </span>
          </td>
-         <td className="row-actions">
+         <td className="org-member-actions"><RareRowActions>
           <RareButton type="button" onClick={()=>{setNotice(null);setResetTarget(user);}}>重置密码</RareButton>
           {user.id===currentUserId
            ?<RareButton type="button" disabled title="不能对当前登录账号执行禁用">禁用</RareButton>
            :<RareButton type="button" tone={user.disabled===true?"neutral":"danger"} className={user.disabled===true?"org-btn-enable":"danger"}
              onClick={()=>{setNotice(null);setStateTarget(user);}}>{user.disabled===true?"启用":"禁用"}</RareButton>}
-         </td>
+         </RareRowActions></td>
         </tr>)}
         {filteredMembers.length===0&&<tr><td colSpan={5} className="empty">{memberTableEmpty}</td></tr>}
        </tbody>
-      </table>
+      </RareDataTable>
      </div>
      {filteredMembers.length>memberLimit&&<div className="org-list-more">
       <span className="hint">已显示 {memberLimit} / {filteredMembers.length} 位成员</span>
@@ -891,14 +896,15 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
      </div>}
 
 
-     {/* 快速添加成员卡片 */}
+    </div>}
+    {createFormOpen&&<Dialog open title="新增成员" className="org-create-user-dialog" initialFocus="#org-new-login" onClose={()=>setCreateFormOpen(false)}>
      <div className="org-create-user-card">
       <div className="org-create-user-head">
        <div className="org-create-user-title">
         <IconPlus/>
         <span>快速添加新成员</span>
        </div>
-       <span className="hint">密码至少 16 位，创建后即可登录</span>
+       <span className="hint">初始密码至少 16 位</span>
       </div>
       <form className="inline-form org-form org-create-form" onSubmit={submitCreateUser}>
        <div className="org-field">
@@ -924,10 +930,11 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
          {departmentOptions.map(option=><option key={option.id} value={option.id}>{option.label}</option>)}
         </RareSelect>
        </div>
-       <RareButton className="primary" tone="primary" type="submit" disabled={!canCreateUser}>创建用户</RareButton>
+       <div className="dialog-actions org-create-form-actions"><RareButton type="button" onClick={()=>setCreateFormOpen(false)}>取消</RareButton>
+        <RareButton className="primary" tone="primary" type="submit" disabled={!canCreateUser}>核对并创建</RareButton></div>
       </form>
      </div>
-    </div>}
+    </Dialog>}
 
     {/* Tab 2: 工作组管理（Master-Detail 双栏结构） */}
     {activeTab==="groups"&&<div className="org-groups-stage" role="tabpanel" id="org-panel-groups" aria-labelledby="org-tab-groups">
@@ -1085,7 +1092,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    onClose={()=>setRemoveTarget(null)} onSubmit={removeMember}/>}
   {createUserOpen&&<CreateUserConfirmDialog draft={{login:newUser.login.trim(),displayName:newUser.displayName.trim()}}
    department={departmentLabel(newUser.departmentId)}
-   onClose={()=>setCreateUserOpen(false)} onSubmit={createUser}/>}
+   onClose={()=>{setCreateUserOpen(false);if(newUser.login.trim())setCreateFormOpen(true);}} onSubmit={createUser}/>}
   {createDepartmentOpen&&<CreateDepartmentDialog options={departmentOptions} defaultParentId={deptFilter}
    listAvailable={departmentsReady}
    onClose={()=>setCreateDepartmentOpen(false)} onSubmit={createDepartment}/>}

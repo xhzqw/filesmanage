@@ -37,7 +37,7 @@
 .perm-result.selected,.perm-result[aria-current="true"]{background:var(--surface-row-selected);color:var(--brand-blue)}
 .perm-result small{font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 
-.perm-detail{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;background:var(--surface-canvas)}
+.perm-detail{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;background:var(--surface-canvas);container:perm-panel / inline-size}
 .perm-detail-heading{flex:none;min-height:63px;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 18px;border-bottom:1px solid var(--border-hairline);background:var(--surface-panel)}
 .perm-heading-copy{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-width:0}
 .perm-eyebrow{color:var(--text-secondary);font-size:11px}
@@ -47,18 +47,18 @@
 .perm-heading-actions a{color:var(--brand-blue);text-decoration:none;white-space:nowrap}
 .perm-heading-actions a:hover{text-decoration:underline}
 .perm-heading-actions .rare-button{min-height:34px}
-.perm-detail-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(370px,.78fr);align-items:start;gap:12px;padding:12px;flex:1;min-height:0;min-width:0;overflow:hidden}
+.perm-detail-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(330px,.78fr);align-items:start;gap:8px;padding:8px;flex:1;min-height:0;min-width:0;overflow:hidden}
 .perm-inspection-column{display:flex;flex-direction:column;gap:14px;min-width:0;min-height:0;overflow:auto;padding:1px 2px 2px}
 .perm-card{display:flex;flex-direction:column;min-width:0;flex:none;background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-md);box-shadow:var(--shadow-panel);overflow:hidden}
 .perm-card-grants{min-height:0}
 .perm-compose-card{min-height:0;max-height:100%;flex:none;overflow:auto}
-.perm-section-title{display:flex;gap:9px;align-items:center;justify-content:flex-start;font-weight:650;font-size:14px;color:var(--text-primary);background:var(--surface-header);border-bottom:1px solid var(--border-hairline);padding:10px 15px;min-height:42px}
+.perm-section-title{display:flex;gap:7px;align-items:center;justify-content:flex-start;font-weight:650;font-size:12px;color:var(--text-primary);background:var(--surface-header);border-bottom:1px solid var(--border-hairline);padding:6px 10px;min-height:34px}
 .perm-count{background:var(--surface-row-selected);border-radius:var(--radius-sm);font-size:12px;color:var(--brand-blue);padding:2px 7px;font-weight:600}
 .perm-hint{font-size:12px;color:var(--text-secondary);line-height:1.55;padding:13px 17px;margin:0}
 .perm-grants-scroller{max-height:45vh;min-height:0;min-width:0;max-width:100%;overflow:auto}
 .perm-table{width:100%;border-collapse:collapse;font-size:13px}
-.perm-table th,.perm-table td{text-align:left;border-bottom:1px solid var(--border-hairline);padding:12px 11px;vertical-align:middle;line-height:1.4}
-.perm-table th{font-size:12px;white-space:nowrap;color:var(--text-secondary);background:var(--surface-subtle);position:sticky;top:0}
+.perm-table th,.perm-table td{text-align:left;border-bottom:1px solid var(--border-hairline);padding:6px 8px;vertical-align:middle;line-height:1.4}
+.perm-table th{font-size:11px;height:32px;white-space:nowrap;color:var(--text-secondary);background:var(--surface-subtle);position:sticky;top:0}
 .perm-table td small{display:block;font-size:11px;color:var(--text-secondary);margin-top:3px}
 .perm-table tbody tr:last-child td{border-bottom:0}
 .perm-table .danger{min-height:30px;white-space:nowrap}
@@ -68,7 +68,7 @@
 .perm-empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:24px;text-align:center;gap:10px}
 .perm-empty-state strong{font-size:17px}
 .perm-empty-state p{color:var(--text-secondary);max-width:360px;line-height:1.6;margin:0}
-.perm-form{padding:14px 15px;display:flex;flex-direction:column;gap:14px;font-size:13px}
+.perm-form{padding:10px 12px;display:flex;flex-direction:column;gap:10px;font-size:12px}
 .perm-form-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
 .perm-form-row label{min-width:0;display:flex;flex-direction:column;gap:7px;font-weight:550;color:var(--text-primary);font-size:12px}
 .perm-form-row .rare-select-root,.perm-insight-picker .rare-select-root{width:100%}
@@ -138,7 +138,7 @@
 .org-compact-permissions .perm-compose-card{max-height:none;overflow:visible}
 .org-compact-permissions .perm-audit{flex:none;max-height:75vh;min-height:260px}
 
-@media(max-width:1380px){
+@container perm-panel (max-width:750px){
  .perm-detail-layout{grid-template-columns:minmax(0,1fr);overflow:auto;align-content:start}
  .perm-inspection-column{overflow:visible}
  .perm-compose-card{flex:none;overflow:visible}
@@ -168,4 +168,75 @@
  .perm-form{padding:12px}
  .perm-form-row{grid-template-columns:minmax(0,1fr)}
  .perm-action-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+/* Direct ACLs use the same Rare table + action contract as other workbenches.
+   The data pane decides column priority independently of the viewport. */
+.perm-grants-scroller{container:acl-list / inline-size}
+.perm-grants-table{table-layout:fixed;border-collapse:separate;border-spacing:0}
+.perm-grants-table th:first-child{width:31%}
+.perm-grants-table th:nth-child(2){width:26%}
+.perm-grants-table th:nth-child(3){width:15%}
+.perm-grants-table th:nth-child(4){width:18%}
+.perm-grants-table th:last-child{width:10%}
+.perm-grants-table td{height:40px;overflow:hidden;text-overflow:ellipsis}
+.perm-grant-subject strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.perm-grant-subject small{margin-top:2px}
+.perm-grant-actions{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.perm-grant-mobile-expiry{display:none}
+.perm-grant-controls{text-align:right}
+.perm-grant-controls .rare-row-actions{justify-content:flex-end;width:100%}
+.perm-grant-controls .rare-button{height:26px;min-height:26px;padding:0 5px;font-size:11px}
+@container acl-list (max-width:740px){
+ .perm-grants-table .perm-grant-optional{display:none}
+ .perm-grants-table th:first-child{width:43%}
+ .perm-grants-table th:nth-child(2){width:auto}
+ .perm-grants-table th:last-child{width:68px}
+ .perm-grant-mobile-expiry{display:inline}
+}
+@container acl-list (max-width:400px){
+ .perm-grants-table th:first-child{width:47%}
+ .perm-grants-table th:last-child{width:62px}
+ .perm-grant-actions{font-size:11px}
+}
+
+/* Management-role workspace follows the same list/editor split as ACLs. */
+.org-role-workbench{padding:8px;background:var(--surface-canvas)}
+.org-role-workbench>.perm-section-title{border:1px solid var(--border-hairline);border-radius:var(--radius-sm)}
+.org-role-explanation{flex:none;font-size:11px;color:var(--text-secondary);padding:5px 3px}
+.org-role-explanation summary{cursor:pointer;width:max-content}
+.org-role-explanation p{margin:5px 0 0;line-height:1.5}
+.org-role-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.7fr);gap:8px;min-width:0;min-height:0;align-items:start;flex:1}
+.org-role-list,.org-role-editor{display:flex;flex-direction:column;min-width:0;min-height:0;border:1px solid var(--border-hairline);border-radius:var(--radius-md);background:var(--surface-panel);overflow:hidden}
+.org-role-scroll{max-height:min(60vh,530px);overflow:auto;container:roles / inline-size}
+.org-role-table{table-layout:fixed}
+.org-role-table th:first-child{width:21%}
+.org-role-table th:nth-child(2){width:20%}
+.org-role-table th:nth-child(3){width:17%}
+.org-role-table th:nth-child(4){width:18%}
+.org-role-table th:nth-child(5){width:13%}
+.org-role-table th:last-child{width:11%}
+.org-role-table td{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.org-role-table .org-role-user{font-weight:550}
+.org-role-mobile-meta{display:none}
+.org-role-actions{text-align:right}
+.org-role-actions .rare-row-actions{justify-content:flex-end;flex-wrap:wrap}
+.org-role-actions .rare-button{min-height:25px;height:25px;padding:0 4px;font-size:11px}
+.org-role-editor .perm-form-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+.org-role-editor .perm-form-row :is(.rare-input,.rare-select-root){min-width:0;width:100%}
+.org-role-editor .perm-form-row .rare-select{max-width:100%}
+@container roles (max-width:760px){
+ .org-role-table .org-role-optional{display:none}
+ .org-role-table th:first-child{width:auto}
+ .org-role-table th:nth-child(2){width:125px}
+ .org-role-table th:last-child{width:112px}
+ .org-role-mobile-meta{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:400;font-size:10px;color:var(--text-secondary)}
+ .org-role-table td{height:44px}
+}
+@container perm-panel (max-width:830px){
+ .org-role-layout{grid-template-columns:minmax(0,1fr)}
+ .org-role-scroll{max-height:40vh}
+}
+@media(max-width:650px){
+ .org-role-editor .perm-form-row{grid-template-columns:minmax(0,1fr)}
 }

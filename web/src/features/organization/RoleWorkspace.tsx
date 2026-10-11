@@ -1,4 +1,4 @@
-import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
+import {RareBadge,RareButton,RareDataTable,RareInput,RareRowActions,RareSelect} from "../../shared/ui/rare";
 import {useEffect,useState,type FormEvent} from "react";
 import type {User} from "../../entities/user/model";
 import {request} from "../../shared/http";
@@ -74,24 +74,27 @@ export function RoleBindingsPanel({users}:{users:User[]}){
   catch(e){setError(errorCopy(e,"撤销角色失败"));}
   finally{setBusy(false);}
  }
- return <section className="perm-detail" aria-label="管理角色绑定" style={{padding:16}}>
-  <div className="perm-section-title">管理角色委派 <span className="perm-subtle">仅系统管理员可调整</span></div>
-  <p className="perm-hint">审计员只读权限审计，不获得文件访问权。目录权限管理员只在指定目录管理指定动作的直接 ACL，不能向自己授权，不能授予子树继承。</p>
+ return <section className="perm-detail org-role-workbench" aria-label="管理角色绑定">
+  <div className="perm-section-title">管理角色 <span className="perm-subtle">仅系统管理员可调整</span></div>
+  <details className="org-role-explanation"><summary>角色权限说明</summary><p>审计员只读权限审计，不获得文件访问权。目录权限管理员只在指定目录管理指定动作的直接 ACL，不能向自己授权，不能授予子树继承。</p></details>
   {error&&<p role="alert" className="notice error">{error}</p>}
-  <div className="perm-grants-scroller"><table className="perm-table">
-   <thead><tr><th>账号</th><th>角色</th><th>目录范围</th><th>可管理动作</th><th>有效期</th><th>操作</th></tr></thead>
+  <div className="org-role-layout"><section className="org-role-list" aria-label="已有角色委派">
+  <div className="perm-section-title">已委派 <span className="perm-count">{items.length}</span></div>
+  <div className="perm-grants-scroller org-role-scroll"><RareDataTable className="perm-table org-role-table">
+   <thead><tr><th>账号</th><th>角色</th><th className="org-role-optional">目录范围</th><th className="org-role-optional">可管理动作</th><th className="org-role-optional">有效期</th><th>操作</th></tr></thead>
    <tbody>{items.map(b=><tr key={b.id}>
-    <td>{userName(b.userId)}</td><td>{roleName(b.role)}</td>
-    <td>{b.scopeId||"全局审计"}</td>
-    <td>{b.allowedActions.map(actionName).join("、")||"只读"}</td>
-    <td>{b.expiresAt?new Date(b.expiresAt).toLocaleString():"不过期"}</td>
-    <td>{confirmRevoke===b.id
+    <td className="org-role-user" title={userName(b.userId)}>{userName(b.userId)}<small className="org-role-mobile-meta">{b.scopeId||"全局审计"} · {b.allowedActions.map(actionName).join("、")||"只读"}</small></td>
+    <td><RareBadge tone={b.role==="auditor"?"neutral":"info"}>{roleName(b.role)}</RareBadge></td>
+    <td className="org-role-optional" title={b.scopeId||"全局审计"}>{b.scopeId||"全局审计"}</td>
+    <td className="org-role-optional">{b.allowedActions.map(actionName).join("、")||"只读"}</td>
+    <td className="org-role-optional rare-data-date">{b.expiresAt?new Date(b.expiresAt).toLocaleString():"不过期"}</td>
+    <td className="org-role-actions"><RareRowActions>{confirmRevoke===b.id
      ?<><RareButton className="danger" type="button" disabled={busy} onClick={()=>void revoke(b.id)}>确认撤销</RareButton>
         <RareButton type="button" onClick={()=>setConfirmRevoke("")}>取消</RareButton></>
-     :<RareButton className="danger" type="button" onClick={()=>setConfirmRevoke(b.id)}>撤销</RareButton>}</td>
+     :<RareButton className="danger" type="button" onClick={()=>setConfirmRevoke(b.id)}>撤销</RareButton>}</RareRowActions></td>
    </tr>)}</tbody>
-  </table>{items.length===0&&<p className="empty">暂无委派角色。</p>}</div>
-  <div className="perm-section-title">新增角色委派</div>
+  </RareDataTable>{items.length===0&&<p className="empty">暂无委派角色。</p>}</div></section>
+  <section className="org-role-editor" aria-label="新增角色委派"><div className="perm-section-title">新增委派</div>
   <form className="perm-form" onSubmit={create} onChange={()=>setReview(false)}>
    <div className="perm-form-row">
     <label>委派给账号<RareSelect required value={userId} onChange={e=>{setUserId(e.target.value);setReview(false);}}>
@@ -127,6 +130,7 @@ export function RoleBindingsPanel({users}:{users:User[]}){
     <RareButton type="submit" className="primary" disabled={!valid||busy}>{busy?"提交中…":review?"确认委派":"预览委派"}</RareButton>
    </div>
   </form>
+  </section></div>
  </section>;
 }
 
