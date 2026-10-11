@@ -1,16 +1,19 @@
-import {type HTMLAttributes,type TableHTMLAttributes} from "react";
-import "./dataTable.css";
-
-/** Shared semantic data table. Feature-owned column widths and keyboard/selection
- * semantics remain untouched (file grid uses a separate ARIA grid contract). */
-export function RareDataTable({className="",density="compact",...props}:TableHTMLAttributes<HTMLTableElement>&{
- density?:"compact"|"standard";
-}){
- return <table {...props} data-rare-table="" data-rare-density={density}
-  className={"rare-data-table"+(className?" "+className:"")}/>;
+/* Rare data-list primitives. Low-specificity defaults let feature-owned
+   column widths, selection semantics and narrow-pane rules take precedence. */
+.rare-data-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+.rare-data-table :where(th){
+ height:var(--height-table-header);padding:0 var(--space-2);
+ background:var(--surface-header);font-size:11px;color:var(--text-secondary);
+ font-weight:600;white-space:nowrap;text-align:left;
 }
-
-/** Put inside <td>; never apply flex/display to the table-cell itself. */
-export function RareRowActions({className="",...props}:HTMLAttributes<HTMLDivElement>){
- return <div {...props} className={"rare-row-actions"+(className?" "+className:"")}/>;
+.rare-data-table :where(td){
+ height:var(--height-row-standard);padding:4px var(--space-2);
+ border-bottom:1px solid var(--border-hairline);vertical-align:middle;font-size:12px;
 }
+.rare-data-table :where(tbody tr:last-child td){border-bottom:0}
+.rare-data-table :where(tbody tr:hover){background:var(--surface-row-hover)}
+.rare-data-table[data-rare-density="standard"] :where(td){height:40px}
+.rare-data-table .rare-data-primary{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rare-data-table .rare-data-date{font-variant-numeric:tabular-nums;color:var(--text-secondary)}
+.rare-row-actions{display:inline-flex;align-items:center;justify-content:flex-end;gap:3px;max-width:100%;white-space:nowrap}
+.rare-row-actions :where(.rare-button){min-height:26px;height:26px;padding:0 7px;font-size:11px}
