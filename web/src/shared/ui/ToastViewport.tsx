@@ -6,18 +6,24 @@ import "./toast.css";
 
 function ToastRow({item}:{item:ToastItem}){
  const[paused,setPaused]=useState(false);
+ const[hidden,setHidden]=useState(()=>document.hidden);
  const remaining=useRef(item.duration);
  const timerIdentity=useRef({id:item.id,revision:item.revision});
+ useEffect(()=>{
+  const sync=()=>setHidden(document.hidden);
+  document.addEventListener("visibilitychange",sync);
+  return()=>document.removeEventListener("visibilitychange",sync);
+ },[]);
  useEffect(()=>{
   if(timerIdentity.current.id!==item.id||timerIdentity.current.revision!==item.revision){
    timerIdentity.current={id:item.id,revision:item.revision};
    remaining.current=item.duration;
   }
-  if(!item.duration||paused)return;
+  if(!item.duration||paused||hidden)return;
   const start=Date.now();
   const handle=window.setTimeout(()=>toast.dismiss(item.id),remaining.current);
   return()=>{window.clearTimeout(handle);remaining.current=Math.max(0,remaining.current-(Date.now()-start));};
- },[item.id,item.duration,item.revision,paused]);
+ },[item.id,item.duration,item.revision,paused,hidden]);
  return <div className="rare-toast" data-toast-tone={item.tone}
   role={item.tone==="danger"?"alert":"status"}
   onMouseEnter={()=>setPaused(true)} onMouseLeave={()=>setPaused(false)}

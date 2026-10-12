@@ -1,4 +1,6 @@
 import {useEffect,useId,useRef,type ReactNode,type KeyboardEvent}from "react";
+import {RareButton} from "./rare";
+import "./dialog.css";
 
 // Real modal dialog primitive (DESIGN-SYSTEM-v1 §4.2 / DESKTOP-INTERACTION §4.1).
 // Built on the native <dialog>.showModal() top layer: the background is inert,
@@ -93,15 +95,22 @@ export function Dialog({open,title,onClose,closeGuard,initialFocus,className,chi
 
  return <dialog ref={node} className={"dialog "+(className??"")} aria-labelledby={titleId}
   onKeyDown={onDialogKeyDown} tabIndex={-1}>
-  <h2 id={titleId} className="dialog-title">{title}</h2>
+  <div className="dialog-header">
+   <h2 id={titleId} className="dialog-title">{title}</h2>
+   <RareButton type="button" tone="ghost" className="dialog-close" aria-label="关闭弹窗"
+    onClick={()=>{if(!closeGuard||closeGuard())onClose();}}>
+    <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false" width="16" height="16"
+     fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M5 5l10 10M15 5 5 15"/></svg>
+   </RareButton>
+  </div>
   {children}
  </dialog>;
 }
 
 function firstFocusable(root:HTMLElement):HTMLElement|null{
- const candidates=root.querySelectorAll<HTMLElement>("input:not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]),[href],[tabindex]:not([tabindex='-1'])");
+ const candidates=root.querySelectorAll<HTMLElement>("input:not([disabled]):not([type='hidden']),select:not([disabled]),textarea:not([disabled]),button:not([disabled]):not(.dialog-close),[href],[tabindex]:not([tabindex='-1'])");
  for(const candidate of candidates){
-  if(candidate.tabIndex>=0)return candidate;
+  if(candidate.tabIndex>=0&&candidate.getClientRects().length>0)return candidate;
  }
  return null;
 }

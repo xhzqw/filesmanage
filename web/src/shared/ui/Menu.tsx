@@ -1,5 +1,6 @@
 import {RareButton} from "./rare";
 import {useEffect,useLayoutEffect,useRef,useState,type KeyboardEvent}from "react";
+import {createPortal} from "react-dom";
 import "./menu.css";
 
 export type MenuItem={
@@ -143,7 +144,7 @@ export function Menu({open,onClose,items,anchor,label,point}:{
  }
 
  if(!open)return null;
- return <div ref={node} className="menu" role="menu" aria-label={label} aria-orientation="vertical"
+ const content=<div ref={node} className="menu" role="menu" aria-label={label} aria-orientation="vertical"
   tabIndex={-1}
   style={{left:position?position.left:0,top:position?position.top:0,opacity:position?1:0}}
   onKeyDown={onKeyDown}
@@ -158,6 +159,9 @@ export function Menu({open,onClose,items,anchor,label,point}:{
    {item.hint&&<span className="menu-hint">{item.hint}</span>}
   </RareButton>)}
  </div>;
+ // Render above scrollable tables and folder trees. Inside a native modal,
+ // the portal must remain in its top layer rather than behind the scrim.
+ return createPortal(content,anchor?.closest("dialog[open]")??document.body);
 }
 
 function enabledItems(root:HTMLElement|null):HTMLButtonElement[]{

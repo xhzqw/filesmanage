@@ -11,6 +11,7 @@
 .rare-toast-mark{display:grid;place-items:center;flex:none;width:18px;height:18px;color:var(--toast-accent)}
 .rare-toast-mark svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .rare-toast-text{flex:1;min-width:0;padding-top:1px;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.rare-toast:focus-within{border-color:var(--border-focus)}
 .rare-toast .rare-toast-close{display:grid;place-items:center;flex:none;padding:3px;width:22px;height:22px;min-height:22px;
  color:var(--text-secondary);border:0;background:transparent;border-radius:var(--radius-xs)}
 .rare-toast .rare-toast-close:hover{background:var(--surface-subtle);color:var(--text-primary)}
@@ -19,5 +20,5 @@
  border-top-color:var(--brand-blue);border-radius:50%;animation:rare-toast-spin .85s linear infinite}
 @keyframes rare-toast-spin{to{transform:rotate(360deg)}}
 @keyframes rare-toast-enter{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
-@media(max-width:600px){.rare-toast-viewport{top:calc(var(--height-header) + 8px);right:12px}}
+@media(max-width:600px){.rare-toast-viewport{top:calc(var(--height-header) + 8px);right:12px;width:min(360px,calc(100vw - 24px))}}
 @media(prefers-reduced-motion:reduce){.rare-toast,.rare-toast-spinner{animation:none}}

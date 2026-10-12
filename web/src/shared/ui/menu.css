@@ -9,3 +9,8 @@
 .menu-item.danger:focus-visible{outline-color:var(--color-danger)}
 .menu-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .menu-hint{color:var(--color-text-secondary);font-size:11px;white-space:nowrap}
+/* Rare UI-inspired restrained popup motion; geometry remains on shared tokens. */
+@keyframes rare-menu-enter{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:translateY(0)}}
+.menu{animation:rare-menu-enter .12s cubic-bezier(.22,1,.36,1)}
+.menu-item[aria-disabled="true"]{opacity:.65}
+@media(prefers-reduced-motion:reduce){.menu{animation:none}}

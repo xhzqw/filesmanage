@@ -35,6 +35,8 @@
 .rare-select-label.placeholder{color:var(--text-tertiary)}
 .rare-select-chevron{height:14px;width:14px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .rare-select-menu{position:fixed;z-index:21000;display:flex;flex-direction:column;overflow:hidden;border-radius:var(--radius-sm);background:var(--surface-panel);border:1px solid var(--border-subtle);box-shadow:var(--shadow-panel);padding:4px}
+.rare-select-menu{animation:rare-select-enter .12s cubic-bezier(.22,1,.36,1)}
+@keyframes rare-select-enter{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:translateY(0)}}
 .rare-select-search{padding:3px 3px 7px}
 .rare-select-search input{width:100%;height:30px;padding:0 8px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm)}
 .rare-select-options{overflow:auto;min-height:0}
@@ -43,7 +45,10 @@
 .rare-select-option:hover,.rare-select-option.highlighted{background:var(--surface-row-hover)}
 .rare-select-option[aria-selected="true"]{background:var(--surface-row-selected);color:var(--brand-blue);font-weight:600}
 .rare-select-option:disabled{opacity:.4;cursor:not-allowed}
+.rare-select-option:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px}
+.rare-select-check{flex:none;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .rare-select-empty{padding:8px;color:var(--text-secondary);margin:0}
+@media(prefers-reduced-motion:reduce){.rare-select-menu{animation:none}}
 @media(prefers-reduced-motion:reduce){.rare-button,.rare-button:active:not(:disabled){transform:none;transition:none}}
 .rare-tab-panel{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;overflow:hidden}
 .rare-tabs[data-rare-tabs]{position:relative;isolation:isolate}
