@@ -59,5 +59,15 @@ try{
   chrome.kill("SIGTERM");
   await Promise.race([finished,sleep(1500)]);
  }
- rmSync(profile,{recursive:true,force:true,maxRetries:10,retryDelay:150});
+ // Chromium child processes can keep writing into the profile briefly
+ // after the browser process exits. Cleanup must not mask UI assertions.
+ await sleep(250);
+ for(let attempt=0;attempt<5;attempt++){
+  try{rmSync(profile,{recursive:true,force:true,maxRetries:5,retryDelay:120});break;}
+  catch(error){
+   if(!["ENOTEMPTY","EBUSY"].includes(error?.code))throw error;
+   if(attempt===4)console.warn("Chrome profile cleanup deferred");
+   else await sleep(200);
+  }
+ }
 }
