@@ -56,4 +56,12 @@ try{
  assert.equal(multi.ids,2);assert.equal(multi.count,"+1");assert.equal(multi.parts,2);
  console.log("DRAG_PREVIEW_READONLY_PASS: filename ghost, count badge, row reduction, target motion, cancel");
 }catch(error){console.error("DRAG_PREVIEW_READONLY_FAIL",error.message);process.exitCode=1;
-}finally{ws?.close();chrome.kill("SIGTERM");rmSync(profile,{recursive:true,force:true,maxRetries:2});}
+}finally{
+ ws?.close();
+ if(chrome.exitCode===null){
+  const finished=new Promise(resolve=>chrome.once("exit",resolve));
+  chrome.kill("SIGTERM");
+  await Promise.race([finished,sleep(1500)]);
+ }
+ rmSync(profile,{recursive:true,force:true,maxRetries:10,retryDelay:150});
+}
