@@ -764,8 +764,14 @@ async function moveUiSuite() {
       const trigger=document.querySelector(".file-more-trigger");
       if(!menu||!trigger)return null;
       const m=menu.getBoundingClientRect(),t=trigger.getBoundingClientRect();
-      return {upward:m.bottom<=t.top+2,inline:menu.closest('.file-workbench-side-actions')!==null,
-       items:[...menu.querySelectorAll('button,a')].map(b=>b.textContent?.trim())};
+      const items=[...menu.querySelectorAll('button,a')];
+      const lastBottom=items.length?Math.max(...items.map(el=>el.getBoundingClientRect().bottom)):m.bottom;
+      // The expansion container intentionally includes bottom padding.
+      // Check the clickable items rather than treating that padding as overlap.
+      return {upward:m.top<t.top&&lastBottom<=t.top+2,inline:menu.closest('.file-workbench-side-actions')!==null,
+       expansionTop:m.top,expansionBottom:m.bottom,triggerTop:t.top,triggerBottom:t.bottom,
+       lastActionBottom:lastBottom,panelHeight:menu.closest('.file-workbench-side-actions')?.getBoundingClientRect().height,
+       items:items.map(b=>b.textContent?.trim())};
      })()`);
      check("preview More expands inline above anchor and retains operations",moreReady===true&&expansionGeometry?.upward===true&&expansionGeometry?.inline===true&&expansionGeometry.items.includes("移动文件"),JSON.stringify(expansionGeometry));
      await cdp.evaluate(`(()=>{document.querySelector(".file-more-trigger")?.click();return true;})()`);
