@@ -19,7 +19,10 @@ assert(item?.id,"DO05 fixture must be present for DOCX layout check");
 const probe=await fetch(base+"/api/files/"+encodeURIComponent(item.id)+"/preview/office-pdf",{headers:{Cookie:cookie},signal:AbortSignal.timeout(35000)});
 assert.equal(probe.status,200,"DOCX derivative must be available");
 assert.match(probe.headers.get("content-type")??"",/^application\/pdf/);
-assert.equal(Buffer.from(await probe.arrayBuffer()).subarray(0,5).toString(),"%PDF-");
+const pdfBytes=Buffer.from(await probe.arrayBuffer());
+assert.equal(pdfBytes.subarray(0,5).toString(),"%PDF-");
+assert.equal(Number(probe.headers.get("content-length")),pdfBytes.byteLength,
+ "DOCX derivative must expose a trustworthy transfer length");
 console.log("PASS DOCX derivative produces a real PDF");
 
 const profile=mkdtempSync(join(tmpdir(),"fm-docx-check-"));

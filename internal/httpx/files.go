@@ -262,6 +262,9 @@ func (h *Handler) previewOfficePDF(c *gin.Context) {
 	c.Header("X-Content-Type-Options", "nosniff")
 	c.Header("Cross-Origin-Resource-Policy", "same-origin")
 	c.Header("Content-Security-Policy", "sandbox")
+	// The completed derivative is fully buffered here. Give the browser a
+	// trustworthy byte total for bounded streaming and progress display.
+	c.Header("Content-Length", strconv.Itoa(len(pdf)))
 	c.Data(200, "application/pdf", pdf)
 }
 
