@@ -15,6 +15,12 @@ type DurableEventStore interface {
 	RealtimeAfter(context.Context, string, int64, int) ([]domain.RealtimeEvent, error)
 }
 
+// Instance-level reads, unlike end-user replay, contain private recipients
+// for revocation-cache invalidation. Never expose them via HTTP/WebSocket.
+type DurableInstanceFeed interface {
+	RealtimeFeedAfter(context.Context, int64, int) ([]domain.RealtimeEvent, error)
+}
+
 func (s *Service) WithDurableEvents(store DurableEventStore) *Service {
 	s.durable = store
 	return s
@@ -26,6 +32,13 @@ func (s *Service) DurableEvents() DurableEventStore { return s.durable }
 // soon as that replica observes the shared DB journal. The REST ACL checks
 // remain authoritative independently of the event hint.
 func (s *Service) InvalidateFromDurableEvent(event domain.RealtimeEvent) {
+	if event.Type == "session.changed" && event.UserID != "" {
+		// Evict revocations originating on other API replicas; prevent old
+		// in-flight DB reads from populating a now-revoked cached session.
+		s.aclEpoch.Add(1)
+		s.session.dropUser(event.UserID)
+		return
+	}
 	if event.Type != "workspace.changed" {
 		return
 	}
@@ -42,32 +55,70 @@ func (s *Service) InvalidateFromDurableEvent(event domain.RealtimeEvent) {
 	}
 }
 
+func (s *Service) invalidateAllReplicaCaches() {
+	s.aclEpoch.Add(1)
+	s.search.invalidate()
+	s.stats.invalidate()
+	s.session.invalidate()
+}
+
 // WatchDurableCache synchronizes *server-side* caches even when this replica
 // currently has no WebSocket clients. Live sockets still own per-user replay;
-// this watcher reads only public anonymous invalidations and never holds
-// private user events. Start it once per API process.
+// this watcher reads recipient identities only to invalidate session caches,
+// never exposing private events through the browser. Start once per process.
 func (s *Service) WatchDurableCache(ctx context.Context) {
+	s.watchDurableCache(ctx, 2*time.Second)
+}
+
+func (s *Service) watchDurableCache(ctx context.Context, interval time.Duration) {
 	if s.durable == nil {
 		return
 	}
-	_, cursor, err := s.durable.RealtimeBounds(ctx)
-	if err != nil {
-		log.Printf("realtime cache observer startup failed: %v", err)
+	feed, ok := s.durable.(DurableInstanceFeed)
+	if !ok {
+		log.Printf("realtime cache observer cannot follow private session revocations")
 		return
 	}
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
+	var cursor int64
+	initialized := false
+	broken := false
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			for {
-				events, err := s.durable.RealtimeAfter(ctx, "", cursor, 256)
+			oldest, newest, err := s.durable.RealtimeBounds(ctx)
+			if err != nil {
+				if ctx.Err() != nil {
+					return
+				}
+				broken = true
+				log.Printf("realtime cache observer bounds retry: %v", err)
+				continue
+			}
+			if !initialized {
+				cursor = newest
+				initialized = true
+				s.invalidateAllReplicaCaches()
+				continue
+			}
+			if broken || cursor > newest || (oldest > 0 && cursor < oldest-1) {
+				// Pruning, a DB restore, or an outage may make events
+				// unreplayable. Never keep stale session/authorization caches.
+				s.invalidateAllReplicaCaches()
+				cursor = newest
+				broken = false
+				continue
+			}
+			for page := 0; page < 8; page++ {
+				events, err := feed.RealtimeFeedAfter(ctx, cursor, 256)
 				if err != nil {
 					if ctx.Err() != nil {
 						return
 					}
+					broken = true
 					log.Printf("realtime cache observer retry: %v", err)
 					break
 				}

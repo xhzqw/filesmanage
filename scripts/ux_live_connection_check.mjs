@@ -16,7 +16,7 @@ const intervals=new Map();
 let nextId=10000;
 browser.location={protocol:"http:",host:"files.local:18091"};
 const cursorStore=new Map();
-browser.localStorage={
+browser.sessionStorage={
  getItem:key=>cursorStore.get(key)??null,
  setItem:(key,value)=>cursorStore.set(key,value),
 };
@@ -148,6 +148,19 @@ resumed.message({type:"connection.ready",version:3,resync:false,cursor:"32"});
 await new Promise(resolve=>realSetTimeout(resolve,170));
 assert.equal(cursorStore.get("fm-live-cursor-v3:u_replay"),"32");
 stop4();
+// A second browser tab must not inherit the first tab's applied bookmark.
+// sessionStorage is tab-local, unlike localStorage, so it must reconnect
+// without a cursor and reconcile all visible state instead.
+const tabAStorage=browser.sessionStorage;
+browser.sessionStorage={
+ getItem:()=>null,
+ setItem:()=>{},
+};
+const stopOtherTab=imported.connectSessionEvents(()=>{},"u_replay");
+const otherTab=FakeSocket.instances.at(-1);
+assert.ok(!otherTab.url.includes("cursor="),"separate tabs must never share replay progress");
+stopOtherTab();
+browser.sessionStorage=tabAStorage;
 browser.removeEventListener("filesmanage:workspace-changed",onWorkspace);
 assert.equal(pendingLong.size,0);
 assert.equal(intervals.size,0);

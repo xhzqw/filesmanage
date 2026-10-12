@@ -152,6 +152,12 @@ func (c *sessionCache) dropUser(userID string) {
 	}
 }
 
+func (c *sessionCache) invalidate() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries = nil
+}
+
 // searchCache memoises search pages for a shorter TTL than the dashboard
 // aggregates: a freshly uploaded file must not be missing from results for
 // long, so the staleness window is deliberately tighter.

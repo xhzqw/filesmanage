@@ -129,7 +129,10 @@ func (h *Handler) streamLiveEvents(req *http.Request, ws *websocket.Conn, userID
 			return false
 		}
 		if err != nil {
-			return send(map[string]any{"type": "server.unavailable"})
+			// A temporary inability to validate credentials is not proof
+			// the session is revoked, but it must not allow delivery either.
+			send(map[string]any{"type": "server.unavailable"})
+			return false
 		}
 		h.S.TouchActiveSession(req.Context(), token)
 		return true
@@ -153,8 +156,7 @@ func (h *Handler) streamLiveEvents(req *http.Request, ws *websocket.Conn, userID
 		// If the client has no bookmark, it must reconcile all visible state;
 		// replaying the full lifetime of the journal would be unnecessary.
 		// Expired, invalid or future bookmarks likewise require a full resync.
-		resync := resumeCursor == 0 || resumeCursor > newest ||
-			(oldest > 0 && resumeCursor < oldest-1)
+		resync := resumeCursor == 0 || replayCursorExpired(resumeCursor, oldest, newest)
 		if resync {
 			resumeCursor = newest
 		}
@@ -225,9 +227,32 @@ func (h *Handler) streamLiveEvents(req *http.Request, ws *websocket.Conn, userID
 			if !checkSession() {
 				return
 			}
+			if store != nil {
+				// Retention can advance while a socket stays connected. Its
+				// cursor may fall outside the journal before the next replay.
+				oldest, newest, err := store.RealtimeBounds(req.Context())
+				if err != nil {
+					if !send(map[string]any{"type": "server.unavailable"}) {
+						return
+					}
+					continue
+				}
+				if replayCursorExpired(resumeCursor, oldest, newest) {
+					if !send(map[string]any{"type": "state.resync", "cursor": strconv.FormatInt(newest, 10)}) {
+						return
+					}
+					resumeCursor = newest
+				}
+			}
 			if !send(map[string]any{"type": "connection.heartbeat"}) {
 				return
 			}
 		}
 	}
+}
+
+// Journal gap detection is based on a *durable* retention watermark in
+// RealtimeBounds, not only the oldest row that happens to remain.
+func replayCursorExpired(cursor, oldest, newest int64) bool {
+	return cursor > newest || (oldest > 0 && cursor < oldest-1)
 }

@@ -171,3 +171,25 @@ func TestDurableWebSocketCursorReplayAndGapReconciliation(t *testing.T) {
 		t.Fatalf("retention gap not reconciled: %+v", gap)
 	}
 }
+
+func TestReplayCursorExpiryOnRetentionOrDatabaseRestore(t *testing.T) {
+	cases := []struct {
+		name                   string
+		cursor, oldest, newest int64
+		expired                bool
+	}{
+		{"normal cursor", 11, 10, 14, false},
+		{"last pruned cursor", 10, 11, 14, false},
+		{"too old", 9, 11, 14, true},
+		{"future after restore", 99, 11, 14, true},
+		{"fully pruned", 4, 11, 10, true},
+		{"new journal empty", 0, 0, 0, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := replayCursorExpired(tc.cursor, tc.oldest, tc.newest); got != tc.expired {
+				t.Fatalf("cursor=%d oldest=%d newest=%d expired=%v want=%v", tc.cursor, tc.oldest, tc.newest, got, tc.expired)
+			}
+		})
+	}
+}

@@ -9,6 +9,17 @@ set -a
 set +a
 psql "$DATABASE_URL" -X -q -v ON_ERROR_STOP=1 <<'SQL'
 SELECT pg_advisory_lock(21007722);
+DO $probe$
+BEGIN
+ IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_realtime_public_id')
+    OR NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_realtime_user_id') THEN
+    RAISE EXCEPTION 'missing scoped replay indexes';
+ END IF;
+ IF NOT EXISTS (SELECT 1 FROM realtime_retention WHERE singleton=true) THEN
+    RAISE EXCEPTION 'missing durable prune watermark';
+ END IF;
+END
+$probe$;
 CREATE TEMP TABLE ws_replay_probe_baseline AS
  SELECT count(*)::bigint AS n FROM realtime_events;
 BEGIN;
@@ -40,6 +51,15 @@ BEGIN
     AND (user_id IS NULL OR user_id='rt_unrelated_user')) THEN
     RAISE EXCEPTION 'private event leaked to another user';
  END IF;
+ -- The same visibility contract used by the indexed UNION replay query:
+ -- public hints plus only this account's own personal hints.
+ IF NOT EXISTS (
+   SELECT 1 FROM (
+     SELECT id FROM realtime_events WHERE id>first_id AND user_id IS NULL
+     UNION ALL
+     SELECT id FROM realtime_events WHERE id>first_id AND user_id=owner
+   ) visible
+ ) THEN RAISE EXCEPTION 'indexed authorized replay returned nothing'; END IF;
 END
 $probe$;
 ROLLBACK;

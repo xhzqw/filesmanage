@@ -19,12 +19,14 @@ export function connectSessionEvents(onIdentity:(user:User|null)=>void,userID=""
  let revoked=false;
  let lastFrameAt=Date.now();
  let connectingSince=Date.now();
- // Cursor is a receipt for applied invalidation hints, never a credential.
- // Partition it by authenticated user so account switching cannot skip state.
+ // The bookmark belongs to this tab, NOT the entire browser profile.
+ // localStorage would let tab A acknowledge an event that tab B never saw:
+ // B could subsequently reconnect past the unseen mutation. sessionStorage
+ // survives reloads but isolates tabs (and is partitioned by authenticated user).
  const cursorKey=userID?"fm-live-cursor-v3:"+userID:"";
  const validCursor=(value:unknown):value is string=>typeof value==="string"&&/^(0|[1-9]\d{0,18})$/.test(value);
  let committedCursor="";
- try{if(cursorKey){const stored=window.localStorage.getItem(cursorKey);if(validCursor(stored))committedCursor=stored;}}catch{}
+ try{if(cursorKey){const stored=window.sessionStorage.getItem(cursorKey);if(validCursor(stored))committedCursor=stored;}}catch{}
  let pendingCursor="";
  const pending=new Set<WorkspaceScope>();
 
@@ -59,7 +61,7 @@ export function connectSessionEvents(onIdentity:(user:User|null)=>void,userID=""
   }
   if(pendingCursor){
    committedCursor=pendingCursor;pendingCursor="";
-   try{if(cursorKey)window.localStorage.setItem(cursorKey,committedCursor);}catch{}
+   try{if(cursorKey)window.sessionStorage.setItem(cursorKey,committedCursor);}catch{}
   }
  }
  function acknowledge(value:unknown){
