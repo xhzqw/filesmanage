@@ -1,7 +1,10 @@
 import {useEffect,useRef,useState} from "react";
-import {fileApi,type FileHistoryEvent,type FileHistoryPage} from "./api";
-import {RareButton} from "../../shared/ui/rare";
-import {errorCopy} from "../../shared/errors";
+import {request} from "../http";
+export type FileHistoryEvent={id:number;actorId:string;actorName?:string;requestId:string;eventType:string;targetKind:string;targetId:string;outcome:string;details:Record<string,unknown>;createdAt:string};
+export type FileHistoryPage={items:FileHistoryEvent[];nextCursor:string};
+const history=(id:string,cursor:string,signal?:AbortSignal)=>request<FileHistoryPage>("/files/"+encodeURIComponent(id)+"/history?"+new URLSearchParams({cursor,limit:"30"}),{signal});
+import {RareButton} from "./rare";
+import {errorCopy} from "../errors";
 import "./fileHistory.css";
 
 const eventLabels:Record<string,string>={
@@ -53,7 +56,7 @@ export function FileHistoryPanel({fileId,revision}:{fileId:string;revision:numbe
   const epoch=++requestEpoch.current;
   const controller=new AbortController();
   setLoading(true);setPage({items:[],nextCursor:""});setError("");
-  void fileApi.history(fileId,"",controller.signal).then(value=>{
+  void history(fileId,"",controller.signal).then(value=>{
    if(live&&epoch===requestEpoch.current)setPage(value);
   }).catch(err=>{
    if(live&&epoch===requestEpoch.current)setError(errorCopy(err,"读取文件历史失败"));
@@ -65,7 +68,7 @@ export function FileHistoryPanel({fileId,revision}:{fileId:string;revision:numbe
   const epoch=requestEpoch.current;
   setMore(true);
   try{
-   const next=await fileApi.history(fileId,page.nextCursor);
+   const next=await history(fileId,page.nextCursor);
    if(epoch!==requestEpoch.current)return;
    setPage(current=>({
     items:[...current.items,...next.items.filter(x=>!current.items.some(old=>old.id===x.id))],

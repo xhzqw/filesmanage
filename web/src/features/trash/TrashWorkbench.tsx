@@ -10,7 +10,7 @@ import {Menu} from "../../shared/ui/Menu";
 import {MicroHoldToDelete,RareButton,RareDataTable,RareInput,RareRowActions,RareSelect} from "../../shared/ui/rare";
 import {trashApi} from "./api";
 import {RestoreDialog} from "./RestoreDialog";
-import {FileHistoryPanel} from "../documents/FileHistoryPanel";
+import {FileHistoryPanel} from "../../shared/ui/FileHistoryPanel";
 import "./trashWorkbench.css";
 
 const PAGE_SIZE=40;

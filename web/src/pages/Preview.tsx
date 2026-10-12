@@ -15,7 +15,7 @@ import {resolvePreviewAdapter} from "../features/documents/previewAdapters";
 import {FileEditor} from "../features/documents/FileEditor";
 import {FileMetadataEditor} from "../features/documents/FileMetadataEditor";
 import {VersionComparePanel} from "../features/documents/VersionComparePanel";
-import {FileHistoryPanel} from "../features/documents/FileHistoryPanel";
+import {FileHistoryPanel} from "../shared/ui/FileHistoryPanel";
 import {FileSealsPanel} from "../features/seals/FileSealsPanel";
 import {FileReviewPanel} from "../features/documents/FileReviewPanel";
 import {PrintDialog} from "../features/documents/PrintDialog";

@@ -123,8 +123,10 @@ func (s *Service) SubmitEdit(ctx context.Context, u domain.User, fileID string, 
 	if err = s.approvalEvent(ctx, tx, approval, u, "submitted", reason, approval.ApproverID); err != nil {
 		return domain.Approval{}, err
 	}
-	audit(ctx, tx, u, "approval.request", "file", file.ID, "success",
-		map[string]any{"approvalId": approval.ID, "baseSeq": baseSeq, "action": approval.Action})
+	if err = auditRequired(ctx, tx, u, "approval.request", "file", file.ID, "success",
+		map[string]any{"approvalId": approval.ID, "baseSeq": baseSeq, "action": approval.Action}); err != nil {
+		return domain.Approval{}, err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return domain.Approval{}, err
 	}
@@ -179,8 +181,10 @@ func (s *Service) SubmitRollback(ctx context.Context, u domain.User, fileID stri
 	if err = s.approvalEvent(ctx, tx, approval, u, "submitted", reason, approval.ApproverID); err != nil {
 		return domain.Approval{}, err
 	}
-	audit(ctx, tx, u, "approval.request", "file", file.ID, "success",
-		map[string]any{"approvalId": approval.ID, "targetSeq": targetSeq, "action": approval.Action})
+	if err = auditRequired(ctx, tx, u, "approval.request", "file", file.ID, "success",
+		map[string]any{"approvalId": approval.ID, "targetSeq": targetSeq, "action": approval.Action}); err != nil {
+		return domain.Approval{}, err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return domain.Approval{}, err
 	}
@@ -325,8 +329,10 @@ func (s *Service) Reject(ctx context.Context, actor domain.User, approvalID, com
 	if approval.Action == domain.VersionActionEdit {
 		_ = tx.SetBlobState(ctx, approval.PayloadBlobID, "gc_pending")
 	}
-	audit(ctx, tx, actor, "approval.reject", "file", approval.FileID, "success",
-		map[string]any{"approvalId": approvalID, "requesterId": approval.RequesterID})
+	if err = auditRequired(ctx, tx, actor, "approval.reject", "file", approval.FileID, "success",
+		map[string]any{"approvalId": approvalID, "requesterId": approval.RequesterID}); err != nil {
+		return err
+	}
 	if err = s.approvalEvent(ctx, tx, approval, actor, "rejected", comment, approval.RequesterID); err != nil {
 		return err
 	}
@@ -364,8 +370,10 @@ func (s *Service) CancelApproval(ctx context.Context, actor domain.User, approva
 	if approval.Action == domain.VersionActionEdit {
 		_ = tx.SetBlobState(ctx, approval.PayloadBlobID, "gc_pending")
 	}
-	audit(ctx, tx, actor, "approval.cancel", "file", approval.FileID, "success",
-		map[string]any{"approvalId": approvalID})
+	if err = auditRequired(ctx, tx, actor, "approval.cancel", "file", approval.FileID, "success",
+		map[string]any{"approvalId": approvalID}); err != nil {
+		return err
+	}
 	if err = s.approvalEvent(ctx, tx, approval, actor, "cancelled", "", approval.ApproverID); err != nil {
 		return err
 	}

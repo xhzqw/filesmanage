@@ -108,8 +108,10 @@ func (s *Service) OpenOfficeSession(ctx context.Context, u domain.User, fileID s
 	if err != nil {
 		return OfficeSessionView{}, err
 	}
-	audit(ctx, tx, u, "office.session_open", "file", file.ID, "success",
-		map[string]any{"sessionId": session.ID, "baseSeq": baseSeq})
+	if err = auditRequired(ctx, tx, u, "office.session_open", "file", file.ID, "success",
+		map[string]any{"sessionId": session.ID, "baseSeq": baseSeq}); err != nil {
+		return OfficeSessionView{}, err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return OfficeSessionView{}, err
 	}
@@ -136,8 +138,10 @@ func (s *Service) CloseOfficeSession(ctx context.Context, u domain.User, session
 	if err = tx.CloseOfficeSession(ctx, sessionID); err != nil {
 		return err
 	}
-	audit(ctx, tx, u, "office.session_close", "file", session.FileID, "success",
-		map[string]any{"sessionId": sessionID})
+	if err = auditRequired(ctx, tx, u, "office.session_close", "file", session.FileID, "success",
+		map[string]any{"sessionId": sessionID}); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
 }
 
