@@ -66,7 +66,7 @@ export function AppShell({user,onLogout,product,actions,children}:{user:ShellUse
   hideHeaderTimer.current=setTimeout(()=>{
    hideHeaderTimer.current=null;
    if(previewHeaderRef.current?.contains(document.activeElement))return;
-   if(revealRef.current===document.activeElement&&revealRef.current.matches(":focus-visible"))return;
+   if(revealRef.current===document.activeElement&&revealRef.current?.matches(":focus-visible"))return;
    setPreviewHeaderOpen(false);setAccountOpen(false);
   },320);
  }
