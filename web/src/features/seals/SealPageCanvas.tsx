@@ -27,7 +27,7 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
  const pendingAnchor=useRef<{x:number;y:number;oldZoom:number;left:number;top:number}|null>(null);
  const zoomRef=useRef(1);
  const[zoom,setZoom]=useState(1);
- const[fitMode,setFitMode]=useState<"page"|"width">("page");
+ const[fitMode,setFitMode]=useState<"page"|"width">("width");
  const[panMode,setPanMode]=useState(false);
  const[viewportWidth,setViewportWidth]=useState(650);
  const[viewportHeight,setViewportHeight]=useState(590);
@@ -40,7 +40,7 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
  },[]);
  // Do not reset zoom or scroll merely because a page changed.
  useEffect(()=>{
-  zoomRef.current=1;setZoom(1);setFitMode("page");setPanMode(false);
+  zoomRef.current=1;setZoom(1);setFitMode("width");setPanMode(false);
   const viewport=viewportRef.current;if(viewport){viewport.scrollLeft=0;viewport.scrollTop=0}
  },[fileId]);
  const availableWidth=Math.max(120,viewportWidth-32);

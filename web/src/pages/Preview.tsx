@@ -56,6 +56,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const[focusMode,setFocusMode]=useState(false);
  const[historyView,setHistoryView]=useState<"activity"|"versions">("activity");
  const[tab,setTab]=useState<Tab>(()=>new URLSearchParams(window.location.search).get("tab")==="seals"?"seals":"preview");
+ const[hasOpenedSeals,setHasOpenedSeals]=useState(()=>new URLSearchParams(window.location.search).get("tab")==="seals");
  const[sealRevision,setSealRevision]=useState<number|null>(null);
  useEffect(()=>{setSealRevision(null)},[id,preview?.sha256,file?.currentVersionSeq]);
 
@@ -296,7 +297,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
         </article>)}
        </div>}
        </section>}
-      {tab==="seals"&&!isOfficeName(preview.name)&&<div id="file-seals-sidebar" className="file-sidebar-context file-seal-sidebar-host"/>}
+      {hasOpenedSeals&&!isOfficeName(preview.name)&&<div id="file-seals-sidebar" hidden={tab!=="seals"} className="file-sidebar-context file-seal-sidebar-host"/>}
 
       </aside>
       <div className="file-workbench-main">
@@ -334,7 +335,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
       <VersionComparePanel fileId={id} versions={versions}/>
      </section>}
 
-            {tab==="seals"&&<section id="file-panel-seals" role="tabpanel" aria-labelledby="file-tab-seals" className="file-workbench-mode-panel file-workbench-signing">
+            {hasOpenedSeals&&<section hidden={tab!=="seals"} id="file-panel-seals" role="tabpanel" aria-labelledby="file-tab-seals" className="file-workbench-mode-panel file-workbench-signing">
       {isOfficeName(preview.name)?
        <DocxSealConversion fileId={id} versionSeq={currentSeq} sha={preview.sha256} name={preview.name}/>:
        <FileSealsPanel fileId={id} seq={currentSeq} sha={preview.sha256} name={preview.name} isAdmin={user.isAdmin} controlsTargetId="file-seals-sidebar" onSelectRevision={value=>{setSealRevision(value);setTab("preview")}} onChanged={()=>{setSealRevision(null);refresh();toast.success("签章版本已更新")}}/>}

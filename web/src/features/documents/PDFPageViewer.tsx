@@ -51,7 +51,7 @@ export function PDFPageViewer({fileId,sha,name,seq,revision,onRevisionChange,epo
  const[viewport,setViewport]=useState({width:800,height:740});
  const[pageRatio,setPageRatio]=useState(1.414);
  const[zoom,setZoom]=useState(1);
- const[fitMode,setFitMode]=useState<"page"|"width">("page");
+ const[fitMode,setFitMode]=useState<"page"|"width">("width");
  const[panMode,setPanMode]=useState(false);
  useEffect(()=>{
   const node=viewportRef.current;if(!node)return;
@@ -60,7 +60,7 @@ export function PDFPageViewer({fileId,sha,name,seq,revision,onRevisionChange,epo
   const observer=new ResizeObserver(measure);observer.observe(node);
   return()=>observer.disconnect();
  },[]);
- useEffect(()=>{setZoom(1);setFitMode("page");setPanMode(false)},[fileId,sha]);
+ useEffect(()=>{setZoom(1);setFitMode("width");setPanMode(false)},[fileId,sha]);
  function setZoomAt(value:number){
   const node=viewportRef.current;
   if(node)anchorRef.current={zoom,x:node.clientWidth/2,y:node.clientHeight/2,left:node.scrollLeft,top:node.scrollTop};
