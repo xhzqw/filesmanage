@@ -23,11 +23,8 @@
 .command-list{list-style:none;margin:0;padding:var(--space-1);max-height:240px;overflow:auto;display:grid;gap:1px;align-content:start}
 .command-row{display:flex;align-items:center;gap:var(--space-2);min-height:var(--height-row-standard);padding:var(--space-1) var(--space-2);border-radius:var(--radius-sm);font-size:12px;color:var(--text-primary);cursor:pointer;user-select:none}
 .command-row:hover{background:var(--surface-row-hover)}
-/* The active row is the keyboard cursor, so it must read apart from hover alone
-   (VIS-02): selected background plus the 2px rail from spec §4.2. The rail uses
-   the selected-border token, not the decorative cyan, because an inset ring is
-   a measured boundary and must clear 3:1 (spec §6.2 keeps cyan for the glow). */
-.command-row.active,.command-row.active:hover{background:var(--surface-row-selected);box-shadow:inset 2px 0 0 var(--border-selected)}
+/* A keyboard-active row is distinguishable from hover by one steady surface. */
+.command-row.active,.command-row.active:hover{background:var(--surface-subtle);box-shadow:none}
 .command-row-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;color:var(--brand-blue)}
 .command-row[data-kind="folder"] .command-row-name{color:var(--text-primary);font-weight:600}
 .command-row-path{flex:none;max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-tertiary);font-size:11px}

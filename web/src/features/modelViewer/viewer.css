@@ -5,7 +5,7 @@
 .cad-title span{color:var(--text-secondary);font-size:11px}
 .cad-layout-tabs{margin-left:auto;display:flex;align-items:center;gap:3px;min-width:0;max-width:62%;overflow-x:auto;scrollbar-width:thin}
 .cad-layout-tabs button{flex:none;min-height:25px;height:25px;max-width:150px;padding:0 9px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cad-layout-tabs button.on{color:var(--brand-blue);background:var(--surface-row-selected);border-color:var(--border-selected)}
+.cad-layout-tabs button.on{color:var(--brand-blue);background:var(--surface-subtle);border-color:transparent}
 .cad-workbench{flex:1;min-width:0;min-height:0;display:flex;gap:8px;padding:8px;overflow:hidden}
 .cad-viewport{position:relative;flex:1;min-width:0;min-height:340px;border:1px solid var(--border-hairline);border-radius:var(--radius-lg);overflow:hidden;background:#f0f5fa}
 .cad-viewport .viewer-stage{position:relative;width:100%;height:100%;min-height:0;min-width:0;margin:0!important;box-shadow:none;border:0}
@@ -21,7 +21,7 @@
 .cad-toolgroup{display:flex;gap:2px;padding:3px;border:1px solid rgba(136,162,187,.6);background:rgba(255,255,255,.94);border-radius:var(--radius-md);box-shadow:0 2px 12px rgba(15,39,92,.08)}
 .cad-toolbar>button{background:rgba(255,255,255,.96);box-shadow:0 2px 12px rgba(15,39,92,.07)}
 .cad-toolbar button{height:27px;min-height:27px;white-space:nowrap;border-radius:var(--radius-sm);padding:0 9px;font-size:11px}
-.cad-toolbar button.on{color:var(--brand-blue);background:var(--surface-row-selected);border-color:var(--border-selected)}
+.cad-toolbar button.on{color:var(--brand-blue);background:var(--surface-subtle);border-color:transparent}
 .cad-print-error{pointer-events:none;background:var(--surface-panel);color:var(--status-warning);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:5px 8px;font-size:11px}
 .cad-print-scale{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:var(--text-secondary)}
 .cad-print-scale .rare-select-root{width:108px;min-width:0}
@@ -53,7 +53,7 @@
 .cad-part{display:flex;align-items:center;gap:6px;min-width:0;min-height:28px;padding:2px 4px;border-radius:var(--radius-xs)}
 .cad-part button{flex:1;min-width:0;max-width:100%;justify-content:flex-start;overflow:hidden;text-overflow:ellipsis}
 .cad-part button:last-child{flex:none;width:auto;font-size:11px;padding:0 5px}
-.cad-part button.on{color:var(--brand-blue);background:var(--surface-row-selected);border-color:var(--border-selected)}
+.cad-part button.on{color:var(--brand-blue);background:var(--surface-subtle);border-color:transparent}
 .cad-inspector-section>button{align-self:flex-start}
 .cad-properties{gap:6px}
 .cad-properties>div{display:grid;grid-template-columns:56px minmax(0,1fr);align-items:start;gap:8px;font-size:11px;line-height:19px}

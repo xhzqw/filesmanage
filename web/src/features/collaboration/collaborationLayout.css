@@ -37,7 +37,7 @@
 .collab-root .share-picker-row .share-option-name{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .collab-root .share-picker-row svg{flex:none}
 .collab-root .share-picker-row .resource-file-icon{color:var(--text-secondary)}
-.collab-root .share-picker-row.on{background:var(--surface-row-selected);box-shadow:inset 0 0 0 1px var(--border-focus);color:var(--brand-blue)}
+.collab-root .share-picker-row.on{background:var(--surface-subtle);box-shadow:none;color:var(--brand-blue)}
 .collab-root .share-picker-row:hover:not(.on){background:var(--surface-row-hover)}
 .collab-root .share-tree-entry{display:flex;align-items:center;min-width:0;width:100%;gap:1px}
 .collab-root .share-tree-expander,.collab-root .share-tree-expander-spacer{display:flex;align-items:center;justify-content:center;flex:none;width:21px;min-width:21px;height:30px;padding:0;border:0;background:transparent;box-shadow:none}

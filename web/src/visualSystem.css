@@ -48,7 +48,8 @@ button,input:not([type="checkbox"]):not([type="radio"]),select,textarea,
   border-radius:var(--radius-sm);
 }
 input[type="checkbox"],input[type="radio"]{border-radius:var(--radius-xs)}
-.toolbar button.on,.group-list button.on{box-shadow:inset 0 0 0 1px var(--border-selected)}
+/* Selection appearance belongs to its component, never a global inset rail. */
+.toolbar button.on,.group-list button.on{box-shadow:none}
 .nav-toggle,.account-trigger{border-radius:var(--radius-sm)}
 
 /* Independent content bands gain air and rounded edges without sacrificing

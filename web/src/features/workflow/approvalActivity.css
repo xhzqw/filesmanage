@@ -3,7 +3,7 @@
 .approval-toolbar{display:flex;flex:none;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin:6px 7px 0;padding:5px 8px;border:1px solid var(--border-hairline);border-radius:var(--radius-md);background:var(--surface-panel)}
 .approval-tabs{display:inline-flex;align-items:center;gap:2px;padding:2px;border-radius:var(--radius-sm);background:var(--surface-header)}
 .approval-tabs>.rare-button{font-size:12px;height:28px;min-height:28px;padding:0 10px;border:0;border-radius:var(--radius-sm);color:var(--text-secondary);background:transparent}
-.approval-tabs>.rare-button[aria-selected=true]{color:var(--brand-blue);background:var(--surface-panel);box-shadow:var(--shadow-panel);font-weight:600}
+.approval-tabs>.rare-button[aria-selected=true]{color:var(--brand-blue);background:var(--surface-panel);box-shadow:none;font-weight:600}
 .approval-tab-count{border-radius:var(--radius-pill);padding:0 6px;font-size:11px;font-variant-numeric:tabular-nums;background:var(--surface-header);color:var(--text-secondary)}
 .approval-filters{display:flex;align-items:center;gap:6px;min-width:0}
 .approval-filters input{width:165px;height:28px}
@@ -75,10 +75,10 @@
 .approval-result-count{flex:none;padding:5px 10px;color:var(--text-secondary);font-size:12px}
 .approval-table tbody tr.approval-selected td{background:var(--surface-row-selected)}
 .approval-table tbody tr{cursor:pointer;transition:background-color .12s ease}
-.approval-table tbody tr.approval-selected td:first-child{box-shadow:inset 3px 0 0 var(--brand-cyan)}
+.approval-table tbody tr.approval-selected td:first-child{box-shadow:none}
 .approval-table tbody tr:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px}
-.approval-table tbody tr:focus-visible td{background:var(--surface-row-hover)}
-.approval-table tbody tr:focus-within td{background:var(--surface-row-hover)}
+.approval-table tbody tr:not(.approval-selected):focus-visible td{background:var(--surface-row-hover)}
+.approval-table tbody tr:not(.approval-selected):focus-within td{background:var(--surface-row-hover)}
 .approval-side{gap:0;padding:0}
 .approval-side-header{display:flex;flex:none;gap:6px;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--border-hairline)}
 .approval-side-nav{min-width:0;max-width:100%}
@@ -86,7 +86,7 @@
 .approval-side-nav [data-slot="gooey-nav-item"]{height:29px;min-height:29px;padding:0 11px;font-size:11px}
 .approval-side-tabs{display:flex;gap:2px;padding:2px;background:var(--surface-header);border-radius:var(--radius-sm)}
 .approval-side-tabs>.rare-button{height:27px;min-height:27px;font-size:12px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-secondary)}
-.approval-side-tabs>.rare-button[aria-selected=true]{background:var(--surface-panel);box-shadow:var(--shadow-panel);color:var(--brand-blue);font-weight:600}
+.approval-side-tabs>.rare-button[aria-selected=true]{background:var(--surface-panel);box-shadow:none;color:var(--brand-blue);font-weight:600}
 .approval-detail-empty{padding:24px 12px;text-align:center;color:var(--text-secondary);font-size:12px}
 .approval-detail-content{min-width:0;display:flex;flex-direction:column;gap:0;padding:9px 12px 0}
 .approval-detail-header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}

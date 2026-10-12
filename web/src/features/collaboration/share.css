@@ -6,13 +6,13 @@
 .share-fieldset{display:grid;gap:var(--space-2);margin:0;padding:var(--space-2);border:1px solid var(--color-border);border-radius:var(--radius-control)}
 .share-fieldset legend{padding:0 var(--space-1);color:var(--color-text-secondary);font-size:12px}
 .share-kind-switch{display:flex;gap:var(--space-2)}
-.share-kind-switch button.on{background:var(--color-row-selected);border-color:var(--color-row-selected-border);color:var(--color-action);font-weight:700}
+.share-kind-switch button.on{background:var(--surface-subtle);border-color:transparent;color:var(--color-action);font-weight:600}
 .share-actions{display:flex;flex-wrap:wrap;gap:var(--space-3)}
 /* Single-select lists: one candidate, hover never impersonates the choice. */
 .share-recipient-list,.share-picker-list{display:grid;gap:2px;max-height:220px;overflow:auto;padding:var(--space-1);border:1px solid var(--color-border);border-radius:var(--radius-control);background:var(--color-panel)}
 .share-option,.share-picker-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--space-1) var(--space-2);width:100%;min-height:var(--height-tree-row);padding:var(--space-1) var(--space-2);border:1px solid transparent;border-radius:var(--radius-control);background:transparent;color:var(--color-text);text-align:left}
 .share-option:hover,.share-picker-row:hover{background:var(--color-row-hover)}
-.share-option.on,.share-option.on:hover,.share-picker-row.on,.share-picker-row.on:hover{border-color:var(--color-row-selected-border);background:var(--color-row-selected);color:var(--color-action)}
+.share-option.on,.share-option.on:hover,.share-picker-row.on,.share-picker-row.on:hover{border-color:transparent;background:var(--surface-subtle);color:var(--color-action)}
 .share-option-kind{flex:0 0 auto;padding:0 var(--space-1);border:1px solid var(--color-border);border-radius:var(--radius-control);color:var(--color-text-secondary);font-size:11px}
 .share-option-name{font-weight:600;overflow-wrap:anywhere}
 .share-option-detail{color:var(--color-text-secondary);font-size:12px;overflow-wrap:anywhere}

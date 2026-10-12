@@ -20,7 +20,7 @@
 .folder-picker-results{list-style:none;margin:0;padding:var(--space-1);display:grid;gap:2px;max-height:200px;overflow:auto;border:1px solid var(--color-border);border-radius:var(--radius-control);background:var(--color-panel)}
 .folder-picker-result{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--space-1) var(--space-2);width:100%;min-height:var(--height-tree-row);padding:var(--space-1) var(--space-2);border:1px solid transparent;border-radius:var(--radius-control);background:transparent;color:var(--color-text);text-align:left}
 .folder-picker-result:hover{background:var(--color-row-hover)}
-.folder-picker-result.candidate,.folder-picker-result.candidate:hover{border-color:var(--color-row-selected-border);background:var(--color-row-selected);color:var(--color-action)}
+.folder-picker-result.candidate,.folder-picker-result.candidate:hover{border-color:transparent;background:var(--surface-subtle);color:var(--color-action)}
 .folder-picker-result-name{font-weight:600}
 .folder-picker-result-path{font-size:11px;color:var(--color-text-secondary);overflow-wrap:anywhere}
 /* Tree: 28px rows (--height-tree-row), one roving tab stop, hover never impersonates selection. */
@@ -29,7 +29,7 @@
 .folder-picker-tree[aria-busy="true"]{opacity:.6}
 .folder-picker-row{display:flex;align-items:center;gap:var(--space-1);min-height:var(--height-tree-row);padding-right:var(--space-2);border-radius:var(--radius-control)}
 .folder-picker-row:hover{background:var(--color-row-hover)}
-.folder-picker-row.candidate,.folder-picker-row.candidate:hover{background:var(--color-row-selected);box-shadow:inset 0 0 0 1px var(--color-row-selected-border);color:var(--color-action)}
+.folder-picker-row.candidate,.folder-picker-row.candidate:hover{background:var(--surface-subtle);box-shadow:none;color:var(--color-action)}
 .folder-picker-row.invalid{color:var(--color-text-secondary)}
 .folder-picker li:focus-visible{outline:3px solid var(--color-focus);outline-offset:-2px;border-radius:var(--radius-control)}
 .folder-picker-chevron{display:flex;align-items:center;justify-content:center;align-self:stretch;width:28px;min-width:28px;min-height:32px;padding:0;border:0;border-radius:var(--radius-control);background:transparent;color:inherit;font-size:11px;line-height:1}
@@ -57,9 +57,9 @@
 .folder-picker-candidate-path{color:var(--brand-blue);font-weight:650}
 .folder-picker-tree,.folder-picker-results{padding:5px;border:0;background:var(--surface-header);border-radius:var(--radius-md)}
 .folder-picker-row{margin:1px 0}
-.folder-picker-row.candidate,.folder-picker-row.candidate:hover{background:var(--surface-row-selected);box-shadow:inset 3px 0 0 var(--brand-cyan)}
+.folder-picker-row.candidate,.folder-picker-row.candidate:hover{background:var(--surface-subtle);box-shadow:none}
 .folder-picker-result{flex-wrap:nowrap;min-height:36px;padding:6px 9px}
-.folder-picker-result.candidate,.folder-picker-result.candidate:hover{border-color:transparent;background:var(--surface-row-selected);box-shadow:inset 3px 0 0 var(--brand-cyan)}
+.folder-picker-result.candidate,.folder-picker-result.candidate:hover{border-color:transparent;background:var(--surface-subtle);box-shadow:none}
 .folder-picker-result-path{flex:1;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .folder-picker-name:hover{text-decoration:none}
 .folder-picker-empty{border:0;background:var(--surface-header);padding:20px 12px}

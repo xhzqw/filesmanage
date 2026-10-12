@@ -50,6 +50,42 @@ try{
   assert.ok(state.name,"selected node has no name");
   console.log("FOLDER_SELECTION_SIZE_PASS",width+"px",state.name);
  }
+ const surfaces=await evaluate(String.raw`(()=>{
+  const fixture=document.createElement("div");
+  fixture.style.cssText="position:fixed;left:-9999px;top:0;width:400px;pointer-events:none";
+  fixture.innerHTML=[
+   '<div class="folder-picker"><div class="folder-picker-row candidate">目标</div><button class="folder-picker-result candidate">搜索目标</button></div>',
+   '<button class="org-group-card active">工作组</button>',
+   '<div class="perm-tree-row selected">权限目录</div>',
+   '<div class="collab-root"><button class="share-picker-row on">分享对象</button></div>',
+   '<div class="command-row active">搜索结果</div>',
+   '<table class="rare-data-table"><tbody><tr aria-selected="true"><td>结果</td></tr></tbody></table>',
+   '<table class="approval-table"><tbody><tr class="approval-selected"><td>审批</td></tr></tbody></table>'
+  ].join("");
+  document.body.append(fixture);
+  const checks=[
+   [".folder-picker-row.candidate","目录树候选"],
+   [".folder-picker-result.candidate","目录搜索结果"],
+   [".org-group-card.active","工作组"],
+   [".perm-tree-row.selected","权限树"],
+   [".collab-root .share-picker-row.on","分享对象"],
+   [".command-row.active","搜索结果"],
+   [".rare-data-table tbody tr[aria-selected=true]","共享表格"],
+   [".approval-table tr.approval-selected td","审批行"]
+  ].map(([selector,label])=>{
+   const el=fixture.querySelector(selector),s=getComputedStyle(el);
+   return {label,shadow:s.boxShadow,background:s.backgroundColor,borderLeft:s.borderLeftColor,borderLeftWidth:s.borderLeftWidth};
+  });
+  fixture.remove();
+  return checks;
+ })()`);
+ for(const surface of surfaces){
+  assert.equal(surface.shadow,"none",surface.label+" has a stacked selection shadow");
+  assert.notEqual(surface.background,"rgba(0, 0, 0, 0)",surface.label+" has no selection surface");
+  assert.notEqual(surface.background,"transparent",surface.label+" has no selection surface");
+  console.log("SELECTION_SURFACE_PASS",surface.label);
+ }
+ console.log("GLOBAL_SELECTION_READONLY_PASS: 8 shared and feature selection surfaces");
  console.log("FOLDER_SELECTION_READONLY_PASS: single low-noise selected surface, 4 viewport widths");
 }catch(error){console.error("FOLDER_SELECTION_READONLY_FAIL",error.message);process.exitCode=1;
 }finally{

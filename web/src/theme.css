@@ -445,12 +445,11 @@ th{
 td{vertical-align:middle}
 tbody tr{height:var(--height-row-standard);transition:background-color .05s ease}
 
-/* 行交互状态机 (spec §4.2): hover/selected/focused 三态可辨, 不仅靠颜色 */
+/* Table selection is one surface; keyboard focus is the only extra outline. */
 .table tbody tr{cursor:default;user-select:none}
 .table tbody tr:hover{background:var(--surface-row-hover)}
-.table tbody tr.selected,.table tbody tr.selected:hover{background:var(--surface-row-selected);box-shadow:inset 2px 0 0 var(--border-selected)}
-.table tbody tr.focused{box-shadow:inset 0 0 0 1px var(--border-focus)}
-.table tbody tr.selected.focused{box-shadow:inset 2px 0 0 var(--border-selected),inset 0 0 0 1px var(--border-focus)}
+.table tbody tr.selected,.table tbody tr.selected:hover{background:var(--surface-row-selected);box-shadow:none}
+.table tbody tr.focused,.table tbody tr.selected.focused{box-shadow:none}
 .table tbody tr:focus-visible{outline:1px solid var(--border-focus);outline-offset:-1px}
 
 /* 等宽数字与哈希排印 (spec §4.1) */
@@ -642,7 +641,7 @@ tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions 
 .org-form input{min-width:120px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:0 var(--space-2);height:var(--height-control)}
 .group-list,.member-list{list-style:none;padding:0;margin:0 0 var(--space-3);display:grid;gap:2px}
 .group-list button{width:100%;text-align:left;justify-content:flex-start;font-weight:400}
-.group-list button.on{background:var(--surface-row-selected);border-color:var(--border-selected);color:var(--brand-blue);font-weight:600}
+.group-list button.on{background:var(--surface-subtle);border-color:transparent;color:var(--brand-blue);font-weight:600}
 .member-list li{display:flex;justify-content:space-between;align-items:center;gap:var(--space-2);padding:var(--space-1) var(--space-2);border:1px solid var(--border-hairline);border-radius:var(--radius-sm);font-size:12px}
 .member-list li.empty{border:0;display:block}
 .grant-dialog{min-width:560px}
@@ -678,7 +677,7 @@ tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions 
 .stat-card{background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-md);box-shadow:var(--shadow-panel);padding:var(--space-3);display:grid;gap:2px;justify-items:start}
 .stat-card:last-child{border-right:1px solid var(--border-hairline)}
 .stat-num{font-size:20px;font-weight:700;color:var(--brand-navy);font-variant-numeric:tabular-nums}
-.toolbar button.on{background:var(--surface-row-selected);border-color:var(--border-selected);color:var(--brand-blue);font-weight:600}
+.toolbar button.on{background:var(--surface-subtle);border-color:transparent;color:var(--brand-blue);font-weight:600}
 
 .search-bar input{border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:0 var(--space-2);height:var(--height-control)}
 .search-total{color:var(--text-secondary);font-size:11px;padding:var(--space-2) var(--space-3)}
@@ -696,8 +695,8 @@ tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions 
   .nav-toggle{display:inline-flex}
   .header nav{display:none;position:absolute;top:var(--height-header);left:0;right:0;background:var(--surface-panel);border-bottom:1px solid var(--border-hairline);flex-direction:column;align-items:stretch;padding:var(--space-1) var(--space-3);z-index:20;height:auto;gap:0}
   .header nav.open{display:flex}
-  .header nav a{height:32px;padding:0 var(--space-2);border-bottom:0;border-left:2px solid transparent}
-  .header nav a.active{border-bottom:0;border-left-color:var(--brand-cyan)}
+  .header nav a{height:32px;padding:0 var(--space-2);border:0}
+  .header nav a.active{border:0;box-shadow:none}
   .header nav[data-slot="gooey-nav"]{
    display:none;flex:none;position:absolute;top:calc(100% + 4px);left:4px;right:4px;
    height:auto;min-width:0;width:auto;max-width:none;margin:0;padding:6px;
