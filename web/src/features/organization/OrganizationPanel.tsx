@@ -1,6 +1,7 @@
 import {RareTabs} from "../../shared/ui/rare/RareTabs";
+import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {RareBadge,RareButton,RareDataTable,RareInput,RareNotice,RareRowActions,RareSelect} from "../../shared/ui/rare";
-import {useEffect,useMemo,useRef,useState,type FormEvent,type KeyboardEvent,type ReactNode} from "react";
+import {useCallback,useEffect,useMemo,useRef,useState,type FormEvent,type KeyboardEvent,type ReactNode} from "react";
 import {organizationApi,type Department,type Workgroup} from "./api";
 import {errorCode,errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
@@ -131,13 +132,26 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  // 视图与筛选状态：默认 Tab 1 为部门成员，Tab 2 为工作组管理
  const[queryParams,setQueryParams]=useSearchParams();
  const activeTab=queryParams.get("tab")==="approvals"&&isAdmin?"approvals":queryParams.get("tab")==="roles"?"roles":queryParams.get("tab")==="permissions"?"permissions":queryParams.get("tab")==="groups"?"groups":"members";
- const setActiveTab=(tab:"members"|"groups"|"permissions"|"roles"|"approvals")=>setQueryParams(old=>{
-  const next=new URLSearchParams(old);
-  next.set("tab",tab);
-  if(tab!=="permissions")next.delete("view");
-  if(tab!=="permissions"&&tab!=="approvals")next.delete("folder");
-  return next;
- });
+ // The resource folder is shared across tabs; leaving a dirty editor requires consent.
+ const[hasUnsavedChanges,setHasUnsavedChanges]=useState(false);
+ const[discardDialogOpen,setDiscardDialogOpen]=useState(false);
+ const pendingNavigation=useRef<(()=>void)|null>(null);
+ const requestNavigation=useCallback((navigate:()=>void)=>{
+  if(hasUnsavedChanges){pendingNavigation.current=navigate;setDiscardDialogOpen(true);}
+  else navigate();
+ },[hasUnsavedChanges]);
+ const setActiveTab=(tab:"members"|"groups"|"permissions"|"roles"|"approvals")=>{
+  if(tab===activeTab)return;
+  requestNavigation(()=>setQueryParams(old=>{
+   const next=new URLSearchParams(old);next.set("tab",tab);return next;
+  }));
+ };
+ useEffect(()=>{
+  if(!hasUnsavedChanges)return;
+  const beforeUnload=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue="";};
+  window.addEventListener("beforeunload",beforeUnload);
+  return()=>window.removeEventListener("beforeunload",beforeUnload);
+ },[hasUnsavedChanges]);
  const[selectedDepartment,setSelectedDepartment]=useState("");
  const[deptQuery,setDeptQuery]=useState("");
  const[expanded,setExpanded]=useState<Set<string>>(()=>new Set<string>());
@@ -197,6 +211,10 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    .catch(()=>{if(valid)setGroupsState("failed");});
   return()=>{valid=false;};
  },[isAdmin,groupsToken]);
+ useEffect(()=>observeWorkspaceChange(()=>{
+  setUsersToken(token=>token+1);setDepartmentsToken(token=>token+1);
+  setGroupsToken(token=>token+1);setMembersToken(token=>token+1);
+ },["organization","permissions"]),[]);
 
  useEffect(()=>{
   if(departments.length===0||rootsExpanded.current)return;
@@ -205,11 +223,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   setExpanded(new Set(departments.filter(d=>d.parentId===null||!ids.has(d.parentId)).map(d=>d.id)));
  },[departments]);
 
- useEffect(()=>{
-  if(selectedGroup!=="")return;
-  const first=groups[0];
-  if(first)setSelectedGroup(first.id);
- },[groups,selectedGroup]);
+
 
  useEffect(()=>{
   if(!isAdmin||selectedGroup==="")return;
@@ -330,13 +344,21 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
 
  const filteredGroups=useMemo(()=>{
   const keyword=groupQuery.trim().toLowerCase();
-  if(keyword==="")return groups;
-  return groups.filter(g=>g.name.toLowerCase().includes(keyword));
- },[groups,groupQuery]);
- useEffect(()=>setGroupLimit(GROUP_DISPLAY_STEP),[groupQuery]);
+  return groups.filter(group=>{
+   if(selectedDepartment==="__unassigned"){
+    if(group.departmentId&&deptById.has(group.departmentId))return false;
+   }else if(selectedDeptIds&&!selectedDeptIds.has(group.departmentId??""))return false;
+   return keyword===""||group.name.toLowerCase().includes(keyword);
+  });
+ },[groups,groupQuery,selectedDepartment,selectedDeptIds,deptById]);
+ useEffect(()=>{
+  if(!filteredGroups.some(group=>group.id===selectedGroup))
+   setSelectedGroup(filteredGroups[0]?.id??"");
+ },[filteredGroups,selectedGroup]);
+ useEffect(()=>setGroupLimit(GROUP_DISPLAY_STEP),[groupQuery,selectedDepartment]);
  useEffect(()=>setGroupMemberLimit(MEMBER_DISPLAY_STEP),[selectedGroup]);
 
- const selectedGroupRow=groups.find(g=>g.id===selectedGroup)??null;
+ const selectedGroupRow=filteredGroups.find(g=>g.id===selectedGroup)??null;
 
  const candidates=useMemo(()=>{
   const keyword=candidateQuery.trim().toLowerCase();
@@ -697,10 +719,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
       <span>组织架构</span>
       <span className="org-count-pill">{departments.length} 部门</span>
      </h3>
-     <RareButton type="button" className="org-header-btn" title="新建部门"
-      onClick={()=>{setNotice(null);setCreateDepartmentOpen(true);}}>
-      <IconPlus/>新建
-     </RareButton>
     </div>
 
     {departmentsState==="loading"&&<p className="hint" style={{padding:"8px 12px"}}>正在读取部门…</p>}
@@ -755,7 +773,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
        {/* 未分配部门节点 */}
        {unassignedCount>0&&<li role="treeitem" aria-selected={selectedDepartment==="__unassigned"} tabIndex={-1}
         onClick={()=>setSelectedDepartment("__unassigned")}>
-        <div className={"tree-row "+(selectedDepartment==="__unassigned警"||selectedDepartment==="__unassigned"?"on":"")} style={{paddingLeft:"10px"}}>
+        <div className={"tree-row "+(selectedDepartment==="__unassigned"?"on":"")} style={{paddingLeft:"10px"}}>
          <span className="org-tree-chevron-spacer" aria-hidden="true"/>
          <span className="org-tree-icon" aria-hidden="true"><IconUsers/></span>
          <RareButton type="button" className="org-node-label" tabIndex={-1}
@@ -787,7 +805,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
        onClick={()=>setActiveTab("groups")}>
        <span className="org-tab-icon"><IconGroup/></span>
        <span>工作组管理</span>
-       <span className="org-tab-badge">{groups.length}</span>
+       <span className="org-tab-badge">{filteredGroups.length}</span>
       </RareButton>
       <RareButton type="button" role="tab" aria-selected={activeTab==="permissions"} tabIndex={activeTab==="permissions"?0:-1} id="org-tab-permissions" aria-controls="org-panel-permissions"
        className={"org-tab"+(activeTab==="permissions"?" active":"")}
@@ -811,10 +829,10 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
     {activeTab==="permissions"&&<div className="rare-tab-panel" role="tabpanel" id="org-panel-permissions" aria-labelledby="org-tab-permissions"><PermissionsPanel users={users} groups={groups}
      usersState={usersState} groupsState={groupsState}
      onRetryUsers={()=>setUsersToken(token=>token+1)}
-     onRetryGroups={()=>setGroupsToken(token=>token+1)}/></div>}
+     onRetryGroups={()=>setGroupsToken(token=>token+1)} onDirtyChange={setHasUnsavedChanges} requestNavigation={requestNavigation}/></div>}
     {activeTab==="approvals"&&<div className="rare-tab-panel" role="tabpanel" id="org-panel-approvals" aria-labelledby="org-tab-approvals">
-     <ApprovalPoliciesPanel users={users} usersState={usersState} onRetryUsers={()=>setUsersToken(token=>token+1)}/></div>}
-    {activeTab==="roles"&&<div className="rare-tab-panel" role="tabpanel" id="org-panel-roles" aria-labelledby="org-tab-roles"><RoleBindingsPanel users={users}/></div>}
+     <ApprovalPoliciesPanel users={users} usersState={usersState} onRetryUsers={()=>setUsersToken(token=>token+1)} onDirtyChange={setHasUnsavedChanges} requestNavigation={requestNavigation}/></div>}
+    {activeTab==="roles"&&<div className="rare-tab-panel" role="tabpanel" id="org-panel-roles" aria-labelledby="org-tab-roles"><RoleBindingsPanel users={users} onDirtyChange={setHasUnsavedChanges}/></div>}
 
     {/* Tab 1: 部门成员 */}
     {activeTab==="members"&&<div className="org-tab-stage" role="tabpanel" id="org-panel-members" aria-labelledby="org-tab-members">
@@ -944,12 +962,8 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
        <h4 className="org-card-title">
         <IconGroup/>
         <span>工作组列表</span>
-        <span className="org-count-pill">{groups.length}</span>
+        <span className="org-count-pill">{filteredGroups.length}</span>
        </h4>
-       <RareButton type="button" className="org-header-btn" title="创建工作组"
-        onClick={()=>{setNotice(null);setCreateGroupOpen(true);}}>
-        <IconPlus/>新建
-       </RareButton>
       </div>
 
       <div className="org-search-box">
@@ -964,7 +978,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
        <RareButton type="button" className="secondary-action" onClick={()=>setGroupsToken(t=>t+1)}>重试</RareButton>
       </div>}
 
-      {groupsReady&&groups.length===0&&<p className="empty" style={{padding:"16px 12px"}}>暂无工作组，可点上方“新建”创建。</p>}
+      {groupsReady&&groups.length===0&&<p className="empty" style={{padding:"16px 12px"}}>暂无工作组，可使用顶部按钮创建。</p>}
 
       {groupsReady&&groups.length>0&&<ul className="org-group-cards-list">
        {filteredGroups.slice(0,groupLimit).map(group=>{
@@ -1082,6 +1096,18 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    </section>
   </div>
 
+  <Dialog open={discardDialogOpen} title="未保存的修改" className="org-dialog"
+   onClose={()=>{pendingNavigation.current=null;setDiscardDialogOpen(false);}}>
+   <p>当前编辑尚未保存。离开后将丢弃这些修改。</p>
+   <div className="dialog-actions">
+    <RareButton type="button" onClick={()=>{pendingNavigation.current=null;setDiscardDialogOpen(false);}}>继续编辑</RareButton>
+    <RareButton type="button" className="danger" tone="danger" onClick={()=>{
+     const next=pendingNavigation.current;
+     pendingNavigation.current=null;setDiscardDialogOpen(false);setHasUnsavedChanges(false);
+     next?.();
+    }}>放弃修改并离开</RareButton>
+   </div>
+  </Dialog>
   {/* 对话框保持原样 */}
   {resetTarget&&<ResetPasswordDialog target={resetTarget} department={departmentLabel(resetTarget.departmentId)}
    onClose={()=>setResetTarget(null)} onSubmit={resetPassword}/>}

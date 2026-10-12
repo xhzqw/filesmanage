@@ -26,7 +26,7 @@ const roleAPI={
  revoke:(id:string)=>request<{revoked:string}>("/roles/bindings/"+encodeURIComponent(id),{method:"DELETE"}),
 };
 
-export function RoleBindingsPanel({users}:{users:User[]}){
+export function RoleBindingsPanel({users,onDirtyChange}:{users:User[];onDirtyChange:(dirty:boolean)=>void}){
  const[items,setItems]=useState<ManagementRole[]>([]);
  const[load,setLoad]=useState(0);
  useEffect(()=>observeWorkspaceChange(()=>setLoad(n=>n+1),["permissions"]),[]);
@@ -42,6 +42,10 @@ export function RoleBindingsPanel({users}:{users:User[]}){
  const[expires,setExpires]=useState("");
  const[review,setReview]=useState(false);
  const[confirmRevoke,setConfirmRevoke]=useState("");
+ const dirty=userId!==""||role!=="auditor"||scopeId!==""||folderQuery!==""||
+  actions.length!==1||actions[0]!=="list"||expires!==""||review;
+ useEffect(()=>onDirtyChange(dirty),[dirty,onDirtyChange]);
+ useEffect(()=>()=>onDirtyChange(false),[onDirtyChange]);
  useEffect(()=>{let live=true;roleAPI.list().then(v=>{if(live)setItems(v);})
   .catch(e=>{if(live)setError(errorCopy(e,"读取管理角色失败"));});return()=>{live=false};},[load]);
  useEffect(()=>{
@@ -66,7 +70,7 @@ export function RoleBindingsPanel({users}:{users:User[]}){
    await roleAPI.create({userId,role,scopeId:role==="auditor"?"":scopeId.trim(),
     allowedActions:role==="auditor"?[]:actions,
     ...(expires?{expiresAt:new Date(expires).toISOString()}:{})});
-   setLoad(n=>n+1);setUserId("");setScopeId("");setFolderQuery("");setReview(false);
+   setLoad(n=>n+1);setUserId("");setRole("auditor");setActions(["list"]);setExpires("");setScopeId("");setFolderQuery("");setReview(false);
   }catch(e){setError(errorCopy(e,"分配角色失败"));}
   finally{setBusy(false);}
  }

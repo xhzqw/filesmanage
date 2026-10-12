@@ -10,34 +10,52 @@ import type {ResourceFolder} from "./permissionsApi";
 import "./approvalPolicies.css";
 
 type LoadState="loading"|"ready"|"failed";
-export function ApprovalPoliciesPanel({users,usersState,onRetryUsers}:{users:User[];usersState:LoadState;onRetryUsers:()=>void}){
+export function ApprovalPoliciesPanel({users,usersState,onRetryUsers,onDirtyChange,requestNavigation}:{
+ users:User[];usersState:LoadState;onRetryUsers:()=>void;
+ onDirtyChange:(dirty:boolean)=>void;requestNavigation:(navigate:()=>void)=>void;
+}){
  const [params,setParams]=useSearchParams();
  const folderId=params.get("folder")??"";
  const currentFolder=useRef(folderId);currentFolder.current=folderId;
  const [folderName,setFolderName]=useState<{id:string;name:string}|null>(null);
  const [status,setStatus]=useState<LoadState>("ready");
  const [refresh,setRefresh]=useState(0);
- useEffect(()=>observeWorkspaceChange(()=>setRefresh(n=>n+1),["approval-policy","permissions"]),[]);
  const [approverIds,setApproverIds]=useState<string[]>([""]);
  const [enabled,setEnabled]=useState(false);
  const [configured,setConfigured]=useState(false);
  const [busy,setBusy]=useState(false);
  const [confirmRemove,setConfirmRemove]=useState(false);
  const [notice,setNotice]=useState<{message:string;error:boolean}|null>(null);
+ const [saved,setSaved]=useState<{ids:string[];enabled:boolean}|null>(null);
+ const dirty=!!folderId&&status==="ready"&&saved!==null&&
+  (saved.enabled!==enabled||saved.ids.join("|")!==approverIds.join("|"));
+ const dirtyRef=useRef(false);dirtyRef.current=dirty||busy;
+ useEffect(()=>onDirtyChange(dirty),[dirty,onDirtyChange]);
+ useEffect(()=>()=>onDirtyChange(false),[onDirtyChange]);
+ useEffect(()=>observeWorkspaceChange(()=>{
+  if(dirtyRef.current){
+   setNotice({message:"检测到远端策略更新；请先保存或放弃当前修改，再重新读取。",error:true});
+  }else setRefresh(n=>n+1);
+ },["approval-policy","permissions"]),[]);
  useEffect(()=>{
-  setNotice(null);setConfirmRemove(false);setApproverIds([""]);setEnabled(false);setConfigured(false);setBusy(false);
+  setNotice(null);setConfirmRemove(false);setApproverIds([""]);setEnabled(false);setConfigured(false);setSaved(null);setBusy(false);
   if(!folderId){setStatus("ready");return;}
   let live=true;setStatus("loading");
   approvalPolicyApi.get(folderId).then(policy=>{
    if(!live)return;
-   setConfigured(policy.configured);setApproverIds(policy.approverIds?.length?policy.approverIds:[policy.approverId??""]);
-   setEnabled(policy.configured&&policy.enabled===true);setStatus("ready");
+   const ids=policy.approverIds?.length?policy.approverIds:[policy.approverId??""];
+   const currentEnabled=policy.configured&&policy.enabled===true;
+   setConfigured(policy.configured);setApproverIds(ids);
+   setEnabled(currentEnabled);setSaved({ids:[...ids],enabled:currentEnabled});setStatus("ready");
   }).catch(error=>{if(live){setStatus("failed");setNotice({message:errorCopy(error,"读取审批策略失败"),error:true});}});
   return()=>{live=false;};
  },[folderId,refresh]);
  function selectFolder(folder:ResourceFolder){
-  setFolderName({id:folder.id,name:folder.path||folder.name});
-  setParams(old=>{const next=new URLSearchParams(old);next.set("tab","approvals");next.set("folder",folder.id);next.delete("view");return next;});
+  if(folder.id===folderId)return;
+  requestNavigation(()=>{
+   setFolderName({id:folder.id,name:folder.path||folder.name});
+   setParams(old=>{const next=new URLSearchParams(old);next.set("tab","approvals");next.set("folder",folder.id);next.delete("view");return next;});
+  });
  }
  async function save(event:FormEvent<HTMLFormElement>){
   event.preventDefault();if(!folderId||approverIds.some(id=>!id)||new Set(approverIds).size!==approverIds.length||busy||status!=="ready"||usersState!=="ready")return;
@@ -45,7 +63,7 @@ export function ApprovalPoliciesPanel({users,usersState,onRetryUsers}:{users:Use
   try{
    await approvalPolicyApi.set(folderId,approverIds,enabled);
    if(currentFolder.current!==folderId)return;
-   setConfigured(true);setNotice({message:"审批策略已保存",error:false});
+   setConfigured(true);setSaved({ids:[...approverIds],enabled});setNotice({message:"审批策略已保存",error:false});
   }catch(error){
    if(currentFolder.current===folderId)setNotice({message:errorCode(error)==="E_NETWORK"?"网络中断，请刷新确认策略是否生效":errorCopy(error,"保存失败"),error:true});
   }finally{if(currentFolder.current===folderId)setBusy(false);}
@@ -56,7 +74,7 @@ export function ApprovalPoliciesPanel({users,usersState,onRetryUsers}:{users:Use
   try{
    await approvalPolicyApi.clear(folderId);
    if(currentFolder.current!==folderId)return;
-   setConfigured(false);setEnabled(false);setApproverIds([""]);setConfirmRemove(false);
+   setConfigured(false);setEnabled(false);setApproverIds([""]);setSaved({ids:[""],enabled:false});setConfirmRemove(false);
    setNotice({message:"审批策略已移除",error:false});
   }catch(error){
    if(currentFolder.current===folderId)setNotice({message:errorCode(error)==="E_NETWORK"?"网络中断，请刷新确认策略是否仍存在":errorCopy(error,"移除失败"),error:true});

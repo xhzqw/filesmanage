@@ -103,6 +103,16 @@ try{
   })()`),tab+" changes only the right panel");
  }
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-tree-name')"),"resource folder browser loads");
+ for(const width of [1100,1024,900,820]){
+  await cdp.send("Emulation.setDeviceMetricsOverride",{width,height:900,deviceScaleFactor:1,mobile:false});
+  assert(await cdp.evaluate(`(()=>{
+   const tree=document.querySelector('.org-dept-card').getBoundingClientRect();
+   const task=document.querySelector('.org-stage-card').getBoundingClientRect();
+   return task.x>=tree.right&&Math.abs(task.y-tree.y)<=3&&
+    document.documentElement.scrollWidth<=innerWidth+2;
+  })()`),width+"px keeps compact side-by-side organization workbench");
+ }
+ await cdp.send("Emulation.clearDeviceMetricsOverride");
  await cdp.evaluate("(()=>{document.querySelector('.perm-tree-name')?.click();return true;})()");
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-insight select')"),"effective permission explanation renders");
  await cdp.evaluate(`(()=>{
@@ -164,10 +174,22 @@ try{
  })()`);
  assert(await cdp.waitFor("()=>!document.querySelector('.perm-risk-consent')"),
   "editing ACL scope invalidates reviewed consent");
+ await cdp.evaluate("(()=>{document.querySelector('#org-tab-groups').click();return true})()");
+ assert(await cdp.waitFor("()=>!!document.querySelector('dialog[open] .dialog-actions')"),
+  "unsaved ACL draft blocks tab navigation");
+ assert(await cdp.evaluate("(()=>document.querySelector('#org-tab-permissions')?.getAttribute('aria-selected')==='true')()"),
+  "ACL draft keeps current tab before confirmation");
+ await cdp.evaluate("(()=>{[...document.querySelectorAll('dialog[open] button')].find(b=>b.textContent?.includes('继续编辑')).click();return true})()");
+ assert(await cdp.waitFor("()=>!document.querySelector('dialog[open]')"),"cancel preserves ACL editing");
+ assert(await cdp.evaluate("(()=>[...document.querySelectorAll('.perm-action-grid label')].some(x=>x.textContent?.includes('下载')&&x.querySelector('input')?.checked))()"),
+  "cancel keeps the unsaved ACL actions");
  await cdp.evaluate(`(()=>{
   [...document.querySelectorAll('.perm-subnav button')]
    .find(b=>b.textContent?.includes('审计'))?.click();return true;
  })()`);
+ assert(await cdp.waitFor("()=>!!document.querySelector('dialog[open]')"),
+  "unsaved ACL draft blocks changing permission subviews");
+ await cdp.evaluate("(()=>{[...document.querySelectorAll('dialog[open] button')].find(b=>b.textContent?.includes('放弃修改')).click();return true})()");
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-audit .perm-table')"),"audit view loads with event table");
  assert(await cdp.evaluate("(()=>new URLSearchParams(location.search).get('view')==='audit')()"),
   "audit tab is deep-linkable");
@@ -176,6 +198,29 @@ try{
   "P2 role bindings page renders");
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-detail form')"),
   "P2 role delegation form is available");
+ await cdp.navigate(BASE+"/org?tab=approvals");
+ assert(await cdp.waitFor("()=>!!document.querySelector('.approval-workspace .perm-tree-name')"),
+  "approval resource navigation renders");
+ await cdp.evaluate("(()=>{document.querySelector('.approval-workspace .perm-tree-name').click();return true})()");
+ assert(await cdp.waitFor("()=>!!document.querySelector('.approval-toggle input:not(:disabled)')"),
+  "approval policy editor is ready");
+ const before=await cdp.evaluate("(()=>document.querySelector('.approval-toggle input').checked)()");
+ await cdp.evaluate("(()=>{document.querySelector('.approval-toggle input').click();return true})()");
+ assert(await cdp.waitFor(`()=>document.querySelector('.approval-toggle input')?.checked===${!before}`),
+  "approval draft changes locally without server writes");
+ const selectedFolder=await cdp.evaluate("(()=>new URLSearchParams(location.search).get('folder'))()");
+ await cdp.evaluate("(()=>{document.querySelector('#org-tab-roles').click();return true})()");
+ assert(await cdp.waitFor("()=>!!document.querySelector('dialog[open]')"),
+  "unsaved approval draft blocks tab navigation");
+ await cdp.evaluate("(()=>{[...document.querySelectorAll('dialog[open] button')].find(b=>b.textContent?.includes('继续编辑')).click();return true})()");
+ assert(await cdp.waitFor(`()=>document.querySelector('.approval-toggle input')?.checked===${!before}`),
+  "cancelling navigation preserves approval draft");
+ await cdp.evaluate("(()=>{document.querySelector('#org-tab-roles').click();return true})()");
+ await cdp.evaluate("(()=>{[...document.querySelectorAll('dialog[open] button')].find(b=>b.textContent?.includes('放弃修改')).click();return true})()");
+ assert(await cdp.waitFor("()=>!!document.querySelector('#org-panel-roles')"),
+  "confirmed discard switches to roles");
+ assert(await cdp.evaluate(`(()=>new URLSearchParams(location.search).get('folder')===${JSON.stringify(selectedFolder)})()`),
+  "resource folder context survives switching tabs");
  console.log("PERMISSIONS_P1_BROWSER_PASS");
 }finally{
  cdp?.close();

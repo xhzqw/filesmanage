@@ -158,9 +158,10 @@ export function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(f
  </aside>;
 }
 
-export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUsers,onRetryGroups}:{
+export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUsers,onRetryGroups,onDirtyChange,requestNavigation}:{
  users:User[];groups:Group[];usersState:LoadState;groupsState:LoadState;
  onRetryUsers:()=>void;onRetryGroups:()=>void;
+ onDirtyChange:(dirty:boolean)=>void;requestNavigation:(navigate:()=>void)=>void;
 }){
  const [params,setParams]=useSearchParams();
  const folderId=params.get("folder")??"";
@@ -185,6 +186,10 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
  const [revokeTarget,setRevokeTarget]=useState<DirectGrant|null>(null);
  const [revokeBusy,setRevokeBusy]=useState(false);
  const [revokeError,setRevokeError]=useState("");
+ const dirty=!!folderId&&(subjectKind!=="group"||subjectId!==""||
+  actions.length!==1||actions[0]!=="list"||!scopeOnly||expiresAt!==""||submitState==="review");
+ useEffect(()=>onDirtyChange(dirty),[dirty,onDirtyChange]);
+ useEffect(()=>()=>onDirtyChange(false),[onDirtyChange]);
 
  // URL navigation is independent of ResourceBrowser selection (back/forward,
  // deep links). Never reuse a confirmation or grant subject across resources.
@@ -219,9 +224,12 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
  const displayActions=(xs:string[])=>xs.map(x=>LABELS.get(x)??x).join("、");
  const reload=()=>setRefresh(x=>x+1);
  function selectFolder(folder:ResourceFolder){
-  setSelectedName({id:folder.id,name:folder.path||folder.name});
-  setParams(old=>{const next=new URLSearchParams(old);next.set("tab","permissions");next.set("view","folder");next.set("folder",folder.id);return next;});
-  setSubmitState("edit");setRiskAcknowledged(false);setRevokeTarget(null);setNotice(null);
+  if(folder.id===folderId)return;
+  requestNavigation(()=>{
+   setSelectedName({id:folder.id,name:folder.path||folder.name});
+   setParams(old=>{const next=new URLSearchParams(old);next.set("tab","permissions");next.set("view","folder");next.set("folder",folder.id);return next;});
+   setSubmitState("edit");setRiskAcknowledged(false);setRevokeTarget(null);setNotice(null);
+  });
  }
  async function submit(event:FormEvent<HTMLFormElement>){
   event.preventDefault();
@@ -241,7 +249,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
     ...(parsed!==null?{expiresAt:new Date(parsed).toISOString()}:{})});
    if(currentFolderRef.current!==folderId)return;
    setNotice({text:"直接授权已提交，请以刷新后的服务端记录为准。",error:false});
-   setSubjectId("");setExpiresAt("");setActions(["list"]);setScopeOnly(true);
+   setSubjectKind("group");setSubjectId("");setExpiresAt("");setActions(["list"]);setScopeOnly(true);
    reload();
   }catch(e){
    if(currentFolderRef.current!==folderId)return;
@@ -268,11 +276,11 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
  return <div className="perm-content-root">
   <nav className="perm-subnav" aria-label="权限管理功能">
    <RareButton type="button" className={!auditView&&!documentAuditView?"active":""} aria-current={!auditView&&!documentAuditView?"page":undefined}
-    onClick={()=>setParams(old=>{const next=new URLSearchParams(old);next.set("view","folder");return next;})}>资源授权</RareButton>
+    onClick={()=>requestNavigation(()=>setParams(old=>{const next=new URLSearchParams(old);next.set("view","folder");return next;}))}>资源授权</RareButton>
    <RareButton type="button" className={auditView?"active":""} aria-current={auditView?"page":undefined}
-    onClick={()=>{setRevokeTarget(null);setParams(old=>{const next=new URLSearchParams(old);next.set("view","audit");return next;});}}>权限变更审计</RareButton>
+    onClick={()=>requestNavigation(()=>{setRevokeTarget(null);setParams(old=>{const next=new URLSearchParams(old);next.set("view","audit");return next;});})}>权限变更审计</RareButton>
    <RareButton type="button" className={documentAuditView?"active":""} aria-current={documentAuditView?"page":undefined}
-    onClick={()=>setParams(old=>{const next=new URLSearchParams(old);next.set("view","document-audit");return next;})}>文档活动审计</RareButton>
+    onClick={()=>requestNavigation(()=>setParams(old=>{const next=new URLSearchParams(old);next.set("view","document-audit");return next;}))}>文档活动审计</RareButton>
   </nav>
   {documentAuditView?<DocumentActivityPanel/>:auditView?<PermissionAudit users={users}/>:<div className="perm-workspace">
   <ResourceBrowser selected={folderId} onSelect={selectFolder}/>

@@ -834,16 +834,19 @@
   border-color:var(--color-danger);
 }
 
-@media(max-width:1024px){
+/* Preserve a genuine side-by-side workbench on laptop/compact desktop widths.
+   Only narrow viewports need a vertically stacked mobile layout. */
+@media(min-width:801px) and (max-width:1250px){
+  .org-workbench{grid-template-columns:220px minmax(0,1fr)}
+  .org-dept-card{min-width:0}
+}
+@media(max-width:800px){
   .org-workbench{
     grid-template-columns:minmax(0,1fr);
     grid-template-rows:minmax(140px,26%) minmax(0,1fr);
   }
-  .org-dept-card{min-width:0;min-height:0}
-  .org-stage-card{min-width:0;min-height:0}
-  .org-groups-stage{
-    grid-template-columns:minmax(0,1fr);
-  }
+  .org-dept-card,.org-stage-card{min-width:0;min-height:0}
+  .org-groups-stage{grid-template-columns:minmax(0,1fr)}
 }
 @media(max-width:700px){
   .org-table-container table{min-width:640px}
