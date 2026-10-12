@@ -60,8 +60,12 @@ func (s *Service) RenameFolder(ctx context.Context, u domain.User, folderID, nam
 	if err = tx.RenameFolder(ctx, folder.ID, name); err != nil {
 		return domain.Folder{}, mapError(err)
 	}
+	oldName := folder.Name
 	folder.Name = name
-	audit(ctx, tx, u, "folder.rename", "folder", folder.ID, "success", map[string]any{"name": name})
+	if err = auditRequired(ctx, tx, u, "folder.rename", "folder", folder.ID, "success",
+		map[string]any{"oldName": oldName, "newName": name}); err != nil {
+		return domain.Folder{}, err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return domain.Folder{}, err
 	}
@@ -95,8 +99,15 @@ func (s *Service) MoveFolder(ctx context.Context, u domain.User, folderID, targe
 	if err = tx.MoveFolder(ctx, folder.ID, &target.ID); err != nil {
 		return domain.Folder{}, mapError(err)
 	}
+	var oldParent string
+	if folder.ParentID != nil {
+		oldParent = *folder.ParentID
+	}
 	folder.ParentID = &target.ID
-	audit(ctx, tx, u, "folder.move", "folder", folder.ID, "success", map[string]any{"targetId": target.ID})
+	if err = auditRequired(ctx, tx, u, "folder.move", "folder", folder.ID, "success",
+		map[string]any{"fromParentId": oldParent, "toParentId": target.ID}); err != nil {
+		return domain.Folder{}, err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return domain.Folder{}, err
 	}

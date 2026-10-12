@@ -14,45 +14,46 @@ import (
 // memoryRepo is an in-memory ports.Repository for unit tests. Only the paths
 // under test carry behavior; untouched methods return zero values.
 type memoryRepo struct {
-	mu                         sync.Mutex
-	users                      map[string]memoryUser
-	departments                []domain.Department
-	workgroupList              []domain.Workgroup
-	groupMembers               map[string][]string
-	policies                   map[string]domain.ApprovalPolicy
-	approvals                  []domain.Approval
-	approvalEvents             []domain.ApprovalEvent
-	approvalNotifications      []domain.ApprovalNotification
-	searchPresets              map[string]map[string]domain.SearchPreset
-	approvalNotificationOwners []string
-	locks                      map[string]domain.EditLock
-	officeSessions             []domain.OfficeSession
-	saveEvents                 []domain.OfficeSaveEvent
-	compatReports              []domain.OfficeCompatibilityReport
-	derivatives                []domain.ModelDerivative
-	derivativeJobs             []memoryJob
-	shares                     []domain.Share
-	favorites                  []domain.Favorite
-	sessions                   map[string]memorySession
-	folders                    map[string]domain.Folder
-	files                      map[string]domain.File
-	fileText                   map[string]memoryFileText
-	fileMetadata               map[string]domain.FileMetadata
-	lifecycle                  map[string]domain.FileLifecycle
-	lifecycleFolderPolicies    map[string]domain.LifecyclePolicy
+	mu                          sync.Mutex
+	users                       map[string]memoryUser
+	departments                 []domain.Department
+	workgroupList               []domain.Workgroup
+	groupMembers                map[string][]string
+	policies                    map[string]domain.ApprovalPolicy
+	approvals                   []domain.Approval
+	approvalEvents              []domain.ApprovalEvent
+	approvalNotifications       []domain.ApprovalNotification
+	searchPresets               map[string]map[string]domain.SearchPreset
+	approvalNotificationOwners  []string
+	locks                       map[string]domain.EditLock
+	officeSessions              []domain.OfficeSession
+	saveEvents                  []domain.OfficeSaveEvent
+	compatReports               []domain.OfficeCompatibilityReport
+	derivatives                 []domain.ModelDerivative
+	derivativeJobs              []memoryJob
+	shares                      []domain.Share
+	favorites                   []domain.Favorite
+	sessions                    map[string]memorySession
+	folders                     map[string]domain.Folder
+	files                       map[string]domain.File
+	fileText                    map[string]memoryFileText
+	fileMetadata                map[string]domain.FileMetadata
+	lifecycle                   map[string]domain.FileLifecycle
+	lifecycleFolderPolicies     map[string]domain.LifecyclePolicy
 	lifecycleDepartmentPolicies map[string]domain.LifecyclePolicy
-	lifecycleNotifications     []domain.LifecycleNotification
-	reviewComments             []domain.FileReviewComment
-	resumableUploads           map[string]domain.ResumableUpload
-	versions                   map[string][]domain.FileVersion
-	blobs                      map[string]domain.Blob
-	grants                     map[string]domain.ACL
-	roleBindings               map[string]domain.ManagementRoleBinding
-	trash                      []domain.TrashEntry
-	workgroups                 map[string][]string
-	audit                      []domain.AuditEvent
-	idempotency                map[string][]byte
-	failOnCommit               bool
+	lifecycleNotifications      []domain.LifecycleNotification
+	reviewComments              []domain.FileReviewComment
+	resumableUploads            map[string]domain.ResumableUpload
+	versions                    map[string][]domain.FileVersion
+	blobs                       map[string]domain.Blob
+	grants                      map[string]domain.ACL
+	roleBindings                map[string]domain.ManagementRoleBinding
+	trash                       []domain.TrashEntry
+	workgroups                  map[string][]string
+	audit                       []domain.AuditEvent
+	auditFileLinks              map[int64]map[string]bool
+	idempotency                 map[string][]byte
+	failOnCommit                bool
 }
 
 type memoryFileText struct {
@@ -74,22 +75,23 @@ type memorySession struct {
 
 func newMemoryRepo() *memoryRepo {
 	return &memoryRepo{
-		users:         map[string]memoryUser{},
-		searchPresets: map[string]map[string]domain.SearchPreset{},
-		sessions:      map[string]memorySession{},
-		folders:       map[string]domain.Folder{},
-		files:         map[string]domain.File{},
-		fileMetadata:  map[string]domain.FileMetadata{},
-		lifecycle:     map[string]domain.FileLifecycle{},
-		versions:      map[string][]domain.FileVersion{},
-		blobs:         map[string]domain.Blob{},
-		grants:        map[string]domain.ACL{},
-		roleBindings:  map[string]domain.ManagementRoleBinding{},
-		workgroups:    map[string][]string{},
-		idempotency:   map[string][]byte{},
-		groupMembers:  map[string][]string{},
-		policies:      map[string]domain.ApprovalPolicy{},
-		locks:         map[string]domain.EditLock{},
+		users:          map[string]memoryUser{},
+		searchPresets:  map[string]map[string]domain.SearchPreset{},
+		sessions:       map[string]memorySession{},
+		folders:        map[string]domain.Folder{},
+		files:          map[string]domain.File{},
+		fileMetadata:   map[string]domain.FileMetadata{},
+		lifecycle:      map[string]domain.FileLifecycle{},
+		versions:       map[string][]domain.FileVersion{},
+		blobs:          map[string]domain.Blob{},
+		grants:         map[string]domain.ACL{},
+		roleBindings:   map[string]domain.ManagementRoleBinding{},
+		auditFileLinks: map[int64]map[string]bool{},
+		workgroups:     map[string][]string{},
+		idempotency:    map[string][]byte{},
+		groupMembers:   map[string][]string{},
+		policies:       map[string]domain.ApprovalPolicy{},
+		locks:          map[string]domain.EditLock{},
 	}
 }
 

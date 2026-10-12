@@ -7,6 +7,7 @@ import "./fileHistory.css";
 const eventLabels:Record<string,string>={
  "file.upload":"文件上传","file.save":"内容修改","file.rollback":"版本回滚",
  "file.rename":"文件重命名","file.move":"文件移动","file.delete":"移入回收站",
+ "folder.rename":"所在文件夹重命名","folder.move":"所在文件夹移动","folder.delete":"所在文件夹被删除",
  "file.metadata_update":"属性修改","trash.restore":"从回收站恢复","trash.purge":"永久删除",
  "office.save_commit":"Office 内容保存","office.session_open":"开始在线编辑",
  "office.session_close":"结束在线编辑","approval.request":"提交审批",
@@ -19,6 +20,8 @@ const detailText=(value:unknown)=>typeof value==="string"?value:typeof value==="
 function describe(item:FileHistoryEvent){
  const d=item.details;
  if(item.eventType==="file.rename")return detailText(d.oldName)+" → "+(detailText(d.newName)||detailText(d.name));
+ if(item.eventType==="folder.rename")return detailText(d.oldName)&&detailText(d.newName)?detailText(d.oldName)+" → "+detailText(d.newName):"文件所在路径受到影响";
+ if(item.eventType==="folder.move"||item.eventType==="folder.delete")return "此操作影响了文件所在目录";
  if(item.eventType==="file.move")return "位置变更"+(d.fromFolderId&&d.toFolderId?" · "+detailText(d.fromFolderId)+" → "+detailText(d.toFolderId):"");
  if(item.eventType==="trash.restore")return "恢复文件"+(d.newName?" · "+detailText(d.newName):"");
  if(item.eventType==="file.save"||item.eventType==="office.save_commit")return "保存为 v"+detailText(d.versionSeq)+(d.baseSeq?" · 原版本 v"+detailText(d.baseSeq):"");

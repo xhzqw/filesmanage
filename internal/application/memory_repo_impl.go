@@ -876,6 +876,37 @@ func (r *memoryRepo) RecordAudit(_ context.Context, e domain.AuditEvent) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.audit = append(r.audit, e)
+	var root string
+	switch {
+	case e.TargetKind == "folder" && (e.EventType == "folder.rename" || e.EventType == "folder.move" || e.EventType == "folder.delete"):
+		root = e.TargetID
+	case e.TargetKind == "trash" && (e.EventType == "trash.restore" || e.EventType == "trash.purge"):
+		for _, entry := range r.trash {
+			if entry.ID == e.TargetID && entry.FolderID != nil {
+				root = *entry.FolderID
+				break
+			}
+		}
+	}
+	if root != "" {
+		descendants := map[string]bool{root: true}
+		for changed := true; changed; {
+			changed = false
+			for id, folder := range r.folders {
+				if !descendants[id] && folder.ParentID != nil && descendants[*folder.ParentID] {
+					descendants[id] = true
+					changed = true
+				}
+			}
+		}
+		links := map[string]bool{}
+		for id, file := range r.files {
+			if descendants[file.FolderID] {
+				links[id] = true
+			}
+		}
+		r.auditFileLinks[int64(len(r.audit))] = links
+	}
 	return nil
 }
 
