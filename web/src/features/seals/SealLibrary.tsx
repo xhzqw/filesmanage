@@ -27,6 +27,7 @@ export function SealLibrary({isAdmin}:{isAdmin:boolean}){
  const[owner,setOwner]=useState("");
  const[userId,setUserId]=useState("");
  const[file,setFile]=useState<File|null>(null);
+ const[bundle,setBundle]=useState<File|null>(null);
  const[busy,setBusy]=useState(false);
  const[error,setError]=useState("");
  const[status,setStatus]=useState("");
@@ -43,6 +44,16 @@ export function SealLibrary({isAdmin}:{isAdmin:boolean}){
   setBusy(true);setError("");setStatus("");
   try{await sealsApi.configure(active.id,action,action==="retire"?"":action==="rename"?renameValue:userId);setRevision(i=>i+1);setStatus("已保存");}
   catch(err){setError(errorCopy(err,"操作失败"))}finally{setBusy(false);}
+ }
+
+ async function importBundle(){
+  if(!bundle||busy)return;
+  setBusy(true);setError("");setStatus("");
+  try{
+   const result=await sealsApi.importBundle(bundle);
+   setBundle(null);setRevision(x=>x+1);
+   setStatus("批量导入完成："+result.created+" 份新增，"+result.existing+" 份已存在；共 "+result.total+" 份。个人签名已按清单绑定账号。");
+  }catch(err){setError(errorCopy(err,"批量导入失败，未确认导入结果"));}finally{setBusy(false);}
  }
  async function create(){
   if(!file||!name.trim())return;
@@ -86,6 +97,13 @@ export function SealLibrary({isAdmin}:{isAdmin:boolean}){
      <RareButton disabled={busy} onClick={()=>void perform("retire")}>停用{active.kind==="personal"?"签名":"印章"}</RareButton>
     </div>}
    </div>:<div className="empty">选择签章查看</div>}
+   {isAdmin&&<div className="seal-library-batch">
+    <strong>批量导入已确认素材</strong>
+    <label className="seal-batch-input">签章 ZIP 包
+     <RareInput type="file" accept=".zip,application/zip" onChange={e=>setBundle(e.target.files?.[0]??null)}/>
+    </label>
+    <RareButton disabled={busy||!bundle} onClick={()=>void importBundle()}>{busy?"正在导入…":"导入并绑定账号"}</RareButton>
+   </div>}
    <div className="seal-library-create">
     <h3>{isAdmin?"导入签章素材":"上传我的个人签名"}</h3>
     <div className="seal-library-form">

@@ -1,4 +1,4 @@
-import {request} from "../../shared/http";
+import {ApiError,request,reportSessionResponse} from "../../shared/http";
 import type {SealAsset,FileSealMark,SealPlacement,SealUserPermission} from "../../entities/seal/model";
 
 export const sealsApi={
@@ -7,6 +7,16 @@ export const sealsApi={
  updatePermission:(userId:string,canSign:boolean,canStamp:boolean)=>request<SealUserPermission>("/seal-permissions/"+encodeURIComponent(userId),{method:"PUT",body:JSON.stringify({canSign,canStamp})}),
 
  list:()=>request<SealAsset[]>("/seals"),
+ importBundle:async(file:File):Promise<{created:number;existing:number;total:number}>=>{
+  if(file.size<40||file.size>6*1024*1024||(!file.name.toLowerCase().endsWith(".zip")))throw new Error("请选择 6 MB 以内的签章 ZIP 导入包");
+  const res=await fetch("/api/seals/bulk",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/zip"},body:file});
+  await reportSessionResponse(res,"/seals/bulk");
+  let reply:{ok:boolean;data?:{created:number;existing:number;total:number};error?:{code:string;message:string}}|undefined;
+  try{reply=await res.json()}catch{}
+  if(!res.ok||!reply?.ok||!reply.data)throw new ApiError(reply?.error?.code||"E_IMPORT",res.status,undefined,reply?.error?.message||"批量导入失败");
+  return reply.data;
+ },
+
  imageUrl:(id:string)=>"/api/seals/"+encodeURIComponent(id)+"/image",
  create:(data:{kind:"personal"|"company";name:string;ownerId:string;pngBase64:string})=>request<SealAsset>("/seals",{method:"POST",body:JSON.stringify(data)}),
  configure:(id:string,action:"bind"|"grant"|"revoke"|"retire"|"rename",userId="")=>request<{updated:string}>("/seals/"+encodeURIComponent(id)+"/manage",{method:"POST",body:JSON.stringify({action,userId})}),

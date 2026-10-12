@@ -17,6 +17,10 @@
 .seal-library-create{border-top:1px solid var(--border-hairline);padding-top:9px}
 .seal-library-form{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin-top:9px}
 .seal-library-form label{flex:1 1 150px;min-width:0}.seal-library-form input[type=file]{max-width:220px;font-size:11px}
+.seal-library-batch{display:flex;align-items:end;flex-wrap:wrap;gap:8px;padding:8px;border:1px solid var(--border-hairline);border-radius:var(--radius-sm);background:var(--surface-header)}
+.seal-library-batch>strong{font-size:12px;align-self:center}
+.seal-batch-input{display:flex;flex:1 1 170px;min-width:0;flex-direction:column;gap:4px;font-size:11px}
+.seal-batch-input input{width:100%;max-width:330px;min-width:0;font-size:11px}
 .seal-file-workspace{display:grid;grid-template-columns:minmax(180px,220px) minmax(0,1fr) minmax(180px,220px);gap:8px;padding:8px;min-height:470px;height:min(720px,calc(100vh - 250px))}
 .seal-file-controls,.seal-file-history{display:flex;flex-direction:column;gap:10px}
 .seal-size-controls{display:grid;grid-template-columns:1fr 1fr;gap:7px}
