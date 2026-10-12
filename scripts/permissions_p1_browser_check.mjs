@@ -89,7 +89,7 @@ try{
  // Switching views must not replace the organization shell.
  assert(await cdp.evaluate("(()=>!!document.querySelector('.org-dept-card')&&!!document.querySelector('.work-body>.toolbar'))()"),
   "organization navigation is visible on the permissions tab");
- await cdp.evaluate("window.__orgShellTree=document.querySelector('.org-dept-card');window.__orgShellTabs=document.querySelector('.org-tabs-bar')");
+ await cdp.evaluate("window.__orgShellTree=document.querySelector('.org-dept-card');window.__orgShellTabs=document.querySelector('.org-tabs-bar');true");
  for(const tab of ["members","groups","approvals","roles","permissions"]){
   await cdp.evaluate(`document.querySelector('#org-tab-${tab}').click()`);
   assert(await cdp.waitFor(`()=>document.querySelector('#org-tab-${tab}')?.getAttribute('aria-selected')==='true'`),
