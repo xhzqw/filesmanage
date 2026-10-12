@@ -69,7 +69,7 @@ export function buildVectorSheet(root:Three.Group,options:PlotOptions):PlotSheet
     continue;
    }
    const mesh=child as Three.Mesh;
-   if(mesh.isMesh&&(mesh.name==="HATCH"||mesh.name==="VIEWPORT_HATCH")){
+   if(mesh.isMesh&&(mesh.name==="HATCH"||mesh.name==="SOLID"||mesh.name==="VIEWPORT_HATCH")){
     const attr=mesh.geometry.getAttribute("position");
     if(!attr||attr.count%3!==0)throw new Error("填充三角形不完整");
     faces+=attr.count/3;

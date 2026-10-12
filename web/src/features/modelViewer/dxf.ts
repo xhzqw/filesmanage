@@ -246,7 +246,7 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
      return;
     }
     const mesh=node as THREE.Mesh;
-    if(mesh.isMesh&&mesh.name==="HATCH"){
+    if(mesh.isMesh&&(mesh.name==="HATCH"||mesh.name==="SOLID")){
      const position=mesh.geometry.getAttribute("position");
      if(!position)return;
      const triangles:SourceFill["triangles"]=[];
@@ -434,6 +434,48 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
    anchor.y+offsetX*Math.sin(angle)+offsetY*Math.cos(angle),0);
   (sprite.material as THREE.SpriteMaterial).rotation=angle;
   groupFor(resolved).add(sprite);
+ };
+
+ // SOLID's 4-point order is 10,11,13,12; 10,11,12,13 crosses itself.
+ const drawSolid=(e:Entity)=>{
+  const corner=(index:number)=>{
+   const x=e.raw.find(pair=>pair.code===10+index)?.value;
+   const y=e.raw.find(pair=>pair.code===20+index)?.value;
+   if(x===undefined||y===undefined)return null;
+   const point={x:Number(x),y:Number(y)};
+   return Number.isFinite(point.x)&&Number.isFinite(point.y)&&
+    Math.abs(point.x)<1e12&&Math.abs(point.y)<1e12?point:null;
+  };
+  const a=corner(0),b=corner(1),c=corner(2),d=corner(3);
+  if(!a||!b||!c){skipped.add("SOLID: 顶点缺失或无效");return;}
+  const input=d&&Math.hypot(d.x-c.x,d.y-c.y)>1e-9
+   ?[a,b,d,c]:[a,b,c];
+  const polygon=input.map(point=>{
+   const p=transformed(point.x,point.y);
+   return new THREE.Vector2(p.x,p.y);
+  });
+  if(polygon.some(p=>!Number.isFinite(p.x)||!Number.isFinite(p.y)||
+    Math.abs(p.x)>1e12||Math.abs(p.y)>1e12)){
+   skipped.add("SOLID: 顶点变换越界");return;
+  }
+  const faces=THREE.ShapeUtils.triangulateShape(polygon,[]);
+  if(!faces.length){skipped.add("SOLID: 退化或自交");return;}
+  if(hatchTriangles+faces.length>hatchBudget){
+   skipped.add("SOLID: 填充预算超限");return;
+  }
+  hatchTriangles+=faces.length;
+  const coordinates:number[]=[];
+  for(const face of faces)for(const index of face){
+   const v=polygon[index];
+   if(v)coordinates.push(v.x,v.y,-0.0001);
+  }
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute("position",new THREE.Float32BufferAttribute(coordinates,3));
+  const mesh=new THREE.Mesh(geometry,new THREE.MeshBasicMaterial({
+   color:currentColor,side:THREE.DoubleSide,depthWrite:false,
+  }));
+  mesh.name="SOLID";mesh.renderOrder=-1;
+  groupFor(actualLayer(e.layer)).add(mesh);
  };
 
  const drawHatch=(e:Entity)=>{
@@ -686,6 +728,7 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
     break;
    }
    case "HATCH":drawHatch(e);break;
+   case "SOLID":drawSolid(e);break;
    case "LWPOLYLINE":
    case "POLYLINE":{
     if(e.points.length<2)break;
