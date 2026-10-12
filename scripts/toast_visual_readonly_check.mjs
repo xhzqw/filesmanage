@@ -54,8 +54,8 @@ const geometry=String.raw`(()=>{
  const a=viewport.getBoundingClientRect(),b=row.getBoundingClientRect();
  const rowStyle=getComputedStyle(row),copyStyle=getComputedStyle(copy);
  const outcome={
-  screenX:innerWidth/2,screenY:innerHeight/2,
-  x:a.left+a.width/2,y:a.top+a.height/2,
+  screenX:innerWidth/2,screenHeight:innerHeight,
+  x:a.left+a.width/2,top:a.top,
   rowWidth:b.width,rowHeight:b.height,
   borderLeft:parseFloat(rowStyle.borderLeftWidth),
   borderRadius:parseFloat(rowStyle.borderTopLeftRadius),
@@ -69,7 +69,9 @@ const geometry=String.raw`(()=>{
 
 function assertGeometry(state,where){
  assert.ok(Math.abs(state.x-state.screenX)<=2,where+": viewport not horizontally centered");
- assert.ok(Math.abs(state.y-state.screenY)<=2,where+": viewport not vertically centered");
+ const top=Math.min(112,Math.max(72,state.screenHeight*.12));
+ assert.ok(Math.abs(state.top-top)<=2,where+": toast should sit at the upper-center anchor");
+ assert.ok(state.top<state.screenHeight/3,where+": toast must not return to vertical middle");
  assert.ok(Math.abs(state.rowCenterX-state.screenX)<=2,where+": toast row not centered");
  assert.ok(state.rowHeight<=48,where+": notification became oversized");
  assert.ok(state.rowWidth<=400,where+": notification exceeds compact maximum");
@@ -125,14 +127,16 @@ try{
   const bounds=row.getBoundingClientRect();
   const hit=document.elementFromPoint(bounds.left+bounds.width/2,bounds.top+bounds.height/2);
   const result={modal:dialog.matches(":modal"),clickable:row.contains(hit),
-   centerX:bounds.left+bounds.width/2,screenX:innerWidth/2};
+   centerX:bounds.left+bounds.width/2,screenX:innerWidth/2,
+   top:bounds.top,screenHeight:innerHeight};
   dialog.close();dialog.remove();
   return result;
 })()`);
  assert.equal(inModal.modal,true);
  assert.equal(inModal.clickable,true,"notification must be clickable inside native modal");
  assert.ok(Math.abs(inModal.centerX-inModal.screenX)<=2,"modal toast remains screen-centered");
- console.log("TOAST_VISUAL_READONLY_PASS: desktop/mobile center, compact pill, ellipsis, modal top layer");
+ assert.ok(inModal.top>=70&&inModal.top<inModal.screenHeight/3,"modal toast must remain in top center");
+ console.log("TOAST_VISUAL_READONLY_PASS: desktop/mobile top-center, compact pill, ellipsis, modal top layer");
 }catch(error){
  console.error("TOAST_VISUAL_READONLY_FAIL",error.message);
  process.exitCode=1;

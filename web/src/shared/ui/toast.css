@@ -1,5 +1,5 @@
-/* Rare micro-feedback: centered in the viewport, never a side notification card. */
-.rare-toast-viewport{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:2100;
+/* Rare micro-feedback: top center of the viewport, clear of the header. */
+.rare-toast-viewport{position:fixed;top:clamp(72px,12vh,112px);left:50%;transform:translateX(-50%);z-index:2100;
  width:min(400px,calc(100vw - 24px));max-height:calc(100dvh - 24px);
  display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
 .rare-toast{--toast-accent:var(--text-secondary);display:inline-flex;align-items:center;gap:8px;
