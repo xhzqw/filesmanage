@@ -44,6 +44,11 @@ func (r *memoryRepo) OfficeSessionByKey(_ context.Context, key string) (domain.O
 	return domain.OfficeSession{}, ports.ErrRowMissing
 }
 
+func (r *memoryRepo) LockOfficeSessionByKey(ctx context.Context, key string) error {
+	_, err := r.OfficeSessionByKey(ctx, key)
+	return err
+}
+
 func (r *memoryRepo) ActiveOfficeSessionForFile(_ context.Context, fileID string) (domain.OfficeSession, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -61,6 +66,18 @@ func (r *memoryRepo) SetOfficeSessionState(_ context.Context, id, state string) 
 	for i := range r.officeSessions {
 		if r.officeSessions[i].ID == id {
 			r.officeSessions[i].State = state
+			return nil
+		}
+	}
+	return ports.ErrRowMissing
+}
+
+func (r *memoryRepo) SetOfficeSessionBaseSeq(_ context.Context, id string, seq int) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i := range r.officeSessions {
+		if r.officeSessions[i].ID == id {
+			r.officeSessions[i].BaseSeq = seq
 			return nil
 		}
 	}
@@ -115,6 +132,17 @@ func (r *memoryRepo) SaveEventExists(_ context.Context, sessionID, eventHash str
 		}
 	}
 	return false, nil
+}
+
+func (r *memoryRepo) OfficeSaveEventOutcome(_ context.Context, sessionID, eventHash string) (string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, e := range r.saveEvents {
+		if e.SessionID == sessionID && e.EventHash == eventHash {
+			return e.Outcome, nil
+		}
+	}
+	return "", nil
 }
 
 func (r *memoryRepo) RecordSaveEvent(_ context.Context, e domain.OfficeSaveEvent) error {

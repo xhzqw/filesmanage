@@ -88,6 +88,10 @@ export const fileApi={
     return data;
    }),
  openOfficeSession:(id:string)=>request<OfficeSessionData>("/files/"+id+"/office/session",{method:"POST",body:"{}"}),
+ requestOfficeSave:(id:string,sessionId:string)=>request<{status:"pending"|"unchanged";requestId?:string}>(
+  "/files/"+encodeURIComponent(id)+"/office/session/"+encodeURIComponent(sessionId)+"/save",{method:"POST",body:"{}"}),
+ officeSaveStatus:(id:string,sessionId:string,requestId:string)=>request<{status:"pending"|"committed"|"failed";versionSeq:number}>(
+  "/files/"+encodeURIComponent(id)+"/office/session/"+encodeURIComponent(sessionId)+"/save/"+encodeURIComponent(requestId)),
  derivativeStatus:(id:string)=>request<{found:boolean;state:string;format:string;class:string;engine:string;note:string;outputKind?:string;outputSize?:number;outputSha256?:string;errorCode?:string}>("/files/"+id+"/derivative"),
  requestDerivative:(id:string)=>request<{derivativeId:string;state:string;sourceFormat:string;outputKind:string;converter:string}>("/files/"+id+"/derivative",{method:"POST",body:"{}"}),
  cancelOfficeSession:(fileId:string,sessionId:string)=>request<{cancelled:string}>("/files/"+fileId+"/office/session/"+sessionId+"/cancel",{method:"POST",body:"{}"}),

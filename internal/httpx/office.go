@@ -4,8 +4,8 @@ import (
 	"filesmanage/internal/application"
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 // Document editor handlers. Session endpoints require modify; the source and
@@ -38,10 +38,11 @@ func (h *Handler) openOfficeSession(c *gin.Context) {
 			},
 		},
 		"editorConfig": map[string]any{
-			"mode":        "edit",
-			"callbackUrl": h.S.SourceURL() + "/api/internal/office/callback",
-			"user":        map[string]any{"id": u.ID, "name": u.DisplayName},
-			"lang":        "zh-CN",
+			"mode":          "edit",
+			"callbackUrl":   h.S.SourceURL() + "/api/internal/office/callback",
+			"user":          map[string]any{"id": u.ID, "name": u.DisplayName},
+			"lang":          "zh-CN",
+			"customization": map[string]any{"autosave": true, "forcesave": false},
 		},
 	}
 	signed, err := h.S.SignEditorConfig(config)
@@ -56,6 +57,38 @@ func (h *Handler) openOfficeSession(c *gin.Context) {
 		"sessionId": view.SessionID, "documentKey": view.DocumentKey,
 		"baseSeq": view.BaseSeq, "editorUrl": view.EditorURL, "config": config,
 	}})
+}
+
+// HTTP 202 acknowledges force-save dispatch, not persistence. The browser
+// must poll for the matching committed callback receipt before showing saved.
+func (h *Handler) saveOfficeSession(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	rid, unchanged, err := h.S.StartOfficeSave(c.Request.Context(), u, c.Param("id"), c.Param("sid"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	if unchanged {
+		c.JSON(http.StatusOK, gin.H{"ok": true, "data": gin.H{"status": "unchanged"}})
+		return
+	}
+	c.JSON(http.StatusAccepted, gin.H{"ok": true, "data": gin.H{"status": "pending", "requestId": rid}})
+}
+
+func (h *Handler) officeSaveStatus(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	result, err := h.S.OfficeSaveStatus(c.Request.Context(), u, c.Param("id"), c.Param("sid"), c.Param("rid"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true, "data": result})
 }
 
 func (h *Handler) cancelOfficeSession(c *gin.Context) {

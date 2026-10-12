@@ -1,16 +1,20 @@
 package application
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"filesmanage/internal/domain"
+	"filesmanage/internal/ports"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -137,6 +141,134 @@ func (s *Service) CloseOfficeSession(ctx context.Context, u domain.User, session
 	return tx.Commit(ctx)
 }
 
+// StartOfficeSave requests a point-in-time snapshot from ONLYOFFICE. A
+// successful command response is NOT evidence of persisted file bytes.
+func (s *Service) StartOfficeSave(ctx context.Context, u domain.User, fileID, sessionID string) (string, bool, error) {
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return "", false, err
+	}
+	defer tx.Rollback(ctx)
+	file, err := s.visibleFile(ctx, tx, u, fileID, domain.ActionModify)
+	if err != nil {
+		return "", false, err
+	}
+	session, err := tx.OfficeSessionByID(ctx, sessionID)
+	if err != nil {
+		return "", false, domain.ErrNotFound
+	}
+	if session.FileID != fileID || session.OwnerID != u.ID {
+		return "", false, domain.ErrForbidden
+	}
+	if session.ClosedAt != nil || session.State != domain.OfficeStateOpen || session.ExpiresAt.Before(s.now()) {
+		return "", false, domain.ErrConflict
+	}
+	if currentSeq(file) != session.BaseSeq {
+		return "", false, domain.ErrVersionConflict
+	}
+	requestID := NewID("osave")
+	// No database transaction is held while waiting for the document server.
+	if err = tx.Rollback(ctx); err != nil {
+		return "", false, err
+	}
+	command := map[string]any{"c": "forcesave", "key": session.DocumentKey, "userdata": requestID}
+	token, err := signJWT(s.office.Secret, command, time.Minute)
+	if err != nil {
+		return "", false, err
+	}
+	command["token"] = token
+	encoded, err := json.Marshal(command)
+	if err != nil {
+		return "", false, err
+	}
+	endpoint := strings.TrimRight(s.office.EditorURL, "/") + "/command"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(encoded))
+	if err != nil {
+		return "", false, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	client := &http.Client{Timeout: 12 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error {
+		return errors.New("editor command redirects are disabled")
+	}}
+	response, err := client.Do(req)
+	if err != nil {
+		return "", false, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return "", false, domain.ErrInvalidInput
+	}
+	var result struct {
+		Error *int `json:"error"`
+	}
+	if err = json.NewDecoder(io.LimitReader(response.Body, 4096)).Decode(&result); err != nil {
+		return "", false, err
+	}
+	if result.Error == nil {
+		return "", false, domain.ErrInvalidInput
+	}
+	if *result.Error == 4 {
+		return "", true, nil
+	}
+	if *result.Error != 0 {
+		return "", false, domain.ErrInvalidInput
+	}
+	return requestID, false, nil
+}
+
+type OfficeSaveReceipt struct {
+	Status     string `json:"status"`
+	VersionSeq int    `json:"versionSeq"`
+}
+
+// OfficeSaveStatus reports a correlated callback receipt, never an
+// optimistic editor-side "all changes saved" notification.
+func (s *Service) OfficeSaveStatus(ctx context.Context, u domain.User, fileID, sessionID, requestID string) (OfficeSaveReceipt, error) {
+	if !strings.HasPrefix(requestID, "osave_") || len(requestID) > 128 {
+		return OfficeSaveReceipt{}, domain.ErrInvalidInput
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return OfficeSaveReceipt{}, err
+	}
+	defer tx.Rollback(ctx)
+	file, err := s.visibleFile(ctx, tx, u, fileID, domain.ActionRead)
+	if err != nil {
+		return OfficeSaveReceipt{}, err
+	}
+	session, err := tx.OfficeSessionByID(ctx, sessionID)
+	if err != nil {
+		return OfficeSaveReceipt{}, domain.ErrNotFound
+	}
+	if session.FileID != fileID || session.OwnerID != u.ID {
+		return OfficeSaveReceipt{}, domain.ErrForbidden
+	}
+	outcome, err := tx.OfficeSaveEventOutcome(ctx, session.ID, officeSaveReceiptHash(session.ID, requestID))
+	if err != nil {
+		return OfficeSaveReceipt{}, err
+	}
+	if strings.HasPrefix(outcome, "committed:") {
+		seq, err := strconv.Atoi(strings.TrimPrefix(outcome, "committed:"))
+		if err != nil {
+			return OfficeSaveReceipt{}, err
+		}
+		return OfficeSaveReceipt{Status: "committed", VersionSeq: seq}, nil
+	}
+	if outcome == "failed" || session.State == domain.OfficeStateFailed {
+		return OfficeSaveReceipt{Status: "failed", VersionSeq: currentSeq(file)}, nil
+	}
+	if session.ClosedAt != nil || session.State == domain.OfficeStateAbandoned {
+		return OfficeSaveReceipt{Status: "failed", VersionSeq: currentSeq(file)}, nil
+	}
+	return OfficeSaveReceipt{Status: "pending", VersionSeq: currentSeq(file)}, nil
+}
+
+func officeSaveReceiptHash(sessionID, requestID string) string {
+	sum := sha256.Sum256([]byte("manual-save|" + sessionID + "|" + requestID))
+	return hex.EncodeToString(sum[:])
+}
+
 // EditorSource resolves a source token to the current version's bytes. The
 // token is short-lived and bound to one document key.
 func (s *Service) EditorSource(ctx context.Context, token string) (io.ReadSeekCloser, string, int64, func(), error) {
@@ -165,7 +297,7 @@ func (s *Service) EditorSource(ctx context.Context, token string) (io.ReadSeekCl
 	if err != nil {
 		return nil, "", 0, nil, domain.ErrNotFound
 	}
-	version, err := tx.VersionBySeq(ctx, file.ID, currentSeq(file))
+	version, err := tx.VersionBySeq(ctx, file.ID, session.BaseSeq)
 	if err != nil {
 		return nil, "", 0, nil, domain.ErrNotFound
 	}
@@ -196,12 +328,24 @@ func (s *Service) HandleEditorCallback(ctx context.Context, authorization string
 		return 1, err
 	}
 	defer tx.Rollback(ctx)
+	if err = tx.LockOfficeSessionByKey(ctx, payload.Key); err != nil {
+		return 1, domain.ErrUnauthorized
+	}
 	session, err := tx.OfficeSessionByKey(ctx, payload.Key)
 	if err != nil {
 		return 1, domain.ErrUnauthorized
 	}
+	if session.ClosedAt != nil || session.State == domain.OfficeStateAbandoned {
+		return 1, domain.ErrVersionConflict
+	}
 	if payload.Status == domain.CallbackStatusEditing {
 		if err = tx.TouchOfficeSession(ctx, session.ID, s.now().Add(30*time.Minute)); err != nil {
+			return 1, err
+		}
+		return 0, tx.Commit(ctx)
+	}
+	if payload.Status == domain.CallbackStatusCorrupted && strings.HasPrefix(payload.UserData, "osave_") {
+		if err = recordOfficeSaveReceipt(ctx, tx, session, payload, "failed", session.LockGeneration); err != nil {
 			return 1, err
 		}
 		return 0, tx.Commit(ctx)
@@ -212,7 +356,7 @@ func (s *Service) HandleEditorCallback(ctx context.Context, authorization string
 	if payload.URL == "" {
 		return 1, domain.ErrInvalidInput
 	}
-	eventHash := callbackEventHash(session.ID, payload.Key, payload.Status, payload.URL)
+	eventHash := callbackEventHash(session.ID, payload.Key, payload.Status, payload.URL, payload.UserData)
 	if exists, err := tx.SaveEventExists(ctx, session.ID, eventHash); err != nil {
 		return 1, err
 	} else if exists {
@@ -233,6 +377,25 @@ func (s *Service) HandleEditorCallback(ctx context.Context, authorization string
 	if file.DeletedAt != nil || currentSeq(file) != session.BaseSeq {
 		// The file moved on: report a conflict so the editor reloads and re-keys.
 		return 1, domain.ErrVersionConflict
+	}
+	// Ignore duplicate document content while still confirming its receipt.
+	currentHash := sha256.Sum256(content)
+	if hex.EncodeToString(currentHash[:]) == file.Sha256 {
+		if err = tx.RecordSaveEvent(ctx, domain.OfficeSaveEvent{
+			ID: NewID("oev"), SessionID: session.ID, Generation: session.LockGeneration,
+			CallbackStatus: payload.Status, EventHash: eventHash, Outcome: "committed",
+		}); err != nil {
+			return 1, err
+		}
+		if err = recordOfficeSaveReceipt(ctx, tx, session, payload, fmt.Sprintf("committed:%d", currentSeq(file)), session.LockGeneration); err != nil {
+			return 1, err
+		}
+		if payload.Status == domain.CallbackStatusSaveReady {
+			if err = tx.SetOfficeSessionState(ctx, session.ID, domain.OfficeStateCommitted); err != nil {
+				return 1, err
+			}
+		}
+		return 0, tx.Commit(ctx)
 	}
 	stage, err := s.blobs.Stage()
 	if err != nil {
@@ -260,13 +423,24 @@ func (s *Service) HandleEditorCallback(ctx context.Context, authorization string
 		return 1, err
 	}
 	_ = tx.SetBlobState(ctx, blob.ID, "ready")
-	if err = tx.SetOfficeSessionState(ctx, session.ID, domain.OfficeStateCommitted); err != nil {
+	if err = tx.SetOfficeSessionBaseSeq(ctx, session.ID, version.Seq); err != nil {
+		return 1, err
+	}
+	// Status 6 is a checkpoint: editing may continue within this session.
+	nextState := domain.OfficeStateOpen
+	if payload.Status == domain.CallbackStatusSaveReady {
+		nextState = domain.OfficeStateCommitted
+	}
+	if err = tx.SetOfficeSessionState(ctx, session.ID, nextState); err != nil {
 		return 1, err
 	}
 	if err = tx.RecordSaveEvent(ctx, domain.OfficeSaveEvent{
 		ID: NewID("oev"), SessionID: session.ID, Generation: generation,
 		CallbackStatus: payload.Status, EventHash: eventHash, Outcome: "committed",
 	}); err != nil {
+		return 1, err
+	}
+	if err = recordOfficeSaveReceipt(ctx, tx, session, payload, fmt.Sprintf("committed:%d", version.Seq), generation); err != nil {
 		return 1, err
 	}
 	if err = tx.RecordCompatibilityReport(ctx, domain.OfficeCompatibilityReport{
@@ -287,14 +461,28 @@ func (s *Service) HandleEditorCallback(ctx context.Context, authorization string
 
 // EditorCallbackPayload is the document-server callback body.
 type EditorCallbackPayload struct {
-	Key    string `json:"key"`
-	Status int    `json:"status"`
-	URL    string `json:"url"`
+	Key      string `json:"key"`
+	Status   int    `json:"status"`
+	URL      string `json:"url"`
+	UserData string `json:"userdata"`
 }
 
-func callbackEventHash(sessionID, key string, status int, url string) string {
-	sum := sha256.Sum256([]byte(sessionID + "|" + key + "|" + fmt.Sprint(status) + "|" + url))
+func callbackEventHash(sessionID, key string, status int, url, userdata string) string {
+	sum := sha256.Sum256([]byte(sessionID + "|" + key + "|" + fmt.Sprint(status) + "|" + url + "|" + userdata))
 	return hex.EncodeToString(sum[:])
+}
+
+func recordOfficeSaveReceipt(ctx context.Context, tx ports.Repository, session domain.OfficeSession, payload EditorCallbackPayload, outcome string, generation int64) error {
+	if payload.Status != domain.CallbackStatusForceSave && payload.Status != domain.CallbackStatusCorrupted {
+		return nil
+	}
+	if !strings.HasPrefix(payload.UserData, "osave_") || len(payload.UserData) > 128 {
+		return nil
+	}
+	return tx.RecordSaveEvent(ctx, domain.OfficeSaveEvent{
+		ID: NewID("oev"), SessionID: session.ID, Generation: generation,
+		CallbackStatus: payload.Status, EventHash: officeSaveReceiptHash(session.ID, payload.UserData), Outcome: outcome,
+	})
 }
 
 // downloadFromEditor fetches the saved document under strict SSRF controls:

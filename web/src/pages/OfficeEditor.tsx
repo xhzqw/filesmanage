@@ -10,20 +10,51 @@ import {AppShell} from "../shared/ui/AppShell";
 
 declare global{
  interface Window{
-  DocsAPI?:{DocEditor?:new (id:string,config:{token:string})=>unknown};
+  DocsAPI?:{DocEditor?:new (id:string,config:Record<string,unknown>)=>{destroyEditor?:()=>void}};
  }
 }
 
-// Loads the external document editor inside the page. This is the real
-// ONLYOFFICE editor: the iframe renders and edits the actual DOCX bytes, and
-// saves arrive through the server-side callback.
+type EditorStatus="loading"|"ready"|"failed";
+type SaveState="clean"|"dirty"|"saving"|"saved"|"failed";
+
+const delay=(ms:number)=>new Promise<void>(resolve=>window.setTimeout(resolve,ms));
+
+// Only the application's callback receipt, followed by a committed file
+// version, can make the UI say "saved". The editor's cache sync is not a save.
 export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
  const{id=""}=useParams();
- const[status,setStatus]=useState("loading");
+ const[status,setStatus]=useState<EditorStatus>("loading");
  const[message,setMessage]=useState("");
  const[file,setFile]=useState<FileItem|null>(null);
  const[sessionId,setSessionId]=useState("");
+ const[saveState,setSaveState]=useState<SaveState>("clean");
+ const[saveMessage,setSaveMessage]=useState("尚未修改");
+ const[confirmedSeq,setConfirmedSeq]=useState<number|null>(null);
  const holder=useRef<HTMLDivElement>(null);
+ const editor=useRef<{destroyEditor?:()=>void}|null>(null);
+ const dirty=useRef(false);
+ const saving=useRef(false);
+ const changeNumber=useRef(0);
+
+ useEffect(()=>{
+  const beforeUnload=(event:BeforeUnloadEvent)=>{
+   if(!dirty.current&&!saving.current)return;
+   event.preventDefault();
+   event.returnValue="";
+  };
+  window.addEventListener("beforeunload",beforeUnload);
+  // React Router navigates without beforeunload; protect links in the shell.
+  const beforeLink=(event:MouseEvent)=>{
+   const target=event.target;
+   if(!(target instanceof Element)||!target.closest("a[href]"))return;
+   if(saving.current||(dirty.current&&!window.confirm("修改尚未保存至文档库。确定放弃修改并离开吗？"))){
+    event.preventDefault();
+    event.stopPropagation();
+   }
+  };
+  document.addEventListener("click",beforeLink,true);
+  return()=>{window.removeEventListener("beforeunload",beforeUnload);document.removeEventListener("click",beforeLink,true);};
+ },[]);
 
  useEffect(()=>{
   let valid=true;
@@ -36,42 +67,142 @@ export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
  useEffect(()=>{
   if(!file)return;
   let valid=true;
+  let ready=false;
+  let waitForDocument:number|undefined;
+  setStatus("loading");
   fileApi.openOfficeSession(file.id)
    .then(async session=>{
     if(!valid)return;
     const opened=session as OfficeSessionData;
     setSessionId(opened.sessionId);
-     await loadEditorScript(editorBrowserUrl(opened.editorUrl)+"/web-apps/apps/api/documents/api.js");
+    await loadEditorScript(editorBrowserUrl(opened.editorUrl)+"/web-apps/apps/api/documents/api.js");
     if(!valid||!holder.current)return;
-    // The server returns the full editor config with its signed token; the
-    // editor validates the signature server-side.
     const DocEditor=window.DocsAPI?.DocEditor;
     if(!DocEditor)throw new Error("editor api unavailable");
-    new DocEditor("docx-editor-target",opened.config as {token:string});
-    setStatus("ready");
+    const events={
+     onDocumentReady:()=>{
+      if(!valid)return;
+      ready=true;
+      window.clearTimeout(waitForDocument);
+      setStatus("ready");
+     },
+     onDocumentStateChange:(event:{data?:boolean})=>{
+      if(!valid||event.data!==true)return;
+      changeNumber.current++;
+      dirty.current=true;
+      setSaveState(saving.current?"saving":"dirty");
+      setSaveMessage("有修改未保存至文档库");
+     },
+     onError:(event:{data?:{errorDescription?:string}})=>{
+      if(!valid)return;
+      if(!ready){
+       window.clearTimeout(waitForDocument);
+       setStatus("failed");
+       setMessage(event.data?.errorDescription||"文档打开失败，请检查编辑服务");
+      }else{
+       dirty.current=true;
+       setSaveState("failed");
+       setSaveMessage("编辑器出现错误，请检查文档后重试保存");
+      }
+     }
+    };
+    editor.current=new DocEditor("docx-editor-target",{...opened.config,events});
+    waitForDocument=window.setTimeout(()=>{
+     if(!valid||ready)return;
+     setStatus("failed");
+     setMessage("文档加载超时。请检查 ONLYOFFICE 服务和文档源地址，然后重试。");
+    },45000);
    })
    .catch(error=>{
     if(!valid)return;
+    window.clearTimeout(waitForDocument);
     setStatus("failed");
     setMessage(errorCopy(error,"无法启动编辑器"));
    });
-  return()=>{valid=false;};
+  return()=>{valid=false;window.clearTimeout(waitForDocument);editor.current?.destroyEditor?.();editor.current=null;};
  },[file]);
 
+ async function save(){
+  if(!file||!sessionId||status!=="ready"||saving.current)return;
+  saving.current=true;
+  const revision=changeNumber.current;
+  setSaveState("saving");
+  setSaveMessage("正在保存至文档库…");
+  try{
+   // Remove focus from the editor while taking a save snapshot. UI remains
+   // blocked from further editor interaction until the callback is received.
+   if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
+   const start=await fileApi.requestOfficeSave(file.id,sessionId);
+   if(start.status==="unchanged"){
+    if(dirty.current)throw new Error("编辑器尚未同步修改，请稍等片刻后再保存");
+    setSaveState("clean");
+    setSaveMessage("没有需要保存的新修改");
+    return;
+   }
+   if(!start.requestId)throw new Error("保存服务未返回确认编号");
+   const deadline=Date.now()+45000;
+   while(Date.now()<deadline){
+    await delay(1100);
+    const receipt=await fileApi.officeSaveStatus(file.id,sessionId,start.requestId);
+    if(receipt.status==="failed")throw new Error("文档服务器回调失败，修改尚未确认保存");
+    if(receipt.status!=="committed")continue;
+    // Version sequencing is checked by the backend in the same transaction
+    // as the callback receipt; read it back through the ordinary file API.
+    const result=await fileApi.meta(file.id);
+    if(result.file.currentVersionSeq<receipt.versionSeq)continue;
+    setConfirmedSeq(receipt.versionSeq);
+    if(changeNumber.current===revision){
+     dirty.current=false;
+     setSaveState("saved");
+     setSaveMessage("已保存至文档库 · v"+receipt.versionSeq);
+    }else{
+     dirty.current=true;
+     setSaveState("dirty");
+     setSaveMessage("v"+receipt.versionSeq+" 已保存，之后的修改仍需保存");
+    }
+    return;
+   }
+   throw new Error("等待保存确认超时。请勿关闭页面，可重试保存。");
+  }catch(error){
+   dirty.current=true;
+   setSaveState("failed");
+   setSaveMessage(errorCopy(error,"保存失败，请重试"));
+  }finally{saving.current=false;}
+ }
+
  async function close(){
+  if(saving.current)return;
+  if(dirty.current&&!window.confirm("修改尚未确认保存。确定要放弃修改并退出吗？"))return;
   try{
    if(sessionId)await fileApi.cancelOfficeSession(file?.id??"",sessionId);
-  }catch{/* closing is best-effort */}
+  }catch{
+   setSaveState("failed");
+   setSaveMessage("结束编辑失败，请重试以免会话状态丢失");
+   return;
+  }
   window.location.href="/preview/"+id;
  }
 
- return <AppShell user={user} onLogout={onLogout} product="文档编辑" actions={<RareButton type="button" onClick={close}>结束编辑</RareButton>}>
+ const guardedLogout=()=>{
+  if(saving.current)return;
+  if(dirty.current&&!window.confirm("修改未保存。确定退出登录并放弃修改吗？"))return;
+  onLogout();
+ };
+ return <AppShell user={user} onLogout={guardedLogout} product="文档编辑" actions={<>
+  <RareButton type="button" tone="primary" onClick={()=>void save()} loading={saveState==="saving"} disabled={status!=="ready"}>保存</RareButton>
+  <RareButton type="button" tone="neutral" onClick={()=>void close()} disabled={saveState==="saving"}>结束编辑</RareButton>
+ </>}>
   <div className="office-stage">
-   {file&&<div className="breadcrumb">{file.name} · 当前 v{file.currentVersionSeq}</div>}
-   {status==="loading"&&<p className="empty">正在启动文档编辑器…</p>}
-   {status==="failed"&&<p role="alert" className="notice error">{message}</p>}
+   <div className="office-edit-strip">
+    <span className="office-edit-name">{file?.name??"正在获取文档"} · v{confirmedSeq??file?.currentVersionSeq??"—"}</span>
+    <span role="status" aria-live="polite" className={"office-save-state office-save-"+saveState}>{saveMessage}</span>
+   </div>
    <div id="placeholder" ref={holder} className="office-holder">
     <div id="docx-editor-target"/>
+    {status!=="ready"&&<div className="office-loading-cover" role={status==="failed"?"alert":"status"}>
+     {status==="failed"?<><strong>无法打开文档</strong><span>{message}</span><RareButton type="button" onClick={()=>window.location.reload()}>重试</RareButton></>:<span>正在加载 Office 文档…</span>}
+    </div>}
+    {saveState==="saving"&&<div className="office-saving-shield" aria-label="正在保存文档"/>}
    </div>
   </div>
  </AppShell>;
@@ -90,19 +221,29 @@ function editorBrowserUrl(internalUrl:string):string{
  return internalUrl.replace(/\/$/,"");
 }
 
+let pendingOfficeScript:Promise<void>|null=null;
+let pendingOfficeScriptURL="";
 function loadEditorScript(src:string):Promise<void>{
- const existing=document.querySelector(`script[src="${src}"]`) as HTMLScriptElement|null;
- if(existing){
-  if(window.DocsAPI?.DocEditor)return Promise.resolve();
-  const{promise,resolve}=Promise.withResolvers<void>();
-  existing.addEventListener("load",()=>resolve());
-  return promise;
- }
- const{promise,resolve,reject}=Promise.withResolvers<void>();
- const script=document.createElement("script");
- script.src=src;
- script.onload=()=>resolve();
- script.onerror=()=>reject(new Error("editor script failed to load"));
- document.head.appendChild(script);
- return promise;
+ if(window.DocsAPI?.DocEditor)return Promise.resolve();
+ if(pendingOfficeScript&&pendingOfficeScriptURL===src)return pendingOfficeScript;
+ pendingOfficeScriptURL=src;
+ pendingOfficeScript=new Promise<void>((resolve,reject)=>{
+  const existing=document.querySelector(`script[src="${src}"]`) as HTMLScriptElement|null;
+  const script=existing??document.createElement("script");
+  let settled=false;
+  const cleanup=()=>{window.clearTimeout(timeout);script.removeEventListener("load",loaded);script.removeEventListener("error",failed);};
+  const finish=(error?:Error)=>{
+   if(settled)return;
+   settled=true;
+   cleanup();
+   if(error){script.remove();reject(error);}else resolve();
+  };
+  const loaded=()=>finish(window.DocsAPI?.DocEditor?undefined:new Error("编辑器脚本未提供 DocsAPI"));
+  const failed=()=>finish(new Error("Office 编辑器脚本加载失败"));
+  const timeout=window.setTimeout(()=>finish(new Error("Office 编辑器脚本加载超时")),18000);
+  script.addEventListener("load",loaded);
+  script.addEventListener("error",failed);
+  if(!existing){script.src=src;document.head.appendChild(script);}
+ }).catch(error=>{pendingOfficeScript=null;throw error;});
+ return pendingOfficeScript;
 }

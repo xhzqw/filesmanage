@@ -55,6 +55,15 @@ func (r *Repository) OfficeSessionByKey(ctx context.Context, key string) (domain
 	return s, nil
 }
 
+func (r *Repository) LockOfficeSessionByKey(ctx context.Context, key string) error {
+	var id string
+	err := r.Q.QueryRow(ctx, "SELECT id FROM office_sessions WHERE document_key=$1 FOR UPDATE", key).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ports.ErrRowMissing
+	}
+	return err
+}
+
 func (r *Repository) ActiveOfficeSessionForFile(ctx context.Context, fileID string) (domain.OfficeSession, bool, error) {
 	row := r.Q.QueryRow(ctx,
 		officeSessionSelect+" WHERE file_id=$1 AND state IN('open','saving') AND expires_at>now() ORDER BY created_at DESC", fileID)
@@ -70,6 +79,11 @@ func (r *Repository) ActiveOfficeSessionForFile(ctx context.Context, fileID stri
 
 func (r *Repository) SetOfficeSessionState(ctx context.Context, id, state string) error {
 	_, err := r.Q.Exec(ctx, "UPDATE office_sessions SET state=$2 WHERE id=$1", id, state)
+	return err
+}
+
+func (r *Repository) SetOfficeSessionBaseSeq(ctx context.Context, id string, seq int) error {
+	_, err := r.Q.Exec(ctx, "UPDATE office_sessions SET base_seq=$2 WHERE id=$1", id, seq)
 	return err
 }
 
@@ -101,6 +115,16 @@ func (r *Repository) SaveEventExists(ctx context.Context, sessionID, eventHash s
 	err := r.Q.QueryRow(ctx,
 		"SELECT EXISTS(SELECT 1 FROM office_save_events WHERE session_id=$1 AND event_hash=$2)", sessionID, eventHash).Scan(&exists)
 	return exists, err
+}
+
+func (r *Repository) OfficeSaveEventOutcome(ctx context.Context, sessionID, eventHash string) (string, error) {
+	var outcome string
+	err := r.Q.QueryRow(ctx, "SELECT outcome FROM office_save_events WHERE session_id=$1 AND event_hash=$2",
+		sessionID, eventHash).Scan(&outcome)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return outcome, err
 }
 
 func (r *Repository) RecordSaveEvent(ctx context.Context, e domain.OfficeSaveEvent) error {

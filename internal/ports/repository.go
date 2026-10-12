@@ -151,12 +151,15 @@ type Repository interface {
 	CreateOfficeSession(context.Context, domain.OfficeSession) error
 	OfficeSessionByID(context.Context, string) (domain.OfficeSession, error)
 	OfficeSessionByKey(context.Context, string) (domain.OfficeSession, error)
+	LockOfficeSessionByKey(context.Context, string) error
 	ActiveOfficeSessionForFile(context.Context, string) (domain.OfficeSession, bool, error)
 	SetOfficeSessionState(context.Context, string, string) error
+	SetOfficeSessionBaseSeq(context.Context, string, int) error
 	BumpOfficeSessionGeneration(context.Context, string) (int64, error)
 	TouchOfficeSession(context.Context, string, time.Time) error
 	CloseOfficeSession(context.Context, string) error
 	SaveEventExists(context.Context, string, string) (bool, error)
+	OfficeSaveEventOutcome(context.Context, string, string) (string, error)
 	RecordSaveEvent(context.Context, domain.OfficeSaveEvent) error
 	RecordCompatibilityReport(context.Context, domain.OfficeCompatibilityReport) error
 
