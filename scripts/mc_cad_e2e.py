@@ -371,6 +371,7 @@ def main():
     parser.add_argument("--base", default="http://127.0.0.1:18091")
     parser.add_argument("--admin-password-file", default=".secrets/admin.password")
     parser.add_argument("--existing-file-id", default="", help="Probe one existing CAD derivative without uploading test files")
+    parser.add_argument("--capture-dxf", action="store_true", help="Save verified derivative to a mode-0600 temporary file for remote browser regression")
     args = parser.parse_args()
     host = up.urlsplit(args.base).hostname
     if host not in ("127.0.0.1", "localhost", "::1"):
@@ -428,6 +429,11 @@ def main():
                 code, output = admin.request("GET", path + "/bytes")
                 verified = code == 200 and len(output) > 0 and hashlib.sha256(output).hexdigest() == data.get("outputSha256")
                 print(f"DWG_PROBE_READY http={code} output_kind={data.get('outputKind')} bytes={len(output)} sha_verified={verified}")
+                if verified and data.get("outputKind") == "dxf" and args.capture_dxf:
+                    import tempfile
+                    with tempfile.NamedTemporaryFile(prefix="filesmanage-cad-dwg-", suffix=".dxf", delete=False) as capture:
+                        capture.write(output)
+                        print(f"DWG_PROBE_FIXTURE={capture.name}")
                 return 0 if verified and data.get("outputKind") == "dxf" else 2
             if state == "failed":
                 print(f"DWG_PROBE_FAILED error_code={data.get('errorCode')}")

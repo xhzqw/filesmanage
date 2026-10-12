@@ -13,7 +13,7 @@ import {setTimeout as delay} from "node:timers/promises";
 
 const root=path.resolve("web");
 // Optional downloaded mechanical DXF, stored outside git.
-const samplePath="/tmp/filesmanage_public_dxf_20261011/02-机械支点零件.dxf";
+const samplePath=process.env.FILESMANAGE_CAD_REAL_DXF_FIXTURE||"/tmp/filesmanage_public_dxf_20261011/02-机械支点零件.dxf";
 const realDxf=existsSync(samplePath)?readFileSync(samplePath,"latin1"):"";
 const source=String.raw`
 import * as THREE from "three";
@@ -395,6 +395,7 @@ const fonts=await cdp.eval("window.__cad.fonts()");
   assert.match(real.drawingFilter,/invert/,"actual drawing must use dark CAD review canvas");
   assert.equal(real.coordinateRulers,1);
   assert.equal(await cdp.eval("window.__cad.png()"),true);
+  console.log(`CAD_REAL_FIXTURE_PASS width=${real.metrics.size[0]} height=${real.metrics.size[1]} dimension_segments=${real.dimensionSegments} text_sprites=${real.dimensionSprites}`);
  }
  assert.equal(fonts.length,2);
  assert.match(fonts[0].family,/Comic Sans MS/);
