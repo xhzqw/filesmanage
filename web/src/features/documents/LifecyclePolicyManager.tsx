@@ -38,7 +38,10 @@ export function LifecyclePolicyManager(){
   if(!id||busy)return;
   setBusy(true);setError("");setNotice("");
   try{
-   await toast.track(()=>clear?lifecycleWorkspaceApi.clearPolicy(kind,id):lifecycleWorkspaceApi.savePolicy(kind,id,{dueDays,retentionDays}),{
+   await toast.track(async()=>{
+    if(clear)await lifecycleWorkspaceApi.clearPolicy(kind,id);
+    else await lifecycleWorkspaceApi.savePolicy(kind,id,{dueDays,retentionDays});
+   },{
     loading:"正在保存生命周期策略…",success:clear?"已恢复上级策略":"生命周期策略已保存",
     error:e=>errorCopy(e,"保存生命周期策略失败")
    });
