@@ -254,6 +254,34 @@ async function main() {
     await cdp.navigate(`${BASE}/doc`);
     await cdp.waitFor(`()=>document.body.textContent?.includes('journey-${stamp}.txt')`, 20000);
 
+    // Batch browser print uses the existing file selection and a single
+    // workbench, never automatically launching N popup windows.
+    const batchSelectable=await cdp.waitFor(`()=>[...document.querySelectorAll('tbody tr')]
+      .some(row=>row.textContent?.includes('journey-${stamp}.txt')&&row.querySelector('input[type=checkbox]'))`,12000);
+    if(batchSelectable){
+      await cdp.evaluate(`(()=>{
+       const row=[...document.querySelectorAll('tbody tr')].find(r=>r.textContent?.includes('journey-${stamp}.txt'));
+       row?.querySelector('input[type=checkbox]')?.click();return true;})()`);
+    }
+    const batchButton=await cdp.waitFor(`()=>[...document.querySelectorAll('button')].some(b=>b.textContent?.trim()==='批量打印'&&!b.disabled)`,5000);
+    if(batchButton)await cdp.clickText("批量打印");
+    const batchDialog=await cdp.waitFor(`()=>Boolean(document.querySelector('dialog.batch-print-dialog[open]')
+     ?.querySelector('[aria-label="批量打印纸张"]'))`,5000);
+    check("selected file opens browser batch print workbench",Boolean(batchDialog),"single modal, explicit per-file print");
+    if(batchDialog){
+     const watermarkUI=await cdp.evaluate(`(()=>{
+      const dialog=document.querySelector('dialog.batch-print-dialog[open]');
+      dialog?.querySelector('input[type=checkbox]')?.click();
+      return Boolean(dialog?.textContent?.includes('水印文字'));})()`);
+     check("batch print exposes optional text/image watermark",Boolean(watermarkUI),"watermark input available");
+     await cdp.evaluate(`(()=>{const dialog=document.querySelector('dialog.batch-print-dialog[open]');
+      [...(dialog?.querySelectorAll('button')??[])].find(b=>b.textContent?.trim()==='关闭')?.click();return true;})()`);
+    }else check("batch print exposes optional text/image watermark",false,"batch dialog unavailable");
+    await cdp.waitFor(`()=>!document.querySelector('dialog.batch-print-dialog[open]')`,3000);
+    if(batchSelectable)await cdp.evaluate(`(()=>{
+     const row=[...document.querySelectorAll('tbody tr')].find(r=>r.textContent?.includes('journey-${stamp}.txt'));
+     const check=row?.querySelector('input[type=checkbox]');if(check?.checked)check.click();return true;})()`);
+
     // 8. the download endpoint round-trips the exact bytes (session-authenticated)
     const download = await cdp.evaluate(`(async()=>{
       const res=await fetch('/api/files?folder=folder_root&limit=200',{credentials:'same-origin'});
