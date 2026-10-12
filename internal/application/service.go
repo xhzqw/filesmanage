@@ -38,6 +38,7 @@ type Service struct {
 	search  searchCache
 	session sessionCache
 	live    userEventHub
+	durable DurableEventStore
 	// aclEpoch changes whenever an authorisation decision could change: grants,
 	// shares, user disabling, folder moves and trash restores all bump it, and
 	// every cached read key includes it. That is what makes "the next request

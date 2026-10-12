@@ -33,7 +33,7 @@ export function App(){
  }),[setUser]);
  useEffect(()=>{
   if(!user)return;
-  return connectSessionEvents(setUser);
+  return connectSessionEvents(setUser,user.id);
  },[user?.id,setUser]);
  async function logout(){
   if(logoutPending.current)return;

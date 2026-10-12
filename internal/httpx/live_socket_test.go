@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"context"
 	"filesmanage/internal/application"
 	"filesmanage/internal/domain"
 	"golang.org/x/net/websocket"
@@ -10,6 +11,27 @@ import (
 	"testing"
 	"time"
 )
+
+type replayStore struct{ events []domain.RealtimeEvent }
+
+func (r replayStore) RealtimeBounds(context.Context) (int64, int64, error) {
+	if len(r.events) == 0 {
+		return 0, 0, nil
+	}
+	return r.events[0].ID, r.events[len(r.events)-1].ID, nil
+}
+func (r replayStore) RealtimeAfter(_ context.Context, userID string, cursor int64, limit int) ([]domain.RealtimeEvent, error) {
+	var out []domain.RealtimeEvent
+	for _, e := range r.events {
+		if e.ID > cursor {
+			out = append(out, e)
+			if len(out) == limit {
+				break
+			}
+		}
+	}
+	return out, nil
+}
 
 func TestWebSocketSameOriginSecurity(t *testing.T) {
 	for _, tc := range []struct {
@@ -90,5 +112,62 @@ func TestWebSocketHandshakeAndSessionGate(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("missing-origin HTTP request returned %d", resp.StatusCode)
+	}
+}
+
+func TestDurableWebSocketCursorReplayAndGapReconciliation(t *testing.T) {
+	t.Setenv("FILESMANAGE_LAN_ALLOW_CIDRS", "127.0.0.1/32")
+	events := replayStore{events: []domain.RealtimeEvent{
+		{ID: 11, Type: "workspace.changed", Scopes: []string{"file"}},
+		{ID: 12, Type: "workspace.changed", Scopes: []string{"folder"}},
+		{ID: 13, Type: "session.changed"},
+	}}
+	svc := application.New(authGateTestUOW{user: domain.User{ID: "u_1", Login: "user1"}}, nil).WithDurableEvents(events)
+	server := httptest.NewServer(New(svc, false, t.TempDir()))
+	defer server.Close()
+	connect := func(cursor string) *websocket.Conn {
+		t.Helper()
+		url := "ws" + strings.TrimPrefix(server.URL, "http") + "/api/events/ws?cursor=" + cursor
+		config, err := websocket.NewConfig(url, server.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		config.Header.Set("Cookie", "fm_session=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+		conn, err := websocket.DialConfig(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := conn.SetReadDeadline(time.Now().Add(3 * time.Second)); err != nil {
+			t.Fatal(err)
+		}
+		return conn
+	}
+	read := func(c *websocket.Conn) map[string]any {
+		t.Helper()
+		var payload map[string]any
+		if err := websocket.JSON.Receive(c, &payload); err != nil {
+			t.Fatal(err)
+		}
+		return payload
+	}
+	conn := connect("11")
+	first := read(conn)
+	if first["version"] != float64(3) || first["resync"] != false || first["cursor"] != "11" {
+		t.Fatalf("unexpected durable hello: %+v", first)
+	}
+	second := read(conn)
+	third := read(conn)
+	if second["type"] != "workspace.changed" || second["cursor"] != "12" ||
+		third["type"] != "session.changed" || third["cursor"] != "13" {
+		t.Fatalf("durable replay out of order: %+v %+v", second, third)
+	}
+	conn.Close()
+	// A bookmark older than the retained floor must never pretend that
+	// an incomplete replay represents a complete current state.
+	conn = connect("8")
+	defer conn.Close()
+	gap := read(conn)
+	if gap["version"] != float64(3) || gap["resync"] != true || gap["cursor"] != "13" {
+		t.Fatalf("retention gap not reconciled: %+v", gap)
 	}
 }

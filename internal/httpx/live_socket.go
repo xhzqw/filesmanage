@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +18,8 @@ const (
 	maxLiveConnections = 128
 	liveHeartbeat      = 12 * time.Second
 	liveWriteTimeout   = 4 * time.Second
+	liveDurablePoll    = 2 * time.Second
+	liveReplayBatch    = 128
 )
 
 // websocketSameOrigin is separate from checkOrigin: WebSocket handshakes use
@@ -77,15 +80,23 @@ func (h *Handler) websocketEvents(c *gin.Context) {
 		return
 	}
 	token, _ := c.Cookie("fm_session")
+	// The cursor is not a credential: reject malformed/unbounded values rather
+	// than interpreting them as tokens or permitting arbitrary SQL ranges.
+	cursor := int64(0)
+	if raw := c.Query("cursor"); raw != "" && len(raw) <= 19 {
+		if parsed, err := strconv.ParseInt(raw, 10, 64); err == nil && parsed >= 0 {
+			cursor = parsed
+		}
+	}
 	events, unsubscribe := h.S.SubscribeUserEvents(user.ID)
 	defer unsubscribe()
 
 	websocket.Handler(func(ws *websocket.Conn) {
-		h.streamLiveEvents(c.Request, ws, user.ID, token, events)
+		h.streamLiveEvents(c.Request, ws, user.ID, token, cursor, events)
 	}).ServeHTTP(c.Writer, c.Request)
 }
 
-func (h *Handler) streamLiveEvents(req *http.Request, ws *websocket.Conn, userID, token string, events <-chan application.UserEvent) {
+func (h *Handler) streamLiveEvents(req *http.Request, ws *websocket.Conn, userID, token string, resumeCursor int64, events <-chan application.UserEvent) {
 	ws.MaxPayloadBytes = 1024
 	defer ws.Close()
 
@@ -126,14 +137,66 @@ func (h *Handler) streamLiveEvents(req *http.Request, ws *websocket.Conn, userID
 	if !checkSession() {
 		return
 	}
-	// After a reconnect the browser must reconcile all state that might
-	// have changed while the socket was unavailable.
-	if !send(map[string]any{"type": "connection.ready", "version": 2, "resync": true, "heartbeatSeconds": int(liveHeartbeat / time.Second)}) {
-		return
+	store := h.S.DurableEvents()
+	// Tests with an in-memory repository retain the legacy v2 stream. The
+	// production constructor requires a PostgreSQL-backed durable store.
+	if store == nil {
+		if !send(map[string]any{"type": "connection.ready", "version": 2, "resync": true, "heartbeatSeconds": int(liveHeartbeat / time.Second)}) {
+			return
+		}
+	} else {
+		oldest, newest, err := store.RealtimeBounds(req.Context())
+		if err != nil {
+			send(map[string]any{"type": "server.unavailable"})
+			return
+		}
+		// If the client has no bookmark, it must reconcile all visible state;
+		// replaying the full lifetime of the journal would be unnecessary.
+		// Expired, invalid or future bookmarks likewise require a full resync.
+		resync := resumeCursor == 0 || resumeCursor > newest ||
+			(oldest > 0 && resumeCursor < oldest-1)
+		if resync {
+			resumeCursor = newest
+		}
+		if !send(map[string]any{"type": "connection.ready", "version": 3,
+			"resync": resync, "cursor": strconv.FormatInt(resumeCursor, 10),
+			"heartbeatSeconds": int(liveHeartbeat / time.Second)}) {
+			return
+		}
 	}
 
 	ticker := time.NewTicker(liveHeartbeat)
 	defer ticker.Stop()
+	poll := time.NewTicker(liveDurablePoll)
+	defer poll.Stop()
+	// Database is the single source of truth, including events produced by
+	// other API replicas. Local notifications only wake this reader promptly.
+	// Cursors advance after successful sends, never before.
+	replay := func() bool {
+		for {
+			batch, err := store.RealtimeAfter(req.Context(), userID, resumeCursor, liveReplayBatch)
+			if err != nil {
+				return send(map[string]any{"type": "server.unavailable"})
+			}
+			for _, event := range batch {
+				if !checkSession() {
+					return false
+				}
+				if !send(map[string]any{"type": event.Type, "scopes": event.Scopes,
+					"cursor": strconv.FormatInt(event.ID, 10)}) {
+					return false
+				}
+				resumeCursor = event.ID
+				h.S.InvalidateFromDurableEvent(event)
+			}
+			if len(batch) < liveReplayBatch {
+				return true
+			}
+		}
+	}
+	if store != nil && !replay() {
+		return
+	}
 	for {
 		select {
 		case <-req.Context().Done():
@@ -144,7 +207,15 @@ func (h *Handler) streamLiveEvents(req *http.Request, ws *websocket.Conn, userID
 			if !checkSession() {
 				return
 			}
-			if !send(event) {
+			if store != nil {
+				if !replay() {
+					return
+				}
+			} else if !send(event) {
+				return
+			}
+		case <-poll.C:
+			if store != nil && !replay() {
 				return
 			}
 		case <-ticker.C:

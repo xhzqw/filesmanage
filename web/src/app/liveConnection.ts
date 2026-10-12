@@ -7,7 +7,7 @@ const ALL_SCOPES:WorkspaceScope[]=["file","folder","trash","permissions","collab
 
 // Hints are never trusted as file data or authorization. An HTTP re-read
 // reconciles every open view after missed, coalesced or reordered events.
-export function connectSessionEvents(onIdentity:(user:User|null)=>void):()=>void {
+export function connectSessionEvents(onIdentity:(user:User|null)=>void,userID=""):()=>void {
  let active=true;
  let socket:WebSocket|null=null;
  let retry:number|undefined;
@@ -19,6 +19,13 @@ export function connectSessionEvents(onIdentity:(user:User|null)=>void):()=>void
  let revoked=false;
  let lastFrameAt=Date.now();
  let connectingSince=Date.now();
+ // Cursor is a receipt for applied invalidation hints, never a credential.
+ // Partition it by authenticated user so account switching cannot skip state.
+ const cursorKey=userID?"fm-live-cursor-v3:"+userID:"";
+ const validCursor=(value:unknown):value is string=>typeof value==="string"&&/^(0|[1-9]\d{0,18})$/.test(value);
+ let committedCursor="";
+ try{if(cursorKey){const stored=window.localStorage.getItem(cursorKey);if(validCursor(stored))committedCursor=stored;}}catch{}
+ let pendingCursor="";
  const pending=new Set<WorkspaceScope>();
 
  function revokeIdentity(){
@@ -45,9 +52,20 @@ export function connectSessionEvents(onIdentity:(user:User|null)=>void):()=>void
  }
  function flush(){
   flushTimer=undefined;
-  if(!active||pending.size===0)return;
-  const scopes=Array.from(pending);pending.clear();
-  receiveRemoteResourceChanges(scopes);
+  if(!active||revoked)return;
+  if(pending.size>0){
+   const scopes=Array.from(pending);pending.clear();
+   receiveRemoteResourceChanges(scopes);
+  }
+  if(pendingCursor){
+   committedCursor=pendingCursor;pendingCursor="";
+   try{if(cursorKey)window.localStorage.setItem(cursorKey,committedCursor);}catch{}
+  }
+ }
+ function acknowledge(value:unknown){
+  if(!validCursor(value))return;
+  pendingCursor=value;
+  if(flushTimer===undefined)flushTimer=window.setTimeout(flush,120);
  }
  function invalidate(scopes:WorkspaceScope[]){
   for(const scope of scopes)pending.add(scope);
@@ -69,7 +87,8 @@ export function connectSessionEvents(onIdentity:(user:User|null)=>void):()=>void
   if(!active||revoked||socket)return;
   const protocol=window.location.protocol==="https:"?"wss:":"ws:";
   try{
-   const connection=new WebSocket(protocol+"//"+window.location.host+"/api/events/ws");
+   const path="/api/events/ws"+(committedCursor?"?cursor="+encodeURIComponent(committedCursor):"");
+   const connection=new WebSocket(protocol+"//"+window.location.host+path);
    socket=connection;
    connectingSince=Date.now();
    connection.onopen=()=>{reconnectDelay=1000;lastFrameAt=Date.now();};
@@ -77,22 +96,38 @@ export function connectSessionEvents(onIdentity:(user:User|null)=>void):()=>void
     if(!active||revoked||socket!==connection)return;
     lastFrameAt=Date.now();
     if(typeof event.data!=="string"||event.data.length>2048){fullResync();return;}
-    let data:{type?:unknown;scopes?:unknown;resync?:unknown};
+    let data:{type?:unknown;scopes?:unknown;resync?:unknown;cursor?:unknown;version?:unknown};
     try{data=JSON.parse(event.data) as typeof data;}catch{fullResync();return;}
     switch(data.type){
      case "session.revoked":revokeIdentity();break;
-     case "approval.changed":window.dispatchEvent(new Event("filesmanage:approvals-changed"));break;
+     case "approval.changed":
+      window.dispatchEvent(new Event("filesmanage:approvals-changed"));
+      acknowledge(data.cursor);break;
      case "session.changed":
       window.dispatchEvent(new Event("filesmanage:sessions-changed"));
-      validateSession(true);break;
+      validateSession(true);acknowledge(data.cursor);break;
      case "workspace.changed":{
       if(!Array.isArray(data.scopes)||data.scopes.length>12){fullResync();break;}
       const scopes=data.scopes.filter((value):value is WorkspaceScope=>ALL_SCOPES.includes(value as WorkspaceScope));
       if(scopes.length)invalidate(scopes);else fullResync();
+      acknowledge(data.cursor);
       break;
      }
-     case "state.resync":fullResync();break;
-     case "connection.ready":if(data.resync===true)fullResync();break;
+     case "state.resync":fullResync();acknowledge(data.cursor);break;
+     case "connection.ready":{
+      if(data.version===3){
+       if(data.resync===true){
+        fullResync();
+        acknowledge(data.cursor);
+       }else if(!committedCursor){
+        // A reconnect without a local bookmark must not silently
+        // advance past changes that have not been reconciled.
+        fullResync();
+        acknowledge(data.cursor);
+       }
+      }else fullResync();
+      break;
+     }
      case "connection.heartbeat":break;
      case "server.unavailable":break;
      // Heartbeat and temporary DB errors are transport signals only.

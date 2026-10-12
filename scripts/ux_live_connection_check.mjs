@@ -15,6 +15,11 @@ const pendingLong=new Map();
 const intervals=new Map();
 let nextId=10000;
 browser.location={protocol:"http:",host:"files.local:18091"};
+const cursorStore=new Map();
+browser.localStorage={
+ getItem:key=>cursorStore.get(key)??null,
+ setItem:(key,value)=>cursorStore.set(key,value),
+};
 browser.setTimeout=(callback,ms)=>{
  if(ms>500){const id=++nextId;pendingLong.set(id,callback);return id;}
  return realSetTimeout(callback,ms);
@@ -38,7 +43,8 @@ class FakeSocket {
  static CLOSED=3;
  static instances=[];
  constructor(url){
-  assert.equal(url,"ws://files.local:18091/api/events/ws");
+  assert.ok(url.startsWith("ws://files.local:18091/api/events/ws"),"same-origin WebSocket only");
+  this.url=url;
   this.readyState=FakeSocket.CONNECTING;
   FakeSocket.instances.push(this);
  }
@@ -119,6 +125,29 @@ replies[3](success("stale-user"));
 await new Promise(resolve=>setImmediate(resolve));
 assert.deepEqual(identities2,["restored-user"]);
 stop2();
+// A v3 cursor is stored only after invalidation has been dispatched, then
+// replayed after a fresh socket connects. Bookmarks are partitioned by user.
+const stop3=imported.connectSessionEvents(()=>{},"u_replay");
+const replaySocket=FakeSocket.instances.at(-1);
+replaySocket.open();
+assert.ok(!replaySocket.url.includes("cursor="),"no bookmark for a fresh user");
+replaySocket.message({type:"connection.ready",version:3,resync:true,cursor:"31"});
+assert.equal(cursorStore.get("fm-live-cursor-v3:u_replay"),undefined,"cannot ack before refresh");
+await new Promise(resolve=>realSetTimeout(resolve,170));
+assert.equal(cursorStore.get("fm-live-cursor-v3:u_replay"),"31");
+replaySocket.message({type:"workspace.changed",scopes:["file"],cursor:"32"});
+assert.equal(cursorStore.get("fm-live-cursor-v3:u_replay"),"31","unapplied event remains replayable");
+await new Promise(resolve=>realSetTimeout(resolve,170));
+assert.equal(cursorStore.get("fm-live-cursor-v3:u_replay"),"32","applied hint persists its cursor");
+stop3();
+const stop4=imported.connectSessionEvents(()=>{},"u_replay");
+const resumed=FakeSocket.instances.at(-1);
+assert.ok(resumed.url.endsWith("?cursor=32"),"reconnect must replay from durable bookmark");
+resumed.open();
+resumed.message({type:"connection.ready",version:3,resync:false,cursor:"32"});
+await new Promise(resolve=>realSetTimeout(resolve,170));
+assert.equal(cursorStore.get("fm-live-cursor-v3:u_replay"),"32");
+stop4();
 browser.removeEventListener("filesmanage:workspace-changed",onWorkspace);
 assert.equal(pendingLong.size,0);
 assert.equal(intervals.size,0);

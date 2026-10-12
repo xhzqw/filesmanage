@@ -79,6 +79,11 @@ func main() {
 	if err = pool.Ping(ctx); err != nil {
 		log.Fatal("DB unavailable: ", err)
 	}
+	// Fail startup closed if the persistent event migration is missing. A live
+	// service must not silently downgrade to volatile in-memory notifications.
+	if _, _, err = postgres.New(pool).RealtimeBounds(ctx); err != nil {
+		log.Fatal("persistent realtime journal unavailable; run migrations: ", err)
+	}
 	addr := os.Getenv("FILESMANAGE_ADDR")
 	if addr == "" {
 		addr = "127.0.0.1:18091"
@@ -126,7 +131,7 @@ func main() {
 			cleanupResumable()
 		}
 	}()
-	service := application.New(postgres.New(pool), store).WithOffice(application.OfficeConfig{
+	service := application.New(postgres.New(pool), store).WithDurableEvents(postgres.New(pool)).WithOffice(application.OfficeConfig{
 		EditorURL:     os.Getenv("FILESMANAGE_OFFICE_URL"),
 		Secret:        os.Getenv("FILESMANAGE_OFFICE_SECRET"),
 		SourceBaseURL: os.Getenv("FILESMANAGE_OFFICE_SOURCE_BASE"),
@@ -149,6 +154,34 @@ func main() {
 		defer tick.Stop()
 		for range tick.C {
 			remindLifecycle()
+		}
+	}()
+	// Persistent event retention: defaults to 90 days. Set 0 for indefinite
+	// retention; deletion is capped to keep each maintenance pass bounded.
+	retentionDays := 90
+	if raw := os.Getenv("FILESMANAGE_REALTIME_RETENTION_DAYS"); raw != "" {
+		if days, parseErr := strconv.Atoi(raw); parseErr == nil && days >= 0 && days <= 36500 {
+			retentionDays = days
+		}
+	}
+	pruneRealtime := func() {
+		if retentionDays == 0 {
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if count, e := postgres.New(pool).PruneRealtimeEvents(ctx, retentionDays, 5000); e != nil {
+			log.Printf("realtime retention failed: %v", e)
+		} else if count > 0 {
+			log.Printf("realtime retention removed %d old hints", count)
+		}
+	}
+	pruneRealtime()
+	go func() {
+		tick := time.NewTicker(24 * time.Hour)
+		defer tick.Stop()
+		for range tick.C {
+			pruneRealtime()
 		}
 	}()
 	r := httpx.New(service, secure, "web/dist")
