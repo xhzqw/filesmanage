@@ -48,19 +48,30 @@ export function PDFPageViewer({fileId,sha,name,seq,revision,onRevisionChange,epo
  const viewportRef=useRef<HTMLDivElement>(null);
  const dragRef=useRef<{x:number;y:number;left:number;top:number}|null>(null);
  const anchorRef=useRef<{zoom:number;x:number;y:number;left:number;top:number}|null>(null);
- const[viewport,setViewport]=useState({width:800,height:740});
+ const[viewport,setViewport]=useState({width:0,height:0,paddingX:0,paddingY:0});
  const[pageRatio,setPageRatio]=useState(1.414);
  const[zoom,setZoom]=useState(1);
- const[fitMode,setFitMode]=useState<"page"|"width">("width");
+ const[fitMode,setFitMode]=useState<"page"|"width">("page");
  const[panMode,setPanMode]=useState(false);
- useEffect(()=>{
+ // The scroll viewport is mounted only after pdfPages resolves. Observing on
+ // the initial component mount misses it entirely and leaves a stale 800px
+ // fallback width regardless of the actual workbench size.
+ useLayoutEffect(()=>{
+  if(!pages||error)return;
   const node=viewportRef.current;if(!node)return;
-  const measure=()=>setViewport({width:node.clientWidth,height:node.clientHeight});
+  const measure=()=>{
+   const style=getComputedStyle(node);
+   const paddingX=parseFloat(style.paddingLeft)+parseFloat(style.paddingRight);
+   const paddingY=parseFloat(style.paddingTop)+parseFloat(style.paddingBottom);
+   const next={width:node.clientWidth,height:node.clientHeight,paddingX,paddingY};
+   setViewport(previous=>Object.keys(next).every(key=>
+    previous[key as keyof typeof next]===next[key as keyof typeof next])?previous:next);
+  };
   measure();
   const observer=new ResizeObserver(measure);observer.observe(node);
   return()=>observer.disconnect();
- },[]);
- useEffect(()=>{setZoom(1);setFitMode("width");setPanMode(false)},[fileId,sha]);
+ },[pages,error]);
+ useEffect(()=>{setZoom(1);setFitMode("page");setPageRatio(1.414);setPanMode(false)},[fileId,sha]);
  function setZoomAt(value:number){
   const node=viewportRef.current;
   if(node)anchorRef.current={zoom,x:node.clientWidth/2,y:node.clientHeight/2,left:node.scrollLeft,top:node.scrollTop};
@@ -91,9 +102,13 @@ export function PDFPageViewer({fileId,sha,name,seq,revision,onRevisionChange,epo
   const node=viewportRef.current;
   if(node?.hasPointerCapture(e.pointerId))node.releasePointerCapture(e.pointerId);
  }
- const availableWidth=Math.max(150,viewport.width-32);
- const pageWidth=fitMode==="width"?availableWidth:Math.min(availableWidth,Math.max(150,(viewport.height-28)/pageRatio));
- const displayWidth=Math.round(pageWidth*zoom);
+ // Fit the raster's intrinsic aspect ratio inside the actual scroll area,
+ // excluding top/bottom floating docks and the CSS padding on that area.
+ // "100%" is relative to the active fit mode, not a fabricated 800px viewport.
+ const availableWidth=Math.max(1,viewport.width-viewport.paddingX-12);
+ const availableHeight=Math.max(1,viewport.height-viewport.paddingY-12);
+ const pageWidth=fitMode==="width"?availableWidth:Math.min(availableWidth,availableHeight/pageRatio);
+ const displayWidth=Math.max(1,Math.round(pageWidth*zoom));
  return <div className="file-pdf-viewer">
   <div className="file-pdf-toolbar">
    <strong>PDF 预览</strong>
@@ -108,7 +123,10 @@ export function PDFPageViewer({fileId,sha,name,seq,revision,onRevisionChange,epo
     <RareButton type="button" aria-label="缩小 PDF" disabled={zoom<=0.5} onClick={()=>setZoomAt(zoom/1.25)}>−</RareButton>
     <span className="file-pdf-zoom-value">{Math.round(zoom*100)}%</span>
     <RareButton type="button" aria-label="放大 PDF" disabled={zoom>=5} onClick={()=>setZoomAt(zoom*1.25)}>＋</RareButton>
-    <RareButton type="button" onClick={()=>{setFitMode(mode=>mode==="page"?"width":"page");setZoom(1);}}>{fitMode==="page"?"适应页面":"适应宽度"}</RareButton>
+    <RareButton type="button" title="切换整页 / 页宽适配" aria-label={"PDF 适配方式："+(fitMode==="page"?"整页":"页宽")+"，点击切换"}
+     onClick={()=>{anchorRef.current=null;setFitMode(mode=>mode==="page"?"width":"page");setZoom(1);
+      if(viewportRef.current){viewportRef.current.scrollLeft=0;viewportRef.current.scrollTop=0;}}}>
+     {fitMode==="page"?"整页":"页宽"}</RareButton>
     <RareButton type="button" aria-pressed={panMode} onClick={()=>setPanMode(v=>!v)}>{panMode?"结束平移":"平移"}</RareButton>
     <RareButton type="button" disabled={!pages||page===1} onClick={()=>changePage(page-1)}>上一页</RareButton>
     <span aria-live="polite">{pages?"第 "+page+" / "+pages+" 页":"—"}</span>
@@ -120,7 +138,7 @@ export function PDFPageViewer({fileId,sha,name,seq,revision,onRevisionChange,epo
    <div className="file-pdf-placeholder" role="status"><BrandLoader size="lg" decorative/><span>正在加载 PDF 页面…</span></div>
   </div>}
   {error&&<div className="file-pdf-message"><p role="alert">{error}</p><RareButton type="button" onClick={()=>setRetry(i=>i+1)}>重试</RareButton></div>}
-  {pages>0&&!error&&<div className={"file-pdf-paper"+(!imageReady?" is-pending":"")+(panMode?" is-panning":"")} ref={viewportRef} aria-busy={!imageReady} onPointerDown={panDown} onPointerMove={panMove} onPointerUp={panEnd} onPointerCancel={panEnd} style={{touchAction:panMode?"none":"auto"}}>
+  {pages>0&&!error&&<div className={"file-pdf-paper"+(!imageReady?" is-pending":"")+(panMode?" is-panning":"")} ref={viewportRef} data-fit-mode={fitMode} aria-busy={!imageReady} onPointerDown={panDown} onPointerMove={panMove} onPointerUp={panEnd} onPointerCancel={panEnd} style={{touchAction:panMode?"none":"auto"}}>
    {retained&&!pageError&&<img className="file-pdf-retained" src={retained.url} alt="" aria-hidden="true"/>}
    {!imageReady&&!pageError&&<div className={"file-pdf-placeholder"+(retained?" is-overlaid":"")} role="status">
     <BrandLoader size="lg" decorative/><span>正在渲染第 {page} 页…</span>

@@ -89,7 +89,50 @@ try{
  await navigate("/login","!!document.querySelector('input[type=password]')");
  const password=readFileSync(".secrets/admin.password","utf8").trim();
  assert.equal(await evalJS(`(async()=>{const response=await fetch("/api/login",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({login:"admin",password:${JSON.stringify(password)}})});return response.ok;})()`),true);
- if(process.env.TITLES_ONLY==="1"){
+ if(process.env.PDF_FIT_ONLY==="1"){
+  const fixture=await evalJS(`(async()=>{
+   for(const params of ["category=pdf&scope=all&limit=100","q=pdf&scope=all&limit=100","type=pdf&scope=all&limit=100"]){
+    const response=await fetch("/api/search?"+params,{credentials:"same-origin"});
+    if(!response.ok)continue;
+    const data=await response.json();
+    const file=data.items?.find(item=>String(item.name).toLowerCase().endsWith(".pdf"));
+    if(file)return file.id;
+   }
+   return null;
+  })()`);
+  assert(fixture,"PDF viewport regression needs one accessible PDF fixture");
+  const checked=[];
+  for(const width of [1440,900,390]){
+   await viewport(width,width===390?760:900);
+   await navigate("/preview/"+encodeURIComponent(fixture),'!!document.querySelector(".file-pdf-viewer")');
+   await waitFor('!!document.querySelector(".file-pdf-paper img.file-pdf-image:not(.is-pending)")?.naturalWidth');
+   const measure=()=>evalJS(`(()=>{
+    const area=document.querySelector(".file-pdf-paper"),img=area.querySelector("img.file-pdf-image:not(.is-pending)");
+    const s=getComputedStyle(area),r=img.getBoundingClientRect(),a=area.getBoundingClientRect();
+    const availableWidth=area.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight)-12;
+    const availableHeight=area.clientHeight-parseFloat(s.paddingTop)-parseFloat(s.paddingBottom)-12;
+    return {mode:area.dataset.fitMode,width:r.width,height:r.height,expectedRatio:img.naturalHeight/img.naturalWidth,
+      maxWidth:availableWidth,maxHeight:availableHeight,viewportWidth:a.width,
+      overflow:document.documentElement.scrollWidth-innerWidth};
+   })()`);
+   const initial=await measure();
+   assert(initial.mode==="page"&&initial.width<=initial.maxWidth+2&&initial.height<=initial.maxHeight+2&&
+    Math.abs(initial.height/initial.width-initial.expectedRatio)<.02&&initial.overflow<=1,
+    "PDF default whole-page fit and natural ratio at "+width+": "+JSON.stringify(initial));
+   await click('.file-pdf-tools button[aria-label="放大 PDF"]');
+   const enlarged=await measure();
+   assert(enlarged.width>initial.width*1.2&&Math.abs(enlarged.height/enlarged.width-enlarged.expectedRatio)<.02,
+    "PDF zoom preserves aspect ratio at "+width+": "+JSON.stringify(enlarged));
+   const toggle=await evalJS(`(()=>{document.querySelector('.file-pdf-tools button[aria-label^="PDF 适配方式"]')?.click();return true})()`);
+   assert(toggle,"PDF fit toggle exists");
+   await waitFor('document.querySelector(".file-pdf-paper")?.dataset.fitMode==="width"');
+   const fullWidth=await measure();
+   assert(fullWidth.width>=initial.width&&Math.abs(fullWidth.height/fullWidth.width-fullWidth.expectedRatio)<.02,
+    "PDF fit-width preserves ratio at "+width+": "+JSON.stringify(fullWidth));
+   checked.push(width+"px");
+  }
+  console.log("PDF_FIT_READONLY_PASS "+checked.join(", ")+"; default page, intrinsic ratio, zoom, width fit");
+ }else if(process.env.TITLES_ONLY==="1"){
   const pages=[
    ["/stats",".stats-workbench"],
    ["/workspace",".collab-root"],

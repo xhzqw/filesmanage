@@ -76,7 +76,7 @@
 .file-workbench-layout.is-collapsed .file-action-expansion{display:none}
 .file-workbench-preview-surface,.file-workbench-mode-panel{background:transparent}
 .file-pdf-viewer{position:relative;flex:1 1 auto;min-height:0;overflow:hidden;background:transparent}
-.file-pdf-viewer .file-pdf-paper{height:100%;min-height:0;padding:74px 18px 106px;justify-content:flex-start}
+.file-pdf-viewer .file-pdf-paper{height:100%;min-height:0;padding:74px 18px 106px;justify-content:safe center}
 .file-pdf-viewer .file-pdf-toolbar{
  position:absolute;z-index:12;left:50%;bottom:17px;transform:translateX(-50%);
  display:flex;align-items:center;justify-content:center;
