@@ -18,6 +18,7 @@ const chrome=spawn("/usr/bin/google-chrome",[
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 let ws,seq=0;
 const requests=new Map();
+const browserExceptions=[];
 function send(method,params={}){
  const id=++seq;
  return new Promise((resolve,reject)=>{
@@ -76,6 +77,9 @@ try{
  await new Promise((resolve,reject)=>{ws.addEventListener("open",resolve,{once:true});ws.addEventListener("error",reject,{once:true});});
  ws.addEventListener("message",event=>{
   const response=JSON.parse(event.data),pending=requests.get(response.id);
+  if(response.method==="Runtime.exceptionThrown")browserExceptions.push({
+   text:response.params?.exceptionDetails?.text,
+   description:response.params?.exceptionDetails?.exception?.description?.slice(0,650)});
   if(!pending)return;
   requests.delete(response.id);
   clearTimeout(pending.timer);
@@ -459,6 +463,7 @@ try{
  console.log("RARE_OVERLAY_READONLY_PASS "+results.join("; ")+"; file grid, permission Gooey, dialog and focus OK"+(availablePreviewId?"":"; preview fixture absent"));
 }catch(error){
  console.error("RARE_OVERLAY_READONLY_FAIL",error.message);
+ if(browserExceptions.length)console.error("RARE_OVERLAY_BROWSER_EXCEPTIONS",JSON.stringify(browserExceptions.slice(-3)));
  try{
   const snapshot=await evalJS(`(()=>({url:location.href,ready:document.readyState,
    title:document.title,body:document.body.innerText.slice(0,450),
