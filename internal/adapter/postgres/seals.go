@@ -93,11 +93,11 @@ func (r *Repository) InsertSealMark(ctx context.Context, m domain.FileSealMark) 
 	if current != m.VersionSeq {
 		return domain.ErrVersionConflict
 	}
-	tag, err := r.Q.Exec(ctx, `INSERT INTO file_seal_marks(id,file_id,version_seq,file_sha256,asset_id,asset_kind,asset_sha256,signer_id,page_number,x,y,width,height)
- SELECT $1,$2,$3,$4,$5,a.kind,$6,$7,$8,$9,$10,$11,$12
+	tag, err := r.Q.Exec(ctx, `INSERT INTO file_seal_marks(id,file_id,version_seq,file_sha256,asset_id,asset_kind,asset_sha256,signer_id,page_number,x,y,width,height,angle_degrees)
+ SELECT $1,$2,$3,$4,$5,a.kind,$6,$7,$8,$9,$10,$11,$12,$13
  FROM file_versions v JOIN seal_assets a ON a.id=$5
  WHERE v.file_id=$2 AND v.seq=$3 AND v.sha256=$4 AND a.sha256=$6 AND a.retired_at IS NULL`,
-		m.ID, m.FileID, m.VersionSeq, m.FileSha256, m.AssetID, m.AssetSha256, m.SignerID, m.PageNumber, m.X, m.Y, m.Width, m.Height)
+		m.ID, m.FileID, m.VersionSeq, m.FileSha256, m.AssetID, m.AssetSha256, m.SignerID, m.PageNumber, m.X, m.Y, m.Width, m.Height, m.AngleDegrees)
 	if isUniqueViolation(err) {
 		return domain.ErrNameConflict
 	}
@@ -110,14 +110,14 @@ func (r *Repository) InsertSealMark(ctx context.Context, m domain.FileSealMark) 
 	return nil
 }
 
-const marksQuery = `SELECT m.id,m.file_id,m.version_seq,m.file_sha256,m.asset_id,m.asset_sha256,a.name,a.kind,m.signer_id,u.display_name,m.page_number,m.x::float8,m.y::float8,m.width::float8,m.height::float8,m.created_at
+const marksQuery = `SELECT m.id,m.file_id,m.version_seq,m.file_sha256,m.asset_id,m.asset_sha256,a.name,a.kind,m.signer_id,u.display_name,m.page_number,m.x::float8,m.y::float8,m.width::float8,m.height::float8,m.angle_degrees::float8,m.created_at
  FROM file_seal_marks m JOIN seal_assets a ON a.id=m.asset_id JOIN users u ON u.id=m.signer_id`
 
 func scanSealMark(rows pgx.Rows) ([]domain.FileSealMark, error) {
 	out := []domain.FileSealMark{}
 	for rows.Next() {
 		var m domain.FileSealMark
-		if err := rows.Scan(&m.ID, &m.FileID, &m.VersionSeq, &m.FileSha256, &m.AssetID, &m.AssetSha256, &m.AssetName, &m.AssetKind, &m.SignerID, &m.SignerName, &m.PageNumber, &m.X, &m.Y, &m.Width, &m.Height, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.FileID, &m.VersionSeq, &m.FileSha256, &m.AssetID, &m.AssetSha256, &m.AssetName, &m.AssetKind, &m.SignerID, &m.SignerName, &m.PageNumber, &m.X, &m.Y, &m.Width, &m.Height, &m.AngleDegrees, &m.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, m)

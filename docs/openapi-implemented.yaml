@@ -5776,6 +5776,10 @@ paths:
                   type: number
                 height:
                   type: number
+                angleDegrees:
+                  type: number
+                  minimum: -180
+                  maximum: 180
               required:
               - assetId
               - versionSeq
@@ -10455,6 +10459,10 @@ components:
           type: number
         height:
           type: number
+        angleDegrees:
+          type: number
+          minimum: -180
+          maximum: 180
         createdAt:
           type: string
           format: date-time

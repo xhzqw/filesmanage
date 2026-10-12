@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"image"
 	"image/png"
 	"io"
@@ -130,9 +129,7 @@ func (s *Service) ExportSignedPDF(ctx context.Context, actor domain.User, fileID
 		if err != nil {
 			return SignedPDFExport{}, err
 		}
-		dx := m.X * dim.Width
-		dy := (1 - m.Y - m.Height) * dim.Height
-		spec := fmt.Sprintf("pos:bl, off:%.3f %.3f, scale:1 abs, rot:0", dx, dy)
+		spec := sealWatermarkSpec(m, dim.Width, dim.Height)
 		wm, err := api.ImageWatermarkForReader(ctx, bytes.NewReader(scaled), spec, true, false, types.POINTS)
 		if err != nil {
 			return SignedPDFExport{}, err

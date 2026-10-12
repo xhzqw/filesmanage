@@ -13,6 +13,7 @@ import (
 	"math"
 	"strings"
 
+	"github.com/pdfcpu/pdfcpu/pkg/api"
 	"golang.org/x/crypto/bcrypt"
 	"rsc.io/pdf"
 )
@@ -247,15 +248,16 @@ func (s *Service) SealImage(ctx context.Context, actor domain.User, id string) (
 }
 
 type SealPlacement struct {
-	AssetID    string  `json:"assetId"`
-	VersionSeq int     `json:"versionSeq"`
-	FileSha256 string  `json:"fileSha256"`
-	Password   string  `json:"password"`
-	PageNumber int     `json:"pageNumber"`
-	X          float64 `json:"x"`
-	Y          float64 `json:"y"`
-	Width      float64 `json:"width"`
-	Height     float64 `json:"height"`
+	AssetID      string  `json:"assetId"`
+	VersionSeq   int     `json:"versionSeq"`
+	FileSha256   string  `json:"fileSha256"`
+	Password     string  `json:"password"`
+	PageNumber   int     `json:"pageNumber"`
+	X            float64 `json:"x"`
+	Y            float64 `json:"y"`
+	Width        float64 `json:"width"`
+	Height       float64 `json:"height"`
+	AngleDegrees float64 `json:"angleDegrees"`
 }
 
 func normalizedSealPosition(p SealPlacement) bool {
@@ -264,7 +266,7 @@ func normalizedSealPosition(p SealPlacement) bool {
 			return false
 		}
 	}
-	return p.PageNumber >= 1 && p.PageNumber <= 10000 && p.X >= 0 && p.Y >= 0 && p.Width > 0 && p.Height > 0 && p.X+p.Width <= 1.00000001 && p.Y+p.Height <= 1.00000001
+	return !math.IsNaN(p.AngleDegrees) && !math.IsInf(p.AngleDegrees, 0) && math.Abs(p.AngleDegrees) <= 180 && math.Abs(p.AngleDegrees-math.Round(p.AngleDegrees*100)/100) < 1e-8 && p.PageNumber >= 1 && p.PageNumber <= 10000 && p.X >= 0 && p.Y >= 0 && p.Width > 0 && p.Height > 0 && p.X+p.Width <= 1.00000001 && p.Y+p.Height <= 1.00000001
 }
 func (s *Service) SignFile(ctx context.Context, actor domain.User, fileID string, p SealPlacement) (domain.FileSealMark, error) {
 	if !normalizedSealPosition(p) || p.VersionSeq < 1 || len(p.AssetID) > 128 || len(p.AssetID) == 0 || len(p.Password) == 0 || len(p.Password) > 1024 || len(p.FileSha256) != 64 {
@@ -319,6 +321,13 @@ func (s *Service) SignFile(ctx context.Context, actor domain.User, fileID string
 	if parseErr != nil || document.NumPage() < p.PageNumber {
 		return domain.FileSealMark{}, domain.ErrInvalidInput
 	}
+	// Rotation must fit the PDF's actual physical page dimensions, not just
+	// its unrotated normalized rectangle.
+	dims, dimErr := api.PageDims(ctx, bytes.NewReader(content), nil)
+	if dimErr != nil || p.PageNumber > len(dims) || !rotatedSealFits(dims[p.PageNumber-1].Width, dims[p.PageNumber-1].Height, p) {
+		return domain.FileSealMark{}, domain.ErrInvalidInput
+	}
+
 	store, err := sealRepository(tx)
 	if err != nil {
 		return domain.FileSealMark{}, err
@@ -362,12 +371,12 @@ func (s *Service) SignFile(ctx context.Context, actor domain.User, fileID string
 			}
 		}
 	}
-	mark := domain.FileSealMark{ID: NewID("mark"), FileID: file.ID, VersionSeq: p.VersionSeq, FileSha256: version.Sha256, AssetID: asset.ID, AssetSha256: asset.Sha256, SignerID: actor.ID, PageNumber: p.PageNumber, X: p.X, Y: p.Y, Width: p.Width, Height: p.Height}
+	mark := domain.FileSealMark{ID: NewID("mark"), FileID: file.ID, VersionSeq: p.VersionSeq, FileSha256: version.Sha256, AssetID: asset.ID, AssetSha256: asset.Sha256, SignerID: actor.ID, PageNumber: p.PageNumber, X: p.X, Y: p.Y, Width: p.Width, Height: p.Height, AngleDegrees: p.AngleDegrees}
 	if err = store.InsertSealMark(ctx, mark); err != nil {
 		return domain.FileSealMark{}, err
 	}
 	if err = auditRequired(ctx, tx, actor, "seal.apply", "file", file.ID, "success", map[string]any{
-		"markId": mark.ID, "fileSha256": mark.FileSha256, "versionSeq": mark.VersionSeq, "assetId": mark.AssetID, "assetSha256": mark.AssetSha256, "page": mark.PageNumber, "x": mark.X, "y": mark.Y, "width": mark.Width, "height": mark.Height,
+		"markId": mark.ID, "fileSha256": mark.FileSha256, "versionSeq": mark.VersionSeq, "assetId": mark.AssetID, "assetSha256": mark.AssetSha256, "page": mark.PageNumber, "x": mark.X, "y": mark.Y, "width": mark.Width, "height": mark.Height, "angleDegrees": mark.AngleDegrees,
 	}); err != nil {
 		return domain.FileSealMark{}, err
 	}

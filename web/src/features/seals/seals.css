@@ -20,6 +20,16 @@
 .seal-file-workspace{display:grid;grid-template-columns:minmax(180px,220px) minmax(0,1fr) minmax(180px,220px);gap:8px;padding:8px;min-height:470px;height:min(720px,calc(100vh - 250px))}
 .seal-file-controls,.seal-file-history{display:flex;flex-direction:column;gap:10px}
 .seal-size-controls{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.seal-angle-control{display:flex;flex-direction:column;gap:6px;min-width:0}
+.seal-angle-heading{display:flex;align-items:center;justify-content:space-between;font-size:12px}
+.seal-angle-heading span{font-variant-numeric:tabular-nums;color:var(--text-secondary)}
+.seal-angle-inputs{display:flex;align-items:center;gap:7px;min-width:0}
+.seal-angle-inputs .seal-angle-range{flex:1 1 auto;min-width:0;accent-color:var(--brand-blue);cursor:pointer;padding:0}
+.seal-angle-inputs .seal-angle-number{flex:0 0 66px;min-width:0;text-align:center}
+.seal-angle-presets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+.seal-angle-presets .rare-button{min-width:0;padding-inline:4px}
+.seal-angle-warning{color:var(--status-warning);font-size:11px;margin:0}
+
 .seal-file-controls .hint{font-size:11px;color:var(--text-secondary);margin:0;line-height:1.5}
 .seal-selected-asset{display:flex;align-items:center;gap:8px;font-size:11px}
 .seal-selected-asset img{width:65px;height:50px;object-fit:contain}
