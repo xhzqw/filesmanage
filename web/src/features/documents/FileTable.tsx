@@ -17,6 +17,7 @@ import {newIdempotencyKey} from "../../shared/ids";
 import {Dialog} from "../../shared/ui/Dialog";
 import {FolderPicker} from "../../shared/ui/FolderPicker";
 import {BatchPrintDialog} from "./BatchPrintDialog";
+import {canOfferPrintFromListing} from "./previewCapabilities";
 import {Menu,type MenuItem,type MenuPoint}from"../../shared/ui/Menu";
 import {MicroHoldToDelete}from"../../shared/ui/rare";
 import"./dragMove.css";
@@ -631,10 +632,11 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    items.push({id:"rename",label:"重命名",hint:"F2",onSelect:()=>setRenaming(file)});
    items.push({id:"move",label:"移动到…",onSelect:()=>startMove(file)});
    items.push({id:"download",label:"下载",onSelect:()=>startDownload(file)});
-   items.push({id:"print",label:"打印",onSelect:()=>navigate("/preview/"+file.id+"?print=1")});
+   if(canOfferPrintFromListing(file))items.push({id:"print",label:"打印",onSelect:()=>navigate("/preview/"+file.id+"?print=1")});
   }else if(targets.length>1){
    items.push({id:"move-batch",label:"移动到…",onSelect:()=>startMoveSelection(targets)});
-   if(targets.length<=20)items.push({id:"print-batch",label:"批量打印",onSelect:()=>setPrintingBatch(targets)});
+   if(targets.length<=20&&targets.every(canOfferPrintFromListing))
+    items.push({id:"print-batch",label:"批量打印",onSelect:()=>setPrintingBatch(targets)});
   }
   items.push({id:"delete",label:"删除",hint:"Delete",danger:true,onSelect:()=>openDelete(targets)});
   return items;
@@ -767,8 +769,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     {selectedIds.size>0&&<div className="batch-actions-group" role="group" aria-label={`已选 ${selectedIds.size} 个文件的批量操作`}>
      <span className="file-selected-count" aria-live="polite">已选 <strong>{selectedIds.size}</strong></span>
      <RareButton type="button" tone="ghost" className="batch-btn" disabled={zipController.current!==null} onClick={()=>void batchDownload(selection)} title="批量下载已勾选文件">下载</RareButton>
-     <RareButton type="button" tone="ghost" className="batch-btn" disabled={selectedIds.size>20}
-      onClick={()=>setPrintingBatch(selection)} title={selectedIds.size>20?"每批最多 20 份文件":"逐份确认并打开浏览器打印预览"}>打印</RareButton>
+     {selection.every(canOfferPrintFromListing)&&<RareButton type="button" tone="ghost" className="batch-btn" disabled={selectedIds.size>20}
+      onClick={()=>setPrintingBatch(selection)} title={selectedIds.size>20?"每批最多 20 份文件":"逐份确认并打开浏览器打印预览"}>打印</RareButton>}
      <RareButton type="button" tone="ghost" className="batch-btn" onClick={()=>startMoveSelection(selection)} title="批量移动已勾选文件">移动</RareButton>
      <RareButton type="button" tone="danger" className="batch-btn danger" onClick={()=>openDelete(selection)} title="批量删除已勾选文件">删除</RareButton>
      <RareButton type="button" tone="ghost" className="batch-clear-selection" onClick={()=>{setSelectedIds(new Set<string>());setAnchorId(null);}} aria-label="取消全部选中" title="取消选择">

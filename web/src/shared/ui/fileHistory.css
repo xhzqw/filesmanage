@@ -15,3 +15,86 @@
 .file-history-detail{font-size:12px;margin:5px 0 0;overflow-wrap:anywhere;color:var(--text-primary)}
 .file-history-footer{display:flex;justify-content:center;padding:9px}
 .file-history-error{display:flex;align-items:center;gap:12px;color:var(--danger,var(--text-primary));font-size:12px}
+
+/* Rail TOC-inspired month navigation. Keep one scrolling owner and no cards. */
+.file-workbench-history .file-history{
+ display:flex;flex-direction:column;flex:1 1 auto;min-height:0;min-width:0;
+ padding:0 18px 14px
+}
+.file-workbench-history .file-history-filters{
+ display:flex;align-items:center;gap:4px;flex:0 0 auto;margin:0;padding:8px 0 11px
+}
+.file-workbench-history .file-history-filters .rare-button{
+ padding:5px 12px;min-height:30px;border:0;border-radius:var(--radius-pill);font-size:11px
+}
+.file-workbench-history .file-history-filters .rare-button[aria-pressed="true"]{
+ background:var(--brand-cyan-muted);color:var(--brand-blue);font-weight:650
+}
+.file-history-rail-layout{display:grid;grid-template-columns:142px minmax(0,1fr);gap:20px;min-height:0;flex:1}
+.file-history-month-rail{
+ position:relative;display:flex;flex-direction:column;align-self:start;gap:2px;
+ padding:7px 0 8px 19px;max-height:100%;overflow:auto
+}
+.file-history-month-rail:before{
+ content:"";position:absolute;left:7px;top:15px;bottom:16px;
+ width:1px;background:var(--border-hairline)
+}
+.file-history-month-rail .rare-button{
+ position:relative;justify-content:flex-start;text-align:left;flex:none;
+ min-height:34px;height:34px;padding:0 5px;background:transparent;border:0;
+ font-size:11px;color:var(--text-secondary)
+}
+.file-history-month-rail .rare-button:before{
+ content:"";position:absolute;left:-16px;top:12px;width:9px;height:9px;
+ box-sizing:border-box;border:2px solid var(--border-subtle);
+ border-radius:50%;background:var(--surface-panel)
+}
+.file-history-month-rail .rare-button[aria-current="location"]{color:var(--brand-blue);font-weight:700}
+.file-history-month-rail .rare-button[aria-current="location"]:before{
+ background:var(--brand-blue);border-color:var(--brand-blue);
+ box-shadow:0 0 0 3px var(--brand-cyan-muted)
+}
+.file-history-scroll{
+ position:relative;min-width:0;min-height:0;height:100%;overflow-y:auto;
+ overscroll-behavior:contain;scrollbar-width:thin;padding:0 10px 16px 0
+}
+.file-history-month-group{scroll-margin-top:12px}
+.file-history-month-group>h2{
+ margin:6px 0 13px;font-size:11px;font-weight:650;color:var(--text-tertiary)
+}
+.file-workbench-history .file-history-timeline{
+ margin:0 0 15px 5px;padding:0 0 0 25px;border-left:1px solid var(--border-hairline)
+}
+.file-workbench-history .file-history-item{
+ position:relative;display:block;min-height:0;padding:0 0 20px
+}
+.file-workbench-history .file-history-point{
+ position:absolute;top:3px;left:-31px;width:10px;height:10px;
+ margin:0;box-sizing:border-box;background:var(--surface-panel);
+ border:2px solid var(--brand-blue);border-radius:50%
+}
+.file-workbench-history .file-history-point:after{display:none}
+.file-workbench-history .file-history-entry{
+ padding:0;border:0;display:grid;gap:4px
+}
+.file-workbench-history .file-history-row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+.file-workbench-history .file-history-row strong{font-size:13px;font-weight:650}
+.file-workbench-history .file-history-row time{margin-left:auto;color:var(--text-tertiary)}
+.file-workbench-history .file-history-actor{color:var(--text-tertiary)}
+.file-workbench-history .file-history-detail{
+ margin:0;font-size:12px;color:var(--text-secondary);line-height:1.5
+}
+@media(max-width:980px){
+ .file-history-rail-layout{grid-template-columns:115px minmax(0,1fr);gap:10px}
+}
+@media(max-width:820px){
+ .file-workbench-history .file-history{padding:0 9px 12px}
+ .file-history-rail-layout{display:flex;flex-direction:column;gap:5px}
+ .file-history-month-rail{
+ flex-direction:row;gap:6px;max-height:45px;overflow-x:auto;
+ overflow-y:hidden;padding:0 2px 6px
+ }
+ .file-history-month-rail:before,.file-history-month-rail .rare-button:before{display:none}
+ .file-history-month-rail .rare-button{white-space:nowrap;min-height:29px;height:29px}
+ .file-history-scroll{flex:1 1 auto;height:auto}
+}

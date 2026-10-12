@@ -12,6 +12,7 @@ import {PDFPageViewer} from "../features/documents/PDFPageViewer";
 import {DocxSealConversion} from "../features/documents/DocxSealConversion";
 import {CadPreviewStatus} from "../features/documents/CadPreviewStatus";
 import {resolvePreviewAdapter} from "../features/documents/previewAdapters";
+import {previewCapabilities} from "../features/documents/previewCapabilities";
 import {FileEditor} from "../features/documents/FileEditor";
 import {FileMetadataEditor} from "../features/documents/FileMetadataEditor";
 import {VersionComparePanel} from "../features/documents/VersionComparePanel";
@@ -108,7 +109,14 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const archived=lifecycle?.state==="archived";
  const currentSeq=Math.max(file?.currentVersionSeq??1,...versions.map(v=>v.versionSeq));
  const adapter=preview?resolvePreviewAdapter(preview):"unsupported";
+ const capabilities=preview?previewCapabilities(preview,versions.length):null;
  const canManage=file!==null;
+ useEffect(()=>{
+  if(!preview)return;
+  if((tab==="compare"&&!capabilities?.canCompare)||
+     (tab==="review"&&!capabilities?.canReview)||
+     (tab==="seals"&&!capabilities?.canSign))setTab("preview");
+ },[preview,tab,versions.length]);
 
  // Other tabs, the file list and the trash can modify or remove this file.
  // Notifications only invalidate local state; all details are refetched from
@@ -226,7 +234,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const moreActions:MenuItem[]=[
   {id:"favorite",label:favorite===null?"收藏状态不可用":favorite?"取消收藏":"收藏文件",
    disabled:!canManage||favorite===null||favoriteBusy,onSelect:()=>void toggleFavorite()},
-  ...(preview?.textual&&canManage&&!archived?[{id:"edit-text",label:"编辑文本内容",
+  ...(capabilities?.canEditText&&canManage&&!archived?[{id:"edit-text",label:"编辑文本内容",
     disabled:requiresApproval===null,onSelect:()=>setEditing(true)}]:[]),
   ...(canManage&&!archived?[{id:"rename",label:"重命名",onSelect:()=>setRenaming(true)},
     {id:"move",label:"移动文件",onSelect:()=>setMoving(true)}]:[]),
@@ -247,7 +255,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
     </div>}
     {status==="ready"&&preview&&<div className="file-workbench">
 
-     <div className={"file-workbench-layout"+(sidebarCollapsed?" is-collapsed":"")+(["details","versions","review","seals"].includes(tab)?" has-context":"")}>
+     <div className={"file-workbench-layout"+(sidebarCollapsed?" is-collapsed":"")+(["details","review","seals"].includes(tab)?" has-context":"")}>
       <aside className="file-workbench-sidebar" aria-label="文件工作台">
        <div className="file-sidebar-top">
         <RareButton type="button" tone="ghost" className="file-sidebar-collapse"
@@ -260,7 +268,9 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
        </div>
        <nav className="file-workbench-nav" aria-label="文件功能导航">
         {([["preview","预览"],["details","文件信息"],["versions","历史记录"],["compare","版本对比"],["review","审查批注"],["seals","签名与盖章"]] as const)
-         .filter(([key])=>key!=="seals"||preview.renderer==="pdf"||isOfficeName(preview.name))
+         .filter(([key])=>(key!=="seals"||!!capabilities?.canSign)&&
+          (key!=="compare"||!!capabilities?.canCompare)&&
+          (key!=="review"||!!capabilities?.canReview))
          .map(([key,label])=><RareButton key={key} type="button" className={"file-workbench-nav-item"+(tab===key?" is-active":"")}
           aria-label={label} title={sidebarCollapsed?label:undefined}
           aria-current={tab===key?"page":undefined} aria-pressed={tab===key} onClick={()=>{
@@ -300,20 +310,6 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
       <FileReviewPanel fileId={id} versions={versions}/>
      </section>}
 
-       {tab==="versions"&&<section className="file-sidebar-context" aria-label="文件历史">
-         <div className="file-history-switch" role="group" aria-label="历史分类">
-          <RareButton type="button" aria-pressed={historyView==="activity"} onClick={()=>setHistoryView("activity")}>操作记录</RareButton>
-          <RareButton type="button" aria-pressed={historyView==="versions"} onClick={()=>setHistoryView("versions")}>内容版本</RareButton>
-         </div>
-         {historyView==="activity"?<FileHistoryPanel fileId={id} revision={reloadToken}/>:<div className="file-version-timeline">
-        {versions.length===0?<p className="empty">暂无版本记录</p>:versions.slice().reverse().map(v=><article key={v.versionSeq} className="file-version-entry">
-         <div className="file-version-entry-heading"><strong>v{v.versionSeq}</strong>{v.versionSeq===currentSeq&&<RareBadge tone="info">当前</RareBadge>}</div>
-         <span>{ACTION_LABELS[v.action]??v.action}{v.rollbackTargetSeq?" · 来自 v"+v.rollbackTargetSeq:""}</span>
-         <small>{v.createdBy} · {versionTime(v.createdAt)}</small>
-         {v.versionSeq!==currentSeq&&<RareButton type="button" disabled={!canManage||archived} onClick={()=>{announce("");setRollback(v)}}>恢复此版本</RareButton>}
-        </article>)}
-       </div>}
-       </section>}
       {hasOpenedSeals&&!isOfficeName(preview.name)&&<div id="file-seals-sidebar" hidden={tab!=="seals"} className="file-sidebar-context file-seal-sidebar-host"/>}
 
       </aside>
@@ -328,7 +324,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
         </div>}
         <div className="file-workbench-actions" role="group" aria-label="文件操作">
          <RareButton type="button" tone="ghost" title="下载" aria-label="下载" onClick={download}><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M4 17v3h16v-3"/></svg><span className="file-side-action-label">下载</span></RareButton>
-         <RareButton type="button" tone="ghost" title="打印" aria-label="打印" onClick={()=>setPrinting(true)}><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M7 8V4h10v4M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M7 14h10v6H7z"/><path d="M17 11h1"/></svg><span className="file-side-action-label">打印</span></RareButton>
+         {capabilities?.canPrint&&<RareButton type="button" tone="ghost" title="打印" aria-label="打印" onClick={()=>setPrinting(true)}><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M7 8V4h10v4M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M7 14h10v6H7z"/><path d="M17 11h1"/></svg><span className="file-side-action-label">打印</span></RareButton>}
          <RareButton type="button" tone="ghost" className="file-more-trigger"
           aria-label="更多文件操作" aria-controls="file-workbench-more-actions" aria-expanded={moreOpen}
           onClick={()=>setMoreOpen(open=>!open)}><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg><span className="file-side-action-label">更多操作</span> <svg viewBox="0 0 20 20" width="12" height="12"
@@ -357,7 +353,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
       </div>
      </header>
        {error&&<p role="alert" className="notice error file-workbench-inline-notice">{error}</p>}
-            <section className="file-workbench-panel file-workbench-preview-surface" aria-label="文件预览" hidden={tab==="compare"||tab==="seals"}>
+            <section className="file-workbench-panel file-workbench-preview-surface" aria-label="文件预览" hidden={tab==="compare"||tab==="seals"||tab==="versions"}>
       {(preview.renderer==="image"||preview.renderer==="video"||preview.renderer==="audio")?
        <MediaPreview key={preview.fileId+preview.sha256} fileId={preview.fileId} sha256={preview.sha256}
         name={preview.name} kind={preview.renderer} mime={preview.mediaType??""}/>:
@@ -386,11 +382,25 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
         </div>}
      </section>
 
-            {tab==="compare"&&<section id="file-panel-compare" role="tabpanel" aria-labelledby="file-tab-compare" className="file-workbench-mode-panel">
+            {tab==="versions"&&<section id="file-panel-versions" role="tabpanel" aria-label="文件历史记录" className="file-workbench-mode-panel file-workbench-history">
+       <div className="file-history-switch" role="group" aria-label="历史分类">
+        <RareButton type="button" aria-pressed={historyView==="activity"} onClick={()=>setHistoryView("activity")}>操作记录</RareButton>
+        <RareButton type="button" aria-pressed={historyView==="versions"} onClick={()=>setHistoryView("versions")}>内容版本</RareButton>
+       </div>
+       {historyView==="activity"?<FileHistoryPanel fileId={id} revision={reloadToken}/>:<div className="file-version-timeline file-history-version-list">
+        {versions.length===0?<p className="empty">暂无版本记录</p>:versions.slice().reverse().map(v=><article key={v.versionSeq} className="file-version-entry">
+         <div className="file-version-entry-heading"><strong>v{v.versionSeq}</strong>{v.versionSeq===currentSeq&&<RareBadge tone="info">当前</RareBadge>}</div>
+         <span>{ACTION_LABELS[v.action]??v.action}{v.rollbackTargetSeq?" · 来自 v"+v.rollbackTargetSeq:""}</span>
+         <small>{v.createdBy} · {versionTime(v.createdAt)} · {formatSize(v.sizeBytes)}</small>
+         {v.versionSeq!==currentSeq&&<RareButton type="button" disabled={!canManage||archived} onClick={()=>{announce("");setRollback(v)}}>恢复此版本</RareButton>}
+        </article>)}
+       </div>}
+     </section>}
+            {tab==="compare"&&capabilities?.canCompare&&<section id="file-panel-compare" role="tabpanel" aria-labelledby="file-tab-compare" className="file-workbench-mode-panel">
       <VersionComparePanel fileId={id} versions={versions}/>
      </section>}
 
-            {hasOpenedSeals&&<section hidden={tab!=="seals"} id="file-panel-seals" role="tabpanel" aria-labelledby="file-tab-seals" className="file-workbench-mode-panel file-workbench-signing">
+            {hasOpenedSeals&&capabilities?.canSign&&<section hidden={tab!=="seals"} id="file-panel-seals" role="tabpanel" aria-labelledby="file-tab-seals" className="file-workbench-mode-panel file-workbench-signing">
       {isOfficeName(preview.name)?
        <DocxSealConversion fileId={id} versionSeq={currentSeq} sha={preview.sha256} name={preview.name}/>:
        <FileSealsPanel fileId={id} seq={currentSeq} sha={preview.sha256} name={preview.name} isAdmin={user.isAdmin} controlsTargetId="file-seals-sidebar" onSelectRevision={value=>{setSealRevision(value);setTab("preview")}} onChanged={()=>{setSealRevision(null);refresh()}}/>}
@@ -406,7 +416,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
    onMoved={()=>{setMoving(false);announce("文件已移动");refresh();}} onReload={refresh}/>}
    {sharing&&file&&<ShareDialog resource={{kind:"file",id:file.id,name:file.name}}
     onClose={()=>setSharing(false)} onCreated={()=>{setSharing(false);announce("分享已创建");}}/>}
-   {printing&&preview&&<PrintDialog preview={preview} sealRevision={sealRevision} onClose={()=>setPrinting(false)}/>}
+   {printing&&preview&&capabilities?.canPrint&&<PrintDialog preview={preview} sealRevision={sealRevision} onClose={()=>setPrinting(false)}/>}
   {renaming&&file&&<FileRenameDialog file={file} onClose={()=>setRenaming(false)}
    onRenamed={()=>{setRenaming(false);refresh();}}/>}
   {deleting&&file&&<Dialog open title="移入回收站" onClose={()=>{if(!busy)setDeleting(false);}} closeGuard={()=>!busy}>

@@ -1,4 +1,4 @@
-import {useEffect,useRef,useState} from "react";
+import {useEffect,useMemo,useRef,useState} from "react";
 import {request} from "../http";
 export type FileHistoryEvent={id:number;actorId:string;actorName?:string;requestId:string;eventType:string;targetKind:string;targetId:string;outcome:string;details:Record<string,unknown>;createdAt:string};
 export type FileHistoryPage={items:FileHistoryEvent[];nextCursor:string};
@@ -51,6 +51,8 @@ export function FileHistoryPanel({fileId,revision}:{fileId:string;revision:numbe
  const[error,setError]=useState("");
  const[retry,setRetry]=useState(0);
  const requestEpoch=useRef(0);
+ const scroller=useRef<HTMLDivElement>(null);
+ const[activeMonth,setActiveMonth]=useState("");
  useEffect(()=>{
   let live=true;
   const epoch=++requestEpoch.current;
@@ -80,6 +82,32 @@ export function FileHistoryPanel({fileId,revision}:{fileId:string;revision:numbe
  }
  const category=(type:string)=>/^(file\.(upload|save|rollback|replace)|office\.save_commit)/.test(type)?"content":/^(approval\.|seal\.|file\.review)/.test(type)?"workflow":"location";
  const shown=filter==="all"?page.items:page.items.filter(item=>category(item.eventType)===filter);
+ const grouped=useMemo(()=>{
+  const months:{id:string;items:FileHistoryEvent[]}[]=[];
+  for(const event of shown){
+   const id=/^\d{4}-\d{2}/.test(event.createdAt)?event.createdAt.slice(0,7):"未知日期";
+   if(months.at(-1)?.id!==id)months.push({id,items:[]});
+   months.at(-1)!.items.push(event);
+  }
+  return months;
+ },[shown]);
+ useEffect(()=>{setActiveMonth(grouped[0]?.id??"");},[fileId,filter,grouped[0]?.id]);
+ function monthLabel(id:string){return id==="未知日期"?id:id.replace("-"," 年 ")+" 月";}
+ function jumpToMonth(id:string){
+  const target=Array.from(scroller.current?.querySelectorAll<HTMLElement>("[data-history-month]")??[])
+   .find(item=>item.dataset.historyMonth===id);
+  if(target&&scroller.current){
+   scroller.current.scrollTo({top:target.offsetTop-scroller.current.offsetTop,behavior:"smooth"});
+   setActiveMonth(id);
+  }
+ }
+ function updateActiveMonth(){
+  if(!scroller.current)return;
+  let id=grouped[0]?.id??"";
+  for(const section of scroller.current.querySelectorAll<HTMLElement>("[data-history-month]"))
+   if(section.offsetTop-scroller.current.offsetTop<=scroller.current.scrollTop+70)id=section.dataset.historyMonth??id;
+  setActiveMonth(current=>current===id?current:id);
+ }
  return <div className="file-history" aria-label="文件操作时间线">
   <div className="file-history-filters" role="group" aria-label="操作类型">
    {([["all","全部"],["content","内容"],["location","文件操作"],["workflow","审批签章"]] as const).map(([key,label])=>
@@ -88,8 +116,16 @@ export function FileHistoryPanel({fileId,revision}:{fileId:string;revision:numbe
   {loading&&<p role="status" className="hint">正在读取历史…</p>}
   {error&&<div className="file-history-error" role="alert">{error}<RareButton type="button" onClick={()=>setRetry(n=>n+1)}>重试</RareButton></div>}
   {!loading&&shown.length===0&&!error&&<p className="empty">暂无匹配记录</p>}
+  <div className="file-history-rail-layout">
+   <nav className="file-history-month-rail" aria-label="按月份跳转">
+    {grouped.map(group=><RareButton key={group.id} type="button" aria-current={activeMonth===group.id?"location":undefined}
+     onClick={()=>jumpToMonth(group.id)}>{monthLabel(group.id)}</RareButton>)}
+   </nav>
+   <div className="file-history-scroll" ref={scroller} tabIndex={0} aria-label="文件操作记录" onScroll={updateActiveMonth}>
+  {grouped.map(group=><section key={group.id} className="file-history-month-group" data-history-month={group.id}>
+   <h2>{monthLabel(group.id)}</h2>
   <ol className="file-history-timeline">
-   {shown.map(item=><li key={item.id} className="file-history-item">
+   {group.items.map(item=><li key={item.id} className="file-history-item">
     <span className="file-history-point" aria-hidden="true"/>
     <div className="file-history-entry">
      <div className="file-history-row">
@@ -101,6 +137,9 @@ export function FileHistoryPanel({fileId,revision}:{fileId:string;revision:numbe
     </div>
    </li>)}
   </ol>
+  </section>)}
   {page.nextCursor&&<div className="file-history-footer"><RareButton type="button" disabled={more} onClick={()=>void nextPage()}>{more?"正在加载…":"加载更早记录"}</RareButton></div>}
+   </div>
+  </div>
  </div>;
 }
