@@ -379,8 +379,12 @@ func (s *Service) HandleEditorCallback(ctx context.Context, authorization string
 		return 1, domain.ErrVersionConflict
 	}
 	// Ignore duplicate document content while still confirming its receipt.
+	currentVersion, err := tx.VersionBySeq(ctx, file.ID, currentSeq(file))
+	if err != nil {
+		return 1, err
+	}
 	currentHash := sha256.Sum256(content)
-	if hex.EncodeToString(currentHash[:]) == file.Sha256 {
+	if hex.EncodeToString(currentHash[:]) == currentVersion.Sha256 {
 		if err = tx.RecordSaveEvent(ctx, domain.OfficeSaveEvent{
 			ID: NewID("oev"), SessionID: session.ID, Generation: session.LockGeneration,
 			CallbackStatus: payload.Status, EventHash: eventHash, Outcome: "committed",
