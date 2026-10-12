@@ -56,6 +56,8 @@ if [ "${1:-}" = "--with-tests" ]; then
   echo "== migrations: checksum re-verify =="
   set -a; . .secrets/server.env; set +a
   go run ./cmd/migrate -dir migrations -check
+  echo "== realtime: transactional PostgreSQL journal == "
+  bash scripts/realtime_journal_db_check.sh
 fi
 
 echo "BUILD_OK server=$(du -h .bin/server | cut -f1) worker=$(du -h .bin/worker | cut -f1)"

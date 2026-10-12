@@ -137,6 +137,9 @@ func main() {
 		SourceBaseURL: os.Getenv("FILESMANAGE_OFFICE_SOURCE_BASE"),
 		EditorVersion: os.Getenv("FILESMANAGE_OFFICE_VERSION"),
 	})
+	// App replicas must also invalidate HTTP read caches without connected WS
+	// clients; each process follows the same committed PostgreSQL journal.
+	go service.WatchDurableCache(context.Background())
 	// Durable due-date reminders. At startup and hourly; duplicate instances
 	// are safe because PostgreSQL enforces one notification per due date/phase.
 	remindLifecycle := func() {

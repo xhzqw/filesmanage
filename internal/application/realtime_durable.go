@@ -3,6 +3,8 @@ package application
 import (
 	"context"
 	"filesmanage/internal/domain"
+	"log"
+	"time"
 )
 
 // DurableEventStore is backed by PostgreSQL. Database triggers write the
@@ -36,6 +38,47 @@ func (s *Service) InvalidateFromDurableEvent(event domain.RealtimeEvent) {
 				s.aclEpoch.Add(1)
 			}
 			return
+		}
+	}
+}
+
+// WatchDurableCache synchronizes *server-side* caches even when this replica
+// currently has no WebSocket clients. Live sockets still own per-user replay;
+// this watcher reads only public anonymous invalidations and never holds
+// private user events. Start it once per API process.
+func (s *Service) WatchDurableCache(ctx context.Context) {
+	if s.durable == nil {
+		return
+	}
+	_, cursor, err := s.durable.RealtimeBounds(ctx)
+	if err != nil {
+		log.Printf("realtime cache observer startup failed: %v", err)
+		return
+	}
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			for {
+				events, err := s.durable.RealtimeAfter(ctx, "", cursor, 256)
+				if err != nil {
+					if ctx.Err() != nil {
+						return
+					}
+					log.Printf("realtime cache observer retry: %v", err)
+					break
+				}
+				for _, event := range events {
+					s.InvalidateFromDurableEvent(event)
+					cursor = event.ID
+				}
+				if len(events) < 256 {
+					break
+				}
+			}
 		}
 	}
 }
