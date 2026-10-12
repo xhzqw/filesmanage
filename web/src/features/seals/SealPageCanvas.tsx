@@ -5,7 +5,9 @@ import {fitStampToPage} from "./sealGeometry";
 import type {FileSealMark,SealAsset} from "../../entities/seal/model";
 
 type StampPosition={x:number;y:number;width:number;height:number};
+type StagedCanvasMark={assetId:string;asset?:SealAsset;pageNumber:number;x:number;y:number;width:number;height:number;angleDegrees:number};
 type Props={
+ drafts?:StagedCanvasMark[];
  fileId:string;page:number;imageUrl:string;selected?:SealAsset;marks:FileSealMark[];
  position:StampPosition;setPosition:(update:(value:StampPosition)=>StampPosition)=>void;
  angle:number;pageRatio:number;setPageRatio:(value:number)=>void;
@@ -14,7 +16,7 @@ type Props={
 const zoomLimit=(value:number)=>Math.max(1,Math.min(5,Math.round(value*100)/100));
 
 /** Viewport zoom/pan is presentation-only; actual signatures use page-relative coordinates. */
-export function SealPageCanvas({fileId,page,imageUrl,selected,marks,position,setPosition,angle,pageRatio,setPageRatio,imageAvailable,setImageAvailable}:Props){
+export function SealPageCanvas({fileId,page,imageUrl,selected,marks,position,setPosition,angle,pageRatio,setPageRatio,imageAvailable,setImageAvailable,drafts=[]}:Props){
  const viewportRef=useRef<HTMLDivElement>(null);
  const dragRef=useRef<{x:number;y:number;left:number;top:number}|null>(null);
  const pendingAnchor=useRef<{x:number;y:number;oldZoom:number;left:number;top:number}|null>(null);
@@ -121,6 +123,7 @@ export function SealPageCanvas({fileId,page,imageUrl,selected,marks,position,set
       setPosition(p=>fitStampToPage(p,angle,ratio));
      }
     }}/>
+    {drafts.filter(p=>p.pageNumber===page&&p.asset&&p.assetId!==selected?.id).map(p=><span key={p.assetId} className="seal-staged-mark" title={(p.asset?.ownerName||p.asset?.name||"签章")+" · 待签"} style={{left:p.x*100+"%",top:p.y*100+"%",width:p.width*100+"%",height:p.height*100+"%",transform:"rotate("+p.angleDegrees+"deg)"}}><img alt="" src={sealsApi.imageUrl(p.assetId)}/></span>)}
     {selected&&<span className="seal-position-mark" style={{left:position.x*100+"%",top:position.y*100+"%",width:position.width*100+"%",height:position.height*100+"%",transform:"rotate("+angle+"deg)"}}>
      <img alt="" src={sealsApi.imageUrl(selected.id)}/>
     </span>}

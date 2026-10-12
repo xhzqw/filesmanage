@@ -6116,6 +6116,117 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/{id}/seals/batch:
+    post:
+      summary: Atomically apply up to twenty different authorized personal signatures or company seals on one immutable PDF
+        version, verifying the real operator password once
+      operationId: signFileSealsBatch
+      tags:
+      - Seals
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: PDF file ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+                versionSeq:
+                  type: integer
+                  minimum: 1
+                fileSha256:
+                  type: string
+                placements:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      assetId:
+                        type: string
+                      pageNumber:
+                        type: integer
+                        minimum: 1
+                      x:
+                        type: number
+                      y:
+                        type: number
+                      width:
+                        type: number
+                      height:
+                        type: number
+                      angleDegrees:
+                        type: number
+                        minimum: -180
+                        maximum: 180
+                    required:
+                    - assetId
+                    - pageNumber
+                    - x
+                    - y
+                    - width
+                    - height
+              required:
+              - password
+              - versionSeq
+              - fileSha256
+              - placements
+      responses:
+        '201':
+          description: All append-only signature evidence committed atomically; true operator and asset owner audited separately
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FileSealMark'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/files/{id}/seals/page:
     get:
       summary: Permission-gated PDF page image for exact seal placement

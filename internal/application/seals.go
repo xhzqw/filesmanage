@@ -269,111 +269,164 @@ func normalizedSealPosition(p SealPlacement) bool {
 	return !math.IsNaN(p.AngleDegrees) && !math.IsInf(p.AngleDegrees, 0) && math.Abs(p.AngleDegrees) <= 180 && math.Abs(p.AngleDegrees-math.Round(p.AngleDegrees*100)/100) < 1e-8 && p.PageNumber >= 1 && p.PageNumber <= 10000 && p.X >= 0 && p.Y >= 0 && p.Width > 0 && p.Height > 0 && p.X+p.Width <= 1.00000001 && p.Y+p.Height <= 1.00000001
 }
 func (s *Service) SignFile(ctx context.Context, actor domain.User, fileID string, p SealPlacement) (domain.FileSealMark, error) {
-	if !normalizedSealPosition(p) || p.VersionSeq < 1 || len(p.AssetID) > 128 || len(p.AssetID) == 0 || len(p.Password) == 0 || len(p.Password) > 1024 || len(p.FileSha256) != 64 {
-		return domain.FileSealMark{}, domain.ErrInvalidInput
+	marks, err := s.SignFileBatch(ctx, actor, fileID, []SealPlacement{p})
+	if err != nil {
+		return domain.FileSealMark{}, err
+	}
+	return marks[0], nil
+}
+
+// SignFileBatch validates every proposed mark before committing any evidence.
+// The actor authenticates once and is the recorded operator for all marks;
+// personal signature ownership is recorded separately in the audit payload.
+func (s *Service) SignFileBatch(ctx context.Context, actor domain.User, fileID string, placements []SealPlacement) ([]domain.FileSealMark, error) {
+	if len(placements) < 1 || len(placements) > 20 {
+		return nil, domain.ErrInvalidInput
+	}
+	first := placements[0]
+	if first.VersionSeq < 1 || len(first.FileSha256) != 64 || len(first.Password) < 1 || len(first.Password) > 1024 {
+		return nil, domain.ErrInvalidInput
+	}
+	ids := make(map[string]bool, len(placements))
+	for _, p := range placements {
+		if !normalizedSealPosition(p) || p.AssetID == "" || len(p.AssetID) > 128 ||
+			p.VersionSeq != first.VersionSeq || p.FileSha256 != first.FileSha256 || p.Password != first.Password || ids[p.AssetID] {
+			return nil, domain.ErrInvalidInput
+		}
+		ids[p.AssetID] = true
 	}
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
-		return domain.FileSealMark{}, err
+		return nil, err
 	}
 	defer tx.Rollback(ctx)
-	// Password verification is within the same DB transaction as the signed
-	// mark. Never accept a previous browser confirmation or somebody else's password.
 	identity, hash, err := tx.UserByLogin(ctx, actor.Login)
-	if err != nil || identity.ID != actor.ID || bcrypt.CompareHashAndPassword([]byte(hash), []byte(p.Password)) != nil {
-		return domain.FileSealMark{}, ErrInvalidCredentials
+	if err != nil || identity.ID != actor.ID || bcrypt.CompareHashAndPassword([]byte(hash), []byte(first.Password)) != nil {
+		return nil, ErrInvalidCredentials
 	}
 	file, err := s.visibleFile(ctx, tx, actor, fileID, domain.ActionPrint)
 	if err != nil {
-		return domain.FileSealMark{}, err
+		return nil, err
 	}
 	if _, err = s.visibleFile(ctx, tx, actor, fileID, domain.ActionPreview); err != nil {
-		return domain.FileSealMark{}, err
+		return nil, err
 	}
-	if currentSeq(file) != p.VersionSeq {
-		return domain.FileSealMark{}, domain.ErrVersionConflict
+	if currentSeq(file) != first.VersionSeq {
+		return nil, domain.ErrVersionConflict
 	}
-	version, err := tx.VersionBySeq(ctx, file.ID, p.VersionSeq)
-	if err != nil || version.Sha256 != p.FileSha256 {
-		return domain.FileSealMark{}, domain.ErrVersionConflict
+	version, err := tx.VersionBySeq(ctx, file.ID, first.VersionSeq)
+	if err != nil || version.Sha256 != first.FileSha256 {
+		return nil, domain.ErrVersionConflict
 	}
-	// Only a verified PDF page may receive a positioned document signature.
 	if extensionOf(file.Name) != ".pdf" || version.SizeBytes > 20<<20 {
-		return domain.FileSealMark{}, domain.ErrInvalidInput
+		return nil, domain.ErrInvalidInput
 	}
 	blob, err := tx.BlobByID(ctx, version.BlobID)
 	if err != nil {
-		return domain.FileSealMark{}, domain.ErrNotFound
+		return nil, domain.ErrNotFound
 	}
 	reader, err := s.blobs.Open(blob.StorageKey)
 	if err != nil {
-		return domain.FileSealMark{}, err
+		return nil, err
 	}
 	content, readErr := io.ReadAll(io.LimitReader(reader, (20<<20)+1))
 	reader.Close()
 	if readErr != nil {
-		return domain.FileSealMark{}, readErr
+		return nil, readErr
 	}
 	if int64(len(content)) != version.SizeBytes || len(content) < 8 || !bytes.HasPrefix(content, []byte("%PDF-")) {
-		return domain.FileSealMark{}, domain.ErrInvalidInput
+		return nil, domain.ErrInvalidInput
 	}
 	document, parseErr := pdf.NewReader(bytes.NewReader(content), int64(len(content)))
-	if parseErr != nil || document.NumPage() < p.PageNumber {
-		return domain.FileSealMark{}, domain.ErrInvalidInput
+	if parseErr != nil {
+		return nil, domain.ErrInvalidInput
 	}
-	// Rotation must fit the PDF's actual physical page dimensions, not just
-	// its unrotated normalized rectangle.
 	dims, dimErr := api.PageDims(ctx, bytes.NewReader(content), nil)
-	if dimErr != nil || p.PageNumber > len(dims) || !rotatedSealFits(dims[p.PageNumber-1].Width, dims[p.PageNumber-1].Height, p) {
-		return domain.FileSealMark{}, domain.ErrInvalidInput
+	if dimErr != nil {
+		return nil, domain.ErrInvalidInput
 	}
-
 	store, err := sealRepository(tx)
 	if err != nil {
-		return domain.FileSealMark{}, err
-	}
-	asset, _, err := store.GetSeal(ctx, p.AssetID)
-	if err != nil {
-		return domain.FileSealMark{}, notFoundOr(err)
+		return nil, err
 	}
 	permission, err := store.SealUserPermission(ctx, actor.ID)
 	if err != nil {
-		return domain.FileSealMark{}, notFoundOr(err)
+		return nil, notFoundOr(err)
 	}
-	var hasCompanyGrant bool
-	if !actor.IsAdmin && asset.Kind == "company" {
-		hasCompanyGrant, err = store.HasSealGrant(ctx, asset.ID, actor.ID)
+	type preparedMark struct {
+		mark  domain.FileSealMark
+		asset domain.SealAsset
+	}
+	prepared := make([]preparedMark, 0, len(placements))
+	hashes := make(map[string]bool, len(placements))
+	for _, p := range placements {
+		if document.NumPage() < p.PageNumber || p.PageNumber > len(dims) ||
+			!rotatedSealFits(dims[p.PageNumber-1].Width, dims[p.PageNumber-1].Height, p) {
+			return nil, domain.ErrInvalidInput
+		}
+		asset, _, err := store.GetSeal(ctx, p.AssetID)
 		if err != nil {
-			return domain.FileSealMark{}, err
+			return nil, notFoundOr(err)
+		}
+		var companyGranted bool
+		if !actor.IsAdmin && asset.Kind == "company" {
+			companyGranted, err = store.HasSealGrant(ctx, asset.ID, actor.ID)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if !sealCanApply(actor, asset, permission, companyGranted) {
+			return nil, domain.ErrForbidden
+		}
+		if hashes[asset.Sha256] {
+			return nil, domain.ErrNameConflict
+		}
+		hashes[asset.Sha256] = true
+		already, err := store.FileHasSeal(ctx, file.ID, asset.ID)
+		if err != nil {
+			return nil, err
+		}
+		if already {
+			return nil, domain.ErrNameConflict
+		}
+		mark := domain.FileSealMark{
+			ID: NewID("mark"), FileID: file.ID, VersionSeq: first.VersionSeq, FileSha256: version.Sha256,
+			AssetID: asset.ID, AssetSha256: asset.Sha256, SignerID: actor.ID, PageNumber: p.PageNumber,
+			X: p.X, Y: p.Y, Width: p.Width, Height: p.Height, AngleDegrees: p.AngleDegrees,
+		}
+		prepared = append(prepared, preparedMark{mark: mark, asset: asset})
+	}
+	// Insert and audit in a single unit of work. Unique digest constraints still
+	// protect concurrent imports and signing attempts in the persistence layer.
+	for _, item := range prepared {
+		m, a := item.mark, item.asset
+		if err = store.InsertSealMark(ctx, m); err != nil {
+			return nil, err
+		}
+		if err = auditRequired(ctx, tx, actor, "seal.apply", "file", file.ID, "success", map[string]any{
+			"markId": m.ID, "fileSha256": m.FileSha256, "versionSeq": m.VersionSeq,
+			"assetId": m.AssetID, "assetSha256": m.AssetSha256, "assetKind": a.Kind,
+			"assetOwnerId": a.OwnerID, "performedBy": actor.ID,
+			"adminOverride": actor.IsAdmin && (a.Kind == "company" || (a.Kind == "personal" && a.OwnerID != actor.ID)),
+			"batchCount":    len(prepared), "page": m.PageNumber, "x": m.X, "y": m.Y,
+			"width": m.Width, "height": m.Height, "angleDegrees": m.AngleDegrees,
+		}); err != nil {
+			return nil, err
 		}
 	}
-	if !sealCanApply(actor, asset, permission, hasCompanyGrant) {
-		return domain.FileSealMark{}, domain.ErrForbidden
-	}
-	alreadyUsed, err := store.FileHasSeal(ctx, file.ID, asset.ID)
-	if err != nil {
-		return domain.FileSealMark{}, err
-	}
-	if alreadyUsed {
-		return domain.FileSealMark{}, domain.ErrNameConflict
-	}
-	mark := domain.FileSealMark{ID: NewID("mark"), FileID: file.ID, VersionSeq: p.VersionSeq, FileSha256: version.Sha256, AssetID: asset.ID, AssetSha256: asset.Sha256, SignerID: actor.ID, PageNumber: p.PageNumber, X: p.X, Y: p.Y, Width: p.Width, Height: p.Height, AngleDegrees: p.AngleDegrees}
-	if err = store.InsertSealMark(ctx, mark); err != nil {
-		return domain.FileSealMark{}, err
-	}
-	if err = auditRequired(ctx, tx, actor, "seal.apply", "file", file.ID, "success", map[string]any{
-		"markId": mark.ID, "fileSha256": mark.FileSha256, "versionSeq": mark.VersionSeq, "assetId": mark.AssetID, "assetSha256": mark.AssetSha256, "assetKind": asset.Kind, "assetOwnerId": asset.OwnerID, "performedBy": actor.ID, "adminOverride": actor.IsAdmin && (asset.Kind == "personal" && asset.OwnerID != actor.ID || asset.Kind == "company"), "page": mark.PageNumber, "x": mark.X, "y": mark.Y, "width": mark.Width, "height": mark.Height, "angleDegrees": mark.AngleDegrees,
-	}); err != nil {
-		return domain.FileSealMark{}, err
-	}
 	if err = tx.Commit(ctx); err != nil {
-		return domain.FileSealMark{}, err
+		return nil, err
 	}
-	mark.AssetKind = asset.Kind
-	mark.AssetName = asset.Name
-	mark.SignerName = actor.DisplayName
-	mark.CreatedAt = s.now()
-	return mark, nil
+	out := make([]domain.FileSealMark, 0, len(prepared))
+	for _, item := range prepared {
+		m := item.mark
+		m.AssetName = item.asset.Name
+		m.AssetKind = item.asset.Kind
+		m.SignerName = actor.DisplayName
+		m.CreatedAt = s.now()
+		out = append(out, m)
+	}
+	return out, nil
 }
 
 func (s *Service) FileSeals(ctx context.Context, actor domain.User, fileID string, seq int) ([]domain.FileSealMark, error) {
