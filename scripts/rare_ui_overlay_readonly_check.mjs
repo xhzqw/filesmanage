@@ -121,6 +121,7 @@ try{
    await waitFor('!!document.querySelector(".file-pdf-paper img.file-pdf-image:not(.is-pending)")?.naturalWidth');
    const measure=()=>evalJS(`(()=>{
     const area=document.querySelector(".file-pdf-paper"),img=area.querySelector("img.file-pdf-image:not(.is-pending)");
+    if(!area||!img)return null;
     const s=getComputedStyle(area),r=img.getBoundingClientRect(),a=area.getBoundingClientRect();
     const availableWidth=area.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight)-12;
     const availableHeight=area.clientHeight-parseFloat(s.paddingTop)-parseFloat(s.paddingBottom)-12;
@@ -138,9 +139,9 @@ try{
     "PDF zoom preserves aspect ratio at "+width+": "+JSON.stringify(enlarged));
    const toggle=await evalJS(`(()=>{document.querySelector('.file-pdf-tools button[aria-label^="PDF 适配方式"]')?.click();return true})()`);
    assert(toggle,"PDF fit toggle exists");
-   await waitFor('document.querySelector(".file-pdf-paper")?.dataset.fitMode==="width"');
+   await waitFor('document.querySelector(".file-pdf-paper")?.dataset.fitMode==="width" && !!document.querySelector(".file-pdf-paper img.file-pdf-image:not(.is-pending)")?.naturalWidth');
    const fullWidth=await measure();
-   assert(fullWidth.width>=initial.width&&Math.abs(fullWidth.height/fullWidth.width-fullWidth.expectedRatio)<.02,
+   assert(fullWidth&&fullWidth.width>=initial.width&&Math.abs(fullWidth.height/fullWidth.width-fullWidth.expectedRatio)<.02,
     "PDF fit-width preserves ratio at "+width+": "+JSON.stringify(fullWidth));
    checked.push(width+"px");
   }
