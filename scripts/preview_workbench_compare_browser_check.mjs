@@ -87,7 +87,7 @@ try{
  });
  await cdp.send("Page.navigate",{url:BASE+"/preview/"+encodeURIComponent(txt.id)});
  assert("file preview loads",await cdp.waitFor(`()=>!!document.querySelector('.file-workbench-nav-item[aria-label="版本对比"]')`));
- await cdp.evaluate(`()=>document.querySelector('.file-workbench-nav-item[aria-label="版本对比"]')?.click()`);
+ await cdp.evaluate(`(()=>document.querySelector('.file-workbench-nav-item[aria-label="版本对比"]')?.click())()`);
  assert("version compare renders actual diff",await cdp.waitFor(`()=>!!document.querySelector('.file-compare-lines .file-diff-line')&&!!document.querySelector('.file-compare-toolbar .file-compare-controls')`));
 
  for(const {label,width,height} of [
@@ -137,7 +137,7 @@ try{
  })()`);
  assert("diff next/expand actions respond",diffNav.selected&&diffNav.all==="true",JSON.stringify(diffNav));
 
- await cdp.evaluate(`()=>document.querySelector('.file-workbench-nav-item[aria-label="历史记录"]')?.click()`);
+ await cdp.evaluate(`(()=>document.querySelector('.file-workbench-nav-item[aria-label="历史记录"]')?.click())()`);
  assert("history panel replaces comparison",await cdp.waitFor(`()=>!!document.querySelector('.file-workbench-history .file-history-switch')&&!document.querySelector('.file-compare-toolbar')`));
  const history=await cdp.evaluate(`(()=>{
   const title=document.querySelector('.file-preview-identity')?.getBoundingClientRect();
