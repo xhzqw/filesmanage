@@ -349,5 +349,14 @@ try{
   }
  }
  console.log("RARE_OVERLAY_READONLY_PASS "+results.join("; ")+"; file grid, permission Gooey, dialog and focus OK"+(availablePreviewId?"":"; preview fixture absent"));
-}catch(error){console.error("RARE_OVERLAY_READONLY_FAIL",error.message);process.exitCode=1;}
+}catch(error){
+ console.error("RARE_OVERLAY_READONLY_FAIL",error.message);
+ try{
+  const snapshot=await evalJS(`(()=>({url:location.href,ready:document.readyState,
+   title:document.title,body:document.body.innerText.slice(0,450),
+   stats:!!document.querySelector(".stats-workbench"),selects:document.querySelectorAll(".rare-select").length}))()`);
+  console.error("RARE_OVERLAY_BROWSER_STATE",JSON.stringify(snapshot));
+ }catch(snapshotError){console.error("RARE_OVERLAY_BROWSER_STATE_UNAVAILABLE",snapshotError.message);}
+ process.exitCode=1;
+}
 finally{ws?.close();chrome.kill("SIGTERM");}
