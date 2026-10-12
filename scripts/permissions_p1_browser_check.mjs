@@ -102,9 +102,15 @@ try{
    !!folder.querySelector('path[fill]')&&!!label&&
    getComputedStyle(label).justifyContent==='flex-start';
  })()`),"organization chart, warm folder icons and left-aligned tree labels");
- const pressKey=async(key,virtualKeyCode)=>{
-  await cdp.send("Input.dispatchKeyEvent",{type:"keyDown",key,code:key,windowsVirtualKeyCode:virtualKeyCode});
-  await cdp.send("Input.dispatchKeyEvent",{type:"keyUp",key,code:key,windowsVirtualKeyCode:virtualKeyCode});
+ // Headless CDP OS-key injection can lose page activation; dispatch a bubbling
+ // keyboard event on the focused node to test React tree keyboard semantics.
+ const pressKey=async(key,_virtualKeyCode)=>{
+  await cdp.evaluate(`(()=>{
+   const focused=document.activeElement;
+   return focused?.dispatchEvent(new KeyboardEvent('keydown',{
+    key:${JSON.stringify(key)},code:${JSON.stringify(key)},bubbles:true,cancelable:true
+   }))??false;
+  })()`);
  };
  await cdp.evaluate("(()=>{document.querySelector('.org-dept-card .tree > li')?.focus();return true})()");
  assert(await cdp.waitFor("()=>document.activeElement?.dataset.treeId==='__all'"),"all-organization row receives keyboard focus");
