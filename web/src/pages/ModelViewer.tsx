@@ -10,6 +10,7 @@ import {parseDxf} from "../features/modelViewer/dxf";
 import type {DrawingPickedSegment} from "../features/modelViewer/snap2d";
 import {printCurrentSheet,type SheetSize} from "../features/modelViewer/printSheet";
 import {openVectorPrint,type PlotScale} from "../features/modelViewer/vectorSheet";
+import {openModelPrint} from "../features/modelViewer/modelPrintSheet";
 import type {MshGeometry} from "../features/modelViewer/mshParser";
 import {mountEngineeringScene,type ViewerControls,type ViewerMetrics} from "../features/modelViewer/viewerScene";
 import "../features/modelViewer/viewer.css";
@@ -40,7 +41,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
  const[status,setStatus]=useState("loading");
  const[message,setMessage]=useState("");
  const[info,setInfo]=useState<DerivativeInfo|null>(null);
- const[fileMeta,setFileMeta]=useState<{sha256:string;versionSeq:number}|null>(null);
+ const[fileMeta,setFileMeta]=useState<{sha256:string;versionSeq:number;name:string}|null>(null);
  const holder=useRef<HTMLDivElement>(null);
  const[metrics,setMetrics]=useState<ViewerMetrics|null>(null);
  // Mesh formats carry no unit; only 3MF declares one in its model XML. The
@@ -57,6 +58,8 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
  const[activeLayout,setActiveLayout]=useState("Model");
  const[paperViewports,setPaperViewports]=useState({total:0,projected:0});
  const[plotScale,setPlotScale]=useState<PlotScale>(1);
+ const[modelPaper,setModelPaper]=useState<SheetSize>("A3");
+ const[plotColorMode,setPlotColorMode]=useState<"monochrome"|"source">("monochrome");
  const[plotError,setPlotError]=useState("");
  // Assembly parts recovered from a converted mesh (MC02/MOD02): the MSH keeps
  // shared node indices, so connected components are the solids.
@@ -109,6 +112,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
   setMetrics(null);setLayers([]);setLayouts([]);setActiveLayout("Model");
   setPaperViewports({total:0,projected:0});
   setPlotScale(1);setPlotError("");
+  setModelPaper("A3");setPlotColorMode("monochrome");
   setParts([]);setSelectedPart(-1);
   setUnit("unknown");setMeasure(null);setSkipped([]);setShowCompatibility(false);
   setSelectedLine(null);setDarkDrawing(true);setShowLengths(true);
@@ -139,7 +143,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
     // which live on the file rather than the derivative.
     try{
      const meta=await fileApi.meta(id);
-     if(valid)setFileMeta({sha256:meta.file.sha256,versionSeq:meta.file.currentVersionSeq});
+      if(valid)setFileMeta({sha256:meta.file.sha256,versionSeq:meta.file.currentVersionSeq,name:meta.file.name});
     }catch{
      if(valid)setFileMeta(null);
     }
@@ -315,8 +319,17 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
           controls.current?.setStandardView(name);
           setView(v=>({...v,projection:name==="iso"?v.projection:"orthographic"}));
          }}>{["等轴","前","后","左","右","俯","仰"][index]}</RareButton>)}
-       </div>}
-       <div className="cad-toolgroup" role="group" aria-label="辅助显示">
+        </div>}
+        {!drawing&&<RareButton type="button" disabled={!fileMeta||!metrics}
+         title="生成主视、俯视、右视和等轴测的正交参考视图，浏览器打印" onClick={()=>{
+          void authorizePaperOutput(popup=>{
+           const images=controls.current?.captureEngineeringViews();
+           if(!images||!metrics||!fileMeta)throw new Error("模型未准备好，无法生成工程视图");
+           openModelPrint({name:fileMeta.name,versionSeq:fileMeta.versionSeq,sha256:fileMeta.sha256,
+            unit,format:info?.format??"模型",paper:modelPaper,metrics,views:images},popup);
+          });
+         }}>工程视图打印</RareButton>}
+        <div className="cad-toolgroup" role="group" aria-label="辅助显示">
         <RareButton type="button" className={view.grid?"on":""} aria-pressed={view.grid}
          onClick={()=>setView(v=>({...v,grid:controls.current?.toggleGrid()??v.grid}))}>网格</RareButton>
         {!drawing&&<>
@@ -383,20 +396,37 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
          <option value="1">1:1</option>
          <option value="2">1:2</option>
          <option value="5">1:5</option>
-         <option value="10">1:10</option>
-        </RareSelect>
-       </label>
-       <div className="cad-quick-actions">
-         {(["A4","A3"] as const).map(sheet=><RareButton key={sheet} type="button"
+          <option value="10">1:10</option>
+          <option value="20">1:20</option>
+          <option value="50">1:50</option>
+         </RareSelect>
+        </label>
+        <label className="cad-print-scale"><span>出图颜色</span>
+         <RareSelect aria-label="出图颜色" value={plotColorMode} onChange={event=>setPlotColorMode(event.target.value as "monochrome"|"source")}>
+          <option value="monochrome">黑白高对比</option><option value="source">原图颜色</option>
+         </RareSelect>
+        </label>
+        <div className="cad-quick-actions">
+          {(["A4","A3","A2","A1"] as const).map(sheet=><RareButton key={sheet} type="button"
           disabled={unit!=="mm"||!fileMeta} onClick={()=>{
            const root=dxfRoot.current;
            if(!root)return;
-           void authorizePaperOutput(popup=>openVectorPrint(root,{sheet,scale:plotScale,unit,layout:activeLayout},popup));
+            void authorizePaperOutput(popup=>openVectorPrint(root,{sheet,scale:plotScale,unit,layout:activeLayout,colorMode:plotColorMode},popup));
          }} title={sheet+" 矢量打印；打印时使用 100% 实际大小"}>{sheet} 矢量</RareButton>)}
        </div>
        {unit!=="mm"&&<p className="cad-notice">仅支持毫米 DXF</p>}
        {plotError&&<p className="cad-notice" role="alert">{plotError}</p>}
       </section>}
+       {!drawing&&<section className="cad-inspector-section cad-print">
+        <h3>工程视图打印</h3>
+        <label className="cad-print-scale"><span>纸张</span>
+         <RareSelect aria-label="工程视图纸张" value={modelPaper} onChange={event=>setModelPaper(event.target.value as SheetSize)}>
+          <option value="A4">A4 横向</option><option value="A3">A3 横向</option>
+          <option value="A2">A2 横向</option><option value="A1">A1 横向</option>
+         </RareSelect>
+        </label>
+        <p className="cad-notice">四视图为网格参考投影，非加工制造图纸。</p>
+       </section>}
       {layers.length>0&&<section className="cad-inspector-section">
        <h3>图层 <span>{layers.filter(item=>item.visible).length}/{layers.length}</span></h3>
        <div className="cad-quick-actions" role="group" aria-label="批量显示图层">

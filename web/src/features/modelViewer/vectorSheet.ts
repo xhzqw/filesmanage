@@ -1,11 +1,11 @@
 import type * as Three from "three";
 import type {SheetSize} from "./printSheet";
 
-export type PlotScale=1|2|5|10;
-export type PlotOptions={sheet:SheetSize;scale:PlotScale;unit:string;layout:string;marginMm?:number};
+export type PlotScale=1|2|5|10|20|50;
+export type PlotOptions={sheet:SheetSize;scale:PlotScale;unit:string;layout:string;marginMm?:number;colorMode?:"monochrome"|"source"};
 export type PlotSheet={html:string;svg:string;drawingMm:[number,number];scaleLabel:string};
 
-const SHEETS:Record<SheetSize,[number,number]>={A3:[420,297],A4:[297,210]};
+const SHEETS:Record<SheetSize,[number,number]>={A1:[841,594],A2:[594,420],A3:[420,297],A4:[297,210]};
 const MAX_SEGMENTS=100000,MAX_FACES=50000,MAX_LABELS=400,MAX_BYTES=15_000_000;
 const esc=(value:string)=>value.replace(/[&<>"']/g,ch=>({
  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;",
@@ -28,7 +28,9 @@ export function buildVectorSheet(root:Three.Group,options:PlotOptions):PlotSheet
  if(options.unit!=="mm")throw new Error("比例出图仅支持明确声明毫米单位的 DXF");
  if(options.layout==="Model")throw new Error("请切换至图纸布局后再按比例打印");
  const paper=SHEETS[options.sheet];
- if(!paper||![1,2,5,10].includes(options.scale))throw new Error("纸张或比例不支持");
+ if(!paper||![1,2,5,10,20,50].includes(options.scale))throw new Error("纸张或比例不支持");
+ if(options.colorMode&&options.colorMode!=="monochrome"&&options.colorMode!=="source")
+  throw new Error("打印颜色模式不支持");
  const margin=options.marginMm??10;
  if(!Number.isFinite(margin)||margin<5||margin>25)
   throw new Error("图纸边距无效");
@@ -40,7 +42,7 @@ export function buildVectorSheet(root:Three.Group,options:PlotOptions):PlotSheet
  };
  const color=(material:Three.Material):string=>{
   const value=(material as Three.MeshBasicMaterial).color;
-  return value?.isColor?"#"+value.getHexString():"#253b53";
+   return options.colorMode!=="source"?"#18212b":value?.isColor?"#"+value.getHexString():"#253b53";
  };
  // Rendering moves the original root to its fit-to-screen center; children
  // keep their unmodified DXF coordinates. Never apply root.matrixWorld here.
@@ -138,7 +140,8 @@ export function buildVectorSheet(root:Three.Group,options:PlotOptions):PlotSheet
   if(shape.kind==="triangle")return '<polygon points="'+shape.points.map(p=>x(p[0])+','+y(p[1])).join(' ')+
    '" fill="'+shape.hex+'" fill-opacity="'+fmt(shape.alpha)+'"/>';
   const [cx,cy]=shape.center,[w,h]=shape.size;
-  return '<image href="'+shape.png+'" x="'+x(cx-w/2)+'" y="'+y(cy+h/2)+
+   return '<image href="'+shape.png+'"'+(options.colorMode==="source"?"":' style="filter:brightness(0)"')+
+    ' x="'+x(cx-w/2)+'" y="'+y(cy+h/2)+
    '" width="'+fmt(w/options.scale)+'" height="'+fmt(h/options.scale)+
    '" transform="rotate('+fmt(-shape.degrees)+' '+x(cx)+' '+y(cy)+')"/>';
  });
@@ -153,13 +156,14 @@ export function buildVectorSheet(root:Three.Group,options:PlotOptions):PlotSheet
  const title=esc(options.layout.slice(0,100));
  const html='<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">'+
   '<title>'+title+' · '+options.sheet+' 1:'+options.scale+'</title><style>'+
-  '@page{size:'+options.sheet+' landscape;margin:0}html,body{margin:0;padding:0}'+
+   '@page{size:'+paper[0]+'mm '+paper[1]+'mm;margin:0}html,body{margin:0;padding:0}'+
   'svg{display:block;width:'+paper[0]+'mm;height:'+paper[1]+'mm}'+
   '.notice{font:13px system-ui,sans-serif;padding:12px;color:#334b63}'+
   '@media print{.notice{display:none}}@media screen{body{background:#e8eef4}svg{background:#fff;'+
   'margin:16px auto;box-shadow:0 6px 30px #0002}}'+
   '</style></head><body><div class="notice">图纸比例 1:'+options.scale+
-  ' · 请在打印设置中选择“实际大小 / 100%”，关闭“适合页面”。浏览器及打印机仍可能引入误差；字形为预览近似。</div>'+
+   ' · '+(options.colorMode==="source"?"原图颜色":"黑白高对比")+
+   ' · 请在打印设置中选择“实际大小 / 100%”，关闭“适合页面”。浏览器及打印机仍可能引入误差；字形为预览近似。</div>'+
   svg+'</body></html>';
  return{html,svg,drawingMm,scaleLabel:"1:"+options.scale};
 }

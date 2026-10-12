@@ -570,6 +570,7 @@ assert(a4.includes("A1 &lt;script&gt;"));
 assert(!a4.includes("<script>"));
 const a3=printableSheetHtml(samplePng,"A3","A2");
 assert(a3.includes("width:420mm;height:297mm"));
+assert(printableSheetHtml(samplePng,"A1","A1").includes("width:841mm;height:594mm"));
 assert.throws(()=>printableSheetHtml("https://evil.invalid/image.png","A4","x"),/无效/);
 
 // V3.7 plot scale is driven by DXF drawing coordinates, never an arbitrary
@@ -594,6 +595,13 @@ assert(!vectorA4.svg.includes("preserveAspectRatio"));
 const vectorHalf=buildVectorSheet(mmDrawing.object,{sheet:"A4",scale:2,unit:"mm",layout:"A1"});
 assert.deepEqual(vectorHalf.drawingMm,[20,10]);
 assert(vectorHalf.html.includes("1:2"));
+assert(vectorA4.svg.includes('stroke="#18212b"'),"high-contrast monochrome is the default CAD plot");
+const colorPlot=buildVectorSheet(mmDrawing.object,{sheet:"A4",scale:1,unit:"mm",layout:"A1",colorMode:"source"});
+assert(!colorPlot.svg.includes('stroke="#18212b"'),"original color mode is distinct from monochrome");
+const largeSheet=buildVectorSheet(mmDrawing.object,{sheet:"A1",scale:20,unit:"mm",layout:"A1"});
+assert(largeSheet.svg.includes('width="841mm" height="594mm"'));
+assert(largeSheet.html.includes("@page{size:841mm 594mm"));
+assert.deepEqual(largeSheet.drawingMm,[2,1]);
 assert.throws(()=>buildVectorSheet(mmDrawing.object,{sheet:"A4",scale:1,unit:"unknown",layout:"A1"}),/毫米/);
 assert.throws(()=>buildVectorSheet(mmDrawing.object,{sheet:"A4",scale:1,unit:"mm",layout:"Model"}),/图纸布局/);
 const overflowGroup=new THREE.Group();
@@ -604,5 +612,18 @@ printedLayer.add(new THREE.LineSegments(
 overflowGroup.add(printedLayer);
 assert.throws(()=>buildVectorSheet(overflowGroup,{sheet:"A4",scale:1,unit:"mm",layout:"A1"}),/超出/);
 assert.deepEqual(buildVectorSheet(overflowGroup,{sheet:"A4",scale:2,unit:"mm",layout:"A1"}).drawingMm,[200,0]);
+
+const modelCode=await transform(readFileSync(new URL("../src/features/modelViewer/modelPrintSheet.ts",import.meta.url),"utf8"),
+ {loader:"ts",format:"esm",target:"es2022"});
+const {modelPrintSheetHtml}=await import("data:text/javascript;base64,"+Buffer.from(modelCode.code).toString("base64"));
+const modelInput={name:"test <script>模型.stl",versionSeq:7,sha256:"a".repeat(64),unit:"unknown",
+ format:"stl",paper:"A3",metrics:{size:[40,25,60],triangles:12,vertices:36,components:1},
+ views:{front:samplePng,right:samplePng,top:samplePng,iso:samplePng}};
+const modelPage=modelPrintSheetHtml(modelInput);
+assert(modelPage.includes("@page{size:420mm 297mm"));
+assert(modelPage.includes("主视图")&&modelPage.includes("俯视图")&&modelPage.includes("等轴测"));
+assert(modelPage.includes("40 × 25 × 60")&&modelPage.includes("未声明（不作为制造尺寸）"));
+assert(!modelPage.includes("<script>"),"model filenames must not inject HTML");
+assert.throws(()=>modelPrintSheetHtml({...modelInput,views:{...modelInput.views,front:"https://bad.invalid"}}),/无效截图/);
 
 console.log("CAD regression passed: DXF geometry, nested blocks, dimension graphics, rational NURBS, ACI/TrueColor and 2D snaps");

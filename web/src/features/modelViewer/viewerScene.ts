@@ -7,6 +7,7 @@ import {LineMaterial} from "three/examples/jsm/lines/LineMaterial.js";
 
 export type StandardView="iso"|"front"|"back"|"left"|"right"|"top"|"bottom";
 export type ViewerMetrics={triangles:number;vertices:number;size:[number,number,number];components:number};
+export type EngineeringPrintViews={front:string;right:string;top:string;iso:string};
 export type ViewerControls={
  dispose:()=>void;invalidate:()=>void;resetView:()=>void;
  setStandardView:(view:StandardView)=>void;
@@ -17,6 +18,7 @@ export type ViewerControls={
  clearLineSelection:()=>void;
  toggleDrawingTheme:()=>boolean;toggleLengthLabels:()=>boolean;
  exportPng:()=>string|null;
+ captureEngineeringViews:()=>EngineeringPrintViews;
 };
 
 /** A Y-up solids viewport or an orthographic XY drawing sheet. */
@@ -452,6 +454,58 @@ export function mountEngineeringScene(
     return renderer.domElement.toDataURL("image/png");
    }catch{return null;}
   },
+   captureEngineeringViews:()=>{
+    if(drawing||disposed||lost)throw new Error("当前模型无法生成工程视图");
+    // Use the existing WebGL context, but an independent orthographic camera.
+    // Neither the user's orbit camera/target nor the live projection changes.
+    const oldPixelRatio=renderer.getPixelRatio();
+    const oldBackground=scene.background;
+    const gridWasVisible=grid.visible,axesWasVisible=axes.visible,marksWereVisible=markers.visible;
+    const width=900,height=590;
+    const bounds=new THREE.Box3().setFromObject(object);
+    if(bounds.isEmpty())throw new Error("模型没有可打印的可见几何");
+    const corners:Three.Vector3[]=[];
+    for(const x of [bounds.min.x,bounds.max.x])
+     for(const y of [bounds.min.y,bounds.max.y])
+      for(const z of [bounds.min.z,bounds.max.z])corners.push(new THREE.Vector3(x,y,z));
+    const directions:Record<keyof EngineeringPrintViews,[number,number,number]>={
+     front:[0,0,1],right:[1,0,0],top:[0,1,0],iso:[1.5,1.25,1.5],
+    };
+    const result={} as EngineeringPrintViews;
+    try{
+     renderer.setPixelRatio(1);
+     renderer.setSize(width,height,false);
+     scene.background=new THREE.Color(0xffffff);
+     grid.visible=false;axes.visible=false;markers.visible=false;
+     for(const key of ["front","right","top","iso"] as const){
+      const eye=new THREE.Vector3(...directions[key]).normalize();
+      const cam=new THREE.OrthographicCamera(-1,1,1,-1,near,far);
+      cam.position.copy(eye).multiplyScalar(distance);
+      cam.up.set(0,key==="top"?0:1,key==="top"?-1:0);
+      cam.lookAt(0,0,0);cam.updateMatrixWorld(true);
+      const right=new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld,0);
+      const up=new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld,1);
+      const spanX=Math.max(...corners.map(point=>point.dot(right)))-Math.min(...corners.map(point=>point.dot(right)));
+      const spanY=Math.max(...corners.map(point=>point.dot(up)))-Math.min(...corners.map(point=>point.dot(up)));
+      const half=Math.max(spanY/2,spanX*height/(2*width),diameter*.02,.000001)*1.17;
+      cam.left=-half*width/height;cam.right=-cam.left;cam.top=half;cam.bottom=-half;
+      cam.updateProjectionMatrix();
+      renderer.render(scene,cam);
+      const png=renderer.domElement.toDataURL("image/png");
+      if(!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(png)||png.length>12_000_000)
+       throw new Error("工程视图截图失败或超出大小限制");
+      result[key]=png;
+     }
+     return result;
+    }finally{
+     renderer.setPixelRatio(oldPixelRatio);
+     renderer.setSize(Math.max(holder.clientWidth,1),Math.max(holder.clientHeight,1),false);
+     scene.background=oldBackground;
+     grid.visible=gridWasVisible;axes.visible=axesWasVisible;markers.visible=marksWereVisible;
+     renderer.render(scene,camera);
+     invalidate();
+    }
+   },
   setStandardView:(name)=>{if(drawing)return;if(name!=="iso")switchCamera(ortho);setPose(name);},
   toggleAxes:()=>{axes.visible=!axes.visible;invalidate();return axes.visible;},
   toggleGrid:()=>{gridVisible=!gridVisible;grid.visible=!drawing&&gridVisible;if(gridVisible)updateGrid();invalidate();return gridVisible;},

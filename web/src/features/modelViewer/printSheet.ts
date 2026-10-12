@@ -1,11 +1,13 @@
-export type SheetSize="A3"|"A4";
+export type SheetSize="A1"|"A2"|"A3"|"A4";
 
 /** Browser print preview for the CURRENT rendered paper layout.
  * Deliberately fit-to-paper: not a CAD plot scale or vector export. */
 export function printableSheetHtml(png:string,size:SheetSize,layout:string):string{
  if(!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(png))
   throw new Error("无效的图纸快照");
- const paper=size==="A3"?{width:420,height:297}:{width:297,height:210};
+ const paper=({A1:{width:841,height:594},A2:{width:594,height:420},
+  A3:{width:420,height:297},A4:{width:297,height:210}})[size];
+ if(!paper)throw new Error("无效纸张");
  const title=layout.slice(0,100).replace(/[&<>"']/g,char=>({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;",
  }[char]??char));

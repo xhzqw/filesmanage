@@ -178,7 +178,16 @@ window.__cad={
    width:n.material.map.image.width,
   })));
  },
- png:()=>controls.exportPng()?.startsWith("data:image/png;base64,")??false,
+  png:()=>controls.exportPng()?.startsWith("data:image/png;base64,")??false,
+  modelPrint:()=>{
+   const camera={...lastCamera};
+   const before=controls.exportPng();
+   const views=controls.captureEngineeringViews();
+   const after=controls.exportPng();
+   return{all:Object.values(views).every(v=>v.startsWith("data:image/png;base64,")&&v.length>1000),
+    cameraUnchanged:JSON.stringify(camera)===JSON.stringify(lastCamera),canvasCount:holder.querySelectorAll("canvas").length,
+    afterCapture:!!before&&!!after};
+  },
  printPreview:()=>printableSheetHtml(controls.exportPng(),"A3","A1").includes("@page{size:A3 landscape"),
  vectorPlot:()=>{
   const a4=buildVectorSheet(actualDrawing.object,{sheet:"A4",scale:1,unit:actualDrawing.unit,layout:"PLOT"});
@@ -266,7 +275,12 @@ try{
  assert(state,"CAD fixture did not mount");
  assert.equal(state.metrics.triangles,12);
  assert.equal(state.canvases,1);
- assert(state.width>1000);
+  assert(state.width>1000);
+  const engineering=await cdp.eval("window.__cad.modelPrint()");
+  assert(engineering.all,"all four orthographic model projections must be real PNG images");
+  assert(engineering.cameraUnchanged,"print capture cannot move the user's active camera");
+  assert.equal(engineering.canvasCount,1,"print capture cannot leak a second WebGL canvas");
+  assert(engineering.afterCapture,"normal screen capture still works after print capture");
  const right=await cdp.eval("(()=>{window.__cad.view('right');return window.__cad.state.camera})()");
  assert(Math.abs(right.yaw-90)<2,"right view camera points toward +X");
  const top=await cdp.eval("(()=>{window.__cad.view('top');return window.__cad.state.camera})()");

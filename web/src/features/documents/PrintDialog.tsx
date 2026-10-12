@@ -57,6 +57,8 @@ export function PrintDialog({preview,onClose}:{preview:PreviewData;onClose:()=>v
  const isText=kind==="text"&&preview.textual;
  const isCad=kind==="cad";
  const printable=isPdf||isOffice||isImage||(isText&&!preview.truncated);
+ const previewUrl=isPdf||isImage?fileApi.mediaUrl(preview.fileId,preview.sha256):
+  isOffice?"/api/files/"+encodeURIComponent(preview.fileId)+"/preview/office-pdf?v="+encodeURIComponent(preview.sha256):"";
 
  async function print(){
   if(busy||!printable)return;
@@ -90,26 +92,25 @@ export function PrintDialog({preview,onClose}:{preview:PreviewData;onClose:()=>v
 
  return <Dialog open title="打印文件" onClose={()=>{if(!busy)onClose();}} closeGuard={()=>!busy} className="document-print-dialog">
   <div className="document-print-layout">
-   <div className="document-print-preview">
-    <div className="document-print-sheet" aria-hidden="true">
-     <span className="document-print-sheet-type">{(preview.name.split(".").pop()??"文件").toUpperCase().slice(0,8)}</span>
-     <span className="document-print-sheet-name">{preview.name}</span>
-     <span className="document-print-sheet-rule"/>
-     <span className="document-print-sheet-rule short"/>
-     <span className="document-print-sheet-rule"/>
-    </div>
-    <span className="document-print-preview-caption">当前文件 · {paper.toUpperCase()} · {orientation==="portrait"?"纵向":"横向"}</span>
+   <div className="document-print-preview" aria-label="文件打印内容预览">
+    {isImage?<img className="document-print-image" src={previewUrl} alt={"图片预览："+preview.name}/>:
+     isPdf||isOffice?<iframe className="document-print-pdf" title={"页面布局预览："+preview.name}
+      src={previewUrl} sandbox="allow-scripts" referrerPolicy="no-referrer"/>:
+     isText?<pre className="document-print-text">{preview.content||"（空文件）"}</pre>:
+     <div className="document-print-empty">{isCad?"图纸在工程查看器内出图":"此格式没有可打印预览"}</div>}
+    <span className="document-print-preview-caption">{isPdf||isOffice?"页面预览 · 实际打印以浏览器设置为准":
+     isImage?"原始图像 · 按比例缩放":isText?"文本内容 · 自动分页":"工程图纸"}</span>
    </div>
    <div className="document-print-options">
     <strong title={preview.name} className="document-print-filename">{preview.name}</strong>
     {isCad?<p>机械图纸请在工程查看器中选择图层、比例与纸张后出图。</p>:
      !printable?<p>{isText&&preview.truncated?"文件超过文本预览上限，已禁止打印截断内容。":"此文件格式暂不支持浏览器打印。"}</p>:null}
-    <label>纸张<RareSelect aria-label="纸张" value={paper} disabled={busy||isPdf||isOffice} onChange={e=>setPaper(e.target.value as Paper)}>
+    {!(isPdf||isOffice)&&<><label>纸张<RareSelect aria-label="纸张" value={paper} disabled={busy} onChange={e=>setPaper(e.target.value as Paper)}>
      <option value="A4">A4</option><option value="A3">A3</option><option value="letter">Letter</option>
     </RareSelect></label>
-    <label>方向<RareSelect aria-label="方向" value={orientation} disabled={busy||isPdf||isOffice} onChange={e=>setOrientation(e.target.value as Orientation)}>
+    <label>方向<RareSelect aria-label="方向" value={orientation} disabled={busy} onChange={e=>setOrientation(e.target.value as Orientation)}>
      <option value="portrait">纵向</option><option value="landscape">横向</option>
-    </RareSelect></label>
+    </RareSelect></label></>}
     {(isPdf||isOffice)&&<small>将在浏览器 PDF 查看器中设置纸张、页码、份数和缩放后打印。</small>}
     {isImage&&<small>图片按比例缩放适应纸张，不裁切原图。</small>}
     {isText&&!preview.truncated&&<small>自动换行并按纸张分页；不执行文件中的代码。</small>}
