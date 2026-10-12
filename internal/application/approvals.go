@@ -17,8 +17,10 @@ func (s *Service) OpenApprovalDraft(ctx context.Context, actor domain.User, appr
 		return Download{}, nil, err
 	}
 	defer tx.Rollback(ctx)
-	approval,file,err:=s.authorizedApprovalDraft(ctx,tx,actor,approvalID)
-	if err!=nil{return Download{},nil,err}
+	approval, file, err := s.authorizedApprovalDraft(ctx, tx, actor, approvalID)
+	if err != nil {
+		return Download{}, nil, err
+	}
 	blob, err := tx.BlobByID(ctx, approval.PayloadBlobID)
 	if err != nil {
 		return Download{}, nil, domain.ErrNotFound
@@ -33,19 +35,30 @@ func (s *Service) OpenApprovalDraft(ctx context.Context, actor domain.User, appr
 	}, func() { _ = reader.Close() }, nil
 }
 
-
 // authorizedApprovalDraft is shared by download, preview and comparison.
 // Participation alone is insufficient: explicit file download access is required.
-func (s *Service) authorizedApprovalDraft(ctx context.Context, tx ports.Repository, actor domain.User, id string) (domain.Approval,domain.File,error) {
- approval,err:=tx.ApprovalByID(ctx,id)
- if err!=nil{return domain.Approval{},domain.File{},notFoundOr(err)}
- if approval.State!=domain.ApprovalPending{return domain.Approval{},domain.File{},domain.ErrNotFound}
- participant:=actor.IsAdmin||actor.ID==approval.RequesterID
- for _,member:=range approval.ApproverChain{if actor.ID==member{participant=true}}
- if !participant{return domain.Approval{},domain.File{},domain.ErrForbidden}
- file,err:=s.visibleFile(ctx,tx,actor,approval.FileID,domain.ActionDownload)
- if err!=nil{return domain.Approval{},domain.File{},err}
- return approval,file,nil
+func (s *Service) authorizedApprovalDraft(ctx context.Context, tx ports.Repository, actor domain.User, id string) (domain.Approval, domain.File, error) {
+	approval, err := tx.ApprovalByID(ctx, id)
+	if err != nil {
+		return domain.Approval{}, domain.File{}, notFoundOr(err)
+	}
+	if approval.State != domain.ApprovalPending {
+		return domain.Approval{}, domain.File{}, domain.ErrNotFound
+	}
+	participant := actor.IsAdmin || actor.ID == approval.RequesterID
+	for _, member := range approval.ApproverChain {
+		if actor.ID == member {
+			participant = true
+		}
+	}
+	if !participant {
+		return domain.Approval{}, domain.File{}, domain.ErrForbidden
+	}
+	file, err := s.visibleFile(ctx, tx, actor, approval.FileID, domain.ActionDownload)
+	if err != nil {
+		return domain.Approval{}, domain.File{}, err
+	}
+	return approval, file, nil
 }
 
 // SubmitEdit creates a pending approval carrying the proposed bytes. The

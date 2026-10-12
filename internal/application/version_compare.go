@@ -70,7 +70,7 @@ func (s *Service) CompareVersions(ctx context.Context, u domain.User, fileID str
 
 // compareBlobs is the same bounded algorithm for committed versions and a
 // pending immutable approval payload. Neither path publishes staged content.
-func (s *Service) compareBlobs(ctx context.Context, tx ports.Repository, file domain.File, leftBlobID,rightBlobID string, out VersionComparison) (VersionComparison,error) {
+func (s *Service) compareBlobs(ctx context.Context, tx ports.Repository, file domain.File, leftBlobID, rightBlobID string, out VersionComparison) (VersionComparison, error) {
 	if out.Left.Sha256 == out.Right.Sha256 {
 		out.Mode = "identical"
 		return out, nil
@@ -191,19 +191,32 @@ func (s *Service) compareBlobs(ctx context.Context, tx ports.Repository, file do
 	}
 	return out, nil
 }
+
 // CompareApprovalDraft compares the immutable requested payload against the
 // recorded base version, never whatever happens to be current now.
-func (s *Service) CompareApprovalDraft(ctx context.Context, actor domain.User, id string) (VersionComparison,error) {
- out:=VersionComparison{Mode:"metadata",Lines:[]CompareLine{}}
- tx,err:=s.uow.Begin(ctx);if err!=nil{return out,err};defer tx.Rollback(ctx)
- approval,file,err:=s.authorizedApprovalDraft(ctx,tx,actor,id)
- if err!=nil{return out,err}
- if _,err=s.visibleFile(ctx,tx,actor,approval.FileID,domain.ActionPreview);err!=nil{return out,err}
- base,err:=tx.VersionBySeq(ctx,approval.FileID,approval.BaseSeq)
- if err!=nil{return out,domain.ErrNotFound}
- draft,err:=tx.BlobByID(ctx,approval.PayloadBlobID)
- if err!=nil{return out,domain.ErrNotFound}
- out.Left=CompareVersionInfo{Seq:base.Seq,Sha256:base.Sha256,Size:base.SizeBytes}
- out.Right=CompareVersionInfo{Seq:0,Sha256:draft.Sha256,Size:draft.SizeBytes}
- return s.compareBlobs(ctx,tx,file,base.BlobID,approval.PayloadBlobID,out)
+func (s *Service) CompareApprovalDraft(ctx context.Context, actor domain.User, id string) (VersionComparison, error) {
+	out := VersionComparison{Mode: "metadata", Lines: []CompareLine{}}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return out, err
+	}
+	defer tx.Rollback(ctx)
+	approval, file, err := s.authorizedApprovalDraft(ctx, tx, actor, id)
+	if err != nil {
+		return out, err
+	}
+	if _, err = s.visibleFile(ctx, tx, actor, approval.FileID, domain.ActionPreview); err != nil {
+		return out, err
+	}
+	base, err := tx.VersionBySeq(ctx, approval.FileID, approval.BaseSeq)
+	if err != nil {
+		return out, domain.ErrNotFound
+	}
+	draft, err := tx.BlobByID(ctx, approval.PayloadBlobID)
+	if err != nil {
+		return out, domain.ErrNotFound
+	}
+	out.Left = CompareVersionInfo{Seq: base.Seq, Sha256: base.Sha256, Size: base.SizeBytes}
+	out.Right = CompareVersionInfo{Seq: 0, Sha256: draft.Sha256, Size: draft.SizeBytes}
+	return s.compareBlobs(ctx, tx, file, base.BlobID, approval.PayloadBlobID, out)
 }
