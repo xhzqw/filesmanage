@@ -89,6 +89,17 @@ try{
  // Switching views must not replace the organization shell.
  assert(await cdp.evaluate("(()=>!!document.querySelector('.org-dept-card')&&!!document.querySelector('.work-body>.toolbar'))()"),
   "organization navigation is visible on the permissions tab");
+ // Tree pictograms: hierarchy is outlined, departments reuse the yellow folder glyph,
+ // and RareButton cannot silently re-center labels in the flexible tree row.
+ assert(await cdp.evaluate(`(()=>{
+  const root=document.querySelector('.org-dept-card .tree > li[role="treeitem"] .org-tree-icon svg');
+  const folder=document.querySelector('.org-dept-card li[data-dept-id] .org-tree-icon svg');
+  const label=document.querySelector('.org-dept-card li[data-dept-id] .org-node-label');
+  return !!root&&root.getAttribute('width')==='18'&&root.querySelectorAll('rect').length===3&&
+   !!folder&&folder.getAttribute('stroke')?.includes('--folder-stroke')&&
+   !!folder.querySelector('path[fill]')&&!!label&&
+   getComputedStyle(label).justifyContent==='flex-start';
+ })()`),"organization chart, warm folder icons and left-aligned tree labels");
  await cdp.evaluate("window.__orgShellTree=document.querySelector('.org-dept-card');window.__orgShellTabs=document.querySelector('.org-tabs-bar');true");
  for(const tab of ["members","groups","approvals","roles","permissions"]){
   await cdp.evaluate(`document.querySelector('#org-tab-${tab}').click()`);

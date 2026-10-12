@@ -1,4 +1,5 @@
 import {RareTabs} from "../../shared/ui/rare/RareTabs";
+import {FolderResourceIcon} from "../../shared/ui/ResourceIcons";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {RareBadge,RareButton,RareDataTable,RareInput,RareNotice,RareRowActions,RareSelect} from "../../shared/ui/rare";
 import {useCallback,useEffect,useMemo,useRef,useState,type FormEvent,type KeyboardEvent,type ReactNode} from "react";
@@ -69,20 +70,20 @@ function mutationCopy(error:unknown,fallback:string):string{
  return errorCopy(error,fallback);
 }
 
-function IconBuilding(){
- return <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-  <path d="M2 14V3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v11h4v1H1v-1h1zm2-10v2h2V4H4zm0 3v2h2V7H4zm0 3v2h2v-2H4zm4-6v2h2V4H8zm0 3v2h2V7H8zm0 3v2h2v-2H8z"/>
- </svg>;
-}
-
-function IconFolder(){
- return <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-  <path d="M1.5 2.5A1.5 1.5 0 0 0 0 4v8a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 16 12V6a1.5 1.5 0 0 0-1.5-1.5H8.414l-1.707-1.707A1 1 0 0 0 6 2.5H1.5z"/>
+function IconOrganization(){
+ // Organization chart: clear silhouette at 18px, consistent Rare-style stroke.
+ return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+  stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+  aria-hidden="true" focusable="false">
+  <rect x="9" y="2" width="6" height="5" rx="1.3"/>
+  <path d="M12 7v5M5 12h14M5 12v3M19 12v3"/>
+  <rect x="2" y="15" width="6" height="6" rx="1.3"/>
+  <rect x="16" y="15" width="6" height="6" rx="1.3"/>
  </svg>;
 }
 
 function IconUsers(){
- return <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+ return <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
   <path d="M11 14v-1.5a2.5 2.5 0 0 0-2.5-2.5h-5A2.5 2.5 0 0 0 1 12.5V14"/>
   <circle cx="6" cy="5" r="3"/>
   <path d="M15 14v-1.2a2.3 2.3 0 0 0-1.8-2.2"/>
@@ -682,7 +683,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
         <IconChevron open={isOpen}/>
        </RareButton>
       :<span className="org-tree-chevron-spacer" aria-hidden="true"/>}
-     <span className="org-tree-icon" aria-hidden="true"><IconFolder/></span>
+     <span className="org-tree-icon" aria-hidden="true"><FolderResourceIcon size={18} open={isOpen}/></span>
      <RareButton type="button" className="org-node-label" tabIndex={-1}
       title={fullPathOf(deptById,department.id)+"｜含子部门 "+String(count)+" 人"}
       onClick={()=>setSelectedDepartment(department.id)}>
@@ -715,7 +716,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    <section className="org-card org-dept-card" aria-label="组织架构树">
     <div className="org-card-header">
      <h3 className="org-card-title">
-      <IconBuilding/>
+       <IconOrganization/>
       <span>组织架构</span>
       <span className="org-count-pill">{departments.length} 部门</span>
      </h3>
@@ -756,7 +757,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
         onClick={()=>setSelectedDepartment("")}>
         <div className={"tree-row "+(selectedDepartment===""?"on":"")} style={{paddingLeft:"10px"}}>
          <span className="org-tree-chevron-spacer" aria-hidden="true"/>
-         <span className="org-tree-icon" aria-hidden="true"><IconBuilding/></span>
+          <span className="org-tree-icon" aria-hidden="true"><IconOrganization/></span>
          <RareButton type="button" className="org-node-label" tabIndex={-1}
           title={"全体组织｜共 "+String(users.length)+" 人"}
           onClick={()=>setSelectedDepartment("")}>

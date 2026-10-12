@@ -236,12 +236,18 @@
   display:inline-flex;
   align-items:center;
   justify-content:center;
+  width:18px;
+  height:18px;
   color:var(--brand-blue);
   margin-right:var(--space-1);
   flex:none;
 }
+.org-tree-icon svg{display:block;flex:none}
 
 .tree .tree-row .org-node-label{
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
   flex:1;
   min-width:0;
   text-align:left;
