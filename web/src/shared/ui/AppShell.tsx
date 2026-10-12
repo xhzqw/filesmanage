@@ -6,7 +6,6 @@ import {Menu} from "./Menu";
 import {FolderResourceIcon} from "./ResourceIcons";
 import {lifecycleWorkspaceEnabled} from "../featureFlags";
 import "./previewAutoHeader.css";
-import "./globalUtilityDock.css";
 import "./shellHeader.css";
 
 // The shell only needs the display name; keeping the type structural avoids a
@@ -21,8 +20,8 @@ export function FolderIcon({size=16}:{size?:number}){
 }
 
 // Local static asset per BRAND-07; square source, fixed box, never stretched.
-export function BrandLogo({size,className}:{size:number;className:string}){
- return <img className={className} src="/assets/brand/logo-256.png" alt="中晟生物科技标志" width={size} height={size}/>;
+export function BrandLogo({size,className,transparent=false}:{size:number;className:string;transparent?:boolean}){
+ return <img className={className} src={transparent?"/assets/brand/logo-loader-256.png":"/assets/brand/logo-256.png"} alt="中晟生物科技标志" width={size} height={size}/>;
 }
 
 const NAV=[
@@ -113,7 +112,7 @@ export function AppShell({user,onLogout,actions,children}:{user:ShellUser;onLogo
     event.preventDefault();cancelHeaderHide();setPreviewHeaderOpen(false);document.querySelector<HTMLButtonElement>(".file-sidebar-collapse")?.focus();
    }}}>
    <Link to="/doc" className="brand shell-home-pill" aria-label="中晟生物 · 返回文档首页" onClick={()=>setOpen(false)}>
-    <BrandLogo size={26} className="brand-logo"/><span className="shell-brand-name">中晟生物</span>
+    <BrandLogo size={29} className="brand-logo" transparent/><span className="shell-brand-name">中晟生物</span>
    </Link>
    <GooeyNav id="shell-main-navigation" aria-label="主导航" className={"header-gooey-nav"+(open?" open":"")}
     appearance="pill" items={GOOEY_MAIN_ITEMS} value={activeNav} size="xs"
@@ -135,7 +134,7 @@ export function AppShell({user,onLogout,actions,children}:{user:ShellUser;onLogo
    </RareButton>
    <div className="header-right global-utility-dock" role="group" aria-label="系统快捷工具">
     <RareButton type="button" className="command-trigger" aria-label="快速跳转" onClick={()=>window.dispatchEvent(new CustomEvent("filesmanage:command-spotlight"))}>
-     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="10.8" cy="10.8" r="6.7"/><path d="m16 16 4.4 4.4"/></svg>
      <span>快速跳转</span>
      <span className="command-keys"><kbd>Ctrl</kbd><kbd>K</kbd></span>
     </RareButton>
@@ -144,7 +143,9 @@ export function AppShell({user,onLogout,actions,children}:{user:ShellUser;onLogo
      <RareButton ref={accountRef} type="button" className="account-trigger" aria-label="当前登录用户" aria-haspopup="true" aria-expanded={accountOpen}
       onClick={()=>setAccountOpen(v=>!v)}>
       <span className="account">
-       <span className="account-avatar" aria-hidden="true">{accountInitial(user.displayName)}</span>
+       <span className="account-avatar" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 19c.5-3.2 3-5 6.5-5s6 1.8 6.5 5"/></svg>
+       </span>
        <span className="account-name">{user.displayName}</span>
        <svg className="account-caret" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
       </span>
@@ -161,11 +162,4 @@ export function AppShell({user,onLogout,actions,children}:{user:ShellUser;onLogo
   </header>
   {children}
  </div>;
-}
-
-// Spec §3.1: the identity slot carries a small monogram badge next to the
-// name. One character, decorative (the name is the accessible label).
-function accountInitial(name:string){
- const first=[...name.trim()][0];
- return first??"·";
 }
