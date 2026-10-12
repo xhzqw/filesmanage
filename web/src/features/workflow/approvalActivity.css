@@ -74,9 +74,16 @@
 .approval-filters{flex-wrap:wrap;justify-content:flex-end}
 .approval-result-count{flex:none;padding:5px 10px;color:var(--text-secondary);font-size:12px}
 .approval-table tbody tr.approval-selected td{background:var(--surface-row-selected)}
+.approval-table tbody tr{cursor:pointer;transition:background-color .12s ease}
+.approval-table tbody tr.approval-selected td:first-child{box-shadow:inset 3px 0 0 var(--brand-cyan)}
+.approval-table tbody tr:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px}
+.approval-table tbody tr:focus-visible td{background:var(--surface-row-hover)}
 .approval-table tbody tr:focus-within td{background:var(--surface-row-hover)}
 .approval-side{gap:0;padding:0}
 .approval-side-header{display:flex;flex:none;gap:6px;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--border-hairline)}
+.approval-side-nav{min-width:0;max-width:100%}
+.approval-side-nav [data-slot="gooey-nav-segment"]{height:29px;min-height:29px}
+.approval-side-nav [data-slot="gooey-nav-item"]{height:29px;min-height:29px;padding:0 11px;font-size:11px}
 .approval-side-tabs{display:flex;gap:2px;padding:2px;background:var(--surface-header);border-radius:var(--radius-sm)}
 .approval-side-tabs>.rare-button{height:27px;min-height:27px;font-size:12px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-secondary)}
 .approval-side-tabs>.rare-button[aria-selected=true]{background:var(--surface-panel);box-shadow:var(--shadow-panel);color:var(--brand-blue);font-weight:600}

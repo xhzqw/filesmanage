@@ -372,8 +372,10 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
 
       <div className="org-search-box">
        <IconSearch/>
-       <RareInput className="org-search" type="search" placeholder="搜索工作组..."
+       <RareInput className="org-search" type="search" aria-label="搜索工作组" placeholder="搜索工作组"
         value={groupQuery} onChange={e=>setGroupQuery(e.target.value)}/>
+       {groupQuery&&<RareButton type="button" className="org-group-search-clear" aria-label="清空工作组搜索" title="清空工作组搜索"
+        onClick={()=>setGroupQuery("")}>×</RareButton>}
       </div>
 
        {groupsState==="loading"&&<p className="hint org-inline-message">正在读取工作组…</p>}
@@ -389,10 +391,12 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
         const isSelected=group.id===selectedGroup;
         return <li key={group.id}>
          <RareButton type="button" className={"org-group-card"+(isSelected?" active":"")}
-          aria-pressed={isSelected} onClick={()=>setSelectedGroup(group.id)}>
+          aria-pressed={isSelected} aria-label={"查看工作组 "+group.name}
+          onClick={()=>setSelectedGroup(group.id)}>
            <div className="org-group-card-header">
+            <span className="org-group-list-icon"><IconGroup/></span>
             <span className="org-group-name" title={group.name}>{group.name}</span>
-            <RareBadge className="org-dept-pill" tone="neutral">{group.departmentId?departmentLabel(group.departmentId):"公共工作组"}</RareBadge>
+            {isSelected&&membersAvailable&&<span className="org-group-selected-count" aria-label={"成员 "+groupMembers.length+" 人"}>{groupMembers.length}</span>}
            </div>
          </RareButton>
         </li>;
@@ -416,7 +420,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
            <RareBadge className="org-dept-pill" tone="neutral">{selectedGroupRow.departmentId?departmentLabel(selectedGroupRow.departmentId):"公共工作组"}</RareBadge>
          </div>
          <div className="org-group-banner-actions">
-          <span className="toolbar-hint">当前成员 {groupMembers.length} 人</span>
+          <RareBadge tone="info" className="org-group-member-count">{groupMembers.length} 位成员</RareBadge>
           <RareButton type="button" tone="danger" className="danger" onClick={()=>setDeleteGroupTarget(selectedGroupRow)}>删除工作组</RareButton>
          </div>
         </div>
@@ -447,7 +451,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
         <div className="org-group-section">
          <div className="org-section-header">
           <h5>添加成员</h5>
-          <span className="hint">仅显示未加入该工作组的正常账号</span>
          </div>
 
          {!usersReady

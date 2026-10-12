@@ -46,6 +46,13 @@ export function RoleDelegationEditor({users,userId,setUserId,role,setRole,scopeI
     <label>过期时间（可选）<RareInput type="datetime-local" value={expires} onChange={e=>setExpires(e.target.value)}/></label>
    </div>
    {role==="permission_admin"&&<fieldset><legend>允许管理的 ACL 动作</legend>
+    <div className="org-role-action-tools" role="group" aria-label="快速选择权限动作">
+     <span role="status">已选 {actions.length} / {actionChoices.length}</span>
+     <RareButton type="button" tone="ghost" onClick={()=>{setActions(actionChoices.map(([key])=>key));setReview(false);}}
+      disabled={busy||actions.length===actionChoices.length}>全部选择</RareButton>
+     <RareButton type="button" tone="ghost" onClick={()=>{setActions([]);setReview(false);}}
+      disabled={busy||actions.length===0}>清空</RareButton>
+    </div>
     <div className="perm-action-grid">{actionChoices.map(([key,name])=><label key={key}>
      <RareInput type="checkbox" checked={actions.includes(key)}
       onChange={e=>setActions(old=>e.target.checked?[...old,key]:old.filter(x=>x!==key))}/>{name}
