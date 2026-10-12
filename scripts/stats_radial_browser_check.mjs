@@ -45,5 +45,17 @@ try{
  await sleep(150);
  const after=await cdp.eval("document.querySelector('[aria-label=\"图谱缩放比例\"]')?.textContent");
  check(before!==after,"zoom responds",before+" => "+after);
+ const target=await cdp.eval("(()=>[...document.querySelectorAll('.stats-graph-folder[aria-expanded=\"false\"]')].find(node=>!node.classList.contains('is-root'))?.getAttribute('aria-label')||'')()");
+ if(target){
+  const action="(()=>{const n=[...document.querySelectorAll('.stats-graph-folder[aria-expanded]')].find(node=>node.getAttribute('aria-label')==="+JSON.stringify(target)+");n?.click();return !!n;})()";
+  check(await cdp.eval(action),"click expandable directory");
+  await sleep(280);
+  const selected="(()=>[...document.querySelectorAll('.stats-graph-folder[aria-expanded]')].find(node=>node.getAttribute('aria-label')==="+JSON.stringify(target)+")?.getAttribute('aria-expanded'))()";
+  check(await cdp.eval(selected)==="true","branch expands on click");
+  const nodeCount=await cdp.eval("document.querySelectorAll('.stats-graph-node').length");
+  const edgeCount=await cdp.eval("document.querySelectorAll('.stats-graph-lines path').length");
+  check(edgeCount===nodeCount-1,"branch expansion reconnects every visible node");
+ }
+
  console.log("STATS_RADIAL_BROWSER_PASS");
 }finally{cdp?.close();chrome.kill();}

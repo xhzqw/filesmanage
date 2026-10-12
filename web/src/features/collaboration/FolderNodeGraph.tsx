@@ -14,7 +14,7 @@ type Edge={from:GraphItem;to:GraphItem};
 type Layout={items:GraphItem[];edges:Edge[];width:number;height:number;rootX:number;rootY:number};
 type View={x:number;y:number;scale:number};
 const NODE_W=158,NODE_H=50,ROOT_W=174,ROOT_H=60,MAX_NODES=110;
-const DEFAULT_CHILDREN=8;
+const DEFAULT_CHILDREN=7;
 const TAU=Math.PI*2;
 
 function defaultExpanded(root:AssetNode):Set<string>{
@@ -30,7 +30,7 @@ function defaultExpanded(root:AssetNode):Set<string>{
  return expanded;
 }
 
-function makeVisible(root:AssetNode,expanded:Set<string>,limits:Map<string,number>):GraphItem{
+function makeVisible(root:AssetNode,expanded:Set<string>,limits:Map<string,number>,revealTypes:Set<string>):GraphItem{
  let total=0;
  function folder(node:AssetNode,parent:string|null):GraphItem{
   const key="folder:"+node.id;
@@ -50,8 +50,11 @@ function makeVisible(root:AssetNode,expanded:Set<string>,limits:Map<string,numbe
     count:0,bytes:0,kind:"more",node,children:[],depth:0,angle:0,x:0,y:0});
    total++;
   }
-  // Only draw file-class leaves of this exact directory, never global estimates.
-  for(const type of node.directTypes.filter(t=>t.count>0)){
+  // Keep the initial graph readable: wrapper folders show their directory
+  // branches first. Show exact file-class leaves on explicit exploration,
+  // or automatically for a terminal folder that has been expanded.
+  const showTypes=node.children.length===0||revealTypes.has(node.id);
+  for(const type of (showTypes?node.directTypes:[]).filter(t=>t.count>0)){
    if(total>=MAX_NODES)break;
    item.children.push({key:"type:"+node.id+":"+type.category,parent:key,
     label:categoryInfo(type.category).label,count:type.count,bytes:type.bytes,
@@ -153,14 +156,15 @@ export function FolderNodeGraph({stats,folders,onChoose}:{stats:Stats;folders:Fo
  const root=useMemo(()=>assetTree(stats,folders),[stats,folders]);
  const [expanded,setExpanded]=useState<Set<string>>(()=>defaultExpanded(root));
  const [limits,setLimits]=useState<Map<string,number>>(()=>new Map());
+ const [revealTypes,setRevealTypes]=useState<Set<string>>(()=>new Set());
  const [active,setActive]=useState(ROOT_ID);
  const [viewport,setViewport]=useState({width:0,height:0});
  const [view,setView]=useState<View>({x:0,y:0,scale:1});
  const viewportRef=useRef<HTMLDivElement>(null);
  const drag=useRef<{x:number;y:number;ox:number;oy:number}|null>(null);
  const [dragging,setDragging]=useState(false);
- useEffect(()=>{setExpanded(defaultExpanded(root));setLimits(new Map());setActive(ROOT_ID);},[root]);
- const model=useMemo(()=>makeVisible(root,expanded,limits),[root,expanded,limits]);
+ useEffect(()=>{setExpanded(defaultExpanded(root));setLimits(new Map());setRevealTypes(new Set());setActive(ROOT_ID);},[root]);
+ const model=useMemo(()=>makeVisible(root,expanded,limits,revealTypes),[root,expanded,limits,revealTypes]);
  const layout=useMemo(()=>radialLayout(model),[model]);
  const byKey=useMemo(()=>new Map(layout.items.map(item=>[item.key,item])),[layout]);
  const activeNode=byKey.get("folder:"+active)?.node;
@@ -213,6 +217,7 @@ export function FolderNodeGraph({stats,folders,onChoose}:{stats:Stats;folders:Fo
   }
   if(item.kind!=="folder"||!item.node||item.node.virtual)return;
   setActive(item.node.id);
+  setRevealTypes(old=>new Set(old).add(item.node!.id));
   setExpanded(old=>{const next=new Set(old);if(next.has(item.node!.id))next.delete(item.node!.id);else next.add(item.node!.id);return next;});
  }
  return <div className="stats-graph">
