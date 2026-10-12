@@ -31,17 +31,17 @@ function changed<T>(promise:Promise<T>,fileId:string,addsTrash=false):Promise<T>
 // Lock, save, rollback and editor sessions are file endpoints and therefore
 // live with the documents feature; approval inbox endpoints live in workflow.
 export const fileApi={
- list:(folder:string,sort:string,cursor:string,limit:number)=>{
+ list:(folder:string,sort:string,cursor:string,limit:number,signal?:AbortSignal)=>{
   const query=new URLSearchParams({folder,sort,limit:String(limit)});
   if(cursor)query.set("cursor",cursor);
-  return request<FilePage>("/files?"+query.toString());
+  return request<FilePage>("/files?"+query.toString(),{signal});
  },
- meta:(id:string)=>request<{file:FileItem;versions:FileVersion[]}>("/files/"+id),
+ meta:(id:string,signal?:AbortSignal)=>request<{file:FileItem;versions:FileVersion[]}>("/files/"+id,{signal}),
  lifecycle:(id:string)=>request<FileLifecycle>("/files/"+id+"/lifecycle"),
  setLifecycle:(id:string,draft:LifecycleDraft)=>changed(request<FileLifecycle>("/files/"+id+"/lifecycle",{method:"PUT",body:JSON.stringify(draft)}),id),
  metadata:(id:string)=>request<FileMetadata>("/files/"+id+"/metadata"),
  setMetadata:(id:string,body:{category:string;description:string;tags:string[]})=>changed(request<FileMetadata>("/files/"+id+"/metadata",{method:"PUT",body:JSON.stringify(body)}),id),
-	preview:(id:string)=>request<PreviewData>("/files/"+id+"/preview"),
+	preview:(id:string,signal?:AbortSignal)=>request<PreviewData>("/files/"+id+"/preview",{signal}),
   preparePrint:(id:string,expectedSha256:string)=>request<{fileId:string;name:string;versionSeq:number;sha256:string}>(
    "/files/"+encodeURIComponent(id)+"/print/prepare",{method:"POST",body:JSON.stringify({expectedSha256})}),
   printMediaUrl:(id:string,sha:string)=>"/api/files/"+encodeURIComponent(id)+"/print/media?sha256="+encodeURIComponent(sha),

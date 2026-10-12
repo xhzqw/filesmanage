@@ -3,6 +3,7 @@ import {toast} from "../shared/ui/feedback";
 import {useEffect,useRef,useState,type FormEvent} from "react";
 import {Link,useNavigate,useParams} from "react-router-dom";
 import {fileApi,formatSize,type FileLifecycle} from "../features/documents/api";
+import {reuseVerifiedPreview} from "../features/documents/revalidate";
 import {MediaPreview} from "../features/documents/MediaPreview";
 import {StructuredFilePreview} from "../features/documents/StructuredFilePreview";
 import {OfficeLayoutPreview} from "../features/documents/OfficeLayoutPreview";
@@ -85,6 +86,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
 
  useEffect(()=>{
   let valid=true;
+  const controller=new AbortController();
   const switchingFile=loadedPreviewId.current!==id;
   loadedPreviewId.current=id;
   // Retain the prior authorized preview while background invalidation
@@ -95,16 +97,32 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
    setPreview(null);setFile(null);setVersions([]);
   }
   setError("");
-  Promise.all([fileApi.preview(id),fileApi.versions(id),fileApi.meta(id).catch(()=>null)])
-   .then(([data,history,meta])=>{
+  // The metadata endpoint checks access and returns the complete version
+  // history in one read. Anonymous WS "file" events cannot identify their
+  // target, but most unrelated changes only need this cheap verification,
+  // not another download and remount of the current PDF/video/Office viewer.
+  const inspect=async()=>{
+   const meta=await fileApi.meta(id,controller.signal);
+   const reused=!switchingFile?reuseVerifiedPreview(preview,meta.file):null;
+   const data=reused??await fileApi.preview(id,controller.signal);
+   return {data,meta};
+  };
+  void inspect()
+   .then(({data,meta})=>{
     if(!valid)return;
-    setPreview(data);setVersions(history);setFile(meta?.file??null);setStatus("ready");
+    setPreview(current=>{
+     if(current===data)return current;
+     return data;
+    });
+    setVersions(current=>JSON.stringify(current)===JSON.stringify(meta.versions)?current:meta.versions);
+    setFile(current=>current&&JSON.stringify(current)===JSON.stringify(meta.file)?current:meta.file);
+    setStatus("ready");
    }).catch(err=>{if(valid){
     // Revoked access must never leave the last successful preview visible.
     setPreview(null);setFile(null);setVersions([]);
     setStatus("failed");setError(errorCopy(err,"无法读取文件，请检查访问权限。"));
    }});
-  return()=>{valid=false;};
+  return()=>{valid=false;controller.abort();};
  },[id,reloadToken]);
 
  useEffect(()=>{

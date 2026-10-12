@@ -19,8 +19,10 @@ const (
 	maxLiveConnections = 128
 	liveHeartbeat      = 12 * time.Second
 	liveWriteTimeout   = 4 * time.Second
-	liveDurablePoll    = 2 * time.Second
-	liveReplayBatch    = 128
+	// The instance-wide observer polls PostgreSQL every 2s and wakes only
+	// relevant sockets; this watchdog covers missed wake-ups and outages.
+	liveDurablePoll = 30 * time.Second
+	liveReplayBatch = 128
 )
 
 // Coalesce contiguous known workspace invalidations before WebSocket writes.
@@ -251,9 +253,12 @@ func (h *Handler) streamLiveEvents(req *http.Request, ws *websocket.Conn, userID
 				h.S.InvalidateFromDurableEvent(event)
 			}
 			if len(batch) < liveReplayBatch {
+				poll.Reset(liveDurablePoll)
 				return true
 			}
 		}
+		// A backlog over 512 events continues promptly with bounded work.
+		poll.Reset(time.Second)
 		return true
 	}
 	if store != nil && !replay() {

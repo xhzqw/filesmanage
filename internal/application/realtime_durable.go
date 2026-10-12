@@ -120,8 +120,13 @@ func (s *Service) watchDurableCache(ctx context.Context, interval time.Duration)
 				s.invalidateAllReplicaCaches()
 				cursor = newest
 				broken = false
+				// Every subscriber replays from its own bookmark, never this
+				// observer cursor. Wake all after a watcher recovery.
+				s.wakeDurableSubscribers(true, nil)
 				continue
 			}
+			publicChanged := false
+			privateChanged := make(map[string]struct{})
 			for page := 0; page < 8; page++ {
 				events, err := feed.RealtimeFeedAfter(ctx, cursor, 256)
 				if err != nil {
@@ -134,12 +139,18 @@ func (s *Service) watchDurableCache(ctx context.Context, interval time.Duration)
 				}
 				for _, event := range events {
 					s.InvalidateFromDurableEvent(event)
+					if event.UserID == "" {
+						publicChanged = true
+					} else {
+						privateChanged[event.UserID] = struct{}{}
+					}
 					cursor = event.ID
 				}
 				if len(events) < 256 {
 					break
 				}
 			}
+			s.wakeDurableSubscribers(publicChanged, privateChanged)
 		}
 	}
 }

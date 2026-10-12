@@ -147,3 +147,42 @@ func TestReplicaInvalidationChecksEveryMergedScope(t *testing.T) {
 		t.Fatal("private presets changed authorization epoch")
 	}
 }
+
+func TestDurableObserverWakesOnlyAuthorizedRecipients(t *testing.T) {
+	journal := &replayJournalProbe{}
+	journal.add(domain.RealtimeEvent{ID: 1, Type: "workspace.changed", Scopes: []string{"file"}})
+	s := New(nil, nil).WithDurableEvents(journal)
+	mine, stopMine := s.SubscribeUserEvents("u_mine")
+	defer stopMine()
+	other, stopOther := s.SubscribeUserEvents("u_other")
+	defer stopOther()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go s.watchDurableCache(ctx, 5*time.Millisecond)
+	untilRealtime(t, func() bool { return s.epoch() > 1 })
+	journal.add(domain.RealtimeEvent{ID: 2, UserID: "u_mine", Type: "session.changed"})
+	select {
+	case event := <-mine:
+		if event.Type != "journal.wakeup" || len(event.Scopes) > 0 {
+			t.Fatalf("unexpected private wakeup %+v", event)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("private recipient was not woken")
+	}
+	select {
+	case event := <-other:
+		t.Fatalf("unrelated user received private wakeup: %+v", event)
+	case <-time.After(30 * time.Millisecond):
+	}
+	journal.add(domain.RealtimeEvent{ID: 3, Type: "workspace.changed", Scopes: []string{"folder"}})
+	for name, ch := range map[string]<-chan UserEvent{"mine": mine, "other": other} {
+		select {
+		case event := <-ch:
+			if event.Type != "journal.wakeup" {
+				t.Fatalf("%s unexpected broadcast %+v", name, event)
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("%s missed public wakeup", name)
+		}
+	}
+}

@@ -5,6 +5,7 @@ import {useNavigate}from "react-router-dom";
 import type {FileItem} from "../../entities/file/model";
 import type {Folder} from "../../entities/folder/model";
 import {fileApi,formatSize} from "./api";
+import {revalidateFileWindow} from "./revalidate";
 import {useUploadStore} from "./uploadStore";
 import {downloadZip,type ZipProgress} from "./zipDownload";
 import {batchConflict,batchExcluded,batchFailed,batchMoveInvalidTarget,batchPickTarget,batchSubmitStarted,batchSucceeded,failed,fileMoveInvalidTarget,openBatch,openFlow,pickTarget,preflightConflict,preflightReady,preflightStarted,submitStarted,succeeded,type BatchMoveFlow,type MoveFlow,type MovePreflight}from"./moveFileFlow";
@@ -257,6 +258,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
 
  useEffect(()=>{
   let valid=true;
+  const controller=new AbortController();
   const revision=++listRevision.current;
   const viewKey=folder+"\u0000"+sort;
   const viewChanged=viewKey!==lastViewRef.current;
@@ -275,7 +277,10 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   }
   if(viewChanged){setCursor("");setHasMore(false);}
   const started=performance.now();
-  fileApi.list(folder,sort,"",50)
+  // Preserve all loaded pages across remote updates; re-query the visible
+  // ordered window instead of merging stale cursor pages with a fresh page.
+  const visibleCount=hasPreviousRows?items.length:50;
+  revalidateFileWindow((next,limit,signal)=>fileApi.list(folder,sort,next,limit,signal),visibleCount,controller.signal)
    .then(page=>{
     if(!valid||revision!==listRevision.current||listKeyRef.current!==listKey)return;
     setItems(page.items);
@@ -284,16 +289,21 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
      const kept=new Set([...current].filter(id=>ids.has(id)));
      return kept.size===current.size?current:kept;
     });
+    setFocusedId(current=>current&&page.items.some(item=>item.id===current)?current:null);
+    setAnchorId(current=>current&&page.items.some(item=>item.id===current)?current:null);
     setHasMore(page.nextCursor!=="");
     setCursor(page.nextCursor);
     setStatus("ready");
     setLatencyMs(Math.max(0,Math.round(performance.now()-started)));
    })
-   .catch(()=>{if(valid&&revision===listRevision.current&&listKeyRef.current===listKey){
+   .catch(error=>{if(valid&&revision===listRevision.current&&listKeyRef.current===listKey){
+    if(["E_FORBIDDEN","E_NOT_FOUND","E_AUTH"].includes(errorCode(error))){
+     setItems([]);setSelectedIds(new Set());setCursor("");setHasMore(false);setStatus("failed");return;
+    }
     // Keep last successfully rendered rows on a transient refresh failure.
     setStatus(hasPreviousRows?"ready":"failed");setLatencyMs(null);
    }});
-  return()=>{valid=false;};
+  return()=>{valid=false;controller.abort();};
  },[folder,sort,reloadKey]);
 
  // A directory, sort or reload change is a new order revision: the previous
@@ -391,9 +401,13 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   completedCursor.current="";
   setLoadingMore(false);
   setMoreError("");
-  const page=await fileApi.list(folder,sort,"",50);
+  const page=await revalidateFileWindow((next,limit)=>fileApi.list(folder,sort,next,limit),items.length);
   if(revision!==listRevision.current||listKeyRef.current!==listKey)return;
   setItems(page.items);setHasMore(page.nextCursor!=="");setCursor(page.nextCursor);
+  setSelectedIds(current=>{
+   const ids=new Set(page.items.map(item=>item.id));
+   return new Set([...current].filter(id=>ids.has(id)));
+  });
  }
 
  // DI-18/WF-27: the toolbar input is the non-drag upload entry. It enqueues

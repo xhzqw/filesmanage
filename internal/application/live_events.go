@@ -49,6 +49,27 @@ func (s *Service) publishUserEvent(userID string, event UserEvent) {
 	}
 }
 
+// The instance-wide durable observer has already performed the shared
+// PostgreSQL poll. Wake only sockets whose authorized replay might advance.
+// A socket always performs its own per-user authorized RealtimeAfter query.
+func (s *Service) wakeDurableSubscribers(public bool, users map[string]struct{}) {
+	if !public && len(users) == 0 {
+		return
+	}
+	s.live.mu.Lock()
+	defer s.live.mu.Unlock()
+	for userID, listeners := range s.live.listeners {
+		if !public {
+			if _, ok := users[userID]; !ok {
+				continue
+			}
+		}
+		for listener := range listeners {
+			enqueueLiveEvent(listener, UserEvent{Type: "journal.wakeup"})
+		}
+	}
+}
+
 // A slow receiver must never lose a previously requested full resync.
 // Repeated hints coalesce while distinct event families escalate to a complete
 // authorized REST re-read. Keeping this single-slot queue nonblocking also
