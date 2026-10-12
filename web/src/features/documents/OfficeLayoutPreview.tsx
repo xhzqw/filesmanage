@@ -47,7 +47,7 @@ export function OfficeLayoutPreview({fileId,sha,structured}:{
   {status==="loading"&&<p className="office-layout-notice" role="status">正在安全转换为页面预览，可先查看内容摘要。</p>}
   {status==="failed"&&<p className="office-layout-notice" role="status">当前文件无法生成页面预览，已回退到只读内容摘要。原始文件未被修改。</p>}
   {status==="ready"&&mode==="pages"&&url?
-   <div className="office-layout-pdf"><iframe title="Office 页面预览" src={url} sandbox="allow-scripts allow-downloads" referrerPolicy="no-referrer"/></div>:
+   <div className="office-layout-pdf"><iframe title="Office 页面预览" src={url} referrerPolicy="no-referrer"/></div>:
    <StructuredFilePreview value={structured}/>}
  </div>;
 }

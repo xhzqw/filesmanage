@@ -7,6 +7,8 @@ import {reuseVerifiedPreview} from "../features/documents/revalidate";
 import {MediaPreview} from "../features/documents/MediaPreview";
 import {StructuredFilePreview} from "../features/documents/StructuredFilePreview";
 import {OfficeLayoutPreview} from "../features/documents/OfficeLayoutPreview";
+import {PDFPageViewer} from "../features/documents/PDFPageViewer";
+import {DocxSealConversion} from "../features/documents/DocxSealConversion";
 import {CadPreviewStatus} from "../features/documents/CadPreviewStatus";
 import {resolvePreviewAdapter,ADAPTER_TITLES} from "../features/documents/previewAdapters";
 import {FileEditor} from "../features/documents/FileEditor";
@@ -47,7 +49,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const[file,setFile]=useState<FileItem|null>(null);
  const[versions,setVersions]=useState<FileVersion[]>([]);
  const[status,setStatus]=useState<"loading"|"ready"|"failed">("loading");
- const[tab,setTab]=useState<Tab>("preview");
+ const[tab,setTab]=useState<Tab>(()=>new URLSearchParams(window.location.search).get("tab")==="seals"?"seals":"preview");
  const[notice,setNotice]=useState("");
  const[error,setError]=useState("");
  const[rollback,setRollback]=useState<FileVersion|null>(null);
@@ -220,6 +222,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
       </div>
       <div className="file-workbench-actions" aria-label="文件操作">
        <RareButton type="button" className="primary" onClick={download}>下载</RareButton>
+       {(preview.renderer==="pdf"||isOfficeName(preview.name))&&<RareButton type="button" className="file-sign-action" onClick={()=>setTab("seals")}>签名 / 盖章</RareButton>}
        <RareButton type="button" onClick={()=>setPrinting(true)}>打印</RareButton>
        {isOfficeName(preview.name)&&!archived&&<Link className="rare-button file-action-link" to={"/office/"+id}>在线编辑</Link>}
        {isCadName(preview.name)&&<Link className="rare-button file-action-link" to={"/model/"+id}>3D 查看</Link>}
@@ -247,11 +250,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
        <MediaPreview key={preview.fileId+preview.sha256} fileId={preview.fileId} sha256={preview.sha256}
         name={preview.name} kind={preview.renderer} mime={preview.mediaType??""}/>:
        preview.renderer==="pdf"?
-        <div className="file-pdf-stage">
-         <iframe title={"PDF 预览："+preview.name} src={fileApi.mediaUrl(preview.fileId,preview.sha256)}
-          sandbox="allow-scripts allow-downloads" referrerPolicy="no-referrer"/>
-         <p>若浏览器不支持内嵌 PDF，可使用上方的「下载」。</p>
-        </div>:
+        <PDFPageViewer fileId={preview.fileId} sha={preview.sha256} name={preview.name} onSign={()=>setTab("seals")}/>:
        preview.structured&&["spreadsheet","presentation","document"].includes(adapter)?
         <OfficeLayoutPreview fileId={preview.fileId} sha={preview.sha256} structured={preview.structured}/>:
        preview.structured&&adapter==="archive"?
@@ -300,7 +299,9 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
       <FileReviewPanel fileId={id} versions={versions}/>
      </section>}
      {tab==="seals"&&<section id="file-panel-seals" role="tabpanel" aria-labelledby="file-tab-seals" className="file-workbench-panel">
-      <FileSealsPanel fileId={id} seq={currentSeq} sha={preview.sha256} name={preview.name}/>
+      {isOfficeName(preview.name)?
+       <DocxSealConversion fileId={id} versionSeq={currentSeq} sha={preview.sha256} name={preview.name}/>:
+       <FileSealsPanel fileId={id} seq={currentSeq} sha={preview.sha256} name={preview.name}/>}
      </section>}
      {tab==="versions"&&<section id="file-panel-versions" role="tabpanel" aria-labelledby="file-tab-versions" className="file-workbench-panel file-versions-panel">
       <div className="file-section-caption"><strong>版本记录</strong><span>所有历史均保留 · 回滚会创建新版本</span></div>

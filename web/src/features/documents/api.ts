@@ -42,6 +42,10 @@ export const fileApi={
  metadata:(id:string)=>request<FileMetadata>("/files/"+id+"/metadata"),
  setMetadata:(id:string,body:{category:string;description:string;tags:string[]})=>changed(request<FileMetadata>("/files/"+id+"/metadata",{method:"PUT",body:JSON.stringify(body)}),id),
 	preview:(id:string,signal?:AbortSignal)=>request<PreviewData>("/files/"+id+"/preview",{signal}),
+ pdfPages:(id:string,sha:string)=>request<{pageCount:number}>("/files/"+encodeURIComponent(id)+"/preview/pdf/pages?sha256="+encodeURIComponent(sha)),
+ pdfPageUrl:(id:string,sha:string,page:number)=>"/api/files/"+encodeURIComponent(id)+"/preview/pdf/page?"+new URLSearchParams({sha256:sha,page:String(page)}),
+ convertDOCXForSigning:(id:string,expectedSeq:number,expectedSha256:string,idempotencyKey:string)=>request<{fileId:string;versionSeq:number;sha256:string;name:string}>("/files/"+encodeURIComponent(id)+"/convert-for-signing",{method:"POST",body:JSON.stringify({expectedSeq,expectedSha256,idempotencyKey})}),
+
   preparePrint:(id:string,expectedSha256:string)=>request<{fileId:string;name:string;versionSeq:number;sha256:string}>(
    "/files/"+encodeURIComponent(id)+"/print/prepare",{method:"POST",body:JSON.stringify({expectedSha256})}),
   printMediaUrl:(id:string,sha:string)=>"/api/files/"+encodeURIComponent(id)+"/print/media?sha256="+encodeURIComponent(sha),

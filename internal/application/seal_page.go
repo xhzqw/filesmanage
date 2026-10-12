@@ -70,7 +70,7 @@ func (s *Service) SealPagePNG(ctx context.Context, actor domain.User, fileID str
 	}
 	runCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(runCtx, "pdftoppm", "-f", itoa(page), "-l", itoa(page), "-singlefile", "-scale-to", "1080", "-png", input.Name(), "-")
+	cmd := exec.CommandContext(runCtx, "pdftoppm", "-f", itoa(page), "-l", itoa(page), "-singlefile", "-scale-to", "1080", "-png", input.Name())
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = io.Discard

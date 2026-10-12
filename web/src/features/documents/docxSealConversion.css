@@ -1,0 +1,6 @@
+.docx-seal-conversion{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;padding:18px}
+.docx-seal-conversion-meta{flex:1 1 290px;min-width:0}
+.docx-seal-conversion-meta strong{font-size:14px}
+.docx-seal-conversion-meta p{font-size:12px;margin:6px 0;color:var(--text-secondary)}
+.docx-seal-conversion-meta small{font-size:11px;color:var(--text-tertiary);overflow-wrap:anywhere}
+.docx-seal-conversion>.notice{flex-basis:100%;margin:0}

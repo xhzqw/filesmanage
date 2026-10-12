@@ -63,8 +63,8 @@ export function PrintDialog({preview,onClose}:{preview:PreviewData;onClose:()=>v
   <div className="document-print-layout">
    <div className="document-print-preview" aria-label="文件打印内容预览">
     {isImage?<img className="document-print-image" src={previewUrl} alt={"图片预览："+preview.name}/>:
-     isPdf||isOffice?<iframe className="document-print-pdf" title={"页面布局预览："+preview.name}
-      src={previewUrl} sandbox="allow-scripts" referrerPolicy="no-referrer"/>:
+     isPdf?<img className="document-print-pdf" src={fileApi.pdfPageUrl(preview.fileId,preview.sha256,1)} alt={"PDF 首页："+preview.name}/>:
+     isOffice?<div className="document-print-empty">Office 页面将转换为 PDF 后交给浏览器打印</div>:
      isText?<pre className="document-print-text">{preview.content||"（空文件）"}</pre>:
      <div className="document-print-empty">{isCad?"图纸在工程查看器内出图":"此格式没有可打印预览"}</div>}
     <span className="document-print-preview-caption">{isPdf||isOffice?"页面预览 · 实际打印以浏览器设置为准":
