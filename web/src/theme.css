@@ -292,7 +292,7 @@ textarea{height:auto;padding:var(--space-1) var(--space-2);line-height:1.5;resiz
 }
 .header-exit-btn:hover{color:var(--status-danger);background:var(--surface-danger-soft)}
 .header-exit-label{font-size:11px}
-.header button:not(.header-exit-btn):not(.nav-toggle):not(.command-trigger):not(.account-trigger){height:26px;min-height:26px;padding:0 var(--space-2);font-size:12px}
+.header button:not(.header-exit-btn):not(.nav-toggle):not(.command-trigger):not(.notification-trigger):not(.account-trigger){height:26px;min-height:26px;padding:0 var(--space-2);font-size:12px}
 
 /* 面包屑条 (spec §3.1): 停靠在工具列上方的 24px 路径条。它必须是 <nav>
    地标 (DI-15)，而 VIS-11 只允许 header.header 内有一个 nav，所以路径不住

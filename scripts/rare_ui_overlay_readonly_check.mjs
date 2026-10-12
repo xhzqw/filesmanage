@@ -292,6 +292,7 @@ try{
   console.log("ROLE_WORKBENCH_READONLY_PASS "+checked.join("; "));
  }else{
  const explorerOnly=process.env.EXPLORER_ONLY==="1";
+ const shellOnly=process.env.SHELL_ONLY==="1";
  const results=[];
  let availablePreviewId="";
  for(const width of (explorerOnly?[1440,820,390]:[1440,1280,1220,900,390])){
@@ -315,9 +316,12 @@ try{
    &&capsules.brandBg==="rgb(255, 255, 255)"&&capsules.navBg==="rgb(237, 242, 250)"
    &&capsules.selectedBg==="rgb(23, 64, 152)"&&capsules.transparentLogo&&capsules.maxHeaderWidth<=1521,
    "independent brand home capsule at "+width+": "+JSON.stringify(capsules));
-  const utility=await evalJS("(()=>{const h=document.querySelector('header.header'),d=h.querySelector('.global-utility-dock'),b=h.querySelector('.shell-home-pill'),toggle=h.querySelector('.nav-toggle'),btns=[...d.querySelectorAll('.command-trigger,.notification-trigger,.account-trigger')],r=d.getBoundingClientRect(),br=b.getBoundingClientRect(),tr=toggle.getBoundingClientRect(),icons=[d.querySelector('.command-trigger svg'),d.querySelector('.notification-trigger svg'),d.querySelector('.account-avatar svg')];return{left:r.left,right:r.right,brandRight:br.right,toggleLeft:tr.left,allButtonsVisible:btns.every(x=>{const q=x.getBoundingClientRect();return q.width>=35&&q.left>=r.left-1&&q.right<=r.right+1}),iconSizes:icons.map(i=>i?Math.round(i.getBoundingClientRect().width):0),overlapsBrand:r.left<br.right-1,documentOverflow:document.documentElement.scrollWidth-innerWidth}})()");
+  const utility=await evalJS("(()=>{const h=document.querySelector('header.header'),d=h.querySelector('.global-utility-dock'),b=h.querySelector('.shell-home-pill'),toggle=h.querySelector('.nav-toggle'),btns=[...d.querySelectorAll('.command-trigger,.notification-trigger,.account-trigger')],r=d.getBoundingClientRect(),br=b.getBoundingClientRect(),tr=toggle.getBoundingClientRect(),icons=[d.querySelector('.command-trigger svg'),d.querySelector('.notification-trigger svg'),d.querySelector('.account-avatar svg')],badge=d.querySelector('.rare-notification-bell-badge'),bell=d.querySelector('.notification-trigger').getBoundingClientRect(),badger=badge?.getBoundingClientRect();return{left:r.left,right:r.right,brandRight:br.right,toggleLeft:tr.left,allButtonsVisible:btns.every(x=>{const q=x.getBoundingClientRect();return q.width>=35&&q.left>=r.left-1&&q.right<=r.right+1}),dimensions:btns.map(x=>{const q=x.getBoundingClientRect();return{width:Math.round(q.width),height:Math.round(q.height)}}),badgeInside:!badger||(badger.left>=bell.left-1&&badger.top>=bell.top-1&&badger.right<=bell.right+1),iconSizes:icons.map(i=>i?Math.round(i.getBoundingClientRect().width):0),overlapsBrand:r.left<br.right-1,documentOverflow:document.documentElement.scrollWidth-innerWidth}})()");
   assert(!utility.overlapsBrand&&utility.right<=width-2&&utility.documentOverflow<=1
-   &&utility.allButtonsVisible&&utility.iconSizes.every(x=>x>=17),
+   &&utility.allButtonsVisible&&utility.iconSizes.every(x=>x>=17)
+   &&utility.dimensions.every(x=>x.height===36)
+   &&utility.dimensions[0].width===36&&utility.dimensions[1].width===36
+   &&utility.dimensions[2].width<=154&&utility.badgeInside,
    "right utility buttons and icons must stay aligned inside the viewport at "+width+": "+JSON.stringify(utility));
   if(width>1210){
    assert(shellNav.rendered!=="none"&&shellNav.lastRight<=shellNav.rightStart+2,
@@ -364,6 +368,7 @@ try{
   await key("Escape","Escape",27);
   await waitFor(`!document.querySelector('[role=menu][aria-label="账户操作菜单"]')`);
   assert.equal(await evalJS('document.activeElement?.classList.contains("account-trigger")'),true,"Escape restores trigger");
+  if(shellOnly){results.push(width+"px: branded pills, utility geometry, nav click, account menu PASS");continue;}
   await waitFor('!!document.querySelector(".file-toolbar")');
   const folderTree=await evalJS(`(()=>{const input=document.querySelector('.tree-head input[aria-label="搜索目录"]'),
    current=document.querySelector('.tree li[aria-current="page"]>.tree-row'),
@@ -507,6 +512,7 @@ try{
   }
   results.push(width+"px: global Gooey nav / menu / combobox OK");
  }
+ if(!shellOnly){
  await viewport(1440,900);
  await navigate("/doc",'!!document.querySelector(".new-folder-wrapper > button")');
  await click(".new-folder-wrapper > button");
@@ -708,6 +714,8 @@ try{
   }
  }
  console.log(explorerOnly?"EXPLORER_GEOMETRY_PASS "+results.join("; "):"RARE_OVERLAY_READONLY_PASS "+results.join("; ")+"; file grid, permission Gooey, dialog and focus OK"+(availablePreviewId?"":"; preview fixture absent"));
+ }
+ if(shellOnly)console.log("SHELL_HEADER_READONLY_PASS "+results.join("; "));
  }
 }catch(error){
  console.error("RARE_OVERLAY_READONLY_FAIL",error.message);
