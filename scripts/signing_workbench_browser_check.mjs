@@ -241,7 +241,7 @@ try{
      const after=await cdp.evaluate(`(()=>parseFloat(document.querySelector('.seal-position-mark').style.left))()`);
      assert("mark moves through real pointer drag",after>before.left+1,"left "+before.left+" → "+after);
      const handle=await cdp.evaluate(`(()=>{
-      const h=document.querySelector('.seal-resize-handle').getBoundingClientRect();
+      const h=document.querySelector('.seal-resize-handle.is-se').getBoundingClientRect();
       return {x:h.x+h.width/2,y:h.y+h.height/2};
      })()`);
      await cdp.drag(handle,{x:handle.x+25,y:handle.y+12});
@@ -286,6 +286,29 @@ try{
      await cdp.evaluate(`(()=>[...document.querySelectorAll('[role="option"]')].find(o=>!o.disabled&&o.textContent.trim()!=='选择人员或公章')?.click())()`);
      const repopulated=await cdp.waitFor(`()=>document.querySelectorAll('.seal-draft-row').length===1`,3500);
      assert("asset can be selected again after X removal",Boolean(repopulated));
+
+     const availableSecond=await cdp.evaluate(`(()=>{
+      const select=document.querySelector('#file-seals-sidebar select');
+      if(!select)return null;
+      const option=[...select.options].find(o=>o.value&&!o.disabled&&o.value!==select.value);
+      return option?.textContent?.trim()??null;
+     })()`);
+     if(availableSecond){
+      await cdp.evaluate(`(()=>document.querySelector('#file-seals-sidebar .rare-select')?.click())()`);
+      await cdp.waitFor(`()=>[...document.querySelectorAll('[role="option"]')].some(o=>o.textContent.trim()===${JSON.stringify(availableSecond)})`,3000);
+      await cdp.evaluate(`(()=>{
+       const target=${JSON.stringify(availableSecond)};
+       [...document.querySelectorAll('[role="option"]')].find(o=>o.textContent.trim()===target)?.click();
+      })()`);
+      const two=await cdp.waitFor(`()=>document.querySelectorAll('.seal-draft-row').length===2`,3500);
+      assert("additional distinct signature/seal auto-joins same batch",Boolean(two));
+      if(two){
+       await cdp.evaluate(`(()=>document.querySelector('.seal-remove-mark')?.click())()`);
+       const one=await cdp.waitFor(`()=>document.querySelectorAll('.seal-draft-row').length===1`,3500);
+       assert("removing one signature preserves other batch members",Boolean(one));
+      }
+     }else console.log("SKIP multiple assets: no second unused authorized signature");
+
 
 
 
