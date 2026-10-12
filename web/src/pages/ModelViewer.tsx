@@ -9,6 +9,7 @@ import type {User} from "../entities/user/model";
 import {AppShell} from "../shared/ui/AppShell";
 import {parseDxf} from "../features/modelViewer/dxf";
 import {decodeDxfBytes} from "../features/modelViewer/dxfEncoding";
+import {cadDerivativeDisposition} from "../features/modelViewer/derivativePolicy";
 import type {DrawingPickedSegment} from "../features/modelViewer/snap2d";
 import {printCurrentSheet,type SheetSize} from "../features/modelViewer/printSheet";
 import {openVectorPrint,type PlotScale} from "../features/modelViewer/vectorSheet";
@@ -146,10 +147,13 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
     let data=await fileApi.derivativeStatus(id);
     if(!valid)return;
     let derivative=data as unknown as DerivativeInfo;
-    // Deep-link support (SPEC §20.5): a /model/:id visit with no derivative yet
-    // creates one, so the page works for every non-licensed format without a
-    // prior preview-page visit.
-    if(!derivative.found){
+    // Capability is returned by GET /derivative even without a derivative row.
+    // Never POST to the conversion endpoint for unsupported DWG/unknown formats.
+    if(cadDerivativeDisposition(derivative)==="unsupported"){
+     setInfo(derivative);setStatus("unsupported");return;
+    }
+    // Deep links create a derivative only for formats with a real renderer.
+    if(cadDerivativeDisposition(derivative)==="request"){
      try{
       await fileApi.requestDerivative(id);
      }catch(error){
@@ -175,7 +179,7 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
        if(valid)setFileMeta({sha256:preview.sha256,versionSeq:0,name:preview.name});
       }catch{if(valid)setFileMeta(null);}
     }
-    if(derivative.class==="licensed"||derivative.class==="unverified"){
+    if(cadDerivativeDisposition(derivative)==="unsupported"){
      setStatus("unsupported");
      return;
     }
@@ -376,7 +380,7 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
  };
  const content=<main className={embedded?"cad-page cad-embedded":"work cad-page"}>
     {(!embedded||(drawing&&layouts.length>1))&&<div className="breadcrumb cad-title">
-     <strong>{drawing?"二维工程图":"三维模型"}</strong>
+     <strong>{drawing?"二维工程图":info?.format==="dwg"?"CAD 图纸":"三维模型"}</strong>
      <span>{info?.format?.toUpperCase()??""}{info?.class==="converted"?" · 已转换":""}</span>
      {drawing&&status==="ready"&&layouts.length>1&&<div className="cad-layout-tabs" role="tablist" aria-label="图纸布局">
       {layouts.map(name=><RareButton type="button" key={name} role="tab" aria-selected={activeLayout===name}
@@ -406,11 +410,13 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
           <span className="cad-loading-caption">{downloadProgress}%</span>:
           status==="converting"&&conversionSeconds>=3?<span className="cad-loading-caption">已等待 {conversionSeconds} 秒</span>:null}
         </div>:
-        <><strong>{status==="unsupported"?(info?.note??"该格式当前不支持在线预览"):
+        <><strong>{status==="unsupported"&&info?.format==="dwg"?"DWG 暂不支持在线预览":
+          status==="unsupported"?(info?.note??"该格式当前不支持在线预览"):
           status==="too-large"?"模型过大，已停止浏览器预览":
           status==="webgl-lost"?(message||"WebGL 上下文丢失"):(message||"预览失败")}</strong>
          {(status==="failed"||status==="webgl-lost")&&<RareButton type="button" onClick={()=>setRetryEpoch(value=>value+1)}>重试</RareButton>}
-         {status==="too-large"&&<span>请下载后使用桌面 CAD 软件打开</span>}</>}
+         {status==="unsupported"&&info?.format==="dwg"&&<span>请将 DWG 转存为 DXF 后预览</span>}
+         {status==="too-large"&&<span>请下载后使用桌面 CAD 软件打开</span></>}
       </div>}
       {status==="ready"&&embedded&&!drawing&&<div className="cad-compact-toolbar" ref={compactToolbarRef} role="group" aria-label="三维视图工具">
        <RareButton type="button" title="居中并适合窗口" onClick={fitEngineeringView}>适合窗口</RareButton>

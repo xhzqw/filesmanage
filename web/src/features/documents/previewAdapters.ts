@@ -14,5 +14,5 @@ export function resolvePreviewAdapter(preview:PreviewData):PreviewAdapter {
 export const ADAPTER_TITLES:Record<PreviewAdapter,string>={
  image:"图片",video:"视频",audio:"音频",pdf:"PDF 文档",text:"文本 / 代码",
  archive:"压缩包目录",spreadsheet:"电子表格",presentation:"演示文稿",document:"文字文档",
- cad:"三维模型",unsupported:"文件",
+ cad:"CAD 图纸 / 模型",unsupported:"文件",
 };

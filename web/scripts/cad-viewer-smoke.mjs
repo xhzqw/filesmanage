@@ -25,6 +25,22 @@ assert(!viewerPage.includes("兼容性提示：{skipped.join"),
 assert(viewerPage.includes("aria-expanded={showCompatibility}")&&viewerPage.includes("setShowCompatibility("),
  "compatibility diagnostics must remain available on demand");
 
+// The actual DWG support class must be checked before the client POSTs.
+// Regression: a 400 on /derivative is never a normal preview-loading step.
+const dispositionBundle=await build({
+ entryPoints:[fileURLToPath(new URL("../src/features/modelViewer/derivativePolicy.ts",import.meta.url))],
+ bundle:true,write:false,format:"esm",platform:"node",target:"es2022",logLevel:"silent",
+});
+const {cadDerivativeDisposition}=await import("data:text/javascript;base64,"+
+ Buffer.from(dispositionBundle.outputFiles[0].text).toString("base64"));
+assert.equal(cadDerivativeDisposition({found:false,class:"licensed"}),"unsupported");
+assert.equal(cadDerivativeDisposition({found:false,class:"unverified"}),"unsupported");
+assert.equal(cadDerivativeDisposition({found:false,class:""}),"unsupported");
+assert.equal(cadDerivativeDisposition({found:false,class:"native"}),"request");
+assert.equal(cadDerivativeDisposition({found:false,class:"converted"}),"request");
+assert.equal(cadDerivativeDisposition({found:true,class:"native"}),"existing");
+assert.equal(cadDerivativeDisposition({found:true,class:"licensed"}),"unsupported");
+
 // Bundle the parser with its pure NURBS evaluator. The Three dependency is
 // type-only and is erased; this remains a remote-only headless regression.
 const parsedBundle=await build({
