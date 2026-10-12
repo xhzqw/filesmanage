@@ -2,6 +2,7 @@ import {RareButton,RareInput} from "../../shared/ui/rare";
 import {Dialog} from "../../shared/ui/Dialog";
 import {FileResourceIcon,FolderResourceIcon} from "../../shared/ui/ResourceIcons";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
+import {toast} from "../../shared/ui/feedback";
 import {useCallback,useEffect,useMemo,useRef,useState,type KeyboardEvent} from "react";
 import {useNavigate} from "react-router-dom";
 import {collaborationApi} from "./api";
@@ -22,7 +23,7 @@ const FOLDER_LIMIT=3;
 
 // Search hits carry only the information actually shown in the overlay.
 type FolderRow={kind:"folder";key:string;id:string;name:string};
-type FileRow={kind:"file";key:string;id:string;name:string};
+type FileRow={kind:"file";key:string;id:string;name:string;folderId:string;contentType:string};
 type Row=FolderRow|FileRow;
 
 // The DOM key event, aliased because the React type of the same name is in
@@ -33,6 +34,25 @@ type WindowKeyEvent=WindowEventMap["keydown"];
 // from the accessibility tree (VIS-11).
 function CommandSearchIcon(){
   return <svg className="command-icon" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="10.8" cy="10.8" r="7.2"/><path d="m16.3 16.3 4.4 4.4"/></svg>;
+}
+type ActionKind="download"|"view"|"print"|"folder";
+function CommandActionIcon({kind}:{kind:ActionKind}){
+ const paths:Record<ActionKind,string>={
+  download:"M12 3v12m-4-4 4 4 4-4M4 17v3h16v-3",
+  view:"M2.7 12s3.5-6.5 9.3-6.5 9.3 6.5 9.3 6.5-3.5 6.5-9.3 6.5S2.7 12 2.7 12ZM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z",
+  print:"M7 8V4h10v4M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M7 14h10v6H7z",
+  folder:"M9 5H5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-8L9 5Zm3 8h6m-2-2 2 2-2 2",
+ };
+ return <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+  strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+  <path d={paths[kind]}/></svg>;
+}
+
+// Only these four families can offer printing in Spotlight. The preview page
+// independently validates the signature-backed renderer and print permission.
+function canPrintSpotlightFile(row:FileRow){
+ return /\.(?:pdf|txt|docx|png|jpe?g|gif|webp|bmp|tiff?|avif)$/i.test(row.name)
+  || /^image\//i.test(row.contentType);
 }
 
 export function CommandSpotlight(){
@@ -157,7 +177,8 @@ export function CommandSpotlight(){
       }
     }
     for(const file of items){
-      list.push({kind:"file",key:"file:"+file.id,id:file.id,name:file.name});
+      list.push({kind:"file",key:"file:"+file.id,id:file.id,name:file.name,
+       folderId:file.folderId,contentType:file.contentType});
     }
     return list;
   },[folders,items,keyword]);
@@ -179,6 +200,26 @@ export function CommandSpotlight(){
     navigate(row.kind==="folder"?("/doc?folder="+encodeURIComponent(row.id)):("/preview/"+row.id));
     closePalette();
   },[closePalette,navigate]);
+
+  function goToFileDirectory(row:FileRow){
+    navigate("/doc?folder="+encodeURIComponent(row.folderId));
+    closePalette();
+  }
+  function download(row:FileRow){
+    // Identical native download path to the document table: the browser owns
+    // transfer and the server enforces file authorization.
+    const link=document.createElement("a");
+    link.href="/api/files/"+encodeURIComponent(row.id)+"/bytes";
+    link.download=row.name;
+    document.body.append(link);link.click();link.remove();
+    closePalette();
+    toast.info("已交由浏览器下载，请在下载列表确认");
+  }
+  function print(row:FileRow){
+    if(!canPrintSpotlightFile(row))return;
+    navigate("/preview/"+encodeURIComponent(row.id)+"?print=1");
+    closePalette();
+  }
 
   function step(delta:number){
     if(visibleRows.length===0)return;
@@ -212,8 +253,7 @@ export function CommandSpotlight(){
      <RareInput ref={inputRef} className="command-input" type="text" value={query}
       onChange={event=>setQuery(event.target.value)}
       placeholder="聚焦搜索" aria-label="聚焦搜索文件与文件夹" autoComplete="off"
-      role="combobox" aria-autocomplete="list" aria-expanded={visibleRows.length>0}
-      aria-controls="command-results" aria-activedescendant={visibleRows[active]?("command-result-"+active):undefined}/>
+      role="searchbox" aria-controls={visibleRows.length>0?"command-results":undefined}/>
      <RareButton type="button" tone="ghost" className="command-close" aria-label="关闭搜索"
       title="关闭搜索（Esc）" onClick={closePalette}>
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -225,20 +265,34 @@ export function CommandSpotlight(){
     {showResults&&status==="loading"&&visibleRows.length===0?<p className="command-status hint" role="status"><BrandLoadingLabel>搜索中</BrandLoadingLabel></p>:null}
     {showResults&&status==="failed"?<p className="command-status error" role="alert">搜索失败</p>:null}
     {showResults&&status==="ready"&&visibleRows.length===0?<p className="command-status hint" role="status">无匹配结果</p>:null}
-    {visibleRows.length>0?<ul ref={listRef} id="command-results" className="command-list" role="listbox" aria-label="搜索结果">
+    {visibleRows.length>0?<ul ref={listRef} id="command-results" className="command-list" aria-label="搜索结果">
      {visibleRows.map((row,index)=>{
       const on=index===active;
+      const action=(kind:ActionKind,label:string,run:()=>void)=><RareButton key={kind}
+       type="button" tone="ghost" className="command-action" data-command-action={kind}
+       aria-label={label+"："+row.name} title={label} onClick={event=>{event.stopPropagation();run();}}>
+       <CommandActionIcon kind={kind}/>
+      </RareButton>;
       return <li key={row.key} id={"command-result-"+index} className={"command-row"+(on?" active":"")} data-kind={row.kind} data-active={on?"true":"false"}
-       role="option" aria-selected={on}
+       aria-current={on?"true":undefined}
        onClick={()=>activate(row)} onMouseEnter={()=>setActive(index)}>
        {row.kind==="folder"
         ?<>
           <FolderResourceIcon size={16}/>
-          <span className="command-row-name">{row.name}</span>
+          <span className="command-row-name" title={row.name}>{row.name}</span>
+          <span className="command-actions" role="group" aria-label={row.name+" 操作"}>
+           {action("folder","进入目录",()=>activate(row))}
+          </span>
          </>
         :<>
           <FileResourceIcon name={row.name} size={18}/>
-          <span className="command-row-name">{row.name}</span>
+          <span className="command-row-name" title={row.name}>{row.name}</span>
+          <span className="command-actions" role="group" aria-label={row.name+" 操作"}>
+           {action("download","下载",()=>download(row))}
+           {action("view","查看",()=>activate(row))}
+           {canPrintSpotlightFile(row)&&action("print","打印",()=>print(row))}
+           {action("folder","到此目录",()=>goToFileDirectory(row))}
+          </span>
          </>}
       </li>;
      })}

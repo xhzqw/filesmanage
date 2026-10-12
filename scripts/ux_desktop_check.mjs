@@ -1424,6 +1424,32 @@ async function main() {
       check("PW-08b1 results show names only, without file metadata",
         compactHits.items>0&&compactHits.metadata===0&&!compactHits.outside,
         JSON.stringify(compactHits));
+      const imageActions=await cdp.evaluate(`(()=>{
+        const row=[...document.querySelectorAll('.command-row')].find(el=>el.textContent?.includes('pw-02.png'));
+        if(!row)return null;
+        const group=row.querySelector('.command-actions');
+        const actions=[...(group?.querySelectorAll('button')??[])];
+        const rowBox=row.getBoundingClientRect(),groupBox=group?.getBoundingClientRect();
+        return {actions:actions.map(el=>el.getAttribute('data-command-action')),
+          labels:actions.map(el=>el.getAttribute('aria-label')),
+          inside:!!groupBox&&groupBox.right<=rowBox.right+1,
+          realButtons:actions.every(el=>el.getAttribute('data-rare-control')==='button')};
+      })()`);
+      check("PW-08b2 image row has a compact four-action capsule",
+        JSON.stringify(imageActions?.actions)==='["download","view","print","folder"]'
+        &&imageActions?.inside===true&&imageActions?.realButtons===true
+        &&imageActions.labels.every(label=>typeof label==='string'&&label.includes('pw-02.png')),
+        JSON.stringify(imageActions));
+      await cdp.evaluate(`(()=>{
+        const i=document.querySelector('.command-input');
+        const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
+        set.call(i,'pw-03');i.dispatchEvent(new Event('input',{bubbles:true}));return true;
+      })()`);
+      const unprintable=await cdp.waitFor(`()=>{
+        const row=[...document.querySelectorAll('.command-row')].find(el=>el.textContent?.includes('pw-03.dat'));
+        return !!row&&!row.querySelector('[data-command-action="print"]');
+      }`,8000);
+      check("PW-08b3 unsupported file never offers print",Boolean(unprintable),String(unprintable));
       await cdp.key("Escape", "Escape", 27);
       const closed = await cdp.waitFor(`()=>document.querySelector('.command-panel')===null`, 5000);
       check("PW-08c Escape closes the palette", Boolean(closed), String(closed));
@@ -1435,6 +1461,21 @@ async function main() {
       })()`);
       const closedByButton = clickedClose && await cdp.waitFor(`()=>document.querySelector('.command-panel')===null`, 5000);
       check("PW-08d the visible X closes Spotlight", Boolean(closedByButton), String(closedByButton));
+      await cdp.key("k", "KeyK", 75, CTRL);
+      await cdp.waitFor(`()=>document.querySelector('.command-input')!==null`,5000);
+      await cdp.evaluate(`(()=>{
+        const i=document.querySelector('.command-input');
+        const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
+        set.call(i,'pw-03');i.dispatchEvent(new Event('input',{bubbles:true}));return true;
+      })()`);
+      await cdp.waitFor(`()=>[...document.querySelectorAll('.command-row')].some(el=>el.textContent?.includes('pw-03.dat'))`,8000);
+      const located=await cdp.evaluate(`(()=>{
+        const row=[...document.querySelectorAll('.command-row')].find(el=>el.textContent?.includes('pw-03.dat'));
+        const btn=row?.querySelector('[data-command-action="folder"]');
+        if(!btn)return false;btn.click();return true;
+      })()`);
+      const openedDirectory=located&&await cdp.waitFor(`()=>location.pathname==='/doc'&&new URLSearchParams(location.search).get('folder')===${JSON.stringify(pwFolderId)}&&document.querySelector('.command-panel')===null`,8000);
+      check("PW-08e locate action navigates into the file's own directory",Boolean(openedDirectory),String(openedDirectory));
 
       // ---- PW-09: hold-to-confirm starts on press and cancels on release ----
       await cdp.navigate(`${BASE}/doc?folder=${pwFolderId}`);
