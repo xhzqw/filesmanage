@@ -117,6 +117,7 @@ export function StatsPanel(){
      <option value="audio/">音频</option><option value="application/pdf">PDF</option>
      <option value="text/">文本</option><option value="application/">其他应用文件</option>
     </RareSelect></label>
+    <MetricSwitch value={metric} onChange={setMetric}/>
     {uploader&&<RareButton tone="ghost" type="button" onClick={()=>setUploader("")}>清除上传人</RareButton>}
     {activeFilters&&<RareButton tone="ghost" type="button" onClick={resetFilters}>重置</RareButton>}
     <a className="stats-export" href={collaborationApi.exportUrl(filters)} aria-label="导出当前统计筛选的文件 CSV">导出 CSV</a>
@@ -134,14 +135,12 @@ export function StatsPanel(){
    </div>
    <div className="stats-grid">
     <section className="stats-panel" aria-labelledby="stats-types-title">
-     <div className="stats-panel-head"><div><h2 id="stats-types-title">文件类型分布</h2><p>按文件扩展名归类</p></div>
-      <MetricSwitch value={metric} onChange={setMetric}/></div>
+     <div className="stats-panel-head"><div><h2 id="stats-types-title">文件类型分布</h2><p>按文件扩展名归类</p></div></div>
      <RankRows metric={metric} items={types.slice(0,7).map(t=>({key:t.type,name:t.type==="无扩展名"?"无扩展名":"."+t.type,count:t.count,bytes:t.bytes}))}/>
      {types.length>7&&<div className="stats-panel-foot">展示前 7 类，共 {types.length} 类</div>}
     </section>
     <section className="stats-panel" aria-labelledby="stats-growth-title">
-     <div className="stats-panel-head"><div><h2 id="stats-growth-title">新增文件趋势</h2><p>按首版本创建月份 · {metric==="count"?"文件数":"当前版本容量"}</p></div>
-      <MetricSwitch value={metric} onChange={setMetric}/></div>
+     <div className="stats-panel-head"><div><h2 id="stats-growth-title">新增文件趋势</h2><p>按首版本创建月份 · {metric==="count"?"文件数":"当前版本容量"}</p></div></div>
      {monthSeries.length===0?<EmptyChart label="暂无可绘制的月份记录"/>:<div className="stats-timeline" aria-label="各月新增文件趋势">
       {monthSeries.map(m=><div key={m.month} className="stats-month" title={m.month+" · "+metricLabel(metric,m[metric])}>
        <strong>{metricLabel(metric,m[metric])}</strong>

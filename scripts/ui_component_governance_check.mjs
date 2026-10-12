@@ -67,6 +67,10 @@ for(const path of [
 }
 if(/const ACTIONS\s*=\s*\[/.test(readFileSync(join(root,"web/src/features/organization/QuickGrantsDialog.tsx"),"utf8")))
  errors.push("QuickGrantsDialog.tsx: duplicated permission action dictionary");
+const quickGrants=readFileSync(join(root,"web/src/features/organization/QuickGrantsDialog.tsx"),"utf8");
+if(/quick-grants-close/.test(quickGrants))errors.push("QuickGrantsDialog.tsx: duplicate close control; use the Dialog header dismiss");
+const statsPanel=readFileSync(join(root,"web/src/features/collaboration/StatsPanel.tsx"),"utf8");
+if((statsPanel.match(/<MetricSwitch /g)||[]).length!==1)errors.push("StatsPanel.tsx: render exactly one shared metric switch");
 if(errors.length){
  for(const error of errors)console.error("COMPONENT_GOVERNANCE_FAIL",error);
  process.exitCode=1;

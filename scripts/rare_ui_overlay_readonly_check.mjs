@@ -155,6 +155,29 @@ try{
    await click(".tree-search-clear");
    assert.equal(await evalJS(`document.querySelector('.tree-head input[aria-label="搜索目录"]')?.value`),"");
   }
+  // The complete grant workflow and file-manager quick grant share the same
+  // nine-choice picker and subject/scope controls; editing here is local only.
+  if((width===1440||width===390)&&await evalJS('!!document.querySelector(".folder-actions .ghost-action-btn")')){
+   await evalJS('(()=>{document.querySelector(".folder-actions .ghost-action-btn").click();return true})()');
+   await waitFor('!!document.querySelector("dialog.quick-grants-dialog:modal .permission-action-picker")');
+   const quick=await evalJS(`(()=>{const d=document.querySelector("dialog.quick-grants-dialog:modal");
+    const r=d.getBoundingClientRect();return{
+     options:d.querySelectorAll(".permission-action-options input[type=checkbox]").length,
+     pickers:d.querySelectorAll(".permission-action-picker").length,
+     selected:d.querySelectorAll(".permission-action-options input:checked").length,
+     subjectFields:d.querySelectorAll(".quick-grants-fields").length,
+     closeIcons:d.querySelectorAll(".dialog-close").length,
+     redundantClose:d.querySelectorAll(".quick-grants-close").length,
+     rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom},
+     overflow:document.documentElement.scrollWidth-innerWidth};})()`);
+   assert(quick.options===9&&quick.pickers===1&&quick.selected===1&&quick.subjectFields===2
+    &&quick.closeIcons===1&&quick.redundantClose===0&&quick.overflow<=1
+    &&inside(quick.rect,width,height),"unified quick grant, no duplicate close at "+width+": "+JSON.stringify(quick));
+   await evalJS('(()=>{document.querySelector("dialog.quick-grants-dialog .permission-action-tools button").click();return true})()');
+   await waitFor('document.querySelectorAll("dialog.quick-grants-dialog .permission-action-options input:checked").length===2');
+   await evalJS('(()=>{document.querySelector("dialog.quick-grants-dialog .dialog-close").click();return true})()');
+   await waitFor('!document.querySelector("dialog.quick-grants-dialog:modal")');
+  }
   if(!availablePreviewId){
    await sleep(140);
    availablePreviewId=await evalJS('document.querySelector(".file-table tbody tr[data-id]")?.dataset.id')||"";
@@ -214,6 +237,23 @@ try{
   assert(select.role==="combobox"&&select.expanded==="true"&&select.count>=3&&inside(select.rect,width,height)&&select.overflow<=1,"time dropdown at "+width+": "+JSON.stringify(select));
   await click('.rare-select-menu [role="option"]:nth-child(2)');
   assert.equal(await evalJS(`document.querySelector('.rare-select[aria-label="修改时间"]').getAttribute("aria-expanded")`),"false");
+  const metrics=await evalJS(`(()=>({count:document.querySelectorAll(".stats-metric").length,
+   buttons:[...document.querySelectorAll('.stats-metric [data-slot="gooey-nav-item"]')].map(x=>x.textContent.trim())}))()`);
+  assert(metrics.count===1&&metrics.buttons.join(",")==="数量,容量",
+   "one shared statistics metric switch at "+width+": "+JSON.stringify(metrics));
+  await click('.stats-metric [data-slot="gooey-nav-item"]:nth-child(2)');
+  await waitFor(`document.querySelector('.stats-metric [data-slot="gooey-nav-item"]:nth-child(2)')?.getAttribute("aria-current")==="page"`);
+  if(width===1440||width===390){
+   await click(".stats-folder-trigger");
+   await waitFor('!!document.querySelector("dialog:modal .folder-picker-tree")');
+   const picker=await evalJS(`(()=>{const d=document.querySelector("dialog:modal"),r=d.getBoundingClientRect();
+    const tree=d.querySelector(".folder-picker-tree");return{tree:!!tree,border:getComputedStyle(tree).borderWidth,
+     dialog:{left:r.left,top:r.top,right:r.right,bottom:r.bottom},overflow:document.documentElement.scrollWidth-innerWidth};})()`);
+   assert(picker.tree&&picker.border==="0px"&&picker.overflow<=1&&inside(picker.dialog,width,height),
+    "flat shared folder picker at "+width+": "+JSON.stringify(picker));
+   await evalJS('(()=>{document.querySelector("dialog:modal .dialog-close").click();return true})()');
+   await waitFor('!document.querySelector("dialog:modal")');
+  }
   results.push(width+"px: global Gooey nav / menu / combobox OK");
  }
  await viewport(1440,900);

@@ -92,7 +92,7 @@ export function QuickGrantsDialog({folder,onClose}:{folder:Folder;onClose:()=>vo
   }finally{setBusy(false);}
  }
  return <Dialog open title={`快捷授权 · ${folder.name}`} onClose={onClose} closeGuard={()=>!busy}
-  className="quick-grants-dialog" initialFocus=".quick-grants-close">
+  className="quick-grants-dialog" initialFocus=".quick-grants-fields .rare-select">
   <div className="quick-grants-body">
    <div className="quick-grants-section-heading">
     <strong>直接授权</strong>
@@ -142,7 +142,6 @@ export function QuickGrantsDialog({folder,onClose}:{folder:Folder;onClose:()=>vo
       <span>确认授予高影响权限（{actionLabels(risk)}）</span></label>}
     </div>}
     <div className="quick-grants-footer">
-     <RareButton type="button" className="quick-grants-close" disabled={busy} onClick={onClose}>关闭</RareButton>
      {review&&<RareButton type="button" disabled={busy} onClick={()=>setReview(false)}>返回修改</RareButton>}
      <RareButton type="submit" tone="primary" className="primary" loading={busy}
       disabled={!canSave||(review&&risk.length>0&&!ack)}>{busy?"保存中…":review?"确认添加":"添加授权"}</RareButton>
