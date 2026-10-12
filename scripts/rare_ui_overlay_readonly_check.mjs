@@ -234,9 +234,9 @@ try{
    paths:links.map(x=>new URL(x.href).pathname),count:segments.length,active:active.map(x=>x.textContent.trim()),
    rendered:getComputedStyle(nav).display,navWidth:rect.width,navScroll:nav.scrollWidth,
    lastRight:last?.right,rightStart:right?.left,overflow:document.documentElement.scrollWidth-innerWidth};})()`);
-  assert.deepEqual(shellNav.labels,["文档管理","全局搜索","共享/关注","统计","审批","生命周期","回收站","组织与权限"],
-   "all eight global Rare UI navigation links");
-  assert(shellNav.count===8&&shellNav.active.length===1&&shellNav.active[0]==="文档管理"&&shellNav.overflow<=1,
+  assert.deepEqual(shellNav.labels,["文档管理","全局搜索","共享/关注","统计","审批","回收站","组织与权限"],
+   "all seven enabled global Rare UI navigation links");
+  assert(shellNav.count===7&&shellNav.active.length===1&&shellNav.active[0]==="文档管理"&&shellNav.overflow<=1,
    "Rare shell nav selection/layout at "+width+": "+JSON.stringify(shellNav));
   if(width>1210){
    assert(shellNav.rendered!=="none"&&shellNav.lastRight<=shellNav.rightStart+2,
