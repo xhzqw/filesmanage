@@ -293,7 +293,12 @@ async function main() {
     const printPanel = await cdp.waitFor(`()=>Boolean(
       document.querySelector('dialog.document-print-dialog[open] .document-print-options')
     )`, 8000);
-    check("file preview exposes RareUI print workbench", Boolean(printOpened&&printPanel), "print options panel visible in modal");
+    const printState=await cdp.evaluate(`(()=>({
+      root:!!document.querySelector('.file-workbench'),
+      actions:[...document.querySelectorAll('.file-workbench-actions button')].map(b=>b.textContent?.trim()),
+      dialogs:[...document.querySelectorAll('dialog')].map(d=>({className:d.className,open:d.open,content:d.textContent?.slice(0,120)}))
+    }))()`);
+    check("file preview exposes RareUI print workbench", Boolean(printOpened&&printPanel), JSON.stringify({printOpened,printPanel,printState}));
     const printPrepared = await cdp.evaluate(`(async()=>{
       const id=location.pathname.split('/').pop();
       const preview=await(await fetch('/api/files/'+encodeURIComponent(id)+'/preview',{credentials:'same-origin'})).json();
