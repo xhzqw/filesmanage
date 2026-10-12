@@ -3,6 +3,7 @@ import type {User} from "../../entities/user/model";
 import {organizationApi,type Workgroup} from "./api";
 import {errorCode,errorCopy} from "../../shared/errors";
 import type {DialogResult} from "./OrganizationDialogs";
+import {loginOf} from "./organizationUserLabel";
 
 type Notice={tone:"info"|"error";text:string};
 type NewUser={login:string;displayName:string;password:string;departmentId:string};
@@ -36,8 +37,6 @@ export function useOrganizationMutations({
   locks.current.set(key,request);
   return request;
  }
-function loginOf(user:User):string{return user.login??"";}
-
 function mutationCopy(error:unknown,fallback:string):string{
  const code=errorCode(error);
  if(code==="E_NETWORK")return "网络中断，无法确认操作是否已提交；请以列表最新状态为准。";
