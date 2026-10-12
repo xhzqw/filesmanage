@@ -122,3 +122,11 @@ const labels={loading:"保存中",success:"已保存",error:"保存失败"};
  assert.equal(h.items().length,0,"field-level validation can suppress a duplicate global alert");
 }
 console.log("TOAST_FEEDBACK_CHECK_PASS: parallel, expiry revision, severity, identity, uncertainty, modal errors");
+
+// File list must not resurrect the previous full-width top banner. Queue
+// admission and favorite state use one feedback surface each.
+const fileTable=readFileSync(new URL("../web/src/features/documents/FileTable.tsx",import.meta.url),"utf8");
+assert.equal(fileTable.includes('className={"notice "+messageTone}'),false,"file workbench must not render duplicate inline status banner");
+assert.equal(fileTable.includes('announce(`已加入上传队列：'),false,"upload queue must own its own admission feedback");
+assert.match(fileTable,/function favoriteFeedback\(/,"favorite updates need a scoped toast that replaces the prior state");
+console.log("FILE_FEEDBACK_SURFACE_PASS: no duplicate top banner, upload feedback single-owner, favorite state replacement");

@@ -199,8 +199,6 @@ export function FileTable({folder,folderName,onEdit,reloadKey,newFolderSlot}:{fo
 // so a failed read shows "—" instead of a stale number.
 const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const[status,setStatus]=useState("loading");
- const[message,setMessage]=useState("");
- const[messageTone,setMessageTone]=useState<"info"|"error">("info");
  const[sort,setSort]=useState<SortKey>("updated_desc");
  const[categoryFilter,setCategoryFilter]=useState<FileCategory>("all");
  const[nameFilter,setNameFilter]=useState("");
@@ -256,6 +254,9 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const[favoriteIds,setFavoriteIds]=useState<Set<string>>(()=>new Set<string>());
  const[favoritesState,setFavoritesState]=useState<"loading"|"ready"|"failed">("loading");
  const[favoriteBusy,setFavoriteBusy]=useState("");
+ // Favorite and unfavorite are mutually exclusive states; never stack their
+ // transient success messages in the center of the screen.
+ const favoriteToastId=useRef(-1);
  const enqueueFiles=useUploadStore(state=>state.enqueueFiles);
  const navigate=useNavigate();
 
@@ -364,10 +365,12 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  },[items]);
 
  function announce(text:string,tone:"info"|"error",toastText=text){
-  setMessage(text);
-  setMessageTone(tone);
-  // Queue admission is announced by uploadStore for both toolbar and drag uploads.
-  if(toastText.trim()&&!text.startsWith("已加入上传队列："))(tone==="error"?toast.error:toast.success)(toastText);
+  if(toastText.trim())(tone==="error"?toast.error:toast.success)(toastText);
+ }
+
+ function favoriteFeedback(text:string,tone:"success"|"danger"|"warning"="success"){
+  if(favoriteToastId.current!==-1)toast.dismiss(favoriteToastId.current);
+  favoriteToastId.current=tone==="warning"?toast.warning(text):tone==="danger"?toast.error(text):toast.success(text);
  }
 
 
@@ -385,14 +388,17 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   });
   try{
    await request<{id:string;favorited:boolean}>("/favorites/file/"+file.id,{method:on?"PUT":"DELETE"});
-   announce(on?`已收藏：${file.name}`:`已取消收藏：${file.name}`,"info",on?"已收藏":"已取消收藏");
+   favoriteFeedback(on?"已收藏":"已取消收藏");
   }catch(error){
    setFavoriteIds(prev=>{
     const next=new Set(prev);
     if(on)next.delete(file.id);else next.add(file.id);
     return next;
    });
-   announce(errorCopy(error,on?"收藏失败，请重试":"取消收藏失败，请重试"),"error");
+   favoriteFeedback(errorCode(error)==="E_NETWORK"
+    ?"网络中断，收藏状态未确认；请刷新后核对"
+    :errorCopy(error,on?"收藏失败，请重试":"取消收藏失败，请重试"),
+    errorCode(error)==="E_NETWORK"?"warning":"danger");
   }finally{
    setFavoriteBusy("");
   }
@@ -423,7 +429,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   event.target.value="";
   if(files.length===0)return;
   enqueueFiles(files,folder);
-  announce(`已加入上传队列：${files.length} 个文件`,"info");
+  // Upload store is the sole owner of enqueue/progress feedback.
  }
 
  async function loadMore(){
@@ -929,7 +935,6 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     {zipProgress.phase==="failed"||zipProgress.phase==="handoff"?"关闭":"取消"}
    </RareButton>
   </div>}
-  {message&&<p role="status" className={"notice "+messageTone}>{message}</p>}
   <div className="table" onClick={event=>{if(!(event.target as HTMLElement).closest("tr")){setSelectedIds(new Set<string>());setAnchorId(null);}}}>
    <RareDataTable role="grid" aria-label={folderName+" 文件列表"} density="compact" className="file-table file-table-ultra">
     <thead><tr>
