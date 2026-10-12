@@ -4,7 +4,7 @@
  box-sizing:border-box;width:100%;max-width:100%;min-height:41px;height:41px;
  margin:0;padding:4px 9px;display:flex;align-items:center;flex-wrap:nowrap;
  gap:7px;border:0;border-bottom:1px solid var(--border-hairline);
- border-radius:var(--radius-md) var(--radius-md) 0 0;
+ border-radius:var(--radius-md);
  background:var(--surface-panel);
 }
 .folder-history-controls,.folder-view-switch{
@@ -29,7 +29,7 @@
 .folder-view-switch .rare-button[aria-pressed="true"]:hover{background:var(--surface-panel)}
 .work .folder-context-bar .breadcrumb{
  flex:1 1 110px;min-width:18px;max-width:none;overflow:hidden;
- margin:0;padding:0;border:0;border-radius:0;
+ margin:0;padding:0;border:0;border-radius:var(--radius-xs);
  white-space:nowrap;background:transparent;min-height:0;
 }
 .work .folder-context-bar .breadcrumb>span{min-width:0}
@@ -39,7 +39,7 @@
 }
 .work .folder-context-bar .folder-actions{
  height:28px;min-height:28px;flex-wrap:nowrap;gap:2px;margin:0;padding:0;
- border:0;border-radius:0;background:transparent;
+ border:0;border-radius:var(--radius-xs);background:transparent;
 }
 .work .folder-context-bar .ghost-action-btn{
  height:26px;min-height:26px;padding:0 6px;
@@ -54,10 +54,10 @@
 .work-body>.file-toolbar{
  box-sizing:border-box;width:100%;max-width:100%;min-height:39px;
  margin:0;padding:5px 10px;gap:5px 9px;
- border:0;border-bottom:1px solid var(--border-hairline);border-radius:0;
+ border:0;border-bottom:1px solid var(--border-hairline);border-radius:var(--radius-xs);
  background:var(--surface-panel);
 }
-.work-body>.table{width:100%;max-width:100%;margin:0;border:0;border-radius:0;contain:paint}
+.work-body>.table{width:100%;max-width:100%;margin:0;border:0;border-radius:var(--radius-xs);contain:paint}
 .work-body>.file-page-controls{margin:0;border-top:1px solid var(--border-hairline)}
 .explorer-surface{
  flex:1 1 auto;min-height:0;min-width:0;
