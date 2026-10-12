@@ -74,7 +74,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
  const[cube,setCube]=useState({yaw:45,pitch:26});
  const drawing=(info?.outputKind??info?.format??"").toLowerCase()==="dxf";
 
- async function authorizePaperOutput(render:(popup:Window)=>void){
+ async function authorizePaperOutput(render:(popup:Window,versionSeq:number)=>void){
   const sha=fileMeta?.sha256;
   if(!sha){setMessage("文件信息尚未加载，无法核对打印版本");return;}
   const popup=window.open("","_blank");
@@ -82,9 +82,10 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
   popup.document.write('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><body style="font:14px system-ui;padding:2em">正在验证图纸打印权限…</body>');
   popup.document.close();
   try{
-   await fileApi.preparePrint(id,sha);
+   const authorization=await fileApi.preparePrint(id,sha);
+   if(authorization.sha256!==sha)throw new Error("文件版本已更新，请刷新后重试");
    if(popup.closed)throw new Error("打印窗口已关闭");
-   render(popup);
+   render(popup,authorization.versionSeq);
    setMessage("");setPlotError("");
   }catch(error){
    if(!popup.closed)popup.close();
@@ -141,11 +142,16 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
     setInfo(derivative);
     // The metadata panel (MOD03) shows the source digest and the real version,
     // which live on the file rather than the derivative.
-    try{
-     const meta=await fileApi.meta(id);
+     try{
+      const meta=await fileApi.meta(id);
       if(valid)setFileMeta({sha256:meta.file.sha256,versionSeq:meta.file.currentVersionSeq,name:meta.file.name});
-    }catch{
-     if(valid)setFileMeta(null);
+     }catch{
+      // A directly shared file may grant preview+print without folder LIST.
+      // Print authorization must not accidentally depend on that separate ACL.
+      try{
+       const preview=await fileApi.preview(id);
+       if(valid)setFileMeta({sha256:preview.sha256,versionSeq:0,name:preview.name});
+      }catch{if(valid)setFileMeta(null);}
     }
     if(!derivative.found||derivative.class==="licensed"||derivative.class==="unverified"){
      setStatus("unsupported");
@@ -322,10 +328,10 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
         </div>}
         {!drawing&&<RareButton type="button" disabled={!fileMeta||!metrics}
          title="生成主视、俯视、右视和等轴测的正交参考视图，浏览器打印" onClick={()=>{
-          void authorizePaperOutput(popup=>{
+          void authorizePaperOutput((popup,versionSeq)=>{
            const images=controls.current?.captureEngineeringViews();
            if(!images||!metrics||!fileMeta)throw new Error("模型未准备好，无法生成工程视图");
-           openModelPrint({name:fileMeta.name,versionSeq:fileMeta.versionSeq,sha256:fileMeta.sha256,
+           openModelPrint({name:fileMeta.name,versionSeq,sha256:fileMeta.sha256,
             unit,format:info?.format??"模型",paper:modelPaper,metrics,views:images},popup);
           });
          }}>工程视图打印</RareButton>}
@@ -489,7 +495,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
       </section>}
       {metrics&&<section className="cad-inspector-section cad-properties">
        <h3>文件属性</h3>
-       <div><span>版本</span><strong>v{fileMeta?.versionSeq??"-"}</strong></div>
+        <div><span>版本</span><strong>{fileMeta?.versionSeq?"v"+fileMeta.versionSeq:"-"}</strong></div>
       <div><span>单位</span><strong>{unit==="unknown"?"未声明":unit}</strong></div>
       {drawing&&paperViewports.total>0&&<div><span>纸空间视口</span>
        <strong>{paperViewports.projected}/{paperViewports.total} 已投影</strong></div>}
