@@ -355,6 +355,33 @@ try{
   "P2 role bindings page renders");
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-detail form')"),
   "P2 role delegation form is available");
+ // The extracted role editor must retain controlled state and the preview gate.
+ const roleCandidate=await cdp.evaluate(`(()=>{
+  const select=document.querySelector('.org-role-editor select');
+  return [...(select?.options??[])].find(o=>o.value)?.value??'';
+ })()`);
+ if(roleCandidate){
+  await cdp.evaluate(`(()=>{
+   const select=document.querySelector('.org-role-editor select');
+   const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;
+   setter.call(select,${JSON.stringify(roleCandidate)});
+   select.dispatchEvent(new Event('change',{bubbles:true}));
+   return true;
+  })()`);
+  assert(await cdp.waitFor(`()=>document.querySelector('.org-role-editor select')?.value===${JSON.stringify(roleCandidate)}`),
+   "role delegation candidate updates controlled field");
+  await cdp.evaluate("(()=>{document.querySelector('.org-role-editor form').requestSubmit();return true})()");
+  assert(await cdp.waitFor("()=>document.querySelector('.org-role-editor .perm-review')?.textContent?.includes('委派不附带文件读取权限')"),
+   "role delegation requires preview without server mutation");
+  await cdp.evaluate(`(()=>{
+   const select=document.querySelector('.org-role-editor select');
+   const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;
+   setter.call(select,'');select.dispatchEvent(new Event('change',{bubbles:true}));
+   return true;
+  })()`);
+  assert(await cdp.waitFor("()=>!document.querySelector('.org-role-editor .perm-review')&&document.querySelector('.org-role-editor button[type=submit]')?.disabled"),
+   "changing role delegate invalidates preview and restores empty draft");
+ }
  await cdp.navigate(BASE+"/org?tab=approvals");
  assert(await cdp.waitFor("()=>!!document.querySelector('.approval-workspace .perm-tree-name')"),
   "approval resource navigation renders");
