@@ -89,6 +89,48 @@ try{
  await navigate("/login","!!document.querySelector('input[type=password]')");
  const password=readFileSync(".secrets/admin.password","utf8").trim();
  assert.equal(await evalJS(`(async()=>{const response=await fetch("/api/login",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({login:"admin",password:${JSON.stringify(password)}})});return response.ok;})()`),true);
+ if(process.env.ROLES_ONLY==="1"){
+  const checked=[];
+  for(const width of [1440,900,390]){
+   await viewport(width,width===390?760:900);
+   await navigate("/org?tab=roles",'!!document.querySelector(".org-role-create")');
+   await waitFor('!!document.querySelector(".org-role-empty")||!!document.querySelector(".org-role-table")');
+   const surface=await evalJS(`(()=>{const root=document.querySelector(".org-role-workbench"),
+    bar=root.querySelector(".org-role-topbar"),roles=root.querySelector(".org-role-catalog"),
+    table=root.querySelector(".org-role-table"),empty=root.querySelector(".org-role-empty");
+    return{empty:!!empty,table:!!table,editor:!!root.querySelector(".org-role-editor"),
+     trigger:root.querySelectorAll(".org-role-create").length,
+     explanations:roles?.querySelectorAll(".org-role-intro-item").length,
+     overflow:document.documentElement.scrollWidth-innerWidth,
+     rolesWidth:roles?.getBoundingClientRect().width,barWidth:bar?.getBoundingClientRect().width};})()`);
+   assert(surface.trigger===1&&surface.explanations===2&&!surface.editor&&surface.overflow<=1,
+    "role list has one action, two meaningful descriptions and no persistent form: "+JSON.stringify(surface));
+   if(surface.empty)assert(!surface.table,"empty role list must not render a full table");
+   await click(".org-role-create");
+   await waitFor('!!document.querySelector("dialog.org-role-dialog:modal .org-role-editor")');
+   const modal=await evalJS(`(()=>{const d=document.querySelector("dialog.org-role-dialog:modal"),
+    r=d.getBoundingClientRect();return{role:!!d.querySelector('[aria-label="选择管理职责"]'),
+     subject:!!d.querySelector('[aria-label="选择接受管理职责的成员"]'),
+     actions:d.querySelectorAll(".permission-action-picker").length,
+     review:d.querySelector(".perm-review")?.textContent?.trim(),
+     rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom}};})()`);
+   assert(modal.role&&modal.subject&&modal.actions===0
+    &&inside(modal.rect,width,width===390?760:900),
+    "clean modal for an audit-only role: "+JSON.stringify(modal));
+   if(width===1440){
+    await click('.org-role-editor .perm-form-row>label:nth-child(2) .rare-select');
+    await waitFor('!!document.querySelector(".rare-select-menu [role=option]")');
+    await evalJS(`(()=>{const option=[...document.querySelectorAll(".rare-select-menu [role=option]")].find(x=>x.textContent.includes("目录权限管理员"));if(!option)throw Error("role missing");option.click();return true})()`);
+    await waitFor('!!document.querySelector(".org-role-editor .permission-action-picker")');
+    assert.equal(await evalJS('document.querySelectorAll(".org-role-editor .permission-action-picker input[type=checkbox]").length'),9);
+   }
+   await click("dialog.org-role-dialog .dialog-close");
+   await waitFor('!document.querySelector("dialog.org-role-dialog")');
+   assert.equal(await evalJS('document.activeElement?.classList.contains("org-role-create")'),true,"role dialog restores focus");
+   checked.push(width+"px: role list/dialog/selection PASS");
+  }
+  console.log("ROLE_WORKBENCH_READONLY_PASS "+checked.join("; "));
+ }else{
  const results=[];
  let availablePreviewId="";
  for(const width of [1440,1280,1220,900,390]){
@@ -461,6 +503,7 @@ try{
   }
  }
  console.log("RARE_OVERLAY_READONLY_PASS "+results.join("; ")+"; file grid, permission Gooey, dialog and focus OK"+(availablePreviewId?"":"; preview fixture absent"));
+ }
 }catch(error){
  console.error("RARE_OVERLAY_READONLY_FAIL",error.message);
  if(browserExceptions.length)console.error("RARE_OVERLAY_BROWSER_EXCEPTIONS",JSON.stringify(browserExceptions.slice(-3)));
