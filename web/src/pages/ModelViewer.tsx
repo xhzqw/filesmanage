@@ -416,7 +416,7 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
           status==="webgl-lost"?(message||"WebGL 上下文丢失"):(message||"预览失败")}</strong>
          {(status==="failed"||status==="webgl-lost")&&<RareButton type="button" onClick={()=>setRetryEpoch(value=>value+1)}>重试</RareButton>}
          {status==="unsupported"&&info?.format==="dwg"&&<span>请将 DWG 转存为 DXF 后预览</span>}
-         {status==="too-large"&&<span>请下载后使用桌面 CAD 软件打开</span></>}
+         {status==="too-large"&&<span>请下载后使用桌面 CAD 软件打开</span>}</>}
       </div>}
       {status==="ready"&&embedded&&!drawing&&<div className="cad-compact-toolbar" ref={compactToolbarRef} role="group" aria-label="三维视图工具">
        <RareButton type="button" title="居中并适合窗口" onClick={fitEngineeringView}>适合窗口</RareButton>
