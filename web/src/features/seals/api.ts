@@ -29,6 +29,6 @@ export const sealsApi={
  markImageUrl:(fileId:string,markId:string)=>"/api/files/"+encodeURIComponent(fileId)+"/seals/"+encodeURIComponent(markId)+"/image",
  exportUrl:(fileId:string,version:number)=>"/api/files/"+encodeURIComponent(fileId)+"/seals/export?version="+version,
  apply:(fileId:string,placement:SealPlacement)=>request<FileSealMark>("/files/"+encodeURIComponent(fileId)+"/seals",{method:"POST",body:JSON.stringify(placement)}),
- revokeSignatures:(fileId:string,data:{versionSeq:number;fileSha256:string;expectedRevision:number;markIds:string[];password:string})=>request<{revision:number;markCount:number}>("/files/"+encodeURIComponent(fileId)+"/seals/signatures/revoke",{method:"POST",body:JSON.stringify(data)}),
+ revokeMarks:(fileId:string,data:{versionSeq:number;fileSha256:string;expectedRevision:number;markIds:string[];password:string})=>request<{revision:number;markCount:number}>("/files/"+encodeURIComponent(fileId)+"/seals/marks/revoke",{method:"POST",body:JSON.stringify(data)}),
  applyBatch:(fileId:string,data:{versionSeq:number;fileSha256:string;password:string;placements:Omit<SealPlacement,"password"|"versionSeq"|"fileSha256">[]})=>request<FileSealMark[]>("/files/"+encodeURIComponent(fileId)+"/seals/batch",{method:"POST",body:JSON.stringify(data)}),
 };

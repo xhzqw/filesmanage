@@ -44,7 +44,11 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
  const[revision,setRevision]=useState(0);
  const isPDF=name.toLowerCase().endsWith(".pdf");
  const requiresPassword=staged.some(item=>assets.find(asset=>asset.id===item.assetId)?.kind==="personal");
- const removable=marks.filter(mark=>mark.assetKind==="personal"&&(isAdmin||mark.signerId===access?.userId));
+ const removable=marks.filter(mark=>
+  isAdmin||(mark.signerId===access?.userId&&(mark.assetKind==="personal"||!!access?.canStamp)));
+ const deleteNeedsPassword=deleteIds.some(id=>marks.some(mark=>mark.id===id&&mark.assetKind==="personal"));
+ const deleteKinds=deleteIds.map(id=>marks.find(mark=>mark.id===id)?.assetKind);
+ const deleteLabel=deleteKinds.every(kind=>kind==="company")?"公章":deleteKinds.every(kind=>kind==="personal")?"签名":"签章";
  const selected=assets.find(a=>a.id===assetId);
  const maySign=!!selected&&(selected.kind!=="personal"||!!selected.ownerId)&&
   (isAdmin||(selected.kind==="personal"?!!access?.canSign:!!access?.canStamp));
@@ -156,18 +160,18 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
   setDeleteIds(items=>items.includes(id)?items.filter(value=>value!==id):[...items,id]);
  }
  async function revoke(){
-  if(deleteBusy||!deletePassword||!deleteIds.length)return;
+  if(deleteBusy||(deleteNeedsPassword&&!deletePassword)||!deleteIds.length)return;
   setDeleteBusy(true);setError("");
   try{
    const history=await sealsApi.history(fileId,seq);
-   await sealsApi.revokeSignatures(fileId,{
+   await sealsApi.revokeMarks(fileId,{
     versionSeq:seq,fileSha256:sha,expectedRevision:history.current,
     markIds:deleteIds,password:deletePassword
    });
-   toast.success("已删除 "+deleteIds.length+" 处签名");
+   toast.success("已删除 "+deleteIds.length+" 处"+deleteLabel);
    setDeleteOpen(false);setDeleteMode(false);setDeleteIds([]);setDeletePassword("");
    setRevision(value=>value+1);onChanged();
-  }catch(err){setError(errorCopy(err,"删除签名失败，请检查密码和签名权限"))}
+  }catch(err){setError(errorCopy(err,"删除签章失败，请核实权限或密码"))}
   finally{setDeletePassword("");setDeleteBusy(false)}
  }
  const controls = <div className="seal-file-controls">
@@ -272,19 +276,19 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
     </div>
    </form>
   </Dialog>
-  <Dialog open={deleteOpen} title={"删除签名 · "+deleteIds.length+" 处"}
+  <Dialog open={deleteOpen} title={"删除"+deleteLabel+" · "+deleteIds.length+" 处"}
    onClose={()=>{if(!deleteBusy){setDeleteOpen(false);setDeletePassword("");setError("")}}}
-   closeGuard={()=>!deleteBusy} initialFocus='input[aria-label="删除签名密码"]' className="seal-confirm-dialog">
+   closeGuard={()=>!deleteBusy} initialFocus={deleteNeedsPassword?'input[aria-label="删除签名密码"]':undefined} className="seal-confirm-dialog">
    <form onSubmit={event=>{event.preventDefault();void revoke()}}>
-    <label>登录密码
+    {deleteNeedsPassword&&<label>登录密码
      <RareInput type="password" aria-label="删除签名密码" autoComplete="current-password"
       value={deletePassword} placeholder="输入密码确认删除" disabled={deleteBusy}
       onChange={event=>setDeletePassword(event.target.value)}/>
-    </label>
+    </label>}
     {error&&<p className="notice error" role="alert">{error}</p>}
     <div className="dialog-actions">
      <RareButton type="button" disabled={deleteBusy} onClick={()=>{setDeleteOpen(false);setDeletePassword("");setError("")}}>取消</RareButton>
-     <RareButton type="submit" tone="danger" emphasis="solid" disabled={deleteBusy||!deletePassword||!deleteIds.length}>
+     <RareButton type="submit" tone="danger" emphasis="solid" disabled={deleteBusy||(deleteNeedsPassword&&!deletePassword)||!deleteIds.length}>
       {deleteBusy?"正在删除…":"确认删除"}
      </RareButton>
     </div>

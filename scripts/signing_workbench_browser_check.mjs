@@ -217,27 +217,55 @@ try{
       label:button.textContent.trim(),visible:button.getBoundingClientRect().height>26};
   })()`);
   if(redDelete){
-   assert("global solid red danger button appears in the bottom signing capsule",
-    redDelete.tone==='danger'&&redDelete.emphasis==='solid'&&redDelete.visible,
-    JSON.stringify(redDelete));
+   assert("bottom capsule offers a single global red delete-seal action",
+    redDelete.tone==='danger'&&redDelete.emphasis==='solid'&&redDelete.visible&&redDelete.label==='删除签章',JSON.stringify(redDelete));
    await cdp.evaluate(`(()=>document.querySelector('.seal-delete-action')?.click())()`);
-   const target=await cdp.waitFor(`()=>!!document.querySelector('.seal-delete-target')`,3500);
-   if(target){
-    await cdp.evaluate(`(()=>document.querySelector('.seal-delete-target')?.click())()`);
-    const highlighted=await cdp.evaluate(`(()=>{
-     const t=document.querySelector('.seal-delete-target');
-     return !!t?.classList.contains('is-selected')&&t.getAttribute('aria-pressed')==='true';
+   const availableKinds=await cdp.evaluate(`(()=>{
+    const marks=[...document.querySelectorAll('.seal-delete-target')];
+    return {personal:marks.some(x=>x.getAttribute('aria-label')?.startsWith('选择删除签名')),
+      company:marks.some(x=>x.getAttribute('aria-label')?.startsWith('选择删除公章'))};
+   })()`);
+   for(const kind of ['company','personal']){
+    if(!availableKinds[kind]){console.log('SKIP existing '+kind+' mark: no eligible mark on current page');continue;}
+    const prefix=kind==='company'?'选择删除公章':'选择删除签名';
+    await cdp.evaluate(`(p=>[...document.querySelectorAll('.seal-delete-target')].find(t=>t.getAttribute('aria-label')?.startsWith(p))?.click())(${JSON.stringify(prefix)})`);
+    const marked=await cdp.evaluate(`(()=>{
+     const buttons=[...document.querySelectorAll('.seal-delete-target')];
+     return buttons.filter(b=>b.classList.contains('is-selected')&&b.getAttribute('aria-pressed')==='true').length===1;
     })()`);
-    assert("clicking a signed personal mark highlights it for deletion",highlighted);
+    assert("individually selecting existing "+kind+" highlights only that mark",marked);
     await cdp.evaluate(`(()=>document.querySelector('.seal-delete-action')?.click())()`);
-    const revokeModal=await cdp.waitFor(`()=>!!document.querySelector('dialog.seal-confirm-dialog[open] input[aria-label="删除签名密码"]')`,3500);
-    assert("deleting an existing signature asks for password",Boolean(revokeModal));
+    const modal=await cdp.waitFor(`()=>!!document.querySelector('dialog.seal-confirm-dialog[open]')`,3500);
+    const check=await cdp.evaluate(`(()=>{
+      const dlg=document.querySelector('dialog.seal-confirm-dialog[open]');
+      const pw=dlg?.querySelector('input[type=password]');
+      const submit=[...(dlg?.querySelectorAll('button')??[])].find(b=>b.textContent?.includes('确认删除'));
+      return {hasPassword:!!pw,disabled:submit?.disabled,title:dlg?.querySelector('h2')?.textContent??''};
+    })()`);
+    assert(kind==="personal"?"deleting a personal signature requires a password":"deleting a company seal requires no password",
+      Boolean(modal)&&check.hasPassword===(kind==="personal")&&(kind==="personal"?check.disabled:!check.disabled),
+      JSON.stringify(check));
+    // Do not submit deletion against existing signed documents.
     await cdp.evaluate(`(()=>[...document.querySelectorAll('dialog.seal-confirm-dialog[open] button')].find(b=>b.textContent?.includes('取消'))?.click())()`);
-    const revokedNone=await cdp.waitFor(`()=>!document.querySelector('dialog.seal-confirm-dialog[open]')`,2500);
-    assert("canceling removal preserves original signed PDF evidence",Boolean(revokedNone));
-   }else console.log("SKIP signed signature selection: none removable on current page");
+    assert("canceling "+kind+" deletion preserves original evidence",
+     await cdp.waitFor(`()=>!document.querySelector('dialog.seal-confirm-dialog[open]')`,2500));
+    await cdp.evaluate(`(p=>[...document.querySelectorAll('.seal-delete-target')].find(t=>t.getAttribute('aria-label')?.startsWith(p))?.click())(${JSON.stringify(prefix)})`);
+   }
+   if(availableKinds.company&&availableKinds.personal){
+    await cdp.evaluate(`(()=>{
+     const marks=[...document.querySelectorAll('.seal-delete-target')];
+     marks.find(t=>t.getAttribute('aria-label')?.startsWith('选择删除公章'))?.click();
+     marks.find(t=>t.getAttribute('aria-label')?.startsWith('选择删除签名'))?.click();
+    })()`);
+    const two=await cdp.evaluate(`(()=>document.querySelectorAll('.seal-delete-target.is-selected').length===2)()`);
+    assert("company seal and personal signature can be selected in one deletion batch",two);
+    await cdp.evaluate(`(()=>document.querySelector('.seal-delete-action')?.click())()`);
+    const mixed=await cdp.waitFor(`()=>!!document.querySelector('dialog.seal-confirm-dialog[open] input[type=password]')`,3500);
+    assert("mixed deletion requires password because personal signature is included",Boolean(mixed));
+    await cdp.evaluate(`(()=>[...document.querySelectorAll('dialog.seal-confirm-dialog[open] button')].find(b=>b.textContent?.includes('取消'))?.click())()`);
+   }
    await cdp.evaluate(`(()=>document.querySelector('.seal-cancel-delete')?.click())()`);
-  }else console.log("SKIP signature-removal button: no personal signatures exist");
+  }else console.log("SKIP mark deletion button: no authorized signed marks exist");
 
   const enabled=await cdp.evaluate(`(()=>{
    const list=document.querySelector('#file-seals-sidebar select');

@@ -172,7 +172,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.GET("/files/:id/seals", h.listFileSealMarks)
 	api.GET("/files/:id/seals/revisions", h.sealRevisionHistory)
 	api.POST("/files/:id/seals/restore", h.restoreSealRevision)
-	api.POST("/files/:id/seals/signatures/revoke", h.revokeFileSignatures)
+	api.POST("/files/:id/seals/marks/revoke", h.revokeFileMarks)
 	api.POST("/files/:id/seals", h.signFileSeal)
 	api.POST("/files/:id/seals/batch", h.signFileSealsBatch)
 	api.GET("/files/:id/seals/export", h.exportFileSealPDF)

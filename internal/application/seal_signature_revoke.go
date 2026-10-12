@@ -6,11 +6,10 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// RevokeFileSignatures removes only selected, currently-visible personal
-// signatures from the next immutable revision. Original marks and all earlier
-// revisions are retained as evidence and remain available to audit/restore.
-func (s *Service) RevokeFileSignatures(ctx context.Context, actor domain.User, id string, seq int, sha string, expected int, markIDs []string, password string) (domain.SealRevision, error) {
-	if seq < 1 || expected < 1 || len(sha) != 64 || len(password) < 1 || len(password) > 1024 || len(markIDs) < 1 || len(markIDs) > 120 {
+// RevokeFileMarks removes exactly the selected visible signatures and/or seals
+// from a new immutable snapshot. Older marks and revisions remain untouched.
+func (s *Service) RevokeFileMarks(ctx context.Context, actor domain.User, id string, seq int, sha string, expected int, markIDs []string, password string) (domain.SealRevision, error) {
+	if seq < 1 || expected < 1 || len(sha) != 64 || len(password) > 1024 || len(markIDs) < 1 || len(markIDs) > 120 {
 		return domain.SealRevision{}, domain.ErrInvalidInput
 	}
 	remove := make(map[string]bool, len(markIDs))
@@ -25,10 +24,6 @@ func (s *Service) RevokeFileSignatures(ctx context.Context, actor domain.User, i
 		return domain.SealRevision{}, err
 	}
 	defer tx.Rollback(ctx)
-	identity, hash, err := tx.UserByLogin(ctx, actor.Login)
-	if err != nil || identity.ID != actor.ID || bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
-		return domain.SealRevision{}, ErrInvalidCredentials
-	}
 	file, err := s.visibleFile(ctx, tx, actor, id, domain.ActionModify)
 	if err != nil {
 		return domain.SealRevision{}, err
@@ -61,9 +56,28 @@ func (s *Service) RevokeFileSignatures(ctx context.Context, actor domain.User, i
 	if err != nil {
 		return domain.SealRevision{}, err
 	}
-	remaining, err := filterSignatureRemoval(actor, active, remove)
+	permission := domain.SealUserPermission{}
+	if !actor.IsAdmin {
+		permission, err = store.SealUserPermission(ctx, actor.ID)
+		if err != nil {
+			return domain.SealRevision{}, notFoundOr(err)
+		}
+	}
+	remaining, hasPersonal, err := filterMarkRemoval(actor, permission, active, remove)
 	if err != nil {
 		return domain.SealRevision{}, err
+	}
+	// Only removing a personal signature requires re-authentication. A company
+	// stamp removal is permitted by file Modify/Print/Preview + mark ownership
+	// and current stamp permission (or administrator status).
+	if hasPersonal {
+		if password == "" {
+			return domain.SealRevision{}, ErrInvalidCredentials
+		}
+		identity, hash, authErr := tx.UserByLogin(ctx, actor.Login)
+		if authErr != nil || identity.ID != actor.ID || bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) != nil {
+			return domain.SealRevision{}, ErrInvalidCredentials
+		}
 	}
 	rev := domain.SealRevision{
 		ID: NewID("sealrev"), FileID: id, VersionSeq: seq, Revision: expected + 1,
@@ -73,7 +87,7 @@ func (s *Service) RevokeFileSignatures(ctx context.Context, actor domain.User, i
 	if err = store.AppendSealRevision(ctx, rev, expected); err != nil {
 		return domain.SealRevision{}, err
 	}
-	if err = auditRequired(ctx, tx, actor, "seal.signature_revoke", "file", id, "success", map[string]any{
+	if err = auditRequired(ctx, tx, actor, "seal.mark_revoke", "file", id, "success", map[string]any{
 		"versionSeq": seq, "fileSha256": sha, "priorRevision": expected,
 		"newRevision": rev.Revision, "markIds": markIDs, "removedCount": len(markIDs),
 		"remainingCount": len(remaining),
@@ -85,20 +99,35 @@ func (s *Service) RevokeFileSignatures(ctx context.Context, actor domain.User, i
 	}
 	return rev, nil
 }
-func filterSignatureRemoval(actor domain.User, active []domain.FileSealMark, remove map[string]bool) ([]string, error) {
+
+// filterMarkRemoval is pure and validates the entire selection atomically.
+// Callers cannot remove another person's evidence without admin rights; stamp
+// removal also requires current can_stamp permission for ordinary users.
+func filterMarkRemoval(actor domain.User, permission domain.SealUserPermission, active []domain.FileSealMark, remove map[string]bool) ([]string, bool, error) {
 	remaining := make([]string, 0, len(active))
+	hasPersonal := false
 	for _, mark := range active {
-		if remove[mark.ID] {
-			if mark.AssetKind != "personal" || (!actor.IsAdmin && mark.SignerID != actor.ID) {
-				return nil, domain.ErrForbidden
-			}
-			delete(remove, mark.ID)
-		} else {
+		if !remove[mark.ID] {
 			remaining = append(remaining, mark.ID)
+			continue
 		}
+		if !actor.IsAdmin && mark.SignerID != actor.ID {
+			return nil, false, domain.ErrForbidden
+		}
+		switch mark.AssetKind {
+		case "personal":
+			hasPersonal = true
+		case "company":
+			if !actor.IsAdmin && !permission.CanStamp {
+				return nil, false, domain.ErrForbidden
+			}
+		default:
+			return nil, false, domain.ErrInvalidInput
+		}
+		delete(remove, mark.ID)
 	}
 	if len(remove) > 0 {
-		return nil, domain.ErrVersionConflict
+		return nil, false, domain.ErrVersionConflict
 	}
-	return remaining, nil
+	return remaining, hasPersonal, nil
 }

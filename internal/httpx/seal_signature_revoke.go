@@ -8,7 +8,7 @@ import (
 	"net/http"
 )
 
-func (h *Handler) revokeFileSignatures(c *gin.Context) {
+func (h *Handler) revokeFileMarks(c *gin.Context) {
 	actor, ok := h.auth(c)
 	if !ok {
 		return
@@ -25,9 +25,9 @@ func (h *Handler) revokeFileSignatures(c *gin.Context) {
 		respondError(c, domain.ErrInvalidInput)
 		return
 	}
-	data, err := h.S.RevokeFileSignatures(c.Request.Context(), actor, c.Param("id"), req.VersionSeq, req.FileSha256, req.ExpectedRevision, req.MarkIDs, req.Password)
+	data, err := h.S.RevokeFileMarks(c.Request.Context(), actor, c.Param("id"), req.VersionSeq, req.FileSha256, req.ExpectedRevision, req.MarkIDs, req.Password)
 	if errors.Is(err, application.ErrInvalidCredentials) {
-		c.JSON(http.StatusForbidden, gin.H{"ok": false, "error": gin.H{"code": "E_SIGN_PASSWORD", "message": "删除签名密码错误"}})
+		c.JSON(http.StatusForbidden, gin.H{"ok": false, "error": gin.H{"code": "E_SIGN_PASSWORD", "message": "删除签章密码错误"}})
 		return
 	}
 	if err != nil {

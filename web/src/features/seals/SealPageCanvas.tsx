@@ -198,12 +198,12 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
     aria-label={"确认签署 "+pendingCount+" 枚签章"} disabled={!canConfirm} onClick={onConfirm}>
     确认签署 · {pendingCount}
    </RareButton>}
-   {marks.some(m=>m.assetKind==="personal")&&<>
+   {deletableMarkIds.length>0&&<>
     {deleteMode&&<RareButton type="button" tone="ghost" className="seal-cancel-delete" onClick={onToggleDeleteMode}>取消</RareButton>}
     <RareButton type="button" tone="danger" emphasis="solid" className="seal-delete-action"
-     aria-pressed={deleteMode} aria-label={deleteMode?(deleteIds.length?"删除选中的 "+deleteIds.length+" 处签名":"退出签名删除模式"):"选择删除已签名"}
+     aria-pressed={deleteMode} aria-label={deleteMode?(deleteIds.length?"删除选中的 "+deleteIds.length+" 处签章":"退出签章删除模式"):"选择删除已签章"}
      onClick={()=>{if(!deleteMode||!deleteIds.length)onToggleDeleteMode();else onRequestDelete()}}>
-     {deleteMode?(deleteIds.length?"删除选中 · "+deleteIds.length:"退出删除"):"删除签名"}
+     {deleteMode?(deleteIds.length?"删除选中 · "+deleteIds.length:"退出删除"):"删除签章"}
     </RareButton>
    </>}
   </div>
@@ -239,11 +239,11 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
     </span>}
     {marks.filter(m=>m.pageNumber===page).map(m=>{
      const style={left:m.x*100+"%",top:m.y*100+"%",width:m.width*100+"%",height:m.height*100+"%",transform:"rotate("+(m.angleDegrees??0)+"deg)"};
-     const selectable=deleteMode&&m.assetKind==="personal"&&deletableMarkIds.includes(m.id);
+     const selectable=deleteMode&&deletableMarkIds.includes(m.id);
      return selectable?
       <RareButton key={m.id} type="button"
        className={"seal-existing-mark seal-delete-target"+(deleteIds.includes(m.id)?" is-selected":"")}
-       aria-label={"选择删除签名 "+m.assetName} aria-pressed={deleteIds.includes(m.id)}
+       aria-label={"选择删除"+(m.assetKind==="company"?"公章 ":"签名 ")+m.assetName} aria-pressed={deleteIds.includes(m.id)}
        style={style} onClick={event=>{event.stopPropagation();onToggleDeleteMark(m.id)}}>
        <img alt="" draggable={false} src={sealsApi.markImageUrl(fileId,m.id)}/>
       </RareButton>:
