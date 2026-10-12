@@ -1,8 +1,7 @@
 import {RareTabs} from "../../shared/ui/rare/RareTabs";
-import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {RareBadge,RareButton,RareDataTable,RareInput,RareNotice,RareRowActions,RareSelect} from "../../shared/ui/rare";
 import {useCallback,useEffect,useMemo,useRef,useState,type FormEvent} from "react";
-import {organizationApi,type Department,type Workgroup} from "./api";
+import {organizationApi,type Department} from "./api";
 import {errorCode,errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
 import type {User} from "../../entities/user/model";
@@ -13,12 +12,12 @@ import {PermissionsPanel} from "./PermissionsPanel";
 import {ApprovalPoliciesPanel} from "./ApprovalPoliciesPanel";
 import {RoleBindingsPanel,DelegatedRolesWorkspace} from "./RoleWorkspace";
 import {DepartmentNavigator} from "./DepartmentNavigator";
+import {useOrganizationDirectory} from "./useOrganizationDirectory";
 import {WorkgroupMemberRow} from "./WorkgroupMemberRow";
 import {IconUsers,IconSearch} from "./OrganizationIcons";
 import {fullPathOf} from "./organizationTreeUtils";
 import {ResetPasswordDialog,SetDisabledDialog,RemoveMemberDialog,CreateUserConfirmDialog,CreateDepartmentDialog,CreateGroupDialog,type DialogResult} from "./OrganizationDialogs";
 
-type LoadState="loading"|"ready"|"failed";
 type Tone="info"|"error";
 type Notice={text:string;tone:Tone};
 type StatusFilter="all"|"normal"|"disabled"|"admin";
@@ -65,15 +64,11 @@ function IconPlus(){
 }
 
 export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;currentUserId:string}){
- const[users,setUsers]=useState<User[]>([]);
- const[departments,setDepartments]=useState<Department[]>([]);
- const[groups,setGroups]=useState<Workgroup[]>([]);
- const[usersState,setUsersState]=useState<LoadState>("loading");
- const[departmentsState,setDepartmentsState]=useState<LoadState>("loading");
- const[groupsState,setGroupsState]=useState<LoadState>("loading");
- const[usersToken,setUsersToken]=useState(0);
- const[departmentsToken,setDepartmentsToken]=useState(0);
- const[groupsToken,setGroupsToken]=useState(0);
+ const[selectedGroup,setSelectedGroup]=useState("");
+ const {users,setUsers,departments,setDepartments,groups,setGroups,
+  usersState,setUsersState,departmentsState,setDepartmentsState,groupsState,setGroupsState,
+  setUsersToken,setDepartmentsToken,setGroupsToken,groupMembers,setGroupMembers,
+  membersState,setMembersState,setMembersToken}=useOrganizationDirectory(isAdmin,selectedGroup);
  const[notice,setNotice]=useState<Notice|null>(null);
 
  // 视图与筛选状态：默认 Tab 1 为部门成员，Tab 2 为工作组管理
@@ -105,13 +100,8 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  const[memberLimit,setMemberLimit]=useState(MEMBER_DISPLAY_STEP);
 
  // 工作组状态
- const[selectedGroup,setSelectedGroup]=useState("");
  const[groupQuery,setGroupQuery]=useState("");
  const[groupLimit,setGroupLimit]=useState(GROUP_DISPLAY_STEP);
- const[groupMembers,setGroupMembers]=useState<User[]>([]);
- const[groupMemberLimit,setGroupMemberLimit]=useState(MEMBER_DISPLAY_STEP);
- const[membersState,setMembersState]=useState<LoadState>("loading");
- const[membersToken,setMembersToken]=useState(0);
  const[candidateQuery,setCandidateQuery]=useState("");
  const[addBusy,setAddBusy]=useState("");
 
@@ -124,50 +114,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  const[createUserOpen,setCreateUserOpen]=useState(false);
  const[createDepartmentOpen,setCreateDepartmentOpen]=useState(false);
  const[createGroupOpen,setCreateGroupOpen]=useState(false);
-
- useEffect(()=>{
-  if(!isAdmin)return;
-  let valid=true;
-  setUsersState("loading");
-  organizationApi.users()
-   .then(data=>{if(valid){setUsers(data);setUsersState("ready");}})
-   .catch(()=>{if(valid)setUsersState("failed");});
-  return()=>{valid=false;};
- },[isAdmin,usersToken]);
-
- useEffect(()=>{
-  if(!isAdmin)return;
-  let valid=true;
-  setDepartmentsState("loading");
-  organizationApi.departments()
-   .then(data=>{if(valid){setDepartments(data);setDepartmentsState("ready");}})
-   .catch(()=>{if(valid)setDepartmentsState("failed");});
-  return()=>{valid=false;};
- },[isAdmin,departmentsToken]);
-
- useEffect(()=>{
-  if(!isAdmin)return;
-  let valid=true;
-  setGroupsState("loading");
-  organizationApi.groups()
-   .then(data=>{if(valid){setGroups(data);setGroupsState("ready");}})
-   .catch(()=>{if(valid)setGroupsState("failed");});
-  return()=>{valid=false;};
- },[isAdmin,groupsToken]);
- useEffect(()=>observeWorkspaceChange(()=>{
-  setUsersToken(token=>token+1);setDepartmentsToken(token=>token+1);
-  setGroupsToken(token=>token+1);setMembersToken(token=>token+1);
- },["organization","permissions"]),[]);
-
- useEffect(()=>{
-  if(!isAdmin||selectedGroup==="")return;
-  let valid=true;
-  setMembersState("loading");
-  organizationApi.members(selectedGroup)
-   .then(data=>{if(valid){setGroupMembers(data);setMembersState("ready");}})
-   .catch(()=>{if(valid){setGroupMembers([]);setMembersState("failed");}});
-  return()=>{valid=false;};
- },[isAdmin,selectedGroup,membersToken]);
 
  const deptById=useMemo(()=>new Map(departments.map(d=>[d.id,d])),[departments]);
  const deptIndex=useMemo(()=>{

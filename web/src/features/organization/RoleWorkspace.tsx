@@ -6,6 +6,7 @@ import {request} from "../../shared/http";
 import {errorCopy} from "../../shared/errors";
 import {permissionsApi,type DirectGrant,type ResourceFolder} from "./permissionsApi";
 import {PermissionAudit} from "./PermissionInsights";
+import {RoleDelegationEditor} from "./RoleDelegationEditor";
 
 export type ManagementRole={
  id:string;userId:string;role:"auditor"|"permission_admin";
@@ -100,43 +101,14 @@ export function RoleBindingsPanel({users,onDirtyChange}:{users:User[];onDirtyCha
      :<RareButton className="danger" type="button" onClick={()=>setConfirmRevoke(b.id)}>撤销</RareButton>}</RareRowActions></td>
    </tr>)}</tbody>
   </RareDataTable>{items.length===0&&<p className="empty">暂无委派角色。</p>}</div></section>
-  <section className="org-role-editor" aria-label="新增角色委派"><div className="perm-section-title">新增委派</div>
-  <form className="perm-form" onSubmit={create} onChange={()=>setReview(false)}>
-   <div className="perm-form-row">
-    <label>委派给账号<RareSelect required value={userId} onChange={e=>{setUserId(e.target.value);setReview(false);}}>
-     <option value="">请选择</option>{users.filter(u=>!u.isAdmin&&!u.disabled).map(u=>
-      <option key={u.id} value={u.id}>{u.displayName}（{u.login}）</option>)}
-    </RareSelect></label>
-    <label>管理角色<RareSelect value={role} onChange={e=>{setRole(e.target.value as ManagementRole["role"]);setReview(false);}}>
-     <option value="auditor">只读审计员</option><option value="permission_admin">目录权限管理员</option>
-    </RareSelect></label>
-    {role==="permission_admin"&&<>
-     <label>查找授权目录<RareInput type="search" value={folderQuery} placeholder="按目录名称搜索"
-      onChange={e=>{setFolderQuery(e.target.value);setReview(false);}}/></label>
-     <label>授权目录<RareSelect required value={scopeId} disabled={folderLoad!=="ready"}
-      onChange={e=>{setScopeId(e.target.value);setReview(false);}}>
-      <option value="">{folderLoad==="loading"?"正在读取目录…":folderLoad==="failed"?"目录加载失败":"请选择目录"}</option>
-      {scopeId&&!folderOptions.some(f=>f.id===scopeId)&&<option value={scopeId}>{scopeId}（已选目录）</option>}
-      {folderOptions.map(f=><option key={f.id} value={f.id}>{f.path||f.name}</option>)}
-     </RareSelect></label>
-     {folderLoad==="failed"&&<span className="perm-hint" role="alert">目录读取失败，请修改搜索词后重试。</span>}
-    </>}
-    <label>过期时间（可选）<RareInput type="datetime-local" value={expires} onChange={e=>setExpires(e.target.value)}/></label>
-   </div>
-   {role==="permission_admin"&&<fieldset><legend>允许管理的 ACL 动作</legend>
-    <div className="perm-action-grid">{ACTIONS.map(([key,name])=><label key={key}>
-     <RareInput type="checkbox" checked={actions.includes(key)}
-      onChange={e=>setActions(old=>e.target.checked?[...old,key]:old.filter(x=>x!==key))}/>{name}
-    </label>)}</div>
-   </fieldset>}
-   {review&&<p className="perm-review">请确认：委派 {roleName(role)} 给 {userName(userId)}；
-    范围 {role==="auditor"?"全局审计":scopeId}；动作 {actions.map(actionName).join("、")}。
-    委派不附带文件读取权限。</p>}
-   <div className="perm-form-actions">
-    <RareButton type="submit" className="primary" disabled={!valid||busy}>{busy?"提交中…":review?"确认委派":"预览委派"}</RareButton>
-   </div>
-  </form>
-  </section></div>
+  <RoleDelegationEditor users={users} userId={userId} setUserId={setUserId}
+   role={role} setRole={setRole} scopeId={scopeId} setScopeId={setScopeId}
+   folderQuery={folderQuery} setFolderQuery={setFolderQuery}
+   folderLoad={folderLoad} folderOptions={folderOptions}
+   actions={actions} setActions={setActions} expires={expires} setExpires={setExpires}
+   review={review} setReview={setReview} busy={busy} valid={valid}
+   userName={userName} roleName={roleName} actionName={actionName} actionChoices={ACTIONS} onSubmit={create}/>
+</div>
  </section>;
 }
 
