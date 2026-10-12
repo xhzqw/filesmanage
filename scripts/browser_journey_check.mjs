@@ -278,31 +278,51 @@ async function main() {
 
     // Batch browser print uses the existing file selection and a single
     // workbench, never automatically launching N popup windows.
-    const batchSelectable=await cdp.waitFor(`()=>[...document.querySelectorAll('tbody tr')]
-      .some(row=>row.textContent?.includes('journey-${stamp}.txt')&&row.querySelector('input[type=checkbox]'))`,12000);
+    // Batch actions only apply to 2+ files; create a second isolated fixture.
+    const batchUploadPath = `/tmp/journey-batch-${stamp}.txt`;
+    writeFileSync(batchUploadPath,`批量打印测试 ${stamp}`);
+    await cdp.setFileInputFiles("input[type=file]",batchUploadPath);
+    const secondUploaded=await cdp.waitFor(`()=>[...document.querySelectorAll('tbody tr')].some(tr=>tr.textContent?.includes('journey-batch-${stamp}.txt'))`,30000);
+    check("batch print secondary file uploaded",Boolean(secondUploaded),"second isolated fixture");
+    const batchSelectable=await cdp.waitFor(`()=>['journey-${stamp}.txt','journey-batch-${stamp}.txt'].every(name=>
+      [...document.querySelectorAll('tbody tr')].some(row=>row.textContent?.includes(name)&&row.querySelector('input[type=checkbox]')))`,12000);
     if(batchSelectable){
-      await cdp.evaluate(`(()=>{
-       const row=[...document.querySelectorAll('tbody tr')].find(r=>r.textContent?.includes('journey-${stamp}.txt'));
-       row?.querySelector('input[type=checkbox]')?.click();return true;})()`);
+     await cdp.evaluate(`(()=>{
+      for(const name of ['journey-${stamp}.txt','journey-batch-${stamp}.txt']){
+       const row=[...document.querySelectorAll('tbody tr')].find(r=>r.textContent?.includes(name));
+       const input=row?.querySelector('input[type=checkbox]');
+       if(input&&!input.checked)input.click();
+      }
+      return true;})()`);
     }
-    const batchButton=await cdp.waitFor(`()=>[...document.querySelectorAll('button')].some(b=>b.textContent?.trim()==='批量打印'&&!b.disabled)`,5000);
-    if(batchButton)await cdp.clickText("批量打印");
-    const batchDialog=await cdp.waitFor(`()=>Boolean(document.querySelector('dialog.batch-print-dialog[open]')
-     ?.querySelector('[aria-label="批量打印纸张"]'))`,5000);
-    check("selected file opens browser batch print workbench",Boolean(batchDialog),"single modal, explicit per-file print");
+    const opened=batchSelectable&&await cdp.evaluate(`(()=>{
+     const row=[...document.querySelectorAll('tbody tr')].find(r=>r.textContent?.includes('journey-${stamp}.txt'));
+     const more=row?.querySelector('button.more-trigger');
+     if(!more)return false;more.click();return true;})()`);
+    const available=opened&&await cdp.waitFor(`()=>[...document.querySelectorAll('[role=menuitem]')].some(b=>b.querySelector('.menu-label')?.textContent==='批量打印')`,5000);
+    if(available)await cdp.evaluate(`(()=>{
+     [...document.querySelectorAll('[role=menuitem]')].find(b=>b.querySelector('.menu-label')?.textContent==='批量打印')?.click();
+     return true;})()`);
+    const batchDialog=await cdp.waitFor(`()=>Boolean(document.querySelector('dialog.batch-print-dialog[open]')?.querySelector('[aria-label="批量打印纸张"]'))`,5000);
+    check("selected files open browser batch print workbench",Boolean(batchDialog),"two files, one dialog");
     if(batchDialog){
      const watermarkUI=await cdp.evaluate(`(()=>{
       const dialog=document.querySelector('dialog.batch-print-dialog[open]');
       dialog?.querySelector('input[type=checkbox]')?.click();
       return Boolean(dialog?.textContent?.includes('水印文字'));})()`);
      check("batch print exposes optional text/image watermark",Boolean(watermarkUI),"watermark input available");
-     await cdp.evaluate(`(()=>{const dialog=document.querySelector('dialog.batch-print-dialog[open]');
+     await cdp.evaluate(`(()=>{
+      const dialog=document.querySelector('dialog.batch-print-dialog[open]');
       [...(dialog?.querySelectorAll('button')??[])].find(b=>b.textContent?.trim()==='关闭')?.click();return true;})()`);
     }else check("batch print exposes optional text/image watermark",false,"batch dialog unavailable");
     await cdp.waitFor(`()=>!document.querySelector('dialog.batch-print-dialog[open]')`,3000);
     if(batchSelectable)await cdp.evaluate(`(()=>{
-     const row=[...document.querySelectorAll('tbody tr')].find(r=>r.textContent?.includes('journey-${stamp}.txt'));
-     const check=row?.querySelector('input[type=checkbox]');if(check?.checked)check.click();return true;})()`);
+     for(const name of ['journey-${stamp}.txt','journey-batch-${stamp}.txt']){
+      const row=[...document.querySelectorAll('tbody tr')].find(r=>r.textContent?.includes(name));
+      const input=row?.querySelector('input[type=checkbox]');
+      if(input?.checked)input.click();
+     }
+     return true;})()`);
 
     // 8. the download endpoint round-trips the exact bytes (session-authenticated)
     const download = await cdp.evaluate(`(async()=>{
@@ -342,7 +362,9 @@ async function main() {
       if(!dialog)return 'no-confirm-dialog';
       const confirm=[...dialog.querySelectorAll('button')].find(b=>b.textContent?.trim()==='确认删除');
       if(!confirm)return 'no-confirm-button';
-      confirm.click();
+      confirm.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerId:42,pointerType:'mouse',button:0}));
+      await new Promise(r=>setTimeout(r,1100));
+      confirm.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,pointerId:42,pointerType:'mouse',button:0}));
       await new Promise(r=>setTimeout(r,2500));
       // The announce notice echoes the file name, so the table is the
       // authoritative surface here, not document.body.
@@ -420,6 +442,8 @@ async function main() {
       const body=await res.json();
       const item=(body.data?.items??[]).find(f=>f.name==='journey-${stamp}.txt');
       if(item)await fetch('/api/files/'+item.id,{method:'DELETE',credentials:'same-origin'});
+      const secondary=(body.data?.items??[]).find(f=>f.name==='journey-batch-${stamp}.txt');
+      if(secondary)await fetch('/api/files/'+secondary.id,{method:'DELETE',credentials:'same-origin'});
       const folders=await (await fetch('/api/folders/tree',{credentials:'same-origin'})).json();
       const folder=(folders.data??[]).find(f=>f.name==='旅程目录-${stamp}');
       if(folder)await fetch('/api/folders/'+folder.id,{method:'DELETE',credentials:'same-origin'});
