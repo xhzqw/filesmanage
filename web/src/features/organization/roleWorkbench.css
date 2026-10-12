@@ -52,7 +52,11 @@
 
 .dialog.org-role-dialog{box-sizing:border-box;width:min(680px,calc(100vw - 24px));
  max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);padding:15px 18px;overflow-y:auto}
-.org-role-dialog>.dialog-header{margin-bottom:12px}
+.org-role-dialog>.dialog-header{
+ position:sticky;top:0;z-index:10;min-height:34px;
+ margin-bottom:12px;padding:0 0 8px;
+ background:var(--surface-panel);
+}
 .org-role-dialog .org-role-editor{display:block;min-width:0;min-height:0;overflow:visible;
  padding:0;border:0;background:transparent;box-shadow:none}
 .org-role-dialog .org-role-editor>.perm-form{padding:0;gap:13px}
@@ -67,7 +71,11 @@
  border:0;background:var(--surface-header);border-radius:var(--radius-md);font-size:12px}
 .org-role-dialog .org-role-review strong{font-size:13px;color:var(--text-primary)}
 .org-role-dialog .org-role-review small{font-size:11px;color:var(--text-secondary)}
-.org-role-dialog .perm-form-actions{justify-content:flex-end;padding:7px 0 0;border-top:0}
+.org-role-dialog .perm-form-actions{
+ position:sticky;bottom:0;z-index:8;
+ justify-content:flex-end;padding:8px 0 4px;
+ border-top:0;background:var(--surface-panel);
+}
 .org-role-dialog .perm-form-actions>.rare-button{min-width:108px;min-height:34px}
 @container roles (max-width:740px){
  .org-role-table .org-role-optional{display:none}
