@@ -134,6 +134,15 @@ try{
   "department tree Home and Enter restore all-organization scope");
  assert(await cdp.evaluate(`(()=>document.querySelectorAll('.org-dept-card li[role=treeitem][tabindex="0"]').length===1)()`),
   "department hierarchy exposes exactly one keyboard tab stop");
+ await cdp.evaluate(`(()=>{
+  const root=document.querySelector('.org-dept-card li[data-tree-id=__all]');
+  root.focus();
+  window.dispatchEvent(new CustomEvent('filesmanage:workspace-changed',{detail:{scopes:['organization']}}));
+  return true;
+ })()`);
+ await sleep(700);
+ assert(await cdp.evaluate("(()=>{const root=document.querySelector('.org-dept-card li[data-tree-id=__all]');return !!root?.isConnected&&document.activeElement===root})()"),
+  "live organization refresh preserves keyboard focus and the mounted department tree");
  const expandableDept=await cdp.evaluate("(()=>document.querySelector('.org-dept-card li[data-dept-id][aria-expanded]')?.dataset.deptId??'')()");
  if(expandableDept){
   await cdp.evaluate(`(()=>{document.querySelector('li[data-dept-id="${expandableDept}"]').focus();return true})()`);
