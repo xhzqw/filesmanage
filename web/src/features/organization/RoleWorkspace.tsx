@@ -1,9 +1,9 @@
 import {RareBadge,RareButton,RareDataTable,RareInput,RareNotice,RareRowActions,RareSelect} from "../../shared/ui/rare";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
-import {useEffect,useState,type FormEvent} from "react";
+import {useEffect,useRef,useState,type FormEvent} from "react";
 import type {User} from "../../entities/user/model";
 import {request} from "../../shared/http";
-import {errorCopy} from "../../shared/errors";
+import {errorCode,errorCopy} from "../../shared/errors";
 import {permissionsApi,type DirectGrant,type ResourceFolder} from "./permissionsApi";
 import {PermissionAudit} from "./PermissionInsights";
 import {RoleDelegationEditor} from "./RoleDelegationEditor";
@@ -43,12 +43,20 @@ export function RoleBindingsPanel({users,onDirtyChange}:{users:User[];onDirtyCha
  const[expires,setExpires]=useState("");
  const[review,setReview]=useState(false);
  const[confirmRevoke,setConfirmRevoke]=useState("");
+ const inFlight=useRef(false);
+ const[loadError,setLoadError]=useState("");
+ const[loading,setLoading]=useState(true);
  const dirty=userId!==""||role!=="auditor"||scopeId!==""||folderQuery!==""||
   actions.length!==1||actions[0]!=="list"||expires!==""||review;
  useEffect(()=>onDirtyChange(dirty),[dirty,onDirtyChange]);
  useEffect(()=>()=>onDirtyChange(false),[onDirtyChange]);
- useEffect(()=>{let live=true;roleAPI.list().then(v=>{if(live)setItems(v);})
-  .catch(e=>{if(live)setError(errorCopy(e,"读取管理角色失败"));});return()=>{live=false};},[load]);
+ useEffect(()=>{
+  let live=true;
+  setLoading(true);setLoadError("");
+  roleAPI.list().then(v=>{if(live){setItems(v);setLoading(false);}})
+   .catch(e=>{if(live){setLoadError(errorCopy(e,"读取管理角色失败"));setLoading(false);}});
+  return()=>{live=false};
+ },[load]);
  useEffect(()=>{
   if(role!=="permission_admin")return;
   let live=true;
@@ -64,9 +72,9 @@ export function RoleBindingsPanel({users,onDirtyChange}:{users:User[];onDirtyCha
  const userName=(id:string)=>users.find(u=>u.id===id)?.displayName??id;
  const valid=Boolean(userId)&& (role==="auditor"||Boolean(scopeId.trim())&&actions.length>0);
  async function create(e:FormEvent){
-  e.preventDefault();if(!valid||busy)return;
+  e.preventDefault();if(!valid||inFlight.current)return;
   if(!review){setReview(true);return;}
-  setBusy(true);setError("");
+  inFlight.current=true;setBusy(true);setError("");
   try{
    await roleAPI.create({userId,role,scopeId:role==="auditor"?"":scopeId.trim(),
     allowedActions:role==="auditor"?[]:actions,
@@ -76,15 +84,17 @@ export function RoleBindingsPanel({users,onDirtyChange}:{users:User[];onDirtyCha
   finally{setBusy(false);}
  }
  async function revoke(id:string){
-  if(busy)return;setBusy(true);setError("");
+  if(inFlight.current)return;inFlight.current=true;setBusy(true);setError("");
   try{await roleAPI.revoke(id);setConfirmRevoke("");setLoad(v=>v+1);}
-  catch(e){setError(errorCopy(e,"撤销角色失败"));}
-  finally{setBusy(false);}
+  catch(e){setError(errorCopy(e,"撤销角色失败"));setLoad(v=>v+1);}
+  finally{inFlight.current=false;setBusy(false);}
  }
  return <section className="perm-detail org-role-workbench" aria-label="管理角色绑定">
   <div className="perm-section-title">管理角色 <span className="perm-subtle">仅系统管理员可调整</span></div>
   <details className="org-role-explanation"><summary>角色权限说明</summary><p>审计员只读权限审计，不获得文件访问权。目录权限管理员只在指定目录管理指定动作的直接 ACL，不能向自己授权，不能授予子树继承。</p></details>
    {error&&<RareNotice tone="danger">{error}</RareNotice>}
+   {loadError&&<RareNotice tone="danger">{loadError} <RareButton type="button" className="secondary-action" onClick={()=>setLoad(n=>n+1)}>重试读取</RareButton></RareNotice>}
+   {loading&&items.length===0&&<p className="hint" role="status">正在读取委派角色…</p>}
   <div className="org-role-layout"><section className="org-role-list" aria-label="已有角色委派">
   <div className="perm-section-title">已委派 <span className="perm-count">{items.length}</span></div>
   <div className="perm-grants-scroller org-role-scroll"><RareDataTable className="perm-table org-role-table">
@@ -100,7 +110,7 @@ export function RoleBindingsPanel({users,onDirtyChange}:{users:User[];onDirtyCha
         <RareButton type="button" onClick={()=>setConfirmRevoke("")}>取消</RareButton></>
      :<RareButton className="danger" type="button" onClick={()=>setConfirmRevoke(b.id)}>撤销</RareButton>}</RareRowActions></td>
    </tr>)}</tbody>
-  </RareDataTable>{items.length===0&&<p className="empty">暂无委派角色。</p>}</div></section>
+  </RareDataTable>{!loading&&!loadError&&items.length===0&&<p className="empty">暂无委派角色。</p>}</div></section>
   <RoleDelegationEditor users={users} userId={userId} setUserId={setUserId}
    role={role} setRole={setRole} scopeId={scopeId} setScopeId={setScopeId}
    folderQuery={folderQuery} setFolderQuery={setFolderQuery}
@@ -124,6 +134,8 @@ export function DelegatedRolesWorkspace(){
  const[expiry,setExpiry]=useState("");
  const[refresh,setRefresh]=useState(0);
  const[confirm,setConfirm]=useState("");
+ const mutationBusy=useRef(false);
+ const[isMutating,setIsMutating]=useState(false);
  useEffect(()=>observeWorkspaceChange(()=>{
   setConfirm("");setRevokeTarget("");setRefresh(n=>n+1);
  },["permissions"]),[]);
@@ -146,18 +158,32 @@ export function DelegatedRolesWorkspace(){
    .catch(e=>{if(live)setError(errorCopy(e,"读取直接 ACL 失败"));});
   return()=>{live=false};
  },[folder,refresh,chosen?.id]);
+ const reviewSignature=JSON.stringify([chosen?.id??"",folder,subject.trim(),effectiveAction,expiry]);
  async function create(e:FormEvent){
-  e.preventDefault();if(!chosen||!subject||!effectiveAction)return;
-  if(!confirm){setConfirm("yes");return;}
-  try{await permissionsApi.create(folder,{subjectKind:"user",subjectId:subject,actions:[effectiveAction],scopeOnly:true,
-   ...(expiry?{expiresAt:new Date(expiry).toISOString()}:{})});
+  e.preventDefault();if(!chosen||!subject.trim()||!effectiveAction||mutationBusy.current)return;
+  if(confirm!==reviewSignature){setConfirm(reviewSignature);return;}
+  mutationBusy.current=true;setIsMutating(true);setError("");
+  const targetFolder=folder;
+  try{
+   await permissionsApi.create(targetFolder,{subjectKind:"user",subjectId:subject.trim(),actions:[effectiveAction],scopeOnly:true,
+    ...(expiry?{expiresAt:new Date(expiry).toISOString()}:{})});
    setConfirm("");setSubject("");setRefresh(v=>v+1);
-  }catch(e){setError(errorCopy(e,"授权失败"));}
+  }catch(e){
+   setConfirm("");
+   setError(errorCopy(e,"授权失败")+(errorCode(e)==="E_NETWORK"?" 结果可能已提交，请先核对授权列表，勿直接重复操作。":""));
+   setRefresh(v=>v+1);
+  }finally{mutationBusy.current=false;setIsMutating(false);}
  }
  async function revoke(id:string){
+  if(mutationBusy.current)return;
   if(revokeTarget!==id){setRevokeTarget(id);return;}
+  mutationBusy.current=true;setIsMutating(true);setError("");
   try{await permissionsApi.revoke(id);setRevokeTarget("");setRefresh(v=>v+1);}
-  catch(e){setError(errorCopy(e,"撤销直接 ACL 失败"));}
+  catch(e){
+   setRevokeTarget("");
+   setError(errorCopy(e,"撤销直接 ACL 失败")+(errorCode(e)==="E_NETWORK"?" 结果未确认，请先核对记录。":""));
+   setRefresh(v=>v+1);
+  }finally{mutationBusy.current=false;setIsMutating(false);}
  }
  return <div className="work-body">
   {busy&&<p role="status" className="hint">正在读取委派职责…</p>}
@@ -178,7 +204,7 @@ export function DelegatedRolesWorkspace(){
       <td>{g.scopeOnly?"仅本目录":"包含子目录"}</td><td>{g.expiresAt||"不过期"}</td>
       <td>{g.scopeOnly&&g.actions.every(a=>chosen.allowedActions.includes(a))&&
         (!chosen.expiresAt||Boolean(g.expiresAt&&new Date(g.expiresAt)<=new Date(chosen.expiresAt)))&&
-        <RareButton className="danger" type="button" onClick={()=>void revoke(g.id)}>
+        <RareButton className="danger" type="button" disabled={isMutating} onClick={()=>void revoke(g.id)}>
          {revokeTarget===g.id?"确认撤销":"撤销"}
         </RareButton>}</td>
      </tr>)}</tbody>
@@ -192,9 +218,9 @@ export function DelegatedRolesWorkspace(){
       <label>授权到期时间{chosen.expiresAt?"（必填且不能晚于委派到期）":"（可选）"}
        <RareInput type="datetime-local" required={Boolean(chosen.expiresAt)} value={expiry} onChange={e=>setExpiry(e.target.value)}/></label>
      </div>
-     {confirm&&<p className="perm-review">确认向 {subject} 授予 {actionName(effectiveAction)}，仅当前目录。</p>}
+     {confirm===reviewSignature&&<p className="perm-review">确认向 {subject} 授予 {actionName(effectiveAction)}，仅当前目录。</p>}
      <RareButton type="button" className="secondary-action" onClick={()=>setRefresh(v=>v+1)}>刷新</RareButton>
-     <RareButton className="primary" type="submit" disabled={!subject||!effectiveAction}>{confirm?"确认授权":"预览授权"}</RareButton>
+     <RareButton className="primary" type="submit" disabled={!subject||!effectiveAction||isMutating}>{isMutating?"提交中…":confirm===reviewSignature?"确认授权":"预览授权"}</RareButton>
     </form>
    </>}
   </section>}

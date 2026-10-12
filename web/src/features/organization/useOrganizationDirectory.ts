@@ -24,35 +24,66 @@ export function useOrganizationDirectory(isAdmin:boolean,selectedGroup:string){
  const selectedGroupRef=useRef(selectedGroup);
  selectedGroupRef.current=selectedGroup;
  const membersGeneration=useRef(0);
+ const usersGeneration=useRef(0);
+ const departmentsGeneration=useRef(0);
+ const groupsGeneration=useRef(0);
+ type RefreshResult="ok"|"failed"|"stale";
+
+ async function reloadUsers():Promise<RefreshResult>{
+  if(!isAdmin)return "stale";
+  const generation=++usersGeneration.current;
+  try{
+   const data=await organizationApi.users();
+   if(generation!==usersGeneration.current)return "stale";
+   setUsers(data);setUsersState("ready");return "ok";
+  }catch{
+   if(generation!==usersGeneration.current)return "stale";
+   setUsersState("failed");return "failed";
+  }
+ }
+ async function reloadDepartments():Promise<RefreshResult>{
+  if(!isAdmin)return "stale";
+  const generation=++departmentsGeneration.current;
+  try{
+   const data=await organizationApi.departments();
+   if(generation!==departmentsGeneration.current)return "stale";
+   setDepartments(data);setDepartmentsState("ready");return "ok";
+  }catch{
+   if(generation!==departmentsGeneration.current)return "stale";
+   setDepartmentsState("failed");return "failed";
+  }
+ }
+ async function reloadGroups():Promise<RefreshResult>{
+  if(!isAdmin)return "stale";
+  const generation=++groupsGeneration.current;
+  try{
+   const data=await organizationApi.groups();
+   if(generation!==groupsGeneration.current)return "stale";
+   setGroups(data);setGroupsState("ready");return "ok";
+  }catch{
+   if(generation!==groupsGeneration.current)return "stale";
+   setGroupsState("failed");return "failed";
+  }
+ }
+
 
  useEffect(()=>{
   if(!isAdmin)return;
-  let valid=true;
   setUsersState("loading");
-  organizationApi.users()
-   .then(data=>{if(valid){setUsers(data);setUsersState("ready");}})
-   .catch(()=>{if(valid)setUsersState("failed");});
-  return()=>{valid=false;};
+  void reloadUsers();
+  return()=>{++usersGeneration.current;};
  },[isAdmin,usersToken]);
-
  useEffect(()=>{
   if(!isAdmin)return;
-  let valid=true;
   setDepartmentsState("loading");
-  organizationApi.departments()
-   .then(data=>{if(valid){setDepartments(data);setDepartmentsState("ready");}})
-   .catch(()=>{if(valid)setDepartmentsState("failed");});
-  return()=>{valid=false;};
+  void reloadDepartments();
+  return()=>{++departmentsGeneration.current;};
  },[isAdmin,departmentsToken]);
-
  useEffect(()=>{
   if(!isAdmin)return;
-  let valid=true;
   setGroupsState("loading");
-  organizationApi.groups()
-   .then(data=>{if(valid){setGroups(data);setGroupsState("ready");}})
-   .catch(()=>{if(valid)setGroupsState("failed");});
-  return()=>{valid=false;};
+  void reloadGroups();
+  return()=>{++groupsGeneration.current;};
  },[isAdmin,groupsToken]);
  useEffect(()=>observeWorkspaceChange(()=>{
   setUsersToken(token=>token+1);setDepartmentsToken(token=>token+1);
@@ -92,5 +123,6 @@ export function useOrganizationDirectory(isAdmin:boolean,selectedGroup:string){
   usersState,setUsersState,departmentsState,setDepartmentsState,groupsState,setGroupsState,
   setUsersToken,setDepartmentsToken,setGroupsToken,
   groupMembers:membersGroupId===selectedGroup?groupMembers:[],
-  setGroupMembers,membersState,setMembersState,setMembersToken,reloadMembers};
+  setGroupMembers,membersState,setMembersState,setMembersToken,
+  reloadUsers,reloadDepartments,reloadGroups,reloadMembers};
 }
