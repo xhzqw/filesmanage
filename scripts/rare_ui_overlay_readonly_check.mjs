@@ -167,10 +167,11 @@ try{
     const row=document.querySelector(".file-table tbody tr.selected");
     const actions=row?.querySelector(".actions-hover-group");
     return actions?{opacity:getComputedStyle(actions).opacity,
-     checked:row.querySelector(".col-select input").checked}:null;
+     checked:row.querySelector(".col-select input").checked,
+     alwaysVisible:matchMedia("(hover: none), (pointer: coarse)").matches||document.querySelector(".work-body").clientWidth<=820}:null;
    })()`);
-   assert(idleActions&&Number(idleActions.opacity)===0&&idleActions.checked,
-    "selected file keeps actions quiet away from hover: "+JSON.stringify(idleActions));
+   assert(idleActions&&Number(idleActions.opacity)===(idleActions.alwaysVisible?1:0)&&idleActions.checked,
+    "selected file respects desktop hover / touch discoverability: "+JSON.stringify(idleActions));
    results.push("1440px: quiet selected file, mixed select-all, low-noise actions OK");
    const batch=await evalJS(`(()=>({count:document.querySelector(".file-selected-count")?.textContent?.trim(),
     buttons:[...document.querySelectorAll(".batch-actions-group button")].map(x=>x.textContent?.trim()||x.getAttribute("aria-label"))}))()`);
