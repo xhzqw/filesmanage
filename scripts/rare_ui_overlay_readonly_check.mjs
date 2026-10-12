@@ -295,7 +295,7 @@ try{
  const shellOnly=process.env.SHELL_ONLY==="1";
  const results=[];
  let availablePreviewId="";
- for(const width of (explorerOnly?[1440,820,390]:[1440,1280,1220,900,390])){
+ for(const width of (explorerOnly?[1440,820,390]:shellOnly?[2048,1920,1440,1280,1220,900,390]:[1440,1280,1220,900,390])){
   const height=width===390?760:900;
   await viewport(width,height);
   await navigate("/doc","!!document.querySelector('.account-trigger')");
@@ -311,17 +311,19 @@ try{
    "all seven enabled global Rare UI navigation links");
   assert(shellNav.count===7&&shellNav.active.length===1&&shellNav.active[0]==="文档管理"&&shellNav.overflow<=1,
    "Rare shell nav selection/layout at "+width+": "+JSON.stringify(shellNav));
-  const capsules=await evalJS("(()=>{const h=document.querySelector('header.header'),b=h.querySelector('a.shell-home-pill'),n=h.querySelector('nav[data-appearance=pill]'),hr=h.getBoundingClientRect(),nr=n.getBoundingClientRect(),logo=b.querySelector('img'),active=n.querySelector('.rare-pill-nav-active');return{home:b.getAttribute('href'),brand:b.innerText.trim(),pill:getComputedStyle(b).borderRadius,offset:Math.abs((nr.left+nr.right-hr.left-hr.right)/2),headerBg:getComputedStyle(h).backgroundColor,brandBg:getComputedStyle(b).backgroundColor,navBg:getComputedStyle(n).backgroundColor,selectedBg:active&&getComputedStyle(active).backgroundColor,transparentLogo:logo.currentSrc.endsWith('logo-loader-256.png'),maxHeaderWidth:hr.width}})()");
+  const capsules=await evalJS("(()=>{const h=document.querySelector('header.header'),b=h.querySelector('a.shell-home-pill'),n=h.querySelector('nav[data-appearance=pill]'),hr=h.getBoundingClientRect(),br=b.getBoundingClientRect(),nr=n.getBoundingClientRect(),logo=b.querySelector('img'),active=n.querySelector('.rare-pill-nav-active');return{home:b.getAttribute('href'),brand:b.innerText.trim(),pill:getComputedStyle(b).borderRadius,offset:Math.abs((nr.left+nr.right-hr.left-hr.right)/2),headerBg:getComputedStyle(h).backgroundColor,brandBg:getComputedStyle(b).backgroundColor,navBg:getComputedStyle(n).backgroundColor,selectedBg:active&&getComputedStyle(active).backgroundColor,transparentLogo:logo.currentSrc.endsWith('logo-loader-256.png'),headerWidth:hr.width,brandLeft:br.left,headerLeft:hr.left,headerRight:hr.right}})()");
   assert(capsules.home==="/doc"&&capsules.brand==="中晟生物"&&capsules.pill.endsWith("px")
    &&capsules.brandBg==="rgb(255, 255, 255)"&&capsules.navBg==="rgb(237, 242, 250)"
-   &&capsules.selectedBg==="rgb(23, 64, 152)"&&capsules.transparentLogo&&capsules.maxHeaderWidth<=1521,
+   &&capsules.selectedBg==="rgb(23, 64, 152)"&&capsules.transparentLogo
+   &&capsules.headerWidth>=width-30&&capsules.brandLeft<=24,
    "independent brand home capsule at "+width+": "+JSON.stringify(capsules));
   const utility=await evalJS("(()=>{const h=document.querySelector('header.header'),d=h.querySelector('.global-utility-dock'),b=h.querySelector('.shell-home-pill'),toggle=h.querySelector('.nav-toggle'),btns=[...d.querySelectorAll('.command-trigger,.notification-trigger,.account-trigger')],r=d.getBoundingClientRect(),br=b.getBoundingClientRect(),tr=toggle.getBoundingClientRect(),icons=[d.querySelector('.command-trigger svg'),d.querySelector('.notification-trigger svg'),d.querySelector('.account-avatar svg')],badge=d.querySelector('.rare-notification-bell-badge'),bell=d.querySelector('.notification-trigger').getBoundingClientRect(),badger=badge?.getBoundingClientRect();return{left:r.left,right:r.right,brandRight:br.right,toggleLeft:tr.left,allButtonsVisible:btns.every(x=>{const q=x.getBoundingClientRect();return q.width>=35&&q.left>=r.left-1&&q.right<=r.right+1}),dimensions:btns.map(x=>{const q=x.getBoundingClientRect();return{width:Math.round(q.width),height:Math.round(q.height)}}),badgeInside:!badger||(badger.left>=bell.left-1&&badger.top>=bell.top-1&&badger.right<=bell.right+1),iconSizes:icons.map(i=>i?Math.round(i.getBoundingClientRect().width):0),overlapsBrand:r.left<br.right-1,documentOverflow:document.documentElement.scrollWidth-innerWidth}})()");
   assert(!utility.overlapsBrand&&utility.right<=width-2&&utility.documentOverflow<=1
    &&utility.allButtonsVisible&&utility.iconSizes.every(x=>x>=17)
    &&utility.dimensions.every(x=>x.height===36)
    &&utility.dimensions[0].width===36&&utility.dimensions[1].width===36
-   &&utility.dimensions[2].width<=154&&utility.badgeInside,
+   &&utility.dimensions[2].width<=154&&utility.badgeInside
+   &&width-utility.right<=24,
    "right utility buttons and icons must stay aligned inside the viewport at "+width+": "+JSON.stringify(utility));
   if(width>1210){
    assert(shellNav.rendered!=="none"&&shellNav.lastRight<=shellNav.rightStart+2,

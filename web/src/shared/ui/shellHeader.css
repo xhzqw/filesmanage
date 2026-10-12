@@ -3,7 +3,8 @@
 .shell>.header{
  display:grid;grid-template-columns:minmax(190px,1fr) auto minmax(190px,1fr);
  align-items:center;column-gap:14px;height:var(--height-header);min-height:var(--height-header);
- width:100%;max-width:1520px;margin:0 auto;
+ /* Brand and actions anchor to the page edges; only the navigation stays centered. */
+ width:100%;max-width:none;margin:0;
  padding:0 4px;border:0;border-radius:var(--radius-lg);background:transparent;box-shadow:none;
  overflow:visible;isolation:isolate;z-index:70;
 }
