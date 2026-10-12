@@ -20,6 +20,9 @@ import{AppShell}from "../shared/ui/AppShell";
 import{Dialog}from "../shared/ui/Dialog";
 import{FolderPicker}from "../shared/ui/FolderPicker";
 import type {FileItem} from "../entities/file/model";
+import type {ExplorerViewMode} from "../features/documents/explorerView";
+import {EXPLORER_VIEWS,readExplorerViewMode,saveExplorerViewMode} from "../features/documents/explorerView";
+import "../features/documents/explorerChrome.css";
 
 // The sidebar width is a user preference, not layout state (SPEC §3.1: 240px
 // default, 180~360px draggable): read once per mount, written back on every
@@ -70,6 +73,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  const[move,setMove]=useState<FolderMoveState>(folderMoveIdle);
  const[moveMessage,setMoveMessage]=useState("");
  const[sidebarWidth,setSidebarWidth]=useState(readSidebarWidth);
+ const[viewMode,setViewMode]=useState<ExplorerViewMode>(readExplorerViewMode);
  // Dragging is transient state the handle alone reads: it drives its own hit
  // area and the data-dragging laser rail, never the persisted width.
  const[resizing,setResizing]=useState(false);
@@ -79,6 +83,31 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  const navigate=useNavigate();
  const explicitFolder=new URLSearchParams(location.search).get("folder");
  const requested=explicitFolder||"folder_root";
+ // Only directory visits enter this history, not browser visits to preview
+ // and organization pages. A new visit discards the forward branch.
+ const folderHistory=useRef<string[]>([requested]);
+ const folderHistoryIndex=useRef(0);
+ const[historyIndex,setHistoryIndex]=useState(0);
+ useEffect(()=>{
+  if(folderHistory.current[folderHistoryIndex.current]===requested)return;
+  const next=folderHistory.current.slice(0,folderHistoryIndex.current+1);
+  next.push(requested);
+  folderHistory.current=next;
+  folderHistoryIndex.current=next.length-1;
+  setHistoryIndex(next.length-1);
+ },[requested]);
+ function travelFolder(delta:-1|1){
+  const next=folderHistoryIndex.current+delta;
+  const target=folderHistory.current[next];
+  if(target===undefined)return;
+  folderHistoryIndex.current=next;
+  setHistoryIndex(next);
+  navigate(target==="folder_root"?"/doc":"/doc?folder="+encodeURIComponent(target));
+ }
+ function switchView(mode:ExplorerViewMode){
+  setViewMode(mode);
+  saveExplorerViewMode(mode);
+ }
  const refreshTreeAndFiles=()=>{
   setTreeReloadKey(value=>value+1);
   setReloadKey(value=>value+1);
@@ -268,7 +297,23 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
        header. Docked at 24px it costs a fraction of the row the old 44px
        breadcrumb bar used to take. */}
    {selected&&<div className="folder-context-bar">
+     <div className="folder-history-controls" role="group" aria-label="目录浏览历史">
+      <RareButton type="button" tone="ghost" aria-label="返回上一个目录" title="后退"
+       disabled={historyIndex===0} onClick={()=>travelFolder(-1)}>
+       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14.5 5-7 7 7 7"/></svg>
+      </RareButton>
+      <span className="folder-control-divider" aria-hidden="true"/>
+      <RareButton type="button" tone="ghost" aria-label="前往下一个目录" title="前进"
+       disabled={historyIndex>=folderHistory.current.length-1} onClick={()=>travelFolder(1)}>
+       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9.5 5 7 7-7 7"/></svg>
+      </RareButton>
+     </div>
      <FolderBreadcrumb folders={knownFolders} folder={selected}/>
+     <div className="folder-view-switch" role="group" aria-label="文件显示方式">
+      {EXPLORER_VIEWS.map(mode=><RareButton type="button" key={mode.id} tone="ghost"
+       aria-label={mode.label} title={mode.label} aria-pressed={viewMode===mode.id}
+       onClick={()=>switchView(mode.id)}><ExplorerViewGlyph mode={mode.id}/></RareButton>)}
+     </div>
      <div className="folder-actions-slot">
       <FolderActions folder={actionsFolder??selected} actionRequest={actionRequest} onActionHandled={()=>setActionRequest(null)} onActionComplete={()=>setActionsFolder(null)} isAdmin={user.isAdmin} onChanged={folderActionChanged}
        onManageGrants={()=>setGrantsFolder(actionsFolder??selected)}/>
@@ -276,7 +321,8 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
    </div>}
    {moveMessage&&<p role="status" className="notice">{moveMessage}</p>}
    {selected&&<DropZone folderId={selected.id} userId={user.id} onCommitted={()=>setReloadKey(k=>k+1)}>
-     <FileTable folder={selected.id} folderName={selected.name} onEdit={setEditingId} reloadKey={reloadKey}
+     <FileTable folder={selected.id} folderName={selected.name} childFolders={knownFolders.filter(item=>item.parentId===selected.id)}
+      onEdit={setEditingId} reloadKey={reloadKey} viewMode={viewMode}
       newFolderSlot={<NewFolderForm parentId={selected.id} onCreated={refreshTreeAndFiles}/>}/>
    </DropZone>}
    {!selected&&resolving&&<p role="status" className="empty">正在核验所选目录…</p>}
@@ -308,6 +354,14 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
      </div>}/>
    </Dialog>}
   </AppShell>;
+}
+
+function ExplorerViewGlyph({mode}:{mode:ExplorerViewMode}){
+ const common={width:16,height:16,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:1.8,strokeLinecap:"round" as const,strokeLinejoin:"round" as const,"aria-hidden":true as const};
+ if(mode==="icons")return <svg {...common}><rect x="3" y="3" width="7" height="7" rx="1.3"/><rect x="14" y="3" width="7" height="7" rx="1.3"/><rect x="3" y="14" width="7" height="7" rx="1.3"/><rect x="14" y="14" width="7" height="7" rx="1.3"/></svg>;
+ if(mode==="list")return <svg {...common}><path d="M9 5h12M9 12h12M9 19h12"/><path d="M3 5h2M3 12h2M3 19h2"/></svg>;
+ if(mode==="columns")return <svg {...common}><rect x="2.5" y="3.5" width="19" height="17" rx="2"/><path d="M9 3.5v17M15.5 3.5v17"/></svg>;
+ return <svg {...common}><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 16.5h18M8 20.5v-4M11 7h6M11 10h5"/></svg>;
 }
 
 // FileEditorBridge loads the file row for the editor dialog; the page owns the

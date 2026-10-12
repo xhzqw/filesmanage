@@ -24,7 +24,9 @@ import"./dragMove.css";
 import {setMoveDragImage} from "./dragPreview";
 import {classifyFile,type FileCategory} from "../../shared/fileTypes";
 import {FileTypeIcon} from "../../shared/ui/FileTypeIcon";
+import {FolderResourceIcon} from "../../shared/ui/ResourceIcons";
 import"./fileTable.css";
+import type {ExplorerViewMode} from "./explorerView";
 
 type SortKey="updated_desc"|"name_asc"|"name_desc"|"size_desc";
 
@@ -91,7 +93,7 @@ type FavoriteRow={kind:string;fileId?:string};
 // current visible order, and the keyboard mirrors every mouse action. The
 // selection model keeps focus, anchor and membership separate so a stale
 // anchor can never resurrect after a re-sort.
-export function FileTable({folder,folderName,onEdit,reloadKey,newFolderSlot}:{folder:string;folderName:string;onEdit:(fileId:string)=>void;reloadKey:number;newFolderSlot?:ReactNode}){
+export function FileTable({folder,folderName,childFolders=[],onEdit,reloadKey,newFolderSlot,viewMode="list"}:{folder:string;folderName:string;childFolders?:Folder[];onEdit:(fileId:string)=>void;reloadKey:number;newFolderSlot?:ReactNode;viewMode?:ExplorerViewMode}){
  const[items,setItems]=useState<FileItem[]>([]);
 // Round-trip of the list read the status bar reports (spec §3.1). It is an
 // observation of the request that already runs below — never an extra one —
@@ -118,6 +120,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const[selectedIds,setSelectedIds]=useState<Set<string>>(()=>new Set<string>());
  const selectAllRef=useRef<HTMLInputElement>(null);
  const[focusedId,setFocusedId]=useState<string|null>(null);
+ const[focusedFolderId,setFocusedFolderId]=useState<string|null>(null);
  const[anchorId,setAnchorId]=useState<string|null>(null);
  const[pendingDelete,setPendingDelete]=useState<FileItem[]>([]);
  const[printingBatch,setPrintingBatch]=useState<FileItem[]|null>(null);
@@ -212,6 +215,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  useEffect(()=>{
   setSelectedIds(new Set<string>());
   setFocusedId(null);
+  setFocusedFolderId(null);
   setAnchorId(null);
   setRowMenu(null);
  },[folder,sort]);
@@ -417,7 +421,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   return visibleItems.slice(low,high+1).map(i=>i.id);
  }
 
- function onRowClick(event:MouseEvent<HTMLTableRowElement>,item:FileItem){
+ function onRowClick(event:MouseEvent<HTMLElement>,item:FileItem){
+  setFocusedFolderId(null);
   if(event.metaKey||event.ctrlKey){
    setSelectedIds(prev=>{
     const next=new Set(prev);
@@ -465,13 +470,13 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  }
 
  function focusRow(id:string){
-  const row=document.querySelector<HTMLTableRowElement>(`tbody tr[data-id="${CSS.escape(id)}"]`);
+  const row=document.querySelector<HTMLElement>(`.file-entry[data-id="${CSS.escape(id)}"]`);
   row?.focus();
  }
 
  // DESKTOP-INTERACTION §3.1: right-clicking a row inside the selection keeps
  // the whole selection; an unselected row becomes the single selection first.
- function onRowContextMenu(event:MouseEvent<HTMLTableRowElement>,item:FileItem){
+ function onRowContextMenu(event:MouseEvent<HTMLElement>,item:FileItem){
   event.preventDefault();
   const inside=selectedIds.has(item.id);
   if(!inside){
@@ -486,7 +491,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  // set, the source folder and the original focus — and writes nothing to the
  // server. The scope rule mirrors the row menu: a row inside the selection
  // drags the whole selection, an unselected row becomes the single source first.
- function onRowDragStart(event:DragEvent<HTMLTableRowElement>,item:FileItem){
+ function onRowDragStart(event:DragEvent<HTMLElement>,item:FileItem){
   const origin=event.target as HTMLElement|null;
   // The actions cell keeps its own behaviour: a link or button must never
   // become the drag source of a row move.
@@ -546,7 +551,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   focusRow(target.id);
  }
 
- function onGridKeyDown(event:KeyboardEvent<HTMLTableSectionElement>){
+ function onGridKeyDown(event:KeyboardEvent<HTMLElement>){
   if(visibleItems.length===0)return;
   const index=focusedId?visibleItems.findIndex(i=>i.id===focusedId):-1;
   const current=index>=0?visibleItems[index]:null;
@@ -608,7 +613,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  }
 
  function openRowMenu(item:FileItem,trigger?:HTMLElement){
-  const row=trigger??document.querySelector<HTMLTableRowElement>(`tbody tr[data-id="${CSS.escape(item.id)}"]`);
+  const row=trigger??document.querySelector<HTMLElement>(`.file-entry[data-id="${CSS.escape(item.id)}"]`);
   // The keyboard menu mirrors the mouse scoping: a focused row inside the
   // selection acts on the whole selection, otherwise on the row alone.
   setRowMenu({targets:selectedIds.has(item.id)?selection:[item],point:null,anchor:row});
@@ -740,6 +745,63 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  }
 
  const selection=visibleItems.filter(i=>selectedIds.has(i.id));
+ const visibleFolders=childFolders.filter(entry=>entry.name.toLocaleLowerCase().includes(nameFilter.trim().toLocaleLowerCase()));
+ const activeFolder=visibleFolders.find(entry=>entry.id===focusedFolderId)??null;
+ const activePreview=visibleItems.find(item=>item.id===focusedId)
+  ??visibleItems.find(item=>selectedIds.has(item.id))??visibleItems[0]??null;
+ // Non-table entries intentionally reuse the same row selection, context menu,
+ // move, download, favorite and deletion state machines above.
+ function renderVisualEntry(item:FileItem,index:number){
+  const image=classifyFile(item.name).category==="image"&&item.sizeBytes<=24*1024*1024;
+  return <div key={item.id} data-id={item.id} role="row"
+   tabIndex={focusedId===item.id||(focusedId===null&&index===0)?0:-1}
+   aria-selected={selectedIds.has(item.id)}
+   className={"file-entry explorer-item"+(selectedIds.has(item.id)?" selected":"")+(focusedId===item.id?" focused":"")+(draggingIds.has(item.id)?" drag-source":"")}
+   draggable
+   onClick={event=>onRowClick(event,item)}
+   onContextMenu={event=>onRowContextMenu(event,item)}
+   onDoubleClick={()=>navigate("/preview/"+item.id)}
+   onDragStart={event=>onRowDragStart(event,item)}
+   onDragEnd={onRowDragEnd}>
+   <div className="explorer-item-art" aria-hidden="true">
+    <FileTypeIcon name={item.name} size={viewMode==="columns"?22:46}/>
+    {image&&<img src={fileApi.mediaUrl(item.id,item.sha256)} alt="" loading="lazy" decoding="async"
+     onError={event=>{event.currentTarget.hidden=true;}}/>}
+   </div>
+   <span className="explorer-item-name" title={item.name}>{item.name}</span>
+   <span className="explorer-item-sub">{formatSize(item.sizeBytes)} · v{item.currentVersionSeq}</span>
+   <RareInput className="explorer-item-check" type="checkbox" checked={selectedIds.has(item.id)}
+    aria-label={"选择 "+item.name} onClick={event=>event.stopPropagation()} onChange={event=>onCheckToggle(event,item)}/>
+   <RareButton type="button" tone="ghost" className={"explorer-item-star"+(favoriteIds.has(item.id)?" favorited":"")}
+    aria-label={favoriteIds.has(item.id)?"取消收藏 "+item.name:"收藏 "+item.name}
+    disabled={favoritesState!=="ready"||favoriteBusy!==""}
+    onClick={event=>{event.stopPropagation();void toggleFavorite(item);}}>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill={favoriteIds.has(item.id)?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.8 1.2 6.9L12 17.8l-6.2 3.2L7 14.1 2 9.3l6.9-1z"/></svg>
+   </RareButton>
+   <RareButton type="button" tone="ghost" className="explorer-item-more" aria-label={"文件操作 "+item.name}
+    aria-haspopup="menu" onClick={event=>{event.stopPropagation();openRowMenu(item,event.currentTarget);}}>···</RareButton>
+  </div>;
+ }
+ function renderFolderEntry(entry:Folder){
+  return <div key={"folder-"+entry.id} data-folder-id={entry.id} role="row"
+   tabIndex={0} aria-selected={focusedFolderId===entry.id}
+   className={"explorer-item explorer-folder"+(focusedFolderId===entry.id?" selected":"")}
+   onClick={()=>{setFocusedFolderId(entry.id);setFocusedId(null);setSelectedIds(new Set());}}
+   onDoubleClick={()=>navigate("/doc?folder="+encodeURIComponent(entry.id))}
+   onKeyDown={event=>{
+    if(event.key==="Enter"){event.preventDefault();event.stopPropagation();navigate("/doc?folder="+encodeURIComponent(entry.id));}
+   }}>
+   <div className="explorer-item-art" aria-hidden="true"><FolderResourceIcon size={viewMode==="columns"?24:52}/></div>
+   <span className="explorer-item-name" title={entry.name}>{entry.name}</span>
+   <span className="explorer-item-sub">文件夹</span>
+  </div>;
+ }
+ const previewArt=(item:FileItem)=><div className="explorer-preview-art">
+  {classifyFile(item.name).category==="image"?
+   <img src={fileApi.mediaUrl(item.id,item.sha256)} alt={item.name} loading="lazy" decoding="async"
+    onError={event=>{event.currentTarget.hidden=true;}}/>:null}
+  <FileTypeIcon name={item.name} size={90}/>
+ </div>;
  const selectedBytes=selection.reduce((sum,file)=>sum+file.sizeBytes,0);
  const selectedVisibleCount=visibleItems.reduce((count,item)=>count+(selectedIds.has(item.id)?1:0),0);
  const allLoadedSelected=visibleItems.length>0&&selectedVisibleCount===visibleItems.length;
@@ -753,7 +815,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  // ("拖回来源", §7.2) and it must not light up the upload zone either, so its
  // drag events are stopped before the DropZone sees them. External file drags
  // are untouched and keep bubbling (DI-17: upload intent stays with §7.1).
- return <div className="work-body"
+ return <div className="work-body" data-explorer-view={viewMode}
   onDragEnter={suppressInternalDrag}
   onDragOver={suppressInternalDrag}
   onDragLeave={suppressInternalDrag}
@@ -819,7 +881,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     {zipProgress.phase==="failed"||zipProgress.phase==="handoff"?"关闭":"取消"}
    </RareButton>
   </div>}
-  <div className="table" onClick={event=>{if(!(event.target as HTMLElement).closest("tr")){setSelectedIds(new Set<string>());setAnchorId(null);}}}>
+  {viewMode==="list"&&<div className="table" onClick={event=>{if(!(event.target as HTMLElement).closest("tr")){setSelectedIds(new Set<string>());setAnchorId(null);}}}>
    <RareDataTable role="grid" aria-label={folderName+" 文件列表"} density="compact" className="file-table file-table-ultra">
     <thead><tr>
      <th className="col-select" scope="col"><RareInput ref={selectAllRef} type="checkbox" checked={allLoadedSelected} onChange={toggleSelectAllLoaded} aria-label="选择当前已加载的文件"/></th>
@@ -832,12 +894,12 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     <tbody onKeyDown={onGridKeyDown}>
      {status==="loading"&&<tr><td colSpan={6} className="empty"><BrandLoadingLabel size="sm">正在加载文件…</BrandLoadingLabel></td></tr>}
      {status==="failed"&&<tr><td colSpan={6} className="empty" role="alert">获取文件失败，请刷新重试</td></tr>}
-     {status==="ready"&&items.length===0&&<tr><td colSpan={6} className="empty">
+     {status==="ready"&&items.length===0&&visibleFolders.length===0&&<tr><td colSpan={6} className="empty">
       <svg className="empty-mark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.5h8A1.5 1.5 0 0 1 20 10v7.5A1.5 1.5 0 0 1 18.5 19h-14A1.5 1.5 0 0 1 3 17.5z"/></svg>
       <span className="empty-title">目录为空</span>
       <span className="empty-hint">上传第一个文件开始使用。</span>
      </td></tr>}
-     {status==="ready"&&items.length>0&&visibleItems.length===0&&<tr><td colSpan={6} className="empty">
+     {status==="ready"&&items.length>0&&visibleItems.length===0&&visibleFolders.length===0&&<tr><td colSpan={6} className="empty">
      <span className="empty-title">无匹配文件</span>
       <span className="empty-hint">已加载的文件中没有匹配项{hasMore?"，可继续加载后查找":""}。</span>
       <RareButton type="button" className="secondary-action" style={{marginTop:6}} onClick={()=>{
@@ -848,10 +910,21 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
        setAnchorId(null);
       }}>清除筛选（显示已加载 {items.length} 个文件）</RareButton>
      </td></tr>}
+     {status==="ready"&&visibleFolders.map(entry=><tr key={"folder-"+entry.id} className={"explorer-list-folder"+(focusedFolderId===entry.id?" selected":"")}
+      tabIndex={0} aria-selected={focusedFolderId===entry.id}
+      onClick={()=>{setFocusedFolderId(entry.id);setFocusedId(null);setSelectedIds(new Set());}}
+      onDoubleClick={()=>navigate("/doc?folder="+encodeURIComponent(entry.id))}
+      onKeyDown={event=>{if(event.key==="Enter"){event.stopPropagation();navigate("/doc?folder="+encodeURIComponent(entry.id));}}}>
+      <td className="col-select"/>
+      <td className="col-name"><div className="file-cell-wrap"><FolderResourceIcon size={19}/><span className="file-name" title={entry.name}>{entry.name}</span></div></td>
+      <td className="col-size">—</td><td className="col-version">—</td><td className="col-date">—</td>
+      <td className="row-actions col-actions"><RareButton type="button" tone="ghost" className="action-link" onClick={()=>navigate("/doc?folder="+encodeURIComponent(entry.id))}>打开</RareButton></td>
+     </tr>)}
      {status==="ready"&&visibleItems.map((item,index)=><tr key={item.id} data-id={item.id}
+      data-file-entry="true"
       tabIndex={focusedId===item.id||(focusedId===null&&index===0)?0:-1}
       aria-selected={selectedIds.has(item.id)}
-      className={(selectedIds.has(item.id)?"selected":"")+(focusedId===item.id?" focused":"")+(draggingIds.has(item.id)?" drag-source":"")}
+      className={"file-entry "+(selectedIds.has(item.id)?"selected":"")+(focusedId===item.id?" focused":"")+(draggingIds.has(item.id)?" drag-source":"")}
       draggable
       onClick={event=>onRowClick(event,item)}
       onContextMenu={event=>onRowContextMenu(event,item)}
@@ -893,7 +966,47 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
      </tr>)}
     </tbody>
    </RareDataTable>
-  </div>
+  </div>}
+  {viewMode!=="list"&&<div className={"explorer-surface explorer-surface-"+viewMode}
+   aria-label={folderName+" 文件"+(viewMode==="icons"?"图标":viewMode==="columns"?"分栏":"画廊")+"视图"}>
+   {status==="loading"&&<div className="explorer-empty" role="status"><BrandLoadingLabel size="sm">正在加载文件…</BrandLoadingLabel></div>}
+   {status==="failed"&&<div className="explorer-empty" role="alert">获取文件失败，请刷新重试</div>}
+   {status==="ready"&&visibleItems.length===0&&visibleFolders.length===0&&<div className="explorer-empty">
+    <span>{items.length===0&&childFolders.length===0?"目录为空":"没有匹配的文件"}</span>
+    {items.length>0&&<RareButton type="button" tone="ghost" onClick={()=>{setCategoryFilter("all");setNameFilter("");setSelectedIds(new Set());}}>清除筛选</RareButton>}
+   </div>}
+   {status==="ready"&&(visibleItems.length>0||visibleFolders.length>0)&&viewMode==="icons"&&<div className="explorer-icon-grid" role="grid" aria-label="文件图标" onKeyDown={onGridKeyDown}>
+    {visibleFolders.map(renderFolderEntry)}
+    {visibleItems.map(renderVisualEntry)}
+   </div>}
+   {status==="ready"&&(visibleItems.length>0||visibleFolders.length>0)&&viewMode==="columns"&&<div className="explorer-columns">
+    <div className="explorer-column-list" role="grid" aria-label="当前目录文件" onKeyDown={onGridKeyDown}>{visibleFolders.map(renderFolderEntry)}{visibleItems.map(renderVisualEntry)}</div>
+    {activeFolder&&<div className="explorer-column-detail" aria-label="所选文件夹详情">
+     <div className="explorer-preview-art"><FolderResourceIcon size={96}/></div>
+     <strong>{activeFolder.name}</strong>
+     <RareButton type="button" tone="neutral" onClick={()=>navigate("/doc?folder="+encodeURIComponent(activeFolder.id))}>打开文件夹</RareButton>
+    </div>}
+    {!activeFolder&&activePreview&&<div className="explorer-column-detail" aria-label="所选文件详情">
+     {previewArt(activePreview)}
+     <strong title={activePreview.name}>{activePreview.name}</strong>
+     <dl><dt>大小</dt><dd>{formatSize(activePreview.sizeBytes)}</dd><dt>版本</dt><dd>v{activePreview.currentVersionSeq}</dd><dt>修改</dt><dd>{activePreview.updatedAt.replace("T"," ").slice(0,16)}</dd></dl>
+     <RareButton type="button" tone="neutral" onClick={()=>navigate("/preview/"+activePreview.id)}>打开预览</RareButton>
+    </div>}
+   </div>}
+   {status==="ready"&&(visibleItems.length>0||visibleFolders.length>0)&&viewMode==="gallery"&&<div className="explorer-gallery">
+    {activeFolder&&<div className="explorer-gallery-stage">
+     <div className="explorer-preview-art"><FolderResourceIcon size={100}/></div>
+     <div className="explorer-gallery-caption"><strong>{activeFolder.name}</strong><span>文件夹</span></div>
+     <RareButton type="button" tone="neutral" onClick={()=>navigate("/doc?folder="+encodeURIComponent(activeFolder.id))}>打开文件夹</RareButton>
+    </div>}
+    {!activeFolder&&activePreview&&<div className="explorer-gallery-stage">
+     {previewArt(activePreview)}
+     <div className="explorer-gallery-caption"><strong title={activePreview.name}>{activePreview.name}</strong><span>{formatSize(activePreview.sizeBytes)} · v{activePreview.currentVersionSeq}</span></div>
+     <RareButton type="button" tone="neutral" onClick={()=>navigate("/preview/"+activePreview.id)}>打开预览</RareButton>
+    </div>}
+    <div className="explorer-gallery-strip" role="grid" aria-label="画廊文件" onKeyDown={onGridKeyDown}>{visibleFolders.map(renderFolderEntry)}{visibleItems.map(renderVisualEntry)}</div>
+   </div>}
+  </div>}
   {(hasMore||loadingMore||moreError)&&<div className="file-page-controls" role="group" aria-label="文件分页">
    <RareButton type="button" className="secondary-action" disabled={loadingMore||status!=="ready"||!hasMore} aria-busy={loadingMore} onClick={()=>void loadMore()}>{loadingMore?"正在加载…":moreError?"重试加载":"加载更多"}</RareButton>
    <span className="file-page-hint">{hasMore?"已加载 "+items.length+" 项 · 后面还有文件":"已显示全部 "+items.length+" 项"}</span>
@@ -921,7 +1034,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    point={rowMenu.point} onClose={()=>setRowMenu(null)}/>}
   <footer className="status-bar">
    <div className="status-left">
-    <span>已选 <span className="status-strong">{selectedIds.size}</span> 项{selectedIds.size>0&&<> / <span className="status-strong">{formatSize(selectedBytes)}</span></>} · {hasMore?"已加载":"共"} <span className="status-strong">{items.length}</span> 个文件{(categoryFilter!=="all"||nameFilter.trim())&&<> · 匹配 <span className="status-strong">{visibleItems.length}</span> 项（已加载范围）</>}</span>
+    <span>已选 <span className="status-strong">{selectedIds.size}</span> 项{selectedIds.size>0&&<> / <span className="status-strong">{formatSize(selectedBytes)}</span></>} · {hasMore?"已加载":"共"} <span className="status-strong">{items.length}</span> 个文件{childFolders.length>0&&<> · <span className="status-strong">{childFolders.length}</span> 个文件夹</>}{(categoryFilter!=="all"||nameFilter.trim())&&<> · 匹配 <span className="status-strong">{visibleItems.length+visibleFolders.length}</span> 项（已加载范围）</>}</span>
    </div>
    <div className="status-right">
     <span>延迟: <span className="status-strong">{latencyMs===null?"—":latencyMs+"ms"}</span> · <span className="status-build">v2.1.0</span></span>
