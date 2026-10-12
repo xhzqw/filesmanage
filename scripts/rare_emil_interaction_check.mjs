@@ -12,6 +12,7 @@ const toastStyle=read("web/src/shared/ui/toast.css");
 const theme=read("web/src/theme.css");
 const preview=read("web/src/pages/Preview.tsx");
 const previewStyles=read("web/src/pages/previewWorkbenchV2.css");
+const workflow=read("scripts/ux_workflows_check.mjs");
 
 assert.match(table,/setMoveDragImage\(dataTransfer,item\.name,ids\.length\)/,"drag should use shared filename preview");
 assert.match(table,/setData\("text\/plain",ids\.length===1\?item\.name:/,"text fallback must be filename-first");
@@ -27,4 +28,7 @@ assert.match(toastStyle,/@media\(prefers-reduced-motion:reduce\)/,"reduced motio
 assert.match(previewStyles,/\.file-workbench-side-actions \.file-workbench-actions\{[^}]*grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/,"preview primary actions use one balanced row");
 assert.match(preview,/moreOpen&&<div className="file-action-expansion"/,"preview More expands directly inside the sidebar");
 assert.match(previewStyles,/\.file-action-expansion\{[^}]*flex-direction:column/,"upward expansion is a compact vertical action group");
+assert.match(workflow,/Input\.dispatchMouseEvent/,"native drag browser gate must exercise actual pointer input");
+assert.match(workflow,/DI-17 native drag of selection opens two-file batch move/,"multi-file native drag scope must be checked");
+assert.match(workflow,/DI-17 OS file drag cannot impersonate internal move/,"OS upload drag must stay distinct from internal move");
 console.log("RARE_EMIL_INTERACTION_PASS: drag, selection, toast lifecycle, preview actions");

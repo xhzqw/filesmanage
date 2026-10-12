@@ -44,3 +44,15 @@ RareUI 仍是唯一视觉体系。Emil Kowalski 的设计工程 Skills 用于代
 - **远端验证证据**：隔离 Chrome `UX_WORKFLOWS_MOVE_PASS`，48/48；`go test ./...`、TypeScript + Vite 构建、UI Style/Component Governance 均通过。静态防回退扩展到预览操作栏。
 
 未覆盖的实机键盘拖拽、权限拒绝组合、CAD/Office 特殊格式和全部大目录压测，继续列为后续验收项；上面的通过结果不等于这些场景已验证。
+
+## 第三批：Chrome 原生文件拖拽（2026-10-12）
+
+对 `scripts/ux_workflows_check.mjs` 的 MOVEUI 套件扩展了真实 Chromium 原生鼠标拖拽测试，保持 `scripts/ux_isolated_lab.sh run ux_workflows_check --suite move` 作为隔离验收入口。验证环境为远端 `filesmanage_ux_test`，不得在开发库运行这些会创建/移动/删除文件的夹具。
+
+- **单文件**：由 CDP `Input.dispatchMouseEvent` 真正产生浏览器 `dragstart`、`DataTransfer`、`dragover` 与 `drop`，而不人工派发伪造的内部移动事件；检查拖到来源目录拒绝，拖到其他目录可预选正确目标，并且未经确认不会写入。
+- **多选**：逐个点击真实文件行 checkbox，验证拖动被选中的一行会携带两份文件，拖动文本为 `文件名 +1`、弹出两文件批量移动对话框；取消后通过 **file ID** 而不是名字核对目标目录，避免把原有同名文件误认成本次移动。
+- **手势结束**：核对源行弱化与落点高亮均能清除。浏览器对原生 `dragover` 存在节流，验收必须在目标位置停留后判断；CDP 合成 Escape 可能不会中止 Chromium 原生拖拽控制器，测试同时让指针回到来源再松开，故此项覆盖“取消后回到来源”，不等同于证明所有平台纯 Escape 取消。
+- **外部文件隔离**：独立构造含 `Files` 的拖动载荷，确认其不会激活内部移动目标或移动弹窗；此负向场景是 DOM 事件模拟，不声称完成真实 OS→浏览器文件上传。
+- **结果**：远端隔离 Chrome 实测 `UX_WORKFLOWS_MOVE_PASS`、59/59 检查通过，旧版单文件移动、批量冲突、文件夹移动、预览操作栏均持续通过。本批仅增加回归测试与文档，未修改现有业务逻辑。
+
+仍待独立验收：仅按 Escape 不回拖的跨浏览器取消语义、实际 OS 文件放入页面的上传路径、受限账号的全部权限组合、CAD/Office/签章不同格式的鼠标直接操作及大规模文件树。

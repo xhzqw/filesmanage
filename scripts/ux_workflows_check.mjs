@@ -598,7 +598,7 @@ async function moveUiSuite() {
   // Regression for every folder falsely displaying “已存在同名文件”.
   await uploadKeyed(unrelatedId, "mv-file.txt");
   await uploadKeyed(dstId, "mv-dup.txt");
-  await uploadKeyed(srcId, "mv-dup.txt");
+  const sourceDuplicate = await uploadKeyed(srcId, "mv-dup.txt");
 
   let chrome = null;
   let cdp = null;
@@ -630,6 +630,140 @@ async function moveUiSuite() {
     await cdp.navigate(`${BASE}/doc?folder=${srcId}`);
     const rowsReady = await cdp.waitFor(`()=>document.querySelectorAll('tbody tr[data-id]').length>=2`);
     check("source folder files listed", Boolean(rowsReady), String(rowsReady));
+
+    // Browser-native file drag. CDP sends pointer input, not a fabricated
+    // DragEvent; the browser must emit dragstart/DataTransfer/drop/dragend.
+    const dragEndpoints=await cdp.waitFor(`()=>!!document.querySelector('li[data-folder-id="${srcId}"] .tree-row')&&!!document.querySelector('li[data-folder-id="${dstId}"] .tree-row')`,10000);
+    check("DI-17 native drag source and tree targets visible",dragEndpoints===true,String(dragEndpoints));
+    await cdp.evaluate(`(()=>{
+      window.__moveDragProbe={starts:0,ends:0,overs:0,lastOver:"",types:[],text:""};
+      document.addEventListener("dragstart",e=>{
+        if(!e.target.closest?.("tr[data-id]"))return;
+        queueMicrotask(()=>{
+          window.__moveDragProbe.starts++;
+          window.__moveDragProbe.types=[...e.dataTransfer.types];
+          window.__moveDragProbe.text=e.dataTransfer.getData("text/plain");
+        });
+      });
+      document.addEventListener("dragend",()=>window.__moveDragProbe.ends++);
+      document.addEventListener("dragover",e=>{
+        window.__moveDragProbe.overs++;
+        window.__moveDragProbe.lastOver=e.target.closest?.("li[data-folder-id]")?.dataset?.folderId||e.target.tagName;
+      },true);
+    })()`);
+    const nativeDrag=async(targetId,cancel=false)=>{
+      const pos=await cdp.evaluate(`(()=>{
+        const row=[...document.querySelectorAll("tr[data-id]")].find(r=>r.textContent?.includes("mv-file.txt"));
+        const source=row?.querySelector(".file-name"),target=document.querySelector('li[data-folder-id="${targetId}"] .tree-row');
+        if(!source||!target)return null;
+        target.scrollIntoView({block:"nearest"});
+        const a=source.getBoundingClientRect(),b=target.getBoundingClientRect();
+        return {sx:a.left+Math.min(a.width/2,35),sy:a.top+a.height/2,tx:b.left+Math.min(b.width/2,65),ty:b.top+b.height/2};
+      })()`);
+      if(!pos)throw Error("native drag target not visible");
+      const {sx,sy,tx,ty}=pos;
+      await cdp.send("Input.dispatchMouseEvent",{type:"mouseMoved",x:sx,y:sy});
+      await cdp.send("Input.dispatchMouseEvent",{type:"mousePressed",x:sx,y:sy,button:"left",buttons:1,clickCount:1});
+      for(let step=1;step<=12;step++){
+        const t=step/12;
+        await cdp.send("Input.dispatchMouseEvent",{type:"mouseMoved",x:sx+(tx-sx)*t,y:sy+(ty-sy)*t,button:"left",buttons:1});
+        await delay(40);
+      }
+      // Chromium throttles native dragover; remain over the destination just
+      // as a person does before releasing, otherwise the last dispatched
+      // pointer move can precede the browser's next dragover event.
+      for(let tick=0;tick<4;tick++){
+        await cdp.send("Input.dispatchMouseEvent",{type:"mouseMoved",x:tx,y:ty,button:"left",buttons:1});
+        await delay(140);
+      }
+      const hover=await cdp.evaluate(`(()=>({
+        probe:window.__moveDragProbe,
+        target:document.querySelector('li[data-folder-id="${targetId}"] .tree-row')?.className??"",
+        source:!!document.querySelector("tr.drag-source"),
+        coords:{sx:${sx},sy:${sy},tx:${tx},ty:${ty}},
+        pointed:document.elementFromPoint(${tx},${ty})?.outerHTML.slice(0,220)||""
+      }))()`);
+      if(cancel){
+        await cdp.key("Escape","Escape",27);
+        // CDP may not abort Chromium's native drag controller on a synthetic
+        // Escape key. Release back over the source so a failed synthetic
+        // cancellation cannot accidentally drop into the destination.
+        await cdp.send("Input.dispatchMouseEvent",{type:"mouseMoved",x:sx,y:sy,button:"left",buttons:1});
+        await delay(200);
+      }
+      await cdp.send("Input.dispatchMouseEvent",{type:"mouseReleased",x:cancel?sx:tx,y:cancel?sy:ty,button:"left",buttons:0,clickCount:1});
+      await delay(350);
+      return hover;
+    };
+    if(dragEndpoints){
+      const same=await nativeDrag(srcId);
+      const sameState=await cdp.evaluate(`(()=>({
+        dialog:!!document.querySelector("dialog.dialog[open] .folder-picker"),
+        dialogTitle:document.querySelector("dialog.dialog[open]")?.textContent?.slice(0,100)||"",
+        pathname:location.pathname,
+        remainingDragRows:document.querySelectorAll("tr.drag-source").length
+      }))()`);
+      check("DI-17 native drag to source folder is refused",same.probe.starts>0&&same.target.includes("drop-reject")&&!sameState.dialog,JSON.stringify({same,sameState}));
+      const dropped=await nativeDrag(dstId);
+      const open=await cdp.waitFor(`()=>!!document.querySelector("dialog.dialog[open] .folder-picker")`,8000);
+      const targetSelected=await cdp.evaluate(`(()=>document.querySelector("dialog.dialog[open] .folder-picker-candidate")?.textContent?.includes(${JSON.stringify(`MV-DST-${stamp}`)})||false)()`);
+      check("DI-17 native drag opens preselected move picker",dropped.probe.starts>0&&dropped.target.includes("drop-accept")&&open===true&&targetSelected===true,JSON.stringify({dropped,open,targetSelected}));
+      check("DI-17 native fallback carries filename only",dropped.probe.text==="mv-file.txt"&&dropped.probe.types.includes("application/x-filesmanage-files"),JSON.stringify(dropped.probe));
+      await cdp.key("Escape","Escape",27);
+      await cdp.waitFor(`()=>!document.querySelector("dialog.dialog[open] .folder-picker")`,5000);
+      const stillSource=(await call("GET",`/api/files?folder=${srcId}&limit=200`)).body?.data?.items??[];
+      check("DI-17 dropped but unconfirmed move writes nothing",stillSource.some(f=>f.id===file.fileId),String(stillSource.length));
+      const escaped=await nativeDrag(dstId,true);
+      const cancelState=await cdp.evaluate(`(()=>({
+        noDialog:!document.querySelector("dialog.dialog[open] .folder-picker"),
+        rows:document.querySelectorAll("tr.drag-source").length,
+        markers:document.querySelectorAll(".tree-row.drop-accept,.tree-row.drop-reject").length
+      }))()`);
+      check("DI-17 Escape and return to source clears drag state",
+       escaped.probe.starts>0&&cancelState.noDialog&&cancelState.rows===0&&cancelState.markers===0,JSON.stringify({escaped,cancelState}));
+      const osFile=await cdp.evaluate(`(()=>{
+        const row=document.querySelector('li[data-folder-id="${dstId}"] .tree-row');
+        const dt=new DataTransfer();
+        dt.items.add(new File(["external"],"external.txt",{type:"text/plain"}));
+        dt.setData("text/plain","external");
+        row.dispatchEvent(new DragEvent("dragover",{bubbles:true,cancelable:true,dataTransfer:dt}));
+        return {className:row.className,dialog:!!document.querySelector("dialog.dialog[open] .folder-picker")};
+      })()`);
+      check("DI-17 OS file drag cannot impersonate internal move",!osFile.className.includes("drop-accept")&&!osFile.dialog,JSON.stringify(osFile));
+
+      // A selected row must carry the entire selection, not only the row
+      // under the pointer. Drive checkboxes independently so React commits
+      // each selection update before the next click.
+      await cdp.evaluate(`(()=>{document.querySelector(".batch-clear-selection")?.click();return true;})()`);
+      await delay(150);
+      const firstChecked=await cdp.evaluate(`(()=>{
+        const row=[...document.querySelectorAll("tbody tr[data-id]")].find(r=>r.textContent?.includes("mv-file.txt"));
+        row?.querySelector('input[type="checkbox"]')?.click();
+        return Boolean(row);
+      })()`);
+      await delay(150);
+      const secondChecked=await cdp.evaluate(`(()=>{
+        const row=[...document.querySelectorAll("tbody tr[data-id]")].find(r=>r.textContent?.includes("mv-dup.txt"));
+        row?.querySelector('input[type="checkbox"]')?.click();
+        return Boolean(row);
+      })()`);
+      await delay(150);
+      const selectedCount=await cdp.evaluate(`(()=>document.querySelectorAll("tbody tr[aria-selected='true']").length)()`);
+      check("DI-17 multiselect marks two visible source rows",firstChecked&&secondChecked&&selectedCount===2,JSON.stringify({firstChecked,secondChecked,selectedCount}));
+      const multi=await nativeDrag(dstId);
+      const batchOpen=await cdp.waitFor(`()=>[...document.querySelectorAll("dialog.dialog[open]")].some(d=>d.querySelector(".folder-picker")&&d.textContent?.includes("移动 2 个文件"))`,8000);
+      const batchTarget=await cdp.evaluate(`(()=>document.querySelector("dialog.dialog[open] .folder-picker-candidate")?.textContent?.includes(${JSON.stringify(`MV-DST-${stamp}`)})||false)()`);
+      check("DI-17 native drag of selection opens two-file batch move",multi.target.includes("drop-accept")&&batchOpen===true&&batchTarget,JSON.stringify({multi,batchOpen,batchTarget}));
+      check("DI-17 native multiselect ghost text is filename plus one",multi.probe.text==="mv-file.txt +1",JSON.stringify(multi.probe));
+      await cdp.key("Escape","Escape",27);
+      await cdp.waitFor(`()=>!document.querySelector("dialog.dialog[open] .folder-picker")`,5000);
+      const destAfterCancel=(await call("GET",`/api/files?folder=${dstId}&limit=200`)).body?.data?.items??[];
+      check("DI-17 cancelling multi-file drag picker writes nothing",
+       !destAfterCancel.some(f=>f.id===file.fileId||f.id===sourceDuplicate.fileId),
+       JSON.stringify(destAfterCancel.map(f=>({id:f.id,name:f.name}))));
+      await cdp.evaluate(`(()=>{document.querySelector(".batch-clear-selection")?.click();return true;})()`);
+      await delay(150);
+    }
 
     const picker = (fn) => cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));${fn};})()`);
     // The picker tree starts collapsed, so targets are chosen through the
