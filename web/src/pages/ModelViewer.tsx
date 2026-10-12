@@ -71,6 +71,25 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
  const[cube,setCube]=useState({yaw:45,pitch:26});
  const drawing=(info?.outputKind??info?.format??"").toLowerCase()==="dxf";
 
+ async function authorizePaperOutput(render:(popup:Window)=>void){
+  const sha=fileMeta?.sha256;
+  if(!sha){setMessage("文件信息尚未加载，无法核对打印版本");return;}
+  const popup=window.open("","_blank");
+  if(!popup){setMessage("浏览器阻止了打印预览弹窗，请允许弹出窗口");return;}
+  popup.document.write('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><body style="font:14px system-ui;padding:2em">正在验证图纸打印权限…</body>');
+  popup.document.close();
+  try{
+   await fileApi.preparePrint(id,sha);
+   if(popup.closed)throw new Error("打印窗口已关闭");
+   render(popup);
+   setMessage("");setPlotError("");
+  }catch(error){
+   if(!popup.closed)popup.close();
+   const reason=errorCopy(error,"无打印权限或图纸版本已更新，请刷新后重试");
+   setMessage(reason);setPlotError(reason);
+  }
+ }
+
  // React Router can keep this component mounted while /model/:id changes.
  // Drop the previous GPU scene and restart loading for the new document.
  useEffect(()=>{
@@ -320,13 +339,13 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
          activeLayout.replace(/[^\p{L}\p{N}_-]/gu,"_").slice(0,50)+".png";
         anchor.click();
        }} title="导出当前图纸 PNG">PNG</RareButton>}
-       {drawing&&activeLayout!=="Model"&&(["A4","A3"] as const).map((paper:SheetSize)=>
-        <RareButton key={paper} type="button" title="适合纸张打印当前图像，非CAD精确比例出图" onClick={()=>{
-         const snapshot=controls.current?.exportPng();
-         if(!snapshot)return;
-         if(!printCurrentSheet(snapshot,paper,activeLayout))
-          setMessage("浏览器阻止了打印预览，请允许弹出窗口");
-        }}>{paper}打印</RareButton>)}
+        {drawing&&activeLayout!=="Model"&&(["A4","A3"] as const).map((paper:SheetSize)=>
+         <RareButton key={paper} type="button" disabled={!fileMeta} title="适合纸张打印当前图像，非CAD精确比例出图" onClick={()=>{
+          const snapshot=controls.current?.exportPng();
+          if(!snapshot)return;
+          void authorizePaperOutput(popup=>{if(!printCurrentSheet(snapshot,paper,activeLayout,popup))
+           throw new Error("打印窗口已关闭");});
+         }}>{paper}打印</RareButton>)}
        {drawing&&message.startsWith("浏览器阻止了打印")&&
         <span className="cad-print-error" role="alert">{message}</span>}
       </div>}
@@ -368,16 +387,11 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
         </RareSelect>
        </label>
        <div className="cad-quick-actions">
-        {(["A4","A3"] as const).map(sheet=><RareButton key={sheet} type="button"
-         disabled={unit!=="mm"} onClick={()=>{
-          const root=dxfRoot.current;
-          if(!root)return;
-          try{
-           openVectorPrint(root,{sheet,scale:plotScale,unit,layout:activeLayout});
-           setPlotError("");
-          }catch(error){
-           setPlotError(error instanceof Error?error.message:"按比例出图失败");
-          }
+         {(["A4","A3"] as const).map(sheet=><RareButton key={sheet} type="button"
+          disabled={unit!=="mm"||!fileMeta} onClick={()=>{
+           const root=dxfRoot.current;
+           if(!root)return;
+           void authorizePaperOutput(popup=>openVectorPrint(root,{sheet,scale:plotScale,unit,layout:activeLayout},popup));
          }} title={sheet+" 矢量打印；打印时使用 100% 实际大小"}>{sheet} 矢量</RareButton>)}
        </div>
        {unit!=="mm"&&<p className="cad-notice">仅支持毫米 DXF</p>}

@@ -1000,6 +1000,29 @@ add("GET", "/api/files/{id}/preview/office-pdf", operation("Isolated Office-to-P
                "404": {"description": ERR["404"]}, "415": {"description": "Unsupported or unsafe Office input."},
                "500": {"description": "Isolated conversion unavailable; client should use textual fallback."}}))
 
+add("POST", "/api/files/{id}/print/prepare", operation("Audit browser print intent (requires preview + print ACL, version digest)", "Files", "prepareBrowserPrint", security=SESSION,
+    params=[id_param("id", "File id.")],
+    request={"application/json":{"schema":obj({"expectedSha256":string()},required=["expectedSha256"])}},
+    responses=dict([json_ok(obj({"fileId":string(),"name":string(),"versionSeq":integer(),"sha256":string()},
+                 required=["fileId","name","versionSeq","sha256"]), "Browser print authorized; does not assert physical print completion."),
+                 resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
+
+add("GET", "/api/files/{id}/print/media", operation("Stream checked PDF or still image for browser print (print + preview ACL)", "Files", "browserPrintMedia", security=SESSION,
+    params=[id_param("id", "File id."),{"name":"sha256","in":"query","required":True,"schema":string()}],
+    responses={"200":{"description":"Only signature-verified PDF/image, pinned to current version, inline/no-store.",
+                      "content":{"application/octet-stream":{"schema":{"type":"string","format":"binary"}}}},
+               "206":{"description":"Partial verified media range."},"401":{"description":ERR["401"]},
+               "403":{"description":ERR["403"]},"404":{"description":ERR["404"]},
+               "409":{"description":ERR["409"]},"415":{"description":"Unsupported printable media."}}))
+
+add("GET", "/api/files/{id}/print/office-pdf", operation("Print-authorized isolated Office PDF conversion (print + preview ACL)", "Files", "browserPrintOfficePDF", security=SESSION,
+    params=[id_param("id", "File id."),{"name":"sha256","in":"query","required":True,"schema":string()}],
+    responses={"200":{"description":"Ephemeral PDF conversion in sandbox, never a physical printer job.",
+                      "content":{"application/pdf":{"schema":{"type":"string","format":"binary"}}}},
+               "401":{"description":ERR["401"]},"403":{"description":ERR["403"]},
+               "404":{"description":ERR["404"]},"409":{"description":ERR["409"]},
+               "415":{"description":"Unsupported or unsafe Office input."}}))
+
 add("POST", "/api/files/{id}/save", operation("Save new file content (new version, idempotent)", "Files", "saveFile", security=SESSION,
     params=[id_param("id", "File id.")],
     request={"application/json": {"schema": ref("SaveFileRequest")}},

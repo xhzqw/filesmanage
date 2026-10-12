@@ -12,6 +12,7 @@ import {FileMetadataEditor} from "../features/documents/FileMetadataEditor";
 import {FileLifecyclePanel} from "../features/documents/FileLifecyclePanel";
 import {VersionComparePanel} from "../features/documents/VersionComparePanel";
 import {FileReviewPanel} from "../features/documents/FileReviewPanel";
+import {PrintDialog} from "../features/documents/PrintDialog";
 import {MoveDialog} from "../features/documents/FileTable";
 import {RollbackDialog} from "../features/documents/RollbackDialog";
 import {ShareDialog} from "../features/collaboration/ShareDialog";
@@ -49,6 +50,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const[rollback,setRollback]=useState<FileVersion|null>(null);
  const[editing,setEditing]=useState(false);
  const[sharing,setSharing]=useState(false);
+ const[printing,setPrinting]=useState(()=>new URLSearchParams(window.location.search).get("print")==="1");
  const[moving,setMoving]=useState(false);
  const[renaming,setRenaming]=useState(false);
  const[renameValue,setRenameValue]=useState("");
@@ -180,6 +182,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
       </div>
       <div className="file-workbench-actions" aria-label="文件操作">
        <RareButton type="button" className="primary" onClick={download}>下载</RareButton>
+       <RareButton type="button" onClick={()=>setPrinting(true)}>打印</RareButton>
        {isOfficeName(preview.name)&&!archived&&<Link className="rare-button file-action-link" to={"/office/"+id}>在线编辑</Link>}
        {isCadName(preview.name)&&<Link className="rare-button file-action-link" to={"/model/"+id}>3D 查看</Link>}
        {preview.textual&&canManage&&!archived&&<RareButton type="button" disabled={requiresApproval===null}
@@ -278,8 +281,9 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
   {editing&&file&&requiresApproval!==null&&<FileEditor file={file} requiresApproval={requiresApproval} onClose={()=>{setEditing(false);refresh();}} onSaved={()=>{announce("编辑已提交，版本状态正在刷新");refresh();}}/>}
   {moving&&file&&<MoveDialog file={file} presetTargetId="" onClose={()=>setMoving(false)}
    onMoved={()=>{setMoving(false);announce("文件已移动");refresh();}} onReload={refresh}/>}
-  {sharing&&file&&<ShareDialog resource={{kind:"file",id:file.id,name:file.name}}
-   onClose={()=>setSharing(false)} onCreated={()=>{setSharing(false);announce("分享已创建");}}/>}
+   {sharing&&file&&<ShareDialog resource={{kind:"file",id:file.id,name:file.name}}
+    onClose={()=>setSharing(false)} onCreated={()=>{setSharing(false);announce("分享已创建");}}/>}
+   {printing&&preview&&<PrintDialog preview={preview} onClose={()=>setPrinting(false)}/>}
   {renaming&&<Dialog open title="重命名文件" onClose={()=>{if(!busy)setRenaming(false);}} closeGuard={()=>!busy}>
    <form onSubmit={rename}>
     <label htmlFor="file-workbench-rename">新文件名</label>

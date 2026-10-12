@@ -164,9 +164,9 @@ export function buildVectorSheet(root:Three.Group,options:PlotOptions):PlotSheet
  return{html,svg,drawingMm,scaleLabel:"1:"+options.scale};
 }
 
-export function openVectorPrint(root:Three.Group,options:PlotOptions):void{
+export function openVectorPrint(root:Three.Group,options:PlotOptions,opened?:Window):void{
  const result=buildVectorSheet(root,options);
- const popup=window.open("","_blank");
+ const popup=opened??window.open("","_blank");
  if(!popup)throw new Error("浏览器阻止了打印预览弹窗");
  popup.document.open();
  popup.document.write(result.html);

@@ -31,6 +31,10 @@ func (s *Service) OfficePDFPreview(ctx context.Context, u domain.User, fileID st
 		return nil, err
 	}
 	defer done()
+	return renderOfficePDFSource(ctx, source)
+}
+
+func renderOfficePDFSource(ctx context.Context, source Download) ([]byte, error) {
 	var format string
 	switch extensionOf(source.FileName) {
 	case ".docx":

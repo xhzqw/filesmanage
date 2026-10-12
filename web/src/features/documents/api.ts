@@ -42,6 +42,10 @@ export const fileApi={
  metadata:(id:string)=>request<FileMetadata>("/files/"+id+"/metadata"),
  setMetadata:(id:string,body:{category:string;description:string;tags:string[]})=>changed(request<FileMetadata>("/files/"+id+"/metadata",{method:"PUT",body:JSON.stringify(body)}),id),
 	preview:(id:string)=>request<PreviewData>("/files/"+id+"/preview"),
+  preparePrint:(id:string,expectedSha256:string)=>request<{fileId:string;name:string;versionSeq:number;sha256:string}>(
+   "/files/"+encodeURIComponent(id)+"/print/prepare",{method:"POST",body:JSON.stringify({expectedSha256})}),
+  printMediaUrl:(id:string,sha:string)=>"/api/files/"+encodeURIComponent(id)+"/print/media?sha256="+encodeURIComponent(sha),
+  printOfficeUrl:(id:string,sha:string)=>"/api/files/"+encodeURIComponent(id)+"/print/office-pdf?sha256="+encodeURIComponent(sha),
 	mediaUrl:(id:string,sha:string)=>"/api/files/"+encodeURIComponent(id)+"/preview/media?v="+encodeURIComponent(sha),
  versions:(id:string)=>request<FileVersion[]>("/files/"+id+"/versions"),
  compareVersions:(id:string,left:number,right:number)=>request<VersionComparison>("/files/"+id+"/versions/compare?"+new URLSearchParams({left:String(left),right:String(right)})),

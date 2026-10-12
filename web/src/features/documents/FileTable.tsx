@@ -680,6 +680,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    items.push({id:"rename",label:"重命名",hint:"F2",onSelect:()=>{setRenaming(file);setRenameValue(file.name);}});
    items.push({id:"move",label:"移动到…",onSelect:()=>startMove(file)});
    items.push({id:"download",label:"下载",onSelect:()=>startDownload(file)});
+   items.push({id:"print",label:"打印",onSelect:()=>navigate("/preview/"+file.id+"?print=1")});
   }else if(targets.length>1){
    items.push({id:"move-batch",label:"移动到…",onSelect:()=>startMoveSelection(targets)});
   }

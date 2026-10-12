@@ -23,9 +23,9 @@ export function printableSheetHtml(png:string,size:SheetSize,layout:string):stri
   '" src="'+png+'"></main></body></html>';
 }
 
-export function printCurrentSheet(png:string,size:SheetSize,layout:string):boolean{
+export function printCurrentSheet(png:string,size:SheetSize,layout:string,opened?:Window):boolean{
  const html=printableSheetHtml(png,size,layout);
- const popup=window.open("","_blank");
+ const popup=opened??window.open("","_blank");
  if(!popup)return false;
  popup.document.open();
  popup.document.write(html);
