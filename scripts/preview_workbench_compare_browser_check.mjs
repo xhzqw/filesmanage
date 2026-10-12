@@ -102,7 +102,7 @@ try{
    const title=document.querySelector('.file-preview-identity');
    const dock=document.querySelector('.file-preview-action-dock .file-workbench-actions');
    const toolbar=document.querySelector('.file-compare-toolbar');
-   const controls=[...document.querySelectorAll('.file-compare-controls select')];
+   const controls=[...document.querySelectorAll('.file-compare-controls button.rare-select')];
    if(!main||!title||!dock||!toolbar||controls.length!==2)return null;
    const rect=element=>element.getBoundingClientRect();
    const overlap=(a,b)=>a.left<b.right-1&&a.right>b.left+1&&a.top<b.bottom-1&&a.bottom>b.top+1;
@@ -128,26 +128,27 @@ try{
    JSON.stringify(geometry));
  }
  await cdp.send("Emulation.clearDeviceMetricsOverride");
- const diffNav=await cdp.evaluate(`(()=>{
+ await cdp.evaluate(`(()=>{
   const next=[...document.querySelectorAll('.file-compare-quicknav button')].find(button=>button.textContent?.includes('下一处'));
   const expand=[...document.querySelectorAll('.file-compare-quicknav button')].find(button=>button.textContent?.includes('显示全部行'));
   next?.click();
   expand?.click();
-  return {selected:!!document.querySelector('.file-diff-line.active-change'),all:expand?.getAttribute('aria-pressed')};
  })()`);
- assert("diff next/expand actions respond",diffNav.selected&&diffNav.all==="true",JSON.stringify(diffNav));
+ const diffNav=await cdp.waitFor(`()=>!!document.querySelector('.file-diff-line.active-change')&&!!document.querySelector('.file-compare-quicknav button[aria-pressed="true"]')`);
+ assert("diff next/expand actions respond",diffNav);
 
  await cdp.evaluate(`(()=>document.querySelector('.file-workbench-nav-item[aria-label="历史记录"]')?.click())()`);
  assert("history panel replaces comparison",await cdp.waitFor(`()=>!!document.querySelector('.file-workbench-history .file-history-switch')&&!document.querySelector('.file-compare-toolbar')`));
- const history=await cdp.evaluate(`(()=>{
+ const historyGeometry=await cdp.evaluate(`(()=>{
   const title=document.querySelector('.file-preview-identity')?.getBoundingClientRect();
   const switcher=document.querySelector('.file-history-switch')?.getBoundingClientRect();
   const versions=[...document.querySelectorAll('.file-history-switch button')].find(button=>button.textContent?.includes('内容版本'));
   versions?.click();
-  return {top:Math.round(switcher?.top??0),titleBottom:Math.round(title?.bottom??0),records:document.querySelectorAll('.file-version-entry').length};
+  return {top:Math.round(switcher?.top??0),titleBottom:Math.round(title?.bottom??0)};
  })()`);
+ const recordsReady=await cdp.waitFor(`()=>document.querySelectorAll('.file-version-entry').length>=2`);
  assert("history controls are clear of title and version timeline works",
-  history.top>=history.titleBottom&&history.records>=2,JSON.stringify(history));
+  historyGeometry.top>=historyGeometry.titleBottom&&recordsReady,JSON.stringify({...historyGeometry,recordsReady}));
  const video=files.find(item=>item.name?.toLowerCase().endsWith(".mp4"));
  if(video){
   await cdp.send("Page.navigate",{url:BASE+"/preview/"+encodeURIComponent(video.id)});
