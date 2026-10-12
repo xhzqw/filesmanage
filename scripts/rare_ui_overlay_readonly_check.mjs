@@ -655,6 +655,10 @@ try{
   await viewport(width,width===390?760:900);
   await navigate("/approvals?tab=seals",'!!document.querySelector(".approval-nav .approval-nav-item")');
   await waitFor('!!document.querySelector(".seal-library-container")');
+  await click('.seal-library-toolbar-actions .rare-button:last-child');
+  await waitFor('!!document.querySelector("dialog.seal-library-dialog[open] input[type=file]")');
+  await click('dialog.seal-library-dialog[open] .dialog-close');
+  await waitFor('!document.querySelector("dialog.seal-library-dialog[open]")');
   const approval=await evalJS(`(()=>{const n=document.querySelector(".approval-nav"),items=[...n.querySelectorAll(".approval-nav-item")];
    const selected=n.querySelector('[aria-current="page"]');
    return{labels:items.map(x=>x.textContent.trim()),active:selected?.textContent.trim(),
