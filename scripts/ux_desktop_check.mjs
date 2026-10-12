@@ -1223,7 +1223,7 @@ async function main() {
       await cdp.evaluate(`(()=>{const btn=document.querySelector('.quick-grants-fields .rare-select');btn?.click();return !!btn;})()`);
       const grantSelect=await cdp.waitFor(`()=>!!document.querySelector('dialog.quick-grants-dialog .rare-select-menu')`,3000);
       check("quick authorization RareSelect stays inside modal top layer",grantSelect===true,String(grantSelect));
-      await cdp.evaluate(`(()=>{document.querySelector('dialog.quick-grants-dialog .quick-grants-close')?.click();return true;})()`);
+      await cdp.evaluate(`(()=>{document.querySelector('dialog.quick-grants-dialog .dialog-close')?.click();return true;})()`);
       const grantsClosed=await cdp.waitFor(`()=>!document.querySelector('dialog.quick-grants-dialog[open]')`,3500);
       check("closing quick authorization preserves document location",grantsClosed===true
         &&await cdp.evaluate(`location.pathname+location.search===${JSON.stringify(grantsBefore)}`),String(grantsClosed));
