@@ -37,8 +37,18 @@ const MAX_INLINE_MODEL_BYTES=256*1024*1024;
 // are streamed natively.
 export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
  const{id=""}=useParams();
+ return <ModelViewerStage id={id} user={user} onLogout={onLogout}/>;
+}
+
+// One CAD renderer for both the file workbench and the dedicated route.
+export function EmbeddedModelViewer({fileId}:{fileId:string}){
+ return <ModelViewerStage id={fileId} embedded/>;
+}
+
+function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:User;onLogout?:()=>void;embedded?:boolean}){
  const navigate=useNavigate();
  const[status,setStatus]=useState("loading");
+ const[retryEpoch,setRetryEpoch]=useState(0);
  const[message,setMessage]=useState("");
  const[info,setInfo]=useState<DerivativeInfo|null>(null);
  const[fileMeta,setFileMeta]=useState<{sha256:string;versionSeq:number;name:string}|null>(null);
@@ -109,6 +119,9 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
 
  useEffect(()=>{
   let valid=true;
+  started.current=false;
+  controls.current?.dispose();controls.current=null;
+  mshRoot.current=null;dxfRoot.current=null;drawingSession.current=null;
   setStatus("loading");setMessage("");setInfo(null);setFileMeta(null);
   setMetrics(null);setLayers([]);setLayouts([]);setActiveLayout("Model");
   setPaperViewports({total:0,projected:0});
@@ -130,8 +143,8 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
     if(!derivative.found){
      try{
       await fileApi.requestDerivative(id);
-     }catch{
-      setStatus("unsupported");
+     }catch(error){
+      if(valid){setMessage(errorCopy(error,"模型转换请求失败"));setStatus("failed");}
       return;
      }
      if(!valid)return;
@@ -153,15 +166,17 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
        if(valid)setFileMeta({sha256:preview.sha256,versionSeq:0,name:preview.name});
       }catch{if(valid)setFileMeta(null);}
     }
-    if(!derivative.found||derivative.class==="licensed"||derivative.class==="unverified"){
+    if(derivative.class==="licensed"||derivative.class==="unverified"){
      setStatus("unsupported");
      return;
     }
-    if(derivative.state==="queued"||derivative.state==="running"){
+    // The worker may not expose its new job on the first status read.
+    if(!derivative.found||derivative.state==="queued"||derivative.state==="running"){
      setStatus("converting");
      return;
     }
     if(derivative.state==="failed"){
+     setMessage(derivative.errorCode?"模型转换失败："+derivative.errorCode:"模型转换失败");
      setStatus("failed");
      return;
     }
@@ -172,7 +187,34 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
   };
   void run();
   return()=>{valid=false;};
- },[id]);
+ },[id,retryEpoch]);
+
+ // Continue waiting in the same canvas while the CAD worker converts.
+ // Stale polls cannot update an unmounted viewer or a different file.
+ useEffect(()=>{
+  if(status!=="converting")return;
+  let active=true;
+  let timer:ReturnType<typeof setTimeout>|undefined;
+  const poll=async()=>{
+   try{
+    const next=await fileApi.derivativeStatus(id);
+    if(!active)return;
+    setInfo(next);
+    if(next.state==="failed"){
+     setMessage(next.errorCode?"模型转换失败："+next.errorCode:"模型转换失败");
+     setStatus("failed");
+    }else if(next.found&&["ready","completed","succeeded"].includes(next.state??"")){
+     setStatus("loading-model");
+    }else{
+     timer=setTimeout(()=>void poll(),document.visibilityState==="hidden"?4500:1800);
+    }
+   }catch(error){
+    if(active){setMessage(errorCopy(error,"无法查询转换状态"));setStatus("failed");}
+   }
+  };
+  timer=setTimeout(()=>void poll(),1200);
+  return()=>{active=false;if(timer!==undefined)clearTimeout(timer);};
+ },[id,status]);
 
  // Parsing can outlive navigation. Every asynchronous boundary checks the
  // effect's lifetime; a parsed but unmounted scene owns disposable geometry.
@@ -265,7 +307,9 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
       }
      },setMeasure,(yaw,pitch)=>setCube({yaw,pitch}),setSelectedLine,drawingUnit);
      controls.current=mountedControls;
-     setView({axes:false,grid:true,edges:format!=="dxf",measure:false,
+     // The inline engineering preview opens with grid and coordinate axes.
+     if(embedded&&format!=="dxf")mountedControls.toggleAxes();
+     setView({axes:embedded&&format!=="dxf",grid:true,edges:format!=="dxf",measure:false,
       projection:format==="dxf"?"orthographic":"perspective"});
      pendingObject=null;
      setStatus("ready");
@@ -281,10 +325,8 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
    return()=>{valid=false;abort.abort();};
   },[status,id,info?.outputKind,info?.format]);
 
- return <AppShell user={user} onLogout={onLogout} product={drawing?"图纸预览":"模型预览"} actions={<RareButton type="button" onClick={()=>navigate("/preview/"+id)}>返回文件</RareButton>}>
-  <div className="panels">
-   <main className="work cad-page">
-    <div className="breadcrumb cad-title">
+ const content=<main className={embedded?"cad-page cad-embedded":"work cad-page"}>
+    {(!embedded||(drawing&&layouts.length>1))&&<div className="breadcrumb cad-title">
      <strong>{drawing?"二维工程图":"三维模型"}</strong>
      <span>{info?.format?.toUpperCase()??""}{info?.class==="converted"?" · 已转换":""}</span>
      {drawing&&status==="ready"&&layouts.length>1&&<div className="cad-layout-tabs" role="tablist" aria-label="图纸布局">
@@ -294,17 +336,18 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
        {name==="Model"?"模型空间":name}
       </RareButton>)}
      </div>}
-    </div>
+    </div>}
     <div className="cad-workbench">
      <section className="cad-viewport" aria-label={drawing?"工程图查看区域":"三维模型查看区域"}>
       <div className="viewer-stage" ref={holder}/>
       {status!=="ready"&&<div className="cad-status" role={status==="failed"||status==="webgl-lost"?"alert":"status"}>
        {status==="unsupported"?(info?.note??"该格式当前不支持在线预览"):
-        status==="converting"?"模型正在转换，请稍后重新打开":
+        status==="converting"?"正在转换模型…":
         status==="too-large"?"模型过大，已停止浏览器预览":
         status==="webgl-lost"?(message||"WebGL 上下文丢失"):
         status==="failed"?(message||"预览失败"):"正在载入几何数据…"}
-       {(status==="too-large"||status==="webgl-lost")&&<a href={"/api/files/"+id+"/bytes"}>下载原文件</a>}
+       {(status==="failed"||status==="webgl-lost")&&<RareButton type="button" onClick={()=>setRetryEpoch(value=>value+1)}>重试</RareButton>}
+       {status==="too-large"&&<span>请下载后使用桌面 CAD 软件打开</span>}
       </div>}
       {status==="ready"&&<div className="cad-toolbar" role="group" aria-label="工程视图工具">
        <RareButton type="button" title="将当前图形居中并适合画布" onClick={()=>{
@@ -516,8 +559,10 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
       </section>}
      </aside>}
     </div>
-   </main>
-  </div>
+   </main>;
+ if(embedded)return content;
+ return <AppShell user={user!} onLogout={onLogout!} product={drawing?"图纸预览":"模型预览"} actions={<RareButton type="button" onClick={()=>navigate("/preview/"+id)}>返回文件</RareButton>}>
+  <div className="panels">{content}</div>
  </AppShell>;
 }
 

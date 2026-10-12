@@ -1,7 +1,7 @@
 import {RareBadge,RareButton,MicroHoldToDelete} from "../shared/ui/rare";
 import {toast} from "../shared/ui/feedback";
 import {BrandLoadingLabel} from "../shared/ui/BrandLoader";
-import {useEffect,useRef,useState} from "react";
+import {lazy,Suspense,useEffect,useRef,useState} from "react";
 import {Link,useNavigate,useParams} from "react-router-dom";
 import {fileApi,formatSize,type FileLifecycle} from "../features/documents/api";
 import {reuseVerifiedPreview} from "../features/documents/revalidate";
@@ -10,7 +10,6 @@ import {StructuredFilePreview} from "../features/documents/StructuredFilePreview
 import {OfficeLayoutPreview} from "../features/documents/OfficeLayoutPreview";
 import {PDFPageViewer} from "../features/documents/PDFPageViewer";
 import {DocxSealConversion} from "../features/documents/DocxSealConversion";
-import {CadPreviewStatus} from "../features/documents/CadPreviewStatus";
 import {resolvePreviewAdapter} from "../features/documents/previewAdapters";
 import {previewCapabilities} from "../features/documents/previewCapabilities";
 import {FileEditor} from "../features/documents/FileEditor";
@@ -39,10 +38,11 @@ import "./previewWorkbenchV2.css";
 import "./previewWorkspaceV3.css";
 import "./previewWorkspaceV4.css";
 
+// CAD/Three.js is loaded only for CAD previews, preserving the ordinary document bundle.
+const CadViewer=lazy(()=>import("./ModelViewer").then(module=>({default:module.EmbeddedModelViewer})));
+
 type Tab="preview"|"details"|"versions"|"compare"|"review"|"seals";
 const ACTION_LABELS:Record<string,string>={upload:"上传",edit:"编辑",rollback:"回滚",restore:"恢复"};
-const CAD_EXTENSIONS=[".stl",".obj",".glb",".gltf",".step",".stp",".iges",".igs",".dxf",".dwg",".3mf",".ply"];
-function isCadName(name:string){return CAD_EXTENSIONS.some(ext=>name.toLowerCase().endsWith(ext));}
 function isOfficeName(name:string){return name.toLowerCase().endsWith(".docx");}
 function fileExtension(name:string){const pos=name.lastIndexOf(".");return pos>=0?name.slice(pos+1).toUpperCase():"文件";}
 function versionTime(value:string){return value.replace("T"," ").slice(0,16);}
@@ -317,7 +317,6 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
        <div className="file-preview-action-dock" ref={actionDockRef}>
         {moreOpen&&<div className="file-action-expansion" id="file-workbench-more-actions" role="group" aria-label="更多文件操作">
          {isOfficeName(preview.name)&&!archived&&<Link className="rare-button file-action-item" to={"/office/"+id} onClick={()=>setMoreOpen(false)}>在线编辑</Link>}
-         {isCadName(preview.name)&&<Link className="rare-button file-action-item" to={"/model/"+id} onClick={()=>setMoreOpen(false)}>3D 查看</Link>}
          {moreActions.map(action=><RareButton key={action.id} type="button"
           className={"file-action-item"+(action.danger?" is-danger":"")} tone="ghost" disabled={action.disabled}
           onClick={()=>{setMoreOpen(false);action.onSelect?.();}}>{action.label}</RareButton>)}
@@ -364,7 +363,9 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
        preview.structured&&adapter==="archive"?
         <StructuredFilePreview value={preview.structured}/>:
        adapter==="cad"?
-        <CadPreviewStatus fileId={preview.fileId}/>:
+        <Suspense fallback={<div className="cad-preview-loading" role="status">正在加载模型查看器…</div>}>
+         <CadViewer key={preview.fileId+":"+preview.sha256} fileId={preview.fileId}/>
+        </Suspense>:
        preview.textual?
         <div className="file-text-stage">
          <pre className={"file-text-content"+(wrapText?" file-text-wrap":"")}>{preview.content||"（空文件）"}</pre>
@@ -377,8 +378,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
         <div className="file-unsupported">
          <div className="file-unsupported-symbol"><FileTypeIcon name={preview.name} size={28}/></div>
          <strong>此格式暂不支持浏览器内直接预览</strong>
-         <p>{isCadName(preview.name)?"可前往 3D 查看器检查模型；若服务端暂不支持该格式的转换，请使用专业软件打开。":
-          "为了安全，网页不会直接执行 SVG、HTML 或其他未知格式的活动内容。可下载后使用对应应用打开。"}</p>
+         <p>此文件无法直接在浏览器内预览，可下载后使用对应应用打开。</p>
         </div>}
      </section>
 

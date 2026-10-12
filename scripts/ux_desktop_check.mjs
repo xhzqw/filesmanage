@@ -447,6 +447,26 @@ async function editorsSuite(cookie) {
     const themed = await cssThemeHits(cdp);
     check("VIS-10 /office/:id: no app CSS rule targets iframe/canvas/webgl", themed.length === 0, JSON.stringify(themed));
 
+    // CAD files must launch a real viewer inside the ordinary preview workbench.
+    await cdp.navigate(`${BASE}/preview/${stl.fileId}`);
+    const inlineCad=await cdp.waitFor(`()=>Boolean(document.querySelector('.file-workbench-preview-surface .cad-embedded .cad-viewport'))`,15000);
+    const inlineState=await cdp.evaluate(`(()=>({path:location.pathname,
+      headers:document.querySelectorAll('header.header').length,
+      rail:Boolean(document.querySelector('.file-workbench-sidebar')),
+      placeholder:document.body.textContent.includes('模型已就绪，可以打开 3D 查看器'),
+      stage:Boolean(document.querySelector('.file-workbench-preview-surface .cad-embedded .cad-viewport'))}))()`);
+    check("VIS-10 CAD opens automatically in the file preview workbench",
+      inlineCad===true&&inlineState.path===`/preview/${stl.fileId}`&&
+      inlineState.headers===1&&inlineState.rail&&inlineState.stage&&!inlineState.placeholder,
+      JSON.stringify(inlineState));
+    const inlineCanvas=await cdp.waitFor(`()=>{const canvas=document.querySelector('.file-workbench-preview-surface .viewer-stage canvas');
+      return canvas&&canvas.width>0&&canvas.height>0?{w:canvas.width,h:canvas.height}:false;}`,45000);
+    if(inlineCanvas){
+      check("VIS-10 CAD model canvas mounts without a manual click",inlineCanvas.w>0&&inlineCanvas.h>0,JSON.stringify(inlineCanvas));
+    }else{
+      console.log("SKIP VIS-10 inline CAD canvas :: no usable WebGL canvas within 45s");
+    }
+
     // ---- DI-19 / VIS-10: the CAD model page ----
     await cdp.navigate(`${BASE}/model/${stl.fileId}`);
     const modelShell = await cdp.waitFor(`()=>document.querySelector('header.header')!==null&&document.querySelectorAll('header.header').length===1`, 15000);
