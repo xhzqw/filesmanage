@@ -8,6 +8,7 @@ import {reportSessionResponse} from "../shared/http";
 import type {User} from "../entities/user/model";
 import {AppShell} from "../shared/ui/AppShell";
 import {parseDxf} from "../features/modelViewer/dxf";
+import {decodeDxfBytes} from "../features/modelViewer/dxfEncoding";
 import type {DrawingPickedSegment} from "../features/modelViewer/snap2d";
 import {printCurrentSheet,type SheetSize} from "../features/modelViewer/printSheet";
 import {openVectorPrint,type PlotScale} from "../features/modelViewer/vectorSheet";
@@ -267,7 +268,7 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
     let object:import("three").Object3D;
     let drawingUnit="";
     if(format==="dxf"){
-     const source=new TextDecoder().decode(buffer);
+     const source=decodeDxfBytes(buffer);
      const parsed=parseDxf(source,THREE);
      object=parsed.object;
      dxfRoot.current=parsed.object;

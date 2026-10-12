@@ -63,9 +63,9 @@ export function mountDrawingRuler(holder:HTMLElement){
     (highlight?"#1b2633":"#ebf3f8")+'" font-size="11" font-weight="700" font-family="ui-monospace,monospace">'+text+'</text>';
   };
   svg.innerHTML=
-   (grid?'<path d="'+light.join(" ")+'" fill="none" stroke="#ecf0f3" stroke-width=".7"/>'+
-    '<path d="'+strong.join(" ")+'" fill="none" stroke="#d5dfe7" stroke-width=".9"/>'+
-    '<path d="'+origin+'" fill="none" stroke="#8da5b8" stroke-width="1.15"/>':"")+
+   (grid?'<path d="'+light.join(" ")+'" fill="none" stroke="#ecf0f3" stroke-opacity=".26" stroke-width=".7"/>'+
+    '<path d="'+strong.join(" ")+'" fill="none" stroke="#d5dfe7" stroke-opacity=".44" stroke-width=".9"/>'+
+    '<path d="'+origin+'" fill="none" stroke="#8da5b8" stroke-opacity=".58" stroke-width="1.15"/>':"")+
    '<rect x="0" y="'+(h-25)+'" width="'+w+'" height="25" fill="#f7f9fc"/>'+
    '<rect x="0" y="0" width="48" height="'+h+'" fill="#f7f9fc"/>'+
    '<path d="M48 0V'+(h-25)+'H'+w+'" fill="none" stroke="#bccbd7" stroke-width="1"/>'+

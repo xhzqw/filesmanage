@@ -86,6 +86,7 @@ type Entity={
  textWidthFactor:number;
  hAlign:number;
  vAlign:number;
+ mTextAttachment:number;
  viewportId:number;
 };
 
@@ -94,7 +95,7 @@ function emptyEntity(type:string):Entity{
   blockName:"",scaleX:1,scaleY:1,rotation:0,major:null,ratio:1,parameterStart:0,parameterEnd:Math.PI*2,
   degree:3,knots:[],weights:[],splineControls:[],invisible:false,colorIndex:256,trueColor:null,
   layout:"",paperSpace:false,raw:[],textStyle:"STANDARD",textWidthFactor:1,
-  hAlign:0,vAlign:0,viewportId:0};
+  hAlign:0,vAlign:0,mTextAttachment:1,viewportId:0};
 }
 
 export function parseDxf(text:string,THREE:typeof import("three"),requestedLayout="Model"):DxfParseResult{
@@ -418,10 +419,20 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
   const origin=transformed(x,y);
   const anchor=e.end&&e.type==="TEXT"&&e.hAlign!==0
    ?transformed(e.end.x,e.end.y):origin;
-  sprite.position.set(anchor.x+(e.hAlign===1?0:e.hAlign===2?-sprite.scale.x/2:sprite.scale.x/2),
-   anchor.y+(e.vAlign===2?0:e.vAlign===3?-sprite.scale.y/2:sprite.scale.y/2),0);
-  (sprite.material as THREE.SpriteMaterial).rotation=Math.atan2(activeTransform.b,activeTransform.a)+
-   (e.a0*Math.PI/180);
+  // MTEXT group 71 specifies a 3x3 attachment, not TEXT justification.
+  // Rotate the anchor-to-sprite-center offset with the text direction.
+  const attachment=e.mTextAttachment>=1&&e.mTextAttachment<=9?e.mTextAttachment:1;
+  const column=(attachment-1)%3,row=Math.floor((attachment-1)/3);
+  const offsetX=e.type==="MTEXT"
+   ?(column===0?sprite.scale.x/2:column===2?-sprite.scale.x/2:0)
+   :(e.hAlign===1?0:e.hAlign===2?-sprite.scale.x/2:sprite.scale.x/2);
+  const offsetY=e.type==="MTEXT"
+   ?(row===0?-sprite.scale.y/2:row===2?sprite.scale.y/2:0)
+   :(e.vAlign===2?0:e.vAlign===3?-sprite.scale.y/2:sprite.scale.y/2);
+  const angle=Math.atan2(activeTransform.b,activeTransform.a)+(e.a0*Math.PI/180);
+  sprite.position.set(anchor.x+offsetX*Math.cos(angle)-offsetY*Math.sin(angle),
+   anchor.y+offsetX*Math.sin(angle)+offsetY*Math.cos(angle),0);
+  (sprite.material as THREE.SpriteMaterial).rotation=angle;
   groupFor(resolved).add(sprite);
  };
 
@@ -927,7 +938,10 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
     break;
    case 51:entity.a1=Number(pair.value);break;
    case 70:entity.closed=(Number.parseInt(pair.value,10)&1)===1;break;
-   case 71:if(entity.type==="SPLINE")entity.degree=Number(pair.value);break;
+   case 71:
+    if(entity.type==="SPLINE")entity.degree=Number(pair.value);
+    if(entity.type==="MTEXT")entity.mTextAttachment=Number(pair.value);
+    break;
    case 72:if(entity.type==="TEXT")entity.hAlign=Number(pair.value);break;
    case 73:if(entity.type==="TEXT")entity.vAlign=Number(pair.value);break;
    case 69:if(entity.type==="VIEWPORT")entity.viewportId=Number(pair.value);break;
@@ -944,7 +958,11 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
     break;
    }
    case 1:entity.text+=pair.value;break;
-   case 3:if(entity.type!=="DIMENSION")entity.text=pair.value+entity.text;break;
+   case 3:
+    // MTEXT group 3 chunks precede the final group 1; keep source order.
+    if(entity.type==="MTEXT")entity.text+=pair.value;
+    else if(entity.type!=="DIMENSION")entity.text=pair.value+entity.text;
+    break;
   }
   entity.raw.push(pair);
  }

@@ -112,7 +112,9 @@ export function mountEngineeringScene(
  if(components===0&&triangles>0)components=1;
  setMetrics({triangles:Math.round(triangles),vertices,size:[size.x,size.y,size.z],components});
  const aspect=()=>Math.max(holder.clientWidth,1)/Math.max(holder.clientHeight,1);
- const halfHeight=()=>Math.max(size.y*.62,size.x/Math.max(aspect(),.1)*.62,diameter*.1,.00001);
+ // Give 2D drawings a close fit, while retaining the larger 3D margin.
+ const fitPadding=drawing?.54:.62;
+ const halfHeight=()=>Math.max(size.y*fitPadding,size.x/Math.max(aspect(),.1)*fitPadding,diameter*.1,.00001);
  const near=Math.max(radius/10000,.000001),far=Math.max(radius*250,1);
  const persp=new THREE.PerspectiveCamera(42,aspect(),near,far);
  const ortho=new THREE.OrthographicCamera(-halfHeight()*aspect(),halfHeight()*aspect(),halfHeight(),-halfHeight(),-far,far);
