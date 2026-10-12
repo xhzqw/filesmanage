@@ -1,16 +1,24 @@
 import {useEffect,useState} from "react";
-import {RareButton} from "../../shared/ui/rare";
+import {RareButton,RareSelect} from "../../shared/ui/rare";
 import {BrandLoader} from "../../shared/ui/BrandLoader";
 import {errorCopy} from "../../shared/errors";
-import {fileApi} from "./api";
+import {fileApi,type SealHistory} from "./api";
 import "./pdfPageViewer.css";
 
 // PDF rasterization is server-side and checked against current preview ACL.
 // Do not embed the Chrome PDF extension in a sandboxed iframe.
-export function PDFPageViewer({fileId,sha,name,onSign}:{
- fileId:string;sha:string;name:string;onSign:()=>void;
+export function PDFPageViewer({fileId,sha,name,onSign,seq,revision,onRevisionChange,epoch}:{
+ fileId:string;sha:string;name:string;seq:number;revision:number|null;epoch:number;onRevisionChange:(value:number|null)=>void;onSign:()=>void;
 }){
  const[pages,setPages]=useState(0);
+ const[history,setHistory]=useState<SealHistory|null>(null);
+ useEffect(()=>{
+  let live=true;setHistory(null);
+  fileApi.sealHistory(fileId,seq).then(value=>{if(live)setHistory(value)})
+   .catch(cause=>{if(live)setError(errorCopy(cause,"无法加载签章历史"))});
+  return()=>{live=false};
+ },[fileId,seq,epoch]);
+
  const[page,setPage]=useState(1);
  const[loading,setLoading]=useState(true);
  const[error,setError]=useState("");
@@ -29,8 +37,8 @@ export function PDFPageViewer({fileId,sha,name,onSign}:{
   }).catch(cause=>{if(live){setError(errorCopy(cause,"PDF 页面预览失败"));setLoading(false);}});
   return()=>{live=false};
  },[fileId,sha,retry]);
- const documentKey=fileId+":"+sha;
- const url=fileApi.pdfPageUrl(fileId,sha,page)+(pageRetry?"&attempt="+pageRetry:"");
+ const documentKey=fileId+":"+sha+":"+(revision===null?"latest":revision);
+ const url=fileApi.pdfPageUrl(fileId,sha,page,revision)+"&sealEpoch="+epoch+(pageRetry?"&attempt="+pageRetry:"");
  const imageReady=displayed?.documentKey===documentKey&&displayed.url===url;
  const retained=displayed?.documentKey===documentKey&&!imageReady?displayed:null;
  function changePage(next:number){
@@ -41,6 +49,13 @@ export function PDFPageViewer({fileId,sha,name,onSign}:{
   <div className="file-pdf-toolbar">
    <strong>PDF 预览</strong>
    <div className="file-pdf-tools">
+    {history&&history.current>0&&<RareSelect aria-label="预览签章版本" value={revision===null?"latest":String(revision)}
+     onChange={event=>{const value=event.target.value;onRevisionChange(value==="latest"?null:Number(value));setPageError("");}}>
+     <option value="latest">当前签章 · r{history.current}</option>
+     {history.revisions.map(item=><option key={item.revision} value={item.revision}>
+      {item.revision===0?"原始未签章":("签章 r"+item.revision+" · "+item.markCount+" 枚")}
+     </option>)}
+    </RareSelect>}
     <RareButton type="button" disabled={!pages||page===1} onClick={()=>changePage(page-1)}>上一页</RareButton>
     <span aria-live="polite">{pages?"第 "+page+" / "+pages+" 页":"—"}</span>
     <RareButton type="button" disabled={!pages||page>=pages} onClick={()=>changePage(page+1)}>下一页</RareButton>

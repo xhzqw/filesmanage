@@ -35,6 +35,17 @@
 .seal-draft-label small{color:var(--text-secondary);font-size:10px}
 .seal-staged-mark{position:absolute;pointer-events:none;display:flex;outline:1px dashed var(--brand-blue)}
 .seal-staged-mark img{display:block;width:100%;height:100%;object-fit:fill}
+
+.seal-revisions{display:flex;flex-direction:column;gap:7px;min-width:0}
+.seal-revision-list{display:flex;flex-direction:column;gap:4px;max-height:280px;overflow:auto}
+.seal-revision-row{display:flex;align-items:center;gap:6px;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border-hairline)}
+.seal-revision-meta{display:flex;flex:1 1 auto;min-width:0;flex-direction:column;gap:2px;overflow-wrap:anywhere}
+.seal-revision-meta strong{font-size:11px}
+.seal-revision-meta small,.seal-restore-controls small{font-size:10px;color:var(--text-secondary)}
+.seal-revision-actions{display:flex;flex:0 0 auto;gap:4px}
+.seal-revision-actions .rare-button{font-size:11px;height:28px;min-height:28px;padding:3px 6px}
+.seal-restore-controls{display:flex;flex-direction:column;gap:7px;padding:7px;background:var(--surface-header);border-radius:var(--radius-sm)}
+.seal-restore-controls label{display:flex;flex-direction:column;gap:4px;font-size:11px}
 .seal-file-workspace{display:grid;grid-template-columns:minmax(180px,220px) minmax(0,1fr) minmax(180px,220px);gap:8px;padding:8px;min-height:470px;height:min(720px,calc(100vh - 250px))}
 .seal-file-controls,.seal-file-history{display:flex;flex-direction:column;gap:10px}
 .seal-size-controls{display:grid;grid-template-columns:1fr 1fr;gap:7px}

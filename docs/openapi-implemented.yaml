@@ -5529,6 +5529,13 @@ paths:
         schema:
           type: integer
           minimum: 1
+      - name: revision
+        in: query
+        required: false
+        description: Signature revision; omitted means latest
+        schema:
+          type: integer
+          minimum: 0
       responses:
         '200':
           description: Private no-store bounded PNG page
@@ -5921,7 +5928,7 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
   /api/files/{id}/seals/used:
     get:
-      summary: Find seal assets already used by this file across all versions, including equivalent image digests
+      summary: Find active seal assets in current signing revision, including equivalent image digests
       operationId: usedFileSeals
       tags:
       - Seals
@@ -5993,6 +6000,13 @@ paths:
         schema:
           type: integer
           minimum: 1
+      - name: revision
+        in: query
+        required: false
+        description: Signature revision
+        schema:
+          type: integer
+          minimum: 0
       responses:
         '200':
           description: Version signature evidence
@@ -6363,6 +6377,13 @@ paths:
         schema:
           type: integer
           minimum: 1
+      - name: revision
+        in: query
+        required: false
+        description: Signature revision; omitted means latest
+        schema:
+          type: integer
+          minimum: 0
       responses:
         '200':
           description: Download separate signed visual PDF; original file bytes stay immutable.
@@ -6371,6 +6392,166 @@ paths:
               schema:
                 type: string
                 format: binary
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/{id}/seals/revisions:
+    get:
+      summary: List immutable visual signing snapshots; revision zero is the original unsigned PDF
+      operationId: sealRevisionHistory
+      tags:
+      - Seals
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      - name: version
+        in: query
+        required: true
+        description: Source file version
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Full signature revision timeline
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      current:
+                        type: integer
+                        minimum: 0
+                      revisions:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SealRevision'
+                    required:
+                    - current
+                    - revisions
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/{id}/seals/restore:
+    post:
+      summary: Admin restores an older signature snapshot as a new append-only revision, verifying their own password
+      operationId: restoreSealRevision
+      tags:
+      - Seals
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: PDF file ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                versionSeq:
+                  type: integer
+                  minimum: 1
+                fileSha256:
+                  type: string
+                expectedRevision:
+                  type: integer
+                  minimum: 0
+                targetRevision:
+                  type: integer
+                  minimum: 0
+                password:
+                  type: string
+              required:
+              - versionSeq
+              - fileSha256
+              - expectedRevision
+              - targetRevision
+              - password
+      responses:
+        '201':
+          description: New immutable signing revision created; source and evidence unchanged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/SealRevision'
+                required:
+                - ok
+                - data
         '400':
           description: E_BAD — malformed request body or parameters
           content:
@@ -10883,3 +11064,36 @@ components:
       - y
       - width
       - height
+    SealRevision:
+      type: object
+      properties:
+        id:
+          type: string
+        fileId:
+          type: string
+        versionSeq:
+          type: integer
+        revision:
+          type: integer
+          minimum: 0
+        markCount:
+          type: integer
+          minimum: 0
+        action:
+          type: string
+        actorId:
+          type: string
+        actorName:
+          type: string
+        restoredFrom:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - fileId
+      - versionSeq
+      - revision
+      - markCount
+      - action

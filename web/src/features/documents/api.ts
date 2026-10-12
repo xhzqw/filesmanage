@@ -3,6 +3,8 @@ import {postMultipart} from "../../shared/uploadClient";
 import {publishResourceChange} from "../../shared/resourceSync";
 import type {FileItem, FileVersion, PreviewData, FileMetadata} from "../../entities/file/model";
 
+export type SealRevision={id:string;fileId:string;versionSeq:number;revision:number;markCount:number;action:"original"|"legacy"|"sign"|"restore";actorId?:string;actorName?:string;restoredFrom?:number;createdAt?:string};
+export type SealHistory={current:number;revisions:SealRevision[]};
 export type CompareDiffLine={kind:"equal"|"added"|"removed";left?:number;right?:number;text:string};
 export type OfficeSemanticChange={kind:"added"|"removed"|"changed";section:string;key:string;before:string;after:string};
 export type VersionComparison={left:{seq:number;sha256:string;sizeBytes:number};right:{seq:number;sha256:string;sizeBytes:number};mode:"identical"|"metadata"|"large"|"text";detail?:"office_parts"|"office_semantic";semanticChanges?:OfficeSemanticChange[];lines:CompareDiffLine[];added:number;removed:number};
@@ -43,12 +45,14 @@ export const fileApi={
  setMetadata:(id:string,body:{category:string;description:string;tags:string[]})=>changed(request<FileMetadata>("/files/"+id+"/metadata",{method:"PUT",body:JSON.stringify(body)}),id),
 	preview:(id:string,signal?:AbortSignal)=>request<PreviewData>("/files/"+id+"/preview",{signal}),
  pdfPages:(id:string,sha:string)=>request<{pageCount:number}>("/files/"+encodeURIComponent(id)+"/preview/pdf/pages?sha256="+encodeURIComponent(sha)),
- pdfPageUrl:(id:string,sha:string,page:number)=>"/api/files/"+encodeURIComponent(id)+"/preview/pdf/page?"+new URLSearchParams({sha256:sha,page:String(page)}),
+ pdfPageUrl:(id:string,sha:string,page:number,revision:number|null=null)=>"/api/files/"+encodeURIComponent(id)+"/preview/pdf/page?"+new URLSearchParams({sha256:sha,page:String(page),...(revision===null?{}:{revision:String(revision)})}),
+ sealHistory:(id:string,version:number)=>request<SealHistory>("/files/"+encodeURIComponent(id)+"/seals/revisions?version="+version),
+ signedDownloadUrl:(id:string,version:number,revision:number|null=null)=>"/api/files/"+encodeURIComponent(id)+"/seals/export?"+new URLSearchParams({version:String(version),...(revision===null?{}:{revision:String(revision)})}),
  convertDOCXForSigning:(id:string,expectedSeq:number,expectedSha256:string,idempotencyKey:string)=>request<{fileId:string;versionSeq:number;sha256:string;name:string}>("/files/"+encodeURIComponent(id)+"/convert-for-signing",{method:"POST",body:JSON.stringify({expectedSeq,expectedSha256,idempotencyKey})}),
 
   preparePrint:(id:string,expectedSha256:string)=>request<{fileId:string;name:string;versionSeq:number;sha256:string}>(
    "/files/"+encodeURIComponent(id)+"/print/prepare",{method:"POST",body:JSON.stringify({expectedSha256})}),
-  printMediaUrl:(id:string,sha:string)=>"/api/files/"+encodeURIComponent(id)+"/print/media?sha256="+encodeURIComponent(sha),
+  printMediaUrl:(id:string,sha:string,revision:number|null=null)=>"/api/files/"+encodeURIComponent(id)+"/print/media?"+new URLSearchParams({sha256:sha,...(revision===null?{}:{revision:String(revision)})}),
   printOfficeUrl:(id:string,sha:string,sheet="")=>"/api/files/"+encodeURIComponent(id)+"/print/office-pdf?"+new URLSearchParams({
    sha256:sha,...(sheet?{sheet}:{})
   }).toString(),

@@ -138,7 +138,12 @@ func (h *Handler) listFileSealMarks(c *gin.Context) {
 		respondError(c, domain.ErrInvalidInput)
 		return
 	}
-	marks, err := h.S.FileSeals(c.Request.Context(), u, c.Param("id"), seq)
+	revision, err := optionalSealRevision(c)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	marks, err := h.S.FileSealsAtRevision(c.Request.Context(), u, c.Param("id"), seq, revision)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -157,7 +162,12 @@ func (h *Handler) exportFileSealPDF(c *gin.Context) {
 		respondError(c, domain.ErrInvalidInput)
 		return
 	}
-	pdf, err := h.S.ExportSignedPDF(c.Request.Context(), u, c.Param("id"), seq)
+	revision, err := optionalSealRevision(c)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	pdf, err := h.S.ExportSignedPDFRevision(c.Request.Context(), u, c.Param("id"), seq, revision, domain.ActionDownload)
 	if errors.Is(err, application.ErrPreviewUnsupported) {
 		c.JSON(http.StatusUnsupportedMediaType, gin.H{"ok": false, "error": gin.H{"code": "E_PREVIEW_UNSUPPORTED"}})
 		return

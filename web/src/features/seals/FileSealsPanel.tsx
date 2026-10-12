@@ -4,6 +4,7 @@ import {RareBadge,RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
 import {errorCopy} from "../../shared/errors";
 import {sealsApi} from "./api";
 import {SealPageCanvas} from "./SealPageCanvas";
+import {SealRevisionControls} from "./SealRevisionControls";
 import {fitStampToPage,stampFitsPage} from "./sealGeometry";
 import type {SealAsset,SealPlacement,FileSealMark,SealUserPermission} from "../../entities/seal/model";
 import "./seals.css";
@@ -12,7 +13,7 @@ type DraftSeal=Omit<SealPlacement,"password"|"versionSeq"|"fileSha256">;
 type Position=Pick<DraftSeal,"x"|"y"|"width"|"height">;
 const clamp=(value:number,max:number)=>Math.max(0,Math.min(max,value));
 
-export function FileSealsPanel({fileId,seq,sha,name,isAdmin}:{fileId:string;seq:number;sha:string;name:string;isAdmin:boolean}){
+export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onChanged}:{fileId:string;seq:number;sha:string;name:string;isAdmin:boolean;onSelectRevision:(revision:number)=>void;onChanged:()=>void}){
  const[assets,setAssets]=useState<SealAsset[]>([]);
  const[access,setAccess]=useState<SealUserPermission|null>(null);
  const[marks,setMarks]=useState<FileSealMark[]>([]);
@@ -107,7 +108,7 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin}:{fileId:string;seq:
   setBusy(true);setError("");setNotice("");
   try{
    const marks=await sealsApi.applyBatch(fileId,{versionSeq:seq,fileSha256:sha,password,placements:staged});
-   setStaged([]);setAssetId("");setRevision(n=>n+1);
+   setStaged([]);setAssetId("");setRevision(n=>n+1);onChanged();
    setNotice("已成功保存 "+marks.length+" 枚签章，全部固定到当前文件版本。");
   }catch(err){setError(errorCopy(err,"批量签署失败；本批次不会部分保存，请核实权限、密码及位置"))}
   finally{setPassword("");setBusy(false)}
@@ -186,6 +187,11 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin}:{fileId:string;seq:
    drafts={staged.map(item=>({...item,asset:assets.find(a=>a.id===item.assetId)}))}/>:
    <div className="seal-file-preview"><p className="empty">仅 PDF 支持页面定位</p></div>}
   <aside className="seal-file-history">
+   <SealRevisionControls fileId={fileId} seq={seq} sha={sha} isAdmin={isAdmin}
+    refreshKey={revision} onSelect={onSelectRevision} onRestored={()=>{
+     setStaged([]);setAssetId("");setRevision(n=>n+1);onChanged();
+    }}/>
+
    <div className="seal-library-heading">签署记录 <span>{marks.length}</span></div>
    {marks.length===0&&<p className="empty">此版本尚无签章</p>}
    {marks.map(m=><div key={m.id} className="seal-history-row">

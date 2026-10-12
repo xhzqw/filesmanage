@@ -51,6 +51,15 @@ func renderSealStampPNG(raw []byte, width, height float64) ([]byte, error) {
 }
 
 func (s *Service) ExportSignedPDF(ctx context.Context, actor domain.User, fileID string, seq int) (SignedPDFExport, error) {
+	return s.ExportSignedPDFRevision(ctx, actor, fileID, seq, -1, domain.ActionPrint)
+}
+
+// ActionPreview supports raster previews, ActionDownload the ordinary download
+// button, and ActionPrint the separate authorized print/portable PDF flows.
+func (s *Service) ExportSignedPDFRevision(ctx context.Context, actor domain.User, fileID string, seq, revision int, action domain.Action) (SignedPDFExport, error) {
+	if revision < -1 || (action != domain.ActionPreview && action != domain.ActionDownload && action != domain.ActionPrint) {
+		return SignedPDFExport{}, domain.ErrInvalidInput
+	}
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
 		return SignedPDFExport{}, err
@@ -59,12 +68,14 @@ func (s *Service) ExportSignedPDF(ctx context.Context, actor domain.User, fileID
 	if seq < 1 {
 		return SignedPDFExport{}, ErrInvalidInput
 	}
-	file, err := s.visibleFile(ctx, tx, actor, fileID, domain.ActionPrint)
+	file, err := s.visibleFile(ctx, tx, actor, fileID, action)
 	if err != nil {
 		return SignedPDFExport{}, err
 	}
-	if _, err = s.visibleFile(ctx, tx, actor, fileID, domain.ActionPreview); err != nil {
-		return SignedPDFExport{}, err
+	if action == domain.ActionPrint {
+		if _, err = s.visibleFile(ctx, tx, actor, fileID, domain.ActionPreview); err != nil {
+			return SignedPDFExport{}, err
+		}
 	}
 	if extensionOf(file.Name) != ".pdf" {
 		return SignedPDFExport{}, ErrPreviewUnsupported
@@ -98,14 +109,22 @@ func (s *Service) ExportSignedPDF(ctx context.Context, actor domain.User, fileID
 	}
 	store, err := sealRepository(tx)
 	if err != nil {
-		return SignedPDFExport{}, err
+		// Lightweight in-memory read-only repositories have no signing evidence.
+		// Explicit revision selection must fail rather than returning wrong bytes.
+		if revision > 0 {
+			return SignedPDFExport{}, err
+		}
+		return SignedPDFExport{FileName: file.Name, SourceSha256: version.Sha256, Data: original}, nil
 	}
-	marks, err := store.ListSealMarks(ctx, fileID, seq)
+	marks, err := store.ListSealMarksAtRevision(ctx, fileID, seq, revision)
 	if err != nil {
 		return SignedPDFExport{}, err
 	}
-	if len(marks) == 0 || len(marks) > maxSignedPDFMarks {
+	if len(marks) > maxSignedPDFMarks {
 		return SignedPDFExport{}, ErrInvalidInput
+	}
+	if len(marks) == 0 {
+		return SignedPDFExport{FileName: file.Name, SourceSha256: version.Sha256, Data: original}, nil
 	}
 	dims, err := api.PageDims(ctx, bytes.NewReader(original), nil)
 	if err != nil {

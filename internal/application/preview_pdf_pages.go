@@ -51,6 +51,12 @@ func (s *Service) PDFPreviewPages(ctx context.Context, u domain.User, id, sha st
 	return count, err
 }
 func (s *Service) PDFPreviewPage(ctx context.Context, u domain.User, id, sha string, page int) ([]byte, error) {
+	return s.PDFPreviewPageRevision(ctx, u, id, sha, page, -1)
+}
+func (s *Service) PDFPreviewPageRevision(ctx context.Context, u domain.User, id, sha string, page, revision int) ([]byte, error) {
+	if revision < -1 {
+		return nil, domain.ErrInvalidInput
+	}
 	if page < 1 || page > 1000 {
 		return nil, domain.ErrInvalidInput
 	}
@@ -61,6 +67,29 @@ func (s *Service) PDFPreviewPage(ctx context.Context, u domain.User, id, sha str
 	if page > count {
 		return nil, domain.ErrInvalidInput
 	}
+	// Render exactly the same signed PDF derivative users download and print.
+	// Reading the source first enforces the SHA fence for current version; a
+	// concurrent source replacement is detected again after signed rendering.
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	file, readErr := s.visibleFile(ctx, tx, u, id, domain.ActionPreview)
+	if readErr != nil {
+		_ = tx.Rollback(ctx)
+		return nil, readErr
+	}
+	seq := currentSeq(file)
+	_ = tx.Rollback(ctx)
+	export, renderErr := s.ExportSignedPDFRevision(ctx, u, id, seq, revision, domain.ActionPreview)
+	if renderErr != nil {
+		return nil, renderErr
+	}
+	if !strings.EqualFold(export.SourceSha256, sha) {
+		return nil, domain.ErrVersionConflict
+	}
+	raw = export.Data
+
 	select {
 	case officeRenderSlots <- struct{}{}:
 		defer func() { <-officeRenderSlots }()

@@ -1196,7 +1196,7 @@ add("GET","/api/files/{id}/preview/pdf/pages",operation("Count PDF pages for ima
  params=[id_param("id","File ID"),query("sha256","Exact current SHA-256",required=True)],
  responses=dict([json_ok(obj({"pageCount":integer(minimum=1)},required=["pageCount"]),"Current authorized PDF page count"),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
 add("GET","/api/files/{id}/preview/pdf/page",operation("Render PDF page as isolated PNG with preview-only permission","Files","pdfPreviewPage",security=SESSION,
- params=[id_param("id","File ID"),query("sha256","Exact current SHA-256",required=True),query("page","Page number",integer(minimum=1),required=True)],
+ params=[id_param("id","File ID"),query("sha256","Exact current SHA-256",required=True),query("page","Page number",integer(minimum=1),required=True),query("revision","Signature revision; omitted means latest",integer(minimum=0))],
  responses=dict([("200",{"description":"Private no-store bounded PNG page","content":{"image/png":{"schema":{"type":"string","format":"binary"}}}}),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
 add("POST","/api/files/{id}/convert-for-signing",operation("Verify source DOCX download and folder upload permission then persist a separate signing-ready PDF file","Files","convertDOCXForSigning",security=SESSION,
  params=[id_param("id","Source DOCX file")],
@@ -1220,11 +1220,11 @@ add("POST","/api/seals/{id}/manage",operation("Admin bind, grant, revoke or reti
  responses=dict([json_ok(obj({"updated":string()}),"Updated"),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
 add("GET","/api/seals/{id}/image",operation("Access assigned or authorized seal image","Seals","sealImage",security=SESSION,
  params=[id_param("id","Seal ID")],responses=dict([("200",seal_bin),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
-add("GET","/api/files/{id}/seals/used",operation("Find seal assets already used by this file across all versions, including equivalent image digests","Seals","usedFileSeals",security=SESSION,
+add("GET","/api/files/{id}/seals/used",operation("Find active seal assets in current signing revision, including equivalent image digests","Seals","usedFileSeals",security=SESSION,
  params=[id_param("id","File ID")],
  responses=dict([json_ok(arr(string()),"Assets unavailable for repeated application to this file"),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
 add("GET","/api/files/{id}/seals",operation("List immutable version-anchored signing evidence","Seals","listFileSealMarks",security=SESSION,
- params=[id_param("id","File ID"),query("version","Version sequence",integer(minimum=1),required=True)],
+ params=[id_param("id","File ID"),query("version","Version sequence",integer(minimum=1),required=True),query("revision","Signature revision",integer(minimum=0))],
  responses=dict([json_ok(arr(ref("FileSealMark")),"Version signature evidence"),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
 add("POST","/api/files/{id}/seals",operation("Verify current user password and append version-specific signing evidence","Seals","signFileSeal",security=SESSION,
  params=[id_param("id","File ID")],
@@ -1242,8 +1242,17 @@ add("GET","/api/files/{id}/seals/{mid}/image",operation("Render seal image from 
  responses=dict([("200",seal_bin),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
 
 add("GET","/api/files/{id}/seals/export",operation("Export actual visually stamped PDF derivative for a signed immutable version","Seals","exportFileSealPDF",security=SESSION,
- params=[id_param("id","File ID"),query("version","Signed file version",integer(minimum=1),required=True)],
+ params=[id_param("id","File ID"),query("version","Signed file version",integer(minimum=1),required=True),query("revision","Signature revision; omitted means latest",integer(minimum=0))],
  responses=dict([("200",{"description":"Download separate signed visual PDF; original file bytes stay immutable.","content":{"application/pdf":{"schema":{"type":"string","format":"binary"}}}}),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
+
+
+schema("SealRevision",obj({"id":string(),"fileId":string(),"versionSeq":integer(),"revision":integer(minimum=0),"markCount":integer(minimum=0),"action":string(),"actorId":string(),"actorName":string(),"restoredFrom":integer(minimum=0),"createdAt":timestamp()},required=["fileId","versionSeq","revision","markCount","action"]))
+add("GET","/api/files/{id}/seals/revisions",operation("List immutable visual signing snapshots; revision zero is the original unsigned PDF","Seals","sealRevisionHistory",security=SESSION,
+ params=[id_param("id","File ID"),query("version","Source file version",integer(minimum=1),required=True)],
+ responses=dict([json_ok(obj({"current":integer(minimum=0),"revisions":arr(ref("SealRevision"))},required=["current","revisions"]),"Full signature revision timeline"),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+add("POST","/api/files/{id}/seals/restore",operation("Admin restores an older signature snapshot as a new append-only revision, verifying their own password","Seals","restoreSealRevision",security=SESSION,
+ params=[id_param("id","PDF file ID")],request={"application/json":{"schema":obj({"versionSeq":integer(minimum=1),"fileSha256":string(),"expectedRevision":integer(minimum=0),"targetRevision":integer(minimum=0),"password":string()},required=["versionSeq","fileSha256","expectedRevision","targetRevision","password"])}},
+ responses=dict([("201",{"description":"New immutable signing revision created; source and evidence unchanged","content":{"application/json":{"schema":obj({"ok":boolean(),"data":ref("SealRevision")},required=["ok","data"])}}}),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
 
 # --- Approvals ---
 add("GET", "/api/approvals", operation("List approvals visible to the caller", "Workflow", "listApprovals", security=SESSION,

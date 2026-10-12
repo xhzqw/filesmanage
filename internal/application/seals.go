@@ -396,8 +396,16 @@ func (s *Service) SignFileBatch(ctx context.Context, actor domain.User, fileID s
 		}
 		prepared = append(prepared, preparedMark{mark: mark, asset: asset})
 	}
-	// Insert and audit in a single unit of work. Unique digest constraints still
-	// protect concurrent imports and signing attempts in the persistence layer.
+	// Preserve the previously visible revision and atomically add this batch.
+	currentRevision, err := store.SealRevision(ctx, file.ID, first.VersionSeq, -1)
+	if err != nil {
+		return nil, err
+	}
+	if len(currentRevision.MarkIDs)+len(prepared) > maxSignedPDFMarks {
+		return nil, domain.ErrInvalidInput
+	}
+
+	// Insert and audit all marks before appending their new immutable snapshot.
 	for _, item := range prepared {
 		m, a := item.mark, item.asset
 		if err = store.InsertSealMark(ctx, m); err != nil {
@@ -413,6 +421,17 @@ func (s *Service) SignFileBatch(ctx context.Context, actor domain.User, fileID s
 		}); err != nil {
 			return nil, err
 		}
+	}
+	activeIDs := append([]string{}, currentRevision.MarkIDs...)
+	for _, item := range prepared {
+		activeIDs = append(activeIDs, item.mark.ID)
+	}
+	revision := domain.SealRevision{
+		ID: NewID("sealrev"), FileID: file.ID, VersionSeq: first.VersionSeq,
+		Revision: currentRevision.Revision + 1, MarkIDs: activeIDs, Action: "sign", ActorID: actor.ID,
+	}
+	if err = store.AppendSealRevision(ctx, revision, currentRevision.Revision); err != nil {
+		return nil, err
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return nil, err
@@ -430,6 +449,12 @@ func (s *Service) SignFileBatch(ctx context.Context, actor domain.User, fileID s
 }
 
 func (s *Service) FileSeals(ctx context.Context, actor domain.User, fileID string, seq int) ([]domain.FileSealMark, error) {
+	return s.FileSealsAtRevision(ctx, actor, fileID, seq, -1)
+}
+func (s *Service) FileSealsAtRevision(ctx context.Context, actor domain.User, fileID string, seq, revision int) ([]domain.FileSealMark, error) {
+	if revision < -1 {
+		return nil, domain.ErrInvalidInput
+	}
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -448,7 +473,7 @@ func (s *Service) FileSeals(ctx context.Context, actor domain.User, fileID strin
 	if err != nil {
 		return nil, err
 	}
-	return store.ListSealMarks(ctx, fileID, seq)
+	return store.ListSealMarksAtRevision(ctx, fileID, seq, revision)
 }
 
 func (s *Service) FileSealImage(ctx context.Context, actor domain.User, fileID, markID string) ([]byte, error) {

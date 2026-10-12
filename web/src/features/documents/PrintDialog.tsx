@@ -11,7 +11,7 @@ import {authorizeAndOpenPrint,browserPrintKind,openPrintWindow,type Paper,type O
 import "./printDialog.css";
 
 
-export function PrintDialog({preview,onClose}:{preview:PreviewData;onClose:()=>void}){
+export function PrintDialog({preview,onClose,sealRevision=null}:{preview:PreviewData;onClose:()=>void;sealRevision?:number|null}){
  const navigate=useNavigate();
  const [paper,setPaper]=useState<Paper>("A4");
  const [orientation,setOrientation]=useState<Orientation>("portrait");
@@ -35,9 +35,9 @@ export function PrintDialog({preview,onClose}:{preview:PreviewData;onClose:()=>v
  const printable=browserPrintKind(preview)!==null;
  const previewUrl=isPdf||isImage?fileApi.mediaUrl(preview.fileId,preview.sha256):
    isOffice?"/api/files/"+encodeURIComponent(preview.fileId)+"/preview/office-pdf?v="+encodeURIComponent(preview.sha256):"";
- const pdfPageUrl=isPdf?fileApi.pdfPageUrl(preview.fileId,preview.sha256,1)+(pdfImageRetry?"&attempt="+pdfImageRetry:""):"";
+ const pdfPageUrl=isPdf?fileApi.pdfPageUrl(preview.fileId,preview.sha256,1,sealRevision)+(pdfImageRetry?"&attempt="+pdfImageRetry:""):"";
  const pdfImageReady=pdfImageUrl===pdfPageUrl;
- useEffect(()=>{setPdfImageError(false);setPdfImageRetry(0);},[preview.fileId,preview.sha256]);
+ useEffect(()=>{setPdfImageError(false);setPdfImageRetry(0);},[preview.fileId,preview.sha256,sealRevision]);
  useEffect(()=>{
   if(!isSpreadsheet)return;
   let valid=true;
@@ -57,7 +57,7 @@ export function PrintDialog({preview,onClose}:{preview:PreviewData;onClose:()=>v
   setBusy(true);setError("");
   try{
    await authorizeAndOpenPrint(popup,preview,{
-    paper,orientation,watermark:markEnabled?markText:"",sheet:isSpreadsheet?selectedSheet:"",
+    paper,orientation,watermark:markEnabled?markText:"",sheet:isSpreadsheet?selectedSheet:"",sealRevision,
    });
    onClose();
   }catch(cause){

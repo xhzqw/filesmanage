@@ -4,7 +4,7 @@ import {resolvePreviewAdapter} from "./previewAdapters";
 
 export type Paper="A4"|"A3"|"letter";
 export type Orientation="portrait"|"landscape";
-export type PrintOptions={paper:Paper;orientation:Orientation;watermark:string;sheet?:string};
+export type PrintOptions={paper:Paper;orientation:Orientation;watermark:string;sheet?:string;sealRevision?:number|null};
 export type BrowserPrintKind="pdf"|"office"|"image"|"text";
 const escapeHTML=(value:string)=>value.replace(/[&<>"']/g,ch=>({
  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;",
@@ -44,7 +44,7 @@ export async function authorizeAndOpenPrint(popup:Window,preview:PreviewData,opt
   throw new Error("文件版本已变化，请刷新文件列表后重试");
  if(popup.closed)throw new Error("打印窗口已关闭");
  if(kind==="pdf"||kind==="office"){
-  popup.location.replace(kind==="pdf"?fileApi.printMediaUrl(preview.fileId,result.sha256):
+  popup.location.replace(kind==="pdf"?fileApi.printMediaUrl(preview.fileId,result.sha256,options.sealRevision):
    fileApi.printOfficeUrl(preview.fileId,result.sha256,options.sheet));
   return;
  }

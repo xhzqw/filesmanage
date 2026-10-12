@@ -1,7 +1,9 @@
 package httpx
 
 import (
+	"filesmanage/internal/domain"
 	"net/http"
+	"strings"
 
 	"filesmanage/internal/application"
 	"github.com/gin-gonic/gin"
@@ -49,6 +51,34 @@ func (h *Handler) browserPrintMedia(c *gin.Context) {
 	sha := c.Query("sha256")
 	if !hexSHA(sha) {
 		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+		return
+	}
+	revision, err := optionalSealRevision(c)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	info, err := h.S.PrepareBrowserPrint(c.Request.Context(), u, c.Param("id"), sha)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	if strings.HasSuffix(strings.ToLower(info.Name), ".pdf") {
+		pdf, err := h.S.ExportSignedPDFRevision(c.Request.Context(), u, c.Param("id"), info.VersionSeq, revision, domain.ActionPrint)
+		if err != nil {
+			respondError(c, err)
+			return
+		}
+		if pdf.SourceSha256 != sha {
+			respondError(c, domain.ErrVersionConflict)
+			return
+		}
+		c.Header("Content-Disposition", "inline")
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("Cache-Control", "private, no-store")
+		c.Header("Cross-Origin-Resource-Policy", "same-origin")
+		c.Header("Content-Security-Policy", "sandbox")
+		c.Data(http.StatusOK, "application/pdf", pdf.Data)
 		return
 	}
 	source, done, err := h.S.OpenBrowserPrintMedia(c.Request.Context(), u, c.Param("id"), sha)

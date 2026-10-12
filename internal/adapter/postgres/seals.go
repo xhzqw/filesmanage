@@ -125,12 +125,7 @@ func scanSealMark(rows pgx.Rows) ([]domain.FileSealMark, error) {
 	return out, rows.Err()
 }
 func (r *Repository) ListSealMarks(ctx context.Context, fileID string, seq int) ([]domain.FileSealMark, error) {
-	rows, err := r.Q.Query(ctx, marksQuery+" WHERE m.file_id=$1 AND m.version_seq=$2 ORDER BY m.created_at,m.id LIMIT 300", fileID, seq)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanSealMark(rows)
+	return r.ListSealMarksAtRevision(ctx, fileID, seq, -1)
 }
 func (r *Repository) GetSealMark(ctx context.Context, fileID, markID string) (domain.FileSealMark, error) {
 	rows, err := r.Q.Query(ctx, marksQuery+" WHERE m.file_id=$1 AND m.id=$2", fileID, markID)

@@ -30,7 +30,12 @@ func (h *Handler) pdfPreviewPage(c *gin.Context) {
 		respondError(c, domain.ErrInvalidInput)
 		return
 	}
-	image, err := h.S.PDFPreviewPage(c.Request.Context(), user, c.Param("id"), c.Query("sha256"), page)
+	revision, err := optionalSealRevision(c)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	image, err := h.S.PDFPreviewPageRevision(c.Request.Context(), user, c.Param("id"), c.Query("sha256"), page, revision)
 	if err != nil {
 		respondError(c, err)
 		return

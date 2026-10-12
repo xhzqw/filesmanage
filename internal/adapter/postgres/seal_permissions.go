@@ -60,9 +60,16 @@ func (r *Repository) RenameSeal(ctx context.Context, id, name string) error {
 }
 
 // Uses a separate index lookup so UI can signal duplicate use before password
-// submission; uniqueness remains enforced in PostgreSQL at commit time.
+// submission; snapshot uniqueness is rechecked under the file row lock.
 func (r *Repository) FileHasSeal(ctx context.Context, fileID, assetID string) (bool, error) {
 	var found bool
-	err := r.Q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM file_seal_marks m JOIN seal_assets a ON a.id=$2 WHERE m.file_id=$1 AND (m.asset_id=a.id OR m.asset_sha256=a.sha256))`, fileID, assetID).Scan(&found)
+	err := r.Q.QueryRow(ctx, `SELECT EXISTS(
+ SELECT 1 FROM file_seal_marks m JOIN seal_assets a ON a.id=$2
+ JOIN files f ON f.id=m.file_id AND f.current_version_seq=m.version_seq
+ WHERE m.file_id=$1 AND (m.asset_id=a.id OR m.asset_sha256=a.sha256)
+ AND m.id=ANY(COALESCE(
+  (SELECT rev.mark_ids FROM file_seal_revisions rev WHERE rev.file_id=f.id
+  AND rev.version_seq=f.current_version_seq ORDER BY rev.revision_no DESC LIMIT 1),'{}'::text[]))
+)`, fileID, assetID).Scan(&found)
 	return found, err
 }

@@ -22,6 +22,9 @@ export const sealsApi={
  configure:(id:string,action:"bind"|"grant"|"revoke"|"retire"|"rename",userId="")=>request<{updated:string}>("/seals/"+encodeURIComponent(id)+"/manage",{method:"POST",body:JSON.stringify({action,userId})}),
  used:(fileId:string)=>request<string[]>("/files/"+encodeURIComponent(fileId)+"/seals/used"),
  marks:(fileId:string,version:number)=>request<FileSealMark[]>("/files/"+encodeURIComponent(fileId)+"/seals?version="+version),
+ history:(fileId:string,version:number)=>request<{current:number;revisions:{revision:number;markCount:number;action:string;actorName?:string;createdAt?:string;restoredFrom?:number}[]}>("/files/"+encodeURIComponent(fileId)+"/seals/revisions?version="+version),
+ restore:(fileId:string,data:{versionSeq:number;fileSha256:string;expectedRevision:number;targetRevision:number;password:string})=>request<{revision:number;markCount:number}>("/files/"+encodeURIComponent(fileId)+"/seals/restore",{method:"POST",body:JSON.stringify(data)}),
+
  markImageUrl:(fileId:string,markId:string)=>"/api/files/"+encodeURIComponent(fileId)+"/seals/"+encodeURIComponent(markId)+"/image",
  exportUrl:(fileId:string,version:number)=>"/api/files/"+encodeURIComponent(fileId)+"/seals/export?version="+version,
  apply:(fileId:string,placement:SealPlacement)=>request<FileSealMark>("/files/"+encodeURIComponent(fileId)+"/seals",{method:"POST",body:JSON.stringify(placement)}),

@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"bytes"
 	"encoding/base64"
 	"filesmanage/internal/application"
 	"github.com/gin-gonic/gin"
@@ -112,6 +113,24 @@ func (h *Handler) downloadFile(c *gin.Context) {
 	}
 	defer closeReader()
 	c.Header("Content-Type", contentTypeOr(download.ContentType))
+	// The ordinary file download must include currently effective signatures.
+	// An unsigned PDF or a non-PDF keeps its original streaming/Range behavior.
+	if strings.HasSuffix(strings.ToLower(download.FileName), ".pdf") && download.Size <= 24<<20 {
+		stamped, err := h.S.CurrentSignedPDFForDownload(c.Request.Context(), u, c.Param("id"), download.Sha256)
+		if err != nil {
+			respondError(c, err)
+			return
+		}
+		if stamped != nil {
+			c.Header("Content-Type", "application/pdf")
+			c.Header("Content-Disposition", contentDisposition(download.FileName))
+			c.Header("X-Source-Sha256", download.Sha256)
+			c.Header("Cache-Control", "private, no-store")
+			http.ServeContent(c.Writer, c.Request, download.FileName, download.ModTime, bytes.NewReader(stamped.Data))
+			return
+		}
+	}
+
 	c.Header("X-Content-Sha256", download.Sha256)
 	c.Header("Content-Disposition", contentDisposition(download.FileName))
 	// ServeContent implements Range/If-Range/ETag revalidation (206/416) on top

@@ -52,6 +52,9 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const[versions,setVersions]=useState<FileVersion[]>([]);
  const[status,setStatus]=useState<"loading"|"ready"|"failed">("loading");
  const[tab,setTab]=useState<Tab>(()=>new URLSearchParams(window.location.search).get("tab")==="seals"?"seals":"preview");
+ const[sealRevision,setSealRevision]=useState<number|null>(null);
+ useEffect(()=>{setSealRevision(null)},[id,preview?.sha256,file?.currentVersionSeq]);
+
  const[notice,setNotice]=useState("");
  const[error,setError]=useState("");
  const[rollback,setRollback]=useState<FileVersion|null>(null);
@@ -165,7 +168,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  function download(){
   if(!preview)return;
   const link=document.createElement("a");
-  link.href=bytesUrl(preview.fileId);link.download=preview.name;
+  link.href=preview.renderer==="pdf"?fileApi.signedDownloadUrl(preview.fileId,currentSeq,sealRevision):bytesUrl(preview.fileId);link.download=preview.name;
   document.body.append(link);link.click();link.remove();
   toast.info("已交由浏览器处理下载，请在下载列表确认结果");
  }
@@ -262,7 +265,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
        <MediaPreview key={preview.fileId+preview.sha256} fileId={preview.fileId} sha256={preview.sha256}
         name={preview.name} kind={preview.renderer} mime={preview.mediaType??""}/>:
        preview.renderer==="pdf"?
-        <PDFPageViewer fileId={preview.fileId} sha={preview.sha256} name={preview.name} onSign={()=>setTab("seals")}/>:
+        <PDFPageViewer fileId={preview.fileId} sha={preview.sha256} name={preview.name} seq={currentSeq} revision={sealRevision} epoch={reloadToken} onRevisionChange={setSealRevision} onSign={()=>{setSealRevision(null);setTab("seals");}}/>:
        preview.structured&&["spreadsheet","presentation","document"].includes(adapter)?
         <OfficeLayoutPreview fileId={preview.fileId} sha={preview.sha256} structured={preview.structured}/>:
        preview.structured&&adapter==="archive"?
@@ -313,10 +316,12 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
      {tab==="seals"&&<section id="file-panel-seals" role="tabpanel" aria-labelledby="file-tab-seals" className="file-workbench-panel">
       {isOfficeName(preview.name)?
        <DocxSealConversion fileId={id} versionSeq={currentSeq} sha={preview.sha256} name={preview.name}/>:
-       <FileSealsPanel fileId={id} seq={currentSeq} sha={preview.sha256} name={preview.name} isAdmin={user.isAdmin}/>}
+       <FileSealsPanel fileId={id} seq={currentSeq} sha={preview.sha256} name={preview.name} isAdmin={user.isAdmin} onSelectRevision={value=>{setSealRevision(value);setTab("preview")}} onChanged={()=>{setSealRevision(null);refresh();toast.success("签章版本已更新")}}/>}
      </section>}
      {tab==="versions"&&<section id="file-panel-versions" role="tabpanel" aria-labelledby="file-tab-versions" className="file-workbench-panel file-versions-panel">
       <div className="file-section-caption"><strong>版本记录</strong><span>所有历史均保留 · 回滚会创建新版本</span></div>
+      {preview.renderer==="pdf"&&<RareButton type="button" onClick={()=>setTab("seals")}>查看签章版本与回退</RareButton>}
+
       <FileLifecyclePanel fileId={id} currentSeq={currentSeq} lifecycle={lifecycle} onUpdated={value=>{setLifecycle(value);announce("生命周期状态已更新");}}/>
       {versions.length===0?<p className="empty">暂无版本记录</p>:
       <div className="table file-versions-table"><RareDataTable className="file-version-data" aria-label="历史版本">
@@ -337,7 +342,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
    onMoved={()=>{setMoving(false);announce("文件已移动");refresh();}} onReload={refresh}/>}
    {sharing&&file&&<ShareDialog resource={{kind:"file",id:file.id,name:file.name}}
     onClose={()=>setSharing(false)} onCreated={()=>{setSharing(false);announce("分享已创建");}}/>}
-   {printing&&preview&&<PrintDialog preview={preview} onClose={()=>setPrinting(false)}/>}
+   {printing&&preview&&<PrintDialog preview={preview} sealRevision={sealRevision} onClose={()=>setPrinting(false)}/>}
   {renaming&&<Dialog open title="重命名文件" onClose={()=>{if(!busy)setRenaming(false);}} closeGuard={()=>!busy}>
    <form onSubmit={rename}>
     <label htmlFor="file-workbench-rename">新文件名</label>
