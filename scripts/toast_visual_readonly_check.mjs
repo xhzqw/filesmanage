@@ -41,6 +41,10 @@ const geometry=String.raw`(()=>{
  const row=document.createElement("div");
  row.className="rare-toast";
  row.dataset.toastTone="success";
+ const surface=document.createElement("span");
+ surface.className="rare-toast-surface";
+ surface.style.animationDuration="2400ms";
+ row.append(surface);
  const mark=document.createElement("span");
  mark.className="rare-toast-mark";
  mark.textContent="✓";
@@ -61,6 +65,9 @@ const geometry=String.raw`(()=>{
   borderRadius:parseFloat(rowStyle.borderTopLeftRadius),
   clipped:copy.scrollWidth>copy.clientWidth,
   ellipsis:copyStyle.textOverflow,
+  backgroundSurface:getComputedStyle(surface).backgroundColor,
+  textOpacity:parseFloat(copyStyle.opacity),
+  surfaceAnimation:getComputedStyle(surface).animationName,
   rowCenterX:b.left+b.width/2,
  };
  viewport.remove();
@@ -79,6 +86,9 @@ function assertGeometry(state,where){
  assert.ok(state.borderRadius>=15,where+": notification should have soft Rare pill geometry");
  assert.equal(state.clipped,true,where+": long filename must be truncated");
  assert.equal(state.ellipsis,"ellipsis");
+ assert.equal(state.backgroundSurface,"rgb(255, 255, 255)","background is an independent layer");
+ assert.equal(state.textOpacity,1,"background softening must not dim text");
+ assert.equal(state.surfaceAnimation,"rare-toast-surface-soften","softening animation is attached to surface only");
 }
 
 try{
@@ -109,6 +119,36 @@ try{
  await waitUntil("!!document.querySelector('input[type=password]') && getComputedStyle(document.documentElement).getPropertyValue('--radius-pill').trim().length>0");
  assertGeometry(await evaluate(geometry),"desktop");
 
+ const softening=await evaluate(String.raw`(()=>{
+  const row=document.createElement("div");
+  row.className="rare-toast";
+  const surface=document.createElement("span");
+  surface.className="rare-toast-surface";
+  surface.style.animationDuration="2400ms";
+  const text=document.createElement("span");
+  text.className="rare-toast-text";
+  text.textContent="文件移动成功";
+  row.append(surface,text);
+  document.body.append(row);
+  const animation=surface.getAnimations()[0];
+  if(!animation)throw Error("toast surface animation missing");
+  animation.pause();
+  animation.currentTime=100;
+  const early=Number(getComputedStyle(surface).opacity);
+  animation.currentTime=1800;
+  const late=Number(getComputedStyle(surface).opacity);
+  surface.style.animationPlayState="paused";
+  const paused=getComputedStyle(surface).animationPlayState;
+  const textOpacity=Number(getComputedStyle(text).opacity);
+  const children=row.children.length;
+  row.remove();
+  return {early,late,paused,textOpacity,children};
+ })()`);
+ assert.ok(softening.early>softening.late,"background must get subtly lighter over time");
+ assert.ok(softening.late>=.85,"background must remain readable");
+ assert.equal(softening.paused,"paused","hover must be able to freeze background progress");
+ assert.equal(softening.textOpacity,1,"text must stay fully opaque");
+ assert.equal(softening.children,2,"no progress track or countdown elements may be introduced");
  await send("Emulation.setDeviceMetricsOverride",{width:390,height:844,deviceScaleFactor:2,mobile:true});
  assertGeometry(await evaluate(geometry),"mobile");
  const inModal=await evaluate(String.raw`(()=>{
@@ -136,7 +176,21 @@ try{
  assert.equal(inModal.clickable,true,"notification must be clickable inside native modal");
  assert.ok(Math.abs(inModal.centerX-inModal.screenX)<=2,"modal toast remains screen-centered");
  assert.ok(inModal.top>=70&&inModal.top<inModal.screenHeight/3,"modal toast must remain in top center");
- console.log("TOAST_VISUAL_READONLY_PASS: desktop/mobile top-center, compact pill, ellipsis, modal top layer");
+ await send("Emulation.setEmulatedMedia",{features:[{name:"prefers-reduced-motion",value:"reduce"}]});
+ const reducedName=await evaluate(String.raw`(()=>{
+  const row=document.createElement("div");
+  row.className="rare-toast";
+  const surface=document.createElement("span");
+  surface.className="rare-toast-surface";
+  row.append(surface);
+  document.body.append(row);
+  const name=getComputedStyle(surface).animationName;
+  row.remove();
+  return name;
+ })()`);
+ assert.equal(reducedName,"none","reduced motion must disable background animation");
+ await send("Emulation.setEmulatedMedia",{features:[]});
+ console.log("TOAST_VISUAL_READONLY_PASS: top-center desktop/mobile, background softening, readable text, paused progress, reduced motion, modal top layer");
 }catch(error){
  console.error("TOAST_VISUAL_READONLY_FAIL",error.message);
  process.exitCode=1;

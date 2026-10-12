@@ -2,11 +2,18 @@
 .rare-toast-viewport{position:fixed;top:clamp(72px,12vh,112px);left:50%;transform:translateX(-50%);z-index:2100;
  width:min(400px,calc(100vw - 24px));max-height:calc(100dvh - 24px);
  display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
-.rare-toast{--toast-accent:var(--text-secondary);display:inline-flex;align-items:center;gap:8px;
+.rare-toast{--toast-accent:var(--text-secondary);position:relative;isolation:isolate;display:inline-flex;align-items:center;gap:8px;
  min-width:0;max-width:100%;width:max-content;min-height:36px;padding:8px 12px;
- background:var(--surface-panel);border:1px solid var(--border-hairline);
+ background:transparent;border:1px solid var(--border-hairline);
  border-radius:var(--radius-pill);box-shadow:0 7px 24px rgba(15,39,92,.12),0 2px 7px rgba(15,39,92,.07);
  color:var(--text-primary);pointer-events:auto}
+/* Paint-only softening behind the content. There is no visual countdown,
+   and the icon/text stay fully opaque as the background gently lightens. */
+.rare-toast-surface{position:absolute;inset:0;border-radius:inherit;z-index:0;pointer-events:none;
+ background:var(--surface-panel);animation:rare-toast-surface-soften linear both}
+@keyframes rare-toast-surface-soften{from{opacity:1}to{opacity:.86}}
+.rare-toast-mark,.rare-toast-text,.rare-toast-close{position:relative;z-index:1}
+
 .rare-toast[data-toast-tone="success"]{--toast-accent:var(--status-success)}
 .rare-toast[data-toast-tone="warning"]{--toast-accent:var(--status-warning)}
 .rare-toast[data-toast-tone="danger"]{--toast-accent:var(--status-danger)}
@@ -25,4 +32,4 @@
 .rare-toast-spinner{display:block;width:14px;height:14px;border:2px solid var(--border-hairline);
  border-top-color:var(--brand-blue);border-radius:var(--radius-pill);animation:rare-toast-spin .85s linear infinite}
 @keyframes rare-toast-spin{to{transform:rotate(360deg)}}
-@media(prefers-reduced-motion:reduce){.rare-toast,.rare-toast-spinner{animation:none}}
+@media(prefers-reduced-motion:reduce){.rare-toast,.rare-toast-spinner,.rare-toast-surface{animation:none}}

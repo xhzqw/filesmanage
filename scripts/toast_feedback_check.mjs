@@ -121,6 +121,15 @@ const labels={loading:"保存中",success:"已保存",error:"保存失败"};
  await assert.rejects(promise);
  assert.equal(h.items().length,0,"field-level validation can suppress a duplicate global alert");
 }
+// The visible lifetime includes the exit, and the lifetime clock pauses with
+// hover/focus/page visibility. A duplicate updates both countdown and surface.
+const toastViewport=readFileSync(new URL("../web/src/shared/ui/ToastViewport.tsx",import.meta.url),"utf8");
+assert.match(toastViewport,/const EXIT_MS=450/,"toast must reserve 450ms for quiet exit");
+assert.match(toastViewport,/remaining\.current-EXIT_MS/,"the exit must happen inside the original TTL");
+assert.match(toastViewport,/const paused=hovered\|\|focused\|\|hidden/,"hover, focus and page visibility must share pause state");
+assert.match(toastViewport,/item\.id}-\$\{item\.revision/,"updated notifications must restart surface animation");
+assert.match(toastViewport,/animationPlayState:paused\?"paused":"running"/,"background progress must pause with lifetime");
+assert.doesNotMatch(toastViewport,/exit=\{[^\n]*x:14/,"toast must not slide sideways on exit");
 console.log("TOAST_FEEDBACK_CHECK_PASS: parallel, expiry revision, severity, identity, uncertainty, modal errors");
 
 // File list must not resurrect the previous full-width top banner. Queue

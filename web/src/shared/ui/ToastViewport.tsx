@@ -6,10 +6,15 @@ import {BrandLoader} from "./BrandLoader";
 import {toast,useToastStore,type ToastItem} from "./feedback";
 import "./toast.css";
 
+// The final portion of the existing TTL is reserved for the actual exit.
+// Keeping one budget makes the background fade and removal agree on timing.
+const EXIT_MS=450;
 function ToastRow({item}:{item:ToastItem}){
  const reduced=useReducedMotion();
- const[paused,setPaused]=useState(false);
+ const[hovered,setHovered]=useState(false);
+ const[focused,setFocused]=useState(false);
  const[hidden,setHidden]=useState(()=>document.hidden);
+ const paused=hovered||focused||hidden;
  const remaining=useRef(item.duration);
  const timerIdentity=useRef({id:item.id,revision:item.revision});
  useEffect(()=>{
@@ -22,19 +27,21 @@ function ToastRow({item}:{item:ToastItem}){
    timerIdentity.current={id:item.id,revision:item.revision};
    remaining.current=item.duration;
   }
-  if(!item.duration||paused||hidden)return;
+  if(!item.duration||paused)return;
   const start=Date.now();
-  const handle=window.setTimeout(()=>toast.dismiss(item.id),remaining.current);
+  const handle=window.setTimeout(()=>toast.dismiss(item.id),Math.max(0,remaining.current-EXIT_MS));
   return()=>{window.clearTimeout(handle);remaining.current=Math.max(0,remaining.current-(Date.now()-start));};
- },[item.id,item.duration,item.revision,paused,hidden]);
+ },[item.id,item.duration,item.revision,paused]);
  return <motion.div layout className="rare-toast" data-toast-tone={item.tone}
-  initial={reduced?false:{opacity:0,y:-8,scale:.97}}
-  animate={{opacity:1,y:0,scale:1}}
-  exit={reduced?{opacity:0}:{opacity:0,x:14,scale:.98}}
-  transition={reduced?{duration:0}:{duration:.21,ease:[.2,.8,.2,1]}}
+  initial={reduced?false:{opacity:0,y:-6}}
+  animate={{opacity:1,y:0}}
+  exit={{opacity:0,y:reduced?0:-4,transition:{duration:reduced?0:EXIT_MS/1000,ease:[.4,0,.2,1]}}}
+  transition={reduced?{duration:0}:{duration:.18,ease:[.18,1,.32,1]}}
   role={item.tone==="danger"?"alert":"status"}
-  onMouseEnter={()=>setPaused(true)} onMouseLeave={()=>setPaused(false)}
-  onFocusCapture={()=>setPaused(true)} onBlurCapture={event=>{if(!event.currentTarget.contains(event.relatedTarget))setPaused(false);}}>
+  onMouseEnter={()=>setHovered(true)} onMouseLeave={()=>setHovered(false)}
+  onFocusCapture={()=>setFocused(true)} onBlurCapture={event=>{if(!event.currentTarget.contains(event.relatedTarget))setFocused(false);}}>
+  <span key={`${item.id}-${item.revision}`} className="rare-toast-surface" aria-hidden="true"
+   style={{animationDuration:`${Math.max(1,item.duration-EXIT_MS)}ms`,animationPlayState:paused?"paused":"running",animationName:item.duration&&!reduced?"rare-toast-surface-soften":"none"}}/>
   <span className="rare-toast-mark" aria-hidden="true">
    {item.tone==="success"?<svg viewBox="0 0 20 20"><path d="m4 10 4 4 8-8"/></svg>:
     item.tone==="danger"?<svg viewBox="0 0 20 20"><path d="M10 5v6m0 3v1M10 2l8 15H2L10 2Z"/></svg>:
