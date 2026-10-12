@@ -1413,7 +1413,7 @@ BRAND-01：用户在本轮会话提供的蓝色抽象图形是正式品牌 Logo�
 BRAND-02：已观察原始附件为 JPEG、1080×1080、约 36 KB，白色背景、天蓝与深蓝渐变；原始 SHA-256 为 b307a0ab8ecdbd365afc75b322f97efb1b67777530d49bd7339dd17fa4592c21。
 BRAND-03：官方附件必须可信入库为 assets/brand/logo-source.jpg 并核对哈希。2026-10-09 客户交付的附件 SHA-256 与 BRAND-02 记录一致，已可信入库为 `web/public/assets/brand/logo-source.jpg`；`scripts/brand_assets.py` 核对哈希并从原件派生 favicon 16/32/48px 与登录页/顶栏用 PNG（派生清单见同目录 `BRAND-ASSETS.md`）。登录页、顶栏、favicon 均已使用该资产；VS01–VS18 截图签收在远端验收执行。
 BRAND-04：允许从原始 JPEG 派生 favicon 16/32/48px、登录页与顶栏用 PNG/WebP；保留原件，不用近似重绘的 SVG 替代。
-BRAND-05：用户未明确授权前不可擅自消除白底、改变图形旋向、配色或渐变。深色顶栏需测试白底边缘与对比度，必要时单独签收透明版。
+BRAND-05：未经用户授权，不得修改 Logo 白底、图形旋向、配色或渐变。2026-10-12 用户明确授权仅将浏览器标签 favicon 白底抠为透明；因此 favicon 16/32/48px 使用真实 Alpha 通道，在深色标签页不出现白色方块，并使用缓存更新标识。原始 JPEG、登录页与顶栏的 logo-256.png 保持原貌，其它场景透明化仍须单独授权。
 BRAND-06：“UI 操作图标必须内联 SVG”与官方 JPEG Logo 是两类资源；前者不能排斥后者。
 BRAND-07：导航、登录页、帮助页、浏览器标签均以本地静态文件加载，不使用外部图片 URL；重启后资源必须仍能访问。
 BRAND-08：品牌验收要存储原始 SHA、派生清单、截图和实际构建后的资源路径；本地出现一个文本路径并不代表真实资产已经交付。
