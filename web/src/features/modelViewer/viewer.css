@@ -141,3 +141,14 @@
  .cad-toolbar{max-height:85px;overflow:auto}
  .cad-layer-list{max-height:100px}
 }
+/* On narrow preview pages the global action capsule moves below the filename. */
+@media(max-width:820px){
+ .cad-embedded .cad-compact-toolbar{top:132px}
+ .cad-embedded .cad-viewcube{top:216px}
+ .cad-embedded .cad-inspector.is-open{top:189px}
+}
+@media(max-width:560px){
+ .cad-embedded .cad-compact-toolbar{top:132px}
+ .cad-embedded .cad-inspector.is-open{top:226px}
+ .cad-embedded .cad-viewcube{top:242px}
+}
