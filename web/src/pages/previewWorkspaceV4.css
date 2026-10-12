@@ -182,3 +182,30 @@
  .file-workbench-preview-surface .file-text-content{padding-top:120px}
 }
 @media(prefers-reduced-motion:reduce){.file-preview-action-dock .file-action-expansion{animation:none}}
+/* Unified signing dock: the only commit action lives beside document tools. */
+.file-workbench-signing .seal-page-toolbar{
+ box-sizing:border-box;width:max-content;
+ max-width:calc(100% - 24px);gap:6px;flex-wrap:nowrap;
+ overflow-x:auto;overflow-y:hidden;scrollbar-width:none
+}
+.file-workbench-signing .seal-page-toolbar::-webkit-scrollbar{display:none}
+.file-workbench-signing .seal-page-tools{flex:0 0 auto}
+.file-workbench-signing .seal-page-toolbar .seal-confirm-action.rare-button{
+ flex:0 0 auto;min-height:31px;height:31px;
+ padding:0 13px;border:0;border-radius:var(--radius-pill);
+ background:var(--brand-blue);color:var(--text-inverse);
+ font-size:11px;font-weight:650;white-space:nowrap
+}
+.file-workbench-signing .seal-page-toolbar .seal-confirm-action.rare-button:hover{
+ background:var(--color-action-hover);color:var(--text-on-brand)
+}
+.file-workbench-signing .seal-page-toolbar .seal-confirm-action.rare-button:disabled{
+ opacity:.45;cursor:not-allowed
+}
+/* Keep all editable handles on-paper even at extreme zoom. */
+.file-workbench-signing .seal-page-viewport{min-width:0;overflow:auto;overscroll-behavior:contain}
+.file-workbench-signing .seal-page-surface{max-width:none;box-sizing:border-box}
+@media(max-width:820px){
+ .file-workbench-signing .seal-page-toolbar{max-width:calc(100% - 12px)}
+ .file-workbench-signing .seal-page-toolbar .seal-confirm-action.rare-button{padding:0 9px}
+}

@@ -247,14 +247,47 @@ try{
      await cdp.drag(handle,{x:handle.x+25,y:handle.y+12});
      const width=await cdp.evaluate(`(()=>parseFloat(document.querySelector('.seal-position-mark').style.width))()`);
      assert("mark resizes through pointer handle",width>before.width+1,"width "+before.width+" → "+width);
-     const add=await cdp.evaluate(`(()=>{
-      const button=[...document.querySelectorAll('#file-seals-sidebar button')].find(b=>b.textContent?.includes('加入待签清单'));
-      if(!button||button.disabled)return false;button.click();return true;
+     const autoDraft=await cdp.evaluate(`(()=>{
+      return !!document.querySelector('.seal-draft-row')&&
+       ![...document.querySelectorAll('#file-seals-sidebar button')].some(b=>b.textContent?.includes('加入待签清单'));
      })()`);
-     await delay(150);
-     assert("positioned mark enters draft without applying seal",add&&await cdp.evaluate(`(()=>document.querySelectorAll('.seal-draft-row').length===1)()`));
-     const submitShown=await cdp.evaluate(`(()=>!!document.querySelector('#file-seals-sidebar .seal-submit-panel input[aria-label="本人登录密码"]'))()`);
-     assert("signing confirmation is shown only after staging",Boolean(submitShown));
+     assert("selecting an asset automatically places its draft without add-list action",autoDraft);
+     const frame=await cdp.evaluate(`(()=>{
+      const mark=document.querySelector('.seal-position-mark');
+      const paper=document.querySelector('.seal-page-surface');
+      const controls=mark?.querySelectorAll('.seal-resize-handle');
+      return {corners:controls?.length,remove:!!mark?.querySelector('.seal-remove-mark'),
+       inside:mark&&paper?mark.getBoundingClientRect().left>=paper.getBoundingClientRect().left-4&&
+       mark.getBoundingClientRect().right<=paper.getBoundingClientRect().right+4:null};
+     })()`);
+     assert("stamp has four resize corners and in-bounds upper-right remove control",
+      frame.corners===4&&frame.remove&&frame.inside,JSON.stringify(frame));
+     const bottomConfirm=await cdp.evaluate(`(()=>{
+      const button=document.querySelector('.seal-page-toolbar .seal-confirm-action');
+      return !!button&&!button.disabled&&button.textContent.includes('确认签署')&&
+       !document.querySelector('#file-seals-sidebar input[type=password]');
+     })()`);
+     assert("single blue signing action lives in the bottom capsule without sidebar password",bottomConfirm);
+     await cdp.evaluate(`(()=>document.querySelector('.seal-confirm-action')?.click())()`);
+     const modal=await cdp.waitFor(`()=>!!document.querySelector('dialog.seal-confirm-dialog[open] input[type=password]')`,3200);
+     assert("password prompt opens as modal after bottom confirm",Boolean(modal));
+     await cdp.evaluate(`(()=>{
+      [...document.querySelectorAll('dialog.seal-confirm-dialog button')].find(b=>b.textContent?.includes('取消'))?.click();
+     })()`);
+     const canceled=await cdp.waitFor(`()=>!document.querySelector('dialog.seal-confirm-dialog[open]')`,3000);
+     assert("cancelling password modal preserves all uncommitted placements",
+      Boolean(canceled)&&await cdp.evaluate(`(()=>document.querySelectorAll('.seal-draft-row').length===1)()`));
+
+     await cdp.evaluate(`(()=>document.querySelector('.seal-remove-mark')?.click())()`);
+     const removed=await cdp.waitFor(`()=>document.querySelectorAll('.seal-draft-row').length===0&&!document.querySelector('.seal-position-mark')`,3500);
+     assert("upper-right X removes staged seal without signing",Boolean(removed));
+     await cdp.evaluate(`(()=>document.querySelector('#file-seals-sidebar .rare-select')?.click())()`);
+     await cdp.waitFor(`()=>[...document.querySelectorAll('[role="option"]')].some(o=>!o.disabled&&o.textContent.trim()!=='选择人员或公章')`,3200);
+     await cdp.evaluate(`(()=>[...document.querySelectorAll('[role="option"]')].find(o=>!o.disabled&&o.textContent.trim()!=='选择人员或公章')?.click())()`);
+     const repopulated=await cdp.waitFor(`()=>document.querySelectorAll('.seal-draft-row').length===1`,3500);
+     assert("asset can be selected again after X removal",Boolean(repopulated));
+
+
 
     }
    }

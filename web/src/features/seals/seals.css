@@ -112,3 +112,46 @@
 .seal-page-error{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:250px;margin:auto;color:var(--text-secondary);font-size:12px}
 .seal-page-tip{font-size:11px;line-height:1.3;text-align:center}
 @media(max-width:860px){.seal-page-toolbar{gap:4px;padding:5px 7px}.seal-page-tools{gap:3px}.seal-page-tools .rare-button{min-height:30px}}
+/* One-step canvas placement: axis-aligned controls, only the artwork rotates. */
+.seal-page-surface .seal-staged-mark.rare-button{
+ position:absolute;display:flex;align-items:stretch;justify-content:stretch;
+ border:1px dashed var(--brand-blue);border-radius:var(--radius-sm);
+ padding:0;min-width:0;min-height:0;box-shadow:none;
+ background:transparent;cursor:pointer;pointer-events:auto;
+}
+.seal-page-surface .seal-staged-mark.rare-button img{
+ width:100%;height:100%;object-fit:fill;pointer-events:none;
+ transform-origin:center
+}
+.seal-page-surface .seal-position-mark.is-editable{
+ outline:2px solid var(--brand-blue);outline-offset:0;
+ border-radius:var(--radius-sm);box-sizing:border-box;
+}
+.seal-page-surface .seal-position-mark.is-editable>img{
+ pointer-events:none;user-select:none;transform-origin:center
+}
+.seal-page-surface .seal-resize-handle{
+ position:absolute;right:auto;bottom:auto;
+ width:13px;height:13px;box-sizing:border-box;
+ border:2px solid var(--surface-panel);border-radius:var(--radius-pill);
+ background:var(--brand-blue);box-shadow:var(--shadow-panel);
+ pointer-events:auto;touch-action:none
+}
+.seal-page-surface .seal-resize-handle.is-nw{top:0;left:0;cursor:nwse-resize;transform:translate(-10%,-10%)}
+.seal-page-surface .seal-resize-handle.is-ne{top:0;right:0;left:auto;cursor:nesw-resize;transform:translate(10%,-10%)}
+.seal-page-surface .seal-resize-handle.is-sw{bottom:0;left:0;cursor:nesw-resize;transform:translate(-10%,10%)}
+.seal-page-surface .seal-resize-handle.is-se{bottom:0;right:0;left:auto;cursor:nwse-resize;transform:translate(10%,10%)}
+.seal-page-surface .seal-remove-mark.rare-button{
+ position:absolute;right:3px;top:3px;
+ display:flex;align-items:center;justify-content:center;
+ width:25px;min-width:25px;height:25px;min-height:25px;padding:0;
+ border:1px solid var(--border-hairline);
+ border-radius:var(--radius-pill);background:var(--surface-panel);
+ box-shadow:var(--shadow-panel);color:var(--text-secondary);cursor:pointer;
+ transform:none;touch-action:manipulation
+}
+.seal-page-surface .seal-remove-mark.rare-button:hover{color:var(--status-danger);background:var(--surface-row-hover)}
+.seal-file-controls .seal-draft-list{max-height:180px}
+.seal-confirm-dialog form{display:flex;flex-direction:column;gap:13px;min-width:min(320px,75vw)}
+.seal-confirm-dialog form>label{display:flex;flex-direction:column;gap:6px;font-size:12px}
+.seal-confirm-dialog .notice.error{margin:0}

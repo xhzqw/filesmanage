@@ -8,18 +8,21 @@ type StampPosition={x:number;y:number;width:number;height:number};
 type StagedCanvasMark={assetId:string;asset?:SealAsset;pageNumber:number;x:number;y:number;width:number;height:number;angleDegrees:number};
 type Props={
  drafts?:StagedCanvasMark[];
+ onSelectDraft:(assetId:string)=>void;onRemoveDraft:(assetId:string)=>void;
+ pendingCount:number;onConfirm:()=>void;canConfirm:boolean;
  fileId:string;page:number;pageCount:number;onPageChange:(page:number)=>void;onRetry:()=>void;
  imageUrl:string;selected?:SealAsset;marks:FileSealMark[];
  position:StampPosition;setPosition:(update:(value:StampPosition)=>StampPosition)=>void;
  angle:number;pageRatio:number;setPageRatio:(value:number)=>void;
  imageAvailable:boolean;setImageAvailable:(value:boolean)=>void;
 };
-type StampDrag={kind:"move"|"resize";x:number;y:number;initial:StampPosition;rect:DOMRect};
+type StampDrag={kind:"move"|"nw"|"ne"|"sw"|"se";x:number;y:number;initial:StampPosition;rect:DOMRect};
 const limit=(value:number)=>Math.max(.6,Math.min(5,Math.round(value*100)/100));
 
 /** All mark coordinates remain normalized to the unscaled PDF page. */
 export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,imageUrl,selected,marks,
- position,setPosition,angle,pageRatio,setPageRatio,imageAvailable,setImageAvailable,drafts=[]}:Props){
+ position,setPosition,angle,pageRatio,setPageRatio,imageAvailable,setImageAvailable,drafts=[],
+ onSelectDraft,onRemoveDraft,pendingCount,onConfirm,canConfirm}:Props){
  const viewportRef=useRef<HTMLDivElement>(null);
  const surfaceRef=useRef<HTMLDivElement>(null);
  const dragRef=useRef<{x:number;y:number;left:number;top:number}|null>(null);
@@ -119,9 +122,10 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
   const rect=surfaceRef.current?.getBoundingClientRect();
   if(!rect||!rect.width||!rect.height)return;
   const target=e.target;
+  const handle=target instanceof Element?target.closest<HTMLElement>(".seal-resize-handle"):null;
+  const kind=handle?.dataset.corner as StampDrag["kind"]|undefined;
   stampDragRef.current={
-   kind:target instanceof Element&&!!target.closest(".seal-resize-handle")?"resize":"move",
-   x:e.clientX,y:e.clientY,initial:{...position},rect
+   kind:kind??"move",x:e.clientX,y:e.clientY,initial:{...position},rect
   };
   e.currentTarget.setPointerCapture(e.pointerId);
   e.preventDefault();e.stopPropagation();
@@ -133,9 +137,22 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
   if(drag.kind==="move"){
    setPosition(()=>fitStampToPage({...drag.initial,x:drag.initial.x+dx,y:drag.initial.y+dy},angle,pageRatio));
   }else{
-   const width=Math.max(.05,Math.min(1,drag.initial.width+dx));
-   const height=Math.max(.05,Math.min(1,drag.initial.height+dy));
-   setPosition(()=>fitStampToPage({...drag.initial,width,height},angle,pageRatio));
+   const start=drag.initial;
+   const min=.05;
+   let x=start.x,y=start.y,width=start.width,height=start.height;
+   if(drag.kind==="nw"||drag.kind==="sw"){
+    const delta=Math.min(start.width-min,dx);
+    x+=delta;width-=delta;
+   }else width=Math.max(min,width+dx);
+   if(drag.kind==="nw"||drag.kind==="ne"){
+    const delta=Math.min(start.height-min,dy);
+    y+=delta;height-=delta;
+   }else height=Math.max(min,height+dy);
+   const resized=fitStampToPage({x,y,width,height},angle,pageRatio);
+   if(resized.width<=1&&resized.height<=1&&resized.x>=-1e-6&&resized.y>=-1e-6&&
+    resized.x+resized.width<=1+1e-6&&resized.y+resized.height<=1+1e-6){
+    setPosition(()=>resized);
+   }
   }
   e.stopPropagation();
  }
@@ -172,6 +189,10 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
     <RareButton type="button" onClick={()=>{setFitMode(m=>m==="page"?"width":"page");fit();}}>{fitMode==="page"?"适应页面":"适应宽度"}</RareButton>
     <RareButton type="button" aria-pressed={panMode} onClick={()=>setPanMode(value=>!value)}>{panMode?"退出平移":"平移"}</RareButton>
    </div>
+   {pendingCount>0&&<RareButton type="button" className="seal-confirm-action primary"
+    aria-label={"确认签署 "+pendingCount+" 枚签章"} disabled={!canConfirm} onClick={onConfirm}>
+    确认签署 · {pendingCount}
+   </RareButton>}
   </div>
   <div className="seal-page-viewport" ref={viewportRef} onPointerDown={pointerDown} onPointerMove={pointerMove}
    onPointerUp={pointerEnd} onPointerCancel={pointerEnd} aria-label="PDF 签章页面，可放大并拖动平移"
@@ -182,16 +203,26 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
     <img src={imageUrl} alt={"PDF 第 "+page+" 页定位图"} onError={()=>setImageAvailable(false)}
      onLoad={e=>{const img=e.currentTarget;const ratio=img.naturalHeight/img.naturalWidth;if(Number.isFinite(ratio)&&ratio>0)setPageRatio(ratio)}}/>
     {drafts.filter(p=>p.pageNumber===page&&p.asset&&p.assetId!==selected?.id).map(p=>
-     <span key={p.assetId} className="seal-staged-mark" title={(p.asset?.ownerName||p.asset?.name||"签章")+" · 待签"}
-      style={{left:p.x*100+"%",top:p.y*100+"%",width:p.width*100+"%",height:p.height*100+"%",transform:"rotate("+p.angleDegrees+"deg)"}}>
-      <img alt="" src={sealsApi.imageUrl(p.assetId)}/></span>)}
-    {activeOnPage&&<span className="seal-position-mark is-editable" role="button" tabIndex={0}
-     aria-label={"拖动移动 "+selected?.name+"；右下角可调整大小，方向键可微调"}
-     style={{left:position.x*100+"%",top:position.y*100+"%",width:position.width*100+"%",height:position.height*100+"%",transform:"rotate("+angle+"deg)"}}
+     <RareButton key={p.assetId} type="button" className="seal-staged-mark"
+      aria-label={"选择调整 "+(p.asset?.ownerName||p.asset?.name||"签章")}
+      onClick={e=>{e.stopPropagation();onSelectDraft(p.assetId)}}
+      style={{left:p.x*100+"%",top:p.y*100+"%",width:p.width*100+"%",height:p.height*100+"%"}}>
+      <img alt="" draggable={false} src={sealsApi.imageUrl(p.assetId)} style={{transform:"rotate("+p.angleDegrees+"deg)"}}/>
+     </RareButton>)}
+    {activeOnPage&&<span className="seal-position-mark is-editable" role="group" tabIndex={0}
+     aria-label={"调整 "+selected?.name+"；拖动移动，四角调整尺寸，方向键微调"}
+     style={{left:position.x*100+"%",top:position.y*100+"%",width:position.width*100+"%",height:position.height*100+"%"}}
      onPointerDown={startStamp} onPointerMove={moveStamp} onPointerUp={endStamp} onPointerCancel={endStamp}
      onClick={e=>e.stopPropagation()} onKeyDown={markKey}>
-     <img alt="" draggable={false} src={sealsApi.imageUrl(selected!.id)}/>
-     <span className="seal-resize-handle" aria-hidden="true"/>
+     <img alt="" draggable={false} src={sealsApi.imageUrl(selected!.id)}
+      style={{transform:"rotate("+angle+"deg)"}}/>
+     <RareButton type="button" tone="ghost" className="seal-remove-mark"
+      aria-label={"移除 "+selected!.name} title="移除此签章"
+      disabled={false} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onRemoveDraft(selected!.id)}}>
+      <svg viewBox="0 0 20 20" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15"/></svg>
+     </RareButton>
+     {(["nw","ne","sw","se"] as const).map(corner=>
+      <span key={corner} className={"seal-resize-handle is-"+corner} data-corner={corner} aria-hidden="true"/>)}
     </span>}
     {marks.filter(m=>m.pageNumber===page).map(m=><span key={m.id} className="seal-existing-mark"
      style={{left:m.x*100+"%",top:m.y*100+"%",width:m.width*100+"%",height:m.height*100+"%",transform:"rotate("+(m.angleDegrees??0)+"deg)"}}>
