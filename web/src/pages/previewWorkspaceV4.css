@@ -186,9 +186,14 @@
 .file-workbench-signing .seal-page-toolbar{
  box-sizing:border-box;width:max-content;
  max-width:calc(100% - 24px);gap:6px;flex-wrap:nowrap;
- overflow-x:auto;overflow-y:hidden;scrollbar-width:none
+ overflow:hidden
 }
-.file-workbench-signing .seal-page-toolbar::-webkit-scrollbar{display:none}
+.file-workbench-signing .seal-toolbar-reader{
+ display:flex;flex:1 1 auto;align-items:center;justify-content:flex-start;
+ gap:6px;min-width:0;overflow-x:auto;overflow-y:hidden;
+ scrollbar-width:none
+}
+.file-workbench-signing .seal-toolbar-reader::-webkit-scrollbar{display:none}
 .file-workbench-signing .seal-page-tools{flex:0 0 auto}
 .file-workbench-signing .seal-page-toolbar .seal-confirm-action.rare-button{
  flex:0 0 auto;min-height:31px;height:31px;

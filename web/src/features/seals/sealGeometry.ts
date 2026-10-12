@@ -16,9 +16,14 @@ export function stampFitsPage(p:StampRect,angle:number,pageRatio:number){
  return halfX<=.5+e&&halfY<=.5+e&&cx>=halfX-e&&cx<=1-halfX+e&&cy>=halfY-e&&cy<=1-halfY+e;
 }
 export function fitStampToPage(p:StampRect,angle:number,pageRatio:number):StampRect{
- const {halfX,halfY}=rotatedStampExtents(p,angle,pageRatio);
- if(halfX>.5||halfY>.5)return p;
+ const safeRatio=Number.isFinite(pageRatio)&&pageRatio>0?pageRatio:1.414;
+ const extents=rotatedStampExtents(p,angle,safeRatio);
+ // Clamp the rotated artwork, not only its unrotated edit box. Very large
+ // stamps should shrink to fit instead of extending beyond the scanned page.
+ const factor=Math.min(1,extents.halfX>0?.98/(extents.halfX*2):1,extents.halfY>0?.98/(extents.halfY*2):1);
+ const scaled={...p,width:p.width*factor,height:p.height*factor};
+ const {halfX,halfY}=rotatedStampExtents(scaled,angle,safeRatio);
  const centerX=Math.max(halfX,Math.min(1-halfX,p.x+p.width/2));
  const centerY=Math.max(halfY,Math.min(1-halfY,p.y+p.height/2));
- return {...p,x:centerX-p.width/2,y:centerY-p.height/2};
+ return {...scaled,x:centerX-scaled.width/2,y:centerY-scaled.height/2};
 }

@@ -287,6 +287,26 @@ try{
      const repopulated=await cdp.waitFor(`()=>document.querySelectorAll('.seal-draft-row').length===1`,3500);
      assert("asset can be selected again after X removal",Boolean(repopulated));
 
+     await cdp.send("Emulation.setDeviceMetricsOverride",{width:760,height:820,deviceScaleFactor:1,mobile:false});
+     await delay(380);
+     const narrow=await cdp.evaluate(`(()=>{
+      const panel=document.querySelector('.seal-file-preview')?.getBoundingClientRect();
+      const dock=document.querySelector('.seal-page-toolbar')?.getBoundingClientRect();
+      const confirm=document.querySelector('.seal-confirm-action')?.getBoundingClientRect();
+      return panel&&dock&&confirm?{
+       inside:confirm.left>=dock.left-1&&confirm.right<=dock.right+1&&
+        dock.left>=panel.left-1&&dock.right<=panel.right+1,
+       visible:confirm.width>70&&confirm.height>=28,
+       pageOverflow:document.documentElement.scrollWidth>window.innerWidth+2,
+       dockWidth:dock.width,confirmWidth:confirm.width
+      }:null;
+     })()`);
+     assert("narrow viewport keeps blue confirmation inside the bottom capsule",
+       !!narrow&&narrow.inside&&narrow.visible&&!narrow.pageOverflow,JSON.stringify(narrow));
+     await cdp.send("Emulation.clearDeviceMetricsOverride");
+     await delay(300);
+
+
      const availableSecond=await cdp.evaluate(`(()=>{
       const select=document.querySelector('#file-seals-sidebar select');
       if(!select)return null;

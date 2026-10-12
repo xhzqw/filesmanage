@@ -177,7 +177,8 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
  const activeOnPage=!!selected&&(stagedPage===undefined||stagedPage===page);
  return <div className="seal-file-preview">
   <div className="seal-page-toolbar">
-   <div className="seal-page-tools" role="group" aria-label="PDF 页码">
+   <div className="seal-toolbar-reader" role="group" aria-label="签章页面工具">
+    <div className="seal-page-tools" role="group" aria-label="PDF 页码">
     <RareButton type="button" aria-label="上一页" disabled={page<=1||!pageCount} onClick={()=>onPageChange(page-1)}>‹</RareButton>
     <span className="seal-page-count">第 {page} / {pageCount||"—"} 页</span>
     <RareButton type="button" aria-label="下一页" disabled={!pageCount||page>=pageCount} onClick={()=>onPageChange(page+1)}>›</RareButton>
@@ -188,6 +189,7 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
     <RareButton type="button" aria-label="放大页面" disabled={zoom>=5} onClick={()=>setZoomAt(zoomRef.current*1.25)}>＋</RareButton>
     <RareButton type="button" onClick={()=>{setFitMode(m=>m==="page"?"width":"page");fit();}}>{fitMode==="page"?"适应页面":"适应宽度"}</RareButton>
     <RareButton type="button" aria-pressed={panMode} onClick={()=>setPanMode(value=>!value)}>{panMode?"退出平移":"平移"}</RareButton>
+    </div>
    </div>
    {pendingCount>0&&<RareButton type="button" className="seal-confirm-action primary"
     aria-label={"确认签署 "+pendingCount+" 枚签章"} disabled={!canConfirm} onClick={onConfirm}>
