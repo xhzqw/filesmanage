@@ -83,6 +83,39 @@ try{
  const previewReady=await cdp.waitFor(`()=>!!document.querySelector('.file-pdf-viewer .file-pdf-image')&&
   !!document.querySelector('.file-workbench-nav-item')`,16000);
  assert("regular PDF preview opens with visible document",Boolean(previewReady));
+ const workspaceUI=await cdp.evaluate(`(()=>{
+  const dock=document.querySelector('.header .global-utility-dock');
+  const identity=document.querySelector('.file-workbench-main .file-preview-identity');
+  const old=document.querySelector('.file-workbench-header');
+  const viewer=document.querySelector('.file-pdf-viewer')?.getBoundingClientRect();
+  const bottom=document.querySelector('.file-pdf-toolbar')?.getBoundingClientRect();
+  return {global:!!dock&&!!dock.querySelector('.command-trigger')&&!!dock.querySelector('.account-trigger'),
+   noExit:!document.querySelector('.header-exit-btn'),identity:!!identity&&!old,
+   dockBottom:viewer&&bottom?Math.round(viewer.bottom-bottom.bottom):null,
+   dockWidth:bottom?.width,viewerWidth:viewer?.width};
+ })()`);
+ assert("global utility dock groups search and account without duplicate logout",
+  workspaceUI.global&&workspaceUI.noExit,JSON.stringify(workspaceUI));
+ assert("file identity floats inside preview, not in a separate header",
+  workspaceUI.identity,JSON.stringify(workspaceUI));
+ assert("PDF reader tools float in a compact bottom dock",
+  workspaceUI.dockBottom!==null&&workspaceUI.dockBottom>=0&&workspaceUI.dockBottom<55&&workspaceUI.dockWidth<workspaceUI.viewerWidth*.94,
+  JSON.stringify(workspaceUI));
+ const collapsed=await cdp.evaluate(`(()=>{
+  document.querySelector('.file-sidebar-collapse')?.click();
+  const sidebar=document.querySelector('.file-workbench-sidebar');
+  return {collapsed:document.querySelector('.file-workbench-layout')?.classList.contains('is-collapsed'),
+   width:sidebar?.getBoundingClientRect().width,
+   icon:!!sidebar?.querySelector('.file-workbench-nav-icon')};
+ })()`);
+ assert("sidebar top toggle collapses to icon-only rail",
+  collapsed.collapsed&&collapsed.width<90&&collapsed.icon,JSON.stringify(collapsed));
+ const restoredSidebar=await cdp.evaluate(`(()=>{
+  document.querySelector('.file-sidebar-collapse')?.click();
+  return document.querySelector('.file-workbench-sidebar')?.getBoundingClientRect().width;
+ })()`);
+ assert("sidebar toggle restores full navigation",restoredSidebar>180,String(restoredSidebar));
+
  const clicked=await cdp.evaluate(`(()=>{
   const item=[...document.querySelectorAll('.file-workbench-nav-item')]
    .find(b=>b.textContent?.trim()==='签名与盖章');
@@ -100,6 +133,15 @@ try{
    return {left:left.width,right:right.width,page:paper.width,distinct:right.left>=left.right-4};
   })()`);
   assert("signing page gets spacious right-hand canvas",geometry.right>580&&geometry.page>350&&geometry.distinct,JSON.stringify(geometry));
+  const signingDock=await cdp.evaluate(`(()=>{
+   const stage=document.querySelector('.seal-file-preview')?.getBoundingClientRect();
+   const dock=document.querySelector('.seal-page-toolbar')?.getBoundingClientRect();
+   return stage&&dock?{bottom:Math.round(stage.bottom-dock.bottom),width:dock.width,stage:stage.width}:null;
+  })()`);
+  assert("signing view controls float below page without top toolbar",
+   !!signingDock&&signingDock.bottom>=0&&signingDock.bottom<55&&signingDock.width<signingDock.stage*.94,
+   JSON.stringify(signingDock));
+
   const compact=await cdp.evaluate(`(()=>{
    const history=document.querySelector('#file-seals-sidebar .seal-sidebar-history');
    return !!history&&!history.open&&!document.querySelector('#file-seals-sidebar .seal-submit-panel');

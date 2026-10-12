@@ -4,6 +4,7 @@ import {ShellAccessories} from "./ShellAccessories";
 import {useLocation,useNavigate} from "react-router-dom";
 import {Menu} from "./Menu";
 import {FolderResourceIcon} from "./ResourceIcons";
+import "./globalUtilityDock.css";
 
 // The shell only needs the display name; keeping the type structural avoids a
 // shared -> entities dependency, which the architecture gate forbids.
@@ -78,7 +79,7 @@ export function AppShell({user,onLogout,product,actions,children}:{user:ShellUse
      const target=event.key==="Home"?0:event.key==="End"?links.length-1:(index+step+links.length)%links.length;
      links[target]?.focus();
     }}/>
-   <div className="header-right">
+   <div className="header-right global-utility-dock" role="group" aria-label="系统快捷工具">
     <RareButton type="button" className="command-trigger" aria-label="快速跳转" onClick={()=>window.dispatchEvent(new CustomEvent("filesmanage:command-spotlight"))}>
      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
      <span>快速跳转</span>
@@ -100,12 +101,9 @@ export function AppShell({user,onLogout,product,actions,children}:{user:ShellUse
        {id:"logout",label:"退出系统",danger:true,onSelect:onLogout}
       ]}/>
     </div>
-    {actions}
-    <RareButton type="button" className="header-exit-btn" onClick={onLogout} title="退出系统">
-     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-     <span className="header-exit-label">退出</span>
-    </RareButton>
+
    </div>
+   {actions&&<div className="header-page-actions">{actions}</div>}
   </header>
   {children}
  </div>;

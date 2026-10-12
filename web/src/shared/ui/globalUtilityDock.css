@@ -1,0 +1,34 @@
+/* The global utility dock is shared by all authenticated pages.
+   Navigation and file-specific operations are deliberately outside this dock. */
+.header .global-utility-dock{
+ margin-left:auto;height:32px;min-width:0;flex:none;
+ display:inline-flex;align-items:center;gap:3px;
+ padding:3px 5px;background:var(--surface-panel);
+ border:1px solid var(--border-hairline);
+ border-radius:var(--radius-pill);
+ box-shadow:var(--shadow-panel);
+}
+.header .global-utility-dock .command-trigger{
+ display:inline-flex;align-items:center;justify-content:center;
+ width:32px;min-width:32px;height:26px;min-height:26px;
+ padding:0;border:0;border-radius:var(--radius-pill);background:transparent;
+ color:var(--text-secondary)
+}
+.header .global-utility-dock .command-trigger>span{display:none}
+.header .global-utility-dock .command-trigger:hover,
+.header .global-utility-dock .account-trigger:hover{background:var(--surface-row-hover);color:var(--brand-blue)}
+.header .global-utility-dock .account-trigger{height:26px;min-height:26px;padding:1px 5px;border:0;border-radius:var(--radius-pill)}
+.header .global-utility-dock .account-avatar{width:21px;height:21px;border-radius:var(--radius-pill)}
+.header .global-utility-dock .account-name{max-width:94px}
+.header .global-utility-dock .account-caret{margin-left:4px}
+.header .global-utility-dock .notification-trigger,
+.header .global-utility-dock button[aria-label*="通知"]{min-width:28px;height:26px;border:0;border-radius:var(--radius-pill);background:transparent}
+.header .header-page-actions{flex:none;display:flex;align-items:center;gap:4px}
+@media(max-width:950px){
+ .header .global-utility-dock .account-name{display:none}
+ .header .global-utility-dock .account-caret{display:none}
+}
+@media(max-width:600px){
+ .header .global-utility-dock{gap:1px;padding:2px 3px;height:30px}
+ .header .global-utility-dock .command-trigger{width:28px;min-width:28px}
+}

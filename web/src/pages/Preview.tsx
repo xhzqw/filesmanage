@@ -34,6 +34,7 @@ import type {User} from "../entities/user/model";
 import {AppShell} from "../shared/ui/AppShell";
 import "./previewWorkbench.css";
 import "./previewWorkbenchV2.css";
+import "./previewWorkspaceV3.css";
 
 type Tab="preview"|"details"|"versions"|"compare"|"review"|"seals";
 const ACTION_LABELS:Record<string,string>={upload:"上传",edit:"编辑",rollback:"回滚",restore:"恢复"};
@@ -46,6 +47,18 @@ function bytesUrl(id:string){return "/api/files/"+encodeURIComponent(id)+"/bytes
 
 // Workbench operations reuse the list editor, preflight move and append-only
 // rollback flows rather than creating divergent business rules.
+function WorkbenchNavIcon({type}:{type:Tab}){
+ const stroke={stroke:"currentColor",strokeWidth:1.7,strokeLinecap:"round" as const,strokeLinejoin:"round" as const,fill:"none"};
+ return <svg className="file-workbench-nav-icon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" {...stroke}>
+  {type==="preview"&&<><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18"/><path d="m10 12 5 2.2-5 2.3z"/></>}
+  {type==="details"&&<><path d="M7 3.5h7l4 4V20H7a2 2 0 0 1-2-2V5.5A2 2 0 0 1 7 3.5Z"/><path d="M14 4v4h4M9 12h6M9 16h5"/></>}
+  {type==="versions"&&<><path d="M5 7a9 9 0 1 1-1 8M5 3v5h5"/><path d="M12 7v5l3 2"/></>}
+  {type==="compare"&&<><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M12 5v14M7 10h2M15 14h2"/></>}
+  {type==="review"&&<><path d="M5 4h14v11H9l-4 4z"/><path d="M8 8h8M8 11h5"/></>}
+  {type==="seals"&&<><path d="M9 3h6l1 5-1 4H9L8 8zM6 12h12l2 6H4zM7 21h10"/></>}
+ </svg>;
+}
+
 export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const{id=""}=useParams();
  const navigate=useNavigate();
@@ -53,7 +66,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const[file,setFile]=useState<FileItem|null>(null);
  const[versions,setVersions]=useState<FileVersion[]>([]);
  const[status,setStatus]=useState<"loading"|"ready"|"failed">("loading");
- const[focusMode,setFocusMode]=useState(false);
+ const[sidebarCollapsed,setSidebarCollapsed]=useState(false);
  const[historyView,setHistoryView]=useState<"activity"|"versions">("activity");
  const[tab,setTab]=useState<Tab>(()=>new URLSearchParams(window.location.search).get("tab")==="seals"?"seals":"preview");
  const[hasOpenedSeals,setHasOpenedSeals]=useState(()=>new URLSearchParams(window.location.search).get("tab")==="seals");
@@ -218,28 +231,30 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
      </div>
     </div>}
     {status==="ready"&&preview&&<div className="file-workbench">
-     <header className="file-workbench-header">
-      <div className="file-workbench-heading">
-       <Link to={file?"/doc?folder="+encodeURIComponent(file.folderId):"/doc"} className="file-back" aria-label="返回文件列表">‹</Link>
-       <div className="file-workbench-type" aria-hidden="true">{fileExtension(preview.name).slice(0,5)}</div>
-       <div className="file-workbench-title">
-        <h1 title={preview.name}>{preview.name}</h1>
-        <div className="file-workbench-subtitle"><span>{fileExtension(preview.name)}</span><span>{formatSize(preview.size)}</span><span>当前版本 v{currentSeq}</span>
-         {lifecycle&&<RareBadge tone={archived?"warning":lifecycle.state==="released"?(lifecycle.publishedSeq===currentSeq?"success":"warning"):"neutral"} dot>{archived?"已归档":lifecycle.state==="released"?(lifecycle.publishedSeq===currentSeq?"已发布":"待发布更新"):"草稿"}</RareBadge>}
-         {lifecycle?.dueStatus==="soon"&&<RareBadge tone="warning">即将到期</RareBadge>}
-         {lifecycle?.dueStatus==="overdue"&&<RareBadge tone="danger">已到期</RareBadge>}</div>
-       </div>
-      </div>
-      <RareButton type="button" tone="ghost" className="file-focus-toggle" aria-pressed={focusMode} onClick={()=>setFocusMode(v=>!v)}>{focusMode?"退出沉浸":"沉浸预览"}</RareButton>
-     </header>
-     <div className={"file-workbench-layout"+(focusMode?" is-focused":"")+(["details","versions","review","seals"].includes(tab)?" has-context":"")}>
+
+     <div className={"file-workbench-layout"+(sidebarCollapsed?" is-collapsed":"")+(["details","versions","review","seals"].includes(tab)?" has-context":"")}>
       <aside className="file-workbench-sidebar" aria-label="文件工作台">
+       <div className="file-sidebar-top">
+        <RareButton type="button" tone="ghost" className="file-sidebar-collapse"
+         aria-label={sidebarCollapsed?"展开侧边栏":"收合侧边栏"} title={sidebarCollapsed?"展开侧边栏":"收合侧边栏"}
+         aria-expanded={!sidebarCollapsed} onClick={()=>setSidebarCollapsed(value=>!value)}>
+         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65"
+          strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M9.5 5v14"/></svg>
+        </RareButton>
+        {!sidebarCollapsed&&<span>工作区</span>}
+       </div>
        <nav className="file-workbench-nav" aria-label="文件功能导航">
         {([["preview","预览"],["details","文件信息"],["versions","历史记录"],["compare","版本对比"],["review","审查批注"],["seals","签名与盖章"]] as const)
          .filter(([key])=>key!=="seals"||preview.renderer==="pdf"||isOfficeName(preview.name))
          .map(([key,label])=><RareButton key={key} type="button" className={"file-workbench-nav-item"+(tab===key?" is-active":"")}
-          aria-current={tab===key?"page":undefined} aria-pressed={tab===key} onClick={()=>{if(key==="seals")setHasOpenedSeals(true);setMoreOpen(false);setTab(key)}}>
-          <span className="file-nav-indicator" aria-hidden="true"/><span>{label}</span>{key==="versions"&&<small>{versions.length}</small>}
+          aria-label={label} title={sidebarCollapsed?label:undefined}
+          aria-current={tab===key?"page":undefined} aria-pressed={tab===key} onClick={()=>{
+           if(key==="seals")setHasOpenedSeals(true);
+           if(key!=="preview")setSidebarCollapsed(false);
+           setMoreOpen(false);setTab(key);
+          }}>
+          <span className="file-nav-indicator" aria-hidden="true"/>
+          <WorkbenchNavIcon type={key}/><span className="file-workbench-nav-label">{label}</span>{key==="versions"&&<small>{versions.length}</small>}
          </RareButton>)}
        </nav>
        <div className="file-workbench-side-actions">
@@ -251,11 +266,11 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
           onClick={()=>{setMoreOpen(false);action.onSelect?.();}}>{action.label}</RareButton>)}
         </div>}
         <div className="file-workbench-actions" role="group" aria-label="文件操作">
-         <RareButton type="button" tone="ghost" onClick={download}>下载</RareButton>
-         <RareButton type="button" tone="ghost" onClick={()=>setPrinting(true)}>打印</RareButton>
+         <RareButton type="button" tone="ghost" title="下载" aria-label="下载" onClick={download}><span className="file-side-action-icon" aria-hidden="true">↓</span><span className="file-side-action-label">下载</span></RareButton>
+         <RareButton type="button" tone="ghost" title="打印" aria-label="打印" onClick={()=>setPrinting(true)}><span className="file-side-action-icon" aria-hidden="true">▣</span><span className="file-side-action-label">打印</span></RareButton>
          <RareButton type="button" tone="ghost" className="file-more-trigger"
           aria-label="更多文件操作" aria-controls="file-workbench-more-actions" aria-expanded={moreOpen}
-          onClick={()=>setMoreOpen(open=>!open)}>更多操作 <svg viewBox="0 0 20 20" width="12" height="12"
+          onClick={()=>{if(sidebarCollapsed)setSidebarCollapsed(false);setMoreOpen(open=>!open)}}><span className="file-side-action-icon" aria-hidden="true">···</span><span className="file-side-action-label">更多操作</span> <svg viewBox="0 0 20 20" width="12" height="12"
            fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"
            className={moreOpen?"is-expanded":""}><path d="m5 8 5 5 5-5"/></svg>
          </RareButton>
@@ -307,6 +322,19 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
 
       </aside>
       <div className="file-workbench-main">
+     <header className="file-preview-identity">
+      <div className="file-workbench-heading">
+       <Link to={file?"/doc?folder="+encodeURIComponent(file.folderId):"/doc"} className="file-back" aria-label="返回文件列表">‹</Link>
+       <div className="file-workbench-type" aria-hidden="true">{fileExtension(preview.name).slice(0,5)}</div>
+       <div className="file-workbench-title">
+        <h1 title={preview.name}>{preview.name}</h1>
+        <div className="file-workbench-subtitle"><span>{fileExtension(preview.name)}</span><span>{formatSize(preview.size)}</span><span>当前版本 v{currentSeq}</span>
+         {lifecycle&&<RareBadge tone={archived?"warning":lifecycle.state==="released"?(lifecycle.publishedSeq===currentSeq?"success":"warning"):"neutral"} dot>{archived?"已归档":lifecycle.state==="released"?(lifecycle.publishedSeq===currentSeq?"已发布":"待发布更新"):"草稿"}</RareBadge>}
+         {lifecycle?.dueStatus==="soon"&&<RareBadge tone="warning">即将到期</RareBadge>}
+         {lifecycle?.dueStatus==="overdue"&&<RareBadge tone="danger">已到期</RareBadge>}</div>
+       </div>
+      </div>
+     </header>
        {error&&<p role="alert" className="notice error file-workbench-inline-notice">{error}</p>}
             <section className="file-workbench-panel file-workbench-preview-surface" aria-label="文件预览" hidden={tab==="compare"||tab==="seals"}>
       {(preview.renderer==="image"||preview.renderer==="video"||preview.renderer==="audio")?
