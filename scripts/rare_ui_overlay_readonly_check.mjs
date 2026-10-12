@@ -327,9 +327,40 @@ try{
  }
  // Role ACL action presets are presentation-only until the separate preview
  // and confirmation workflow is submitted. Never submit a form in this test.
+ for(const width of [1440,900,390]){
+  await viewport(width,width===390?760:900);
+  await navigate("/org?tab=roles",'!!document.querySelector(".org-role-create")');
+  await waitFor('!!document.querySelector(".org-role-catalog")');
+  const roles=await evalJS(`(()=>{const root=document.querySelector(".org-role-workbench"),empty=root.querySelector(".org-role-empty"),
+   table=root.querySelector(".org-role-table"),btn=root.querySelector(".org-role-create"),r=root.getBoundingClientRect();
+   return{descriptions:[...root.querySelectorAll(".org-role-intro-item strong")].map(x=>x.textContent.trim()),
+    empty:!!empty,table:!!table,editor:!!root.querySelector(".org-role-editor"),
+    create:btn?.textContent.trim(),overflow:document.documentElement.scrollWidth-innerWidth,
+    rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom}};})()`);
+  assert(roles.descriptions.join(",")==="只读审计员,目录权限管理员"&&roles.create==="委派角色"
+   &&!roles.editor&&roles.overflow<=1,"clear role surface at "+width+": "+JSON.stringify(roles));
+  if(roles.empty)assert(!roles.table,"empty delegations must never show a six-column blank table");
+  await click(".org-role-create");
+  await waitFor('!!document.querySelector("dialog.org-role-dialog:modal .org-role-editor")');
+  const modal=await evalJS(`(()=>{const d=document.querySelector("dialog.org-role-dialog:modal"),r=d.getBoundingClientRect();
+   return{subject:!!d.querySelector('[aria-label="选择接受管理职责的成员"]'),
+    role:!!d.querySelector('[aria-label="选择管理职责"]'),
+    submit:d.querySelector('button[type=submit]')?.textContent.trim(),
+    noExtraHeading:!d.querySelector(".perm-section-title"),
+    rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom}};})()`);
+  assert(modal.subject&&modal.role&&modal.submit==="核对委派"&&modal.noExtraHeading
+   &&inside(modal.rect,width,width===390?760:900),"role modal accessible and contained at "+width+": "+JSON.stringify(modal));
+  await click("dialog.org-role-dialog .dialog-close");
+  await waitFor('!document.querySelector("dialog.org-role-dialog")');
+  assert.equal(await evalJS('document.activeElement?.classList.contains("org-role-create")'),true,
+   "role dialog close restores trigger");
+  results.push(width+"px: concise role catalog / modal / empty state OK");
+ }
  await viewport(1440,900);
  console.log("RARE_ROLE_CHECK navigating to role editor");
- await navigate("/org?tab=roles",'!!document.querySelector(".org-role-editor")');
+ await navigate("/org?tab=roles",'!!document.querySelector(".org-role-create")');
+ await click(".org-role-create");
+ await waitFor('!!document.querySelector("dialog.org-role-dialog:modal .org-role-editor")');
  console.log("RARE_ROLE_CHECK opening role selector");
  await evalJS(`(()=>{const select=document.querySelector(".org-role-editor .perm-form-row>label:nth-child(2) .rare-select");
   if(!select)throw Error("role combobox missing");
@@ -358,6 +389,8 @@ try{
  await waitFor('!!document.querySelector(".rare-select-menu [role=option]")');
  await evalJS(`(()=>{const option=[...document.querySelectorAll(".rare-select-menu [role=option]")].find(x=>x.textContent.includes("只读审计员"));if(!option)throw Error("auditor role missing");option.click();return true})()`);
  await waitFor(`document.querySelector(".org-role-editor .perm-form-row>label:nth-child(2) .rare-select")?.textContent.includes("只读审计员")`);
+ await click("dialog.org-role-dialog .dialog-close");
+ await waitFor('!document.querySelector("dialog.org-role-dialog")');
  results.push("1440px: role ACL select-all/clear without submission OK");
  // Deep-linking to the seal library must not lose its selected view on reload.
  for(const width of [1440,900,390]){

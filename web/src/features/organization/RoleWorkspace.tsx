@@ -8,6 +8,8 @@ import {errorCode,errorCopy} from "../../shared/errors";
 import {permissionsApi,type DirectGrant,type ResourceFolder} from "./permissionsApi";
 import {PermissionAudit} from "./PermissionInsights";
 import {RoleDelegationEditor} from "./RoleDelegationEditor";
+import {Dialog} from "../../shared/ui/Dialog";
+import "./roleWorkbench.css";
 
 export type ManagementRole={
  id:string;userId:string;role:"auditor"|"permission_admin";
@@ -43,12 +45,13 @@ export function RoleBindingsPanel({users,onDirtyChange}:{users:User[];onDirtyCha
  const[actions,setActions]=useState<string[]>(["list"]);
  const[expires,setExpires]=useState("");
  const[review,setReview]=useState(false);
+ const[editorOpen,setEditorOpen]=useState(false);
  const[confirmRevoke,setConfirmRevoke]=useState("");
  const inFlight=useRef(false);
  const[loadError,setLoadError]=useState("");
  const[loading,setLoading]=useState(true);
- const dirty=userId!==""||role!=="auditor"||scopeId!==""||folderQuery!==""||
-  actions.length!==1||actions[0]!=="list"||expires!==""||review;
+ const dirty=editorOpen&&(userId!==""||role!=="auditor"||scopeId!==""||folderQuery!==""||
+  actions.length!==1||actions[0]!=="list"||expires!==""||review);
  useEffect(()=>onDirtyChange(dirty),[dirty,onDirtyChange]);
  useEffect(()=>()=>onDirtyChange(false),[onDirtyChange]);
  useEffect(()=>{
@@ -72,6 +75,13 @@ export function RoleBindingsPanel({users,onDirtyChange}:{users:User[];onDirtyCha
  },[folderQuery,role,load]);
  const userName=(id:string)=>users.find(u=>u.id===id)?.displayName??id;
  const valid=Boolean(userId)&& (role==="auditor"||Boolean(scopeId.trim())&&actions.length>0);
+ function closeEditor(){
+  if(busy)return;
+  setEditorOpen(false);
+  setUserId("");setRole("auditor");setActions(["list"]);
+  setScopeId("");setFolderQuery("");setExpires("");setReview(false);
+  setError("");
+ }
  async function create(e:FormEvent){
   e.preventDefault();if(!valid||inFlight.current)return;
   if(!review){setReview(true);return;}
@@ -81,6 +91,7 @@ export function RoleBindingsPanel({users,onDirtyChange}:{users:User[];onDirtyCha
     allowedActions:role==="auditor"?[]:actions,
     ...(expires?{expiresAt:new Date(expires).toISOString()}:{})});
    setLoad(n=>n+1);setUserId("");setRole("auditor");setActions(["list"]);setExpires("");setScopeId("");setFolderQuery("");setReview(false);
+   setEditorOpen(false);
    toast.success("管理角色已委派");
   }catch(e){
    const message=errorCode(e)==="E_NETWORK"?"委派结果未确认，请刷新角色列表核对":errorCopy(e,"分配角色失败");
@@ -96,27 +107,39 @@ export function RoleBindingsPanel({users,onDirtyChange}:{users:User[];onDirtyCha
   }finally{inFlight.current=false;setBusy(false);}
  }
  return <section className="perm-detail org-role-workbench" aria-label="管理角色绑定">
-  <div className="perm-section-title">管理角色 <span className="perm-subtle">仅系统管理员可调整</span></div>
-  <details className="org-role-explanation"><summary>角色权限说明</summary><p>审计员只读权限审计，不获得文件访问权。目录权限管理员只在指定目录管理指定动作的直接 ACL，不能向自己授权，不能授予子树继承。</p></details>
+  <div className="org-role-topbar">
+   <div className="org-role-title-group"><h2>管理角色</h2><span>为成员分配审计或授权管理职责</span></div>
+   <RareButton type="button" tone="primary" className="org-role-create" onClick={()=>setEditorOpen(true)}>委派角色</RareButton>
+  </div>
+  <div className="org-role-catalog" aria-label="可委派的管理职责">
+   <div className="org-role-intro-item"><strong>只读审计员</strong><span>查看权限变更记录，不获得文件访问权限</span></div>
+   <div className="org-role-intro-item"><strong>目录权限管理员</strong><span>管理指定目录的直接授权，不能给自己授权</span></div>
+  </div>
    {error&&<RareNotice tone="danger">{error}</RareNotice>}
    {loadError&&<RareNotice tone="danger">{loadError} <RareButton type="button" className="secondary-action" onClick={()=>setLoad(n=>n+1)}>重试读取</RareButton></RareNotice>}
    {loading&&items.length===0&&<p className="hint" role="status">正在读取委派角色…</p>}
-  <div className="org-role-layout"><section className="org-role-list" aria-label="已有角色委派">
-  <div className="perm-section-title">已委派 <span className="perm-count">{items.length}</span></div>
+  {!loading&&!loadError&&items.length===0&&<div className="org-role-empty" role="status">
+   <span className="org-role-empty-symbol" aria-hidden="true">◇</span>
+   <strong>尚未委派管理角色</strong>
+   <span>只有系统管理员能够授予或撤销管理职责</span>
+  </div>}
+  {items.length>0&&<section className="org-role-list" aria-label="已有角色委派">
+  <div className="org-role-list-heading"><strong>已委派的成员</strong><RareBadge tone="neutral">{items.length}</RareBadge></div>
   <div className="perm-grants-scroller org-role-scroll"><RareDataTable className="perm-table org-role-table">
-   <thead><tr><th>账号</th><th>角色</th><th className="org-role-optional">目录范围</th><th className="org-role-optional">可管理动作</th><th className="org-role-optional">有效期</th><th>操作</th></tr></thead>
+   <thead><tr><th>成员</th><th>管理职责及范围</th><th className="org-role-optional">有效期</th><th>操作</th></tr></thead>
    <tbody>{items.map(b=><tr key={b.id}>
-    <td className="org-role-user" title={userName(b.userId)}>{userName(b.userId)}<small className="org-role-mobile-meta">{b.scopeId||"全局审计"} · {b.allowedActions.map(actionName).join("、")||"只读"}</small></td>
-    <td><RareBadge tone={b.role==="auditor"?"neutral":"info"}>{roleName(b.role)}</RareBadge></td>
-    <td className="org-role-optional" title={b.scopeId||"全局审计"}>{b.scopeId||"全局审计"}</td>
-    <td className="org-role-optional">{b.allowedActions.map(actionName).join("、")||"只读"}</td>
-    <td className="org-role-optional rare-data-date">{b.expiresAt?new Date(b.expiresAt).toLocaleString():"不过期"}</td>
+    <td className="org-role-user" title={userName(b.userId)}>{userName(b.userId)}</td>
+    <td className="org-role-duty"><div><RareBadge tone={b.role==="auditor"?"neutral":"info"}>{roleName(b.role)}</RareBadge><span>{b.scopeId||"全局权限审计"}</span></div>
+     {b.role==="permission_admin"&&<small title={b.allowedActions.map(actionName).join("、")}>可管理：{b.allowedActions.map(actionName).join("、")}</small>}</td>
+    <td className="org-role-optional rare-data-date">{b.expiresAt?new Date(b.expiresAt).toLocaleString():"长期有效"}</td>
     <td className="org-role-actions"><RareRowActions>{confirmRevoke===b.id
      ?<><RareButton className="danger" type="button" disabled={busy} onClick={()=>void revoke(b.id)}>确认撤销</RareButton>
         <RareButton type="button" onClick={()=>setConfirmRevoke("")}>取消</RareButton></>
      :<RareButton className="danger" type="button" onClick={()=>setConfirmRevoke(b.id)}>撤销</RareButton>}</RareRowActions></td>
    </tr>)}</tbody>
-  </RareDataTable>{!loading&&!loadError&&items.length===0&&<p className="empty">暂无委派角色。</p>}</div></section>
+  </RareDataTable></div></section>}
+  {editorOpen&&<Dialog open title="委派管理角色" onClose={closeEditor} closeGuard={()=>!busy}
+   className="org-role-dialog" initialFocus=".org-role-editor .rare-select">
   <RoleDelegationEditor users={users} userId={userId} setUserId={setUserId}
    role={role} setRole={setRole} scopeId={scopeId} setScopeId={setScopeId}
    folderQuery={folderQuery} setFolderQuery={setFolderQuery}
@@ -124,7 +147,7 @@ export function RoleBindingsPanel({users,onDirtyChange}:{users:User[];onDirtyCha
    actions={actions} setActions={setActions} expires={expires} setExpires={setExpires}
    review={review} setReview={setReview} busy={busy} valid={valid}
    userName={userName} roleName={roleName} actionName={actionName} actionChoices={ACTIONS} onSubmit={create}/>
-</div>
+  </Dialog>}
  </section>;
 }
 

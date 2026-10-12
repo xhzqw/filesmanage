@@ -394,6 +394,9 @@ try{
  await cdp.navigate(BASE+"/org?tab=roles");
  assert(await cdp.waitFor("()=>!!document.querySelector('.org-role-workbench[aria-label=管理角色绑定]')"),
   "P2 role bindings page renders");
+ assert(await cdp.evaluate("(()=>!!document.querySelector('.org-role-create')&&!document.querySelector('.org-role-editor'))()"),
+  "P2 role editor opens on demand, not as a permanent adjacent form");
+ await cdp.evaluate("(()=>{document.querySelector('.org-role-create').click();return true})()");
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-detail form')"),
   "P2 role delegation form is available");
  // The extracted role editor must retain controlled state and the preview gate.
@@ -423,6 +426,9 @@ try{
   assert(await cdp.waitFor("()=>!document.querySelector('.org-role-editor .perm-review')&&document.querySelector('.org-role-editor button[type=submit]')?.disabled"),
    "changing role delegate invalidates preview and restores empty draft");
  }
+ await cdp.evaluate("(()=>{document.querySelector('dialog.org-role-dialog .dialog-close').click();return true})()");
+ assert(await cdp.waitFor("()=>!document.querySelector('dialog.org-role-dialog')"),
+  "P2 role editor dismiss leaves only the main role list");
  await cdp.navigate(BASE+"/org?tab=approvals");
  assert(await cdp.waitFor("()=>!!document.querySelector('.approval-workspace .perm-tree-name')"),
   "approval resource navigation renders");

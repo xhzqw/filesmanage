@@ -1,0 +1,86 @@
+/* Management roles: one quiet task surface. The empty list never reserves
+   half the workbench or renders table chrome; creation opens a modal on demand. */
+.org-role-workbench{
+ display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;
+ flex:1;min-width:0;min-height:0;gap:14px;overflow:auto;
+ padding:18px 20px;background:var(--surface-panel);
+}
+.org-role-topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex:none}
+.org-role-title-group{display:flex;align-items:baseline;gap:12px;min-width:0;flex-wrap:wrap}
+.org-role-title-group h2{margin:0;color:var(--text-primary);font-size:16px;font-weight:700;line-height:1.35}
+.org-role-title-group>span{color:var(--text-secondary);font-size:12px}
+.org-role-create{flex:none;min-height:34px;padding-inline:15px;font-size:12px}
+.org-role-catalog{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;
+ max-width:1100px;min-width:0;padding:13px 16px;
+ border-radius:var(--radius-md);background:var(--surface-header);
+}
+.org-role-intro-item{display:flex;flex-direction:column;gap:4px;min-width:0}
+.org-role-intro-item strong{font-size:12px;font-weight:650;color:var(--brand-navy)}
+.org-role-intro-item>span{color:var(--text-secondary);font-size:11px;line-height:1.5}
+.org-role-empty{
+ display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;
+ flex:none;min-height:128px;max-width:1100px;padding:16px;
+ color:var(--text-secondary);text-align:center;
+}
+.org-role-empty-symbol{display:grid;place-items:center;width:28px;height:28px;margin-bottom:2px;
+ font-size:26px;line-height:1;color:var(--border-selected)}
+.org-role-empty strong{color:var(--text-primary);font-size:13px;font-weight:650}
+.org-role-empty>span:last-child{font-size:11px}
+.org-role-list{display:flex;flex-direction:column;flex:none;min-width:0;max-width:1250px;
+ min-height:0;border:0;background:transparent;border-radius:0;overflow:visible}
+.org-role-list-heading{display:flex;align-items:center;gap:8px;padding:5px 0 10px}
+.org-role-list-heading strong{font-size:13px;font-weight:650}
+.org-role-scroll{min-width:0;overflow:auto;max-height:min(58vh,510px);container:roles / inline-size;
+ border:1px solid var(--border-hairline);border-radius:var(--radius-md)}
+.org-role-table{table-layout:fixed;width:100%;border-collapse:collapse}
+.org-role-table th:first-child{width:23%}
+.org-role-table th:nth-child(2){width:46%}
+.org-role-table th:nth-child(3){width:20%}
+.org-role-table th:last-child{width:11%;text-align:right}
+.org-role-table :is(th,td){padding:10px 12px}
+.org-role-table tbody tr+tr td{border-top:1px solid var(--surface-header)}
+.org-role-table tbody td{border-bottom:0}
+.org-role-table .org-role-user{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.org-role-duty{min-width:0;white-space:normal;overflow:hidden}
+.org-role-duty>div{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0}
+.org-role-duty>div>span{font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:65%}
+.org-role-duty small{display:block;font-size:10px;color:var(--text-tertiary);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.org-role-actions{text-align:right}
+.org-role-actions .rare-row-actions{display:flex;justify-content:flex-end;gap:4px;flex-wrap:wrap}
+.org-role-actions .rare-button{min-height:27px;height:27px;padding:0 7px;font-size:11px}
+
+.dialog.org-role-dialog{box-sizing:border-box;width:min(680px,calc(100vw - 24px));
+ max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);padding:15px 18px;overflow-y:auto}
+.org-role-dialog>.dialog-header{margin-bottom:12px}
+.org-role-dialog .org-role-editor{display:block;min-width:0;min-height:0;overflow:visible;
+ padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
+.org-role-dialog .org-role-editor>.perm-form{padding:0;gap:13px}
+.org-role-dialog .org-role-editor .perm-form-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 15px}
+.org-role-dialog .org-role-editor .perm-form-row label{gap:6px;font-size:12px}
+.org-role-dialog .org-role-editor :is(.rare-input,.rare-select){min-height:36px;height:36px;font-size:12px}
+.org-role-dialog .org-role-editor .rare-select-root{width:100%;min-width:0}
+.org-role-dialog .org-role-editor .org-role-context{margin:0;padding:9px 11px;line-height:1.5;
+ background:var(--surface-header);border-radius:var(--radius-sm);color:var(--text-secondary);font-size:11px}
+.org-role-dialog .permission-action-picker{margin-top:2px}
+.org-role-dialog .org-role-review{display:flex;flex-direction:column;gap:5px;padding:11px 13px;
+ border:0;background:var(--surface-header);border-radius:var(--radius-md);font-size:12px}
+.org-role-dialog .org-role-review strong{font-size:13px;color:var(--text-primary)}
+.org-role-dialog .org-role-review small{font-size:11px;color:var(--text-secondary)}
+.org-role-dialog .perm-form-actions{justify-content:flex-end;padding:7px 0 0;border-top:0}
+.org-role-dialog .perm-form-actions>.rare-button{min-width:108px;min-height:34px}
+@container roles (max-width:740px){
+ .org-role-table .org-role-optional{display:none}
+ .org-role-table th:first-child{width:30%}
+ .org-role-table th:nth-child(2){width:52%}
+ .org-role-table th:last-child{width:18%}
+}
+@media(max-width:720px){
+ .org-role-workbench{padding:12px 10px;gap:10px}
+ .org-role-title-group{flex-direction:column;gap:2px}
+ .org-role-title-group h2{font-size:14px}
+ .org-role-catalog{grid-template-columns:minmax(0,1fr);gap:11px;padding:12px}
+ .org-role-empty{min-height:106px}
+ .dialog.org-role-dialog{padding:12px}
+ .org-role-dialog .org-role-editor .perm-form-row{grid-template-columns:minmax(0,1fr);gap:10px}
+}
