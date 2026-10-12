@@ -35,7 +35,9 @@ export function OfficeLayoutPreview({fileId,sha,structured}:{
     if(declared>32*1024*1024)throw new Error("converted preview too large");
     setLoadPhase("downloading");
     const limit=32*1024*1024;
-    let bytes:Uint8Array;
+    // BlobPart requires an ArrayBuffer-backed view, not an arbitrary
+    // ArrayBufferLike (which can include SharedArrayBuffer).
+    let bytes:Uint8Array<ArrayBuffer>;
     if(res.body){
      const reader=res.body.getReader();
      const chunks:Uint8Array[]=[];
