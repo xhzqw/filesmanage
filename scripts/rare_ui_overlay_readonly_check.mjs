@@ -120,7 +120,17 @@ try{
    if(width===1440){
     await click('.org-role-editor .perm-form-row>label:nth-child(2) .rare-select');
     await waitFor('!!document.querySelector(".rare-select-menu [role=option]")');
-    await evalJS(`(()=>{const option=[...document.querySelectorAll(".rare-select-menu [role=option]")].find(x=>x.textContent.includes("目录权限管理员"));if(!option)throw Error("role missing");option.click();return true})()`);
+    const popup=await evalJS(`(()=>{const dialog=document.querySelector('dialog.org-role-dialog'),m=dialog.querySelector('.rare-select-menu'),
+      b=dialog.querySelector('.perm-form-row>label:nth-child(2) .rare-select'),
+      option=[...m.querySelectorAll('[role=option]')].find(x=>x.textContent.includes('目录权限管理员'));
+      if(!option)throw Error('role missing');
+      const mr=m.getBoundingClientRect(),br=b.getBoundingClientRect(),or=option.getBoundingClientRect(),dr=dialog.getBoundingClientRect();
+      const hit=document.elementFromPoint(or.x+or.width/2,or.y+or.height/2);
+      return{menu:{x:mr.x,y:mr.y,w:mr.width,h:mr.height},btn:{x:br.x,y:br.y},option:{x:or.x,y:or.y,w:or.width,h:or.height},
+        dialog:{x:dr.x,y:dr.y,w:dr.width,h:dr.height,scrollLeft:dialog.scrollLeft,scrollTop:dialog.scrollTop},
+        hit:hit?.outerHTML?.slice(0,160),style:getComputedStyle(m).position};})()`);
+    console.log("ROLE_POINTER_DEBUG",JSON.stringify(popup));
+    await click('.rare-select-menu [role=option]:last-child');
     await waitFor('!!document.querySelector(".org-role-editor .permission-action-picker")');
     assert.equal(await evalJS('document.querySelectorAll(".org-role-editor .permission-action-picker input[type=checkbox]").length'),9);
    }
