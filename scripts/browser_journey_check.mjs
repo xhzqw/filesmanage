@@ -287,7 +287,7 @@ async function main() {
     // downloading the original file, and the server separately authorizes
     // both preview+print against the current immutable source digest.
     const printOpened = await cdp.evaluate(`(()=>{
-      const action=[...document.querySelectorAll('.file-workbench-actions button')].find(b=>b.textContent?.trim()==='打印');
+      const action=[...document.querySelectorAll('.file-workbench-actions button')].find(b=>b.textContent?.includes('打印'));
       action?.click();return !!action;
     })()`);
     const printPanel = await cdp.waitFor(`()=>Boolean(
