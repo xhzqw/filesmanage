@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -69,41 +70,30 @@ func main() {
 	if err = pool.Ping(ctx); err != nil {
 		log.Fatal("db ping: ", err)
 	}
+	// Never start conversions without an enforceable OS address-space limit.
+	limiter, err := exec.LookPath("prlimit")
+	if err != nil {
+		log.Fatal("CAD worker requires Linux prlimit for converter memory isolation: ", err)
+	}
 	store := blob.New(blobDir)
 	repo := postgres.New(pool)
-	worker := &worker{repo: repo, store: store, timeout: convertTimeout, memoryMB: memoryLimitMB}
+	worker := &worker{repo: repo, store: store, timeout: convertTimeout, memoryMB: memoryLimitMB, limiter: limiter}
 
 	log.Printf("cad-worker started poll=%s concurrency=%d convert_timeout=%s mem_cap=%dMB",
 		poll, concurrency, convertTimeout, memoryLimitMB)
-	sem := make(chan struct{}, concurrency)
-	for {
-		select {
-		case <-ctx.Done():
-			log.Println("cad-worker stopping")
-			return
-		case <-time.After(poll):
-		}
-		job, ok, err := repo.ClaimDerivativeJob(ctx)
-		if err != nil {
-			log.Println("claim error: ", err)
-			continue
-		}
-		if !ok {
-			continue
-		}
-		sem <- struct{}{}
-		go func(job domain.DerivativeJob) {
-			defer func() { <-sem }()
-			if err := worker.process(ctx, job); err != nil {
-				log.Printf("job %s failed: %v", job.JobID, err)
-				_ = repo.FailDerivativeJob(ctx, job.JobID, err.Error())
-				return
-			}
-			if err := repo.CompleteDerivativeJob(ctx, job.JobID); err != nil {
-				log.Printf("job %s completion failed: %v", job.JobID, err)
-			}
-		}(job)
+	// Persistent workers claim only when a slot is free; no already-claimed job
+	// sits idle waiting on a semaphore. A finished slot claims again immediately.
+	var workers sync.WaitGroup
+	for i := 0; i < concurrency; i++ {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			worker.loop(ctx, poll)
+		}()
 	}
+	<-ctx.Done()
+	log.Println("cad-worker stopping; draining active jobs")
+	workers.Wait()
 }
 
 type worker struct {
@@ -111,6 +101,74 @@ type worker struct {
 	store    *blob.Store
 	timeout  time.Duration
 	memoryMB int
+	limiter  string
+}
+
+func (w *worker) loop(ctx context.Context, poll time.Duration) {
+	for ctx.Err() == nil {
+		job, ok, err := w.repo.ClaimDerivativeJob(ctx)
+		if err != nil && ctx.Err() == nil {
+			log.Printf("claim error: %v", err)
+		}
+		if err == nil && ok {
+			w.runJob(ctx, job)
+			continue
+		}
+		timer := time.NewTimer(poll)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+		}
+	}
+}
+
+func (w *worker) runJob(ctx context.Context, job domain.DerivativeJob) {
+	jobCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	finished := make(chan struct{})
+	go func() {
+		defer close(finished)
+		ticker := time.NewTicker(20 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-jobCtx.Done():
+				return
+			case <-ticker.C:
+				checkCtx, stop := context.WithTimeout(jobCtx, 10*time.Second)
+				owned, err := w.repo.RenewDerivativeJobLease(checkCtx, job.JobID, job.LeaseOwner)
+				stop()
+				if err != nil || !owned {
+					log.Printf("job %s lost lease: %v", job.JobID, err)
+					cancel()
+					return
+				}
+			}
+		}
+	}()
+	err := w.process(jobCtx, job)
+	aborted := jobCtx.Err() != nil
+	cancel()
+	<-finished
+	// Shutdown and lease loss are recoverable: let the lease expire instead
+	// of trying to mark an incomplete conversion permanently failed.
+	if ctx.Err() != nil || aborted || errors.Is(err, context.Canceled) {
+		return
+	}
+	finishCtx, stop := context.WithTimeout(context.Background(), 10*time.Second)
+	defer stop()
+	if err != nil {
+		log.Printf("job %s failed: %v", job.JobID, err)
+		if updateErr := w.repo.FailDerivativeJobLease(finishCtx, job.JobID, job.LeaseOwner, err.Error()); updateErr != nil {
+			log.Printf("job %s status update failed: %v", job.JobID, updateErr)
+		}
+		return
+	}
+	if err := w.repo.CompleteDerivativeJobLease(finishCtx, job.JobID, job.LeaseOwner); err != nil {
+		log.Printf("job %s completion failed: %v", job.JobID, err)
+	}
 }
 
 func (w *worker) process(ctx context.Context, job domain.DerivativeJob) error {
@@ -118,7 +176,7 @@ func (w *worker) process(ctx context.Context, job domain.DerivativeJob) error {
 	// the SOURCE format, because converted output (STL) shares its extension.
 	switch job.SourceFormat {
 	case "stl", "obj", "glb", "gltf", "dxf":
-		return w.repo.MarkDerivativeNative(ctx, job.DerivativeID, job.SourceSha256)
+		return w.repo.MarkDerivativeNativeLease(ctx, job)
 	}
 	storageKey, err := w.repo.SourceBlobPath(ctx, job.SourceSha256)
 	if err != nil {
@@ -131,25 +189,35 @@ func (w *worker) process(ctx context.Context, job domain.DerivativeJob) error {
 	}
 	defer os.RemoveAll(workdir)
 	input := filepath.Join(workdir, "input."+job.SourceFormat)
-	if err = copyFile(source, input); err != nil {
+	if err = copyFile(ctx, source, input); err != nil {
 		return err
 	}
 	output := filepath.Join(workdir, "output."+job.OutputKind)
 	args := conversionArgs(job.SourceFormat, input, output)
 	cmdCtx, cancel := context.WithTimeout(ctx, w.timeout)
 	defer cancel()
-	cmd := exec.CommandContext(cmdCtx, args[0], args[1:]...)
+	cmd := limitedConverterCommand(cmdCtx, w.limiter, w.memoryMB, args)
 	cmd.Dir = workdir
-	// Resource isolation: address-space cap and a fresh process group so a
-	// runaway converter cannot take the worker or the API down with it.
+	cmd.WaitDelay = 2 * time.Second
+	// prlimit sets RLIMIT_AS before exec. An environment variable is not a
+	// resource limit, and gmsh does not read FILESMANAGE_MEM_LIMIT.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	applyMemoryLimit(cmd, w.memoryMB)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		if len(out) > 0 {
-			return fmt.Errorf("converter failed: %v: %s", err, tail(out))
+	cmd.Cancel = func() error {
+		// Kill the entire converter process group on timeout/shutdown.
+		err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		if errors.Is(err, syscall.ESRCH) {
+			return nil
 		}
-		return fmt.Errorf("converter failed: %v", err)
+		return err
+	}
+	outputLog := &boundedConverterOutput{}
+	cmd.Stdout, cmd.Stderr = outputLog, outputLog
+	err = cmd.Run()
+	if err != nil {
+		if logTail := outputLog.String(); logTail != "" {
+			return fmt.Errorf("converter failed: %w: %s", err, logTail)
+		}
+		return fmt.Errorf("converter failed: %w", err)
 	}
 	info, err := os.Stat(output)
 	if err != nil || info.Size() == 0 {
@@ -178,7 +246,7 @@ func (w *worker) process(ctx context.Context, job domain.DerivativeJob) error {
 		_ = stage.Abort()
 		return err
 	}
-	return w.repo.StoreDerivativeBlob(ctx, job.DerivativeID, domain.NewID("blob"), stageKey, stage.Sha256(), stage.Size())
+	return w.repo.StoreDerivativeBlobLease(ctx, job, domain.NewID("blob"), stageKey, stage.Sha256(), stage.Size())
 }
 
 func conversionArgs(format, input, output string) []string {
@@ -243,22 +311,75 @@ func mshHasTriangles(text string) bool {
 	return false
 }
 
-func applyMemoryLimit(cmd *exec.Cmd, memoryMB int) {
+func limitedConverterCommand(ctx context.Context, limiter string, memoryMB int, args []string) *exec.Cmd {
 	limit := uint64(memoryMB) * 1024 * 1024
-	cmd.Env = append(os.Environ(), "FILESMANAGE_MEM_LIMIT="+strconv.FormatUint(limit, 10))
+	argv := append([]string{"--as=" + strconv.FormatUint(limit, 10), "--"}, args...)
+	return exec.CommandContext(ctx, limiter, argv...)
 }
 
-func copyFile(src, dst string) error {
-	data, err := os.ReadFile(src)
+// Never materialise an entire CAD source in the Go heap.
+func copyFile(ctx context.Context, src, dst string) error {
+	input, err := os.Open(src)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(dst, data, 0o600)
+	defer input.Close()
+	output, err := os.OpenFile(dst, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		output.Close()
+		if err != nil {
+			os.Remove(dst)
+		}
+	}()
+	buffer := make([]byte, 64<<10)
+	for {
+		if err = ctx.Err(); err != nil {
+			return err
+		}
+		var n int
+		n, err = input.Read(buffer)
+		if n > 0 {
+			if _, writeErr := output.Write(buffer[:n]); writeErr != nil {
+				err = writeErr
+				return err
+			}
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+	}
+	if err = output.Sync(); err != nil {
+		return err
+	}
+	err = output.Close()
+	return err
 }
 
-func tail(b []byte) string {
-	if len(b) > 400 {
-		return string(b[len(b)-400:])
+// Limit untrusted converter stdout/stderr even when a child floods the pipe.
+type boundedConverterOutput struct {
+	mu  sync.Mutex
+	buf []byte
+}
+
+func (w *boundedConverterOutput) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	n := len(p)
+	w.buf = append(w.buf, p...)
+	if len(w.buf) > 4096 {
+		w.buf = append([]byte(nil), w.buf[len(w.buf)-4096:]...)
 	}
-	return string(b)
+	return n, nil
+}
+
+func (w *boundedConverterOutput) String() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return string(w.buf)
 }

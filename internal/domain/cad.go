@@ -18,6 +18,7 @@ func NewID(prefix string) string {
 // DerivativeJob is one claimed conversion unit claimed by the worker.
 type DerivativeJob struct {
 	JobID        string
+	LeaseOwner   string
 	DerivativeID string
 	FileID       string
 	VersionSeq   int
