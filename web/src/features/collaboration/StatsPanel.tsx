@@ -146,9 +146,9 @@ export function StatsPanel(){
        onChange={index=>setViewMode(index===0?"graph":"treemap")}/></div>
      {viewMode==="graph"?<FolderNodeGraph stats={stats} folders={folders} onChoose={id=>{setFolder(id);setScope("descendants");}}/>:
       <FolderTreemap key={scope+folder+type+range+uploader} stats={stats} folders={folders} onChoose={id=>{setFolder(id);setScope("descendants");}}/>}
-     <div className="stats-asset-legend" aria-label="文件类型与颜色图例">
+     {viewMode==="treemap"&&<div className="stats-asset-legend" aria-label="文件类型与颜色图例">
       {CATEGORIES.map(item=><span key={item.id} className="stats-legend-item"><i aria-hidden="true" style={{background:item.color}}/>{item.label}</span>)}
-     </div>
+     </div>}
     </section>
     <div className="stats-insights">
      <section className="stats-panel stats-types-panel" aria-labelledby="stats-types-title">

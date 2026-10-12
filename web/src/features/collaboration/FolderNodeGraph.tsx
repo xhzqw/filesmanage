@@ -13,7 +13,7 @@ type GraphItem={
 type Edge={from:GraphItem;to:GraphItem};
 type Layout={items:GraphItem[];edges:Edge[];width:number;height:number;rootX:number;rootY:number};
 type View={x:number;y:number;scale:number};
-const NODE_W=158,NODE_H=50,ROOT_W=174,ROOT_H=60,MAX_NODES=110;
+const NODE_W=150,NODE_H=44,ROOT_W=132,ROOT_H=132,MAX_NODES=110;
 const DEFAULT_CHILDREN=7;
 const TAU=Math.PI*2;
 
@@ -103,8 +103,8 @@ function radialLayout(root:GraphItem):Layout{
  for(const [depth,peers] of byDepth){
   if(depth===0)continue;
   // Position is based on angular density, not on alphabetical row order.
-  const minimum=depth===1?168:168+(depth-1)*166;
-  let radius=Math.max(minimum,peers.length*170/TAU);
+  const minimum=depth===1?160:160+(depth-1)*145;
+  let radius=Math.max(minimum,peers.length*152/TAU);
   for(let step=0;step<90;step++){
    for(const node of peers){node.x=Math.cos(node.angle)*radius;node.y=Math.sin(node.angle)*radius;}
    let collision=false;
@@ -112,7 +112,7 @@ function radialLayout(root:GraphItem):Layout{
     const a=peers[i]!;
     for(let j=i+1;j<peers.length;j++){
      const b=peers[j]!;
-     if(Math.abs(a.x-b.x)<NODE_W+18&&Math.abs(a.y-b.y)<NODE_H+17){collision=true;break;}
+     if(Math.abs(a.x-b.x)<NODE_W+15&&Math.abs(a.y-b.y)<NODE_H+14){collision=true;break;}
     }
    }
    if(!collision)break;
@@ -133,7 +133,8 @@ function connector(a:GraphItem,b:GraphItem):string{
  const sw=a.depth===0?ROOT_W:NODE_W,sh=a.depth===0?ROOT_H:NODE_H;
  // Intersect the ray with the actual card edge so connectors do not
  // continue through the opaque rectangle at any angle.
- const startT=Math.min((sw/2)/Math.max(.0001,Math.abs(dx)),(sh/2)/Math.max(.0001,Math.abs(dy)));
+ const dist=Math.max(.0001,Math.hypot(dx,dy));
+ const startT=a.depth===0?(ROOT_W/2)/dist:Math.min((sw/2)/Math.max(.0001,Math.abs(dx)),(sh/2)/Math.max(.0001,Math.abs(dy)));
  const endT=Math.min((NODE_W/2)/Math.max(.0001,Math.abs(dx)),(NODE_H/2)/Math.max(.0001,Math.abs(dy)));
  const ax=a.x+dx*startT,ay=a.y+dy*startT;
  const bx=b.x-dx*endT,by=b.y-dy*endT;
@@ -146,11 +147,11 @@ function connector(a:GraphItem,b:GraphItem):string{
 }
 
 function fit(layout:Layout,width:number,height:number):View{
- const scale=Math.max(.4,Math.min(1.12,(width-28)/layout.width,(height-28)/layout.height));
+ const scale=Math.min(1.07,Math.max(.26,Math.min((width-32)/layout.width,(height-32)/layout.height)));
  // Anchor the semantic root, not the asymmetric bounding box, at viewport centre.
  return {scale,x:width/2-layout.rootX*scale,y:height/2-layout.rootY*scale};
 }
-const clamp=(x:number)=>Math.max(.4,Math.min(2.2,x));
+const clamp=(x:number)=>Math.max(.26,Math.min(2.2,x));
 
 export function FolderNodeGraph({stats,folders,onChoose}:{stats:Stats;folders:Folder[];onChoose:(id:string)=>void}){
  const root=useMemo(()=>assetTree(stats,folders),[stats,folders]);
@@ -161,8 +162,11 @@ export function FolderNodeGraph({stats,folders,onChoose}:{stats:Stats;folders:Fo
  const [viewport,setViewport]=useState({width:0,height:0});
  const [view,setView]=useState<View>({x:0,y:0,scale:1});
  const viewportRef=useRef<HTMLDivElement>(null);
+ const previousLayoutRef=useRef<Layout|null>(null);
+ const previousViewportRef=useRef({width:0,height:0});
  const drag=useRef<{x:number;y:number;ox:number;oy:number}|null>(null);
  const [dragging,setDragging]=useState(false);
+ const dragPointerRef=useRef<number|null>(null);
  useEffect(()=>{setExpanded(defaultExpanded(root));setLimits(new Map());setRevealTypes(new Set());setActive(ROOT_ID);},[root]);
  const model=useMemo(()=>makeVisible(root,expanded,limits,revealTypes),[root,expanded,limits,revealTypes]);
  const layout=useMemo(()=>radialLayout(model),[model]);
@@ -183,7 +187,18 @@ export function FolderNodeGraph({stats,folders,onChoose}:{stats:Stats;folders:Fo
   return ()=>observer.disconnect();
  },[]);
  useEffect(()=>{
-  if(viewport.width>0&&viewport.height>0)setView(fit(layout,viewport.width,viewport.height));
+  if(viewport.width<=0||viewport.height<=0)return;
+  const previous=previousLayoutRef.current;
+  const size=previousViewportRef.current;
+  if(!previous||Math.abs(size.width-viewport.width)>1||Math.abs(size.height-viewport.height)>1){
+   setView(fit(layout,viewport.width,viewport.height));
+  }else{
+   // Expanding a branch must not reset a user-selected zoom or drag offset.
+   // Re-anchor the stable semantic root while bounding geometry grows.
+   setView(old=>({...old,x:old.x+(previous.rootX-layout.rootX)*old.scale,y:old.y+(previous.rootY-layout.rootY)*old.scale}));
+  }
+  previousLayoutRef.current=layout;
+  previousViewportRef.current=viewport;
  },[layout,viewport]);
  function zoomBy(factor:number,clientX?:number,clientY?:number){
   setView(old=>{
@@ -193,16 +208,18 @@ export function FolderNodeGraph({stats,folders,onChoose}:{stats:Stats;folders:Fo
   });
  }
  function handlePointerDown(event:PointerEvent<HTMLDivElement>){
-  if(event.button!==0||(event.target as HTMLElement).closest("button"))return;
+  if(event.button!==0||dragPointerRef.current!==null||(event.target as HTMLElement).closest("button"))return;
+  dragPointerRef.current=event.pointerId;
   drag.current={x:event.clientX,y:event.clientY,ox:view.x,oy:view.y};
   setDragging(true);event.currentTarget.setPointerCapture(event.pointerId);
  }
  function handlePointerMove(event:PointerEvent<HTMLDivElement>){
-  if(!drag.current)return;
+  if(!drag.current||dragPointerRef.current!==event.pointerId)return;
   setView(old=>({...old,x:drag.current!.ox+event.clientX-drag.current!.x,y:drag.current!.oy+event.clientY-drag.current!.y}));
  }
  function handlePointerUp(event:PointerEvent<HTMLDivElement>){
-  drag.current=null;setDragging(false);
+  if(dragPointerRef.current!==event.pointerId)return;
+  dragPointerRef.current=null;drag.current=null;setDragging(false);
   if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);
  }
  function handleWheel(event:WheelEvent<HTMLDivElement>){
@@ -222,7 +239,7 @@ export function FolderNodeGraph({stats,folders,onChoose}:{stats:Stats;folders:Fo
  }
  return <div className="stats-graph">
   <div className="stats-graph-toolbar">
-   <span className="stats-graph-hint">点击展开 · 拖拽平移 · Ctrl + 滚轮缩放</span>
+   <span className="stats-graph-hint">目录拓扑 <span aria-hidden="true">·</span> {layout.items.length} 个节点</span>
    <div className="stats-graph-tools" aria-label="图谱缩放">
     <RareButton type="button" tone="ghost" aria-label="缩小图谱" onClick={()=>zoomBy(1/1.2)}>－</RareButton>
     <span aria-label="图谱缩放比例">{Math.round(view.scale*100)}%</span>
@@ -253,8 +270,8 @@ export function FolderNodeGraph({stats,folders,onChoose}:{stats:Stats;folders:Fo
       style={{left:item.x-(isRoot?ROOT_W:NODE_W)/2,top:item.y-(isRoot?ROOT_H:NODE_H)/2,
        width:isRoot?ROOT_W:NODE_W,height:isRoot?ROOT_H:NODE_H,"--stats-node-color":color} as CSSProperties}>
       <span className="stats-graph-node-content">
-       <span className="stats-graph-node-name"><i className="stats-graph-dot" aria-hidden="true"/>{item.label}</span>
-       <span className="stats-graph-node-detail">{item.kind==="more"?"点击显示更多":formatBytes(item.bytes)+" · "+item.count+" 个"}</span>
+       <span className="stats-graph-node-name">{item.kind==="folder"?<svg className="stats-graph-folder-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 7.2V5.8c0-.8.6-1.4 1.4-1.4H9l2.1 2.2h7.8c.9 0 1.6.7 1.6 1.6v9.6c0 .9-.7 1.6-1.6 1.6H5.1c-.9 0-1.6-.7-1.6-1.6V7.2Z"/></svg>:<i className="stats-graph-dot" aria-hidden="true"/>}<span className="stats-graph-node-label">{item.label}</span></span>
+       <span className="stats-graph-node-detail">{item.kind==="more"?"展开剩余目录":formatBytes(item.bytes)+"  ·  "+item.count+" 个文件"}</span>
       </span>
       {canExpand&&<span className="stats-graph-toggle" aria-hidden="true">{open?"−":"+"}</span>}
      </RareButton>;
@@ -262,7 +279,7 @@ export function FolderNodeGraph({stats,folders,onChoose}:{stats:Stats;folders:Fo
    </div>
   </div>
   <div className="stats-graph-footer">
-   <span>{layout.items.length} 个节点{stats.treeTruncated?" · 部分目录已合并":""}</span>
+   <span>{stats.treeTruncated?"部分目录合并显示":"拖拽移动 · Ctrl + 滚轮缩放"}</span>
    {activeNode&&activeNode.id!==ROOT_ID&&!activeNode.virtual&&
     <><span className="stats-graph-current" title={activeNode.name}>{activeNode.name}</span>
      <RareButton type="button" tone="ghost" onClick={()=>onChoose(activeNode.id)}>筛选此目录 ↗</RareButton></>}
