@@ -21,7 +21,7 @@ import {Menu,type MenuItem,type MenuPoint}from"../../shared/ui/Menu";
 import {MicroHoldToDelete}from"../../shared/ui/rare";
 import"./dragMove.css";
 import {setMoveDragImage} from "./dragPreview";
-import {classifyFile} from "../../shared/fileTypes";
+import {classifyFile,type FileCategory} from "../../shared/fileTypes";
 import {FileTypeIcon} from "../../shared/ui/FileTypeIcon";
 import"./fileTable.css";
 
