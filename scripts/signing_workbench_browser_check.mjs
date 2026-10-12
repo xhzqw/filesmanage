@@ -131,11 +131,11 @@ try{
  await cdp.evaluate(`(()=>{
   [...document.querySelectorAll('.file-workbench-nav-item')].find(b=>b.textContent.trim()==='预览')?.click();
  })()`);
- const persisted=await cdp.evaluate(`(()=>!!document.querySelector('.file-workbench-signing[hidden] .seal-draft-row'))()`);
+ const persisted=await cdp.evaluate(`(()=>!!document.querySelector('#file-seals-sidebar[hidden] .seal-draft-row'))()`);
  assert("pending signing draft stays mounted while reading document",persisted);
  await cdp.evaluate(`(()=>{[...document.querySelectorAll('.file-workbench-nav-item')].find(b=>b.textContent.trim()==='签名与盖章')?.click()})()`);
  await delay(200);
- const restored=await cdp.evaluate(`(()=>!!document.querySelector('.file-workbench-signing:not([hidden]) .seal-draft-row'))()`);
+ const restored=await cdp.evaluate(`(()=>!!document.querySelector('#file-seals-sidebar:not([hidden]) .seal-draft-row'))()`);
  assert("pending signing draft is restored after switching back",restored);
  await cdp.evaluate(`(()=>{[...document.querySelectorAll('.file-workbench-nav-item')].find(b=>b.textContent.trim()==='预览')?.click()})()`);
  const dock=await cdp.evaluate(`(()=>{
