@@ -128,6 +128,23 @@ try{
   await waitFor(`!document.querySelector('[role=menu][aria-label="账户操作菜单"]')`);
   assert.equal(await evalJS('document.activeElement?.classList.contains("account-trigger")'),true,"Escape restores trigger");
   await waitFor('!!document.querySelector(".file-toolbar")');
+  const folderTree=await evalJS(`(()=>{const input=document.querySelector('.tree-head input[aria-label="搜索目录"]'),
+   current=document.querySelector('.tree li[aria-current="page"]>.tree-row'),
+   rail=document.querySelector('.tree>.spring-rail-host');
+   return{search:!!input,selected:!!current,rail:rail?getComputedStyle(rail).display:null,
+    selectedBackground:current?getComputedStyle(current).backgroundColor:null,
+    overflow:document.documentElement.scrollWidth-innerWidth};})()`);
+  assert(folderTree.search&&folderTree.overflow<=1,"folder tree searchable at "+width+": "+JSON.stringify(folderTree));
+  if(folderTree.selected)assert(folderTree.rail!=="none"&&folderTree.selectedBackground!=="rgba(0, 0, 0, 0)",
+   "selected folder has visible Rare spring rail at "+width+": "+JSON.stringify(folderTree));
+  if(width===1440){
+   await evalJS(`(()=>{const input=document.querySelector('.tree-head input[aria-label="搜索目录"]');
+    const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
+    setter.call(input,'test-rare-folder');input.dispatchEvent(new Event('input',{bubbles:true}));return true})()`);
+   await waitFor('!!document.querySelector(".tree-search-clear")');
+   await click(".tree-search-clear");
+   assert.equal(await evalJS(`document.querySelector('.tree-head input[aria-label="搜索目录"]')?.value`),"");
+  }
   if(!availablePreviewId){
    await sleep(140);
    availablePreviewId=await evalJS('document.querySelector(".file-table tbody tr[data-id]")?.dataset.id')||"";
@@ -182,6 +199,26 @@ try{
   count:document.querySelectorAll('.perm-view-nav [data-slot="gooey-nav-item"]').length}))()`);
  assert.equal(navResult.view,"audit","Gooey nav must navigate without unexpected dirty guard: "+JSON.stringify(navResult));
  assert.equal(await evalJS(`document.querySelector('.perm-view-nav [aria-current="page"]')?.textContent?.trim()`),"权限变更审计");
+ // Workgroups are a task-first master/detail surface; the selected row and
+ // detail heading must agree even when a filter changes the list.
+ for(const width of [1440,900,390]){
+  await viewport(width,width===390?760:900);
+  await navigate("/org?tab=groups",'!!document.querySelector(".org-groups-stage")');
+  const groupUI=await evalJS(`(()=>({rows:[...document.querySelectorAll(".org-group-card")].length,
+   selected:[...document.querySelectorAll('.org-group-card[aria-pressed="true"]')].length,
+   search:!!document.querySelector('input[aria-label="搜索工作组"]'),
+   overflow:document.documentElement.scrollWidth-innerWidth}))()`);
+  assert(groupUI.search&&groupUI.selected<=1&&groupUI.overflow<=1,
+   "compact group workbench at "+width+": "+JSON.stringify(groupUI));
+  if(groupUI.rows>1){
+   await evalJS(`(()=>{document.querySelector(".org-group-card:not(.active)")?.click();return true})()`);
+   await waitFor('!!document.querySelector(".org-group-card.active[aria-pressed=true]")');
+   const selection=await evalJS(`(()=>({name:document.querySelector('.org-group-card.active .org-group-name')?.textContent?.trim(),
+    inspector:document.querySelector('.org-group-detail-title')?.textContent?.trim()}))()`);
+   assert(selection.name===selection.inspector,"group selected and inspector synchronized: "+JSON.stringify(selection));
+  }
+  results.push(width+"px: workgroup master/detail OK");
+ }
  // Deep-linking to the seal library must not lose its selected view on reload.
  for(const width of [1440,900,390]){
   await viewport(width,width===390?760:900);
@@ -196,6 +233,22 @@ try{
   await click('.approval-root-nav [data-slot="gooey-nav-item"]:first-child');
   await waitFor('new URLSearchParams(location.search).get("tab")!=="seals"');
   await waitFor('!!document.querySelector(".approval-page")');
+  if(width<=900){
+   await click(".approval-mobile-notes");
+   await waitFor('getComputedStyle(document.querySelector(".approval-side")).display!=="none"');
+  }
+  const sideNav=await evalJS(`(()=>{const n=document.querySelector(".approval-side-nav"),
+   items=[...n.querySelectorAll('[data-slot="gooey-nav-item"]')];
+   return{count:items.length,current:n.querySelector('[aria-current="page"]')?.textContent.trim(),
+    overflow:document.documentElement.scrollWidth-innerWidth};})()`);
+  assert(sideNav.count===2&&sideNav.current==="申请详情"&&sideNav.overflow<=1,
+   "approval inspector Rare navigation at "+width+": "+JSON.stringify(sideNav));
+  await click('.approval-side-nav [data-slot="gooey-nav-item"]:nth-child(2)');
+  await waitFor('!!document.querySelector(".approval-notification-list")');
+  await click('.approval-side-nav [data-slot="gooey-nav-item"]:first-child');
+  await waitFor('!!document.querySelector(".approval-side-nav [aria-current=page]")');
+  const approvalRow=await evalJS('document.querySelector(".approval-table tbody tr .approval-file-name")?.closest("tr")?.getAttribute("tabindex")');
+  if(approvalRow!==undefined&&approvalRow!==null)assert.equal(approvalRow,"0","approval rows keyboard-focusable");
   assert.equal(await evalJS('document.querySelector(".approval-root-nav [aria-current=page]")?.textContent.trim()'),"审批工作台");
   await evalJS("history.back()");
   await waitFor('new URLSearchParams(location.search).get("tab")==="seals"');

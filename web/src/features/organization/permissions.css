@@ -237,6 +237,9 @@
 .perm-manage-tabs .rare-button[aria-selected="true"]{color:var(--brand-blue);background:var(--surface-panel);border-color:var(--border-hairline);box-shadow:var(--shadow-panel)}
 .perm-manage-tabs .rare-tab-active-rail{height:2px}
 .perm-manage-toolbar>.perm-create-trigger{min-height:31px;height:31px}
+.org-role-action-tools{display:flex;align-items:center;gap:5px;min-height:30px;flex-wrap:wrap;margin-bottom:6px;color:var(--text-secondary);font-size:11px}
+.org-role-action-tools>span{font-variant-numeric:tabular-nums;margin-right:auto}
+.org-role-action-tools>.rare-button{height:26px;min-height:26px;padding:0 7px;border-color:var(--border-hairline);font-size:11px}
 .perm-manage-toolbar .perm-create-trigger{margin-left:auto}
 .perm-mode-panel{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;overflow:auto}
 .perm-view-body{flex:1;min-height:0;overflow:auto;background:var(--surface-panel)}

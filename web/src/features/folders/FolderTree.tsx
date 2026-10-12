@@ -773,9 +773,16 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
       (results are already trimmed to listable paths), a small tree filters the
       page's authorized list in memory. */}
   <div className="tree-head" role="search">
-   <RareInput id={searchId} className="tree-search" type="search" value={query} autoComplete="off"
+   <div className="tree-search-control">
+    <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m13 13 4 4"/></svg>
+    <RareInput id={searchId} className="tree-search" type="search" value={query} autoComplete="off"
     placeholder="搜索目录" aria-label="搜索目录" aria-describedby={searchHintId}
     onChange={event=>setQuery(event.target.value)} onKeyDown={onSearchKeyDown}/>
+    {query!==""&&<RareButton type="button" className="tree-search-clear" aria-label="清空目录搜索" title="清空目录搜索"
+     onClick={()=>{setQuery("");document.getElementById(searchId)?.focus();}}>
+     <svg viewBox="0 0 20 20" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15"/></svg>
+    </RareButton>}
+   </div>
    <p id={searchHintId} className="tree-search-hint">
     {paged?"仅搜索你有权查看的目录，结果不含未授权路径。":"在当前可见目录中筛选。"}
    </p>

@@ -1,7 +1,7 @@
-import {RareBadge,RareButton,RareDataTable,RareInput,RareRowActions,RareSelect,RareTabs,RareTextarea} from "../../shared/ui/rare";
+import {GooeyNav,RareBadge,RareButton,RareDataTable,RareInput,RareRowActions,RareSelect,RareTabs,RareTextarea} from "../../shared/ui/rare";
 import {toast} from "../../shared/ui/feedback";
 import {Dialog} from "../../shared/ui/Dialog";
-import {useEffect,useState} from "react";
+import {useEffect,useState,type KeyboardEvent,type MouseEvent} from "react";
 import {useLocation} from "react-router-dom";
 import {workflowApi} from "./api";
 import type {Approval} from "./api";
@@ -156,7 +156,21 @@ export function ApprovalInbox({currentUser,onReview}:{currentUser:User;onReview:
  const visibleInbox=inbox.filter(matches).sort(compareTime);
  const visibleMine=mine.filter(a=>matches(a)&&(stateFilter==="all"||a.state===stateFilter)).sort(compareTime);
  const activeApprovals=activeList==="inbox"?visibleInbox:visibleMine;
- const selectedApproval=activeApprovals.find(a=>a.id===selected)??null;
+ const selectedApproval=activeApprovals.find(a=>a.id===selected)??activeApprovals[0]??null;
+ // Filtering can remove the current row from the visible result. The side
+ // inspector must follow the visible selection instead of showing stale
+ // history or an empty panel while matching approvals remain in the list.
+ useEffect(()=>{
+  if(selectedApproval&&selectedApproval.id!==selected)setSelected(selectedApproval.id);
+ },[selectedApproval?.id,selected]);
+ function onRowShortcut(event:KeyboardEvent<HTMLTableRowElement>,approval:Approval){
+  if(event.target!==event.currentTarget)return;
+  if(event.key==="Enter"||event.key===" "){event.preventDefault();showHistory(approval.id);}
+ }
+ function onRowSelect(event:MouseEvent<HTMLTableRowElement>,approval:Approval){
+  if((event.target as HTMLElement).closest("a,button,input,select,textarea"))return;
+  showHistory(approval.id);
+ }
  const decisionTitle=decision?.action==="approve"?"通过审批":decision?.action==="reject"?"拒绝审批":"撤回申请";
  const formatTime=(v:string)=>v.replace("T"," ").slice(0,16);
 
@@ -207,7 +221,10 @@ export function ApprovalInbox({currentUser,onReview}:{currentUser:User;onReview:
       </thead>
       <tbody>{activeList==="inbox"?<>
        {visibleInbox.length===0&&<tr><td colSpan={6} className="empty">{search||typeFilter!=="all"?"没有匹配的审批":"没有待处理的审批"}</td></tr>}
-       {visibleInbox.map(a=><tr key={a.id} className={selected===a.id?"approval-selected":""}>
+       {visibleInbox.map(a=><tr key={a.id} tabIndex={0}
+        aria-label={"查看审批详情 "+a.fileName}
+        onClick={event=>onRowSelect(event,a)} onKeyDown={event=>onRowShortcut(event,a)}
+        className={selectedApproval?.id===a.id?"approval-selected":""}>
         <td className="approval-file"><a className="approval-file-name" href={"/preview/"+encodeURIComponent(a.fileId)} title={a.fileName}>{a.fileName}</a>
          <span className="approval-mobile-meta">{a.requesterName} · {ACTION_LABELS[a.action]??a.action} · 第 {a.stepIndex+1}/{a.stepTotal} 级</span>
         </td>
@@ -223,7 +240,10 @@ export function ApprovalInbox({currentUser,onReview}:{currentUser:User;onReview:
        </tr>)}
       </>:<>
        {visibleMine.length===0&&<tr><td colSpan={6} className="empty">{search||stateFilter!=="all"||typeFilter!=="all"?"没有匹配的审批":"没有发起过审批"}</td></tr>}
-       {visibleMine.map(a=><tr key={a.id} className={selected===a.id?"approval-selected":""}>
+       {visibleMine.map(a=><tr key={a.id} tabIndex={0}
+        aria-label={"查看申请详情 "+a.fileName}
+        onClick={event=>onRowSelect(event,a)} onKeyDown={event=>onRowShortcut(event,a)}
+        className={selectedApproval?.id===a.id?"approval-selected":""}>
         <td className="approval-file"><a className="approval-file-name" href={"/preview/"+encodeURIComponent(a.fileId)} title={a.fileName}>{a.fileName}</a>
          <span className="approval-mobile-meta">{ACTION_LABELS[a.action]??a.action} · {a.approverName} · 第 {a.stepIndex+1}/{a.stepTotal} 级</span>
         </td>
@@ -242,12 +262,10 @@ export function ApprovalInbox({currentUser,onReview}:{currentUser:User;onReview:
    </div>
    <aside className="approval-side" aria-label="审批通知与时间线">
      <div className="approval-side-header">
-      <RareTabs className="approval-side-tabs" label="详情与通知">
-       <RareButton type="button" role="tab" aria-selected={sideMode==="detail"} onClick={()=>setSideMode("detail")}>申请详情</RareButton>
-       <RareButton type="button" role="tab" aria-selected={sideMode==="notifications"} onClick={()=>setSideMode("notifications")}>
-        通知{unread>0?" ("+unread+")":""}
-       </RareButton>
-      </RareTabs>
+      <GooeyNav className="approval-side-nav" aria-label="审批详情与通知" size="xs" radius={7} separation={10}
+       items={["申请详情",unread>0?"通知 ("+unread+")":"通知"]}
+       activeColor="var(--brand-blue)" activeLabelColor="var(--text-inverse)"
+       value={sideMode==="detail"?0:1} onChange={index=>setSideMode(index===0?"detail":"notifications")}/>
       <RareButton type="button" className="approval-side-close" onClick={()=>setSideOpen(false)}>关闭</RareButton>
      </div>
      {sideMode==="detail"?<ApprovalDetail approval={selectedApproval} events={events} historyLoading={historyLoading}
