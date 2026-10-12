@@ -27,7 +27,7 @@ export function App(){
  const user=useSession(s=>s.user),loading=useSession(s=>s.loading),setUser=useSession(s=>s.setUser),setLoading=useSession(s=>s.setLoading);
  const [logoutError,setLogoutError]=useState("");
  const logoutPending=useRef(false);
- useEffect(()=>{useUploadStore.getState().bindUser(user?.id??"");toast.clear();},[user?.id]);
+ useEffect(()=>{useUploadStore.getState().bindUser(user?.id??"");toast.bindOwner(user?.id??"");},[user?.id]);
  useEffect(()=>{let valid=true;authApi.me().then(u=>{if(valid)setUser(u)}).catch(()=>{if(valid)setUser(null)}).finally(()=>{if(valid)setLoading(false)});return()=>{valid=false}},[setLoading,setUser]);
  useEffect(()=>subscribeSessionIssues(issue=>{
   if(issue==="expired"){setUser(null);setLogoutError("");}

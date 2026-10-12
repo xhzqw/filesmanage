@@ -3,7 +3,7 @@ import {toast} from "../../shared/ui/feedback";
 import {useEffect,useRef,useState,type FormEvent} from "react";
 import type {Folder} from "../../entities/folder/model";
 import {folderApi} from "./api";
-import {errorCopy} from "../../shared/errors";
+import {errorCode,errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
 import {Menu,type MenuItem} from "../../shared/ui/Menu";
 
@@ -35,12 +35,12 @@ export function FolderActions({folder,actionRequest,onActionHandled,onActionComp
   setMessage("");setRenameBusy(true);
   try{
    await toast.track(()=>folderApi.rename(folder.id,renameValue.trim()),{
-    loading:"正在重命名文件夹…",success:"文件夹已重命名",error:e=>errorCopy(e,"重命名失败")
+    loading:"正在重命名文件夹…",success:"文件夹已重命名",error:e=>errorCopy(e,"重命名失败"),errorToast:false
    });
    finishRename();
    onChanged("rename",folder);
   }catch(error){
-   setMessage(errorCopy(error,"重命名失败"));
+   setMessage(errorCode(error)==="E_NETWORK"?"网络中断，重命名结果未确认；请刷新目录后核对":errorCopy(error,"重命名失败"));
   }finally{setRenameBusy(false);}
  }
 
@@ -48,11 +48,11 @@ export function FolderActions({folder,actionRequest,onActionHandled,onActionComp
   setMessage("");setRemoveBusy(true);
   try{
    await toast.track(()=>folderApi.remove(folder.id),{
-    loading:"正在移动文件夹至回收站…",success:"文件夹已移入回收站",error:e=>errorCopy(e,"删除失败")
+    loading:"正在移动文件夹至回收站…",success:"文件夹已移入回收站",error:e=>errorCopy(e,"删除失败"),errorToast:false
    });
    finishDelete();onChanged("delete",folder);
   }
-  catch(error){setMessage(errorCopy(error,"删除失败"));}
+  catch(error){setMessage(errorCode(error)==="E_NETWORK"?"网络中断，删除结果未确认；请刷新回收站核对":errorCopy(error,"删除失败"));}
   finally{setRemoveBusy(false);}
  }
  const menuItems:MenuItem[]=[

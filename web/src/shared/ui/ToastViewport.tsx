@@ -1,15 +1,23 @@
-import {useEffect,useState} from "react";
+import {useEffect,useRef,useState} from "react";
+import {createPortal} from "react-dom";
 import {RareButton} from "./rare";
 import {toast,useToastStore,type ToastItem} from "./feedback";
 import "./toast.css";
 
 function ToastRow({item}:{item:ToastItem}){
  const[paused,setPaused]=useState(false);
+ const remaining=useRef(item.duration);
+ const timerIdentity=useRef({id:item.id,revision:item.revision});
  useEffect(()=>{
+  if(timerIdentity.current.id!==item.id||timerIdentity.current.revision!==item.revision){
+   timerIdentity.current={id:item.id,revision:item.revision};
+   remaining.current=item.duration;
+  }
   if(!item.duration||paused)return;
-  const handle=window.setTimeout(()=>toast.dismiss(item.id),item.duration);
-  return()=>window.clearTimeout(handle);
- },[item.id,item.duration,paused]);
+  const start=Date.now();
+  const handle=window.setTimeout(()=>toast.dismiss(item.id),remaining.current);
+  return()=>{window.clearTimeout(handle);remaining.current=Math.max(0,remaining.current-(Date.now()-start));};
+ },[item.id,item.duration,item.revision,paused]);
  return <div className="rare-toast" data-toast-tone={item.tone}
   role={item.tone==="danger"?"alert":"status"}
   onMouseEnter={()=>setPaused(true)} onMouseLeave={()=>setPaused(false)}
@@ -29,8 +37,23 @@ function ToastRow({item}:{item:ToastItem}){
 }
 export function ToastViewport(){
  const items=useToastStore(state=>state.items);
+ const[modal,setModal]=useState<HTMLDialogElement|null>(null);
+ useEffect(()=>{
+  const update=()=>{
+   const dialogs=Array.from(document.querySelectorAll<HTMLDialogElement>("dialog:modal"));
+   const active=dialogs[dialogs.length-1]??null;
+   setModal(old=>old===active?old:active);
+  };
+  update();
+  const observer=new MutationObserver(update);
+  observer.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:["open"]});
+  return()=>observer.disconnect();
+ },[]);
  if(!items.length)return null;
- return <aside className="rare-toast-viewport" aria-label="操作通知">
+ const viewport=<aside className="rare-toast-viewport" aria-label="操作通知">
   {items.map(item=><ToastRow key={item.id} item={item}/>)}
  </aside>;
+ // showModal() moves a dialog into the browser top layer. No sibling z-index
+ // can beat that layer; render notifications inside the active modal.
+ return modal?createPortal(viewport,modal):viewport;
 }

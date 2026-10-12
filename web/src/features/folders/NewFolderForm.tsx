@@ -18,13 +18,15 @@ export function NewFolderForm({parentId,onCreated}:{parentId:string;onCreated:(n
   try{
    await toast.track(()=>folderApi.create(parentId,name.trim()),{
     loading:"正在创建文件夹…",success:"文件夹已创建",
-    error:error=>errorCode(error)==="E_FORBIDDEN"?"当前目录没有新建权限":"新建失败：名称冲突或输入非法"
+    error:error=>errorCode(error)==="E_FORBIDDEN"?"当前目录没有新建权限":"新建失败：名称冲突或输入非法",
+    errorToast:false
    });
    onCreated(name.trim());
    setName("");
    setOpen(false);
   }catch(error){
-   setMessage(errorCode(error)==="E_FORBIDDEN"?"当前目录没有新建权限":"新建失败：名称冲突或输入非法");
+   setMessage(errorCode(error)==="E_NETWORK"?"网络中断，创建结果未确认。请检查目录后再重试。"
+    :errorCode(error)==="E_FORBIDDEN"?"当前目录没有新建权限":"新建失败：名称冲突或输入非法");
   }finally{setBusy(false);}
  }
 
