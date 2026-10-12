@@ -93,7 +93,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
   setParts([]);setSelectedPart(-1);
   setUnit("unknown");setMeasure(null);setSkipped([]);setShowCompatibility(false);
   setSelectedLine(null);setDarkDrawing(true);setShowLengths(true);
-  setView({axes:false,grid:false,edges:true,measure:false,projection:"perspective"});
+  setView({axes:false,grid:true,edges:true,measure:false,projection:"perspective"});
   setCube({yaw:45,pitch:26});
   const run=async()=>{
    try{
@@ -209,7 +209,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
       setActiveLayout(next.layout);setMeasure(null);
       setPlotError("");
       setSelectedLine(null);setDarkDrawing(true);setShowLengths(true);
-      setView({axes:false,grid:false,edges:false,measure:false,projection:"orthographic"});
+      setView({axes:false,grid:true,edges:false,measure:false,projection:"orthographic"});
      };
     }else if(format==="msh"){
      const parsed=await parseMshInWorker(buffer,abort.signal,THREE);
@@ -236,7 +236,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
       }
      },setMeasure,(yaw,pitch)=>setCube({yaw,pitch}),setSelectedLine,drawingUnit);
      controls.current=mountedControls;
-     setView({axes:false,grid:format!=="dxf",edges:format!=="dxf",measure:false,
+     setView({axes:false,grid:true,edges:format!=="dxf",measure:false,
       projection:format==="dxf"?"orthographic":"perspective"});
      pendingObject=null;
      setStatus("ready");

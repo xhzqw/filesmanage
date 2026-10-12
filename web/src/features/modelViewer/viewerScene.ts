@@ -174,7 +174,7 @@ export function mountEngineeringScene(
  if(drawing){grid.rotation.x=Math.PI/2;grid.position.z=-Math.max(radius*.002,.000001);}
  else grid.position.y=-size.y/2-Math.max(radius*.035,.000001);
  scene.add(grid);
- let gridVisible=!drawing,outlineVisible=true,stepLast=0;
+ let gridVisible=true,outlineVisible=true,stepLast=0;
  // 2D grid is drawn by the coordinate SVG ruler in the actual XY plane,
  // rather than placing a 3D GridHelper over engineering linework.
  grid.visible=!drawing;

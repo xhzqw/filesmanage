@@ -315,20 +315,32 @@ try{
  assert(ink.rulerTicks>=3,"CAD coordinate ticks must be legible on both axes");
  assert.match(ink.rulerText,/XY/);
  assert.match(ink.rulerText,/X .*Y /,"live pointer coordinate display must exist");
+ assert(ink.rulerGridLines>=3,"DXF grid must be visible without manually enabling it");
  assert.equal(new Map(ink.inkColors).get("WHITE"),0x172a3b,
   "white TrueColor DXF lines cannot disappear on white paper");
  assert.notEqual(new Map(ink.inkColors).get("CYAN"),0x00ffff,
   "low-contrast cyan DXF lines must be darkened for white paper");
- await cdp.eval("window.__cad.grid()");
- await delay(100);
- const noGrid=await cdp.eval("window.__cad.state");
- assert(noGrid.rulerGridLines>=3,"grid toggle shows a restrained engineering grid when requested");
- await cdp.eval("window.__cad.grid()");
- await delay(100);
- const withGrid=await cdp.eval("window.__cad.state");
- assert.equal(withGrid.rulerGridLines,1,"default clean drawing hides the grid without losing rulers");
+ assert.equal(await cdp.eval("window.__cad.grid()"),false,
+  "first toggle must disable the default-on drawing grid");
+ let noGrid=await cdp.eval("window.__cad.state");
+ for(let attempt=0;attempt<20&&noGrid.rulerGridLines!==1;attempt++){
+  await delay(100);
+  noGrid=await cdp.eval("window.__cad.state");
+ }
+ assert.equal(noGrid.rulerGridLines,1,"user can hide the grid while keeping coordinate rulers");
+ assert.equal(await cdp.eval("window.__cad.grid()"),true,
+  "second toggle must restore the default drawing grid");
+ let withGrid=await cdp.eval("window.__cad.state");
+ for(let attempt=0;attempt<20&&withGrid.rulerGridLines<3;attempt++){
+  await delay(100);
+  withGrid=await cdp.eval("window.__cad.state");
+ }
+ assert(withGrid.rulerGridLines>=3,"grid can be turned back on without losing rulers");
  const sheet=await cdp.eval("(()=>{window.__cad.sheet();return window.__cad.state})()");
  assert.equal(sheet.canvases,1,"layout switching must dispose the old canvas");
+ await delay(100);
+ assert((await cdp.eval("window.__cad.state.rulerGridLines"))>=3,
+  "paper layouts should also start with the coordinate grid visible");
  assert.equal(sheet.drawingLayout,"A1");
  assert.equal(sheet.drawingLayers,1,"model-space elements must not leak into a paper layout");
  assert(sheet.metrics.size[0]<30,"paper layout must be fitted independently");
