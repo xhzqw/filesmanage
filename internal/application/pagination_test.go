@@ -148,7 +148,7 @@ func TestCachesAreBounded(t *testing.T) {
 	clock := time.Date(2026, 10, 8, 13, 0, 0, 0, time.UTC)
 	cache := statsCache{ttl: 30 * time.Second}
 	for i := 0; i < maxCacheEntries+50; i++ {
-		cache.put("key-"+strconvItoa(i), domain.Stats{TotalFiles: int64(i)}, clock)
+		cache.put("key-"+strconvItoa(i), domain.Stats{TotalFiles: int64(i)}, clock, cache.revision)
 	}
 	cache.mu.Lock()
 	size := len(cache.entries)
@@ -160,14 +160,14 @@ func TestCachesAreBounded(t *testing.T) {
 	// Expired entries are dropped once the clock moves past the TTL, so a
 	// steady-state server does not accumulate dead keys.
 	clock = clock.Add(31 * time.Second)
-	cache.put("fresh-key", domain.Stats{TotalFiles: 1}, clock)
+	cache.put("fresh-key", domain.Stats{TotalFiles: 1}, clock, cache.revision)
 	cache.mu.Lock()
 	size = len(cache.entries)
 	cache.mu.Unlock()
 	if size != 1 {
 		t.Fatalf("expired entries must be evicted, got %d entries, want 1", size)
 	}
-	if _, ok := cache.get("fresh-key", clock); !ok {
+	if _, ok, _ := cache.get("fresh-key", clock); !ok {
 		t.Fatal("the fresh entry must be readable")
 	}
 }
