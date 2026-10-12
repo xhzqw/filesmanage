@@ -120,7 +120,7 @@ try{
    await navigate("/preview/"+encodeURIComponent(fixture),'!!document.querySelector(".file-pdf-viewer")');
    await waitFor('!!document.querySelector(".file-pdf-paper img.file-pdf-image:not(.is-pending)")?.naturalWidth');
    const measure=()=>evalJS(`(()=>{
-    const area=document.querySelector(".file-pdf-paper"),img=area.querySelector("img.file-pdf-image:not(.is-pending)");
+    const area=document.querySelector(".file-pdf-paper"),img=area?.querySelector("img.file-pdf-image:not(.is-pending)");
     if(!area||!img)return null;
     const s=getComputedStyle(area),r=img.getBoundingClientRect(),a=area.getBoundingClientRect();
     const availableWidth=area.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight)-12;
@@ -129,18 +129,26 @@ try{
       maxWidth:availableWidth,maxHeight:availableHeight,viewportWidth:a.width,
       overflow:document.documentElement.scrollWidth-innerWidth};
    })()`);
-   const initial=await measure();
+   const readLayout=async mode=>{
+    for(let attempt=0;attempt<120;attempt++){
+     const result=await measure();
+     if(result&&result.mode===mode&&result.width>0)return result;
+     await sleep(140);
+    }
+    throw Error("PDF image did not settle in "+mode+" mode at "+width+"px");
+   };
+   const initial=await readLayout("page");
    assert(initial.mode==="page"&&initial.width<=initial.maxWidth+2&&initial.height<=initial.maxHeight+2&&
     Math.abs(initial.height/initial.width-initial.expectedRatio)<.02&&initial.overflow<=1,
     "PDF default whole-page fit and natural ratio at "+width+": "+JSON.stringify(initial));
    await click('.file-pdf-tools button[aria-label="放大 PDF"]');
-   const enlarged=await measure();
+   const enlarged=await readLayout("page");
    assert(enlarged.width>initial.width*1.2&&Math.abs(enlarged.height/enlarged.width-enlarged.expectedRatio)<.02,
     "PDF zoom preserves aspect ratio at "+width+": "+JSON.stringify(enlarged));
    const toggle=await evalJS(`(()=>{document.querySelector('.file-pdf-tools button[aria-label^="PDF 适配方式"]')?.click();return true})()`);
    assert(toggle,"PDF fit toggle exists");
    await waitFor('document.querySelector(".file-pdf-paper")?.dataset.fitMode==="width" && !!document.querySelector(".file-pdf-paper img.file-pdf-image:not(.is-pending)")?.naturalWidth');
-   const fullWidth=await measure();
+   const fullWidth=await readLayout("width");
    assert(fullWidth&&fullWidth.width>=initial.width&&Math.abs(fullWidth.height/fullWidth.width-fullWidth.expectedRatio)<.02,
     "PDF fit-width preserves ratio at "+width+": "+JSON.stringify(fullWidth));
    checked.push(width+"px");
