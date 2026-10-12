@@ -233,7 +233,7 @@ func (s *Service) OfficeSaveStatus(ctx context.Context, u domain.User, fileID, s
 		return OfficeSaveReceipt{}, err
 	}
 	defer tx.Rollback(ctx)
-	file, err := s.visibleFile(ctx, tx, u, fileID, domain.ActionRead)
+	file, err := s.visibleFile(ctx, tx, u, fileID, domain.ActionPreview)
 	if err != nil {
 		return OfficeSaveReceipt{}, err
 	}
