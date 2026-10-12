@@ -755,7 +755,7 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
      className="tree-node-link"
      onClick={event=>event.stopPropagation()}
      title={entry.disabledReason?`${entry.name} (${entry.disabledReason})`:entry.name}>{entry.name}</Link>
-    {hovered?.legal&&<span className="tree-drop-arrow" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 3v7a3 3 0 0 0 3 3h8m-4-4 4 4-4 4"/></svg></span>
+    {hovered?.legal&&<span className="tree-drop-arrow" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 3v7a3 3 0 0 0 3 3h8m-4-4 4 4-4 4"/></svg></span>}
    </div>
    {isExpanded&&<ul role="group">
     {children.map(child=>renderNode(child,depth+1))}
