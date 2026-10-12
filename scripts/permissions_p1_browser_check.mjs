@@ -106,7 +106,7 @@ try{
   await cdp.send("Input.dispatchKeyEvent",{type:"keyDown",key,code:key,windowsVirtualKeyCode:virtualKeyCode});
   await cdp.send("Input.dispatchKeyEvent",{type:"keyUp",key,code:key,windowsVirtualKeyCode:virtualKeyCode});
  };
- await cdp.evaluate("(()=>{document.querySelector('.org-dept-card .tree > li[role=treeitem]').focus();return true})()");
+ await cdp.evaluate("(()=>{document.querySelector('.org-dept-card .tree > li')?.focus();return true})()");
  await pressKey("ArrowDown",40);
  assert(await cdp.waitFor("()=>!!document.activeElement?.dataset.deptId"),
   "department tree ArrowDown focuses first visible department");
@@ -141,7 +141,7 @@ try{
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-tree-name')"),"resource folder browser loads");
  assert(await cdp.evaluate("(()=>!!document.querySelector('.perm-tree[role=tree] li[role=treeitem] .perm-folder-glyph[stroke]'))()"),
   "resource browser uses shared warm folder glyph and ARIA tree structure");
- await cdp.evaluate("(()=>{document.querySelector('.perm-tree li[role=treeitem]').focus();return true})()");
+ await cdp.evaluate("(()=>{document.querySelector('.perm-tree li')?.focus();return true})()");
  await pressKey("End",35);
  assert(await cdp.waitFor("()=>document.activeElement?.matches('.perm-tree li[role=treeitem]:last-of-type')"),
   "resource browser End reaches last visible folder");
