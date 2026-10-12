@@ -143,6 +143,18 @@ try{
  assert("PDF reader tools float in a compact bottom dock",
   workspaceUI.dockBottom!==null&&workspaceUI.dockBottom>=0&&workspaceUI.dockBottom<55&&workspaceUI.dockWidth<workspaceUI.viewerWidth*.94,
   JSON.stringify(workspaceUI));
+ const topActions=await cdp.evaluate(`(()=>{
+  const area=document.querySelector('.file-workbench-main')?.getBoundingClientRect();
+  const actions=document.querySelector('.file-preview-action-dock')?.getBoundingClientRect();
+  const old=document.querySelector('.file-workbench-sidebar .file-workbench-actions');
+  const buttons=[...document.querySelectorAll('.file-preview-action-dock .file-workbench-actions>button')];
+  return area&&actions?{count:buttons.length,top:actions.top-area.top,right:area.right-actions.right,
+   emptySidebar:!old,buttonLabels:buttons.map(b=>b.getAttribute('aria-label'))}:null;
+ })()`);
+ assert("download print and more are in one top-right floating dock, not sidebar",
+  !!topActions&&topActions.count===3&&topActions.top>=0&&topActions.top<40&&topActions.right>=0&&topActions.right<40&&topActions.emptySidebar,
+  JSON.stringify(topActions));
+
  await cdp.evaluate(`(()=>document.querySelector('.file-sidebar-collapse')?.click())()`);
  const collapsedReady=await cdp.waitFor(`()=>{
   const layout=document.querySelector('.file-workbench-layout');
@@ -163,7 +175,7 @@ try{
   return !layout?.classList.contains('is-collapsed')&&sidebar?.getBoundingClientRect().width>180;
  }`,4000);
  const restoredSidebar=await cdp.evaluate(`(()=>document.querySelector('.file-workbench-sidebar')?.getBoundingClientRect().width)()`);
- assert("sidebar toggle restores full navigation",Boolean(restoredReady)&&restoredSidebar>180,String(restoredSidebar));
+ assert("sidebar toggle restores fixed 240px navigation",Boolean(restoredReady)&&Math.abs(restoredSidebar-240)<2,String(restoredSidebar));
 
  const clicked=await cdp.evaluate(`(()=>{
   const item=[...document.querySelectorAll('.file-workbench-nav-item')]
@@ -182,6 +194,8 @@ try{
    return {left:left.width,right:right.width,page:paper.width,distinct:right.left>=left.right-4};
   })()`);
   assert("signing page gets spacious right-hand canvas",geometry.right>580&&geometry.page>350&&geometry.distinct,JSON.stringify(geometry));
+  assert("sidebar width stays fixed in signing and metadata modes",
+   Math.abs(geometry.left-restoredSidebar)<2,JSON.stringify({signing:geometry.left,preview:restoredSidebar}));
   const signingDock=await cdp.evaluate(`(()=>{
    const stage=document.querySelector('.seal-file-preview')?.getBoundingClientRect();
    const dock=document.querySelector('.seal-page-toolbar')?.getBoundingClientRect();
@@ -274,21 +288,26 @@ try{
  assert("review composer opens only on demand",reviewCompact&&Boolean(reviewExpanded));
  await cdp.evaluate(`(()=>{[...document.querySelectorAll('.file-workbench-nav-item')].find(b=>b.textContent.trim()==='预览')?.click()})()`);
  const dock=await cdp.evaluate(`(()=>{
-  const buttons=[...document.querySelectorAll('.file-workbench-actions>button')];
+  const area=document.querySelector('.file-workbench-main')?.getBoundingClientRect();
+  const group=document.querySelector('.file-preview-action-dock .file-workbench-actions');
+  const buttons=[...(group?.querySelectorAll('button')??[])];
   if(buttons.length!==3)return null;
-  const widths=buttons.map(b=>b.getBoundingClientRect().width);
   buttons[2].click();
-  return {length:buttons.length,widths};
+  return {length:buttons.length,top:group.getBoundingClientRect().top-area.top,
+    right:area.right-group.getBoundingClientRect().right,sidebarActions:!!document.querySelector('.file-workbench-sidebar .file-workbench-actions')};
  })()`);
- const expanded=await cdp.waitFor(`()=>!!document.querySelector('.file-action-expansion')`,3000);
- await delay(260);
- const above=await cdp.evaluate(`(()=>{
-  const more=document.querySelector('.file-workbench-actions');
-  const expanded=document.querySelector('.file-action-expansion');
-  return !!more&&!!expanded&&expanded.getBoundingClientRect().bottom<=more.getBoundingClientRect().top+2;
+ const expanded=await cdp.waitFor(`()=>!!document.querySelector('.file-preview-action-dock .file-action-expansion')`,3000);
+ await delay(250);
+ const dropdownBelow=await cdp.evaluate(`(()=>{
+  const button=document.querySelector('.file-preview-action-dock .file-workbench-actions');
+  const expanded=document.querySelector('.file-preview-action-dock .file-action-expansion');
+  return !!button&&!!expanded&&expanded.getBoundingClientRect().top>=button.getBoundingClientRect().bottom;
  })()`);
- assert("download, print and more occupy same-width button row",!!dock&&Math.max(...dock.widths)-Math.min(...dock.widths)<20,JSON.stringify(dock));
- assert("more actions expand upward in the same dock",expanded&&above);
+ assert("download print more are top-right, not in left sidebar",
+   !!dock&&dock.length===3&&dock.top<40&&dock.right<40&&!dock.sidebarActions,JSON.stringify(dock));
+ assert("more actions drop down under upper-right capsule",
+   Boolean(expanded)&&Boolean(dropdownBelow));
+
 }finally{
  cdp?.close();chrome.kill("SIGKILL");
 }

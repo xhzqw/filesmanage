@@ -36,6 +36,7 @@ import {AppShell} from "../shared/ui/AppShell";
 import "./previewWorkbench.css";
 import "./previewWorkbenchV2.css";
 import "./previewWorkspaceV3.css";
+import "./previewWorkspaceV4.css";
 
 type Tab="preview"|"details"|"versions"|"compare"|"review"|"seals";
 const ACTION_LABELS:Record<string,string>={upload:"上传",edit:"编辑",rollback:"回滚",restore:"恢复"};
@@ -84,6 +85,19 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const[deleting,setDeleting]=useState(false);
  const[busy,setBusy]=useState(false);
  const[moreOpen,setMoreOpen]=useState(false);
+ const actionDockRef=useRef<HTMLDivElement>(null);
+ useEffect(()=>{
+  if(!moreOpen)return;
+  function onOutside(event:PointerEvent){
+   if(!actionDockRef.current?.contains(event.target as Node))setMoreOpen(false);
+  }
+  function onEscape(event:KeyboardEvent){
+   if(event.key==="Escape")setMoreOpen(false);
+  }
+  document.addEventListener("pointerdown",onOutside);
+  document.addEventListener("keydown",onEscape);
+  return()=>{document.removeEventListener("pointerdown",onOutside);document.removeEventListener("keydown",onEscape)};
+ },[moreOpen]);
  const[requiresApproval,setRequiresApproval]=useState<boolean|null>(null);
  const[favorite,setFavorite]=useState<boolean|null>(null);
  const[favoriteBusy,setFavoriteBusy]=useState(false);
@@ -258,25 +272,6 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
           <WorkbenchNavIcon type={key}/><span className="file-workbench-nav-label">{label}</span>{key==="versions"&&<small>{versions.length}</small>}
          </RareButton>)}
        </nav>
-       <div className="file-workbench-side-actions">
-        {moreOpen&&<div className="file-action-expansion" id="file-workbench-more-actions" role="group" aria-label="更多文件操作">
-         {isOfficeName(preview.name)&&!archived&&<Link className="rare-button file-action-item" to={"/office/"+id} onClick={()=>setMoreOpen(false)}>在线编辑</Link>}
-         {isCadName(preview.name)&&<Link className="rare-button file-action-item" to={"/model/"+id} onClick={()=>setMoreOpen(false)}>3D 查看</Link>}
-         {moreActions.map(action=><RareButton key={action.id} type="button"
-          className={"file-action-item"+(action.danger?" is-danger":"")} tone="ghost" disabled={action.disabled}
-          onClick={()=>{setMoreOpen(false);action.onSelect?.();}}>{action.label}</RareButton>)}
-        </div>}
-        <div className="file-workbench-actions" role="group" aria-label="文件操作">
-         <RareButton type="button" tone="ghost" title="下载" aria-label="下载" onClick={download}><span className="file-side-action-icon" aria-hidden="true">↓</span><span className="file-side-action-label">下载</span></RareButton>
-         <RareButton type="button" tone="ghost" title="打印" aria-label="打印" onClick={()=>setPrinting(true)}><span className="file-side-action-icon" aria-hidden="true">▣</span><span className="file-side-action-label">打印</span></RareButton>
-         <RareButton type="button" tone="ghost" className="file-more-trigger"
-          aria-label="更多文件操作" aria-controls="file-workbench-more-actions" aria-expanded={moreOpen}
-          onClick={()=>{if(sidebarCollapsed)setSidebarCollapsed(false);setMoreOpen(open=>!open)}}><span className="file-side-action-icon" aria-hidden="true">···</span><span className="file-side-action-label">更多操作</span> <svg viewBox="0 0 20 20" width="12" height="12"
-           fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"
-           className={moreOpen?"is-expanded":""}><path d="m5 8 5 5 5-5"/></svg>
-         </RareButton>
-        </div>
-       </div>
        {tab==="details"&&<section id="file-panel-details" role="tabpanel" aria-labelledby="file-tab-details" className="file-sidebar-context file-details-panel">
        <dl className="file-properties file-properties-compact">
         {file&&<div><dt>修改于</dt><dd>{versionTime(file.updatedAt)}</dd></div>}
@@ -323,6 +318,25 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
 
       </aside>
       <div className="file-workbench-main">
+       <div className="file-preview-action-dock" ref={actionDockRef}>
+        {moreOpen&&<div className="file-action-expansion" id="file-workbench-more-actions" role="group" aria-label="更多文件操作">
+         {isOfficeName(preview.name)&&!archived&&<Link className="rare-button file-action-item" to={"/office/"+id} onClick={()=>setMoreOpen(false)}>在线编辑</Link>}
+         {isCadName(preview.name)&&<Link className="rare-button file-action-item" to={"/model/"+id} onClick={()=>setMoreOpen(false)}>3D 查看</Link>}
+         {moreActions.map(action=><RareButton key={action.id} type="button"
+          className={"file-action-item"+(action.danger?" is-danger":"")} tone="ghost" disabled={action.disabled}
+          onClick={()=>{setMoreOpen(false);action.onSelect?.();}}>{action.label}</RareButton>)}
+        </div>}
+        <div className="file-workbench-actions" role="group" aria-label="文件操作">
+         <RareButton type="button" tone="ghost" title="下载" aria-label="下载" onClick={download}><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M4 17v3h16v-3"/></svg><span className="file-side-action-label">下载</span></RareButton>
+         <RareButton type="button" tone="ghost" title="打印" aria-label="打印" onClick={()=>setPrinting(true)}><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M7 8V4h10v4M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M7 14h10v6H7z"/><path d="M17 11h1"/></svg><span className="file-side-action-label">打印</span></RareButton>
+         <RareButton type="button" tone="ghost" className="file-more-trigger"
+          aria-label="更多文件操作" aria-controls="file-workbench-more-actions" aria-expanded={moreOpen}
+          onClick={()=>setMoreOpen(open=>!open)}><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg><span className="file-side-action-label">更多操作</span> <svg viewBox="0 0 20 20" width="12" height="12"
+           fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"
+           className={moreOpen?"is-expanded":""}><path d="m5 8 5 5 5-5"/></svg>
+         </RareButton>
+        </div>
+       </div>
      <header className="file-preview-identity">
       <div className="file-workbench-heading">
        <Link to={file?"/doc?folder="+encodeURIComponent(file.folderId):"/doc"} className="file-back"
@@ -357,12 +371,12 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
         <CadPreviewStatus fileId={preview.fileId}/>:
        preview.textual?
         <div className="file-text-stage">
-         <div className="file-text-tools"><span>{preview.truncated?"已显示文件前 256 KB":"文件内容"}</span>
-          <RareButton type="button" aria-pressed={wrapText} onClick={()=>setWrapText(value=>!value)}>{wrapText?"取消自动换行":"自动换行"}</RareButton>
+         <pre className={"file-text-content"+(wrapText?" file-text-wrap":"")}>{preview.content||"（空文件）"}</pre>
+         <div className="file-text-tools preview-reader-dock" role="group" aria-label="文本阅读工具">
+          {preview.truncated&&<span className="file-text-limit" title="仅显示前 256 KB；下载可查看完整内容">前 256 KB</span>}
+          <RareButton type="button" aria-pressed={wrapText} onClick={()=>setWrapText(value=>!value)}>{wrapText?"取消换行":"自动换行"}</RareButton>
           <RareButton type="button" onClick={()=>void navigator.clipboard.writeText(preview.content).then(()=>announce("预览文本已复制")).catch(()=>announce("复制失败，请手动选择文本",true))}>复制文本</RareButton>
          </div>
-         <pre className={"file-text-content"+(wrapText?" file-text-wrap":"")}>{preview.content||"（空文件）"}</pre>
-         {preview.truncated&&<p className="file-text-truncated">内容较长，仅显示前 256 KB。下载后可查看完整内容。</p>}
         </div>:
         <div className="file-unsupported">
          <div className="file-unsupported-symbol"><FileTypeIcon name={preview.name} size={28}/></div>

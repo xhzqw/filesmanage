@@ -37,8 +37,7 @@ export function OfficeLayoutPreview({fileId,sha,structured}:{
   return()=>{active=false;controller.abort();if(blobURL)URL.revokeObjectURL(blobURL);};
  },[fileId,sha]);
  return <div className="office-layout-preview">
-  <div className="office-layout-tools">
-   <strong>Office 文件预览</strong>
+  <div className="office-layout-tools preview-reader-dock" role="group" aria-label="Office 阅读工具">
    <div className="office-layout-switch" aria-label="预览模式">
     <RareButton type="button" aria-pressed={mode==="pages"} disabled={status!=="ready"} onClick={()=>setMode("pages")}>页面布局</RareButton>
     <RareButton type="button" aria-pressed={mode==="content"} onClick={()=>setMode("content")}>内容摘要</RareButton>

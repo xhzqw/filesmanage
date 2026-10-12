@@ -266,6 +266,25 @@ async function main() {
     })()`);
     check("file preview opens a large right-side persistent canvas",
       !!layout&&layout.ratio>=.65&&layout.height>220&&layout.nav,JSON.stringify(layout));
+    const readingDock=await cdp.evaluate(`(()=>{
+      const stage=document.querySelector('.file-text-stage')?.getBoundingClientRect();
+      const content=document.querySelector('.file-text-content')?.getBoundingClientRect();
+      const dock=document.querySelector('.file-text-tools.preview-reader-dock')?.getBoundingClientRect();
+      const side=document.querySelector('.file-workbench-sidebar')?.getBoundingClientRect();
+      return stage&&dock&&content&&side?{
+       dockBottom:Math.round(stage.bottom-dock.bottom),
+       dockCentered:Math.abs(dock.x+dock.width/2-stage.x-stage.width/2)<3,
+       dockOverlay:Math.round(content.top)<=Math.round(stage.top+2)&&
+        Math.round(content.bottom)>=Math.round(stage.bottom-2),
+       sidebarWidth:side.width,
+       hasRedundantTopRow:!!document.querySelector('.file-text-stage>.file-text-tools:not(.preview-reader-dock)')
+      }:null;
+    })()`);
+    check("text controls occupy only bottom floating dock with no redundant top row",
+     !!readingDock&&readingDock.dockBottom>=0&&readingDock.dockBottom<55&&readingDock.dockCentered&&
+     readingDock.dockOverlay&&!readingDock.hasRedundantTopRow&&Math.abs(readingDock.sidebarWidth-240)<2,
+     JSON.stringify(readingDock));
+
     await cdp.evaluate(`(()=>{
       window.__journeyViewer=document.querySelector('.file-workbench-preview-surface .file-text-stage');
       const button=[...document.querySelectorAll('.file-workbench-nav-item')].find(b=>b.textContent?.includes('文件信息'));

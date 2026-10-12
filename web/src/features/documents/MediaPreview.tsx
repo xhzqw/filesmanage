@@ -22,8 +22,8 @@ export function MediaPreview({fileId,sha256,name,kind,mime}:{fileId:string;sha25
 
  if(kind==="image"){
   return <section className="media-preview" aria-label="图片预览">
-   <div className="media-tools">
-    <span className="media-tools-label">图片预览 {naturalSize?"· "+naturalSize.width+" × "+naturalSize.height:""}</span>
+   <div className="media-tools preview-reader-dock" role="group" aria-label="图片查看工具">
+    {naturalSize&&<span className="media-tools-dimensions">{naturalSize.width} × {naturalSize.height}</span>}
     <RareButton type="button" disabled={error} aria-pressed={fit} onClick={()=>{setFit(true);setZoom(1);}}>适应窗口</RareButton>
     <RareButton type="button" disabled={error} aria-pressed={!fit&&zoom===1} onClick={()=>{setFit(false);setZoom(1);}}>原始尺寸</RareButton>
     <RareButton type="button" disabled={error} aria-label="缩小" onClick={()=>{setFit(false);setZoom(value=>Math.max(0.25,Math.round((value-0.25)*100)/100));}}>−</RareButton>
@@ -41,12 +41,10 @@ export function MediaPreview({fileId,sha256,name,kind,mime}:{fileId:string;sha25
  }
  if(kind==="video"){
   return <section className="media-preview" aria-label="视频预览">
-   <div className="media-tools"><span className="media-tools-label">视频预览 · {mime}</span><span>支持播放、音量、进度拖动与全屏</span></div>
    {error?failed:<div className="media-video-stage"><video src={src} controls playsInline preload="metadata" onError={()=>setError(true)} aria-label={name}/></div>}
   </section>;
  }
  return <section className="media-preview" aria-label="音频预览">
-  <div className="media-tools"><span className="media-tools-label">音频预览 · {mime}</span></div>
   {error?failed:<div className="media-audio-stage"><audio src={src} controls preload="metadata" onError={()=>setError(true)} aria-label={name}/></div>}
  </section>;
 }

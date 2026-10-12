@@ -12,9 +12,8 @@ export function StructuredFilePreview({value}:{value:StructuredPreview}){
  return <div className="structured-preview">
   {value.note&&<p className="structured-note" role="status">{value.note}</p>}
   {value.kind==="archive"&&entries.length>0&&<>
-   <div className="structured-heading"><strong>压缩包内容</strong><span>{entries.length} 项{value.truncated?"（部分显示）":""}</span></div>
-   <label className="structured-filter-label">筛选文件名
-    <RareInput value={filter} onChange={event=>setFilter(event.target.value)} placeholder="搜索压缩包内的条目"/>
+   <label className="structured-filter-label preview-reader-dock"><span>{entries.length} 项</span>
+    <RareInput value={filter} onChange={event=>setFilter(event.target.value)} placeholder="筛选文件名"/>
    </label>
    <div className="structured-table-scroll"><table className="structured-table">
     <thead><tr><th scope="col">名称</th><th scope="col">类型</th><th scope="col">大小</th></tr></thead>

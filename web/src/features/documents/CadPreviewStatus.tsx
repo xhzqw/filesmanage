@@ -1,5 +1,4 @@
 import {useEffect,useState} from "react";
-import {Link} from "react-router-dom";
 import {RareButton} from "../../shared/ui/rare";
 import {fileApi} from "./api";
 import {errorCopy} from "../../shared/errors";
@@ -47,8 +46,7 @@ export function CadPreviewStatus({fileId}:{fileId:string}){
    state==="failed"?"模型转换失败："+(info.errorCode??"请检查源文件或转换器"):
    state==="ready"||state==="completed"||state==="succeeded"?"模型已就绪，可以打开 3D 查看器。":
    "当前转换状态："+(state??"未知")}</p>}
-  <div className="file-workbench-actions">
-   {!unsupported&&<Link className="rare-button file-action-link" to={"/model/"+fileId}>打开 3D 查看器</Link>}
+  <div className="preview-reader-dock" role="group" aria-label="模型预览状态工具">
    <RareButton type="button" onClick={()=>setReload(x=>x+1)}>刷新状态</RareButton>
   </div>
  </div>;
