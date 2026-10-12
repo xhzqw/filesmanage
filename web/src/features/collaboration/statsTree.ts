@@ -21,6 +21,20 @@ export const CATEGORIES: {id:FileCategory;label:string;color:string}[]=[
  {id:"other",label:"其他",color:"var(--file-icon-text)"}
 ];
 export const categoryInfo=(id:FileCategory)=>CATEGORIES.find(item=>item.id===id)??CATEGORIES[9]!;
+export function categoryFromExtension(raw:string):FileCategory{
+ const ext=raw.toLowerCase().replace(/^\./,"");
+ if(["dxf","dwg","step","stp","stl","obj","3mf","iges","igs","gltf","glb","fbx","ifc"].includes(ext))return "cad";
+ if(ext==="pdf")return "pdf";
+ if(["doc","docx","odt","rtf","txt","md","pages"].includes(ext))return "document";
+ if(["xls","xlsx","csv","ods","numbers"].includes(ext))return "sheet";
+ if(["ppt","pptx","odp","key"].includes(ext))return "slide";
+ if(["png","jpg","jpeg","gif","webp","tif","tiff","bmp","svg","heic"].includes(ext))return "image";
+ if(["mp4","mov","avi","mkv","webm"].includes(ext))return "video";
+ if(["mp3","wav","flac","aac","ogg"].includes(ext))return "audio";
+ if(["zip","rar","7z","tar","gz","bz2"].includes(ext))return "archive";
+ return "other";
+}
+
 export function categoryTotals(parts:FileCategoryCount[]):FileCategoryCount[]{
  const map=new Map<FileCategory,FileCategoryCount>();
  for(const item of parts){

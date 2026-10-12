@@ -54,6 +54,7 @@
 .stats-rank-main{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);min-width:0;margin-bottom:4px;font-size:11px}
 .stats-rank-main strong{font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap}
 .stats-rank-name,.stats-rank-link{min-width:0;max-width:78%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stats-rank-dot{display:inline-block;vertical-align:middle;width:8px;height:8px;margin-right:7px;border-radius:var(--radius-xs)}
 .stats-rank-link{display:block;border:0;background:transparent;padding:0;color:var(--brand-blue);height:auto;min-height:0;text-align:left;font-size:11px}
 .stats-rank-link:hover{text-decoration:underline}
 .stats-track{height:5px;border-radius:var(--radius-pill);overflow:hidden;background:var(--surface-header)}

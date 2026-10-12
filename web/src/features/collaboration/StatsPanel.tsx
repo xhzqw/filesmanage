@@ -9,7 +9,7 @@ import type {Folder} from "../../entities/folder/model";
 import {collaborationApi,formatBytes,type Stats} from "./api";
 import {FolderTreemap} from "./FolderTreemap";
 import {FolderNodeGraph} from "./FolderNodeGraph";
-import {CATEGORIES} from "./statsTree";
+import {CATEGORIES,categoryInfo,categoryFromExtension} from "./statsTree";
 import {StatsTrend} from "./StatsTrend";
 import "./stats.css";
 
@@ -22,18 +22,18 @@ function dateFromRange(range:string){
 }
 function metricLabel(metric:Metric,value:number){return metric==="bytes"?formatBytes(value):value.toLocaleString("zh-CN");}
 function EmptyChart({label}:{label:string}){return <div className="stats-no-data">{label}</div>;}
-function RankRows({items,metric,onChoose}:{items:{key:string;name:string;count:number;bytes:number;detail?:string}[];metric:Metric;onChoose?:(id:string)=>void}){
+function RankRows({items,metric,onChoose}:{items:{key:string;name:string;count:number;bytes:number;detail?:string;accent?:string}[];metric:Metric;onChoose?:(id:string)=>void}){
  const max=Math.max(1,...items.map(item=>item[metric]));
  return <div className="stats-rank-list">
   {items.length===0?<EmptyChart label="当前筛选下暂无数据"/>:items.map(item=>
    <div className="stats-rank-row" key={item.key}>
     <div className="stats-rank-main">
      {onChoose?<RareButton type="button" tone="ghost" className="stats-rank-link" onClick={()=>onChoose(item.key)} title={"筛选："+item.name}>{item.name}<span aria-hidden="true"> ↗</span></RareButton>
-      :<span className="stats-rank-name" title={item.name}>{item.name}</span>}
+      :<span className="stats-rank-name" title={item.name}>{item.accent&&<i className="stats-rank-dot" aria-hidden="true" style={{background:item.accent}}/>}{item.name}</span>}
      <strong>{metricLabel(metric,item[metric])}</strong>
     </div>
     <div className="stats-track" role="img" aria-label={item.name+"，"+metricLabel(metric,item[metric])}>
-     <span style={{width:Math.max(item[metric]>0?2:0,item[metric]/max*100)+"%"}}/>
+     <span style={{width:Math.max(item[metric]>0?2:0,item[metric]/max*100)+"%",background:item.accent||"var(--brand-blue)"}}/>
     </div>
     {item.detail&&<span className="stats-rank-detail">{item.detail}</span>}
    </div>)}
@@ -153,7 +153,7 @@ export function StatsPanel(){
     <div className="stats-insights">
      <section className="stats-panel stats-types-panel" aria-labelledby="stats-types-title">
       <div className="stats-panel-head"><h2 id="stats-types-title">文件类型</h2></div>
-      <RankRows metric={metric} items={types.slice(0,5).map(t=>({key:t.type,name:t.type==="无扩展名"?"无扩展名":"."+t.type,count:t.count,bytes:t.bytes}))}/>
+      <RankRows metric={metric} items={types.slice(0,5).map(t=>({key:t.type,name:t.type==="无扩展名"?"无扩展名":"."+t.type,count:t.count,bytes:t.bytes,accent:categoryInfo(categoryFromExtension(t.type)).color}))}/>
      </section>
      <section className="stats-panel stats-growth-panel" aria-labelledby="stats-growth-title">
       <div className="stats-panel-head"><h2 id="stats-growth-title">新增趋势</h2><span className="stats-panel-subtitle">{metric==="count"?"文件数":"容量"}</span></div>
