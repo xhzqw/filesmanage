@@ -49,6 +49,9 @@ export function EmbeddedModelViewer({fileId}:{fileId:string}){
 
 function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:User;onLogout?:()=>void;embedded?:boolean}){
  const navigate=useNavigate();
+ const[compactMenu,setCompactMenu]=useState<"views"|"display"|null>(null);
+ const[inspectorOpen,setInspectorOpen]=useState(false);
+ const compactToolbarRef=useRef<HTMLDivElement>(null);
  const[status,setStatus]=useState("loading");
  const[retryEpoch,setRetryEpoch]=useState(0);
  const[loadPhase,setLoadPhase]=useState<"initial"|"fetching"|"downloading"|"parsing"|"scene">("initial");
@@ -347,6 +350,30 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
    return()=>{valid=false;abort.abort();};
   },[status,id,info?.outputKind,info?.format]);
 
+ useEffect(()=>{
+  if(!compactMenu)return;
+  const outside=(event:PointerEvent)=>{if(!compactToolbarRef.current?.contains(event.target as Node))setCompactMenu(null);};
+  const escape=(event:KeyboardEvent)=>{if(event.key==="Escape")setCompactMenu(null);};
+  document.addEventListener("pointerdown",outside);document.addEventListener("keydown",escape);
+  return()=>{document.removeEventListener("pointerdown",outside);document.removeEventListener("keydown",escape);};
+ },[compactMenu]);
+ const fitEngineeringView=()=>{
+  controls.current?.resetView();
+  setView(value=>({...value,axes:false,measure:false,projection:drawing?"orthographic":"perspective"}));
+ };
+ const selectEngineeringView=(name:"iso"|"front"|"back"|"left"|"right"|"top"|"bottom")=>{
+  controls.current?.setStandardView(name);
+  setView(value=>({...value,projection:name==="iso"?value.projection:"orthographic"}));
+  setCompactMenu(null);
+ };
+ const printEngineeringView=()=>{
+  void authorizePaperOutput((popup,versionSeq)=>{
+   const images=controls.current?.captureEngineeringViews();
+   if(!images||!metrics||!fileMeta)throw new Error("模型未准备好，无法生成工程视图");
+   openModelPrint({name:fileMeta.name,versionSeq,sha256:fileMeta.sha256,
+    unit,format:info?.format??"模型",paper:modelPaper,metrics,views:images},popup);
+  });
+ };
  const content=<main className={embedded?"cad-page cad-embedded":"work cad-page"}>
     {(!embedded||(drawing&&layouts.length>1))&&<div className="breadcrumb cad-title">
      <strong>{drawing?"二维工程图":"三维模型"}</strong>
@@ -385,11 +412,31 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
          {(status==="failed"||status==="webgl-lost")&&<RareButton type="button" onClick={()=>setRetryEpoch(value=>value+1)}>重试</RareButton>}
          {status==="too-large"&&<span>请下载后使用桌面 CAD 软件打开</span>}</>}
       </div>}
-      {status==="ready"&&<div className="cad-toolbar" role="group" aria-label="工程视图工具">
-       <RareButton type="button" title="将当前图形居中并适合画布" onClick={()=>{
-        controls.current?.resetView();
-        setView(v=>({...v,axes:false,measure:false,projection:drawing?"orthographic":"perspective"}));
-       }}>适合窗口</RareButton>
+      {status==="ready"&&embedded&&!drawing&&<div className="cad-compact-toolbar" ref={compactToolbarRef} role="group" aria-label="三维视图工具">
+       <RareButton type="button" title="居中并适合窗口" onClick={fitEngineeringView}>适合窗口</RareButton>
+       <div className="cad-compact-item">
+        <RareButton type="button" aria-expanded={compactMenu==="views"} aria-controls="cad-compact-views"
+         className={compactMenu==="views"?"on":""} onClick={()=>setCompactMenu(current=>current==="views"?null:"views")}>视角 <span aria-hidden="true">⌄</span></RareButton>
+        {compactMenu==="views"&&<div id="cad-compact-views" className="cad-compact-menu cad-compact-menu-views" role="group" aria-label="切换标准视角">
+         {(["iso","front","back","left","right","top","bottom"] as const).map((name,index)=><RareButton type="button" key={name} onClick={()=>selectEngineeringView(name)}>{["等轴测","前","后","左","右","俯","仰"][index]}</RareButton>)}
+        </div>}
+       </div>
+       <div className="cad-compact-item">
+        <RareButton type="button" aria-expanded={compactMenu==="display"} aria-controls="cad-compact-display"
+         className={compactMenu==="display"?"on":""} onClick={()=>setCompactMenu(current=>current==="display"?null:"display")}>显示 <span aria-hidden="true">⌄</span></RareButton>
+        {compactMenu==="display"&&<div id="cad-compact-display" className="cad-compact-menu" role="group" aria-label="视图显示选项">
+         <RareButton type="button" className={view.grid?"on":""} aria-pressed={view.grid} onClick={()=>setView(v=>({...v,grid:controls.current?.toggleGrid()??v.grid}))}>网格 {view.grid?"✓":""}</RareButton>
+         <RareButton type="button" className={view.edges?"on":""} aria-pressed={view.edges} onClick={()=>setView(v=>({...v,edges:controls.current?.toggleEdges()??v.edges}))}>轮廓 {view.edges?"✓":""}</RareButton>
+         <RareButton type="button" className={view.axes?"on":""} aria-pressed={view.axes} onClick={()=>setView(v=>({...v,axes:controls.current?.toggleAxes()??v.axes}))}>坐标轴 {view.axes?"✓":""}</RareButton>
+         <RareButton type="button" onClick={()=>setView(v=>({...v,projection:controls.current?.toggleProjection()??v.projection}))}>{view.projection==="orthographic"?"正交投影":"透视投影"}</RareButton>
+        </div>}
+       </div>
+       <RareButton type="button" className={view.measure?"on":""} aria-pressed={view.measure} onClick={()=>setView(v=>({...v,measure:controls.current?.toggleMeasure()??v.measure}))}>测距</RareButton>
+       <RareButton type="button" disabled={!fileMeta||!metrics} title="打印参考工程视图" onClick={printEngineeringView}>出图</RareButton>
+       <RareButton type="button" className="cad-inspector-toggle" aria-expanded={inspectorOpen} aria-controls="cad-engineering-inspector" onClick={()=>{setCompactMenu(null);setInspectorOpen(value=>!value);}}>属性</RareButton>
+      </div>}
+      {status==="ready"&&(!embedded||drawing)&&<div className="cad-toolbar" role="group" aria-label="工程视图工具">
+       <RareButton type="button" title="将当前图形居中并适合画布" onClick={fitEngineeringView}>适合窗口</RareButton>
        {drawing&&<div className="cad-toolgroup" role="group" aria-label="二维审图显示">
         <RareButton type="button" className={darkDrawing?"on":""} aria-pressed={darkDrawing}
          onClick={()=>setDarkDrawing(controls.current?.toggleDrawingTheme()??darkDrawing)}>
@@ -400,20 +447,10 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
        </div>}
        {!drawing&&<div className="cad-toolgroup" role="group" aria-label="标准视角">
         {(["iso","front","back","left","right","top","bottom"] as const).map((name,index)=>
-         <RareButton key={name} type="button" onClick={()=>{
-          controls.current?.setStandardView(name);
-          setView(v=>({...v,projection:name==="iso"?v.projection:"orthographic"}));
-         }}>{["等轴","前","后","左","右","俯","仰"][index]}</RareButton>)}
+         <RareButton key={name} type="button" onClick={()=>selectEngineeringView(name)}>{["等轴","前","后","左","右","俯","仰"][index]}</RareButton>)}
         </div>}
         {!drawing&&<RareButton type="button" disabled={!fileMeta||!metrics}
-         title="生成主视、俯视、右视和等轴测的正交参考视图，浏览器打印" onClick={()=>{
-          void authorizePaperOutput((popup,versionSeq)=>{
-           const images=controls.current?.captureEngineeringViews();
-           if(!images||!metrics||!fileMeta)throw new Error("模型未准备好，无法生成工程视图");
-           openModelPrint({name:fileMeta.name,versionSeq,sha256:fileMeta.sha256,
-            unit,format:info?.format??"模型",paper:modelPaper,metrics,views:images},popup);
-          });
-         }}>工程视图打印</RareButton>}
+         title="生成主视、俯视、右视和等轴测的正交参考视图，浏览器打印" onClick={printEngineeringView}>工程视图打印</RareButton>
         <div className="cad-toolgroup" role="group" aria-label="辅助显示">
         <RareButton type="button" className={view.grid?"on":""} aria-pressed={view.grid}
          onClick={()=>setView(v=>({...v,grid:controls.current?.toggleGrid()??v.grid}))}>网格</RareButton>
@@ -459,7 +496,7 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
        </div>
       </div>}
      </section>
-     {status==="ready"&&<aside className="cad-inspector" aria-label="工程文件属性">
+     {status==="ready"&&<aside id="cad-engineering-inspector" className={"cad-inspector"+(inspectorOpen?" is-open":"")} aria-label="工程文件属性">
       {drawing&&<section className="cad-inspector-section cad-dimension-panel">
        <h3>几何审图 <span>XY</span></h3>
        <div className="cad-dimension-value" title="点击线段查看长度；曲线离散段不代表完整弧长">
