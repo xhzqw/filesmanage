@@ -26,6 +26,68 @@
   box-sizing:border-box;
 }
 .col-select{text-align:center}
+/* Quiet explorer selection: the checked control carries the strong signal.
+   A row is not a giant focus rectangle just because it was clicked. */
+.table table.file-table tbody tr.selected,
+.table table.file-table tbody tr.selected:hover,
+.table table.file-table tbody tr.selected.focused{
+ background:color-mix(in srgb,var(--surface-row-selected) 58%,var(--surface-panel));
+ box-shadow:none;
+}
+.table table.file-table tbody tr.selected:hover{
+ background:color-mix(in srgb,var(--surface-row-selected) 76%,var(--surface-panel));
+}
+.table table.file-table tbody tr.focused:not(:focus-visible){box-shadow:none}
+/* Visible focus is reserved for keyboard traversal; mouse selection has no
+   full-row outline. The checkbox has its own independently visible focus. */
+.table table.file-table tbody tr:focus-visible{
+ outline:1px solid var(--border-focus);
+ outline-offset:-1px;
+ box-shadow:none;
+}
+.file-table .col-select input[type="checkbox"]{
+ -webkit-appearance:none;appearance:none;
+ display:inline-grid;place-content:center;
+ vertical-align:middle;cursor:pointer;
+ width:16px;height:16px;margin:0;padding:0;
+ border:1px solid var(--border-strong);
+ border-radius:var(--radius-xs);
+ background:var(--surface-panel);
+ box-shadow:none;
+ transition:background-color .16s ease,border-color .16s ease,box-shadow .16s ease;
+}
+.file-table .col-select input[type="checkbox"]:hover:not(:disabled){
+ border-color:var(--brand-blue);background:var(--surface-row-hover);
+}
+.file-table .col-select input[type="checkbox"]:is(:checked,:indeterminate){
+ background:var(--surface-panel);border-color:var(--brand-blue);
+}
+.file-table .col-select input[type="checkbox"]::after{
+ content:"";display:block;opacity:0;
+ width:5px;height:8px;
+ border-right:2px solid var(--brand-blue);
+ border-bottom:2px solid var(--brand-blue);
+ transform:translateY(-1px) rotate(45deg) scale(.7);
+ transition:opacity .12s ease,transform .16s ease;
+}
+.file-table .col-select input[type="checkbox"]:checked::after{
+ opacity:1;transform:translateY(-1px) rotate(45deg) scale(1);
+}
+.file-table .col-select input[type="checkbox"]:indeterminate::after{
+ opacity:1;width:8px;height:2px;
+ border:0;background:var(--brand-blue);
+ transform:none;
+}
+.file-table .col-select input[type="checkbox"]:focus-visible{
+ outline:2px solid var(--border-focus);
+ outline-offset:2px;box-shadow:none;
+}
+.file-table .col-select input[type="checkbox"]:disabled{cursor:not-allowed;opacity:.5}
+@media(prefers-reduced-motion:reduce){
+ .file-table .col-select input[type="checkbox"],
+ .file-table .col-select input[type="checkbox"]::after{transition:none}
+}
+
 .col-name{min-width:0}
 .col-size{text-align:right !important}
 .col-version{text-align:center}
@@ -199,8 +261,8 @@
   transition:opacity .12s ease;
 }
 table.file-table tbody tr:hover .actions-hover-group,
-table.file-table tbody tr.selected .actions-hover-group,
-table.file-table tbody tr:focus-within .actions-hover-group{
+table.file-table tbody tr:focus-visible .actions-hover-group,
+table.file-table tbody tr .row-actions:focus-within .actions-hover-group{
   opacity:1;pointer-events:auto;
 }
 @media(hover:none),(pointer:coarse){
