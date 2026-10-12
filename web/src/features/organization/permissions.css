@@ -2,10 +2,7 @@
  * Three distinct tasks, three stable regions: browse / inspect / grant.
  * Geometry is owned here; colors, borders, radius and focus remain Rare tokens.
  */
-.org-workbench.org-permissions-workbench{grid-template-columns:minmax(0,1fr);padding:var(--space-2)}
-.org-permissions-workbench .org-stage-card{min-width:0}
-.org-permissions-workbench .org-tabs-bar{padding-inline:var(--space-3)}
-.org-permissions-workbench .org-tab{font-size:14px;min-height:38px}
+/* All views share the two-column organization workbench geometry. */
 .perm-content-root{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;background:var(--surface-canvas)}
 .perm-subnav{display:flex;align-items:center;gap:7px;padding:9px 15px;border-bottom:1px solid var(--border-hairline);min-height:50px;flex:none;min-width:0;overflow-x:auto;background:var(--surface-panel)}
 .perm-subnav button{flex:none;border:1px solid transparent;border-radius:var(--radius-sm);background:transparent;font-size:13px;color:var(--text-secondary);padding:8px 14px;min-height:34px}
@@ -110,33 +107,8 @@
 .perm-audit-scroll{overflow:auto;min-width:0;min-height:0;flex:1}
 .perm-audit-detail{max-width:300px;overflow-wrap:anywhere;font-size:12px}
 
-/* Permissions are a content-sized editor, not a full-screen document canvas.
- * Do not stretch a one-row ACL and a short form to the viewport height.
- * Keep long resource trees independently scrollable instead of growing the page. */
-.work.work-compact-permissions{
- align-self:flex-start;width:100%;max-height:calc(100dvh - 85px);
- overflow-x:hidden;overflow-y:auto
-}
-.org-compact-permissions{flex:none;min-height:0}
-.org-compact-permissions .org-workbench.org-permissions-workbench{
- flex:none;grid-template-rows:auto;align-items:start
-}
-.org-compact-permissions .org-stage-card{align-self:start;height:auto;min-height:0}
-.org-compact-permissions .rare-tab-panel,
-.org-compact-permissions .perm-content-root{flex:none;min-height:0;overflow:visible}
-.org-compact-permissions .perm-workspace{
- flex:none;min-height:0;align-items:start;overflow:visible
-}
-.org-compact-permissions .perm-browser{
- align-self:start;max-height:min(65vh,560px);overflow:hidden;
- border-bottom:1px solid var(--border-hairline);border-bottom-right-radius:var(--radius-sm)
-}
-.org-compact-permissions .perm-browser-scroll{flex:0 1 auto;max-height:min(48vh,435px);min-height:0}
-.org-compact-permissions .perm-detail{min-height:0;overflow:visible}
-.org-compact-permissions .perm-detail-layout{flex:none;min-height:0;overflow:visible}
-.org-compact-permissions .perm-inspection-column{min-height:0;overflow:visible}
-.org-compact-permissions .perm-compose-card{max-height:none;overflow:visible}
-.org-compact-permissions .perm-audit{flex:none;max-height:75vh;min-height:260px}
+/* Browsers and editors scroll within the stable right-side workspace. */
+.org-stage-card .rare-tab-panel{min-width:0;min-height:0}
 
 @container perm-panel (max-width:750px){
  .perm-detail-layout{grid-template-columns:minmax(0,1fr);overflow:auto;align-content:start}
@@ -153,9 +125,6 @@
 }
 @media(max-width:700px){
  .perm-workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(180px,33%) minmax(0,1fr);margin:5px}
- .org-compact-permissions .perm-workspace{grid-template-rows:auto auto}
- .org-compact-permissions .perm-browser{max-height:220px;border-right:0}
- .org-compact-permissions .perm-browser-scroll{max-height:140px}
  .perm-browser{border-right:0;border-bottom:1px solid var(--border-hairline)}
  .perm-browser-title{min-height:44px}
  .perm-browser-title small{display:none}

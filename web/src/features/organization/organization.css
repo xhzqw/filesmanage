@@ -841,7 +841,6 @@
   }
   .org-dept-card{min-width:0;min-height:0}
   .org-stage-card{min-width:0;min-height:0}
-  .org-permissions-workbench{grid-template-rows:minmax(0,1fr)}
   .org-groups-stage{
     grid-template-columns:minmax(0,1fr);
   }

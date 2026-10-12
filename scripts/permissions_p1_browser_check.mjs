@@ -86,6 +86,22 @@ try{
   "verified admin browser session ("+(session.reused?"reused":"new")+")");
  await cdp.navigate(BASE+"/org?tab=permissions&view=folder");
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-workspace')"),"organization permission workspace renders");
+ // Switching views must not replace the organization shell.
+ assert(await cdp.evaluate("(()=>!!document.querySelector('.org-dept-card')&&!!document.querySelector('.work-body>.toolbar'))()"),
+  "organization navigation is visible on the permissions tab");
+ await cdp.evaluate("window.__orgShellTree=document.querySelector('.org-dept-card');window.__orgShellTabs=document.querySelector('.org-tabs-bar')");
+ for(const tab of ["members","groups","approvals","roles","permissions"]){
+  await cdp.evaluate(`document.querySelector('#org-tab-${tab}').click()`);
+  assert(await cdp.waitFor(`()=>document.querySelector('#org-tab-${tab}')?.getAttribute('aria-selected')==='true'`),
+   tab+" activates");
+  assert(await cdp.evaluate(`(()=>{
+   const tree=document.querySelector('.org-dept-card'),stage=document.querySelector('.org-tabs-bar');
+   return tree===window.__orgShellTree&&tree?.isConnected&&stage===window.__orgShellTabs&&
+    !!document.querySelector('.work-body>.toolbar')&&
+    document.querySelector('.org-workbench')?.children.length===2&&
+    !!document.querySelector('#org-panel-${tab}');
+  })()`),tab+" changes only the right panel");
+ }
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-tree-name')"),"resource folder browser loads");
  await cdp.evaluate("(()=>{document.querySelector('.perm-tree-name')?.click();return true;})()");
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-insight select')"),"effective permission explanation renders");

@@ -1,4 +1,5 @@
 import {RareTabs} from "../../shared/ui/rare/RareTabs";
+import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {RareBadge,RareButton,RareDataTable,RareInput,RareNotice,RareRowActions,RareSelect} from "../../shared/ui/rare";
 import {useEffect,useMemo,useRef,useState,type FormEvent,type KeyboardEvent,type ReactNode} from "react";
 import {organizationApi,type Department,type Workgroup} from "./api";
@@ -154,6 +155,10 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  const[groupMemberLimit,setGroupMemberLimit]=useState(MEMBER_DISPLAY_STEP);
  const[membersState,setMembersState]=useState<LoadState>("loading");
  const[membersToken,setMembersToken]=useState(0);
+ useEffect(()=>observeWorkspaceChange(()=>{
+  setUsersToken(n=>n+1);setDepartmentsToken(n=>n+1);
+  setGroupsToken(n=>n+1);setMembersToken(n=>n+1);
+ },["organization","permissions"]),[]);
  const[candidateQuery,setCandidateQuery]=useState("");
  const[addBusy,setAddBusy]=useState("");
 
@@ -673,9 +678,9 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   });
  }
 
- return <div className={"work-body"+((activeTab==="permissions"||activeTab==="approvals")?" org-compact-permissions":"")}>
+ return <div className="work-body">
   {/* 顶部工具栏：指标摘要与全局快捷创建 */}
-  {activeTab!=="permissions"&&activeTab!=="roles"&&activeTab!=="approvals"&&<div className="toolbar">
+  <div className="toolbar">
    <span className="toolbar-hint">{`账号 ${users.length} · 部门 ${departments.length} · 工作组 ${groups.length}`}</span>
    <RareButton type="button" onClick={()=>{setNotice(null);setCreateDepartmentOpen(true);}}>
     <IconPlus/>新建部门
@@ -683,14 +688,14 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    <RareButton type="button" className="primary" tone="primary" onClick={()=>{setNotice(null);setCreateGroupOpen(true);}}>
     <IconPlus/>创建工作组
    </RareButton>
-  </div>}
+  </div>
 
   {notice&&<RareNotice tone={notice.tone==="error"?"danger":"info"}>{notice.text}</RareNotice>}
 
   {/* 双栏主工作台：左侧组织架构树 + 右侧主工作区卡片 */}
-  <div className={"org-workbench"+((activeTab==="permissions"||activeTab==="roles"||activeTab==="approvals")?" org-permissions-workbench":"")}>
+  <div className="org-workbench">
    {/* 左侧：组织架构树卡片 */}
-   {activeTab!=="permissions"&&activeTab!=="roles"&&activeTab!=="approvals"&&<section className="org-card org-dept-card" aria-label="组织架构树">
+   <section className="org-card org-dept-card" aria-label="组织架构树">
     <div className="org-card-header">
      <h3 className="org-card-title">
       <IconBuilding/>
@@ -769,7 +774,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
       </ul>
      </div>
     </>}
-   </section>}
+   </section>
 
    {/* 右侧：组织工作区 */}
    <section className="org-card org-stage-card" aria-label="组织管理主工作区">
