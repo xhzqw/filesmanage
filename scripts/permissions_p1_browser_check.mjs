@@ -137,7 +137,7 @@ try{
   setter.call(subject,option.value);subject.dispatchEvent(new Event('change',{bubbles:true}));
   return true;
  })()`);
- assert(await cdp.waitFor("()=>!!document.querySelector('.perm-form select[required]')?.value"),
+ assert(await cdp.waitFor("()=>[...document.querySelectorAll('.perm-form select')].some(s=>s.options[0]?.value===''&&!!s.value)"),
   "direct ACL subject selected");
  await cdp.evaluate(`(()=>{
   const risk=[...document.querySelectorAll('.perm-action-grid label')]
