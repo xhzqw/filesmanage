@@ -1395,9 +1395,32 @@ async function main() {
       await cdp.key("k", "KeyK", 75, CTRL);
       const opened = await cdp.waitFor(`()=>document.querySelector('.command-panel')!==null`, 5000);
       check("PW-08a Ctrl+K opens the command palette", Boolean(opened), String(opened));
+      const spotlightEmpty = await cdp.evaluate(`(()=>{
+        const d=document.querySelector('.command-panel');
+        const input=d?.querySelector('.command-input');
+        if(!d||!input)return null;
+        const box=d.getBoundingClientRect(),css=getComputedStyle(input);
+        return {height:box.height,width:box.width,rows:d.querySelectorAll('.command-row').length,
+          status:d.querySelectorAll('.command-status').length,focus:document.activeElement===input,
+          fontSize:parseFloat(css.fontSize),border:css.borderTopWidth,
+          overflow:box.right>innerWidth||box.left<0};
+      })()`);
+      check("PW-08a1 empty Spotlight is one focused search field",
+        spotlightEmpty?.rows===0&&spotlightEmpty?.status===0&&spotlightEmpty?.focus===true
+        &&spotlightEmpty?.height<100&&spotlightEmpty?.fontSize>=18
+        &&spotlightEmpty?.border==="0px"&&spotlightEmpty?.overflow===false,
+        JSON.stringify(spotlightEmpty));
       await cdp.evaluate(`(()=>{const i=document.querySelector('.command-input');const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;set.call(i,'pw-02');i.dispatchEvent(new Event('input',{bubbles:true}));return true;})()`);
       const filtered = await cdp.waitFor(`()=>{const rows=[...document.querySelectorAll('.command-row')];return rows.length>0&&rows.every(r=>r.textContent?.includes('pw-02'));}`, 8000);
       check("PW-08b typing narrows the palette to the matching file", Boolean(filtered), String(filtered));
+      const compactHits=await cdp.evaluate(`(()=>({
+        items:document.querySelectorAll('.command-row').length,
+        metadata:document.querySelectorAll('.command-row-meta,.command-row-path').length,
+        outside:document.querySelector('.command-panel').getBoundingClientRect().right>innerWidth
+      }))()`);
+      check("PW-08b1 results show names only, without file metadata",
+        compactHits.items>0&&compactHits.metadata===0&&!compactHits.outside,
+        JSON.stringify(compactHits));
       await cdp.key("Escape", "Escape", 27);
       const closed = await cdp.waitFor(`()=>document.querySelector('.command-panel')===null`, 5000);
       check("PW-08c Escape closes the palette", Boolean(closed), String(closed));

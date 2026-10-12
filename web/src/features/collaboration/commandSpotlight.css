@@ -1,31 +1,62 @@
-/* CommandSpotlight (spec §6.4): the ⌘K/Ctrl+K global command palette — a 480px
-   panel over a dimmed scrim, a 36px input row and a 240px result stream that
-   keeps the caret in the input while the arrow keys walk the rows.
-   Component-owned styles; every value comes from the token layer in theme.css,
-   so no new colour is introduced here. */
-/* Spec §6.4 frosts the workbench behind the scrim: the blur lives on the
-   overlay, so the panel itself can stay an opaque, fully legible surface. */
-.command-panel.command-native-dialog{width:var(--width-command);max-width:calc(100vw - var(--space-4));max-height:80vh;margin:12vh auto 0;padding:0;background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-md);box-shadow:var(--shadow-overlay);overflow:auto;animation:command-in .12s ease}
-.command-native-dialog::backdrop{background:rgba(15,39,92,.28);backdrop-filter:blur(10px)}
-.command-native-dialog .dialog-title{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+/* Spotlight search: a single floating field at rest, a quiet results list
+   only after typing. Dialog still owns focus and keyboard escape. */
+.command-panel.command-native-dialog{
+  width:760px;min-width:0;max-width:calc(100vw - 40px);max-height:min(72vh,540px);
+  margin:clamp(72px,14vh,150px) auto 0;padding:0;overflow:hidden;
+  color:var(--text-primary);background:rgba(255,255,255,.96);
+  backdrop-filter:blur(4px) saturate(1.05);
+  border:1px solid var(--border-hairline);border-radius:var(--radius-xl);
+  box-shadow:0 18px 50px rgba(15,39,92,.15),0 2px 8px rgba(15,39,92,.05);
+  animation:command-in .15s ease-out both;
+}
+.command-native-dialog::backdrop{background:rgba(15,31,58,.18);backdrop-filter:blur(3px)}
+.command-native-dialog .dialog-title{
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;
+}
 .command-content{min-width:0}
-/* 120ms open: opacity plus a 2px rise. The global prefers-reduced-motion
-   override in theme.css already neutralises it. */
-@keyframes command-in{from{opacity:0;transform:translateY(2px)}to{opacity:1;transform:translateY(0)}}
-.command-input-row{display:flex;align-items:center;gap:var(--space-2);height:var(--height-command);padding:0 var(--space-3);border-bottom:1px solid var(--border-hairline)}
+@keyframes command-in{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+.command-input-row{display:flex;align-items:center;gap:16px;height:74px;padding:0 24px}
+.command-content.has-results .command-input-row{border-bottom:1px solid var(--border-hairline)}
 .command-icon{flex:none;color:var(--text-tertiary)}
-.command-input{flex:1;min-width:0;height:100%;padding:0;border:0;border-radius:var(--radius-sm);background:transparent;font-size:13px;color:var(--text-primary)}
-/* The panel is a single modal text field: the browser's default focus chrome on
-   the input would draw a second boundary inside the panel's own hairline. */
-.command-input:focus{outline:0;box-shadow:none}
-.command-input::placeholder{color:var(--text-tertiary)}
-.command-status{margin:0;padding:var(--space-2) var(--space-3)}
-.command-list{list-style:none;margin:0;padding:var(--space-1);max-height:240px;overflow:auto;display:grid;gap:1px;align-content:start}
-.command-row{display:flex;align-items:center;gap:var(--space-2);min-height:var(--height-row-standard);padding:var(--space-1) var(--space-2);border-radius:var(--radius-sm);font-size:12px;color:var(--text-primary);cursor:pointer;user-select:none}
-.command-row:hover{background:var(--surface-row-hover)}
-/* A keyboard-active row is distinguishable from hover by one steady surface. */
-.command-row.active,.command-row.active:hover{background:var(--surface-subtle);box-shadow:none}
-.command-row-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;color:var(--brand-blue)}
-.command-row[data-kind="folder"] .command-row-name{color:var(--text-primary);font-weight:600}
-.command-row-path{flex:none;max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-tertiary);font-size:11px}
-.command-row-meta{flex:none;color:var(--text-secondary);font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap}
+/* Override generic Dialog/RareInput styles: no second border inside the bar. */
+.command-native-dialog .command-input,
+.command-native-dialog .command-input:focus,
+.command-native-dialog .command-input:focus-visible{
+  flex:1;min-width:0;width:100%;height:100%;min-height:0;
+  padding:0;margin:0;border:0;border-radius:0;background:transparent;
+  outline:none;box-shadow:none;color:var(--text-primary);
+  font-size:22px;font-weight:400;line-height:1.2;
+}
+.command-native-dialog .command-input::placeholder{color:var(--text-tertiary);opacity:.85}
+.command-status{margin:0;padding:16px 24px;font-size:13px;color:var(--text-secondary)}
+.command-status.error{color:var(--status-danger)}
+.command-list{
+  list-style:none;margin:0;padding:8px;max-height:min(340px,50vh);
+  overflow-y:auto;overscroll-behavior:contain;
+  display:grid;gap:2px;align-content:start;
+}
+.command-row{
+  display:flex;align-items:center;gap:13px;min-height:44px;padding:9px 14px;
+  border-radius:var(--radius-md);font-size:15px;color:var(--text-primary);
+  cursor:pointer;user-select:none;
+}
+.command-row:hover,.command-row.active{background:var(--surface-row-hover)}
+.command-row-name{
+  flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;color:var(--text-primary);font-weight:500;
+}
+@media(max-width:600px){
+  .command-panel.command-native-dialog{
+    width:calc(100vw - 24px);max-width:calc(100vw - 24px);
+    margin:11vh auto 0;border-radius:var(--radius-lg);
+  }
+  .command-input-row{height:64px;padding:0 18px;gap:12px}
+  .command-native-dialog .command-input,
+  .command-native-dialog .command-input:focus,
+  .command-native-dialog .command-input:focus-visible{font-size:18px}
+  .command-row{min-height:42px}
+}
+@media(prefers-reduced-motion:reduce){
+  .command-panel.command-native-dialog{animation:none}
+}

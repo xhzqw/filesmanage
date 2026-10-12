@@ -4,10 +4,7 @@ import {FileResourceIcon,FolderResourceIcon} from "../../shared/ui/ResourceIcons
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {useCallback,useEffect,useMemo,useRef,useState,type KeyboardEvent} from "react";
 import {useNavigate} from "react-router-dom";
-import {collaborationApi,formatBytes} from "./api";
-// Size formatting: features/documents owns formatSize, but a feature may not
-// import another feature (scripts/check_architecture.py) and shared has no
-// formatter, so this feature's own formatBytes is reused rather than forked.
+import {collaborationApi} from "./api";
 import type {FileItem} from "../../entities/file/model";
 import type {Folder} from "../../entities/folder/model";
 import "./commandSpotlight.css";
@@ -23,10 +20,9 @@ const DEBOUNCE_MS=120;
 const FILE_LIMIT=8;
 const FOLDER_LIMIT=3;
 
-// One flat row model for the listbox. The discriminated union keeps every
-// per-kind payload required, so rendering never needs a size/date guard.
-type FolderRow={kind:"folder";key:string;id:string;name:string;path:string};
-type FileRow={kind:"file";key:string;id:string;name:string;size:number;updatedAt:string;folderName:string};
+// Search hits carry only the information actually shown in the overlay.
+type FolderRow={kind:"folder";key:string;id:string;name:string};
+type FileRow={kind:"file";key:string;id:string;name:string};
 type Row=FolderRow|FileRow;
 
 // The DOM key event, aliased because the React type of the same name is in
@@ -36,7 +32,7 @@ type WindowKeyEvent=WindowEventMap["keydown"];
 // Line icons drawn from currentColor: no asset, no hex literal, always hidden
 // from the accessibility tree (VIS-11).
 function CommandSearchIcon(){
-  return <svg className="command-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>;
+  return <svg className="command-icon" width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="10.8" cy="10.8" r="7.2"/><path d="m16.3 16.3 4.4 4.4"/></svg>;
 }
 
 export function CommandSpotlight(){
@@ -53,6 +49,7 @@ export function CommandSpotlight(){
   const[items,setItems]=useState<FileItem[]>([]);
   const[status,setStatus]=useState<"idle"|"loading"|"ready"|"failed">("idle");
   const[active,setActive]=useState(0);
+  const hasQuery=query.trim()!=="";
   // Request sequence: every revision bumps it, so a response that lands after a
   // newer query started is discarded instead of overwriting the newer rows.
   const epochRef=useRef(0);
@@ -62,8 +59,7 @@ export function CommandSpotlight(){
     // and makes the document inert, so a palette opened on top of one would
     // have no caret, no keys and no way out.
     if(document.querySelector("dialog[open]")!==null)return;
-    // Opening starts from the empty query, which IS the recently-modified list,
-    // so no keyword from a previous visit survives into a fresh one.
+    // An empty palette contains only the search field, never recent files.
     setQuery("");
     setTerm("");
     setItems([]);
@@ -102,10 +98,9 @@ export function CommandSpotlight(){
     inputRef.current?.select();
   },[open]);
 
-  // One tree request per session. A failed tree only costs the folder hits: the
-  // file rows still resolve their folder by id, so the palette stays usable.
+  // Do not make background requests while the blank palette is visible.
   useEffect(()=>{
-    if(!open||treeRef.current!==null)return;
+    if(!open||!hasQuery||treeRef.current!==null)return;
     let alive=true;
     collaborationApi.folderTree()
      .then(list=>{
@@ -115,7 +110,7 @@ export function CommandSpotlight(){
      })
      .catch(()=>{/* folder hits are an enhancement, never a palette failure */});
     return()=>{alive=false};
-  },[open]);
+  },[open,hasQuery]);
 
   // Debounced query: the input updates per keystroke, the request follows 120ms
   // later, and the cleanup drops the pending timer on every change.
@@ -125,16 +120,20 @@ export function CommandSpotlight(){
     return()=>{window.clearTimeout(timer);};
   },[query,open]);
 
-  // The file list for the committed query. An empty term is the
-  // recently-modified list, which is exactly what an open palette should show.
+  // Empty input is intentionally a one-line Spotlight, not a recent-files view.
   useEffect(()=>{
     if(!open)return;
-    const epoch=++epochRef.current;
-    setStatus("loading");
-    // A whitespace-only term is no term: it keeps showing the recent list
-    // instead of asking the server for a match on a blank.
     const needle=term.trim();
-    collaborationApi.search({q:needle===""?undefined:needle,limit:FILE_LIMIT,sort:"updated_desc"})
+    if(!needle){
+      epochRef.current++;
+      setItems([]);
+      setStatus("idle");
+      return;
+    }
+    const epoch=++epochRef.current;
+    setItems([]);
+    setStatus("loading");
+    collaborationApi.search({q:needle,limit:FILE_LIMIT,sort:"updated_desc"})
      .then(page=>{
       if(epochRef.current!==epoch)return;
       setItems(page.items);
@@ -143,29 +142,6 @@ export function CommandSpotlight(){
      .catch(()=>{if(epochRef.current===epoch)setStatus("failed");});
     return()=>{epochRef.current++;};
   },[term,open]);
-
-  // Visible paths and leaf names from the cached tree: folder rows show the full
-  // path, file rows the folder they live in. The seen set stops a cyclic parent
-  // chain (bad data) from looping forever.
-  const tree=useMemo(()=>{
-    const byId=new Map<string,Folder>();
-    for(const folder of folders)byId.set(folder.id,folder);
-    const paths=new Map<string,string>();
-    const names=new Map<string,string>();
-    for(const folder of folders){
-      const chain:string[]=[];
-      const seen=new Set<string>();
-      let current:Folder|undefined=folder;
-      while(current&&!seen.has(current.id)){
-        seen.add(current.id);
-        chain.unshift(current.name);
-        current=current.parentId!==null?byId.get(current.parentId):undefined;
-      }
-      paths.set(folder.id,chain.join(" / "));
-      names.set(folder.id,folder.name);
-    }
-    return {paths,names};
-  },[folders]);
 
   const keyword=term.trim().toLowerCase();
 
@@ -177,18 +153,18 @@ export function CommandSpotlight(){
       for(const folder of folders){
         if(list.length>=FOLDER_LIMIT)break;
         if(!folder.name.toLowerCase().includes(keyword))continue;
-        list.push({kind:"folder",key:"folder:"+folder.id,id:folder.id,name:folder.name,path:tree.paths.get(folder.id)??folder.name});
+        list.push({kind:"folder",key:"folder:"+folder.id,id:folder.id,name:folder.name});
       }
     }
     for(const file of items){
-      list.push({
-        kind:"file",key:"file:"+file.id,id:file.id,name:file.name,
-        size:file.sizeBytes,updatedAt:file.updatedAt.slice(0,16),
-        folderName:tree.names.get(file.folderId)??"—",
-      });
+      list.push({kind:"file",key:"file:"+file.id,id:file.id,name:file.name});
     }
     return list;
-  },[folders,items,keyword,tree]);
+  },[folders,items,keyword]);
+
+  // Debouncing must not briefly show matches from a previous search.
+  const showResults=hasQuery&&query.trim()===term.trim();
+  const visibleRows=showResults?rows:[];
 
   // A new result set always restarts the keyboard cursor on its first row.
   useEffect(()=>{setActive(0);},[rows]);
@@ -196,7 +172,7 @@ export function CommandSpotlight(){
   useEffect(()=>{
     if(!open)return;
     listRef.current?.querySelector<HTMLElement>('[data-active="true"]')?.scrollIntoView({block:"nearest"});
-  },[active,open,rows]);
+  },[active,open,visibleRows.length]);
 
   const activate=useCallback((row:Row|undefined)=>{
     if(!row)return;
@@ -205,56 +181,55 @@ export function CommandSpotlight(){
   },[closePalette,navigate]);
 
   function step(delta:number){
-    if(rows.length===0)return;
+    if(visibleRows.length===0)return;
     // Wrap: with at most eleven rows a dead end is only friction.
-    setActive(current=>(current+delta+rows.length)%rows.length);
+    setActive(current=>(current+delta+visibleRows.length)%visibleRows.length);
   }
 
   // Every key is handled on the panel, so the caret never leaves the input and
   // no result row needs its own tab stop (a palette is one text field plus a
   // virtual cursor).
   function onPanelKeyDown(event:KeyboardEvent<HTMLDivElement>){
+    if(event.nativeEvent.isComposing)return;
     switch(event.key){
      case "ArrowDown":event.preventDefault();step(1);break;
      case "ArrowUp":event.preventDefault();step(-1);break;
      case "Home":event.preventDefault();setActive(0);break;
-     case "End":event.preventDefault();setActive(Math.max(0,rows.length-1));break;
-     case "Enter":event.preventDefault();activate(rows[active]);break;
+     case "End":event.preventDefault();setActive(Math.max(0,visibleRows.length-1));break;
+     case "Enter":event.preventDefault();activate(visibleRows[active]);break;
      case "Escape":event.preventDefault();closePalette();break;
     }
   }
 
   if(!open)return null;
-  return <Dialog open title="快速指令台" className="command-panel command-native-dialog"
+  return <Dialog open title="聚焦搜索" className="command-panel command-native-dialog"
     initialFocus=".command-input" onClose={closePalette}>
-   <div className="command-content" onKeyDown={onPanelKeyDown}>
+   <div className={"command-content"+(showResults?" has-results":"")} onKeyDown={onPanelKeyDown}>
     <div className="command-input-row">
      <CommandSearchIcon/>
      <RareInput ref={inputRef} className="command-input" type="text" value={query}
       onChange={event=>setQuery(event.target.value)}
-      placeholder="快速搜索" aria-label="快速指令台检索" autoComplete="off"/>
+      placeholder="聚焦搜索" aria-label="聚焦搜索文件与文件夹" autoComplete="off"
+      role="combobox" aria-autocomplete="list" aria-expanded={visibleRows.length>0}
+      aria-controls="command-results" aria-activedescendant={visibleRows[active]?("command-result-"+active):undefined}/>
     </div>
-    {status==="loading"?<p className="command-status hint" role="status"><BrandLoadingLabel>检索中…</BrandLoadingLabel></p>:null}
-    {status==="failed"?<p className="command-status error" role="alert">检索失败，请重试</p>:null}
-    {status==="ready"&&rows.length===0?<p className="command-status hint">没有匹配的结果</p>:null}
-    {rows.length>0?<ul ref={listRef} className="command-list" role="listbox" aria-label="快速指令台结果">
-     {rows.map((row,index)=>{
+    {showResults&&status==="loading"&&visibleRows.length===0?<p className="command-status hint" role="status"><BrandLoadingLabel>搜索中</BrandLoadingLabel></p>:null}
+    {showResults&&status==="failed"?<p className="command-status error" role="alert">搜索失败</p>:null}
+    {showResults&&status==="ready"&&visibleRows.length===0?<p className="command-status hint" role="status">无匹配结果</p>:null}
+    {visibleRows.length>0?<ul ref={listRef} id="command-results" className="command-list" role="listbox" aria-label="搜索结果">
+     {visibleRows.map((row,index)=>{
       const on=index===active;
-      return <li key={row.key} className={"command-row"+(on?" active":"")} data-kind={row.kind} data-active={on?"true":"false"}
+      return <li key={row.key} id={"command-result-"+index} className={"command-row"+(on?" active":"")} data-kind={row.kind} data-active={on?"true":"false"}
        role="option" aria-selected={on}
        onClick={()=>activate(row)} onMouseEnter={()=>setActive(index)}>
        {row.kind==="folder"
         ?<>
           <FolderResourceIcon size={16}/>
           <span className="command-row-name">{row.name}</span>
-          <span className="command-row-path">{row.path}</span>
          </>
         :<>
           <FileResourceIcon name={row.name} size={18}/>
           <span className="command-row-name">{row.name}</span>
-          <span className="command-row-meta">{formatBytes(row.size)}</span>
-          <span className="command-row-meta">{row.updatedAt}</span>
-          <span className="command-row-path">{row.folderName}</span>
          </>}
       </li>;
      })}
