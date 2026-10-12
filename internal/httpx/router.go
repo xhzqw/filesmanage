@@ -125,6 +125,8 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.POST("/uploads/resumable/:id/complete", h.finishResumable)
 	api.DELETE("/uploads/resumable/:id", h.cancelResumable)
 	api.POST("/files", h.uploadFile)
+	api.GET("/files/replace-target", h.resolveReplaceTarget)
+	api.POST("/files/:id/replace", h.replaceFileContent)
 	api.GET("/files", h.listFiles)
 	api.GET("/files/:id", h.fileMeta)
 	api.GET("/files/:id/history", h.fileHistory)

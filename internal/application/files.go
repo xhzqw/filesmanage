@@ -203,7 +203,28 @@ type readCloser interface {
 // OpenDownload streams the current version's source bytes after verifying the
 // download permission; the caller must invoke the returned close func.
 func (s *Service) OpenDownload(ctx context.Context, u domain.User, fileID string) (Download, func(), error) {
-	return s.openFileBytes(ctx, u, fileID, domain.ActionDownload)
+	result, closeReader, err := s.openFileBytes(ctx, u, fileID, domain.ActionDownload)
+	if err != nil {
+		return Download{}, nil, err
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		closeReader()
+		return Download{}, nil, err
+	}
+	defer tx.Rollback(ctx)
+	// The audit proves a download was prepared and authorized, not that the
+	// client received every byte (Range/connection drops may interrupt it).
+	if err = auditRequired(ctx, tx, u, "file.download_prepare", "file", fileID, "success",
+		map[string]any{"sha256": result.Sha256, "size": result.Size}); err != nil {
+		closeReader()
+		return Download{}, nil, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		closeReader()
+		return Download{}, nil, err
+	}
+	return result, closeReader, nil
 }
 
 func (s *Service) openFileBytes(ctx context.Context, u domain.User, fileID string, action domain.Action) (Download, func(), error) {

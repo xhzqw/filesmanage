@@ -857,6 +857,20 @@ add("POST", "/api/files", operation("Upload a file (multipart, idempotent)", "Fi
     }, required=["fileId", "versionSeq", "sha256", "size", "name", "folderId", "deduplicated"])}, required=["ok", "data"])),
                     resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"]), resp("409", ERR["409"]), resp("413", ERR["413"])])))
 
+schema("ReplaceTarget",obj({
+    "fileId":string(),"name":string(),"folderId":string(),"versionSeq":integer(minimum=1),"size":integer()
+},required=["fileId","name","folderId","versionSeq","size"]))
+add("GET","/api/files/replace-target",operation("Preflight explicit same-name version replacement","Files","resolveReplaceTarget",security=SESSION,
+    params=[query("folderId","Target folder ID",required=True),query("name","Exact existing file name",required=True)],
+    responses=dict([json_ok(ref("ReplaceTarget"),"Current, editable and non-locked target; confirmation is required."),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
+add("POST","/api/files/{id}/replace",operation("Append immutable version on explicit, CAS-checked replacement","Files","replaceFileContent",security=SESSION,
+    params=[id_param("id","Confirmed existing file ID")],
+    request={"multipart/form-data":{"schema":obj({
+       "file":{"type":"string","format":"binary"},"folderId":string(),
+       "expectedSeq":integer(minimum=1),"idempotencyKey":string(),
+    },required=["file","folderId","expectedSeq"])}},
+    responses=dict([json_ok(obj({"fileId":string(),"versionSeq":integer(),"sha256":string(),"size":integer(),"name":string(),"folderId":string(),"deduplicated":boolean()}),"File ID preserved; a new immutable version is appended."),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"]),resp("413",ERR["413"])])))
+
 add("POST","/api/uploads/resumable",operation("Start/resume a private upload (max 1 GiB)","Files","startResumable",security=SESSION,
  request={"application/json":{"schema":ref("ResumableStart")}},
  responses=dict([resp("201","Open or replayed upload session",obj({"ok":boolean(),"data":ref("ResumableStatus")},required=["ok","data"])),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("409",ERR["409"])])))

@@ -1,5 +1,5 @@
 import{newIdempotencyKey}from"../../shared/ids";
-import type{UploadProgress}from"../../shared/uploadClient";
+import type{UploadProgress,ReplaceUploadTarget}from"../../shared/uploadClient";
 
 // Upload queue state machine (COMPLEX-WORKFLOWS-v1 §5, UX-ACCEPTANCE WF-24..28).
 // Pure transitions only: the shared upload store owns the async upload loop and
@@ -30,6 +30,8 @@ export type UploadTask={
  idempotencyKey:string;
  status:UploadStatus;
  error?:string;
+ failureCode?:string;
+ replacement?:ReplaceUploadTarget;
  result?:UploadResult;
  file:File|null;
  sourceName?:string;
@@ -118,8 +120,8 @@ export function markCommitted(tasks:UploadTask[],queueId:string,result:UploadRes
  return patch(tasks,queueId,{status:"committed",error:undefined,result,serverProcessing:false});
 }
 
-export function markFailed(tasks:UploadTask[],queueId:string,error:string):UploadTask[]{
- return patch(tasks,queueId,{status:"failed",error,serverProcessing:false});
+export function markFailed(tasks:UploadTask[],queueId:string,error:string,code=""):UploadTask[]{
+ return patch(tasks,queueId,{status:"failed",error,failureCode:code,serverProcessing:false});
 }
 
 // Used only for an aborted in-flight request (E_CANCELLED); a user cancel of a
@@ -150,7 +152,7 @@ export function retryTask(tasks:UploadTask[],queueId:string):UploadTask[]{
 // new operation identity, so it gets a fresh idempotency key (§5.1, WF-25).
 export function renameTask(tasks:UploadTask[],queueId:string,name:string):UploadTask[]{
  return tasks.map(task=>task.queueId===queueId&&task.status!=="committed"
-  ?{...task,name,file:task.file?renameFile(task.file,name):null,idempotencyKey:newIdempotencyKey(),status:task.file?"queued":"interrupted",error:undefined,progress:undefined,serverProcessing:false}
+  ?{...task,name,file:task.file?renameFile(task.file,name):null,idempotencyKey:newIdempotencyKey(),status:task.file?"queued":"interrupted",error:undefined,failureCode:undefined,replacement:undefined,progress:undefined,serverProcessing:false}
   :task);
 }
 
@@ -161,6 +163,13 @@ export function skipTask(tasks:UploadTask[],queueId:string):UploadTask[]{
 }
 
 // Retargeting to a different folder is also a new operation identity.
+// An explicit server-confirmed target CAS, never a silent same-name overwrite.
+export function replaceTask(tasks:UploadTask[],queueId:string,target:ReplaceUploadTarget):UploadTask[]{
+ return tasks.map(task=>task.queueId===queueId&&task.status==="failed"&&task.file!==null&&(task.failureCode==="E_NAME_CONFLICT"||!!task.replacement)
+  ?{...task,replacement:target,idempotencyKey:newIdempotencyKey(),status:"queued",error:undefined,failureCode:undefined,progress:undefined,serverProcessing:false}
+  :task);
+}
+
 export function retargetTask(tasks:UploadTask[],queueId:string,targetFolderId:string):UploadTask[]{
  return tasks.map(task=>task.queueId===queueId&&task.status!=="committed"
   ?{...task,targetFolderId,idempotencyKey:newIdempotencyKey(),status:"queued",error:undefined,progress:undefined,serverProcessing:false}

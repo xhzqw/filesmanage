@@ -1,6 +1,8 @@
 import {RareButton,RareInput} from "../../shared/ui/rare";
 import{useEffect,useRef,useState,type DragEvent,type FormEvent,type ReactNode}from"react";
-import{formatSize}from"./api";
+import{fileApi,formatSize,type ReplaceTarget}from"./api";
+import{errorCopy}from"../../shared/errors";
+import{toast}from"../../shared/ui/feedback";
 import{useUploadStore}from"./uploadStore";
 import {extensionChange} from "./fileExtensionChange";
 import {ExtensionChangeNotice} from "./FileRenameDialog";
@@ -44,6 +46,7 @@ export function DropZone({folderId,userId,disabled,onCommitted,children}:{folder
  const clearFinished=useUploadStore(state=>state.clearFinished);
  const retry=useUploadStore(state=>state.retry);
  const rename=useUploadStore(state=>state.rename);
+ const replace=useUploadStore(state=>state.replace);
  const skip=useUploadStore(state=>state.skip);
  const attach=useUploadStore(state=>state.attach);
  const[dragging,setDragging]=useState(false);
@@ -51,6 +54,8 @@ export function DropZone({folderId,userId,disabled,onCommitted,children}:{folder
  const[renamingId,setRenamingId]=useState<string|null>(null);
  const[renameValue,setRenameValue]=useState("");
  const[pendingRename,setPendingRename]=useState<{queueId:string;name:string}|null>(null);
+ const[replaceConfirm,setReplaceConfirm]=useState<{queueId:string;target:ReplaceTarget}|null>(null);
+ const[preparingReplace,setPreparingReplace]=useState("");
  const dragDepth=useRef(0);
  const seenReload=useRef(reloadTick);
  useEffect(()=>{if(tasks.length>0)setQueueExpanded(true);},[tasks.length]);
@@ -122,6 +127,20 @@ export function DropZone({folderId,userId,disabled,onCommitted,children}:{folder
   }
   finishRename(task.queueId,name);
  }
+ async function prepareReplace(queueId:string){
+  const task=tasks.find(item=>item.queueId===queueId&&item.status==="failed"&&(item.failureCode==="E_NAME_CONFLICT"||!!item.replacement)&&item.file!==null);
+  if(!task||preparingReplace)return;
+  setPreparingReplace(queueId);
+  setReplaceConfirm(null);
+  try{
+   const target=await fileApi.replaceTarget(task.targetFolderId,task.name);
+   const latest=useUploadStore.getState().tasks.find(item=>item.queueId===queueId);
+   if(latest?.status==="failed"&&latest.name===target.name&&latest.targetFolderId===target.folderId){
+    setReplaceConfirm({queueId,target});
+   }
+  }catch(error){toast.warning(errorCopy(error,"无法替换此文件，请检查权限或文件状态"));}
+  finally{setPreparingReplace("");}
+ }
 
  const committed=tasks.filter(task=>task.status==="committed").length;
  const failed=tasks.filter(task=>task.status==="failed").length;
@@ -185,11 +204,17 @@ export function DropZone({folderId,userId,disabled,onCommitted,children}:{folder
        {task.status==="queued"&&<RareButton type="button" onClick={()=>cancel(task.queueId)}>取消</RareButton>}
        {task.status==="uploading"&&<RareButton type="button" title="取消只中断本地请求；服务端已提交的结果无法撤销" onClick={()=>cancel(task.queueId)}>取消</RareButton>}
        {task.status==="failed"&&<>
-        <RareButton type="button" onClick={()=>retry(task.queueId)}>重试</RareButton>
+        <RareButton type="button" onClick={()=>{setReplaceConfirm(null);retry(task.queueId);}}>重试</RareButton>
+        {(task.failureCode==="E_NAME_CONFLICT"||task.replacement)&&task.file&&<RareButton type="button" disabled={preparingReplace===task.queueId} onClick={()=>void prepareReplace(task.queueId)}>{preparingReplace===task.queueId?"正在检查…":task.replacement?"重新确认替换":"替换为新版本"}</RareButton>}
         <RareButton type="button" onClick={()=>{setPendingRename(null);setRenamingId(task.queueId);setRenameValue(task.name);}}>改名重试</RareButton>
-        <RareButton type="button" onClick={()=>skip(task.queueId)}>跳过</RareButton>
+        <RareButton type="button" onClick={()=>{setReplaceConfirm(null);skip(task.queueId);}}>跳过</RareButton>
        </>}
       </div>
+      {replaceConfirm?.queueId===task.queueId&&task.status==="failed"&&<div className="upload-rename" role="group" aria-label="确认替换现有文件">
+       <span>替换「{replaceConfirm.target.name}」的 v{replaceConfirm.target.versionSeq}，保留旧版本</span>
+       <RareButton type="button" className="primary" onClick={()=>{replace(task.queueId,{fileId:replaceConfirm.target.fileId,versionSeq:replaceConfirm.target.versionSeq});setReplaceConfirm(null);}}>确认替换</RareButton>
+       <RareButton type="button" onClick={()=>setReplaceConfirm(null)}>取消</RareButton>
+      </div>}
       {task.status==="uploading"&&<div
        className={"upload-progress"+(sent?"":" indeterminate")}
        role="progressbar"

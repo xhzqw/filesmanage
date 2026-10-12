@@ -49,6 +49,57 @@ func (h *Handler) uploadFile(c *gin.Context) {
 	}})
 }
 
+func (h *Handler) resolveReplaceTarget(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	target, err := h.S.ResolveReplaceTarget(c.Request.Context(), u, c.Query("folderId"), c.Query("name"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true, "data": target})
+}
+
+func (h *Handler) replaceFileContent(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadBytes)
+	header, err := c.FormFile("file")
+	if err != nil {
+		if isBodyTooLarge(err) {
+			c.JSON(413, gin.H{"ok": false, "error": gin.H{"code": "E_TOO_LARGE"}})
+			return
+		}
+		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+		return
+	}
+	seq, err := strconv.Atoi(c.PostForm("expectedSeq"))
+	if err != nil || seq < 1 {
+		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+		return
+	}
+	source, err := header.Open()
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	defer source.Close()
+	result, err := h.S.ReplaceExisting(c.Request.Context(), u, c.PostForm("folderId"),
+		c.Param("id"), header.Filename, seq, header.Header.Get("Content-Type"), c.PostForm("idempotencyKey"), source)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(201, gin.H{"ok": true, "data": gin.H{
+		"fileId": result.FileID, "versionSeq": result.VersionSeq, "sha256": result.Sha256,
+		"size": result.Size, "name": result.Name, "folderId": result.FolderID, "deduplicated": result.Dedup,
+	}})
+}
+
 func (h *Handler) listFiles(c *gin.Context) {
 	u, ok := h.auth(c)
 	if !ok {

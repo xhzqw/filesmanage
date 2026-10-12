@@ -1706,6 +1706,172 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/replace-target:
+    get:
+      summary: Preflight explicit same-name version replacement
+      operationId: resolveReplaceTarget
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: folderId
+        in: query
+        required: true
+        description: Target folder ID
+        schema:
+          type: string
+      - name: name
+        in: query
+        required: true
+        description: Exact existing file name
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Current, editable and non-locked target; confirmation is required.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/ReplaceTarget'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/{id}/replace:
+    post:
+      summary: Append immutable version on explicit, CAS-checked replacement
+      operationId: replaceFileContent
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Confirmed existing file ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                folderId:
+                  type: string
+                expectedSeq:
+                  type: integer
+                  minimum: 1
+                idempotencyKey:
+                  type: string
+              required:
+              - file
+              - folderId
+              - expectedSeq
+      responses:
+        '200':
+          description: File ID preserved; a new immutable version is appended.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      fileId:
+                        type: string
+                      versionSeq:
+                        type: integer
+                      sha256:
+                        type: string
+                      size:
+                        type: integer
+                      name:
+                        type: string
+                      folderId:
+                        type: string
+                      deduplicated:
+                        type: boolean
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '413':
+          description: E_TOO_LARGE — body exceeds the upload limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/uploads/resumable:
     post:
       summary: Start/resume a private upload (max 1 GiB)
@@ -10731,6 +10897,26 @@ components:
       - key
       - status
       - url
+    ReplaceTarget:
+      type: object
+      properties:
+        fileId:
+          type: string
+        name:
+          type: string
+        folderId:
+          type: string
+        versionSeq:
+          type: integer
+          minimum: 1
+        size:
+          type: integer
+      required:
+      - fileId
+      - name
+      - folderId
+      - versionSeq
+      - size
     FileHistoryEvent:
       type: object
       properties:

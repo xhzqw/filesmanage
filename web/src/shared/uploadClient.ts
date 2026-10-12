@@ -42,15 +42,17 @@ export type UploadedFile={fileId:string;versionSeq:number;sha256:string;size:num
 // sent bytes" from "the server committed": onProgress never claims success,
 // while the promise resolves only on the committed 2xx envelope. Same endpoint,
 // body, session and error shaping as postMultipart.
-export function uploadFileWithProgress(folderId:string,file:File,idempotencyKey:string,handlers:{onProgress?:(progress:UploadProgress)=>void;signal?:AbortSignal}):Promise<UploadedFile>{
+export type ReplaceUploadTarget={fileId:string;versionSeq:number};
+export function uploadFileWithProgress(folderId:string,file:File,idempotencyKey:string,handlers:{onProgress?:(progress:UploadProgress)=>void;signal?:AbortSignal;replace?:ReplaceUploadTarget}):Promise<UploadedFile>{
  const body=new FormData();
  body.set("folderId",folderId);
  body.set("file",file);
  body.set("idempotencyKey",idempotencyKey);
+ if(handlers.replace)body.set("expectedSeq",String(handlers.replace.versionSeq));
  return new Promise<UploadedFile>((resolve,reject)=>{
   if(handlers.signal?.aborted){reject(new ApiError("E_CANCELLED",0,undefined,"已取消"));return;}
   const xhr=new XMLHttpRequest();
-  xhr.open("POST","/api/files");
+   xhr.open("POST",handlers.replace?"/api/files/"+encodeURIComponent(handlers.replace.fileId)+"/replace":"/api/files");
   xhr.withCredentials=true;
   xhr.responseType="text";
   const onAbort=()=>xhr.abort();

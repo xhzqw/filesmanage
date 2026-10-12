@@ -6,6 +6,8 @@ import "./fileHistory.css";
 
 const eventLabels:Record<string,string>={
  "file.upload":"文件上传","file.save":"内容修改","file.rollback":"版本回滚",
+ "file.replace":"替换文件内容","file.download_prepare":"请求下载文件",
+ "file.download_zip_prepare":"加入批量下载",
  "file.rename":"文件重命名","file.move":"文件移动","file.delete":"移入回收站",
  "folder.rename":"所在文件夹重命名","folder.move":"所在文件夹移动","folder.delete":"所在文件夹被删除",
  "file.metadata_update":"属性修改","trash.restore":"从回收站恢复","trash.purge":"永久删除",
@@ -25,6 +27,7 @@ function describe(item:FileHistoryEvent){
  if(item.eventType==="file.move")return "位置变更"+(d.fromFolderId&&d.toFolderId?" · "+detailText(d.fromFolderId)+" → "+detailText(d.toFolderId):"");
  if(item.eventType==="trash.restore")return "恢复文件"+(d.newName?" · "+detailText(d.newName):"");
  if(item.eventType==="file.save"||item.eventType==="office.save_commit")return "保存为 v"+detailText(d.versionSeq)+(d.baseSeq?" · 原版本 v"+detailText(d.baseSeq):"");
+ if(item.eventType==="file.replace")return "v"+detailText(d.baseSeq)+" → v"+detailText(d.versionSeq)+" · 旧内容保留";
  if(item.eventType==="file.rollback")return "从 v"+detailText(d.fromSeq)+" 回滚至 v"+detailText(d.targetSeq)+"，生成 v"+detailText(d.versionSeq);
  if(item.eventType==="file.upload")return detailText(d.name)||"初始文件版本";
  if(item.eventType==="file.delete")return detailText(d.name)||"已移入回收站";

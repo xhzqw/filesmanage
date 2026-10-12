@@ -13,6 +13,7 @@ export type ReviewCommentPage={items:FileReviewComment[];nextCursor:string};
 export type FilePage={items:FileItem[];nextCursor:string};
 export type FileHistoryEvent={id:number;actorId:string;actorName?:string;requestId:string;eventType:string;targetKind:string;targetId:string;outcome:string;details:Record<string,unknown>;createdAt:string};
 export type FileHistoryPage={items:FileHistoryEvent[];nextCursor:string};
+export type ReplaceTarget={fileId:string;name:string;folderId:string;versionSeq:number;size:number};
 export type FileLifecycle={fileId:string;state:"draft"|"released"|"archived";publishedSeq:number;publishedAt:string;publishedBy:string;responsibleId?:string;dueAt?:string;retentionUntil?:string;dueStatus:"none"|"soon"|"overdue"|"scheduled";note:string;updatedAt:string;canManage:boolean};
 export type LifecycleDraft={action:"publish"|"archive"|"unarchive"|"set_due"|"assign";expectedVersionSeq:number;dueAt:string|null;note:string;retentionDays?:number;responsibleId?:string};
 
@@ -41,7 +42,8 @@ export const fileApi={
   return request<FilePage>("/files?"+query.toString(),{signal});
  },
  meta:(id:string,signal?:AbortSignal)=>request<{file:FileItem;versions:FileVersion[]}>("/files/"+id,{signal}),
-  history:(id:string,cursor="",signal?:AbortSignal)=>request<FileHistoryPage>("/files/"+encodeURIComponent(id)+"/history?"+new URLSearchParams({cursor,limit:"30"}),{signal}),
+ history:(id:string,cursor="",signal?:AbortSignal)=>request<FileHistoryPage>("/files/"+encodeURIComponent(id)+"/history?"+new URLSearchParams({cursor,limit:"30"}),{signal}),
+  replaceTarget:(folderId:string,name:string)=>request<ReplaceTarget>("/files/replace-target?"+new URLSearchParams({folderId,name})),
  lifecycle:(id:string)=>request<FileLifecycle>("/files/"+id+"/lifecycle"),
  setLifecycle:(id:string,draft:LifecycleDraft)=>changed(request<FileLifecycle>("/files/"+id+"/lifecycle",{method:"PUT",body:JSON.stringify(draft)}),id),
  metadata:(id:string)=>request<FileMetadata>("/files/"+id+"/metadata"),

@@ -13,7 +13,8 @@ const MaxZipBytes int64 = 512 << 20
 
 // OpenDownloadBatch preflights every item before the response starts. If any
 // file is missing, forbidden or exceeds limits, not one byte is served.
-// Each OpenDownload independently authorizes the current version.
+// Each openFileBytes independently authorizes the current version. Inspection
+// is non-auditing; GET logs the bundle and each member in one transaction.
 func (s *Service) OpenDownloadBatch(ctx context.Context, u domain.User, ids []string) ([]Download, func(), error) {
 	return s.prepareDownloadBatch(ctx, u, ids, true)
 }
@@ -53,7 +54,7 @@ func (s *Service) prepareDownloadBatch(ctx context.Context, u domain.User, ids [
 	}
 	var total int64
 	for _, id := range ids {
-		item, closeIt, err := s.OpenDownload(ctx, u, id)
+		item, closeIt, err := s.openFileBytes(ctx, u, id, domain.ActionDownload)
 		if err != nil {
 			cleanup()
 			return nil, nil, err
@@ -81,6 +82,13 @@ func (s *Service) prepareDownloadBatch(ctx context.Context, u domain.User, ids [
 		map[string]any{"count": len(ids), "originalBytes": total}); err != nil {
 		cleanup()
 		return nil, nil, err
+	}
+	for i, id := range ids {
+		if err = auditRequired(ctx, tx, u, "file.download_zip_prepare", "file", id, "success",
+			map[string]any{"bundleSize": len(ids), "sha256": files[i].Sha256, "size": files[i].Size}); err != nil {
+			cleanup()
+			return nil, nil, err
+		}
 	}
 	if err = tx.Commit(ctx); err != nil {
 		cleanup()

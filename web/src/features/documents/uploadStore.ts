@@ -1,12 +1,12 @@
 import{create}from"zustand";
 import {toast} from "../../shared/ui/feedback";
 import{errorCode}from"../../shared/errors";
-import{uploadFileWithProgress}from"../../shared/uploadClient";
+import{uploadFileWithProgress,type ReplaceUploadTarget}from"../../shared/uploadClient";
 import{uploadResumable,resumableThreshold,resumableMaxFile}from"../../shared/resumableUpload";
 import {fingerprintFile,readUploadTasks,storeUploadTasks} from "./uploadQueuePersistence";
 import{
  enqueue,markUploading,markProgress,markServerProcessing,markCommitted,markFailed,markCancelled,
- cancelTask,retryTask,renameTask,skipTask,clearFinishedTasks,limitFinishedHistory,
+  cancelTask,retryTask,renameTask,replaceTask,skipTask,clearFinishedTasks,limitFinishedHistory,
  type UploadTask,
 }from"./uploadQueue";
 
@@ -14,7 +14,9 @@ import{
 // the stable server code and maps to an actionable recovery.
 function failureCopy(error:unknown):string{
  const code=errorCode(error);
- if(code==="E_NAME_CONFLICT")return"同名文件已存在，可改名或跳过";
+ if(code==="E_NAME_CONFLICT")return"同名文件已存在，可选择替换为新版本";
+ if(code==="E_LOCKED")return"目标文件正在编辑，请结束编辑后重新确认";
+ if(code==="E_APPROVAL_PENDING")return"目标目录需要审批，不允许直接替换";
  if(code==="E_FORBIDDEN")return"当前目录没有上传权限";
  if(code==="E_NETWORK")return"连接中断，提交结果未确认；请用原任务重试核对，勿直接新建重复任务";
  if(code==="E_VERSION_CONFLICT"||code==="E_NOT_FOUND")return"原上传会话已失效或偏移不一致；请先核对目标目录，再改名发起新任务";
@@ -36,7 +38,8 @@ export type UploadState={
  enqueueFiles:(files:File[],targetFolderId:string)=>void;
  cancel:(queueId:string)=>void;
  retry:(queueId:string)=>void;
- rename:(queueId:string,name:string)=>void;
+  rename:(queueId:string,name:string)=>void;
+  replace:(queueId:string,target:ReplaceUploadTarget)=>void;
  skip:(queueId:string)=>void;
  clearFinished:()=>void;
  attach:(queueId:string,file:File)=>Promise<void>;
@@ -112,7 +115,8 @@ export const useUploadStore=create<UploadState>((set,get)=>({
  // Retry/rename go through the pure transitions, which keep the idempotency
  // key for a retry and mint a fresh one for a rename (§5.1).
  retry:queueId=>{set({tasks:retryTask(get().tasks,queueId)});void pump();},
- rename:(queueId,name)=>{set({tasks:renameTask(get().tasks,queueId,name)});void pump();},
+  rename:(queueId,name)=>{set({tasks:renameTask(get().tasks,queueId,name)});void pump();},
+  replace:(queueId,target)=>{set({tasks:replaceTask(get().tasks,queueId,target)});void pump();},
  attach:async(queueId,file)=>{
   const task=get().tasks.find(t=>t.queueId===queueId&&t.status==="interrupted");
   if(!task)return;
@@ -162,9 +166,10 @@ async function pump(){
    if(epoch!==identityEpoch)continue;
    useUploadStore.setState(state=>({tasks:markUploading(state.tasks,next.queueId)}));
    try{
-    const uploader=next.file.size>=resumableThreshold&&next.file.size<=resumableMaxFile?uploadResumable:uploadFileWithProgress;
-    const reply=await uploader(next.targetFolderId,next.file,next.idempotencyKey,{
-     signal:controller.signal,
+     const uploader=!next.replacement&&next.file.size>=resumableThreshold&&next.file.size<=resumableMaxFile?uploadResumable:uploadFileWithProgress;
+     const reply=await uploader(next.targetFolderId,next.file,next.idempotencyKey,{
+      signal:controller.signal,
+      ...(next.replacement?{replace:next.replacement}:{}),
      // Byte progress is not success: when every byte is on the wire the item
      // moves to server-processing and only the committed envelope resolves it
      // (COMPLEX-WORKFLOWS-v1 §5.1).
@@ -187,7 +192,7 @@ async function pump(){
    }catch(error){
     if(epoch!==identityEpoch)continue;
     useUploadStore.setState(state=>({tasks:errorCode(error)==="E_CANCELLED"?
-     limitFinishedHistory(markCancelled(state.tasks,next.queueId)):markFailed(state.tasks,next.queueId,failureCopy(error))}));
+      limitFinishedHistory(markCancelled(state.tasks,next.queueId)):markFailed(state.tasks,next.queueId,next.replacement&&errorCode(error)==="E_VERSION_CONFLICT"?"目标文件版本已变化，请重新确认替换":failureCopy(error),errorCode(error))}));
     if(errorCode(error)!=="E_CANCELLED")failed++;
    }finally{
     if(inFlight.get(next.queueId)===controller)inFlight.delete(next.queueId);
