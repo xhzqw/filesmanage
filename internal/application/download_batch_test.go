@@ -23,28 +23,45 @@ func TestBoundedZipDownloadPreflightsAllPermissions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, closeAll, err := s.OpenDownloadBatch(ctx, admin, []string{a.FileID, b.FileID})
+	c, err := s.CommitUpload(ctx, admin, "folder_root", "c.txt", "text/plain", "", strings.NewReader("gamma"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result) != 2 || result[0].Size != 5 || result[1].Size != 4 {
+	d, err := s.CommitUpload(ctx, admin, "folder_root", "d.txt", "text/plain", "", strings.NewReader("delta"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := []string{a.FileID, b.FileID, c.FileID, d.FileID}
+	for count := 1; count < MinZipFiles; count++ {
+		if _, err = s.InspectDownloadBatch(ctx, admin, ids[:count]); !errors.Is(err, domain.ErrInvalidInput) {
+			t.Fatalf("preflight must reject %d-file ZIP: %v", count, err)
+		}
+		if _, _, err = s.OpenDownloadBatch(ctx, admin, ids[:count]); !errors.Is(err, domain.ErrInvalidInput) {
+			t.Fatalf("download must reject %d-file ZIP: %v", count, err)
+		}
+	}
+	result, closeAll, err := s.OpenDownloadBatch(ctx, admin, ids)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result) != 4 || result[0].Size != 5 || result[1].Size != 4 || result[2].Size != 5 || result[3].Size != 5 {
 		t.Fatalf("wrong ZIP inputs %+v", result)
 	}
 	closeAll()
-	bytes, err := s.InspectDownloadBatch(ctx, admin, []string{a.FileID, b.FileID})
-	if err != nil || bytes != 9 {
+	bytes, err := s.InspectDownloadBatch(ctx, admin, ids)
+	if err != nil || bytes != 19 {
 		t.Fatalf("preflight %d %v", bytes, err)
 	}
-	if _, err = s.InspectDownloadBatch(ctx, noAccess, []string{a.FileID, b.FileID}); !errors.Is(err, domain.ErrForbidden) {
+	if _, err = s.InspectDownloadBatch(ctx, noAccess, ids); !errors.Is(err, domain.ErrForbidden) {
 		t.Fatalf("preflight ACL %v", err)
 	}
-	if _, _, err = s.OpenDownloadBatch(ctx, noAccess, []string{a.FileID, b.FileID}); !errors.Is(err, domain.ErrForbidden) {
+	if _, _, err = s.OpenDownloadBatch(ctx, noAccess, ids); !errors.Is(err, domain.ErrForbidden) {
 		t.Fatalf("unauthorized ZIP %v", err)
 	}
-	if _, _, err = s.OpenDownloadBatch(ctx, admin, []string{a.FileID, "missing"}); !errors.Is(err, domain.ErrNotFound) {
+	if _, _, err = s.OpenDownloadBatch(ctx, admin, []string{a.FileID, b.FileID, c.FileID, "missing"}); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("mixed missing item %v", err)
 	}
-	if _, _, err = s.OpenDownloadBatch(ctx, admin, []string{a.FileID, a.FileID}); !errors.Is(err, domain.ErrInvalidInput) {
+	if _, _, err = s.OpenDownloadBatch(ctx, admin, []string{a.FileID, b.FileID, c.FileID, a.FileID}); !errors.Is(err, domain.ErrInvalidInput) {
 		t.Fatalf("duplicate ZIP %v", err)
 	}
 	if _, _, err = s.OpenDownloadBatch(ctx, admin, make([]string, 31)); !errors.Is(err, domain.ErrInvalidInput) {

@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+const MinZipFiles = 4
 const MaxZipFiles = 30
 const MaxZipBytes int64 = 512 << 20
 
@@ -33,7 +34,7 @@ func (s *Service) InspectDownloadBatch(ctx context.Context, u domain.User, ids [
 }
 
 func (s *Service) prepareDownloadBatch(ctx context.Context, u domain.User, ids []string, audit bool) ([]Download, func(), error) {
-	if len(ids) == 0 || len(ids) > MaxZipFiles {
+	if len(ids) < MinZipFiles || len(ids) > MaxZipFiles {
 		return nil, nil, domain.ErrInvalidInput
 	}
 	seen := map[string]bool{}

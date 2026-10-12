@@ -457,6 +457,14 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
 
   async function batchDownload(files:FileItem[]){
    if(files.length===0||zipController.current)return;
+   // Up to three selected files retain their original formats and filenames.
+   // Trigger all links synchronously within the user's click gesture.
+   if(files.length<=3){
+    setZipProgress(null);
+    for(const file of files)startDownload(file);
+    announce(files.length===1?"已请求下载文件":`已请求下载 ${files.length} 个原文件`,"info");
+    return;
+   }
    if(files.length>30){announce("单次最多打包 30 个文件，请分批下载","error");return;}
    const originalBytes=files.reduce((sum,file)=>sum+file.sizeBytes,0);
    if(originalBytes>512*1024*1024){
