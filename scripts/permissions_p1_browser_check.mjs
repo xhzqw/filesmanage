@@ -107,9 +107,18 @@ try{
   await cdp.send("Input.dispatchKeyEvent",{type:"keyUp",key,code:key,windowsVirtualKeyCode:virtualKeyCode});
  };
  await cdp.evaluate("(()=>{document.querySelector('.org-dept-card .tree > li')?.focus();return true})()");
+ assert(await cdp.waitFor("()=>document.activeElement?.dataset.treeId==='__all'"),"all-organization row receives keyboard focus");
  await pressKey("ArrowDown",40);
- assert(await cdp.waitFor("()=>!!document.activeElement?.dataset.deptId"),
-  "department tree ArrowDown focuses first visible department");
+ const arrowDownOk=await cdp.waitFor("()=>!!document.activeElement?.dataset.deptId");
+ if(!arrowDownOk){
+  console.log("TREE_FOCUS_DIAGNOSTIC",JSON.stringify(await cdp.evaluate(`(()=>{
+   const tree=document.querySelector('.org-dept-card .tree');
+   return {active:document.activeElement?.outerHTML?.slice(0,450),
+    count:tree?.querySelectorAll('li[role=treeitem]').length,
+    treeIds:[...tree?.querySelectorAll('li[role=treeitem]')??[]].map(n=>n.dataset.treeId)};
+  })()`)));
+ }
+ assert(arrowDownOk,"department tree ArrowDown focuses first visible department");
  await pressKey("ArrowUp",38);
  assert(await cdp.waitFor("()=>document.activeElement?.dataset.treeId==='__all'"),
   "department tree ArrowUp returns to all organization");
