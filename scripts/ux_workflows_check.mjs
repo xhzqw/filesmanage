@@ -656,19 +656,19 @@ async function moveUiSuite() {
     const dstPicked = await searchSelect(`MV-DST-${stamp}`);
     const candidate = await picker(`return d.querySelector('.folder-picker-candidate')?.textContent||'';`);
     check("candidate shows the full visible path", dstPicked === true && candidate.includes(`MV-DST-${stamp}`), String(candidate));
-    let btn = await picker(`const b=[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='检查并继续');return b?{disabled:b.disabled}:null;`);
-    check("检查并继续 enabled with a candidate", btn && btn.disabled === false, JSON.stringify(btn));
-    await picker(`[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='检查并继续')?.click();return true;`);
+    const noStaleError=await picker(`return !d.querySelector(".folder-picker-blocked")&&!d.querySelector(".folder-picker-candidate-reason")&&!d.querySelector(".folder-picker-reason")&&!d.textContent?.includes("文件已在该目录");`);
+    check("WF-02 choosing another folder clears source-only warning",noStaleError===true,String(noStaleError));
+    const onlyOneAction=await picker(`return ![...d.querySelectorAll("button")].some(b=>b.textContent?.includes("检查并继续"));`);
+    check("WF-03 background preflight removes second confirmation step",onlyOneAction===true,String(onlyOneAction));
     const ready = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));const b=d?[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='确认移动'):null;return b&&!b.disabled?true:false;}`, 15000);
     check("WF-03 preflight ready enables 确认移动", ready === true, String(ready));
-    // WF-05: switching the target invalidates the previous preflight
-    await searchSelect(`MV-OTHER-${stamp}`);
-    btn = await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));const b=d?[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='确认移动'):null;return b?{disabled:b.disabled}:null;})()`);
-    check("WF-05 switching target re-disables 确认移动", btn && btn.disabled === true, JSON.stringify(btn));
+    // WF-05: another target receives its own automatic preflight.
+    const otherPicked=await searchSelect(`MV-OTHER-${stamp}`);
+    const otherReady=await cdp.waitFor(`()=>{const d=[...document.querySelectorAll("dialog.dialog")].find(x=>x.open&&x.querySelector(".folder-picker"));const b=d?[...d.querySelectorAll("button")].find(x=>x.textContent?.trim()==="确认移动"):null;return b&&!b.disabled?true:false;}`, 15000);
+    check("WF-05 changed target runs a fresh automatic preflight",otherPicked&&otherReady,JSON.stringify({otherPicked,otherReady}));
     await searchSelect(`MV-DST-${stamp}`);
-    await picker(`[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='检查并继续')?.click();return true;`);
     const rechecked = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));const b=d?[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='确认移动'):null;return b&&!b.disabled?true:false;}`, 15000);
-    check("WF-05 re-checking the new target re-enables 确认移动", rechecked === true, String(rechecked));
+    check("WF-05 returning to original target rechecks automatically", rechecked === true, String(rechecked));
     await picker(`[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='确认移动')?.click();return true;`);
     const moved = await cdp.waitFor(`()=>![...document.querySelectorAll('dialog.dialog')].some(d=>d.open&&d.querySelector('.folder-picker'))`, 20000);
     check("WF-03 dialog closes after commit", moved === true, String(moved));
@@ -683,7 +683,6 @@ async function moveUiSuite() {
     await cdp.evaluate(`(()=>{const item=[...document.querySelectorAll('[role=menuitem]')].find(b=>b.textContent?.trim()==='移动到…');item?.click();return Boolean(item);})()`);
     await cdp.waitFor(`()=>[...document.querySelectorAll('dialog.dialog')].some(d=>d.open&&d.querySelector('.folder-picker'))`, 8000);
     await searchSelect(`MV-DST-${stamp}`);
-    await picker(`[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='检查并继续')?.click();return true;`);
     const conflictNotice = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));return d&&(d.textContent?.includes('同名')||d.textContent?.includes('冲突'))?d.textContent:false;}`, 15000);
     check("WF-05 name conflict reported, no silent commit", Boolean(conflictNotice), String(conflictNotice).slice(0, 120));
     const confirmLocked = await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));const b=d?[...d.querySelectorAll('button')].find(x=>x.textContent?.trim()==='确认移动'):null;return b?b.disabled:'no-button';})()`);
@@ -1480,6 +1479,10 @@ async function finaleSuite() {
       dragResult === "dragstarted" && dropResult === "dropped" && Boolean(moveDialog), JSON.stringify({ dragResult, dropResult, moveDialog }));
     const targetPreset = moveDialog && /WF-TARGET/.test(moveDialog.target || "");
     check("DI-17 the dropped folder is the pre-selected candidate", targetPreset === true, JSON.stringify(moveDialog));
+    const dropReady = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll("dialog.dialog")].find(x=>x.open&&x.querySelector(".folder-picker"));const b=d?[...d.querySelectorAll("button")].find(x=>x.textContent?.trim()==="确认移动"):null;return b&&!b.disabled?true:false;}`,15000);
+    check("DI-17 preselected drop target is automatically checked",dropReady===true,String(dropReady));
+    const dropNoise = await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll("dialog.dialog")].find(x=>x.open&&x.querySelector(".folder-picker"));return d?{hints:d.querySelectorAll(".folder-picker-search-row .folder-picker-hint,.folder-picker-detail .hint").length,extraCheck:[...d.querySelectorAll("button")].some(b=>b.textContent?.includes("检查并继续")),sourceWarning:!!d.querySelector(".folder-picker-reason")}:null;})()`);
+    check("DI-17 compact picker has no redundant hints or source-folder warning",dropNoise&&dropNoise.hints===0&&!dropNoise.extraCheck&&!dropNoise.sourceWarning,JSON.stringify(dropNoise));
     // cancel: no server change
     await cdp.evaluate(`(()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));[...d.querySelectorAll('button')].find(b=>b.textContent?.trim()==='取消')?.click();return true;})()`);
     await delay(400);

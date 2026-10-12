@@ -1,7 +1,7 @@
 import {RareButton,RareDataTable,RareInput,RareSelect} from "../../shared/ui/rare";
 import {toast} from "../../shared/ui/feedback";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
-import {useEffect,useMemo,useRef,useState,type ChangeEvent,type DragEvent,type FormEvent,type KeyboardEvent,type MouseEvent,type ReactNode}from "react";
+import {useCallback,useEffect,useMemo,useRef,useState,type ChangeEvent,type DragEvent,type FormEvent,type KeyboardEvent,type MouseEvent,type ReactNode}from "react";
 import {useNavigate}from "react-router-dom";
 import type {FileItem} from "../../entities/file/model";
 import type {Folder} from "../../entities/folder/model";
@@ -1061,26 +1061,9 @@ function conflictItemCopy(conflict:{code:string;message?:string}):string{
  return MOVE_CONFLICT_COPY[conflict.code]??conflict.message??"无法移动该文件";
 }
 
-// Visible-ancestor path only: a folder outside the loaded tree is never
-// invented, matching how the server filters its preflight summaries.
-function pathOf(folders:Folder[],id:string):string{
- const byId=new Map(folders.map(folder=>[folder.id,folder]));
- const names:string[]=[];
- const seen=new Set<string>();
- let current=byId.get(id);
- while(current&&!seen.has(current.id)){
-  seen.add(current.id);
-  names.unshift(current.name);
-  const parentId=current.parentId;
-  current=parentId!==null?byId.get(parentId):undefined;
- }
- return names.join(" / ");
-}
-
 // Single-file move (COMPLEX-WORKFLOWS-v1 §2-§3, WF-01..WF-06/WF-09). The dialog
-// hosts the shared FolderPicker: a click only sets a candidate, "检查并继续"
-// runs the read-only server preflight, and only a preflight for the candidate
-// currently shown unlocks "确认移动". The server stays the authority — the
+// hosts the shared FolderPicker: every valid candidate is preflighted in the
+// background, and only a checked candidate unlocks "确认移动". The server stays the authority — the
 // commit re-verifies permissions, the target's active state, name uniqueness
 // and the CAS folder.
 export function MoveDialog({file,presetTargetId,onClose,onMoved,onReload}:{
@@ -1115,17 +1098,14 @@ export function MoveDialog({file,presetTargetId,onClose,onMoved,onReload}:{
   return()=>{valid=false;};
  },[treeToken]);
 
- // How the dialog was opened is cosmetic (§7.2): a drop preselects a candidate
- // and says so, but it takes the same check-then-confirm path below.
- const viaDrop=presetTargetId!=="";
- const dialogTitle=viaDrop?"拖放移动到…":"移动到…";
- const busy=flow.state==="validating"||flow.state==="submitting";
+ const dialogTitle="移动文件";
+ // A running preflight must not lock the tree: choosing another target cancels
+ // its relevance through checkSeq, while the actual commit still locks edits.
+ const busy=flow.state==="submitting";
  const selected=folders.find(folder=>folder.id===flow.targetId)??null;
  const invalid=selected?fileMoveInvalidTarget(selected,file,folders):null;
  const canCheck=tree==="ready"&&!busy&&!needsRefresh&&selected!==null&&invalid===null;
- const canConfirm=canCheck&&flow.state==="ready"&&preflight!==null;
- const sourcePath=pathOf(folders,file.folderId);
- const targetPath=flow.targetId!==""?pathOf(folders,flow.targetId):"";
+ const canConfirm=canCheck&&flow.state==="ready"&&preflight?.status==="ready"&&preflight.allowedCount>0;
 
  function close(){
   if(busy)return;
@@ -1133,35 +1113,44 @@ export function MoveDialog({file,presetTargetId,onClose,onMoved,onReload}:{
  }
 
  function choose(targetId:string){
-  // A new candidate voids the previous preflight and any answer still in
-  // flight: confirm stays disabled until this target is checked.
+  // Re-selecting a checked target is a no-op; a rejected/failed target can be
+  // checked again after an external conflict is resolved.
+  if(targetId===flow.targetId){
+   if(flow.state!=="ready"&&flow.state!=="validating")void check(targetId);
+   return;
+  }
+  // A new candidate voids any in-flight or previous preflight.
   checkSeq.current+=1;
   setPreflight(null);
   setFlow(current=>pickTarget(current,targetId));
  }
 
- async function check(){
-  if(!canCheck)return;
-  const targetId=flow.targetId;
+ const check=useCallback(async(targetId:string)=>{
   const seq=++checkSeq.current;
   setPreflight(null);
-  setFlow(current=>preflightStarted(current));
+  setFlow(current=>current.targetId===targetId?preflightStarted(current):current);
   try{
    const data=await request<MovePreflight>("/moves/preflight",{method:"POST",body:JSON.stringify({resources:[{kind:"file",id:file.id}],targetFolderId:targetId,mode:"all_or_nothing"})});
    if(seq!==checkSeq.current)return;
    if(data.status==="ready"&&data.allowedCount>0){
     setPreflight(data);
-    setFlow(current=>preflightReady(current));
+    setFlow(current=>current.targetId===targetId?preflightReady(current):current);
     return;
    }
-   // Conflict or forbidden: the user stays on the candidate step and may pick
-   // another target; nothing was submitted.
-   setFlow(current=>preflightConflict(current,conflictNotice(data)));
+   setFlow(current=>current.targetId===targetId?preflightConflict(current,conflictNotice(data)):current);
   }catch(error){
    if(seq!==checkSeq.current)return;
-   setFlow(current=>preflightConflict(current,errorCode(error)==="E_NOT_FOUND"?"目标目录不存在或不可见":"预检失败，请重试"));
+   setFlow(current=>current.targetId===targetId?preflightConflict(current,errorCode(error)==="E_NOT_FOUND"?"目标目录不存在或不可见":"检查失败，请重试"):current);
   }
- }
+ },[file.id]);
+
+ useEffect(()=>{
+  if(tree!=="ready"||needsRefresh||!flow.targetId)return;
+  const candidate=folders.find(folder=>folder.id===flow.targetId);
+  if(!candidate||fileMoveInvalidTarget(candidate,file,folders))return;
+  void check(flow.targetId);
+  return()=>{checkSeq.current+=1;};
+ },[tree,folders,flow.targetId,needsRefresh,check,file]);
 
  async function submit(){
   if(!canConfirm)return;
@@ -1204,7 +1193,7 @@ export function MoveDialog({file,presetTargetId,onClose,onMoved,onReload}:{
   }
  }
 
- return <Dialog open title={dialogTitle} onClose={close} closeGuard={()=>!busy} className="dialog">
+ return <Dialog open title={dialogTitle} onClose={close} closeGuard={()=>!busy} className="move-file-dialog">
   {tree==="loading"&&<p className="empty"><BrandLoadingLabel>正在读取目录…</BrandLoadingLabel></p>}
   {tree==="failed"&&<>
    <p role="alert" className="notice error">获取目录失败，请稍后重试。</p>
@@ -1223,17 +1212,12 @@ export function MoveDialog({file,presetTargetId,onClose,onMoved,onReload}:{
    invalidTarget={folder=>fileMoveInvalidTarget(folder,file,folders)}
    notice={flow.notice}
    busy={busy}
-   detail={<>
-    <p className="hint">来源：{sourcePath||"当前目录"} · 目标：{targetPath||"未选择"}</p>
-    {viaDrop&&<p className="hint">目标由拖放预选，仍需检查并确认后才会移动。</p>}
-    {preflight?.warnings.map((warning,index)=><p className="hint" key={index}>{warning}</p>)}
-   </>}
    footer={needsRefresh
     ?<RareButton type="button" className="secondary-action" onClick={()=>{onReload();onClose();}} disabled={busy}>刷新查看状态</RareButton>
     :<>
      <RareButton type="button" className="secondary-action" onClick={close} disabled={busy}>取消</RareButton>
-     <RareButton type="button" className="secondary-action" onClick={check} disabled={!canCheck}>{flow.state==="validating"?"检查中…":"检查并继续"}</RareButton>
-     <RareButton type="button" className="primary" onClick={submit} disabled={!canConfirm}>{flow.state==="submitting"?"移动中…":"确认移动"}</RareButton>
+     {flow.state==="conflict"&&flow.notice==="检查失败，请重试"&&<RareButton type="button" className="secondary-action" onClick={()=>void check(flow.targetId)} disabled={!canCheck}>重试检查</RareButton>}
+     <RareButton type="button" className="primary" onClick={submit} disabled={!canConfirm}>{flow.state==="validating"?"检查中…":flow.state==="submitting"?"移动中…":"确认移动"}</RareButton>
     </>}
   />}
  </Dialog>;
@@ -1274,18 +1258,13 @@ function BatchMoveDialog({files,presetTargetId,onClose,onMoved,onReload}:{
   return()=>{valid=false;};
  },[treeToken]);
 
- // How the dialog was opened is cosmetic (§7.2): a drop preselects a candidate
- // and says so, but the confirmation below is unchanged.
- const viaDrop=presetTargetId!=="";
- const dialogTitle=pendingIds.length>0?(viaDrop?`拖放移动 ${pendingIds.length} 个文件到…`:`移动 ${pendingIds.length} 个文件到…`):"移动到…";
+ const dialogTitle=`移动 ${pendingIds.length} 个文件`;
  const busy=flow.state==="submitting";
  const selected=folders.find(folder=>folder.id===flow.targetId)??null;
  const invalid=selected?batchMoveInvalidTarget(selected,files,folders):null;
  const canSubmit=tree==="ready"&&!busy&&!needsRefresh&&flow.state==="candidate"&&selected!==null&&invalid===null&&pendingIds.length>0;
  const conflictIds=new Set(flow.conflicts.map(conflict=>conflict.id));
  const nameOf=new Map(files.map(file=>[file.id,file.name]));
- const sourcePath=pathOf(folders,files[0]?.folderId??"");
- const targetPath=flow.targetId!==""?pathOf(folders,flow.targetId):"";
 
  function close(){
   if(busy)return;
@@ -1345,7 +1324,7 @@ function BatchMoveDialog({files,presetTargetId,onClose,onMoved,onReload}:{
   }
  }
 
- return <Dialog open title={dialogTitle} onClose={close} closeGuard={()=>!busy} className="dialog">
+ return <Dialog open title={dialogTitle} onClose={close} closeGuard={()=>!busy} className="move-file-dialog">
   {tree==="loading"&&<p className="empty"><BrandLoadingLabel>正在读取目录…</BrandLoadingLabel></p>}
   {tree==="failed"&&<>
    <p role="alert" className="notice error">获取目录失败，请稍后重试。</p>
@@ -1364,10 +1343,8 @@ function BatchMoveDialog({files,presetTargetId,onClose,onMoved,onReload}:{
    invalidTarget={folder=>batchMoveInvalidTarget(folder,files,folders)}
    notice={flow.notice}
    busy={busy}
-   detail={<>
-    <p className="hint">来源：{sourcePath||"当前目录"} · 目标：{targetPath||"未选择"}{pendingIds.length>0?` · 本次将移动 ${pendingIds.length} 个文件`:" · 已无可提交的文件"}</p>
-    {viaDrop&&<p className="hint">目标由拖放预选，仍需确认后提交；提交为整批事务。</p>}
-    {flow.state==="conflict"&&pendingIds.length>0&&<>
+   detail={flow.state==="conflict"?<>
+    {pendingIds.length>0&&<>
      <p className="hint" role="status">以下 {flow.conflicts.length} 个文件无法移动，本次没有移动任何文件：</p>
      <ul className="delete-list" style={{maxHeight:"160px",overflow:"auto"}}>
       {flow.conflicts.map(conflict=><li key={conflict.id}>{nameOf.get(conflict.id)??conflict.id}：{conflictItemCopy(conflict)}</li>)}
@@ -1375,7 +1352,7 @@ function BatchMoveDialog({files,presetTargetId,onClose,onMoved,onReload}:{
     </>}
     {flow.state==="conflict"&&pendingIds.length===0&&
      <p className="hint" role="status">已排除全部问题文件，没有可提交的项。请关闭后重新选择要移动的文件。</p>}
-   </>}
+   </>:undefined}
    footer={needsRefresh
     ?<RareButton type="button" className="secondary-action" onClick={()=>{onReload();onClose();}} disabled={busy}>刷新查看状态</RareButton>
     :<>

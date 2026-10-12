@@ -1,6 +1,6 @@
 import {RareButton,RareInput} from "./rare";
 import {FolderResourceIcon} from "./ResourceIcons";
-import {useEffect,useId,useMemo,useRef,useState,type KeyboardEvent,type ReactNode}from "react";
+import {useEffect,useMemo,useRef,useState,type KeyboardEvent,type ReactNode}from "react";
 import "./folderPicker.css";
 
 // Structural copy of entities/folder/model `Folder`: a shared -> entities import
@@ -42,7 +42,6 @@ export function FolderPicker({open,title,folders,selectedId,onSelect,onClose,inv
  const panel=useRef<HTMLDivElement>(null);
  const tree=useRef<HTMLUListElement>(null);
  const search=useRef<HTMLInputElement>(null);
- const hintId=useId();
  const[query,setQuery]=useState("");
  const[expanded,setExpanded]=useState<Set<string>>(()=>new Set<string>());
  const[focusedId,setFocusedId]=useState<string|null>(null);
@@ -128,9 +127,12 @@ export function FolderPicker({open,title,folders,selectedId,onSelect,onClose,inv
   if(!open)return;
   setQuery("");
   setBlocked(null);
-  reveal(selectedId);
   search.current?.focus();
  },[open]);
+
+ // A drag-selected folder may only become available after the async tree load.
+ // Reveal its ancestors then without stealing focus from search or rerunning it.
+ useEffect(()=>{if(open&&selectedId)reveal(selectedId);},[open,selectedId,index]);
 
  // A blocked reason belongs to the candidate it was raised for.
  useEffect(()=>{setBlocked(null);},[selectedId]);
@@ -299,10 +301,9 @@ export function FolderPicker({open,title,folders,selectedId,onSelect,onClose,inv
        <span aria-hidden="true">{isOpen?"▾":"▸"}</span>
       </RareButton>
       :<span className="folder-picker-chevron-spacer" aria-hidden="true"/>}
-     <RareButton type="button" className="folder-picker-name" tabIndex={-1} title={folder.name}
+     <RareButton type="button" className="folder-picker-name" tabIndex={-1} title={reason??folder.name}
       aria-disabled={reason?true:undefined}
       onClick={()=>{focusRow(folder.id);choose(folder);}}><FolderResourceIcon size={16} open={isOpen}/><span className="folder-picker-name-label">{folder.name}</span></RareButton>
-     {reason&&<span className="folder-picker-reason">{reason}</span>}
     </div>
     {isOpen&&children.length>0&&<ul role="group">{branch(folder.id,depth+1)}</ul>}
    </li>;
@@ -314,19 +315,23 @@ export function FolderPicker({open,title,folders,selectedId,onSelect,onClose,inv
   onKeyDown={onPanelKeyDown}>
   <div className="folder-picker-search-row">
    <RareInput ref={search} className="folder-picker-search" type="search" value={query}
-    placeholder="搜索目录名或可见路径" aria-label="搜索目标目录" aria-describedby={hintId}
+    placeholder="搜索目录" aria-label="搜索目标目录"
     autoComplete="off" disabled={busy}
     onChange={event=>setQuery(event.target.value)}
     onKeyDown={onSearchKeyDown}/>
-   <p id={hintId} className="folder-picker-hint">仅搜索当前有权查看的目录，结果不包含未授权路径。</p>
   </div>
   {notice&&<p className="folder-picker-notice" role="status">{notice}</p>}
+  <p className="folder-picker-candidate" aria-live="polite" title={candidatePath??undefined}>
+   <span className="folder-picker-candidate-label">目标</span>
+   {selectedId===""&&<span className="folder-picker-candidate-none">请选择文件夹</span>}
+   {selectedId!==""&&candidatePath===null&&<span className="folder-picker-candidate-none">目录不可见</span>}
+   {candidatePath!==null&&<span className="folder-picker-candidate-path">{candidatePath||"（未命名目录）"}</span>}
+   {candidateReason&&<span className="folder-picker-candidate-reason">不可选：{candidateReason}</span>}
+  </p>
   {keyword!==""&&(matches.length===0
    ?<p className="folder-picker-empty">没有匹配的目录，请更换关键词。</p>
    :<>
-    <p className="folder-picker-hint">{results.length<matches.length
-     ?`匹配 ${matches.length} 条，仅显示前 ${MAX_RESULTS} 条，请继续输入以缩小范围`
-     :`匹配 ${matches.length} 条`}</p>
+    {results.length<matches.length&&<p className="folder-picker-hint">结果较多，请继续输入关键词</p>}
     <ul className="folder-picker-results">
      {results.map(row=>{
       const reason=reasonOf(row.folder);
@@ -334,36 +339,27 @@ export function FolderPicker({open,title,folders,selectedId,onSelect,onClose,inv
       return <li key={row.folder.id}>
        <RareButton type="button"
         className={"folder-picker-result"+(isCandidate?" candidate":"")+(reason?" invalid":"")}
-        aria-disabled={reason?true:undefined}
+        aria-disabled={reason?true:undefined} title={reason??row.path}
         onClick={()=>chooseResult(row.folder)}>
         <FolderResourceIcon size={16}/><span className="folder-picker-result-name">{row.folder.name}</span>
         <span className="folder-picker-result-path">{row.path}</span>
-        {isCandidate&&<span className="folder-picker-result-flag">当前候选</span>}
-        {reason&&<span className="folder-picker-reason">{reason}</span>}
        </RareButton>
       </li>;
      })}
     </ul>
    </>)}
-  <p className="folder-picker-candidate" aria-live="polite">
-   <span className="folder-picker-candidate-label">已选目标：</span>
-   {selectedId===""&&<span className="folder-picker-candidate-none">尚未选择</span>}
-   {selectedId!==""&&candidatePath===null&&<span className="folder-picker-candidate-none">该目录当前不可见</span>}
-   {candidatePath!==null&&<span className="folder-picker-candidate-path">{candidatePath||"（未命名目录）"}</span>}
-   {candidateReason&&<span className="folder-picker-candidate-reason">不可选：{candidateReason}</span>}
-  </p>
   {blocked&&<p className="folder-picker-blocked" role="status">
    {blockedName?`“${blockedName}”不能作为目标：`:"该目录不能作为目标："}{blocked.reason}
   </p>}
   {/* Single target: aria-selected marks the candidate on every treeitem. The
       navigation tree's aria-current="page" meaning is deliberately not mixed in. */}
-  {folders.length===0
+  {keyword===""&&(folders.length===0
    ?<p className="folder-picker-empty">没有可选择的目标目录</p>
    :<ul ref={tree} className="folder-picker-tree" role="tree" aria-label="目标目录"
     aria-multiselectable={false} aria-busy={busy?true:undefined}
     onKeyDown={onTreeKeyDown}>
     {branch("",0)}
-   </ul>}
+   </ul>)}
   {detail&&<div className="folder-picker-detail">{detail}</div>}
   {footer&&<div className="folder-picker-footer">{footer}</div>}
  </div>;
