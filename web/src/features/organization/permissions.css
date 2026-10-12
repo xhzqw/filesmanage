@@ -8,7 +8,7 @@
 .perm-subnav button{flex:none;border:1px solid transparent;border-radius:var(--radius-sm);background:transparent;font-size:13px;color:var(--text-secondary);padding:8px 14px;min-height:34px}
 .perm-subnav button:hover{background:var(--surface-row-hover)}
 .perm-subnav button.active{background:var(--surface-row-selected);border-color:var(--border-hairline);color:var(--brand-blue);font-weight:650}
-.perm-workspace{display:grid;grid-template-columns:240px minmax(0,1fr);flex:1;min-height:0;min-width:0;overflow:hidden;margin:0;border:0;background:var(--surface-panel)}
+.perm-workspace{display:grid;grid-template-columns:220px minmax(0,1fr);flex:1;min-height:0;min-width:0;overflow:hidden;margin:0;border:0;background:var(--surface-panel)}
 .perm-browser{display:flex;flex-direction:column;min-width:0;min-height:0;border-right:1px solid var(--border-hairline);background:var(--surface-panel)}
 .perm-browser-title{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid var(--border-hairline);padding:10px 13px;min-height:50px}
 .perm-browser-title>div{display:flex;flex-direction:column;gap:4px;min-width:0}
@@ -24,6 +24,7 @@
 .perm-tree-row:hover{background:var(--surface-row-hover)}
 .perm-tree-row.selected:hover{background:var(--surface-row-selected)}
 .perm-tree-toggle,.perm-tree-spacer{width:20px;min-width:20px;min-height:30px;background:transparent;border:0;padding:0;color:var(--text-secondary)}
+.perm-tree li[role="treeitem"]:focus-visible>.perm-tree-row{outline:2px solid var(--border-focus);outline-offset:-2px}
 .perm-folder-glyph{color:var(--folder-stroke,#C28B21);fill:var(--folder-fill,#FFF0C9);flex:none;margin-right:5px}
 .perm-tree-name{border:0;background:transparent;text-align:left;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-primary);padding:7px 5px;font-weight:500}
 .perm-tree-row.selected .perm-tree-name{color:var(--brand-blue);font-weight:650}
@@ -107,6 +108,16 @@
 .perm-audit-scroll{overflow:auto;min-width:0;min-height:0;flex:1}
 .perm-audit-detail{max-width:300px;overflow-wrap:anywhere;font-size:12px}
 
+/* Navigation budget follows the actual workpane width; tab switching never resizes the outer tree. */
+.org-stage-card{container:org-stage / inline-size}
+@container org-stage (max-width:800px){
+ .perm-workspace{grid-template-columns:190px minmax(0,1fr)}
+ .approval-workspace{grid-template-columns:190px minmax(0,1fr)}
+}
+@container org-stage (max-width:570px){
+ .perm-workspace{grid-template-columns:170px minmax(0,1fr)}
+ .approval-workspace{grid-template-columns:170px minmax(0,1fr)}
+}
 /* Browsers and editors scroll within the stable right-side workspace. */
 .org-stage-card .rare-tab-panel{min-width:0;min-height:0}
 .org-delegated-workspace{padding:var(--space-3);gap:var(--space-2)}

@@ -5,7 +5,7 @@ import type {User} from "../../entities/user/model";
 import {approvalPolicyApi} from "../../entities/approval/api";
 import {RareBadge,RareButton,RareInput,RareNotice,RareSelect} from "../../shared/ui/rare";
 import {errorCode,errorCopy} from "../../shared/errors";
-import {ResourceBrowser} from "./PermissionsPanel";
+import {ResourceBrowser} from "./ResourceBrowser";
 import type {ResourceFolder} from "./permissionsApi";
 import "./approvalPolicies.css";
 

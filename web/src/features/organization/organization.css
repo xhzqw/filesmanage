@@ -4,7 +4,7 @@
 
 .org-workbench{
   display:grid;
-  grid-template-columns:280px minmax(0,1fr);
+  grid-template-columns:236px minmax(0,1fr);
   gap:var(--space-3);
   padding:var(--space-3);
   background:var(--surface-canvas);
@@ -180,6 +180,7 @@
   font-weight:600;
 }
 .tree .tree-row.on::before{display:none}
+.tree li[role="treeitem"]:focus-visible>.tree-row{outline:2px solid var(--border-focus);outline-offset:-2px;border-radius:var(--radius-sm)}
 
 .org-tree-chevron{
   width:18px;

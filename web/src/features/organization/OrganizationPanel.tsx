@@ -1,8 +1,7 @@
 import {RareTabs} from "../../shared/ui/rare/RareTabs";
-import {FolderResourceIcon} from "../../shared/ui/ResourceIcons";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {RareBadge,RareButton,RareDataTable,RareInput,RareNotice,RareRowActions,RareSelect} from "../../shared/ui/rare";
-import {useCallback,useEffect,useMemo,useRef,useState,type FormEvent,type KeyboardEvent,type ReactNode} from "react";
+import {useCallback,useEffect,useMemo,useRef,useState,type FormEvent} from "react";
 import {organizationApi,type Department,type Workgroup} from "./api";
 import {errorCode,errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
@@ -13,17 +12,18 @@ import {useSearchParams} from "react-router-dom";
 import {PermissionsPanel} from "./PermissionsPanel";
 import {ApprovalPoliciesPanel} from "./ApprovalPoliciesPanel";
 import {RoleBindingsPanel,DelegatedRolesWorkspace} from "./RoleWorkspace";
+import {DepartmentNavigator} from "./DepartmentNavigator";
+import {WorkgroupMemberRow} from "./WorkgroupMemberRow";
+import {IconUsers,IconSearch} from "./OrganizationIcons";
+import {fullPathOf} from "./organizationTreeUtils";
+import {ResetPasswordDialog,SetDisabledDialog,RemoveMemberDialog,CreateUserConfirmDialog,CreateDepartmentDialog,CreateGroupDialog,type DialogResult} from "./OrganizationDialogs";
 
 type LoadState="loading"|"ready"|"failed";
 type Tone="info"|"error";
 type Notice={text:string;tone:Tone};
-type DialogResult={ok:string}|{error:string};
-type DeptRow={department:Department;depth:number};
 type StatusFilter="all"|"normal"|"disabled"|"admin";
 
-const MAX_DEPTH=32;
 const CANDIDATE_CAP=50;
-const DEPT_HIT_CAP=30;
 const MEMBER_DISPLAY_STEP=100;
 const GROUP_DISPLAY_STEP=60;
 
@@ -31,26 +31,6 @@ function loginOf(user:User):string{return user.login??"";}
 
 function matchesQuery(user:User,needle:string):boolean{
  return user.displayName.toLowerCase().includes(needle)||loginOf(user).toLowerCase().includes(needle);
-}
-
-function ancestorPathOf(byId:Map<string,Department>,id:string):string{
- const names:string[]=[];
- const seen=new Set<string>();
- let current=byId.get(id)?.parentId??null;
- while(current!==null&&!seen.has(current)){
-  seen.add(current);
-  const parent=byId.get(current);
-  if(!parent)break;
-  names.unshift(parent.name);
-  current=parent.parentId;
- }
- return names.join(" / ");
-}
-
-function fullPathOf(byId:Map<string,Department>,id:string):string{
- const name=byId.get(id)?.name??id;
- const ancestors=ancestorPathOf(byId,id);
- return ancestors===""?name:ancestors+" / "+name;
 }
 
 function departmentLabelOf(byId:Map<string,Department>,id:string|undefined):string{
@@ -70,27 +50,6 @@ function mutationCopy(error:unknown,fallback:string):string{
  return errorCopy(error,fallback);
 }
 
-function IconOrganization(){
- // Organization chart: clear silhouette at 18px, consistent Rare-style stroke.
- return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-  stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-  aria-hidden="true" focusable="false">
-  <rect x="9" y="2" width="6" height="5" rx="1.3"/>
-  <path d="M12 7v5M5 12h14M5 12v3M19 12v3"/>
-  <rect x="2" y="15" width="6" height="6" rx="1.3"/>
-  <rect x="16" y="15" width="6" height="6" rx="1.3"/>
- </svg>;
-}
-
-function IconUsers(){
- return <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-  <path d="M11 14v-1.5a2.5 2.5 0 0 0-2.5-2.5h-5A2.5 2.5 0 0 0 1 12.5V14"/>
-  <circle cx="6" cy="5" r="3"/>
-  <path d="M15 14v-1.2a2.3 2.3 0 0 0-1.8-2.2"/>
-  <path d="M11 2.2a2.3 2.3 0 0 1 0 4.5"/>
- </svg>;
-}
-
 function IconGroup(){
  return <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
   <rect x="2" y="3" width="12" height="10" rx="2"/>
@@ -99,22 +58,9 @@ function IconGroup(){
  </svg>;
 }
 
-function IconSearch(){
- return <svg className="org-search-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-  <circle cx="7" cy="7" r="4.5"/>
-  <path d="M10.5 10.5L14 14"/>
- </svg>;
-}
-
 function IconPlus(){
  return <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
   <path d="M8 2v12M2 8h12"/>
- </svg>;
-}
-
-function IconChevron({open}:{open:boolean}){
- return <svg className={"org-chevron-svg"+(open?" open":"")} width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-  <path d="M6 3l5 5-5 5"/>
  </svg>;
 }
 
@@ -154,9 +100,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   return()=>window.removeEventListener("beforeunload",beforeUnload);
  },[hasUnsavedChanges]);
  const[selectedDepartment,setSelectedDepartment]=useState("");
- const[deptQuery,setDeptQuery]=useState("");
- const[expanded,setExpanded]=useState<Set<string>>(()=>new Set<string>());
- const[focusedId,setFocusedId]=useState<string|null>(null);
  const[memberQuery,setMemberQuery]=useState("");
  const[statusFilter,setStatusFilter]=useState<StatusFilter>("all");
  const[memberLimit,setMemberLimit]=useState(MEMBER_DISPLAY_STEP);
@@ -181,7 +124,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  const[createUserOpen,setCreateUserOpen]=useState(false);
  const[createDepartmentOpen,setCreateDepartmentOpen]=useState(false);
  const[createGroupOpen,setCreateGroupOpen]=useState(false);
- const rootsExpanded=useRef(false);
 
  useEffect(()=>{
   if(!isAdmin)return;
@@ -216,15 +158,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   setUsersToken(token=>token+1);setDepartmentsToken(token=>token+1);
   setGroupsToken(token=>token+1);setMembersToken(token=>token+1);
  },["organization","permissions"]),[]);
-
- useEffect(()=>{
-  if(departments.length===0||rootsExpanded.current)return;
-  rootsExpanded.current=true;
-  const ids=new Set(departments.map(d=>d.id));
-  setExpanded(new Set(departments.filter(d=>d.parentId===null||!ids.has(d.parentId)).map(d=>d.id)));
- },[departments]);
-
-
 
  useEffect(()=>{
   if(!isAdmin||selectedGroup==="")return;
@@ -292,29 +225,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   return totals;
  },[users,departments,deptIndex]);
 
- const rows=useMemo(()=>{
-  const out:DeptRow[]=[];
-  const seen=new Set<string>();
-  const walk=(parentId:string,depth:number)=>{
-   if(depth>MAX_DEPTH)return;
-   for(const d of deptIndex.get(parentId)??[]){
-    if(seen.has(d.id))continue;
-    seen.add(d.id);
-    out.push({department:d,depth});
-    if(expanded.has(d.id))walk(d.id,depth+1);
-   }
-  };
-  walk("",0);
-  return out;
- },[deptIndex,expanded]);
-
- useEffect(()=>{
-  if(!focusedId)return;
-  const node=[...document.querySelectorAll<HTMLElement>("li[data-dept-id]")]
-   .find(element=>element.dataset.deptId===focusedId);
-  node?.focus();
- },[focusedId]);
-
  const deptFilter=departmentsState==="ready"?selectedDepartment:"";
  const activeDeptIds=deptFilter!==""&&deptFilter!=="__unassigned"?selectedDeptIds:null;
  const needle=memberQuery.trim().toLowerCase();
@@ -335,13 +245,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   });
  },[users,activeDeptIds,selectedDepartment,deptById,statusFilter,needle]);
  useEffect(()=>setMemberLimit(MEMBER_DISPLAY_STEP),[selectedDepartment,statusFilter,memberQuery]);
-
- const deptHits=useMemo(()=>{
-  const keyword=deptQuery.trim().toLowerCase();
-  if(keyword==="")return{items:[] as Department[],truncated:false};
-  const matched=departments.filter(d=>d.name.toLowerCase().includes(keyword));
-  return{items:matched.slice(0,DEPT_HIT_CAP),truncated:matched.length>DEPT_HIT_CAP};
- },[departments,deptQuery]);
 
  const filteredGroups=useMemo(()=>{
   const keyword=groupQuery.trim().toLowerCase();
@@ -417,81 +320,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    setNotice({tone:"error",text:failure});
    return false;
   }
- }
-
- function toggle(id:string,force?:boolean){
-  setExpanded(old=>{
-   const next=new Set(old);
-   const shouldOpen=force??!next.has(id);
-   if(shouldOpen)next.add(id);else next.delete(id);
-   return next;
-  });
- }
-
- function focusIndex(index:number){
-  if(rows.length===0)return;
-  const target=rows[Math.max(0,Math.min(rows.length-1,index))];
-  if(target)setFocusedId(target.department.id);
- }
-
- function onTreeKeyDown(event:KeyboardEvent<HTMLUListElement>){
-  if(!focusedId)return;
-  const index=rows.findIndex(row=>row.department.id===focusedId);
-  const row=index<0?undefined:rows[index];
-  if(!row)return;
-  const id=row.department.id;
-  const isOpen=expanded.has(id);
-  const hasChildren=(deptIndex.get(id)??[]).length>0;
-  switch(event.key){
-   case "ArrowDown":
-    event.preventDefault();focusIndex(index+1);break;
-   case "ArrowUp":
-    event.preventDefault();focusIndex(index-1);break;
-   case "ArrowRight":{
-    event.preventDefault();
-    if(!isOpen){
-     if(hasChildren)toggle(id,true);
-     break;
-    }
-    const next=rows[index+1];
-    if(next&&next.depth>row.depth)setFocusedId(next.department.id);
-    break;
-   }
-   case "ArrowLeft":{
-    event.preventDefault();
-    if(isOpen){toggle(id,false);break;}
-    for(let at=index-1;at>=0;at--){
-     const candidateRow=rows[at];
-     if(candidateRow&&candidateRow.depth<row.depth){setFocusedId(candidateRow.department.id);break;}
-    }
-    break;
-   }
-   case "Home":
-    event.preventDefault();focusIndex(0);break;
-   case "End":
-    event.preventDefault();focusIndex(rows.length-1);break;
-   case "Enter":
-   case " ":
-    event.preventDefault();setSelectedDepartment(id);break;
-  }
- }
-
- function revealDepartment(id:string){
-  const chain:string[]=[];
-  const seen=new Set<string>();
-  let current=deptById.get(id)?.parentId??null;
-  while(current!==null&&!seen.has(current)){
-   seen.add(current);
-   chain.push(current);
-   current=deptById.get(current)?.parentId??null;
-  }
-  if(chain.length>0)setExpanded(old=>{
-   const next=new Set(old);
-   for(const ancestor of chain)next.add(ancestor);
-   return next;
-  });
-  setSelectedDepartment(id);
-  setDeptQuery("");
  }
 
  async function createUser():Promise<DialogResult>{
@@ -659,43 +487,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    ?"用户列表读取失败，请先用上方的重试按钮。"
    :memberEmpty;
 
- const rendered=new Set<string>();
- function renderDeptNodes(parentId:string,depth:number):ReactNode{
-  if(depth>MAX_DEPTH)return null;
-  return (deptIndex.get(parentId)??[]).map(department=>{
-   if(rendered.has(department.id))return null;
-   rendered.add(department.id);
-   const isOpen=expanded.has(department.id);
-   const hasChildren=(deptIndex.get(department.id)??[]).length>0;
-   const count=deptCounts.get(department.id)??0;
-   const isSelected=selectedDepartment===department.id;
-
-   return <li key={department.id} data-dept-id={department.id} role="treeitem"
-    aria-expanded={hasChildren?isOpen:undefined}
-    aria-selected={isSelected}
-    tabIndex={focusedId===department.id||(focusedId===null&&rows[0]?.department.id===department.id)?0:-1}
-    onFocus={event=>{if(event.target===event.currentTarget)setFocusedId(department.id);}}>
-    <div className={"tree-row "+(isSelected?"on":"")} style={{paddingLeft:`${depth*16+14}px`}}>
-     {hasChildren
-      ?<RareButton type="button" className={"org-tree-chevron"+(isOpen?" open":"")}
-        aria-label={(isOpen?"折叠":"展开")+" "+department.name} tabIndex={-1}
-        onClick={e=>{e.stopPropagation();toggle(department.id);}}>
-        <IconChevron open={isOpen}/>
-       </RareButton>
-      :<span className="org-tree-chevron-spacer" aria-hidden="true"/>}
-     <span className="org-tree-icon" aria-hidden="true"><FolderResourceIcon size={18} open={isOpen}/></span>
-     <RareButton type="button" className="org-node-label" tabIndex={-1}
-      title={fullPathOf(deptById,department.id)+"｜含子部门 "+String(count)+" 人"}
-      onClick={()=>setSelectedDepartment(department.id)}>
-      {department.name}
-     </RareButton>
-     <span className="org-node-count">（{count}）</span>
-    </div>
-    {isOpen&&<ul role="group">{renderDeptNodes(department.id,depth+1)}</ul>}
-   </li>;
-  });
- }
-
  return <div className="work-body">
   {/* 顶部工具栏：指标摘要与全局快捷创建 */}
   <div className="toolbar">
@@ -712,83 +503,11 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
 
   {/* 双栏主工作台：左侧组织架构树 + 右侧主工作区卡片 */}
   <div className="org-workbench">
-   {/* 左侧：组织架构树卡片 */}
-   <section className="org-card org-dept-card" aria-label="组织架构树">
-    <div className="org-card-header">
-     <h3 className="org-card-title">
-       <IconOrganization/>
-      <span>组织架构</span>
-      <RareBadge className="org-count-pill" tone="neutral">{departments.length} 部门</RareBadge>
-     </h3>
-    </div>
-
-     {departmentsState==="loading"&&<p className="hint org-inline-message">正在读取部门…</p>}
-     {departmentsState==="failed"&&<div className="org-inline-message">
-     <RareNotice tone="danger">读取部门列表失败，部门树与筛选暂不可用。</RareNotice>
-     <RareButton type="button" className="secondary-action" onClick={()=>setDepartmentsToken(token=>token+1)}>重试</RareButton>
-    </div>}
-
-    {departmentsReady&&<>
-     <div className="org-search-box">
-      <IconSearch/>
-      <RareInput id="org-dept-search" className="org-search" type="search" autoComplete="off"
-       value={deptQuery} onChange={event=>setDeptQuery(event.target.value)} placeholder="按部门名称查找"/>
-     </div>
-
-     {deptQuery.trim()!==""&&<div className="org-hits-panel">
-      {deptHits.items.length===0
-       ?<p className="hint">没有匹配的部门。</p>
-       :<ul className="org-hits">
-        {deptHits.items.map(d=><li key={d.id}>
-         <RareButton type="button" aria-label={"选择部门 "+fullPathOf(deptById,d.id)}
-          onClick={()=>revealDepartment(d.id)}>
-          <span className="org-hit-name">{d.name}</span>
-          <span className="hint">{ancestorPathOf(deptById,d.id)||"顶层部门"}</span>
-         </RareButton>
-        </li>)}
-       </ul>}
-      {deptHits.truncated&&<p className="hint">结果较多，仅显示前 {deptHits.items.length} 个，请细化关键词。</p>}
-     </div>}
-
-     <div className="org-tree-scroll">
-      <ul className="tree" role="tree" aria-label="部门树" onKeyDown={onTreeKeyDown}>
-       {/* 全体组织根节点 */}
-       <li role="treeitem" aria-selected={selectedDepartment===""} tabIndex={0}
-        onClick={()=>setSelectedDepartment("")}>
-         <div className={"tree-row org-tree-root-row "+(selectedDepartment===""?"on":"")}>
-         <span className="org-tree-chevron-spacer" aria-hidden="true"/>
-          <span className="org-tree-icon" aria-hidden="true"><IconOrganization/></span>
-         <RareButton type="button" className="org-node-label" tabIndex={-1}
-          title={"全体组织｜共 "+String(users.length)+" 人"}
-          onClick={()=>setSelectedDepartment("")}>
-          全体组织
-         </RareButton>
-         <span className="org-node-count">（{users.length}）</span>
-        </div>
-       </li>
-
-       {/* 部门层级子树 */}
-        {departments.length===0&&<li role="none" className="hint org-inline-message">还没有部门；可用上方按钮创建。</li>}
-       {renderDeptNodes("",0)}
-
-       {/* 未分配部门节点 */}
-       {unassignedCount>0&&<li role="treeitem" aria-selected={selectedDepartment==="__unassigned"} tabIndex={-1}
-        onClick={()=>setSelectedDepartment("__unassigned")}>
-         <div className={"tree-row org-tree-root-row "+(selectedDepartment==="__unassigned"?"on":"")}>
-         <span className="org-tree-chevron-spacer" aria-hidden="true"/>
-         <span className="org-tree-icon" aria-hidden="true"><IconUsers/></span>
-         <RareButton type="button" className="org-node-label" tabIndex={-1}
-          title={"未分配部门｜共 "+String(unassignedCount)+" 人"}
-          onClick={()=>setSelectedDepartment("__unassigned")}>
-          未分配部门
-         </RareButton>
-         <span className="org-node-count">（{unassignedCount}）</span>
-        </div>
-       </li>}
-      </ul>
-     </div>
-    </>}
-   </section>
+   <DepartmentNavigator departments={departments} departmentsState={departmentsState}
+    deptIndex={deptIndex} deptById={deptById} deptCounts={deptCounts}
+    selectedDepartment={selectedDepartment} onSelect={setSelectedDepartment}
+    usersCount={users.length} unassignedCount={unassignedCount}
+    onRetry={()=>setDepartmentsToken(token=>token+1)}/>
 
    {/* 右侧：组织工作区 */}
    <section className="org-card org-stage-card" aria-label="组织管理主工作区">
@@ -1024,19 +743,9 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
 
          {membersState==="loading"&&<p className="hint">正在读取工作组成员…</p>}
          {membersState==="ready"&&<div className="org-member-grid">
-          {groupMembers.slice(0,groupMemberLimit).map(member=><div key={member.id} className="org-member-card">
-           <div className="org-member-card-info">
-            <span className="org-avatar" aria-hidden="true">{member.displayName.slice(0,1)}</span>
-            <div className="org-member-card-text">
-             <span className="org-member-card-name">{member.displayName}</span>
-             <code className="org-member-card-login">{loginOf(member)}</code>
-            </div>
-            {member.disabled===true&&<RareBadge tone="danger" dot>已禁用</RareBadge>}
-           </div>
-           <RareButton type="button" tone="danger" className="danger org-action-btn"
-            onClick={()=>{setNotice(null);setRemoveTarget(member);}}>移除</RareButton>
-          </div>)}
-           {groupMembers.length===0&&<p className="empty org-grid-empty">该工作组暂无成员，可在下方添加成员。</p>}
+          {groupMembers.slice(0,groupMemberLimit).map(member=><WorkgroupMemberRow key={member.id}
+           user={member} kind="member" onAction={()=>{setNotice(null);setRemoveTarget(member);}}/>)}
+          {groupMembers.length===0&&<p className="empty org-grid-empty">该工作组暂无成员，可在下方添加成员。</p>}
          </div>}
          {membersState==="ready"&&groupMembers.length>groupMemberLimit&&
           <div className="org-list-more">
@@ -1064,19 +773,9 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
            </div>
 
            <div className="org-candidate-grid">
-            {candidates.map(user=><div key={user.id} className="org-candidate-card">
-             <div className="org-candidate-info">
-              <span className="org-avatar" aria-hidden="true">{user.displayName.slice(0,1)}</span>
-              <div className="org-candidate-text">
-               <span className="org-candidate-name">{user.displayName}</span>
-               <code className="org-candidate-login">{loginOf(user)}</code>
-              </div>
-              <RareBadge className="org-dept-pill" tone="neutral">{departmentLabel(user.departmentId)}</RareBadge>
-             </div>
-             <RareButton type="button" className="primary org-action-btn" onClick={()=>addMember(user)} disabled={addBusy!==""}>
-              {addBusy===user.id?"加入中…":"加入"}
-             </RareButton>
-            </div>)}
+            {candidates.map(user=><WorkgroupMemberRow key={user.id} user={user} kind="candidate"
+             department={departmentLabel(user.departmentId)} busy={addBusy!==""}
+             onAction={()=>addMember(user)}/>)}
              {candidates.length===0&&<p className="empty org-grid-empty">{candidateEmpty}</p>}
            </div>
 
@@ -1119,284 +818,4 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    listAvailable={departmentsReady}
    onClose={()=>setCreateGroupOpen(false)} onSubmit={createGroup}/>}
  </div>;
-}
-
-function ResetPasswordDialog({target,department,onClose,onSubmit}:{
- target:User;
- department:string;
- onClose:()=>void;
- onSubmit:(password:string)=>Promise<DialogResult>;
-}){
- const[password,setPassword]=useState("");
- const[busy,setBusy]=useState(false);
- const[result,setResult]=useState<{text:string;tone:Tone}|null>(null);
- const[confirmDiscard,setConfirmDiscard]=useState(false);
- const dirty=password!==""&&result===null;
-
- async function submit(event:FormEvent<HTMLFormElement>){
-  event.preventDefault();
-  if(busy||password.length<16)return;
-  setBusy(true);
-  const outcome=await onSubmit(password);
-  setBusy(false);
-  if("error" in outcome)setResult({text:outcome.error,tone:"error"});
-  else{
-   setPassword("");
-   setResult({text:outcome.ok,tone:"info"});
-  }
- }
-
- function requestClose(){
-  if(busy)return;
-  if(dirty){setConfirmDiscard(true);return;}
-  onClose();
- }
-
- return <Dialog open title={`重置密码 — ${target.displayName}`} onClose={onClose} className="org-dialog"
-  initialFocus="#org-reset-password"
-  closeGuard={()=>{if(busy)return false;if(dirty){setConfirmDiscard(true);return false;}return true;}}>
-  {confirmDiscard
-   ?<>
-    <p className="hint">已输入的新密码将被丢弃，不会提交给服务端。</p>
-    <div className="dialog-actions">
-     <RareButton type="button" className="secondary-action" onClick={()=>setConfirmDiscard(false)} disabled={busy}>继续编辑</RareButton>
-     <RareButton type="button" tone="danger" className="danger" onClick={onClose} disabled={busy}>放弃并关闭</RareButton>
-    </div>
-   </>
-   :result
-    ?<>
-     <RareNotice tone={result.tone==="error"?"danger":"success"}>{result.text}</RareNotice>
-     <div className="dialog-actions"><RareButton type="button" tone="primary" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
-    </>
-    :<form onSubmit={submit}>
-     <p>账号：{loginOf(target)||"—"}</p>
-     <p>部门：{department}</p>
-     {target.disabled===true&&<p className="hint">该账号当前已禁用：重置密码不会启用账号。</p>}
-     <p className="hint">提交后该账号的全部登录会话立即失效，可使用新密码直接登录。</p>
-     <label htmlFor="org-reset-password">新密码</label>
-     <RareInput id="org-reset-password" type="password" autoComplete="new-password" value={password}
-      onChange={event=>setPassword(event.target.value)} disabled={busy}/>
-     <p className="hint">至少 16 个字符（客户端只校验长度，密码策略以服务端判定为准）。</p>
-     <div className="dialog-actions">
-      <RareButton type="button" className="secondary-action" onClick={requestClose} disabled={busy}>取消</RareButton>
-      <RareButton type="submit" tone="primary" className="primary" loading={busy} disabled={busy||password.length<16}>{busy?"重置中…":"确认重置密码"}</RareButton>
-     </div>
-    </form>}
- </Dialog>;
-}
-
-function SetDisabledDialog({target,department,onClose,onSubmit}:{
- target:User;
- department:string;
- onClose:()=>void;
- onSubmit:()=>Promise<DialogResult>;
-}){
- const[busy,setBusy]=useState(false);
- const[result,setResult]=useState<{text:string;tone:Tone}|null>(null);
- const disabling=target.disabled!==true;
-
- async function run(){
-  if(busy)return;
-  setBusy(true);
-  const outcome=await onSubmit();
-  setBusy(false);
-  if("error" in outcome)setResult({text:outcome.error,tone:"error"});
-  else setResult({text:outcome.ok,tone:"info"});
- }
-
- return <Dialog open title={disabling?"禁用账号":"启用账号"} onClose={onClose} closeGuard={()=>!busy} className="org-dialog">
-  {result
-   ?<>
-    <RareNotice tone={result.tone==="error"?"danger":"success"}>{result.text}</RareNotice>
-    <div className="dialog-actions"><RareButton type="button" tone="primary" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
-   </>
-   :<form onSubmit={event=>{event.preventDefault();run();}}>
-    <p>账号：{loginOf(target)||"—"}（{target.displayName}）</p>
-    <p>部门：{department}</p>
-    <p>当前状态：{target.disabled===true?"已禁用":"正常"}</p>
-    <p>{disabling
-     ?"影响：禁用后该账号立即无法登录，现有登录会话立即失效；其工作组与授权记录保留，启用后恢复。该操作写入审计日志。"
-     :"影响：启用后该账号可再次登录，并恢复原有的工作组与授权（最终生效权限由服务端判定）。"}</p>
-    <div className="dialog-actions">
-     <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</RareButton>
-     <RareButton type="submit" tone={disabling?"danger":"primary"} className={disabling?"danger":"primary"} loading={busy}>
-      {busy?(disabling?"禁用中…":"启用中…"):(disabling?"确认禁用":"确认启用")}
-     </RareButton>
-    </div>
-   </form>}
- </Dialog>;
-}
-
-function RemoveMemberDialog({member,groupName,department,onClose,onSubmit}:{
- member:User;
- groupName:string;
- department:string;
- onClose:()=>void;
- onSubmit:()=>Promise<DialogResult>;
-}){
- const[busy,setBusy]=useState(false);
- const[result,setResult]=useState<{text:string;tone:Tone}|null>(null);
-
- async function run(){
-  if(busy)return;
-  setBusy(true);
-  const outcome=await onSubmit();
-  setBusy(false);
-  if("error" in outcome)setResult({text:outcome.error,tone:"error"});
-  else setResult({text:outcome.ok,tone:"info"});
- }
-
- return <Dialog open title="移除工作组成员" onClose={onClose} closeGuard={()=>!busy} className="org-dialog">
-  {result
-   ?<>
-    <RareNotice tone={result.tone==="error"?"danger":"success"}>{result.text}</RareNotice>
-    <div className="dialog-actions"><RareButton type="button" tone="primary" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
-   </>
-   :<form onSubmit={event=>{event.preventDefault();run();}}>
-    <p>工作组：{groupName||"—"}</p>
-    <p>成员：{member.displayName}（{loginOf(member)||"—"}）</p>
-    <p>部门：{department}</p>
-    <p>影响：移除后该账号不再通过本工作组获得授权；直接授予该账号的权限不受影响，最终生效权限由服务端判定。之后可以重新加入。</p>
-    <div className="dialog-actions">
-     <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</RareButton>
-     <RareButton type="submit" tone="danger" loading={busy}>{busy?"移除中…":"确认移除"}</RareButton>
-    </div>
-   </form>}
- </Dialog>;
-}
-
-function CreateUserConfirmDialog({draft,department,onClose,onSubmit}:{
- draft:{login:string;displayName:string};
- department:string;
- onClose:()=>void;
- onSubmit:()=>Promise<DialogResult>;
-}){
- const[busy,setBusy]=useState(false);
- const[result,setResult]=useState<{text:string;tone:Tone}|null>(null);
-
- async function run(){
-  if(busy)return;
-  setBusy(true);
-  const outcome=await onSubmit();
-  setBusy(false);
-  if("error" in outcome)setResult({text:outcome.error,tone:"error"});
-  else setResult({text:outcome.ok,tone:"info"});
- }
-
- return <Dialog open title="创建账号确认" onClose={onClose} closeGuard={()=>!busy} className="org-dialog">
-  {result
-   ?<>
-    <RareNotice tone={result.tone==="error"?"danger":"success"}>{result.text}</RareNotice>
-    <div className="dialog-actions"><RareButton type="button" tone="primary" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
-   </>
-   :<form onSubmit={event=>{event.preventDefault();run();}}>
-    <p>账号：{draft.login}</p>
-    <p>姓名：{draft.displayName}</p>
-    <p>部门：{department}</p>
-    <p className="hint">密码不会在界面回显；创建后该账号可直接使用此密码登录。</p>
-    <p className="hint">取消不会清空表单内容，可以修改后再提交。</p>
-    <div className="dialog-actions">
-     <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>返回修改</RareButton>
-     <RareButton type="submit" tone="primary" loading={busy}>{busy?"创建中…":"确认创建"}</RareButton>
-    </div>
-   </form>}
- </Dialog>;
-}
-
-function CreateDepartmentDialog({options,defaultParentId,listAvailable,onClose,onSubmit}:{
- options:{id:string;label:string}[];
- defaultParentId:string;
- listAvailable:boolean;
- onClose:()=>void;
- onSubmit:(name:string,parentId:string)=>Promise<DialogResult>;
-}){
- const[name,setName]=useState("");
- const[parentId,setParentId]=useState(defaultParentId);
- const[busy,setBusy]=useState(false);
- const[result,setResult]=useState<{text:string;tone:Tone}|null>(null);
-
- async function run(event:FormEvent<HTMLFormElement>){
-  event.preventDefault();
-  if(busy||name.trim()==="")return;
-  setBusy(true);
-  const outcome=await onSubmit(name.trim(),parentId);
-  setBusy(false);
-  if("error" in outcome)setResult({text:outcome.error,tone:"error"});
-  else setResult({text:outcome.ok,tone:"info"});
- }
-
- return <Dialog open title="新建部门" onClose={onClose} closeGuard={()=>!busy} className="org-dialog">
-  {result
-   ?<>
-    <RareNotice tone={result.tone==="error"?"danger":"success"}>{result.text}</RareNotice>
-    <div className="dialog-actions"><RareButton type="button" tone="primary" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
-   </>
-   :<form onSubmit={run}>
-    <label htmlFor="org-new-department">部门名称</label>
-    <RareInput id="org-new-department" value={name} maxLength={80} disabled={busy}
-     onChange={event=>setName(event.target.value)}/>
-    <label htmlFor="org-new-department-parent">上级部门</label>
-    <RareSelect id="org-new-department-parent" className="org-select" value={parentId} disabled={busy}
-     onChange={event=>setParentId(event.target.value)}>
-     <option value="">（顶层部门）</option>
-     {options.map(option=><option key={option.id} value={option.id}>{option.label}</option>)}
-    </RareSelect>
-    <p className="hint">{listAvailable
-     ?"默认挂在部门树当前筛选的部门下（未选择时为顶层部门），可更改。"
-     :"部门列表不可用，只能创建顶层部门。"}名称最多 80 个字符；成员与工作组需要另行指派。</p>
-    <div className="dialog-actions">
-     <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</RareButton>
-     <RareButton type="submit" tone="primary" className="primary" loading={busy} disabled={busy||name.trim()===""}>{busy?"创建中…":"创建部门"}</RareButton>
-    </div>
-   </form>}
- </Dialog>;
-}
-
-function CreateGroupDialog({options,defaultDepartmentId,listAvailable,onClose,onSubmit}:{
- options:{id:string;label:string}[];
- defaultDepartmentId:string;
- listAvailable:boolean;
- onClose:()=>void;
- onSubmit:(name:string,departmentId:string)=>Promise<DialogResult>;
-}){
- const[name,setName]=useState("");
- const[departmentId,setDepartmentId]=useState(defaultDepartmentId);
- const[busy,setBusy]=useState(false);
- const[result,setResult]=useState<{text:string;tone:Tone}|null>(null);
-
- async function run(event:FormEvent<HTMLFormElement>){
-  event.preventDefault();
-  if(busy||name.trim()==="")return;
-  setBusy(true);
-  const outcome=await onSubmit(name.trim(),departmentId);
-  setBusy(false);
-  if("error" in outcome)setResult({text:outcome.error,tone:"error"});
-  else setResult({text:outcome.ok,tone:"info"});
- }
-
- return <Dialog open title="创建工作组" onClose={onClose} closeGuard={()=>!busy} className="org-dialog">
-  {result
-   ?<>
-    <RareNotice tone={result.tone==="error"?"danger":"success"}>{result.text}</RareNotice>
-    <div className="dialog-actions"><RareButton type="button" tone="primary" className="primary" onClick={onClose} autoFocus>关闭</RareButton></div>
-   </>
-   :<form onSubmit={run}>
-    <label htmlFor="org-new-group">工作组名称</label>
-    <RareInput id="org-new-group" value={name} maxLength={80} disabled={busy}
-     onChange={event=>setName(event.target.value)}/>
-    <label htmlFor="org-new-group-department">所属部门</label>
-    <RareSelect id="org-new-group-department" className="org-select" value={departmentId} disabled={busy}
-     onChange={event=>setDepartmentId(event.target.value)}>
-     <option value="">（不指定部门）</option>
-     {options.map(option=><option key={option.id} value={option.id}>{option.label}</option>)}
-    </RareSelect>
-    <p className="hint">{listAvailable
-     ?"默认使用部门树当前筛选的部门（未选择时留空），可更改。"
-     :"部门列表不可用，只能创建不指定部门的工作组。"}名称最多 80 个字符；成员在创建后于“添加成员”中维护。</p>
-    <div className="dialog-actions">
-     <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</RareButton>
-     <RareButton type="submit" tone="primary" className="primary" loading={busy} disabled={busy||name.trim()===""}>{busy?"创建中…":"创建工作组"}</RareButton>
-    </div>
-   </form>}
- </Dialog>;
 }

@@ -1,5 +1,5 @@
 .approval-content{flex:1;min-height:0;min-width:0;overflow:hidden}
-.approval-workspace{grid-template-columns:240px minmax(0,1fr);min-height:0;max-height:none}
+.approval-workspace{grid-template-columns:220px minmax(0,1fr);min-height:0;max-height:none}
 .approval-detail{min-width:0;min-height:0;overflow:auto;background:var(--surface-panel)}
 .approval-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border-hairline)}
 .approval-heading h2{margin:0;font-size:15px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
