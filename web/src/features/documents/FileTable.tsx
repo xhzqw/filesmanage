@@ -746,7 +746,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
 
  const selection=visibleItems.filter(i=>selectedIds.has(i.id));
  const visibleFolders=childFolders.filter(entry=>entry.name.toLocaleLowerCase().includes(nameFilter.trim().toLocaleLowerCase()));
- const activeFolder=visibleFolders.find(entry=>entry.id===focusedFolderId)??null;
+ const activeFolder=visibleFolders.find(entry=>entry.id===focusedFolderId)
+  ??(focusedId===null?visibleFolders[0]??null:null);
  const activePreview=visibleItems.find(item=>item.id===focusedId)
   ??visibleItems.find(item=>selectedIds.has(item.id))??visibleItems[0]??null;
  // Non-table entries intentionally reuse the same row selection, context menu,
