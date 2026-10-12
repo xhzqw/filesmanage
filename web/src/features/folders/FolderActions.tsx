@@ -7,7 +7,7 @@ import {errorCode,errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
 import {Menu,type MenuItem} from "../../shared/ui/Menu";
 
-export function FolderActions({folder,actionRequest,onActionHandled,onActionComplete,onChanged,isAdmin,onManageGrants}:{folder:Folder;actionRequest?:{folderId:string;action:"rename"|"delete";id:number}|null;onActionHandled?:()=>void;onActionComplete?:()=>void;onChanged:(action:"rename"|"delete",folder:Folder)=>void;isAdmin:boolean;onManageGrants:()=>void}){
+export function FolderActions({folder,actionRequest,onActionHandled,onActionComplete,onChanged,onMove,isAdmin,onManageGrants}:{folder:Folder;actionRequest?:{folderId:string;action:"rename"|"delete";id:number}|null;onActionHandled?:()=>void;onActionComplete?:()=>void;onChanged:(action:"rename"|"delete",folder:Folder)=>void;onMove?:()=>void;isAdmin:boolean;onManageGrants:()=>void}){
  const[message,setMessage]=useState("");
  const[renaming,setRenaming]=useState(false);
  const[renameValue,setRenameValue]=useState(folder.name);
@@ -57,6 +57,7 @@ export function FolderActions({folder,actionRequest,onActionHandled,onActionComp
  }
  const menuItems:MenuItem[]=[
   {id:"rename",label:"重命名目录",onSelect:()=>{setRenaming(true);setRenameValue(folder.name);}},
+  ...(onMove?[{id:"move",label:"移动目录",onSelect:onMove}]:[]),
   {id:"delete",label:"删除目录",danger:true,onSelect:()=>setDeleting(true)}
  ];
  return <div className="folder-actions">

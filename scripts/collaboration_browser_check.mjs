@@ -73,34 +73,36 @@ try{
  mkdirSync(SHOTS,{recursive:true});
  for(const vp of [{name:"wide",w:1920,h:1080},{name:"desktop",w:1366,h:768},{name:"narrow",w:720,h:900}]){
   await cdp.send("Emulation.setDeviceMetricsOverride",{width:vp.w,height:vp.h,deviceScaleFactor:1,mobile:false});
-  await cdp.navigate(BASE+"/workspace");
-  check(await cdp.waitFor("()=>!!document.querySelector('.collab-workspace .collab-results') && !!document.querySelector('.collab-workspace .share-workbench') && document.querySelectorAll('.collab-results tbody .rare-badge').length>0"),vp.name+" favorites render");
+  await cdp.navigate(BASE+"/doc?view=favorites");
+  check(await cdp.waitFor("()=>!!document.querySelector('.collab-workspace .collab-results') && !!document.querySelector('.finder-sidebar') && document.querySelectorAll('.collab-results tbody .rare-badge').length>0"),vp.name+" favorites render");
   const layout=await cdp.evaluate(`(()=>{
-   const first=document.querySelector('.collab-tablist [role=tab]');
-   const left=document.querySelector('.collab-workspace .share-workbench')?.getBoundingClientRect();
+   const first=document.querySelector('.finder-nav-item[href="/doc?view=favorites"]');
+   const left=document.querySelector('.finder-sidebar')?.getBoundingClientRect();
    const right=document.querySelector('.collab-workspace .collab-results')?.getBoundingClientRect();
    const bad=[...document.querySelectorAll('.collab-results tbody tr')].filter(row=>row.querySelector('.rare-badge[data-rare-badge-tone=danger]'));
    const allBadUnlinked=bad.every(row=>!row.querySelector('td:first-child a'));
    const badges=[...document.querySelectorAll('.collab-results tbody .rare-badge')];
-   return {first:first?.textContent?.trim(),selected:first?.getAttribute('aria-selected'),
-    aligned:Math.abs(left.top-right.top)<3,below:right.top>left.top+left.height-3,
+   return {first:first?.textContent?.trim(),selected:first?.getAttribute('aria-current'),
+    beside:left.right<=right.left+3,mainVisible:right.top<innerHeight-80,
     rightInside:right.right<=innerWidth+1,overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,
     count:badges.length,tones:badges.every(b=>['success','danger'].includes(b.dataset.rareBadgeTone)&&b.textContent.trim()),
     badCount:bad.length,allBadUnlinked};
   })()`);
-  check(layout.first==="关注"&&layout.selected==="true",vp.name+" 关注 first/default");
-  check((vp.w>840?layout.aligned:layout.below)&&layout.rightInside,vp.name+" responsive workbench",JSON.stringify(layout));
+  check(layout.first==="我的关注"&&layout.selected==="page",vp.name+" 关注 in Finder sidebar");
+  check(layout.beside&&layout.mainVisible&&layout.rightInside,vp.name+" responsive workbench",JSON.stringify(layout));
   check(layout.overflow<=1,vp.name+" no document horizontal overflow",JSON.stringify(layout));
   check(layout.tones&&layout.allBadUnlinked,vp.name+" status badges and invalid links",JSON.stringify(layout));
   const shot=await cdp.send("Page.captureScreenshot",{format:"png",captureBeyondViewport:false});
   writeFileSync(SHOTS+"/"+vp.name+".png",Buffer.from(shot.data,"base64"));
+  await cdp.evaluate(`(()=>{document.querySelector('.collab-create-action')?.click();return true;})()`);
+  check(await cdp.waitFor("()=>!!document.querySelector('.share-workbench')"),vp.name+" resource picker opens on demand");
   await cdp.evaluate(`(()=>{[...document.querySelectorAll('.share-kind-switch button')].find(b=>b.textContent.trim()==='文件')?.click();return true;})()`);
   check(await cdp.waitFor("()=>!!document.querySelector('[aria-label=\"选择文件所在目录\"]')"),vp.name+" file selector opens");
  }
  // Switching tabs and reading page data must not navigate away.
- await cdp.evaluate(`(()=>{[...document.querySelectorAll('.collab-tablist button')].find(b=>b.textContent.trim()==='我共享的')?.click();return true;})()`);
+ await cdp.evaluate(`(()=>{document.querySelector('.finder-nav-item[href="/doc?view=sent"]')?.click();return true;})()`);
  check(await cdp.waitFor("()=>document.querySelector('.collab-results-head strong')?.textContent==='我共享的' && document.querySelector('.collab-results-count')?.textContent?.includes('已加载')"),"sent shares page reads");
- check(await cdp.evaluate("(()=>location.pathname==='/workspace')()"),"tab stays in workspace");
+ check(await cdp.evaluate("(()=>location.pathname==='/doc' && new URLSearchParams(location.search).get('view')==='sent')()"),"shared view stays in documents");
  console.log("COLLABORATION_BROWSER_CHECK_PASS");
 }finally{
  cdp?.close();chrome.kill();

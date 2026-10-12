@@ -163,7 +163,7 @@ try{
  }else if(process.env.TITLES_ONLY==="1"){
   const pages=[
    ["/stats",".stats-workbench"],
-   ["/workspace",".collab-root"],
+   ["/doc?view=favorites",".collab-root"],
    ["/org",".work-body"],
    ["/lifecycle",".lifecycle-ledger"],
    ["/trash",".trash-workbench"],
@@ -307,9 +307,9 @@ try{
    paths:links.map(x=>new URL(x.href).pathname),count:segments.length,active:active.map(x=>x.textContent.trim()),
    rendered:getComputedStyle(nav).display,navWidth:rect.width,navScroll:nav.scrollWidth,
    lastRight:last?.right,rightStart:right?.left,overflow:document.documentElement.scrollWidth-innerWidth};})()`);
-  assert.deepEqual(shellNav.labels,["文档管理","全局搜索","共享/关注","统计","审批","回收站","组织与权限"],
-   "all seven enabled global Rare UI navigation links");
-  assert(shellNav.count===7&&shellNav.active.length===1&&shellNav.active[0]==="文档管理"&&shellNav.overflow<=1,
+  assert.deepEqual(shellNav.labels,["文档管理","全局搜索","统计","审批","回收站","组织与权限"],
+   "all six enabled global Rare UI navigation links");
+  assert(shellNav.count===6&&shellNav.active.length===1&&shellNav.active[0]==="文档管理"&&shellNav.overflow<=1,
    "Rare shell nav selection/layout at "+width+": "+JSON.stringify(shellNav));
   const capsules=await evalJS("(()=>{const h=document.querySelector('header.header'),b=h.querySelector('a.shell-home-pill'),n=h.querySelector('nav[data-appearance=pill]'),hr=h.getBoundingClientRect(),br=b.getBoundingClientRect(),nr=n.getBoundingClientRect(),logo=b.querySelector('img'),active=n.querySelector('.rare-pill-nav-active');return{home:b.getAttribute('href'),brand:b.innerText.trim(),pill:getComputedStyle(b).borderRadius,offset:Math.abs((nr.left+nr.right-hr.left-hr.right)/2),headerBg:getComputedStyle(h).backgroundColor,brandBg:getComputedStyle(b).backgroundColor,navBg:getComputedStyle(n).backgroundColor,selectedBg:active&&getComputedStyle(active).backgroundColor,transparentLogo:logo.currentSrc.endsWith('logo-loader-256.png'),headerWidth:hr.width,brandLeft:br.left,headerLeft:hr.left,headerRight:hr.right}})()");
   assert(capsules.home==="/doc"&&capsules.brand==="中晟生物"&&capsules.pill.endsWith("px")

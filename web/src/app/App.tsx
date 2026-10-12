@@ -60,7 +60,7 @@ export function App(){
  <Route path="/approvals" element={user?<Approvals user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/office/:id" element={user?<OfficeEditor user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/model/:id" element={user?<Suspense fallback={<main className="brand-loading-screen" aria-busy="true"><BrandLoader size="lg" label="正在加载 CAD 模型预览"/><span>正在加载 CAD 模型预览…</span></main>}><ModelViewer user={user} onLogout={logout}/></Suspense>:<Navigate to="/login" replace/>}/>
- <Route path="/workspace" element={user?<WorkspacePage user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
+ <Route path="/workspace" element={<Navigate to={user?"/doc?view=favorites":"/login"} replace/>}/>
  <Route path="/search" element={user?<SearchPage user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/stats" element={user?<WorkspacePage user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="*" element={<Navigate to={user?"/doc":"/login"} replace/>}/></Routes></ShellAccessories.Provider>

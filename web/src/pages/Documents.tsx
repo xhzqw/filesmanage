@@ -6,7 +6,9 @@ import{Link,useLocation,useNavigate}from "react-router-dom";
 import type{User}from "../entities/user/model";
 import type{Folder}from "../entities/folder/model";
 import{folderApi}from "../features/folders/api";
-import{FolderTree,ancestorPath}from "../features/folders/FolderTree";
+import{ancestorPath}from "../features/folders/FolderTree";
+import{FinderSidebar,type DocumentSection}from "../features/collaboration/FinderSidebar";
+import{CollaborationPanel}from "../features/collaboration/CollaborationPanel";
 import{NewFolderForm}from "../features/folders/NewFolderForm";
 import{FolderActions}from "../features/folders/FolderActions";
 import{QuickGrantsDialog}from "../features/organization/QuickGrantsDialog";
@@ -60,11 +62,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  // preview finishing must never make the entire folder tree show "刷新中".
  const[treeReloadKey,setTreeReloadKey]=useState(0);
  const[grantsFolder,setGrantsFolder]=useState<Folder|null>(null);
- // Rename/delete from the tree menu reuse FolderActions' own dialogs: the bar
- // follows the right-clicked folder until the selection moves again.
- const[actionsFolder,setActionsFolder]=useState<Folder|null>(null);
- const[actionRequest,setActionRequest]=useState<{folderId:string;action:"rename"|"delete";id:number}|null>(null);
- const nextActionId=useRef(0);
+ const[collaborationRevision,setCollaborationRevision]=useState(0);
  const[requiresApproval,setRequiresApproval]=useState(false);
  const[editingId,setEditingId]=useState<string|null>(null);
  // Folder move (AUD-02/WF-04) is dialog-scoped: the source is the right-clicked
@@ -81,7 +79,10 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  const latestWidth=useRef(sidebarWidth);
  const location=useLocation();
  const navigate=useNavigate();
- const explicitFolder=new URLSearchParams(location.search).get("folder");
+ const params=new URLSearchParams(location.search);
+ const explicitFolder=params.get("folder");
+ const requestedView=params.get("view");
+ const section:DocumentSection=requestedView==="favorites"||requestedView==="received"||requestedView==="sent"?requestedView:"files";
  const requested=explicitFolder||"folder_root";
  // Only directory visits enter this history, not browser visits to preview
  // and organization pages. A new visit discards the forward branch.
@@ -209,14 +210,6 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
    setMove(prev=>folderMoveFailed(prev,failure.notice,failure.unknown));
   }
  }
- // The actions bar follows the right-clicked tree node only until the
- // selection moves again; navigation restores it to the selected folder.
- useEffect(()=>{setActionsFolder(null);},[selected?.id]);
- // Tree context actions are explicit React intents: never click hidden DOM.
- function runFolderAction(folder:Folder,action:"rename"|"delete"){
-  setActionsFolder(folder);
-  setActionRequest({folderId:folder.id,action,id:++nextActionId.current});
- }
  function folderActionChanged(action:"rename"|"delete",folder:Folder){
   if(action==="delete"&&selected){
    // A subtree deletion invalidates an open descendant just as it invalidates
@@ -266,22 +259,9 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
   persistSidebarWidth(width);
  }
  return <AppShell user={user} onLogout={onLogout}>
-  <div className="panels document-explorer"><aside className="sidebar" style={{width:sidebarWidth+"px"}}>
+  <div className="panels document-explorer"><aside className="sidebar finder-sidebar" style={{width:sidebarWidth+"px"}}>
    <div className="sidebar-scroll">
-   {/* The tree stays mounted across reloadKey cycles (an upload commit, a folder
-       change, an edit save): unmounting it would drop keyboard focus and the
-       expand state, so the previous folders keep rendering while the fresh tree
-       loads and only the first load shows the loading/error states. */}
-   {folders.length===0&&status==="loading"&&<p><BrandLoadingLabel>正在加载目录…</BrandLoadingLabel></p>}
-   {folders.length===0&&status==="failed"&&<p role="alert" className="error">获取目录失败，请刷新重试</p>}
-   {folders.length>0&&<FolderTree items={folders} selected={selected?.id||""} isAdmin={user.isAdmin}
-    onRenameFolder={folder=>runFolderAction(folder,"rename")}
-    onMoveFolder={openMove}
-    onDeleteFolder={folder=>runFolderAction(folder,"delete")}
-    onManageGrants={folder=>setGrantsFolder(folder)}
-/>}
-   {folders.length>0&&status==="loading"&&<p className="hint">正在刷新目录…</p>}
-   {folders.length>0&&status==="failed"&&<p role="alert" className="error">目录刷新失败，以下为上次数据。</p>}
+    <FinderSidebar section={section} revision={collaborationRevision}/>
    </div>
    {/* The handle is a sibling of the scroll port, not a child of it: a 40-row
        tree would otherwise scroll the handle off screen while it stays
@@ -292,6 +272,10 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
     onKeyDown={onResizeKey}/>
    </aside>
    <main className="work">
+   {section!=="files"&&<CollaborationPanel embedded activeTab={section}
+    onSelectTab={tab=>navigate("/doc?view="+tab)}
+    onChanged={()=>setCollaborationRevision(value=>value+1)}/>}
+   {section==="files"&&<>
    {/* The path is a docked strip here, not inside the 40px top bar: it has to
        stay a <nav> landmark (DI-15) and VIS-11 allows only one nav in the
        header. Docked at 24px it costs a fraction of the row the old 44px
@@ -315,8 +299,8 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
        onClick={()=>switchView(mode.id)}><ExplorerViewGlyph mode={mode.id}/></RareButton>)}
      </div>
      <div className="folder-actions-slot">
-      <FolderActions folder={actionsFolder??selected} actionRequest={actionRequest} onActionHandled={()=>setActionRequest(null)} onActionComplete={()=>setActionsFolder(null)} isAdmin={user.isAdmin} onChanged={folderActionChanged}
-       onManageGrants={()=>setGrantsFolder(actionsFolder??selected)}/>
+      <FolderActions folder={selected} isAdmin={user.isAdmin} onChanged={folderActionChanged}
+       onMove={()=>openMove(selected)} onManageGrants={()=>setGrantsFolder(selected)}/>
      </div>
    </div>}
    {moveMessage&&<p role="status" className="notice">{moveMessage}</p>}
@@ -326,8 +310,10 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
       newFolderSlot={<NewFolderForm parentId={selected.id} onCreated={refreshTreeAndFiles}/>}/>
    </DropZone>}
    {!selected&&resolving&&<p role="status" className="empty">正在核验所选目录…</p>}
+   {!selected&&status==="loading"&&!resolving&&<p role="status" className="empty"><BrandLoadingLabel>正在加载目录…</BrandLoadingLabel></p>}
    {!selected&&inaccessible&&<p role="alert" className="empty">目录不存在或当前账号无权访问。<Link to="/doc">返回根目录</Link></p>}
    {!selected&&!resolving&&!inaccessible&&status!=="loading"&&<p className="empty">当前账号没有可访问的目录，请联系管理员授权。</p>}
+   </>}
    </main></div>
    {grantsFolder&&<QuickGrantsDialog folder={grantsFolder} onClose={()=>setGrantsFolder(null)}/>}
    {editingId&&<FileEditorBridge fileId={editingId} requiresApproval={requiresApproval}

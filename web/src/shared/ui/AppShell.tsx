@@ -27,7 +27,6 @@ export function BrandLogo({size,className,transparent=false}:{size:number;classN
 const NAV=[
  {to:"/doc",label:"文档管理"},
  {to:"/search",label:"全局搜索"},
- {to:"/workspace",label:"共享/关注"},
  {to:"/stats",label:"统计"},
  {to:"/approvals",label:"审批"},
  {to:"/lifecycle",label:"生命周期"},

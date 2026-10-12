@@ -26,8 +26,14 @@ type PickRow={folder:Folder;depth:number;path:string};
 // 分享 and the 关注 entry act on one explicitly chosen file or folder. Every
 // write is submitted to the server, which stays the authority on recipients,
 // actions and expiry.
-export function CollaborationPanel(){
- const[tab,setTab]=useState<"received"|"sent"|"favorites">("favorites");
+type CollaborationTab="received"|"sent"|"favorites";
+export function CollaborationPanel({embedded=false,activeTab,onSelectTab,onChanged}:{
+ embedded?:boolean;activeTab?:CollaborationTab;onSelectTab?:(tab:CollaborationTab)=>void;onChanged?:()=>void;
+}){
+ const[localTab,setLocalTab]=useState<CollaborationTab>("favorites");
+ const tab=activeTab??localTab;
+ const setTab=(next:CollaborationTab)=>{if(onSelectTab)onSelectTab(next);else setLocalTab(next);};
+ const[pickerOpen,setPickerOpen]=useState(!embedded);
  const[shares,setShares]=useState<Share[]>([]);
  const[favorites,setFavorites]=useState<Favorite[]>([]);
  const[status,setStatus]=useState("loading");
@@ -287,6 +293,7 @@ export function CollaborationPanel(){
   try{
    await collaborationApi.setFavorite(kind,id,false);
    say("已取消关注");
+   onChanged?.();
    refresh();
   }catch(error){say(errorCode(error)==="E_NETWORK"?"网络中断，取消关注结果未确认；请刷新列表核对":errorCopy(error,"操作失败"),errorCode(error)==="E_NETWORK"?"warning":"error");}
  }
@@ -317,6 +324,7 @@ export function CollaborationPanel(){
   }
   setRevokeTarget(null);
   say("已撤销分享");
+  onChanged?.();
   refresh();
   setRevokeBusy(false);
  }
@@ -328,6 +336,7 @@ export function CollaborationPanel(){
   try{
    await collaborationApi.setFavorite(target.kind,target.id,true);
    say(`已关注「${target.name}」`);
+   onChanged?.();
    refresh();
   }catch(error){
     say(errorCode(error)==="E_NETWORK"?"网络中断，关注结果未确认；请刷新列表核对":errorCopy(error,"关注失败"),errorCode(error)==="E_NETWORK"?"warning":"error");
@@ -345,20 +354,26 @@ export function CollaborationPanel(){
  function createdShare(){
   setShareTarget(null);
   say("已创建分享");
+  onChanged?.();
   setTab("sent");
   refresh();
  }
 
- return <div className="work-body collab-root">
-  <div className="toolbar collab-tabs"><div className="collab-tablist" role="tablist" aria-label="共享与关注">
+ function toggleCreate(){
+  if(tab==="favorites")setPickerOpen(value=>!value);
+  else{setPickerOpen(true);openCreate();}
+ }
+
+ return <div className={"work-body collab-root"+(embedded?" is-embedded":"")}>
+  {!embedded&&<div className="toolbar collab-tabs"><div className="collab-tablist" role="tablist" aria-label="共享与关注">
    <RareButton type="button" role="tab" aria-selected={tab==="favorites"} className={tab==="favorites"?"on":""} onClick={()=>setTab("favorites")}>关注</RareButton>
    <RareButton type="button" role="tab" aria-selected={tab==="received"} className={tab==="received"?"on":""} onClick={()=>setTab("received")}>与我共享</RareButton>
    <RareButton type="button" role="tab" aria-selected={tab==="sent"} className={tab==="sent"?"on":""} onClick={()=>setTab("sent")}>我共享的</RareButton>
    </div>
    <RareButton type="button" className="primary collab-create-action" onClick={openCreate}>创建分享</RareButton>
-  </div>
-  <div className={"collab-workspace"+(tab==="favorites"?" with-picker":"")}>
-  {tab==="favorites"&&<section className={"share-workbench"+(pickKind==="file"?" is-file-mode":"")} aria-label="选择关注或分享资源">
+  </div>}
+  <div className={"collab-workspace"+(tab==="favorites"&&pickerOpen?" with-picker":"")}>
+  {tab==="favorites"&&pickerOpen&&<section className={"share-workbench"+(pickKind==="file"?" is-file-mode":"")} aria-label="选择关注或分享资源">
    <div className="share-workbench-head"><h3>选择资源</h3></div>
    {treeState==="loading"&&<p className="hint"><BrandLoadingLabel>正在读取目录…</BrandLoadingLabel></p>}
    {treeState==="failed"&&<>
@@ -436,9 +451,13 @@ export function CollaborationPanel(){
    </>}
   </section>}
   <div className="table collab-results">
-   <div className="collab-results-head">
+  <div className="collab-results-head">
     <strong>{tab==="favorites"?"我的关注":tab==="received"?"与我共享":"我共享的"}</strong>
     <span className="collab-results-count">{status==="ready"?"已加载 "+(tab==="favorites"?favorites.length:shares.length)+" 项"+(nextCursor?" · 还有更多":""):""}</span>
+    {embedded&&<RareButton type="button" className="primary collab-create-action"
+     aria-expanded={tab==="favorites"&&pickerOpen} onClick={toggleCreate}>
+     {tab==="favorites"?(pickerOpen?"收起":"添加关注 / 分享"):"创建分享"}
+    </RareButton>}
     <RareButton type="button" className="secondary-action" onClick={refresh}>刷新</RareButton>
    </div>
    <div className="collab-table-scroll">

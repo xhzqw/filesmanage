@@ -1,0 +1,33 @@
+/* Finder hierarchy, adapted to the system's existing blue/neutral RareUI tokens. */
+.document-explorer .finder-sidebar{background:var(--surface-header);border-color:var(--border-hairline)}
+.finder-navigation{display:flex;flex-direction:column;gap:17px;min-width:0;padding:15px 10px 20px}
+.finder-nav-section{display:flex;flex-direction:column;gap:3px;min-width:0}
+.finder-nav-label{padding:0 12px 5px;font-size:11px;font-weight:650;color:var(--text-tertiary);letter-spacing:.025em}
+.finder-nav-item,.finder-favorite-item{
+ box-sizing:border-box;display:flex;align-items:center;gap:11px;width:100%;min-width:0;min-height:36px;
+ padding:6px 11px;border:0;border-radius:10px;background:transparent;text-decoration:none;
+ color:var(--text-primary);font-size:13px;font-weight:540;text-align:left;
+ transition:background-color .15s ease,color .15s ease;
+}
+.finder-nav-item svg{flex:none;color:var(--brand-blue)}
+.finder-nav-item span,.finder-favorite-item span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.finder-nav-item:hover,.finder-favorite-item:hover{background:var(--surface-row-hover);text-decoration:none}
+.finder-nav-item.is-current{background:var(--surface-row-selected);color:var(--brand-blue);font-weight:650}
+.finder-favorite-item{min-height:31px;padding-left:29px;gap:9px;font-size:12px;font-weight:450}
+.finder-favorite-item svg{flex:none}
+.finder-nav-empty,.finder-nav-more,.finder-nav-retry{display:block;padding:5px 12px 5px 29px;font-size:11px;color:var(--text-tertiary)}
+.finder-nav-more{color:var(--brand-blue);text-decoration:none}
+.finder-nav-retry{border:0;background:transparent;text-align:left;cursor:pointer}
+.document-explorer .finder-sidebar .sidebar-scroll{padding:0;overflow-y:auto;overflow-x:hidden}
+.document-explorer .finder-sidebar .sidebar-resizer::after{background:transparent}
+.document-explorer .finder-sidebar .sidebar-resizer:hover::after,
+.document-explorer .finder-sidebar .sidebar-resizer[data-dragging="true"]::after{background:var(--brand-blue)}
+.document-explorer .collab-root{flex:1}
+.document-explorer .collab-root.is-embedded .collab-workspace{margin:0;gap:0}
+.document-explorer .collab-root.is-embedded .collab-results{border:0;border-radius:0}
+.document-explorer .collab-root.is-embedded .collab-results-head .collab-create-action{margin-left:auto;flex:none}
+.document-explorer .collab-root.is-embedded .collab-results-head .secondary-action{margin-left:0}
+.document-explorer .collab-root.is-embedded .share-workbench{margin:8px;border-radius:var(--radius-md)}
+@media(prefers-reduced-motion:reduce){
+ .finder-nav-item,.finder-favorite-item{transition:none}
+}

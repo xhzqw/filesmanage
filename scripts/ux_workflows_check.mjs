@@ -990,9 +990,9 @@ async function g4UiSuite() {
       (favList.body?.data ?? []).some((f) => f.resourceName === `g4-${stamp}.txt`), JSON.stringify((favList.body?.data ?? []).map((f) => f.resourceName)));
 
     // ---- WF-21: share wizard through the collaboration panel ----
-    await cdp.navigate(`${BASE}/workspace`);
-    const panelReady = await cdp.waitFor(`()=>document.body.textContent?.includes('创建分享')`, 20000);
-    check("collaboration panel offers 创建分享", Boolean(panelReady), String(panelReady));
+    await cdp.navigate(`${BASE}/doc?view=favorites`);
+    const panelReady = await cdp.waitFor(`()=>document.querySelector('.finder-nav-item[aria-current=page]') && document.querySelector('.collab-create-action')`, 20000);
+    check("collaboration panel is embedded in documents", Boolean(panelReady), String(panelReady));
     const favoriteStatusBadge = await cdp.waitFor(`()=>{
       const row=[...document.querySelectorAll('.collab-results tbody tr')].find(r=>r.textContent?.includes(${JSON.stringify(`g4-${stamp}.txt`)}));
       const badge=row?.querySelector('.rare-badge[data-rare-badge-tone=success]');
@@ -1002,24 +1002,23 @@ async function g4UiSuite() {
     // User-facing default and geometry: the primary list must not sit below
     // a full-width creator or a centered directory picker on desktop.
     const collaborationLayout = await cdp.evaluate(`(()=>{
-      const tabs=document.querySelector('.collab-tablist');
-      const first=tabs?.querySelector('[role=tab]');
-      const left=document.querySelector('.collab-workspace .share-workbench');
+      const first=document.querySelector('.finder-nav-item[href="/doc?view=favorites"]');
+      const left=document.querySelector('.finder-sidebar');
       const right=document.querySelector('.collab-workspace .collab-results');
       if(!left||!right)return {ready:false};
       const a=left.getBoundingClientRect(),b=right.getBoundingClientRect();
-      return {ready:true,first:first?.textContent?.trim(),selected:first?.getAttribute('aria-selected'),
-        left:a.left,right:b.left,sameRow:Math.abs(a.top-b.top)<3,
+      return {ready:true,first:first?.textContent?.trim(),selected:first?.getAttribute('aria-current'),
+        left:a.left,right:b.left,sameRow:a.right<=b.left+3,
         mainVisible:b.top<innerHeight-70,
         viewportOverflow:document.documentElement.scrollWidth-document.documentElement.clientWidth};
     })()`);
-    check("collaboration defaults to 关注 with left resource picker and right results",
-      collaborationLayout.ready&&collaborationLayout.first==="关注"
-      &&collaborationLayout.selected==="true"&&collaborationLayout.sameRow
+    check("collaboration defaults to Finder favorites and right results",
+      collaborationLayout.ready&&collaborationLayout.first==="我的关注"
+      &&collaborationLayout.selected==="page"&&collaborationLayout.sameRow
       &&collaborationLayout.right>collaborationLayout.left
       &&collaborationLayout.mainVisible&&collaborationLayout.viewportOverflow<=1,
       JSON.stringify(collaborationLayout));
-    await cdp.evaluate(`(()=>{[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='创建分享')?.click();return true;})()`);
+    await cdp.evaluate(`(()=>{document.querySelector('.collab-create-action')?.click();return true;})()`);
     // the panel switches to its inline workbench: filter the visible tree, pick the fixture folder
     const benchReady = await cdp.waitFor(`()=>document.querySelector('#share-picker-filter')!==null`, 10000);
     check("WF-21 resource workbench opens", benchReady === true, String(benchReady));

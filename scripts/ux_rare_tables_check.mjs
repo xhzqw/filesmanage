@@ -120,13 +120,13 @@ async function run(){
  if(!page)throw Error("headless Chrome not ready");
  cdp=await Browser.create(page.webSocketDebuggerUrl);
  await cdp.send("Page.enable");await cdp.send("Runtime.enable");await cdp.send("Network.enable");
- await cdp.send("Network.setCookie",{name:"fm_session",value:cookie.slice(11),url:BASE+"/workspace",httpOnly:true});
+ await cdp.send("Network.setCookie",{name:"fm_session",value:cookie.slice(11),url:BASE+"/doc",httpOnly:true});
  for(const width of [390,760,1366]){
   await cdp.send("Emulation.setDeviceMetricsOverride",{width,height:840,deviceScaleFactor:1,mobile:false});
-  await cdp.goto("/workspace",".collab-favorites-table");
+  await cdp.goto("/doc?view=favorites",".collab-favorites-table");
   await inspect("favorites "+width+"px",".collab-favorites-table",fileName,"td:first-child a",".collab-action-cell button");
   if(recipient){
-   await cdp.eval("(()=>{[...document.querySelectorAll('.collab-tablist button')].find(b=>b.textContent?.trim()==='我共享的').click();return true;})()");
+   await cdp.eval("(()=>{document.querySelector('.finder-nav-item[href=\"/doc?view=sent\"]')?.click();return true;})()");
    await inspect("shares "+width+"px",".collab-shares-table",fileName,"td:first-child a","td:nth-last-child(2) .rare-badge");
   }
   await cdp.goto("/trash",".trash-table");
