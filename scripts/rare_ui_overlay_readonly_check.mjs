@@ -280,6 +280,25 @@ try{
     selectedBackground:current?getComputedStyle(current).backgroundColor:null,
     overflow:document.documentElement.scrollWidth-innerWidth};})()`);
   assert(folderTree.search&&folderTree.overflow<=1,"folder tree searchable at "+width+": "+JSON.stringify(folderTree));
+  // The explorer is one frame with one internal seam. Search and first-row
+  // edges must line up, without nesting a second focus outline.
+  const explorer=await evalJS(`(()=>{const panel=document.querySelector(".panels.document-explorer"),
+   sidebar=panel?.querySelector(".sidebar"),work=panel?.querySelector(".work"),
+   control=panel?.querySelector(".tree-search-control"),
+   input=control?.querySelector(".tree-search"),row=panel?.querySelector(".tree>li>.tree-row");
+   if(!panel||!sidebar||!work||!control||!input)return null;
+   const cs=getComputedStyle,rect=control.getBoundingClientRect();input.focus();
+   const geometry={gap:cs(panel).columnGap,sideLeft:cs(sidebar).borderLeftWidth,
+    sideRight:cs(sidebar).borderRightWidth,sideBottom:cs(sidebar).borderBottomWidth,
+    workLeft:cs(work).borderLeftWidth,workRight:cs(work).borderRightWidth,
+    inputOutline:cs(input).outlineStyle,searchHeight:rect.height,
+    aligned:!row||Math.abs(rect.left-row.getBoundingClientRect().left)<=2,
+    contained:rect.left>=sidebar.getBoundingClientRect().left&&rect.right<=sidebar.getBoundingClientRect().right};
+   input.blur();return geometry;})()`);
+  assert(explorer&&explorer.gap==="0px"&&explorer.sideLeft==="0px"&&explorer.workLeft==="0px"&&explorer.workRight==="0px"&&
+   (width<=700?explorer.sideRight==="0px"&&explorer.sideBottom==="1px":explorer.sideRight==="1px")&&
+   explorer.inputOutline==="none"&&explorer.searchHeight>=36&&explorer.aligned&&explorer.contained,
+   "single-seam explorer and spacious directory search at "+width+": "+JSON.stringify(explorer));
   if(folderTree.selected)assert(folderTree.rail!=="none"&&folderTree.selectedBackground!=="rgba(0, 0, 0, 0)",
    "selected folder has visible Rare spring rail at "+width+": "+JSON.stringify(folderTree));
   if(width===1440){

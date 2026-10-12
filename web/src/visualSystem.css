@@ -28,6 +28,28 @@ html{overflow-x:clip}
 .work{overflow:hidden;background:var(--surface-canvas)}
 .work.file-preview-page{overflow-y:auto;overflow-x:hidden}
 .sidebar-scroll{padding:5px 4px}
+/* File explorer: one continuous workspace, not two outlined cards plus a
+   permanent resize rail. The only internal stroke is the pane separator. */
+.panels.document-explorer{
+  gap:0;
+  overflow:hidden;
+  border:1px solid var(--border-hairline);
+  border-radius:var(--radius-lg);
+  background:var(--surface-panel);
+  box-shadow:var(--shadow-panel);
+}
+.document-explorer>.sidebar,.document-explorer>.work{
+  border:0;
+  border-radius:0;
+  box-shadow:none;
+}
+.document-explorer>.sidebar{border-right:1px solid var(--border-hairline)}
+.document-explorer .sidebar-resizer::after{opacity:0;transition:opacity .12s ease}
+.document-explorer .sidebar-resizer:is(:hover,:focus-visible)::after,
+.document-explorer .sidebar-resizer[data-dragging="true"]::after{opacity:1}
+@media(max-width:700px){
+  .document-explorer>.sidebar{border-right:0;border-bottom:1px solid var(--border-hairline)}
+}
 .sidebar .tree-row{
   width:calc(100% - 8px);
   margin-inline:4px;

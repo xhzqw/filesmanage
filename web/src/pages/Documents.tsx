@@ -237,7 +237,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
   persistSidebarWidth(width);
  }
  return <AppShell user={user} onLogout={onLogout}>
-  <div className="panels"><aside className="sidebar" style={{width:sidebarWidth+"px"}}>
+  <div className="panels document-explorer"><aside className="sidebar" style={{width:sidebarWidth+"px"}}>
    <div className="sidebar-scroll">
    {/* The tree stays mounted across reloadKey cycles (an upload commit, a folder
        change, an edit save): unmounting it would drop keyboard focus and the
