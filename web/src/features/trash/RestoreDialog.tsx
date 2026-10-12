@@ -1,4 +1,5 @@
 import {RareButton,RareInput} from "../../shared/ui/rare";
+import {toast} from "../../shared/ui/feedback";
 import {useEffect,useMemo,useState}from"react";
 import {request}from"../../shared/http";
 import type {Folder}from"../../entities/folder/model";
@@ -95,21 +96,26 @@ export function RestoreDialog({entry,onClose,onRestored,onReload}:{
   const renamed=newName.trim()!==entry.oldName?newName.trim():"";
   try{
    await trashApi.restore(entry.id,targetId,renamed,explicitChoice);
+   toast.success("资源已恢复");
    onRestored();
   }catch(error){
    const code=errorCode(error);
    if(code==="E_NAME_CONFLICT"){
     setStage("rename");
     setMessage(errorCopy(error,"名称已存在，请更换"));
+    toast.warning("恢复遇到同名资源，请修改名称后重试");
    }else if(code==="E_PARENT_MISSING"){
     setLocationChanged(true);setExplicitChoice(false);setTargetId("");setStage("pick");
     setMessage(errorCopy(error,"原目录位置已变化，请重新选择恢复目录"));
+    toast.warning("原恢复位置已变化，请重新选择目录");
    }else if(code==="E_NETWORK"){
     // The request outcome is unknown: never claim the restore completed.
     setUnknown(true);
     setMessage("网络中断，无法确认是否已恢复，请刷新查看状态。");
+    toast.warning("恢复结果未确认，请刷新回收站后核对");
    }else{
     setMessage(errorCopy(error,"恢复失败"));
+    toast.error(errorCopy(error,"恢复失败"));
    }
   }finally{
    setBusy(false);

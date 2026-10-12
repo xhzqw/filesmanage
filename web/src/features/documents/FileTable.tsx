@@ -1,4 +1,5 @@
 import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
+import {toast} from "../../shared/ui/feedback";
 import {useEffect,useMemo,useRef,useState,type ChangeEvent,type DragEvent,type FormEvent,type KeyboardEvent,type MouseEvent,type ReactNode}from "react";
 import {useNavigate}from "react-router-dom";
 import type {FileItem} from "../../entities/file/model";
@@ -352,6 +353,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  function announce(text:string,tone:"info"|"error"){
   setMessage(text);
   setMessageTone(tone);
+  // Queue admission is announced by uploadStore for both toolbar and drag uploads.
+  if(text.trim()&&!text.startsWith("已加入上传队列："))(tone==="error"?toast.error:toast.success)(text);
  }
 
 

@@ -1,4 +1,5 @@
 import {RareBadge,RareButton,RareDataTable,RareInput,RareNotice,RareRowActions,RareSelect} from "../../shared/ui/rare";
+import {toast} from "../../shared/ui/feedback";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useEffect,useMemo,useRef,useState,type FormEvent} from "react";
 import {Link,useSearchParams} from "react-router-dom";
@@ -35,6 +36,9 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
  const [refresh,setRefresh]=useState(0);
  useEffect(()=>observeWorkspaceChange(()=>setRefresh(n=>n+1),["permissions","folder"]),[]);
  const [notice,setNotice]=useState<{text:string;error:boolean}|null>(null);
+ useEffect(()=>{
+  if(notice)(notice.error?toast.error:toast.success)(notice.text);
+ },[notice]);
  const [subjectKind,setSubjectKind]=useState<"user"|"group">("group");
  const [subjectId,setSubjectId]=useState("");
  const [actions,setActions]=useState<string[]>(["list"]);
@@ -131,6 +135,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
    setRevokeError(errorCode(e)==="E_NETWORK"
     ?"网络中断，撤销结果未知。关闭弹窗并刷新授权后确认。"
     :errorCopy(e,"撤销失败"));
+   toast.warning(errorCode(e)==="E_NETWORK"?"撤销结果未确认，请刷新授权记录核对":"撤销授权失败，请重试");
   }finally{setRevokeBusy(false);}
  }
  return <div className="perm-content-root">

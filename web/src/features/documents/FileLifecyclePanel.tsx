@@ -1,5 +1,6 @@
 import {useEffect,useState} from "react";
 import {RareBadge,RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
+import {toast} from "../../shared/ui/feedback";
 import {Dialog} from "../../shared/ui/Dialog";
 import {errorCopy} from "../../shared/errors";
 import {fileApi,type FileLifecycle} from "./api";
@@ -36,7 +37,10 @@ export function FileLifecyclePanel({fileId,currentSeq,lifecycle,onUpdated}:{file
   if(busy||!lifecycle)return;
   setBusy(true);setError("");
   try{
-   const value=await fileApi.setLifecycle(fileId,{action,expectedVersionSeq:currentSeq,dueAt:dueUTC(),note:note.trim(),...(action==="archive"?{retentionDays}:{}),...(action==="assign"?{responsibleId:assignee}:{})});
+   const labels={publish:"文档已发布",archive:"文档已归档",unarchive:"文档已解除归档",set_due:"到期日期已更新",assign:"负责人已更新"};
+   const value=await toast.track(()=>fileApi.setLifecycle(fileId,{action,expectedVersionSeq:currentSeq,dueAt:dueUTC(),note:note.trim(),...(action==="archive"?{retentionDays}:{}),...(action==="assign"?{responsibleId:assignee}:{})}),{
+    loading:"正在更新文档生命周期…",success:labels[action],error:e=>errorCopy(e,"生命周期更新失败")
+   });
    onUpdated(value);setConfirmArchive(false);
   }catch(e){setError(errorCopy(e,"生命周期更新失败，请确认权限或当前版本状态"));}
   finally{setBusy(false);}

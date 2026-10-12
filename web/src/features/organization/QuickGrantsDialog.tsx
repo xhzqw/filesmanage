@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useState,type FormEvent} from "react";
+import {toast} from "../../shared/ui/feedback";
 import type {Folder} from "../../entities/folder/model";
 import type {User} from "../../entities/user/model";
 import {RareButton,RareInput,RareNotice,RareSelect} from "../../shared/ui/rare";
@@ -27,6 +28,9 @@ export function QuickGrantsDialog({folder,onClose}:{folder:Folder;onClose:()=>vo
  const [busy,setBusy]=useState(false);
  const [unknown,setUnknown]=useState(false);
  const [notice,setNotice]=useState<{text:string;error:boolean}|null>(null);
+ useEffect(()=>{
+  if(notice)(notice.error?toast.error:toast.success)(notice.text);
+ },[notice]);
  const [kind,setKind]=useState<"user"|"group">("group");
  const [subject,setSubject]=useState("");
  const [actions,setActions]=useState<string[]>(["list"]);

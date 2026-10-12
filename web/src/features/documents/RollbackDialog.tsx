@@ -1,4 +1,5 @@
 import {RareButton,RareInput} from "../../shared/ui/rare";
+import {toast} from "../../shared/ui/feedback";
 import {useEffect,useRef,useState,type FormEvent}from"react";
 import {fileApi}from"./api";
 import {errorCode,errorCopy}from"../../shared/errors";
@@ -53,11 +54,12 @@ export function RollbackDialog({fileId,currentSeq,version,onClose,onCommitted,on
    lock.current=lockToken;
    const result=await fileApi.rollback(fileId,version.versionSeq,currentSeq,lockToken,reason.trim(),newIdempotencyKey());
    lock.current="";
-   if(result.status==="pending"){onPending();return;}
+   if(result.status==="pending"){toast.info("回滚已提交审批，当前文件版本未改变");onPending();return;}
+   toast.success("已回滚并生成新的文件版本");
    onCommitted(result.versionSeq??0);
   }catch(error){
    const code=errorCode(error);
-   if(code==="E_VERSION_CONFLICT"){onConflict();return;}
+   if(code==="E_VERSION_CONFLICT"){toast.warning("版本已变化，请刷新后重新确认回滚");onConflict();return;}
    if(code==="E_APPROVAL_PENDING"){setMessage("该文件已有待处理的审批，请等待处理完成后再试");return;}
    if(code==="E_LOCKED"){
     let hint="文件被其他编辑锁定";
@@ -72,6 +74,7 @@ export function RollbackDialog({fileId,currentSeq,version,onClose,onCommitted,on
     // The request outcome is unknown: never claim success or failure.
     setUnknown(true);
     setMessage("网络中断，无法确认回滚是否已提交，请刷新查看状态。");
+    toast.warning("回滚结果未确认，请刷新版本记录核对");
     return;
    }
    setMessage(errorCopy(error,"回滚失败"));

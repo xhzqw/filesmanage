@@ -2,6 +2,7 @@ import {useEffect,useRef,useState} from "react";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useNavigate} from "react-router-dom";
 import {RareButton} from "../../shared/ui/rare";
+import {toast} from "../../shared/ui/feedback";
 import {approvalActivityApi,type ApprovalNotification} from "./activityApi";
 import {lifecycleNotificationApi,type LifecycleNotice} from "./lifecycleNotificationApi";
 import "./notificationCenter.css";
@@ -51,7 +52,7 @@ export function NotificationCenter(){
     await approvalActivityApi.read(note.id);
     setNotes(current=>current.map(n=>n.id===note.id?{...n,read:true}:n));
     window.dispatchEvent(new Event("filesmanage:approval-notifications-read"));
-   }catch{setError("标记已读失败，可重试");setLoading(false);return;}
+   }catch{setError("标记已读失败，可重试");toast.error("标记已读失败，可重试");setLoading(false);return;}
   }
   setOpen(false);
   setLoading(false);
@@ -65,7 +66,7 @@ export function NotificationCenter(){
     await lifecycleNotificationApi.read(note.id);
     setLifecycleNotes(current=>current.map(n=>n.id===note.id?{...n,read:true}:n));
     window.dispatchEvent(new Event("filesmanage:lifecycle-notifications-read"));
-   }catch{setError("标记已读失败，可重试");setLoading(false);return;}
+   }catch{setError("标记已读失败，可重试");toast.error("标记已读失败，可重试");setLoading(false);return;}
   }
   setOpen(false);setLoading(false);
   navigate("/preview/"+encodeURIComponent(note.fileId));

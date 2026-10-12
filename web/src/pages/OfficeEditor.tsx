@@ -1,4 +1,5 @@
 import {RareButton} from "../shared/ui/rare";
+import {toast} from "../shared/ui/feedback";
 import {useEffect,useRef,useState} from "react";
 import {useParams} from "react-router-dom";
 import {fileApi} from "../features/documents/api";
@@ -150,6 +151,7 @@ export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
       dirty.current=false;
       setSaveState("saved");
       setSaveMessage("已保存至文档库 · v"+receipt.versionSeq);
+      toast.success("文档已保存至文档库 · v"+receipt.versionSeq);
      }else{
       setSaveState("dirty");
       setSaveMessage("新修改待保存");
@@ -157,6 +159,7 @@ export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
     }else if(failed){
      setSaveState("failed");
      setSaveMessage("保存失败，请重试编辑器左上角的保存");
+     toast.error("保存失败，请重试编辑器左上角的保存");
     }
    }catch{
     if(active){setSaveState("failed");setSaveMessage("无法确认服务器保存状态，请检查网络");}
@@ -173,6 +176,7 @@ export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
   }catch{
    setSaveState("failed");
    setSaveMessage("结束编辑失败，请重试以免会话状态丢失");
+   toast.error("结束编辑失败，请重试");
    return;
   }
   window.location.href="/preview/"+id;

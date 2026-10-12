@@ -1,4 +1,5 @@
 import {RareButton,RareTextarea} from "../../shared/ui/rare";
+import {toast} from "../../shared/ui/feedback";
 import {useEffect,useState,type FormEvent}from "react";
 import {fileApi,formatSize}from "./api";
 import {assessEditable,encodeEditedText,type EditAssessment}from "./safeEdit";
@@ -93,6 +94,7 @@ export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileIte
     await fileApi.submitForApproval(file.id,baseSeq,data);
     setLoaded(content);
     setMessage("已提交审批，通过后生成新版本；当前生效版本未变。");
+    toast.success("修改已提交审批，当前生效版本未变");
     onSaved();
     return;
    }
@@ -105,10 +107,12 @@ export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileIte
    setBaseSeq(result.versionSeq);
    setLoaded(content);
    setMessage(`已保存为 v${result.versionSeq}`);
+   toast.success(`文件已保存为 v${result.versionSeq}`);
    onSaved();
   }catch(error){
    const code=errorCode(error);
-   setMessage(code==="E_VERSION_CONFLICT"?"文件已被其他人修改，请刷新后重试":code==="E_LOCKED"?"编辑锁已失效，请重新打开编辑器":errorCopy(error,"保存失败"));
+   const detail=code==="E_VERSION_CONFLICT"?"文件已被其他人修改，请刷新后重试":code==="E_LOCKED"?"编辑锁已失效，请重新打开编辑器":errorCopy(error,"保存失败");
+   setMessage(detail);toast.error(detail);
   }finally{setBusy(false);}
  }
 

@@ -1,4 +1,5 @@
 import {RareButton} from "../shared/ui/rare";
+import {toast} from "../shared/ui/feedback";
 import {useCallback,useEffect,useState} from "react";
 import {Link} from "react-router-dom";
 import type {User} from "../entities/user/model";
@@ -49,13 +50,15 @@ export function SessionDevices({user,onLogout}:{user:User;onLogout:()=>void}){
    if(confirm==="others"){
     const result=await sessionApi.revokeOthers();
     setNotice("已撤销 "+result.revoked+" 个其他登录会话。");
+    toast.success("已撤销 "+result.revoked+" 个其他登录会话");
    }else{
     await sessionApi.revoke(confirm);
     setNotice("该设备已退出登录。");
+    toast.success("该设备已退出登录");
    }
    setConfirm(null);
    await refresh();
-  }catch{setError("撤销未完成，服务器未确认操作成功。请重试。")}
+  }catch{setError("撤销未完成，服务器未确认操作成功。请重试。");toast.warning("服务器未确认会话撤销结果，请刷新后核对")}
   finally{setBusy(false)}
  }
  const others=sessions.filter(row=>!row.current);

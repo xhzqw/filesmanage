@@ -1,4 +1,5 @@
 import {RareBadge,RareButton,RareDataTable,RareInput,RareRowActions,RareTabs,MicroHoldToDelete} from "../shared/ui/rare";
+import {toast} from "../shared/ui/feedback";
 import {useEffect,useRef,useState,type FormEvent} from "react";
 import {Link,useNavigate,useParams} from "react-router-dom";
 import {fileApi,formatSize,type FileLifecycle} from "../features/documents/api";
@@ -132,12 +133,16 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  },[id]);
 
  function refresh(){setReloadToken(value=>value+1);}
- function announce(message:string,isError=false){setError(isError?message:"");setNotice(isError?"":message);}
+ function announce(message:string,isError=false){
+  setError(isError?message:"");setNotice(isError?"":message);
+  if(message)(isError?toast.error:toast.success)(message);
+ }
  function download(){
   if(!preview)return;
   const link=document.createElement("a");
   link.href=bytesUrl(preview.fileId);link.download=preview.name;
   document.body.append(link);link.click();link.remove();
+  toast.info("已交由浏览器处理下载，请在下载列表确认结果");
  }
  async function toggleFavorite(){
   if(favorite===null||favoriteBusy)return;
@@ -164,6 +169,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
   setBusy(true);
   try{
    await fileApi.remove(file.id);
+   toast.success("文件已移入回收站");
    navigate("/doc?folder="+encodeURIComponent(file.folderId),{replace:true});
   }catch(err){announce(errorCopy(err,"删除失败"),true);}
   finally{setBusy(false);}

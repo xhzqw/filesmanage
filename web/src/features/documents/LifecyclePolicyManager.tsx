@@ -1,6 +1,7 @@
 import {useEffect,useMemo,useState} from "react";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
+import {toast} from "../../shared/ui/feedback";
 import {errorCopy} from "../../shared/errors";
 import {lifecycleWorkspaceApi,type LifecyclePolicyView,type LifecycleScope} from "./lifecycleWorkspaceApi";
 
@@ -37,8 +38,10 @@ export function LifecyclePolicyManager(){
   if(!id||busy)return;
   setBusy(true);setError("");setNotice("");
   try{
-   if(clear)await lifecycleWorkspaceApi.clearPolicy(kind,id);
-   else await lifecycleWorkspaceApi.savePolicy(kind,id,{dueDays,retentionDays});
+   await toast.track(()=>clear?lifecycleWorkspaceApi.clearPolicy(kind,id):lifecycleWorkspaceApi.savePolicy(kind,id,{dueDays,retentionDays}),{
+    loading:"正在保存生命周期策略…",success:clear?"已恢复上级策略":"生命周期策略已保存",
+    error:e=>errorCopy(e,"保存生命周期策略失败")
+   });
    setNotice(clear?"已恢复上级策略":"策略已保存");setVersion(v=>v+1);
   }catch(e){setError(errorCopy(e,"保存策略失败"));}finally{setBusy(false)}
  }

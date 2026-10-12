@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState,type FormEvent} from "react";
 import {RareButton,RareInput,RareSelect,RareTextarea} from "../../shared/ui/rare";
+import {toast} from "../../shared/ui/feedback";
 import {errorCopy} from "../../shared/errors";
 import {fileApi,type FileReviewComment} from "./api";
 import type {FileVersion} from "../../entities/file/model";
@@ -33,14 +34,21 @@ export function FileReviewPanel({fileId,versions}:{fileId:string;versions:FileVe
   if(lineNumber!==undefined&&(!Number.isInteger(lineNumber)||lineNumber<1||lineNumber>1000000)){setError("行号必须是 1～1000000 的整数");return;}
   setBusy(true);setError("");
   try{
-   await fileApi.addReviewComment(fileId,{version:seq,lineNumber,body:body.trim()});
+   await toast.track(()=>fileApi.addReviewComment(fileId,{version:seq,lineNumber,body:body.trim()}),{
+    loading:"正在提交批注…",success:"批注已添加",error:e=>errorCopy(e,"新增批注失败")
+   });
    setBody("");setLine("");setRefresh(i=>i+1);
   }catch(err){setError(errorCopy(err,"新增批注失败"));}
   finally{setBusy(false);}
  }
  async function resolve(comment:FileReviewComment){
   if(busy)return;setBusy(true);setError("");
-  try{await fileApi.resolveReviewComment(fileId,comment.id);setRefresh(i=>i+1);}
+  try{
+   await toast.track(()=>fileApi.resolveReviewComment(fileId,comment.id),{
+    loading:"正在更新批注状态…",success:"批注已标记为解决",error:e=>errorCopy(e,"标记解决失败")
+   });
+   setRefresh(i=>i+1);
+  }
   catch(e){setError(errorCopy(e,"无法标记已解决（需作者或修改权限）"));}
   finally{setBusy(false);}
  }

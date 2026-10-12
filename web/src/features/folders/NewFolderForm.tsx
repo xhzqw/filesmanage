@@ -1,4 +1,5 @@
 import {RareButton,RareInput} from "../../shared/ui/rare";
+import {toast} from "../../shared/ui/feedback";
 import {useState,type FormEvent} from "react";
 import {folderApi} from "./api";
 import {errorCode} from "../../shared/errors";
@@ -15,7 +16,10 @@ export function NewFolderForm({parentId,onCreated}:{parentId:string;onCreated:(n
   if(name.trim()==="")return;
   setBusy(true);setMessage("");
   try{
-   await folderApi.create(parentId,name.trim());
+   await toast.track(()=>folderApi.create(parentId,name.trim()),{
+    loading:"正在创建文件夹…",success:"文件夹已创建",
+    error:error=>errorCode(error)==="E_FORBIDDEN"?"当前目录没有新建权限":"新建失败：名称冲突或输入非法"
+   });
    onCreated(name.trim());
    setName("");
    setOpen(false);

@@ -1,4 +1,5 @@
 import {RareButton,RareInput} from "../../shared/ui/rare";
+import {toast} from "../../shared/ui/feedback";
 import {useEffect,useRef,useState,type FormEvent} from "react";
 import type {Folder} from "../../entities/folder/model";
 import {folderApi} from "./api";
@@ -33,7 +34,9 @@ export function FolderActions({folder,actionRequest,onActionHandled,onActionComp
   if(renameBusy)return;
   setMessage("");setRenameBusy(true);
   try{
-   await folderApi.rename(folder.id,renameValue.trim());
+   await toast.track(()=>folderApi.rename(folder.id,renameValue.trim()),{
+    loading:"正在重命名文件夹…",success:"文件夹已重命名",error:e=>errorCopy(e,"重命名失败")
+   });
    finishRename();
    onChanged("rename",folder);
   }catch(error){
@@ -43,7 +46,12 @@ export function FolderActions({folder,actionRequest,onActionHandled,onActionComp
 
  async function remove(){
   setMessage("");setRemoveBusy(true);
-  try{await folderApi.remove(folder.id);finishDelete();onChanged("delete",folder);}
+  try{
+   await toast.track(()=>folderApi.remove(folder.id),{
+    loading:"正在移动文件夹至回收站…",success:"文件夹已移入回收站",error:e=>errorCopy(e,"删除失败")
+   });
+   finishDelete();onChanged("delete",folder);
+  }
   catch(error){setMessage(errorCopy(error,"删除失败"));}
   finally{setRemoveBusy(false);}
  }

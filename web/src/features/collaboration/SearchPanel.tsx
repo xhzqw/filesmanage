@@ -1,4 +1,5 @@
 import {RareButton,RareDataTable,RareInput,RareSelect} from "../../shared/ui/rare";
+import {toast} from "../../shared/ui/feedback";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useEffect,useMemo,useRef,useState,type FormEvent} from "react";
 import {Link} from "react-router-dom";
@@ -101,8 +102,8 @@ export function SearchPanel({userId}:{userId:string}){
   const fields:SearchPresetFields={q,category,tag,uploader,type,sort,limit:pageSize,scope,folder,from,to};
   try{
    setPresets(await searchPresetsApi.save(title,fields));
-   setPresetName("");setMessage(`已同步搜索条件：${title}`);
-  }catch{setPresetError("保存失败或已达到 12 条限制");}
+   setPresetName("");setMessage(`已同步搜索条件：${title}`);toast.success("搜索预设已保存");
+  }catch{setPresetError("保存失败或已达到 12 条限制");toast.error("搜索预设保存失败或已达到 12 条限制");}
   finally{setPresetBusy(false);}
  }
  function loadPreset(preset:SearchPresetFields){
@@ -112,6 +113,7 @@ export function SearchPanel({userId}:{userId:string}){
   setFolder(preset.folder);setFrom(preset.from);setTo(preset.to);setShowAdvanced(true);
   epochRef.current++;setQuery(null);setItems([]);setStatus("idle");
   setMessage("预设已加载，点击搜索或应用筛选执行");
+  toast.info("搜索预设已加载");
  }
  async function deletePreset(id:string){
   if(presetBusy)return;
@@ -119,7 +121,8 @@ export function SearchPanel({userId}:{userId:string}){
   try{
    await searchPresetsApi.remove(id);
    setPresets(await searchPresetsApi.list());
-  }catch{setPresetError("删除失败，请重试");}
+   toast.success("搜索预设已删除");
+  }catch{setPresetError("删除失败，请重试");toast.error("删除搜索预设失败，请重试");}
   finally{setPresetBusy(false);}
  }
  useEffect(()=>{

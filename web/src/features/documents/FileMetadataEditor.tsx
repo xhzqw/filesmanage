@@ -1,5 +1,6 @@
 import {useEffect,useState,type FormEvent} from "react";
 import {RareBadge,RareButton,RareInput,RareTextarea} from "../../shared/ui/rare";
+import {toast} from "../../shared/ui/feedback";
 import {errorCopy} from "../../shared/errors";
 import {fileApi} from "./api";
 import type {FileMetadata} from "../../entities/file/model";
@@ -24,7 +25,9 @@ export function FileMetadataEditor({fileId}:{fileId:string}){
   event.preventDefault();if(busy)return;
   setBusy(true);setError("");
   try{
-   const value=await fileApi.setMetadata(fileId,{category:category.trim(),description:description.trim(),tags:tags.split(/[,，、]/).map(s=>s.trim()).filter(Boolean)});
+   const value=await toast.track(()=>fileApi.setMetadata(fileId,{category:category.trim(),description:description.trim(),tags:tags.split(/[,，、]/).map(s=>s.trim()).filter(Boolean)}),{
+    loading:"正在保存文档属性…",success:"文档属性已保存",error:e=>errorCopy(e,"保存文档属性失败")
+   });
    setMetadata(value);setEditing(false);
   }catch(err){setError(errorCopy(err,"保存失败"));}
   finally{setBusy(false);}

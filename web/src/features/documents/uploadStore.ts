@@ -1,4 +1,5 @@
 import{create}from"zustand";
+import {toast} from "../../shared/ui/feedback";
 import{errorCode}from"../../shared/errors";
 import{uploadFileWithProgress}from"../../shared/uploadClient";
 import{uploadResumable,resumableThreshold,resumableMaxFile}from"../../shared/resumableUpload";
@@ -89,6 +90,7 @@ export const useUploadStore=create<UploadState>((set,get)=>({
   const previous=new Set(get().tasks.map(t=>t.queueId));
   const epoch=identityEpoch;
   set({tasks:enqueue(get().tasks,files,targetFolderId)});
+  toast.info(`已加入上传队列：${files.length} 个文件`);
   for(const task of get().tasks.filter(t=>!previous.has(t.queueId)&&t.file&&t.size>=resumableThreshold&&t.size<=resumableMaxFile)){
    void fingerprintFile(task.file!).then(fingerprint=>{
     if(epoch!==identityEpoch)return;
@@ -147,6 +149,8 @@ useUploadStore.subscribe(state=>{
 async function pump(){
  if(pumping)return;
  pumping=true;
+ const ownerEpoch=identityEpoch;
+ let completed=0,failed=0;
  try{
   for(;;){
    const next=useUploadStore.getState().tasks.find(task=>task.status==="queued"&&task.file!==null);
@@ -179,15 +183,21 @@ async function pump(){
      // folder the page currently shows asks the page to reload its list.
      return next.targetFolderId===state.currentFolderId?{tasks,reloadTick:state.reloadTick+1}:{tasks};
     });
+    completed++;
    }catch(error){
     if(epoch!==identityEpoch)continue;
     useUploadStore.setState(state=>({tasks:errorCode(error)==="E_CANCELLED"?
      limitFinishedHistory(markCancelled(state.tasks,next.queueId)):markFailed(state.tasks,next.queueId,failureCopy(error))}));
+    if(errorCode(error)!=="E_CANCELLED")failed++;
    }finally{
     if(inFlight.get(next.queueId)===controller)inFlight.delete(next.queueId);
    }
   }
  }finally{
   pumping=false;
+  if(ownerEpoch===identityEpoch){
+   if(failed)toast.warning(`上传结束：成功 ${completed} 个，失败 ${failed} 个；请在上传队列处理失败项`);
+   else if(completed)toast.success(`已完成上传 ${completed} 个文件`);
+  }
  }
 }

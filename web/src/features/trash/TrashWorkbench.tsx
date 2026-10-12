@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useState} from "react";
+import {toast} from "../../shared/ui/feedback";
 import type {TrashEntry} from "../../entities/trash/model";
 import type {Folder} from "../../entities/folder/model";
 import {request} from "../../shared/http";
@@ -119,7 +120,10 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
  function updateKind(value:string){setKind(value);setOffset(0);}
  function updatePeriod(value:string){setPeriod(value);setOffset(0);}
  function updateSort(value:string){setSort(value);setOffset(0);}
- function notify(text:string,error=false){setNotice({text,error});}
+ function notify(text:string,error=false){
+  setNotice({text,error});
+  (error?toast.error:toast.success)(text);
+ }
  function chooseOne(id:string,checked:boolean){
   setSelected(current=>{const next=new Set(current);if(checked)next.add(id);else next.delete(id);return next;});
  }

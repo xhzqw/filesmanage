@@ -8,6 +8,8 @@ import "./authFeedback.css";
 import{CommandSpotlight}from "../features/collaboration/CommandSpotlight";
 import{NotificationCenter}from "../features/workflow/NotificationCenter";
 import{ShellAccessories}from "../shared/ui/ShellAccessories";
+import{ToastViewport}from "../shared/ui/ToastViewport";
+import{toast}from "../shared/ui/feedback";
 import{useUploadStore}from "../features/documents/uploadStore";
 import{useSession}from "./session";
 import{Login}from "../pages/Login";
@@ -25,7 +27,7 @@ export function App(){
  const user=useSession(s=>s.user),loading=useSession(s=>s.loading),setUser=useSession(s=>s.setUser),setLoading=useSession(s=>s.setLoading);
  const [logoutError,setLogoutError]=useState("");
  const logoutPending=useRef(false);
- useEffect(()=>{useUploadStore.getState().bindUser(user?.id??"");},[user?.id]);
+ useEffect(()=>{useUploadStore.getState().bindUser(user?.id??"");toast.clear();},[user?.id]);
  useEffect(()=>{let valid=true;authApi.me().then(u=>{if(valid)setUser(u)}).catch(()=>{if(valid)setUser(null)}).finally(()=>{if(valid)setLoading(false)});return()=>{valid=false}},[setLoading,setUser]);
  useEffect(()=>subscribeSessionIssues(issue=>{
   if(issue==="expired"){setUser(null);setLogoutError("");}
@@ -45,7 +47,7 @@ export function App(){
  }
  const feedback=logoutError?<div className="auth-feedback" role="alert"><span>{logoutError}</span><RareButton type="button" onClick={()=>void logout()}>重试退出</RareButton></div>:null;
  if(loading)return <main className="login-bg">正在检查会话…</main>;
- return <>{feedback}<ShellAccessories.Provider value={user?<NotificationCenter key={user.id}/>:null}><Routes><Route path="/login" element={user?<Navigate to="/doc" replace/>:<Login onSuccess={setUser}/>}/>
+ return <>{feedback}<ToastViewport/><ShellAccessories.Provider value={user?<NotificationCenter key={user.id}/>:null}><Routes><Route path="/login" element={user?<Navigate to="/doc" replace/>:<Login onSuccess={setUser}/>}/>
   <Route path="/doc" element={user?<Documents user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
   <Route path="/account/sessions" element={user?<SessionDevices user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/preview/:id" element={user?<Preview user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>

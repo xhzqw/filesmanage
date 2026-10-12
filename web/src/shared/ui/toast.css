@@ -1,0 +1,23 @@
+/* App-wide operation feedback, aligned with Rare semantic tokens. */
+.rare-toast-viewport{position:fixed;top:calc(var(--height-header) + 12px);right:16px;z-index:2100;
+ width:min(360px,calc(100vw - 24px));display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.rare-toast{--toast-accent:var(--brand-blue);display:flex;align-items:flex-start;gap:9px;min-width:0;
+ padding:11px 8px 11px 12px;background:var(--surface-panel);border:1px solid var(--border-hairline);
+ border-left:3px solid var(--toast-accent);border-radius:var(--radius-md);box-shadow:var(--shadow-overlay);
+ color:var(--text-primary);pointer-events:auto;animation:rare-toast-enter .16s ease-out}
+.rare-toast[data-toast-tone="success"]{--toast-accent:var(--status-success)}
+.rare-toast[data-toast-tone="warning"]{--toast-accent:var(--status-warning)}
+.rare-toast[data-toast-tone="danger"]{--toast-accent:var(--status-danger)}
+.rare-toast-mark{display:grid;place-items:center;flex:none;width:18px;height:18px;color:var(--toast-accent)}
+.rare-toast-mark svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.rare-toast-text{flex:1;min-width:0;padding-top:1px;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.rare-toast .rare-toast-close{display:grid;place-items:center;flex:none;padding:3px;width:22px;height:22px;min-height:22px;
+ color:var(--text-secondary);border:0;background:transparent;border-radius:var(--radius-xs)}
+.rare-toast .rare-toast-close:hover{background:var(--surface-subtle);color:var(--text-primary)}
+.rare-toast-close svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round}
+.rare-toast-spinner{display:block;width:14px;height:14px;border:2px solid var(--border-hairline);
+ border-top-color:var(--brand-blue);border-radius:50%;animation:rare-toast-spin .85s linear infinite}
+@keyframes rare-toast-spin{to{transform:rotate(360deg)}}
+@keyframes rare-toast-enter{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:600px){.rare-toast-viewport{top:calc(var(--height-header) + 8px);right:12px}}
+@media(prefers-reduced-motion:reduce){.rare-toast,.rare-toast-spinner{animation:none}}

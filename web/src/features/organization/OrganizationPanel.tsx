@@ -1,4 +1,5 @@
 import {RareTabs} from "../../shared/ui/rare/RareTabs";
+import {toast} from "../../shared/ui/feedback";
 import {RareBadge,RareButton,RareDataTable,RareInput,RareNotice,RareRowActions,RareSelect} from "../../shared/ui/rare";
 import {useCallback,useEffect,useRef,useState,type FormEvent} from "react";
 import {organizationApi} from "./api";
@@ -60,6 +61,9 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   setUsersToken,setDepartmentsToken,setGroupsToken,groupMembers,setGroupMembers,
   membersState,setMembersToken,reloadMembers}=useOrganizationDirectory(isAdmin,selectedGroup);
  const[notice,setNotice]=useState<Notice|null>(null);
+ useEffect(()=>{
+  if(notice)(notice.tone==="error"?toast.error:notice.text.startsWith("已")?toast.success:toast.info)(notice.text);
+ },[notice]);
 
  // 视图与筛选状态：默认 Tab 1 为部门成员，Tab 2 为工作组管理
  const[queryParams,setQueryParams]=useSearchParams();

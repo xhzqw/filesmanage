@@ -1,4 +1,5 @@
 import {RareBadge,RareButton,RareDataTable,RareInput,RareRowActions} from "../../shared/ui/rare";
+import {toast} from "../../shared/ui/feedback";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useEffect,useMemo,useRef,useState} from "react";
 import {Link} from "react-router-dom";
@@ -250,6 +251,7 @@ export function CollaborationPanel(){
  function say(text:string,tone:"info"|"error"="info"){
   setMessage(text);
   setMessageTone(tone);
+  if(text.trim())(tone==="error"?toast.error:toast.success)(text);
  }
 
  function refresh(){
@@ -310,7 +312,8 @@ export function CollaborationPanel(){
   try{
    await collaborationApi.revokeShare(share.id);
   }catch(error){
-   setRevokeMessage(errorCopy(error,"撤销失败"));
+   const detail=errorCopy(error,"撤销失败");
+   setRevokeMessage(detail);toast.error(detail);
    setRevokeBusy(false);
    return;
   }
