@@ -7,21 +7,48 @@
 .file-workbench-layout.is-collapsed,.file-workbench-layout.has-context.is-collapsed{grid-template-columns:56px minmax(0,1fr)}
 .file-workbench-main{position:relative;isolation:isolate;background:var(--surface-header)}
 .file-preview-identity{
- position:absolute;z-index:14;top:12px;left:14px;
- display:flex;align-items:center;gap:8px;
- max-width:min(590px,calc(100% - 28px));min-height:46px;
- padding:5px 10px;background:var(--surface-panel);
+ position:absolute;z-index:14;top:13px;left:14px;
+ display:flex;align-items:center;
+ width:max-content;min-width:0;max-width:min(530px,calc(100% - 28px));
+ min-height:46px;height:auto;box-sizing:border-box;
+ padding:6px 9px;background:var(--surface-panel);
  border:1px solid var(--border-hairline);border-radius:var(--radius-lg);
- box-shadow:var(--shadow-panel);overflow:hidden;
+ box-shadow:var(--shadow-panel);
 }
-.file-preview-identity .file-workbench-heading{display:flex;align-items:center;gap:8px;min-width:0}
-.file-preview-identity .file-workbench-type{width:30px;height:30px;min-width:30px;min-height:30px;font-size:10px;border-radius:var(--radius-sm)}
-.file-preview-identity .file-workbench-title{flex:1;min-width:0}
-.file-preview-identity .file-workbench-title h1{font-size:12px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:475px;margin:0 0 2px}
-.file-preview-identity .file-workbench-subtitle{gap:6px;flex-wrap:nowrap;overflow:hidden;white-space:nowrap;font-size:10px}
-.file-preview-identity .file-workbench-subtitle>span{white-space:nowrap}
+.file-preview-identity .file-workbench-heading{
+ display:flex;align-items:center;gap:8px;
+ min-width:0;max-width:100%;flex:0 1 auto;
+}
+.file-preview-identity .file-back{
+ display:flex;align-items:center;justify-content:center;
+ flex:0 0 32px;width:32px;height:32px;min-width:32px;
+ padding:0;margin:0;line-height:1;font-size:0;
+ background:var(--surface-header);border-radius:var(--radius-md);
+ color:var(--text-secondary);text-decoration:none;
+}
+.file-preview-identity .file-back svg{display:block;width:18px;height:18px;flex:none}
+.file-preview-identity .file-back:hover{background:var(--surface-row-hover);color:var(--brand-blue)}
+.file-preview-identity .file-workbench-type{
+ display:flex;align-items:center;justify-content:center;
+ flex:0 0 28px;width:28px;height:28px;min-width:28px;min-height:28px;
+ padding:0;border-radius:var(--radius-sm);font-size:9px;letter-spacing:0
+}
+.file-preview-identity .file-workbench-title{display:flex;flex-direction:column;justify-content:center;flex:0 1 auto;min-width:0;max-width:calc(100% - 76px);overflow:hidden}
+.file-preview-identity .file-workbench-title h1{
+ display:block;min-width:0;max-width:100%;margin:0 0 3px;
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+ font-size:12px;font-weight:650;line-height:1.25
+}
+.file-preview-identity .file-workbench-subtitle{
+ display:flex;align-items:center;flex-wrap:nowrap;gap:6px;
+ width:100%;min-width:0;margin:0;overflow:hidden;
+ white-space:nowrap;font-size:10px;line-height:1.25;
+}
+.file-preview-identity .file-workbench-subtitle>span{
+ display:inline-flex;flex:none;align-items:center;min-width:0;white-space:nowrap;
+}
 .file-preview-identity .file-workbench-subtitle span+span::before{margin-right:6px}
-.file-preview-identity .file-back{height:28px;width:27px;font-size:22px}
+.file-preview-identity .file-workbench-subtitle .rare-badge{flex:0 0 auto;font-size:10px}
 .file-sidebar-top{height:51px;display:flex;align-items:center;gap:9px;padding:6px 10px;color:var(--text-tertiary);font-size:11px;font-weight:550;letter-spacing:.01em}
 .file-workbench-sidebar{background:var(--surface-panel)}
 .file-sidebar-collapse.rare-button{display:inline-flex;align-items:center;justify-content:center;flex:0 0 34px;width:34px;height:34px;min-height:34px;padding:0;border:0;border-radius:var(--radius-md);color:var(--text-secondary);background:transparent}
@@ -83,8 +110,8 @@
  .file-workbench-layout.is-collapsed .file-workbench-sidebar{visibility:hidden;overflow:hidden}
  .file-workbench-sidebar{max-height:210px}
  .file-sidebar-top{height:40px}
- .file-workbench-main .file-preview-identity{top:7px;left:7px;max-width:calc(100% - 14px);padding:4px 7px}
- .file-preview-identity .file-workbench-title h1{max-width:45vw}
+ .file-workbench-main .file-preview-identity{top:8px;left:8px;max-width:calc(100% - 16px);padding:5px 7px}
+ .file-preview-identity .file-workbench-title h1{max-width:100%}
  .file-pdf-viewer .file-pdf-toolbar,.file-workbench-signing .seal-page-toolbar{bottom:8px;padding:4px;max-width:calc(100% - 14px)}
  .file-pdf-viewer .file-pdf-paper,.file-workbench-signing .seal-page-viewport{padding-top:67px;padding-bottom:77px}
 }

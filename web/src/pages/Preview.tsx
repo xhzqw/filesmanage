@@ -324,7 +324,13 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
       <div className="file-workbench-main">
      <header className="file-preview-identity">
       <div className="file-workbench-heading">
-       <Link to={file?"/doc?folder="+encodeURIComponent(file.folderId):"/doc"} className="file-back" aria-label="返回文件列表">‹</Link>
+       <Link to={file?"/doc?folder="+encodeURIComponent(file.folderId):"/doc"} className="file-back"
+        aria-label="返回文件列表" title="返回文件列表">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+         strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+         <path d="m14.5 5.5-6 6.5 6 6.5"/>
+        </svg>
+       </Link>
        <div className="file-workbench-type" aria-hidden="true">{fileExtension(preview.name).slice(0,5)}</div>
        <div className="file-workbench-title">
         <h1 title={preview.name}>{preview.name}</h1>

@@ -4,6 +4,7 @@ import {ShellAccessories} from "./ShellAccessories";
 import {useLocation,useNavigate} from "react-router-dom";
 import {Menu} from "./Menu";
 import {FolderResourceIcon} from "./ResourceIcons";
+import "./previewAutoHeader.css";
 import "./globalUtilityDock.css";
 
 // The shell only needs the display name; keeping the type structural avoids a
@@ -47,8 +48,32 @@ export function AppShell({user,onLogout,product,actions,children}:{user:ShellUse
  const[accountOpen,setAccountOpen]=useState(false);
  const accountRef=useRef<HTMLButtonElement>(null);
  const navToggleRef=useRef<HTMLButtonElement>(null);
+ const previewHeaderRef=useRef<HTMLElement>(null);
+ const revealRef=useRef<HTMLButtonElement>(null);
+ const hideHeaderTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+ const[previewHeaderOpen,setPreviewHeaderOpen]=useState(false);
  const navigate=useNavigate();
  const pathname=useLocation().pathname;
+ const previewRoute=pathname.startsWith("/preview/");
+ function cancelHeaderHide(){
+  if(hideHeaderTimer.current!==null){clearTimeout(hideHeaderTimer.current);hideHeaderTimer.current=null}
+ }
+ function showPreviewHeader(){
+  cancelHeaderHide();setPreviewHeaderOpen(true);
+ }
+ function schedulePreviewHeaderHide(){
+  cancelHeaderHide();
+  hideHeaderTimer.current=setTimeout(()=>{
+   hideHeaderTimer.current=null;
+   if(previewHeaderRef.current?.contains(document.activeElement))return;
+   if(revealRef.current===document.activeElement&&revealRef.current.matches(":focus-visible"))return;
+   setPreviewHeaderOpen(false);setAccountOpen(false);
+  },320);
+ }
+ useEffect(()=>{
+  cancelHeaderHide();setPreviewHeaderOpen(false);setAccountOpen(false);
+  return cancelHeaderHide;
+ },[previewRoute,pathname]);
  // Keep the main navigation tied to actual routes, including browser
  // back/forward; preview and account subpages have no misleading active tile.
  const activeNav=NAV.findIndex(item=>item.to===pathname);
@@ -59,8 +84,33 @@ export function AppShell({user,onLogout,product,actions,children}:{user:ShellUse
   if(open)document.querySelector<HTMLAnchorElement>("#shell-main-navigation a[href]")?.focus();
  },[open]);
 
- return <div className="shell">
-  <header className="header">
+ return <div className={"shell"+(previewRoute?" shell-preview-autoheader":"")}
+  onPointerDownCapture={event=>{
+   if(!previewRoute||event.pointerType==="mouse"||!previewHeaderOpen)return;
+   const target=event.target as HTMLElement;
+   if(!target.closest(".header, .preview-header-hotzone")){
+    cancelHeaderHide();setPreviewHeaderOpen(false);setAccountOpen(false);
+   }
+  }}>
+  {previewRoute&&<div className="preview-header-hotzone"
+   onPointerEnter={event=>{if(event.pointerType==="mouse"||event.pointerType==="pen")showPreviewHeader()}}
+   onPointerLeave={schedulePreviewHeaderHide}>
+   <button ref={revealRef} type="button" className="preview-header-reveal"
+    aria-label="显示系统顶部菜单" aria-controls="shell-main-navigation"
+    aria-expanded={previewHeaderOpen}
+    onFocus={showPreviewHeader} onClick={showPreviewHeader}
+    onKeyDown={event=>{if(event.key==="Escape"){event.preventDefault();cancelHeaderHide();setPreviewHeaderOpen(false);event.currentTarget.blur()}}}>
+    <span aria-hidden="true"/>
+   </button>
+  </div>}
+  <header ref={previewHeaderRef} className={"header"+(previewRoute&&previewHeaderOpen?" is-preview-header-open":"")}
+   onPointerEnter={event=>{if(previewRoute&&(event.pointerType==="mouse"||event.pointerType==="pen"))showPreviewHeader()}}
+   onPointerLeave={()=>{if(previewRoute)schedulePreviewHeaderHide()}}
+   onFocusCapture={()=>{if(previewRoute)showPreviewHeader()}}
+   onBlurCapture={()=>{if(previewRoute)schedulePreviewHeaderHide()}}
+   onKeyDown={event=>{if(previewRoute&&event.key==="Escape"&&!open){
+    event.preventDefault();cancelHeaderHide();setPreviewHeaderOpen(false);document.querySelector<HTMLButtonElement>(".file-sidebar-collapse")?.focus();
+   }}}>
    <RareButton ref={navToggleRef} type="button" className="nav-toggle" aria-label="导航菜单" aria-controls="shell-main-navigation"
     aria-expanded={open} onClick={()=>setOpen(v=>!v)}>☰</RareButton>
    <div className="brand"><BrandLogo size={22} className="brand-logo"/>中晟生物科技<span className="product">{product??"文档管理系统"}</span></div>

@@ -1,0 +1,40 @@
+/* The system menu yields its layout space in file preview, returning on edge hover/focus.
+   Only transform and opacity animate; other pages retain the normal static header. */
+.shell.shell-preview-autoheader{position:relative;gap:0}
+.shell.shell-preview-autoheader>.header{
+ position:absolute;top:8px;left:8px;right:8px;width:auto;z-index:70;
+ transform:translate3d(0,calc(-100% - 14px),0);opacity:0;
+ visibility:hidden;pointer-events:none;
+ transition:transform 260ms cubic-bezier(.22,1,.36,1),opacity 180ms ease,visibility 0s linear 260ms;
+}
+.shell.shell-preview-autoheader>.header.is-preview-header-open,
+.shell.shell-preview-autoheader>.header:focus-within{
+ transform:translate3d(0,0,0);opacity:1;visibility:visible;pointer-events:auto;
+ transition:transform 260ms cubic-bezier(.22,1,.36,1),opacity 180ms ease,visibility 0s;
+}
+.shell.shell-preview-autoheader>.preview-header-hotzone{
+ position:absolute;z-index:71;top:0;left:0;right:0;height:13px;
+ display:flex;align-items:flex-start;justify-content:center;
+}
+.preview-header-reveal{
+ width:72px;min-width:72px;height:13px;min-height:13px;padding:0;
+ display:flex;align-items:center;justify-content:center;
+ border:0;border-radius:0 0 var(--radius-md) var(--radius-md);
+ background:transparent;cursor:pointer;
+}
+.preview-header-reveal>span{
+ display:block;width:35px;height:3px;border-radius:var(--radius-pill);
+ background:var(--text-tertiary);opacity:.55;
+ transition:width 170ms ease,opacity 170ms ease,background-color 170ms ease;
+}
+.preview-header-reveal:hover>span,.preview-header-reveal:focus-visible>span,
+.shell.shell-preview-autoheader:has(.header.is-preview-header-open) .preview-header-reveal>span{
+ width:44px;opacity:.9;background:var(--brand-blue)
+}
+.shell.shell-preview-autoheader>.work{min-height:0;flex:1 1 auto}
+@media(prefers-reduced-motion:reduce){
+ .shell.shell-preview-autoheader>.header,
+ .shell.shell-preview-autoheader>.header.is-preview-header-open,
+ .shell.shell-preview-autoheader>.header:focus-within,
+ .preview-header-reveal>span{transition:none}
+}

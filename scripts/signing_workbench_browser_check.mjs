@@ -83,6 +83,48 @@ try{
  const previewReady=await cdp.waitFor(`()=>!!document.querySelector('.file-pdf-viewer .file-pdf-image')&&
   !!document.querySelector('.file-workbench-nav-item')`,16000);
  assert("regular PDF preview opens with visible document",Boolean(previewReady));
+ // Preview uses a real hidden shell header, not a fixed bar consuming content height.
+ const initiallyHidden=await cdp.evaluate(`(()=>{
+  const h=document.querySelector('.shell-preview-autoheader>.header');
+  const shell=document.querySelector('.shell');
+  const work=document.querySelector('.work');
+  if(!h||!shell||!work)return null;
+  const style=getComputedStyle(h);
+  const rect=work.getBoundingClientRect(),parent=shell.getBoundingClientRect();
+  return {hidden:style.visibility==='hidden',headBottom:h.getBoundingClientRect().bottom,
+   workOffset:Math.round(rect.top-parent.top),trigger:!!document.querySelector('.preview-header-reveal')};
+ })()`);
+ assert("preview initially hides system menu without reserving its height",
+  !!initiallyHidden&&initiallyHidden.hidden&&initiallyHidden.trigger&&initiallyHidden.workOffset<24,
+  JSON.stringify(initiallyHidden));
+ const identityGeometry=await cdp.evaluate(`(()=>{
+  const card=document.querySelector('.file-preview-identity');
+  const back=card?.querySelector('.file-back')?.getBoundingClientRect();
+  const svg=card?.querySelector('.file-back svg')?.getBoundingClientRect();
+  const heading=card?.querySelector('h1');
+  const title=heading?.getBoundingClientRect(),rect=card?.getBoundingClientRect();
+  if(!back||!svg||!rect||!title)return null;
+  return {width:rect.width,height:rect.height,titleClipped:heading.scrollWidth>heading.clientWidth,
+   arrowCentered:Math.abs(back.x+back.width/2-svg.x-svg.width/2)<1&&
+    Math.abs(back.y+back.height/2-svg.y-svg.height/2)<1,
+   titleWithinCard:title.right<=rect.right+1};
+ })()`);
+ assert("file identity is compact, title bounded and return arrow centered",
+  !!identityGeometry&&identityGeometry.width<540&&identityGeometry.height<70&&
+  identityGeometry.arrowCentered&&identityGeometry.titleWithinCard,JSON.stringify(identityGeometry));
+ await cdp.send("Input.dispatchMouseEvent",{type:"mouseMoved",x:720,y:2});
+ const headerShown=await cdp.waitFor(`()=>{
+  const h=document.querySelector('.shell-preview-autoheader>.header');
+  return h&&getComputedStyle(h).visibility==='visible'&&h.getBoundingClientRect().top>0;
+ }`,3500);
+ assert("moving mouse to screen top reveals header with animation",Boolean(headerShown));
+ await cdp.send("Input.dispatchMouseEvent",{type:"mouseMoved",x:720,y:450});
+ const headerHidden=await cdp.waitFor(`()=>{
+  const h=document.querySelector('.shell-preview-autoheader>.header');
+  return h&&getComputedStyle(h).visibility==='hidden'&&h.getBoundingClientRect().bottom<=0;
+ }`,3500);
+ assert("moving away from top dismisses header automatically",Boolean(headerHidden));
+
  const workspaceUI=await cdp.evaluate(`(()=>{
   const dock=document.querySelector('.header .global-utility-dock');
   const identity=document.querySelector('.file-workbench-main .file-preview-identity');
