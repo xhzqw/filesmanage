@@ -85,10 +85,11 @@
 }
 .file-current-version{color:var(--brand-blue);font-size:10px;border:1px solid var(--border-hairline);border-radius:var(--radius-pill);padding:1px 6px;margin-left:6px}
 .file-compare,.file-review{padding:14px 16px;min-width:0}
+.file-compare{padding-top:0}
 .file-compare-controls,.file-review-header{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap}
 .file-compare-controls label,.file-review-header label{display:flex;flex-direction:column;gap:5px;font-size:12px;min-width:125px}
 .file-compare-arrow{align-self:center;color:var(--text-secondary)}
-.file-compare-result{margin-top:13px;border:1px solid var(--border-hairline);border-radius:var(--radius-md);overflow:hidden}
+.file-compare-result{margin-top:0;min-width:0;overflow:hidden}
 .file-compare-stats{display:flex;gap:12px;flex-wrap:wrap;padding:9px 11px;border-bottom:1px solid var(--border-hairline);background:var(--surface-header);font-size:11px;color:var(--text-secondary)}
 .file-compare-stats strong{color:var(--text-primary)}
 .file-compare-lines{overflow:auto;max-height:65vh;font-family:var(--font-mono);font-size:11px;line-height:1.65}

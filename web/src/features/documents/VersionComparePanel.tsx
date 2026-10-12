@@ -55,34 +55,35 @@ export function VersionComparePanel({fileId,versions}:{fileId:string;versions:Fi
   return()=>{live=false;};
  },[fileId,left,right,retry]);
  if(ordered.length<2)return <div className="empty">至少需要两个版本才能对比。</div>;
- return <div className="file-compare">
-  <div className="file-compare-controls">
-   <label>基准版本<RareSelect value={left} onChange={e=>setLeft(Number(e.target.value))}>
-    {ordered.map(v=><option key={v} value={v}>v{v}</option>)}
-   </RareSelect></label>
-   <span className="file-compare-arrow" aria-hidden="true">→</span>
-   <label>对比版本<RareSelect value={right} onChange={e=>setRight(Number(e.target.value))}>
-    {ordered.map(v=><option key={v} value={v}>v{v}</option>)}
-   </RareSelect></label>
-   <RareButton type="button" onClick={()=>setRetry(x=>x+1)} disabled={left===right||state==="loading"}>刷新</RareButton>
-  </div>
-  {left===right&&<p className="hint">请选择两个不同的版本。</p>}
-  {state==="loading"&&<p role="status" className="hint">正在比较…</p>}
-  {state==="failed"&&<p role="alert" className="notice error">{error}</p>}
-  {result&&<div className="file-compare-result">
-   <div className="file-compare-stats">
-    <span>v{result.left.seq} · {result.left.sizeBytes.toLocaleString()} B</span>
-    <span>v{result.right.seq} · {result.right.sizeBytes.toLocaleString()} B</span>
-    {result.mode==="text"&&<strong>{result.detail==="office_semantic"?`${result.semanticChanges?.length??0} 处变化`:`+${result.added} / −${result.removed} 行`}</strong>}
+  return <div className="file-compare">
+   <div className="file-compare-toolbar">
+    <div className="file-compare-controls" role="group" aria-label="选择对比版本">
+     <label>基准<RareSelect value={left} onChange={e=>setLeft(Number(e.target.value))}>
+      {ordered.map(v=><option key={v} value={v}>v{v}</option>)}
+     </RareSelect></label>
+     <span className="file-compare-arrow" aria-hidden="true">→</span>
+     <label>对比<RareSelect value={right} onChange={e=>setRight(Number(e.target.value))}>
+      {ordered.map(v=><option key={v} value={v}>v{v}</option>)}
+     </RareSelect></label>
+    </div>
+    {result&&<div className="file-compare-summary" role="status">
+     {result.mode==="text"
+      ?<><strong>{result.detail==="office_semantic"?(result.semanticChanges?.length??0):changes.length} 处变更</strong>
+        {result.detail!=="office_semantic"&&<span>+{result.added} / −{result.removed} 行</span>}</>
+      :<span>v{result.left.seq} · {result.left.sizeBytes.toLocaleString()} B → v{result.right.seq} · {result.right.sizeBytes.toLocaleString()} B</span>}
+    </div>}
+    {result?.mode==="text"&&result.detail!=="office_semantic"&&<div className="file-compare-quicknav" role="group" aria-label="差异导航">
+     <RareButton type="button" disabled={changes.length===0} onClick={()=>focusChange(-1)}>上一处</RareButton>
+     <RareButton type="button" disabled={changes.length===0} onClick={()=>focusChange(1)}>下一处</RareButton>
+     <RareButton type="button" aria-pressed={showAll} onClick={()=>setShowAll(v=>!v)}>{showAll?"折叠未变更行":"显示全部行"}</RareButton>
+    </div>}
    </div>
+   {left===right&&<p className="file-compare-feedback">请选择不同的版本。</p>}
+   {state==="loading"&&left!==right&&<p role="status" className="file-compare-feedback">正在比较…</p>}
+   {state==="failed"&&<div role="alert" className="file-compare-feedback file-compare-failed"><span>{error}</span><RareButton type="button" onClick={()=>setRetry(x=>x+1)}>重试</RareButton></div>}
+   {result&&<div className="file-compare-result">
    {result.detail==="office_semantic"&&<p className="hint">语义差异：DOCX 按可提取段落、XLSX 按工作表及单元格值比较；不涵盖样式、公式重新计算或排版。</p>}
    {result.detail==="office_parts"&&<p className="hint">Office 部件差异：比较文档内部部件的名称、大小和 CRC32，不能代表段落文字或页面版式完全一致。</p>}
-   {result.mode==="text"&&result.detail!=="office_semantic"&&<div className="file-compare-quicknav">
-    <span>{changes.length} 处变更</span>
-    <RareButton type="button" disabled={changes.length===0} onClick={()=>focusChange(-1)}>上一处</RareButton>
-    <RareButton type="button" disabled={changes.length===0} onClick={()=>focusChange(1)}>下一处</RareButton>
-    <RareButton type="button" aria-pressed={showAll} onClick={()=>setShowAll(v=>!v)}>{showAll?"折叠未变更行":"显示全部行"}</RareButton>
-   </div>}
    {(result.mode==="metadata"||result.mode==="large")&&<div className="file-compare-hashes">
     <span>v{result.left.seq} SHA-256：<code>{result.left.sha256}</code></span>
     <span>v{result.right.seq} SHA-256：<code>{result.right.sha256}</code></span>

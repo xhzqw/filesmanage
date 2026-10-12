@@ -50,6 +50,11 @@
 }
 .file-preview-action-dock .file-action-item:hover{background:var(--surface-row-hover)}
 .file-preview-action-dock .file-action-item.is-danger{color:var(--status-danger)}
+/* Floating identity/actions need a shared safe area in history and compare.
+   Without it, their top controls sit beneath the filename card. */
+.file-workbench-main>.file-workbench-mode-panel:not(.file-workbench-signing){
+ box-sizing:border-box;padding-top:82px
+}
 /* Renderers keep their own behavior but share one restrained dock location. */
 .file-workbench-preview-surface .preview-reader-dock,
 .file-workbench-preview-surface .file-pdf-toolbar,
@@ -179,6 +184,7 @@
  .file-preview-identity{max-width:calc(100% - 16px)}
  .file-preview-action-dock{top:72px;right:8px}
  .file-preview-action-dock .file-workbench-actions>.rare-button{padding:0 7px}
+ .file-workbench-main>.file-workbench-mode-panel:not(.file-workbench-signing){padding-top:124px}
  .file-workbench-preview-surface .file-text-content{padding-top:120px}
 }
 @media(prefers-reduced-motion:reduce){.file-preview-action-dock .file-action-expansion{animation:none}}
