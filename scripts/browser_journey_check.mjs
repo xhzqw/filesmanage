@@ -298,6 +298,29 @@ async function main() {
     })()`);
     check("file metadata stays in left pane without remounting preview",
       !!details&&details.shown&&details.stable&&details.canvas,JSON.stringify(details));
+    // History replaces the right viewer, not the fixed-width navigation.
+    await cdp.evaluate(`(()=>{
+      [...document.querySelectorAll('.file-workbench-nav-item')].find(b=>b.textContent?.includes('历史记录'))?.click();
+    })()`);
+    const historyMode=await cdp.waitFor(`()=>Boolean(document.querySelector('.file-workbench-history .file-history-rail-layout'))`,10000);
+    const historySwap=await cdp.evaluate(`(()=>{
+      const left=document.querySelector('.file-workbench-sidebar')?.getBoundingClientRect();
+      const history=document.querySelector('.file-workbench-history')?.getBoundingClientRect();
+      const viewer=document.querySelector('.file-workbench-preview-surface');
+      return {leftWidth:left?.width,historyWidth:history?.width,
+        previewHidden:viewer?.hidden,monthRail:!!document.querySelector('.file-history-month-rail'),
+        leftHistory:!!document.querySelector('.file-sidebar-context .file-history')};
+    })()`);
+    check("history replaces right viewer with month rail and keeps left rail fixed",
+      Boolean(historyMode&&historySwap?.previewHidden&&historySwap.monthRail&&
+      !historySwap.leftHistory&&Math.abs(historySwap.leftWidth-240)<2&&
+      historySwap.historyWidth>historySwap.leftWidth),JSON.stringify(historySwap));
+    await cdp.evaluate(`(()=>{
+      [...document.querySelectorAll('.file-workbench-history .file-history-switch button')]
+       .find(b=>b.textContent?.includes('内容版本'))?.click();
+    })()`);
+    const versionSwap=await cdp.waitFor(`()=>document.querySelectorAll('.file-workbench-history .file-version-entry').length>=2`,7000);
+    check("content versions render in right history canvas",Boolean(versionSwap),"v1/v2 both present in main area");
     await cdp.evaluate(`(()=>{
       [...document.querySelectorAll('.file-workbench-nav-item')].find(b=>b.textContent?.trim()==='预览')?.click();
     })()`);
