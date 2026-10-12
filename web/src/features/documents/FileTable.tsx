@@ -19,6 +19,7 @@ import {BatchPrintDialog} from "./BatchPrintDialog";
 import {Menu,type MenuItem,type MenuPoint}from"../../shared/ui/Menu";
 import {MicroHoldToDelete}from"../../shared/ui/rare";
 import"./dragMove.css";
+import {setMoveDragImage} from "./dragPreview";
 import"./fileTable.css";
 
 type SortKey="updated_desc"|"name_asc"|"name_desc"|"size_desc";
@@ -243,8 +244,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  // WF-07/WF-08/ADR-UX-02: the multi-selection being moved through the
  // all-or-nothing batch endpoint — the snapshot the row menu opened on.
  const[movingBatch,setMovingBatch]=useState<FileItem[]|null>(null);
- // The live internal-move drag session (§7.2) plus the rows it came from, only
- // so the source rows can dim while the gesture is in flight.
+ // The live internal-move drag session (§7.2) and source-row lift state.
+ // The native drag image is a separate filename-only surface, not a table row.
  const dragSession=useRef<MoveDragSession|null>(null);
  const[draggingIds,setDraggingIds]=useState<Set<string>>(()=>new Set<string>());
  // A target preselected by a drop; "" is the menu entry, which opens the same
@@ -605,7 +606,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   // cursor over a gesture that moves would misstate the outcome (§7.2).
   dataTransfer.effectAllowed="move";
   dataTransfer.setData(DRAG_MIME,JSON.stringify(session));
-  dataTransfer.setData("text/plain",`移动 ${ids.length} 个文件`);
+  dataTransfer.setData("text/plain",ids.length===1?item.name:`移动 ${ids.length} 个文件`);
+  setMoveDragImage(dataTransfer,item.name,ids.length);
   window.dispatchEvent(new CustomEvent<MoveSessionDetail>(MOVE_SESSION_EVENT,{detail:{active:true,...session}}));
  }
 

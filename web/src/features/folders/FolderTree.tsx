@@ -42,13 +42,7 @@ function isInternalMoveDrag(dataTransfer:DataTransfer|null):boolean{
  return true;
 }
 
-// Drop markers are drawn inline from the theme tokens: the file table owns the
-// gesture's stylesheet and features/folders may not import it.
-const DROP_MARKER:Record<"accept"|"reject",CSSProperties>={
- accept:{outline:"2px solid var(--color-focus)",outlineOffset:"-2px",background:"var(--color-row-selected)"},
- reject:{outline:"2px dashed var(--color-danger)",outlineOffset:"-2px"},
-};
-
+// Hover feedback is themed and animated by the local tree stylesheet.
 // The nearest scrollable ancestor of the tree list (the page sidebar in the
 // explorer layout), found by overflow geometry rather than by a class name the
 // hosting page could rename.
@@ -726,7 +720,7 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
   const busy=paged&&levels.get(entry.id)?.status==="loading";
   // The drop marker for a live internal move: accept or reject, never both.
   const hovered=dropHover&&dropHover.id===entry.id?dropHover:null;
-  const dropMarker=hovered?DROP_MARKER[hovered.legal?"accept":"reject"]:null;
+  const dropClass=hovered?(hovered.legal?" drop-accept":" drop-reject"):"";
   return <li key={entry.id} data-folder-id={entry.id} data-depth={depth} role="treeitem"
    aria-expanded={canExpand?isExpanded:undefined}
    aria-busy={busy?true:undefined}
@@ -743,8 +737,8 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
     event.preventDefault();
     openNodeMenu(entry,{x:event.clientX,y:event.clientY});
    }}>
-   <div className={"tree-row "+(entry.id===selected?"on":"")}
-    style={{["--tree-depth"]:Math.min(depth,MAX_INDENT_DEPTH),...(dropMarker??{})} as CSSProperties}
+   <div className={"tree-row "+(entry.id===selected?"on":"")+dropClass}
+    style={{["--tree-depth"]:Math.min(depth,MAX_INDENT_DEPTH)} as CSSProperties}
     onClick={event=>{
      if((event.target as HTMLElement).closest("button"))return;
      navigate("/doc?folder="+encodeURIComponent(entry.id));
@@ -761,6 +755,7 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
      className="tree-node-link"
      onClick={event=>event.stopPropagation()}
      title={entry.disabledReason?`${entry.name} (${entry.disabledReason})`:entry.name}>{entry.name}</Link>
+    {hovered?.legal&&<span className="tree-drop-arrow" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 3v7a3 3 0 0 0 3 3h8m-4-4 4 4-4 4"/></svg></span>
    </div>
    {isExpanded&&<ul role="group">
     {children.map(child=>renderNode(child,depth+1))}
@@ -788,7 +783,7 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
     {paged?"仅搜索你有权查看的目录，结果不含未授权路径。":"在当前可见目录中筛选。"}
    </p>
   </div>
-  {session&&<p className="tree-search-hint" role="status">拖放中：{session.ids.length} 个文件 · 高亮目录可放入，红框目录不可用</p>}
+  {session&&<p className="sr-only" role="status">拖动 {session.ids.length} 个文件，选择目标目录</p>}
   <ul className="tree" role="tree" aria-label="目录树" ref={treeRef}
    aria-busy={paged&&levels.get("")?.status==="loading"?true:undefined}
    onKeyDown={onTreeKeyDown}

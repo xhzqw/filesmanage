@@ -1458,6 +1458,7 @@ async function finaleSuite() {
       const row=[...document.querySelectorAll('tbody tr[data-id]')][0];
       if(!row)return 'no-row';
       const dt=new DataTransfer();
+      Object.defineProperty(dt,'setDragImage',{value:(image,x,y)=>{window.__dragGhost={text:image.textContent||'',html:image.outerHTML,offset:[x,y],rowName:row.querySelector('.file-name')?.textContent};}});
       dt.setData('application/x-filesmanage-files',JSON.stringify({ids:[row.getAttribute('data-id')],sourceFolderId:${JSON.stringify(folderId)},focusId:row.getAttribute('data-id')}));
       dt.setData('text/plain','移动 1 个文件');
       row.dispatchEvent(new DragEvent('dragstart',{bubbles:true,cancelable:true,dataTransfer:dt}));
@@ -1465,15 +1466,25 @@ async function finaleSuite() {
       if(!li)return 'no-target-node';
       window.__wfdt=dt;
       return 'dragstarted';})()`);
+    const ghost = await cdp.evaluate(`(()=>window.__dragGhost||null)()`);
+    check("DI-17 drag image has only the file name, never table metadata/actions",
+      ghost&&ghost.text===ghost.rowName&&!/打开|下载|编辑|修改日期|版本/.test(ghost.text)&&ghost.html.includes("file-drag-ghost"),JSON.stringify(ghost));
     await delay(600);
+    const hovered = await cdp.evaluate(`(()=>{
+      const dt=window.__wfdt;
+      const row=document.querySelector('li[data-folder-id="${targetId}"]>.tree-row');
+      if(!row||!dt)return false;
+      row.dispatchEvent(new DragEvent("dragover",{bubbles:true,cancelable:true,dataTransfer:dt}));
+      return true;})()`);
+    await delay(180);
+    const hoverVisual = await cdp.evaluate(`(()=>{const r=document.querySelector('li[data-folder-id="${targetId}"]>.tree-row');return !!r?.classList.contains("drop-accept")&&!!r.querySelector(".tree-drop-arrow");})()`);
+    check("DI-17 target folder lifts and shows drop arrow",hovered&&hoverVisual,JSON.stringify({hovered,hoverVisual}));
     const dropResult = await cdp.evaluate(`(()=>{
       const dt=window.__wfdt;
-      const li=document.querySelector('li[data-folder-id="${targetId}"]');
-      if(!li||!dt)return 'no-target';
-      const rowEl=li.querySelector('.tree-row')||li;
-      rowEl.dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:dt}));
-      rowEl.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));
-      return 'dropped';})()`);
+      const row=document.querySelector('li[data-folder-id="${targetId}"]>.tree-row');
+      if(!row||!dt)return 'no-target';
+      row.dispatchEvent(new DragEvent("drop",{bubbles:true,cancelable:true,dataTransfer:dt}));
+      return "dropped";})()`);
     const moveDialog = await cdp.waitFor(`()=>{const d=[...document.querySelectorAll('dialog.dialog')].find(x=>x.open&&x.querySelector('.folder-picker'));return d?{title:d.querySelector('.dialog-title')?.textContent,target:d.querySelector('.folder-picker-candidate')?.textContent}:false;}`, 10000);
     check("DI-17 dropping on a folder opens the move dialog",
       dragResult === "dragstarted" && dropResult === "dropped" && Boolean(moveDialog), JSON.stringify({ dragResult, dropResult, moveDialog }));
@@ -1488,6 +1499,19 @@ async function finaleSuite() {
     await delay(400);
     const stillThere = await cdp.evaluate(`(()=>[...document.querySelectorAll('tbody tr[data-id]')].length>=2)()`);
     check("DI-17 cancelling the drop changes nothing", stillThere === true, String(stillThere));
+    // Multiselect is still one compact ghost; the extra-file count is the
+    // only added metadata, and the original move set remains intact.
+    await cdp.evaluate(`(()=>{const rows=[...document.querySelectorAll('tbody tr[data-id]')];rows[0]?.dispatchEvent(new MouseEvent('click',{bubbles:true}));rows[1]?.dispatchEvent(new MouseEvent('click',{bubbles:true,ctrlKey:true}));return true;})()`);
+    await delay(100);
+    const multiGhost = await cdp.evaluate(`(()=>{
+      const row=document.querySelector('tbody tr[data-id]'),dt=new DataTransfer();
+      let image=null;
+      Object.defineProperty(dt,'setDragImage',{value:(el)=>{image={text:el.textContent,children:el.children.length,count:el.querySelector('.file-drag-ghost-count')?.textContent||''};}});
+      row.dispatchEvent(new DragEvent('dragstart',{bubbles:true,cancelable:true,dataTransfer:dt}));
+      const session=JSON.parse(dt.getData('application/x-filesmanage-files')||'{"ids":[]}');
+      row.dispatchEvent(new DragEvent('dragend',{bubbles:true,cancelable:true,dataTransfer:dt}));
+      return {...image,sourceCount:session.ids.length};})()`);
+    check("DI-17 multiselect keeps filename ghost plus compact count",multiGhost&&multiGhost.sourceCount===2&&multiGhost.count==="+1"&&multiGhost.children===2,JSON.stringify(multiGhost));
 
     // ---- G2: upload is OS-file-only, with bounded queue geometry ----
     const dragPolicy=await cdp.evaluate(`(()=>{

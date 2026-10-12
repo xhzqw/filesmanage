@@ -26,6 +26,29 @@
 .tree li[aria-current="page"]>.tree-row .tree-node-link{color:var(--brand-blue)}
 .tree li[role="treeitem"]:focus-visible>.tree-row{outline:2px solid var(--border-focus);outline-offset:-2px}
 .tree-row::before,.tree .tree-row.on::before{display:none}
+/* Quiet spring-lift for valid drop targets; a single arrow is only visible
+   while hovering the target. No hint paragraphs or blinking outlines. */
+.tree .tree-row.drop-accept,.tree .tree-row.on.drop-accept{
+ background:var(--surface-row-selected);
+ box-shadow:inset 0 0 0 1px var(--border-focus),0 4px 12px rgba(15,53,101,.08);
+ transform:translateX(3px);
+}
+.tree .tree-row.drop-reject{background:var(--surface-subtle);box-shadow:inset 0 0 0 1px var(--border-subtle);opacity:.58}
+.tree .tree-row{transition:background-color .16s ease,box-shadow .18s ease,transform .24s cubic-bezier(.22,1,.36,1),opacity .18s ease}
+.tree-drop-arrow{
+ pointer-events:none;display:grid;place-items:center;flex:none;
+ width:21px;height:21px;margin-left:5px;border-radius:var(--radius-pill);
+ background:var(--brand-blue);color:var(--surface-panel);
+ font-size:16px;font-weight:600;line-height:1;
+ animation:tree-drop-enter .22s cubic-bezier(.2,1.45,.4,1) both;
+}
+@keyframes tree-drop-enter{from{opacity:0;transform:translateX(-5px) scale(.65)}to{opacity:1;transform:translateX(0) scale(1)}}
+@media(prefers-reduced-motion:reduce){
+ .tree .tree-row{transition:none}
+ .tree .tree-row.drop-accept{transform:none}
+ .tree-drop-arrow{animation:none}
+}
+
 .tree>.spring-rail-host{display:block}
 .tree .spring-rail{width:3px;background:var(--brand-cyan);border-radius:var(--radius-pill)}
 .tree-note{display:flex;align-items:center;gap:var(--space-2);min-height:24px;color:var(--text-secondary);font-size:11px}
