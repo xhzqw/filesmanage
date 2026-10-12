@@ -57,7 +57,7 @@ const labels={loading:"保存中",success:"已保存",error:"保存失败"};
  const h=harness();
  const task=h.toast.track(async()=>42,labels);
  assert.equal(await task,42);
- assert.deepEqual(h.items().map(x=>x.tone),["success"]);
+ assert.deepEqual(Array.from(h.items(),x=>x.tone),["success"]);
  assert.equal(h.items()[0].duration,4000);
 }
 {
@@ -80,7 +80,7 @@ const labels={loading:"保存中",success:"已保存",error:"保存失败"};
  h.advance(451);
  task.reject(Object.assign(Error("offline"),{code:"E_NETWORK"}));
  await assert.rejects(promise);
- assert.deepEqual(h.items().map(x=>x.tone),["warning"]);
+ assert.deepEqual(Array.from(h.items(),x=>x.tone),["warning"]);
  assert.match(h.items()[0].text,/未确认/);
 }
 {
