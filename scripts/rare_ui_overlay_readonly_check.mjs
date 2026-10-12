@@ -287,6 +287,16 @@ try{
  await waitFor(`[...document.querySelectorAll(".org-role-editor .perm-action-grid input[type=checkbox]")].every(x=>x.checked)`);
  await click(".org-role-action-tools .rare-button:last-of-type");
  await waitFor(`[...document.querySelectorAll(".org-role-editor .perm-action-grid input[type=checkbox]")].every(x=>!x.checked)`);
+ // Restore the pristine editor state before navigating. An unsaved delegation
+ // intentionally triggers the app's beforeunload protection, which would
+ // block a low-level Chrome Page.navigate command.
+ await evalJS(`(()=>{const browse=document.querySelector(".org-role-editor .perm-action-grid input[type=checkbox]");
+  if(!browse)throw Error("browse ACL checkbox missing");browse.click();return true})()`);
+ await waitFor(`[...document.querySelectorAll(".org-role-editor .perm-action-grid input[type=checkbox]")].filter(x=>x.checked).length===1`);
+ await evalJS(`(()=>{document.querySelector(".org-role-editor .perm-form-row>label:nth-child(2) .rare-select")?.click();return true})()`);
+ await waitFor('!!document.querySelector(".rare-select-menu [role=option]")');
+ await evalJS(`(()=>{const option=[...document.querySelectorAll(".rare-select-menu [role=option]")].find(x=>x.textContent.includes("只读审计员"));if(!option)throw Error("auditor role missing");option.click();return true})()`);
+ await waitFor(`document.querySelector(".org-role-editor .perm-form-row>label:nth-child(2) .rare-select")?.textContent.includes("只读审计员")`);
  results.push("1440px: role ACL select-all/clear without submission OK");
  // Deep-linking to the seal library must not lose its selected view on reload.
  for(const width of [1440,900,390]){
