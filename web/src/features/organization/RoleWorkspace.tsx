@@ -1,4 +1,4 @@
-import {RareBadge,RareButton,RareDataTable,RareInput,RareRowActions,RareSelect} from "../../shared/ui/rare";
+import {RareBadge,RareButton,RareDataTable,RareInput,RareNotice,RareRowActions,RareSelect} from "../../shared/ui/rare";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useEffect,useState,type FormEvent} from "react";
 import type {User} from "../../entities/user/model";
@@ -83,7 +83,7 @@ export function RoleBindingsPanel({users,onDirtyChange}:{users:User[];onDirtyCha
  return <section className="perm-detail org-role-workbench" aria-label="管理角色绑定">
   <div className="perm-section-title">管理角色 <span className="perm-subtle">仅系统管理员可调整</span></div>
   <details className="org-role-explanation"><summary>角色权限说明</summary><p>审计员只读权限审计，不获得文件访问权。目录权限管理员只在指定目录管理指定动作的直接 ACL，不能向自己授权，不能授予子树继承。</p></details>
-  {error&&<p role="alert" className="notice error">{error}</p>}
+   {error&&<RareNotice tone="danger">{error}</RareNotice>}
   <div className="org-role-layout"><section className="org-role-list" aria-label="已有角色委派">
   <div className="perm-section-title">已委派 <span className="perm-count">{items.length}</span></div>
   <div className="perm-grants-scroller org-role-scroll"><RareDataTable className="perm-table org-role-table">
@@ -178,18 +178,18 @@ export function DelegatedRolesWorkspace(){
   catch(e){setError(errorCopy(e,"撤销直接 ACL 失败"));}
  }
  return <div className="work-body">
-  {busy&&<p role="status">正在读取委派职责…</p>}
-  {error&&<p role="alert" className="notice error">{error}</p>}
-  {!busy&&roles.length===0&&<p className="notice">没有有效管理角色；部门、用户和工作组管理仍需系统管理员权限。</p>}
+  {busy&&<p role="status" className="hint">正在读取委派职责…</p>}
+   {error&&<RareNotice tone="danger">{error}</RareNotice>}
+   {!busy&&roles.length===0&&<RareNotice tone="info">没有有效管理角色；部门、用户和工作组管理需要系统管理员权限。</RareNotice>}
   {canAudit&&<PermissionAudit users={[]}/>}
-  {permissionRoles.length>0&&<section className="perm-detail" style={{padding:16}}>
+  {permissionRoles.length>0&&<section className="perm-detail org-delegated-workspace">
    <div className="perm-section-title">委派目录 ACL 管理</div>
    <p className="perm-hint">只能维护所选目录的直接授权。角色自身不赋予浏览或下载文件的权限。</p>
    <label>管理目录<RareSelect value={folder} onChange={e=>setFolder(e.target.value)}>
     {permissionRoles.map(r=><option key={r.id} value={r.scopeId}>{r.scopeId}</option>)}
    </RareSelect></label>
    {chosen&&<><p>可授权动作：{chosen.allowedActions.map(actionName).join("、")}</p>
-    <table className="perm-table"><thead><tr><th>主体 ID</th><th>动作</th><th>范围</th><th>到期</th><th>操作</th></tr></thead>
+     <RareDataTable className="perm-table"><thead><tr><th>主体 ID</th><th>动作</th><th>范围</th><th>到期</th><th>操作</th></tr></thead>
      <tbody>{grants.map(g=><tr key={g.id}><td>{g.subjectId}</td><td>{g.actions.map(actionName).join("、")}</td>
       <td>{g.scopeOnly?"仅本目录":"包含子目录"}</td><td>{g.expiresAt||"不过期"}</td>
       <td>{g.scopeOnly&&g.actions.every(a=>chosen.allowedActions.includes(a))&&
@@ -198,7 +198,7 @@ export function DelegatedRolesWorkspace(){
          {revokeTarget===g.id?"确认撤销":"撤销"}
         </RareButton>}</td>
      </tr>)}</tbody>
-    </table>
+     </RareDataTable>
     <form className="perm-form" onSubmit={create} onChange={()=>setConfirm("")}>
      <p className="perm-hint">请输入已知的目标账号 ID。不得填写自己的 ID；所有范围检查以服务端为准。</p>
      <div className="perm-form-row">

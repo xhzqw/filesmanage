@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState,type FormEvent} from "react";
-import {RareBadge,RareButton,RareInput} from "../../shared/ui/rare";
+import {RareBadge,RareButton,RareDataTable,RareInput,RareNotice} from "../../shared/ui/rare";
 import {errorCopy} from "../../shared/errors";
 import {permissionsApi,type PermissionAuditPage} from "./permissionsApi";
 
@@ -51,10 +51,10 @@ export function DocumentActivityPanel(){
    <RareButton type="button" onClick={()=>setRevision(i=>i+1)}>刷新</RareButton>
   </form>
   {state==="loading"&&<p role="status" className="hint">正在读取文档活动…</p>}
-  {error&&<p role="alert" className="notice error">{error}</p>}
+  {error&&<RareNotice tone="danger">{error}</RareNotice>}
   {state==="failed"&&<RareButton onClick={()=>setRevision(i=>i+1)}>重试</RareButton>}
   {state==="ready"&&<div className="perm-audit-scroll">
-   <table className="perm-table">
+   <RareDataTable className="perm-table">
     <thead><tr><th>时间</th><th>事件</th><th>操作人</th><th>资源</th><th>结果</th><th>请求追踪</th></tr></thead>
     <tbody>{page.items.map(item=><tr key={item.id}>
      <td>{item.createdAt?new Date(item.createdAt).toLocaleString("zh-CN"):"—"}</td>
@@ -64,7 +64,7 @@ export function DocumentActivityPanel(){
      <td><RareBadge tone={item.outcome==="success"?"success":"danger"}>{item.outcome==="success"?"成功":"失败"}</RareBadge></td>
      <td><code title={item.requestId}>{item.requestId||"—"}</code></td>
     </tr>)}</tbody>
-   </table>
+   </RareDataTable>
    {page.items.length===0&&<p className="empty">没有符合条件的文档活动。</p>}
    {page.nextCursor&&<RareButton className="perm-more" type="button" disabled={more} onClick={()=>void loadMore()}>{more?"加载中…":"加载更多"}</RareButton>}
   </div>}

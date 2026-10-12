@@ -1,4 +1,4 @@
-import {RareButton,RareSelect} from "../../shared/ui/rare";
+import {RareBadge,RareButton,RareDataTable,RareNotice,RareSelect} from "../../shared/ui/rare";
 import {useEffect,useMemo,useRef,useState} from "react";
 import type {User} from "../../entities/user/model";
 import {errorCopy} from "../../shared/errors";
@@ -70,11 +70,11 @@ export function PermissionInsights({folderId,users,usersState,refreshToken}:{
    <RareButton type="button" className="secondary-action" disabled={!activeUser||busy} onClick={()=>setGeneration(n=>n+1)}>重新计算</RareButton>
   </div>
   {!activeUser&&usersState==="ready"&&<div className="perm-insight-empty">选择用户后显示有效权限。</div>}
-  {usersState==="failed"&&<p role="alert" className="hint">用户列表读取失败，请先在授权表单处重试。</p>}
+  {usersState==="failed"&&<RareNotice tone="danger">用户列表读取失败，请先在授权表单处重试。</RareNotice>}
   {busy&&<p role="status" className="hint">正在计算有效权限…</p>}
-  {error&&<p role="alert" className="notice error">{error}</p>}
+  {error&&<RareNotice tone="danger">{error}</RareNotice>}
   {result&&result.folderId===folderId&&result.subjectId===activeUser&&<>
-   {result.subjectDisabled&&<p className="notice">该账号已禁用，没有可使用的文件权限。</p>}
+   {result.subjectDisabled&&<RareNotice tone="warning">该账号已禁用，没有可使用的文件权限。</RareNotice>}
    <div className="perm-effective"><strong>当前有效动作</strong>
     {result.effectiveActions.length===0?<span>无（默认拒绝）</span>
      :result.effectiveActions.map(a=><span key={a} className="perm-action-token">{ACTIONS[a]??a}</span>)}
@@ -133,19 +133,19 @@ export function PermissionAudit({users}:{users:User[]}){
     queryGeneration.current++;setVersion(v=>v+1);
    }}>刷新</RareButton></div>
   {busy&&<p role="status" className="hint">正在读取审计记录…</p>}
-  {error&&<p role="alert" className="notice error">{error}</p>}
+  {error&&<RareNotice tone="danger">{error}</RareNotice>}
   {!busy&&<div className="perm-audit-scroll">
-   <table className="perm-table"><thead><tr><th>时间</th><th>变更</th><th>操作人</th><th>资源</th><th>变更前 → 变更后</th><th>结果</th><th>请求追踪</th></tr></thead>
+   <RareDataTable className="perm-table"><thead><tr><th>时间</th><th>变更</th><th>操作人</th><th>资源</th><th>变更前 → 变更后</th><th>结果</th><th>请求追踪</th></tr></thead>
     <tbody>{page.items.map(item=><tr key={item.id}>
      <td>{item.createdAt?new Date(item.createdAt).toLocaleString("zh-CN"):"—"}</td>
      <td>{EVENTS[item.eventType]??item.eventType}</td>
      <td>{names.get(item.actorId)??item.actorId}</td>
      <td>{item.targetKind} · {item.targetId}</td>
      <td className="perm-audit-detail">{auditDetails(item.details??{})}</td>
-     <td>{item.outcome==="success"?"成功":item.outcome==="denied"?"拒绝":item.outcome}</td>
+      <td><RareBadge tone={item.outcome==="success"?"success":item.outcome==="denied"?"warning":"danger"}>{item.outcome==="success"?"成功":item.outcome==="denied"?"拒绝":item.outcome}</RareBadge></td>
      <td><code title={item.requestId}>{item.requestId||"—"}</code></td>
     </tr>)}</tbody>
-   </table>
+   </RareDataTable>
    {page.items.length===0&&<p className="empty">暂无权限变更审计记录。</p>}
    {page.nextCursor&&<RareButton className="perm-more" type="button" disabled={moreBusy} onClick={()=>void more()}>
     {moreBusy?"正在加载…":"加载更多"}</RareButton>}

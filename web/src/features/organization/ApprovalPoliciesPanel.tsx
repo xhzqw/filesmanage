@@ -3,7 +3,7 @@ import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useSearchParams} from "react-router-dom";
 import type {User} from "../../entities/user/model";
 import {approvalPolicyApi} from "../../entities/approval/api";
-import {RareButton,RareInput,RareNotice,RareSelect} from "../../shared/ui/rare";
+import {RareBadge,RareButton,RareInput,RareNotice,RareSelect} from "../../shared/ui/rare";
 import {errorCode,errorCopy} from "../../shared/errors";
 import {ResourceBrowser} from "./PermissionsPanel";
 import type {ResourceFolder} from "./permissionsApi";
@@ -90,7 +90,7 @@ export function ApprovalPoliciesPanel({users,usersState,onRetryUsers,onDirtyChan
     {!folderId?<div className="perm-empty-state"><strong>选择资源目录</strong></div>:<>
      <div className="approval-heading">
       <h2 title={folderName?.id===folderId?folderName.name:folderId}>{folderName?.id===folderId?folderName.name:folderId}</h2>
-      {status==="ready"&&<span className="approval-state">{!configured?"未配置":enabled?"已启用":"已停用"}</span>}
+      {status==="ready"&&<RareBadge className="approval-state" tone={!configured?"neutral":enabled?"success":"warning"} dot>{!configured?"未配置":enabled?"已启用":"已停用"}</RareBadge>}
      </div>
      <div className="approval-editor">
       {status==="loading"&&<p role="status" className="hint">正在读取审批策略…</p>}

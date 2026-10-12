@@ -718,12 +718,12 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
      <h3 className="org-card-title">
        <IconOrganization/>
       <span>组织架构</span>
-      <span className="org-count-pill">{departments.length} 部门</span>
+      <RareBadge className="org-count-pill" tone="neutral">{departments.length} 部门</RareBadge>
      </h3>
     </div>
 
-    {departmentsState==="loading"&&<p className="hint" style={{padding:"8px 12px"}}>正在读取部门…</p>}
-    {departmentsState==="failed"&&<div style={{padding:"8px 12px"}}>
+     {departmentsState==="loading"&&<p className="hint org-inline-message">正在读取部门…</p>}
+     {departmentsState==="failed"&&<div className="org-inline-message">
      <RareNotice tone="danger">读取部门列表失败，部门树与筛选暂不可用。</RareNotice>
      <RareButton type="button" className="secondary-action" onClick={()=>setDepartmentsToken(token=>token+1)}>重试</RareButton>
     </div>}
@@ -755,7 +755,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
        {/* 全体组织根节点 */}
        <li role="treeitem" aria-selected={selectedDepartment===""} tabIndex={0}
         onClick={()=>setSelectedDepartment("")}>
-        <div className={"tree-row "+(selectedDepartment===""?"on":"")} style={{paddingLeft:"10px"}}>
+         <div className={"tree-row org-tree-root-row "+(selectedDepartment===""?"on":"")}>
          <span className="org-tree-chevron-spacer" aria-hidden="true"/>
           <span className="org-tree-icon" aria-hidden="true"><IconOrganization/></span>
          <RareButton type="button" className="org-node-label" tabIndex={-1}
@@ -768,13 +768,13 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
        </li>
 
        {/* 部门层级子树 */}
-       {departments.length===0&&<li role="none" className="hint" style={{padding:"8px 12px"}}>还没有部门；可用上方按钮创建。</li>}
+        {departments.length===0&&<li role="none" className="hint org-inline-message">还没有部门；可用上方按钮创建。</li>}
        {renderDeptNodes("",0)}
 
        {/* 未分配部门节点 */}
        {unassignedCount>0&&<li role="treeitem" aria-selected={selectedDepartment==="__unassigned"} tabIndex={-1}
         onClick={()=>setSelectedDepartment("__unassigned")}>
-        <div className={"tree-row "+(selectedDepartment==="__unassigned"?"on":"")} style={{paddingLeft:"10px"}}>
+         <div className={"tree-row org-tree-root-row "+(selectedDepartment==="__unassigned"?"on":"")}>
          <span className="org-tree-chevron-spacer" aria-hidden="true"/>
          <span className="org-tree-icon" aria-hidden="true"><IconUsers/></span>
          <RareButton type="button" className="org-node-label" tabIndex={-1}
@@ -963,7 +963,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
        <h4 className="org-card-title">
         <IconGroup/>
         <span>工作组列表</span>
-        <span className="org-count-pill">{filteredGroups.length}</span>
+        <RareBadge className="org-count-pill" tone="neutral">{filteredGroups.length}</RareBadge>
        </h4>
       </div>
 
@@ -973,13 +973,13 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
         value={groupQuery} onChange={e=>setGroupQuery(e.target.value)}/>
       </div>
 
-      {groupsState==="loading"&&<p className="hint" style={{padding:"8px 12px"}}>正在读取工作组…</p>}
-      {groupsState==="failed"&&<div style={{padding:"8px 12px"}}>
+       {groupsState==="loading"&&<p className="hint org-inline-message">正在读取工作组…</p>}
+       {groupsState==="failed"&&<div className="org-inline-message">
        <RareNotice tone="danger">读取工作组列表失败。</RareNotice>
        <RareButton type="button" className="secondary-action" onClick={()=>setGroupsToken(t=>t+1)}>重试</RareButton>
       </div>}
 
-      {groupsReady&&groups.length===0&&<p className="empty" style={{padding:"16px 12px"}}>暂无工作组，可使用顶部按钮创建。</p>}
+       {groupsReady&&groups.length===0&&<p className="empty org-list-empty">暂无工作组，可使用顶部按钮创建。</p>}
 
       {groupsReady&&groups.length>0&&<ul className="org-group-cards-list">
        {filteredGroups.slice(0,groupLimit).map(group=>{
@@ -987,15 +987,10 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
         return <li key={group.id}>
          <RareButton type="button" className={"org-group-card"+(isSelected?" active":"")}
           aria-pressed={isSelected} onClick={()=>setSelectedGroup(group.id)}>
-          <div className="org-group-card-header">
-           <span className="org-group-name">{group.name}</span>
-           {isSelected&&<span className="org-active-pill">选中</span>}
-          </div>
-          <div className="org-group-card-sub">
-           <span className="org-dept-pill">
-            {group.departmentId?departmentLabel(group.departmentId):"公共工作组"}
-           </span>
-          </div>
+           <div className="org-group-card-header">
+            <span className="org-group-name" title={group.name}>{group.name}</span>
+            <RareBadge className="org-dept-pill" tone="neutral">{group.departmentId?departmentLabel(group.departmentId):"公共工作组"}</RareBadge>
+           </div>
          </RareButton>
         </li>;
        })}
@@ -1010,14 +1005,12 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
      {/* 右侧：所选工作组详情与成员维护 */}
      <div className="org-group-detail-col">
       {selectedGroupRow===null
-       ?<div className="empty" style={{margin:"auto",textAlign:"center"}}>请从左侧选择一个工作组以查看并配置成员。</div>
+        ?<div className="empty org-group-empty">请从左侧选择一个工作组以查看并配置成员。</div>
        :<>
         <div className="org-group-banner">
          <div className="org-group-banner-info">
           <h4 className="org-group-detail-title">{selectedGroupRow.name}</h4>
-          <span className="org-dept-pill">
-           {selectedGroupRow.departmentId?departmentLabel(selectedGroupRow.departmentId):"公共工作组"}
-          </span>
+           <RareBadge className="org-dept-pill" tone="neutral">{selectedGroupRow.departmentId?departmentLabel(selectedGroupRow.departmentId):"公共工作组"}</RareBadge>
          </div>
          <span className="toolbar-hint">当前成员 {groupMembers.length} 人</span>
         </div>
@@ -1043,7 +1036,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
            <RareButton type="button" tone="danger" className="danger org-action-btn"
             onClick={()=>{setNotice(null);setRemoveTarget(member);}}>移除</RareButton>
           </div>)}
-          {groupMembers.length===0&&<p className="empty" style={{gridColumn:"1/-1"}}>该工作组暂无成员，可在下方添加成员。</p>}
+           {groupMembers.length===0&&<p className="empty org-grid-empty">该工作组暂无成员，可在下方添加成员。</p>}
          </div>}
          {membersState==="ready"&&groupMembers.length>groupMemberLimit&&
           <div className="org-list-more">
@@ -1064,11 +1057,10 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
          {!usersReady
           ?<p className="hint">{usersState==="loading"?"正在读取可选择的账号…":"账号列表不可用，无法选择新成员。"}</p>
           :<>
-           <div className="org-search-box" style={{border:"1px solid var(--border-hairline)",borderRadius:"var(--radius-sm)",padding:"0 var(--space-2)"}}>
+           <div className="org-search-box org-candidate-search">
             <IconSearch/>
             <RareInput className="org-search" type="search" aria-label="搜索可加入的账号" autoComplete="off"
-             placeholder="按姓名或账号搜索可加入的账号" value={candidateQuery} onChange={event=>setCandidateQuery(event.target.value)}
-             style={{border:"0"}}/>
+             placeholder="按姓名或账号搜索可加入的账号" value={candidateQuery} onChange={event=>setCandidateQuery(event.target.value)}/>
            </div>
 
            <div className="org-candidate-grid">
@@ -1079,13 +1071,13 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
                <span className="org-candidate-name">{user.displayName}</span>
                <code className="org-candidate-login">{loginOf(user)}</code>
               </div>
-              <span className="org-dept-pill">{departmentLabel(user.departmentId)}</span>
+              <RareBadge className="org-dept-pill" tone="neutral">{departmentLabel(user.departmentId)}</RareBadge>
              </div>
              <RareButton type="button" className="primary org-action-btn" onClick={()=>addMember(user)} disabled={addBusy!==""}>
               {addBusy===user.id?"加入中…":"加入"}
              </RareButton>
             </div>)}
-            {candidates.length===0&&<p className="empty" style={{gridColumn:"1/-1"}}>{candidateEmpty}</p>}
+             {candidates.length===0&&<p className="empty org-grid-empty">{candidateEmpty}</p>
            </div>
 
            {candidates.length>=CANDIDATE_CAP&&<p className="hint">最多显示 {CANDIDATE_CAP} 个候选账号，继续输入可缩小范围。</p>}

@@ -140,6 +140,15 @@ try{
  await cdp.evaluate("(()=>{document.querySelector('#org-tab-groups').click();return true})()");
  assert(await cdp.waitFor("()=>!!document.querySelector('.org-group-cards-list')"),
   "workgroup list available for scope checks");
+ assert(await cdp.evaluate(`(()=>{
+  const card=document.querySelector('.org-group-cards-list .org-group-card');
+  const badge=card?.querySelector('.org-dept-pill[data-rare-badge-tone]');
+  if(!card||!badge)return false;
+  const rect=card.getBoundingClientRect();
+  return card.querySelectorAll('.org-group-card-header').length===1&&
+   card.querySelector('.org-active-pill')===null&&rect.height<=53&&
+   getComputedStyle(card).minHeight==='39px';
+ })()`),"workgroup navigation uses compact RareUI list rows and badges");
  const deptScope=await cdp.evaluate(`(async()=>{
   const departments=(await(await fetch('/api/departments')).json()).data;
   const groups=(await(await fetch('/api/groups?limit=200')).json()).data.items;
@@ -162,6 +171,11 @@ try{
  await cdp.evaluate("(()=>{document.querySelector('#org-tab-permissions').click();return true})()");
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-workspace')"),
   "permission resource browser survives department filtering");
+ assert(await cdp.evaluate(`(()=>{
+  const panel=document.querySelector('.perm-workspace');
+  return panel&&getComputedStyle(panel).borderTopWidth==='0px'&&
+   getComputedStyle(panel).marginTop==='0px';
+ })()`),"permissions avoid redundant nested workspace borders");
  await cdp.evaluate("(()=>{document.querySelector('.perm-tree-name')?.click();return true;})()");
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-insight select')"),"effective permission explanation renders");
  await cdp.evaluate(`(()=>{
@@ -242,6 +256,14 @@ try{
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-audit .perm-table')"),"audit view loads with event table");
  assert(await cdp.evaluate("(()=>new URLSearchParams(location.search).get('view')==='audit')()"),
   "audit tab is deep-linkable");
+ assert(await cdp.evaluate("(()=>!!document.querySelector('.perm-audit .rare-data-table[data-rare-table]'))()"),
+  "permission audit uses semantic RareDataTable");
+ await cdp.evaluate(`(()=>{
+  [...document.querySelectorAll('.perm-subnav button')].find(b=>b.textContent?.includes('文档活动'))?.click();
+  return true;
+ })()`);
+ assert(await cdp.waitFor("()=>!!document.querySelector('.document-activity .rare-data-table[data-rare-table]')"),
+  "document activity audit uses semantic RareDataTable");
  await cdp.navigate(BASE+"/org?tab=roles");
  assert(await cdp.waitFor("()=>!!document.querySelector('.org-role-workbench[aria-label=管理角色绑定]')"),
   "P2 role bindings page renders");
@@ -253,6 +275,12 @@ try{
  await cdp.evaluate("(()=>{document.querySelector('.approval-workspace .perm-tree-name').click();return true})()");
  assert(await cdp.waitFor("()=>!!document.querySelector('.approval-toggle input:not(:disabled)')"),
   "approval policy editor is ready");
+ assert(await cdp.evaluate(`(()=>{
+  const work=document.querySelector('.approval-workspace');
+  const state=document.querySelector('.approval-state[data-rare-badge-tone]');
+  return !!work&&!!state&&getComputedStyle(work).maxHeight==='none'&&
+   getComputedStyle(work).marginTop==='0px';
+ })()`),"approval policy uses RareBadge and full-height workspace layout");
  const before=await cdp.evaluate("(()=>document.querySelector('.approval-toggle input').checked)()");
  await cdp.evaluate("(()=>{document.querySelector('.approval-toggle input').click();return true})()");
  assert(await cdp.waitFor(`()=>document.querySelector('.approval-toggle input')?.checked===${!before}`),

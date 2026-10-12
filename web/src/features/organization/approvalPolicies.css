@@ -1,11 +1,11 @@
-.approval-content{flex:none;min-width:0;overflow:visible}
-.approval-workspace{grid-template-columns:268px minmax(0,1fr);min-height:340px;max-height:min(68dvh,620px)}
+.approval-content{flex:1;min-height:0;min-width:0;overflow:hidden}
+.approval-workspace{grid-template-columns:240px minmax(0,1fr);min-height:0;max-height:none}
 .approval-detail{min-width:0;min-height:0;overflow:auto;background:var(--surface-panel)}
-.approval-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 18px;border-bottom:1px solid var(--border-hairline)}
+.approval-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border-hairline)}
 .approval-heading h2{margin:0;font-size:15px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.approval-state{flex:none;color:var(--text-secondary);font-size:12px}
-.approval-editor{padding:18px;max-width:560px;display:flex;flex-direction:column;gap:12px}
-.approval-form{display:flex;flex-direction:column;gap:18px}
+.approval-state{flex:none}
+.approval-editor{padding:var(--space-3);max-width:720px;display:flex;flex-direction:column;gap:var(--space-3)}
+.approval-form{display:flex;flex-direction:column;gap:var(--space-3)}
 .approval-field{display:flex;flex-direction:column;gap:7px;font-size:12px;font-weight:600;min-width:0}
 .approval-field .rare-select-root{display:flex;width:100%;min-width:0}
 .approval-field .rare-select{min-height:36px}
