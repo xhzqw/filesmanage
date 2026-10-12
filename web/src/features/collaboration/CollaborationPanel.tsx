@@ -1,4 +1,5 @@
 import {RareBadge,RareButton,RareDataTable,RareInput,RareRowActions} from "../../shared/ui/rare";
+import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useEffect,useMemo,useRef,useState} from "react";
 import {Link} from "react-router-dom";
 import {collaborationApi,type Favorite,type Share} from "./api";
@@ -43,6 +44,10 @@ export function CollaborationPanel(){
  // Write revision: a successful create/revoke/favorite reloads the active list
  // even when the same result text is announced twice in a row.
  const[revision,setRevision]=useState(0);
+ useEffect(()=>observeWorkspaceChange(()=>{
+  setRevision(n=>n+1);
+  setTreeToken(n=>n+1);
+ },["collaboration","permissions","file","folder"]),[]);
  const[shareTarget,setShareTarget]=useState<ShareResource|null>(null);
  const[folders,setFolders]=useState<Folder[]>([]);
  const[treeState,setTreeState]=useState<"loading"|"ready"|"failed">("loading");

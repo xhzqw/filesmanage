@@ -95,6 +95,7 @@ func (s *Service) CommitUpload(ctx context.Context, u domain.User, folderID, fil
 	}
 	// The search index follows the committed current version (SPEC §10.1).
 	s.ReindexFile(ctx, file.ID)
+	s.notifyWorkspaceChange("file", "search", "stats")
 	return result, nil
 }
 
@@ -319,6 +320,7 @@ func (s *Service) Save(ctx context.Context, u domain.User, fileID string, conten
 	}
 	// The search index follows the committed current version (SPEC §10.1).
 	s.ReindexFile(ctx, file.ID)
+	s.notifyWorkspaceChange("file", "search", "stats")
 	return outcome, nil
 }
 
@@ -385,6 +387,7 @@ func (s *Service) Rollback(ctx context.Context, u domain.User, fileID string, ta
 	// The appended rollback version is current now; its bytes equal the target
 	// version, so the index is refreshed from the new current version.
 	s.ReindexFile(ctx, file.ID)
+	s.notifyWorkspaceChange("file", "search", "stats")
 	return outcome, nil
 }
 
@@ -435,6 +438,7 @@ func (s *Service) DeleteFile(ctx context.Context, u domain.User, fileID string) 
 	if err = tx.Commit(ctx); err != nil {
 		return domain.TrashEntry{}, err
 	}
+	s.notifyWorkspaceChange("file", "trash", "search", "stats")
 	return entry, nil
 }
 

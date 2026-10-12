@@ -205,7 +205,11 @@ func (s *Service) PurgeTrashEntry(ctx context.Context, u domain.User, entryID st
 		return err
 	}
 	audit(ctx, tx, u, "trash.purge", "trash", entry.ID, "success", map[string]any{"oldName": entry.OldName})
-	return tx.Commit(ctx)
+	if err = tx.Commit(ctx); err != nil {
+		return err
+	}
+	s.notifyWorkspaceChange("trash", "file", "stats")
+	return nil
 }
 
 func validateFileName(name string) error {

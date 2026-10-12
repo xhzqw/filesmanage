@@ -2,8 +2,20 @@
 // Never cache file contents, permissions or names here: the server remains the
 // authority and every recipient makes a fresh authorized request.
 export type ResourceScope="file"|"trash"|"folder";
+export type WorkspaceScope=ResourceScope|"permissions"|"collaboration"|"organization"|"search"|"stats"|"review"|"lifecycle";
 export type ResourceChange={scope:ResourceScope;id?:string};
 const KEY="fm-workspace-change-v1";
+const LIVE_EVENT="filesmanage:resource-changed";
+
+// WebSocket data is an anonymous hint, not file metadata.
+export function receiveRemoteResourceChanges(scopes:WorkspaceScope[]):void{
+ if(typeof window==="undefined")return;
+ for(const scope of new Set(scopes)){
+  if(scope==="file"||scope==="folder"||scope==="trash")
+   window.dispatchEvent(new CustomEvent<ResourceChange>(LIVE_EVENT,{detail:{scope}}));
+ }
+ window.dispatchEvent(new CustomEvent<{scopes:WorkspaceScope[]}>("filesmanage:workspace-changed",{detail:{scopes}}));
+}
 
 function validChange(input:unknown):input is ResourceChange{
  if(!input||typeof input!=="object")return false;
@@ -23,6 +35,10 @@ export function publishResourceChange(change:ResourceChange):void{
 }
 
 export function observeResourceChange(scope:ResourceScope,callback:(change:ResourceChange)=>void):()=>void{
+ const live=(event:Event)=>{
+  const change=(event as CustomEvent<unknown>).detail;
+  if(validChange(change)&&change.scope===scope)callback(change);
+ };
  const storage=(event:StorageEvent)=>{
   if(event.key!==KEY||!event.newValue)return;
   try{
@@ -31,7 +47,17 @@ export function observeResourceChange(scope:ResourceScope,callback:(change:Resou
   }catch{/* malformed or unrelated storage writes cannot break the view */}
  };
  window.addEventListener("storage",storage);
- return()=>{window.removeEventListener("storage",storage);};
+ window.addEventListener(LIVE_EVENT,live);
+ return()=>{window.removeEventListener("storage",storage);window.removeEventListener(LIVE_EVENT,live);};
+}
+
+export function observeWorkspaceChange(callback:()=>void,scopes?:WorkspaceScope[]):()=>void{
+ const listener=(event:Event)=>{
+  const changed=(event as CustomEvent<{scopes?:WorkspaceScope[]}>).detail?.scopes;
+  if(!scopes||!changed||changed.some(value=>scopes.includes(value)))callback();
+ };
+ window.addEventListener("filesmanage:workspace-changed",listener);
+ return()=>window.removeEventListener("filesmanage:workspace-changed",listener);
 }
 
 // A user can return to a stale tab after another device or an external API

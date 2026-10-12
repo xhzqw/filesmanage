@@ -347,7 +347,12 @@ func (s *Service) SetFavorite(ctx context.Context, u domain.User, kind, resource
 		}
 	}
 	audit(ctx, tx, u, "favorite.set", kind, resourceID, "success", map[string]any{"on": on})
-	return tx.Commit(ctx)
+	if err = tx.Commit(ctx); err != nil {
+		return err
+	}
+	// Favorites are personal. Only other sessions for this user need a hint.
+	s.publishUserEvent(u.ID, UserEvent{Type: "workspace.changed", Scopes: []string{"collaboration"}})
+	return nil
 }
 
 func statsQuery(u domain.User, groups []string, filter SearchFilter) ports.StatsQuery {

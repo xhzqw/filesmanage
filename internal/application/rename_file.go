@@ -33,5 +33,6 @@ func (s *Service) RenameFile(ctx context.Context, u domain.User, fileID, name st
 	if err = tx.Commit(ctx); err != nil {
 		return domain.File{}, err
 	}
+	s.notifyWorkspaceChange("file", "search")
 	return file, nil
 }

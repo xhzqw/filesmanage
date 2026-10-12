@@ -5,8 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"filesmanage/internal/domain"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -36,13 +36,13 @@ func (s *Service) SignEditorConfig(config map[string]any) (string, error) {
 }
 
 type OfficeSessionView struct {
-	SessionID    string
-	DocumentKey  string
-	Token        string
-	EditorURL    string
-	FileID       string
-	BaseSeq      int
-	Generation   int64
+	SessionID   string
+	DocumentKey string
+	Token       string
+	EditorURL   string
+	FileID      string
+	BaseSeq     int
+	Generation  int64
 }
 
 // OpenSession starts a DOCX editing session for a file the user can modify.
@@ -277,7 +277,12 @@ func (s *Service) HandleEditorCallback(ctx context.Context, authorization string
 	}
 	audit(ctx, tx, domain.User{ID: session.OwnerID}, "office.save_commit", "file", file.ID, "success",
 		map[string]any{"sessionId": session.ID, "versionSeq": version.Seq, "generation": generation})
-	return 0, tx.Commit(ctx)
+	if err = tx.Commit(ctx); err != nil {
+		return 1, err
+	}
+	s.ReindexFile(ctx, file.ID)
+	s.notifyWorkspaceChange("file", "search", "stats")
+	return 0, nil
 }
 
 // EditorCallbackPayload is the document-server callback body.

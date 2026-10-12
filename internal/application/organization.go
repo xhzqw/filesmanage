@@ -151,6 +151,7 @@ func (s *Service) CreateUser(ctx context.Context, actor domain.User, draft UserD
 	if err = tx.Commit(ctx); err != nil {
 		return domain.User{}, err
 	}
+	s.notifyWorkspaceChange("organization")
 	return user, nil
 }
 
@@ -294,6 +295,7 @@ func (s *Service) CreateDepartment(ctx context.Context, actor domain.User, name,
 	if err = tx.Commit(ctx); err != nil {
 		return domain.Department{}, err
 	}
+	s.notifyWorkspaceChange("organization")
 	return department, nil
 }
 
@@ -340,6 +342,7 @@ func (s *Service) CreateWorkgroup(ctx context.Context, actor domain.User, name, 
 	if err = tx.Commit(ctx); err != nil {
 		return domain.Workgroup{}, err
 	}
+	s.notifyWorkspaceChange("organization")
 	return group, nil
 }
 

@@ -37,6 +37,7 @@ func (s *Service) CreateFolder(ctx context.Context, u domain.User, parentID, nam
 	if err = tx.Commit(ctx); err != nil {
 		return domain.Folder{}, err
 	}
+	s.notifyWorkspaceChange("folder", "file")
 	return folder, nil
 }
 
@@ -64,6 +65,7 @@ func (s *Service) RenameFolder(ctx context.Context, u domain.User, folderID, nam
 	if err = tx.Commit(ctx); err != nil {
 		return domain.Folder{}, err
 	}
+	s.notifyWorkspaceChange("folder", "file")
 	return folder, nil
 }
 
@@ -161,6 +163,7 @@ func (s *Service) DeleteFolder(ctx context.Context, u domain.User, folderID stri
 	if err = tx.Commit(ctx); err != nil {
 		return domain.TrashEntry{}, 0, err
 	}
+	s.notifyWorkspaceChange("folder", "file", "trash")
 	return entry, len(subtree), nil
 }
 

@@ -82,6 +82,7 @@ func (s *Service) AddReviewComment(ctx context.Context, u domain.User, fileID st
 	if err = tx.Commit(ctx); err != nil {
 		return domain.FileReviewComment{}, err
 	}
+	s.notifyWorkspaceChange("review")
 	return comment, nil
 }
 func (s *Service) ResolveReviewComment(ctx context.Context, u domain.User, fileID string, id int64) error {
@@ -125,5 +126,9 @@ func (s *Service) ResolveReviewComment(ctx context.Context, u domain.User, fileI
 	if err = auditRequired(ctx, tx, u, "file.review_resolve", "file", fileID, "success", map[string]any{"commentId": id, "versionSeq": comment.VersionSeq}); err != nil {
 		return err
 	}
-	return tx.Commit(ctx)
+	if err = tx.Commit(ctx); err != nil {
+		return err
+	}
+	s.notifyWorkspaceChange("review")
+	return nil
 }

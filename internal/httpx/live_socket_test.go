@@ -73,12 +73,13 @@ func TestWebSocketHandshakeAndSessionGate(t *testing.T) {
 	var payload struct {
 		Type             string `json:"type"`
 		Version          int    `json:"version"`
+		Resync           bool   `json:"resync"`
 		HeartbeatSeconds int    `json:"heartbeatSeconds"`
 	}
 	if err := websocket.JSON.Receive(conn, &payload); err != nil {
 		t.Fatalf("reading greeting: %v", err)
 	}
-	if payload.Type != "connection.ready" || payload.Version != 1 || payload.HeartbeatSeconds <= 0 {
+	if payload.Type != "connection.ready" || payload.Version != 2 || !payload.Resync || payload.HeartbeatSeconds <= 0 {
 		t.Fatalf("unexpected greeting: %+v", payload)
 	}
 

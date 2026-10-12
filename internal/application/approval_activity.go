@@ -15,6 +15,9 @@ func (s *Service) approvalEvent(ctx context.Context, tx ports.Repository, approv
 // Notify only after the surrounding transaction has committed. The durable
 // notification table remains authoritative if a client is disconnected.
 func (s *Service) notifyApprovalChanges(users ...string) {
+	// A final approval may have committed a new immutable file version; pending
+	// and terminal decisions also update workflow-facing read models.
+	s.notifyWorkspaceChange("file", "review", "stats")
 	seen := map[string]bool{}
 	for _, id := range users {
 		if id == "" || seen[id] {

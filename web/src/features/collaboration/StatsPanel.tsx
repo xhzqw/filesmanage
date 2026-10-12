@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useState} from "react";
+import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {RareButton,RareSelect,AnimatedCounter} from "../../shared/ui/rare";
 import {request} from "../../shared/http";
 import {Dialog} from "../../shared/ui/Dialog";
@@ -44,6 +45,7 @@ export function StatsPanel(){
  const[metric,setMetric]=useState<Metric>("count");
  const[uploader,setUploader]=useState("");
  const[reload,setReload]=useState(0);
+ useEffect(()=>observeWorkspaceChange(()=>setReload(n=>n+1),["file","folder","stats","permissions"]),[]);
  const[pickerOpen,setPickerOpen]=useState(false);
  const[pendingScope,setPendingScope]=useState<Scope>("descendants");
  const[candidate,setCandidate]=useState("");

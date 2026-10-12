@@ -9,21 +9,28 @@
 - 必须同源 Origin，包含方案、Host 与端口。服务端验证 Cookie 并拒绝未完成改密的用户。
 - 不支持查询参数中的令牌，不接收客户端业务命令，连接中不包含密码、Cookie 或文件内容。
 
-## 事件（协议版本 1）
+## 实时事件（协议版本 2）
 
 | type | 含义 |
 |---|---|
-| `connection.ready` | 建立连接，含 `version:1`、`heartbeatSeconds:12` |
+| `connection.ready` | 建立或恢复连接，含 `version:2`、`resync:true`、`heartbeatSeconds:12`，客户端必须全量核对当前可见视图 |
 | `connection.heartbeat` | 每 12 秒重验 Session |
 | `session.changed` | 用户登录、退出、改密、停用或重置密码后触发，前端重新请求 `/api/me` |
 | `session.revoked` | 当前 Session 已失效，前端退出到登录页 |
 | `session.password_change_required` | 必须修改密码 |
 | `server.unavailable` | 暂时无法检查会话，不应误判为退出 |
+| `workspace.changed` | 已提交的资源或权限变更；`scopes` 是无敏感详情的模块失效提示，客户端重新请求自己有权访问的数据 |
+| `approval.changed` | 仅通知对应审批参与者刷新审批与消息 |
+| `state.resync` | 有界缓冲拥塞导致不同事件合并，客户端必须刷新全部可见资源、会话和通知 |
 
-连接断开后客户端指数退避重连，最多 30 秒。连接和重连不会阻止 HTTP 文件管理功能。服务端全局最多 128 条连接，入站消息不超过 1 KiB，发送超时为 4 秒；每用户消息通道是单条有界缓冲，新事件会合并旧事件。
+支持的 `workspace.changed.scopes`：`file`、`folder`、`trash`、`search`、`stats`、`permissions`、`collaboration`、`organization`、`review`、`lifecycle`。浏览器会按范围合并 120 毫秒内的通知，再调用现有 HTTP 查询接口。文件列表/树、文件预览与版本、回收站、搜索、统计、共享与关注、组织管理、生命周期和评论等页面按影响范围更新。个人收藏和搜索预设的变更仅发送到该用户的会话。
 
-这是**单进程内发布订阅总线**，不存储历史，也不跨实例广播。未来多实例部署需要引入共享事件传输（例如 PostgreSQL LISTEN/NOTIFY）；当前单实例 LAN 部署不需要 Redis。无法通过 WS 收到事件时，API 仍会独立执行身份验证。
+所有工作区通知必须在数据库 **Commit 成功后**发送；回滚、校验错误或未提交的请求不得推送。事件载荷不包含资源 ID、名称、正文、文件路径、账号资料或 ACL 明细。所有刷新均重新走服务器权限判断、分页和版本控制，绝不将通知内容当作资源数据。搜索与统计缓存会在提交后同步失效，以免刷新命中旧结果。对未知或丢失的事件按 `state.resync` 处理。
+
+连接断开后客户端带随机抖动指数退避重连，最多约 30 秒；浏览器恢复联网立即尝试重新连接。每次 `connection.ready` 都请求客户端重新核对当前状态，避免断线期间丢事件。连接和重连不会阻止 HTTP 文件管理功能。服务端全局最多 128 条连接，入站消息不超过 1 KiB，发送超时为 4 秒；每个订阅通道是一条有界缓冲，不同通知拥塞时退化成 `state.resync` 而不是静默丢失。
+
+这是**单进程内发布订阅总线**，不存储历史，也不跨实例广播。未来多实例部署必须引入共享事件传输与事件序号/游标（例如 PostgreSQL LISTEN/NOTIFY 加持久事件表）；当前单实例 LAN 部署不需要 Redis。无法通过 WS 收到事件时，页面仍可通过焦点/可见性及手动操作核对状态，API 仍会独立执行身份验证。
 
 ## 验收
 
-仅在远端 `/root/repository77/filesmanage-v21` 执行 `bash scripts/build.sh --with-tests`、测试跨站拒绝、无 Session 拒绝、合法握手返回 101、初始 `connection.ready`、断线重连和双入口 WS/WSS。未完成改密及账号停用等事件要经过实际权限验证，不能只靠前端信号。
+仅在远端 `/root/repository77/filesmanage-v21` 执行 `bash scripts/build.sh --with-tests`，验证跨站拒绝、无 Session 拒绝、合法握手返回 101、协议 v2 的 `connection.ready.resync`、断线重连、并发通知合并和双入口 WS/WSS。文件、目录、权限、审批的双浏览器更新应在已提交后触发，失败事务不触发；失权时旧预览不得继续显示受限内容。未完成改密及账号停用等事件必须经过实际权限验证，不能只靠前端信号。

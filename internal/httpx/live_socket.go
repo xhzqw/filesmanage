@@ -126,7 +126,9 @@ func (h *Handler) streamLiveEvents(req *http.Request, ws *websocket.Conn, userID
 	if !checkSession() {
 		return
 	}
-	if !send(map[string]any{"type": "connection.ready", "version": 1, "heartbeatSeconds": int(liveHeartbeat / time.Second)}) {
+	// After a reconnect the browser must reconcile all state that might
+	// have changed while the socket was unavailable.
+	if !send(map[string]any{"type": "connection.ready", "version": 2, "resync": true, "heartbeatSeconds": int(liveHeartbeat / time.Second)}) {
 		return
 	}
 

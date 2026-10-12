@@ -1,4 +1,5 @@
 import {RareButton,RareDataTable,RareInput,RareSelect} from "../../shared/ui/rare";
+import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useEffect,useMemo,useRef,useState,type FormEvent} from "react";
 import {Link} from "react-router-dom";
 import {collaborationApi,formatBytes} from "./api";
@@ -152,6 +153,7 @@ export function SearchPanel({userId}:{userId:string}){
  const[moreStatus,setMoreStatus]=useState<"idle"|"loading"|"failed">("idle");
  const[message,setMessage]=useState("");
  const[reloadToken,setReloadToken]=useState(0);
+ useEffect(()=>observeWorkspaceChange(()=>setReloadToken(n=>n+1),["file","folder","search","permissions"]),[]);
  // Query generation plus the append mutex (DI-16 §9): the generation discards
  // every response of an older revision, the mutex keeps 加载更多 single-flight.
  const epochRef=useRef(0);

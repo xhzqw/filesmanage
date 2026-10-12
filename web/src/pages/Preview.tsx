@@ -18,7 +18,7 @@ import {ShareDialog} from "../features/collaboration/ShareDialog";
 import {workflowApi} from "../features/workflow/api";
 import {request} from "../shared/http";
 import {errorCopy} from "../shared/errors";
-import {observeResourceChange,observeWindowReturn} from "../shared/resourceSync";
+import {observeResourceChange,observeWindowReturn,observeWorkspaceChange} from "../shared/resourceSync";
 import {Dialog} from "../shared/ui/Dialog";
 import type {PreviewData,FileVersion,FileItem} from "../entities/file/model";
 import type {User} from "../entities/user/model";
@@ -74,7 +74,8 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
    if(!change.id||change.id===id)invalidate();
   });
   const returned=observeWindowReturn(invalidate);
-  return()=>{changed();returned();};
+  const reviewed=observeWorkspaceChange(invalidate,["review","lifecycle","permissions"]);
+  return()=>{changed();returned();reviewed();};
  },[id]);
 
  useEffect(()=>{

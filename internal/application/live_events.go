@@ -5,7 +5,8 @@ import "sync"
 // UserEvent is deliberately small: the transport exposes only event names,
 // never file contents, bearer tokens or sensitive account information.
 type UserEvent struct {
-	Type string `json:"type"`
+	Type   string   `json:"type"`
+	Scopes []string `json:"scopes,omitempty"`
 }
 
 type userEventHub struct {
@@ -44,19 +45,52 @@ func (s *Service) publishUserEvent(userID string, event UserEvent) {
 	s.live.mu.Lock()
 	defer s.live.mu.Unlock()
 	for listener := range s.live.listeners[userID] {
+		enqueueLiveEvent(listener, event)
+	}
+}
+
+// A slow receiver must never silently lose a different invalidation. When
+// its bounded queue overflows, require a complete authorized REST re-read.
+func enqueueLiveEvent(ch chan UserEvent, event UserEvent) {
+	select {
+	case ch <- event:
+	default:
+		// The hub mutex serializes all publishers. The receiver may drain the
+		// slot concurrently, in which case the fallback still fits.
 		select {
-		case listener <- event:
+		case <-ch:
 		default:
-			// If the consumer is still occupied with an older event, retain
-			// only the freshest signal so that the client revalidates state.
-			select {
-			case <-listener:
-			default:
-			}
-			select {
-			case listener <- event:
-			default:
-			}
+		}
+		select {
+		case ch <- UserEvent{Type: "state.resync"}:
+		default:
+		}
+	}
+}
+
+// Call only after the successful transaction commit. This is a coarse
+// single-tenant invalidation: never broadcast filenames, IDs, user identities,
+// permissions or file content to accounts that might not have access.
+// Every receiver fetches data through its own REST authorization.
+func (s *Service) notifyWorkspaceChange(scopes ...string) {
+	if len(scopes) == 0 {
+		return
+	}
+	// Search and statistics caches are projections of mutable resource state.
+	// Clear them before pushing a refresh hint or the next authorized HTTP
+	// request could repeat the old cached result for 10/30 seconds.
+	s.search.mu.Lock()
+	s.search.entries = nil
+	s.search.mu.Unlock()
+	s.stats.mu.Lock()
+	s.stats.entries = nil
+	s.stats.mu.Unlock()
+	event := UserEvent{Type: "workspace.changed", Scopes: scopes}
+	s.live.mu.Lock()
+	defer s.live.mu.Unlock()
+	for _, listeners := range s.live.listeners {
+		for listener := range listeners {
+			enqueueLiveEvent(listener, event)
 		}
 	}
 }

@@ -233,7 +233,12 @@ func New(uow ports.UnitOfWork, blobs ports.BlobStore) *Service {
 
 // bumpACLEpoch invalidates every cached read atomically. Called after any
 // authorisation-relevant mutation commits.
-func (s *Service) bumpACLEpoch() { s.aclEpoch.Add(1) }
+func (s *Service) bumpACLEpoch() {
+	s.aclEpoch.Add(1)
+	// A changed ACL invalidates client-side views, never their server-side
+	// authorization checks. No resource identifiers cross this broadcast.
+	s.notifyWorkspaceChange("file", "folder", "trash", "permissions", "collaboration")
+}
 
 // epoch returns the current authorisation epoch for cache keys.
 func (s *Service) epoch() uint64 { return s.aclEpoch.Load() }

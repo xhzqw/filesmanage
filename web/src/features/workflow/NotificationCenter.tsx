@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from "react";
+import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useNavigate} from "react-router-dom";
 import {RareButton} from "../../shared/ui/rare";
 import {approvalActivityApi,type ApprovalNotification} from "./activityApi";
@@ -28,10 +29,11 @@ export function NotificationCenter(){
   void refresh();
   const interval=window.setInterval(()=>void refresh(),30000);
   const onUpdate=()=>void refresh();
+  const onWorkspace=observeWorkspaceChange(onUpdate,["lifecycle","review"]);
   window.addEventListener("filesmanage:approvals-changed",onUpdate);
   window.addEventListener("filesmanage:approval-notifications-read",onUpdate);
   window.addEventListener("filesmanage:lifecycle-notifications-read",onUpdate);
-  return()=>{valid=false;window.clearInterval(interval);window.removeEventListener("filesmanage:approvals-changed",onUpdate);window.removeEventListener("filesmanage:approval-notifications-read",onUpdate);window.removeEventListener("filesmanage:lifecycle-notifications-read",onUpdate);};
+  return()=>{valid=false;window.clearInterval(interval);onWorkspace();window.removeEventListener("filesmanage:approvals-changed",onUpdate);window.removeEventListener("filesmanage:approval-notifications-read",onUpdate);window.removeEventListener("filesmanage:lifecycle-notifications-read",onUpdate);};
  },[]);
  useEffect(()=>{
   if(!open)return;
