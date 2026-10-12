@@ -6,11 +6,14 @@ import {spawn} from "node:child_process";
 import {readFileSync} from "node:fs";
 
 const base="http://127.0.0.1:18091";
-const port=9563;
+// Chrome chooses a free port for every run. A fixed debugging port can attach
+// a fresh test to a stale browser from a terminated or concurrent job.
+let port=0;
+const chromeProfile="/tmp/fm-rare-overlay-"+process.pid;
 const chrome=spawn("/usr/bin/google-chrome",[
  "--headless=new","--no-sandbox","--disable-gpu",
- "--user-data-dir=/tmp/fm-rare-overlay-"+process.pid,
- "--remote-debugging-port="+port,"--window-size=1440,900","about:blank"
+ "--user-data-dir="+chromeProfile,
+ "--remote-debugging-port=0","--window-size=1440,900","about:blank"
 ],{stdio:"ignore"});
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 let ws,seq=0;
@@ -57,8 +60,13 @@ function inside(rect,width,height){
 }
 try{
  for(let i=0;i<100;i++){
-  await sleep(110);
-  try{
+ await sleep(110);
+ try{
+   if(port===0){
+    const first=readFileSync(chromeProfile+"/DevToolsActivePort","utf8").split("\n")[0];
+    port=Number(first);
+    if(!Number.isInteger(port)||port<=0)throw Error("Invalid Chrome debugging port");
+   }
    const targets=await(await fetch("http://127.0.0.1:"+port+"/json/list")).json();
    const page=targets.find(t=>t.type==="page");
    if(page){ws=new WebSocket(page.webSocketDebuggerUrl);break;}
