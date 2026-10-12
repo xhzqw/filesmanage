@@ -1,4 +1,5 @@
 import {RareButton,RareNotice} from "../../shared/ui/rare";
+import {toast} from "../../shared/ui/feedback";
 import {useEffect,useState} from "react";
 import type {TrashEntry} from "../../entities/trash/model";
 import {trashApi} from "./api";
@@ -11,8 +12,6 @@ import {MicroHoldToDelete} from "../../shared/ui/rare";
 export function TrashList({onRestored}:{onRestored:()=>void}){
  const[entries,setEntries]=useState<TrashEntry[]>([]);
  const[status,setStatus]=useState("loading");
- const[message,setMessage]=useState("");
- const[messageTone,setMessageTone]=useState<"info"|"error">("info");
  const[restoring,setRestoring]=useState<TrashEntry|null>(null);
  const[reloadToken,setReloadToken]=useState(0);
  const[purgeTarget,setPurgeTarget]=useState<TrashEntry|null>(null);
@@ -44,10 +43,6 @@ export function TrashList({onRestored}:{onRestored:()=>void}){
   return()=>{valid=false;};
  },[]);
 
- function say(text:string,tone:"info"|"error"="info"){
-  setMessage(text);
-  setMessageTone(tone);
- }
 
  // Purge destroys the entry and its version history for good; the two dialog
  // stages are the required second confirmation, and the server re-checks the
@@ -74,14 +69,13 @@ export function TrashList({onRestored}:{onRestored:()=>void}){
    return;
   }
   setPurgeTarget(null);
-  say(`已永久删除「${entry.oldName}」`);
+  toast.success("已永久删除");
   setReloadToken(token=>token+1);
   setPurgeBusy(false);
  }
 
  return <div className="work-body">
   <div className="toolbar"><span className="toolbar-hint">回收站中的资源仍保留完整版本历史，恢复后 ID 与版本不变。</span></div>
-  {message&&<RareNotice tone={messageTone==="error"?"danger":"success"}>{message}</RareNotice>}
   <div className="table">
    <table>
     <thead><tr><th scope="col">名称</th><th scope="col">类型</th><th scope="col">删除人</th><th scope="col">删除时间</th><th scope="col">操作</th></tr></thead>
@@ -96,7 +90,7 @@ export function TrashList({onRestored}:{onRestored:()=>void}){
       <td>{entry.deletedAt.replace("T"," ").slice(0,16)}</td>
       <td className="row-actions">
        <RareButton type="button" disabled={restoring!==null||purgeTarget!==null}
-        onClick={()=>{setMessage("");setRestoring(entry);}}>恢复</RareButton>
+        onClick={()=>setRestoring(entry)}>恢复</RareButton>
        {isAdmin&&<RareButton type="button" tone="danger" className="danger" disabled={restoring!==null||purgeTarget!==null}
         onClick={()=>askPurge(entry)}>永久删除</RareButton>}
       </td>

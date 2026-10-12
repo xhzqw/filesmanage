@@ -48,7 +48,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   membersState,setMembersToken,reloadUsers,reloadDepartments,reloadGroups,reloadMembers}=useOrganizationDirectory(isAdmin,selectedGroup);
  const[notice,setNotice]=useState<Notice|null>(null);
  useEffect(()=>{
-  if(notice)(notice.tone==="error"?toast.error:notice.text.startsWith("已")?toast.success:toast.info)(notice.text);
+  if(notice&&notice.tone!=="error")(notice.text.startsWith("已")?toast.success:toast.info)(notice.text);
  },[notice]);
 
  // 视图与筛选状态：默认 Tab 1 为部门成员，Tab 2 为工作组管理

@@ -121,7 +121,9 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
  function updatePeriod(value:string){setPeriod(value);setOffset(0);}
  function updateSort(value:string){setSort(value);setOffset(0);}
  function notify(text:string,tone:"success"|"warning"|"danger"="success"){
-  setNotice({text,error:tone==="danger",warning:tone==="warning",announced:true});
+  // Partial/uncertain results need persistent actionable details. A fully
+  // completed success should only appear in the shared toast.
+  setNotice(tone==="success"?null:{text,error:tone==="danger",warning:tone==="warning",announced:true});
   (tone==="danger"?toast.error:tone==="warning"?toast.warning:toast.success)(text);
  }
  function chooseOne(id:string,checked:boolean){

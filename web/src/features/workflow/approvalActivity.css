@@ -10,7 +10,6 @@
 .approval-filters .rare-select-root{width:125px}
 .approval-filters .rare-select{height:28px}
 .approval-mobile-notes,.approval-side-close{display:none!important}
-.approval-notice{margin:5px 7px 0;padding:6px 10px;background:var(--surface-row-selected);color:var(--brand-blue);border-radius:var(--radius-sm)}
 .approval-load{display:flex;align-items:center;justify-content:center;flex:1;gap:12px;color:var(--text-secondary)}
 .approval-workbench{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,310px);gap:7px;padding:6px 7px 7px;flex:1;min-width:0;min-height:0;overflow:hidden;position:relative}
 .approval-workbench>.approval-main{container:approval-main / inline-size;display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden}

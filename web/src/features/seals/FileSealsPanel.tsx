@@ -3,6 +3,7 @@ import {createPortal} from "react-dom";
 import {Link} from "react-router-dom";
 import {RareBadge,RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
 import {errorCopy} from "../../shared/errors";
+import {toast} from "../../shared/ui/feedback";
 import {sealsApi} from "./api";
 import {SealPageCanvas} from "./SealPageCanvas";
 import {SealRevisionControls} from "./SealRevisionControls";
@@ -30,7 +31,6 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
  const[password,setPassword]=useState("");
  const[busy,setBusy]=useState(false);
  const[error,setError]=useState("");
- const[notice,setNotice]=useState("");
  const[imageAvailable,setImageAvailable]=useState(true);
  const[revision,setRevision]=useState(0);
  const isPDF=name.toLowerCase().endsWith(".pdf");
@@ -100,7 +100,7 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
   if(!selected||!maySign||duplicate||!isPDF||!rotationFits||!imageAvailable||busy||(!staged.some(item=>item.assetId===selected.id)&&staged.length>=20))return;
   const item:DraftSeal={assetId:selected.id,pageNumber:page,...position,angleDegrees:angle};
   setStaged(list=>list.some(s=>s.assetId===item.assetId)?list.map(s=>s.assetId===item.assetId?item:s):[...list,item]);
-  setNotice("已加入待签清单，可选择下一位人员的签名。");setError("");
+  toast.info("已加入待签清单");setError("");
  }
  function removeDraft(id:string){
   setStaged(list=>list.filter(item=>item.assetId!==id));
@@ -108,17 +108,17 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
  }
  async function sign(){
   if(!password||!isPDF||busy||!staged.length||!imageAvailable)return;
-  setBusy(true);setError("");setNotice("");
+  setBusy(true);setError("");
   try{
    const marks=await sealsApi.applyBatch(fileId,{versionSeq:seq,fileSha256:sha,password,placements:staged});
    setStaged([]);setAssetId("");setRevision(n=>n+1);onChanged();
-   setNotice("已成功保存 "+marks.length+" 枚签章，全部固定到当前文件版本。");
+   toast.success("已保存 "+marks.length+" 枚签章");
   }catch(err){setError(errorCopy(err,"批量签署失败；本批次不会部分保存，请核实权限、密码及位置"))}
   finally{setPassword("");setBusy(false)}
  }
  const controls = <div className="seal-file-controls">
    <div className="seal-library-heading">签署设置</div>
-   {(error||notice)&&<p role={error?"alert":"status"} className={error?"notice error":"notice"}>{error||notice}</p>}
+   {error&&<p role="alert" className="notice error">{error}</p>}
    <label>选择签名 / 印章
     <RareSelect value={assetId} onChange={e=>pickAsset(e.target.value)}>
      <option value="">选择人员或公章</option>

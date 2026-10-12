@@ -2,7 +2,7 @@ import {useEffect,useMemo,useState} from "react";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
 import {toast} from "../../shared/ui/feedback";
-import {errorCopy} from "../../shared/errors";
+import {errorCode,errorCopy} from "../../shared/errors";
 import {lifecycleWorkspaceApi,type LifecyclePolicyView,type LifecycleScope} from "./lifecycleWorkspaceApi";
 
 export function LifecyclePolicyManager(){
@@ -15,7 +15,6 @@ export function LifecyclePolicyManager(){
  const[retentionDays,setRetentionDays]=useState(0);
  const[busy,setBusy]=useState(false);
  const[error,setError]=useState("");
- const[notice,setNotice]=useState("");
  const[version,setVersion]=useState(0);
  useEffect(()=>observeWorkspaceChange(()=>setVersion(n=>n+1),["lifecycle","permissions"]),[]);
  useEffect(()=>{
@@ -36,17 +35,19 @@ export function LifecyclePolicyManager(){
  const filtered=useMemo(()=>scopes.filter(s=>s.name.toLowerCase().includes(query.trim().toLowerCase())).slice(0,100),[scopes,query]);
  async function save(clear:boolean){
   if(!id||busy)return;
-  setBusy(true);setError("");setNotice("");
+  setBusy(true);setError("");
   try{
    await toast.track(async()=>{
     if(clear)await lifecycleWorkspaceApi.clearPolicy(kind,id);
     else await lifecycleWorkspaceApi.savePolicy(kind,id,{dueDays,retentionDays});
    },{
     loading:"正在保存生命周期策略…",success:clear?"已恢复上级策略":"生命周期策略已保存",
-    error:e=>errorCopy(e,"保存生命周期策略失败")
+    error:e=>errorCopy(e,"保存生命周期策略失败"),errorToast:false
    });
-   setNotice(clear?"已恢复上级策略":"策略已保存");setVersion(v=>v+1);
-  }catch(e){setError(errorCopy(e,"保存策略失败"));}finally{setBusy(false)}
+   setVersion(v=>v+1);
+  }catch(e){setError(errorCode(e)==="E_NETWORK"
+    ?"网络中断，策略保存结果未确认；请重新读取当前策略后核对"
+    :errorCopy(e,"保存策略失败"));}finally{setBusy(false)}
  }
  return <section className="lifecycle-policy-manager" aria-label="生命周期默认策略">
   <div className="lifecycle-ledger-toolbar"><strong>默认策略</strong><span className="lifecycle-ledger-muted">仅影响后续发布和归档</span></div>
@@ -55,7 +56,7 @@ export function LifecyclePolicyManager(){
     <option value="folder">文件夹</option><option value="department">部门</option>
    </RareSelect></label>
    <label>查找<RareInput aria-label="搜索策略范围" value={query} onChange={e=>setQuery(e.target.value)} placeholder="输入名称"/></label>
-   <label>对象<RareSelect aria-label="选择策略对象" value={id} onChange={e=>{setId(e.target.value);setNotice("");}}>
+   <label>对象<RareSelect aria-label="选择策略对象" value={id} onChange={e=>setId(e.target.value)}>
     <option value="">请选择</option>
     {filtered.map(scope=><option key={scope.id} value={scope.id}>{scope.name}</option>)}
     {id&&!filtered.some(scope=>scope.id===id)&&<option value={id}>{scopes.find(scope=>scope.id===id)?.name??id}</option>}
@@ -73,6 +74,5 @@ export function LifecyclePolicyManager(){
   </div>
   {value&&<p className="lifecycle-policy-source">{value.sourceKind==="folder"?"继承自文件夹":value.sourceKind==="department"?"继承自部门":"未设置策略"}{value.sourceId?" · "+(scopes.find(s=>s.id===value.sourceId)?.name??value.sourceId):""}</p>}
   {error&&<p className="notice error" role="alert">{error}</p>}
-  {notice&&<p className="lifecycle-policy-source" role="status">{notice}</p>}
  </section>;
 }

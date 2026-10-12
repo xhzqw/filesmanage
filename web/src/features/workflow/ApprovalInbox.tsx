@@ -32,7 +32,6 @@ export function ApprovalInbox({currentUser,onReview}:{currentUser:User;onReview:
  const[inbox,setInbox]=useState<Approval[]>([]);
  const[mine,setMine]=useState<Approval[]>([]);
  const[status,setStatus]=useState("loading");
- const[message,setMessage]=useState("");
  const[decision,setDecision]=useState<{approval:Approval;action:"approve"|"reject"|"cancel"}|null>(null);
  const[comment,setComment]=useState("");
  const[decisionError,setDecisionError]=useState("");
@@ -76,7 +75,7 @@ export function ApprovalInbox({currentUser,onReview}:{currentUser:User;onReview:
   setSelected(note.approvalId);setSideMode("detail");setSideOpen(true);
   if(!note.read){
    try{await approvalActivityApi.read(note.id);setNotifications(items=>items.map(item=>item.id===note.id?{...item,read:true}:item));window.dispatchEvent(new Event("filesmanage:approval-notifications-read"));}
-   catch{setNoticeError("标记已读失败");toast.error("标记已读失败，请重试");}
+   catch{setNoticeError("标记已读失败，请重试");}
   }
  }
  const unread=notifications.filter(n=>!n.read).length;
@@ -102,31 +101,31 @@ export function ApprovalInbox({currentUser,onReview}:{currentUser:User;onReview:
  async function act(id:string,action:"approve"|"reject"|"cancel"){
   if(busyId!=="")return;
   if(action==="reject"&&!comment.trim()){setDecisionError("拒绝审批需要填写原因");return;}
-  setMessage("");setBusyId(id);
+  setBusyId(id);
   try{
    if(action==="approve"){
     const result=await workflowApi.approve(id,comment);
     const detail=result.status==="committed"?"已通过并生成新版本":"本级审批已通过，已转交下一级；当前版本不变";
-    setMessage(detail);toast.success(detail);
+    toast.success(detail);
    }else if(action==="reject"){
     await workflowApi.reject(id,comment);
-    setMessage("已拒绝，当前版本不变");toast.success("审批已拒绝，文件版本未改变");
+    toast.success("审批已拒绝，文件版本未改变");
    }else{
     await workflowApi.cancel(id);
-    setMessage("已撤回申请");toast.success("审批申请已撤回");
+    toast.success("审批申请已撤回");
    }
    setDecision(null);setComment("");
    setReloadToken(token=>token+1);
   }catch(error){
    const code=errorCode(error);
    if(code==="E_VERSION_CONFLICT"||code==="E_APPROVAL_PENDING"){
-    setDecision(null);setMessage("审批状态已变化，请刷新");toast.warning("审批状态已变化，正在刷新列表");
+    setDecision(null);toast.warning("审批状态已变化，正在刷新列表");
     setReloadToken(token=>token+1);
    }else if(code==="E_NETWORK"){
     // Lost response is not a rejection; do not leave the confirmation button
     // active for an accidental duplicate approval or withdrawal.
-    setDecision(null);setMessage("网络中断，本次审批结果未确认；已重新读取审批列表，请核对后操作");
-    toast.warning("审批结果未确认，正在刷新审批列表");
+    setDecision(null);
+    toast.warning("网络中断，审批结果未确认；请核对刷新后的列表");
     setReloadToken(token=>token+1);
    }else{
     // The modal's actionable alert is authoritative. A second global alert
@@ -205,7 +204,6 @@ export function ApprovalInbox({currentUser,onReview}:{currentUser:User;onReview:
     </RareButton>
    </div>
   </div>
-  {message&&<div className="approval-notice">{message}</div>}
   <div className={"approval-workbench"+(sideOpen?" side-open":"")}>
    <div className="approval-main" id={"approval-panel-"+activeList} role="tabpanel" aria-labelledby={"approval-tab-"+activeList}>
     <div className="approval-result-count">{activeList==="inbox"?"待处理":"我的申请"} · {activeApprovals.length} 条</div>

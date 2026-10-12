@@ -59,7 +59,6 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const[sealRevision,setSealRevision]=useState<number|null>(null);
  useEffect(()=>{setSealRevision(null)},[id,preview?.sha256,file?.currentVersionSeq]);
 
- const[notice,setNotice]=useState("");
  const[error,setError]=useState("");
  const[rollback,setRollback]=useState<FileVersion|null>(null);
  const[editing,setEditing]=useState(false);
@@ -165,8 +164,9 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
 
  function refresh(){setReloadToken(value=>value+1);}
  function announce(message:string,isError=false){
-  setError(isError?message:"");setNotice(isError?"":message);
-  if(message)(isError?toast.error:toast.success)(message);
+  // Persistent inline feedback is reserved for actionable errors.
+  setError(isError?message:"");
+  if(message&&!isError)toast.success(message);
  }
  function download(){
   if(!preview)return;
@@ -296,7 +296,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
 
       </aside>
       <div className="file-workbench-main">
-       {(notice||error)&&<p role={error?"alert":"status"} className={"notice file-workbench-inline-notice"+(error?" error":"")}>{error||notice}</p>}
+       {error&&<p role="alert" className="notice error file-workbench-inline-notice">{error}</p>}
             <section className="file-workbench-panel file-workbench-preview-surface" aria-label="文件预览" hidden={tab==="compare"||tab==="seals"}>
       {(preview.renderer==="image"||preview.renderer==="video"||preview.renderer==="audio")?
        <MediaPreview key={preview.fileId+preview.sha256} fileId={preview.fileId} sha256={preview.sha256}

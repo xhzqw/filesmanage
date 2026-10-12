@@ -36,6 +36,7 @@ node scripts/ux_session_identity_check.mjs
 node scripts/ux_file_revalidation_check.mjs
 node scripts/file_rename_extension_check.mjs
 node scripts/toast_feedback_check.mjs
+node scripts/toast_surface_governance_check.mjs
 
 echo "== go: build server and worker =="
 go build -o .bin/server ./cmd/server

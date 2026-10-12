@@ -95,7 +95,7 @@ export function RoleBindingsPanel({users,onDirtyChange}:{users:User[];onDirtyCha
    toast.success("管理角色已委派");
   }catch(e){
    const message=errorCode(e)==="E_NETWORK"?"委派结果未确认，请刷新角色列表核对":errorCopy(e,"分配角色失败");
-   setError(message);(errorCode(e)==="E_NETWORK"?toast.warning:toast.error)(message);setLoad(n=>n+1);
+   setError(message);setLoad(n=>n+1);
   }finally{inFlight.current=false;setBusy(false);}
  }
  async function revoke(id:string){
@@ -103,7 +103,7 @@ export function RoleBindingsPanel({users,onDirtyChange}:{users:User[];onDirtyCha
   try{await roleAPI.revoke(id);setConfirmRevoke("");setLoad(v=>v+1);toast.success("管理角色已撤销");}
   catch(e){
    const message=errorCode(e)==="E_NETWORK"?"撤销结果未确认，请刷新角色列表核对":errorCopy(e,"撤销角色失败");
-   setError(message);(errorCode(e)==="E_NETWORK"?toast.warning:toast.error)(message);setLoad(v=>v+1);
+   setError(message);setLoad(v=>v+1);
   }finally{inFlight.current=false;setBusy(false);}
  }
  return <section className="perm-detail org-role-workbench" aria-label="管理角色绑定">

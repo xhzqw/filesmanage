@@ -104,7 +104,7 @@ export function SearchPanel({userId}:{userId:string}){
   const fields:SearchPresetFields={q,category,tag,uploader,type,sort,limit:pageSize,scope,folder,from,to};
   try{
    setPresets(await searchPresetsApi.save(title,fields));
-   setPresetName("");setMessage(`已同步搜索条件：${title}`);toast.success("搜索预设已保存");
+   setPresetName("");toast.success("搜索预设已保存");
   }catch(error){
    setPresetError(errorCode(error)==="E_NETWORK"
     ?"网络中断，预设保存结果未确认；请重新读取预设后核对"
@@ -118,8 +118,8 @@ export function SearchPanel({userId}:{userId:string}){
   setType(preset.type);setSort(preset.sort);setPageSize(preset.limit);setScope(preset.scope);
   setFolder(preset.folder);setFrom(preset.from);setTo(preset.to);setShowAdvanced(true);
   epochRef.current++;setQuery(null);setItems([]);setStatus("idle");
-  setMessage("预设已加载，点击搜索或应用筛选执行");
-  toast.info("搜索预设已加载");
+  setMessage("");
+  toast.info("搜索预设已加载，请点击搜索执行");
  }
  async function deletePreset(id:string){
   if(presetBusy)return;

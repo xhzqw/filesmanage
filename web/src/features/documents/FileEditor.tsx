@@ -94,8 +94,6 @@ export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileIte
    if(requiresApproval){
     await fileApi.submitForApproval(file.id,baseSeq,data);
     setLoaded(content);
-    setMessageTone("success");
-    setMessage("已提交审批，通过后生成新版本；当前生效版本未变。");
     toast.success("修改已提交审批，当前生效版本未变");
     onSaved();
     return;
@@ -109,8 +107,6 @@ export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileIte
    setLockToken("");
    setBaseSeq(result.versionSeq);
    setLoaded(content);
-   setMessageTone("success");
-   setMessage(`已保存为 v${result.versionSeq}`);
    toast.success(`文件已保存为 v${result.versionSeq}`);
    onSaved();
   }catch(error){
@@ -139,7 +135,7 @@ export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileIte
     <label htmlFor="editor-content">内容</label>
     <RareTextarea id="editor-content" value={content} rows={16} onChange={e=>setContent(e.target.value)}/>
    </>}
-   {message&&status!=="failed"&&<p role={messageTone==="success"?undefined:messageTone==="warning"?"status":"alert"} className={"notice"+(messageTone==="danger"?" error":"")}>{message}</p>}
+   {message&&status!=="failed"&&<p role={messageTone==="warning"?"status":"alert"} className={"notice"+(messageTone==="danger"?" error":"")}>{message}</p>}
    {pending&&<p role="alert" className="notice error">有未保存的修改，放弃后将丢失本次编辑。</p>}
    <div className="dialog-actions">
     {pending===null&&<>

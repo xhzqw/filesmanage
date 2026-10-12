@@ -31,8 +31,6 @@ export function CollaborationPanel(){
  const[shares,setShares]=useState<Share[]>([]);
  const[favorites,setFavorites]=useState<Favorite[]>([]);
  const[status,setStatus]=useState("loading");
- const[message,setMessage]=useState("");
- const[messageTone,setMessageTone]=useState<"info"|"error">("info");
  const[nextCursor,setNextCursor]=useState("");
  const[moreStatus,setMoreStatus]=useState<"idle"|"loading"|"failed">("idle");
  const pageEpoch=useRef(0);
@@ -250,8 +248,6 @@ export function CollaborationPanel(){
  const chosenFavorited=chosen!==null&&favoriteKeys.has(chosen.kind+":"+chosen.id);
 
  function say(text:string,tone:"info"|"error"|"warning"="info"){
-  setMessage(text);
-  setMessageTone(tone==="info"?"info":"error");
   if(text.trim())(tone==="error"?toast.error:tone==="warning"?toast.warning:toast.success)(text);
  }
 
@@ -261,7 +257,6 @@ export function CollaborationPanel(){
 
  function openCreate(){
   setTab("favorites");
-  setMessage("");
  }
 
  function pickFolder(id:string){
@@ -289,7 +284,6 @@ export function CollaborationPanel(){
  }
 
  async function unfavorite(id:string,kind:string){
-  setMessage("");
   try{
    await collaborationApi.setFavorite(kind,id,false);
    say("已取消关注");
@@ -363,7 +357,6 @@ export function CollaborationPanel(){
    </div>
    <RareButton type="button" className="primary collab-create-action" onClick={openCreate}>创建分享</RareButton>
   </div>
-  {message&&<p className={"notice"+(messageTone==="error"?" error":"")}>{message}</p>}
   <div className={"collab-workspace"+(tab==="favorites"?" with-picker":"")}>
   {tab==="favorites"&&<section className={"share-workbench"+(pickKind==="file"?" is-file-mode":"")} aria-label="选择关注或分享资源">
    <div className="share-workbench-head"><h3>选择资源</h3></div>
