@@ -36,7 +36,10 @@ func TestConvertedDXFRejectsEmptyAndTruncated(t *testing.T) {
 			}
 			got, err := outputHasDxfGeometry(path)
 			if err != nil {
-				t.Fatal(err)
+				if tc.valid {
+					t.Fatal(err)
+				}
+				return // Invalid data is correctly rejected with a parse error.
 			}
 			if got != tc.valid {
 				t.Errorf("valid=%v want %v", got, tc.valid)
