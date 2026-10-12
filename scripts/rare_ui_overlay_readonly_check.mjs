@@ -6,11 +6,14 @@ import {spawn} from "node:child_process";
 import {readFileSync} from "node:fs";
 
 const base="http://127.0.0.1:18091";
-const port=9563;
+// Chrome chooses a free port for every run. A fixed debugging port can attach
+// a fresh test to a stale browser from a terminated or concurrent job.
+let port=0;
+const chromeProfile="/tmp/fm-rare-overlay-"+process.pid;
 const chrome=spawn("/usr/bin/google-chrome",[
  "--headless=new","--no-sandbox","--disable-gpu",
- "--user-data-dir=/tmp/fm-rare-overlay-"+process.pid,
- "--remote-debugging-port="+port,"--window-size=1440,900","about:blank"
+ "--user-data-dir="+chromeProfile,
+ "--remote-debugging-port=0","--window-size=1440,900","about:blank"
 ],{stdio:"ignore"});
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 let ws,seq=0;
@@ -18,7 +21,8 @@ const requests=new Map();
 function send(method,params={}){
  const id=++seq;
  return new Promise((resolve,reject)=>{
-  requests.set(id,{resolve,reject});
+  const timer=setTimeout(()=>{requests.delete(id);reject(Error("Chrome DevTools command timed out: "+method+" #"+id));},18000);
+  requests.set(id,{resolve,reject,timer});
   ws.send(JSON.stringify({id,method,params}));
  });
 }
@@ -56,8 +60,13 @@ function inside(rect,width,height){
 }
 try{
  for(let i=0;i<100;i++){
-  await sleep(110);
-  try{
+ await sleep(110);
+ try{
+   if(port===0){
+    const first=readFileSync(chromeProfile+"/DevToolsActivePort","utf8").split("\n")[0];
+    port=Number(first);
+    if(!Number.isInteger(port)||port<=0)throw Error("Invalid Chrome debugging port");
+   }
    const targets=await(await fetch("http://127.0.0.1:"+port+"/json/list")).json();
    const page=targets.find(t=>t.type==="page");
    if(page){ws=new WebSocket(page.webSocketDebuggerUrl);break;}
@@ -69,6 +78,7 @@ try{
   const response=JSON.parse(event.data),pending=requests.get(response.id);
   if(!pending)return;
   requests.delete(response.id);
+  clearTimeout(pending.timer);
   response.error?pending.reject(Error(response.error.message)):pending.resolve(response.result);
  });
  await send("Page.enable");await send("Runtime.enable");
@@ -254,6 +264,40 @@ try{
   }
   results.push(width+"px: workgroup master/detail OK");
  }
+ // Role ACL action presets are presentation-only until the separate preview
+ // and confirmation workflow is submitted. Never submit a form in this test.
+ await viewport(1440,900);
+ console.log("RARE_ROLE_CHECK navigating to role editor");
+ await navigate("/org?tab=roles",'!!document.querySelector(".org-role-editor")');
+ console.log("RARE_ROLE_CHECK opening role selector");
+ await evalJS(`(()=>{const select=document.querySelector(".org-role-editor .perm-form-row>label:nth-child(2) .rare-select");
+  if(!select)throw Error("role combobox missing");
+  select.scrollIntoView({block:"center",inline:"nearest"});select.click();
+  return true;})()`);
+ await waitFor(`document.querySelector('.org-role-editor .perm-form-row>label:nth-child(2) .rare-select')?.getAttribute("aria-expanded")==="true"`);
+ await waitFor('!!document.querySelector(".rare-select-menu [role=option]")');
+ console.log("RARE_ROLE_CHECK choosing folder permission administrator");
+ await evalJS(`(()=>{const option=[...document.querySelectorAll(".rare-select-menu [role=option]")].find(x=>x.textContent.includes("目录权限管理员"));if(!option)throw Error("permission-admin role missing");option.click();return true})()`);
+ await waitFor('!!document.querySelector(".org-role-action-tools")');
+ console.log("RARE_ROLE_CHECK toggling action presets");
+ const actionsBefore=await evalJS(`(()=>({total:document.querySelectorAll(".org-role-editor .perm-action-grid input[type=checkbox]").length,
+  selected:[...document.querySelectorAll(".org-role-editor .perm-action-grid input[type=checkbox]")].filter(x=>x.checked).length}))()`);
+ assert(actionsBefore.total>=8,"role action choices visible: "+JSON.stringify(actionsBefore));
+ await click(".org-role-action-tools .rare-button:first-of-type");
+ await waitFor(`[...document.querySelectorAll(".org-role-editor .perm-action-grid input[type=checkbox]")].every(x=>x.checked)`);
+ await click(".org-role-action-tools .rare-button:last-of-type");
+ await waitFor(`[...document.querySelectorAll(".org-role-editor .perm-action-grid input[type=checkbox]")].every(x=>!x.checked)`);
+ // Restore the pristine editor state before navigating. An unsaved delegation
+ // intentionally triggers the app's beforeunload protection, which would
+ // block a low-level Chrome Page.navigate command.
+ await evalJS(`(()=>{const browse=document.querySelector(".org-role-editor .perm-action-grid input[type=checkbox]");
+  if(!browse)throw Error("browse ACL checkbox missing");browse.click();return true})()`);
+ await waitFor(`[...document.querySelectorAll(".org-role-editor .perm-action-grid input[type=checkbox]")].filter(x=>x.checked).length===1`);
+ await evalJS(`(()=>{document.querySelector(".org-role-editor .perm-form-row>label:nth-child(2) .rare-select")?.click();return true})()`);
+ await waitFor('!!document.querySelector(".rare-select-menu [role=option]")');
+ await evalJS(`(()=>{const option=[...document.querySelectorAll(".rare-select-menu [role=option]")].find(x=>x.textContent.includes("只读审计员"));if(!option)throw Error("auditor role missing");option.click();return true})()`);
+ await waitFor(`document.querySelector(".org-role-editor .perm-form-row>label:nth-child(2) .rare-select")?.textContent.includes("只读审计员")`);
+ results.push("1440px: role ACL select-all/clear without submission OK");
  // Deep-linking to the seal library must not lose its selected view on reload.
  for(const width of [1440,900,390]){
   await viewport(width,width===390?760:900);
@@ -319,5 +363,14 @@ try{
   }
  }
  console.log("RARE_OVERLAY_READONLY_PASS "+results.join("; ")+"; file grid, permission Gooey, dialog and focus OK"+(availablePreviewId?"":"; preview fixture absent"));
-}catch(error){console.error("RARE_OVERLAY_READONLY_FAIL",error.message);process.exitCode=1;}
+}catch(error){
+ console.error("RARE_OVERLAY_READONLY_FAIL",error.message);
+ try{
+  const snapshot=await evalJS(`(()=>({url:location.href,ready:document.readyState,
+   title:document.title,body:document.body.innerText.slice(0,450),
+   stats:!!document.querySelector(".stats-workbench"),selects:document.querySelectorAll(".rare-select").length}))()`);
+  console.error("RARE_OVERLAY_BROWSER_STATE",JSON.stringify(snapshot));
+ }catch(snapshotError){console.error("RARE_OVERLAY_BROWSER_STATE_UNAVAILABLE",snapshotError.message);}
+ process.exitCode=1;
+}
 finally{ws?.close();chrome.kill("SIGTERM");}
