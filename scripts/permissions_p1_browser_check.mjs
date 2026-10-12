@@ -125,6 +125,16 @@ try{
   "department tree Home and Enter restore all-organization scope");
  assert(await cdp.evaluate(`(()=>document.querySelectorAll('.org-dept-card li[role=treeitem][tabindex="0"]').length===1)()`),
   "department hierarchy exposes exactly one keyboard tab stop");
+ const expandableDept=await cdp.evaluate("(()=>document.querySelector('.org-dept-card li[data-dept-id][aria-expanded]')?.dataset.deptId??'')()");
+ if(expandableDept){
+  await cdp.evaluate(`(()=>{document.querySelector('li[data-dept-id="${expandableDept}"]').focus();return true})()`);
+  await pressKey("ArrowLeft",37);
+  assert(await cdp.waitFor(`()=>document.querySelector('li[data-dept-id="${expandableDept}"]')?.getAttribute('aria-expanded')==='false'`),
+   "department tree ArrowLeft collapses a branch");
+  await pressKey("ArrowRight",39);
+  assert(await cdp.waitFor(`()=>document.querySelector('li[data-dept-id="${expandableDept}"]')?.getAttribute('aria-expanded')==='true'`),
+   "department tree ArrowRight expands a branch");
+ }
  await cdp.evaluate("window.__orgShellTree=document.querySelector('.org-dept-card');window.__orgShellTabs=document.querySelector('.org-tabs-bar');true");
  for(const tab of ["members","groups","approvals","roles","permissions"]){
   await cdp.evaluate(`document.querySelector('#org-tab-${tab}').click()`);
@@ -151,6 +161,16 @@ try{
  await pressKey("Enter",13);
  assert(await cdp.waitFor("()=>document.activeElement?.getAttribute('aria-selected')==='true'"),
   "resource tree Enter selects focused resource");
+ const expandableFolder=await cdp.evaluate("(()=>document.querySelector('.perm-tree li[aria-expanded]')?.dataset.folderId??'')()");
+ if(expandableFolder){
+  await cdp.evaluate(`(()=>{document.querySelector('.perm-tree li[data-folder-id="${expandableFolder}"]').focus();return true})()`);
+  await pressKey("ArrowLeft",37);
+  assert(await cdp.waitFor(`()=>document.querySelector('.perm-tree li[data-folder-id="${expandableFolder}"]')?.getAttribute('aria-expanded')==='false'`),
+   "resource tree ArrowLeft collapses a branch");
+  await pressKey("ArrowRight",39);
+  assert(await cdp.waitFor(`()=>document.querySelector('.perm-tree li[data-folder-id="${expandableFolder}"]')?.getAttribute('aria-expanded')==='true'`),
+   "resource tree ArrowRight expands a branch");
+ }
  for(const width of [1100,1024,900,820]){
   await cdp.send("Emulation.setDeviceMetricsOverride",{width,height:900,deviceScaleFactor:1,mobile:false});
   assert(await cdp.evaluate(`(()=>{
@@ -159,6 +179,11 @@ try{
    return task.x>=tree.right&&Math.abs(task.y-tree.y)<=3&&
     document.documentElement.scrollWidth<=innerWidth+2;
   })()`),width+"px keeps compact side-by-side organization workbench");
+  assert(await cdp.evaluate(`(()=>{
+   const browser=document.querySelector('.perm-workspace .perm-browser').getBoundingClientRect();
+   const detail=document.querySelector('.perm-workspace .perm-detail').getBoundingClientRect();
+   return browser.width>0&&browser.width<=221&&detail.left>=browser.right-2&&detail.width>0;
+  })()`),width+"px keeps resource navigator compact and details accessible");
  }
  await cdp.send("Emulation.clearDeviceMetricsOverride");
  // Organization invalidations must refresh the directory without a page reload.
