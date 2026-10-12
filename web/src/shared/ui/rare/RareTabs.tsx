@@ -25,10 +25,16 @@ export function RareTabs({className="",label,children}:{
     update();
     const resize=typeof ResizeObserver==="undefined"?null:new ResizeObserver(update);
     resize?.observe(root);
-    root.querySelectorAll('[role="tab"]').forEach(tab=>resize?.observe(tab));
+    const tabs=Array.from(root.querySelectorAll('[role="tab"]'));
+    tabs.forEach(tab=>resize?.observe(tab));
+    // Watch semantic selection changes rather than re-measuring on each React commit.
+    // A layout effect that sets rail state after every render can loop forever when
+    // tab badges change geometry during organization filtering.
+    const observer=typeof MutationObserver==="undefined"?null:new MutationObserver(update);
+    observer?.observe(root,{subtree:true,attributes:true,attributeFilter:["aria-selected"]});
     root.addEventListener("scroll",update,{passive:true});
-    return()=>{resize?.disconnect();root.removeEventListener("scroll",update);};
-  });
+    return()=>{resize?.disconnect();observer?.disconnect();root.removeEventListener("scroll",update);};
+  },[]);
   function onKeyDown(event:KeyboardEvent<HTMLDivElement>){
     if(!["ArrowRight","ArrowLeft","Home","End"].includes(event.key))return;
     const tabs=Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]:not(:disabled)'));
