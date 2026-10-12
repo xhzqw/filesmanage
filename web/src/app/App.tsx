@@ -21,6 +21,7 @@ import{Trash}from "../pages/Trash";
 import{Org}from "../pages/Org";
 import{Approvals}from "../pages/Approvals";
 import{Lifecycle}from "../pages/Lifecycle";
+import{lifecycleWorkspaceEnabled}from "../shared/featureFlags";
 import{OfficeEditor}from "../pages/OfficeEditor";
 import{SessionDevices}from "../pages/SessionDevices";
 import{SearchPage,WorkspacePage}from "./AppShell";
@@ -55,7 +56,7 @@ export function App(){
  <Route path="/preview/:id" element={user?<Preview user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/trash" element={user?<Trash user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/org" element={user?<Org user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
- <Route path="/lifecycle" element={user?<Lifecycle user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
+ <Route path="/lifecycle" element={user&&lifecycleWorkspaceEnabled?<Lifecycle user={user} onLogout={logout}/>:<Navigate to={user?"/doc":"/login"} replace/>}/>
  <Route path="/approvals" element={user?<Approvals user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/office/:id" element={user?<OfficeEditor user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/model/:id" element={user?<Suspense fallback={<main className="brand-loading-screen" aria-busy="true"><BrandLoader size="lg" label="正在加载 CAD 模型预览"/><span>正在加载 CAD 模型预览…</span></main>}><ModelViewer user={user} onLogout={logout}/></Suspense>:<Navigate to="/login" replace/>}/>

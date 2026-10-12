@@ -5,6 +5,7 @@ import {RareButton,NotificationBell} from "../../shared/ui/rare";
 import {toast} from "../../shared/ui/feedback";
 import {approvalActivityApi,type ApprovalNotification} from "./activityApi";
 import {lifecycleNotificationApi,type LifecycleNotice} from "./lifecycleNotificationApi";
+import {lifecycleWorkspaceEnabled} from "../../shared/featureFlags";
 import "./notificationCenter.css";
 
 const eventLabel:Record<string,string>={submitted:"待你审批",advanced:"审批已流转",approved:"审批已通过",rejected:"审批被拒绝",cancelled:"申请已撤回",conflicted:"审批冲突"};
@@ -23,7 +24,7 @@ export function NotificationCenter(){
   let valid=true;
   async function refresh(){
    try{
-    const [items,due]=await Promise.all([approvalActivityApi.notifications(),lifecycleNotificationApi.notifications()]);
+    const [items,due]=await Promise.all([approvalActivityApi.notifications(),lifecycleWorkspaceEnabled?lifecycleNotificationApi.notifications():Promise.resolve([] as LifecycleNotice[])]);
     if(valid){setNotes(items);setLifecycleNotes(due);setError("");}
    }catch{if(valid)setError("通知暂时不可用");}
   }
@@ -96,7 +97,7 @@ export function NotificationCenter(){
       {!n.read&&<span className="notification-dot" aria-label="未读"/>}
      </RareButton>)}
    </div>
-   <div className="notification-footer"><RareButton type="button" onClick={()=>{setOpen(false);navigate("/lifecycle");}}>生命周期台账</RareButton><RareButton type="button" onClick={()=>{setOpen(false);navigate("/approvals");}}>进入审批工作台</RareButton></div>
+   <div className="notification-footer">{lifecycleWorkspaceEnabled&&<RareButton type="button" onClick={()=>{setOpen(false);navigate("/lifecycle");}}>生命周期台账</RareButton>}<RareButton type="button" onClick={()=>{setOpen(false);navigate("/approvals");}}>进入审批工作台</RareButton></div>
   </div>}
  </div>;
 }

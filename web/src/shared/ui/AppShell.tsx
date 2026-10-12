@@ -4,6 +4,7 @@ import {ShellAccessories} from "./ShellAccessories";
 import {useLocation,useNavigate} from "react-router-dom";
 import {Menu} from "./Menu";
 import {FolderResourceIcon} from "./ResourceIcons";
+import {lifecycleWorkspaceEnabled} from "../featureFlags";
 import "./previewAutoHeader.css";
 import "./globalUtilityDock.css";
 
@@ -32,7 +33,7 @@ const NAV=[
  {to:"/lifecycle",label:"生命周期"},
  {to:"/trash",label:"回收站"},
  {to:"/org",label:"组织与权限"},
-];
+].filter(item=>lifecycleWorkspaceEnabled||item.to!=="/lifecycle");
 const GOOEY_MAIN_ITEMS=NAV.map(item=>({label:item.label,href:item.to}));
 
 // The single shell shared by every authenticated page (DESIGN-SYSTEM-v1 §3.1,
