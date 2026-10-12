@@ -139,7 +139,7 @@ export function FolderTreemap({stats,folders,onChoose}:{stats:Stats;folders:Fold
      const compact=width<155||height<78;
      const tiny=width<85||height<45;
      const canOpen=!node.virtual;
-     return <button
+     return <RareButton
       key={node.id} type="button" className={"stats-map-tile stats-map-tone-"+index%7+(tiny?" is-tiny":"")}
       style={{left:x/10+"%",top:y/5.6+"%",width:width/10+"%",height:height/5.6+"%"}}
       title={node.name+" · "+formatBytes(node.bytes)+" · "+node.count+" 个文件 · "+(share*100).toFixed(1)+"%"}
@@ -150,7 +150,7 @@ export function FolderTreemap({stats,folders,onChoose}:{stats:Stats;folders:Fold
       {!tiny&&<span className="stats-map-tile-name">{node.name}</span>}
       {!compact&&<span className="stats-map-tile-number">{formatBytes(node.bytes)}</span>}
       {!compact&&<span className="stats-map-tile-meta">{(share*100).toFixed(1)}% · {node.count} 个</span>}
-     </button>;
+     </RareButton>;
     })}
    </div>}
   <div className="stats-map-caption"><span>{drawable.length} 个项目 · {formatBytes(total)}</span>
