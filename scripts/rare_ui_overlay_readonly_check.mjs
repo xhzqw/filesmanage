@@ -148,7 +148,7 @@ try{
     assert.equal(await evalJS('document.querySelector(".org-role-editor button[type=submit]")?.disabled'),true,
      "delegation must still require a folder scope for directory permission administrator");
     await waitFor(`[...document.querySelectorAll('.org-role-editor .perm-form-row label')].some(x=>x.textContent.startsWith('管理范围')&&x.querySelector('.rare-select:not(:disabled)'))`);
-    const scopeSelector='.org-role-editor .perm-form-row:last-of-type>label:nth-child(2) .rare-select';
+    const scopeSelector='.org-role-editor .perm-form-row:nth-of-type(2)>label:nth-child(2) .rare-select';
     await evalJS(`(()=>{document.querySelector(${JSON.stringify(scopeSelector)})?.scrollIntoView({block:'center',inline:'nearest'});return true})()`);
     await click(scopeSelector);
     await waitFor('!!document.querySelector(".rare-select-menu [role=option]")');
