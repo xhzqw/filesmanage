@@ -51,6 +51,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
  const[darkDrawing,setDarkDrawing]=useState(true);
  const[showLengths,setShowLengths]=useState(true);
  const[skipped,setSkipped]=useState<string[]>([]);
+ const[showCompatibility,setShowCompatibility]=useState(false);
  const[layers,setLayers]=useState<{name:string;visible:boolean}[]>([]);
  const[layouts,setLayouts]=useState<string[]>([]);
  const[activeLayout,setActiveLayout]=useState("Model");
@@ -90,7 +91,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
   setPaperViewports({total:0,projected:0});
   setPlotScale(1);setPlotError("");
   setParts([]);setSelectedPart(-1);
-  setUnit("unknown");setMeasure(null);setSkipped([]);
+  setUnit("unknown");setMeasure(null);setSkipped([]);setShowCompatibility(false);
   setSelectedLine(null);setDarkDrawing(true);setShowLengths(true);
   setView({axes:false,grid:false,edges:true,measure:false,projection:"perspective"});
   setCube({yaw:45,pitch:26});
@@ -203,7 +204,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
         }
        },setMeasure,()=>{},setSelectedLine,next.unit);
       controls.current=mounted;
-      setLayers(next.layers);setSkipped(next.skipped);
+      setLayers(next.layers);setSkipped(next.skipped);setShowCompatibility(false);
       setPaperViewports(next.viewports);
       setActiveLayout(next.layout);setMeasure(null);
       setPlotError("");
@@ -287,7 +288,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
          {darkDrawing?"深色审图":"白纸模式"}</RareButton>
         <RareButton type="button" className={showLengths?"on":""} aria-pressed={showLengths}
          onClick={()=>setShowLengths(controls.current?.toggleLengthLabels()??showLengths)}>
-         线长标签</RareButton>
+         线长</RareButton>
        </div>}
        {!drawing&&<div className="cad-toolgroup" role="group" aria-label="标准视角">
         {(["iso","front","back","left","right","top","bottom"] as const).map((name,index)=>
@@ -318,7 +319,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
         anchor.download="drawing-"+id.replace(/[^a-zA-Z0-9_-]/g,"").slice(0,60)+"-"+
          activeLayout.replace(/[^\p{L}\p{N}_-]/gu,"_").slice(0,50)+".png";
         anchor.click();
-       }}>导出当前图纸 PNG</RareButton>}
+       }} title="导出当前图纸 PNG">PNG</RareButton>}
        {drawing&&activeLayout!=="Model"&&(["A4","A3"] as const).map((paper:SheetSize)=>
         <RareButton key={paper} type="button" title="适合纸张打印当前图像，非CAD精确比例出图" onClick={()=>{
          const snapshot=controls.current?.exportPng();
@@ -344,18 +345,17 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
      {status==="ready"&&<aside className="cad-inspector" aria-label="工程文件属性">
       {drawing&&<section className="cad-inspector-section cad-dimension-panel">
        <h3>几何审图 <span>XY</span></h3>
-       <div className="cad-dimension-value">
-        {selectedLine?selectedLine.length.toLocaleString("zh-CN",{maximumFractionDigits:4})+" "+(unit==="unknown"?"绘图单位":unit):"点击线段查看长度"}
+       <div className="cad-dimension-value" title="点击线段查看长度；曲线离散段不代表完整弧长">
+        {selectedLine?selectedLine.length.toLocaleString("zh-CN",{maximumFractionDigits:4})+" "+(unit==="unknown"?"单位未声明":unit):"选择线段"}
        </div>
-       {selectedLine&&<span className="cad-precision-note">
-        起点 ({selectedLine.x1.toPrecision(5)}, {selectedLine.y1.toPrecision(5)}) ·
-        终点 ({selectedLine.x2.toPrecision(5)}, {selectedLine.y2.toPrecision(5)})
-       </span>}
-       <span className="cad-precision-note">长度基于原始 XY 坐标；圆弧离散后的小线段不是完整弧长。未知单位不假定毫米。</span>
-       {selectedLine&&<RareButton type="button" onClick={()=>{setSelectedLine(null);controls.current?.clearLineSelection();}}>清除线段选择</RareButton>}
+       {selectedLine&&<div className="cad-coordinate-pair" title="原图坐标 X, Y">
+        <span>A ({selectedLine.x1.toPrecision(5)}, {selectedLine.y1.toPrecision(5)})</span>
+        <span>B ({selectedLine.x2.toPrecision(5)}, {selectedLine.y2.toPrecision(5)})</span>
+       </div>}
+       {selectedLine&&<RareButton type="button" onClick={()=>{setSelectedLine(null);controls.current?.clearLineSelection();}}>清除</RareButton>}
       </section>}
       {drawing&&activeLayout!=="Model"&&<section className="cad-inspector-section cad-print">
-       <h3>图纸比例出图</h3>
+       <h3>比例出图</h3>
        <label className="cad-print-scale">
         <span>打印比例</span>
         <RareSelect aria-label="打印比例" value={String(plotScale)} onChange={event=>{
@@ -378,10 +378,9 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
           }catch(error){
            setPlotError(error instanceof Error?error.message:"按比例出图失败");
           }
-         }}>{sheet} 矢量打印</RareButton>)}
+         }} title={sheet+" 矢量打印；打印时使用 100% 实际大小"}>{sheet} 矢量</RareButton>)}
        </div>
-       <span className="cad-precision-note">仅毫米 DXF · 坐标 1:{plotScale} · 打印时请选择 100% 实际大小</span>
-       {unit!=="mm"&&<p className="cad-notice">单位未明确为毫米；请使用图像打印或核实源图纸单位。</p>}
+       {unit!=="mm"&&<p className="cad-notice">仅支持毫米 DXF</p>}
        {plotError&&<p className="cad-notice" role="alert">{plotError}</p>}
       </section>}
       {layers.length>0&&<section className="cad-inspector-section">
@@ -442,8 +441,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
       {view.measure&&<section className="cad-inspector-section">
        <h3>测量</h3>
        <strong className="cad-measure">{measure===null?"请选择两个点":measure.toLocaleString("zh-CN",{maximumFractionDigits:4})+" "+(unit==="unknown"?(drawing?"绘图单位":"模型单位"):unit)}</strong>
-       <span className="cad-precision-note">{drawing?"按二维绘图坐标计算，曲线捕捉基于预览离散线段":"基于三角网格的近似距离，非 CAD 曲面精确测量"}</span>
-       <RareButton type="button" onClick={()=>controls.current?.clearMeasurement()}>清除测量</RareButton>
+       <RareButton type="button" title={drawing?"按二维坐标计算；曲线捕捉基于离散线段":"三维网格近似距离"} onClick={()=>controls.current?.clearMeasurement()}>清除</RareButton>
       </section>}
       {metrics&&<section className="cad-inspector-section cad-properties">
        <h3>文件属性</h3>
@@ -456,8 +454,15 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
        {!drawing&&<div><span>网格组</span><strong title="网格组数量不等于原始 CAD 装配零件数量">{metrics.components}</strong></div>}
        <div><span>格式</span><strong>{info?.format?.toUpperCase()??"-"}</strong></div>
        <div><span>源校验</span><strong title={fileMeta?.sha256}>{fileMeta?.sha256?.slice(0,10)??"-"}…</strong></div>
-       {info?.note&&<p className="cad-notice">{info.note}</p>}
-       {skipped.length>0&&<p className="cad-notice">兼容性提示：{skipped.join("、")}</p>}
+       {(info?.note||skipped.length>0)&&<>
+        <RareButton type="button" aria-expanded={showCompatibility} onClick={()=>setShowCompatibility(value=>!value)}>
+         兼容提示{skipped.length>0?" ("+skipped.length+")":""} {showCompatibility?"收起":"展开"}
+        </RareButton>
+        {showCompatibility&&<div className="cad-compat-details" role="status">
+         {info?.note&&<p>{info.note}</p>}
+         {skipped.map((note,index)=><p key={index}>{note}</p>)}
+        </div>}
+       </>}
       </section>}
      </aside>}
     </div>

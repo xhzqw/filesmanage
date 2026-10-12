@@ -18,6 +18,12 @@ assert(!viewerCss.includes(".cad-hint{"),
  "CAD must not retain the bottom-anchored white instruction pill");
 assert(viewerPage.includes('aria-label="工程视图工具"'),
  "short in-toolbar action labels must remain accessible");
+assert(!viewerPage.includes("长度基于原始 XY 坐标"),
+ "persistent geometry explanation must not crowd the engineering workbench");
+assert(!viewerPage.includes("兼容性提示：{skipped.join"),
+ "long compatibility lists must not remain permanently expanded");
+assert(viewerPage.includes("aria-expanded={showCompatibility}")&&viewerPage.includes("setShowCompatibility("),
+ "compatibility diagnostics must remain available on demand");
 
 // Bundle the parser with its pure NURBS evaluator. The Three dependency is
 // type-only and is erased; this remains a remote-only headless regression.
