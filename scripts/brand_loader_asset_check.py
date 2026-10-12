@@ -2,6 +2,7 @@
 """Fail builds if the shared loader regresses to a favicon-sized/opaque mark."""
 import struct
 import zlib
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -40,4 +41,15 @@ component = (ROOT / "web/src/shared/ui/BrandLoader.tsx").read_text()
 style = (ROOT / "web/src/shared/ui/brand-loader.css").read_text()
 assert "logo-loader-256.png" in component and "logo-loader-256.png" in style
 assert "brandLoaderPaths" not in component and "favicon-48.png" not in style
+# The PDF viewer previously applied a white paper background, fixed image
+# dimensions and drop shadow to EVERY nested img, including BrandLoader's
+# transparent logo image. Constrain PDF paper visuals to its *direct* page
+# images and fail the build if an unscoped descendant selector reappears.
+pdf_style = (ROOT / "web/src/features/documents/pdfPageViewer.css").read_text()
+assert not re.search(r"\.file-pdf-paper\s+img(?=\s*[,\.{:#>]|\s*\{)", pdf_style), (
+    "PDF paper img selector leaks paper background/shadow into nested loader"
+)
+for selector in (".file-pdf-paper > img.file-pdf-image",
+                 ".file-pdf-paper > img.file-pdf-retained"):
+    assert selector in pdf_style, "Paper styling must target direct PDF images only"
 print(f"BRAND_LOADER_ASSET_PASS: full-resolution transparent logo ({visible} ink pixels)")

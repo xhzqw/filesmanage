@@ -5,8 +5,8 @@
 .file-pdf-tools>span{font-size:12px;color:var(--text-secondary);font-variant-numeric:tabular-nums;white-space:nowrap}
 .file-pdf-paper{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:240px;overflow:auto;padding:12px;background:var(--surface-header)}
 .file-pdf-paper.is-pending{min-height:clamp(260px,56vh,620px)}
-.file-pdf-paper img{display:block;max-width:100%;max-height:78vh;height:auto;width:auto;box-shadow:var(--shadow-panel);background:#fff}
-.file-pdf-paper img.file-pdf-image.is-pending{display:none}
+.file-pdf-paper > img.file-pdf-image,.file-pdf-paper > img.file-pdf-retained{display:block;max-width:100%;max-height:78vh;height:auto;width:auto;box-shadow:var(--shadow-panel);background:#fff}
+.file-pdf-paper > img.file-pdf-image.is-pending{display:none}
 .file-pdf-retained{opacity:.48;filter:grayscale(.12)}
 .file-pdf-placeholder{position:absolute;inset:12px;z-index:1;display:flex;flex-direction:column;
  align-items:center;justify-content:center;gap:12px;color:var(--text-secondary);font-size:12px;
