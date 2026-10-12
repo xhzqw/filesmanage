@@ -48,7 +48,7 @@ assert.match(preview,/error&&<p role="alert"/,"preview keeps persistent actionab
 
 const seals=source("features/seals/FileSealsPanel.tsx");
 assert.doesNotMatch(seals,/setNotice\(/,"signed PDF result must not create a second banner");
-assert.match(seals,/toast\.success\("签署记录已保存"/);
+assert.match(seals,/toast\.success\("已保存 "\+marks\.length\+" 枚签章"/);
 
 const trash=source("features/trash/TrashWorkbench.tsx");
 assert.match(trash,/tone==="success"\?null:/,"fully successful trash actions must not create a second banner");
