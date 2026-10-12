@@ -1,4 +1,7 @@
 .file-history{padding:4px 16px 12px;min-width:0}
+.file-history-filters{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px}
+.file-history-filters button{font-size:11px;padding:4px 7px}
+.file-history-filters button[aria-pressed="true"]{background:var(--surface-tertiary);font-weight:600}
 .file-history-timeline{list-style:none;margin:0;padding:4px 0}
 .file-history-item{display:grid;grid-template-columns:18px minmax(0,1fr);gap:9px;min-height:59px}
 .file-history-point{position:relative;margin-top:12px;width:7px;height:7px;border-radius:50%;background:var(--brand-blue,var(--text-secondary))}

@@ -2,6 +2,8 @@ package application
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"filesmanage/internal/domain"
@@ -78,41 +80,70 @@ func (s *Service) ReplaceExisting(ctx context.Context, u domain.User, folderID, 
 	if folderID == "" || fileID == "" || name == "" || expectedSeq < 1 || len(name) > 200 {
 		return UploadResult{}, domain.ErrInvalidInput
 	}
+	// Reject unauthorized or stale uploads before accepting bytes or publishing
+	// any ready blob. Final checks under the file row lock are still required.
+	preflight, err := s.uow.Begin(ctx)
+	if err != nil {
+		return UploadResult{}, err
+	}
+	file, err := s.visibleFile(ctx, preflight, u, fileID, domain.ActionModify)
+	if err != nil {
+		_ = preflight.Rollback(ctx)
+		return UploadResult{}, err
+	}
+	if file.FolderID != folderID || file.Name != name {
+		_ = preflight.Rollback(ctx)
+		return UploadResult{}, domain.ErrVersionConflict
+	}
+	if err = s.require(ctx, preflight, u, folderID, domain.ActionUpload); err != nil {
+		_ = preflight.Rollback(ctx)
+		return UploadResult{}, err
+	}
+	if err = replacementReady(ctx, preflight, file, s.now()); err != nil {
+		_ = preflight.Rollback(ctx)
+		return UploadResult{}, err
+	}
+	operation := "file.replace:" + fileID
+	// A replay may refer to a version already committed by this request.
+	if currentSeq(file) != expectedSeq {
+		_, replay, lookupErr := idempotentResult(ctx, preflight, u.ID, operation, idempotencyKey)
+		if lookupErr != nil || !replay {
+			_ = preflight.Rollback(ctx)
+			if lookupErr != nil {
+				return UploadResult{}, lookupErr
+			}
+			return UploadResult{}, domain.ErrVersionConflict
+		}
+	}
+	if err = preflight.Rollback(ctx); err != nil {
+		return UploadResult{}, err
+	}
 	stage, err := s.blobs.Stage()
 	if err != nil {
 		return UploadResult{}, err
 	}
-	if _, err = io.Copy(stage, content); err != nil {
+	fingerprint := sha256.New()
+	if _, err = io.Copy(io.MultiWriter(stage, fingerprint), content); err != nil {
 		_ = stage.Abort()
 		return UploadResult{}, err
 	}
-	key, dedup, err := stage.Commit()
-	if err != nil {
-		_ = stage.Abort()
-		return UploadResult{}, err
-	}
+	sha := hex.EncodeToString(fingerprint.Sum(nil))
+	size := stage.Size()
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
+		_ = stage.Abort()
 		return UploadResult{}, err
 	}
 	defer tx.Rollback(ctx)
-	operation := "file.replace:" + fileID
-	if cached, ok, readErr := idempotentResult(ctx, tx, u.ID, operation, idempotencyKey); readErr == nil && ok {
-		var result UploadResult
-		if json.Unmarshal(cached, &result) == nil {
-			return result, nil
-		}
-	} else if readErr != nil {
-		return UploadResult{}, readErr
-	}
+	defer stage.Abort()
 	if err = tx.LockFileRow(ctx, fileID); err != nil {
 		return UploadResult{}, domain.ErrNotFound
 	}
-	file, err := s.visibleFile(ctx, tx, u, fileID, domain.ActionModify)
+	file, err = s.visibleFile(ctx, tx, u, fileID, domain.ActionModify)
 	if err != nil {
 		return UploadResult{}, err
 	}
-	if file.FolderID != folderID || file.Name != name || currentSeq(file) != expectedSeq {
+	if file.FolderID != folderID || file.Name != name {
 		return UploadResult{}, domain.ErrVersionConflict
 	}
 	if err = s.require(ctx, tx, u, folderID, domain.ActionUpload); err != nil {
@@ -121,7 +152,25 @@ func (s *Service) ReplaceExisting(ctx context.Context, u domain.User, folderID, 
 	if err = replacementReady(ctx, tx, file, s.now()); err != nil {
 		return UploadResult{}, err
 	}
-	sha, size := stage.Sha256(), stage.Size()
+	if cached, ok, readErr := idempotentResult(ctx, tx, u.ID, operation, idempotencyKey); readErr == nil && ok {
+		var result UploadResult
+		if json.Unmarshal(cached, &result) == nil {
+			if result.FileID != fileID || result.FolderID != folderID || result.Name != name || result.VersionSeq != expectedSeq+1 || result.Sha256 != sha || result.Size != size {
+				return UploadResult{}, domain.ErrVersionConflict
+			}
+			return result, nil
+		}
+		return UploadResult{}, domain.ErrConflict
+	} else if readErr != nil {
+		return UploadResult{}, readErr
+	}
+	if currentSeq(file) != expectedSeq {
+		return UploadResult{}, domain.ErrVersionConflict
+	}
+	key, dedup, err := stage.Commit()
+	if err != nil {
+		return UploadResult{}, err
+	}
 	blob, err := ensureBlob(ctx, tx, key, sha, size)
 	if err != nil {
 		return UploadResult{}, err
@@ -142,7 +191,11 @@ func (s *Service) ReplaceExisting(ctx context.Context, u domain.User, folderID, 
 	}); err != nil {
 		return UploadResult{}, err
 	}
-	storeIdempotentResult(ctx, tx, u.ID, operation, idempotencyKey, mustMarshal(result))
+	if idempotencyKey != "" {
+		if err = tx.IdempotencyPut(ctx, u.ID, operation, idempotencyKey, mustMarshal(result)); err != nil {
+			return UploadResult{}, err
+		}
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return UploadResult{}, err
 	}

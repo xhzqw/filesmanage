@@ -62,10 +62,8 @@ func (s *Service) ListDocumentAudit(ctx context.Context, u domain.User, cursor s
 	return page, nil
 }
 
-// FileHistory is scoped to one live file. A user with list access to the file
-// can see its operation timeline without acquiring global auditor privileges.
-// Deleted files remain accessible through the existing trash workflow only;
-// global administrators may inspect them by stable file ID.
+// FileHistory uses live-file list ACL, or the narrowly scoped right to access
+// the file through an active (including ancestor folder) trash entry.
 func (s *Service) FileHistory(ctx context.Context, u domain.User, fileID, cursor string, limit int) (DocumentAuditPage, error) {
 	page := DocumentAuditPage{Items: []domain.PermissionAuditRecord{}}
 	if fileID == "" || len(fileID) > 160 || limit < 1 || limit > 100 {
@@ -84,13 +82,22 @@ func (s *Service) FileHistory(ctx context.Context, u domain.User, fileID, cursor
 		return page, err
 	}
 	defer tx.Rollback(ctx)
-	if u.IsAdmin {
-		if _, err = tx.FileByID(ctx, fileID); err != nil {
+	file, err := tx.FileByID(ctx, fileID)
+	if err != nil {
+		return page, domain.ErrNotFound
+	}
+	if !u.IsAdmin {
+		if file.DeletedAt != nil {
+			allowed, accessErr := tx.TrashHistoryAccessible(ctx, fileID, u.ID)
+			if accessErr != nil {
+				return page, accessErr
+			}
+			if !allowed {
+				return page, domain.ErrNotFound
+			}
+		} else if _, err = s.visibleFile(ctx, tx, u, fileID, domain.ActionList); err != nil {
 			return page, domain.ErrNotFound
 		}
-	} else if _, err = s.visibleFile(ctx, tx, u, fileID, domain.ActionList); err != nil {
-		// Do not disclose whether the inaccessible file exists.
-		return page, domain.ErrNotFound
 	}
 	rows, err := tx.ListDocumentAudit(ctx, domain.DocumentAuditFilter{
 		FileID: fileID, BeforeID: before, Limit: limit + 1,
@@ -117,6 +124,11 @@ func (s *Service) FileHistory(ctx context.Context, u domain.User, fileID, cursor
 				if allowed[k] {
 					details[k] = v
 				}
+			}
+			// The previous location may be outside the current ACL.
+			// Distinguish withheld data from a genuinely missing old snapshot.
+			if _, hasPath := rows[i].Details["fromPath"]; hasPath {
+				details["pathRestricted"] = true
 			}
 			rows[i].Details = details
 			rows[i].RequestID = ""

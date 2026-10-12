@@ -34,6 +34,10 @@ func TestExplicitReplacementAppendsImmutableVersionAndAudit(t *testing.T) {
 		t.Fatalf("idempotent replay produced a new version: %+v, %v", again, err)
 	}
 	if _, err = s.ReplaceExisting(ctx, admin, target.FolderID, target.FileID, target.Name, target.VersionSeq,
+		"application/octet-stream", "replace-once", strings.NewReader("different-payload")); !errors.Is(err, domain.ErrVersionConflict) {
+		t.Fatalf("same replay key accepted different bytes: %v", err)
+	}
+	if _, err = s.ReplaceExisting(ctx, admin, target.FolderID, target.FileID, target.Name, target.VersionSeq,
 		"application/octet-stream", "replace-twice", strings.NewReader("stale")); !errors.Is(err, domain.ErrVersionConflict) {
 		t.Fatalf("stale replacement accepted: %v", err)
 	}
@@ -83,6 +87,38 @@ func TestExplicitReplacementRespectsFileLocksAndPermissions(t *testing.T) {
 	}
 	if _, err = s.ResolveReplaceTarget(ctx, admin, "folder_market", "protected.step"); err != nil {
 		t.Fatalf("replacement did not reopen after release: %v", err)
+	}
+}
+
+type rejectRead struct{ attempted bool }
+
+func (r *rejectRead) Read(_ []byte) (int, error) {
+	r.attempted = true
+	return 0, errors.New("body must not be read")
+}
+
+func TestReplacementRejectsUnauthorizedAndStaleWithoutReadingBody(t *testing.T) {
+	s, _ := testService(t)
+	ctx := context.Background()
+	admin := domain.User{ID: "u_admin", IsAdmin: true}
+	visitor := domain.User{ID: "u_user"}
+	initial, err := s.CommitUpload(ctx, admin, "folder_market", "preflight.txt", "text/plain", "", strings.NewReader("first"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := &rejectRead{}
+	if _, err = s.ReplaceExisting(ctx, visitor, "folder_market", initial.FileID, "preflight.txt", 1, "text/plain", "", body); err == nil {
+		t.Fatal("unauthorized replacement accepted")
+	}
+	if body.attempted {
+		t.Fatal("unauthorized upload body was consumed")
+	}
+	body = &rejectRead{}
+	if _, err = s.ReplaceExisting(ctx, admin, "folder_market", initial.FileID, "preflight.txt", 999, "text/plain", "", body); !errors.Is(err, domain.ErrVersionConflict) {
+		t.Fatalf("stale replacement accepted: %v", err)
+	}
+	if body.attempted {
+		t.Fatal("stale upload body was consumed")
 	}
 }
 

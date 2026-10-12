@@ -8,6 +8,8 @@ const eventLabels:Record<string,string>={
  "file.upload":"文件上传","file.save":"内容修改","file.rollback":"版本回滚",
  "file.replace":"替换文件内容","file.download_prepare":"请求下载文件",
  "file.download_zip_prepare":"加入批量下载",
+ "seal.restore":"签章修订回退","approval.cancel":"撤销审批",
+ "file.print.prepare":"准备打印","file.print.render":"生成打印内容",
  "file.rename":"文件重命名","file.move":"文件移动","file.delete":"移入回收站",
  "folder.rename":"所在文件夹重命名","folder.move":"所在文件夹移动","folder.delete":"所在文件夹被删除",
  "file.metadata_update":"属性修改","trash.restore":"从回收站恢复","trash.purge":"永久删除",
@@ -24,7 +26,7 @@ function describe(item:FileHistoryEvent){
  if(item.eventType==="file.rename")return d.oldName?detailText(d.oldName)+" → "+(detailText(d.newName)||detailText(d.name)):"新名称："+(detailText(d.newName)||detailText(d.name))+" · 旧名称未留存";
  if(item.eventType==="folder.rename")return detailText(d.oldName)&&detailText(d.newName)?detailText(d.oldName)+" → "+detailText(d.newName):"文件所在路径受到影响";
  if(item.eventType==="folder.move"||item.eventType==="folder.delete")return "此操作影响了文件所在目录";
- if(item.eventType==="file.move")return d.fromPath&&d.toPath?detailText(d.fromPath)+" → "+detailText(d.toPath):"位置变更 · 旧记录无路径快照";
+ if(item.eventType==="file.move")return d.pathRestricted?"位置变更 · 旧路径受权限保护":d.fromPath&&d.toPath?detailText(d.fromPath)+" → "+detailText(d.toPath):"位置变更 · 旧记录无路径快照";
  if(item.eventType==="trash.restore")return "恢复文件"+(d.newName?" · "+detailText(d.newName):"");
  if(item.eventType==="file.save"||item.eventType==="office.save_commit")return "保存为 v"+detailText(d.versionSeq)+(d.baseSeq?" · 原版本 v"+detailText(d.baseSeq):"");
  if(item.eventType==="file.replace")return "v"+detailText(d.baseSeq)+" → v"+detailText(d.versionSeq)+" · 旧内容保留";
@@ -39,6 +41,7 @@ function describe(item:FileHistoryEvent){
 // Read-only timeline. The single "历史" workspace reuses the existing
 // content-version actions rather than creating a second rollback flow.
 export function FileHistoryPanel({fileId,revision}:{fileId:string;revision:number}){
+ const[filter,setFilter]=useState<"all"|"content"|"location"|"workflow">("all");
  const[page,setPage]=useState<FileHistoryPage>({items:[],nextCursor:""});
  const[loading,setLoading]=useState(true);
  const[more,setMore]=useState(false);
@@ -72,12 +75,18 @@ export function FileHistoryPanel({fileId,revision}:{fileId:string;revision:numbe
   }catch(err){if(epoch===requestEpoch.current)setError(errorCopy(err,"加载后续历史失败"));}
   finally{if(epoch===requestEpoch.current)setMore(false);}
  }
+ const category=(type:string)=>/^(file\.(upload|save|rollback|replace)|office\.save_commit)/.test(type)?"content":/^(approval\.|seal\.|file\.review)/.test(type)?"workflow":"location";
+ const shown=filter==="all"?page.items:page.items.filter(item=>category(item.eventType)===filter);
  return <div className="file-history" aria-label="文件操作时间线">
+  <div className="file-history-filters" role="group" aria-label="操作类型">
+   {([["all","全部"],["content","内容"],["location","文件操作"],["workflow","审批签章"]] as const).map(([key,label])=>
+    <RareButton key={key} type="button" aria-pressed={filter===key} onClick={()=>setFilter(key)}>{label}</RareButton>)}
+  </div>
   {loading&&<p role="status" className="hint">正在读取历史…</p>}
   {error&&<div className="file-history-error" role="alert">{error}<RareButton type="button" onClick={()=>setRetry(n=>n+1)}>重试</RareButton></div>}
-  {!loading&&page.items.length===0&&!error&&<p className="empty">暂无可查询的操作记录。内容版本仍可在「内容版本」查看。</p>}
+  {!loading&&shown.length===0&&!error&&<p className="empty">暂无匹配记录</p>}
   <ol className="file-history-timeline">
-   {page.items.map(item=><li key={item.id} className="file-history-item">
+   {shown.map(item=><li key={item.id} className="file-history-item">
     <span className="file-history-point" aria-hidden="true"/>
     <div className="file-history-entry">
      <div className="file-history-row">

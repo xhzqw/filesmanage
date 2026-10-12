@@ -10,6 +10,7 @@ import {Menu} from "../../shared/ui/Menu";
 import {MicroHoldToDelete,RareButton,RareDataTable,RareInput,RareRowActions,RareSelect} from "../../shared/ui/rare";
 import {trashApi} from "./api";
 import {RestoreDialog} from "./RestoreDialog";
+import {FileHistoryPanel} from "../documents/FileHistoryPanel";
 import "./trashWorkbench.css";
 
 const PAGE_SIZE=40;
@@ -70,6 +71,7 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
  const[isAdmin,setIsAdmin]=useState(false);
  const[folders,setFolders]=useState<Folder[]>([]);
  const[restoring,setRestoring]=useState<TrashEntry|null>(null);
+ const[historyEntry,setHistoryEntry]=useState<TrashEntry|null>(null);
  const[menu,setMenu]=useState<MenuState|null>(null);
  const[purgeTargets,setPurgeTargets]=useState<TrashEntry[]>([]);
  const[purgeStage,setPurgeStage]=useState<"impact"|"final">("impact");
@@ -224,6 +226,7 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
       <td className="trash-muted">{dateLabel(entry.deletedAt)}</td>
       <td><RareRowActions className="trash-row-actions">
        <RareButton type="button" disabled={locked} onClick={()=>{setNotice(null);setRestoring(entry);}}>恢复</RareButton>
+       {entry.fileId&&<RareButton type="button" disabled={locked} onClick={()=>setHistoryEntry(entry)}>历史</RareButton>}
        {isAdmin&&<RareButton type="button" aria-label={`更多操作：${entry.oldName}`} title="更多操作" disabled={locked} onClick={e=>setMenu({entry,anchor:e.currentTarget})}>···</RareButton>}
       </RareRowActions></td>
      </tr>)}
@@ -235,6 +238,9 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
    <RareButton type="button" disabled={locked||status!=="ready"||!hasMore} onClick={()=>setOffset(v=>v+PAGE_SIZE)}>下一页</RareButton>
   </div>
   <Menu open={menu!==null} onClose={()=>setMenu(null)} label="回收站操作" anchor={menu?.anchor} items={menu?[{id:"purge",label:"永久删除",danger:true,onSelect:()=>askPurge([menu.entry])}]:[]}/>
+  {historyEntry?.fileId&&<Dialog open title={historyEntry.oldName+" · 历史"} onClose={()=>setHistoryEntry(null)} className="trash-history-dialog">
+   <FileHistoryPanel fileId={historyEntry.fileId} revision={reload}/>
+  </Dialog>}
   {restoring&&<RestoreDialog entry={restoring} onClose={()=>setRestoring(null)} onReload={()=>{setRestoring(null);refresh();}} onRestored={()=>{setRestoring(null);refresh();onRestored();}}/>}
   {purgeTargets.length>0&&<Dialog open title={purgeTargets.length===1?"永久删除":"批量永久删除"} onClose={()=>{if(!busy)setPurgeTargets([]);}} closeGuard={()=>!busy} className="dialog">
    <p role="alert" className="trash-danger-note">将永久移除 {purgeTargets.length} 项资源及其版本历史，无法撤销。</p>

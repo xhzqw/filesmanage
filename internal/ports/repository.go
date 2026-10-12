@@ -102,6 +102,9 @@ type Repository interface {
 	// Only the deleting actor or a caller entitled to upload into the old
 	// parent may restore a known trash ID (subject to destination permission).
 	TrashEntryRestorable(context.Context, string, string) (bool, error)
+	// True only when a live, authorized trash entry covers this deleted file,
+	// including a parent folder deletion. Never grants access by ID alone.
+	TrashHistoryAccessible(context.Context, string, string) (bool, error)
 	MarkTrashRestored(context.Context, string) error
 	MarkTrashPurged(context.Context, string) error
 

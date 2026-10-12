@@ -65,6 +65,38 @@ func TestFileHistoryAuthorizationAndCursor(t *testing.T) {
 	}
 }
 
+func TestDeletedFileHistoryFollowsTrashAccess(t *testing.T) {
+	s, repo := testService(t)
+	ctx := context.Background()
+	admin := domain.User{ID: "u_admin", IsAdmin: true}
+	viewer := domain.User{ID: "u_user"}
+	uploaded, err := s.CommitUpload(ctx, admin, "folder_market", "trashed-history.txt", "text/plain", "", strings.NewReader("data"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry, err := s.DeleteFile(ctx, admin, uploaded.FileID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.FileHistory(ctx, viewer, uploaded.FileID, "", 30); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("unrelated user read deleted history: %v", err)
+	}
+	repo.mu.Lock()
+	for i := range repo.trash {
+		if repo.trash[i].ID == entry.ID {
+			repo.trash[i].DeletedBy = viewer.ID
+		}
+	}
+	repo.mu.Unlock()
+	page, err := s.FileHistory(ctx, viewer, uploaded.FileID, "", 30)
+	if err != nil || len(page.Items) != 2 || page.Items[0].EventType != "file.delete" {
+		t.Fatalf("deleted file history not accessible to trash owner: %+v %v", page, err)
+	}
+	if page.Items[0].RequestID != "" {
+		t.Fatal("viewer was given internal request ID")
+	}
+}
+
 func TestFileHistoryCapturesFolderCascadeAtEventTime(t *testing.T) {
 	s, repo := testService(t)
 	ctx := context.Background()

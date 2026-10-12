@@ -63,3 +63,4 @@
  .trash-resource-text .trash-mobile-meta{display:block}
 }
 @media(max-width:680px){.trash-workbench{padding:8px}.trash-filters{grid-template-columns:minmax(150px,1fr) minmax(120px,1fr) auto;gap:6px}.trash-selection{flex-wrap:wrap}}
+.trash-history-dialog .file-history{max-height:min(65vh,600px);overflow-y:auto}
