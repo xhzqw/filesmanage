@@ -224,12 +224,34 @@ async function main() {
       open?.click();return true;})()`);
     await cdp.waitFor(`()=>location.pathname.startsWith('/preview/')`, 15000);
     await delay(1200);
-    const preview = await cdp.evaluate(`(()=>{
-      const text=document.body.textContent||'';
-      const onPreview=location.pathname.startsWith('/preview/');
-      return (onPreview&&/SHA|sha|编码|BOM|字节/.test(text))?'preview':('path='+location.pathname+' meta='+/SHA|sha|编码|BOM|字节/.test(text));
+    // The workspace is content-first. Metadata and review panels must not
+    // replace or remount the right-side viewer when selected.
+    const layout = await cdp.evaluate(`(()=>{
+      const root=document.querySelector('.file-workbench-layout');
+      const left=document.querySelector('.file-workbench-sidebar');
+      const right=document.querySelector('.file-workbench-preview-surface');
+      if(!root||!left||!right)return null;
+      const box=root.getBoundingClientRect(),stage=right.getBoundingClientRect();
+      return {ratio:stage.width/Math.max(1,box.width),height:stage.height,nav:!!left.querySelector('.file-workbench-nav')};
     })()`);
-    check("preview shows byte metadata", preview === "preview", String(preview));
+    check("file preview opens a large right-side persistent canvas",
+      !!layout&&layout.ratio>=.65&&layout.height>220&&layout.nav,JSON.stringify(layout));
+    await cdp.evaluate(`(()=>{
+      window.__journeyViewer=document.querySelector('.file-workbench-preview-surface .file-text-stage');
+      const button=[...document.querySelectorAll('.file-workbench-nav-item')].find(b=>b.textContent?.includes('文件信息'));
+      button?.click();
+    })()`);
+    await delay(300);
+    const details=await cdp.evaluate(`(()=>{
+      const viewer=document.querySelector('.file-workbench-preview-surface .file-text-stage');
+      const panel=document.querySelector('.file-sidebar-context.file-details-panel');
+      return {shown:!!panel&&panel.textContent?.includes('SHA-256'),stable:viewer===window.__journeyViewer,canvas:!!document.querySelector('.file-workbench-preview-surface')};
+    })()`);
+    check("file metadata stays in left pane without remounting preview",
+      !!details&&details.shown&&details.stable&&details.canvas,JSON.stringify(details));
+    await cdp.evaluate(`(()=>{
+      [...document.querySelectorAll('.file-workbench-nav-item')].find(b=>b.textContent?.trim()==='预览')?.click();
+    })()`);
 
     // Browser-only print is a proper file action: the workbench opens without
     // downloading the original file, and the server separately authorizes
