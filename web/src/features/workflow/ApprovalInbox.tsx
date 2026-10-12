@@ -1,4 +1,4 @@
-import {useEffect,useMemo,useState} from "react";
+import {useEffect,useMemo,useRef,useState} from "react";
 import {useLocation} from "react-router-dom";
 import {RareBadge,RareButton,RareInput,RareSelect,RareTextarea} from "../../shared/ui/rare";
 import {toast} from "../../shared/ui/feedback";
@@ -25,6 +25,7 @@ export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:
  const[loading,setLoading]=useState(true);
  const[loadError,setLoadError]=useState("");
  const[refreshKey,setRefreshKey]=useState(0);
+ const everLoaded=useRef(false);
  const[notifications,setNotifications]=useState<ApprovalNotification[]>([]);
  const[noticeError,setNoticeError]=useState("");
  const[selected,setSelected]=useState("");
@@ -47,11 +48,13 @@ export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:
 
  useEffect(()=>{
   let active=true;
-  setLoading(true);setLoadError("");
+  // Revalidate in place on live events. Don't blank the whole list each time.
+  if(!everLoaded.current)setLoading(true);
+  setLoadError("");
   Promise.all([workflowApi.approvals("inbox"),workflowApi.approvals("mine")])
    .then(([todo,own])=>{if(active){setInbox(todo);setMine(own);}})
    .catch(error=>{if(active)setLoadError(errorCopy(error,"审批列表加载失败"));})
-   .finally(()=>{if(active)setLoading(false);});
+   .finally(()=>{if(active){everLoaded.current=true;setLoading(false);}});
   return()=>{active=false;};
  },[refreshKey]);
  useEffect(()=>{

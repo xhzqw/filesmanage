@@ -3,10 +3,10 @@
 .approval-shell{display:grid;grid-template-columns:188px minmax(0,1fr);height:100%;min-height:0;min-width:0;overflow:hidden}
 .approval-nav{display:flex;flex-direction:column;align-items:stretch;gap:3px;min-width:0;padding:19px 10px;background:var(--surface-header);border-right:1px solid var(--border-hairline)}
 .approval-nav-heading{padding:0 12px 13px;font-size:14px;font-weight:700;letter-spacing:.01em}
-.approval-nav .approval-nav-item{display:flex;justify-content:space-between;align-items:center;text-align:left;height:37px;min-height:37px;width:100%;padding:0 12px;border:0;border-radius:11px;background:transparent;color:var(--text-secondary);font-size:12px;font-weight:550;box-shadow:none}
+.approval-nav .approval-nav-item{display:flex;justify-content:space-between;align-items:center;text-align:left;height:37px;min-height:37px;width:100%;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-secondary);font-size:12px;font-weight:550;box-shadow:none}
 .approval-nav .approval-nav-item:hover{background:var(--surface-row-hover);color:var(--text-primary)}
 .approval-nav .approval-nav-item[aria-current=page]{color:var(--brand-blue);background:var(--surface-row-selected);font-weight:700}
-.approval-nav-count{font-size:11px;font-variant-numeric:tabular-nums;padding:2px 7px;border-radius:20px;background:var(--surface-panel);color:var(--text-secondary)}
+.approval-nav-count{font-size:11px;font-variant-numeric:tabular-nums;padding:2px 7px;border-radius:var(--radius-pill);background:var(--surface-panel);color:var(--text-secondary)}
 .approval-stage{min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden;background:var(--surface-panel)}
 .approval-stage>.seal-library-container{min-height:0;flex:1;overflow:auto}
 .approval-page{min-height:0;min-width:0;flex:1;display:flex;flex-direction:column;overflow:hidden}
@@ -15,17 +15,17 @@
 .approval-heading strong{font-size:15px;font-weight:700}
 .approval-heading span{font-size:12px;color:var(--text-secondary);font-variant-numeric:tabular-nums}
 .approval-filters{display:flex;align-items:center;gap:7px;min-width:0}
-.approval-filters .rare-input{width:220px;min-width:0;height:32px;background:var(--surface-header);border-radius:10px}
+.approval-filters .rare-input{width:220px;min-width:0;height:32px;background:var(--surface-header);border-radius:var(--radius-md)}
 .approval-filters .rare-select-root{width:120px;min-width:105px}
 .approval-filters .rare-select{height:32px}
 .approval-filters .approval-refresh{height:32px;min-height:32px;padding:0 12px;white-space:nowrap}
 .approval-workbench{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,36%);flex:1;min-height:0;min-width:0;overflow:hidden}
 .approval-main{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain}
-.approval-list-row.rare-button{display:flex;align-items:center;gap:12px;width:100%;min-height:67px;height:auto;padding:11px 20px;text-align:left;border:0;border-bottom:1px solid var(--border-hairline);border-radius:0;background:transparent;color:var(--text-primary);box-shadow:none;font-size:12px}
+.approval-list-row.rare-button{display:flex;align-items:center;gap:12px;width:100%;min-height:67px;height:auto;padding:11px 20px;text-align:left;border:0;border-bottom:1px solid var(--border-hairline);border-radius:inherit;background:transparent;color:var(--text-primary);box-shadow:none;font-size:12px}
 .approval-list-row.rare-button:hover{background:var(--surface-row-hover)}
 .approval-list-row.rare-button.is-selected{background:var(--surface-row-selected);box-shadow:inset 3px 0 0 var(--brand-blue)}
 .approval-list-row.rare-button:focus-visible{outline:2px solid var(--brand-blue);outline-offset:-3px;z-index:1}
-.approval-file-mark{display:flex;align-items:center;justify-content:center;flex:none;width:35px;height:40px;color:var(--brand-blue);border-radius:9px;background:var(--surface-header)}
+.approval-file-mark{display:flex;align-items:center;justify-content:center;flex:none;width:35px;height:40px;color:var(--brand-blue);border-radius:var(--radius-md);background:var(--surface-header)}
 .approval-row-core{display:flex;min-width:0;flex:1;flex-direction:column;gap:5px}
 .approval-row-core strong{font-size:12px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .approval-row-core small{font-size:11px;font-weight:400;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
