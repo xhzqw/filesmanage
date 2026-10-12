@@ -118,3 +118,32 @@ func TestReplicaObserverRecoversFromJournalOutage(t *testing.T) {
 		return !found
 	})
 }
+
+func TestReplicaInvalidationChecksEveryMergedScope(t *testing.T) {
+	s := New(nil, nil)
+	now := time.Now()
+	_, _, searchRevision := s.search.get("list", now)
+	_, _, statsRevision := s.stats.get("dashboard", now)
+	before := s.epoch()
+	// Server coalescing can place the sensitive scope *after* a non-sensitive
+	// file scope. A premature return would leave the authorization epoch stale.
+	s.InvalidateFromDurableEvent(domain.RealtimeEvent{Type: "workspace.changed",
+		Scopes: []string{"file", "stats", "permissions", "organization"}})
+	if s.epoch() != before+1 {
+		t.Fatalf("coalesced permissions were missed or applied multiple times: old=%d new=%d", before, s.epoch())
+	}
+	s.search.put("list", searchEntryValue{total: 99}, now, searchRevision)
+	s.stats.put("dashboard", domain.Stats{TotalFiles: 99}, now, statsRevision)
+	if _, cached, _ := s.search.get("list", now); cached {
+		t.Fatal("stale search data repopulated after merged event")
+	}
+	if _, cached, _ := s.stats.get("dashboard", now); cached {
+		t.Fatal("stale stats data repopulated after merged event")
+	}
+	// A notification-only hint does not flush expensive workspace caches.
+	before = s.epoch()
+	s.InvalidateFromDurableEvent(domain.RealtimeEvent{Type: "workspace.changed", Scopes: []string{"presets"}})
+	if s.epoch() != before {
+		t.Fatal("private presets changed authorization epoch")
+	}
+}

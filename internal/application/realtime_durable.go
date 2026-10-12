@@ -42,16 +42,26 @@ func (s *Service) InvalidateFromDurableEvent(event domain.RealtimeEvent) {
 	if event.Type != "workspace.changed" {
 		return
 	}
+	cacheAffected := false
+	permissionAffected := false
 	for _, scope := range event.Scopes {
 		switch scope {
 		case "file", "folder", "trash", "search", "stats", "permissions", "lifecycle", "organization":
-			s.search.invalidate()
-			s.stats.invalidate()
+			cacheAffected = true
 			if scope == "permissions" || scope == "organization" {
-				s.aclEpoch.Add(1)
+				permissionAffected = true
 			}
-			return
 		}
+	}
+	// Multiple scopes may be combined into a single durable replay hint.
+	// Do NOT exit after the first matching scope: ["file","permissions"] must
+	// still invalidate authorization on a different app replica.
+	if cacheAffected {
+		s.search.invalidate()
+		s.stats.invalidate()
+	}
+	if permissionAffected {
+		s.aclEpoch.Add(1)
 	}
 }
 
