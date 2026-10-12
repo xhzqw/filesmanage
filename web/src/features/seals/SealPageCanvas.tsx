@@ -46,6 +46,19 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
  const availableWidth=Math.max(120,viewportWidth-32);
  const baseWidth=fitMode==="width"?availableWidth:Math.min(availableWidth,Math.max(120,(viewportHeight-32)/pageRatio));
  const displayWidth=baseWidth*zoom;
+ // Focus a newly selected asset in the viewport rather than leaving it below
+ // the fold in width-fit mode. Do not refocus on every pointer move.
+ useLayoutEffect(()=>{
+  if(!selected)return;
+  const stagedPage=drafts.find(item=>item.assetId===selected.id)?.pageNumber;
+  if(stagedPage!==undefined&&stagedPage!==page)return;
+  const viewport=viewportRef.current;
+  if(!viewport)return;
+  const x=(position.x+position.width/2)*displayWidth;
+  const y=(position.y+position.height/2)*displayWidth*pageRatio;
+  viewport.scrollLeft=Math.max(0,x-viewport.clientWidth/2);
+  viewport.scrollTop=Math.max(0,y-viewport.clientHeight/2);
+ },[selected?.id,page]);
  const setZoomAt=useCallback((next:number,clientX?:number,clientY?:number)=>{
   const viewport=viewportRef.current;if(!viewport)return;
   const value=limit(next);

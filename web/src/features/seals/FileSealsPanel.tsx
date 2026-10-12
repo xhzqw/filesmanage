@@ -89,7 +89,9 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
   setStaged(list=>list.map(item=>item.assetId===assetId?{...item,...moved,angleDegrees:next}:item));
  }
  function changeSize(update:Partial<Position>){
-  updatePosition(p=>fitStampToPage({...p,...update},angle,pageRatio));
+  const next=fitStampToPage({...position,...update},angle,pageRatio);
+  setPosition(next);
+  if(assetId)setStaged(list=>list.map(item=>item.assetId===assetId?{...item,...next}:item));
  }
  function changePage(next:number){
   setPage(Math.max(1,Math.min(pageCount||1,next)));
@@ -104,7 +106,7 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
   }else if(id){
    // New signatures get distinct initial positions; each one is independently editable.
    const offset=(staged.length%4)*.13;
-   setPosition({x:.20+offset,y:.67,width:.22,height:.12});setAngle(0);
+   setPosition({x:.20+offset,y:.18+(staged.length%3)*.10,width:.22,height:.12});setAngle(0);
   }
  }
  function addDraft(){
