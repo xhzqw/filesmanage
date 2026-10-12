@@ -1400,15 +1400,18 @@ async function main() {
         const input=d?.querySelector('.command-input');
         if(!d||!input)return null;
         const box=d.getBoundingClientRect(),css=getComputedStyle(input);
+        const close=d.querySelector('.command-close');
         return {height:box.height,width:box.width,rows:d.querySelectorAll('.command-row').length,
           status:d.querySelectorAll('.command-status').length,focus:document.activeElement===input,
           fontSize:parseFloat(css.fontSize),border:css.borderTopWidth,
-          overflow:box.right>innerWidth||box.left<0};
+          overflow:box.right>innerWidth||box.left<0,
+          closeLabel:close?.getAttribute('aria-label'),closeWidth:close?.getBoundingClientRect().width};
       })()`);
       check("PW-08a1 empty Spotlight is one focused search field",
         spotlightEmpty?.rows===0&&spotlightEmpty?.status===0&&spotlightEmpty?.focus===true
-        &&spotlightEmpty?.height<100&&spotlightEmpty?.fontSize>=18
-        &&spotlightEmpty?.border==="0px"&&spotlightEmpty?.overflow===false,
+        &&spotlightEmpty?.height<=64&&spotlightEmpty?.width<=540&&spotlightEmpty?.fontSize>=16
+        &&spotlightEmpty?.border==="0px"&&spotlightEmpty?.overflow===false
+        &&spotlightEmpty?.closeLabel==="关闭搜索"&&spotlightEmpty?.closeWidth>=28,
         JSON.stringify(spotlightEmpty));
       await cdp.evaluate(`(()=>{const i=document.querySelector('.command-input');const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;set.call(i,'pw-02');i.dispatchEvent(new Event('input',{bubbles:true}));return true;})()`);
       const filtered = await cdp.waitFor(`()=>{const rows=[...document.querySelectorAll('.command-row')];return rows.length>0&&rows.every(r=>r.textContent?.includes('pw-02'));}`, 8000);
@@ -1424,6 +1427,14 @@ async function main() {
       await cdp.key("Escape", "Escape", 27);
       const closed = await cdp.waitFor(`()=>document.querySelector('.command-panel')===null`, 5000);
       check("PW-08c Escape closes the palette", Boolean(closed), String(closed));
+      await cdp.key("k", "KeyK", 75, CTRL);
+      const reopened = await cdp.waitFor(`()=>document.querySelector('.command-close')!==null`, 5000);
+      const clickedClose = reopened && await cdp.evaluate(`(()=>{
+        const button=document.querySelector('.command-close');
+        if(!button)return false;button.click();return true;
+      })()`);
+      const closedByButton = clickedClose && await cdp.waitFor(`()=>document.querySelector('.command-panel')===null`, 5000);
+      check("PW-08d the visible X closes Spotlight", Boolean(closedByButton), String(closedByButton));
 
       // ---- PW-09: hold-to-confirm starts on press and cancels on release ----
       await cdp.navigate(`${BASE}/doc?folder=${pwFolderId}`);

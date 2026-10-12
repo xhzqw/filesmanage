@@ -1,4 +1,4 @@
-import {RareInput} from "../../shared/ui/rare";
+import {RareButton,RareInput} from "../../shared/ui/rare";
 import {Dialog} from "../../shared/ui/Dialog";
 import {FileResourceIcon,FolderResourceIcon} from "../../shared/ui/ResourceIcons";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
@@ -32,7 +32,7 @@ type WindowKeyEvent=WindowEventMap["keydown"];
 // Line icons drawn from currentColor: no asset, no hex literal, always hidden
 // from the accessibility tree (VIS-11).
 function CommandSearchIcon(){
-  return <svg className="command-icon" width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="10.8" cy="10.8" r="7.2"/><path d="m16.3 16.3 4.4 4.4"/></svg>;
+  return <svg className="command-icon" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="10.8" cy="10.8" r="7.2"/><path d="m16.3 16.3 4.4 4.4"/></svg>;
 }
 
 export function CommandSpotlight(){
@@ -191,6 +191,8 @@ export function CommandSpotlight(){
   // virtual cursor).
   function onPanelKeyDown(event:KeyboardEvent<HTMLDivElement>){
     if(event.nativeEvent.isComposing)return;
+    // Leave Enter/Space on the close button to native button activation.
+    if(event.target!==inputRef.current&&event.key!=="Escape")return;
     switch(event.key){
      case "ArrowDown":event.preventDefault();step(1);break;
      case "ArrowUp":event.preventDefault();step(-1);break;
@@ -212,6 +214,13 @@ export function CommandSpotlight(){
       placeholder="聚焦搜索" aria-label="聚焦搜索文件与文件夹" autoComplete="off"
       role="combobox" aria-autocomplete="list" aria-expanded={visibleRows.length>0}
       aria-controls="command-results" aria-activedescendant={visibleRows[active]?("command-result-"+active):undefined}/>
+     <RareButton type="button" tone="ghost" className="command-close" aria-label="关闭搜索"
+      title="关闭搜索（Esc）" onClick={closePalette}>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       strokeWidth="1.9" strokeLinecap="round" aria-hidden="true" focusable="false">
+       <path d="M18 6 6 18M6 6l12 12"/>
+      </svg>
+     </RareButton>
     </div>
     {showResults&&status==="loading"&&visibleRows.length===0?<p className="command-status hint" role="status"><BrandLoadingLabel>搜索中</BrandLoadingLabel></p>:null}
     {showResults&&status==="failed"?<p className="command-status error" role="alert">搜索失败</p>:null}
