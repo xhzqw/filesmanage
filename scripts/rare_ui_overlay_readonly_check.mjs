@@ -95,7 +95,7 @@ try{
     const response=await fetch("/api/search?"+params,{credentials:"same-origin"});
     if(!response.ok)continue;
     const data=await response.json();
-    const file=data.items?.find(item=>String(item.name).toLowerCase().endsWith(".pdf"));
+    const file=(data.data?.items??data.items)?.find(item=>String(item.name).toLowerCase().endsWith(".pdf"));
     if(file)return file.id;
    }
    // The search index may not include older seeded documents. Walk readable
@@ -103,11 +103,11 @@ try{
    const foldersResponse=await fetch("/api/folders/tree",{credentials:"same-origin"});
    if(foldersResponse.ok){
     const folders=await foldersResponse.json();
-    for(const folder of Array.isArray(folders)?folders:[]){
+    for(const folder of Array.isArray(folders.data??folders)?(folders.data??folders):[]){
      const response=await fetch("/api/files?"+new URLSearchParams({folder:folder.id,sort:"updated_desc",limit:"100"}),{credentials:"same-origin"});
      if(!response.ok)continue;
      const data=await response.json();
-     const file=data.items?.find(item=>String(item.name).toLowerCase().endsWith(".pdf"));
+     const file=(data.data?.items??data.items)?.find(item=>String(item.name).toLowerCase().endsWith(".pdf"));
      if(file)return file.id;
     }
    }
