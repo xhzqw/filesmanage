@@ -44,11 +44,15 @@ export function RareFolderComponent({open=false,size=16,className=""}:Props){
  const [hover,setHover]=useState(false);
  const reducedMotion=useReducedMotion();
  const uid=useId().replace(/:/g,"");
- const active=open||(hover&&size>=32);
+ // Upstream has THREE states, not two. Hover presents the shallow glass flap
+ // and subtly fanned cards shown in RareUI's demo; clicked/open is a separate
+ // deeper fan-out. Never map hover onto the clicked-open animation.
+ const hovered=hover&&size>=32;
+ const active=open||hovered;
  const paperStates=[
-  {x:active?70:40,y:active?-160:hover?-30:-10,rotate:active?18:hover?14:10,delay:active?.1:hover?.12:0},
-  {x:active?0:3,y:active?-180:hover?-35:-20,rotate:active?-3:hover?-1:2,delay:active?.05:hover?.06:0},
-  {x:active?-65:-40,y:active?-170:hover?-44:-22,rotate:active?-14:hover?-9:-5,delay:0}
+  {x:open?70:40,y:open?-160:hovered?-30:-10,rotate:open?18:hovered?14:10,delay:open?.1:hovered?.12:0},
+  {x:open?0:3,y:open?-180:hovered?-35:-20,rotate:open?-3:hovered?-1:2,delay:open?.05:hovered?.06:0},
+  {x:open?-65:-40,y:open?-170:hovered?-44:-22,rotate:open?-14:hovered?-9:-5,delay:0}
  ];
  return <span
   data-slot="rare-folder-component" data-folder-open={active?"true":"false"}
@@ -68,7 +72,7 @@ export function RareFolderComponent({open=false,size=16,className=""}:Props){
     </motion.span>)}
    </span>
    <motion.span className="rare-folder-front"
-    animate={{rotateX:active?-55:hover?-45:-15}}
+    animate={{rotateX:open?-55:hovered?-45:-15}}
     transition={reducedMotion?{duration:0}:{type:"spring",stiffness:120,damping:14}}>
     <span className="rare-folder-glass" style={{clipPath:`path('${FLAP}')`}}/>
     <svg width="321" height="241" viewBox="0 0 321 241" fill="none" aria-hidden="true">
