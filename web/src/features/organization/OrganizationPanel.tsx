@@ -1,5 +1,4 @@
 import {RareTabs} from "../../shared/ui/rare/RareTabs";
-import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {RareBadge,RareButton,RareDataTable,RareInput,RareNotice,RareRowActions,RareSelect} from "../../shared/ui/rare";
 import {useEffect,useMemo,useRef,useState,type FormEvent,type KeyboardEvent,type ReactNode} from "react";
 import {organizationApi,type Department,type Workgroup} from "./api";
@@ -155,10 +154,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  const[groupMemberLimit,setGroupMemberLimit]=useState(MEMBER_DISPLAY_STEP);
  const[membersState,setMembersState]=useState<LoadState>("loading");
  const[membersToken,setMembersToken]=useState(0);
- useEffect(()=>observeWorkspaceChange(()=>{
-  setUsersToken(n=>n+1);setDepartmentsToken(n=>n+1);
-  setGroupsToken(n=>n+1);setMembersToken(n=>n+1);
- },["organization","permissions"]),[]);
  const[candidateQuery,setCandidateQuery]=useState("");
  const[addBusy,setAddBusy]=useState("");
 
