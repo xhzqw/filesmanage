@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useState} from "react";
+import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
 import {errorCopy} from "../../shared/errors";
 import {lifecycleWorkspaceApi,type LifecyclePolicyView,type LifecycleScope} from "./lifecycleWorkspaceApi";
@@ -15,6 +16,7 @@ export function LifecyclePolicyManager(){
  const[error,setError]=useState("");
  const[notice,setNotice]=useState("");
  const[version,setVersion]=useState(0);
+ useEffect(()=>observeWorkspaceChange(()=>setVersion(n=>n+1),["lifecycle","permissions"]),[]);
  useEffect(()=>{
   let live=true;
   setScopes([]);setId("");setValue(null);setQuery("");setError("");

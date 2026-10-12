@@ -62,7 +62,11 @@ func (s *Service) SetApprovalChainPolicy(ctx context.Context, actor domain.User,
 	}
 	audit(ctx, tx, actor, "approval_policy.set", "folder", folder.ID, "success",
 		map[string]any{"approverIds": chain, "enabled": enabled})
-	return tx.Commit(ctx)
+	if err = tx.Commit(ctx); err != nil {
+		return err
+	}
+	s.notifyWorkspaceChange("approval-policy")
+	return nil
 }
 
 func (s *Service) ClearApprovalPolicy(ctx context.Context, actor domain.User, folderID string) error {
@@ -82,7 +86,11 @@ func (s *Service) ClearApprovalPolicy(ctx context.Context, actor domain.User, fo
 		return err
 	}
 	audit(ctx, tx, actor, "approval_policy.clear", "folder", folder.ID, "success", nil)
-	return tx.Commit(ctx)
+	if err = tx.Commit(ctx); err != nil {
+		return err
+	}
+	s.notifyWorkspaceChange("approval-policy")
+	return nil
 }
 
 // ---------- edit locks ----------

@@ -78,5 +78,7 @@ func(s *Service)SetLifecyclePolicy(ctx context.Context,u domain.User,kind,id str
  if err!=nil{return err}
  action:="lifecycle.policy.upsert";if pol==nil{action="lifecycle.policy.clear"}
  if err=auditRequired(ctx,tx,u,action,kind,id,"success",map[string]any{"policy":pol});err!=nil{return err}
- return tx.Commit(ctx)
+ if err=tx.Commit(ctx);err!=nil{return err}
+ s.notifyWorkspaceChange("lifecycle")
+ return nil
 }

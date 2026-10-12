@@ -3,7 +3,7 @@ import {ApiError} from "../shared/http";
 import {receiveRemoteResourceChanges,type WorkspaceScope} from "../shared/resourceSync";
 import type {User} from "../entities/user/model";
 
-const ALL_SCOPES:WorkspaceScope[]=["file","folder","trash","permissions","collaboration","organization","search","stats","review","lifecycle"];
+const ALL_SCOPES:WorkspaceScope[]=["file","folder","trash","permissions","collaboration","organization","search","stats","review","lifecycle","approval-policy","presets"];
 
 // Hints are never trusted as file data or authorization. An HTTP re-read
 // reconciles every open view after missed, coalesced or reordered events.

@@ -74,6 +74,8 @@ export function SearchPanel({userId}:{userId:string}){
  const[showPresets,setShowPresets]=useState(false);
  const[presetBusy,setPresetBusy]=useState(false);
  const[presetError,setPresetError]=useState("");
+ const[presetToken,setPresetToken]=useState(0);
+ useEffect(()=>observeWorkspaceChange(()=>setPresetToken(n=>n+1),["presets"]),[]);
  useEffect(()=>{
   let active=true;setPresets([]);setPresetName("");setPresetError("");
   void (async()=>{
@@ -91,7 +93,7 @@ export function SearchPanel({userId}:{userId:string}){
    }catch{if(active)setPresetError("无法读取云端搜索预设，请重试");}
   })();
   return()=>{active=false;};
- },[userId]);
+ },[userId,presetToken]);
  async function savePreset(){
   const title=presetName.trim();
   if(!title||presetBusy)return;

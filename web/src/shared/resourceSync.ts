@@ -2,7 +2,7 @@
 // Never cache file contents, permissions or names here: the server remains the
 // authority and every recipient makes a fresh authorized request.
 export type ResourceScope="file"|"trash"|"folder";
-export type WorkspaceScope=ResourceScope|"permissions"|"collaboration"|"organization"|"search"|"stats"|"review"|"lifecycle";
+export type WorkspaceScope=ResourceScope|"permissions"|"collaboration"|"organization"|"search"|"stats"|"review"|"lifecycle"|"approval-policy"|"presets";
 export type ResourceChange={scope:ResourceScope;id?:string};
 const KEY="fm-workspace-change-v1";
 const LIVE_EVENT="filesmanage:resource-changed";

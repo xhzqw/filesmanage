@@ -23,7 +23,7 @@
 | `approval.changed` | 仅通知对应审批参与者刷新审批与消息 |
 | `state.resync` | 有界缓冲拥塞导致不同事件合并，客户端必须刷新全部可见资源、会话和通知 |
 
-支持的 `workspace.changed.scopes`：`file`、`folder`、`trash`、`search`、`stats`、`permissions`、`collaboration`、`organization`、`review`、`lifecycle`。浏览器会按范围合并 120 毫秒内的通知，再调用现有 HTTP 查询接口。文件列表/树、文件预览与版本、回收站、搜索、统计、共享与关注、组织管理、生命周期和评论等页面按影响范围更新。个人收藏和搜索预设的变更仅发送到该用户的会话。
+支持的 `workspace.changed.scopes`：`file`、`folder`、`trash`、`search`、`stats`、`permissions`、`collaboration`、`organization`、`review`、`lifecycle`、`approval-policy`、`presets`。浏览器会按范围合并 120 毫秒内的通知，再调用现有 HTTP 查询接口。文件列表/树、文件预览与版本、回收站、搜索和搜索预设、统计、共享与关注、组织与角色委派、审批策略、生命周期台账及策略和评论等页面按影响范围更新。个人收藏和搜索预设的变更仅发送到该用户的会话。
 
 所有工作区通知必须在数据库 **Commit 成功后**发送；回滚、校验错误或未提交的请求不得推送。事件载荷不包含资源 ID、名称、正文、文件路径、账号资料或 ACL 明细。所有刷新均重新走服务器权限判断、分页和版本控制，绝不将通知内容当作资源数据。搜索与统计缓存会在提交后同步失效，以免刷新命中旧结果。对未知或丢失的事件按 `state.resync` 处理。
 

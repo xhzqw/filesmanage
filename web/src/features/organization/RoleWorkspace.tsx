@@ -1,4 +1,5 @@
 import {RareBadge,RareButton,RareDataTable,RareInput,RareRowActions,RareSelect} from "../../shared/ui/rare";
+import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useEffect,useState,type FormEvent} from "react";
 import type {User} from "../../entities/user/model";
 import {request} from "../../shared/http";
@@ -28,6 +29,7 @@ const roleAPI={
 export function RoleBindingsPanel({users}:{users:User[]}){
  const[items,setItems]=useState<ManagementRole[]>([]);
  const[load,setLoad]=useState(0);
+ useEffect(()=>observeWorkspaceChange(()=>setLoad(n=>n+1),["permissions"]),[]);
  const[error,setError]=useState("");
  const[busy,setBusy]=useState(false);
  const[userId,setUserId]=useState("");
@@ -144,6 +146,7 @@ export function DelegatedRolesWorkspace(){
  const[action,setAction]=useState("list");
  const[expiry,setExpiry]=useState("");
  const[refresh,setRefresh]=useState(0);
+ useEffect(()=>observeWorkspaceChange(()=>setRefresh(n=>n+1),["permissions"]),[]);
  const[confirm,setConfirm]=useState("");
  const[revokeTarget,setRevokeTarget]=useState("");
  useEffect(()=>{let live=true;roleAPI.mine().then(r=>{if(live){setRoles(r);setBusy(false);}})

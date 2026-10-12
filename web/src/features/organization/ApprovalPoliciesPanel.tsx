@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState,type FormEvent} from "react";
+import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useSearchParams} from "react-router-dom";
 import type {User} from "../../entities/user/model";
 import {approvalPolicyApi} from "../../entities/approval/api";
@@ -16,6 +17,7 @@ export function ApprovalPoliciesPanel({users,usersState,onRetryUsers}:{users:Use
  const [folderName,setFolderName]=useState<{id:string;name:string}|null>(null);
  const [status,setStatus]=useState<LoadState>("ready");
  const [refresh,setRefresh]=useState(0);
+ useEffect(()=>observeWorkspaceChange(()=>setRefresh(n=>n+1),["approval-policy","permissions"]),[]);
  const [approverIds,setApproverIds]=useState<string[]>([""]);
  const [enabled,setEnabled]=useState(false);
  const [configured,setConfigured]=useState(false);

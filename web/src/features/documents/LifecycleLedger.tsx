@@ -1,4 +1,5 @@
 import {useEffect,useState} from "react";
+import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {Link} from "react-router-dom";
 import {RareBadge,RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
 import {errorCopy} from "../../shared/errors";
@@ -20,6 +21,9 @@ export function LifecycleLedger({isAdmin=false}:{isAdmin?:boolean}){
  const[loading,setLoading]=useState(false);
  const[error,setError]=useState("");
  const[reload,setReload]=useState(0);
+ useEffect(()=>observeWorkspaceChange(()=>{
+  setSelected([]);setCursor("");setCursorNext("");setItems([]);setReload(n=>n+1);
+ },["lifecycle","permissions"]),[]);
  const[selected,setSelected]=useState<string[]>([]);
  const[bulkDate,setBulkDate]=useState("");
  const[bulkBusy,setBulkBusy]=useState(false);

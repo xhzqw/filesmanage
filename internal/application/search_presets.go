@@ -80,7 +80,7 @@ func (s *Service) SaveSearchPreset(ctx context.Context, u domain.User, p domain.
 		return nil, err
 	}
 	// Search presets belong to one account; notify its other devices only.
-	s.publishUserEvent(u.ID, UserEvent{Type: "workspace.changed", Scopes: []string{"search"}})
+	s.publishUserEvent(u.ID, UserEvent{Type: "workspace.changed", Scopes: []string{"presets"}})
 	return s.ListSearchPresets(ctx, u)
 }
 func (s *Service) RemoveSearchPreset(ctx context.Context, u domain.User, name string) error {
@@ -105,6 +105,6 @@ func (s *Service) RemoveSearchPreset(ctx context.Context, u domain.User, name st
 	if err = tx.Commit(ctx); err != nil {
 		return err
 	}
-	s.publishUserEvent(u.ID, UserEvent{Type: "workspace.changed", Scopes: []string{"search"}})
+	s.publishUserEvent(u.ID, UserEvent{Type: "workspace.changed", Scopes: []string{"presets"}})
 	return nil
 }

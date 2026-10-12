@@ -1,4 +1,5 @@
 import {RareBadge,RareButton,RareDataTable,RareInput,RareNotice,RareRowActions,RareSelect} from "../../shared/ui/rare";
+import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useEffect,useMemo,useRef,useState,type FormEvent,type ReactNode} from "react";
 import {Link,useSearchParams} from "react-router-dom";
 import type {User} from "../../entities/user/model";
@@ -171,6 +172,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
  const [grants,setGrants]=useState<DirectGrant[]>([]);
  const [state,setState]=useState<LoadState>("ready");
  const [refresh,setRefresh]=useState(0);
+ useEffect(()=>observeWorkspaceChange(()=>setRefresh(n=>n+1),["permissions","folder"]),[]);
  const [notice,setNotice]=useState<{text:string;error:boolean}|null>(null);
  const [subjectKind,setSubjectKind]=useState<"user"|"group">("group");
  const [subjectId,setSubjectId]=useState("");
