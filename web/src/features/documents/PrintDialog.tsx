@@ -3,6 +3,7 @@ import {useNavigate} from "react-router-dom";
 import type {PreviewData} from "../../entities/file/model";
 import {Dialog} from "../../shared/ui/Dialog";
 import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
+import {BrandLoader} from "../../shared/ui/BrandLoader";
 import {errorCopy} from "../../shared/errors";
 import {fileApi} from "./api";
 import {resolvePreviewAdapter} from "./previewAdapters";
@@ -21,6 +22,9 @@ export function PrintDialog({preview,onClose}:{preview:PreviewData;onClose:()=>v
  const [sheetState,setSheetState]=useState<"loading"|"ready"|"failed">("loading");
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState("");
+ const [pdfImageUrl,setPdfImageUrl]=useState("");
+ const [pdfImageError,setPdfImageError]=useState(false);
+ const [pdfImageRetry,setPdfImageRetry]=useState(0);
  const kind=resolvePreviewAdapter(preview);
  const isPdf=kind==="pdf";
  const isOffice=["document","spreadsheet","presentation"].includes(kind);
@@ -31,6 +35,9 @@ export function PrintDialog({preview,onClose}:{preview:PreviewData;onClose:()=>v
  const printable=browserPrintKind(preview)!==null;
  const previewUrl=isPdf||isImage?fileApi.mediaUrl(preview.fileId,preview.sha256):
    isOffice?"/api/files/"+encodeURIComponent(preview.fileId)+"/preview/office-pdf?v="+encodeURIComponent(preview.sha256):"";
+ const pdfPageUrl=isPdf?fileApi.pdfPageUrl(preview.fileId,preview.sha256,1)+(pdfImageRetry?"&attempt="+pdfImageRetry:""):"";
+ const pdfImageReady=pdfImageUrl===pdfPageUrl;
+ useEffect(()=>{setPdfImageError(false);setPdfImageRetry(0);},[preview.fileId,preview.sha256]);
  useEffect(()=>{
   if(!isSpreadsheet)return;
   let valid=true;
@@ -63,7 +70,18 @@ export function PrintDialog({preview,onClose}:{preview:PreviewData;onClose:()=>v
   <div className="document-print-layout">
    <div className="document-print-preview" aria-label="文件打印内容预览">
     {isImage?<img className="document-print-image" src={previewUrl} alt={"图片预览："+preview.name}/>:
-     isPdf?<img className="document-print-pdf" src={fileApi.pdfPageUrl(preview.fileId,preview.sha256,1)} alt={"PDF 首页："+preview.name}/>:
+     isPdf?<div className="document-print-pdf-stage" aria-busy={!pdfImageReady&&!pdfImageError}>
+      {!pdfImageReady&&!pdfImageError&&<div className="document-print-pdf-loading" role="status">
+       <BrandLoader size="md" decorative/><span>正在渲染 PDF 首页…</span>
+      </div>}
+      {pdfImageError&&<div className="document-print-pdf-loading" role="alert">
+       <span>首页预览失败</span><RareButton type="button" onClick={()=>{setPdfImageRetry(i=>i+1);setPdfImageError(false);}}>重试</RareButton>
+      </div>}
+      <img key={pdfPageUrl} className={"document-print-pdf"+(pdfImageReady?"":" is-pending")}
+       src={pdfPageUrl} alt={"PDF 首页："+preview.name} aria-hidden={!pdfImageReady}
+       onLoad={()=>{setPdfImageUrl(pdfPageUrl);setPdfImageError(false);}}
+       onError={()=>setPdfImageError(true)}/>
+     </div>:
      isOffice?<div className="document-print-empty">Office 页面将转换为 PDF 后交给浏览器打印</div>:
      isText?<pre className="document-print-text">{preview.content||"（空文件）"}</pre>:
      <div className="document-print-empty">{isCad?"图纸在工程查看器内出图":"此格式没有可打印预览"}</div>}
