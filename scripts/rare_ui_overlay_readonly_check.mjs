@@ -143,7 +143,8 @@ try{
    assert(initial.mode==="page"&&initial.width<=initial.maxWidth+2&&initial.height<=initial.maxHeight+2&&
     Math.abs(initial.height/initial.width-initial.expectedRatio)<.02&&initial.overflow<=1,
     "PDF default whole-page fit and natural ratio at "+width+": "+JSON.stringify(initial));
-   await click('.file-pdf-tools button[aria-label="放大 PDF"]');
+   await evalJS(`(()=>{const button=document.querySelector('.file-pdf-tools button[aria-label="放大 PDF"]');if(!button)throw Error("missing PDF zoom control");button.click();return true})()`);
+   await waitFor('document.querySelector(".file-pdf-zoom-value")?.textContent?.trim()==="125%"');
    const enlarged=await readLayout("page");
    console.log("PDF_STAGE",width,"zoom",JSON.stringify(enlarged));
    assert(enlarged.width>initial.width*1.2&&Math.abs(enlarged.height/enlarged.width-enlarged.expectedRatio)<.02,
