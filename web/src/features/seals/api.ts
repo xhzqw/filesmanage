@@ -2,6 +2,7 @@ import {ApiError,request,reportSessionResponse} from "../../shared/http";
 import type {SealAsset,FileSealMark,SealPlacement,SealUserPermission} from "../../entities/seal/model";
 
 export const sealsApi={
+ pageCount:(fileId:string,sha:string)=>request<{pageCount:number}>("/files/"+encodeURIComponent(fileId)+"/preview/pdf/pages?sha256="+encodeURIComponent(sha)),
  myPermission:()=>request<SealUserPermission>("/seal-permissions/me"),
  permissions:()=>request<SealUserPermission[]>("/seal-permissions"),
  updatePermission:(userId:string,canSign:boolean,canStamp:boolean)=>request<SealUserPermission>("/seal-permissions/"+encodeURIComponent(userId),{method:"PUT",body:JSON.stringify({canSign,canStamp})}),

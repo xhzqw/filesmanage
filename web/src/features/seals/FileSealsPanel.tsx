@@ -1,5 +1,4 @@
 import {useEffect,useLayoutEffect,useState} from "react";
-import {fileApi} from "../documents/api";
 import {createPortal} from "react-dom";
 import {Link} from "react-router-dom";
 import {RareBadge,RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
@@ -71,7 +70,7 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
   if(!isPDF)return;
   let live=true;
   setPage(1);setPageCount(0);setImageRetry(0);
-  void fileApi.pdfPages(fileId,sha).then(result=>{
+  void sealsApi.pageCount(fileId,sha).then(result=>{
    if(live)setPageCount(Math.max(0,result.pageCount));
   }).catch(err=>{if(live)setError(errorCopy(err,"无法获取 PDF 页数"))});
   return()=>{live=false};
