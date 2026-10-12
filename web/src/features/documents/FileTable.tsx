@@ -12,6 +12,7 @@ import {request} from "../../shared/http";
 import {newIdempotencyKey} from "../../shared/ids";
 import {Dialog} from "../../shared/ui/Dialog";
 import {FolderPicker} from "../../shared/ui/FolderPicker";
+import {BatchPrintDialog} from "./BatchPrintDialog";
 import {Menu,type MenuItem,type MenuPoint}from"../../shared/ui/Menu";
 import {MicroHoldToDelete}from"../../shared/ui/rare";
 import"./dragMove.css";
@@ -218,6 +219,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const[focusedId,setFocusedId]=useState<string|null>(null);
  const[anchorId,setAnchorId]=useState<string|null>(null);
  const[pendingDelete,setPendingDelete]=useState<FileItem[]>([]);
+ const[printingBatch,setPrintingBatch]=useState<FileItem[]|null>(null);
  // Transient context-menu state (DESKTOP-INTERACTION §1.1 contextTarget): it
  // lives only while the row menu is open and is never business state.
  const[rowMenu,setRowMenu]=useState<{targets:FileItem[];point:MenuPoint|null;anchor:HTMLElement|null}|null>(null);
@@ -683,6 +685,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    items.push({id:"print",label:"打印",onSelect:()=>navigate("/preview/"+file.id+"?print=1")});
   }else if(targets.length>1){
    items.push({id:"move-batch",label:"移动到…",onSelect:()=>startMoveSelection(targets)});
+   if(targets.length<=20)items.push({id:"print-batch",label:"批量打印",onSelect:()=>setPrintingBatch(targets)});
   }
   items.push({id:"delete",label:"删除",hint:"Delete",danger:true,onSelect:()=>openDelete(targets)});
   return items;
@@ -823,6 +826,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     {newFolderSlot}
     <div className="batch-actions-group">
      <RareButton type="button" className="batch-btn" disabled={selectedIds.size===0||zipController.current!==null} onClick={()=>void batchDownload(selection)} title={selectedIds.size===0?"勾选文件后可批量下载":"批量下载已勾选文件"}>批量下载</RareButton>
+     <RareButton type="button" className="batch-btn" disabled={selectedIds.size===0||selectedIds.size>20}
+      onClick={()=>setPrintingBatch(selection)} title={selectedIds.size>20?"每批最多 20 份文件":"逐份确认并打开浏览器打印预览"}>批量打印</RareButton>
      <RareButton type="button" className="batch-btn" disabled={selectedIds.size===0} onClick={()=>startMoveSelection(selection)} title={selectedIds.size===0?"勾选文件后可批量移动":"批量移动已勾选文件"}>批量移动</RareButton>
      <RareButton type="button" className="batch-btn danger" disabled={selectedIds.size===0} onClick={()=>openDelete(selection)} title={selectedIds.size===0?"勾选文件后可批量删除":"批量删除已勾选文件"}>批量删除</RareButton>
     </div>
@@ -974,6 +979,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   </Dialog>}
   {moving&&<MoveDialog file={moving} presetTargetId={moveDropTarget} onClose={()=>{setMoveDropTarget("");setMoving(null);}} onMoved={onMoved} onReload={onMoveReload}/>}
   {movingBatch&&<BatchMoveDialog files={movingBatch} presetTargetId={moveDropTarget} onClose={()=>{setMoveDropTarget("");setMovingBatch(null);}} onMoved={onBatchMoved} onReload={onMoveReload}/>}
+   {printingBatch&&<BatchPrintDialog files={printingBatch} onClose={()=>setPrintingBatch(null)}/>}
   {rowMenu&&<Menu open label="文件操作菜单" items={rowMenuItems(rowMenu.targets)} anchor={rowMenu.anchor}
    point={rowMenu.point} onClose={()=>setRowMenu(null)}/>}
   <footer className="status-bar">

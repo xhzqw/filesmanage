@@ -10,6 +10,7 @@
 .document-print-options{display:flex;flex-direction:column;gap:13px;min-width:0}
 .document-print-filename{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .document-print-options label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600}
+.document-print-options label.document-print-mark-option{flex-direction:row;align-items:center;gap:8px}
 .document-print-options .rare-select-root{width:100%}
 .document-print-options small,.document-print-options p{font-size:12px;line-height:1.55;color:var(--text-tertiary);margin:0}
 @media(max-width:610px){.document-print-dialog .document-print-layout{grid-template-columns:1fr;gap:12px}.document-print-preview{min-height:160px;padding:8px}.document-print-image,.document-print-pdf,.document-print-text,.document-print-empty{height:150px}}

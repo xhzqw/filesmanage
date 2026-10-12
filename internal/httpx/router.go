@@ -149,6 +149,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.POST("/files/:id/print/prepare", h.prepareBrowserPrint)
 	api.GET("/files/:id/print/media", h.browserPrintMedia)
 	api.GET("/files/:id/print/office-pdf", h.browserPrintOfficePDF)
+ api.GET("/files/:id/print/sheets",h.browserPrintSheets)
 	api.POST("/files/:id/save", h.saveFile)
 	api.POST("/files/:id/move", h.moveFile)
 	api.POST("/files/move-batch", h.moveFilesBatch)

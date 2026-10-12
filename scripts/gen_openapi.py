@@ -1016,12 +1016,18 @@ add("GET", "/api/files/{id}/print/media", operation("Stream checked PDF or still
                "409":{"description":ERR["409"]},"415":{"description":"Unsupported printable media."}}))
 
 add("GET", "/api/files/{id}/print/office-pdf", operation("Print-authorized isolated Office PDF conversion (print + preview ACL)", "Files", "browserPrintOfficePDF", security=SESSION,
-    params=[id_param("id", "File id."),{"name":"sha256","in":"query","required":True,"schema":string()}],
+    params=[id_param("id", "File id."),{"name":"sha256","in":"query","required":True,"schema":string()},
+            {"name":"sheet","in":"query","required":False,"schema":string(),"description":"Optional exact visible Excel worksheet name; others hidden only in sandbox conversion copy."}],
     responses={"200":{"description":"Ephemeral PDF conversion in sandbox, never a physical printer job.",
                       "content":{"application/pdf":{"schema":{"type":"string","format":"binary"}}}},
                "401":{"description":ERR["401"]},"403":{"description":ERR["403"]},
                "404":{"description":ERR["404"]},"409":{"description":ERR["409"]},
                "415":{"description":"Unsupported or unsafe Office input."}}))
+
+add("GET", "/api/files/{id}/print/sheets", operation("List visible Excel sheets under print + preview ACL", "Files", "browserPrintSheets", security=SESSION,
+    params=[id_param("id","File id."),{"name":"sha256","in":"query","required":True,"schema":string()}],
+    responses=dict([json_ok(arr(obj({"name":string()},required=["name"])),"Visible worksheet names from validated workbook; current digest required."),
+      resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
 
 add("POST", "/api/files/{id}/save", operation("Save new file content (new version, idempotent)", "Files", "saveFile", security=SESSION,
     params=[id_param("id", "File id.")],

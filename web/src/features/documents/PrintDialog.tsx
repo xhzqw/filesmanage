@@ -1,53 +1,24 @@
-import {useState} from "react";
+import {useEffect,useState} from "react";
 import {useNavigate} from "react-router-dom";
 import type {PreviewData} from "../../entities/file/model";
 import {Dialog} from "../../shared/ui/Dialog";
-import {RareButton,RareSelect} from "../../shared/ui/rare";
+import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
 import {errorCopy} from "../../shared/errors";
 import {fileApi} from "./api";
 import {resolvePreviewAdapter} from "./previewAdapters";
+import {authorizeAndOpenPrint,browserPrintKind,openPrintWindow,type Paper,type Orientation} from "./browserPrint";
 import "./printDialog.css";
 
-type Paper="A4"|"A3"|"letter";
-type Orientation="portrait"|"landscape";
-const escapeHTML=(value:string)=>value.replace(/[&<>"']/g,ch=>({
- "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;",
-}[ch]??ch));
-
-// Standalone same-origin browsing context. All printable text is a DOM text
-// node; user document HTML/SVG is NEVER inserted as executable markup.
-function renderPage(popup:Window,preview:PreviewData,source:string,kind:"text"|"image",paper:Paper,orientation:Orientation){
- const safeTitle=escapeHTML(preview.name.slice(0,200));
- popup.document.open();
- popup.document.write('<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>'+safeTitle+
-  '</title><style>@page{size:'+paper+' '+orientation+';margin:12mm}'+
-  'html,body{background:#fff;color:#161f2b;margin:0;padding:0}'+
-  'main{max-width:100%;margin:auto}pre{font:10pt/1.5 Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;tab-size:4}'+
-  'img{display:block;max-width:100%;max-height:95vh;object-fit:contain;margin:auto}'+
-  '@media print{img{max-height:100%}}'+
-  '</style></head><body><main></main></body></html>');
- popup.document.close();
- const main=popup.document.querySelector("main");
- if(!main)throw new Error("无法创建打印页面");
- if(kind==="text"){
-  const pre=popup.document.createElement("pre");
-  pre.textContent=preview.content;
-  main.append(pre);
-  popup.focus();popup.print();
-  return;
- }
- const image=popup.document.createElement("img");
- image.alt=preview.name;
- image.onload=()=>{popup.focus();popup.print();};
- image.onerror=()=>{main.textContent="打印图片加载失败。请检查文件权限或版本是否发生变化。";};
- image.src=source;
- main.append(image);
-}
 
 export function PrintDialog({preview,onClose}:{preview:PreviewData;onClose:()=>void}){
  const navigate=useNavigate();
  const [paper,setPaper]=useState<Paper>("A4");
  const [orientation,setOrientation]=useState<Orientation>("portrait");
+ const [markEnabled,setMarkEnabled]=useState(false);
+ const [markText,setMarkText]=useState("内部资料");
+ const [sheets,setSheets]=useState<{name:string}[]>([]);
+ const [selectedSheet,setSelectedSheet]=useState("");
+ const [sheetState,setSheetState]=useState<"loading"|"ready"|"failed">("loading");
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState("");
  const kind=resolvePreviewAdapter(preview);
@@ -56,33 +27,31 @@ export function PrintDialog({preview,onClose}:{preview:PreviewData;onClose:()=>v
  const isImage=kind==="image";
  const isText=kind==="text"&&preview.textual;
  const isCad=kind==="cad";
- const printable=isPdf||isOffice||isImage||(isText&&!preview.truncated);
+ const isSpreadsheet=kind==="spreadsheet";
+ const printable=browserPrintKind(preview)!==null;
  const previewUrl=isPdf||isImage?fileApi.mediaUrl(preview.fileId,preview.sha256):
-  isOffice?"/api/files/"+encodeURIComponent(preview.fileId)+"/preview/office-pdf?v="+encodeURIComponent(preview.sha256):"";
+   isOffice?"/api/files/"+encodeURIComponent(preview.fileId)+"/preview/office-pdf?v="+encodeURIComponent(preview.sha256):"";
+ useEffect(()=>{
+  if(!isSpreadsheet)return;
+  let valid=true;
+  setSheetState("loading");setSelectedSheet("");setSheets([]);
+  fileApi.printSheets(preview.fileId,preview.sha256).then(result=>{
+   if(valid){setSheets(result);setSheetState("ready");}
+  }).catch(()=>{if(valid)setSheetState("failed");});
+  return()=>{valid=false;};
+ },[isSpreadsheet,preview.fileId,preview.sha256]);
 
  async function print(){
   if(busy||!printable)return;
   // Must open synchronously inside the click gesture, before awaiting ACL
   // checks/conversion, or Chrome may block the printing context.
-  const popup=window.open("","_blank");
-  if(!popup){setError("浏览器阻止了打印窗口，请允许此站点弹出窗口后重试。");return;}
-  popup.opener=null;
-  popup.document.write('<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>准备打印</title><body style="font:14px system-ui;padding:2em">正在检查权限并准备打印内容…</body>');
-  popup.document.close();
+  let popup:Window;
+  try{popup=openPrintWindow();}catch(cause){setError(errorCopy(cause,"无法打开打印窗口"));return;}
   setBusy(true);setError("");
   try{
-   const prep=await fileApi.preparePrint(preview.fileId,preview.sha256);
-   if(prep.sha256!==preview.sha256)throw new Error("文件版本已更新，请刷新页面后再打印。");
-   if(popup.closed)throw new Error("打印窗口已关闭。");
-   if(isPdf||isOffice){
-    // Native PDF viewer owns page-range/copies/scale. Do not claim these can
-    // be controlled by CSS or that opening the viewer means physical success.
-    popup.location.replace(isPdf?fileApi.printMediaUrl(preview.fileId,prep.sha256):
-     fileApi.printOfficeUrl(preview.fileId,prep.sha256));
-   }else{
-    renderPage(popup,preview,isImage?fileApi.printMediaUrl(preview.fileId,prep.sha256):"",
-     isImage?"image":"text",paper,orientation);
-   }
+   await authorizeAndOpenPrint(popup,preview,{
+    paper,orientation,watermark:markEnabled?markText:"",sheet:isSpreadsheet?selectedSheet:"",
+   });
    onClose();
   }catch(cause){
    if(!popup.closed)popup.close();
@@ -112,8 +81,24 @@ export function PrintDialog({preview,onClose}:{preview:PreviewData;onClose:()=>v
      <option value="portrait">纵向</option><option value="landscape">横向</option>
     </RareSelect></label></>}
     {(isPdf||isOffice)&&<small>将在浏览器 PDF 查看器中设置纸张、页码、份数和缩放后打印。</small>}
+    {isSpreadsheet&&<label>工作表
+     <RareSelect aria-label="打印工作表" disabled={busy||sheetState!=="ready"} value={selectedSheet}
+      onChange={event=>setSelectedSheet(event.target.value)}>
+      <option value="">全部可见工作表</option>
+      {sheets.map(sheet=><option key={sheet.name} value={sheet.name}>{sheet.name}</option>)}
+     </RareSelect>
+     <small>{sheetState==="loading"?"正在读取工作表…":sheetState==="failed"?"工作表列表不可用，可直接打印整个工作簿":
+      "单独打印工作表时，原预览仍显示整个工作簿。输出采用文档原有打印区域与分页设置。"}</small>
+    </label>}
     {isImage&&<small>图片按比例缩放适应纸张，不裁切原图。</small>}
     {isText&&!preview.truncated&&<small>自动换行并按纸张分页；不执行文件中的代码。</small>}
+    {(isImage||isText)&&<><label className="document-print-mark-option">
+     <RareInput type="checkbox" checked={markEnabled} disabled={busy} onChange={event=>setMarkEnabled(event.target.checked)}/>
+     页面水印
+    </label>
+    {markEnabled&&<label>水印文字<RareInput className="document-print-mark-input" value={markText} maxLength={60}
+     disabled={busy} onChange={event=>setMarkText(event.target.value)}/></label>}</>}
+    {(isPdf||isOffice)&&<small>PDF/Office 的水印需要写入打印派生文件，原生浏览器打印暂不支持叠加。</small>}
    </div>
   </div>
   {error&&<p role="alert" className="notice error">{error}</p>}
