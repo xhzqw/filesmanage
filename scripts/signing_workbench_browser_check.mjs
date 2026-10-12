@@ -472,16 +472,23 @@ try{
  const cad=(files.data?.items??[]).find(item=>/\.(step|stp|stl|obj|dxf|dwg)$/i.test(item.name??""));
  if(cad){
   await cdp.send("Page.navigate",{url:BASE+"/preview/"+encodeURIComponent(cad.id)});
-  const ready=await cdp.waitFor(`()=>!!document.querySelector('.file-unsupported .preview-reader-dock')`,14000);
+  // Supported CAD must auto-mount the actual viewer. The old assertion
+  // expected an unsupported-file fallback and incorrectly required Print.
+  const ready=await cdp.waitFor(`()=>!!document.querySelector('.file-workbench-preview-surface .cad-embedded .cad-viewport')`,18000);
   const ui=await cdp.evaluate(`(()=>{
-   const stage=document.querySelector('.file-unsupported')?.getBoundingClientRect();
-   const dock=document.querySelector('.file-unsupported .preview-reader-dock')?.getBoundingClientRect();
-   return {bottom:stage&&dock?Math.round(stage.bottom-dock.bottom):null,
-    actionCount:document.querySelectorAll('.file-unsupported .preview-reader-dock button').length,
-    topActions:document.querySelectorAll('.file-preview-action-dock .file-workbench-actions>button').length};
+   const stage=document.querySelector('.file-workbench-preview-surface .cad-embedded .cad-viewport');
+   const panel=document.querySelector('.file-workbench-preview-surface');
+   const box=stage?.getBoundingClientRect(),parent=panel?.getBoundingClientRect();
+   const actions=[...document.querySelectorAll('.file-preview-action-dock .file-workbench-actions>button')];
+   return {stage:!!box&&box.width>0&&box.height>100&&box.left>=parent.left-2&&box.right<=parent.right+2,
+    loading:!!stage?.querySelector('.cad-loading-body'),canvas:!!stage?.querySelector('canvas'),
+    unsupportedFallback:!!document.querySelector('.file-unsupported'),
+    toolbar:!!stage?.querySelector('.cad-compact-toolbar'),
+    topActions:actions.map(button=>button.getAttribute('aria-label'))};
   })()`);
-  assert("CAD fallback uses one bottom refresh control and upper-right file actions",
-   Boolean(ready)&&ui.bottom!==null&&ui.bottom>=0&&ui.bottom<55&&ui.actionCount===1&&ui.topActions===3,
+  assert("CAD automatically mounts a viewer with the compact controls and no unsupported fallback",
+   Boolean(ready)&&ui.stage&&(ui.loading||ui.canvas)&&!ui.unsupportedFallback&&
+   ui.topActions.includes("下载")&&ui.topActions.includes("更多文件操作")&&!ui.topActions.includes("打印"),
    JSON.stringify(ui));
  }
 
