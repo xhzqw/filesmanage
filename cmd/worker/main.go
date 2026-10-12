@@ -194,6 +194,20 @@ func (w *worker) process(ctx context.Context, job domain.DerivativeJob) error {
 	}
 	output := filepath.Join(workdir, "output."+job.OutputKind)
 	args := conversionArgs(job.SourceFormat, input, output)
+	if job.SourceFormat == "dwg" && os.Geteuid() == 0 {
+		// Run the untrusted native DWG parser as nobody, not as the root worker.
+		setpriv, lookupErr := exec.LookPath("setpriv")
+		if lookupErr != nil {
+			return fmt.Errorf("DWG conversion requires setpriv: %w", lookupErr)
+		}
+		if err := os.Chown(workdir, 65534, 65534); err != nil {
+			return err
+		}
+		if err := os.Chown(input, 65534, 65534); err != nil {
+			return err
+		}
+		args = append([]string{setpriv, "--reuid=65534", "--regid=65534", "--clear-groups", "--no-new-privs", "--"}, args...)
+	}
 	cmdCtx, cancel := context.WithTimeout(ctx, w.timeout)
 	defer cancel()
 	cmd := limitedConverterCommand(cmdCtx, w.limiter, w.memoryMB, args)

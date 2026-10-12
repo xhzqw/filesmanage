@@ -152,8 +152,8 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
     if(cadDerivativeDisposition(derivative)==="unsupported"){
      setInfo(derivative);setStatus("unsupported");return;
     }
-    // Deep links create a derivative only for formats with a real renderer.
-    if(cadDerivativeDisposition(derivative)==="request"){
+    // Only an explicit retry queues failed conversions again.
+    if(cadDerivativeDisposition(derivative,retryEpoch>0)==="request"){
      try{
       await fileApi.requestDerivative(id);
      }catch(error){
@@ -189,7 +189,8 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
      return;
     }
     if(derivative.state==="failed"){
-     setMessage(derivative.errorCode?"模型转换失败："+derivative.errorCode:"模型转换失败");
+     setMessage(derivative.format==="dwg"?"DWG 转换失败，请确认图纸是否有效或下载使用 CAD 软件查看":
+      derivative.errorCode?"模型转换失败："+derivative.errorCode:"模型转换失败");
      setStatus("failed");
      return;
     }
@@ -381,7 +382,7 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
  const content=<main className={embedded?"cad-page cad-embedded":"work cad-page"}>
     {(!embedded||(drawing&&layouts.length>1))&&<div className="breadcrumb cad-title">
      <strong>{drawing?"二维工程图":info?.format==="dwg"?"CAD 图纸":"三维模型"}</strong>
-     <span>{info?.format?.toUpperCase()??""}{info?.class==="converted"?" · 已转换":""}</span>
+     <span>{info?.format?.toUpperCase()??""}{info?.class==="converted"&&info?.state==="ready"?" · 已转换":""}</span>
      {drawing&&status==="ready"&&layouts.length>1&&<div className="cad-layout-tabs" role="tablist" aria-label="图纸布局">
       {layouts.map(name=><RareButton type="button" key={name} role="tab" aria-selected={activeLayout===name}
        className={activeLayout===name?"on":""}

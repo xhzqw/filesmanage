@@ -3,7 +3,8 @@
  * for licensed/unverified/unknown formats just to discover a predictable 400.
  */
 export type DerivativeDisposition="request"|"existing"|"unsupported";
-export function cadDerivativeDisposition(info:{found:boolean;class:string}):DerivativeDisposition{
+export function cadDerivativeDisposition(info:{found:boolean;class:string;state?:string},retryFailed=false):DerivativeDisposition{
  if(info.class!=="native"&&info.class!=="converted")return "unsupported";
- return info.found?"existing":"request";
+ if(!info.found||(retryFailed&&info.state==="failed"))return "request";
+ return "existing";
 }

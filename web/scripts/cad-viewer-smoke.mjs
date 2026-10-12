@@ -40,6 +40,9 @@ assert.equal(cadDerivativeDisposition({found:false,class:"native"}),"request");
 assert.equal(cadDerivativeDisposition({found:false,class:"converted"}),"request");
 assert.equal(cadDerivativeDisposition({found:true,class:"native"}),"existing");
 assert.equal(cadDerivativeDisposition({found:true,class:"licensed"}),"unsupported");
+assert.equal(cadDerivativeDisposition({found:true,class:"converted",state:"failed"}),"existing");
+assert.equal(cadDerivativeDisposition({found:true,class:"converted",state:"failed"},true),"request");
+assert.equal(cadDerivativeDisposition({found:true,class:"converted",state:"ready"},true),"existing");
 
 // Bundle the parser with its pure NURBS evaluator. The Three dependency is
 // type-only and is erased; this remains a remote-only headless regression.
