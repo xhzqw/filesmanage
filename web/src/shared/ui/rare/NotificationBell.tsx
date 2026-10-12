@@ -6,6 +6,7 @@
  */
 import {useEffect,useRef,type ButtonHTMLAttributes} from "react";
 import {AnimatePresence,animate,motion,useMotionValue,useReducedMotion,type AnimationPlaybackControls} from "motion/react";
+import {RareButton} from "./RareControls";
 import "./notificationBell.css";
 
 export type NotificationBellProps=Omit<ButtonHTMLAttributes<HTMLButtonElement>,"children"> & {
@@ -30,7 +31,7 @@ export function NotificationBell({count,max=99,variant="count",className="",...p
     ringing.current=animate(rotation,[0,-14*strength,11*strength,-6*strength,3*strength,0],{duration:.66,ease:"easeOut"});
     return()=>ringing.current?.stop();
   },[total,reduced,rotation]);
-  return <button {...props} type="button" className={"rare-notification-bell"+(className?" "+className:"")}
+  return <RareButton {...props} type="button" className={"rare-notification-bell"+(className?" "+className:"")}
     data-slot="notification-bell" data-unread={total>0} aria-label={props["aria-label"]??`消息通知，未读 ${total} 条`}>
     <motion.svg aria-hidden="true" style={{rotate:rotation,transformOrigin:"50% 14%"}}
       viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -46,5 +47,5 @@ export function NotificationBell({count,max=99,variant="count",className="",...p
           transition={reduced?{duration:0}:{duration:.18}}>{total>limit?`${limit}+`:total}</motion.span>}
       </motion.span>}
     </AnimatePresence>
-  </button>;
+  </RareButton>;
 }

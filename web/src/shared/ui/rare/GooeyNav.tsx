@@ -12,6 +12,7 @@ import {
 import { Link, useLocation } from "react-router-dom";
 import { motion, useReducedMotion, useSpring, useTransform } from "motion/react";
 import { cn } from "./utils";
+import { RareButton } from "./RareControls";
 import "./gooey.css";
 
 // the duration picker's spring, damped so nothing overshoots
@@ -191,10 +192,10 @@ function NavLabel({
       {label}
     </Link>
   ) : (
-    <button type="button" {...props}>
+    <RareButton type="button" {...props}>
       {icon}
       {label}
-    </button>
+    </RareButton>
   );
 }
 
