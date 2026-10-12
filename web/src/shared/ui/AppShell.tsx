@@ -1,5 +1,5 @@
 import {GooeyNav,RareButton} from "./rare";
-import {useContext,useRef,useState,type ReactNode} from "react";
+import {useContext,useEffect,useRef,useState,type ReactNode} from "react";
 import {ShellAccessories} from "./ShellAccessories";
 import {useLocation,useNavigate} from "react-router-dom";
 import {Menu} from "./Menu";
@@ -52,6 +52,11 @@ export function AppShell({user,onLogout,product,actions,children}:{user:ShellUse
  // back/forward; preview and account subpages have no misleading active tile.
  const activeNav=NAV.findIndex(item=>item.to===pathname);
  const notificationSlot=useContext(ShellAccessories);
+ // Once the collapsed navigation opens, keyboard focus must enter the links,
+ // otherwise Escape remains on the toggle and cannot close the menu.
+ useEffect(()=>{
+  if(open)document.querySelector<HTMLAnchorElement>("#shell-main-navigation a[href]")?.focus();
+ },[open]);
 
  return <div className="shell">
   <header className="header">
