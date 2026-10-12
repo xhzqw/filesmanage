@@ -1,45 +1,92 @@
-/* Adapted from Rare UI Folder Component (Swami Malode and contributors).
- * Original https://www.rareui.com/components/foldercomponent
- * Source https://github.com/swamimalode07/rare-ui/blob/main/components/ui/folder-component.tsx
- * License: MIT + Commons Clause; visible attribution is in project README.
- * Retains the tabbed backing, fanning paper cards and tilting front flap.
- * Here the icon never steals the parent folder row's click, drag or keyboard.
+/* Direct visual adaptation of Rare UI FolderComponent, blue theme.
+ * Source: https://github.com/swamimalode07/rare-ui/blob/main/components/ui/folder-component.tsx
+ * Design: https://www.rareui.com/components/foldercomponent
+ * Rare UI's MIT + Commons Clause attribution is retained in README.md.
+ *
+ * The original 321 × 270 stage, paper-card SVG and glass flap are preserved.
+ * Only host sizing and passive folder-list behavior are adapted. There is no
+ * competing onClick: selection, double-open and dragging belong to the row.
  */
+import {useId,useState} from "react";
+import {motion,useReducedMotion} from "motion/react";
 import "./folderComponent.css";
 
 type Props={open?:boolean;size?:number;className?:string};
-// Original Rare UI outline, retained at its upstream proportions.
+const W=321,H=270;
 const FLAP="M0 25C0 11.1929 11.1929 0 25 0H136.084C143.044 0 149.689 2.90139 154.42 8.00608L178.08 33.5343C182.811 38.639 189.456 41.5404 196.416 41.5404H296C309.807 41.5404 321 52.7333 321 66.5404V216C321 229.807 309.807 241 296 241H25C11.1929 241 0 229.807 0 216V25Z";
+const FLAP_OUTLINE="M25 0.5H136.084C142.905 0.5 149.417 3.3431 154.054 8.3457L177.713 33.874C182.539 39.0808 189.317 42.04 196.416 42.04H296C309.531 42.04 320.5 53.0092 320.5 66.54V216C320.5 229.531 309.531 240.5 296 240.5H25C11.469 240.5 0.5 229.531 0.5 216V25C0.5 11.469 11.469 0.5 25 0.5Z";
+const SPRING={type:"spring" as const,stiffness:120,damping:13};
+
+function PaperCard({filterId}:{filterId:string}){
+ return <svg data-slot="folder-card" width="164" height="214" viewBox="0 0 164 214" fill="none" aria-hidden="true">
+  <g filter={`url(#${filterId})`}><rect width="163.078" height="213.262" rx="20" fill="#F1F1F1"/></g>
+  <rect x=".5" y=".5" width="162.078" height="212.262" rx="19.5" stroke="#E0E0E0"/>
+  <rect x="14.1193" y="31.2091" width="134.84" height="11.8892" rx="5.94459" fill="#D4D4D4"/>
+  <rect x="14.8253" y="60.9939" width="64.5183" height="5.88276" rx="2.94" fill="#D4D4D4"/>
+  <rect x="84.4303" y="60.9617" width="64.5183" height="5.88276" rx="2.94" fill="#D4D4D4"/>
+  <rect x="14.8253" y="75.1122" width="64.5183" height="5.88276" rx="2.94" fill="#D4D4D4"/>
+  <rect x="84.4303" y="75.0801" width="64.5183" height="5.88276" rx="2.94" fill="#D4D4D4"/>
+  <rect x="14.8253" y="89.2306" width="64.5183" height="5.88276" rx="2.94" fill="#D4D4D4"/>
+  <rect x="84.4303" y="89.199" width="64.5183" height="5.88276" rx="2.94" fill="#D4D4D4"/>
+  {Array.from({length:5},(_,line)=><g key={line} transform={`translate(0 ${106+line*14.1})`}>
+   <rect x="14.8253" width="64.5183" height="5.88276" rx="2.94" fill="#D4D4D4"/>
+   <rect x="84.4303" width="64.5183" height="5.88276" rx="2.94" fill="#D4D4D4"/>
+  </g>)}
+  <defs><filter id={filterId} x="-7" y="-7" width="177" height="227" filterUnits="userSpaceOnUse">
+   <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
+   <feOffset dy="1"/><feComponentTransfer><feFuncA type="linear" slope=".13"/></feComponentTransfer>
+   <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter></defs>
+ </svg>;
+}
 
 export function RareFolderComponent({open=false,size=16,className=""}:Props){
- return <svg data-slot="rare-folder-component" data-folder-open={open?"true":"false"}
-  data-folder-scale={size<28?"compact":"large"}
+ const [hover,setHover]=useState(false);
+ const reducedMotion=useReducedMotion();
+ const uid=useId().replace(/:/g,"");
+ const active=open||(hover&&size>=32);
+ const paperStates=[
+  {x:active?70:40,y:active?-160:hover?-30:-10,rotate:active?18:hover?14:10,delay:active?.1:hover?.12:0},
+  {x:active?0:3,y:active?-180:hover?-35:-20,rotate:active?-3:hover?-1:2,delay:active?.05:hover?.06:0},
+  {x:active?-65:-40,y:active?-170:hover?-44:-22,rotate:active?-14:hover?-9:-5,delay:0}
+ ];
+ return <span
+  data-slot="rare-folder-component" data-folder-open={active?"true":"false"}
+  data-folder-scale={size<32?"compact":"large"}
   className={"resource-folder-icon rare-folder-component"+(className?" "+className:"")}
-  width={size} height={size} viewBox="0 0 321 290" fill="none"
-  aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
-  <path className="rare-folder-back" d={FLAP} transform="translate(0 35)"
-   fill="var(--folder-fill,#F5BF43)" stroke="var(--folder-stroke,#AD7410)" strokeWidth="5"/>
-  <g className="rare-folder-card rare-folder-card-left">
-   <rect x="66" y="57" width="164" height="198" rx="18" fill="#FFF7E7" stroke="#CFB578" strokeWidth="3"/>
-   <rect x="85" y="82" width="110" height="9" rx="4" fill="#E0C58A"/>
-   <rect x="85" y="104" width="88" height="7" rx="3.5" fill="#EBDDAB"/>
-   <rect x="85" y="124" width="101" height="7" rx="3.5" fill="#EBDDAB"/>
-  </g>
-  <g className="rare-folder-card rare-folder-card-middle">
-   <rect x="82" y="44" width="164" height="210" rx="18" fill="#F8FAFD" stroke="#BECAD6" strokeWidth="3"/>
-   <rect x="101" y="68" width="118" height="10" rx="4" fill="#CDD9E7"/>
-   <rect x="101" y="91" width="102" height="7" rx="3.5" fill="#E0E7EF"/>
-   <rect x="101" y="112" width="88" height="7" rx="3.5" fill="#E0E7EF"/>
-  </g>
-  <g className="rare-folder-card rare-folder-card-right">
-   <rect x="96" y="52" width="164" height="204" rx="18" fill="#FFFEFB" stroke="#D1D9DF" strokeWidth="3"/>
-   <rect x="116" y="78" width="115" height="10" rx="4" fill="#D7DFE4"/>
-   <rect x="116" y="100" width="90" height="7" rx="3.5" fill="#E5EAEE"/>
-  </g>
-  <g className="rare-folder-front">
-   <path d={FLAP} transform="translate(0 47)"
-    fill="var(--folder-open-fill,#F9D47C)" stroke="var(--folder-stroke,#AD7410)" strokeWidth="4.5"/>
-   <path d="M16 253H305" stroke="#FFEABB" strokeWidth="7" strokeLinecap="round" opacity=".72"/>
-  </g>
- </svg>;
+  style={{width:size,height:size}}
+  onMouseEnter={()=>{if(size>=32)setHover(true);}}
+  onMouseLeave={()=>setHover(false)} aria-hidden="true">
+  <span className="rare-folder-stage" style={{width:W,height:H,transform:`translate(-50%,-50%) scale(${size/W})`}}>
+   <span className="rare-folder-back"/>
+   <span className="rare-folder-papers">
+    {paperStates.map((paper,index)=><motion.span
+     key={index} className={"rare-folder-card rare-folder-card-"+(index+1)}
+     animate={{x:paper.x,y:paper.y,rotate:paper.rotate}}
+     transition={reducedMotion?{duration:0}:{...SPRING,delay:paper.delay}}>
+     <PaperCard filterId={uid+"-card-"+index}/>
+    </motion.span>)}
+   </span>
+   <motion.span className="rare-folder-front"
+    animate={{rotateX:active?-55:hover?-45:-15}}
+    transition={reducedMotion?{duration:0}:{type:"spring",stiffness:120,damping:14}}>
+    <span className="rare-folder-glass" style={{clipPath:`path('${FLAP}')`}}/>
+    <svg width="321" height="241" viewBox="0 0 321 241" fill="none" aria-hidden="true">
+     <g filter={`url(#${uid}-front)`}>
+      <path d={FLAP} fill="#3A9AE8" fillOpacity=".45"/>
+      <path d={FLAP_OUTLINE} stroke="#7EC8FF"/>
+     </g>
+     <defs><filter id={uid+"-front"} x="-25.4" y="-25.4" width="371.8" height="291.8" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+      <feFlood floodOpacity="0" result="BackgroundImageFix"/>
+      <feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset/><feGaussianBlur stdDeviation="2.65"/>
+      <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.12 0"/>
+      <feBlend in2="shape" result="innerShadow"/>
+     </filter></defs>
+    </svg>
+   </motion.span>
+  </span>
+ </span>;
 }

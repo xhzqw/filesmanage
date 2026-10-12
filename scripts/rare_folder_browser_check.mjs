@@ -50,6 +50,9 @@ async function measure(width){
   if(!bar||!switcher||!history||!icon)return null;
   const b=bar.getBoundingClientRect(),s=switcher.getBoundingClientRect(),h=history.getBoundingClientRect();
   const styles=getComputedStyle(switcher);
+  const back=getComputedStyle(icon.querySelector(".rare-folder-back"));
+  const glass=getComputedStyle(icon.querySelector(".rare-folder-glass"));
+  const flap=icon.querySelector(".rare-folder-front svg path");
   return {
    width:innerWidth,documentOverflow:document.documentElement.scrollWidth-innerWidth,
    bar:{left:b.left,right:b.right,top:b.top,bottom:b.bottom},
@@ -57,11 +60,17 @@ async function measure(width){
    border:styles.borderColor,iconCount:document.querySelectorAll('[data-slot="rare-folder-component"]').length,
    nestedCards:icon.querySelectorAll(".rare-folder-card").length,
    flap:Boolean(icon.querySelector(".rare-folder-front")),
+   blueBack:back.backgroundColor,glassBlur:glass.backdropFilter,
+   flapFill:flap?.getAttribute("fill"),
+   stageSize:icon.querySelector(".rare-folder-stage")?.getBoundingClientRect().width,
    controls:[...switcher.querySelectorAll("button")].map(x=>x.getAttribute("aria-label"))
   };
  })()`);
  assert(result,"folder toolbar and shared icon must render");
  assert(result.iconCount>0&&result.nestedCards===3&&result.flap,"RareUI layered folder needs 3 cards and a movable flap");
+ assert(result.blueBack==="rgb(80, 177, 253)","RareUI original blue theme must be used, not yellow: "+result.blueBack);
+ assert(result.glassBlur.includes("blur(6px)")&&result.flapFill==="#3A9AE8","RareUI front requires the source glass blur and translucent blue flap");
+ assert(result.stageSize>0,"RareUI original component stage must have positive size");
  assert.equal(result.controls.join(","),"图标视图,列表视图,分栏视图,画廊视图");
  assert(result.documentOverflow<=2,"page-level horizontal overflow at "+width+": "+JSON.stringify(result));
  assert(result.bar.left>=-2&&result.bar.right<=width+2,"folder toolbar overflow at "+width);

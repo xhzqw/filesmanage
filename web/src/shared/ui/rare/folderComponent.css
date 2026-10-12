@@ -1,39 +1,46 @@
-/* Scalable Rare UI Folder Component. Transform-only fanning on large icons;
-   compact tree rows share its shape but don't spray cards on every hover. */
+/* The geometry and blue glass styling follow the upstream Rare UI Folder
+   Component. Size scales the entire original stage, never the individual
+   paper cards, so closed/open silhouettes preserve their proportions. */
 .rare-folder-component{
- flex:none;display:inline-block;vertical-align:middle;
- overflow:visible;pointer-events:none;isolation:isolate;
+ position:relative;display:inline-block;flex:none;vertical-align:middle;
+ overflow:visible;isolation:isolate;user-select:none;
 }
-.rare-folder-back{filter:drop-shadow(0 3px 2px rgba(113,81,23,.11))}
-.rare-folder-card,.rare-folder-front{
- transform-box:fill-box;transform-origin:center 85%;
- transition:transform .24s cubic-bezier(.2,.8,.2,1);
+.rare-folder-stage{
+ position:absolute;top:50%;left:50%;transform-origin:center center;
+ display:block;pointer-events:none;perspective:800px;
 }
-.rare-folder-card-left{transform:translateY(-7px) rotate(-3deg)}
-.rare-folder-card-middle{transform:translateY(-10px) rotate(1deg)}
-.rare-folder-card-right{transform:translateY(-6px) rotate(3deg)}
-.rare-folder-front{transform-origin:center bottom;transform:perspective(460px) rotateX(-10deg)}
-.rare-folder-component[data-folder-open="true"] .rare-folder-card-left,
-.explorer-item:hover .rare-folder-component[data-folder-scale="large"] .rare-folder-card-left{
- transform:translate(-26px,-43px) rotate(-13deg);
+.rare-folder-back{
+ position:absolute;inset:0;display:block;
+ background:#50b1fd;border-radius:var(--radius-xl);
+ box-shadow:inset 0 0 6px 2px rgba(255,255,255,.35);
 }
-.rare-folder-component[data-folder-open="true"] .rare-folder-card-middle,
-.explorer-item:hover .rare-folder-component[data-folder-scale="large"] .rare-folder-card-middle{
- transform:translate(0,-56px) rotate(-2deg);
+.rare-folder-papers{
+ position:absolute;top:50%;left:50%;display:block;
+ width:0;height:0;
 }
-.rare-folder-component[data-folder-open="true"] .rare-folder-card-right,
-.explorer-item:hover .rare-folder-component[data-folder-scale="large"] .rare-folder-card-right{
- transform:translate(27px,-43px) rotate(12deg);
+.rare-folder-card{
+ position:absolute;left:-82px;top:-107px;display:block;
+ width:164px;height:214px;transform-origin:center;
 }
-.rare-folder-component[data-folder-open="true"] .rare-folder-front,
-.explorer-item:hover .rare-folder-component[data-folder-scale="large"] .rare-folder-front{
- transform:perspective(460px) rotateX(-28deg) translateY(5px);
+.rare-folder-card svg{display:block;width:164px;height:214px;overflow:visible}
+.rare-folder-front{
+ position:absolute;top:50%;left:50%;
+ margin-left:-160.5px;margin-top:-104.5px;
+ width:321px;height:241px;display:block;
+ transform-origin:bottom center;transform-style:preserve-3d;
+ backface-visibility:hidden;
 }
-.rare-folder-component[data-folder-scale="compact"] .rare-folder-card{transform:translateY(-8px) rotate(0deg)}
-.rare-folder-component[data-folder-scale="compact"] .rare-folder-front{transform:perspective(460px) rotateX(-9deg)}
-.rare-folder-component[data-folder-scale="compact"][data-folder-open="true"] .rare-folder-front{
- transform:perspective(460px) rotateX(-24deg) translateY(3px);
+.rare-folder-front svg{position:absolute;inset:0;display:block;width:321px;height:241px;overflow:visible}
+.rare-folder-glass{
+ position:absolute;inset:0;display:block;
+ backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+ background:
+  radial-gradient(ellipse at 48% 45%,rgba(255,255,255,.31),transparent 56%),
+  linear-gradient(100deg,rgba(11,70,121,.18),rgba(98,182,251,.07) 35%,rgba(41,126,201,.19) 90%);
+ backface-visibility:hidden;
 }
+/* Micro glyphs retain the source shape, but are not independent buttons. */
+.rare-folder-component[data-folder-scale="compact"]{cursor:inherit}
 @media(prefers-reduced-motion:reduce){
- .rare-folder-component :is(.rare-folder-card,.rare-folder-front){transition:none}
+ .rare-folder-component .rare-folder-stage{perspective:none}
 }
