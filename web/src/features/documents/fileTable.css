@@ -113,19 +113,7 @@
   background:var(--surface-panel);color:var(--brand-blue);font-weight:700;
 }
 .file-mobile-actions:hover{background:var(--surface-row-hover)}
-.file-type-icon{flex:none}
-.file-icon-cad{color:var(--file-icon-cad)}
-.file-icon-word{color:var(--file-icon-word)}
-.file-icon-sheet{color:var(--file-icon-sheet)}
-.file-icon-slide{color:var(--file-icon-slide)}
-.file-icon-pdf{color:var(--file-icon-pdf)}
-.file-icon-image{color:var(--file-icon-image)}
-.file-icon-media{color:var(--file-icon-media)}
-.file-icon-archive{color:var(--file-icon-archive)}
-.file-icon-code{color:var(--file-icon-code)}
-.file-icon-text{color:var(--file-icon-text)}
-.file-icon-file{color:var(--file-icon-file)}
-
+.file-type-icon{flex:none;display:block;overflow:visible}
 /* This bar tracks the actual file-pane width, not the browser viewport.
    A resized folder tree must never push controls outside the panel. */
 .work-body{container:file-list / inline-size;min-width:0}

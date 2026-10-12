@@ -47,7 +47,8 @@
 .search-data-table th:first-child{width:40%}
 .search-data-table th:last-child{width:85px}
 .search-data-table td{overflow:hidden;text-overflow:ellipsis}
-.search-data-table td:first-child>a{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--brand-blue)}
+.search-data-table td:first-child>a{display:flex;align-items:center;gap:7px;min-width:0;overflow:hidden;white-space:nowrap;color:var(--brand-blue)}
+.search-file-link>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .search-data-table td:last-child a{color:var(--brand-blue)}
 .search-mobile-meta{display:none}
 .search-more{display:flex;align-items:center;justify-content:center;gap:var(--space-2);padding:var(--space-3)}

@@ -1,5 +1,6 @@
 import {RareInput} from "../../shared/ui/rare";
 import {Dialog} from "../../shared/ui/Dialog";
+import {FileResourceIcon,FolderResourceIcon} from "../../shared/ui/ResourceIcons";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {useCallback,useEffect,useMemo,useRef,useState,type KeyboardEvent} from "react";
 import {useNavigate} from "react-router-dom";
@@ -36,12 +37,6 @@ type WindowKeyEvent=WindowEventMap["keydown"];
 // from the accessibility tree (VIS-11).
 function CommandSearchIcon(){
   return <svg className="command-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>;
-}
-function CommandFolderIcon(){
-  return <svg className="command-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M3 7.5A2 2 0 0 1 5 5.5h3.7l2 2.4H19a2 2 0 0 1 2 2v7.6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>;
-}
-function CommandFileIcon(){
-  return <svg className="command-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M6.5 3.5h6.7L18.5 8.8v11.7H6.5z"/><path d="M13 3.5v5.5h5.5"/></svg>;
 }
 
 export function CommandSpotlight(){
@@ -250,12 +245,12 @@ export function CommandSpotlight(){
        onClick={()=>activate(row)} onMouseEnter={()=>setActive(index)}>
        {row.kind==="folder"
         ?<>
-          <CommandFolderIcon/>
+          <FolderResourceIcon size={16}/>
           <span className="command-row-name">{row.name}</span>
           <span className="command-row-path">{row.path}</span>
          </>
         :<>
-          <CommandFileIcon/>
+          <FileResourceIcon name={row.name} size={18}/>
           <span className="command-row-name">{row.name}</span>
           <span className="command-row-meta">{formatBytes(row.size)}</span>
           <span className="command-row-meta">{row.updatedAt}</span>

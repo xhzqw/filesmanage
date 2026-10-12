@@ -1,6 +1,7 @@
 import {useState} from "react";
 import type {FileItem} from "../../entities/file/model";
 import {Dialog} from "../../shared/ui/Dialog";
+import {FileTypeIcon} from "../../shared/ui/FileTypeIcon";
 import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
 import {errorCopy} from "../../shared/errors";
 import {fileApi} from "./api";
@@ -56,6 +57,7 @@ export function BatchPrintDialog({files,onClose}:{files:FileItem[];onClose:()=>v
      className={"batch-print-row"+(index===active?" active":"")}
      aria-pressed={index===active} onClick={()=>setActive(index)}>
      <span className="batch-print-index">{index+1}</span>
+     <FileTypeIcon name={file.name} size={18}/>
      <span className="batch-print-name" title={file.name}>{file.name}</span>
      <span className={"batch-print-state "+(state[file.id]?.state??"pending")}>
       {state[file.id]?.state==="opened"?"已预览":state[file.id]?.state==="failed"?"失败":

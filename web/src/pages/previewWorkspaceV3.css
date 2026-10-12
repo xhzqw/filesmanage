@@ -47,6 +47,7 @@
 .file-preview-identity .file-workbench-subtitle>span{
  display:inline-flex;flex:none;align-items:center;min-width:0;white-space:nowrap;
 }
+.file-preview-identity .file-workbench-type{background:transparent;border-radius:0}
 .file-preview-identity .file-workbench-subtitle span+span::before{margin-right:6px}
 .file-preview-identity .file-workbench-subtitle .rare-badge{flex:0 0 auto;font-size:10px}
 .file-sidebar-top{height:51px;display:flex;align-items:center;gap:9px;padding:6px 10px;color:var(--text-tertiary);font-size:11px;font-weight:550;letter-spacing:.01em}

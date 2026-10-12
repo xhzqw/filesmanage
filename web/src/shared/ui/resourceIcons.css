@@ -2,6 +2,7 @@
    a 28px file tree and no hover layout change. Yellow is the app's folder
    identity, independent of current selection. */
 .resource-folder-icon{flex:none;overflow:visible}
+.resource-file-icon{flex:none;display:inline-block;vertical-align:middle;overflow:visible}
 .resource-folder-front{transform-box:fill-box;transform-origin:center top;transition:transform .2s cubic-bezier(.22,1,.36,1)}
 .resource-folder-icon[data-folder-open="true"] .resource-folder-front{transform:translateY(1px) rotate(-2deg)}
 @media(prefers-reduced-motion:reduce){.resource-folder-front{transition:none}}

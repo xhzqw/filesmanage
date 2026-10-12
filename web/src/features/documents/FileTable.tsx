@@ -21,6 +21,8 @@ import {Menu,type MenuItem,type MenuPoint}from"../../shared/ui/Menu";
 import {MicroHoldToDelete}from"../../shared/ui/rare";
 import"./dragMove.css";
 import {setMoveDragImage} from "./dragPreview";
+import {classifyFile} from "../../shared/fileTypes";
+import {FileTypeIcon} from "../../shared/ui/FileTypeIcon";
 import"./fileTable.css";
 
 type SortKey="updated_desc"|"name_asc"|"name_desc"|"size_desc";
@@ -34,113 +36,8 @@ const SORT_LABELS:Record<SortKey,string>={
 
 const SORT_KEYS:SortKey[]=["updated_desc","name_asc","name_desc","size_desc"];
 
-type FileKind = "cad" | "word" | "sheet" | "slide" | "pdf" | "image" | "media" | "archive" | "code" | "text" | "file";
-export type FileCategory = "all" | "cad" | "doc" | "image" | "media" | "archive" | "code" | "other";
-
-const CAD_EXT = new Set(["dwg", "dxf", "stl", "step", "stp", "iges", "igs", "obj", "3mf", "ply", "gcode"]);
-const WORD_EXT = new Set(["doc", "docx", "wps", "odt", "rtf"]);
-const SHEET_EXT = new Set(["xls", "xlsx", "csv", "tsv", "et"]);
-const SLIDE_EXT = new Set(["ppt", "pptx", "dps", "key"]);
-const IMAGE_EXT = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "tiff", "tif", "psd"]);
-const MEDIA_EXT = new Set(["mp4", "mkv", "avi", "mov", "webm", "flv", "mp3", "wav", "flac", "aac", "ogg"]);
-const ARCHIVE_EXT = new Set(["zip", "rar", "7z", "tar", "gz", "bz2", "xz"]);
-const CODE_EXT = new Set(["json", "xml", "yaml", "yml", "js", "ts", "jsx", "tsx", "html", "css", "py", "go", "sh", "sql", "c", "cpp", "h", "java", "rs"]);
-const TEXT_EXT = new Set(["txt", "md", "markdown", "log"]);
-
-export function classifyFile(name: string): { kind: FileKind; category: FileCategory } {
- const dot = name.lastIndexOf(".");
- const ext = dot > 0 && dot < name.length - 1 ? name.slice(dot + 1).toLowerCase() : "";
- if (CAD_EXT.has(ext)) return { kind: "cad", category: "cad" };
- if (ext === "pdf") return { kind: "pdf", category: "doc" };
- if (WORD_EXT.has(ext)) return { kind: "word", category: "doc" };
- if (SHEET_EXT.has(ext)) return { kind: "sheet", category: "doc" };
- if (SLIDE_EXT.has(ext)) return { kind: "slide", category: "doc" };
- if (IMAGE_EXT.has(ext)) return { kind: "image", category: "image" };
- if (MEDIA_EXT.has(ext)) return { kind: "media", category: "media" };
- if (ARCHIVE_EXT.has(ext)) return { kind: "archive", category: "archive" };
- if (CODE_EXT.has(ext)) return { kind: "code", category: "code" };
- if (TEXT_EXT.has(ext)) return { kind: "text", category: "doc" };
- return { kind: "file", category: "other" };
-}
-
-// 14px semantic file glyph: distinct vector shape & category color, aria-hidden (VIS-11)
-function FileTypeIcon({name}:{name:string}){
- const {kind} = classifyFile(name);
- return <svg className={"file-type-icon file-icon-"+kind} width="14" height="14" viewBox="0 0 24 24" fill="none"
-  stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-  {kind==="cad"&&(
-   <>
-    <path d="M12 2.5L3.5 7.5v9l8.5 5 8.5-5v-9L12 2.5z"/>
-    <path d="M12 12l8.5-4.8M12 12L3.5 7.2M12 12v9.5"/>
-   </>
-  )}
-  {kind==="word"&&(
-   <>
-    <path d="M4 2.5h9l6 6V20a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 20V4A1.5 1.5 0 0 1 4 2.5z"/>
-    <path d="M13 2.5V8.5h6"/>
-    <path d="M7 12.5h7M7 16h5"/>
-   </>
-  )}
-  {kind==="sheet"&&(
-   <>
-    <path d="M4 2.5h9l6 6V20a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 20V4A1.5 1.5 0 0 1 4 2.5z"/>
-    <path d="M13 2.5V8.5h6"/>
-    <path d="M6 12h10M6 16h10M11 12v7"/>
-   </>
-  )}
-  {kind==="slide"&&(
-   <>
-    <rect x="3" y="3.5" width="18" height="13" rx="1.5"/>
-    <path d="M8 20.5l4-4 4 4M12 16.5v4"/>
-    <path d="M7 8h5M7 11h8"/>
-   </>
-  )}
-  {kind==="pdf"&&(
-   <>
-    <path d="M4 2.5h9l6 6V20a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 20V4A1.5 1.5 0 0 1 4 2.5z"/>
-    <path d="M13 2.5V8.5h6"/>
-    <path d="M7 13.5a1.5 1.5 0 0 0 3 0c0-1-1.5-1.5-1.5-1.5s1.5-.5 1.5-1.5a1.5 1.5 0 0 0-3 0v4.5"/>
-   </>
-  )}
-  {kind==="image"&&(
-   <>
-    <rect x="3" y="3.5" width="18" height="15" rx="2"/>
-    <circle cx="8" cy="8.5" r="1.5"/>
-    <path d="M4.5 16.5l5-5 3.5 3.5 3-2.5 3.5 3.5"/>
-   </>
-  )}
-  {kind==="media"&&(
-   <>
-    <rect x="2.5" y="3.5" width="19" height="15" rx="2"/>
-    <path d="M10 8.5l5 2.5-5 2.5V8.5z"/>
-   </>
-  )}
-  {kind==="archive"&&(
-   <>
-    <path d="M4 4h16v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4z"/>
-    <path d="M10 4v10M14 4v10M10 7h4M10 10h4M10 13h4"/>
-   </>
-  )}
-  {kind==="code"&&(
-   <>
-    <path d="M8.5 7.5L4 12l4.5 4.5M15.5 7.5L20 12l-4.5 4.5M13.5 5.5l-3 13"/>
-   </>
-  )}
-  {kind==="text"&&(
-   <>
-    <path d="M4 2.5h11l5 5V20a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 20V4A1.5 1.5 0 0 1 4 2.5z"/>
-    <path d="M15 2.5V7.5h5"/>
-    <path d="M6 12h8M6 15h6"/>
-   </>
-  )}
-  {kind==="file"&&(
-   <>
-    <path d="M4 2.5h11l5 5V20a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 20V4A1.5 1.5 0 0 1 4 2.5z"/>
-    <path d="M15 2.5V7.5h5"/>
-   </>
-  )}
- </svg>;
-}
+export {classifyFile} from "../../shared/fileTypes";
+export type {FileCategory} from "../../shared/fileTypes";
 
 // Locked ultra-compact density (26px rows): permanent high-density layout
 type Density="compact";
@@ -961,7 +858,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       onDragEnd={onRowDragEnd}>
       <td className="col-select"><RareInput type="checkbox" checked={selectedIds.has(item.id)} aria-label={"选择 "+item.name} onClick={event=>event.stopPropagation()} onChange={event=>onCheckToggle(event,item)}/></td>
       <td className="col-name"><div className="file-cell-wrap">
-       <FileTypeIcon name={item.name}/><span className="file-name" title={item.name}>{item.name}</span>
+       <FileTypeIcon name={item.name} size={19}/><span className="file-name" title={item.name}>{item.name}</span>
        <small className="file-mobile-meta">v{item.currentVersionSeq} · {formatSize(item.sizeBytes)}</small>
        <RareButton type="button" className="file-mobile-actions" aria-label={"操作 "+item.name}
         title={"文件操作："+item.name} aria-haspopup="menu"

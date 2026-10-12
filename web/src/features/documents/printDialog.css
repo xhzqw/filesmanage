@@ -14,7 +14,7 @@
 .document-print-empty{display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:12px;padding:12px;text-align:center}
 .document-print-preview-caption{font-size:12px;color:var(--text-tertiary)}
 .document-print-options{display:flex;flex-direction:column;gap:13px;min-width:0}
-.document-print-filename{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.document-print-filename{display:flex;align-items:center;gap:7px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .document-print-options label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600}
 .document-print-options label.document-print-mark-option{flex-direction:row;align-items:center;gap:8px}
 .document-print-options .rare-select-root{width:100%}

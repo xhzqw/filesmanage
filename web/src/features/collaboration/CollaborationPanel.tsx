@@ -413,7 +413,7 @@ export function CollaborationPanel(){
       {files.map(file=><RareButton key={file.id} type="button" role="radio" aria-checked={fileId===file.id}
        className={"share-picker-row"+(fileId===file.id?" on":"")} disabled={pickBusy}
        onClick={()=>setFileId(file.id)}>
-       <FileResourceIcon size={16}/>
+       <FileResourceIcon name={file.name} size={18}/>
        <span className="share-option-name" title={file.name}>{file.name}</span>
        <span className="share-option-detail">{file.updatedAt.replace("T"," ").slice(0,16)}</span>{fileId===file.id&&<span className="share-picker-check" aria-hidden="true">✓</span>}
       </RareButton>)}
@@ -449,7 +449,7 @@ export function CollaborationPanel(){
      {status==="failed"&&<tr><td colSpan={5} className="empty" role="alert">获取关注列表失败，请刷新重试。</td></tr>}
      {status==="ready"&&favorites.length===0&&<tr><td colSpan={5} className="empty">没有关注内容。</td></tr>}
      {status==="ready"&&favorites.map(f=><tr key={f.id}>
-      <td>{f.unavailable?<span className="collab-unavailable-name" title="当前资源不能访问">{f.resourceName||"不可访问的资源"}</span>:f.kind==="file"?<Link to={"/preview/"+f.fileId}>{f.resourceName}</Link>:<Link to={"/doc?folder="+f.folderId}>{f.resourceName}</Link>}<span className="collab-mobile-meta">{f.kind==="file"?"文件":"目录"} · {f.createdAt.slice(0,10)}</span></td>
+      <td>{f.unavailable?<span className="collab-unavailable-name" title="当前资源不能访问">{f.resourceName||"不可访问的资源"}</span>:f.kind==="file"?<Link to={"/preview/"+f.fileId}><FileResourceIcon name={f.resourceName} size={17}/> {f.resourceName}</Link>:<Link to={"/doc?folder="+f.folderId}><FolderResourceIcon size={17}/> {f.resourceName}</Link>}<span className="collab-mobile-meta">{f.kind==="file"?"文件":"目录"} · {f.createdAt.slice(0,10)}</span></td>
       <td className="collab-optional">{f.kind==="file"?"文件":"目录"}</td>
       <td>{f.unavailable
        ?<RareBadge tone="danger" dot title="资源已删除、失效或当前账号无权访问">已删除或不可访问</RareBadge>
@@ -470,7 +470,7 @@ export function CollaborationPanel(){
      {status==="failed"&&<tr><td colSpan={8} className="empty" role="alert">获取分享列表失败，请刷新重试。</td></tr>}
      {status==="ready"&&shares.length===0&&<tr><td colSpan={8} className="empty">没有{tab==="received"?"收到的":"发出的"}分享。</td></tr>}
      {status==="ready"&&shares.map(s=><tr key={s.id}>
-      <td>{s.resourceKind==="file"?<Link to={"/preview/"+s.resourceId}>{s.resourceName}</Link>:<Link to={"/doc?folder="+s.resourceId}>{s.resourceName}</Link>}<span className="collab-mobile-meta">{s.resourceKind==="file"?"文件":"目录"} · {s.recipientName||"—"} · {s.actions.join("、")}</span></td>
+      <td>{s.resourceKind==="file"?<Link to={"/preview/"+s.resourceId}><FileResourceIcon name={s.resourceName} size={17}/> {s.resourceName}</Link>:<Link to={"/doc?folder="+s.resourceId}><FolderResourceIcon size={17}/> {s.resourceName}</Link>}<span className="collab-mobile-meta">{s.resourceKind==="file"?"文件":"目录"} · {s.recipientName||"—"} · {s.actions.join("、")}</span></td>
       <td className="collab-optional">{s.resourceKind==="file"?"文件":"目录"}</td>
       <td className="collab-optional">{tab==="received"?s.recipientName:(s.recipientName||"—")}</td>
       <td className="collab-optional">{s.actions.join("、")}</td>

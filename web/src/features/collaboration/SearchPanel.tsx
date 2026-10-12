@@ -10,6 +10,7 @@ import type {FileItem} from "../../entities/file/model";
 import type {Folder} from "../../entities/folder/model";
 import {FolderPicker} from "../../shared/ui/FolderPicker";
 import {Dialog} from "../../shared/ui/Dialog";
+import {FileTypeIcon} from "../../shared/ui/FileTypeIcon";
 import {readSearchPresets,writeSearchPresets,type SearchPresetFields} from "./searchPresets";
 import {searchPresetsApi} from "./searchPresetsApi";
 import "./search.css";
@@ -374,7 +375,7 @@ export function SearchPanel({userId}:{userId:string}){
       </div>:<RareDataTable className="search-data-table">
        <thead><tr><th scope="col">文件名</th><th className="search-secondary" scope="col">大小</th><th className="search-secondary" scope="col">上传人</th><th className="search-secondary" scope="col">版本</th><th className="search-secondary" scope="col">修改时间</th><th scope="col">所在目录</th></tr></thead>
        <tbody>{items.map(file=><tr key={file.id}>
-        <td><Link to={"/preview/"+file.id} title={file.name}>{file.name}</Link>
+        <td><Link to={"/preview/"+file.id} title={file.name} className="search-file-link"><FileTypeIcon name={file.name} size={18}/><span>{file.name}</span></Link>
          <div className="search-mobile-meta">{formatBytes(file.sizeBytes)} · v{file.currentVersionSeq} · {file.uploadedBy} · {new Date(file.updatedAt).toLocaleDateString("zh-CN")}</div>
          {file.snippet&&<div className="snippet"><Highlighted text={file.snippet} query={query?.q??""}/></div>}
         </td>

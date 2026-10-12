@@ -76,6 +76,7 @@
 .collab-table-scroll .rare-data-table{width:100%;min-width:0;table-layout:fixed}
 .collab-table-scroll td:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0}
 .collab-table-scroll td:first-child a{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.collab-table-scroll td:first-child a>svg{margin-right:6px;vertical-align:-3px}
 .collab-table-scroll td{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .collab-favorites-table th:first-child{width:auto}
 .collab-favorites-table th:nth-child(2){width:70px}

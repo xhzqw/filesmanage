@@ -10,11 +10,5 @@ export function FolderResourceIcon({open=false,size=16,className=""}:{open?:bool
    :<path d="M3 9h18"/>}
  </svg>;
 }
-export function FileResourceIcon({size=16}:{size?:number}){
- return <svg className="resource-file-icon" width={size} height={size} viewBox="0 0 24 24"
-  fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"
-  strokeLinejoin="round" aria-hidden="true" focusable="false">
-  <path d="M6 2.8h8l4.5 4.5V21H6a2 2 0 0 1-2-2V4.8a2 2 0 0 1 2-2Z"/>
-  <path d="M14 3v5h4.5M8 12h7M8 16h7"/>
- </svg>;
-}
+// Backwards-compatible API: all resource callers use one colored file glyph.
+export {FileTypeIcon as FileResourceIcon} from "./FileTypeIcon";

@@ -2,6 +2,7 @@ import {useEffect,useState} from "react";
 import {useNavigate} from "react-router-dom";
 import type {PreviewData} from "../../entities/file/model";
 import {Dialog} from "../../shared/ui/Dialog";
+import {FileTypeIcon} from "../../shared/ui/FileTypeIcon";
 import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
 import {BrandLoader} from "../../shared/ui/BrandLoader";
 import {errorCopy} from "../../shared/errors";
@@ -89,7 +90,7 @@ export function PrintDialog({preview,onClose,sealRevision=null}:{preview:Preview
      isImage?"原始图像 · 按比例缩放":isText?"文本内容 · 自动分页":"工程图纸"}</span>
    </div>
    <div className="document-print-options">
-    <strong title={preview.name} className="document-print-filename">{preview.name}</strong>
+    <strong title={preview.name} className="document-print-filename"><FileTypeIcon name={preview.name} size={19}/> {preview.name}</strong>
     {isCad?<p>机械图纸请在工程查看器中选择图层、比例与纸张后出图。</p>:
      !printable?<p>{isText&&preview.truncated?"文件超过文本预览上限，已禁止打印截断内容。":"此文件格式暂不支持浏览器打印。"}</p>:null}
     {!(isPdf||isOffice)&&<><label>纸张<RareSelect aria-label="纸张" value={paper} disabled={busy} onChange={e=>setPaper(e.target.value as Paper)}>

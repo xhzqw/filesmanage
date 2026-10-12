@@ -7,6 +7,7 @@ import {errorCode,errorCopy} from "../../shared/errors";
 import {observeResourceChange,observeWindowReturn} from "../../shared/resourceSync";
 import {Dialog} from "../../shared/ui/Dialog";
 import {Menu} from "../../shared/ui/Menu";
+import {FileResourceIcon,FolderResourceIcon} from "../../shared/ui/ResourceIcons";
 import {MicroHoldToDelete,RareButton,RareDataTable,RareInput,RareRowActions,RareSelect} from "../../shared/ui/rare";
 import {trashApi} from "./api";
 import {RestoreDialog} from "./RestoreDialog";
@@ -30,10 +31,8 @@ function dateLabel(raw:string):string{
  return Number.isNaN(d.valueOf())?raw:d.toLocaleString("zh-CN",{year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false});
 }
 
-function EntryIcon({folder}:{folder:boolean}){
- return folder
-  ?<svg className="trash-glyph folder" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 6.5A2.5 2.5 0 0 1 5 4h4.7l2.1 2.5H19A2.5 2.5 0 0 1 21.5 9v9A2.5 2.5 0 0 1 19 20.5H5A2.5 2.5 0 0 1 2.5 18Z"/></svg>
-  :<svg className="trash-glyph file" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.8h8.5L20 8.2V20a1.5 1.5 0 0 1-1.5 1.5h-12A2.5 2.5 0 0 1 4 19V5a2.2 2.2 0 0 1 2-2.2Z"/><path d="M14.5 3v5.5H20M8 13h8M8 17h6"/></svg>;
+function EntryIcon({folder,name}:{folder:boolean;name:string}){
+ return folder?<FolderResourceIcon size={20}/>:<FileResourceIcon name={name} size={20}/>;
 }
 
 function visibleParentPath(entry:TrashEntry,byId:Map<string,Folder>):string{
@@ -215,7 +214,7 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
      {status==="ready"&&entries.length===0&&<tr><td colSpan={6} className="trash-empty">{offset>0?"当前页无记录，请返回上一页":"没有符合条件的记录"}</td></tr>}
      {status==="ready"&&entries.map(entry=><tr key={entry.id}>
       <td><RareInput type="checkbox" aria-label={`选择 ${entry.oldName}`} checked={selected.has(entry.id)} disabled={locked} onChange={e=>chooseOne(entry.id,e.target.checked)}/></td>
-      <td><div className="trash-resource"><EntryIcon folder={!!entry.folderId}/><div className="trash-resource-text"><strong title={entry.oldName}>{entry.oldName}</strong><small title={visibleParentPath(entry,byId)}>{visibleParentPath(entry,byId)}</small><small className="trash-mobile-meta">{entry.folderId?"目录":"文件"} · {entry.deletedByName||"—"} · {dateLabel(entry.deletedAt)}</small></div></div></td>
+      <td><div className="trash-resource"><EntryIcon folder={!!entry.folderId} name={entry.oldName}/><div className="trash-resource-text"><strong title={entry.oldName}>{entry.oldName}</strong><small title={visibleParentPath(entry,byId)}>{visibleParentPath(entry,byId)}</small><small className="trash-mobile-meta">{entry.folderId?"目录":"文件"} · {entry.deletedByName||"—"} · {dateLabel(entry.deletedAt)}</small></div></div></td>
       <td>{entry.folderId?`目录${entry.subtreeCount?` · ${entry.subtreeCount} 子项`:""}`:"文件"}</td>
       <td className="trash-muted">{entry.deletedByName||"—"}</td>
       <td className="trash-muted">{dateLabel(entry.deletedAt)}</td>

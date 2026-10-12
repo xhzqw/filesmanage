@@ -28,6 +28,7 @@ import {request} from "../shared/http";
 import {errorCopy} from "../shared/errors";
 import {observeResourceChange,observeWindowReturn,observeWorkspaceChange} from "../shared/resourceSync";
 import {Dialog} from "../shared/ui/Dialog";
+import {FileTypeIcon} from "../shared/ui/FileTypeIcon";
 import type {MenuItem} from "../shared/ui/Menu";
 import type {PreviewData,FileVersion,FileItem} from "../entities/file/model";
 import type {User} from "../entities/user/model";
@@ -331,7 +332,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
          <path d="m14.5 5.5-6 6.5 6 6.5"/>
         </svg>
        </Link>
-       <div className="file-workbench-type" aria-hidden="true">{fileExtension(preview.name).slice(0,5)}</div>
+       <div className="file-workbench-type"><FileTypeIcon name={preview.name} size={26}/></div>
        <div className="file-workbench-title">
         <h1 title={preview.name}>{preview.name}</h1>
         <div className="file-workbench-subtitle"><span>{fileExtension(preview.name)}</span><span>{formatSize(preview.size)}</span><span>当前版本 v{currentSeq}</span>
@@ -364,7 +365,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
          {preview.truncated&&<p className="file-text-truncated">内容较长，仅显示前 256 KB。下载后可查看完整内容。</p>}
         </div>:
         <div className="file-unsupported">
-         <div className="file-unsupported-symbol" aria-hidden="true">{fileExtension(preview.name).slice(0,5)}</div>
+         <div className="file-unsupported-symbol"><FileTypeIcon name={preview.name} size={28}/></div>
          <strong>此格式暂不支持浏览器内直接预览</strong>
          <p>{isCadName(preview.name)?"可前往 3D 查看器检查模型；若服务端暂不支持该格式的转换，请使用专业软件打开。":
           "为了安全，网页不会直接执行 SVG、HTML 或其他未知格式的活动内容。可下载后使用对应应用打开。"}</p>
