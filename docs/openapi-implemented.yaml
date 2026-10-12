@@ -6274,7 +6274,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
     post:
-      summary: Verify current user password and append version-specific signing evidence
+      summary: Append version-specific evidence; personal signatures require login password, company seals use granted session
+        permissions
       operationId: signFileSeal
       tags:
       - Seals
@@ -6320,7 +6321,6 @@ paths:
               - assetId
               - versionSeq
               - fileSha256
-              - password
               - pageNumber
               - x
               - y
@@ -6362,7 +6362,7 @@ paths:
   /api/files/{id}/seals/batch:
     post:
       summary: Atomically apply up to twenty different authorized personal signatures or company seals on one immutable PDF
-        version, verifying the real operator password once
+        version; verify the login password only when personal signatures are included
       operationId: signFileSealsBatch
       tags:
       - Seals
@@ -6419,7 +6419,6 @@ paths:
                     - width
                     - height
               required:
-              - password
               - versionSeq
               - fileSha256
               - placements
@@ -6769,6 +6768,94 @@ paths:
       responses:
         '201':
           description: New immutable signing revision created; source and evidence unchanged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/SealRevision'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/{id}/seals/signatures/revoke:
+    post:
+      summary: Password-confirmed selective removal of currently visible personal signatures. Append an immutable revision;
+        never delete evidence rows or company stamps.
+      operationId: revokeFileSignatures
+      tags:
+      - Seals
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Signed PDF file ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                versionSeq:
+                  type: integer
+                  minimum: 1
+                fileSha256:
+                  type: string
+                expectedRevision:
+                  type: integer
+                  minimum: 1
+                markIds:
+                  type: array
+                  items:
+                    type: string
+                password:
+                  type: string
+              required:
+              - versionSeq
+              - fileSha256
+              - expectedRevision
+              - markIds
+              - password
+      responses:
+        '201':
+          description: New audited signing revision without selected personal signatures; older evidence retained
           content:
             application/json:
               schema:
