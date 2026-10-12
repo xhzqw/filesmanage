@@ -91,6 +91,8 @@ try{
   "organization navigation is visible on the permissions tab");
  // Tree pictograms: hierarchy is outlined, departments reuse the yellow folder glyph,
  // and RareButton cannot silently re-center labels in the flexible tree row.
+ assert(await cdp.waitFor("()=>!!document.querySelector('.org-dept-card li[data-dept-id] .org-tree-icon svg')"),
+  "department tree data loads before visual assertions");
  assert(await cdp.evaluate(`(()=>{
   const root=document.querySelector('.org-dept-card .tree > li[role="treeitem"] .org-tree-icon svg');
   const folder=document.querySelector('.org-dept-card li[data-dept-id] .org-tree-icon svg');
