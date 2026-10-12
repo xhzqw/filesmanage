@@ -450,7 +450,7 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
          <RareButton key={name} type="button" onClick={()=>selectEngineeringView(name)}>{["等轴","前","后","左","右","俯","仰"][index]}</RareButton>)}
         </div>}
         {!drawing&&<RareButton type="button" disabled={!fileMeta||!metrics}
-         title="生成主视、俯视、右视和等轴测的正交参考视图，浏览器打印" onClick={printEngineeringView}>工程视图打印</RareButton>
+         title="生成主视、俯视、右视和等轴测的正交参考视图，浏览器打印" onClick={printEngineeringView}>工程视图打印</RareButton>}
         <div className="cad-toolgroup" role="group" aria-label="辅助显示">
         <RareButton type="button" className={view.grid?"on":""} aria-pressed={view.grid}
          onClick={()=>setView(v=>({...v,grid:controls.current?.toggleGrid()??v.grid}))}>网格</RareButton>
