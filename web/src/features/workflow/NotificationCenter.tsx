@@ -12,6 +12,7 @@ const eventLabel:Record<string,string>={submitted:"待你审批",advanced:"审�
 
 export function NotificationCenter(){
  const[notes,setNotes]=useState<ApprovalNotification[]>([]);
+ const[approvalUnread,setApprovalUnread]=useState(0);
  const[lifecycleNotes,setLifecycleNotes]=useState<LifecycleNotice[]>([]);
  const[open,setOpen]=useState(false);
  const[loading,setLoading]=useState(false);
@@ -19,13 +20,13 @@ export function NotificationCenter(){
  const[showUnread,setShowUnread]=useState(false);
  const box=useRef<HTMLDivElement>(null);
  const navigate=useNavigate();
- const unread=[...notes,...lifecycleNotes].reduce((sum,n)=>sum+(n.read?0:1),0);
+ const unread=approvalUnread+lifecycleNotes.filter(n=>!n.read).length;
  useEffect(()=>{
   let valid=true;
   async function refresh(){
    try{
-    const [items,due]=await Promise.all([approvalActivityApi.notifications(),lifecycleWorkspaceEnabled?lifecycleNotificationApi.notifications():Promise.resolve([] as LifecycleNotice[])]);
-    if(valid){setNotes(items);setLifecycleNotes(due);setError("");}
+    const [page,due]=await Promise.all([approvalActivityApi.notificationsPage(0,50),lifecycleWorkspaceEnabled?lifecycleNotificationApi.notifications():Promise.resolve([] as LifecycleNotice[])]);
+    if(valid){setNotes(page.items);setApprovalUnread(page.unreadCount);setLifecycleNotes(due);setError("");}
    }catch{if(valid)setError("通知暂时不可用");}
   }
   void refresh();
@@ -52,6 +53,7 @@ export function NotificationCenter(){
    try{
     await approvalActivityApi.read(note.id);
     setNotes(current=>current.map(n=>n.id===note.id?{...n,read:true}:n));
+    setApprovalUnread(current=>Math.max(0,current-1));
     window.dispatchEvent(new Event("filesmanage:approval-notifications-read"));
    }catch{setError("标记已读失败，可重试");toast.error("标记已读失败，可重试");setLoading(false);return;}
   }
@@ -97,7 +99,7 @@ export function NotificationCenter(){
       {!n.read&&<span className="notification-dot" aria-label="未读"/>}
      </RareButton>)}
    </div>
-   <div className="notification-footer">{lifecycleWorkspaceEnabled&&<RareButton type="button" onClick={()=>{setOpen(false);navigate("/lifecycle");}}>生命周期台账</RareButton>}<RareButton type="button" onClick={()=>{setOpen(false);navigate("/approvals");}}>进入审批工作台</RareButton></div>
+   <div className="notification-footer">{lifecycleWorkspaceEnabled&&<RareButton type="button" onClick={()=>{setOpen(false);navigate("/lifecycle");}}>生命周期台账</RareButton>}<RareButton type="button" onClick={()=>{setOpen(false);navigate("/approvals?tab=notifications");}}>查看全部通知</RareButton></div>
   </div>}
  </div>;
 }

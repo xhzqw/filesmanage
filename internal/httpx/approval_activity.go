@@ -35,6 +35,19 @@ func (h *Handler) approvalNotifications(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if c.Query("limit")!=""{
+		limit,err:=strconv.Atoi(c.Query("limit"))
+		before:=int64(0)
+		if c.Query("before")!=""{before,err=strconv.ParseInt(c.Query("before"),10,64)}
+		if err!=nil||limit<1||limit>100||before<0{
+			c.JSON(400,gin.H{"ok":false,"error":gin.H{"code":"E_INVALID_INPUT"}});return
+		}
+		page,err:=h.S.ApprovalNotificationsPage(c.Request.Context(),u,before,limit)
+		if err!=nil{respondError(c,err);return}
+		c.Header("Cache-Control","private, no-store")
+		c.JSON(200,gin.H{"ok":true,"data":page})
+		return
+	}
 	notes, err := h.S.ApprovalNotifications(c.Request.Context(), u)
 	if err != nil {
 		respondError(c, err)

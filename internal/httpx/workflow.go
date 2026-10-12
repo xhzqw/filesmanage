@@ -3,6 +3,7 @@ package httpx
 import (
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"strconv"
 )
 
 // Lock and approval handlers. Locks are file-level single-writer leases with a
@@ -169,6 +170,20 @@ func (h *Handler) compareApprovalDraft(c *gin.Context) {
 func (h *Handler) listApprovals(c *gin.Context) {
 	u, ok := h.auth(c)
 	if !ok {
+		return
+	}
+	if c.Query("limit")!="" {
+		limit,err:=strconv.Atoi(c.Query("limit"))
+		if err!=nil||limit<1||limit>100 {
+			c.JSON(400,gin.H{"ok":false,"error":gin.H{"code":"E_INVALID_INPUT"}})
+			return
+		}
+		page,err:=h.S.ListApprovalsPage(c.Request.Context(),u,c.Query("scope"),c.Query("cursor"),limit)
+		if err!=nil{respondError(c,err);return}
+		items:=make([]gin.H,0,len(page.Items))
+		for _,a:=range page.Items{items=append(items,approvalPayload(a))}
+		c.Header("Cache-Control","private, no-store")
+		c.JSON(200,gin.H{"ok":true,"data":gin.H{"items":items,"nextCursor":page.NextCursor,"hasMore":page.HasMore,"pendingCount":page.PendingCount}})
 		return
 	}
 	approvals, err := h.S.ListApprovals(c.Request.Context(), u, c.Query("scope"))

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"filesmanage/internal/domain"
 	"filesmanage/internal/ports"
+	"sort"
 	"time"
 )
 
@@ -96,6 +97,40 @@ func (r *memoryRepo) ListApprovalsByRequester(_ context.Context, requesterID str
 		}
 	}
 	return out, nil
+}
+
+func (r *memoryRepo) ListApprovalPage(_ context.Context, scope,userID,cursor string,limit int)([]domain.Approval,error){
+	r.mu.Lock();defer r.mu.Unlock()
+	all:=make([]domain.Approval,0)
+	for _,a:=range r.approvals{
+		switch scope{
+		case "inbox":if a.ApproverID!=userID||a.State!=domain.ApprovalPending{continue}
+		case "mine":if a.RequesterID!=userID{continue}
+		case "all_pending":if a.State!=domain.ApprovalPending{continue}
+		default:return nil,domain.ErrInvalidInput
+		}
+		all=append(all,a)
+	}
+	sort.Slice(all,func(i,j int)bool{if all[i].CreatedAt.Equal(all[j].CreatedAt){return all[i].ID>all[j].ID};return all[i].CreatedAt.After(all[j].CreatedAt)})
+	start:=0
+	if cursor!=""{
+		var boundary domain.Approval
+		for _,a:=range r.approvals{if a.ID==cursor{boundary=a;break}}
+		start=len(all)
+		for i,a:=range all{
+			if a.CreatedAt.Before(boundary.CreatedAt)||(a.CreatedAt.Equal(boundary.CreatedAt)&&a.ID<boundary.ID){
+				start=i;break
+			}
+		}
+	}
+	end:=start+limit;if end>len(all){end=len(all)}
+	return all[start:end],nil
+}
+func (r *memoryRepo) CountPendingApprovals(_ context.Context,userID string)(int,error){
+	r.mu.Lock();defer r.mu.Unlock()
+	count:=0
+	for _,a:=range r.approvals{if a.ApproverID==userID&&a.State==domain.ApprovalPending{count++}}
+	return count,nil
 }
 
 func (r *memoryRepo) PendingApprovalForFile(_ context.Context, fileID string) (domain.Approval, bool, error) {

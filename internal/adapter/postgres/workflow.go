@@ -45,7 +45,7 @@ func (r *Repository) ClearApprovalPolicy(ctx context.Context, folderID string) e
 
 // ---------- approvals ----------
 
-const approvalSelect = "SELECT a.id,a.file_id,a.requester_id,a.approver_id,a.payload_blob_id,a.base_seq,a.action,a.rollback_target_seq,a.state,coalesce(a.reason,''),coalesce(a.decision_comment,''),a.created_at,a.decided_at,coalesce(f.name,''),b.sha256,b.size_bytes,coalesce(rq.display_name,''),coalesce(ap.display_name,''),a.approver_chain,a.step_index FROM approvals a LEFT JOIN files f ON f.id=a.file_id LEFT JOIN blobs b ON b.id=a.payload_blob_id LEFT JOIN users rq ON rq.id=a.requester_id LEFT JOIN users ap ON ap.id=a.approver_id"
+const approvalSelect = "SELECT a.id,a.file_id,a.requester_id,a.approver_id,a.payload_blob_id,a.base_seq,a.action,a.rollback_target_seq,a.state,coalesce(a.reason,''),coalesce(a.decision_comment,''),a.created_at,a.decided_at,coalesce(nullif(a.file_name_snapshot,''),f.name,''),b.sha256,b.size_bytes,coalesce(rq.display_name,''),coalesce(ap.display_name,''),a.approver_chain,a.step_index FROM approvals a LEFT JOIN files f ON f.id=a.file_id LEFT JOIN blobs b ON b.id=a.payload_blob_id LEFT JOIN users rq ON rq.id=a.requester_id LEFT JOIN users ap ON ap.id=a.approver_id"
 
 func scanApproval(row rowScanner) (domain.Approval, error) {
 	var a domain.Approval
@@ -57,8 +57,8 @@ func scanApproval(row rowScanner) (domain.Approval, error) {
 
 func (r *Repository) CreateApproval(ctx context.Context, a domain.Approval) error {
 	_, err := r.Q.Exec(ctx,
-		"INSERT INTO approvals(id,file_id,requester_id,approver_id,payload_blob_id,base_seq,action,rollback_target_seq,state,reason,approver_chain,step_index) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
-		a.ID, a.FileID, a.RequesterID, a.ApproverID, a.PayloadBlobID, a.BaseSeq, a.Action, a.RollbackTargetSeq, a.State, a.Reason, a.ApproverChain, a.StepIndex)
+		"INSERT INTO approvals(id,file_id,requester_id,approver_id,payload_blob_id,base_seq,action,rollback_target_seq,state,reason,approver_chain,step_index,file_name_snapshot) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)",
+		a.ID, a.FileID, a.RequesterID, a.ApproverID, a.PayloadBlobID, a.BaseSeq, a.Action, a.RollbackTargetSeq, a.State, a.Reason, a.ApproverChain, a.StepIndex, a.FileName)
 	if isUniqueViolation(err) {
 		return domain.ErrApprovalPending
 	}
@@ -129,6 +129,44 @@ func (r *Repository) ListApprovalsByRequester(ctx context.Context, requesterID s
 		out = append(out, a)
 	}
 	return out, rows.Err()
+}
+
+// Keyset cursor is the last approval ID of the preceding page. The immutable
+// (created_at,id) ordering prevents concurrent inserts from shifting pages.
+func (r *Repository) ListApprovalPage(ctx context.Context, scope, userID, cursor string, limit int) ([]domain.Approval, error) {
+	var where string
+	switch scope {
+	case "inbox":
+		where = "a.approver_id=$1 AND a.state='pending'"
+	case "mine":
+		where = "a.requester_id=$1"
+	case "all_pending":
+		where = "a.state='pending'"
+	default:
+		return nil, domain.ErrInvalidInput
+	}
+	rows, err := r.Q.Query(ctx, approvalSelect+" WHERE "+where+
+		" AND ($2::text='' OR (a.created_at,a.id)<(SELECT created_at,id FROM approvals WHERE id=$2))"+
+		" ORDER BY a.created_at DESC,a.id DESC LIMIT $3", userID, cursor, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]domain.Approval, 0)
+	for rows.Next() {
+		a, err := scanApproval(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) CountPendingApprovals(ctx context.Context, userID string) (int, error) {
+	var count int
+	err := r.Q.QueryRow(ctx,"SELECT count(*) FROM approvals WHERE approver_id=$1 AND state='pending'",userID).Scan(&count)
+	return count,err
 }
 
 func (r *Repository) PendingApprovalForFile(ctx context.Context, fileID string) (domain.Approval, bool, error) {

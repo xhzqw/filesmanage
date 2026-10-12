@@ -43,6 +43,11 @@ export function SealLibrary({isAdmin}:{isAdmin:boolean}){
   return()=>{live=false;};
  },[isAdmin,revision]);
  const active=items.find(x=>x.id===selected);
+ function chooseAsset(id:string){
+  if(busy||id===selected)return;
+  setSelected(id);setRenameValue("");setUserId("");setError("");
+  setConfirmRetire(false);
+ }
  async function perform(action:"bind"|"grant"|"revoke"|"retire"|"rename"){
   if(!active||busy)return;
   setBusy(true);setError("");
@@ -77,7 +82,7 @@ export function SealLibrary({isAdmin}:{isAdmin:boolean}){
   <aside className="seal-library-list">
    <div className="seal-library-heading">签章库 <span>{items.length}</span></div>
    {items.length===0&&<p className="empty">暂无可用签章</p>}
-   {items.map(a=><RareButton key={a.id} type="button" className={"seal-library-item"+(a.id===selected?" is-selected":"")} onClick={()=>setSelected(a.id)}>
+   {items.map(a=><RareButton key={a.id} type="button" disabled={busy} className={"seal-library-item"+(a.id===selected?" is-selected":"")} onClick={()=>chooseAsset(a.id)}>
     <span>{a.name}</span><small>{a.kind==="personal"?(a.ownerName||"待绑定"): "公司印章"}</small>
     {!a.active&&<RareBadge tone="neutral">停用</RareBadge>}
    </RareButton>)}

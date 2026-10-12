@@ -59,6 +59,26 @@ func (r *memoryRepo) ListApprovalNotifications(_ context.Context, user string) (
 	}
 	return out, nil
 }
+func (r *memoryRepo) ListApprovalNotificationPage(_ context.Context,user string,before int64,limit int)([]domain.ApprovalNotification,error){
+	r.mu.Lock();defer r.mu.Unlock()
+	out:=make([]domain.ApprovalNotification,0)
+	for i:=len(r.approvalNotifications)-1;i>=0;i--{
+		if r.approvalNotificationOwners[i]!=user{continue}
+		n:=r.approvalNotifications[i]
+		if before>0&&n.ID>=before{continue}
+		for _,a:=range r.approvals{if a.ID==n.ApprovalID{n.FileName=a.FileName;break}}
+		out=append(out,n)
+		if len(out)==limit{break}
+	}
+	return out,nil
+}
+func (r *memoryRepo) CountUnreadApprovalNotifications(_ context.Context,user string)(int,error){
+	r.mu.Lock();defer r.mu.Unlock()
+	count:=0
+	for i,n:=range r.approvalNotifications{if r.approvalNotificationOwners[i]==user&&!n.Read{count++}}
+	return count,nil
+}
+
 func (r *memoryRepo) ReadApprovalNotification(_ context.Context, user string, id int64) (bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

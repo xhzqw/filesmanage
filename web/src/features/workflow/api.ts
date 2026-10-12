@@ -29,6 +29,9 @@ export type Approval={
 // Approval workflow endpoints: inbox, decisions and folder policies.
 export const workflowApi={
  approvals:(scope:"inbox"|"mine"|"all_pending")=>request<Approval[]>("/approvals?scope="+scope),
+ approvalsPage:(scope:"inbox"|"mine"|"all_pending",cursor="",limit=50)=>
+  request<{items:Approval[];nextCursor:string;hasMore:boolean;pendingCount:number}>(
+   "/approvals?scope="+scope+"&limit="+limit+(cursor?"&cursor="+encodeURIComponent(cursor):"")),
  detail:(id:string)=>request<Approval>("/approvals/"+encodeURIComponent(id)),
  approve:(id:string,comment:string)=>request<{fileId:string;versionSeq:number;status:string}>("/approvals/"+id+"/approve",{method:"POST",body:JSON.stringify({comment})}),
  reject:(id:string,comment:string)=>request<{rejected:string}>("/approvals/"+id+"/reject",{method:"POST",body:JSON.stringify({comment})}),

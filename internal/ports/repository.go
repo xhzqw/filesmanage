@@ -139,6 +139,8 @@ type Repository interface {
 	ListApprovalsForApprover(context.Context, string) ([]domain.Approval, error)
 	ListPendingApprovalsForAdmin(context.Context) ([]domain.Approval, error)
 	ListApprovalsByRequester(context.Context, string) ([]domain.Approval, error)
+	ListApprovalPage(context.Context, string, string, string, int) ([]domain.Approval, error)
+	CountPendingApprovals(context.Context, string) (int, error)
 	PendingApprovalForFile(context.Context, string) (domain.Approval, bool, error)
 	DecideApproval(context.Context, string, string, string) (bool, error)
 	AdvanceApproval(context.Context, string, int, string) (bool, error)

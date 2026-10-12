@@ -108,6 +108,10 @@ async function run(){
  check(changed?.status==="pending"||changed?.status==="awaiting_approval","new version awaits approval");
  const adminQueue=await api("GET","/approvals?scope=all_pending");
  check(adminQueue.some(item=>item.fileId===fileId&&item.state==="pending"),"admin can enumerate pending requests");
+ const pendingPage=await api("GET","/approvals?scope=all_pending&limit=1");
+ check(pendingPage.items.length===1&&pendingPage.items[0].fileId===fileId&&typeof pendingPage.hasMore==="boolean","admin paged approvals response");
+ const notificationPage=await api("GET","/approvals/notifications?limit=1");
+ check(notificationPage.items.length===1&&notificationPage.unreadCount>=1,"notification page has exact unread count");
  chrome=spawn("/usr/bin/google-chrome",[
   "--headless=new","--no-sandbox","--disable-gpu","--window-size=1440,900",
   "--remote-debugging-port="+PORT,"about:blank",
@@ -157,6 +161,11 @@ async function run(){
  await cdp.send("Page.navigate",{url:BASE+"/approvals?item="+encodeURIComponent(approved.id)});
  await cdp.waitFor("()=>document.querySelector('.approval-detail-content')?.textContent?.includes("+rowQuery+")&&getComputedStyle(document.querySelector('.approval-side')).display!=='none'",25000);
  check(true,"390px deep link opens completed approval inspector immediately");
+ const renamed="renamed-"+filename;
+ await api("PATCH","/files/"+fileId,{name:renamed});
+ const snapshot=await api("GET","/approvals/"+approved.id);
+ const notificationSnapshot=await api("GET","/approvals/notifications?limit=5");
+ check(snapshot.fileName===filename&&notificationSnapshot.items.some(n=>n.approvalId===approved.id&&n.fileName===filename),"approval and notifications preserve original filename after rename");
  console.log("UX_APPROVAL_PASS");
 }
 try{

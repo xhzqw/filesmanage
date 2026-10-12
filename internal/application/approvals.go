@@ -117,7 +117,7 @@ func (s *Service) SubmitEdit(ctx context.Context, u domain.User, fileID string, 
 	approval := domain.Approval{
 		ID: NewID("appr"), FileID: file.ID, RequesterID: u.ID, ApproverID: policy.ApproverID, ApproverChain: policy.ApproverChain,
 		PayloadBlobID: blob.ID, BaseSeq: baseSeq, Action: domain.VersionActionEdit,
-		State: domain.ApprovalPending, Reason: reason,
+		State: domain.ApprovalPending, Reason: reason, FileName: file.Name,
 	}
 	if err = tx.CreateApproval(ctx, approval); err != nil {
 		return domain.Approval{}, mapError(err)
@@ -175,7 +175,7 @@ func (s *Service) SubmitRollback(ctx context.Context, u domain.User, fileID stri
 	approval := domain.Approval{
 		ID: NewID("appr"), FileID: file.ID, RequesterID: u.ID, ApproverID: policy.ApproverID, ApproverChain: policy.ApproverChain,
 		PayloadBlobID: target.BlobID, BaseSeq: expectedCurrentSeq, Action: domain.VersionActionRollback,
-		RollbackTargetSeq: new(targetSeq), State: domain.ApprovalPending, Reason: reason,
+		RollbackTargetSeq: new(targetSeq), State: domain.ApprovalPending, Reason: reason, FileName: file.Name,
 	}
 	if err = tx.CreateApproval(ctx, approval); err != nil {
 		return domain.Approval{}, mapError(err)
@@ -416,6 +416,35 @@ func (s *Service) authorizedFileForApproval(ctx context.Context, repo ports.Repo
 		return file, nil
 	}
 	return domain.File{}, domain.ErrForbidden
+}
+
+type ApprovalPage struct {
+	Items []domain.Approval `json:"items"`
+	NextCursor string `json:"nextCursor"`
+	HasMore bool `json:"hasMore"`
+	PendingCount int `json:"pendingCount"`
+}
+
+func (s *Service) ListApprovalsPage(ctx context.Context,u domain.User,scope,cursor string,limit int)(ApprovalPage,error){
+	if limit<1||limit>100||len(cursor)>128{return ApprovalPage{},domain.ErrInvalidInput}
+	if scope!="inbox"&&scope!="mine"&&scope!="all_pending"{return ApprovalPage{},domain.ErrInvalidInput}
+	if scope=="all_pending"&&!u.IsAdmin{return ApprovalPage{},domain.ErrForbidden}
+	tx,err:=s.uow.Begin(ctx);if err!=nil{return ApprovalPage{},err};defer tx.Rollback(ctx)
+	if cursor!="" {
+		boundary,lookupErr:=tx.ApprovalByID(ctx,cursor)
+		if lookupErr!=nil{return ApprovalPage{},domain.ErrInvalidInput}
+		switch scope {
+		case "inbox":if boundary.ApproverID!=u.ID{return ApprovalPage{},domain.ErrInvalidInput}
+		case "mine":if boundary.RequesterID!=u.ID{return ApprovalPage{},domain.ErrInvalidInput}
+		}
+	}
+	rows,err:=tx.ListApprovalPage(ctx,scope,u.ID,cursor,limit+1);if err!=nil{return ApprovalPage{},err}
+	count,err:=tx.CountPendingApprovals(ctx,u.ID);if err!=nil{return ApprovalPage{},err}
+	hasMore:=len(rows)>limit
+	if hasMore{rows=rows[:limit]}
+	next:=""
+	if hasMore&&len(rows)>0{next=rows[len(rows)-1].ID}
+	return ApprovalPage{Items:rows,NextCursor:next,HasMore:hasMore,PendingCount:count},nil
 }
 
 func (s *Service) ListApprovals(ctx context.Context, u domain.User, scope string) ([]domain.Approval, error) {

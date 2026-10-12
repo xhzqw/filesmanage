@@ -18,11 +18,21 @@ const actionLabels:Record<string,string>={edit:"内容修改",rollback:"版本�
 const eventLabels:Record<string,string>={submitted:"提交申请",advanced:"本级通过",approved:"最终通过",rejected:"拒绝",cancelled:"撤回",conflicted:"版本冲突"};
 const timeLabel=(value:string)=>value?new Date(value).toLocaleString("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}):"—";
 type Decision={approval:Approval;action:"approve"|"reject"|"cancel"};
+type ApprovalScope="inbox"|"mine"|"all_pending";
+type PageState={nextCursor:string;hasMore:boolean};
+const emptyPage=():PageState=>({nextCursor:"",hasMore:false});
 
 export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:User;view:ApprovalView;onReview:(approval:Approval)=>void;onCounts:(value:{pending:number;unread:number})=>void}){
  const[inbox,setInbox]=useState<Approval[]>([]);
  const[mine,setMine]=useState<Approval[]>([]);
  const[adminPending,setAdminPending]=useState<Approval[]>([]);
+ const[approvalPages,setApprovalPages]=useState<Record<ApprovalScope,PageState>>({
+  inbox:emptyPage(),mine:emptyPage(),all_pending:emptyPage(),
+ });
+ const[pendingCount,setPendingCount]=useState(0);
+ const[notificationPage,setNotificationPage]=useState<{nextCursor:number;hasMore:boolean}>({nextCursor:0,hasMore:false});
+ const[unreadCount,setUnreadCount]=useState(0);
+ const[loadingMore,setLoadingMore]=useState(false);
  const[loading,setLoading]=useState(true);
  const[loadError,setLoadError]=useState("");
  const[refreshKey,setRefreshKey]=useState(0);
@@ -52,16 +62,27 @@ export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:
   // Revalidate in place on live events. Don't blank the whole list each time.
   if(!everLoaded.current)setLoading(true);
   setLoadError("");
-  Promise.all([workflowApi.approvals("inbox"),workflowApi.approvals("mine"),
-   currentUser.isAdmin?workflowApi.approvals("all_pending"):Promise.resolve([] as Approval[])])
-   .then(([todo,own,pending])=>{if(active){setInbox(todo);setMine(own);setAdminPending(pending);}})
+  Promise.all([workflowApi.approvalsPage("inbox"),workflowApi.approvalsPage("mine"),
+   currentUser.isAdmin?workflowApi.approvalsPage("all_pending"):Promise.resolve(null)])
+   .then(([todo,own,pending])=>{if(active){
+    setInbox(todo.items);setMine(own.items);setAdminPending(pending?.items??[]);
+    setPendingCount(todo.pendingCount);
+    setApprovalPages({
+     inbox:{nextCursor:todo.nextCursor,hasMore:todo.hasMore},
+     mine:{nextCursor:own.nextCursor,hasMore:own.hasMore},
+     all_pending:{nextCursor:pending?.nextCursor??"",hasMore:pending?.hasMore??false},
+    });
+   }})
    .catch(error=>{if(active)setLoadError(errorCopy(error,"审批列表加载失败"));})
    .finally(()=>{if(active){everLoaded.current=true;setLoading(false);}});
   return()=>{active=false;};
  },[refreshKey,currentUser.isAdmin]);
  useEffect(()=>{
   let active=true;
-  const update=()=>approvalActivityApi.notifications().then(items=>{if(active){setNotifications(items);setNoticeError("");}})
+  const update=()=>approvalActivityApi.notificationsPage().then(page=>{if(active){
+   setNotifications(page.items);setUnreadCount(page.unreadCount);
+   setNotificationPage({nextCursor:page.nextCursor,hasMore:page.hasMore});setNoticeError("");
+  }})
    .catch(()=>{if(active)setNoticeError("通知读取失败");});
   void update();
   const timer=window.setInterval(()=>void update(),20000);
@@ -70,8 +91,35 @@ export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:
   window.addEventListener("filesmanage:approval-notifications-read",update);
   return()=>{active=false;window.clearInterval(timer);window.removeEventListener("filesmanage:approvals-changed",changed);window.removeEventListener("filesmanage:approval-notifications-read",update);};
  },[]);
- const unread=notifications.filter(note=>!note.read).length;
- useEffect(()=>onCounts({pending:inbox.length,unread}),[inbox.length,unread,onCounts]);
+ useEffect(()=>onCounts({pending:pendingCount,unread:unreadCount}),[pendingCount,unreadCount,onCounts]);
+
+ async function loadMore(){
+  if(loadingMore)return;
+  setLoadingMore(true);setLoadError("");setNoticeError("");
+  try{
+   if(view==="notifications"){
+    if(!notificationPage.hasMore)return;
+    const page=await approvalActivityApi.notificationsPage(notificationPage.nextCursor);
+    setNotifications(current=>[...current,...page.items.filter(n=>!current.some(prev=>prev.id===n.id))]);
+    setUnreadCount(page.unreadCount);
+    setNotificationPage({nextCursor:page.nextCursor,hasMore:page.hasMore});
+   }else{
+    const scope=view as ApprovalScope;
+    const state=approvalPages[scope];
+    if(!state.hasMore)return;
+    const page=await workflowApi.approvalsPage(scope,state.nextCursor);
+    const append=(current:Approval[])=>[...current,...page.items.filter(a=>!current.some(prev=>prev.id===a.id))];
+    if(scope==="inbox")setInbox(append);
+    else if(scope==="mine")setMine(append);
+    else setAdminPending(append);
+    setPendingCount(page.pendingCount);
+    setApprovalPages(current=>({...current,[scope]:{nextCursor:page.nextCursor,hasMore:page.hasMore}}));
+   }
+  }catch(error){
+   if(view==="notifications")setNoticeError(errorCopy(error,"载入通知失败"));
+   else setLoadError(errorCopy(error,"载入审批失败"));
+  }finally{setLoadingMore(false);}
+ }
 
  const list=useMemo(()=>{
   const source=view==="mine"?mine:view==="all_pending"?adminPending:inbox;
@@ -120,6 +168,7 @@ export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:
   try{
    await approvalActivityApi.read(note.id);
    setNotifications(items=>items.map(item=>item.id===note.id?{...item,read:true}:item));
+   setUnreadCount(count=>Math.max(0,count-1));
    window.dispatchEvent(new Event("filesmanage:approval-notifications-read"));
   }catch{setNoticeError("标记已读失败");}
  }
@@ -158,6 +207,7 @@ export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:
  const canCancel=!!selectedApproval&&selectedApproval.state==="pending"&&isMineItem&&selectedApproval.requesterId===currentUser.id;
  const title=view==="inbox"?"待我审批":view==="mine"?"我发起的":view==="all_pending"?"全部待审批":"通知";
  const count=view==="notifications"?matchingNotes.length:list.length;
+ const hasMore=view==="notifications"?notificationPage.hasMore:approvalPages[view].hasMore;
  const hasFilters=query.trim()||typeFilter!=="all"||(view==="mine"&&statusFilter!=="all");
  return <div className="approval-page">
   <div className="approval-toolbar">
@@ -197,6 +247,11 @@ export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:
        <span className="approval-row-end">{view==="mine"?<RareBadge tone={stateTones[approval.state]} dot>{stateLabels[approval.state]}</RareBadge>:<small>第 {approval.stepIndex+1}/{approval.stepTotal} 级</small>}<small>{timeLabel(approval.createdAt)}</small></span>
       </RareButton>)}
      </>}
+    {hasMore&&<div className="approval-load-more">
+     <RareButton type="button" disabled={loadingMore} loading={loadingMore} onClick={()=>void loadMore()}>
+      {loadingMore?"正在加载…":"加载更多"}
+     </RareButton>
+    </div>}
    </section>
    <aside className="approval-side" aria-label="审批详情">
     <div className="approval-side-header"><strong>申请详情</strong>

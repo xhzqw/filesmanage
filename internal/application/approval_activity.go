@@ -81,6 +81,24 @@ func (s *Service) ApprovalNotifications(ctx context.Context, actor domain.User) 
 	defer tx.Rollback(ctx)
 	return tx.ListApprovalNotifications(ctx, actor.ID)
 }
+type ApprovalNotificationPage struct {
+	Items []domain.ApprovalNotification `json:"items"`
+	NextCursor int64 `json:"nextCursor"`
+	HasMore bool `json:"hasMore"`
+	UnreadCount int `json:"unreadCount"`
+}
+func (s *Service) ApprovalNotificationsPage(ctx context.Context,actor domain.User,before int64,limit int)(ApprovalNotificationPage,error){
+	if before<0||limit<1||limit>100{return ApprovalNotificationPage{},domain.ErrInvalidInput}
+	tx,err:=s.uow.Begin(ctx);if err!=nil{return ApprovalNotificationPage{},err};defer tx.Rollback(ctx)
+	items,err:=tx.ListApprovalNotificationPage(ctx,actor.ID,before,limit+1);if err!=nil{return ApprovalNotificationPage{},err}
+	unread,err:=tx.CountUnreadApprovalNotifications(ctx,actor.ID);if err!=nil{return ApprovalNotificationPage{},err}
+	hasMore:=len(items)>limit
+	if hasMore{items=items[:limit]}
+	next:=int64(0)
+	if hasMore&&len(items)>0{next=items[len(items)-1].ID}
+	return ApprovalNotificationPage{Items:items,NextCursor:next,HasMore:hasMore,UnreadCount:unread},nil
+}
+
 func (s *Service) ReadApprovalNotification(ctx context.Context, actor domain.User, id int64) error {
 	if id <= 0 {
 		return domain.ErrInvalidInput

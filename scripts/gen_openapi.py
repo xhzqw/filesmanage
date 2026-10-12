@@ -1283,9 +1283,11 @@ add("POST","/api/files/{id}/seals/marks/revoke",operation("Selectively revoke an
  responses=dict([("201",{"description":"New audited signing revision without only the selected stamps and signatures; older evidence retained","content":{"application/json":{"schema":obj({"ok":boolean(),"data":ref("SealRevision")},required=["ok","data"])}}}),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
 
 # --- Approvals ---
+schema("ApprovalPage",obj({"items":arr(ref("Approval")),"nextCursor":string(),"hasMore":boolean(),"pendingCount":integer(minimum=0)},required=["items","nextCursor","hasMore","pendingCount"]))
+schema("ApprovalNotificationPage",obj({"items":arr(ref("ApprovalNotification")),"nextCursor":integer(minimum=0),"hasMore":boolean(),"unreadCount":integer(minimum=0)},required=["items","nextCursor","hasMore","unreadCount"]))
 add("GET", "/api/approvals", operation("List approvals visible to the caller", "Workflow", "listApprovals", security=SESSION,
-    params=[query("scope", "mine = requested by me; pending = awaiting my decision; empty = both.", {"type": "string", "enum": ["mine", "pending"]})],
-    responses=dict([json_ok(arr(ref("Approval")), "Approvals."), resp("401", ERR["401"]), resp("403", ERR["403"])])))
+    params=[query("scope", "inbox = my pending; mine = requested by me; all_pending = admin only.", {"type": "string", "enum": ["mine", "inbox", "all_pending"]}),query("limit","Page size 1–100. Omit for legacy array response.",integer(minimum=1)),query("cursor","Last approval ID from the previous page.")],
+    responses=dict([json_ok({"oneOf":[arr(ref("Approval")),ref("ApprovalPage")]},"Legacy array, or keyset page when limit is supplied."), resp("401", ERR["401"]), resp("403", ERR["403"])])))
 
 add("GET","/api/approvals/{id}",operation("Get an approval record, including completed approval history, for a participant or admin","Workflow","getApprovalDetail",security=SESSION,
  params=[id_param("id","Approval ID")],
@@ -1311,8 +1313,9 @@ add("GET","/api/approvals/{id}/draft/compare",operation("Bounded base-versus-pen
 add("GET","/api/approvals/{id}/history",operation("Read immutable per-step approval activity (participant or admin)","Workflow","approvalHistory",security=SESSION,
  params=[id_param("id","Approval ID")],
  responses=dict([json_ok(arr(ref("ApprovalEvent")),"Ordered approval events."),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
-add("GET","/api/approvals/notifications",operation("Read the authenticated user's newest 100 approval notifications","Workflow","approvalNotifications",security=SESSION,
- responses=dict([json_ok(arr(ref("ApprovalNotification")),"Recipient-scoped, newest first."),resp("401",ERR["401"])])))
+add("GET","/api/approvals/notifications",operation("Read recipient-scoped approval notifications with accurate unread count","Workflow","approvalNotifications",security=SESSION,
+ params=[query("limit","Page size 1–100. Omit for legacy array response.",integer(minimum=1)),query("before","ID cursor; only older notifications are returned.",integer(minimum=0))],
+ responses=dict([json_ok({"oneOf":[arr(ref("ApprovalNotification")),ref("ApprovalNotificationPage")]},"Legacy array or keyset page with unreadCount."),resp("401",ERR["401"])])))
 add("POST","/api/approvals/notifications/{id}/read",operation("Mark own approval notification read (idempotent)","Workflow","readApprovalNotification",security=SESSION,
  params=[id_param("id","Notification ID")],
  responses=dict([json_ok(obj({"read":integer()}),"Recipient-owned receipt."),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("404",ERR["404"])])))
