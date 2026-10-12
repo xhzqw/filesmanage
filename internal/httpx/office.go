@@ -42,7 +42,7 @@ func (h *Handler) openOfficeSession(c *gin.Context) {
 			"callbackUrl":   h.S.SourceURL() + "/api/internal/office/callback",
 			"user":          map[string]any{"id": u.ID, "name": u.DisplayName},
 			"lang":          "zh-CN",
-			"customization": map[string]any{"autosave": true, "forcesave": false},
+			"customization": map[string]any{"autosave": true, "forcesave": true},
 		},
 	}
 	signed, err := h.S.SignEditorConfig(config)
@@ -89,6 +89,19 @@ func (h *Handler) officeSaveStatus(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true, "data": result})
+}
+
+func (h *Handler) nativeOfficeSaveStatus(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	status, err := h.S.OfficeNativeSaveStatus(c.Request.Context(), u, c.Param("id"), c.Param("sid"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true, "data": status})
 }
 
 func (h *Handler) cancelOfficeSession(c *gin.Context) {

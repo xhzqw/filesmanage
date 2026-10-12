@@ -649,7 +649,7 @@ tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions 
 .office-edit-strip{height:36px;flex-shrink:0;display:flex;align-items:center;gap:12px;justify-content:space-between;padding:0 10px;border-bottom:1px solid var(--border-hairline);background:var(--surface-panel);font-size:12px}
 .office-edit-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary)}
 .office-save-state{flex-shrink:0;color:var(--text-secondary);font-weight:500}
-.office-save-dirty,.office-save-saving{color:var(--status-warning)}
+.office-save-dirty{color:var(--status-warning)}
 .office-save-failed{color:var(--status-danger)}
 .office-save-saved{color:var(--status-success)}
 /* flex:1 (not height:100%) so the editor takes the space left after the
@@ -659,7 +659,6 @@ tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions 
 .office-holder #docx-editor-target{width:100%;height:100%;min-height:0}
 .office-loading-cover{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;background:var(--surface-panel);color:var(--text-secondary);text-align:center}
 .office-loading-cover strong{color:var(--text-primary)}
-.office-saving-shield{position:absolute;inset:0;z-index:5;background:transparent;cursor:wait}
 @media(max-width:820px){.office-edit-strip{gap:6px;padding-inline:6px}.office-save-state{font-size:11px;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
 .viewer-stage{flex:1;min-height:480px;background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-md);box-shadow:var(--shadow-panel);overflow:hidden}
 

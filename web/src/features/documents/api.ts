@@ -91,6 +91,8 @@ export const fileApi={
     return data;
    }),
  openOfficeSession:(id:string)=>request<OfficeSessionData>("/files/"+id+"/office/session",{method:"POST",body:"{}"}),
+ officeNativeSaveStatus:(id:string,sessionId:string)=>request<{versionSeq:number;savedCount:number;failedCount:number}>(
+  "/files/"+encodeURIComponent(id)+"/office/session/"+encodeURIComponent(sessionId)+"/state"),
  requestOfficeSave:(id:string,sessionId:string)=>request<{status:"pending"|"unchanged";requestId?:string}>(
   "/files/"+encodeURIComponent(id)+"/office/session/"+encodeURIComponent(sessionId)+"/save",{method:"POST",body:"{}"}),
  officeSaveStatus:(id:string,sessionId:string,requestId:string)=>request<{status:"pending"|"committed"|"failed";versionSeq:number}>(

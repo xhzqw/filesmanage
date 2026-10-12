@@ -125,3 +125,64 @@ func TestOfficeManualSaveFailureReceipt(t *testing.T) {
 		t.Fatalf("failure receipt: %+v %v", receipt, err)
 	}
 }
+
+// Built-in ONLYOFFICE Save sends status=6, forcesavetype=1, and normally no
+// userdata. Unlike /command force-save it must still have an observable
+// durable receipt and remain possible repeatedly in the same editor session.
+func TestOfficeNativeSaveCallbackReceipts(t *testing.T) {
+	ctx := context.Background()
+	admin := domain.User{ID: "u_admin", IsAdmin: true}
+	current := []byte("PK\x03\x04[Content_Types].xml-native-v2")
+	docServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(current)
+	}))
+	defer docServer.Close()
+	s, _ := officeService(t)
+	s.office.EditorURL = docServer.URL
+	uploaded, err := s.CommitUpload(ctx, admin, "folder_root", "native.docx",
+		"application/vnd.openxmlformats-officedocument.wordprocessingml.document", "",
+		bytes.NewReader([]byte("PK\x03\x04[Content_Types].xml-original")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, err := s.OpenOfficeSession(ctx, admin, uploaded.FileID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, err := signJWT(s.office.Secret, map[string]any{"key": view.DocumentKey}, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	verify := func(seq int, saved, failed int64) {
+		t.Helper()
+		state, e := s.OfficeNativeSaveStatus(ctx, admin, uploaded.FileID, view.SessionID)
+		if e != nil || state.VersionSeq != seq || state.SavedCount != saved || state.FailedCount != failed {
+			t.Fatalf("native status: %+v %v, expected v%d saves=%d errors=%d", state, e, seq, saved, failed)
+		}
+	}
+	verify(1, 0, 0)
+	callback := func(status int, url string) {
+		t.Helper()
+		code, e := s.HandleEditorCallback(ctx, token, EditorCallbackPayload{
+			Key: view.DocumentKey, Status: status, URL: url, ForceSaveType: 1,
+		})
+		if code != 0 || e != nil {
+			t.Fatalf("native callback: %d %v", code, e)
+		}
+	}
+	callback(domain.CallbackStatusForceSave, docServer.URL+"/native-v2")
+	verify(2, 1, 0)
+	callback(domain.CallbackStatusForceSave, docServer.URL+"/native-v2") // replay
+	verify(2, 1, 0)
+	current = []byte("PK\x03\x04[Content_Types].xml-native-v3")
+	callback(domain.CallbackStatusForceSave, docServer.URL+"/native-v3")
+	verify(3, 2, 0)
+	callback(domain.CallbackStatusCorrupted, "")
+	verify(3, 2, 1)
+	if err := s.CloseOfficeSession(ctx, admin, view.SessionID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.OfficeNativeSaveStatus(ctx, domain.User{ID: "u_other"}, uploaded.FileID, view.SessionID); err == nil {
+		t.Fatal("unrelated user must not view the native save receipt")
+	}
+}

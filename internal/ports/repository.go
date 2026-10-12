@@ -160,6 +160,7 @@ type Repository interface {
 	CloseOfficeSession(context.Context, string) error
 	SaveEventExists(context.Context, string, string) (bool, error)
 	OfficeSaveEventOutcome(context.Context, string, string) (string, error)
+	OfficeNativeSaveCounts(context.Context, string) (int64, int64, error)
 	RecordSaveEvent(context.Context, domain.OfficeSaveEvent) error
 	RecordCompatibilityReport(context.Context, domain.OfficeCompatibilityReport) error
 

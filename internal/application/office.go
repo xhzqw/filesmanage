@@ -269,6 +269,39 @@ func officeSaveReceiptHash(sessionID, requestID string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// OfficeNativeSaveStatus provides an authoritative, monotonically increasing
+// receipt count for ONLYOFFICE's built-in Save button (forcesavetype=1).
+// The document server's local "saved" state is not proof of persistence.
+type OfficeNativeSaveStatusView struct {
+	VersionSeq  int   `json:"versionSeq"`
+	SavedCount  int64 `json:"savedCount"`
+	FailedCount int64 `json:"failedCount"`
+}
+
+func (s *Service) OfficeNativeSaveStatus(ctx context.Context, u domain.User, fileID, sessionID string) (OfficeNativeSaveStatusView, error) {
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return OfficeNativeSaveStatusView{}, err
+	}
+	defer tx.Rollback(ctx)
+	file, err := s.visibleFile(ctx, tx, u, fileID, domain.ActionPreview)
+	if err != nil {
+		return OfficeNativeSaveStatusView{}, err
+	}
+	session, err := tx.OfficeSessionByID(ctx, sessionID)
+	if err != nil {
+		return OfficeNativeSaveStatusView{}, domain.ErrNotFound
+	}
+	if session.FileID != fileID || session.OwnerID != u.ID {
+		return OfficeNativeSaveStatusView{}, domain.ErrForbidden
+	}
+	saved, failed, err := tx.OfficeNativeSaveCounts(ctx, session.ID)
+	if err != nil {
+		return OfficeNativeSaveStatusView{}, err
+	}
+	return OfficeNativeSaveStatusView{VersionSeq: currentSeq(file), SavedCount: saved, FailedCount: failed}, nil
+}
+
 // EditorSource resolves a source token to the current version's bytes. The
 // token is short-lived and bound to one document key.
 func (s *Service) EditorSource(ctx context.Context, token string) (io.ReadSeekCloser, string, int64, func(), error) {
@@ -344,9 +377,17 @@ func (s *Service) HandleEditorCallback(ctx context.Context, authorization string
 		}
 		return 0, tx.Commit(ctx)
 	}
-	if payload.Status == domain.CallbackStatusCorrupted && strings.HasPrefix(payload.UserData, "osave_") {
+	if payload.Status == domain.CallbackStatusCorrupted {
 		if err = recordOfficeSaveReceipt(ctx, tx, session, payload, "failed", session.LockGeneration); err != nil {
 			return 1, err
+		}
+		if payload.ForceSaveType == 1 {
+			if err = tx.RecordSaveEvent(ctx, domain.OfficeSaveEvent{
+				ID: NewID("oev"), SessionID: session.ID, Generation: session.LockGeneration,
+				CallbackStatus: payload.Status, EventHash: callbackEventHash(session.ID, payload.Key, payload.Status, payload.URL, payload.UserData), Outcome: "native_failed",
+			}); err != nil {
+				return 1, err
+			}
 		}
 		return 0, tx.Commit(ctx)
 	}
@@ -387,7 +428,7 @@ func (s *Service) HandleEditorCallback(ctx context.Context, authorization string
 	if hex.EncodeToString(currentHash[:]) == currentVersion.Sha256 {
 		if err = tx.RecordSaveEvent(ctx, domain.OfficeSaveEvent{
 			ID: NewID("oev"), SessionID: session.ID, Generation: session.LockGeneration,
-			CallbackStatus: payload.Status, EventHash: eventHash, Outcome: "committed",
+			CallbackStatus: payload.Status, EventHash: eventHash, Outcome: officeCallbackOutcome(payload),
 		}); err != nil {
 			return 1, err
 		}
@@ -440,7 +481,7 @@ func (s *Service) HandleEditorCallback(ctx context.Context, authorization string
 	}
 	if err = tx.RecordSaveEvent(ctx, domain.OfficeSaveEvent{
 		ID: NewID("oev"), SessionID: session.ID, Generation: generation,
-		CallbackStatus: payload.Status, EventHash: eventHash, Outcome: "committed",
+		CallbackStatus: payload.Status, EventHash: eventHash, Outcome: officeCallbackOutcome(payload),
 	}); err != nil {
 		return 1, err
 	}
@@ -465,10 +506,18 @@ func (s *Service) HandleEditorCallback(ctx context.Context, authorization string
 
 // EditorCallbackPayload is the document-server callback body.
 type EditorCallbackPayload struct {
-	Key      string `json:"key"`
-	Status   int    `json:"status"`
-	URL      string `json:"url"`
-	UserData string `json:"userdata"`
+	Key           string `json:"key"`
+	Status        int    `json:"status"`
+	URL           string `json:"url"`
+	UserData      string `json:"userdata"`
+	ForceSaveType int    `json:"forcesavetype"`
+}
+
+func officeCallbackOutcome(payload EditorCallbackPayload) string {
+	if payload.Status == domain.CallbackStatusForceSave && payload.ForceSaveType == 1 {
+		return "native_committed"
+	}
+	return "committed"
 }
 
 func callbackEventHash(sessionID, key string, status int, url, userdata string) string {

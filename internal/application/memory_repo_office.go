@@ -145,6 +145,24 @@ func (r *memoryRepo) OfficeSaveEventOutcome(_ context.Context, sessionID, eventH
 	return "", nil
 }
 
+func (r *memoryRepo) OfficeNativeSaveCounts(_ context.Context, sessionID string) (int64, int64, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var committed, failed int64
+	for _, event := range r.saveEvents {
+		if event.SessionID != sessionID {
+			continue
+		}
+		switch event.Outcome {
+		case "native_committed":
+			committed++
+		case "native_failed":
+			failed++
+		}
+	}
+	return committed, failed, nil
+}
+
 func (r *memoryRepo) RecordSaveEvent(_ context.Context, e domain.OfficeSaveEvent) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

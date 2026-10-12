@@ -15,9 +15,7 @@ declare global{
 }
 
 type EditorStatus="loading"|"ready"|"failed";
-type SaveState="clean"|"dirty"|"saving"|"saved"|"failed";
-
-const delay=(ms:number)=>new Promise<void>(resolve=>window.setTimeout(resolve,ms));
+type SaveState="clean"|"dirty"|"saved"|"failed";
 
 // Only the application's callback receipt, followed by a committed file
 // version, can make the UI say "saved". The editor's cache sync is not a save.
@@ -33,12 +31,13 @@ export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
  const holder=useRef<HTMLDivElement>(null);
  const editor=useRef<{destroyEditor?:()=>void}|null>(null);
  const dirty=useRef(false);
- const saving=useRef(false);
  const changeNumber=useRef(0);
+ const nativeSavedCount=useRef(0);
+ const nativeFailedCount=useRef(0);
 
  useEffect(()=>{
   const beforeUnload=(event:BeforeUnloadEvent)=>{
-   if(!dirty.current&&!saving.current)return;
+   if(!dirty.current)return;
    event.preventDefault();
    event.returnValue="";
   };
@@ -47,7 +46,7 @@ export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
   const beforeLink=(event:MouseEvent)=>{
    const target=event.target;
    if(!(target instanceof Element)||!target.closest("a[href]"))return;
-   if(saving.current||(dirty.current&&!window.confirm("修改尚未保存至文档库。确定放弃修改并离开吗？"))){
+   if(dirty.current&&!window.confirm("修改尚未保存至文档库。确定放弃修改并离开吗？")){
     event.preventDefault();
     event.stopPropagation();
    }
@@ -75,6 +74,11 @@ export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
     if(!valid)return;
     const opened=session as OfficeSessionData;
     setSessionId(opened.sessionId);
+    // Capture the current server receipts before the user can edit.
+    const initial=await fileApi.officeNativeSaveStatus(file.id,opened.sessionId);
+    if(!valid)return;
+    nativeSavedCount.current=initial.savedCount;
+    nativeFailedCount.current=initial.failedCount;
     await loadEditorScript(editorBrowserUrl(opened.editorUrl)+"/web-apps/apps/api/documents/api.js");
     if(!valid||!holder.current)return;
     const DocEditor=window.DocsAPI?.DocEditor;
@@ -90,7 +94,7 @@ export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
       if(!valid||event.data!==true)return;
       changeNumber.current++;
       dirty.current=true;
-      setSaveState(saving.current?"saving":"dirty");
+      setSaveState("dirty");
       setSaveMessage("有修改未保存至文档库");
      },
      onError:(event:{data?:{errorDescription?:string}})=>{
@@ -122,56 +126,47 @@ export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
   return()=>{valid=false;window.clearTimeout(waitForDocument);editor.current?.destroyEditor?.();editor.current=null;};
  },[file]);
 
- async function save(){
-  if(!file||!sessionId||status!=="ready"||saving.current)return;
-  saving.current=true;
-  const revision=changeNumber.current;
-  setSaveState("saving");
-  setSaveMessage("正在保存至文档库…");
-  try{
-   // Remove focus from the editor while taking a save snapshot. UI remains
-   // blocked from further editor interaction until the callback is received.
-   if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
-   const start=await fileApi.requestOfficeSave(file.id,sessionId);
-   if(start.status==="unchanged"){
-    if(dirty.current)throw new Error("编辑器尚未同步修改，请稍等片刻后再保存");
-    setSaveState("clean");
-    setSaveMessage("没有需要保存的新修改");
-    return;
-   }
-   if(!start.requestId)throw new Error("保存服务未返回确认编号");
-   const deadline=Date.now()+45000;
-   while(Date.now()<deadline){
-    await delay(1100);
-    const receipt=await fileApi.officeSaveStatus(file.id,sessionId,start.requestId);
-    if(receipt.status==="failed")throw new Error("文档服务器回调失败，修改尚未确认保存");
-    if(receipt.status!=="committed")continue;
-    // Version sequencing is checked by the backend in the same transaction
-    // as the callback receipt; read it back through the ordinary file API.
-    const result=await fileApi.meta(file.id);
-    if(result.file.currentVersionSeq<receipt.versionSeq)continue;
-    setConfirmedSeq(receipt.versionSeq);
-    if(changeNumber.current===revision){
-     dirty.current=false;
-     setSaveState("saved");
-     setSaveMessage("已保存至文档库 · v"+receipt.versionSeq);
-    }else{
-     dirty.current=true;
-     setSaveState("dirty");
-     setSaveMessage("v"+receipt.versionSeq+" 已保存，之后的修改仍需保存");
+ // The native floppy-disk Save button triggers status=6 (forcesavetype=1).
+ // The app checks its persisted receipt. No second command and no blocking
+ // 45-second save overlay are needed.
+ useEffect(()=>{
+  if(!sessionId||!file)return;
+  let active=true;
+  let inFlight=false;
+  const check=async()=>{
+   if(!dirty.current||inFlight)return;
+   inFlight=true;
+   const revision=changeNumber.current;
+   try{
+    const receipt=await fileApi.officeNativeSaveStatus(file.id,sessionId);
+    if(!active)return;
+    const committed=receipt.savedCount>nativeSavedCount.current;
+    const failed=receipt.failedCount>nativeFailedCount.current;
+    nativeSavedCount.current=receipt.savedCount;
+    nativeFailedCount.current=receipt.failedCount;
+    if(committed){
+     setConfirmedSeq(receipt.versionSeq);
+     if(changeNumber.current===revision){
+      dirty.current=false;
+      setSaveState("saved");
+      setSaveMessage("已保存至文档库 · v"+receipt.versionSeq);
+     }else{
+      setSaveState("dirty");
+      setSaveMessage("新修改待保存");
+     }
+    }else if(failed){
+     setSaveState("failed");
+     setSaveMessage("保存失败，请重试编辑器左上角的保存");
     }
-    return;
-   }
-   throw new Error("等待保存确认超时。请勿关闭页面，可重试保存。");
-  }catch(error){
-   dirty.current=true;
-   setSaveState("failed");
-   setSaveMessage(errorCopy(error,"保存失败，请重试"));
-  }finally{saving.current=false;}
- }
+   }catch{
+    if(active){setSaveState("failed");setSaveMessage("无法确认服务器保存状态，请检查网络");}
+   }finally{inFlight=false;}
+  };
+  const timer=window.setInterval(()=>void check(),1200);
+  return()=>{active=false;window.clearInterval(timer);};
+ },[file,sessionId]);
 
  async function close(){
-  if(saving.current)return;
   if(dirty.current&&!window.confirm("修改尚未确认保存。确定要放弃修改并退出吗？"))return;
   try{
    if(sessionId)await fileApi.cancelOfficeSession(file?.id??"",sessionId);
@@ -184,13 +179,11 @@ export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
  }
 
  const guardedLogout=()=>{
-  if(saving.current)return;
   if(dirty.current&&!window.confirm("修改未保存。确定退出登录并放弃修改吗？"))return;
   onLogout();
  };
  return <AppShell user={user} onLogout={guardedLogout} product="文档编辑" actions={<>
-  <RareButton type="button" tone="primary" onClick={()=>void save()} loading={saveState==="saving"} disabled={status!=="ready"}>保存</RareButton>
-  <RareButton type="button" tone="neutral" onClick={()=>void close()} disabled={saveState==="saving"}>结束编辑</RareButton>
+  <RareButton type="button" tone="neutral" onClick={()=>void close()}>结束编辑</RareButton>
  </>}>
   <div className="office-stage">
    <div className="office-edit-strip">
@@ -202,7 +195,6 @@ export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
     {status!=="ready"&&<div className="office-loading-cover" role={status==="failed"?"alert":"status"}>
      {status==="failed"?<><strong>无法打开文档</strong><span>{message}</span><RareButton type="button" onClick={()=>window.location.reload()}>重试</RareButton></>:<span>正在加载 Office 文档…</span>}
     </div>}
-    {saveState==="saving"&&<div className="office-saving-shield" aria-label="正在保存文档"/>}
    </div>
   </div>
  </AppShell>;

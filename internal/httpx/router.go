@@ -191,6 +191,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.PUT("/folders/:id/approval-policy", h.setApprovalPolicy)
 	api.DELETE("/folders/:id/approval-policy", h.clearApprovalPolicy)
 	api.POST("/files/:id/office/session", h.openOfficeSession)
+	api.GET("/files/:id/office/session/:sid/state", h.nativeOfficeSaveStatus)
 	api.POST("/files/:id/office/session/:sid/save", h.saveOfficeSession)
 	api.GET("/files/:id/office/session/:sid/save/:rid", h.officeSaveStatus)
 	api.POST("/files/:id/office/session/:sid/cancel", h.cancelOfficeSession)

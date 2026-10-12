@@ -127,6 +127,14 @@ func (r *Repository) OfficeSaveEventOutcome(ctx context.Context, sessionID, even
 	return outcome, err
 }
 
+func (r *Repository) OfficeNativeSaveCounts(ctx context.Context, sessionID string) (int64, int64, error) {
+	var committed, failed int64
+	err := r.Q.QueryRow(ctx, `SELECT count(*) FILTER (WHERE outcome='native_committed'),
+		count(*) FILTER (WHERE outcome='native_failed')
+		FROM office_save_events WHERE session_id=$1`, sessionID).Scan(&committed, &failed)
+	return committed, failed, err
+}
+
 func (r *Repository) RecordSaveEvent(ctx context.Context, e domain.OfficeSaveEvent) error {
 	_, err := r.Q.Exec(ctx,
 		`INSERT INTO office_save_events(id,session_id,generation,callback_status,event_hash,outcome)
