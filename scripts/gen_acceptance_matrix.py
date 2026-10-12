@@ -276,7 +276,7 @@ def build():
         if MATRIX[identifier][0] == "EXTERNAL":
             doc.append("- `%s` — %s" % (identifier, MATRIX[identifier][1]))
     doc.append("")
-    return "\n".join(doc), counts, len(declared)
+    return "\n".join(doc).rstrip() + "\n", counts, len(declared)
 
 
 def main():

@@ -7,7 +7,7 @@ gaps and must be registered in `docs/OPEN-BLOCKERS.md`; `EXTERNAL` rows
 wait on customer/licence input. Run `python3 scripts/gen_acceptance_matrix.py --check`
 to fail the build on an unverified id.
 
-Status totals: **123 PASS / 2 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
+Status totals: **123 PASS / 3 PARTIAL / 0 EXTERNAL** (of 126 declared ids).
 
 ## S — 安全 / ACL / 一致性矩阵
 
@@ -34,7 +34,7 @@ Status totals: **123 PASS / 2 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 | S19 | ### 13.3 第一阶段新验收 S14–S19 | **PASS** | S14–S19 阶段标题 |
 | S20 | VS01–VS18 属于首期品牌验收，附加在 S13/S20，不可被“已经有 CSS 文件”代替。 | **PARTIAL** | 官方 Logo 已按 BRAND-03 可信入库（SHA-256 与 BRAND-02 一致，BLK-01 关闭），登录/顶栏/favicon 已使用该资产；VS01–VS18 截图签收待在远端重跑 |
 | S21 | S21：DO01–DO14，真正 DOCX 编辑+保存、锁/审批、回调、版本、服务不可用和安全负面用例。 | **PASS** | DO01–DO14 全矩阵 + office_session_check.py 12/12 + do05_header_footer_check.py 15/15 |
-| S22 | S6：DOCX、MP4、PNG、PDF、TXT 基础预览和 MP4 Range/206；模型格式完整预览在 S22 验收，不用提示页代替。 | **PASS** | 真实查看器（three.js）渲染原生格式、STEP/IGES 经 worker 转换后渲染；无提示页代替；DWG 属 MC11 外部项 |
+| S22 | S6：DOCX、MP4、PNG、PDF、TXT 基础预览和 MP4 Range/206；模型格式完整预览在 S22 验收，不用提示页代替。 | **PASS** | 真实查看器渲染 DXF/网格格式，STEP/IGES 由 worker 转换；DWG 可选 LibreDWG 转 DXF，限制见 MC11 |
 
 ## PT — 纯文本双重标准与字节保真
 
@@ -84,7 +84,7 @@ Status totals: **123 PASS / 2 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 | MC08 | MC08：PLY 受支持的点/网格类型； | **PASS** | PLYLoader 覆盖 ascii/binary 点/网格几何，浏览器实测渲染 |
 | MC09 | MC09：3MF 多部件及基本材质； | **PASS** | mc_multiasset_check.mjs：双部件 3MF 渲染 24 三角形（2x12），多部件解析生效 |
 | MC10 | MC10：DXF 图层、圆弧、尺寸/文字； | **PASS** | 自研 DXF 解析器渲染图层/圆弧/文字，浏览器实测图层开关面板 |
-| MC11 | MC11：DWG 两种来源版本的许可 PoC，没有许可证判 BLOCKED； | **EXTERNAL** | DWG 需商业 SDK 许可（ODA Teigha 等），维持 licence-blocked（BLK-03） |
+| MC11 | MC11：DWG 两种来源版本的许可 PoC，没有许可证判 BLOCKED； | **PARTIAL** | DWG 可选 LibreDWG dwgread→DXF Worker 转换；缺少转换器时能力矩阵保持禁用，部分专有对象和 SHX 字体仍需与 AutoCAD 对照验收 |
 | MC12 | MC12：超大装配受限制且不拖垮 API； | **PASS** | worker 内存/超时/并发上限 + pe12_cad_saturation.py 7/7（API p95 劣化 x0.93–x1.14） |
 | MC13 | MC13：没有 preview 权限者无法取 manifest/content/thumbnail； | **PASS** | mc_cad_e2e.py：'MC13 ungranted derivative status refused' / 'bytes refused' |
 | MC14 | MC14：同版本并发请求转换任务去重； | **PASS** | mc_cad_e2e.py：5 个并发转换请求全部返回同一 derivativeId（EnsureDerivative ON CONFLICT 收敛） |
@@ -177,7 +177,6 @@ Status totals: **123 PASS / 2 PARTIAL / 1 EXTERNAL** (of 126 declared ids).
 
 - `S12` — 升级/回退演练已取证（scripts/upgrade_rollback_drill.py 12/12，含跨 MSH 格式边界的回退：新构建写入的数据在旧构建下字节级存活）；远程 URL 可达已在 LAN 验证；systemd 开机自启的单元已编写并语法验证但未安装（BLK-05 授权）
 - `S20` — 官方 Logo 已按 BRAND-03 可信入库（SHA-256 与 BRAND-02 一致，BLK-01 关闭），登录/顶栏/favicon 已使用该资产；VS01–VS18 截图签收待在远端重跑
+- `MC11` — DWG 可选 LibreDWG dwgread→DXF Worker 转换；缺少转换器时能力矩阵保持禁用，部分专有对象和 SHX 字体仍需与 AutoCAD 对照验收
 
 ## EXTERNAL 登记
-
-- `MC11` — DWG 需商业 SDK 许可（ODA Teigha 等），维持 licence-blocked（BLK-03）
