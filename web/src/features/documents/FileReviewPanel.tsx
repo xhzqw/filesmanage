@@ -13,6 +13,7 @@ export function FileReviewPanel({fileId,versions}:{fileId:string;versions:FileVe
  const[state,setState]=useState<"loading"|"ready"|"failed">("loading");
  const[error,setError]=useState("");
  const[body,setBody]=useState("");
+ const[composing,setComposing]=useState(false);
  const[line,setLine]=useState("");
  const[busy,setBusy]=useState(false);
  const[moreBusy,setMoreBusy]=useState(false);
@@ -37,7 +38,7 @@ export function FileReviewPanel({fileId,versions}:{fileId:string;versions:FileVe
    await toast.track(()=>fileApi.addReviewComment(fileId,{version:seq,lineNumber,body:body.trim()}),{
     loading:"正在提交批注…",success:"批注已添加",error:e=>errorCopy(e,"新增批注失败")
    });
-   setBody("");setLine("");setRefresh(i=>i+1);
+   setBody("");setLine("");setComposing(false);setRefresh(i=>i+1);
   }catch(err){setError(errorCopy(err,"新增批注失败"));}
   finally{setBusy(false);}
  }
@@ -67,15 +68,18 @@ export function FileReviewPanel({fileId,versions}:{fileId:string;versions:FileVe
    <label>审查版本<RareSelect value={seq} onChange={e=>setSeq(Number(e.target.value))}>
     {versions.slice().sort((a,b)=>b.versionSeq-a.versionSeq).map(v=><option key={v.versionSeq} value={v.versionSeq}>v{v.versionSeq}</option>)}
    </RareSelect></label>
-   <RareButton type="button" onClick={()=>setRefresh(x=>x+1)}>刷新</RareButton>
+   <div className="file-review-header-actions">
+    <RareButton type="button" aria-label="刷新批注" onClick={()=>setRefresh(x=>x+1)}>刷新</RareButton>
+    <RareButton type="button" aria-expanded={composing} onClick={()=>setComposing(value=>!value)}>{composing?"收起":"＋ 批注"}</RareButton>
+   </div>
   </header>
-  <form className="file-review-form" onSubmit={submit}>
+  {composing&&<form className="file-review-form" onSubmit={submit}>
    <RareTextarea aria-label="批注内容" value={body} onChange={e=>setBody(e.target.value)} placeholder="填写审查意见…" rows={3} maxLength={2000} required disabled={busy}/>
    <div className="file-review-actions">
     <RareInput aria-label="关联行号（可选）" value={line} onChange={e=>setLine(e.target.value)} placeholder="行号（可选）" inputMode="numeric" disabled={busy}/>
     <RareButton type="submit" className="primary" disabled={busy||!body.trim()}>{busy?"提交中…":"添加批注"}</RareButton>
    </div>
-  </form>
+  </form>}
   {error&&<p role="alert" className="notice error">{error}</p>}
   {state==="loading"&&<p role="status" className="hint">正在加载审查记录…</p>}
   {state==="failed"&&<RareButton type="button" onClick={()=>setRefresh(x=>x+1)}>重试</RareButton>}

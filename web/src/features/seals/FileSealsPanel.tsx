@@ -112,7 +112,7 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
   if(!selected||!maySign||duplicate||!isPDF||!pageCount||!rotationFits||!imageAvailable||busy||(!staged.some(item=>item.assetId===selected.id)&&staged.length>=20))return;
   const item:DraftSeal={assetId:selected.id,pageNumber:page,...position,angleDegrees:angle};
   setStaged(list=>list.some(s=>s.assetId===item.assetId)?list.map(s=>s.assetId===item.assetId?item:s):[...list,item]);
-  toast.info("已加入待签清单");setError("");
+  setError("");
  }
  function removeDraft(id:string){
   setStaged(list=>list.filter(item=>item.assetId!==id));
@@ -130,7 +130,7 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
  }
  const controls = <div className="seal-file-controls">
    {error&&<p role="alert" className="notice error">{error}</p>}
-   <label>选择签名 / 印章
+   <label>签名 / 公章
     <RareSelect value={assetId} onChange={e=>pickAsset(e.target.value)}>
      <option value="">选择人员或公章</option>
      {assets.map(a=><option key={a.id} value={a.id}
@@ -147,6 +147,8 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
     <img src={sealsApi.imageUrl(selected.id)} alt={selected.name}/>
     <span>{selected.kind==="personal"?(selected.ownerName||"未绑定")+"的签名":"公司印章"} · {selected.name}</span>
    </div>}
+   {selected&&<details className="seal-advanced-settings">
+    <summary>精确调整 <span>{Math.round(position.width*100)}% · {angle}°</span></summary>
    <div className="seal-size-controls">
     <label>宽度 %<RareInput type="number" min={5} max={100} step={1} value={Math.round(position.width*100)}
      onChange={e=>changeSize({width:clamp((Number(e.target.value)||5)/100,1)})}/></label>
@@ -166,12 +168,13 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
     </div>
     {!rotationFits&&<p role="status" className="seal-angle-warning">旋转后超出页面，请调整大小或位置。</p>}
    </div>
+   </details>}
    <RareButton type="button" disabled={busy||!selected||!maySign||duplicate||!rotationFits||!imageAvailable||!isPDF||!pageCount||(!staged.some(s=>s.assetId===assetId)&&staged.length>=20)} onClick={addDraft}>
     {staged.some(s=>s.assetId===assetId)?"更新当前签章位置":"＋ 加入待签清单"}
    </RareButton>
-   <div className="seal-draft-heading">待签清单 <RareBadge tone="neutral">{staged.length}/20</RareBadge></div>
+   <div className="seal-draft-heading">待签 <RareBadge tone="neutral">{staged.length}</RareBadge></div>
    <div className="seal-draft-list" aria-label="本次待签人员和印章">
-    {staged.length===0&&<span className="seal-draft-empty">选择一枚签章并定位，可依次加入多位人员。</span>}
+    {staged.length===0&&<span className="seal-draft-empty">暂无待签项</span>}
     {staged.map((item,i)=>{
      const a=assets.find(x=>x.id===item.assetId);
      return <div className={"seal-draft-row"+(assetId===item.assetId?" is-active":"")} key={item.assetId}>
@@ -183,27 +186,31 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
      </div>;
     })}
    </div>
-   <label>本人登录密码<RareInput type="password" autoComplete="new-password" value={password}
-    placeholder="整批提交前输入" onChange={e=>setPassword(e.target.value)}/></label>
-   <RareButton className="primary" disabled={busy||!isPDF||!pageCount||!staged.length||!password||!imageAvailable} onClick={()=>void sign()}>
-    {busy?"正在签署…":"确认全部签署（"+staged.length+"）"}
-   </RareButton>
+   {staged.length>0&&<div className="seal-submit-panel">
+    <RareInput type="password" aria-label="本人登录密码" autoComplete="new-password" value={password}
+     placeholder="输入登录密码确认" onChange={e=>setPassword(e.target.value)}/>
+    <RareButton className="primary" disabled={busy||!isPDF||!pageCount||!password||!imageAvailable} onClick={()=>void sign()}>
+     {busy?"正在签署…":"确认签署（"+staged.length+"）"}
+    </RareButton>
+   </div>}
    {!isPDF&&<p className="hint">Office 文件需先生成 PDF 副本再签署。</p>}
   </div>;
- const history = <aside className="seal-file-history">
+ const history = <details className="seal-sidebar-history">
+  <summary>签署记录 <span>{marks.length}</span></summary>
+  <aside className="seal-file-history">
    <SealRevisionControls fileId={fileId} seq={seq} sha={sha} isAdmin={isAdmin}
     refreshKey={revision} onSelect={onSelectRevision} onRestored={()=>{
      setStaged([]);setAssetId("");setRevision(n=>n+1);onChanged();
     }}/>
 
-   <div className="seal-library-heading">签署记录 <span>{marks.length}</span></div>
    {marks.length===0&&<p className="empty">此版本尚无签章</p>}
    {marks.map(m=><div key={m.id} className="seal-history-row">
     <div><strong>{m.assetName}</strong><RareBadge tone="neutral">第 {m.pageNumber} 页</RareBadge></div>
     <small>{m.signerName} · {new Date(m.createdAt).toLocaleString("zh-CN")}</small>
     <small>v{m.versionSeq} · {m.angleDegrees?m.angleDegrees+"° · ":""}SHA {m.fileSha256.slice(0,12)}…</small>
    </div>)}
-  </aside>;
+  </aside>
+ </details>;
  return <div className={"seal-file-workspace"+(controlsTargetId?" is-workbench":"")}>
   {controlsTargetId&&host?createPortal(<div className="file-seal-sidebar-controls">{controls}{history}</div>,host):<>{controls}{history}</>}
   {isPDF?<SealPageCanvas fileId={fileId} page={page} imageUrl={imageUrl} selected={selected} marks={marks}

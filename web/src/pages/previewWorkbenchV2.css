@@ -88,3 +88,44 @@
 .file-workbench-signing .seal-page-viewport{padding:14px 22px}
 @media(max-width:820px){.file-seal-sidebar-host{max-height:180px}.file-workbench-signing .seal-file-workspace.is-workbench{min-height:0;height:100%}}
 @media(prefers-reduced-motion:reduce){.file-action-expansion{animation:none}.file-workbench-side-actions .file-more-trigger svg{transition:none}}
+/* Quiet contextual sidebar: essential actions first, details on demand. */
+.file-workbench-nav{gap:1px;padding:8px 8px 5px}
+.file-workbench-nav .file-workbench-nav-item{height:34px;min-height:34px;font-size:12px;padding:0 9px}
+.file-sidebar-context{padding:10px 11px}
+.file-sidebar-context .file-sidebar-disclosure{padding:0;border-bottom:1px solid var(--border-hairline)}
+.file-sidebar-context .file-sidebar-disclosure>summary,
+.file-seal-sidebar-controls .seal-advanced-settings>summary,
+.file-seal-sidebar-controls .seal-sidebar-history>summary{display:flex;align-items:center;justify-content:space-between;min-height:38px;padding:6px 3px;cursor:pointer;font-size:12px;font-weight:550;color:var(--text-secondary);list-style:none}
+.file-sidebar-context summary::-webkit-details-marker,.file-seal-sidebar-controls summary::-webkit-details-marker{display:none}
+.file-sidebar-context summary::after,.file-seal-sidebar-controls summary::after{content:"⌄";font-size:13px;color:var(--text-tertiary);transition:transform 160ms ease}
+.file-sidebar-context details[open]>summary::after,.file-seal-sidebar-controls details[open]>summary::after{transform:rotate(180deg)}
+.file-sidebar-context .file-properties-compact{gap:0;margin:0 0 8px}
+.file-sidebar-context .file-properties-compact>div{display:flex;align-items:start;justify-content:space-between;gap:8px;padding:7px 0}
+.file-sidebar-context .file-properties-compact>div dt{flex:0 0 auto}
+.file-sidebar-context .file-properties-compact>div dd{min-width:0;text-align:right;overflow-wrap:anywhere}
+.file-sidebar-context .file-metadata-section{padding:4px 0 10px}
+.file-sidebar-context .file-metadata-bar>strong{display:none}
+.file-sidebar-context .file-metadata-bar{justify-content:flex-end}
+.file-seal-sidebar-controls{gap:9px}
+.file-seal-sidebar-controls .seal-file-controls{gap:9px}
+.file-seal-sidebar-controls .seal-selected-asset{padding:4px 0;gap:8px}
+.file-seal-sidebar-controls .seal-selected-asset img{width:44px;height:34px}
+.file-seal-sidebar-controls .seal-selected-asset span{line-height:1.35}
+.file-seal-sidebar-controls .seal-advanced-settings,.file-seal-sidebar-controls .seal-sidebar-history{min-width:0;border-top:1px solid var(--border-hairline)}
+.file-seal-sidebar-controls .seal-advanced-settings>summary span,.file-seal-sidebar-controls .seal-sidebar-history>summary span{font-size:11px;color:var(--text-tertiary);margin-left:auto;margin-right:10px;font-weight:400}
+.file-seal-sidebar-controls .seal-advanced-settings[open]{display:flex;flex-direction:column;gap:9px;padding-bottom:7px}
+.file-seal-sidebar-controls .seal-submit-panel{display:flex;flex-direction:column;gap:6px;padding-top:8px;border-top:1px solid var(--border-hairline)}
+.file-seal-sidebar-controls .seal-draft-list{max-height:190px}
+.file-seal-sidebar-controls .seal-sidebar-history[open]>.seal-file-history{padding-top:4px}
+.file-seal-sidebar-controls .seal-file-controls>.rare-button{width:100%}
+.file-seal-sidebar-controls .seal-advanced-settings .seal-size-controls{gap:6px}
+.file-seal-sidebar-controls .seal-advanced-settings label{font-size:11px}
+@media(prefers-reduced-motion:reduce){.file-sidebar-context summary::after,.file-seal-sidebar-controls summary::after{transition:none}}
+/* Reviews: collapsed composer, compact version selector and action row. */
+.file-sidebar-context .file-review-header{display:flex;align-items:flex-end;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+.file-sidebar-context .file-review-header>label{min-width:85px;flex:1 1 95px}
+.file-sidebar-context .file-review-header-actions{display:flex;align-items:center;gap:4px}
+.file-sidebar-context .file-review-header-actions .rare-button{min-height:30px;padding-inline:7px;white-space:nowrap;font-size:11px}
+.file-sidebar-context .file-review-form{padding-bottom:9px;margin-bottom:9px;border-bottom:1px solid var(--border-hairline)}
+.file-sidebar-context .file-review-list{margin:0;gap:5px}
+.file-sidebar-context .file-review-item{padding:9px 1px}

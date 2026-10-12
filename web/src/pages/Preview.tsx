@@ -262,21 +262,27 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
         </div>
        </div>
        {tab==="details"&&<section id="file-panel-details" role="tabpanel" aria-labelledby="file-tab-details" className="file-sidebar-context file-details-panel">
-      <FileMetadataEditor fileId={id}/>
-      <dl className="file-properties">
-       <div><dt>文件名</dt><dd>{preview.name}</dd></div>
-       <div><dt>文件类型</dt><dd>{fileExtension(preview.name)} · {preview.contentType||"未知"}</dd></div>
-       <div><dt>文件大小</dt><dd>{formatSize(preview.size)}（{preview.size.toLocaleString()} 字节）</dd></div>
-       <div><dt>当前版本</dt><dd>v{currentSeq}</dd></div>
-       {file&&<div><dt>修改时间</dt><dd>{versionTime(file.updatedAt)}</dd></div>}
-       {file&&<div><dt>创建人</dt><dd>{file.uploadedBy}</dd></div>}
-       <div><dt>SHA-256</dt><dd className="file-full-hash">{preview.sha256}</dd></div>
-       {preview.textual&&<>
-        <div><dt>文本编码</dt><dd>{preview.byteMeta.encoding}</dd></div>
-        <div><dt>行尾格式</dt><dd>{preview.byteMeta.eol}</dd></div>
-        <div><dt>字节标记 / 末尾换行</dt><dd>{preview.byteMeta.hasBom?"包含 BOM":"无 BOM"} / {preview.byteMeta.endsWithNewline?"有":"无"}</dd></div>
-       </>}
-      </dl>
+       <dl className="file-properties file-properties-compact">
+        {file&&<div><dt>修改于</dt><dd>{versionTime(file.updatedAt)}</dd></div>}
+        {file&&<div><dt>创建人</dt><dd>{file.uploadedBy}</dd></div>}
+       </dl>
+       <details className="file-sidebar-disclosure">
+        <summary>分类与标签</summary>
+        <FileMetadataEditor fileId={id}/>
+       </details>
+       <details className="file-sidebar-disclosure">
+        <summary>技术信息</summary>
+        <dl className="file-properties">
+         <div><dt>格式</dt><dd>{fileExtension(preview.name)} · {preview.contentType||"未知"}</dd></div>
+         <div><dt>大小</dt><dd>{preview.size.toLocaleString()} B</dd></div>
+         <div><dt>SHA-256</dt><dd className="file-full-hash">{preview.sha256}</dd></div>
+         {preview.textual&&<>
+          <div><dt>编码</dt><dd>{preview.byteMeta.encoding}</dd></div>
+          <div><dt>行尾</dt><dd>{preview.byteMeta.eol}</dd></div>
+          <div><dt>BOM / 末尾换行</dt><dd>{preview.byteMeta.hasBom?"有":"无"} / {preview.byteMeta.endsWithNewline?"有":"无"}</dd></div>
+         </>}
+        </dl>
+       </details>
      </section>}
 
             {tab==="review"&&<section id="file-panel-review" role="tabpanel" aria-labelledby="file-tab-review" className="file-sidebar-context">
@@ -338,7 +344,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
             {hasOpenedSeals&&<section hidden={tab!=="seals"} id="file-panel-seals" role="tabpanel" aria-labelledby="file-tab-seals" className="file-workbench-mode-panel file-workbench-signing">
       {isOfficeName(preview.name)?
        <DocxSealConversion fileId={id} versionSeq={currentSeq} sha={preview.sha256} name={preview.name}/>:
-       <FileSealsPanel fileId={id} seq={currentSeq} sha={preview.sha256} name={preview.name} isAdmin={user.isAdmin} controlsTargetId="file-seals-sidebar" onSelectRevision={value=>{setSealRevision(value);setTab("preview")}} onChanged={()=>{setSealRevision(null);refresh();toast.success("签章版本已更新")}}/>}
+       <FileSealsPanel fileId={id} seq={currentSeq} sha={preview.sha256} name={preview.name} isAdmin={user.isAdmin} controlsTargetId="file-seals-sidebar" onSelectRevision={value=>{setSealRevision(value);setTab("preview")}} onChanged={()=>{setSealRevision(null);refresh()}}/>}
      </section>}
 
       </div>
