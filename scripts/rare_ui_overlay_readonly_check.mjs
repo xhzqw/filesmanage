@@ -372,43 +372,33 @@ try{
   assert.equal(await evalJS('document.activeElement?.classList.contains("account-trigger")'),true,"Escape restores trigger");
   if(shellOnly){results.push(width+"px: branded pills, utility geometry, nav click, account menu PASS");continue;}
   await waitFor('!!document.querySelector(".file-toolbar")');
-  const folderTree=await evalJS(`(()=>{const input=document.querySelector('.tree-head input[aria-label="搜索目录"]'),
-   current=document.querySelector('.tree li[aria-current="page"]>.tree-row'),
-   rail=document.querySelector('.tree>.spring-rail-host');
-   return{search:!!input,selected:!!current,rail:rail?getComputedStyle(rail).display:null,
-    selectedBackground:current?getComputedStyle(current).backgroundColor:null,
-    overflow:document.documentElement.scrollWidth-innerWidth};})()`);
-  assert(folderTree.search&&folderTree.overflow<=1,"folder tree searchable at "+width+": "+JSON.stringify(folderTree));
-  // The explorer is one frame with one internal seam. Search and first-row
-  // edges must line up, without nesting a second focus outline.
   const explorer=await evalJS(`(()=>{const panel=document.querySelector(".panels.document-explorer"),
-   sidebar=panel?.querySelector(".sidebar"),work=panel?.querySelector(".work"),
-   control=panel?.querySelector(".tree-search-control"),
-   input=control?.querySelector(".tree-search"),row=panel?.querySelector(".tree>li>.tree-row");
-   if(!panel||!sidebar||!work||!control||!input)return null;
-   const cs=getComputedStyle,rect=control.getBoundingClientRect();input.focus();
-   const geometry={gap:cs(panel).columnGap,sideLeft:cs(sidebar).borderLeftWidth,
-    sideRight:cs(sidebar).borderRightWidth,sideBottom:cs(sidebar).borderBottomWidth,
-    workLeft:cs(work).borderLeftWidth,workRight:cs(work).borderRightWidth,
-    inputOutline:cs(input).outlineStyle,searchHeight:rect.height,
-    aligned:!row||Math.abs(rect.left-row.getBoundingClientRect().left)<=2,
-    contained:rect.left>=sidebar.getBoundingClientRect().left&&rect.right<=sidebar.getBoundingClientRect().right};
-   input.blur();return geometry;})()`);
-  assert(explorer&&explorer.gap==="0px"&&explorer.sideLeft==="0px"&&explorer.workLeft==="0px"&&explorer.workRight==="0px"&&
-   (width<=700?explorer.sideRight==="0px"&&explorer.sideBottom==="1px":explorer.sideRight==="1px")&&
-   explorer.inputOutline==="none"&&explorer.searchHeight>=36&&explorer.aligned&&explorer.contained,
-   "single-seam explorer and spacious directory search at "+width+": "+JSON.stringify(explorer));
-  if(folderTree.selected)assert(folderTree.rail!=="none"&&folderTree.selectedBackground!=="rgba(0, 0, 0, 0)",
-   "selected folder has visible Rare spring rail at "+width+": "+JSON.stringify(folderTree));
+   sidebar=panel?.querySelector(".finder-sidebar"),work=panel?.querySelector(".work"),
+   navigation=sidebar?.querySelector('nav[aria-label="文档位置与共享"]'),
+   all=sidebar?.querySelector('.finder-nav-item[href="/doc"]'),
+   favorite=sidebar?.querySelector('.finder-nav-item[href="/doc?view=favorites"]'),
+   received=sidebar?.querySelector('.finder-nav-item[href="/doc?view=received"]'),
+   sent=sidebar?.querySelector('.finder-nav-item[href="/doc?view=sent"]');
+   if(!panel||!sidebar||!work||!navigation||!all||!favorite||!received||!sent)return null;
+   const a=sidebar.getBoundingClientRect(),b=work.getBoundingClientRect(),
+    items=[all,favorite,received,sent],selected=getComputedStyle(all).backgroundColor;
+   return{navLabels:items.map(x=>x.textContent.trim()),selected:all.getAttribute('aria-current'),
+    selectedBg:selected,treeRemoved:!sidebar.querySelector(".tree,.tree-search"),
+    clickTargets:items.every(x=>{const r=x.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return x.contains(hit)}),
+    sideInside:a.left>=-1&&a.right<=innerWidth+1,mainInside:b.left>=-1&&b.right<=innerWidth+1,
+    adjacent:a.right<=b.left+1,gap:b.left-a.right,overflow:document.documentElement.scrollWidth-innerWidth};})()`);
+  assert(explorer&&explorer.treeRemoved&&explorer.navLabels.join("|")==="全部文档|我的关注|与我共享|我共享的"
+   &&explorer.selected==="page"&&explorer.selectedBg!=="rgba(0, 0, 0, 0)"
+   &&explorer.clickTargets&&explorer.sideInside&&explorer.mainInside&&explorer.adjacent&&explorer.overflow<=1,
+   "Finder document sidebar, selected nav and real pointer targets at "+width+": "+JSON.stringify(explorer));
   if(width===1440){
-   await evalJS(`(()=>{const input=document.querySelector('.tree-head input[aria-label="搜索目录"]');
-    const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
-    setter.call(input,'test-rare-folder');input.dispatchEvent(new Event('input',{bubbles:true}));return true})()`);
-   await waitFor('!!document.querySelector(".tree-search-clear")');
-   await click(".tree-search-clear");
-   assert.equal(await evalJS(`document.querySelector('.tree-head input[aria-label="搜索目录"]')?.value`),"");
+   await click('.finder-nav-item[href="/doc?view=favorites"]');
+   await waitFor('location.pathname==="/doc" && new URLSearchParams(location.search).get("view")==="favorites"');
+   await waitFor('!!document.querySelector(".collab-results")');
+   await click('.finder-nav-item[href="/doc"]');
+   await waitFor('location.pathname==="/doc" && location.search===""');
   }
-  if(explorerOnly){results.push(width+"px: single seam, aligned spacious search and keyboard focus OK");continue;}
+  if(explorerOnly){results.push(width+"px: Finder sidebar navigation and hit targets OK");continue;}
   // The complete grant workflow and file-manager quick grant share the same
   // nine-choice picker and subject/scope controls; editing here is local only.
   if((width===1440||width===390)&&await evalJS('!!document.querySelector(".folder-actions .ghost-action-btn")')){
