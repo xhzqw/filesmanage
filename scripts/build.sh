@@ -10,6 +10,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+echo "== brand: high-resolution transparent logo loader =="
+python3 scripts/brand_loader_asset_check.py
+
 echo "== web: npm ci + vite build =="
 if [ -d web/node_modules ]; then
   (cd web && npm run build)
