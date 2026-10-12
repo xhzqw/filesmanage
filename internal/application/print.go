@@ -125,7 +125,7 @@ func (s *Service) openBrowserPrintSource(ctx context.Context, u domain.User, id,
 }
 
 func (s *Service) BrowserPrintOfficePDF(ctx context.Context, u domain.User, id, sha string) ([]byte, error) {
- return s.BrowserPrintOfficePDFSheet(ctx,u,id,sha,"")
+	return s.BrowserPrintOfficePDFSheet(ctx, u, id, sha, "")
 }
 
 func (s *Service) BrowserPrintOfficePDFSheet(ctx context.Context, u domain.User, id, sha, sheetName string) ([]byte, error) {
@@ -137,5 +137,5 @@ func (s *Service) BrowserPrintOfficePDFSheet(ctx context.Context, u domain.User,
 		return nil, err
 	}
 	defer done()
-	return renderOfficePDFSourceWithSheet(ctx, source,sheetName)
+	return renderOfficePDFSourceWithSheet(ctx, source, sheetName)
 }

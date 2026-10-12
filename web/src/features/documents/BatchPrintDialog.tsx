@@ -76,7 +76,7 @@ export function BatchPrintDialog({files,onClose}:{files:FileItem[];onClose:()=>v
     {watermark&&<label>水印文字<RareInput value={markText} disabled={busy} maxLength={60}
      onChange={event=>setMarkText(event.target.value)}/></label>}
     <p className="batch-print-note">逐份打开系统打印预览。PDF/Office 页码和打印区域由浏览器设置；水印仅支持文本、图片。</p>
-    {item&&state[item.id]&&<p role="status" className="batch-print-result">{state[item.id].message}</p>}
+    {item&&state[item.id]&&<p role="status" className="batch-print-result">{state[item.id]?.message}</p>}
     <div className="batch-print-navigation">
      <RareButton type="button" disabled={busy||active===0} onClick={()=>setActive(i=>Math.max(0,i-1))}>上一份</RareButton>
      <RareButton type="button" disabled={busy||active===selection.length-1} onClick={()=>setActive(i=>Math.min(selection.length-1,i+1))}>下一份</RareButton>

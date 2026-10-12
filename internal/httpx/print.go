@@ -80,9 +80,12 @@ func (h *Handler) browserPrintOfficePDF(c *gin.Context) {
 		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
 		return
 	}
- sheet:=c.Query("sheet")
- if len(sheet)>200 {c.JSON(400,gin.H{"ok":false,"error":gin.H{"code":"E_BAD"}});return}
- pdf, err := h.S.BrowserPrintOfficePDFSheet(c.Request.Context(), u, c.Param("id"), sha,sheet)
+	sheet := c.Query("sheet")
+	if len(sheet) > 200 {
+		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+		return
+	}
+	pdf, err := h.S.BrowserPrintOfficePDFSheet(c.Request.Context(), u, c.Param("id"), sha, sheet)
 	if err != nil {
 		if err == application.ErrPreviewUnsupported {
 			c.JSON(415, gin.H{"ok": false, "error": gin.H{"code": "E_PREVIEW_UNSUPPORTED"}})
@@ -100,12 +103,20 @@ func (h *Handler) browserPrintOfficePDF(c *gin.Context) {
 }
 
 func (h *Handler) browserPrintSheets(c *gin.Context) {
- u,ok:=h.auth(c)
- if !ok{return}
- sha:=c.Query("sha256")
- if !hexSHA(sha){c.JSON(400,gin.H{"ok":false,"error":gin.H{"code":"E_BAD"}});return}
- sheets,err:=h.S.BrowserPrintSheets(c.Request.Context(),u,c.Param("id"),sha)
- if err!=nil{respondError(c,err);return}
- c.Header("Cache-Control","no-store")
- c.JSON(200,gin.H{"ok":true,"data":sheets})
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	sha := c.Query("sha256")
+	if !hexSHA(sha) {
+		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+		return
+	}
+	sheets, err := h.S.BrowserPrintSheets(c.Request.Context(), u, c.Param("id"), sha)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(200, gin.H{"ok": true, "data": sheets})
 }

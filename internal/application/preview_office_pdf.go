@@ -35,7 +35,7 @@ func (s *Service) OfficePDFPreview(ctx context.Context, u domain.User, fileID st
 }
 
 func renderOfficePDFSource(ctx context.Context, source Download) ([]byte, error) {
- return renderOfficePDFSourceWithSheet(ctx,source,"")
+	return renderOfficePDFSourceWithSheet(ctx, source, "")
 }
 
 func renderOfficePDFSourceWithSheet(ctx context.Context, source Download, sheetName string) ([]byte, error) {
@@ -64,11 +64,15 @@ func renderOfficePDFSourceWithSheet(ctx context.Context, source Download, sheetN
 	if err != nil || index.Kind != format {
 		return nil, ErrPreviewUnsupported
 	}
- if sheetName!="" {
-  if format!="spreadsheet" {return nil,ErrInvalidInput}
-  raw,err=selectWorkbookSheet(raw,sheetName)
-  if err!=nil{return nil,err}
- }
+	if sheetName != "" {
+		if format != "spreadsheet" {
+			return nil, ErrInvalidInput
+		}
+		raw, err = selectWorkbookSheet(raw, sheetName)
+		if err != nil {
+			return nil, err
+		}
+	}
 	// Only known OOXML packages are allowed. Total expanded size limits ZIP
 	// bombs without opening arbitrary members; the preview adapter separately
 	// limits all XML decompression for the textual fallback.
