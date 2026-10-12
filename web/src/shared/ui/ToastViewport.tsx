@@ -1,10 +1,12 @@
 import {useEffect,useRef,useState} from "react";
 import {createPortal} from "react-dom";
+import {AnimatePresence,motion,useReducedMotion} from "motion/react";
 import {RareButton} from "./rare";
 import {toast,useToastStore,type ToastItem} from "./feedback";
 import "./toast.css";
 
 function ToastRow({item}:{item:ToastItem}){
+ const reduced=useReducedMotion();
  const[paused,setPaused]=useState(false);
  const[hidden,setHidden]=useState(()=>document.hidden);
  const remaining=useRef(item.duration);
@@ -24,7 +26,11 @@ function ToastRow({item}:{item:ToastItem}){
   const handle=window.setTimeout(()=>toast.dismiss(item.id),remaining.current);
   return()=>{window.clearTimeout(handle);remaining.current=Math.max(0,remaining.current-(Date.now()-start));};
  },[item.id,item.duration,item.revision,paused,hidden]);
- return <div className="rare-toast" data-toast-tone={item.tone}
+ return <motion.div layout className="rare-toast" data-toast-tone={item.tone}
+  initial={reduced?false:{opacity:0,y:-8,scale:.97}}
+  animate={{opacity:1,y:0,scale:1}}
+  exit={reduced?{opacity:0}:{opacity:0,x:14,scale:.98}}
+  transition={reduced?{duration:0}:{duration:.21,ease:[.2,.8,.2,1]}}
   role={item.tone==="danger"?"alert":"status"}
   onMouseEnter={()=>setPaused(true)} onMouseLeave={()=>setPaused(false)}
   onFocusCapture={()=>setPaused(true)} onBlurCapture={event=>{if(!event.currentTarget.contains(event.relatedTarget))setPaused(false);}}>
@@ -39,7 +45,7 @@ function ToastRow({item}:{item:ToastItem}){
   <RareButton type="button" tone="ghost" className="rare-toast-close" aria-label="关闭通知" onClick={()=>toast.dismiss(item.id)}>
    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"/></svg>
   </RareButton>
- </div>;
+ </motion.div>;
 }
 export function ToastViewport(){
  const items=useToastStore(state=>state.items);
@@ -55,9 +61,10 @@ export function ToastViewport(){
   observer.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:["open"]});
   return()=>observer.disconnect();
  },[]);
- if(!items.length)return null;
  const viewport=<aside className="rare-toast-viewport" aria-label="操作通知">
-  {items.map(item=><ToastRow key={item.id} item={item}/>)}
+  <AnimatePresence initial={false}>
+   {items.map(item=><ToastRow key={item.id} item={item}/>)}
+  </AnimatePresence>
  </aside>;
  // showModal() moves a dialog into the browser top layer. No sibling z-index
  // can beat that layer; render notifications inside the active modal.

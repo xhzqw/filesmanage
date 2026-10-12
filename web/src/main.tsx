@@ -6,4 +6,5 @@ import "./theme.css";
 // Geometry governance is intentionally loaded after the legacy feature sheets.
 // Keep its contracts central instead of reintroducing per-page square corners.
 import "./visualSystem.css";
+import "./motionSystem.css";
 createRoot(document.getElementById("root")!).render(<React.StrictMode><BrowserRouter><App/></BrowserRouter></React.StrictMode>);
