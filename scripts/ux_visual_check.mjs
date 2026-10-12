@@ -881,7 +881,9 @@ async function main() {
       await cdp.evaluate(`(()=>{const row=${keepRow};row?.click();return Boolean(row);})()`);
       await delay(250);
       reportDocPair(await vis(cdp, { op: "text", pair: { id: "selected-row-text", sel: "tbody tr.selected .file-name" } }));
-      reportDocPair(await vis(cdp, { op: "boundary", pair: { id: "selected-row-border", kind: "boundary", sel: "tbody tr.selected" } }));
+      // Selected state is indicated by a checked, contrast-compliant control,
+      // not a high-contrast perimeter around the entire dense file row.
+      reportDocPair(await vis(cdp, { op: "boundary", pair: { id: "selected-checkbox-boundary", kind: "boundary", sel: "tbody tr.selected .col-select input:checked" } }));
       reportDocPair(await vis(cdp, { op: "text", pair: { id: "selection-bar-action", sel: ".selection-bar .secondary-action" } }));
       stateEvidence.selected = await vis(cdp, { op: "rowState" });
 

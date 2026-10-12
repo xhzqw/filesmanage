@@ -155,6 +155,41 @@ try{
   if(width===1440&&await evalJS('!!document.querySelector(".file-table tbody tr[data-id] .col-select input[type=checkbox]")')){
    await click(".file-table tbody tr[data-id] .col-select input[type=checkbox]");
    await waitFor('!!document.querySelector(".file-toolbar .batch-actions-group .file-selected-count")');
+   await sleep(210);
+   // Selection is conveyed by the native checkbox plus soft row tint.
+   // A pointer click must NOT leave a thick row-long focus outline.
+   const selectionStyle=await evalJS(`(()=>{
+    const row=document.querySelector(".file-table tbody tr.selected");
+    const check=row?.querySelector(".col-select input[type=checkbox]");
+    const header=document.querySelector(".file-table thead .col-select input[type=checkbox]");
+    return row&&check&&header?{
+     checked:check.checked,selected:row.getAttribute("aria-selected"),
+     shadow:getComputedStyle(row).boxShadow,
+     outline:getComputedStyle(row).outlineStyle,
+     fill:getComputedStyle(row).backgroundColor,
+     tick:getComputedStyle(check,"::after").opacity,
+     indeterminate:header.indeterminate,
+     headerTabIndex:header.tabIndex,
+     total:document.querySelectorAll(".file-table tbody tr[data-id]").length
+    }:null;
+   })()`);
+   assert(selectionStyle&&selectionStyle.checked&&selectionStyle.selected==="true"
+    &&selectionStyle.shadow==="none"&&selectionStyle.outline==="none"
+    &&Number(selectionStyle.tick)>.95&&selectionStyle.headerTabIndex>=0
+    &&(selectionStyle.total===1||selectionStyle.indeterminate),
+    "quiet file selection/accessible mixed checkbox: "+JSON.stringify(selectionStyle));
+   await send("Input.dispatchMouseEvent",{type:"mouseMoved",x:2,y:2});
+   await sleep(200);
+   const idleActions=await evalJS(`(()=>{
+    const row=document.querySelector(".file-table tbody tr.selected");
+    const actions=row?.querySelector(".actions-hover-group");
+    return actions?{opacity:getComputedStyle(actions).opacity,
+     checked:row.querySelector(".col-select input").checked,
+     alwaysVisible:matchMedia("(hover: none), (pointer: coarse)").matches||document.querySelector(".work-body").clientWidth<=820}:null;
+   })()`);
+   assert(idleActions&&Number(idleActions.opacity)===(idleActions.alwaysVisible?1:0)&&idleActions.checked,
+    "selected file respects desktop hover / touch discoverability: "+JSON.stringify(idleActions));
+   results.push("1440px: quiet selected file, mixed select-all, low-noise actions OK");
    const batch=await evalJS(`(()=>({count:document.querySelector(".file-selected-count")?.textContent?.trim(),
     buttons:[...document.querySelectorAll(".batch-actions-group button")].map(x=>x.textContent?.trim()||x.getAttribute("aria-label"))}))()`);
    assert(batch.count?.includes("1")&&batch.buttons.includes("移动")&&batch.buttons.includes("删除")&&batch.buttons.includes("取消全部选中"),

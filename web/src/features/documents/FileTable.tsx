@@ -219,6 +219,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const[renameValue,setRenameValue]=useState("");
  const[renameBusy,setRenameBusy]=useState(false);
  const[selectedIds,setSelectedIds]=useState<Set<string>>(()=>new Set<string>());
+ const selectAllRef=useRef<HTMLInputElement>(null);
  const[focusedId,setFocusedId]=useState<string|null>(null);
  const[anchorId,setAnchorId]=useState<string|null>(null);
  const[pendingDelete,setPendingDelete]=useState<FileItem[]>([]);
@@ -839,7 +840,13 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
 
  const selection=visibleItems.filter(i=>selectedIds.has(i.id));
  const selectedBytes=selection.reduce((sum,file)=>sum+file.sizeBytes,0);
- const allLoadedSelected=visibleItems.length>0&&visibleItems.every(i=>selectedIds.has(i.id));
+ const selectedVisibleCount=visibleItems.reduce((count,item)=>count+(selectedIds.has(item.id)?1:0),0);
+ const allLoadedSelected=visibleItems.length>0&&selectedVisibleCount===visibleItems.length;
+ // Mixed selection is a real native indeterminate checkbox state, including
+ // screen-reader semantics. Never fake it with another selected-row border.
+ useEffect(()=>{
+  if(selectAllRef.current)selectAllRef.current.indeterminate=selectedVisibleCount>0&&!allLoadedSelected;
+ },[selectedVisibleCount,allLoadedSelected]);
 
  // The work area is not a move target: an internal drag over it is a cancel
  // ("拖回来源", §7.2) and it must not light up the upload zone either, so its
@@ -915,7 +922,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   <div className="table" onClick={event=>{if(!(event.target as HTMLElement).closest("tr")){setSelectedIds(new Set<string>());setAnchorId(null);}}}>
    <RareDataTable role="grid" aria-label={folderName+" 文件列表"} density="compact" className="file-table file-table-ultra">
     <thead><tr>
-     <th className="col-select" scope="col"><RareInput type="checkbox" tabIndex={-1} checked={allLoadedSelected} onChange={toggleSelectAllLoaded} aria-label="选择当前已加载的文件"/></th>
+     <th className="col-select" scope="col"><RareInput ref={selectAllRef} type="checkbox" checked={allLoadedSelected} onChange={toggleSelectAllLoaded} aria-label="选择当前已加载的文件"/></th>
      <th className="col-name" scope="col">文件名</th>
      <th className="col-size" scope="col">大小</th>
      <th className="col-version" scope="col">版本</th>

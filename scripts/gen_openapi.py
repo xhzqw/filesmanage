@@ -1212,6 +1212,9 @@ add("GET","/api/seals",operation("List available signature and seal assets","Sea
 add("POST","/api/seals",operation("Admin import of an immutable PNG personal signature or company seal","Seals","createSealAsset",security=SESSION,
  request={"application/json":{"schema":obj({"kind":string(),"name":string(),"ownerId":string(),"pngBase64":string()},required=["kind","name","pngBase64"])}},
  responses=dict([("201",{"description":"New immutable seal asset"}),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"])])))
+add("POST","/api/seals/bulk",operation("Administrator-only, atomic import of bounded ZIP with SHA-256-verified signature assets and owner login mapping","Seals","importSealBundle",security=SESSION,
+ request={"application/zip":{"schema":{"type":"string","format":"binary"}}},
+ responses=dict([json_ok(obj({"created":integer(),"existing":integer(),"total":integer()},required=["created","existing","total"]),"Atomic import result; identical previously imported images are skipped"),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"])])))
 add("POST","/api/seals/{id}/manage",operation("Admin bind, grant, revoke or retire a seal","Seals","manageSealAsset",security=SESSION,
  params=[id_param("id","Seal ID")],request={"application/json":{"schema":obj({"action":string(),"userId":string()},required=["action"])}},
  responses=dict([json_ok(obj({"updated":string()}),"Updated"),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))

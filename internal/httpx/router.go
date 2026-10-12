@@ -162,6 +162,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.PUT("/seal-permissions/:id", h.updateSealUserPermission)
 	api.GET("/seals", h.listSealAssets)
 	api.POST("/seals", h.createSealAsset)
+	api.POST("/seals/bulk", h.importSealBundle)
 	api.POST("/seals/:id/manage", h.manageSealAsset)
 	api.GET("/seals/:id/image", h.sealImage)
 	api.GET("/files/:id/seals/used", h.usedFileSeals)

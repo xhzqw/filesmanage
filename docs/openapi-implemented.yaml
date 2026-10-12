@@ -5745,6 +5745,67 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/seals/bulk:
+    post:
+      summary: Administrator-only, atomic import of bounded ZIP with SHA-256-verified signature assets and owner login mapping
+      operationId: importSealBundle
+      tags:
+      - Seals
+      security:
+      - cookieSession: []
+      requestBody:
+        required: true
+        content:
+          application/zip:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Atomic import result; identical previously imported images are skipped
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      created:
+                        type: integer
+                      existing:
+                        type: integer
+                      total:
+                        type: integer
+                    required:
+                    - created
+                    - existing
+                    - total
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/seals/{id}/manage:
     post:
       summary: Admin bind, grant, revoke or retire a seal
