@@ -3,6 +3,7 @@ import {Link} from "react-router-dom";
 import {collaborationApi,type Favorite} from "./api";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {FileResourceIcon,FolderResourceIcon} from "../../shared/ui/ResourceIcons";
+import {RareButton} from "../../shared/ui/rare";
 import "./finderSidebar.css";
 
 export type DocumentSection="files"|"favorites"|"received"|"sent";
@@ -51,7 +52,7 @@ export function FinderSidebar({section,revision}:{section:DocumentSection;revisi
    })}
    {status==="ready"&&favorites.length>8&&<Link to="/doc?view=favorites" className="finder-nav-more">查看全部关注</Link>}
    {status==="ready"&&favorites.length===0&&<span className="finder-nav-empty">暂无关注</span>}
-   {status==="failed"&&<button type="button" className="finder-nav-retry" onClick={()=>setToken(n=>n+1)}>重试加载关注</button>}
+   {status==="failed"&&<RareButton type="button" className="finder-nav-retry" onClick={()=>setToken(n=>n+1)}>重试加载关注</RareButton>}
   </div>
   <div className="finder-nav-section">
    <div className="finder-nav-label">共享</div>
