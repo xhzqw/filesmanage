@@ -286,9 +286,16 @@ async function main() {
     // Browser-only print is a proper file action: the workbench opens without
     // downloading the original file, and the server separately authorizes
     // both preview+print against the current immutable source digest.
-    const printOpened = await cdp.clickText("打印");
-    const printPanel = await cdp.waitFor(`()=>Boolean(document.querySelector('dialog.document-print-dialog[open]')?.querySelector('button[aria-label="纸张"]'))`, 5000);
-    check("file preview exposes RareUI print workbench", Boolean(printOpened&&printPanel), "paper settings visible in modal");
+    const printOpened = await cdp.evaluate(`(()=>{
+      const action=[...document.querySelectorAll('.file-workbench-actions button')].find(b=>b.textContent?.trim()==='打印');
+      action?.click();return !!action;
+    })()`);
+    const printPanel = await cdp.waitFor(`()=>Boolean((()=>{
+      const dialog=document.querySelector('dialog.document-print-dialog[open]');
+      return dialog && (dialog.querySelector('select[aria-label="纸张"]') ||
+        dialog.textContent?.includes('浏览器 PDF 查看器'));
+    })())`, 5000);
+    check("file preview exposes RareUI print workbench", Boolean(printOpened&&printPanel), "print dialog with settings appropriate to file type");
     const printPrepared = await cdp.evaluate(`(async()=>{
       const id=location.pathname.split('/').pop();
       const preview=await(await fetch('/api/files/'+encodeURIComponent(id)+'/preview',{credentials:'same-origin'})).json();
@@ -441,7 +448,17 @@ async function main() {
     // 11. logout invalidates the session and deep links redirect to /login
     await cdp.navigate(`${BASE}/doc`);
     await delay(1000);
-    const loggedOut = await cdp.clickText("退出");
+    // Logout is in the account menu, not a permanent standalone button.
+    const accountOpened = await cdp.evaluate(`(()=>{
+      const trigger=document.querySelector('button[aria-label="当前登录用户"]');
+      trigger?.click();return !!trigger;
+    })()`);
+    if(accountOpened)await cdp.waitFor(`()=>Boolean(document.querySelector('[role="menu"][aria-label="账户操作菜单"]'))`,4000);
+    const loggedOut = await cdp.evaluate(`(()=>{
+      const menu=document.querySelector('[role="menu"][aria-label="账户操作菜单"]');
+      const item=[...(menu?.querySelectorAll('[role="menuitem"]')??[])].find(b=>b.textContent?.includes('退出系统'));
+      item?.click();return !!item;
+    })()`);
     await delay(1500);
     const afterLogout = await cdp.evaluate(`(()=>location.pathname)()`);
     const apiDead = await cdp.evaluate(`(async()=>{
