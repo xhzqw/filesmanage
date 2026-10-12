@@ -22,6 +22,7 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
  const closeTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
  const focusOnOpen=useRef(false);
  const suppressHover=useRef(false);
+ const pointerInside=useRef(false);
 
  function cancelClose(){
   if(closeTimer.current!==null){clearTimeout(closeTimer.current);closeTimer.current=null;}
@@ -32,12 +33,27 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
  function collapse(){
   cancelClose();setOpen(false);setResetHint(false);setError("");
  }
+ function collapseAndReturnFocus(){
+  suppressHover.current=true;
+  collapse();
+  // Do not focus the button while it still has visibility:hidden from the
+  // expanded state; let React commit the collapsed view first.
+  // React commits visibility after the close event. Blur the now-hidden
+  // close action and restore keyboard focus once the entry is focusable.
+  if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
+  window.setTimeout(()=>entry.current?.focus({preventScroll:true}),90);
+ }
  function delayedCollapse(){
   cancelClose();
-  if(busy||error||resetHint||zone.current?.contains(document.activeElement))return;
+  // Focusing a control is not a permanent lock: previous logic trapped the
+  // card open after any click, including a click on the submit button.
+  if(busy)return;
   closeTimer.current=setTimeout(()=>{
    closeTimer.current=null;
-   if(!zone.current?.contains(document.activeElement))setOpen(false);
+   if(pointerInside.current)return;
+   const active=document.activeElement;
+   if(active instanceof HTMLElement&&zone.current?.contains(active))active.blur();
+   setOpen(false);
   },CLOSE_DELAY_MS);
  }
  useEffect(()=>()=>{if(closeTimer.current!==null)clearTimeout(closeTimer.current);},[]);
@@ -71,8 +87,8 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
   }}
   onKeyDown={e=>{
    if(e.key==="Escape"&&open){
-    e.preventDefault();suppressHover.current=true;collapse();
-    window.setTimeout(()=>entry.current?.focus({preventScroll:true}),0);
+    e.preventDefault();
+    collapseAndReturnFocus();
    }
   }}>
   <div className="login-scene" aria-hidden="true">
@@ -83,8 +99,22 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
    <h1>中晟生物科技</h1>
   </header>
   <div ref={zone} className={`login-reveal-zone${open?" is-expanded":""}`}
-   onPointerEnter={e=>{cancelClose();if(e.pointerType!=="touch"&&!suppressHover.current)expand();}}
-   onPointerLeave={()=>{suppressHover.current=false;if(open)delayedCollapse();}}
+   onPointerEnter={e=>{
+    if(e.pointerType==="touch")return;
+    pointerInside.current=true;
+    cancelClose();
+    if(!suppressHover.current)expand();
+   }}
+   onPointerLeave={e=>{
+    if(e.pointerType==="touch")return;
+    pointerInside.current=false;
+    suppressHover.current=false;
+    if(open)delayedCollapse();
+   }}
+   onKeyDownCapture={e=>{
+    // Keep an actively typed form usable even when the mouse is elsewhere.
+    if(!pointerInside.current&&open&&e.key!=="Escape")delayedCollapse();
+   }}
    onFocusCapture={cancelClose}
    onBlurCapture={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))delayedCollapse();}}>
    <RareButton ref={entry} type="button" className="login-entry"
@@ -95,7 +125,7 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
    <section id="login-panel" className="login-panel" aria-hidden={!open}>
     <RareButton type="button" className="login-panel-close" tabIndex={open?0:-1}
      aria-label="关闭登录窗口" onClick={()=>{
-      suppressHover.current=true;collapse();entry.current?.focus({preventScroll:true});
+      collapseAndReturnFocus();
      }}>×</RareButton>
     <h2>账号登录</h2>
     <form onSubmit={submit} autoComplete="on">

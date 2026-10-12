@@ -93,9 +93,12 @@ try{
   m.error?slot.reject(Error(m.error.message)):slot.resolve(m.result);
  });
  await send("Page.enable");await send("Runtime.enable");
+ let navigationSeq=0;
  async function navigate(){
-  await send("Page.navigate",{url:base+"/login"});
-  const found=await eventually(()=>evaluate(`(()=>!!document.querySelector(".login-entry"))()`),7500);
+  const marker="interaction-test-"+(++navigationSeq);
+  await send("Page.navigate",{url:base+"/login?qa_nav="+marker});
+  // Do not inspect stale DOM from the previous navigation.
+  const found=await eventually(()=>evaluate(`(()=>location.search.includes("${marker}")&&!!document.querySelector(".login-entry"))()`),7500);
   if(!found)throw Error("login page failed to load");
   await sleep(250);
  }
@@ -120,6 +123,77 @@ try{
  check("click can open form",await eventually(()=>evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`)));
  await evaluate(`(()=>{document.querySelector(".login-panel-close").click();return true})()`);
  check("close control collapses form",!await evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`));
+
+ // Real mouse click + typing: programmatic .click() misses focus traps.
+ async function physicalClick(x,y){
+  await move(x,y);
+  await send("Input.dispatchMouseEvent",{type:"mousePressed",x:Math.round(x),y:Math.round(y),button:"left",clickCount:1});
+  await send("Input.dispatchMouseEvent",{type:"mouseReleased",x:Math.round(x),y:Math.round(y),button:"left",clickCount:1});
+ }
+ await move(5,5);
+ await navigate();
+ await move(720,380);
+ check("real pointer hover opens panel",await eventually(()=>evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`)));
+ const fields=await evaluate(`(()=>{
+  const r=document.querySelector("#login-account").getBoundingClientRect();
+  return {x:r.left+r.width/2,y:r.top+r.height/2};
+ })()`);
+ await physicalClick(fields.x,fields.y);
+ check("real pointer can focus account input",await evaluate(`(()=>document.activeElement?.id==="login-account")()`));
+ await send("Input.insertText",{text:"interaction-check"});
+ check("real keyboard can type account",await evaluate(`(()=>document.querySelector("#login-account").value==="interaction-check")()`));
+ await move(5,5);
+ await sleep(300);
+ check("editing window persists for close grace",await evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`));
+ await sleep(900);
+ check("input focus does not permanently defeat mouseleave",!await evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`));
+ await move(720,380);
+ check("can reopen after timed close",await eventually(()=>evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`)));
+ await sleep(570);
+ const closePosition=await evaluate(`(()=>{
+  const r=document.querySelector(".login-panel-close").getBoundingClientRect();
+  return {x:r.left+r.width/2,y:r.top+r.height/2};
+ })()`);
+
+ await physicalClick(closePosition.x,closePosition.y);
+ await sleep(220);
+ check("real close click closes",!await evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`));
+ await sleep(120);
+ check("close restores focus to visible login entry",
+  await evaluate(`(()=>document.activeElement?.classList.contains("login-entry")&&getComputedStyle(document.activeElement).visibility==="visible")()`));
+
+ await move(730,385);
+ await sleep(300);
+ check("manually closed card stays closed until pointer reenters",!await evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`));
+ await move(5,5);
+ await move(700,370);
+ check("re-entering after close can reopen",await eventually(()=>evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`)));
+ // Clicking outside is always an explicit dismissal, regardless of focus.
+ await physicalClick(10,10);
+ check("outside click closes",!await evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`));
+
+
+ // Touch: a real tap must not lose the target to RareUI :active transforms.
+ await move(5,5);await navigate();
+ await send("Emulation.setTouchEmulationEnabled",{enabled:true,maxTouchPoints:1});
+ await send("Input.dispatchTouchEvent",{type:"touchStart",touchPoints:[{x:720,y:380}]});
+ await send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});
+ check("touch tap opens the login form",await eventually(()=>evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`)));
+ await send("Emulation.setTouchEmulationEnabled",{enabled:false});
+ // Keyboard: focus and Escape should open/close without a mouse.
+ await move(5,5);await navigate();
+ await evaluate(`(()=>{if(document.activeElement instanceof HTMLElement)document.activeElement.blur();document.querySelector(".login-entry").focus();return true})()`);
+ await send("Input.dispatchKeyEvent",{type:"keyDown",key:"Enter",code:"Enter",windowsVirtualKeyCode:13});
+ await send("Input.dispatchKeyEvent",{type:"keyUp",key:"Enter",code:"Enter",windowsVirtualKeyCode:13});
+ check("keyboard Enter opens form",await eventually(()=>evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`)));
+ await sleep(240);
+ check("keyboard-open focuses account",
+  await evaluate(`(()=>document.activeElement?.id==="login-account")()`));
+ await send("Input.dispatchKeyEvent",{type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
+ await send("Input.dispatchKeyEvent",{type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
+ await sleep(120);
+ check("Escape closes and restores entry focus",
+  await evaluate(`(()=>!document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded")&&document.activeElement?.classList.contains("login-entry"))()`));
  for(const [width,height] of [[900,680],[390,844]]){
   await send("Emulation.setDeviceMetricsOverride",{width,height,deviceScaleFactor:1,mobile:false});
   await navigate();
