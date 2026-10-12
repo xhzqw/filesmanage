@@ -6,3 +6,5 @@
 .office-layout-pdf{padding:12px}
 .office-layout-pdf iframe{display:block;width:100%;height:clamp(380px,74vh,950px);border:1px solid var(--border-hairline);border-radius:var(--radius-md)}
 @media(max-width:640px){.office-layout-pdf iframe{height:58vh}}
+.office-layout-download-progress{width:min(180px,66%);height:3px;overflow:hidden;border-radius:var(--radius-pill);background:var(--surface-tertiary)}
+.office-layout-download-progress>span{display:block;width:100%;height:100%;background:var(--brand-blue);transform-origin:left center}
