@@ -44,6 +44,29 @@ const sharedExports=readFileSync(join(root,"web/src/shared/ui/rare/index.ts"),"u
 for(const symbol of ["RareBadge","RareNotice"]){
  if(!sharedExports.includes(symbol))errors.push(`rare/index.ts: ${symbol} is not exported`);
 }
+// Single-owner ACL UI contract: quick grant, directory grant and delegated
+// admin may differ in *workflow*, never by reimplementing a checkbox matrix.
+for(const path of [
+ "web/src/features/organization/DirectGrantForm.tsx",
+ "web/src/features/organization/QuickGrantsDialog.tsx",
+ "web/src/features/organization/RoleDelegationEditor.tsx",
+]){
+ const source=readFileSync(join(root,path),"utf8");
+ if(!source.includes("<PermissionActionPicker "))errors.push(`${path}: must use shared PermissionActionPicker`);
+ if(/(?:PERMISSION_ACTIONS|actionChoices|ACTIONS)\.map\([^)]*=>\s*<label/.test(source))
+  errors.push(`${path}: duplicate ACL option markup; use PermissionActionPicker`);
+}
+for(const path of [
+ "web/src/features/organization/DirectGrantForm.tsx",
+ "web/src/features/organization/QuickGrantsDialog.tsx",
+]){
+ const source=readFileSync(join(root,path),"utf8");
+ for(const symbol of ["PermissionGrantSubjectFields","PermissionGrantScopeFields"]){
+  if(!source.includes(`<${symbol} `))errors.push(`${path}: missing shared ${symbol}`);
+ }
+}
+if(/const ACTIONS\s*=\s*\[/.test(readFileSync(join(root,"web/src/features/organization/QuickGrantsDialog.tsx"),"utf8")))
+ errors.push("QuickGrantsDialog.tsx: duplicated permission action dictionary");
 if(errors.length){
  for(const error of errors)console.error("COMPONENT_GOVERNANCE_FAIL",error);
  process.exitCode=1;

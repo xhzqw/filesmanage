@@ -3,6 +3,7 @@ import type {Dispatch,FormEvent,SetStateAction} from "react";
 import type {User} from "../../entities/user/model";
 import type {ResourceFolder} from "./permissionsApi";
 import type {ManagementRole} from "./RoleWorkspace";
+import {PermissionActionPicker} from "./PermissionActionPicker";
 
 /** Controlled role editor. Server mutation and confirmation lifecycle belong to the owner. */
 export function RoleDelegationEditor({users,userId,setUserId,role,setRole,scopeId,setScopeId,
@@ -45,19 +46,9 @@ export function RoleDelegationEditor({users,userId,setUserId,role,setRole,scopeI
     </>}
     <label>过期时间（可选）<RareInput type="datetime-local" value={expires} onChange={e=>setExpires(e.target.value)}/></label>
    </div>
-   {role==="permission_admin"&&<fieldset><legend>允许管理的 ACL 动作</legend>
-    <div className="org-role-action-tools" role="group" aria-label="快速选择权限动作">
-     <span role="status">已选 {actions.length} / {actionChoices.length}</span>
-     <RareButton type="button" tone="ghost" onClick={()=>{setActions(actionChoices.map(([key])=>key));setReview(false);}}
-      disabled={busy||actions.length===actionChoices.length}>全部选择</RareButton>
-     <RareButton type="button" tone="ghost" onClick={()=>{setActions([]);setReview(false);}}
-      disabled={busy||actions.length===0}>清空</RareButton>
-    </div>
-    <div className="perm-action-grid">{actionChoices.map(([key,name])=><label key={key}>
-     <RareInput type="checkbox" checked={actions.includes(key)}
-      onChange={e=>setActions(old=>e.target.checked?[...old,key]:old.filter(x=>x!==key))}/>{name}
-    </label>)}</div>
-   </fieldset>}
+   {role==="permission_admin"&&<PermissionActionPicker options={actionChoices} value={actions}
+    label="允许管理的 ACL 动作" preset="all" disabled={busy} toolbarClassName="org-role-action-tools"
+    onChange={next=>{setActions(next);setReview(false);}}/>}
    {review&&<p className="perm-review">请确认：委派 {roleName(role)} 给 {userName(userId)}；
     范围 {role==="auditor"?"全局审计":scopeId}；动作 {actions.map(actionName).join("、")}。
     委派不附带文件读取权限。</p>}
