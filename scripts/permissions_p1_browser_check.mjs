@@ -437,6 +437,44 @@ try{
   "confirmed discard switches to roles");
  assert(await cdp.evaluate(`(()=>new URLSearchParams(location.search).get('folder')===${JSON.stringify(selectedFolder)})()`),
   "resource folder context survives switching tabs");
+ // Real Chrome, zero persistent writes: intercept the create-department POST to
+ // verify the mutation coordinator does not issue duplicate requests on fast submit.
+ await cdp.navigate(BASE+"/org?tab=members");
+ assert(await cdp.waitFor("()=>!!document.querySelector('.org-dept-card .tree')"),
+  "single-flight smoke can open the organization workbench");
+ await cdp.evaluate(`(()=>{
+  [...document.querySelectorAll('.toolbar button')].find(b=>b.textContent?.includes('新建部门'))?.click();
+  return true;
+ })()`);
+ assert(await cdp.waitFor("()=>!!document.querySelector('#org-new-department')"),
+  "create-department form is available for duplicate-submit smoke");
+ await cdp.evaluate(`(()=>{
+  const field=document.querySelector('#org-new-department');
+  const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
+  setter.call(field,'qa-no-write');field.dispatchEvent(new Event('input',{bubbles:true}));
+  const nativeFetch=window.fetch.bind(window);
+  window.__singleFlightWriteCount=0;
+  window.fetch=(input,init)=>{
+   const url=new URL(typeof input==='string'?input:input.url,location.href);
+   if(url.pathname==='/api/departments'&&(init?.method??'GET').toUpperCase()==='POST'){
+    window.__singleFlightWriteCount++;
+    return new Promise((_,reject)=>{window.__rejectSyntheticWrite=()=>reject(new TypeError('QA simulated disconnect'));});
+   }
+   return nativeFetch(input,init);
+  };
+  window.__restoreMutationFetch=()=>{window.fetch=nativeFetch;};
+  return true;
+ })()`);
+ assert(await cdp.waitFor("()=>!!document.querySelector('dialog[open] button[type=submit]:not(:disabled)')"),
+  "synthetic department name enables the submit button");
+ await cdp.evaluate("(()=>{const form=document.querySelector('dialog[open] form');form.requestSubmit();form.requestSubmit();return true})()");
+ assert(await cdp.waitFor("()=>window.__singleFlightWriteCount===1"),
+  "two immediate department submits share one intercepted write request");
+ await sleep(200);
+ const writes=await cdp.evaluate("(()=>{const count=window.__singleFlightWriteCount;window.__restoreMutationFetch?.();window.__rejectSyntheticWrite?.();return count})()");
+ assert(writes===1,"no second POST is sent while the mutation is pending");
+ assert(await cdp.waitFor("()=>!!document.querySelector('dialog[open] .rare-notice')"),
+  "synthetic network failure provides in-dialog feedback without data mutation");
  console.log("PERMISSIONS_P1_BROWSER_PASS");
 }finally{
  cdp?.close();
