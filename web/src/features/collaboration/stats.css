@@ -52,7 +52,7 @@
 .stats-map-caption{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;min-height:24px;color:var(--text-tertiary);font-size:10px}
 .stats-map-caption .rare-button{min-height:22px;padding:0 4px;color:var(--brand-blue);font-size:11px}
 .stats-insights{display:grid;grid-template-rows:1.15fr 1fr .9fr;gap:0;min-width:0;padding:var(--space-3);border:1px solid var(--border-hairline);border-radius:var(--radius-lg);background:var(--surface-panel)}
-.stats-insights .stats-panel{min-height:0;border:0;border-radius:0;padding:var(--space-2) 0;background:transparent}
+.stats-insights .stats-panel{min-height:0;border:0;padding:var(--space-2) 0;background:transparent}
 .stats-insights .stats-panel+.stats-panel{border-top:1px solid var(--border-hairline);padding-top:var(--space-3)}
 .stats-metric{padding:2px;border-radius:var(--radius-sm);background:var(--surface-header)}
 .stats-metric .rare-button{height:23px;min-height:23px;font-size:11px}

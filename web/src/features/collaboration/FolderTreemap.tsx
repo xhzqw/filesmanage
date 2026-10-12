@@ -118,9 +118,12 @@ export function FolderTreemap({stats,folders,onChoose}:{stats:Stats;folders:Fold
  while(cursor&&!seen.has(cursor.id)){seen.add(cursor.id);crumbs.unshift(cursor);cursor=cursor.parentId?byId.get(cursor.parentId):undefined;}
  if(crumbs[0]?.id!==ROOT)crumbs.unshift(root);
  const children=tileChildren(current);
- const rects=layout(children);
  const total=children.reduce((sum,node)=>sum+node.bytes,0);
  const count=children.reduce((sum,node)=>sum+node.count,0);
+ // A zero-byte folder must not receive an invented area when other folders
+ // hold real bytes. Only use counts when the entire selection is zero-byte.
+ const drawable=total>0?children.filter(node=>node.bytes>0):children.filter(node=>node.count>0);
+ const rects=layout(drawable);
 
  return <div className="stats-map-wrap">
   <nav className="stats-map-path" aria-label="目录层级">
@@ -150,7 +153,7 @@ export function FolderTreemap({stats,folders,onChoose}:{stats:Stats;folders:Fold
      </button>;
     })}
    </div>}
-  <div className="stats-map-caption"><span>{children.length} 个项目 · {formatBytes(total)}</span>
+  <div className="stats-map-caption"><span>{drawable.length} 个项目 · {formatBytes(total)}</span>
    {stats.treeTruncated&&<span>目录较多，仅展示前 1500 个含文件目录</span>}
    {current.id!==ROOT&&<RareButton type="button" tone="ghost" onClick={()=>onChoose(current.id)}>筛选此目录 ↗</RareButton>}
   </div>
