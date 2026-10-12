@@ -39,10 +39,9 @@ const GOOEY_MAIN_ITEMS=NAV.map(item=>({label:item.label,href:item.to}));
 // VIS-09): one brand block, one navigation, one identity/exit area. Pages may
 // add `actions` (page-specific header buttons) and a `product` subtitle; they
 // must not draw their own header.
-// The page path deliberately does NOT live here: a breadcrumb is a second
-// navigation landmark, and VIS-11 asserts exactly one `header.header nav`, so
-// the path is a docked strip at the top of the work area instead (see
-// Documents.tsx and the .crumb-bar rule in theme.css).
+// The selected GooeyNav item already names the page. Do not repeat it in a
+// separate breadcrumb/title strip. The Documents folder path remains a genuine
+// navigable breadcrumb in its own workbench, below the shell navigation.
 export function AppShell({user,onLogout,product,actions,children}:{user:ShellUser;onLogout:()=>void;product?:string;actions?:ReactNode;children:ReactNode}){
  const[open,setOpen]=useState(false);
  const[accountOpen,setAccountOpen]=useState(false);

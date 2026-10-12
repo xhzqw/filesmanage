@@ -179,12 +179,6 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
  }
 
  return <section className="trash-workbench" aria-label="回收站">
-  <div className="trash-heading">
-   <h1>回收站</h1>
-   <span className="trash-count">{status==="ready"?`本页 ${entries.length} 项`:""}</span>
-   <span className="trash-heading-spacer"/>
-   <RareButton type="button" className="trash-refresh" disabled={busy} onClick={refresh} aria-label="刷新回收站" title="刷新回收站">↻ 刷新</RareButton>
-  </div>
   <div className="trash-filters">
    <RareInput type="search" aria-label="搜索删除记录" placeholder="搜索文件或目录名称" value={search} maxLength={120} onChange={e=>setSearch(e.target.value)}/>
    <RareSelect aria-label="资源类型" value={kind} onChange={e=>updateKind(e.target.value)}>
@@ -197,6 +191,7 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
     <option value="recent">最近删除</option><option value="oldest">最早删除</option><option value="name">名称升序</option>
    </RareSelect>
    <RareButton type="button" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)} className={expanded?"on":""}>筛选 <span aria-hidden="true">⌄</span></RareButton>
+   <RareButton type="button" className="trash-refresh" disabled={busy} onClick={refresh} aria-label="刷新回收站" title="刷新回收站">↻ 刷新</RareButton>
   </div>
   {expanded&&<div className="trash-extra"><label htmlFor="trash-delete-user">删除人</label><RareInput id="trash-delete-user" placeholder="按删除人筛选" maxLength={80} value={deletedBy} onChange={e=>setDeletedBy(e.target.value)}/>
    <RareButton type="button" onClick={()=>{setDeletedBy("");setSearch("");updateKind("all");updatePeriod("all");updateSort("recent");}}>重置筛选</RareButton>

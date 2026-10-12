@@ -1,5 +1,7 @@
 .sessions-page{width:min(100%,980px);padding:24px;margin:0 auto;display:flex;flex-direction:column;gap:18px;color:var(--text-primary)}
 .sessions-heading,.sessions-panel-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.sessions-heading-actions{display:flex;align-items:center;gap:8px;flex:none;flex-wrap:wrap;justify-content:flex-end}
+.sessions-back{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;text-decoration:none}
 .sessions-page h1{font-size:20px;font-weight:650;margin:0 0 8px}
 .sessions-page h2,.sessions-confirm h2{font-size:15px;font-weight:650;margin:0 0 6px}
 .sessions-page p,.sessions-confirm p{font-size:12px;line-height:1.65;color:var(--text-secondary);margin:0}

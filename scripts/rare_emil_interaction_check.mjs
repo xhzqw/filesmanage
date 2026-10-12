@@ -31,4 +31,20 @@ assert.match(previewStyles,/\.file-action-expansion\{[^}]*flex-direction:column/
 assert.match(workflow,/Input\.dispatchMouseEvent/,"native drag browser gate must exercise actual pointer input");
 assert.match(workflow,/DI-17 native drag of selection opens two-file batch move/,"multi-file native drag scope must be checked");
 assert.match(workflow,/DI-17 OS file drag cannot impersonate internal move/,"OS upload drag must stay distinct from internal move");
-console.log("RARE_EMIL_INTERACTION_PASS: drag, selection, toast lifecycle, preview actions");
+// The active shell tile already identifies these sections. A separate
+// breadcrumb/title-only band takes an entire row without adding navigation.
+for(const path of [
+ "web/src/app/AppShell.tsx",
+ "web/src/pages/Org.tsx",
+ "web/src/pages/Lifecycle.tsx",
+ "web/src/pages/SessionDevices.tsx",
+]){
+ assert.doesNotMatch(read(path),/className="breadcrumb(?: crumb-bar)?"/,path+": redundant title strip must not return");
+}
+const trash=read("web/src/features/trash/TrashWorkbench.tsx");
+assert.doesNotMatch(trash,/className="trash-heading"/,"trash page must not allocate a title-only row");
+assert.match(trash,/className="trash-filters"/,"trash controls must still have an accessible primary toolbar");
+assert.match(trash,/aria-label="刷新回收站"/,"trash refresh must remain available after merging the toolbar");
+assert.match(read("web/src/pages/SessionDevices.tsx"),/className="sessions-btn sessions-back"/,"account page must retain its real return path");
+assert.match(read("web/src/pages/Documents.tsx"),/<FolderBreadcrumb folders=/,"folder path is a functional breadcrumb, not a page title");
+console.log("RARE_EMIL_INTERACTION_PASS: drag, selection, toast lifecycle, preview actions, no redundant page title rows");

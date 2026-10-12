@@ -89,7 +89,46 @@ try{
  await navigate("/login","!!document.querySelector('input[type=password]')");
  const password=readFileSync(".secrets/admin.password","utf8").trim();
  assert.equal(await evalJS(`(async()=>{const response=await fetch("/api/login",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({login:"admin",password:${JSON.stringify(password)}})});return response.ok;})()`),true);
- if(process.env.ROLES_ONLY==="1"){
+ if(process.env.TITLES_ONLY==="1"){
+  const pages=[
+   ["/stats",".stats-workbench"],
+   ["/workspace",".collab-root"],
+   ["/org",".work-body"],
+   ["/lifecycle",".lifecycle-ledger"],
+   ["/trash",".trash-workbench"],
+   ["/account/sessions",".sessions-page"],
+   ["/approvals",".approval-root-switch"],
+   ["/search",".search-page"]
+  ];
+  const verified=[];
+  for(const width of [1440,900,390]){
+   await viewport(width,width===390?760:900);
+   for(const [route,content] of pages){
+    await navigate(route,`!!document.querySelector(${JSON.stringify(content)})`);
+    const layout=await evalJS(`(()=>{
+     const main=document.querySelector("main.work");
+     const first=main?.firstElementChild,content=document.querySelector(${JSON.stringify(content)});
+     const m=main?.getBoundingClientRect(),f=first?.getBoundingClientRect();
+     return {
+      first:first?.className,visible:!!content&&content.getBoundingClientRect().height>0,
+      redundant:!!main?.querySelector(":scope > .breadcrumb, :scope > .crumb-bar, :scope > .trash-heading"),
+      topGap:m&&f?Math.round(f.top-m.top):null,
+      trashRefresh:!!document.querySelector(".trash-filters .trash-refresh"),
+      sessionBack:!!document.querySelector(".sessions-heading .sessions-back")
+     };
+    })()`);
+    assert(layout.visible&&!layout.redundant&&layout.topGap!==null&&layout.topGap<=12,
+     "no title-only second row at "+route+" "+width+": "+JSON.stringify(layout));
+    if(route==="/trash")assert(layout.trashRefresh,"trash refresh must share the filter row");
+    if(route==="/account/sessions")assert(layout.sessionBack,"account back link must remain in heading actions");
+    verified.push(route+"@"+width);
+   }
+   await navigate("/doc",'!!document.querySelector(".folder-context-bar nav.breadcrumb")');
+   assert.equal(await evalJS('!!document.querySelector(".folder-context-bar nav.breadcrumb a")'),true,
+    "the navigable folder-path breadcrumb must survive");
+  }
+  console.log("PAGE_TITLE_ROWS_READONLY_PASS "+verified.length+" routes/width checks, functional folder path preserved");
+ }else if(process.env.ROLES_ONLY==="1"){
   const checked=[];
   for(const width of [1440,900,390]){
    await viewport(width,width===390?760:900);

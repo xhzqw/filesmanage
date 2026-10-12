@@ -1,15 +1,14 @@
 .trash-workbench{display:flex;flex-direction:column;min-width:0;min-height:0;flex:1;padding:10px 12px 12px;gap:9px;background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-lg)}
-.trash-heading{display:flex;align-items:center;gap:10px;min-height:30px}
-.trash-heading h1{font-size:15px;line-height:1.35;font-weight:650;margin:0}
-.trash-count{font-size:12px;color:var(--text-secondary)}
 .trash-heading-spacer{flex:1;min-width:4px}
 .trash-workbench .rare-button{min-height:29px;padding:3px 10px;border-radius:var(--radius-sm);white-space:nowrap}
 .trash-workbench .rare-button.danger{color:var(--status-danger);border-color:var(--status-danger);background:var(--surface-panel)}
 .trash-workbench .rare-button.danger:hover{background:var(--surface-danger-soft)}
-.trash-filters{display:grid;grid-template-columns:minmax(160px,1fr) repeat(3,minmax(124px,148px)) auto;align-items:center;gap:8px;min-width:0}
+.trash-filters{display:flex;align-items:center;flex-wrap:wrap;gap:8px;min-width:0}
 .trash-filters .rare-input{width:100%;min-width:0;min-height:32px;border-radius:var(--radius-sm)}
-.trash-filters .rare-select-root{display:flex;width:100%}
+.trash-filters>.rare-input{flex:1 1 180px}
+.trash-filters .rare-select-root{display:flex;flex:0 1 136px;width:136px;min-width:108px}
 .trash-filters>.rare-button{height:32px}
+.trash-filters .trash-refresh{margin-left:auto}
 .trash-extra{display:flex;align-items:center;gap:9px;min-height:34px;padding:6px 9px;background:var(--surface-header);border:1px solid var(--border-hairline);border-radius:var(--radius-sm)}
 .trash-extra label{white-space:nowrap;color:var(--text-secondary)}
 .trash-extra .rare-input{min-width:160px;width:220px;max-width:65%}
@@ -53,7 +52,6 @@
 .trash-footer .rare-button{min-height:28px}
 .trash-danger-note{color:var(--status-danger);background:var(--surface-danger-soft);padding:9px 11px;border-radius:var(--radius-sm)}
 .trash-purge-summary{overflow-wrap:anywhere;max-height:100px;overflow:auto}
-@media(max-width:1000px){.trash-filters{grid-template-columns:minmax(170px,1fr) repeat(2,minmax(120px,145px)) auto;grid-auto-flow:row}.trash-filters>.rare-select-root:nth-of-type(3){grid-column:2}}
 @container trash-grid (max-width:790px){
  .trash-table{min-width:0}
  .trash-table :is(th,td):nth-child(3),.trash-table :is(th,td):nth-child(4),.trash-table :is(th,td):nth-child(5){display:none}
@@ -62,5 +60,5 @@
  .trash-resource{gap:6px}
  .trash-resource-text .trash-mobile-meta{display:block}
 }
-@media(max-width:680px){.trash-workbench{padding:8px}.trash-filters{grid-template-columns:minmax(150px,1fr) minmax(120px,1fr) auto;gap:6px}.trash-selection{flex-wrap:wrap}}
+@media(max-width:680px){.trash-workbench{padding:8px}.trash-filters{gap:6px}.trash-filters>.rare-input{flex-basis:100%}.trash-filters .rare-select-root{flex:1 1 110px}.trash-selection{flex-wrap:wrap}}
 .trash-history-dialog .file-history{max-height:min(65vh,600px);overflow-y:auto}

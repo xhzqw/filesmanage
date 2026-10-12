@@ -71,11 +71,13 @@ export function SessionDevices({user,onLogout}:{user:User;onLogout:()=>void}){
  return <AppShell user={user} onLogout={onLogout} product="账号安全">
   <div className="panels">
    <main className="work">
-    <div className="breadcrumb crumb-bar"><Link to="/doc">文档管理</Link> / 登录设备与安全</div>
     <div className="sessions-page">
      <div className="sessions-heading">
       <div><h1>登录设备与安全</h1><p>管理你自己的登录会话。撤销后，其他设备将通过实时通知或下次请求退出。</p></div>
-      <RareButton type="button" className="sessions-btn" onClick={()=>void refresh()} disabled={loading||busy}>刷新</RareButton>
+      <div className="sessions-heading-actions">
+       <Link to="/doc" className="sessions-btn sessions-back">返回文件列表</Link>
+       <RareButton type="button" className="sessions-btn" onClick={()=>void refresh()} disabled={loading||busy}>刷新</RareButton>
+      </div>
      </div>
      {error&&<p className="sessions-alert" role="alert">{error}</p>}
      {notice&&<p className="sessions-notice" role="status">{notice}</p>}
