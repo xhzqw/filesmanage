@@ -77,13 +77,15 @@ try{
   else {
    assert(result.toggle,"Inspector toggle absent "+width);
    await evaluate("document.querySelector('.cad-inspector-toggle').click()");
-   const opened=await evaluate("(()=>{const el=document.querySelector('.cad-inspector.is-open');return el?{visible:getComputedStyle(el).display!=='none',top:el.querySelector('.cad-inspector-section')?.getBoundingClientRect().top}:null;})()");
+   const opened=await until("(()=>{const el=document.querySelector('.cad-inspector.is-open');return el?{visible:getComputedStyle(el).display!=='none',top:el.querySelector('.cad-inspector-section')?.getBoundingClientRect().top}:null;})()");
    assert(opened?.visible&&opened.top>=result.dock.bottom-2,"Inspector drawer overlaps actions "+width+" "+JSON.stringify(opened));
    await evaluate("document.querySelector('.cad-inspector-toggle').click()");
   }
-  const menu=await evaluate("(()=>{const trigger=[...document.querySelectorAll('.cad-compact-item>button')].find(button=>button.textContent.includes('视角'));trigger?.click();const el=document.querySelector('#cad-compact-views');const box=el?.getBoundingClientRect();return box?{top:box.top,right:box.right,visible:getComputedStyle(el).display!=='none'}:null;})()");
+  await evaluate("([...document.querySelectorAll('.cad-compact-item>button')].find(button=>button.textContent.includes('视角')))?.click()");
+  const menu=await until("(()=>{const el=document.querySelector('#cad-compact-views');const box=el?.getBoundingClientRect();return box?{top:box.top,right:box.right,visible:getComputedStyle(el).display!=='none'}:null;})()");
   assert(menu?.visible&&menu.top>=result.toolbar.bottom-2&&menu.right<=width+2,"CAD view menu clipped at "+width+" "+JSON.stringify(menu));
   await evaluate("document.querySelector('#cad-compact-views button')?.click()");
+  for(let attempt=0;attempt<15;attempt++){if(!(await evaluate("Boolean(document.querySelector('#cad-compact-views'))")))break;await pause(70);}
   assert(!(await evaluate("Boolean(document.querySelector('#cad-compact-views'))")),"CAD view selection did not close menu");
   console.log("CAD_LAYOUT_PASS",width,height,JSON.stringify({canvas:result.stage.width,inspector:result.visible,toolbar:result.toolbar.width}));
  }
