@@ -268,6 +268,87 @@ func TestPreflightMoveReadyShape(t *testing.T) {
 	}
 }
 
+// An identical filename in an unrelated directory is not a collision in the
+// selected target. Preflight and commit must agree on that scope.
+func TestMoveFileNameConflictScopedToDestination(t *testing.T) {
+	s, repo := testService(t)
+	admin := domain.User{ID: "u_admin", Login: "admin", IsAdmin: true}
+	ctx := context.Background()
+	source, err := s.CommitUpload(ctx, admin, "folder_root", "same-name.txt", "text/plain", "", strings.NewReader("source"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := s.CreateFolder(ctx, admin, "folder_root", "unrelated")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.CommitUpload(ctx, admin, other.ID, "same-name.txt", "text/plain", "", strings.NewReader("other")); err != nil {
+		t.Fatal(err)
+	}
+	target, err := s.CreateFolder(ctx, admin, "folder_root", "empty destination")
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := totalAudit(repo)
+	pf, err := s.PreflightMove(ctx, admin, []MoveResource{{Kind: "file", ID: source.FileID}}, target.ID, "all_or_nothing")
+	if err != nil || pf.Status != "ready" || pf.AllowedCount != 1 || len(pf.Conflicts) != 0 {
+		t.Fatalf("unrelated same-name file must not block target: preflight=%+v err=%v", pf, err)
+	}
+	if totalAudit(repo) != before {
+		t.Fatal("preflight must not write audit rows")
+	}
+	moved, err := s.MoveFile(ctx, admin, source.FileID, target.ID, "folder_root", "unrelated-name-scope")
+	if err != nil || moved.ToFolderID != target.ID {
+		t.Fatalf("commit must accept clean target: %+v %v", moved, err)
+	}
+	file, _, err := s.FileMeta(ctx, admin, source.FileID)
+	if err != nil || file.FolderID != target.ID {
+		t.Fatalf("file did not move to selected destination: %+v %v", file, err)
+	}
+}
+
+// Preflight must agree with the atomic batch commit when two source folders
+// contain the same filename and the candidate destination is empty.
+func TestPreflightMoveBatchDuplicateSourceNames(t *testing.T) {
+	s, repo := testService(t)
+	admin := domain.User{ID: "u_admin", Login: "admin", IsAdmin: true}
+	ctx := context.Background()
+	first, err := s.CommitUpload(ctx, admin, "folder_root", "cross-duplicate.txt", "text/plain", "", strings.NewReader("one"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := s.CommitUpload(ctx, admin, "folder_market", "cross-duplicate.txt", "text/plain", "", strings.NewReader("two"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := s.CreateFolder(ctx, admin, "folder_root", "empty batch target")
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := totalAudit(repo)
+	resources := []MoveResource{{Kind: "file", ID: first.FileID}, {Kind: "file", ID: second.FileID}}
+	pf, err := s.PreflightMove(ctx, admin, resources, target.ID, "all_or_nothing")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pf.Status != "conflict" || pf.AllowedCount != 1 || len(pf.Conflicts) != 1 || pf.Conflicts[0].ID != second.FileID || pf.Conflicts[0].Code != "E_NAME_CONFLICT" {
+		t.Fatalf("preflight must expose intra-batch duplicate: %+v", pf)
+	}
+	result, err := s.MoveFilesBatch(ctx, admin, []string{first.FileID, second.FileID}, target.ID, "all_or_nothing", "batch-name-scope")
+	if err != nil || result.Status != "conflict" || len(result.Conflicts) != 1 || result.Conflicts[0].ID != second.FileID {
+		t.Fatalf("preflight and batch commit disagree: %+v %v", result, err)
+	}
+	if totalAudit(repo) != before {
+		t.Fatal("rejected preflight/batch may not write audit rows")
+	}
+	for _, id := range []string{first.FileID, second.FileID} {
+		file, _, err := s.FileMeta(ctx, admin, id)
+		if err != nil || file.FolderID == target.ID {
+			t.Fatalf("rejected batch moved %s: %+v %v", id, file, err)
+		}
+	}
+}
+
 func TestPreflightMoveReportsConflicts(t *testing.T) {
 	s, repo := testService(t)
 	admin := domain.User{ID: "u_admin", Login: "admin", IsAdmin: true}

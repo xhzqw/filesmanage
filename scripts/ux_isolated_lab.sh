@@ -121,14 +121,14 @@ case "$ACTION" in
   suite="${2:-}"
   case "$suite" in
    ux_workflows_check)
-    # The finale is self-contained; rerun its browser/auth chain without
-    # repeating the destructive move/rollback fixtures after a flaky finish.
+    # Run only the move and preview interaction fixtures when auditing those
+    # workflows, without replaying unrelated destructive approval fixtures.
     if [[ "$#" -eq 2 ]]; then
      extra=()
-    elif [[ "$#" -eq 4 && "${3:-}" == "--suite" && "${4:-}" == "finale" ]]; then
-     extra=(--suite finale)
+    elif [[ "$#" -eq 4 && "${3:-}" == "--suite" && ( "${4:-}" == "finale" || "${4:-}" == "move" ) ]]; then
+     extra=(--suite "${4}")
     else
-     echo "LAB_REFUSED: only --suite finale is supported" >&2; exit 2
+     echo "LAB_REFUSED: only --suite finale or move is supported" >&2; exit 2
     fi
     DATABASE_URL="$TEST_DSN" FILESMANAGE_UX_FIXTURE_DB="$TEST_DB" \
      node "scripts/$suite.mjs" --isolated-fixtures --base "$BASE" --password-file "$PASS_FILE" "${extra[@]}"

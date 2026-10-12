@@ -10,6 +10,8 @@ const dragStyle=read("web/src/features/documents/dragMove.css");
 const toast=read("web/src/shared/ui/ToastViewport.tsx");
 const toastStyle=read("web/src/shared/ui/toast.css");
 const theme=read("web/src/theme.css");
+const preview=read("web/src/pages/Preview.tsx");
+const previewStyles=read("web/src/pages/previewWorkbenchV2.css");
 
 assert.match(table,/setMoveDragImage\(dataTransfer,item\.name,ids\.length\)/,"drag should use shared filename preview");
 assert.match(table,/setData\("text\/plain",ids\.length===1\?item\.name:/,"text fallback must be filename-first");
@@ -22,4 +24,7 @@ assert.match(toast,/const paused=hovered\|\|focused\|\|hidden/,"toast must pause
 assert.match(toast,/animationPlayState:paused\?"paused":"running"/,"visual lifetime matches timer pause");
 assert.match(toast,/EXIT_MS\/1000/,"exit animation and TTL share the same exit budget");
 assert.match(toastStyle,/@media\(prefers-reduced-motion:reduce\)/,"reduced motion is required");
-console.log("RARE_EMIL_INTERACTION_PASS: drag, selection, toast lifecycle");
+assert.match(previewStyles,/\.file-workbench-side-actions \.file-workbench-actions\{[^}]*grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/,"preview primary actions use one balanced row");
+assert.match(preview,/moreOpen&&<div className="file-action-expansion"/,"preview More expands directly inside the sidebar");
+assert.match(previewStyles,/\.file-action-expansion\{[^}]*flex-direction:column/,"upward expansion is a compact vertical action group");
+console.log("RARE_EMIL_INTERACTION_PASS: drag, selection, toast lifecycle, preview actions");

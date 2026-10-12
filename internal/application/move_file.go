@@ -354,6 +354,10 @@ func (s *Service) PreflightMove(ctx context.Context, u domain.User, resources []
 	}
 	sources := make([]string, 0, len(resources))
 	seenSource := map[string]bool{}
+	// Each source folder may legally contain a file with the same name. Those
+	// files cannot both land in one target, even when that target is empty.
+	// Mirror MoveFilesBatch's intra-request uniqueness check during preflight.
+	seenTargetNames := map[string]bool{}
 	for _, res := range resources {
 		if res.Kind != "file" {
 			out.addConflict(MoveConflict{ID: res.ID, Code: "E_BAD", Message: "不支持的资源类型"})
@@ -390,6 +394,11 @@ func (s *Service) PreflightMove(ctx context.Context, u domain.User, resources []
 		} else if !isRowMissing(err) {
 			return MovePreflight{}, err
 		}
+		if seenTargetNames[file.Name] {
+			out.addConflict(MoveConflict{ID: res.ID, Code: "E_NAME_CONFLICT", Message: "所选文件存在重名，无法同时移动到同一目录"})
+			continue
+		}
+		seenTargetNames[file.Name] = true
 		out.AllowedCount++
 		if !seenSource[file.FolderID] {
 			seenSource[file.FolderID] = true
