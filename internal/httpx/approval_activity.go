@@ -5,6 +5,19 @@ import (
 	"strconv"
 )
 
+func (h *Handler) getApprovalDetail(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	approval, err := h.S.ApprovalDetail(c.Request.Context(), u, c.Param("id"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "private, no-store")
+	c.JSON(200, gin.H{"ok": true, "data": approvalPayload(approval)})
+}
 func (h *Handler) approvalHistory(c *gin.Context) {
 	u, ok := h.auth(c)
 	if !ok {

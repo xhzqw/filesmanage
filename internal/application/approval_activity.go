@@ -27,6 +27,37 @@ func (s *Service) notifyApprovalChanges(users ...string) {
 		s.publishUserEvent(id, UserEvent{Type: "approval.changed"})
 	}
 }
+
+// A participant may inspect the record even after the approval leaves their inbox.
+// Draft bytes retain the stricter pending-state and file-permission checks.
+func approvalParticipant(actor domain.User, a domain.Approval) bool {
+	if actor.IsAdmin || actor.ID == a.RequesterID {
+		return true
+	}
+	for _, member := range a.ApproverChain {
+		if actor.ID == member {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Service) ApprovalDetail(ctx context.Context, actor domain.User, id string) (domain.Approval, error) {
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return domain.Approval{}, err
+	}
+	defer tx.Rollback(ctx)
+	a, err := tx.ApprovalByID(ctx, id)
+	if err != nil {
+		return domain.Approval{}, notFoundOr(err)
+	}
+	if !approvalParticipant(actor, a) {
+		return domain.Approval{}, domain.ErrForbidden
+	}
+	return a, nil
+}
+
 func (s *Service) ApprovalHistory(ctx context.Context, actor domain.User, id string) ([]domain.ApprovalEvent, error) {
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
@@ -37,13 +68,7 @@ func (s *Service) ApprovalHistory(ctx context.Context, actor domain.User, id str
 	if err != nil {
 		return nil, notFoundOr(err)
 	}
-	allowed := actor.IsAdmin || actor.ID == a.RequesterID
-	for _, approverID := range a.ApproverChain {
-		if actor.ID == approverID {
-			allowed = true
-		}
-	}
-	if !allowed {
+	if !approvalParticipant(actor, a) {
 		return nil, domain.ErrForbidden
 	}
 	return tx.ListApprovalEvents(ctx, id)

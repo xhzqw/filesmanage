@@ -27,6 +27,12 @@ func TestApprovalEventHistoryAndScopedNotifications(t *testing.T) {
 		t.Fatalf("save %v %+v", err, submitted)
 	}
 	id := submitted.Approval.ID
+	if _, err = s.ApprovalDetail(ctx, outsider, id); !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("unauthorized approval detail: %v", err)
+	}
+	if detail, detailErr := s.ApprovalDetail(ctx, admin, id); detailErr != nil || detail.ID != id {
+		t.Fatalf("participant detail %+v %v", detail, detailErr)
+	}
 	if _, err = s.ApprovalHistory(ctx, outsider, id); !errors.Is(err, domain.ErrForbidden) {
 		t.Fatalf("unauthorized timeline: %v", err)
 	}
@@ -57,6 +63,9 @@ func TestApprovalEventHistoryAndScopedNotifications(t *testing.T) {
 	}
 	if _, err = s.Approve(ctx, requester, id, "final checked"); err != nil {
 		t.Fatal(err)
+	}
+	if detail, detailErr := s.ApprovalDetail(ctx, admin, id); detailErr != nil || detail.State != domain.ApprovalApproved {
+		t.Fatalf("completed approval not available to prior reviewer %+v %v", detail, detailErr)
 	}
 	timeline, err = s.ApprovalHistory(ctx, admin, id)
 	if err != nil || len(timeline) != 3 || timeline[2].Kind != "approved" || timeline[2].StepIndex != 1 || timeline[2].Comment != "final checked" {

@@ -202,6 +202,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.DELETE("/files/:id/lock", h.releaseLock)
 	api.GET("/files/:id/lock", h.lockStatus)
 	api.GET("/approvals", h.listApprovals)
+	api.GET("/approvals/:id", h.getApprovalDetail)
 	api.GET("/approvals/:id/draft", h.downloadApprovalDraft)
 	api.GET("/approvals/:id/draft/preview", h.previewApprovalDraft)
 	api.GET("/approvals/:id/draft/media", h.previewApprovalDraftMedia)

@@ -1,33 +1,51 @@
 import {useState} from "react";
-import type {Approval} from "../features/workflow/api";
-import {GooeyNav} from "../shared/ui/rare";
 import {useSearchParams} from "react-router-dom";
+import type {Approval} from "../features/workflow/api";
+import {RareButton} from "../shared/ui/rare";
 import {SealLibrary} from "../features/seals/SealLibrary";
 import {ApprovalReviewDialog} from "./ApprovalReviewDialog";
-import type{User}from "../entities/user/model";
-import{ApprovalInbox}from "../features/workflow/ApprovalInbox";
-import{AppShell}from "../shared/ui/AppShell";
-import "./approvalsWorkbench.css";
+import type {User} from "../entities/user/model";
+import {ApprovalInbox,type ApprovalView} from "../features/workflow/ApprovalInbox";
+import {AppShell} from "../shared/ui/AppShell";
+
+type Section=ApprovalView|"seals";
 
 export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
  const[review,setReview]=useState<Approval|null>(null);
  const[params,setParams]=useSearchParams();
- const screen=params.get("tab")==="seals"?"seals":"approvals";
+ const requested=params.get("tab");
+ const section:Section=requested==="mine"||requested==="notifications"||requested==="seals"?requested:"inbox";
+ function changeSection(next:Section){
+  setParams(previous=>{
+   const updated=new URLSearchParams(previous);
+   if(next==="inbox")updated.delete("tab");else updated.set("tab",next);
+   updated.delete("item");
+   return updated;
+  });
+ }
+ const[counts,setCounts]=useState({pending:0,unread:0});
+ const navigation:{id:Section;label:string;count?:number}[]=[
+  {id:"inbox",label:"待我审批",count:counts.pending},
+  {id:"mine",label:"我发起的"},
+  {id:"notifications",label:"通知",count:counts.unread},
+  {id:"seals",label:user.isAdmin?"签章管理":"我的签章"},
+ ];
  return <AppShell user={user} onLogout={onLogout}>
   <div className="panels">
-   <main className="work approval-root">
-    <div className="approval-root-switch">
-     <GooeyNav className="approval-root-nav" aria-label="审批与签章视图" size="sm" radius={8} separation={12}
-      items={["审批工作台",user.isAdmin?"签章管理":"我的签章"]}
-      value={screen==="seals"?1:0} activeColor="var(--brand-blue)" activeLabelColor="var(--text-inverse)"
-      onChange={index=>setParams(old=>{
-       const next=new URLSearchParams(old);
-       if(index===0)next.delete("tab");else next.set("tab","seals");
-       return next;
-      })}/>
-    </div>
-    <div className="approval-root-stage">
-     {screen==="approvals"?<ApprovalInbox currentUser={user} onReview={setReview}/>:<SealLibrary isAdmin={user.isAdmin}/>}
+   <main className="work approval-work">
+    <div className="approval-shell">
+     <nav className="approval-nav" aria-label="审批工作区">
+      <div className="approval-nav-heading">审批</div>
+      {navigation.map(item=><RareButton type="button" key={item.id}
+       className="approval-nav-item" aria-current={section===item.id?"page":undefined}
+       onClick={()=>changeSection(item.id)}>
+       <span>{item.label}</span>{item.count? <span className="approval-nav-count">{item.count}</span>:null}
+      </RareButton>)}
+     </nav>
+     <div className="approval-stage">
+      {section==="seals"?<SealLibrary isAdmin={user.isAdmin}/>:
+       <ApprovalInbox currentUser={user} view={section} onCounts={setCounts} onReview={setReview}/>}
+     </div>
     </div>
     {review&&<ApprovalReviewDialog approval={review} onClose={()=>setReview(null)}/>}
    </main>
