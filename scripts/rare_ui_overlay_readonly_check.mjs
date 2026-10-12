@@ -478,11 +478,11 @@ try{
    await waitFor('!document.querySelector(".batch-actions-group")');
   }
   await navigate("/stats",`!!document.querySelector('.rare-select[aria-label="修改时间"]')`);
-  const beforeTimeSelect=await evalJS("(()=>{const b=document.querySelector('.rare-select[aria-label=修改时间]');const r=b.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2;return{x,y,width:r.width,height:r.height,viewport:{width:innerWidth,height:innerHeight},hit:document.elementFromPoint(x,y)?.outerHTML?.slice(0,210),scrollTop:document.querySelector('.stats-workbench')?.scrollTop}})()");
-  console.log("STATS_TIME_SELECT_TRACE",width,JSON.stringify(beforeTimeSelect));
+  const beforeTimeSelect=await evalJS("(()=>{const b=document.querySelector('.rare-select[aria-label=修改时间]');const r=b.getBoundingClientRect();return{width:r.width,height:r.height,visible:getComputedStyle(b).display!=='none'}})()");
+  assert(beforeTimeSelect.visible&&beforeTimeSelect.width>=90&&beforeTimeSelect.height>=24,
+   "stats filter must remain operable in narrow viewports at "+width+": "+JSON.stringify(beforeTimeSelect));
   await evalJS("(()=>{document.querySelector('.rare-select[aria-label=修改时间]').scrollIntoView({block:'center',inline:'nearest'});return true})()");
   await click('.rare-select[aria-label="修改时间"]');
-  console.log("STATS_TIME_SELECT_AFTER",width,await evalJS("(()=>({expanded:document.querySelector('.rare-select[aria-label=修改时间]')?.getAttribute('aria-expanded'),menu:!!document.querySelector('.rare-select-menu'),scrollTop:document.querySelector('.stats-workbench')?.scrollTop}))()"));
   await waitFor('!!document.querySelector(".rare-select-menu [role=option]")');
   const select=await evalJS(`(()=>{const b=document.querySelector('.rare-select[aria-label="修改时间"]');const m=document.querySelector(".rare-select-menu");const r=m.getBoundingClientRect();return{role:b.getAttribute("role"),expanded:b.getAttribute("aria-expanded"),count:m.querySelectorAll('[role=option]').length,rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom},overflow:document.documentElement.scrollWidth-innerWidth};})()`);
   assert(select.role==="combobox"&&select.expanded==="true"&&select.count>=3&&inside(select.rect,width,height)&&select.overflow<=1,"time dropdown at "+width+": "+JSON.stringify(select));
