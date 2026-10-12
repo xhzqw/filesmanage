@@ -327,6 +327,8 @@ try{
    await evalJS(`(()=>document.querySelector('header.header nav[data-slot="gooey-nav"] a')?.focus())()`);
    await key("ArrowRight","ArrowRight",39);
    assert.equal(await evalJS("document.activeElement?.getAttribute('href')"),"/search","arrow moves focus between Rare navigation links");
+   const navHit=await evalJS("(()=>{const a=document.querySelector('header.header nav a[href$=search]'),r=a.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2,e=document.elementFromPoint(x,y);return{rect:{x,y,width:r.width,height:r.height},hit:e?.outerHTML?.slice(0,260),linkHit:a.contains(e),pointerEvents:getComputedStyle(a).pointerEvents,navZ:getComputedStyle(a.closest('nav')).zIndex}})()");
+   assert(navHit.linkHit,"top nav target must receive real pointer clicks: "+JSON.stringify(navHit));
    await click('header.header nav[data-slot="gooey-nav"] a[href="/search"]');
    await waitFor('location.pathname==="/search"');
    await click("a.shell-home-pill");
