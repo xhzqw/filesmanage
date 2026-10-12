@@ -41,6 +41,7 @@ type Service struct {
 	statsFlights  singleflight.Group
 	officeCache   officePDFCache
 	officeFlights singleflight.Group
+	indexJobs     ports.FileIndexJobs
 	session       sessionCache
 	live          userEventHub
 	durable       DurableEventStore

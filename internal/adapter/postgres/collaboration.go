@@ -839,9 +839,12 @@ func (r *Repository) FileSharesForSubject(ctx context.Context, userID string, gr
 // version row exists in the same transaction.
 func (r *Repository) UpsertFileText(ctx context.Context, fileID string, seq int, content, spaced string) error {
 	_, err := r.Q.Exec(ctx,
-		`INSERT INTO file_text(file_id,current_seq,content,spaced) VALUES ($1,$2,$3,$4)
+		`INSERT INTO file_text(file_id,current_seq,content,spaced)
+		 SELECT id,$2,$3,$4 FROM files
+		 WHERE id=$1 AND current_version_seq=$2 FOR SHARE
 		 ON CONFLICT (file_id) DO UPDATE SET current_seq=EXCLUDED.current_seq,
-		   content=EXCLUDED.content, spaced=EXCLUDED.spaced`,
+		   content=EXCLUDED.content, spaced=EXCLUDED.spaced
+		 WHERE file_text.current_seq<=EXCLUDED.current_seq`,
 		fileID, seq, content, spaced)
 	return err
 }

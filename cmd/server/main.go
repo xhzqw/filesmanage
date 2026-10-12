@@ -155,7 +155,11 @@ func main() {
 			}
 		}
 	})
-	service := application.New(postgres.New(pool), store).WithDurableEvents(postgres.New(pool)).WithOffice(application.OfficeConfig{
+	indexRepo := postgres.New(pool)
+	if err := indexRepo.IndexJobsReady(ctx); err != nil {
+		log.Fatal("persistent file index queue unavailable; run migrations: ", err)
+	}
+	service := application.New(postgres.New(pool), store).WithDurableEvents(postgres.New(pool)).WithAsyncIndexJobs(indexRepo).WithOffice(application.OfficeConfig{
 		EditorURL:     os.Getenv("FILESMANAGE_OFFICE_URL"),
 		Secret:        os.Getenv("FILESMANAGE_OFFICE_SECRET"),
 		SourceBaseURL: os.Getenv("FILESMANAGE_OFFICE_SOURCE_BASE"),
@@ -164,6 +168,7 @@ func main() {
 	// App replicas must also invalidate HTTP read caches without connected WS
 	// clients; each process follows the same committed PostgreSQL journal.
 	startMaintenance(func() { service.WatchDurableCache(runCtx) })
+	startMaintenance(func() { service.RunFileIndexJobs(runCtx) })
 	// Durable due-date reminders. At startup and hourly; duplicate instances
 	// are safe because PostgreSQL enforces one notification per due date/phase.
 	remindLifecycle := func() {

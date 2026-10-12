@@ -2,8 +2,12 @@ package application
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"log"
 	"strings"
+	"sync"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -74,42 +78,59 @@ func ExtractText(name, contentType string, data []byte) string {
 	return ""
 }
 
-// ReindexFile refreshes the search index row for a file's current version from
-// its immutable blob. It runs after every version-producing transaction so the
-// index always matches files.current_version_seq (SPEC §10.1). Indexing is
-// best-effort: a failure must never fail the business write that triggered it.
+// WithAsyncIndexJobs enables a durable, post-commit file index queue. Legacy
+// reindex tools/tests without this option retain synchronous behavior.
+func (s *Service) WithAsyncIndexJobs(jobs ports.FileIndexJobs) *Service {
+	s.indexJobs = jobs
+	return s
+}
+
+// ReindexFile is invoked after successful version-writing commits. In the
+// server, the trigger already queued the work transactionally; doing the work
+// inline would add PDF parsing latency to uploads and manual saves.
 func (s *Service) ReindexFile(ctx context.Context, fileID string) {
-	tx, err := s.uow.Begin(ctx)
-	if err != nil {
+	if s.indexJobs != nil {
 		return
 	}
-	file, version, blob, readErr := currentVersionBlob(ctx, tx, fileID)
+	_ = s.reindexFile(ctx, fileID)
+}
+
+// reindexFile reads only the current immutable blob. UpsertFileText also
+// verifies current_version_seq under a DB row lock, preventing older jobs
+// from overwriting newer search projections.
+func (s *Service) reindexFile(ctx context.Context, fileID string) error {
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	file, _, blob, readErr := currentVersionBlob(ctx, tx, fileID)
 	_ = tx.Rollback(ctx)
 	if readErr != nil {
-		return
+		return readErr
 	}
 	reader, err := s.blobs.Open(blob.StorageKey)
 	if err != nil {
-		return
+		return err
 	}
 	defer reader.Close()
 	readLimit := int64(indexTextLimit)
 	if strings.HasSuffix(strings.ToLower(file.Name), ".pdf") {
 		if blob.SizeBytes > maxPDFIndexSource {
-			return
+			// Record an empty projection so oversized PDFs do not stay in
+			// the missing-index backfill queue forever.
+			return s.storeFileText(ctx, fileID, currentSeq(file), "", "")
 		}
 		readLimit = maxPDFIndexSource
 	}
 	data, err := io.ReadAll(io.LimitReader(reader, readLimit+1))
 	if err != nil {
-		return
+		return err
 	}
-	_ = version
 	if strings.HasSuffix(strings.ToLower(file.Name), ".pdf") && int64(len(data)) > readLimit {
-		return
+		return s.storeFileText(ctx, fileID, currentSeq(file), "", "")
 	}
 	text := ExtractText(file.Name, file.ContentType, data)
-	s.storeFileText(ctx, fileID, currentSeq(file), text, SpaceCJK(text))
+	return s.storeFileText(ctx, fileID, currentSeq(file), text, SpaceCJK(text))
 }
 
 func currentVersionBlob(ctx context.Context, repo ports.Repository, fileID string) (domain.File, domain.FileVersion, domain.Blob, error) {
@@ -129,16 +150,76 @@ func currentVersionBlob(ctx context.Context, repo ports.Repository, fileID strin
 }
 
 // storeFileText upserts the index row for the current version.
-func (s *Service) storeFileText(ctx context.Context, fileID string, seq int, text, spaced string) {
+func (s *Service) storeFileText(ctx context.Context, fileID string, seq int, text, spaced string) error {
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
-		return
+		return err
 	}
 	defer tx.Rollback(ctx)
 	if err = tx.UpsertFileText(ctx, fileID, seq, text, spaced); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// RunFileIndexJobs starts a fixed-size worker pool. PostgreSQL persists every
+// task through restarts and arbitrates concurrent app replicas with row locks.
+// Worker-owned goroutines finish before this function returns on shutdown.
+func (s *Service) RunFileIndexJobs(ctx context.Context) {
+	if s.indexJobs == nil {
 		return
 	}
-	_ = tx.Commit(ctx)
+	var wg sync.WaitGroup
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s.indexWorkerLoop(ctx)
+		}()
+	}
+	wg.Wait()
+}
+
+func (s *Service) indexWorkerLoop(ctx context.Context) {
+	for ctx.Err() == nil {
+		job, found, err := s.indexJobs.ClaimFileIndexJob(ctx)
+		if err != nil && ctx.Err() == nil {
+			log.Printf("file index claim failed: %v", err)
+		}
+		if err == nil && found {
+			s.runIndexJob(ctx, job)
+			continue
+		}
+		timer := time.NewTimer(2 * time.Second)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+		}
+	}
+}
+
+func (s *Service) runIndexJob(ctx context.Context, job domain.FileIndexJob) {
+	workCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	err := s.reindexFile(workCtx, job.FileID)
+	cancel()
+	// A final state update is bounded but survives the canceled work context;
+	// if it cannot commit, lease expiry makes the job recoverable.
+	finishCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
+	defer stop()
+	if err != nil {
+		if ctx.Err() == nil {
+			log.Printf("index job %d failed: %v", job.ID, err)
+		}
+		if retryErr := s.indexJobs.RetryFileIndexJob(finishCtx, job, fmt.Sprint(err)); retryErr != nil {
+			log.Printf("index job %d retry state failed: %v", job.ID, retryErr)
+		}
+		return
+	}
+	if err := s.indexJobs.CompleteFileIndexJob(finishCtx, job); err != nil {
+		log.Printf("index job %d completion failed: %v", job.ID, err)
+	}
 }
 
 // ReindexAllFiles walks every active file and rebuilds its index row. It backs
@@ -158,7 +239,9 @@ func (s *Service) ReindexAllFiles(ctx context.Context, batch int) (int, error) {
 			return indexed, nil
 		}
 		for _, id := range ids {
-			s.ReindexFile(ctx, id)
+			if err := s.reindexFile(ctx, id); err != nil {
+				return indexed, err
+			}
 			indexed++
 		}
 	}
