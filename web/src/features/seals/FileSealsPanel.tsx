@@ -1,4 +1,5 @@
-import {useEffect,useState} from "react";
+import {useEffect,useLayoutEffect,useState} from "react";
+import {fileApi} from "../documents/api";
 import {createPortal} from "react-dom";
 import {Link} from "react-router-dom";
 import {RareBadge,RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
@@ -17,13 +18,15 @@ const clamp=(value:number,max:number)=>Math.max(0,Math.min(max,value));
 
 export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onChanged,controlsTargetId}:{fileId:string;seq:number;sha:string;name:string;isAdmin:boolean;onSelectRevision:(revision:number)=>void;onChanged:()=>void;controlsTargetId?:string}){
  const[host,setHost]=useState<HTMLElement|null>(null);
- useEffect(()=>{setHost(controlsTargetId?document.getElementById(controlsTargetId):null)},[controlsTargetId]);
+ useLayoutEffect(()=>{setHost(controlsTargetId?document.getElementById(controlsTargetId):null)},[controlsTargetId]);
  const[assets,setAssets]=useState<SealAsset[]>([]);
  const[access,setAccess]=useState<SealUserPermission|null>(null);
  const[marks,setMarks]=useState<FileSealMark[]>([]);
  const[usedAssetIds,setUsedAssetIds]=useState<string[]>([]);
  const[assetId,setAssetId]=useState("");
  const[page,setPage]=useState(1);
+ const[pageCount,setPageCount]=useState(0);
+ const[imageRetry,setImageRetry]=useState(0);
  const[position,setPosition]=useState<Position>({x:.70,y:.78,width:.22,height:.12});
  const[angle,setAngle]=useState(0);
  const[pageRatio,setPageRatio]=useState(1.414);
@@ -40,7 +43,7 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
  const duplicate=!!selected&&(usedAssetIds.includes(selected.id)||staged.some(s=>s.assetId!==selected.id&&assets.some(a=>a.id===s.assetId&&a.sha256===selected.sha256)));
  const rotationFits=stampFitsPage(position,angle,pageRatio);
  const imageUrl="/api/files/"+encodeURIComponent(fileId)+"/seals/page?"+
-  new URLSearchParams({version:String(seq),page:String(page),sha256:sha}).toString();
+  new URLSearchParams({version:String(seq),page:String(page),sha256:sha,retry:String(imageRetry)}).toString();
 
  useEffect(()=>{
   let live=true;
@@ -64,11 +67,20 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
   return()=>{live=false};
  },[fileId,seq,revision]);
  useEffect(()=>setImageAvailable(true),[imageUrl]);
+ useEffect(()=>{
+  if(!isPDF)return;
+  let live=true;
+  setPage(1);setPageCount(0);setImageRetry(0);
+  void fileApi.pdfPages(fileId,sha).then(result=>{
+   if(live)setPageCount(Math.max(0,result.pageCount));
+  }).catch(err=>{if(live)setError(errorCopy(err,"无法获取 PDF 页数"))});
+  return()=>{live=false};
+ },[fileId,sha,isPDF]);
 
  function updatePosition(updater:(value:Position)=>Position){
   const next=updater(position);
   setPosition(next);
-  if(assetId)setStaged(list=>list.map(item=>item.assetId===assetId?{...item,...next}:item));
+  if(assetId)setStaged(list=>list.map(item=>item.assetId===assetId?{...item,...next,pageNumber:page}:item));
  }
  function changeAngle(value:number){
   const next=Math.max(-180,Math.min(180,Math.round(Number.isFinite(value)?value:0)));
@@ -80,8 +92,7 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
   updatePosition(p=>fitStampToPage({...p,...update},angle,pageRatio));
  }
  function changePage(next:number){
-  setPage(next);
-  if(assetId)setStaged(list=>list.map(item=>item.assetId===assetId?{...item,pageNumber:next}:item));
+  setPage(Math.max(1,Math.min(pageCount||1,next)));
  }
  function pickAsset(id:string){
   setAssetId(id);
@@ -97,7 +108,7 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
   }
  }
  function addDraft(){
-  if(!selected||!maySign||duplicate||!isPDF||!rotationFits||!imageAvailable||busy||(!staged.some(item=>item.assetId===selected.id)&&staged.length>=20))return;
+  if(!selected||!maySign||duplicate||!isPDF||!pageCount||!rotationFits||!imageAvailable||busy||(!staged.some(item=>item.assetId===selected.id)&&staged.length>=20))return;
   const item:DraftSeal={assetId:selected.id,pageNumber:page,...position,angleDegrees:angle};
   setStaged(list=>list.some(s=>s.assetId===item.assetId)?list.map(s=>s.assetId===item.assetId?item:s):[...list,item]);
   toast.info("已加入待签清单");setError("");
@@ -107,7 +118,7 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
   if(assetId===id)setAssetId("");
  }
  async function sign(){
-  if(!password||!isPDF||busy||!staged.length||!imageAvailable)return;
+  if(!password||!isPDF||busy||!pageCount||!staged.length||!imageAvailable)return;
   setBusy(true);setError("");
   try{
    const marks=await sealsApi.applyBatch(fileId,{versionSeq:seq,fileSha256:sha,password,placements:staged});
@@ -117,7 +128,6 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
   finally{setPassword("");setBusy(false)}
  }
  const controls = <div className="seal-file-controls">
-   <div className="seal-library-heading">签署设置</div>
    {error&&<p role="alert" className="notice error">{error}</p>}
    <label>选择签名 / 印章
     <RareSelect value={assetId} onChange={e=>pickAsset(e.target.value)}>
@@ -136,7 +146,6 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
     <img src={sealsApi.imageUrl(selected.id)} alt={selected.name}/>
     <span>{selected.kind==="personal"?(selected.ownerName||"未绑定")+"的签名":"公司印章"} · {selected.name}</span>
    </div>}
-   <label>页码<RareInput type="number" min={1} max={1000} value={page} onChange={e=>changePage(clamp(Number(e.target.value)||1,1000))}/></label>
    <div className="seal-size-controls">
     <label>宽度 %<RareInput type="number" min={5} max={100} step={1} value={Math.round(position.width*100)}
      onChange={e=>changeSize({width:clamp((Number(e.target.value)||5)/100,1)})}/></label>
@@ -156,7 +165,7 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
     </div>
     {!rotationFits&&<p role="status" className="seal-angle-warning">旋转后超出页面，请调整大小或位置。</p>}
    </div>
-   <RareButton type="button" disabled={busy||!selected||!maySign||duplicate||!rotationFits||!imageAvailable||!isPDF||(!staged.some(s=>s.assetId===assetId)&&staged.length>=20)} onClick={addDraft}>
+   <RareButton type="button" disabled={busy||!selected||!maySign||duplicate||!rotationFits||!imageAvailable||!isPDF||!pageCount||(!staged.some(s=>s.assetId===assetId)&&staged.length>=20)} onClick={addDraft}>
     {staged.some(s=>s.assetId===assetId)?"更新当前签章位置":"＋ 加入待签清单"}
    </RareButton>
    <div className="seal-draft-heading">待签清单 <RareBadge tone="neutral">{staged.length}/20</RareBadge></div>
@@ -175,12 +184,10 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
    </div>
    <label>本人登录密码<RareInput type="password" autoComplete="new-password" value={password}
     placeholder="整批提交前输入" onChange={e=>setPassword(e.target.value)}/></label>
-   <RareButton className="primary" disabled={busy||!isPDF||!staged.length||!password||!imageAvailable} onClick={()=>void sign()}>
+   <RareButton className="primary" disabled={busy||!isPDF||!pageCount||!staged.length||!password||!imageAvailable} onClick={()=>void sign()}>
     {busy?"正在签署…":"确认全部签署（"+staged.length+"）"}
    </RareButton>
-   {isAdmin&&<p className="hint">管理员代签会明确记录真实操作账号和各签名归属人，不视作归属人本人签署。</p>}
    {!isPDF&&<p className="hint">Office 文件需先生成 PDF 副本再签署。</p>}
-   {marks.length>0&&<a className="rare-button" href={sealsApi.exportUrl(fileId,seq)} download={"签章版-v"+seq+".pdf"}>下载带章 PDF</a>}
   </div>;
  const history = <aside className="seal-file-history">
    <SealRevisionControls fileId={fileId} seq={seq} sha={sha} isAdmin={isAdmin}
@@ -199,9 +206,9 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
  return <div className={"seal-file-workspace"+(controlsTargetId?" is-workbench":"")}>
   {controlsTargetId&&host?createPortal(<div className="file-seal-sidebar-controls">{controls}{history}</div>,host):<>{controls}{history}</>}
   {isPDF?<SealPageCanvas fileId={fileId} page={page} imageUrl={imageUrl} selected={selected} marks={marks}
-   position={position} setPosition={updatePosition} angle={angle} pageRatio={pageRatio} setPageRatio={ratio=>{
-    setPageRatio(ratio);
-   }} imageAvailable={imageAvailable} setImageAvailable={setImageAvailable}
+   position={position} setPosition={updatePosition} angle={angle} pageRatio={pageRatio} setPageRatio={setPageRatio}
+   pageCount={pageCount} onPageChange={changePage} onRetry={()=>setImageRetry(n=>n+1)}
+   imageAvailable={imageAvailable} setImageAvailable={setImageAvailable}
    drafts={staged.map(item=>({...item,asset:assets.find(a=>a.id===item.assetId)}))}/>:
    <div className="seal-file-preview"><p className="empty">仅 PDF 支持页面定位</p></div>}
  </div>;

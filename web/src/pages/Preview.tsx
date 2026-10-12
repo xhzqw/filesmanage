@@ -28,7 +28,7 @@ import {request} from "../shared/http";
 import {errorCopy} from "../shared/errors";
 import {observeResourceChange,observeWindowReturn,observeWorkspaceChange} from "../shared/resourceSync";
 import {Dialog} from "../shared/ui/Dialog";
-import {Menu,type MenuItem} from "../shared/ui/Menu";
+import type {MenuItem} from "../shared/ui/Menu";
 import type {PreviewData,FileVersion,FileItem} from "../entities/file/model";
 import type {User} from "../entities/user/model";
 import {AppShell} from "../shared/ui/AppShell";
@@ -69,7 +69,6 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const[deleting,setDeleting]=useState(false);
  const[busy,setBusy]=useState(false);
  const[moreOpen,setMoreOpen]=useState(false);
- const moreRef=useRef<HTMLButtonElement>(null);
  const[requiresApproval,setRequiresApproval]=useState<boolean|null>(null);
  const[favorite,setFavorite]=useState<boolean|null>(null);
  const[favoriteBusy,setFavoriteBusy]=useState(false);
@@ -242,21 +241,26 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
           <span className="file-nav-indicator" aria-hidden="true"/><span>{label}</span>{key==="versions"&&<small>{versions.length}</small>}
          </RareButton>)}
        </nav>
-       <div className="file-workbench-side-actions">      <div className="file-workbench-actions" role="group" aria-label="文件操作">
-       <RareButton type="button" className="primary" tone="primary" onClick={download}>下载</RareButton>
-       <RareButton type="button" tone="ghost" onClick={()=>setPrinting(true)}>打印</RareButton>
-       {isOfficeName(preview.name)&&!archived&&<Link className="rare-button file-action-link" to={"/office/"+id}>在线编辑</Link>}
-       {isCadName(preview.name)&&<Link className="rare-button file-action-link" to={"/model/"+id}>3D 查看</Link>}
-       {moreActions.length>0&&<RareButton ref={moreRef} type="button" tone="ghost" className="file-more-trigger"
-        aria-label="更多文件操作" aria-haspopup="menu" aria-expanded={moreOpen}
-        onClick={()=>setMoreOpen(value=>!value)}>
-        更多操作 <svg viewBox="0 0 20 20" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="m5 8 5 5 5-5"/></svg>
-       </RareButton>}
-       <Menu open={moreOpen} onClose={()=>setMoreOpen(false)} anchor={moreRef.current}
-        label="文件更多操作" items={moreActions}/>
-      </div>
-</div>
-            {tab==="details"&&<section id="file-panel-details" role="tabpanel" aria-labelledby="file-tab-details" className="file-sidebar-context file-details-panel">
+       <div className="file-workbench-side-actions">
+        {moreOpen&&<div className="file-action-expansion" id="file-workbench-more-actions" role="group" aria-label="更多文件操作">
+         {isOfficeName(preview.name)&&!archived&&<Link className="rare-button file-action-item" to={"/office/"+id} onClick={()=>setMoreOpen(false)}>在线编辑</Link>}
+         {isCadName(preview.name)&&<Link className="rare-button file-action-item" to={"/model/"+id} onClick={()=>setMoreOpen(false)}>3D 查看</Link>}
+         {moreActions.map(action=><RareButton key={action.id} type="button"
+          className={"file-action-item"+(action.danger?" is-danger":"")} tone="ghost" disabled={action.disabled}
+          onClick={()=>{setMoreOpen(false);action.onSelect?.();}}>{action.label}</RareButton>)}
+        </div>}
+        <div className="file-workbench-actions" role="group" aria-label="文件操作">
+         <RareButton type="button" tone="ghost" onClick={download}>下载</RareButton>
+         <RareButton type="button" tone="ghost" onClick={()=>setPrinting(true)}>打印</RareButton>
+         <RareButton type="button" tone="ghost" className="file-more-trigger"
+          aria-label="更多文件操作" aria-controls="file-workbench-more-actions" aria-expanded={moreOpen}
+          onClick={()=>setMoreOpen(open=>!open)}>更多操作 <svg viewBox="0 0 20 20" width="12" height="12"
+           fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"
+           className={moreOpen?"is-expanded":""}><path d="m5 8 5 5 5-5"/></svg>
+         </RareButton>
+        </div>
+       </div>
+       {tab==="details"&&<section id="file-panel-details" role="tabpanel" aria-labelledby="file-tab-details" className="file-sidebar-context file-details-panel">
       <FileMetadataEditor fileId={id}/>
       <dl className="file-properties">
        <div><dt>文件名</dt><dd>{preview.name}</dd></div>
