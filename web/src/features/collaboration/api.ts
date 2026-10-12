@@ -36,8 +36,11 @@ export type Stats={
  byType:{type:string;count:number;bytes:number}[];
  byMonth:{month:string;count:number;bytes:number}[];
  byUploader:{uploaderId:string;uploaderName:string;count:number;bytes:number}[];
- byFolder:{folderId:string;folderName:string;count:number;bytes:number}[];
+ byFolder:FolderCount[];
+ folderTree?:FolderCount[];
+ treeTruncated?:boolean;
 };
+export type FolderCount={folderId:string;folderName:string;parentId?:string|null;count:number;bytes:number};
 
 export type SearchPage={items:FileItem[];total:number;nextCursor:string};
 
@@ -90,6 +93,7 @@ export const collaborationApi={
 export function formatBytes(bytes:number):string{
  if(bytes<1024)return bytes+" B";
  if(bytes<1024*1024)return (bytes/1024).toFixed(1)+" KB";
- if(bytes<1024*1024*1024)return (bytes/1024/1024).toFixed(2)+" GB";
- return (bytes/1024/1024/1024).toFixed(2)+" TB";
+ if(bytes<1024*1024*1024)return (bytes/1024/1024).toFixed(1)+" MB";
+ if(bytes<1024*1024*1024*1024)return (bytes/1024/1024/1024).toFixed(2)+" GB";
+ return (bytes/1024/1024/1024/1024).toFixed(2)+" TB";
 }

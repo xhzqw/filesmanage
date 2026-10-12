@@ -724,12 +724,13 @@ func (r *Repository) Stats(ctx context.Context, q ports.StatsQuery) (domain.Stat
 	if len(stats.ByUploader) > 20 {
 		stats.ByUploader = stats.ByUploader[:20]
 	}
-	// Direct-folder ranking uses exactly the authorized file predicate.
-	folderSQL := cte + ` SELECT d.id,d.name,count(*),coalesce(sum(v.size_bytes),0)
+	// Directory treemap aggregates use exactly the authorized file predicate.
+	// Limit payload size and explicitly mark a partial result.
+	folderSQL := cte + ` SELECT d.id,d.name,d.parent_id,count(*),coalesce(sum(v.size_bytes),0)
 	   FROM files f JOIN folders d ON d.id=f.folder_id
 	   LEFT JOIN file_versions v ON v.file_id=f.id AND v.seq=f.current_version_seq
 	   WHERE ` + predicate + `
-	   GROUP BY d.id,d.name ORDER BY sum(v.size_bytes) DESC NULLS LAST,d.id LIMIT 8`
+	   GROUP BY d.id,d.name,d.parent_id ORDER BY sum(v.size_bytes) DESC NULLS LAST,d.id LIMIT 1501`
 	folderRows, err := r.Q.Query(ctx, folderSQL, scopeArgs...)
 	if err != nil {
 		return domain.Stats{}, err
@@ -737,10 +738,17 @@ func (r *Repository) Stats(ctx context.Context, q ports.StatsQuery) (domain.Stat
 	defer folderRows.Close()
 	for folderRows.Next() {
 		var item domain.FolderCount
-		if err = folderRows.Scan(&item.FolderID, &item.FolderName, &item.Count, &item.Bytes); err != nil {
+		if err = folderRows.Scan(&item.FolderID, &item.FolderName, &item.ParentID, &item.Count, &item.Bytes); err != nil {
 			return domain.Stats{}, err
 		}
-		stats.ByFolder = append(stats.ByFolder, item)
+		if len(stats.FolderTree) == 1500 {
+			stats.TreeTruncated = true
+			break
+		}
+		stats.FolderTree = append(stats.FolderTree, item)
+		if len(stats.ByFolder) < 8 {
+			stats.ByFolder = append(stats.ByFolder, item)
+		}
 	}
 	if err = folderRows.Err(); err != nil {
 		return domain.Stats{}, err

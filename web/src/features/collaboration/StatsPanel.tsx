@@ -7,6 +7,8 @@ import {Dialog} from "../../shared/ui/Dialog";
 import {FolderPicker} from "../../shared/ui/FolderPicker";
 import type {Folder} from "../../entities/folder/model";
 import {collaborationApi,formatBytes,type Stats} from "./api";
+import {FolderTreemap} from "./FolderTreemap";
+import {StatsTrend} from "./StatsTrend";
 import "./stats.css";
 
 type Scope="all"|"current"|"descendants";
@@ -55,6 +57,8 @@ export function StatsPanel(){
  const[treeToken,setTreeToken]=useState(0);
 
  const from=useMemo(()=>dateFromRange(range),[range]);
+ // Shared folder metadata is already permission-filtered by /folders/tree.
+ useEffect(()=>{let active=true;collaborationApi.folderTree().then(data=>{if(active)setFolders(data);}).catch(()=>{});return()=>{active=false;};},[reload]);
  const filters=useMemo(()=>({folder:scope==="all"?"":folder,scope:scope==="descendants"?"descendants":"",type,uploader,from}),[folder,scope,type,uploader,from]);
  const folderPath=useMemo(()=>pathOf(folders,folder),[folders,folder]);
  const folderLabel=scope==="all"?"全部可见目录":folderPath||"已选目录";
@@ -95,15 +99,13 @@ export function StatsPanel(){
   setScope("all");setFolder("");setType("");setRange("all");setUploader("");
  }
  const activeFilters=scope!=="all"||!!type||range!=="all"||!!uploader;
- const monthSeries=stats?.byMonth.filter(m=>/^\d{4}-\d{2}$/.test(m.month))||[];
- const maxMonth=Math.max(1,...monthSeries.map(m=>m[metric]));
+ const monthSeries=stats?.byMonth?.filter(m=>/^\d{4}-\d{2}$/.test(m.month))||[];
  const types=stats?.byType||[];
  const byUploader=stats?.byUploader||[];
- const foldersRank=stats?.byFolder||[];
 
  return <div className="work-body stats-workbench">
   <div className="stats-toolbar">
-   <div className="stats-heading"><strong>文件资产概览</strong><span>按权限统计可见文件</span></div>
+   <div className="stats-heading"><strong>文件资产概览</strong></div>
    <div className="stats-filters">
     <label className="stats-field"><span>目录</span><RareSelect aria-label="目录范围" value={scope} onChange={e=>changeScope(e.target.value as Scope)}>
      <option value="all">全部可见</option><option value="current">仅当前目录</option><option value="descendants">包含子目录</option>
@@ -128,39 +130,32 @@ export function StatsPanel(){
   {status==="failed"&&<div className="stats-state" role="alert">统计加载失败 <RareButton type="button" tone="neutral" onClick={()=>setReload(n=>n+1)}>重试</RareButton></div>}
   {status==="ready"&&stats&&<>
    <div className="stats-summary">
-    <div className="stats-summary-card"><span>文件总数</span><strong><AnimatedCounter value={stats.totalFiles}/></strong><small>当前可见范围</small></div>
-    <div className="stats-summary-card"><span>目录总数</span><strong><AnimatedCounter value={stats.totalFolders}/></strong><small>权限内目录</small></div>
-    <div className="stats-summary-card"><span>文件总容量</span><strong>{formatBytes(stats.totalBytes)}</strong><small>当前版本逻辑大小</small></div>
-    <div className="stats-summary-card"><span>近 30 日新增</span><strong><AnimatedCounter value={stats.added30Days}/></strong><small>按首版本创建时间</small></div>
+    <div className="stats-summary-card"><span>文件</span><strong><AnimatedCounter value={stats.totalFiles}/></strong></div>
+    <div className="stats-summary-card"><span>目录</span><strong><AnimatedCounter value={stats.totalFolders}/></strong></div>
+    <div className="stats-summary-card"><span>存储容量</span><strong>{formatBytes(stats.totalBytes)}</strong></div>
+    <div className="stats-summary-card"><span>近 30 天新增</span><strong><AnimatedCounter value={stats.added30Days}/></strong></div>
    </div>
-   <div className="stats-grid">
-    <section className="stats-panel" aria-labelledby="stats-types-title">
-     <div className="stats-panel-head"><div><h2 id="stats-types-title">文件类型分布</h2><p>按文件扩展名归类</p></div></div>
-     <RankRows metric={metric} items={types.slice(0,7).map(t=>({key:t.type,name:t.type==="无扩展名"?"无扩展名":"."+t.type,count:t.count,bytes:t.bytes}))}/>
-     {types.length>7&&<div className="stats-panel-foot">展示前 7 类，共 {types.length} 类</div>}
+   <div className="stats-layout">
+    <section className="stats-panel stats-map-panel" aria-labelledby="stats-map-title">
+     <div className="stats-panel-head"><div><h2 id="stats-map-title">目录空间分布</h2><p>面积代表容量 · 点击进入下级目录</p></div></div>
+     <FolderTreemap key={scope+folder+type+range+uploader} stats={stats} folders={folders} onChoose={id=>{setFolder(id);setScope("descendants");}}/>
     </section>
-    <section className="stats-panel" aria-labelledby="stats-growth-title">
-     <div className="stats-panel-head"><div><h2 id="stats-growth-title">新增文件趋势</h2><p>按首版本创建月份 · {metric==="count"?"文件数":"当前版本容量"}</p></div></div>
-     {monthSeries.length===0?<EmptyChart label="暂无可绘制的月份记录"/>:<div className="stats-timeline" aria-label="各月新增文件趋势">
-      {monthSeries.map(m=><div key={m.month} className="stats-month" title={m.month+" · "+metricLabel(metric,m[metric])}>
-       <strong>{metricLabel(metric,m[metric])}</strong>
-       <div className="stats-month-column"><div style={{height:Math.max(m[metric]>0?4:0,m[metric]/maxMonth*100)+"%"}}/></div>
-       <span>{m.month.slice(5)}月</span>
-      </div>)}
-     </div>}
-    </section>
-    <section className="stats-panel" aria-labelledby="stats-folders-title">
-     <div className="stats-panel-head"><div><h2 id="stats-folders-title">目录容量排行</h2><p>直属文件 · 点击查看目录及子目录</p></div></div>
-     <RankRows metric="bytes" items={foldersRank.slice(0,6).map(f=>({key:f.folderId,name:f.folderName||"未命名目录",count:f.count,bytes:f.bytes,detail:f.count+" 个文件"}))}
-      onChoose={id=>{setFolder(id);setScope("descendants");}}/>
-    </section>
-    <section className="stats-panel" aria-labelledby="stats-uploader-title">
-     <div className="stats-panel-head"><div><h2 id="stats-uploader-title">上传活跃度</h2><p>点击上传人筛选所有统计</p></div></div>
-     <RankRows metric="count" items={byUploader.slice(0,6).map(u=>({key:u.uploaderId,name:u.uploaderName||u.uploaderId,count:u.count,bytes:u.bytes,detail:formatBytes(u.bytes)}))}
-      onChoose={setUploader}/>
-    </section>
+    <div className="stats-insights">
+     <section className="stats-panel stats-types-panel" aria-labelledby="stats-types-title">
+      <div className="stats-panel-head"><h2 id="stats-types-title">文件类型</h2></div>
+      <RankRows metric={metric} items={types.slice(0,5).map(t=>({key:t.type,name:t.type==="无扩展名"?"无扩展名":"."+t.type,count:t.count,bytes:t.bytes}))}/>
+     </section>
+     <section className="stats-panel stats-growth-panel" aria-labelledby="stats-growth-title">
+      <div className="stats-panel-head"><h2 id="stats-growth-title">新增趋势</h2><span className="stats-panel-subtitle">{metric==="count"?"文件数":"容量"}</span></div>
+      {monthSeries.length===0?<EmptyChart label="暂无月份记录"/>:<StatsTrend series={monthSeries} metric={metric}/>}
+     </section>
+     <section className="stats-panel stats-uploader-panel" aria-labelledby="stats-uploader-title">
+      <div className="stats-panel-head"><h2 id="stats-uploader-title">上传活跃度</h2><span className="stats-panel-subtitle">按文件数</span></div>
+      <RankRows metric="count" items={byUploader.slice(0,4).map(u=>({key:u.uploaderId,name:u.uploaderName||u.uploaderId,count:u.count,bytes:u.bytes}))} onChoose={setUploader}/>
+     </section>
+    </div>
    </div>
-   <div className="stats-footer">容量为当前版本逻辑大小，非物理磁盘占用；时间筛选按最后修改时间，新增趋势按首次上传时间统计。</div>
+   <div className="stats-footer">容量按当前版本逻辑大小统计；新增按文件首次上传时间计算。</div>
   </>}
   {pickerOpen&&<Dialog open title="选择统计目录" onClose={()=>setPickerOpen(false)} className="dialog">
    {treeState==="loading"&&<p className="empty"><BrandLoadingLabel>正在读取目录…</BrandLoadingLabel></p>}

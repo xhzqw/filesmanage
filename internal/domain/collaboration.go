@@ -42,6 +42,8 @@ type Stats struct {
 	ByMonth      []MonthCount    `json:"byMonth"`
 	ByUploader   []UploaderCount `json:"byUploader"`
 	ByFolder     []FolderCount   `json:"byFolder"`
+	FolderTree   []FolderCount   `json:"folderTree"`
+	TreeTruncated bool           `json:"treeTruncated"`
 }
 
 // TypeCount groups files by extension bucket.
@@ -70,6 +72,7 @@ type UploaderCount struct {
 type FolderCount struct {
 	FolderID   string `json:"folderId"`
 	FolderName string `json:"folderName"`
+	ParentID   *string `json:"parentId,omitempty"`
 	Count      int64  `json:"count"`
 	Bytes      int64  `json:"bytes"`
 }
