@@ -173,7 +173,9 @@ func (h *Handler) streamLiveEvents(req *http.Request, ws *websocket.Conn, userID
 	// other API replicas. Local notifications only wake this reader promptly.
 	// Cursors advance after successful sends, never before.
 	replay := func() bool {
-		for {
+		// Bound one wake-up to 512 events. A huge backlog must not starve
+		// heartbeat and disconnect handling while the user catches up.
+		for page := 0; page < 4; page++ {
 			batch, err := store.RealtimeAfter(req.Context(), userID, resumeCursor, liveReplayBatch)
 			if err != nil {
 				return send(map[string]any{"type": "server.unavailable"})
@@ -193,6 +195,7 @@ func (h *Handler) streamLiveEvents(req *http.Request, ws *websocket.Conn, userID
 				return true
 			}
 		}
+		return true
 	}
 	if store != nil && !replay() {
 		return
