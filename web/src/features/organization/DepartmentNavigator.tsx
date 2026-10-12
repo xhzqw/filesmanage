@@ -1,4 +1,4 @@
-import {useEffect,useMemo,useRef,useState,type KeyboardEvent,type ReactNode} from "react";
+import {useEffect,useLayoutEffect,useMemo,useRef,useState,type KeyboardEvent,type ReactNode} from "react";
 import {RareBadge,RareButton,RareInput,RareNotice} from "../../shared/ui/rare";
 import {FolderResourceIcon} from "../../shared/ui/ResourceIcons";
 import type {Department} from "./api";
@@ -65,11 +65,14 @@ export function DepartmentNavigator({departments,departmentsState,deptIndex,dept
   focusRequested.current=true;
   setFocusedId(id);
  }
- useEffect(()=>{
+ useLayoutEffect(()=>{
   if(!focusRequested.current)return;
   const node=Array.from(treeRef.current?.querySelectorAll<HTMLElement>('li[role="treeitem"]')??[])
    .find(n=>n.dataset.treeId===focusedId);
-  if(node){focusRequested.current=false;node.focus();}
+  if(!node)return;
+  if(document.activeElement!==node)node.focus();
+  // Do not consume the request until the browser actually accepted the focus.
+  if(document.activeElement===node)focusRequested.current=false;
  },[focusedId,expanded,departmentsState]);
  // A DOM-derived visible tree respects every collapsed branch and keeps root/unassigned in the order.
  function onTreeKeyDown(event:KeyboardEvent<HTMLUListElement>){
