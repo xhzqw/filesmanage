@@ -107,8 +107,13 @@ func TestWorkspaceEventsAreAnonymousAndCoalesced(t *testing.T) {
 	}
 	s.notifyWorkspaceChange("folder")
 	s.notifyWorkspaceChange("trash")
-	awaitUserEvent(t, first, "state.resync")
-	awaitUserEvent(t, second, "state.resync")
+	for _, ch := range []<-chan UserEvent{first, second} {
+		event := <-ch
+		if event.Type != "workspace.changed" || len(event.Scopes) != 2 ||
+			event.Scopes[0] != "folder" || event.Scopes[1] != "trash" {
+			t.Fatalf("same-family scopes must be merged: %+v", event)
+		}
+	}
 	// Private session signals must not go to other accounts.
 	s.notifySessionChange("u_user")
 	awaitUserEvent(t, first, "session.changed")
@@ -150,4 +155,53 @@ func TestWorkspaceMutationsNotifyOnlyAfterSuccessfulCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	awaitUserEvent(t, ch, "workspace.changed")
+}
+
+func TestLiveOverflowResyncIsSticky(t *testing.T) {
+	s, _ := testService(t)
+	ch, stop := s.SubscribeUserEvents("u_user")
+	defer stop()
+	s.publishUserEvent("u_user", UserEvent{Type: "approval.changed"})
+	s.notifyWorkspaceChange("file")
+	// Two families coalesce to a full revalidation. Later traffic must
+	// not overwrite that marker while the receiving socket is slow.
+	for i := 0; i < 200; i++ {
+		s.notifyWorkspaceChange("folder", "trash")
+		s.publishUserEvent("u_user", UserEvent{Type: "session.changed"})
+	}
+	event := <-ch
+	if event.Type != "state.resync" {
+		t.Fatalf("critical resync lost under pressure: %+v", event)
+	}
+	if len(ch) != 0 {
+		t.Fatal("bounded channel retained unbounded messages")
+	}
+}
+
+func TestCacheInvalidateRejectsLateInFlightResults(t *testing.T) {
+	now := time.Now()
+	s := New(nil, nil)
+	_, _, oldSearchRev := s.search.get("query", now)
+	_, _, oldStatsRev := s.stats.get("dashboard", now)
+	s.notifyWorkspaceChange("file")
+	// Simulate an older DB query completing AFTER an intervening file commit.
+	s.search.put("query", searchEntryValue{total: 19}, now, oldSearchRev)
+	s.stats.put("dashboard", domain.Stats{TotalFiles: 19}, now, oldStatsRev)
+	if _, found, _ := s.search.get("query", now); found {
+		t.Fatal("stale search result repopulated after commit")
+	}
+	if _, found, _ := s.stats.get("dashboard", now); found {
+		t.Fatal("stale stats result repopulated after commit")
+	}
+	// The current generation may be cached, but a new commit must invalidate it.
+	_, _, currentSearchRev := s.search.get("query", now)
+	_, _, currentStatsRev := s.stats.get("dashboard", now)
+	s.search.put("query", searchEntryValue{total: 20}, now, currentSearchRev)
+	s.stats.put("dashboard", domain.Stats{TotalFiles: 20}, now, currentStatsRev)
+	if v, found, _ := s.search.get("query", now); !found || v.total != 20 {
+		t.Fatalf("current search revision not cached: %+v found=%v", v, found)
+	}
+	if v, found, _ := s.stats.get("dashboard", now); !found || v.TotalFiles != 20 {
+		t.Fatalf("current stats revision not cached: %+v found=%v", v, found)
+	}
 }

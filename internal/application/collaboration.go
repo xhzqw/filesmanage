@@ -415,9 +415,14 @@ func (s *Service) Search(ctx context.Context, u domain.User, filter SearchFilter
 	// changes, so a revocation or a new grant is visible on the next request
 	// (PE04) instead of after the TTL.
 	key := fmt.Sprintf("%d|%s", s.epoch(), searchCacheKey(u, filter))
-	if cached, ok := s.search.get(key, s.now()); ok {
+	if cached, ok, revision := s.search.get(key, s.now()); ok {
 		return SearchPage{Items: cached.files, Total: cached.total, NextCursor: cached.nextCursor}, nil
+	} else {
+		return s.searchUncached(ctx, u, filter, key, revision)
 	}
+}
+
+func (s *Service) searchUncached(ctx context.Context, u domain.User, filter SearchFilter, key string, revision uint64) (SearchPage, error) {
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
 		return SearchPage{}, err
@@ -439,7 +444,7 @@ func (s *Service) Search(ctx context.Context, u domain.User, filter SearchFilter
 		page.Items = files[:filter.Limit]
 		page.NextCursor = encodeCursor(filter.Sort, files[filter.Limit-1])
 	}
-	s.search.put(key, searchEntryValue{files: page.Items, total: page.Total, nextCursor: page.NextCursor}, s.now())
+	s.search.put(key, searchEntryValue{files: page.Items, total: page.Total, nextCursor: page.NextCursor}, s.now(), revision)
 	return page, nil
 }
 
@@ -495,9 +500,14 @@ func searchQuery(u domain.User, groups []string, filter SearchFilter) ports.File
 
 func (s *Service) Stats(ctx context.Context, u domain.User, filter SearchFilter) (domain.Stats, error) {
 	key := fmt.Sprintf("%d|%s", s.epoch(), statsCacheKey(u, filter))
-	if cached, ok := s.stats.get(key, s.now()); ok {
+	if cached, ok, revision := s.stats.get(key, s.now()); ok {
 		return cached, nil
+	} else {
+		return s.statsUncached(ctx, u, filter, key, revision)
 	}
+}
+
+func (s *Service) statsUncached(ctx context.Context, u domain.User, filter SearchFilter, key string, revision uint64) (domain.Stats, error) {
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
 		return domain.Stats{}, err
@@ -512,7 +522,7 @@ func (s *Service) Stats(ctx context.Context, u domain.User, filter SearchFilter)
 		return domain.Stats{}, err
 	}
 	// Only successful aggregations are memoised; a failed one must retry.
-	s.stats.put(key, stats, s.now())
+	s.stats.put(key, stats, s.now(), revision)
 	return stats, nil
 }
 

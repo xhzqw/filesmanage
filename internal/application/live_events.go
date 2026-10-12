@@ -49,23 +49,53 @@ func (s *Service) publishUserEvent(userID string, event UserEvent) {
 	}
 }
 
-// A slow receiver must never silently lose a different invalidation. When
-// its bounded queue overflows, require a complete authorized REST re-read.
+// A slow receiver must never lose a previously requested full resync.
+// Repeated hints coalesce while distinct event families escalate to a complete
+// authorized REST re-read. Keeping this single-slot queue nonblocking also
+// bounds publisher latency independently of browser/network speed.
 func enqueueLiveEvent(ch chan UserEvent, event UserEvent) {
 	select {
 	case ch <- event:
 	default:
-		// The hub mutex serializes all publishers. The receiver may drain the
-		// slot concurrently, in which case the fallback still fits.
+		// The hub mutex serializes all publishers. The receiver may drain
+		// the slot concurrently, but will never see a partially merged event.
+		previous := UserEvent{Type: "state.resync"}
 		select {
-		case <-ch:
+		case previous = <-ch:
 		default:
 		}
+		merged := mergeLiveEvents(previous, event)
 		select {
-		case ch <- UserEvent{Type: "state.resync"}:
+		case ch <- merged:
 		default:
 		}
 	}
+}
+
+func mergeLiveEvents(a, b UserEvent) UserEvent {
+	if a.Type == "state.resync" || b.Type == "state.resync" {
+		return UserEvent{Type: "state.resync"}
+	}
+	if a.Type == "session.revoked" || b.Type == "session.revoked" {
+		return UserEvent{Type: "session.revoked"}
+	}
+	if a.Type == b.Type {
+		if a.Type != "workspace.changed" {
+			return a
+		}
+		seen := make(map[string]bool, len(a.Scopes)+len(b.Scopes))
+		merged := UserEvent{Type: "workspace.changed"}
+		for _, scope := range append(append([]string{}, a.Scopes...), b.Scopes...) {
+			if !seen[scope] {
+				seen[scope] = true
+				merged.Scopes = append(merged.Scopes, scope)
+			}
+		}
+		if len(merged.Scopes) <= 12 {
+			return merged
+		}
+	}
+	return UserEvent{Type: "state.resync"}
 }
 
 // Call only after the successful transaction commit. This is a coarse
@@ -87,12 +117,8 @@ func (s *Service) notifyWorkspaceChange(scopes ...string) {
 		}
 	}
 	if invalidateCache {
-		s.search.mu.Lock()
-		s.search.entries = nil
-		s.search.mu.Unlock()
-		s.stats.mu.Lock()
-		s.stats.entries = nil
-		s.stats.mu.Unlock()
+		s.search.invalidate()
+		s.stats.invalidate()
 	}
 	event := UserEvent{Type: "workspace.changed", Scopes: scopes}
 	s.live.mu.Lock()

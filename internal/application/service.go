@@ -54,9 +54,10 @@ type Service struct {
 // allowed to lag by that much, and the win is that N viewers of the same scope
 // cost one aggregation instead of N (PE06/PE07 headroom on large datasets).
 type statsCache struct {
-	mu      sync.Mutex
-	entries map[string]statsEntry
-	ttl     time.Duration
+	mu       sync.Mutex
+	entries  map[string]statsEntry
+	ttl      time.Duration
+	revision uint64
 }
 
 // maxCacheEntries bounds every in-process cache: keys are principal+filter
@@ -154,9 +155,10 @@ func (c *sessionCache) dropUser(userID string) {
 // aggregates: a freshly uploaded file must not be missing from results for
 // long, so the staleness window is deliberately tighter.
 type searchCache struct {
-	mu      sync.Mutex
-	entries map[string]searchEntry
-	ttl     time.Duration
+	mu       sync.Mutex
+	entries  map[string]searchEntry
+	ttl      time.Duration
+	revision uint64
 }
 
 type searchEntry struct {
@@ -170,19 +172,22 @@ type searchEntryValue struct {
 	nextCursor string
 }
 
-func (c *searchCache) get(key string, now time.Time) (searchEntryValue, bool) {
+func (c *searchCache) get(key string, now time.Time) (searchEntryValue, bool, uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	entry, ok := c.entries[key]
 	if !ok || !entry.expireAt.After(now) {
-		return searchEntryValue{}, false
+		return searchEntryValue{}, false, c.revision
 	}
-	return entry.value, true
+	return entry.value, true, c.revision
 }
 
-func (c *searchCache) put(key string, value searchEntryValue, now time.Time) {
+func (c *searchCache) put(key string, value searchEntryValue, now time.Time, revision uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if revision != c.revision {
+		return
+	}
 	if c.entries == nil {
 		c.entries = make(map[string]searchEntry)
 	}
@@ -195,19 +200,29 @@ func (c *searchCache) put(key string, value searchEntryValue, now time.Time) {
 	c.entries[key] = searchEntry{value: value, expireAt: now.Add(c.ttl)}
 }
 
-func (c *statsCache) get(key string, now time.Time) (domain.Stats, bool) {
+func (c *searchCache) invalidate() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.revision++
+	c.entries = nil
+}
+
+func (c *statsCache) get(key string, now time.Time) (domain.Stats, bool, uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	entry, ok := c.entries[key]
 	if !ok || !entry.expireAt.After(now) {
-		return domain.Stats{}, false
+		return domain.Stats{}, false, c.revision
 	}
-	return entry.value, true
+	return entry.value, true, c.revision
 }
 
-func (c *statsCache) put(key string, value domain.Stats, now time.Time) {
+func (c *statsCache) put(key string, value domain.Stats, now time.Time, revision uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if revision != c.revision {
+		return
+	}
 	if c.entries == nil {
 		c.entries = make(map[string]statsEntry)
 	}
@@ -218,6 +233,13 @@ func (c *statsCache) put(key string, value domain.Stats, now time.Time) {
 		}
 	}
 	c.entries[key] = statsEntry{value: value, expireAt: now.Add(c.ttl)}
+}
+
+func (c *statsCache) invalidate() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.revision++
+	c.entries = nil
 }
 
 func New(uow ports.UnitOfWork, blobs ports.BlobStore) *Service {

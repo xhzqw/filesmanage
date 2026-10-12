@@ -12,16 +12,35 @@ export function connectSessionEvents(onIdentity:(user:User|null)=>void):()=>void
  let socket:WebSocket|null=null;
  let retry:number|undefined;
  let flushTimer:number|undefined;
+ let watchdog:number|undefined;
  let reconnectDelay=1000;
  let lastValidation=0;
+ let validationSequence=0;
+ let revoked=false;
+ let lastFrameAt=Date.now();
+ let connectingSince=Date.now();
  const pending=new Set<WorkspaceScope>();
 
- function validateSession(){
+ function revokeIdentity(){
+  if(!active||revoked)return;
+  revoked=true;
+  validationSequence++;
+  if(retry!==undefined){window.clearTimeout(retry);retry=undefined;}
+  socket?.close();
+  socket=null;
+  onIdentity(null);
+ }
+ function validateSession(force=false){
+  if(!active||revoked)return;
   const now=Date.now();
-  if(now-lastValidation<2500)return;
+  if(!force&&now-lastValidation<2500)return;
   lastValidation=now;
-  void authApi.me().then(user=>{if(active)onIdentity(user)}).catch(error=>{
-   if(active&&error instanceof ApiError&&error.httpStatus===401)onIdentity(null);
+  const sequence=++validationSequence;
+  void authApi.me().then(user=>{
+   if(active&&!revoked&&sequence===validationSequence)onIdentity(user);
+  }).catch(error=>{
+   if(active&&!revoked&&sequence===validationSequence&&error instanceof ApiError&&error.httpStatus===401)
+    revokeIdentity();
   });
  }
  function flush(){
@@ -38,31 +57,34 @@ export function connectSessionEvents(onIdentity:(user:User|null)=>void):()=>void
   invalidate(ALL_SCOPES);
   window.dispatchEvent(new Event("filesmanage:approvals-changed"));
   window.dispatchEvent(new Event("filesmanage:sessions-changed"));
-  validateSession();
+  validateSession(true);
  }
  function reconnect(){
-  if(!active||retry!==undefined)return;
+  if(!active||revoked||retry!==undefined)return;
   const delay=Math.round(reconnectDelay*(0.8+Math.random()*0.4));
   retry=window.setTimeout(()=>{retry=undefined;open();},delay);
   reconnectDelay=Math.min(reconnectDelay*2,30000);
  }
  function open(){
-  if(!active||socket)return;
+  if(!active||revoked||socket)return;
   const protocol=window.location.protocol==="https:"?"wss:":"ws:";
   try{
    const connection=new WebSocket(protocol+"//"+window.location.host+"/api/events/ws");
    socket=connection;
-   connection.onopen=()=>{reconnectDelay=1000;};
+   connectingSince=Date.now();
+   connection.onopen=()=>{reconnectDelay=1000;lastFrameAt=Date.now();};
    connection.onmessage=event=>{
-    if(!active||typeof event.data!=="string"||event.data.length>2048)return;
+    if(!active||revoked||socket!==connection)return;
+    lastFrameAt=Date.now();
+    if(typeof event.data!=="string"||event.data.length>2048){fullResync();return;}
     let data:{type?:unknown;scopes?:unknown;resync?:unknown};
-    try{data=JSON.parse(event.data) as typeof data;}catch{return;}
+    try{data=JSON.parse(event.data) as typeof data;}catch{fullResync();return;}
     switch(data.type){
-     case "session.revoked":onIdentity(null);break;
+     case "session.revoked":revokeIdentity();break;
      case "approval.changed":window.dispatchEvent(new Event("filesmanage:approvals-changed"));break;
      case "session.changed":
       window.dispatchEvent(new Event("filesmanage:sessions-changed"));
-      validateSession();break;
+      validateSession(true);break;
      case "workspace.changed":{
       if(!Array.isArray(data.scopes)||data.scopes.length>12){fullResync();break;}
       const scopes=data.scopes.filter((value):value is WorkspaceScope=>ALL_SCOPES.includes(value as WorkspaceScope));
@@ -71,12 +93,15 @@ export function connectSessionEvents(onIdentity:(user:User|null)=>void):()=>void
      }
      case "state.resync":fullResync();break;
      case "connection.ready":if(data.resync===true)fullResync();break;
+     case "connection.heartbeat":break;
+     case "server.unavailable":break;
      // Heartbeat and temporary DB errors are transport signals only.
+     default:fullResync();
     }
    };
    connection.onclose=()=>{
     if(socket===connection)socket=null;
-    if(active){validateSession();reconnect();}
+    if(active&&!revoked){validateSession();reconnect();}
    };
    connection.onerror=()=>connection.close();
   }catch{socket=null;reconnect();}
@@ -86,12 +111,24 @@ export function connectSessionEvents(onIdentity:(user:User|null)=>void):()=>void
   if(!socket)open();
  }
  window.addEventListener("online",online);
+ // A half-open LAN or reverse-proxy connection may remain OPEN in the
+ // browser even after the server disappears. Two missed server heartbeats
+ // close it and engage the normal reconnect/reconciliation path.
+ watchdog=window.setInterval(()=>{
+  if(!active||revoked||!socket||document.visibilityState==="hidden")return;
+  if(socket.readyState===WebSocket.OPEN&&Date.now()-lastFrameAt>40000)
+   socket.close();
+  else if(socket.readyState===WebSocket.CONNECTING&&Date.now()-connectingSince>25000)
+   socket.close();
+ },12000);
  open();
  return ()=>{
   active=false;
   window.removeEventListener("online",online);
   if(retry!==undefined)window.clearTimeout(retry);
   if(flushTimer!==undefined)window.clearTimeout(flushTimer);
+  if(watchdog!==undefined)window.clearInterval(watchdog);
+  validationSequence++;
   pending.clear();
   socket?.close();socket=null;
  };
