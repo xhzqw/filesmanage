@@ -244,7 +244,6 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
        </nav>
        <div className="file-workbench-side-actions">      <div className="file-workbench-actions" role="group" aria-label="文件操作">
        <RareButton type="button" className="primary" tone="primary" onClick={download}>下载</RareButton>
-       {(preview.renderer==="pdf"||isOfficeName(preview.name))&&<RareButton type="button" tone="ghost" className="file-sign-action" onClick={()=>setTab("seals")}>签名 / 盖章</RareButton>}
        <RareButton type="button" tone="ghost" onClick={()=>setPrinting(true)}>打印</RareButton>
        {isOfficeName(preview.name)&&!archived&&<Link className="rare-button file-action-link" to={"/office/"+id}>在线编辑</Link>}
        {isCadName(preview.name)&&<Link className="rare-button file-action-link" to={"/model/"+id}>3D 查看</Link>}
@@ -291,7 +290,10 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
          <small>{v.createdBy} · {versionTime(v.createdAt)}</small>
          {v.versionSeq!==currentSeq&&<RareButton type="button" disabled={!canManage||archived} onClick={()=>{announce("");setRollback(v)}}>恢复此版本</RareButton>}
         </article>)}
+       </div>}
        </section>}
+      {tab==="seals"&&!isOfficeName(preview.name)&&<div id="file-seals-sidebar" className="file-sidebar-context file-seal-sidebar-host"/>}
+
       </aside>
       <div className="file-workbench-main">
        {(notice||error)&&<p role={error?"alert":"status"} className={"notice file-workbench-inline-notice"+(error?" error":"")}>{error||notice}</p>}
