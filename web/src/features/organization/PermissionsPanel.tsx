@@ -1,4 +1,4 @@
-import {RareBadge,RareButton,RareDataTable,RareInput,RareNotice,RareRowActions,RareSelect} from "../../shared/ui/rare";
+import {GooeyNav,RareBadge,RareButton,RareDataTable,RareInput,RareNotice,RareRowActions,RareSelect,RareTabs} from "../../shared/ui/rare";
 import {toast} from "../../shared/ui/feedback";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useEffect,useMemo,useRef,useState,type FormEvent} from "react";
@@ -147,14 +147,17 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
   }finally{setRevokeBusy(false);}
  }
  return <div className="perm-content-root">
-  <nav className="perm-subnav" aria-label="权限管理功能">
-   <RareButton type="button" className={!auditView&&!documentAuditView?"active":""} aria-current={!auditView&&!documentAuditView?"page":undefined}
-    onClick={()=>requestNavigation(()=>setParams(old=>{const next=new URLSearchParams(old);next.set("view","folder");return next;}))}>资源授权</RareButton>
-   <RareButton type="button" className={auditView?"active":""} aria-current={auditView?"page":undefined}
-    onClick={()=>requestNavigation(()=>{setRevokeTarget(null);setParams(old=>{const next=new URLSearchParams(old);next.set("view","audit");return next;});})}>权限变更审计</RareButton>
-   <RareButton type="button" className={documentAuditView?"active":""} aria-current={documentAuditView?"page":undefined}
-    onClick={()=>requestNavigation(()=>setParams(old=>{const next=new URLSearchParams(old);next.set("view","document-audit");return next;}))}>文档活动审计</RareButton>
-  </nav>
+  <div className="perm-subnav">
+   <GooeyNav className="perm-view-nav" aria-label="权限管理功能" size="sm" separation={12} radius={8}
+    items={["资源授权","权限变更审计","文档活动审计"]}
+    value={auditView?1:documentAuditView?2:0}
+    activeColor="var(--brand-blue)" activeLabelColor="var(--text-inverse)"
+    onChange={index=>requestNavigation(()=>{
+     if(index!==0)setRevokeTarget(null);
+     setParams(old=>{const next=new URLSearchParams(old);
+      next.set("view",index===0?"folder":index===1?"audit":"document-audit");return next;});
+    })}/>
+  </div>
   {documentAuditView?<DocumentActivityPanel/>:auditView?<PermissionAudit users={users}/>:<div className="perm-workspace">
   <ResourceBrowser selected={folderId} onSelect={selectFolder}/>
   <section className="perm-detail" aria-label="目录权限">
@@ -164,17 +167,21 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
      <div className="perm-heading-actions"><Link to={"/doc?folder="+encodeURIComponent(folderId)}>在文档中打开</Link>
       <RareButton type="button" className="secondary-action" onClick={reload}>刷新授权</RareButton></div>
     </div>
-    <div className="perm-manage-toolbar" role="tablist" aria-label="目录权限视图">
-     <RareButton type="button" role="tab" aria-selected={mode==="list"} className={mode==="list"?"active":""}
-      onClick={()=>setMode("list")}>授权列表 <RareBadge tone="neutral">{grants.length}</RareBadge></RareButton>
-     <RareButton type="button" role="tab" aria-selected={mode==="effective"} className={mode==="effective"?"active":""}
-      onClick={()=>requestNavigation(()=>setMode("effective"))}>查看生效权限</RareButton>
+    <div className="perm-manage-toolbar">
+     <RareTabs className="perm-manage-tabs" label="目录权限视图">
+      <RareButton type="button" role="tab" tabIndex={mode!=="effective"?0:-1} aria-selected={mode==="list"}
+       aria-controls="perm-list-panel" className={mode==="list"?"active":""}
+       onClick={()=>setMode("list")}>授权列表 <RareBadge tone="neutral">{grants.length}</RareBadge></RareButton>
+      <RareButton type="button" role="tab" tabIndex={mode==="effective"?0:-1} aria-selected={mode==="effective"}
+       aria-controls="perm-effective-panel" className={mode==="effective"?"active":""}
+       onClick={()=>requestNavigation(()=>setMode("effective"))}>生效权限</RareButton>
+     </RareTabs>
      <RareButton type="button" className="primary perm-create-trigger" tone="primary"
       onClick={()=>setMode("create")}>+ 新增授权</RareButton>
     </div>
     <div className="perm-view-body">
-     {mode==="effective"&&<PermissionInsights folderId={folderId} users={users} usersState={usersState} refreshToken={refresh}/>}
-     {mode==="list"&&<section className="perm-card perm-overview" aria-label="直接授权记录">
+     {mode==="effective"&&<div id="perm-effective-panel" role="tabpanel" aria-label="生效权限" className="perm-mode-panel"><PermissionInsights folderId={folderId} users={users} usersState={usersState} refreshToken={refresh}/></div>}
+     {mode==="list"&&<section id="perm-list-panel" role="tabpanel" className="perm-card perm-overview" aria-label="直接授权记录">
       <div className="perm-list-filter">
        <span className="perm-list-heading">当前目录的直接授权</span>
        <RareInput type="search" className="perm-grant-search" aria-label="筛选授权用户或工作组" placeholder="搜索用户或工作组"
