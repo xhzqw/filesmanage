@@ -1151,6 +1151,11 @@ add("GET", "/api/approvals", operation("List approvals visible to the caller", "
     params=[query("scope", "mine = requested by me; pending = awaiting my decision; empty = both.", {"type": "string", "enum": ["mine", "pending"]})],
     responses=dict([json_ok(arr(ref("Approval")), "Approvals."), resp("401", ERR["401"]), resp("403", ERR["403"])])))
 
+add("GET","/api/approvals/{id}/draft",operation("Download exact pending proposal bytes (participant with file download permission)","Workflow","downloadApprovalDraft",security=SESSION,
+ params=[id_param("id","Approval ID")],
+ responses=dict([("200",{"description":"Pending draft bytes. Attachment only; private no-store.","content":{"application/octet-stream":{"schema":{"type":"string","format":"binary"}}}}),
+                 resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+
 add("GET","/api/approvals/{id}/history",operation("Read immutable per-step approval activity (participant or admin)","Workflow","approvalHistory",security=SESSION,
  params=[id_param("id","Approval ID")],
  responses=dict([json_ok(arr(ref("ApprovalEvent")),"Ordered approval events."),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))

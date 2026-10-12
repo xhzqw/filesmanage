@@ -9,6 +9,48 @@ import (
 // Approval use cases. Under an active folder policy, saves and rollbacks become
 // pending requests; the approver (or admin) commits them into a new version.
 
+// OpenApprovalDraft exposes immutable proposed bytes only to an approval participant
+// who still holds explicit file-download rights. It never publishes the staged blob.
+func (s *Service) OpenApprovalDraft(ctx context.Context, actor domain.User, approvalID string) (Download, func(), error) {
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return Download{}, nil, err
+	}
+	defer tx.Rollback(ctx)
+	approval, err := tx.ApprovalByID(ctx, approvalID)
+	if err != nil {
+		return Download{}, nil, notFoundOr(err)
+	}
+	if approval.State != domain.ApprovalPending {
+		return Download{}, nil, domain.ErrNotFound
+	}
+	participant := actor.IsAdmin || actor.ID == approval.RequesterID
+	for _, id := range approval.ApproverChain {
+		if actor.ID == id {
+			participant = true
+		}
+	}
+	if !participant {
+		return Download{}, nil, domain.ErrForbidden
+	}
+	file, err := s.visibleFile(ctx, tx, actor, approval.FileID, domain.ActionDownload)
+	if err != nil {
+		return Download{}, nil, err
+	}
+	blob, err := tx.BlobByID(ctx, approval.PayloadBlobID)
+	if err != nil {
+		return Download{}, nil, domain.ErrNotFound
+	}
+	reader, err := s.blobs.Open(blob.StorageKey)
+	if err != nil {
+		return Download{}, nil, err
+	}
+	return Download{
+		FileName: file.Name, Sha256: blob.Sha256, Size: blob.SizeBytes,
+		ContentType: "application/octet-stream", Reader: reader, ModTime: approval.CreatedAt,
+	}, func() { _ = reader.Close() }, nil
+}
+
 // SubmitEdit creates a pending approval carrying the proposed bytes. The
 // current version stays untouched; previews and downloads keep returning the
 // committed content.

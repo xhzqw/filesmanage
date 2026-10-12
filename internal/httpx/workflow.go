@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"github.com/gin-gonic/gin"
+	"net/http"
 )
 
 // Lock and approval handlers. Locks are file-level single-writer leases with a
@@ -85,6 +86,27 @@ func (h *Handler) lockStatus(c *gin.Context) {
 	}})
 }
 
+// downloadApprovalDraft serves the exact proposed bytes without modifying
+// the published version. A participant must independently have download rights.
+func (h *Handler) downloadApprovalDraft(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	download, closeReader, err := h.S.OpenApprovalDraft(c.Request.Context(), u, c.Param("id"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	defer closeReader()
+	c.Header("Content-Type", "application/octet-stream")
+	c.Header("Content-Disposition", contentDisposition(download.FileName))
+	c.Header("X-Content-Sha256", download.Sha256)
+	c.Header("Cache-Control", "private, no-store")
+	c.Header("X-Content-Type-Options", "nosniff")
+	http.ServeContent(c.Writer, c.Request, download.FileName, download.ModTime, download.Reader)
+}
+
 func (h *Handler) listApprovals(c *gin.Context) {
 	u, ok := h.auth(c)
 	if !ok {
@@ -116,9 +138,11 @@ func (h *Handler) approveApproval(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	status:="committed"
-	if result.VersionSeq==0{status="pending"}
-	c.JSON(200,gin.H{"ok":true,"data":gin.H{"fileId":result.FileID,"versionSeq":result.VersionSeq,"sha256":result.Sha256,"status":status}})
+	status := "committed"
+	if result.VersionSeq == 0 {
+		status = "pending"
+	}
+	c.JSON(200, gin.H{"ok": true, "data": gin.H{"fileId": result.FileID, "versionSeq": result.VersionSeq, "sha256": result.Sha256, "status": status}})
 }
 
 func (h *Handler) rejectApproval(c *gin.Context) {
@@ -164,7 +188,7 @@ func (h *Handler) getApprovalPolicy(c *gin.Context) {
 		return
 	}
 	c.JSON(200, gin.H{"ok": true, "data": gin.H{
-		"configured": true, "approverId": policy.ApproverID, "approverIds":policy.ApproverChain, "enabled": policy.Enabled,
+		"configured": true, "approverId": policy.ApproverID, "approverIds": policy.ApproverChain, "enabled": policy.Enabled,
 	}})
 }
 
@@ -174,21 +198,23 @@ func (h *Handler) setApprovalPolicy(c *gin.Context) {
 		return
 	}
 	var req struct {
-		ApproverID string
+		ApproverID  string
 		ApproverIDs []string
-		Enabled    bool
+		Enabled     bool
 	}
-	if c.ShouldBindJSON(&req) != nil || (req.ApproverID == "" && len(req.ApproverIDs)==0) {
+	if c.ShouldBindJSON(&req) != nil || (req.ApproverID == "" && len(req.ApproverIDs) == 0) {
 		c.JSON(400, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
 		return
 	}
-	chain:=req.ApproverIDs
-	if len(chain)==0{chain=[]string{req.ApproverID}}
+	chain := req.ApproverIDs
+	if len(chain) == 0 {
+		chain = []string{req.ApproverID}
+	}
 	if err := h.S.SetApprovalChainPolicy(c.Request.Context(), u, c.Param("id"), chain, req.Enabled); err != nil {
 		respondError(c, err)
 		return
 	}
-	c.JSON(200, gin.H{"ok": true, "data": gin.H{"configured": true, "approverId": chain[0], "approverIds":chain, "enabled": req.Enabled}})
+	c.JSON(200, gin.H{"ok": true, "data": gin.H{"configured": true, "approverId": chain[0], "approverIds": chain, "enabled": req.Enabled}})
 }
 
 func (h *Handler) clearApprovalPolicy(c *gin.Context) {
