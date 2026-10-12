@@ -270,7 +270,11 @@ try{
  console.log("RARE_ROLE_CHECK navigating to role editor");
  await navigate("/org?tab=roles",'!!document.querySelector(".org-role-editor")');
  console.log("RARE_ROLE_CHECK opening role selector");
- await click(".org-role-editor .perm-form-row>label:nth-child(2) .rare-select");
+ const roleExpanded=await evalJS(`(()=>{const select=document.querySelector(".org-role-editor .perm-form-row>label:nth-child(2) .rare-select");
+  if(!select)throw Error("role combobox missing");
+  select.scrollIntoView({block:"center",inline:"nearest"});select.click();
+  return select.getAttribute("aria-expanded");})()`);
+ assert.equal(roleExpanded,"true","role combobox did not open");
  await waitFor('!!document.querySelector(".rare-select-menu [role=option]")');
  console.log("RARE_ROLE_CHECK choosing folder permission administrator");
  await evalJS(`(()=>{const option=[...document.querySelectorAll(".rare-select-menu [role=option]")].find(x=>x.textContent.includes("目录权限管理员"));if(!option)throw Error("permission-admin role missing");option.click();return true})()`);
