@@ -1,7 +1,7 @@
-import {RareButton} from "./rare";
+import {GooeyNav,RareButton} from "./rare";
 import {useContext,useRef,useState,type ReactNode} from "react";
 import {ShellAccessories} from "./ShellAccessories";
-import {Link,useLocation,useNavigate} from "react-router-dom";
+import {useLocation,useNavigate} from "react-router-dom";
 import {Menu} from "./Menu";
 import {FolderResourceIcon} from "./ResourceIcons";
 
@@ -31,6 +31,7 @@ const NAV=[
  {to:"/trash",label:"回收站"},
  {to:"/org",label:"组织与权限"},
 ];
+const GOOEY_MAIN_ITEMS=NAV.map(item=>({label:item.label,href:item.to}));
 
 // The single shell shared by every authenticated page (DESIGN-SYSTEM-v1 §3.1,
 // VIS-09): one brand block, one navigation, one identity/exit area. Pages may
@@ -44,18 +45,34 @@ export function AppShell({user,onLogout,product,actions,children}:{user:ShellUse
  const[open,setOpen]=useState(false);
  const[accountOpen,setAccountOpen]=useState(false);
  const accountRef=useRef<HTMLButtonElement>(null);
+ const navToggleRef=useRef<HTMLButtonElement>(null);
  const navigate=useNavigate();
+ const pathname=useLocation().pathname;
+ // Keep the main navigation tied to actual routes, including browser
+ // back/forward; preview and account subpages have no misleading active tile.
+ const activeNav=NAV.findIndex(item=>item.to===pathname);
  const notificationSlot=useContext(ShellAccessories);
 
  return <div className="shell">
   <header className="header">
-   <RareButton className="nav-toggle" aria-label="导航菜单" aria-expanded={open} onClick={()=>setOpen(v=>!v)}>☰</RareButton>
+   <RareButton ref={navToggleRef} type="button" className="nav-toggle" aria-label="导航菜单" aria-controls="shell-main-navigation"
+    aria-expanded={open} onClick={()=>setOpen(v=>!v)}>☰</RareButton>
    <div className="brand"><BrandLogo size={22} className="brand-logo"/>中晟生物科技<span className="product">{product??"文档管理系统"}</span></div>
-   <nav aria-label="主导航" className={open?"open":""}>
-    {NAV.map(item=><NavLink key={item.to} to={item.to} onClick={()=>setOpen(false)}>
-     {item.label}
-    </NavLink>)}
-   </nav>
+   <GooeyNav id="shell-main-navigation" aria-label="主导航" className={"header-gooey-nav"+(open?" open":"")}
+    items={GOOEY_MAIN_ITEMS} value={activeNav} size="xs" radius={8} separation={12}
+    activeColor="var(--brand-blue)" activeLabelColor="var(--text-inverse)"
+    onChange={()=>setOpen(false)}
+    onKeyDown={event=>{
+     if(event.key==="Escape"&&open){setOpen(false);navToggleRef.current?.focus();event.preventDefault();return;}
+     if(!["ArrowRight","ArrowLeft","ArrowDown","ArrowUp","Home","End"].includes(event.key))return;
+     const links=Array.from(event.currentTarget.querySelectorAll<HTMLAnchorElement>('a[href]'));
+     const index=links.indexOf(document.activeElement as HTMLAnchorElement);
+     if(index<0)return;
+     event.preventDefault();
+     const step=event.key==="ArrowRight"||event.key==="ArrowDown"?1:-1;
+     const target=event.key==="Home"?0:event.key==="End"?links.length-1:(index+step+links.length)%links.length;
+     links[target]?.focus();
+    }}/>
    <div className="header-right">
     <RareButton type="button" className="command-trigger" aria-label="快速跳转" onClick={()=>window.dispatchEvent(new CustomEvent("filesmanage:command-spotlight"))}>
      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
@@ -94,10 +111,4 @@ export function AppShell({user,onLogout,product,actions,children}:{user:ShellUse
 function accountInitial(name:string){
  const first=[...name.trim()][0];
  return first??"·";
-}
-
-function NavLink({to,children,onClick}:{to:string;children:ReactNode;onClick:()=>void}){
- const location=useLocation();
- const active=location.pathname===to;
- return <Link to={to} className={active?"active":""} aria-current={active?"page":undefined} onClick={onClick}>{children}</Link>;
 }

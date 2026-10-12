@@ -237,6 +237,24 @@ textarea{height:auto;padding:var(--space-1) var(--space-2);line-height:1.5;resiz
 }
 .header nav a:hover{color:var(--brand-blue);background:transparent}
 .header nav a.active{color:var(--brand-blue);background:transparent;border-bottom-color:var(--brand-blue);font-weight:600}
+/* The global eight-route navigation actually renders Rare UI GooeyNav.
+   Override the legacy link underline rules without altering other navs. */
+.header nav[data-slot="gooey-nav"]{display:flex;flex:1 1 auto;align-items:center;min-width:0;max-width:100%;height:100%;margin-left:var(--space-2);color:var(--surface-header);overflow:visible}
+.header nav[data-slot="gooey-nav"]>ul{display:flex;flex-direction:row;align-items:center;width:max-content;max-width:100%;height:100%;margin:0;padding:0;gap:0}
+.header nav[data-slot="gooey-nav"] [data-slot="gooey-nav-segment"]{height:30px;min-height:30px;flex:none}
+.header nav[data-slot="gooey-nav"] [data-slot="gooey-nav-item"]{
+ display:inline-flex;align-items:center;justify-content:center;
+ min-height:30px;height:30px;padding:0 10px;
+ font-size:12px;font-weight:550;line-height:1;letter-spacing:0;
+ color:var(--text-secondary);background:transparent;border:0;
+ border-radius:inherit;text-decoration:none;white-space:nowrap;
+}
+.header nav[data-slot="gooey-nav"] [data-slot="gooey-nav-item"]:hover:not(.active){color:var(--brand-blue);background:transparent}
+.header nav[data-slot="gooey-nav"] [data-slot="gooey-nav-item"].active,
+.header nav[data-slot="gooey-nav"] [data-slot="gooey-nav-item"].active:hover{
+ color:var(--text-inverse);background:transparent;border:0;font-weight:650;
+}
+.header nav[data-slot="gooey-nav"] [data-slot="gooey-nav-item"]:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px}
 .header-right{margin-left:auto;display:flex;align-items:center;gap:var(--space-2);padding-right:var(--space-2);height:100%}
 .account-dropdown-wrapper{position:relative;display:inline-flex;align-items:center}
 .account-trigger{
@@ -680,12 +698,31 @@ tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions 
    be dead weight competing with that sheet on specificity. */
 
 /* ================= 响应式 ================= */
-@media(max-width:1050px){
+@media(max-width:1210px){
   .nav-toggle{display:inline-flex}
   .header nav{display:none;position:absolute;top:var(--height-header);left:0;right:0;background:var(--surface-panel);border-bottom:1px solid var(--border-hairline);flex-direction:column;align-items:stretch;padding:var(--space-1) var(--space-3);z-index:20;height:auto;gap:0}
   .header nav.open{display:flex}
   .header nav a{height:32px;padding:0 var(--space-2);border-bottom:0;border-left:2px solid transparent}
   .header nav a.active{border-bottom:0;border-left-color:var(--brand-cyan)}
+  .header nav[data-slot="gooey-nav"]{
+   display:none;flex:none;position:absolute;top:calc(100% + 4px);left:4px;right:4px;
+   height:auto;min-width:0;width:auto;max-width:none;margin:0;padding:6px;
+   z-index:30;overflow:visible;background:var(--surface-panel);
+   border:1px solid var(--border-hairline);border-radius:var(--radius-md);
+   box-shadow:var(--shadow-overlay);
+  }
+  .header nav[data-slot="gooey-nav"].open{display:flex}
+  .header nav[data-slot="gooey-nav"]>ul{flex-direction:column;align-items:stretch;width:100%;max-width:100%;height:auto;gap:2px}
+  .header nav[data-slot="gooey-nav"] [data-slot="gooey-nav-segment"]{
+   width:100%;height:35px;min-height:35px;
+   margin-left:0!important;border-radius:var(--radius-sm);
+  }
+  .header nav[data-slot="gooey-nav"] [data-slot="gooey-nav-segment"]>svg{display:none}
+  .header nav[data-slot="gooey-nav"] [data-slot="gooey-nav-item"]{
+   display:flex;justify-content:flex-start;width:100%;height:35px;min-height:35px;
+   padding:0 12px;font-size:13px;border:0;
+  }
+  .header nav[data-slot="gooey-nav"] [data-slot="gooey-nav-item"].active{color:var(--text-inverse);border:0}
   .sidebar{width:200px}
   .command-trigger{width:140px}
   .command-trigger .command-keys{display:none}

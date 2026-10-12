@@ -80,6 +80,36 @@ try{
   const height=width===390?760:900;
   await viewport(width,height);
   await navigate("/doc","!!document.querySelector('.account-trigger')");
+  const shellNav=await evalJS(`(()=>{const nav=document.querySelector('header.header nav[data-slot="gooey-nav"]'),
+   links=[...nav.querySelectorAll('a[data-slot="gooey-nav-item"]')],
+   segments=[...nav.querySelectorAll('[data-slot="gooey-nav-segment"]')],active=links.filter(x=>x.getAttribute('aria-current')==='page'),
+   last=segments.at(-1)?.getBoundingClientRect(),right=document.querySelector('.header-right')?.getBoundingClientRect(),
+   rect=nav.getBoundingClientRect();return{labels:links.map(x=>x.textContent.trim()),
+   paths:links.map(x=>new URL(x.href).pathname),count:segments.length,active:active.map(x=>x.textContent.trim()),
+   rendered:getComputedStyle(nav).display,navWidth:rect.width,navScroll:nav.scrollWidth,
+   lastRight:last?.right,rightStart:right?.left,overflow:document.documentElement.scrollWidth-innerWidth};})()`);
+  assert.deepEqual(shellNav.labels,["文档管理","全局搜索","共享/关注","统计","审批","生命周期","回收站","组织与权限"],
+   "all eight global Rare UI navigation links");
+  assert(shellNav.count===8&&shellNav.active.length===1&&shellNav.active[0]==="文档管理"&&shellNav.overflow<=1,
+   "Rare shell nav selection/layout at "+width+": "+JSON.stringify(shellNav));
+  if(width>1210){
+   assert(shellNav.rendered!=="none"&&shellNav.lastRight<=shellNav.rightStart+2,
+    "desktop GooeyNav fits before header actions at "+width+": "+JSON.stringify(shellNav));
+   await evalJS(`(()=>document.querySelector('header.header nav[data-slot="gooey-nav"] a')?.focus())()`);
+   await key("ArrowRight","ArrowRight",39);
+   assert.equal(await evalJS("document.activeElement?.getAttribute('href')"),"/search","arrow moves focus between Rare navigation links");
+  }else{
+   assert.equal(shellNav.rendered,"none","narrow shell hides GooeyNav until requested");
+   await click(".nav-toggle");
+   await waitFor(`getComputedStyle(document.querySelector('header.header nav[data-slot="gooey-nav"]')).display!=="none"`);
+   const mobileNav=await evalJS(`(()=>{const n=document.querySelector('header.header nav[data-slot="gooey-nav"]'),r=n.getBoundingClientRect();
+    return{rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom},items:[...n.querySelectorAll('a')].every(a=>{const b=a.getBoundingClientRect();return b.width>100&&b.right<=r.right+1})}})()`);
+   assert(mobileNav.items&&inside(mobileNav.rect,width,height),
+    "narrow GooeyNav expanded within viewport at "+width+": "+JSON.stringify(mobileNav));
+   await key("Escape","Escape",27);
+   await waitFor(`getComputedStyle(document.querySelector('header.header nav[data-slot="gooey-nav"]')).display==="none"`);
+   assert.equal(await evalJS('document.activeElement?.classList.contains("nav-toggle")'),true,"escape returns focus to nav toggle");
+  }
   await click(".account-trigger");
   await waitFor(`!!document.querySelector('[role=menu][aria-label="账户操作菜单"]')`);
   const menu=await evalJS(`(()=>{const m=document.querySelector('[role=menu][aria-label="账户操作菜单"]');const r=m.getBoundingClientRect();return{portal:m.parentElement===document.body,rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom},focused:m.contains(document.activeElement),overflow:document.documentElement.scrollWidth-innerWidth};})()`);
@@ -108,7 +138,7 @@ try{
   assert(select.role==="combobox"&&select.expanded==="true"&&select.count>=3&&inside(select.rect,width,height)&&select.overflow<=1,"time dropdown at "+width+": "+JSON.stringify(select));
   await click('.rare-select-menu [role="option"]:nth-child(2)');
   assert.equal(await evalJS(`document.querySelector('.rare-select[aria-label="修改时间"]').getAttribute("aria-expanded")`),"false");
-  results.push(width+"px: menu/combobox viewport and escape OK");
+  results.push(width+"px: global Gooey nav / menu / combobox OK");
  }
  await viewport(1440,900);
  await navigate("/doc",'!!document.querySelector(".new-folder-wrapper > button")');
