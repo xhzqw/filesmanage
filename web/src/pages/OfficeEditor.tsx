@@ -1,5 +1,6 @@
 import {RareButton} from "../shared/ui/rare";
 import {toast} from "../shared/ui/feedback";
+import {BrandLoadingLabel} from "../shared/ui/BrandLoader";
 import {useEffect,useRef,useState} from "react";
 import {useParams} from "react-router-dom";
 import {fileApi} from "../features/documents/api";
@@ -197,7 +198,7 @@ export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
    <div id="placeholder" ref={holder} className="office-holder">
     <div id="docx-editor-target"/>
     {status!=="ready"&&<div className="office-loading-cover" role={status==="failed"?"alert":"status"}>
-     {status==="failed"?<><strong>无法打开文档</strong><span>{message}</span><RareButton type="button" onClick={()=>window.location.reload()}>重试</RareButton></>:<span>正在加载 Office 文档…</span>}
+     {status==="failed"?<><strong>无法打开文档</strong><span>{message}</span><RareButton type="button" onClick={()=>window.location.reload()}>重试</RareButton></>:<BrandLoadingLabel size="sm">正在加载 Office 文档…</BrandLoadingLabel>}
     </div>}
    </div>
   </div>

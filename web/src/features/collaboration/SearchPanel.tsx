@@ -1,5 +1,6 @@
 import {RareButton,RareDataTable,RareInput,RareSelect} from "../../shared/ui/rare";
 import {toast} from "../../shared/ui/feedback";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {errorCode,errorCopy} from "../../shared/errors";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useEffect,useMemo,useRef,useState,type FormEvent} from "react";
@@ -363,7 +364,7 @@ export function SearchPanel({userId}:{userId:string}){
        <RareButton type="button" disabled={status!=="ready"||items.length===0} onClick={exportLoaded}>导出{items.length>0?" ("+items.length+")":""}</RareButton>
       </div>
      </div>
-     {status==="loading"&&<div className="search-result-message" role="status">检索中…</div>}
+     {status==="loading"&&<div className="search-result-message" role="status"><BrandLoadingLabel size="sm">检索中…</BrandLoadingLabel></div>}
      {status==="failed"&&<div className="search-result-message" role="alert">检索失败 <RareButton type="button" onClick={()=>setReloadToken(token=>token+1)}>重试</RareButton></div>}
      {status==="ready"&&<div className="table search-table-wrap">
       {items.length===0?<div className="search-empty">
@@ -396,7 +397,7 @@ export function SearchPanel({userId}:{userId:string}){
     </section>
    </div>
    {pickerOpen&&<Dialog open title="选择检索目录" onClose={()=>setPickerOpen(false)}>
-    {treeState==="loading"?<p className="empty">正在读取目录…</p>:treeState==="failed"?<div role="alert" className="notice error">目录读取失败 <RareButton type="button" onClick={()=>setTreeToken(v=>v+1)}>重试</RareButton></div>
+    {treeState==="loading"?<p className="empty"><BrandLoadingLabel>正在读取目录…</BrandLoadingLabel></p>:treeState==="failed"?<div role="alert" className="notice error">目录读取失败 <RareButton type="button" onClick={()=>setTreeToken(v=>v+1)}>重试</RareButton></div>
      :<FolderPicker open title="选择检索目录" folders={folders} selectedId={candidate} onSelect={setCandidate} onClose={()=>setPickerOpen(false)}
       footer={<><RareButton type="button" onClick={()=>setPickerOpen(false)}>取消</RareButton>
        <RareButton type="button" className="primary" disabled={!candidate} onClick={()=>{setFolder(candidate);setPickerOpen(false);}}>确定</RareButton></>}/>}

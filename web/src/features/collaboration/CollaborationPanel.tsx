@@ -1,5 +1,6 @@
 import {RareBadge,RareButton,RareDataTable,RareInput,RareRowActions} from "../../shared/ui/rare";
 import {toast} from "../../shared/ui/feedback";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useEffect,useMemo,useRef,useState} from "react";
 import {Link} from "react-router-dom";
@@ -366,7 +367,7 @@ export function CollaborationPanel(){
   <div className={"collab-workspace"+(tab==="favorites"?" with-picker":"")}>
   {tab==="favorites"&&<section className={"share-workbench"+(pickKind==="file"?" is-file-mode":"")} aria-label="选择关注或分享资源">
    <div className="share-workbench-head"><h3>选择资源</h3></div>
-   {treeState==="loading"&&<p className="hint">正在读取目录…</p>}
+   {treeState==="loading"&&<p className="hint"><BrandLoadingLabel>正在读取目录…</BrandLoadingLabel></p>}
    {treeState==="failed"&&<>
     <p role="alert" className="notice error">获取目录失败，请稍后重试。</p>
     <RareButton type="button" className="secondary-action" disabled={pickBusy} onClick={()=>setTreeToken(token=>token+1)}>重试</RareButton>
@@ -411,7 +412,7 @@ export function CollaborationPanel(){
     {matchingFolders.length>folderShownLimit&&<RareButton type="button" className="secondary-action" disabled={pickBusy} onClick={()=>setFolderShownLimit(n=>n+PICKER_PAGE)}>加载更多目录（已显示 {shownFolders.length}/{matchingFolders.length}）</RareButton>}
     {pickKind==="file"&&<>
      {folderId===""&&<p className="hint">请先选择文件所在的目录。</p>}
-     {filesState==="loading"&&<p className="hint">正在读取文件…</p>}
+     {filesState==="loading"&&<p className="hint"><BrandLoadingLabel>正在读取文件…</BrandLoadingLabel></p>}
      {filesState==="failed"&&<p role="alert" className="notice error">获取文件失败，请重新选择目录或稍后重试。</p>}
      {filesState==="ready"&&files.length>0&&<p className="hint">目录「{browseFolder?.name??folderId}」 · 已显示 {files.length} 个文件</p>}
      {filesState==="ready"&&files.length===0&&<p className="share-list-empty">该目录没有文件。</p>}
@@ -451,7 +452,7 @@ export function CollaborationPanel(){
    {tab==="favorites"?<RareDataTable className="collab-favorites-table">
     <thead><tr><th scope="col">资源</th><th className="collab-optional" scope="col">类型</th><th scope="col">状态</th><th className="collab-optional" scope="col">关注时间</th><th scope="col">操作</th></tr></thead>
     <tbody>
-     {status==="loading"&&<tr><td colSpan={5} className="empty">正在加载…</td></tr>}
+     {status==="loading"&&<tr><td colSpan={5} className="empty"><BrandLoadingLabel>正在加载…</BrandLoadingLabel></td></tr>}
      {status==="failed"&&<tr><td colSpan={5} className="empty" role="alert">获取关注列表失败，请刷新重试。</td></tr>}
      {status==="ready"&&favorites.length===0&&<tr><td colSpan={5} className="empty">没有关注内容。</td></tr>}
      {status==="ready"&&favorites.map(f=><tr key={f.id}>
@@ -472,7 +473,7 @@ export function CollaborationPanel(){
    </RareDataTable>:<RareDataTable className="collab-shares-table">
     <thead><tr><th scope="col">资源</th><th className="collab-optional" scope="col">类型</th><th className="collab-optional" scope="col">接收方/来源</th><th className="collab-optional" scope="col">权限</th><th className="collab-optional" scope="col">继承子目录</th><th className="collab-optional" scope="col">截止</th><th scope="col">状态</th><th scope="col">操作</th></tr></thead>
     <tbody>
-     {status==="loading"&&<tr><td colSpan={8} className="empty">正在加载…</td></tr>}
+     {status==="loading"&&<tr><td colSpan={8} className="empty"><BrandLoadingLabel>正在加载…</BrandLoadingLabel></td></tr>}
      {status==="failed"&&<tr><td colSpan={8} className="empty" role="alert">获取分享列表失败，请刷新重试。</td></tr>}
      {status==="ready"&&shares.length===0&&<tr><td colSpan={8} className="empty">没有{tab==="received"?"收到的":"发出的"}分享。</td></tr>}
      {status==="ready"&&shares.map(s=><tr key={s.id}>

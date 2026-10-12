@@ -1,4 +1,5 @@
 import {RareButton} from "../shared/ui/rare";
+import {BrandLoadingLabel} from "../shared/ui/BrandLoader";
 import {observeResourceChange,observeWindowReturn} from "../shared/resourceSync";
 import{useEffect,useMemo,useRef,useState,type KeyboardEvent as ReactKeyboardEvent,type PointerEvent as ReactPointerEvent}from "react";
 import{Link,useLocation,useNavigate}from "react-router-dom";
@@ -242,7 +243,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
        change, an edit save): unmounting it would drop keyboard focus and the
        expand state, so the previous folders keep rendering while the fresh tree
        loads and only the first load shows the loading/error states. */}
-   {folders.length===0&&status==="loading"&&<p>正在加载目录…</p>}
+   {folders.length===0&&status==="loading"&&<p><BrandLoadingLabel>正在加载目录…</BrandLoadingLabel></p>}
    {folders.length===0&&status==="failed"&&<p role="alert" className="error">获取目录失败，请刷新重试</p>}
    {folders.length>0&&<FolderTree items={folders} selected={selected?.id||""} isAdmin={user.isAdmin}
     onRenameFolder={folder=>runFolderAction(folder,"rename")}

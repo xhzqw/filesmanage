@@ -1,5 +1,6 @@
 import {RareButton,RareDataTable,RareInput,RareSelect} from "../../shared/ui/rare";
 import {toast} from "../../shared/ui/feedback";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {useEffect,useMemo,useRef,useState,type ChangeEvent,type DragEvent,type FormEvent,type KeyboardEvent,type MouseEvent,type ReactNode}from "react";
 import {useNavigate}from "react-router-dom";
 import type {FileItem} from "../../entities/file/model";
@@ -930,7 +931,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
      <th className="col-actions" scope="col">操作</th>
     </tr></thead>
     <tbody onKeyDown={onGridKeyDown}>
-     {status==="loading"&&<tr><td colSpan={6} className="empty">正在加载文件…</td></tr>}
+     {status==="loading"&&<tr><td colSpan={6} className="empty"><BrandLoadingLabel size="sm">正在加载文件…</BrandLoadingLabel></td></tr>}
      {status==="failed"&&<tr><td colSpan={6} className="empty" role="alert">获取文件失败，请刷新重试</td></tr>}
      {status==="ready"&&items.length===0&&<tr><td colSpan={6} className="empty">
       <svg className="empty-mark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.5h8A1.5 1.5 0 0 1 20 10v7.5A1.5 1.5 0 0 1 18.5 19h-14A1.5 1.5 0 0 1 3 17.5z"/></svg>
@@ -1204,7 +1205,7 @@ export function MoveDialog({file,presetTargetId,onClose,onMoved,onReload}:{
  }
 
  return <Dialog open title={dialogTitle} onClose={close} closeGuard={()=>!busy} className="dialog">
-  {tree==="loading"&&<p className="empty">正在读取目录…</p>}
+  {tree==="loading"&&<p className="empty"><BrandLoadingLabel>正在读取目录…</BrandLoadingLabel></p>}
   {tree==="failed"&&<>
    <p role="alert" className="notice error">获取目录失败，请稍后重试。</p>
    <div className="dialog-actions">
@@ -1345,7 +1346,7 @@ function BatchMoveDialog({files,presetTargetId,onClose,onMoved,onReload}:{
  }
 
  return <Dialog open title={dialogTitle} onClose={close} closeGuard={()=>!busy} className="dialog">
-  {tree==="loading"&&<p className="empty">正在读取目录…</p>}
+  {tree==="loading"&&<p className="empty"><BrandLoadingLabel>正在读取目录…</BrandLoadingLabel></p>}
   {tree==="failed"&&<>
    <p role="alert" className="notice error">获取目录失败，请稍后重试。</p>
    <div className="dialog-actions">

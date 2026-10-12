@@ -1,5 +1,6 @@
 import {RareInput} from "../../shared/ui/rare";
 import {Dialog} from "../../shared/ui/Dialog";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {useCallback,useEffect,useMemo,useRef,useState,type KeyboardEvent} from "react";
 import {useNavigate} from "react-router-dom";
 import {collaborationApi,formatBytes} from "./api";
@@ -238,7 +239,7 @@ export function CommandSpotlight(){
       onChange={event=>setQuery(event.target.value)}
       placeholder="快速搜索" aria-label="快速指令台检索" autoComplete="off"/>
     </div>
-    {status==="loading"?<p className="command-status hint" role="status">检索中…</p>:null}
+    {status==="loading"?<p className="command-status hint" role="status"><BrandLoadingLabel>检索中…</BrandLoadingLabel></p>:null}
     {status==="failed"?<p className="command-status error" role="alert">检索失败，请重试</p>:null}
     {status==="ready"&&rows.length===0?<p className="command-status hint">没有匹配的结果</p>:null}
     {rows.length>0?<ul ref={listRef} className="command-list" role="listbox" aria-label="快速指令台结果">

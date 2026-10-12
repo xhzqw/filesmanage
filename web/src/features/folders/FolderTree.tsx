@@ -1,5 +1,6 @@
 import {RareButton,RareInput} from "../../shared/ui/rare";
 import {FolderResourceIcon} from "../../shared/ui/ResourceIcons";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {useEffect,useId,useLayoutEffect,useMemo,useRef,useState,type CSSProperties,type DragEvent,type KeyboardEvent,type ReactNode}from "react";
 import {Link,useNavigate}from "react-router-dom";
 import type{Folder}from"../../entities/folder/model";
@@ -695,7 +696,7 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
   if(!level)return null;
   const style={paddingLeft:String((parentDepth+1)*14+8)+"px"};
   if(level.status==="loading")
-   return <li role="none" className="tree-note hint" style={style}>{count>0?"正在加载…":"正在加载子目录…"}</li>;
+   return <li role="none" className="tree-note hint" style={style}><BrandLoadingLabel>{count>0?"正在加载…":"正在加载子目录…"}</BrandLoadingLabel></li>;
   if(level.status==="error")
    return <li role="none" className="tree-note" style={style}>
     <span role="alert" className="tree-note-error">子目录加载失败</span>
@@ -800,7 +801,7 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
    {paged&&levelNotes("",-1,levelItems("").length)}
   </ul>
   {keyword!==""&&<div className="tree-search-panel">
-   {hitsStatus==="loading"&&<p className="hint">搜索中…</p>}
+   {hitsStatus==="loading"&&<p className="hint"><BrandLoadingLabel>搜索中…</BrandLoadingLabel></p>}
    {hitsStatus==="error"&&<p className="hint error" role="alert">目录搜索失败，请稍后重试。</p>}
    {hitsStatus==="ready"&&hits.length===0&&<p className="hint">没有匹配的目录。</p>}
    {hits.length>0&&<ul className="tree-results" aria-label="目录搜索结果">

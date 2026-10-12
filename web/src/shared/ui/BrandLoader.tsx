@@ -1,11 +1,16 @@
 import "./brand-loader.css";
 import {brandLoaderPaths} from "./brandLoaderPaths";
+import {type ReactNode} from "react";
 
 /** Reuses the approved transparent brand favicon as the precise silhouette.
  *  The highlights orbit *inside* the official mark rather than redrawing it.
  *  No canvas/JS animation loop, network library or extra animation dependency.
  */
 export type BrandLoaderSize="xs"|"sm"|"md"|"lg";
+/** Inline wait text, without introducing a new block or disturbing table cells. */
+export function BrandLoadingLabel({children,size="xs"}:{children:ReactNode;size?:BrandLoaderSize}){
+ return <span className="brand-loading-content"><BrandLoader decorative size={size}/><span>{children}</span></span>;
+}
 export function BrandLoader({size="md",label="正在加载",decorative=false,className=""}:{
  size?:BrandLoaderSize;label?:string;decorative?:boolean;className?:string;
 }){

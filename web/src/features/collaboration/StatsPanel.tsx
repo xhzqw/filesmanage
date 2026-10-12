@@ -1,5 +1,6 @@
 import {useEffect,useMemo,useState} from "react";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {RareButton,RareSelect,AnimatedCounter,GooeyNav} from "../../shared/ui/rare";
 import {request} from "../../shared/http";
 import {Dialog} from "../../shared/ui/Dialog";
@@ -122,7 +123,7 @@ export function StatsPanel(){
    </div>
   </div>
   {scope!=="all"&&<div className="stats-scope-note">当前目录：{folderLabel} <RareButton tone="ghost" type="button" onClick={()=>openPicker(scope)}>更改</RareButton></div>}
-  {status==="loading"&&<div className="stats-state" role="status">正在加载统计数据…</div>}
+  {status==="loading"&&<div className="stats-state" role="status"><BrandLoadingLabel size="sm">正在加载统计数据…</BrandLoadingLabel></div>}
   {status==="failed"&&<div className="stats-state" role="alert">统计加载失败 <RareButton type="button" tone="neutral" onClick={()=>setReload(n=>n+1)}>重试</RareButton></div>}
   {status==="ready"&&stats&&<>
    <div className="stats-summary">
@@ -163,7 +164,7 @@ export function StatsPanel(){
    <div className="stats-footer">容量为当前版本逻辑大小，非物理磁盘占用；时间筛选按最后修改时间，新增趋势按首次上传时间统计。</div>
   </>}
   {pickerOpen&&<Dialog open title="选择统计目录" onClose={()=>setPickerOpen(false)} className="dialog">
-   {treeState==="loading"&&<p className="empty">正在读取目录…</p>}
+   {treeState==="loading"&&<p className="empty"><BrandLoadingLabel>正在读取目录…</BrandLoadingLabel></p>}
    {treeState==="failed"&&<div role="alert" className="notice error">获取目录失败 <RareButton type="button" onClick={()=>setTreeToken(n=>n+1)}>重试</RareButton></div>}
    {treeState==="ready"&&<FolderPicker open title="选择统计目录" folders={folders} selectedId={candidate}
     onSelect={setCandidate} onClose={()=>setPickerOpen(false)}

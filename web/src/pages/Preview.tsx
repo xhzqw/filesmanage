@@ -1,5 +1,6 @@
 import {RareBadge,RareButton,RareDataTable,RareInput,RareRowActions,RareTabs,MicroHoldToDelete} from "../shared/ui/rare";
 import {toast} from "../shared/ui/feedback";
+import {BrandLoadingLabel} from "../shared/ui/BrandLoader";
 import {useEffect,useRef,useState,type FormEvent} from "react";
 import {Link,useNavigate,useParams} from "react-router-dom";
 import {fileApi,formatSize,type FileLifecycle} from "../features/documents/api";
@@ -212,7 +213,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  return <AppShell user={user} onLogout={onLogout}>
   <div className="panels">
    <main className="work file-preview-page">
-    {status==="loading"&&<p className="empty" role="status">正在加载文件…</p>}
+    {status==="loading"&&<p className="empty" role="status"><BrandLoadingLabel size="sm">正在加载文件…</BrandLoadingLabel></p>}
     {status==="failed"&&<div className="file-workbench-error"><p role="alert" className="notice error">{error}</p>
      <div className="file-workbench-recovery-actions">
       <RareButton onClick={refresh}>重新加载</RareButton>
