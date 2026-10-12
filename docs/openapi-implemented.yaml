@@ -6909,15 +6909,29 @@ paths:
       - name: scope
         in: query
         required: false
-        description: mine = requested by me; pending = awaiting my decision; empty = both.
+        description: inbox = my pending; mine = requested by me; all_pending = admin only.
         schema:
           type: string
           enum:
           - mine
-          - pending
+          - inbox
+          - all_pending
+      - name: limit
+        in: query
+        required: false
+        description: Page size 1–100. Omit for legacy array response.
+        schema:
+          type: integer
+          minimum: 1
+      - name: cursor
+        in: query
+        required: false
+        description: Last approval ID from the previous page.
+        schema:
+          type: string
       responses:
         '200':
-          description: Approvals.
+          description: Legacy array, or keyset page when limit is supplied.
           content:
             application/json:
               schema:
@@ -6928,9 +6942,11 @@ paths:
                     enum:
                     - true
                   data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Approval'
+                    oneOf:
+                    - type: array
+                      items:
+                        $ref: '#/components/schemas/Approval'
+                    - $ref: '#/components/schemas/ApprovalPage'
                 required:
                 - ok
                 - data
@@ -7232,15 +7248,30 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
   /api/approvals/notifications:
     get:
-      summary: Read the authenticated user's newest 100 approval notifications
+      summary: Read recipient-scoped approval notifications with accurate unread count
       operationId: approvalNotifications
       tags:
       - Workflow
       security:
       - cookieSession: []
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        description: Page size 1–100. Omit for legacy array response.
+        schema:
+          type: integer
+          minimum: 1
+      - name: before
+        in: query
+        required: false
+        description: ID cursor; only older notifications are returned.
+        schema:
+          type: integer
+          minimum: 0
       responses:
         '200':
-          description: Recipient-scoped, newest first.
+          description: Legacy array or keyset page with unreadCount.
           content:
             application/json:
               schema:
@@ -7251,9 +7282,11 @@ paths:
                     enum:
                     - true
                   data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/ApprovalNotification'
+                    oneOf:
+                    - type: array
+                      items:
+                        $ref: '#/components/schemas/ApprovalNotification'
+                    - $ref: '#/components/schemas/ApprovalNotificationPage'
                 required:
                 - ok
                 - data
@@ -11529,3 +11562,42 @@ components:
       - revision
       - markCount
       - action
+    ApprovalPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Approval'
+        nextCursor:
+          type: string
+        hasMore:
+          type: boolean
+        pendingCount:
+          type: integer
+          minimum: 0
+      required:
+      - items
+      - nextCursor
+      - hasMore
+      - pendingCount
+    ApprovalNotificationPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApprovalNotification'
+        nextCursor:
+          type: integer
+          minimum: 0
+        hasMore:
+          type: boolean
+        unreadCount:
+          type: integer
+          minimum: 0
+      required:
+      - items
+      - nextCursor
+      - hasMore
+      - unreadCount

@@ -141,7 +141,8 @@ func (r *Repository) ListApprovalPage(ctx context.Context, scope, userID, cursor
 	case "mine":
 		where = "a.requester_id=$1"
 	case "all_pending":
-		where = "a.state='pending'"
+		// Keep the first bind parameter typed even for this admin-only scope.
+		where = "a.state='pending' AND $1::text <> ''"
 	default:
 		return nil, domain.ErrInvalidInput
 	}

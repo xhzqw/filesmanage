@@ -42,11 +42,14 @@ export function SealLibrary({isAdmin}:{isAdmin:boolean}){
   if(isAdmin){sealsApi.permissions().then(list=>{if(live)setPeople(list.map(u=>({id:u.userId,displayName:u.displayName})));}).catch(err=>{if(live)setError(errorCopy(err,"人员名单读取失败"));});}
   return()=>{live=false;};
  },[isAdmin,revision]);
+ // Applies to clicks, newly imported assets and fallback selection after reload.
+ useEffect(()=>{
+  setRenameValue("");setUserId("");setError("");setConfirmRetire(false);
+ },[selected]);
  const active=items.find(x=>x.id===selected);
  function chooseAsset(id:string){
   if(busy||id===selected)return;
-  setSelected(id);setRenameValue("");setUserId("");setError("");
-  setConfirmRetire(false);
+  setSelected(id);
  }
  async function perform(action:"bind"|"grant"|"revoke"|"retire"|"rename"){
   if(!active||busy)return;

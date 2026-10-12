@@ -33,6 +33,7 @@ export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:
  const[notificationPage,setNotificationPage]=useState<{nextCursor:number;hasMore:boolean}>({nextCursor:0,hasMore:false});
  const[unreadCount,setUnreadCount]=useState(0);
  const[loadingMore,setLoadingMore]=useState(false);
+ const loadedOlderNotifications=useRef(false);
  const[loading,setLoading]=useState(true);
  const[loadError,setLoadError]=useState("");
  const[refreshKey,setRefreshKey]=useState(0);
@@ -80,8 +81,15 @@ export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:
  useEffect(()=>{
   let active=true;
   const update=()=>approvalActivityApi.notificationsPage().then(page=>{if(active){
-   setNotifications(page.items);setUnreadCount(page.unreadCount);
-   setNotificationPage({nextCursor:page.nextCursor,hasMore:page.hasMore});setNoticeError("");
+   // Live refresh must not discard older pages the user already loaded.
+   setNotifications(current=>loadedOlderNotifications.current
+    ?[...page.items,...current.filter(note=>note.id<(page.items.at(-1)?.id??Number.MAX_SAFE_INTEGER))]
+    :page.items);
+   setUnreadCount(page.unreadCount);
+   if(!loadedOlderNotifications.current){
+    setNotificationPage({nextCursor:page.nextCursor,hasMore:page.hasMore});
+   }
+   setNoticeError("");
   }})
    .catch(()=>{if(active)setNoticeError("通知读取失败");});
   void update();
@@ -101,6 +109,7 @@ export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:
     if(!notificationPage.hasMore)return;
     const page=await approvalActivityApi.notificationsPage(notificationPage.nextCursor);
     setNotifications(current=>[...current,...page.items.filter(n=>!current.some(prev=>prev.id===n.id))]);
+    loadedOlderNotifications.current=true;
     setUnreadCount(page.unreadCount);
     setNotificationPage({nextCursor:page.nextCursor,hasMore:page.hasMore});
    }else{
@@ -229,7 +238,7 @@ export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:
     {view==="notifications"&&noticeError&&<div role="alert" className="approval-error-bar">{noticeError}</div>}
     {loading?<div className="approval-list-empty" role="status">正在读取审批…</div>:
      view==="notifications"?<>
-      {matchingNotes.length===0&&<div className="approval-list-empty">{query?"没有匹配的通知":"暂无通知"}</div>}
+      {matchingNotes.length===0&&<div className="approval-list-empty">{query?(hasMore?"已加载通知中暂无匹配，可继续加载":"没有匹配的通知"):"暂无通知"}</div>}
       {matchingNotes.map(note=><RareButton type="button" key={note.id}
        className={"approval-list-row approval-notification-row"+(selected===note.approvalId?" is-selected":"")+(note.read?"":" is-unread")}
        aria-pressed={selected===note.approvalId} onClick={()=>void openNote(note)}>
@@ -238,7 +247,7 @@ export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:
        <span className="approval-row-end">{!note.read&&<i className="approval-unread-dot" aria-label="未读"/>}<small>{timeLabel(note.createdAt)}</small></span>
       </RareButton>)}
      </>:<>
-      {list.length===0&&<div className="approval-list-empty">{hasFilters?"没有匹配的审批":view==="inbox"||view==="all_pending"?"当前没有待处理的申请":"还没有发起过审批"}</div>}
+      {list.length===0&&<div className="approval-list-empty">{hasFilters?(hasMore?"已加载审批中暂无匹配，可继续加载":"没有匹配的审批"):view==="inbox"||view==="all_pending"?"当前没有待处理的申请":"还没有发起过审批"}</div>}
       {list.map(approval=><RareButton type="button" key={approval.id}
        className={"approval-list-row"+(selected===approval.id?" is-selected":"")}
        aria-pressed={selected===approval.id} onClick={()=>{setSelected(approval.id);setMobileDetail(true);}}>

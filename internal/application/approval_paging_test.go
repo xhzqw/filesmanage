@@ -63,6 +63,11 @@ func TestApprovalPagesBeyondLegacyCaps(t *testing.T){
   before=page.NextCursor
  }
  if len(seen)!=137{t.Fatalf("notifications truncated: %d",len(seen))}
+ if err:=svc.ReadApprovalNotification(ctx,admin,137);err!=nil{t.Fatal(err)}
+ afterRead,err:=svc.ApprovalNotificationsPage(ctx,admin,0,1)
+ if err!=nil||afterRead.UnreadCount!=101{
+  t.Fatalf("unread count did not update after marking an older notification read: %+v %v",afterRead,err)
+ }
  if _,err:=svc.ApprovalNotificationsPage(ctx,admin,0,101);!errors.Is(err,domain.ErrInvalidInput){t.Fatalf("limit not validated: %v",err)}
 }
 
