@@ -243,3 +243,65 @@
 @media(max-width:820px){
  .file-workbench-main .file-workbench-history{padding:120px 2px 0}
 }
+
+/* DOCX/Office: page fidelity is primary. Never substitute a flat outline for
+   a failed PDF render without the reader deliberately choosing that mode. */
+.file-workbench-preview-surface .office-layout-pdf{
+ background:var(--surface-header);
+ padding:74px 12px 76px
+}
+.file-workbench-preview-surface .office-layout-pdf iframe{
+ display:block;min-width:0;min-height:0;width:100%;height:100%;
+ background:var(--surface-header);border:0;border-radius:var(--radius-md)
+}
+.file-workbench-preview-surface .office-layout-state{
+ display:flex;flex:1 1 auto;min-height:0;align-items:center;
+ justify-content:center;flex-direction:column;gap:12px;
+ padding:84px 24px 96px;box-sizing:border-box;
+ color:var(--text-secondary);font-size:12px;text-align:center
+}
+.file-workbench-preview-surface .office-layout-state strong{
+ color:var(--text-primary);font-size:14px;font-weight:650
+}
+.file-workbench-preview-surface .office-layout-state .rare-button{
+ border-radius:var(--radius-pill);min-height:34px;padding:0 14px
+}
+.file-workbench-preview-surface .office-layout-outline{
+ flex:1 1 auto;min-height:0;min-width:0;overflow-y:auto;overflow-x:hidden;
+ padding:78px 22px 86px;box-sizing:border-box;overscroll-behavior:contain;
+ background:var(--surface-header)
+}
+.file-workbench-preview-surface .office-layout-outline>.structured-preview{
+ width:100%;max-width:840px;min-height:0;height:auto;
+ margin:0 auto;padding:0;overflow:visible;background:var(--surface-panel);
+ border:1px solid var(--border-hairline);border-radius:var(--radius-md);
+ box-shadow:var(--shadow-panel)
+}
+.file-workbench-preview-surface .office-layout-outline .structured-preview-scroll{
+ display:block;max-width:none;width:100%;min-height:300px;height:auto;overflow:visible;
+ margin:0;box-sizing:border-box;padding:38px 48px 52px
+}
+.file-workbench-preview-surface .office-layout-outline .structured-sections{
+ display:block
+}
+.file-workbench-preview-surface .office-layout-outline .structured-section{
+ border:0;border-radius:0;margin:0 0 25px;overflow:visible
+}
+.file-workbench-preview-surface .office-layout-outline .structured-section h3{
+ margin:0 0 12px;padding:0 0 10px;border:0;border-bottom:1px solid var(--border-hairline);
+ background:transparent;color:var(--text-secondary);font-size:12px
+}
+.file-workbench-preview-surface .office-layout-outline .structured-lines{
+ padding:0;max-height:none;overflow:visible
+}
+.file-workbench-preview-surface .office-layout-outline .structured-lines p{
+ margin:0 0 10px;padding:0;border:0;line-height:1.75;
+ white-space:pre-wrap;font-family:inherit;font-size:13px;color:var(--text-primary)
+}
+@media(max-width:820px){
+ .file-workbench-preview-surface .office-layout-pdf{padding:120px 5px 72px}
+ .file-workbench-preview-surface .office-layout-outline{padding:120px 8px 78px}
+ .file-workbench-preview-surface .office-layout-outline .structured-preview-scroll{
+  min-height:220px;padding:24px 20px 35px
+ }
+}
