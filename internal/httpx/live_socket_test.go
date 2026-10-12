@@ -193,3 +193,52 @@ func TestReplayCursorExpiryOnRetentionOrDatabaseRestore(t *testing.T) {
 		})
 	}
 }
+
+func TestCompactLiveBatchPreservesCursorsAndSecurityBoundaries(t *testing.T) {
+	journal := []domain.RealtimeEvent{
+		{ID: 10, Type: "workspace.changed", Scopes: []string{"file", "search"}},
+		{ID: 11, Type: "workspace.changed", Scopes: []string{"file", "stats"}},
+		{ID: 12, Type: "workspace.changed", Scopes: []string{"folder", "permissions"}},
+		{ID: 13, Type: "session.changed"},
+		{ID: 14, Type: "workspace.changed", Scopes: []string{"review"}},
+		{ID: 15, Type: "workspace.changed", Scopes: []string{"unrecognized.extension"}},
+		{ID: 16, Type: "workspace.changed", Scopes: []string{"lifecycle"}},
+		{ID: 17, Type: "approval.changed"},
+		{ID: 18, Type: "workspace.changed", Scopes: []string{"file"}},
+	}
+	result := compactLiveBatch(journal)
+	if len(result) != 7 {
+		t.Fatalf("grouped frames=%d want 7: %+v", len(result), result)
+	}
+	for i, want := range []struct {
+		id       int64
+		typeName string
+	}{
+		{12, "workspace.changed"}, {13, "session.changed"},
+		{14, "workspace.changed"}, {15, "workspace.changed"},
+		{16, "workspace.changed"}, {17, "approval.changed"},
+		{18, "workspace.changed"},
+	} {
+		if result[i].ID != want.id || result[i].Type != want.typeName {
+			t.Fatalf("frame[%d] = %+v want id=%d type=%s", i, result[i], want.id, want.typeName)
+		}
+	}
+	if got := result[0].Scopes; len(got) != 5 ||
+		got[0] != "file" || got[1] != "search" || got[2] != "stats" ||
+		got[3] != "folder" || got[4] != "permissions" {
+		t.Fatalf("scope union incorrect: %v", got)
+	}
+	if journal[0].ID != 10 || len(journal[0].Scopes) != 2 {
+		t.Fatalf("compaction mutated durable store input: %+v", journal[0])
+	}
+	// Extremely high event rates cannot grow the outbound socket queue: a
+	// full replay page of identical file updates becomes one invalidation.
+	many := make([]domain.RealtimeEvent, 128)
+	for i := range many {
+		many[i] = domain.RealtimeEvent{ID: int64(i + 1), Type: "workspace.changed", Scopes: []string{"file"}}
+	}
+	merged := compactLiveBatch(many)
+	if len(merged) != 1 || merged[0].ID != 128 || len(merged[0].Scopes) != 1 {
+		t.Fatalf("128-event replay page not reduced to one monotonic hint: %+v", merged)
+	}
+}

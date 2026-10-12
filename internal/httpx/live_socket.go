@@ -3,6 +3,7 @@ package httpx
 import (
 	"errors"
 	"filesmanage/internal/application"
+	"filesmanage/internal/domain"
 	"golang.org/x/net/websocket"
 	"net"
 	"net/http"
@@ -21,6 +22,56 @@ const (
 	liveDurablePoll    = 2 * time.Second
 	liveReplayBatch    = 128
 )
+
+// Coalesce contiguous known workspace invalidations before WebSocket writes.
+// The persisted journal still contains every original transaction; only the
+// subscriber's stateless replay *frames* are compacted. Keep other event
+// types in order so session revocations and approval notifications are never
+// suppressed, and carry the highest included cursor for at-least-once replay.
+func compactLiveBatch(batch []domain.RealtimeEvent) []domain.RealtimeEvent {
+	out := make([]domain.RealtimeEvent, 0, len(batch))
+	for _, event := range batch {
+		if event.Type == "workspace.changed" && knownLiveScopes(event.Scopes) && len(out) > 0 {
+			last := &out[len(out)-1]
+			if last.Type == "workspace.changed" && knownLiveScopes(last.Scopes) {
+				last.ID = event.ID
+				for _, scope := range event.Scopes {
+					found := false
+					for _, present := range last.Scopes {
+						if present == scope {
+							found = true
+							break
+						}
+					}
+					if !found {
+						last.Scopes = append(last.Scopes, scope)
+					}
+				}
+				continue
+			}
+		}
+		// Copy the scopes: compaction must never mutate the input backing array,
+		// which can be shared by a fake store or retained between replays.
+		event.Scopes = append([]string(nil), event.Scopes...)
+		out = append(out, event)
+	}
+	return out
+}
+
+func knownLiveScopes(scopes []string) bool {
+	if len(scopes) == 0 {
+		return false
+	}
+	for _, scope := range scopes {
+		switch scope {
+		case "file", "folder", "trash", "permissions", "collaboration", "organization",
+			"search", "stats", "review", "lifecycle", "approval-policy", "presets":
+		default:
+			return false
+		}
+	}
+	return true
+}
 
 // websocketSameOrigin is separate from checkOrigin: WebSocket handshakes use
 // GET and carry ambient cookies. Missing, null, cross-scheme and cross-host
@@ -122,6 +173,7 @@ func (h *Handler) streamLiveEvents(req *http.Request, ws *websocket.Conn, userID
 		}
 		return websocket.JSON.Send(ws, message) == nil
 	}
+	var lastTouched time.Time
 	checkSession := func() bool {
 		authenticated, err := h.S.Session(req.Context(), token)
 		if errors.Is(err, application.ErrUnauthorized) || (err == nil && authenticated.User.ID != userID) {
@@ -134,7 +186,12 @@ func (h *Handler) streamLiveEvents(req *http.Request, ws *websocket.Conn, userID
 			send(map[string]any{"type": "server.unavailable"})
 			return false
 		}
-		h.S.TouchActiveSession(req.Context(), token)
+		// TouchSession is a SQL write transaction even when its 60-second
+		// predicate rejects the update. Never execute it per replay frame.
+		if time.Since(lastTouched) >= 45*time.Second {
+			lastTouched = time.Now()
+			h.S.TouchActiveSession(req.Context(), token)
+		}
 		return true
 	}
 	if !checkSession() {
@@ -182,7 +239,7 @@ func (h *Handler) streamLiveEvents(req *http.Request, ws *websocket.Conn, userID
 			if err != nil {
 				return send(map[string]any{"type": "server.unavailable"})
 			}
-			for _, event := range batch {
+			for _, event := range compactLiveBatch(batch) {
 				if !checkSession() {
 					return false
 				}
@@ -209,15 +266,14 @@ func (h *Handler) streamLiveEvents(req *http.Request, ws *websocket.Conn, userID
 		case <-disconnected:
 			return
 		case event := <-events:
-			if !checkSession() {
-				return
-			}
 			if store != nil {
 				if !replay() {
 					return
 				}
-			} else if !send(event) {
-				return
+			} else {
+				if !checkSession() || !send(event) {
+					return
+				}
 			}
 		case <-poll.C:
 			if store != nil && !replay() {
