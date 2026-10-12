@@ -226,6 +226,27 @@ async function main() {
       return (onPreview&&/SHA|sha|编码|BOM|字节/.test(text))?'preview':('path='+location.pathname+' meta='+/SHA|sha|编码|BOM|字节/.test(text));
     })()`);
     check("preview shows byte metadata", preview === "preview", String(preview));
+
+    // Browser-only print is a proper file action: the workbench opens without
+    // downloading the original file, and the server separately authorizes
+    // both preview+print against the current immutable source digest.
+    const printOpened = await cdp.clickText("打印");
+    const printPanel = await cdp.waitFor(`()=>Boolean(document.querySelector('dialog.document-print-dialog[open]')?.querySelector('button[aria-label="纸张"]'))`, 5000);
+    check("file preview exposes RareUI print workbench", Boolean(printOpened&&printPanel), "paper settings visible in modal");
+    const printPrepared = await cdp.evaluate(`(async()=>{
+      const id=location.pathname.split('/').pop();
+      const preview=await(await fetch('/api/files/'+encodeURIComponent(id)+'/preview',{credentials:'same-origin'})).json();
+      const response=await fetch('/api/files/'+encodeURIComponent(id)+'/print/prepare',{
+       method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},
+       body:JSON.stringify({expectedSha256:preview.data?.sha256})
+      });
+      const body=await response.json();
+      return response.status===200&&body.data?.sha256===preview.data?.sha256&&body.data?.versionSeq>=1;
+    })()`);
+    check("browser print API pins digest and audits intention", Boolean(printPrepared), "print+preview ACL authorized");
+    await cdp.clickText("取消");
+    const printClosed=await cdp.waitFor(`()=>!document.querySelector('dialog.document-print-dialog[open]')`,3000);
+    check("print workbench closes without navigation", Boolean(printClosed), "still on file preview");
     await cdp.navigate(`${BASE}/doc`);
     await cdp.waitFor(`()=>document.body.textContent?.includes('journey-${stamp}.txt')`, 20000);
 
