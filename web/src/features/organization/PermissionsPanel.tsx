@@ -98,7 +98,12 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
   if(folder.id===folderId)return;
   requestNavigation(()=>{
    setSelectedName({id:folder.id,name:folder.path||folder.name});
-   setParams(old=>{const next=new URLSearchParams(old);next.set("tab","permissions");next.set("view","folder");next.set("folder",folder.id);return next;});
+   setParams(old=>{
+    // The root browser may finish auto-selecting just as the user switches to
+    // an audit view. Its stale callback must not pull the user back here.
+    if(old.get("view")==="audit"||old.get("view")==="document-audit")return old;
+    const next=new URLSearchParams(old);next.set("tab","permissions");next.set("view","folder");next.set("folder",folder.id);return next;
+   });
    setSubmitState("edit");setRiskAcknowledged(false);setRevokeTarget(null);setNotice(null);setMode("list");
   });
  }

@@ -26,6 +26,10 @@ export function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(f
  const busyParents=useRef(new Set<string>());
  const searchRef=useRef(0);
  const requestSerial=useRef<Record<string,number>>({});
+ // Route switching may unmount the browser while its initial root fetch is
+ // still pending. Never let a late reply reselect a folder or overwrite the
+ // user's new permission/audit view.
+ const alive=useRef(false);
  const selectedRef=useRef(selected);
  const selectRef=useRef(onSelect);
  selectedRef.current=selected;
@@ -40,7 +44,7 @@ export function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(f
   setErrors(old=>({...old,[parentId]:""}));
   try{
    const page=await permissionsApi.children(parentId,cursor);
-   if(requestSerial.current[parentId]!==generation)return;
+   if(!alive.current||requestSerial.current[parentId]!==generation)return;
    setPages(old=>({...old,[parentId]:cursor
     ?{items:[...(old[parentId]?.items??[]),...page.items],nextCursor:page.nextCursor}
     :page}));
@@ -55,13 +59,17 @@ export function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(f
     }
    }
   }catch(e){
-   if(requestSerial.current[parentId]===generation)setErrors(old=>({...old,[parentId]:errorCopy(e,"目录读取失败")}));
+   if(alive.current&&requestSerial.current[parentId]===generation)setErrors(old=>({...old,[parentId]:errorCopy(e,"目录读取失败")}));
   }finally{
    busyParents.current.delete(parentId);
-   if(requestSerial.current[parentId]===generation)setLoading(old=>({...old,[parentId]:false}));
+   if(alive.current&&requestSerial.current[parentId]===generation)setLoading(old=>({...old,[parentId]:false}));
   }
  }
- useEffect(()=>{void load("");},[]);
+ useEffect(()=>{
+  alive.current=true;
+  void load("");
+  return()=>{alive.current=false;};
+ },[]);
  const needle=query.trim();
  useEffect(()=>{
   const serial=++searchRef.current;
