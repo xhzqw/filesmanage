@@ -35,7 +35,7 @@ export function useApprovalPolicyEditor(folderId:string){
  const busy=writingFolder===folderId&&folderId!=="";
  const unknown=unknownFolder===folderId||unknownFolders.current.has(folderId);
  const dirty=!!current&&(current.enabled!==enabled||current.ids.join("|")!==approverIds.join("|"));
- const protectedDraft=dirty||busy||unknown||remoteChanged;
+ const protectedDraft=!!folderId&&(dirty||busy||unknown||remoteChanged);
 
  // Change folder, not refresh: replace local edit state and invalidate confirmations.
  useEffect(()=>{
@@ -73,6 +73,7 @@ export function useApprovalPolicyEditor(folderId:string){
  const snapshotRef=useRef(snapshot);snapshotRef.current=snapshot;
  const dirtyRef=useRef(dirty);dirtyRef.current=protectedDraft;
  useEffect(()=>observeWorkspaceChange(()=>{
+  if(!activeFolder.current)return;
   if(dirtyRef.current){
    setRemoteChanged(true);
   }else{

@@ -412,8 +412,19 @@ try{
  assert(await cdp.waitFor("()=>!!document.querySelector('.approval-workspace .perm-tree-name')"),
   "approval resource navigation renders");
  await cdp.evaluate("(()=>{document.querySelector('.approval-workspace .perm-tree-name').click();return true})()");
- assert(await cdp.waitFor("()=>!!document.querySelector('.approval-toggle input:not(:disabled)')"),
-  "approval policy editor is ready");
+ assert(await cdp.waitFor("()=>!!new URLSearchParams(location.search).get('folder')"),
+  "approval directory click navigates without a phantom unsaved draft");
+ const firstApprovalReady=await cdp.waitFor("()=>!!document.querySelector('.approval-toggle input:not(:disabled)')");
+ if(!firstApprovalReady){
+  console.log("APPROVAL_DIAGNOSTIC",JSON.stringify(await cdp.evaluate(`(()=>{
+   const edit=document.querySelector('.approval-editor');
+   const toggle=document.querySelector('.approval-toggle input');
+   return {url:location.href,html:edit?.innerHTML.slice(0,1400),
+    toggle:toggle?.outerHTML,notices:[...document.querySelectorAll('.approval-detail [role=alert],.approval-detail [role=status]')].map(n=>n.textContent),
+    state:document.querySelector('.approval-state')?.outerHTML};
+  })()`)));
+ }
+ assert(firstApprovalReady,"approval policy editor is ready");
  assert(await cdp.evaluate(`(()=>{
   const work=document.querySelector('.approval-workspace');
   const state=document.querySelector('.approval-state[data-rare-badge-tone]');
@@ -481,6 +492,8 @@ try{
  assert(await cdp.waitFor("()=>!!document.querySelector('.approval-workspace .perm-tree-name')"),
   "approval write safety test loads resource browser");
  await cdp.evaluate("(()=>{document.querySelector('.approval-workspace .perm-tree-name').click();return true})()");
+ assert(await cdp.waitFor("()=>!!new URLSearchParams(location.search).get('folder')"),
+  "approval directory click navigates without a phantom unsaved draft");
  assert(await cdp.waitFor("()=>!!document.querySelector('.approval-chain-entry select:not(:disabled)')"),
   "approval form can select an approver");
  const initialApprover=await cdp.evaluate("(()=>document.querySelector('.approval-chain-entry select')?.value??'')()");
