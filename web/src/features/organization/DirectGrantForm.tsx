@@ -1,6 +1,8 @@
-import {RareButton,RareInput,RareNotice,RareSelect} from "../../shared/ui/rare";
+import {RareButton,RareInput,RareNotice} from "../../shared/ui/rare";
 import type {Dispatch,FormEvent,SetStateAction} from "react";
 import {PERMISSION_ACTIONS} from "./permissionActions";
+import {PermissionActionPicker} from "./PermissionActionPicker";
+import {PermissionGrantSubjectFields,PermissionGrantScopeFields} from "./PermissionGrantFields";
 
 type LoadState="loading"|"ready"|"failed";
 export type SubmitState="edit"|"review"|"saving";
@@ -34,21 +36,15 @@ export function DirectGrantForm({folderName,usersState,groupsState,onRetryUsers,
      {usersState==="failed"&&<RareNotice tone="danger">读取用户列表失败。<RareButton type="button" className="secondary-action" onClick={onRetryUsers}>重试用户列表</RareButton></RareNotice>}
      {groupsState==="failed"&&<RareNotice tone="danger">读取工作组列表失败。<RareButton type="button" className="secondary-action" onClick={onRetryGroups}>重试工作组列表</RareButton></RareNotice>}
      {subjectSourceState==="loading"&&<p role="status" className="hint">正在读取可授权主体…</p>}
-     <div className="perm-form-row">
-      <label>主体类型<RareSelect value={subjectKind} onChange={e=>{setSubjectKind(e.target.value as "user"|"group");setSubjectId("");setSubmitState("edit");}}>
-       <option value="group">工作组</option><option value="user">用户</option></RareSelect></label>
-      <label>授权对象<RareSelect searchable aria-label="授权对象，可在下拉列表内搜索" value={subjectId} required disabled={subjectSourceState!=="ready"} onChange={e=>{setSubjectId(e.target.value);setSubmitState("edit");}}>
-       <option value="">选择{subjectKind==="user"?"用户":"工作组"}</option>{candidates.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</RareSelect></label>
-     </div>
-     <fieldset className="perm-action-fieldset"><legend>操作权限</legend><div className="perm-action-grid">
-      {PERMISSION_ACTIONS.map(([key,label])=><label key={key}><RareInput type="checkbox" checked={actions.includes(key)}
-       onChange={e=>setActions(old=>e.target.checked?[...old,key]:old.filter(x=>x!==key))}/>{label}</label>)}
-     </div></fieldset>
-     <div className="perm-form-row">
-      <label>作用范围<RareSelect value={scopeOnly?"only":"subtree"} onChange={e=>{setScopeOnly(e.target.value==="only");setSubmitState("edit");}}>
-       <option value="only">仅当前目录</option><option value="subtree">包含子目录</option></RareSelect></label>
-      <label>到期时间<RareInput type="datetime-local" value={expiresAt} onChange={e=>setExpiresAt(e.target.value)}/></label>
-     </div>
+     <PermissionGrantSubjectFields kind={subjectKind} subject={subjectId} candidates={candidates}
+      subjectDisabled={subjectSourceState!=="ready"}
+      onKindChange={value=>{setSubjectKind(value);setSubjectId("");setSubmitState("edit");setRiskAcknowledged(false);}}
+      onSubjectChange={value=>{setSubjectId(value);setSubmitState("edit");setRiskAcknowledged(false);}}/>
+     <PermissionActionPicker options={PERMISSION_ACTIONS} value={actions} preset="basic" disabled={submitState==="saving"}
+      className="perm-action-fieldset" onChange={next=>{setActions(next);setSubmitState("edit");setRiskAcknowledged(false);}}/>
+     <PermissionGrantScopeFields scopeOnly={scopeOnly} expiresAt={expiresAt}
+      onScopeChange={value=>{setScopeOnly(value);setSubmitState("edit");setRiskAcknowledged(false);}}
+      onExpiryChange={value=>{setExpiresAt(value);setSubmitState("edit");setRiskAcknowledged(false);}}/>
      {submitState==="review"&&<div className="perm-review" role="status">
       <strong>请核对授权摘要</strong>
        <p><strong>目录：</strong>{folderName}</p>

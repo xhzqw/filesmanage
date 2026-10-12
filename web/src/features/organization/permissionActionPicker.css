@@ -1,0 +1,14 @@
+/* One low-noise ACL choice surface for every permission workflow. */
+.permission-action-picker{border:0;padding:0;margin:0;min-width:0}
+.permission-action-picker legend{font-size:12px;font-weight:650;padding:0 0 2px}
+.permission-action-tools{display:flex;justify-content:flex-end;align-items:center;gap:4px;flex-wrap:wrap;min-height:28px;margin:0 0 7px}
+.permission-action-tools>span{margin-right:auto;font-size:11px;color:var(--text-secondary);font-variant-numeric:tabular-nums}
+.permission-action-tools>.rare-button{height:26px;min-height:26px;padding:0 8px;font-size:11px}
+.permission-action-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.permission-action-options label{display:flex;align-items:center;min-width:0;min-height:36px;gap:8px;padding:5px 9px;border:1px solid transparent;border-radius:var(--radius-sm);background:var(--surface-header);font-size:12px;cursor:pointer}
+.permission-action-options label:hover{background:var(--surface-row-hover)}
+.permission-action-options label.is-selected{background:var(--brand-cyan-muted);color:var(--brand-blue);font-weight:600}
+.permission-action-options label:focus-within{outline:2px solid var(--border-focus);outline-offset:-2px}
+.permission-action-options label input{flex:none;width:15px;height:15px;min-height:15px;padding:0;accent-color:var(--brand-blue)}
+.permission-action-picker:disabled .permission-action-options{opacity:.55}
+@media(max-width:600px){.permission-action-options{grid-template-columns:repeat(2,minmax(0,1fr))}}

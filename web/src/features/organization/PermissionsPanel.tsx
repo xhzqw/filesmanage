@@ -181,17 +181,18 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
        aria-controls="perm-effective-panel" className={mode==="effective"?"active":""}
        onClick={()=>requestNavigation(()=>setMode("effective"))}>生效权限</RareButton>
      </RareTabs>
-     <RareButton type="button" className="primary perm-create-trigger" tone="primary"
-      onClick={()=>setMode("create")}>+ 新增授权</RareButton>
+     <RareButton type="button" className="primary perm-create-trigger" tone={mode==="create"?"ghost":"primary"}
+      onClick={()=>mode==="create"?requestNavigation(()=>setMode("list")):setMode("create")}>
+      {mode==="create"?"返回授权列表":"新增授权"}</RareButton>
     </div>
     <div className="perm-view-body">
      {mode==="effective"&&<div id="perm-effective-panel" role="tabpanel" aria-label="生效权限" className="perm-mode-panel"><PermissionInsights folderId={folderId} users={users} usersState={usersState} refreshToken={refresh}/></div>}
      {mode==="list"&&<section id="perm-list-panel" role="tabpanel" className="perm-card perm-overview" aria-label="直接授权记录">
-      <div className="perm-list-filter">
-       <span className="perm-list-heading">当前目录的直接授权</span>
+      {grants.length>0&&<div className="perm-list-filter">
+       <span className="perm-list-heading">直接授权</span>
        <RareInput type="search" className="perm-grant-search" aria-label="筛选授权用户或工作组" placeholder="搜索用户或工作组"
         value={grantQuery} onChange={event=>setGrantQuery(event.target.value)}/>
-      </div>
+      </div>}
       {notice?.error&&<RareNotice tone="danger">{notice.text}</RareNotice>}
       {state==="loading"&&<p role="status" className="hint perm-list-hint">正在读取授权…</p>}
       {state==="failed"&&<RareNotice tone="danger">读取授权失败，无法管理当前目录。<RareButton type="button" onClick={reload}>重试</RareButton></RareNotice>}
@@ -206,15 +207,12 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
         <td><RareRowActions><RareButton type="button" className="danger" tone="danger"
          onClick={()=>{setRevokeError("");setRevokeTarget(g);}}>撤销</RareButton></RareRowActions></td>
        </tr>)}</tbody></RareDataTable>
-       :<div className="perm-empty-grants"><strong>{grantQuery?"没有匹配的授权":"暂无直接授权"}</strong>
-        {!grantQuery&&<RareButton type="button" className="primary" onClick={()=>setMode("create")}>新增授权</RareButton>}</div>}
+       :<div className="perm-empty-grants"><strong>{grantQuery?"没有匹配的授权":"暂无直接授权"}</strong></div>}
       </div>}
      </section>}
      {mode==="create"&&<div className="perm-create-view">
       {notice?.error&&<RareNotice tone={notice.text.includes("结果未知")?"warning":"danger"}>{notice.text}</RareNotice>}
-      <div className="perm-create-heading"><strong>为当前目录新增授权</strong>
-       <RareButton type="button" onClick={()=>requestNavigation(()=>setMode("list"))}>返回列表</RareButton>
-      </div>
+      <div className="perm-create-heading"><strong>新增直接授权</strong></div>
       <DirectGrantForm folderName={selectedName?.id===folderId?selectedName.name:folderId}
        usersState={usersState} groupsState={groupsState} onRetryUsers={onRetryUsers} onRetryGroups={onRetryGroups}
        subjectKind={subjectKind} setSubjectKind={setSubjectKind} subjectId={subjectId} setSubjectId={setSubjectId}

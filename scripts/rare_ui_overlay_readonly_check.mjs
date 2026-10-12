@@ -236,6 +236,27 @@ try{
    tabs:!!tabs,scroll:document.documentElement.scrollWidth-innerWidth};})()`);
  assert(permissions.count===3&&permissions.selected==="资源授权"&&permissions.activeFill!=="rgba(0, 0, 0, 0)"&&permissions.scroll<=1,
   "real branded Gooey nav in permission workbench: "+JSON.stringify(permissions));
+ // Directory grant must have exactly one primary create/back action and one
+ // shared ACL fieldset. Interactions are reverted; never submit permissions.
+ if(await evalJS('!!document.querySelector(".perm-create-trigger")')){
+  await evalJS('(()=>{document.querySelector(".perm-create-trigger").click();return true})()');
+  await waitFor('!!document.querySelector(".perm-create-view .permission-action-picker")');
+  const grantPicker=await evalJS(`(()=>({count:document.querySelectorAll(".perm-create-view .permission-action-picker").length,
+   choices:document.querySelectorAll(".perm-create-view .permission-action-options input[type=checkbox]").length,
+   selected:document.querySelectorAll(".perm-create-view .permission-action-options input:checked").length,
+   creates:[...document.querySelectorAll(".perm-create-view button")].filter(x=>x.textContent.includes("新增授权")).length,
+   back:document.querySelector(".perm-create-trigger")?.textContent.trim()}))()`);
+  assert(grantPicker.count===1&&grantPicker.choices===9&&grantPicker.selected===1&&grantPicker.creates===0&&grantPicker.back==="返回授权列表",
+   "single low-noise directory grant editor: "+JSON.stringify(grantPicker));
+  await evalJS('(()=>{document.querySelector(".perm-create-view .permission-action-tools button").click();return true})()');
+  await waitFor('document.querySelectorAll(".perm-create-view .permission-action-options input:checked").length===2');
+  await evalJS(`(()=>{const preview=[...document.querySelectorAll(".perm-create-view .permission-action-options label")].find(x=>x.textContent.trim()==="预览");if(!preview)throw Error("preview ACL action missing");preview.querySelector("input").click();return true})()`);
+  await waitFor('document.querySelectorAll(".perm-create-view .permission-action-options input:checked").length===1');
+  await evalJS('(()=>{document.querySelector(".perm-create-trigger").click();return true})()');
+  await waitFor('!document.querySelector(".perm-create-view")');
+  assert.equal(await evalJS('document.querySelectorAll(".perm-empty-grants button").length'),0,
+   "empty authorization table does not duplicate create entry");
+ }
  await evalJS(`(()=>{document.querySelectorAll('.perm-view-nav [data-slot="gooey-nav-item"]')[1].click();return true})()`);
  await sleep(350);
  const navResult=await evalJS(`(()=>({url:location.href,view:new URLSearchParams(location.search).get("view"),

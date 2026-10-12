@@ -2,17 +2,17 @@ import {useEffect,useMemo,useState,type FormEvent} from "react";
 import {toast} from "../../shared/ui/feedback";
 import type {Folder} from "../../entities/folder/model";
 import type {User} from "../../entities/user/model";
-import {RareButton,RareInput,RareNotice,RareSelect} from "../../shared/ui/rare";
+import {RareButton,RareInput,RareNotice} from "../../shared/ui/rare";
 import {Dialog} from "../../shared/ui/Dialog";
 import {errorCode,errorCopy} from "../../shared/errors";
+import {PermissionActionPicker} from "./PermissionActionPicker";
+import {PERMISSION_ACTIONS,HIGH_RISK_PERMISSION_ACTIONS} from "./permissionActions";
+import {PermissionGrantSubjectFields,PermissionGrantScopeFields} from "./PermissionGrantFields";
 import {organizationApi,type Workgroup} from "./api";
 import {permissionsApi,type DirectGrant} from "./permissionsApi";
 import "./quickGrants.css";
 
-const ACTIONS=[["list","查看列表"],["preview","预览"],["upload","上传/新建"],["download","下载"],
- ["modify","修改"],["delete","删除"],["rename","重命名"],["move","移动"],["print","打印"]] as const;
-const LABELS=new Map<string,string>(ACTIONS.map(([key,label])=>[key,label]));
-const HIGHRISK=new Set(["download","modify","delete","move"]);
+const LABELS=new Map<string,string>(PERMISSION_ACTIONS.map(([key,label])=>[key,label]));
 type LoadState="loading"|"ready"|"failed";
 function actionLabels(keys:string[]){return keys.map(key=>LABELS.get(key)??key).join("、");}
 
@@ -58,7 +58,7 @@ export function QuickGrantsDialog({folder,onClose}:{folder:Folder;onClose:()=>vo
   ?users.filter(u=>!u.disabled).map(u=>({id:u.id,name:u.displayName+(u.login?`（${u.login}）`:"")}))
   :groups.map(g=>({id:g.id,name:g.name}));
  const subjectReady=kind==="user"?usersState==="ready":groupsState==="ready";
- const risk=actions.filter(a=>HIGHRISK.has(a));
+ const risk=actions.filter(a=>HIGH_RISK_PERMISSION_ACTIONS.has(a));
  const canSave=grantsState==="ready"&&subjectReady&&!!subject&&actions.length>0&&!unknown&&!busy;
  function edit(){setReview(false);setAck(false);setNotice(null);}
  function refresh(){setRevokeId(null);edit();setRefreshKey(n=>n+1);}
@@ -123,28 +123,16 @@ export function QuickGrantsDialog({folder,onClose}:{folder:Folder;onClose:()=>vo
     <RareButton type="button" disabled={busy} onClick={()=>setSubjectsKey(n=>n+1)}>重试</RareButton>
    </div>}
    <form className="quick-grants-form" onSubmit={submit}>
-    <div className="quick-grants-fields">
-     <label>主体类型<RareSelect value={kind} disabled={busy} onChange={e=>{setKind(e.target.value as "user"|"group");setSubject("");edit();}}>
-      <option value="group">工作组</option><option value="user">用户</option></RareSelect></label>
-     <label>授权对象<RareSelect value={subject} searchable disabled={!subjectReady||busy} required
-      aria-label="选择授权对象" onChange={e=>{setSubject(e.target.value);edit();}}>
-      <option value="">选择{kind==="user"?"用户":"工作组"}</option>
-      {choices.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</RareSelect></label>
-    </div>
-    <fieldset className="quick-grants-fieldset"><legend>操作权限</legend>
-     <div className="quick-grants-actions-grid">{ACTIONS.map(([key,label])=><label key={key}>
-      <RareInput type="checkbox" checked={actions.includes(key)} disabled={busy}
-       onChange={e=>{setActions(old=>e.target.checked?[...old,key]:old.filter(a=>a!==key));edit();}}/>
-      <span>{label}</span>
-     </label>)}</div>
-    </fieldset>
-    <div className="quick-grants-fields">
-     <label>作用范围<RareSelect value={scopeOnly?"only":"tree"} disabled={busy}
-      onChange={e=>{setScopeOnly(e.target.value==="only");edit();}}>
-      <option value="only">仅当前目录</option><option value="tree">包含子目录</option></RareSelect></label>
-     <label>到期时间（可选）<RareInput type="datetime-local" value={expiresAt} disabled={busy}
-      onChange={e=>{setExpiresAt(e.target.value);edit();}}/></label>
-    </div>
+    <PermissionGrantSubjectFields className="quick-grants-fields" kind={kind} subject={subject}
+     candidates={choices} disabled={busy} subjectDisabled={!subjectReady}
+     onKindChange={value=>{setKind(value);setSubject("");edit();}}
+     onSubjectChange={value=>{setSubject(value);edit();}}/>
+    <PermissionActionPicker options={PERMISSION_ACTIONS} value={actions} preset="basic" disabled={busy}
+     className="quick-grants-fieldset" optionsClassName="quick-grants-actions-grid" toolbarClassName="quick-grants-action-toolbar"
+     onChange={next=>{setActions(next);edit();}}/>
+    <PermissionGrantScopeFields className="quick-grants-fields" scopeOnly={scopeOnly} expiresAt={expiresAt}
+     disabled={busy} onScopeChange={value=>{setScopeOnly(value);edit();}}
+     onExpiryChange={value=>{setExpiresAt(value);edit();}}/>
     {review&&<div className="quick-grants-review" role="status">
      <strong>确认授权</strong>
      <span>{folder.name} → {names.get(kind+":"+subject)??subject}</span>
