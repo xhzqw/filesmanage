@@ -100,6 +100,11 @@ try{
    return {left:left.width,right:right.width,page:paper.width,distinct:right.left>=left.right-4};
   })()`);
   assert("signing page gets spacious right-hand canvas",geometry.right>580&&geometry.page>350&&geometry.distinct,JSON.stringify(geometry));
+  const compact=await cdp.evaluate(`(()=>{
+   const history=document.querySelector('#file-seals-sidebar .seal-sidebar-history');
+   return !!history&&!history.open&&!document.querySelector('#file-seals-sidebar .seal-submit-panel');
+  })()`);
+  assert("signing sidebar defaults to compact controls with history collapsed",compact);
   const enabled=await cdp.evaluate(`(()=>{
    const list=document.querySelector('#file-seals-sidebar select');
    return [...(list?.options??[])].filter(o=>o.value&&!o.disabled).length;
@@ -112,6 +117,16 @@ try{
     await cdp.evaluate(`(()=>{[...document.querySelectorAll('[role="option"]')].find(o=>!o.disabled&&o.textContent.trim()!=='选择人员或公章')?.click()})()`);
     const mark=await cdp.waitFor(`()=>!!document.querySelector('.seal-position-mark.is-editable')`,4500);
     assert("selected signing asset has movable page overlay",Boolean(mark));
+    const advanced=await cdp.evaluate(`(()=>{
+     const section=document.querySelector('#file-seals-sidebar .seal-advanced-settings');
+     if(!section||section.open)return false;
+     section.querySelector('summary')?.click();
+     const visible=section.open&&!!section.querySelector('input[aria-label="旋转度数"]');
+     section.querySelector('summary')?.click();
+     return visible&&!section.open;
+    })()`);
+    assert("precision controls expand on demand without replacing stamp",advanced);
+
     if(mark){
      const before=await cdp.evaluate(`(()=>{
       const p=document.querySelector('.seal-position-mark').getBoundingClientRect();
@@ -133,6 +148,9 @@ try{
      })()`);
      await delay(150);
      assert("positioned mark enters draft without applying seal",add&&await cdp.evaluate(`(()=>document.querySelectorAll('.seal-draft-row').length===1)()`));
+     const submitShown=await cdp.evaluate(`(()=>!!document.querySelector('#file-seals-sidebar .seal-submit-panel input[aria-label="本人登录密码"]'))()`);
+     assert("signing confirmation is shown only after staging",Boolean(submitShown));
+
     }
    }
   }else console.log("SKIP asset editing: no unconsumed authorized signing assets");
@@ -146,6 +164,23 @@ try{
  await delay(200);
  const restored=await cdp.evaluate(`(()=>!!document.querySelector('#file-seals-sidebar:not([hidden]) .seal-draft-row'))()`);
  assert("pending signing draft is restored after switching back",restored);
+ await cdp.evaluate(`(()=>{[...document.querySelectorAll('.file-workbench-nav-item')].find(b=>b.textContent.trim()==='文件信息')?.click()})()`);
+ const infoCompact=await cdp.evaluate(`(()=>{
+  const s=document.querySelector('.file-details-panel');
+  return !!s&&!!s.querySelector('.file-properties-compact')&&
+   [...s.querySelectorAll('details.file-sidebar-disclosure')].length===2&&
+   [...s.querySelectorAll('details.file-sidebar-disclosure')].every(x=>!x.open);
+ })()`);
+ assert("file details show essentials, hide classification and technical fields",infoCompact);
+ await cdp.evaluate(`(()=>{[...document.querySelectorAll('.file-workbench-nav-item')].find(b=>b.textContent.trim()==='审查批注')?.click()})()`);
+ const reviewCompact=await cdp.evaluate(`(()=>{
+  const b=[...document.querySelectorAll('.file-review button')].find(b=>b.textContent?.includes('批注'));
+  const initial=!document.querySelector('.file-review-form');
+  b?.click();
+  return initial&&!!b;
+ })()`);
+ const reviewExpanded=await cdp.waitFor(`()=>!!document.querySelector('.file-review-form')`,3000);
+ assert("review composer opens only on demand",reviewCompact&&Boolean(reviewExpanded));
  await cdp.evaluate(`(()=>{[...document.querySelectorAll('.file-workbench-nav-item')].find(b=>b.textContent.trim()==='预览')?.click()})()`);
  const dock=await cdp.evaluate(`(()=>{
   const buttons=[...document.querySelectorAll('.file-workbench-actions>button')];
