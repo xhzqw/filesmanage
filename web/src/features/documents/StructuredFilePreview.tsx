@@ -10,11 +10,9 @@ export function StructuredFilePreview({value}:{value:StructuredPreview}){
  const sections=value.sections??[];
  const matched=entries.filter(entry=>entry.name.toLowerCase().includes(filter.trim().toLowerCase()));
  return <div className="structured-preview">
+  <div className="structured-preview-scroll">
   {value.note&&<p className="structured-note" role="status">{value.note}</p>}
   {value.kind==="archive"&&entries.length>0&&<>
-   <label className="structured-filter-label preview-reader-dock"><span>{entries.length} 项</span>
-    <RareInput value={filter} onChange={event=>setFilter(event.target.value)} placeholder="筛选文件名"/>
-   </label>
    <div className="structured-table-scroll"><table className="structured-table">
     <thead><tr><th scope="col">名称</th><th scope="col">类型</th><th scope="col">大小</th></tr></thead>
     <tbody>{matched.map((entry,index)=><tr key={entry.name+index}>
@@ -31,5 +29,10 @@ export function StructuredFilePreview({value}:{value:StructuredPreview}){
   </section>)}</div>}
   {!value.note&&sections.length===0&&entries.length===0&&<p className="empty">没有可展示的内容。</p>}
   {value.truncated&&<p className="structured-limit">当前仅显示安全读取范围内的内容，可下载后查看完整文件。</p>}
+  </div>
+  {value.kind==="archive"&&entries.length>0&&<label className="structured-filter-label preview-reader-dock">
+   <span>{entries.length} 项</span>
+   <RareInput value={filter} onChange={event=>setFilter(event.target.value)} placeholder="筛选文件名"/>
+  </label>}
  </div>;
 }

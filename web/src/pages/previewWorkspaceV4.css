@@ -133,8 +133,15 @@
 .file-workbench-preview-surface .office-layout-preview>.structured-preview{flex:1 1 auto;min-height:0;overflow:auto}
 /* Archive and structured formats: filter rather than a redundant title row. */
 .file-workbench-preview-surface .structured-preview{
- position:relative;flex:1 1 auto;min-height:0;height:100%;
- box-sizing:border-box;padding:80px 18px 87px;overflow:auto
+ position:relative;display:flex;flex-direction:column;flex:1 1 auto;
+ min-height:0;height:100%;box-sizing:border-box;padding:0;overflow:hidden
+}
+.file-workbench-preview-surface .structured-preview-scroll{
+ flex:1 1 auto;min-height:0;min-width:0;overflow:auto;
+ box-sizing:border-box;padding:80px 18px 87px
+}
+.file-workbench-preview-surface .office-layout-preview>.structured-preview .structured-preview-scroll{
+ padding-top:10px
 }
 .file-workbench-preview-surface .structured-preview .structured-filter-label.preview-reader-dock{
  display:flex;align-items:center;gap:9px;margin:0;
@@ -145,7 +152,7 @@
  width:min(250px,48vw);height:29px;min-height:29px
 }
 .file-workbench-preview-surface .structured-table-scroll{
- height:100%;max-height:none;overflow:auto
+ max-height:none;min-height:0;overflow:auto
 }
 .file-workbench-preview-surface .file-unsupported{
  position:relative;flex:1;min-height:0;

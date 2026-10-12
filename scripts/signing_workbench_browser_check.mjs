@@ -308,6 +308,36 @@ try{
  assert("more actions drop down under upper-right capsule",
    Boolean(expanded)&&Boolean(dropdownBelow));
 
+ const video=(files.data?.items??[]).find(item=>/\.(mp4|webm|mov)$/i.test(item.name??""));
+ if(video){
+  await cdp.send("Page.navigate",{url:BASE+"/preview/"+encodeURIComponent(video.id)});
+  const ready=await cdp.waitFor(`()=>!!document.querySelector('.media-video-stage video')`,14000);
+  const media=await cdp.evaluate(`(()=>{
+   const section=document.querySelector('.file-workbench-preview-surface .media-preview');
+   const controls=section?.querySelector('video');
+   return {stage:!!section,controls:!!controls?.controls,
+    noRedundantRow:!section?.querySelector('.media-tools'),topDock:!!document.querySelector('.file-preview-action-dock')};
+  })()`);
+  assert("video preview uses native playback without duplicate help row",
+   Boolean(ready)&&media.stage&&media.controls&&media.noRedundantRow&&media.topDock,JSON.stringify(media));
+ }
+ const cad=(files.data?.items??[]).find(item=>/\.(step|stp|stl|obj|dxf|dwg)$/i.test(item.name??""));
+ if(cad){
+  await cdp.send("Page.navigate",{url:BASE+"/preview/"+encodeURIComponent(cad.id)});
+  const ready=await cdp.waitFor(`()=>!!document.querySelector('.file-unsupported .preview-reader-dock')`,14000);
+  const ui=await cdp.evaluate(`(()=>{
+   const stage=document.querySelector('.file-unsupported')?.getBoundingClientRect();
+   const dock=document.querySelector('.file-unsupported .preview-reader-dock')?.getBoundingClientRect();
+   return {bottom:stage&&dock?Math.round(stage.bottom-dock.bottom):null,
+    actionCount:document.querySelectorAll('.file-unsupported .preview-reader-dock button').length,
+    topActions:document.querySelectorAll('.file-preview-action-dock .file-workbench-actions>button').length};
+  })()`);
+  assert("CAD fallback uses one bottom refresh control and upper-right file actions",
+   Boolean(ready)&&ui.bottom!==null&&ui.bottom>=0&&ui.bottom<55&&ui.actionCount===1&&ui.topActions===3,
+   JSON.stringify(ui));
+ }
+
+
 }finally{
  cdp?.close();chrome.kill("SIGKILL");
 }
