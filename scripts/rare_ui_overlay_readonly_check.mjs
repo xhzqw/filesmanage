@@ -329,7 +329,9 @@ try{
    assert.equal(await evalJS("document.activeElement?.getAttribute('href')"),"/search","arrow moves focus between Rare navigation links");
    const navHit=await evalJS("(()=>{const a=document.querySelector('header.header nav a[href$=search]'),r=a.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2,e=document.elementFromPoint(x,y);return{rect:{x,y,width:r.width,height:r.height},hit:e?.outerHTML?.slice(0,260),linkHit:a.contains(e),pointerEvents:getComputedStyle(a).pointerEvents,navZ:getComputedStyle(a.closest('nav')).zIndex}})()");
    assert(navHit.linkHit,"top nav target must receive real pointer clicks: "+JSON.stringify(navHit));
+   console.log("NAV_TRACE",width,"desktop",JSON.stringify(navHit));
    await click('header.header nav[data-slot="gooey-nav"] a[href="/search"]');
+   console.log("NAV_AFTER_CLICK",width,await evalJS("location.pathname"));
    await waitFor('location.pathname==="/search"');
    await click("a.shell-home-pill");
    await waitFor('location.pathname==="/doc"');
@@ -347,6 +349,7 @@ try{
    await click(".nav-toggle");
    await waitFor(`getComputedStyle(document.querySelector('header.header nav[data-slot="gooey-nav"]')).display!=="none"`);
    await click('header.header nav[data-slot="gooey-nav"] a[href="/search"]');
+   console.log("NAV_AFTER_CLICK",width,await evalJS("location.pathname"));
    await waitFor('location.pathname==="/search"');
    assert.equal(await evalJS('document.querySelector("#shell-main-navigation")?.classList.contains("open")'),false,
     "narrow nav closes on real client-side route change");
