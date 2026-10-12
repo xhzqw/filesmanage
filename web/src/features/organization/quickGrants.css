@@ -1,5 +1,5 @@
 .dialog.quick-grants-dialog{box-sizing:border-box;width:min(700px,calc(100vw - 24px));min-width:0;max-width:calc(100vw - 24px);max-height:calc(100dvh - 32px);overflow:auto;padding:16px;border-radius:var(--radius-lg)}
-.quick-grants-dialog>.dialog-title{font-size:15px;margin-bottom:12px}
+.quick-grants-dialog>.dialog-header .dialog-title{font-size:15px}
 .quick-grants-body{display:flex;flex-direction:column;gap:10px;min-width:0}
 .quick-grants-section-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--border-hairline);padding-bottom:7px;font-size:13px}
 .quick-grants-section-heading>div{display:flex;align-items:center;gap:10px}

@@ -1,8 +1,7 @@
 import {Children,forwardRef,isValidElement,useEffect,useId,useMemo,useRef,useState,type ChangeEvent,type FocusEvent as ReactFocusEvent,type ReactNode,type SelectHTMLAttributes,type KeyboardEvent as ReactKeyboardEvent} from "react";
 import {createPortal} from "react-dom";
 
-type Choice={value:string;label:ReactNode;search:string;disabled:boolean};
-type RareSelectProps=SelectHTMLAttributes<HTMLSelectElement>&{searchable?:boolean};
+export type RareSelectProps=SelectHTMLAttributes<HTMLSelectElement>&{searchable?:boolean};
 
 // Owned listbox: styling a native <select> cannot style its OS popup.
 // Keep a non-focusable select for forms/ref compatibility; use a portaled
@@ -24,6 +23,9 @@ export const RareSelect=forwardRef<HTMLSelectElement,RareSelectProps>(function R
  const current=options.find(o=>o.value===selected);
  const searchable=enableSearch??options.length>10;
  const visible=options.filter(o=>o.search.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
+ const firstEnabled=visible.findIndex(o=>!o.disabled);
+ const activeIndex=visible[active]&&!visible[active]!.disabled?active:firstEnabled;
+ const activeDescendant=open&&activeIndex>=0?menuId+"-option-"+activeIndex:undefined;
  function positionMenu(){
   const rect=button.current?.getBoundingClientRect();if(!rect)return;
   const modal=button.current?.closest("dialog[open]");
@@ -40,7 +42,13 @@ export const RareSelect=forwardRef<HTMLSelectElement,RareSelectProps>(function R
   setPosition({top:above?rect.top-maxHeight-5:rect.bottom+5,
    left:Math.max(leftEdge,Math.min(rect.left,rightEdge-width)),width,maxHeight:Math.max(0,maxHeight)});
  }
- function show(){if(disabled)return;setQuery("");setActive(Math.max(0,options.findIndex(o=>o.value===selected)));positionMenu();setOpen(true);}
+ function show(){
+  if(disabled)return;
+  setQuery("");
+  const selectedIndex=options.findIndex(o=>o.value===selected&&!o.disabled);
+  setActive(selectedIndex<0?Math.max(0,options.findIndex(o=>!o.disabled)):selectedIndex);
+  positionMenu();setOpen(true);
+ }
  function close(focus=false){setOpen(false);setQuery("");if(focus)button.current?.focus();}
  function choose(next:string){
   if(value===undefined)setOwnValue(next);
@@ -57,26 +65,40 @@ export const RareSelect=forwardRef<HTMLSelectElement,RareSelectProps>(function R
    window.removeEventListener("resize",positionMenu);window.removeEventListener("scroll",positionMenu,true);};
  },[open]);
  useEffect(()=>{if(open&&searchable)searchRef.current?.focus();},[open,searchable]);
+ useEffect(()=>{if(disabled&&open)close();},[disabled,open]);
+ // Keyboard navigation never loses the highlighted option behind an internal
+ // scrollbar. Do not scroll the document or move focus off the search field.
+ useEffect(()=>{
+  if(!open||activeIndex<0)return;
+  const port=menu.current?.querySelector<HTMLElement>(".rare-select-options");
+  const option=menu.current?.querySelector<HTMLElement>('[id="'+menuId+"-option-"+activeIndex+'"]');
+  if(!port||!option)return;
+  const top=option.offsetTop-port.offsetTop;
+  if(top<port.scrollTop)port.scrollTop=top;
+  else if(top+option.offsetHeight>port.scrollTop+port.clientHeight)
+   port.scrollTop=top+option.offsetHeight-port.clientHeight;
+ },[open,activeIndex,query,menuId]);
  function onKeyDown(event:ReactKeyboardEvent){
   if(disabled)return;
   if(event.key==="ArrowDown"||event.key==="ArrowUp"){
    event.preventDefault();if(!open){show();return;}
-   const step=event.key==="ArrowDown"?1:-1;let index=active;
+   const step=event.key==="ArrowDown"?1:-1;let index=activeIndex<0?0:activeIndex;
    for(let i=0;i<visible.length;i++){index=(index+step+visible.length)%visible.length;
     if(!visible[index]?.disabled){setActive(index);break;}}
-  }else if(event.key==="Home"&&open){event.preventDefault();setActive(0);}
-  else if(event.key==="End"&&open){event.preventDefault();setActive(Math.max(0,visible.length-1));}
+  }else if(event.key==="Home"&&open){event.preventDefault();if(firstEnabled>=0)setActive(firstEnabled);}
+  else if(event.key==="End"&&open){event.preventDefault();const last=visible.findLastIndex(o=>!o.disabled);if(last>=0)setActive(last);}
   else if(event.key==="Enter"||(event.key===" "&&!searchable)){
    event.preventDefault();if(!open){show();return;}
-   const candidate=visible[active];if(candidate&&!candidate.disabled)choose(candidate.value);
+   const candidate=visible[activeIndex];if(candidate&&!candidate.disabled)choose(candidate.value);
   }else if(event.key==="Escape"&&open){event.preventDefault();close(true);}
  }
  return <span className="rare-select-root" style={style}>
-  <select {...rest} ref={ref} name={name} value={selected} tabIndex={-1} aria-hidden="true"
+  <select {...rest} ref={ref} name={name} value={selected} disabled={disabled} tabIndex={-1} aria-hidden="true"
    className="rare-select-native" onChange={onChange}>{children}</select>
   <button id={buttonId} ref={button} type="button" disabled={disabled}
-   className={"rare-select"+(className?" "+className:"")} data-rare-control="select"
+   className={"rare-select"+(className?" "+className:"")} data-rare-control="select" role="combobox"
    aria-label={rest["aria-label"]??undefined} aria-haspopup="listbox" aria-expanded={open}
+   aria-activedescendant={searchable?undefined:activeDescendant}
    aria-controls={open?menuId:undefined} aria-required={required||undefined}
    onClick={()=>open?close():show()} onKeyDown={onKeyDown}
    onBlur={e=>onBlur?.(e as unknown as ReactFocusEvent<HTMLSelectElement>)}
@@ -88,12 +110,19 @@ export const RareSelect=forwardRef<HTMLSelectElement,RareSelectProps>(function R
    aria-label={rest["aria-label"]??"选项"} onKeyDown={onKeyDown}
    style={{top:position.top,left:position.left,width:position.width,maxHeight:position.maxHeight}}>
    {searchable&&<div className="rare-select-search"><input ref={searchRef} aria-label="搜索选项"
-    type="search" value={query} placeholder="搜索选项…" onChange={e=>{setQuery(e.target.value);setActive(0);}}/></div>}
+    aria-controls={menuId} aria-activedescendant={activeDescendant} aria-autocomplete="list"
+    type="search" value={query} placeholder="搜索选项…"
+    onChange={e=>{
+     const next=e.target.value;setQuery(next);
+     const first=options.filter(o=>o.search.toLocaleLowerCase().includes(next.trim().toLocaleLowerCase())).findIndex(o=>!o.disabled);
+     setActive(Math.max(0,first));
+    }}/></div>}
    <div className="rare-select-options">
-    {visible.map((item,index)=><button type="button" key={item.value} role="option" disabled={item.disabled}
-     aria-selected={selected===item.value} className={"rare-select-option"+(active===index?" highlighted":"")}
+    {visible.map((item,index)=><button type="button" key={item.value} id={menuId+"-option-"+index}
+     role="option" disabled={item.disabled} tabIndex={-1}
+     aria-selected={selected===item.value} className={"rare-select-option"+(activeIndex===index?" highlighted":"")}
      onMouseEnter={()=>setActive(index)} onClick={()=>choose(item.value)}>
-     <span>{item.label}</span>{selected===item.value&&<span aria-hidden="true">✓</span>}
+     <span>{item.label}</span>{selected===item.value&&<svg className="rare-select-check" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m3 8 3 3 7-7"/></svg>}
     </button>)}
     {!visible.length&&<p className="rare-select-empty">没有匹配项</p>}
    </div>

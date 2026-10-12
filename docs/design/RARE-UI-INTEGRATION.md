@@ -10,3 +10,12 @@
 | `FolderResourceIcon`、`SpringActiveRail`、`FluidOrb`、`AnimatedCounter` | 自研的 Rare UI 风格实现；FolderResourceIcon 的开合微动效参考官方 [Folder component](https://www.rareui.com/components/foldercomponent) | 兼顾黄色文件夹识别、密集文件树、统计与低功耗；与官方放大式文件夹卡片不同 |
 
 后续新组件必须区分“直接接入源码”“基于源码改造”和“参考风格自建”。高频表格/树行不得增加无意义动画；应保留键盘支持、焦点态、reduced-motion，颜色使用 `--brand-blue`、`--brand-cyan`、`--folder-fill` 与工程工作台 token。宽屏、笔记本、窄屏效果必须在远端验收。
+
+## 第二批：公共交互控件（自建，非 Rare UI 官方源码）
+
+- **Dialog**：新增统一紧凑标题栏及关闭图标，调用现有 `closeGuard` 防止提交中误关；首焦点仍进入表单字段，原有原生 `showModal()`、Escape、焦点恢复逻辑不变。
+- **Menu**：使用 React Portal 避免受文件表格、目录树滚动容器裁切；保持键盘方向键/Home/End/Escape、光标定位、锚点焦点恢复及缩减动效。
+- **RareSelect**：统一品牌样式并补齐 combobox ARIA、搜索高亮、跳过禁用项、活动选项自动滚动、禁止失效下拉继续打开；继续在原生 `select` 处理表单值。
+- **Toast**：隐藏标签页期间暂停自动关闭计时，回到页面仍有反馈；保留模态框顶层提示与优先级/并发操作语义。
+
+这些控件是按照 Rare UI 的交互理念和系统现有设计 token 自研实现，不宣称来自官方同名组件。
