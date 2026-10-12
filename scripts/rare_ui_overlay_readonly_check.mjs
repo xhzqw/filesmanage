@@ -76,6 +76,7 @@ try{
  const password=readFileSync(".secrets/admin.password","utf8").trim();
  assert.equal(await evalJS(`(async()=>{const response=await fetch("/api/login",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({login:"admin",password:${JSON.stringify(password)}})});return response.ok;})()`),true);
  const results=[];
+ let availablePreviewId="";
  for(const width of [1440,1280,1220,900,390]){
   const height=width===390?760:900;
   await viewport(width,height);
@@ -127,6 +128,10 @@ try{
   await waitFor(`!document.querySelector('[role=menu][aria-label="账户操作菜单"]')`);
   assert.equal(await evalJS('document.activeElement?.classList.contains("account-trigger")'),true,"Escape restores trigger");
   await waitFor('!!document.querySelector(".file-toolbar")');
+  if(!availablePreviewId){
+   await sleep(140);
+   availablePreviewId=await evalJS('document.querySelector(".file-table tbody tr[data-id]")?.dataset.id')||"";
+  }
   const grid=await evalJS(`(()=>{const table=document.querySelector(".file-table"),bar=document.querySelector(".file-toolbar"),r=bar.getBoundingClientRect();return{role:table?.getAttribute("role"),shared:table?.hasAttribute("data-rare-table"),idleBatch:!!bar.querySelector(".batch-actions-group"),rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom},overflow:document.documentElement.scrollWidth-innerWidth};})()`);
   assert(grid.role==="grid"&&grid.shared&&!grid.idleBatch&&inside(grid.rect,width,height)&&grid.overflow<=1,
    "shared file grid + tidy idle toolbar at "+width+": "+JSON.stringify(grid));
@@ -177,6 +182,54 @@ try{
   count:document.querySelectorAll('.perm-view-nav [data-slot="gooey-nav-item"]').length}))()`);
  assert.equal(navResult.view,"audit","Gooey nav must navigate without unexpected dirty guard: "+JSON.stringify(navResult));
  assert.equal(await evalJS(`document.querySelector('.perm-view-nav [aria-current="page"]')?.textContent?.trim()`),"权限变更审计");
- console.log("RARE_OVERLAY_READONLY_PASS "+results.join("; ")+"; file table/selected actions, permission Gooey nav, dialog/close/focus OK");
+ // Deep-linking to the seal library must not lose its selected view on reload.
+ for(const width of [1440,900,390]){
+  await viewport(width,width===390?760:900);
+  await navigate("/approvals?tab=seals",`!!document.querySelector(".approval-root-nav [data-slot=gooey-nav-item]")`);
+  await waitFor('!!document.querySelector(".seal-library-container")');
+  const approval=await evalJS(`(()=>{const n=document.querySelector(".approval-root-nav"),links=[...n.querySelectorAll('[data-slot="gooey-nav-item"]')];
+   const s=[...n.querySelectorAll('[data-slot="gooey-nav-segment"]')];
+   return{labels:links.map(x=>x.textContent.trim()),active:n.querySelector('[aria-current="page"]')?.textContent.trim(),
+    activeFill:getComputedStyle(s[1]).backgroundColor,overflow:document.documentElement.scrollWidth-innerWidth};})()`);
+  assert(approval.labels.length===2&&approval.active.includes("签章")&&approval.activeFill!=="rgba(0, 0, 0, 0)"&&approval.overflow<=1,
+   "approval Rare view switch at "+width+": "+JSON.stringify(approval));
+  await click('.approval-root-nav [data-slot="gooey-nav-item"]:first-child');
+  await waitFor('new URLSearchParams(location.search).get("tab")!=="seals"');
+  await waitFor('!!document.querySelector(".approval-page")');
+  assert.equal(await evalJS('document.querySelector(".approval-root-nav [aria-current=page]")?.textContent.trim()'),"审批工作台");
+  await evalJS("history.back()");
+  await waitFor('new URLSearchParams(location.search).get("tab")==="seals"');
+  await waitFor('!!document.querySelector(".seal-library-container")');
+  results.push(width+"px: approval URL/Gooey view switch OK");
+ }
+ if(availablePreviewId){
+  for(const width of [1440,390]){
+   await viewport(width,width===390?760:900);
+   await navigate("/preview/"+encodeURIComponent(availablePreviewId),'!!document.querySelector(".file-workbench-actions .file-more-trigger")');
+   const preview=await evalJS(`(()=>{const a=document.querySelector(".file-workbench-actions"),r=a.getBoundingClientRect();
+    const tabs=[...document.querySelectorAll(".file-workbench-tabs [role=tab]")];
+    return{buttons:[...a.children].filter(x=>x.tagName==="BUTTON").map(x=>x.textContent.trim()),
+     tabCount:tabs.length,selected:tabs.filter(x=>x.getAttribute("aria-selected")==="true").length,
+     rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom},overflow:document.documentElement.scrollWidth-innerWidth};})()`);
+   assert(preview.buttons.includes("下载")&&preview.buttons.some(x=>x.includes("更多操作"))&&preview.buttons.length<=4&&preview.tabCount===6&&preview.selected===1&&preview.overflow<=1,
+    "compact file actions and Rare tabs at "+width+": "+JSON.stringify(preview));
+   await click(".file-more-trigger");
+   await waitFor(`!!document.querySelector('[role=menu][aria-label="文件更多操作"]')`);
+   const actionMenu=await evalJS(`(()=>({labels:[...document.querySelectorAll('[role=menu][aria-label="文件更多操作"] [role=menuitem]')].map(x=>x.textContent.trim()),
+    portal:document.querySelector('[role=menu][aria-label="文件更多操作"]')?.parentElement===document.body}))()`);
+   assert(actionMenu.portal&&actionMenu.labels.includes("重命名")&&actionMenu.labels.includes("移动文件")&&actionMenu.labels.includes("移入回收站"),
+    "all secondary file actions preserved: "+JSON.stringify(actionMenu));
+   await key("Escape","Escape",27);
+   await waitFor(`!document.querySelector('[role=menu][aria-label="文件更多操作"]')`);
+   assert.equal(await evalJS('document.activeElement?.classList.contains("file-more-trigger")'),true);
+   await evalJS(`(()=>{document.querySelector("#file-tab-versions")?.scrollIntoView({block:"nearest",inline:"nearest"});return true})()`);
+   await sleep(120);
+   await click("#file-tab-versions");
+   await waitFor('!!document.querySelector("#file-panel-versions")');
+   assert.equal(await evalJS('document.querySelector("#file-tab-versions")?.getAttribute("aria-selected")'),"true");
+   results.push(width+"px: preview actions/menu/Rare tabs OK");
+  }
+ }
+ console.log("RARE_OVERLAY_READONLY_PASS "+results.join("; ")+"; file grid, permission Gooey, dialog and focus OK"+(availablePreviewId?"":"; preview fixture absent"));
 }catch(error){console.error("RARE_OVERLAY_READONLY_FAIL",error.message);process.exitCode=1;}
 finally{ws?.close();chrome.kill("SIGTERM");}

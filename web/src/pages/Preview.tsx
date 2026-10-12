@@ -26,6 +26,7 @@ import {request} from "../shared/http";
 import {errorCopy} from "../shared/errors";
 import {observeResourceChange,observeWindowReturn,observeWorkspaceChange} from "../shared/resourceSync";
 import {Dialog} from "../shared/ui/Dialog";
+import {Menu,type MenuItem} from "../shared/ui/Menu";
 import type {PreviewData,FileVersion,FileItem} from "../entities/file/model";
 import type {User} from "../entities/user/model";
 import {AppShell} from "../shared/ui/AppShell";
@@ -61,6 +62,8 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const[renameValue,setRenameValue]=useState("");
  const[deleting,setDeleting]=useState(false);
  const[busy,setBusy]=useState(false);
+ const[moreOpen,setMoreOpen]=useState(false);
+ const moreRef=useRef<HTMLButtonElement>(null);
  const[requiresApproval,setRequiresApproval]=useState<boolean|null>(null);
  const[favorite,setFavorite]=useState<boolean|null>(null);
  const[favoriteBusy,setFavoriteBusy]=useState(false);
@@ -195,6 +198,16 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
   }catch(err){announce(errorCopy(err,"删除失败"),true);}
   finally{setBusy(false);}
  }
+ const moreActions:MenuItem[]=[
+  {id:"favorite",label:favorite===null?"收藏状态不可用":favorite?"取消收藏":"收藏文件",
+   disabled:!canManage||favorite===null||favoriteBusy,onSelect:()=>void toggleFavorite()},
+  ...(preview?.textual&&canManage&&!archived?[{id:"edit-text",label:"编辑文本内容",
+    disabled:requiresApproval===null,onSelect:()=>setEditing(true)}]:[]),
+  ...(canManage&&!archived?[{id:"rename",label:"重命名",onSelect:()=>{setRenameValue(preview?.name??"");setRenaming(true);}},
+    {id:"move",label:"移动文件",onSelect:()=>setMoving(true)}]:[]),
+  ...(canManage&&user.isAdmin?[{id:"share",label:"分享文件",onSelect:()=>setSharing(true)}]:[]),
+  ...(canManage&&!archived?[{id:"delete",label:"移入回收站",danger:true,onSelect:()=>setDeleting(true)}]:[]),
+ ];
 
  return <AppShell user={user} onLogout={onLogout}>
   <div className="panels">
@@ -220,21 +233,19 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
          {lifecycle?.dueStatus==="overdue"&&<RareBadge tone="danger">已到期</RareBadge>}</div>
        </div>
       </div>
-      <div className="file-workbench-actions" aria-label="文件操作">
-       <RareButton type="button" className="primary" onClick={download}>下载</RareButton>
-       {(preview.renderer==="pdf"||isOfficeName(preview.name))&&<RareButton type="button" className="file-sign-action" onClick={()=>setTab("seals")}>签名 / 盖章</RareButton>}
-       <RareButton type="button" onClick={()=>setPrinting(true)}>打印</RareButton>
+      <div className="file-workbench-actions" role="group" aria-label="文件操作">
+       <RareButton type="button" className="primary" tone="primary" onClick={download}>下载</RareButton>
+       {(preview.renderer==="pdf"||isOfficeName(preview.name))&&<RareButton type="button" tone="ghost" className="file-sign-action" onClick={()=>setTab("seals")}>签名 / 盖章</RareButton>}
+       <RareButton type="button" tone="ghost" onClick={()=>setPrinting(true)}>打印</RareButton>
        {isOfficeName(preview.name)&&!archived&&<Link className="rare-button file-action-link" to={"/office/"+id}>在线编辑</Link>}
        {isCadName(preview.name)&&<Link className="rare-button file-action-link" to={"/model/"+id}>3D 查看</Link>}
-       {preview.textual&&canManage&&!archived&&<RareButton type="button" disabled={requiresApproval===null}
-        onClick={()=>setEditing(true)}>编辑内容</RareButton>}
-       <RareButton type="button" disabled={!canManage||favorite===null||favoriteBusy} onClick={()=>void toggleFavorite()}>
-        {favorite===null?"收藏不可用":favorite?"取消收藏":"收藏"}
-       </RareButton>
-       {canManage&&!archived&&<RareButton type="button" onClick={()=>{setRenameValue(preview.name);setRenaming(true);}}>重命名</RareButton>}
-       {canManage&&!archived&&<RareButton type="button" onClick={()=>setMoving(true)}>移动</RareButton>}
-       {canManage&&user.isAdmin&&<RareButton type="button" onClick={()=>setSharing(true)}>分享</RareButton>}
-       {canManage&&!archived&&<RareButton type="button" className="file-delete-trigger" onClick={()=>setDeleting(true)}>删除</RareButton>}
+       {moreActions.length>0&&<RareButton ref={moreRef} type="button" tone="ghost" className="file-more-trigger"
+        aria-label="更多文件操作" aria-haspopup="menu" aria-expanded={moreOpen}
+        onClick={()=>setMoreOpen(value=>!value)}>
+        更多操作 <svg viewBox="0 0 20 20" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="m5 8 5 5 5-5"/></svg>
+       </RareButton>}
+       <Menu open={moreOpen} onClose={()=>setMoreOpen(false)} anchor={moreRef.current}
+        label="文件更多操作" items={moreActions}/>
       </div>
      </header>
      {(notice||error)&&<p role={error?"alert":"status"} className={"notice"+(error?" error":"")}>{error||notice}</p>}
