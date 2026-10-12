@@ -57,9 +57,9 @@ export function AppShell({user,onLogout,product,actions,children}:{user:ShellUse
     </NavLink>)}
    </nav>
    <div className="header-right">
-    <RareButton type="button" className="command-trigger" aria-label="全局搜索" onClick={()=>window.dispatchEvent(new CustomEvent("filesmanage:command-spotlight"))}>
+    <RareButton type="button" className="command-trigger" aria-label="快速跳转" onClick={()=>window.dispatchEvent(new CustomEvent("filesmanage:command-spotlight"))}>
      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
-     <span>全局搜索</span>
+     <span>快速跳转</span>
      <span className="command-keys"><kbd>Ctrl</kbd><kbd>K</kbd></span>
     </RareButton>
     {notificationSlot}

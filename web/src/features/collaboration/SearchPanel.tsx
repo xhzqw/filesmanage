@@ -57,7 +57,7 @@ export function SearchPanel({userId}:{userId:string}){
  const[tag,setTag]=useState("");
  const[uploader,setUploader]=useState("");
  const[type,setType]=useState("");
- const[sort,setSort]=useState("relevance");
+ const[sort,setSort]=useState("updated_desc");
  const[pageSize,setPageSize]=useState<number>(DEFAULT_PAGE_SIZE);
  const[showAdvanced,setShowAdvanced]=useState(false);
  const[scope,setScope]=useState<"all"|"current"|"descendants">("all");
@@ -71,7 +71,7 @@ export function SearchPanel({userId}:{userId:string}){
  const[treeToken,setTreeToken]=useState(0);
  const[presets,setPresets]=useState<Awaited<ReturnType<typeof searchPresetsApi.list>>>([]);
  const[presetName,setPresetName]=useState("");
- const[showPresets,setShowPresets]=useState(false);
+ const[filtersOpen,setFiltersOpen]=useState(false);
  const[presetBusy,setPresetBusy]=useState(false);
  const[presetError,setPresetError]=useState("");
  const[presetToken,setPresetToken]=useState(0);
@@ -144,10 +144,10 @@ export function SearchPanel({userId}:{userId:string}){
  function clearFilters(){
   cancelPendingSearch();
   setQ("");setCategory("");setTag("");setUploader("");setType("");setScope("all");setFolder("");
-  setFrom("");setTo("");setSort("relevance");setPageSize(DEFAULT_PAGE_SIZE);
-  epochRef.current++;moreBusyRef.current=false;setQuery(null);setItems([]);setNextCursor("");setTotal(0);setStatus("idle");setMessage("");
+  setFrom("");setTo("");setSort("updated_desc");setPageSize(DEFAULT_PAGE_SIZE);setShowAdvanced(false);
+  epochRef.current++;moreBusyRef.current=false;setQuery({q:"",category:"",tag:"",uploader:"",type:"",sort:"updated_desc",limit:DEFAULT_PAGE_SIZE,folder:"",scope:"",from:"",to:""});setItems([]);setNextCursor("");setTotal(0);setStatus("loading");setMessage("");
  }
- const[query,setQuery]=useState<Query|null>(null);
+ const[query,setQuery]=useState<Query|null>({q:"",category:"",tag:"",uploader:"",type:"",sort:"updated_desc",limit:DEFAULT_PAGE_SIZE,folder:"",scope:"",from:"",to:""});
  const[items,setItems]=useState<FileItem[]>([]);
  const[total,setTotal]=useState(0);
  const[nextCursor,setNextCursor]=useState("");
@@ -183,7 +183,7 @@ export function SearchPanel({userId}:{userId:string}){
   epochRef.current++;
   moreBusyRef.current=false;
   setItems([]);setNextCursor("");setTotal(0);setMoreStatus("idle");
-  if(!term.trim()||(scope!=="all"&&!folder)||(from&&to&&from>to)||composing.current){
+  if((scope!=="all"&&!folder)||(from&&to&&from>to)||composing.current){
    setStatus("idle");
    setQuery(null);
    return;
@@ -226,9 +226,6 @@ export function SearchPanel({userId}:{userId:string}){
   setMessage("");
   if(from&&to&&from>to){setMessage("开始日期不能晚于结束日期");return;}
   if(scope!=="all"&&!folder){setMessage("请先选择搜索目录");return;}
-  if(!q.trim()&&!category.trim()&&!tag.trim()&&!uploader.trim()&&!type.trim()&&!from&&!to&&scope==="all"){
-   setMessage("请输入关键词或至少设置一个筛选条件");return;
-  }
   // Invalidate the previous revision before React commits, so a page request
   // that resolves in the gap between render and effect cannot append old rows.
   epochRef.current++;
@@ -268,109 +265,128 @@ export function SearchPanel({userId}:{userId:string}){
  // "more" signal (DI-16 §9). An exhausted cursor with a count mismatch can only
  // mean the endpoint's hard cap, so the hint names a filter, not a dead action.
  const capped=total>TOTAL_CAP;
- const loadedLimit=query?.limit??DEFAULT_PAGE_SIZE;
  const hasMore=nextCursor!=="";
  const limitReached=!hasMore&&(capped||items.length<total);
 
- return <div className="work-body">
-  <form id="advanced-search-form" className="toolbar search-bar search-primary" onSubmit={submit} role="search">
-   <RareInput id="search-q" type="search" aria-label="文件名或正文关键词" value={q}
-    onChange={event=>onKeywordChange(event.target.value)}
-    onCompositionStart={()=>{composing.current=true;cancelPendingSearch();}}
-    onCompositionEnd={event=>{composing.current=false;onKeywordChange(event.currentTarget.value);}}
-    placeholder="输入即搜：文件名或正文…" maxLength={200}/>
-   <RareButton type="submit" className="primary">搜索</RareButton>
-   <RareButton type="button" aria-expanded={showAdvanced} onClick={()=>setShowAdvanced(v=>!v)}>高级筛选</RareButton>
-   <RareButton type="button" onClick={clearFilters}>重置</RareButton>
-   <RareButton type="button" disabled={status!=="ready"||items.length===0} onClick={exportLoaded}>导出已加载 {items.length} 条</RareButton>
-   <RareButton type="button" aria-expanded={showPresets} onClick={()=>setShowPresets(v=>!v)}>搜索预设 {presets.length}</RareButton>
-   {message&&<span className="error" role="alert">{message}</span>}
-  </form>
-  {showPresets&&<div className="search-presets" aria-label="已保存搜索条件">
-   {presetError&&<span className="error" role="alert">{presetError}</span>}
-   <RareInput aria-label="预设名称" placeholder="给当前筛选命名…" maxLength={48} value={presetName} onChange={e=>setPresetName(e.target.value)}/>
-   <RareButton type="button" onClick={()=>void savePreset()} disabled={!presetName.trim()||presetBusy}>保存当前条件</RareButton>
-   {presets.map(preset=><div className="search-preset-item" key={preset.id}>
-    <RareButton type="button" title="载入搜索条件" onClick={()=>loadPreset(preset.fields)}>{preset.name}</RareButton>
-    <RareButton type="button" aria-label={"删除预设 "+preset.name} onClick={()=>void deletePreset(preset.name)}>×</RareButton>
-   </div>)}
-   {presets.length===0&&<span className="hint">暂无预设（最多 12 项）</span>}
-  </div>}
-  <div className={"search-workbench"+(showAdvanced?" with-filters":"")}>
-   {showAdvanced&&<aside className="search-filters" aria-label="高级搜索条件">
-    <div className="search-filter-heading"><strong>筛选条件</strong><RareButton type="button" onClick={()=>setShowAdvanced(false)}>收起</RareButton></div>
-    <label>范围<RareSelect aria-label="搜索范围" value={scope} onChange={e=>setScope(e.target.value as "all"|"current"|"descendants")}>
-     <option value="all">全部可访问</option><option value="current">指定目录</option><option value="descendants">包含子目录</option>
-    </RareSelect></label>
-    {scope!=="all"&&<div className="search-folder-select">
-     <span title={currentFolder?.name??""}>{folder?(currentFolder?.name??"所选目录"):"未选择目录"}</span>
-     <RareButton type="button" onClick={()=>{setCandidate(folder);setPickerOpen(true);}}>选择目录</RareButton>
-    </div>}
-    <label>分类<RareInput id="search-category" value={category} onChange={e=>setCategory(e.target.value)} placeholder="如：工程图纸" maxLength={80}/></label>
-    <label>标签<RareInput id="search-tag" value={tag} onChange={e=>setTag(e.target.value)} placeholder="精确标签" maxLength={80}/></label>
-    <label>上传人 ID<RareInput id="search-uploader" value={uploader} onChange={e=>setUploader(e.target.value)} placeholder="上传人 ID" maxLength={100}/></label>
-    <label>格式<RareSelect aria-label="文件格式筛选" value={type} onChange={e=>setType(e.target.value)}>
-     <option value="">全部格式</option><option value="application/pdf">PDF</option><option value="image/">图片</option>
-     <option value="video/">视频</option><option value="audio/">音频</option><option value="text/">纯文本</option>
-     <option value="application/vnd.">Office / 结构化文档</option>
-    </RareSelect></label>
-    <div className="search-date-range">
-     <label>修改开始<RareInput type="date" aria-label="修改开始日期" value={from} onChange={e=>setFrom(e.target.value)}/></label>
-     <label>修改结束<RareInput type="date" aria-label="修改结束日期" value={to} onChange={e=>setTo(e.target.value)}/></label>
+  const activeFilters=[category,tag,uploader,type,scope!=="all"?folder:"",from,to].filter(Boolean).length;
+  const recentView=Boolean(query&&!query.q&&!query.category&&!query.tag&&!query.uploader&&!query.type&&!query.folder&&!query.from&&!query.to);
+  const title=recentView?"最近更新":query?.q?"搜索结果":"筛选结果";
+  const shownTotal=capped?TOTAL_CAP+"+":String(total);
+  return <div className="work-body global-search">
+   <form id="advanced-search-form" className="search-primary" onSubmit={submit} role="search">
+    <div className="search-input-wrap">
+     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+     <RareInput id="search-q" type="search" aria-label="文件名或正文关键词" value={q}
+      onChange={event=>onKeywordChange(event.target.value)}
+      onCompositionStart={()=>{composing.current=true;cancelPendingSearch();}}
+      onCompositionEnd={event=>{composing.current=false;onKeywordChange(event.currentTarget.value);}}
+      placeholder="搜索文件名或正文…" maxLength={200}/>
     </div>
-    <label>排序<RareSelect id="search-sort" value={sort} onChange={e=>setSort(e.target.value)}>
-     <option value="relevance">最佳匹配</option><option value="updated_desc">最近修改</option><option value="name_asc">名称 A→Z</option><option value="size_desc">大小降序</option>
-    </RareSelect></label>
-    <label>每页<RareSelect id="search-limit" value={pageSize} onChange={e=>setPageSize(Number(e.target.value))}>
-     {PAGE_SIZES.map(size=><option key={size} value={size}>{size} 条</option>)}
-    </RareSelect></label>
-    <RareButton type="submit" form="advanced-search-form" className="primary">应用筛选</RareButton>
-   </aside>}
-   <div className="search-results">
-
-  {status==="loading"?<p className="notice" role="status">检索中…</p>:null}
-  {status==="failed"?<>
-   <p role="alert" className="notice error">检索失败，请稍后重试。</p>
-   <RareButton type="button" className="secondary-action" onClick={()=>setReloadToken(token=>token+1)}>重试</RareButton>
-  </>:null}
-  {status==="ready"?<div className="table">
-   <div className="search-total">已显示 {items.length} / 共 {capped?TOTAL_CAP+"+":total} 个结果 · 每页最多 {loadedLimit} 条（仅显示你有权访问的文件）{limitReached?<> · 已达本次检索可浏览的上限，请添加筛选条件缩小范围</>:null}</div>
-   {items.length===0?<p className="empty">没有匹配的文件。换个关键词，或确认你有该内容的预览权限。</p>:(
-    <RareDataTable className="search-data-table">
-     <thead><tr><th scope="col">文件名</th><th className="search-secondary" scope="col">大小</th><th className="search-secondary" scope="col">上传人</th><th className="search-secondary" scope="col">版本</th><th className="search-secondary" scope="col">修改日期</th><th scope="col">所在目录</th></tr></thead>
-     <tbody>
-      {items.map(file=><tr key={file.id}>
-       <td>
-        <Link to={"/preview/"+file.id} title={file.name}>{file.name}</Link>
-        <div className="search-mobile-meta">{formatBytes(file.sizeBytes)} · v{file.currentVersionSeq} · {file.uploadedBy} · {new Date(file.updatedAt).toLocaleDateString("zh-CN")}</div>
-        {file.snippet?<div className="snippet"><Highlighted text={file.snippet} query={query?.q??""}/></div>:null}
-       </td>
-       <td className="search-secondary">{formatBytes(file.sizeBytes)}</td>
-       <td className="search-secondary">{file.uploadedBy}</td>
-       <td className="search-secondary">v{file.currentVersionSeq}</td>
-       <td className="search-secondary rare-data-date">{new Date(file.updatedAt).toLocaleString("zh-CN")}</td>
-       {/* Every search hit sits in a folder inside the caller's visible scope
-           (postgres.collaboration scopeFolderSQL), so the target is listable. */}
-       <td><Link to={"/doc?folder="+file.folderId} aria-label={"在目录中打开 "+file.name}>打开</Link></td>
-      </tr>)}
-     </tbody>
-    </RareDataTable>
-   )}
-   {hasMore?<div className="search-more">
-    {moreStatus==="failed"?<span className="error" role="alert">加载下一页失败。</span>:null}
-    <RareButton type="button" className="secondary-action" disabled={moreStatus==="loading"} onClick={loadMore}>
-     {moreStatus==="loading"?"加载中…":moreStatus==="failed"?"重试加载":"加载更多"}
-    </RareButton>
-   </div>:null}
-  </div>:null}
-  {status==="idle"?<p className="empty">输入关键词或使用高级筛选检索有权限访问的文件。</p>:null}
+    <RareButton type="submit" className="primary">搜索</RareButton>
+    <RareButton type="button" onClick={clearFilters}>重置</RareButton>
+    <RareButton type="button" className="search-mobile-filters" aria-expanded={filtersOpen} onClick={()=>setFiltersOpen(v=>!v)}>筛选{activeFilters>0?" · "+activeFilters:""}</RareButton>
+    {message&&<span className="search-feedback" role="status">{message}</span>}
+   </form>
+   <div className={"search-workbench"+(filtersOpen?" filters-open":"")}>
+    <aside className="search-filters" aria-label="搜索筛选条件">
+     <div className="search-filter-heading"><strong>筛选条件</strong><RareButton type="button" onClick={clearFilters}>清除</RareButton></div>
+     <label>搜索范围<RareSelect aria-label="搜索范围" value={scope} onChange={e=>setScope(e.target.value as "all"|"current"|"descendants")}>
+      <option value="all">全部可访问文件</option><option value="current">指定目录</option><option value="descendants">含子目录</option>
+     </RareSelect></label>
+     {scope!=="all"&&<div className="search-folder-select">
+      <span title={currentFolder?.name??""}>{folder?(currentFolder?.name??"已选目录"):"请选择目录"}</span>
+      <RareButton type="button" onClick={()=>{setCandidate(folder);setPickerOpen(true);}}>选择</RareButton>
+     </div>}
+     <label>文件类型<RareSelect aria-label="文件格式筛选" value={type} onChange={e=>setType(e.target.value)}>
+      <option value="">全部格式</option><option value="application/pdf">PDF</option>
+      <option value="image/">图片</option><option value="video/">视频</option><option value="audio/">音频</option>
+      <option value="text/">纯文本</option><option value="application/vnd.">Office 文档</option>
+     </RareSelect></label>
+     <label>分类<RareInput id="search-category" value={category} onChange={e=>setCategory(e.target.value)} placeholder="按分类筛选" maxLength={80}/></label>
+     <label>标签<RareInput id="search-tag" value={tag} onChange={e=>setTag(e.target.value)} placeholder="按标签筛选" maxLength={80}/></label>
+     <RareButton type="button" className="search-advanced-toggle" aria-expanded={showAdvanced} onClick={()=>setShowAdvanced(v=>!v)}>
+      {showAdvanced?"收起高级筛选":"高级筛选"}
+     </RareButton>
+     {showAdvanced&&<div className="search-advanced-fields">
+      <label>上传人 ID<RareInput id="search-uploader" value={uploader} onChange={e=>setUploader(e.target.value)} placeholder="输入上传人 ID" maxLength={100}/></label>
+      <div className="search-date-range">
+       <label>修改开始<RareInput type="date" aria-label="修改开始日期" value={from} onChange={e=>setFrom(e.target.value)}/></label>
+       <label>修改结束<RareInput type="date" aria-label="修改结束日期" value={to} onChange={e=>setTo(e.target.value)}/></label>
+      </div>
+     </div>}
+     <RareButton type="submit" form="advanced-search-form" className="primary search-apply">应用筛选</RareButton>
+     <div className="search-filter-divider"/>
+     <section className="search-saved" aria-label="搜索预设">
+      <div className="search-saved-heading"><strong>搜索预设</strong><span>{presets.length}/12</span></div>
+      <div className="search-preset-new">
+       <RareInput aria-label="预设名称" placeholder="保存当前条件…" maxLength={48} value={presetName} onChange={e=>setPresetName(e.target.value)}/>
+       <RareButton type="button" onClick={()=>void savePreset()} disabled={!presetName.trim()||presetBusy}>保存</RareButton>
+      </div>
+      {presetError&&<span className="error" role="alert">{presetError}</span>}
+      <div className="search-preset-list">
+       {presets.map(preset=><div className="search-preset-item" key={preset.id}>
+        <RareButton type="button" title={"载入 "+preset.name} onClick={()=>loadPreset(preset.fields)}>{preset.name}</RareButton>
+        <RareButton type="button" aria-label={"删除预设 "+preset.name} onClick={()=>void deletePreset(preset.name)}>×</RareButton>
+       </div>)}
+       {presets.length===0&&<span className="search-preset-empty">暂无已保存条件</span>}
+      </div>
+     </section>
+    </aside>
+    <section className="search-results" aria-label="搜索结果">
+     <div className="search-results-toolbar">
+      <div className="search-results-caption"><strong>{title}</strong>
+       <span className="search-total">{status==="ready"?"已显示 "+items.length+" / 共 "+shownTotal+" 项":status==="loading"?"正在检索…":status==="failed"?"检索失败":"应用筛选查看结果"}</span>
+      </div>
+      <div className="search-results-actions">
+       <label>排序<RareSelect id="search-sort" aria-label="搜索结果排序" value={sort} onChange={e=>{
+        const next=e.target.value;setSort(next);if(query)setQuery({...query,sort:next});
+       }}>
+        <option value="updated_desc">最近修改</option><option value="relevance">最佳匹配</option>
+        <option value="name_asc">名称 A→Z</option><option value="size_desc">大小降序</option>
+       </RareSelect></label>
+       <label>每页<RareSelect id="search-limit" aria-label="搜索每页条数" value={pageSize} onChange={e=>{
+        const next=Number(e.target.value);setPageSize(next);if(query)setQuery({...query,limit:next});
+       }}>{PAGE_SIZES.map(size=><option key={size} value={size}>{size}</option>)}</RareSelect></label>
+       <RareButton type="button" disabled={status!=="ready"||items.length===0} onClick={exportLoaded}>导出{items.length>0?" ("+items.length+")":""}</RareButton>
+      </div>
+     </div>
+     {status==="loading"&&<div className="search-result-message" role="status">检索中…</div>}
+     {status==="failed"&&<div className="search-result-message" role="alert">检索失败 <RareButton type="button" onClick={()=>setReloadToken(token=>token+1)}>重试</RareButton></div>}
+     {status==="ready"&&<div className="table search-table-wrap">
+      {items.length===0?<div className="search-empty">
+       <strong>{recentView?"暂无可访问的文件":"没有找到匹配的文件"}</strong>
+       <span>{recentView?"前往文档管理上传或查看文件。":"可更换关键词，或清除筛选条件。"}</span>
+       {recentView?<Link to="/doc">打开文档管理</Link>:<RareButton type="button" onClick={clearFilters}>清除筛选</RareButton>}
+      </div>:<RareDataTable className="search-data-table">
+       <thead><tr><th scope="col">文件名</th><th className="search-secondary" scope="col">大小</th><th className="search-secondary" scope="col">上传人</th><th className="search-secondary" scope="col">版本</th><th className="search-secondary" scope="col">修改时间</th><th scope="col">所在目录</th></tr></thead>
+       <tbody>{items.map(file=><tr key={file.id}>
+        <td><Link to={"/preview/"+file.id} title={file.name}>{file.name}</Link>
+         <div className="search-mobile-meta">{formatBytes(file.sizeBytes)} · v{file.currentVersionSeq} · {file.uploadedBy} · {new Date(file.updatedAt).toLocaleDateString("zh-CN")}</div>
+         {file.snippet&&<div className="snippet"><Highlighted text={file.snippet} query={query?.q??""}/></div>}
+        </td>
+        <td className="search-secondary">{formatBytes(file.sizeBytes)}</td>
+        <td className="search-secondary">{file.uploadedBy}</td>
+        <td className="search-secondary">v{file.currentVersionSeq}</td>
+        <td className="search-secondary rare-data-date">{new Date(file.updatedAt).toLocaleString("zh-CN")}</td>
+        <td><Link to={"/doc?folder="+file.folderId} aria-label={"在目录中打开 "+file.name}>打开</Link></td>
+       </tr>)}</tbody>
+      </RareDataTable>}
+      {hasMore&&<div className="search-more">
+       {moreStatus==="failed"&&<span className="error" role="alert">加载下一页失败。</span>}
+       <RareButton type="button" disabled={moreStatus==="loading"} onClick={loadMore}>
+        {moreStatus==="loading"?"加载中…":moreStatus==="failed"?"重试加载":"加载更多"}
+       </RareButton>
+      </div>}
+      {limitReached&&<div className="search-limit-hint">已达检索上限，可进一步缩小筛选范围。</div>}
+     </div>}
+     {status==="idle"&&<div className="search-result-message">点击「应用筛选」查看结果</div>}
+    </section>
    </div>
-  </div>
-  {pickerOpen&&<Dialog open title="选择检索目录" onClose={()=>setPickerOpen(false)}>
-   {treeState==="loading"?<p className="empty">正在读取目录…</p>:treeState==="failed"?<div role="alert" className="notice error">目录读取失败 <RareButton type="button" onClick={()=>setTreeToken(v=>v+1)}>重试</RareButton></div>
-    :<FolderPicker open title="选择检索目录" folders={folders} selectedId={candidate} onSelect={setCandidate} onClose={()=>setPickerOpen(false)}
-     footer={<><RareButton type="button" onClick={()=>setPickerOpen(false)}>取消</RareButton>
-      <RareButton type="button" className="primary" disabled={!candidate} onClick={()=>{setFolder(candidate);setPickerOpen(false);}}>确定</RareButton></>}/>}
-  </Dialog>}
- </div>;
+   {pickerOpen&&<Dialog open title="选择检索目录" onClose={()=>setPickerOpen(false)}>
+    {treeState==="loading"?<p className="empty">正在读取目录…</p>:treeState==="failed"?<div role="alert" className="notice error">目录读取失败 <RareButton type="button" onClick={()=>setTreeToken(v=>v+1)}>重试</RareButton></div>
+     :<FolderPicker open title="选择检索目录" folders={folders} selectedId={candidate} onSelect={setCandidate} onClose={()=>setPickerOpen(false)}
+      footer={<><RareButton type="button" onClick={()=>setPickerOpen(false)}>取消</RareButton>
+       <RareButton type="button" className="primary" disabled={!candidate} onClick={()=>{setFolder(candidate);setPickerOpen(false);}}>确定</RareButton></>}/>}
+   </Dialog>}
+  </div>;
 }

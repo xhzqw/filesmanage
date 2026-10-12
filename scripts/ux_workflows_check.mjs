@@ -1404,6 +1404,8 @@ async function finaleSuite() {
     const searchPageState=await cdp.evaluate(`(()=>({path:location.pathname,title:document.title,login:!!document.querySelector('input[type=password]'),error:document.querySelector('[role=alert]')?.textContent?.slice(0,120)||''}))()`);
     check("search page ready", Boolean(searchReady), JSON.stringify(searchPageState));
     if(!searchReady)throw Error("search page not ready after navigation: "+JSON.stringify(searchPageState));
+    const recentRows = await cdp.waitFor(`()=>document.querySelectorAll('.search-data-table tbody tr').length>0`, 30000);
+    check("SEARCH-00 global search opens recent authorized files",recentRows===true,String(recentRows));
     await cdp.evaluate(`(()=>{
       const q=document.querySelector('#search-q');
       const set=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
