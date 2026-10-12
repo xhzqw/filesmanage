@@ -205,6 +205,10 @@ async function main() {
     // 7. open the preview page from the row (DESKTOP-INTERACTION-v1: the file
     // name is no longer a single-click navigation link; the row offers an
     // explicit 打开 action and double-click instead)
+    // The live resource event can invalidate the first post-upload table page;
+    // wait for the committed row to be present after reconciliation.
+    await delay(800);
+    await cdp.waitFor(`()=>[...document.querySelectorAll('tbody tr')].some(tr=>tr.textContent?.includes('journey-${stamp}.txt'))`,15000);
     const rowSurface = await cdp.evaluate(`(()=>{
       const row=[...document.querySelectorAll('tbody tr')].find(tr=>tr.textContent?.includes('journey-${stamp}.txt'));
       if(!row)return 'no-row';
