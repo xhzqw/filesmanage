@@ -85,11 +85,11 @@ function layout(nodes:Node[],width=1000,height=560):Rect[]{
  const getWeight=(n:Node)=>useCount?Math.max(0,n.count):weight(n);
  const recurse=(list:Node[],x:number,y:number,w:number,h:number)=>{
   if(!list.length||w<=0||h<=0)return;
-  if(list.length===1){result.push({node:list[0],x,y,width:w,height:h});return;}
+  if(list.length===1){const only=list[0];if(only)result.push({node:only,x,y,width:w,height:h});return;}
   const total=list.reduce((sum,n)=>sum+getWeight(n),0);
   if(total<=0)return;
   let running=0,index=0;
-  while(index<list.length-1){running+=getWeight(list[index]);index++;if(running>=total/2)break;}
+  while(index<list.length-1){const next=list[index];if(!next)break;running+=getWeight(next);index++;if(running>=total/2)break;}
   const ratio=Math.min(.985,Math.max(.015,running/total));
   if(w>=h){
    recurse(list.slice(0,index),x,y,w*ratio,h);

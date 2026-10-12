@@ -14,7 +14,8 @@ export function StatsTrend({series,metric}:{series:Month[];metric:Metric}){
   return {x,y,item};
  });
  const curve=points.map((point,index)=>(index?"L":"M")+point.x.toFixed(2)+" "+point.y.toFixed(2)).join(" ");
- const area=points.length>0?"M"+points[0].x+" "+bottom+" "+curve.slice(1)+" L"+points[points.length-1].x+" "+bottom+" Z":"";
+ const first=points[0],last=points[points.length-1];
+ const area=first&&last?"M"+first.x+" "+bottom+" "+curve.slice(1)+" L"+last.x+" "+bottom+" Z":"";
  return <div className="stats-trend-chart">
   <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label={metric==="bytes"?"月度新增容量走势":"月度新增文件数量走势"}>
    <defs><linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
