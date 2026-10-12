@@ -131,17 +131,19 @@ export function DepartmentNavigator({departments,departmentsState,deptIndex,dept
   });
  }
  const allSelected=selectedDepartment==="",unassignedSelected=selectedDepartment===UNASSIGNED_ID;
+ // Keep cached nodes mounted during realtime refetches so focus and scroll survive.
+ const showTree=departmentsState==="ready"||departments.length>0;
  return <section className="org-card org-dept-card" aria-label="组织架构树">
   <div className="org-card-header"><h3 className="org-card-title">
    <IconOrganization/><span>组织架构</span>
    <RareBadge tone="neutral" className="org-count-pill">{departments.length} 部门</RareBadge>
   </h3></div>
-  {departmentsState==="loading"&&<p className="hint org-inline-message">正在读取部门…</p>}
+  {departmentsState==="loading"&&departments.length===0&&<p className="hint org-inline-message">正在读取部门…</p>}
   {departmentsState==="failed"&&<div className="org-inline-message">
-   <RareNotice tone="danger">读取部门列表失败，部门树与筛选暂不可用。</RareNotice>
+   <RareNotice tone="danger">读取部门失败，可重试；已有组织树将暂时保留。</RareNotice>
    <RareButton type="button" className="secondary-action" onClick={onRetry}>重试</RareButton>
   </div>}
-  {departmentsState==="ready"&&<>
+  {showTree&&<>
    <div className="org-search-box">
     <IconSearch/>
     <RareInput id="org-dept-search" className="org-search" type="search" autoComplete="off"

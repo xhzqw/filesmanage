@@ -225,7 +225,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   return totals;
  },[users,departments,deptIndex]);
 
- const deptFilter=departmentsState==="ready"?selectedDepartment:"";
+ const deptFilter=departmentsState==="ready"||departments.length>0?selectedDepartment:"";
  const activeDeptIds=deptFilter!==""&&deptFilter!=="__unassigned"?selectedDeptIds:null;
  const needle=memberQuery.trim().toLowerCase();
 
