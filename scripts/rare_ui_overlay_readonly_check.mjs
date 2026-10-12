@@ -156,7 +156,18 @@ try{
     if(folderOptions>0){
      await click('.rare-select-menu [role=option]:nth-child(2)');
      await waitFor('!document.querySelector(".org-role-editor button[type=submit]")?.disabled');
+     const submitBefore=await evalJS(`(()=>{const form=document.querySelector('.org-role-editor form'),btn=form.querySelector('button[type=submit]'),
+      dialog=form.closest('dialog'),r=btn.getBoundingClientRect(), hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+      return{valid:form.checkValidity(),inputs:[...form.querySelectorAll('select,input')].map(x=>({tag:x.tagName,type:x.type,value:x.value,required:x.required,valid:x.checkValidity()})),
+       btn:{left:r.left,top:r.top,right:r.right,bottom:r.bottom,disabled:btn.disabled},
+       dialog:{scrollTop:dialog.scrollTop,scrollHeight:dialog.scrollHeight,clientHeight:dialog.clientHeight},
+       hit:hit?.outerHTML?.slice(0,130)};})()`);
+     console.log("ROLE_SUBMIT_BEFORE",width,JSON.stringify(submitBefore));
+     await evalJS(`(()=>{document.querySelector('.org-role-editor button[type=submit]').scrollIntoView({block:'end',inline:'nearest'});return true})()`);
      await click('.org-role-editor button[type=submit]');
+     const submitAfter=await evalJS(`(()=>{const f=document.querySelector('.org-role-editor form'),b=f.querySelector('button[type=submit]'),r=b.getBoundingClientRect();
+      return{review:!!f.querySelector('.org-role-review'),valid:f.checkValidity(),disabled:b.disabled,button:{x:r.x,y:r.y},hit:document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.outerHTML?.slice(0,140)};})()`);
+     console.log("ROLE_SUBMIT_AFTER",width,JSON.stringify(submitAfter));
      await waitFor('!!document.querySelector(".org-role-editor .org-role-review")');
      assert.equal(await evalJS('document.querySelector(".org-role-editor button[type=submit]")?.textContent.trim()'),"确认委派");
      // Never click the second-step confirmation: this browser test must remain
