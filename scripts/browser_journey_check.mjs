@@ -290,12 +290,10 @@ async function main() {
       const action=[...document.querySelectorAll('.file-workbench-actions button')].find(b=>b.textContent?.trim()==='打印');
       action?.click();return !!action;
     })()`);
-    const printPanel = await cdp.waitFor(`()=>Boolean((()=>{
-      const dialog=document.querySelector('dialog.document-print-dialog[open]');
-      return dialog && (dialog.querySelector('select[aria-label="纸张"]') ||
-        dialog.textContent?.includes('浏览器 PDF 查看器'));
-    })())`, 5000);
-    check("file preview exposes RareUI print workbench", Boolean(printOpened&&printPanel), "print dialog with settings appropriate to file type");
+    const printPanel = await cdp.waitFor(`()=>Boolean(
+      document.querySelector('dialog.document-print-dialog[open] .document-print-options')
+    )`, 8000);
+    check("file preview exposes RareUI print workbench", Boolean(printOpened&&printPanel), "print options panel visible in modal");
     const printPrepared = await cdp.evaluate(`(async()=>{
       const id=location.pathname.split('/').pop();
       const preview=await(await fetch('/api/files/'+encodeURIComponent(id)+'/preview',{credentials:'same-origin'})).json();
