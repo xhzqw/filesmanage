@@ -384,17 +384,26 @@ try{
     items=[all,favorite,received,sent],selected=getComputedStyle(all).backgroundColor;
    return{navLabels:items.map(x=>x.textContent.trim()),selected:all.getAttribute('aria-current'),
     selectedBg:selected,treeRemoved:!sidebar.querySelector(".tree,.tree-search"),
-    clickTargets:items.every(x=>{const r=x.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return x.contains(hit)}),
+    clickTargets:items.filter(x=>{const r=x.getBoundingClientRect();return r.left>=a.left&&r.right<=a.right}).every(x=>{const r=x.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return x.contains(hit)}),
     sideInside:a.left>=-1&&a.right<=innerWidth+1,mainInside:b.left>=-1&&b.right<=innerWidth+1,
-    adjacent:a.right<=b.left+1,gap:b.left-a.right,overflow:document.documentElement.scrollWidth-innerWidth};})()`);
+    arranged:innerWidth<=700?a.bottom<=b.top+1:a.right<=b.left+1,
+    gap:innerWidth<=700?b.top-a.bottom:b.left-a.right,overflow:document.documentElement.scrollWidth-innerWidth};})()`);
   assert(explorer&&explorer.treeRemoved&&explorer.navLabels.join("|")==="全部文档|我的关注|与我共享|我共享的"
    &&explorer.selected==="page"&&explorer.selectedBg!=="rgba(0, 0, 0, 0)"
-   &&explorer.clickTargets&&explorer.sideInside&&explorer.mainInside&&explorer.adjacent&&explorer.overflow<=1,
+   &&explorer.clickTargets&&explorer.sideInside&&explorer.mainInside&&explorer.arranged&&explorer.overflow<=1,
    "Finder document sidebar, selected nav and real pointer targets at "+width+": "+JSON.stringify(explorer));
   if(width===1440){
    await click('.finder-nav-item[href="/doc?view=favorites"]');
    await waitFor('location.pathname==="/doc" && new URLSearchParams(location.search).get("view")==="favorites"');
    await waitFor('!!document.querySelector(".collab-results")');
+   await click('.finder-nav-item[href="/doc"]');
+   await waitFor('location.pathname==="/doc" && location.search===""');
+  }
+  if(width===390){
+   await evalJS(`(()=>{document.querySelector('.finder-nav-item[href="/doc?view=received"]')?.scrollIntoView({block:"nearest",inline:"center"});return true})()`);
+   await click('.finder-nav-item[href="/doc?view=received"]');
+   await waitFor('new URLSearchParams(location.search).get("view")==="received" && !!document.querySelector(".collab-results")');
+   await evalJS(`(()=>{document.querySelector('.finder-nav-item[href="/doc"]')?.scrollIntoView({block:"nearest",inline:"center"});return true})()`);
    await click('.finder-nav-item[href="/doc"]');
    await waitFor('location.pathname==="/doc" && location.search===""');
   }
