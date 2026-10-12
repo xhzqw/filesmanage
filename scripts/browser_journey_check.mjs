@@ -311,7 +311,9 @@ async function main() {
     // Batch actions only apply to 2+ files; create a second isolated fixture.
     const batchUploadPath = `/tmp/journey-batch-${stamp}.txt`;
     writeFileSync(batchUploadPath,`批量打印测试 ${stamp}`);
-    await cdp.setFileInputFiles("input[type=file]",batchUploadPath);
+    const batchPickerReady=await cdp.waitFor(`()=>Boolean(document.querySelector('input[type=file]'))`,20000);
+    check("batch upload picker restored after navigation",Boolean(batchPickerReady),"async folder hydration finished");
+    if(batchPickerReady)await cdp.setFileInputFiles("input[type=file]",batchUploadPath);
     const secondUploaded=await cdp.waitFor(`()=>[...document.querySelectorAll('tbody tr')].some(tr=>tr.textContent?.includes('journey-batch-${stamp}.txt'))`,30000);
     check("batch print secondary file uploaded",Boolean(secondUploaded),"second isolated fixture");
     const batchSelectable=await cdp.waitFor(`()=>['journey-${stamp}.txt','journey-batch-${stamp}.txt'].every(name=>
