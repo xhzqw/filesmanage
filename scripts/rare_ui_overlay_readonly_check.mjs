@@ -147,6 +147,23 @@ try{
     await waitFor(`document.querySelector('.org-role-editor .perm-form-row:first-child label:first-child .rare-select')?.textContent.includes('（')`);
     assert.equal(await evalJS('document.querySelector(".org-role-editor button[type=submit]")?.disabled'),true,
      "delegation must still require a folder scope for directory permission administrator");
+    await waitFor(`[...document.querySelectorAll('.org-role-editor .perm-form-row label')].some(x=>x.textContent.startsWith('管理范围')&&x.querySelector('.rare-select:not(:disabled)'))`);
+    const scopeSelector='.org-role-editor .perm-form-row:last-of-type>label:nth-child(2) .rare-select';
+    await evalJS(`(()=>{document.querySelector(${JSON.stringify(scopeSelector)})?.scrollIntoView({block:'center',inline:'nearest'});return true})()`);
+    await click(scopeSelector);
+    await waitFor('!!document.querySelector(".rare-select-menu [role=option]")');
+    const folderOptions=await evalJS(`(()=>[...document.querySelectorAll('.rare-select-menu [role=option]')].filter(x=>!x.disabled&&!x.textContent.includes('请选择目录')&&!x.textContent.includes('正在读取')).length)()`);
+    if(folderOptions>0){
+     await click('.rare-select-menu [role=option]:nth-child(2)');
+     await waitFor('!document.querySelector(".org-role-editor button[type=submit]")?.disabled');
+     await click('.org-role-editor button[type=submit]');
+     await waitFor('!!document.querySelector(".org-role-editor .org-role-review")');
+     assert.equal(await evalJS('document.querySelector(".org-role-editor button[type=submit]")?.textContent.trim()'),"确认委派");
+     // Never click the second-step confirmation: this browser test must remain
+     // read-only even though it exercises a fully valid selection.
+    }else{
+     await click(scopeSelector);
+    }
    }
    await click("dialog.org-role-dialog .dialog-close");
    await waitFor('!document.querySelector("dialog.org-role-dialog")');
