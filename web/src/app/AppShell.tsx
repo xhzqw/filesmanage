@@ -26,7 +26,7 @@ export function SearchPage({user,onLogout}:{user:User;onLogout:()=>void}){
  return <AppShell user={user} onLogout={onLogout}>
   <div className="panels">
    <main className="work">
-    <div className="breadcrumb crumb-bar">全文检索</div>
+    <div className="breadcrumb crumb-bar">全局搜索</div>
     <SearchPanel key={user.id} userId={user.id}/>
    </main>
   </div>

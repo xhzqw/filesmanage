@@ -117,7 +117,7 @@ class CDP {
 
 const CTRL = 2, SHIFT = 8;
 
-const NAV_LABELS = ["文档管理", "提要", "共享/关注", "统计", "审批", "回收站", "组织与权限"];
+const NAV_LABELS = ["文档管理", "全局搜索", "共享/关注", "统计", "审批", "回收站", "组织与权限"];
 
 // The shell login check must exercise a real logged-out login page: the
 // browser session from the previous suite is revoked first.
@@ -856,7 +856,7 @@ async function main() {
 
       const routes = [
         { path: "/doc", active: "文档管理" },
-        { path: "/search", active: "提要" },
+        { path: "/search", active: "全局搜索" },
         { path: "/workspace", active: "共享/关注" },
         { path: "/stats", active: "统计" },
         { path: "/approvals", active: "审批" },
