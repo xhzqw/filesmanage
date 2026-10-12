@@ -113,6 +113,44 @@ try{
   })()`),width+"px keeps compact side-by-side organization workbench");
  }
  await cdp.send("Emulation.clearDeviceMetricsOverride");
+ // Organization invalidations must refresh the directory without a page reload.
+ await cdp.evaluate(`(()=>{
+  const nativeFetch=window.fetch.bind(window);
+  window.__orgReads=0;
+  window.fetch=(input,init)=>{
+   const url=new URL(typeof input==='string'?input:input.url,location.href);
+   if(['/api/users','/api/groups','/api/departments'].includes(url.pathname))window.__orgReads++;
+   return nativeFetch(input,init);
+  };
+  window.dispatchEvent(new CustomEvent('filesmanage:workspace-changed',{detail:{scopes:['organization']}}));
+  return true;
+ })()`);
+ assert(await cdp.waitFor("()=>window.__orgReads>=3"),"organization realtime hint refreshes users, groups, departments");
+ await cdp.evaluate("(()=>{document.querySelector('#org-tab-groups').click();return true})()");
+ assert(await cdp.waitFor("()=>!!document.querySelector('.org-group-cards-list')"),
+  "workgroup list available for scope checks");
+ const deptScope=await cdp.evaluate(`(async()=>{
+  const departments=(await(await fetch('/api/departments')).json()).data;
+  const groups=(await(await fetch('/api/groups?limit=200')).json()).data.items;
+  const leaves=departments.filter(d=>!departments.some(child=>child.parentId===d.id));
+  const target=leaves.map(d=>({id:d.id,expected:groups.filter(g=>g.departmentId===d.id).length}))
+   .sort((a,b)=>a.expected-b.expected)[0];
+  return target??null;
+ })()`);
+ if(deptScope){
+  await cdp.evaluate(`(()=>{
+   document.querySelector('li[data-dept-id="${deptScope.id}"] .org-node-label').click();
+   return true;
+  })()`);
+  assert(await cdp.waitFor(`()=>Number(document.querySelector('#org-tab-groups .org-tab-badge')?.textContent)===${deptScope.expected}`),
+   "workgroup count follows selected department subtree");
+  assert(await cdp.evaluate(`(()=>[...document.querySelectorAll('.org-group-cards-list > li .org-group-card')]
+   .every(card=>!card.querySelector('.org-dept-pill')?.textContent?.includes('公共工作组')))()`),
+   "department scope excludes unrelated common workgroups");
+ }
+ await cdp.evaluate("(()=>{document.querySelector('#org-tab-permissions').click();return true})()");
+ assert(await cdp.waitFor("()=>!!document.querySelector('.perm-workspace')"),
+  "permission resource browser survives department filtering");
  await cdp.evaluate("(()=>{document.querySelector('.perm-tree-name')?.click();return true;})()");
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-insight select')"),"effective permission explanation renders");
  await cdp.evaluate(`(()=>{
