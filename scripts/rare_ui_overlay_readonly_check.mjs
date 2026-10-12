@@ -76,7 +76,7 @@ try{
  const password=readFileSync(".secrets/admin.password","utf8").trim();
  assert.equal(await evalJS(`(async()=>{const response=await fetch("/api/login",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({login:"admin",password:${JSON.stringify(password)}})});return response.ok;})()`),true);
  const results=[];
- for(const width of [1440,900,390]){
+ for(const width of [1440,1280,1220,900,390]){
   const height=width===390?760:900;
   await viewport(width,height);
   await navigate("/doc","!!document.querySelector('.account-trigger')");
@@ -98,6 +98,8 @@ try{
    await evalJS(`(()=>document.querySelector('header.header nav[data-slot="gooey-nav"] a')?.focus())()`);
    await key("ArrowRight","ArrowRight",39);
    assert.equal(await evalJS("document.activeElement?.getAttribute('href')"),"/search","arrow moves focus between Rare navigation links");
+   await click('header.header nav[data-slot="gooey-nav"] a[href="/search"]');
+   await waitFor('location.pathname==="/search"');
   }else{
    assert.equal(shellNav.rendered,"none","narrow shell hides GooeyNav until requested");
    await click(".nav-toggle");
@@ -109,7 +111,14 @@ try{
    await key("Escape","Escape",27);
    await waitFor(`getComputedStyle(document.querySelector('header.header nav[data-slot="gooey-nav"]')).display==="none"`);
    assert.equal(await evalJS('document.activeElement?.classList.contains("nav-toggle")'),true,"escape returns focus to nav toggle");
+   await click(".nav-toggle");
+   await waitFor(`getComputedStyle(document.querySelector('header.header nav[data-slot="gooey-nav"]')).display!=="none"`);
+   await click('header.header nav[data-slot="gooey-nav"] a[href="/search"]');
+   await waitFor('location.pathname==="/search"');
+   assert.equal(await evalJS('document.querySelector("#shell-main-navigation")?.classList.contains("open")'),false,
+    "narrow nav closes on real client-side route change");
   }
+  await navigate("/doc","!!document.querySelector('.account-trigger')");
   await click(".account-trigger");
   await waitFor(`!!document.querySelector('[role=menu][aria-label="账户操作菜单"]')`);
   const menu=await evalJS(`(()=>{const m=document.querySelector('[role=menu][aria-label="账户操作菜单"]');const r=m.getBoundingClientRect();return{portal:m.parentElement===document.body,rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom},focused:m.contains(document.activeElement),overflow:document.documentElement.scrollWidth-innerWidth};})()`);
