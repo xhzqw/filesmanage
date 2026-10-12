@@ -12,3 +12,4 @@ export {RareTabs} from "./RareTabs";
 export {RareBadge,RareNotice} from "./RareFeedback";
 export type {RareBadgeProps,RareNoticeProps,RareFeedbackTone} from "./RareFeedback";
 export {RareDataTable,RareRowActions} from "./RareDataTable";
+export {RareFolderComponent} from "./FolderComponent";

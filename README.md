@@ -4,4 +4,4 @@
 
 ## 组件来源与致谢
 
-本项目的部分动画组件基于 [Rare UI](https://www.rareui.com/) 的开源实现修改，包括 Gooey nav。版权归原作者及贡献者所有；使用时遵守上游 [LICENSE](https://github.com/swamimalode07/rare-ui/blob/main/LICENSE) 中的 MIT + Commons Clause 与署名要求，禁止将组件作为独立组件库重新销售或分发。
+本项目的部分动画组件基于 [Rare UI](https://www.rareui.com/) 的开源实现修改，包括 Gooey nav、[Folder Component](https://www.rareui.com/components/foldercomponent)。版权归原作者及贡献者所有；使用时遵守上游 [LICENSE](https://github.com/swamimalode07/rare-ui/blob/main/LICENSE) 中的 MIT + Commons Clause 与署名要求，禁止将组件作为独立组件库重新销售或分发。

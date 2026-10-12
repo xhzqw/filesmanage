@@ -9,8 +9,8 @@
 }
 .folder-history-controls,.folder-view-switch{
  display:inline-flex;flex:none;align-items:center;gap:1px;
- padding:2px;border:1px solid var(--border-subtle);
- background:var(--surface-subtle);border-radius:var(--radius-pill);
+ padding:2px;border:1px solid transparent;
+ background:var(--surface-header);border-radius:var(--radius-md);
 }
 .folder-history-controls .rare-button,.folder-view-switch .rare-button{
  width:27px;height:26px;min-height:26px;padding:0;display:grid;place-items:center;
@@ -23,10 +23,22 @@
 .folder-history-controls .rare-button:disabled:active{transform:none}
 .folder-control-divider{height:15px;width:1px;background:var(--border-subtle);flex:none}
 .folder-view-switch .rare-button[aria-pressed="true"]{
- background:var(--surface-panel);color:var(--brand-blue);
- box-shadow:0 1px 3px color-mix(in srgb,var(--text-primary) 10%,transparent);
+ background:var(--surface-panel);color:var(--text-primary);
+ box-shadow:0 1px 2px color-mix(in srgb,var(--text-primary) 12%,transparent);
 }
 .folder-view-switch .rare-button[aria-pressed="true"]:hover{background:var(--surface-panel)}
+.document-explorer .work .folder-context-bar{
+ box-shadow:none;border-left:0;border-right:0;
+}
+.document-explorer .work .folder-context-bar .breadcrumb a{
+ color:var(--text-secondary);font-weight:500;
+}
+.document-explorer .work .folder-context-bar .breadcrumb a:hover{
+ color:var(--brand-blue);
+}
+.document-explorer .work .folder-context-bar .breadcrumb .crumb-current{
+ font-weight:600;color:var(--text-primary);
+}
 .work .folder-context-bar .breadcrumb{
  flex:1 1 110px;min-width:18px;max-width:none;overflow:hidden;
  margin:0;padding:0;border:0;border-radius:var(--radius-xs);
@@ -46,9 +58,10 @@
  color:var(--text-secondary);border:0;border-radius:var(--radius-sm);
 }
 .work .folder-context-bar .ghost-more-btn{
- border:1px solid var(--border-subtle);border-radius:var(--radius-pill);
- height:27px;min-height:27px;width:29px;background:var(--surface-subtle);
+ border:1px solid transparent;border-radius:var(--radius-md);
+ height:27px;min-height:27px;width:29px;background:var(--surface-header);
 }
+.work .folder-context-bar .ghost-more-btn:hover{border-color:transparent;background:var(--surface-row-hover)}
 /* The file commands remain where they were, but lose the extra nested-card
    outline. Their sorting/filtering controls are never replicated in a view. */
 .work-body>.file-toolbar{

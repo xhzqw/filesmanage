@@ -106,10 +106,9 @@ type LevelRequest={generation:number;controller:AbortController};
 // set) surfacing as accessible roots without leaking hidden ancestors. Above
 // PAGED_THRESHOLD expansion fetches one level on demand, with per-node
 // loading/empty/error states and an in-place retry.
-// Precision folder glyph (14px): enterprise thin-line icon distinguishing directories
-// from plain text, rendering open state when expanded (VIS-11 compliant, aria-hidden).
+// Rare UI layered folder: shared shape across tree, table, and icon views.
 function FolderGlyph({expanded}:{expanded:boolean}){
- return <FolderResourceIcon className="tree-folder-icon" size={14} open={expanded}/>;
+ return <FolderResourceIcon className="tree-folder-icon" size={18} open={expanded}/>;
 }
 
 export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFolder,onDeleteFolder,onManageGrants}:{

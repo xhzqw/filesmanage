@@ -792,7 +792,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    onKeyDown={event=>{
     if(event.key==="Enter"){event.preventDefault();event.stopPropagation();navigate("/doc?folder="+encodeURIComponent(entry.id));}
    }}>
-   <div className="explorer-item-art" aria-hidden="true"><FolderResourceIcon size={viewMode==="columns"?24:52}/></div>
+   <div className="explorer-item-art" aria-hidden="true"><FolderResourceIcon open={focusedFolderId===entry.id} size={viewMode==="columns"?24:52}/></div>
    <span className="explorer-item-name" title={entry.name}>{entry.name}</span>
    <span className="explorer-item-sub">文件夹</span>
   </div>;
@@ -983,7 +983,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    {status==="ready"&&(visibleItems.length>0||visibleFolders.length>0)&&viewMode==="columns"&&<div className="explorer-columns">
     <div className="explorer-column-list" role="grid" aria-label="当前目录文件" onKeyDown={onGridKeyDown}>{visibleFolders.map(renderFolderEntry)}{visibleItems.map(renderVisualEntry)}</div>
     {activeFolder&&<div className="explorer-column-detail" aria-label="所选文件夹详情">
-     <div className="explorer-preview-art"><FolderResourceIcon size={96}/></div>
+     <div className="explorer-preview-art"><FolderResourceIcon open size={96}/></div>
      <strong>{activeFolder.name}</strong>
      <RareButton type="button" tone="neutral" onClick={()=>navigate("/doc?folder="+encodeURIComponent(activeFolder.id))}>打开文件夹</RareButton>
     </div>}
@@ -996,7 +996,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    </div>}
    {status==="ready"&&(visibleItems.length>0||visibleFolders.length>0)&&viewMode==="gallery"&&<div className="explorer-gallery">
     {activeFolder&&<div className="explorer-gallery-stage">
-     <div className="explorer-preview-art"><FolderResourceIcon size={100}/></div>
+     <div className="explorer-preview-art"><FolderResourceIcon open size={100}/></div>
      <div className="explorer-gallery-caption"><strong>{activeFolder.name}</strong><span>文件夹</span></div>
      <RareButton type="button" tone="neutral" onClick={()=>navigate("/doc?folder="+encodeURIComponent(activeFolder.id))}>打开文件夹</RareButton>
     </div>}

@@ -1,0 +1,39 @@
+/* Scalable Rare UI Folder Component. Transform-only fanning on large icons;
+   compact tree rows share its shape but don't spray cards on every hover. */
+.rare-folder-component{
+ flex:none;display:inline-block;vertical-align:middle;
+ overflow:visible;pointer-events:none;isolation:isolate;
+}
+.rare-folder-back{filter:drop-shadow(0 3px 2px rgba(113,81,23,.11))}
+.rare-folder-card,.rare-folder-front{
+ transform-box:fill-box;transform-origin:center 85%;
+ transition:transform .24s cubic-bezier(.2,.8,.2,1);
+}
+.rare-folder-card-left{transform:translateY(-7px) rotate(-3deg)}
+.rare-folder-card-middle{transform:translateY(-10px) rotate(1deg)}
+.rare-folder-card-right{transform:translateY(-6px) rotate(3deg)}
+.rare-folder-front{transform-origin:center bottom;transform:perspective(460px) rotateX(-10deg)}
+.rare-folder-component[data-folder-open="true"] .rare-folder-card-left,
+.explorer-item:hover .rare-folder-component[data-folder-scale="large"] .rare-folder-card-left{
+ transform:translate(-26px,-43px) rotate(-13deg);
+}
+.rare-folder-component[data-folder-open="true"] .rare-folder-card-middle,
+.explorer-item:hover .rare-folder-component[data-folder-scale="large"] .rare-folder-card-middle{
+ transform:translate(0,-56px) rotate(-2deg);
+}
+.rare-folder-component[data-folder-open="true"] .rare-folder-card-right,
+.explorer-item:hover .rare-folder-component[data-folder-scale="large"] .rare-folder-card-right{
+ transform:translate(27px,-43px) rotate(12deg);
+}
+.rare-folder-component[data-folder-open="true"] .rare-folder-front,
+.explorer-item:hover .rare-folder-component[data-folder-scale="large"] .rare-folder-front{
+ transform:perspective(460px) rotateX(-28deg) translateY(5px);
+}
+.rare-folder-component[data-folder-scale="compact"] .rare-folder-card{transform:translateY(-8px) rotate(0deg)}
+.rare-folder-component[data-folder-scale="compact"] .rare-folder-front{transform:perspective(460px) rotateX(-9deg)}
+.rare-folder-component[data-folder-scale="compact"][data-folder-open="true"] .rare-folder-front{
+ transform:perspective(460px) rotateX(-24deg) translateY(3px);
+}
+@media(prefers-reduced-motion:reduce){
+ .rare-folder-component :is(.rare-folder-card,.rare-folder-front){transition:none}
+}
