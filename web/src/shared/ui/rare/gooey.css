@@ -1,0 +1,11 @@
+/* Rare UI Gooey nav adapted to the engineering workbench without Tailwind.
+   Slot styling is token-driven, fixed-height and keyboard accessible. */
+.rare-gooey-nav{display:inline-block;max-width:100%;vertical-align:middle;color:var(--surface-header)}
+.rare-gooey-nav>ul{display:flex;align-items:center;list-style:none;padding:0;margin:0}
+.rare-gooey-nav [data-slot="gooey-nav-segment"]{position:relative;flex:none;background:var(--surface-header);height:27px;min-height:27px;list-style:none}
+.rare-gooey-nav [data-slot="gooey-nav-segment"]>svg{position:absolute;right:100%;top:0;height:100%;pointer-events:none}
+.rare-gooey-nav [data-slot="gooey-nav-item"]{display:inline-flex;align-items:center;justify-content:center;gap:5px;height:27px;min-height:27px;padding:0 9px;white-space:nowrap;background:transparent;border:0;border-radius:inherit;font-size:11px;font-weight:600;text-decoration:none;color:var(--text-secondary);cursor:pointer;transition:color .12s ease}
+.rare-gooey-nav [data-slot="gooey-nav-item"]:hover{background:transparent;color:var(--brand-blue)}
+.rare-gooey-nav [data-slot="gooey-nav-item"][data-active="true"],.rare-gooey-nav [data-slot="gooey-nav-item"][data-active="true"]:hover{color:var(--text-inverse)}
+.rare-gooey-nav [data-slot="gooey-nav-item"]:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px;box-shadow:none}
+@media(prefers-reduced-motion:reduce){.rare-gooey-nav [data-slot="gooey-nav-item"]{transition:none}}

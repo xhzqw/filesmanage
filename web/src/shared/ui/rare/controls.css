@@ -46,6 +46,8 @@
 .rare-select-empty{padding:8px;color:var(--text-secondary);margin:0}
 @media(prefers-reduced-motion:reduce){.rare-button,.rare-button:active:not(:disabled){transform:none;transition:none}}
 .rare-tab-panel{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;overflow:hidden}
+.rare-tabs[data-rare-tabs]{position:relative;isolation:isolate}
+.rare-tab-active-rail{position:absolute;bottom:0;height:2px;border-radius:var(--radius-pill);background:var(--brand-cyan);pointer-events:none;z-index:1}
 .rare-tabs [role="tab"]{transition:color .12s ease,background-color .12s ease,box-shadow .18s cubic-bezier(.22,1,.36,1)}
 .rare-tabs [role="tab"][aria-selected="true"]{color:var(--brand-blue)}
 @media(prefers-reduced-motion:reduce){.rare-tabs [role="tab"]{transition:none}}

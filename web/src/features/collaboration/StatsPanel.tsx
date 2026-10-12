@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useState} from "react";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
-import {RareButton,RareSelect,AnimatedCounter} from "../../shared/ui/rare";
+import {RareButton,RareSelect,AnimatedCounter,GooeyNav} from "../../shared/ui/rare";
 import {request} from "../../shared/http";
 import {Dialog} from "../../shared/ui/Dialog";
 import {FolderPicker} from "../../shared/ui/FolderPicker";
@@ -175,10 +175,9 @@ export function StatsPanel(){
  </div>;
 }
 function MetricSwitch({value,onChange}:{value:Metric;onChange:(value:Metric)=>void}){
- return <div className="stats-metric" role="group" aria-label="统计单位">
-  <RareButton type="button" tone={value==="count"?"primary":"ghost"} onClick={()=>onChange("count")}>数量</RareButton>
-  <RareButton type="button" tone={value==="bytes"?"primary":"ghost"} onClick={()=>onChange("bytes")}>容量</RareButton>
- </div>;
+ return <GooeyNav className="stats-metric" aria-label="统计单位" size="xs" items={["数量","容量"]}
+  value={value==="count"?0:1} separation={7} radius={6} activeColor="var(--brand-blue)"
+  activeLabelColor="var(--text-inverse)" onChange={index=>onChange(index===0?"count":"bytes")}/>;
 }
 function pathOf(folders:Folder[],id:string){
  const byId=new Map(folders.map(item=>[item.id,item]));

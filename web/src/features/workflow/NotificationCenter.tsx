@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from "react";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useNavigate} from "react-router-dom";
-import {RareButton} from "../../shared/ui/rare";
+import {RareButton,NotificationBell} from "../../shared/ui/rare";
 import {toast} from "../../shared/ui/feedback";
 import {approvalActivityApi,type ApprovalNotification} from "./activityApi";
 import {lifecycleNotificationApi,type LifecycleNotice} from "./lifecycleNotificationApi";
@@ -74,12 +74,8 @@ export function NotificationCenter(){
  const visible=showUnread?notes.filter(n=>!n.read):notes.slice(0,12);
  const visibleLife=showUnread?lifecycleNotes.filter(n=>!n.read):lifecycleNotes.slice(0,12);
  return <div className="notification-center" ref={box}>
-  <RareButton type="button" className="notification-trigger" title="消息通知" aria-label={`消息通知，未读 ${unread} 条`} aria-haspopup="dialog" aria-expanded={open} onClick={()=>setOpen(v=>!v)}>
-   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4"/>
-   </svg>
-   {unread>0&&<span className="notification-count">{unread>99?"99+":unread}</span>}
-  </RareButton>
+  <NotificationBell className="notification-trigger" title="消息通知" count={unread} max={99}
+    aria-label={`消息通知，未读 ${unread} 条`} aria-haspopup="dialog" aria-expanded={open} onClick={()=>setOpen(v=>!v)}/>
   {open&&<div className="notification-popover" role="dialog" aria-label="消息通知">
    <div className="notification-head"><strong>消息通知</strong><RareButton type="button" onClick={()=>setShowUnread(v=>!v)}>{showUnread?"全部":"未读"}</RareButton></div>
    {error&&<p className="notification-error" role="alert">{error}</p>}
