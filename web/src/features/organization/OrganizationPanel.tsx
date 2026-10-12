@@ -1077,7 +1077,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
               {addBusy===user.id?"加入中…":"加入"}
              </RareButton>
             </div>)}
-             {candidates.length===0&&<p className="empty org-grid-empty">{candidateEmpty}</p>
+             {candidates.length===0&&<p className="empty org-grid-empty">{candidateEmpty}</p>}
            </div>
 
            {candidates.length>=CANDIDATE_CAP&&<p className="hint">最多显示 {CANDIDATE_CAP} 个候选账号，继续输入可缩小范围。</p>}
