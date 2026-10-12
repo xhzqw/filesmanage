@@ -18,7 +18,8 @@ const requests=new Map();
 function send(method,params={}){
  const id=++seq;
  return new Promise((resolve,reject)=>{
-  requests.set(id,{resolve,reject});
+  const timer=setTimeout(()=>{requests.delete(id);reject(Error("Chrome DevTools command timed out: "+method+" #"+id));},18000);
+  requests.set(id,{resolve,reject,timer});
   ws.send(JSON.stringify({id,method,params}));
  });
 }
@@ -69,6 +70,7 @@ try{
   const response=JSON.parse(event.data),pending=requests.get(response.id);
   if(!pending)return;
   requests.delete(response.id);
+  clearTimeout(pending.timer);
   response.error?pending.reject(Error(response.error.message)):pending.resolve(response.result);
  });
  await send("Page.enable");await send("Runtime.enable");
@@ -257,11 +259,15 @@ try{
  // Role ACL action presets are presentation-only until the separate preview
  // and confirmation workflow is submitted. Never submit a form in this test.
  await viewport(1440,900);
+ console.log("RARE_ROLE_CHECK navigating to role editor");
  await navigate("/org?tab=roles",'!!document.querySelector(".org-role-editor")');
+ console.log("RARE_ROLE_CHECK opening role selector");
  await click(".org-role-editor .perm-form-row>label:nth-child(2) .rare-select");
  await waitFor('!!document.querySelector(".rare-select-menu [role=option]")');
+ console.log("RARE_ROLE_CHECK choosing folder permission administrator");
  await evalJS(`(()=>{const option=[...document.querySelectorAll(".rare-select-menu [role=option]")].find(x=>x.textContent.includes("目录权限管理员"));if(!option)throw Error("permission-admin role missing");option.click();return true})()`);
  await waitFor('!!document.querySelector(".org-role-action-tools")');
+ console.log("RARE_ROLE_CHECK toggling action presets");
  const actionsBefore=await evalJS(`(()=>({total:document.querySelectorAll(".org-role-editor .perm-action-grid input[type=checkbox]").length,
   selected:[...document.querySelectorAll(".org-role-editor .perm-action-grid input[type=checkbox]")].filter(x=>x.checked).length}))()`);
  assert(actionsBefore.total>=8,"role action choices visible: "+JSON.stringify(actionsBefore));
