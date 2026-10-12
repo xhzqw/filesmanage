@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"filesmanage/internal/domain"
 	"filesmanage/internal/ports"
@@ -726,11 +727,32 @@ func (r *Repository) Stats(ctx context.Context, q ports.StatsQuery) (domain.Stat
 	}
 	// Directory treemap aggregates use exactly the authorized file predicate.
 	// Limit payload size and explicitly mark a partial result.
-	folderSQL := cte + ` SELECT d.id,d.name,d.parent_id,count(*),coalesce(sum(v.size_bytes),0)
-	   FROM files f JOIN folders d ON d.id=f.folder_id
-	   LEFT JOIN file_versions v ON v.file_id=f.id AND v.seq=f.current_version_seq
-	   WHERE ` + predicate + `
-	   GROUP BY d.id,d.name,d.parent_id ORDER BY sum(v.size_bytes) DESC NULLS LAST,d.id LIMIT 1501`
+	// Categorize files in SQL before aggregating by folder. This is a true
+	// per-directory breakdown under the same ACL, MIME, owner and date predicate.
+	folderSQL := cte + ` SELECT d.id,d.name,d.parent_id,sum(g.n),sum(g.bytes),
+	   jsonb_agg(jsonb_build_object('category',g.category,'count',g.n,'bytes',g.bytes))
+	   FROM (
+	     SELECT f.folder_id,
+	       CASE
+	         WHEN ext.s IN ('dxf','dwg','step','stp','stl','obj','3mf','iges','igs','gltf','glb','fbx','ifc') THEN 'cad'
+	         WHEN ext.s='pdf' OR f.content_type='application/pdf' THEN 'pdf'
+	         WHEN ext.s IN ('doc','docx','odt','rtf','txt','md','pages') THEN 'document'
+	         WHEN ext.s IN ('xls','xlsx','csv','ods','numbers') THEN 'sheet'
+	         WHEN ext.s IN ('ppt','pptx','odp','key') THEN 'slide'
+	         WHEN f.content_type LIKE 'image/%' OR ext.s IN ('png','jpg','jpeg','gif','webp','tif','tiff','bmp','svg','heic') THEN 'image'
+	         WHEN f.content_type LIKE 'video/%' OR ext.s IN ('mp4','mov','avi','mkv','webm') THEN 'video'
+	         WHEN f.content_type LIKE 'audio/%' OR ext.s IN ('mp3','wav','flac','aac','ogg') THEN 'audio'
+	         WHEN ext.s IN ('zip','rar','7z','tar','gz','bz2') THEN 'archive'
+	         ELSE 'other' END AS category,
+	       count(*) AS n,coalesce(sum(v.size_bytes),0) AS bytes
+	     FROM files f
+	     LEFT JOIN file_versions v ON v.file_id=f.id AND v.seq=f.current_version_seq
+	     CROSS JOIN LATERAL (SELECT coalesce(lower(substring(f.name from '\.([^.]+)$')),'') AS s) ext
+	     WHERE ` + predicate + `
+	     GROUP BY f.folder_id,category
+	   ) g JOIN folders d ON d.id=g.folder_id
+	   GROUP BY d.id,d.name,d.parent_id
+	   ORDER BY sum(g.bytes) DESC NULLS LAST,d.id LIMIT 1501`
 	folderRows, err := r.Q.Query(ctx, folderSQL, scopeArgs...)
 	if err != nil {
 		return domain.Stats{}, err
@@ -738,7 +760,11 @@ func (r *Repository) Stats(ctx context.Context, q ports.StatsQuery) (domain.Stat
 	defer folderRows.Close()
 	for folderRows.Next() {
 		var item domain.FolderCount
-		if err = folderRows.Scan(&item.FolderID, &item.FolderName, &item.ParentID, &item.Count, &item.Bytes); err != nil {
+		var typesJSON []byte
+		if err = folderRows.Scan(&item.FolderID, &item.FolderName, &item.ParentID, &item.Count, &item.Bytes, &typesJSON); err != nil {
+			return domain.Stats{}, err
+		}
+		if err = json.Unmarshal(typesJSON, &item.Types); err != nil {
 			return domain.Stats{}, err
 		}
 		if len(stats.FolderTree) == 1500 {

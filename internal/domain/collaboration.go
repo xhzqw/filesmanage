@@ -34,16 +34,16 @@ type Favorite struct {
 
 // Stats is the aggregation result for the stats page and CSV export.
 type Stats struct {
-	TotalFiles   int64           `json:"totalFiles"`
-	TotalFolders int64           `json:"totalFolders"`
-	TotalBytes   int64           `json:"totalBytes"`
-	Added30Days  int64           `json:"added30Days"`
-	ByType       []TypeCount     `json:"byType"`
-	ByMonth      []MonthCount    `json:"byMonth"`
-	ByUploader   []UploaderCount `json:"byUploader"`
-	ByFolder     []FolderCount   `json:"byFolder"`
-	FolderTree   []FolderCount   `json:"folderTree"`
-	TreeTruncated bool           `json:"treeTruncated"`
+	TotalFiles    int64           `json:"totalFiles"`
+	TotalFolders  int64           `json:"totalFolders"`
+	TotalBytes    int64           `json:"totalBytes"`
+	Added30Days   int64           `json:"added30Days"`
+	ByType        []TypeCount     `json:"byType"`
+	ByMonth       []MonthCount    `json:"byMonth"`
+	ByUploader    []UploaderCount `json:"byUploader"`
+	ByFolder      []FolderCount   `json:"byFolder"`
+	FolderTree    []FolderCount   `json:"folderTree"`
+	TreeTruncated bool            `json:"treeTruncated"`
 }
 
 // TypeCount groups files by extension bucket.
@@ -70,9 +70,17 @@ type UploaderCount struct {
 
 // FolderCount contains direct-file totals for a visible folder.
 type FolderCount struct {
-	FolderID   string `json:"folderId"`
-	FolderName string `json:"folderName"`
-	ParentID   *string `json:"parentId,omitempty"`
-	Count      int64  `json:"count"`
-	Bytes      int64  `json:"bytes"`
+	FolderID   string              `json:"folderId"`
+	FolderName string              `json:"folderName"`
+	ParentID   *string             `json:"parentId,omitempty"`
+	Count      int64               `json:"count"`
+	Bytes      int64               `json:"bytes"`
+	Types      []FileCategoryCount `json:"types"`
+}
+
+// FileCategoryCount aggregates actual authorized files within one directory.
+type FileCategoryCount struct {
+	Category string `json:"category"`
+	Count    int64  `json:"count"`
+	Bytes    int64  `json:"bytes"`
 }

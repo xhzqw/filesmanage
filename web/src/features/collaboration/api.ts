@@ -40,7 +40,9 @@ export type Stats={
  folderTree?:FolderCount[];
  treeTruncated?:boolean;
 };
-export type FolderCount={folderId:string;folderName:string;parentId?:string|null;count:number;bytes:number};
+export type FileCategory="pdf"|"document"|"sheet"|"slide"|"image"|"video"|"audio"|"cad"|"archive"|"other";
+export type FileCategoryCount={category:FileCategory;count:number;bytes:number};
+export type FolderCount={folderId:string;folderName:string;parentId?:string|null;count:number;bytes:number;types?:FileCategoryCount[]};
 
 export type SearchPage={items:FileItem[];total:number;nextCursor:string};
 

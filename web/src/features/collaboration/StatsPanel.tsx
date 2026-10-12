@@ -8,6 +8,8 @@ import {FolderPicker} from "../../shared/ui/FolderPicker";
 import type {Folder} from "../../entities/folder/model";
 import {collaborationApi,formatBytes,type Stats} from "./api";
 import {FolderTreemap} from "./FolderTreemap";
+import {FolderNodeGraph} from "./FolderNodeGraph";
+import {CATEGORIES} from "./statsTree";
 import {StatsTrend} from "./StatsTrend";
 import "./stats.css";
 
@@ -46,6 +48,7 @@ export function StatsPanel(){
  const[type,setType]=useState("");
  const[range,setRange]=useState("all");
  const[metric,setMetric]=useState<Metric>("count");
+ const[viewMode,setViewMode]=useState<"graph"|"treemap">("graph");
  const[uploader,setUploader]=useState("");
  const[reload,setReload]=useState(0);
  useEffect(()=>observeWorkspaceChange(()=>setReload(n=>n+1),["file","folder","stats","permissions"]),[]);
@@ -137,8 +140,15 @@ export function StatsPanel(){
    </div>
    <div className="stats-layout">
     <section className="stats-panel stats-map-panel" aria-labelledby="stats-map-title">
-     <div className="stats-panel-head"><div><h2 id="stats-map-title">目录空间分布</h2><p>面积代表容量 · 点击进入下级目录</p></div></div>
-     <FolderTreemap key={scope+folder+type+range+uploader} stats={stats} folders={folders} onChoose={id=>{setFolder(id);setScope("descendants");}}/>
+     <div className="stats-panel-head"><h2 id="stats-map-title">{viewMode==="graph"?"目录关系图谱":"目录容量分布"}</h2>
+      <GooeyNav className="stats-view-switch" aria-label="目录可视化方式" size="xs" items={["节点树","矩形图"]}
+       value={viewMode==="graph"?0:1} separation={7} radius={6} activeColor="var(--brand-blue)" activeLabelColor="var(--text-inverse)"
+       onChange={index=>setViewMode(index===0?"graph":"treemap")}/></div>
+     {viewMode==="graph"?<FolderNodeGraph stats={stats} folders={folders} onChoose={id=>{setFolder(id);setScope("descendants");}}/>:
+      <FolderTreemap key={scope+folder+type+range+uploader} stats={stats} folders={folders} onChoose={id=>{setFolder(id);setScope("descendants");}}/>}
+     <div className="stats-asset-legend" aria-label="文件类型与颜色图例">
+      {CATEGORIES.map(item=><span key={item.id} className="stats-legend-item"><i aria-hidden="true" style={{background:item.color}}/>{item.label}</span>)}
+     </div>
     </section>
     <div className="stats-insights">
      <section className="stats-panel stats-types-panel" aria-labelledby="stats-types-title">
