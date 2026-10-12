@@ -611,7 +611,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   // cursor over a gesture that moves would misstate the outcome (§7.2).
   dataTransfer.effectAllowed="move";
   dataTransfer.setData(DRAG_MIME,JSON.stringify(session));
-  dataTransfer.setData("text/plain",ids.length===1?item.name:`移动 ${ids.length} 个文件`);
+  // Native text fallback mirrors the filename-only visual ghost.
+  dataTransfer.setData("text/plain",ids.length===1?item.name:`${item.name} +${ids.length-1}`);
   setMoveDragImage(dataTransfer,item.name,ids.length);
   window.dispatchEvent(new CustomEvent<MoveSessionDetail>(MOVE_SESSION_EVENT,{detail:{active:true,...session}}));
  }
