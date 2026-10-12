@@ -1,3 +1,4 @@
+import {toast} from "../../shared/ui/feedback";
 import {RareBadge,RareButton,RareDataTable,RareInput,RareNotice,RareRowActions,RareSelect} from "../../shared/ui/rare";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useEffect,useRef,useState,type FormEvent} from "react";
@@ -80,14 +81,19 @@ export function RoleBindingsPanel({users,onDirtyChange}:{users:User[];onDirtyCha
     allowedActions:role==="auditor"?[]:actions,
     ...(expires?{expiresAt:new Date(expires).toISOString()}:{})});
    setLoad(n=>n+1);setUserId("");setRole("auditor");setActions(["list"]);setExpires("");setScopeId("");setFolderQuery("");setReview(false);
-  }catch(e){setError(errorCopy(e,"分配角色失败"));}
-  finally{setBusy(false);}
+   toast.success("管理角色已委派");
+  }catch(e){
+   const message=errorCode(e)==="E_NETWORK"?"委派结果未确认，请刷新角色列表核对":errorCopy(e,"分配角色失败");
+   setError(message);(errorCode(e)==="E_NETWORK"?toast.warning:toast.error)(message);setLoad(n=>n+1);
+  }finally{inFlight.current=false;setBusy(false);}
  }
  async function revoke(id:string){
   if(inFlight.current)return;inFlight.current=true;setBusy(true);setError("");
-  try{await roleAPI.revoke(id);setConfirmRevoke("");setLoad(v=>v+1);}
-  catch(e){setError(errorCopy(e,"撤销角色失败"));setLoad(v=>v+1);}
-  finally{inFlight.current=false;setBusy(false);}
+  try{await roleAPI.revoke(id);setConfirmRevoke("");setLoad(v=>v+1);toast.success("管理角色已撤销");}
+  catch(e){
+   const message=errorCode(e)==="E_NETWORK"?"撤销结果未确认，请刷新角色列表核对":errorCopy(e,"撤销角色失败");
+   setError(message);toast.warning(message);setLoad(v=>v+1);
+  }finally{inFlight.current=false;setBusy(false);}
  }
  return <section className="perm-detail org-role-workbench" aria-label="管理角色绑定">
   <div className="perm-section-title">管理角色 <span className="perm-subtle">仅系统管理员可调整</span></div>

@@ -100,7 +100,7 @@ export function QuickGrantsDialog({folder,onClose}:{folder:Folder;onClose:()=>vo
     <div><RareButton type="button" className="secondary-action" onClick={refresh} disabled={busy}>刷新</RareButton>
      {grantsState==="ready"&&<span className="quick-grants-count">{grants.length} 条</span>}</div>
    </div>
-   {notice&&<RareNotice tone={notice.error?"danger":"success"}>{notice.text}</RareNotice>}
+   {notice?.error&&<RareNotice tone="danger">{notice.text}</RareNotice>}
    {grantsState==="loading"&&<p role="status" className="hint">正在读取授权…</p>}
    {grantsState==="failed"&&<RareNotice tone="danger">读取失败，已暂停授权修改。请刷新重试。</RareNotice>}
    {grantsState==="ready"&&<div className="quick-grants-list">

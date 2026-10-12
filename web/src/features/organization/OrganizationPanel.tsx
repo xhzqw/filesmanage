@@ -182,7 +182,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    </RareButton>
   </div>
 
-  {notice&&<RareNotice tone={notice.tone==="error"?"danger":"info"}>{notice.text}</RareNotice>}
+  {notice?.tone==="error"&&<RareNotice tone="danger">{notice.text}</RareNotice>}
 
   {/* 双栏主工作台：左侧组织架构树 + 右侧主工作区卡片 */}
   <div className="org-workbench">
@@ -260,7 +260,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
       <RareButton type="button" className="primary org-add-member" onClick={()=>{setNotice(null);setCreateFormOpen(true);}}><IconPlus/>新增成员</RareButton>
      </div>
 
-     {notice&&notice.tone==="error"&&usersState==="failed"&&<RareNotice tone="danger">{notice.text}</RareNotice>}
+
 
      {/* 成员数据表格 */}
      <div className="org-table-container">

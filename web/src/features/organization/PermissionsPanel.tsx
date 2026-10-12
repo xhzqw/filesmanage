@@ -160,7 +160,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
      <div className="perm-inspection-column">
       <section className="perm-card perm-card-grants" aria-label="直接授权记录">
        <div className="perm-section-title"><span>直接授权记录</span>{state==="ready"&&<span className="perm-count">{grants.length} 条</span>}</div>
-    {notice&&<RareNotice tone={notice.error?"danger":"success"}>{notice.text}</RareNotice>}
+    {notice?.error&&<RareNotice tone="danger">{notice.text}</RareNotice>}
     {state==="loading"&&<p role="status" className="hint">正在读取直接授权…</p>}
     {state==="failed"&&<RareNotice tone="danger">读取失败，不能编辑该目录的授权。</RareNotice>}
     {state==="ready"&&<div className="perm-grants-scroller">{grants.length>0?<RareDataTable className="perm-table perm-grants-table"><thead><tr><th>授权主体</th><th>动作</th><th className="perm-grant-optional">范围</th><th className="perm-grant-optional">到期</th><th>操作</th></tr></thead>

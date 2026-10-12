@@ -475,6 +475,63 @@ try{
  assert(writes===1,"no second POST is sent while the mutation is pending");
  assert(await cdp.waitFor("()=>!!document.querySelector('dialog[open] .rare-notice')"),
   "synthetic network failure provides in-dialog feedback without data mutation");
+ // Approval PUT is intercepted: assert single-flight and uncertain-write quarantine.
+ // Never persist synthetic approval settings to the real database.
+ await cdp.navigate(BASE+"/org?tab=approvals");
+ assert(await cdp.waitFor("()=>!!document.querySelector('.approval-workspace .perm-tree-name')"),
+  "approval write safety test loads resource browser");
+ await cdp.evaluate("(()=>{document.querySelector('.approval-workspace .perm-tree-name').click();return true})()");
+ assert(await cdp.waitFor("()=>!!document.querySelector('.approval-chain-entry select:not(:disabled)')"),
+  "approval form can select an approver");
+ const initialApprover=await cdp.evaluate("(()=>document.querySelector('.approval-chain-entry select')?.value??'')()");
+ const chosenApprover=await cdp.evaluate("(()=>[...document.querySelector('.approval-chain-entry select').options].find(o=>o.value)?.value??'')()");
+ assert(Boolean(chosenApprover),"approval write smoke has an eligible approver");
+ await cdp.evaluate(`(()=>{
+  const sel=document.querySelector('.approval-chain-entry select');
+  const setter=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set;
+  setter.call(sel,${JSON.stringify(chosenApprover)});
+  sel.dispatchEvent(new Event('change',{bubbles:true}));
+  return true;
+ })()`);
+ assert(await cdp.waitFor("()=>!!document.querySelector('.approval-actions button[type=submit]:not(:disabled)')"),
+  "approval draft is valid before intercepted write");
+ await cdp.evaluate(`(()=>{
+  const nativeFetch=window.fetch.bind(window);
+  window.__approvalTestWrites=0;
+  window.__restoreApprovalFetch=()=>{window.fetch=nativeFetch};
+  window.fetch=(input,init)=>{
+   const url=new URL(typeof input==='string'?input:input.url,location.href);
+   const method=(init?.method??(typeof input==='string'?'GET':input.method)).toUpperCase();
+   if(url.pathname.endsWith('/approval-policy')&&method==='PUT'){
+    window.__approvalTestWrites++;
+    return new Promise((_,reject)=>{window.__rejectApprovalWrite=()=>reject(new TypeError('QA simulated disconnect'))});
+   }
+   return nativeFetch(input,init);
+  };
+  return true;
+ })()`);
+ await cdp.evaluate("(()=>{const form=document.querySelector('.approval-form');form.requestSubmit();form.requestSubmit();return true})()");
+ assert(await cdp.waitFor("()=>window.__approvalTestWrites===1"),
+  "rapid approval submits issue only one intercepted PUT");
+ const approvalWrites=await cdp.evaluate("(()=>{const writes=window.__approvalTestWrites;window.__restoreApprovalFetch?.();window.__rejectApprovalWrite?.();return writes})()");
+ assert(approvalWrites===1,"no additional approval write reached the server");
+ assert(await cdp.waitFor("()=>!!document.querySelector('.approval-editor .rare-notice[data-rare-notice-tone=warning]')"),
+  "uncertain approval write displays persistent reconcile warning");
+ assert(await cdp.evaluate("(()=>!!document.querySelector('.approval-actions button[type=submit]:disabled'))()"),
+  "uncertain approval outcome quarantines repeated submits");
+ await cdp.evaluate(`(()=>{
+  const button=[...document.querySelectorAll('.approval-editor button')]
+   .find(b=>b.textContent?.includes('重新读取'));
+  button?.click();
+  return true;
+ })()`);
+ assert(await cdp.waitFor("()=>!!document.querySelector('dialog[open]')"),
+  "server reconciliation requires explicit draft-discard confirmation");
+ await cdp.evaluate("(()=>{[...document.querySelectorAll('dialog[open] button')].find(b=>b.textContent?.includes('放弃修改'))?.click();return true})()");
+ assert(await cdp.waitFor("()=>!!document.querySelector('.approval-state')&&!document.querySelector('.approval-editor .rare-notice[data-rare-notice-tone=warning]')"),
+  "confirmed server reread exits uncertain approval state");
+ assert(await cdp.evaluate(`(()=>document.querySelector('.approval-chain-entry select')?.value===${JSON.stringify(initialApprover)})()`),
+  "server reconciliation restores saved approvers instead of keeping uncertain draft");
  console.log("PERMISSIONS_P1_BROWSER_PASS");
 }finally{
  cdp?.close();
