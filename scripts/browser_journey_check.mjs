@@ -142,20 +142,25 @@ async function main() {
 
     // 1. the login page renders
     await cdp.navigate(`${BASE}/login`);
-    const hasForm = await cdp.waitFor(`()=>!!document.querySelector('input[type=password]')&&!!document.querySelector('button')`);
-    check("login page renders", Boolean(hasForm), "password field + submit present");
+    const hasForm = await cdp.waitFor(`()=>!!document.querySelector('.login-entry')&&!!document.querySelector('#login-panel')`);
+    check("login page renders", Boolean(hasForm), "center login entry + progressive form present");
+    const collapsed = await cdp.evaluate(`(()=>!document.querySelector('.login-reveal-zone')?.classList.contains('is-expanded')&&getComputedStyle(document.querySelector('.login-panel')).visibility==='hidden')()`);
+    check("login is collapsed by default", collapsed, "hover or click is required");
+    await cdp.evaluate(`(()=>{document.querySelector('.login-entry').click();return true})()`);
+    const expanded = await cdp.waitFor(`()=>document.querySelector('.login-reveal-zone')?.classList.contains('is-expanded')`);
+    check("login expands on click", Boolean(expanded), "touch and keyboard entry supported");
 
     // 2. a wrong password is refused by the real UI
     await cdp.type("input[type=text],input:not([type])", "admin");
     await cdp.type("input[type=password]", "definitely-not-the-password");
-    await cdp.clickText("登录") || await cdp.evaluate(`(()=>{document.querySelector('form button,button').click();return true})()`);
+    await cdp.evaluate(`(()=>{document.querySelector('.login-panel button[type=submit]').click();return true})()`);
     await delay(1200);
     const stillOnLogin = await cdp.evaluate(`()=>location.pathname==='/login'||location.pathname==='/'`);
     check("wrong password refused", Boolean(stillOnLogin), `still on ${await cdp.evaluate("(()=>location.pathname)()")}`);
 
     // 3. real login lands on the document page with the real tree
     await cdp.type("input[type=password]", password);
-    await cdp.clickText("登录") || await cdp.evaluate(`(()=>{document.querySelector('form button,button').click();return true;})()`);
+    await cdp.evaluate(`(()=>{document.querySelector('.login-panel button[type=submit]').click();return true})()`);
     const onDoc = await cdp.waitFor(`()=>location.pathname==='/doc'||location.pathname==='/first-sign-in'`, 15000);
     check("real login reaches the document page", Boolean(onDoc), await cdp.evaluate("(()=>location.pathname)()"));
 

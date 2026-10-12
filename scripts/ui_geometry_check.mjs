@@ -185,35 +185,43 @@ try{
  });
  await send("Page.enable");
  await send("Runtime.enable");
- await navigate("/login",".login-card");
- // Verify the *rendered* input text inset, not merely that an icon exists:
- // the card's input padding shorthand previously overrode the icon spacing.
+ await navigate("/login",".login-entry");
+ // The default view has only the centered login capsule; the actual form
+ // becomes visible only after the progressive click/hover interaction.
  for(const width of [1440,900,390]){
   await compactViewport(width);
-  await navigate("/login",".login-card");
+  await navigate("/login",".login-entry");
   const loginFields=await evaluate(`(()=>{
-   const fields=[...document.querySelectorAll(".login-card .input-wrap")].map(wrap=>{
-    const icon=wrap.querySelector(".input-icon"),input=wrap.querySelector("input");
-    if(!icon||!input)return null;
-    const ir=input.getBoundingClientRect(),gr=icon.getBoundingClientRect();
-    const inset=parseFloat(getComputedStyle(input).paddingLeft);
-    return {name:input.id,inset,gap:Math.round((ir.left+inset-gr.right)*10)/10,
-     inputRight:ir.right};
-   });
-   const cr=document.querySelector(".login-card")?.getBoundingClientRect();
+   const button=document.querySelector(".login-entry"),br=button?.getBoundingClientRect();
+   const panel=document.querySelector(".login-panel"),pr=panel?.getBoundingClientRect();
+   const brand=document.querySelector(".login-minimal-brand")?.getBoundingClientRect();
    return {width:innerWidth,scrollWidth:document.documentElement.scrollWidth,
-    cardLeft:cr?.left,cardRight:cr?.right,fields};
+    buttonCenter:br?(br.left+br.right)/2:null,buttonMiddle:br?(br.top+br.bottom)/2:null,
+    centerY:innerHeight/2,brandLeft:brand?.left,brandTop:brand?.top,
+    panelHidden:panel?getComputedStyle(panel).visibility==="hidden":false,
+    cardLeft:pr?.left,cardRight:pr?.right};
   })()`);
-  check(`login ${width}px icon/text do not overlap`,
-   loginFields.fields.length===2&&loginFields.fields.every(f=>f&&f.gap>=7&&f.inset>=32),
-   JSON.stringify(loginFields.fields));
-  check(`login ${width}px card fits viewport`,
-   loginFields.width===width&&loginFields.scrollWidth<=width+2&&
-   loginFields.cardLeft>=-1&&loginFields.cardRight<=width+1,
+  check(`login ${width}px centered default capsule`,
+   Math.abs(loginFields.buttonCenter-width/2)<=2&&
+   Math.abs(loginFields.buttonMiddle-loginFields.centerY)<=2&&
+   loginFields.panelHidden&&loginFields.brandLeft>=0&&loginFields.brandTop>=0,
    JSON.stringify(loginFields));
+  await evaluate(`(()=>{document.querySelector('.login-entry').click();return true})()`);
+  await delay(560);
+  const expanded=await evaluate(`(()=>{
+   const panel=document.querySelector(".login-panel"),r=panel?.getBoundingClientRect();
+   return {open:document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"),
+    visible:panel?getComputedStyle(panel).visibility==="visible":false,
+    left:r?.left,right:r?.right,fields:panel?.querySelectorAll("input").length};
+  })()`);
+  check(`login ${width}px expanded form fits viewport`,
+   loginFields.width===width&&loginFields.scrollWidth<=width+2&&
+   expanded.open&&expanded.visible&&expanded.fields===3&&
+   expanded.left>=-1&&expanded.right<=width+1,
+   JSON.stringify(expanded));
  }
  await send("Emulation.clearDeviceMetricsOverride");
- await navigate("/login",".login-card");
+ await navigate("/login",".login-entry");
  const loggedIn=await evaluate(`(async()=>{
   const r=await fetch("/api/login",{method:"POST",credentials:"same-origin",
    headers:{"Content-Type":"application/json"},
@@ -221,7 +229,9 @@ try{
   return r.ok;
  })()`);
  check("real login",loggedIn);
- await inspect("login",[["card",".login-card",18],["button",".login-card button.primary",6]]);
+ await evaluate(`(()=>{document.querySelector('.login-entry').click();return true})()`);
+ await delay(560);
+ await inspect("login",[["card",".login-panel",18],["button",".login-panel .login-submit",6]]);
  await navigate("/doc",".sidebar");
  await inspect("documents",[
   ["header",".header",14],["sidebar",".sidebar",14],["workspace",".work",14],
