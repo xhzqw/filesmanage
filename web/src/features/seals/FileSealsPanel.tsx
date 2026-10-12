@@ -1,4 +1,5 @@
 import {useEffect,useState} from "react";
+import {createPortal} from "react-dom";
 import {Link} from "react-router-dom";
 import {RareBadge,RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
 import {errorCopy} from "../../shared/errors";
@@ -13,7 +14,9 @@ type DraftSeal=Omit<SealPlacement,"password"|"versionSeq"|"fileSha256">;
 type Position=Pick<DraftSeal,"x"|"y"|"width"|"height">;
 const clamp=(value:number,max:number)=>Math.max(0,Math.min(max,value));
 
-export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onChanged}:{fileId:string;seq:number;sha:string;name:string;isAdmin:boolean;onSelectRevision:(revision:number)=>void;onChanged:()=>void}){
+export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onChanged,controlsTargetId}:{fileId:string;seq:number;sha:string;name:string;isAdmin:boolean;onSelectRevision:(revision:number)=>void;onChanged:()=>void;controlsTargetId?:string}){
+ const[host,setHost]=useState<HTMLElement|null>(null);
+ useEffect(()=>{setHost(controlsTargetId?document.getElementById(controlsTargetId):null)},[controlsTargetId]);
  const[assets,setAssets]=useState<SealAsset[]>([]);
  const[access,setAccess]=useState<SealUserPermission|null>(null);
  const[marks,setMarks]=useState<FileSealMark[]>([]);
@@ -113,8 +116,7 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
   }catch(err){setError(errorCopy(err,"批量签署失败；本批次不会部分保存，请核实权限、密码及位置"))}
   finally{setPassword("");setBusy(false)}
  }
- return <div className="seal-file-workspace">
-  <div className="seal-file-controls">
+ const controls = <div className="seal-file-controls">
    <div className="seal-library-heading">签署设置</div>
    {(error||notice)&&<p role={error?"alert":"status"} className={error?"notice error":"notice"}>{error||notice}</p>}
    <label>选择签名 / 印章
@@ -179,14 +181,8 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
    {isAdmin&&<p className="hint">管理员代签会明确记录真实操作账号和各签名归属人，不视作归属人本人签署。</p>}
    {!isPDF&&<p className="hint">Office 文件需先生成 PDF 副本再签署。</p>}
    {marks.length>0&&<a className="rare-button" href={sealsApi.exportUrl(fileId,seq)} download={"签章版-v"+seq+".pdf"}>下载带章 PDF</a>}
-  </div>
-  {isPDF?<SealPageCanvas fileId={fileId} page={page} imageUrl={imageUrl} selected={selected} marks={marks}
-   position={position} setPosition={updatePosition} angle={angle} pageRatio={pageRatio} setPageRatio={ratio=>{
-    setPageRatio(ratio);
-   }} imageAvailable={imageAvailable} setImageAvailable={setImageAvailable}
-   drafts={staged.map(item=>({...item,asset:assets.find(a=>a.id===item.assetId)}))}/>:
-   <div className="seal-file-preview"><p className="empty">仅 PDF 支持页面定位</p></div>}
-  <aside className="seal-file-history">
+  </div>;
+ const history = <aside className="seal-file-history">
    <SealRevisionControls fileId={fileId} seq={seq} sha={sha} isAdmin={isAdmin}
     refreshKey={revision} onSelect={onSelectRevision} onRestored={()=>{
      setStaged([]);setAssetId("");setRevision(n=>n+1);onChanged();
@@ -199,6 +195,14 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
     <small>{m.signerName} · {new Date(m.createdAt).toLocaleString("zh-CN")}</small>
     <small>v{m.versionSeq} · {m.angleDegrees?m.angleDegrees+"° · ":""}SHA {m.fileSha256.slice(0,12)}…</small>
    </div>)}
-  </aside>
+  </aside>;
+ return <div className={"seal-file-workspace"+(controlsTargetId?" is-workbench":"")}>
+  {controlsTargetId&&host?createPortal(<div className="file-seal-sidebar-controls">{controls}{history}</div>,host):<>{controls}{history}</>}
+  {isPDF?<SealPageCanvas fileId={fileId} page={page} imageUrl={imageUrl} selected={selected} marks={marks}
+   position={position} setPosition={updatePosition} angle={angle} pageRatio={pageRatio} setPageRatio={ratio=>{
+    setPageRatio(ratio);
+   }} imageAvailable={imageAvailable} setImageAvailable={setImageAvailable}
+   drafts={staged.map(item=>({...item,asset:assets.find(a=>a.id===item.assetId)}))}/>:
+   <div className="seal-file-preview"><p className="empty">仅 PDF 支持页面定位</p></div>}
  </div>;
 }
