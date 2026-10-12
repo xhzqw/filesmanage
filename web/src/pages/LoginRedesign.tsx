@@ -91,9 +91,6 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
     collapseAndReturnFocus();
    }
   }}>
-  <div className="login-scene" aria-hidden="true">
-   <img className="login-scene-device" src="/assets/brand/real-smart-moxa.webp" alt="" draggable={false}/>
-  </div>
   <header className="login-minimal-brand">
    <BrandLogo size={32} className="login-minimal-logo"/>
    <h1>中晟生物科技</h1>

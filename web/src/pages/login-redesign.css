@@ -1,23 +1,11 @@
 /* Minimal blue/white branded login; controls and logo are real HTML elements. */
 .login-minimal{
  position:relative;isolation:isolate;min-height:100dvh;height:100dvh;overflow:hidden;
- background:#f7faff url("/assets/brand/login-landscape.svg") center/cover no-repeat;
+ background:#edf5ff url("/assets/brand/login-showroom-bg.webp") center center / cover no-repeat;
 }
 .login-minimal::before{
  content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
- background:linear-gradient(90deg,rgba(247,250,255,.24) 0%,rgba(247,250,255,.11) 51%,rgba(247,250,255,.03) 84%);
-}
-.login-scene{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
-.login-scene-device{
- position:absolute;top:52%;right:clamp(22px,7.5vw,144px);
- width:clamp(240px,28vw,415px);height:auto;max-height:82dvh;object-fit:contain;
- transform:translateY(-50%);
- filter:drop-shadow(18px 22px 20px rgba(22,53,88,.11));
- animation:login-device-breathe 11s ease-in-out infinite;
-}
-@keyframes login-device-breathe{
- 0%,100%{transform:translateY(-50%)}
- 50%{transform:translateY(calc(-50% - 4px))}
+ background:linear-gradient(90deg,rgba(246,251,255,.08) 0%,rgba(246,251,255,.04) 55%,rgba(246,251,255,0) 85%);
 }
 .login-minimal-brand{
  position:absolute;z-index:2;top:clamp(20px,3vw,42px);left:clamp(20px,3.6vw,50px);
@@ -90,9 +78,8 @@
 }
 .login-panel .login-submit:hover{background:#11347d!important}
 @media(max-width:700px){
- .login-minimal{background-position:43% center}
- .login-minimal::before{background:rgba(247,250,255,.4)}
- .login-scene-device{width:min(43vw,240px);right:-6vw;top:55%;opacity:.33}
+ .login-minimal{background-position:76% center}
+ .login-minimal::before{background:rgba(247,250,255,.23)}
  .login-minimal-brand{top:18px;left:18px}
  .login-minimal-brand h1{font-size:14px}
  .login-minimal-logo{width:29px;height:29px}
@@ -108,5 +95,4 @@
 }
 @media(prefers-reduced-motion:reduce){
  .login-entry,.login-panel,.login-reveal-zone.is-expanded .login-entry,.login-reveal-zone.is-expanded .login-panel{transition:none}
- .login-scene-device{animation:none}
 }

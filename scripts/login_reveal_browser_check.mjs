@@ -60,7 +60,7 @@ const collect=`(()=>{
  const r=e?.getBoundingClientRect(),zr=z?.getBoundingClientRect();
  const panel=document.querySelector(".login-panel");
  const brand=document.querySelector(".login-minimal-brand")?.getBoundingClientRect();
- const device=document.querySelector(".login-scene-device");
+ const background=getComputedStyle(document.querySelector(".login-minimal")).backgroundImage;
  return {
  width:innerWidth,height:innerHeight,scrollWidth:document.documentElement.scrollWidth,
  buttonCenter:r?(r.left+r.right)/2:null,buttonMiddle:r?(r.top+r.bottom)/2:null,
@@ -69,7 +69,8 @@ const collect=`(()=>{
  hidden:panel?getComputedStyle(panel).visibility==="hidden":null,
  panelLeft:panel?.getBoundingClientRect().left,panelRight:panel?.getBoundingClientRect().right,
  brandLeft:brand?.left,brandTop:brand?.top,
- imageLoaded:!!(device?.complete&&device?.naturalWidth>0),
+ showroomBackground:background.includes("login-showroom-bg.webp"),
+ noDuplicateDeviceLayer:!document.querySelector(".login-scene-device"),
  logoLoaded:document.querySelector(".login-minimal-logo")?.naturalWidth>0
  };
 })()`;
@@ -104,7 +105,10 @@ try{
  }
  await navigate();
  let state=await evaluate(collect);
- check("actual company logo and medical device load",state.logoLoaded&&state.imageLoaded);
+ const bgResponse=await fetch(base+"/assets/brand/login-showroom-bg.webp");
+ check("approved integrated showroom background loads",state.logoLoaded&&state.showroomBackground&&state.noDuplicateDeviceLayer&&bgResponse.ok,
+  JSON.stringify({cssBackground:state.showroomBackground,noDuplicateDeviceLayer:state.noDuplicateDeviceLayer,status:bgResponse.status}));
+
  check("default center has only a login capsule",!state.open&&state.hidden&&Math.abs(state.buttonCenter-state.width/2)<1&&Math.abs(state.buttonMiddle-state.height/2)<1,JSON.stringify(state));
  check("brand stays in top left",state.brandLeft>=8&&state.brandTop>=5);
  check("desktop has no horizontal overflow",state.scrollWidth<=state.width+1);
