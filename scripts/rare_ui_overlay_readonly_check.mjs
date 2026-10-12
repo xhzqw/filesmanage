@@ -81,13 +81,13 @@ try{
   await viewport(width,height);
   await navigate("/doc","!!document.querySelector('.account-trigger')");
   await click(".account-trigger");
-  await waitFor('!!document.querySelector("[role=menu][aria-label=\"账户操作菜单\"]")');
+  await waitFor(`!!document.querySelector('[role=menu][aria-label="账户操作菜单"]')`);
   const menu=await evalJS(`(()=>{const m=document.querySelector('[role=menu][aria-label="账户操作菜单"]');const r=m.getBoundingClientRect();return{portal:m.parentElement===document.body,rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom},focused:m.contains(document.activeElement),overflow:document.documentElement.scrollWidth-innerWidth};})()`);
   assert(menu.portal&&menu.focused&&inside(menu.rect,width,height)&&menu.overflow<=1,"account menu overlay at "+width+": "+JSON.stringify(menu));
   await key("Escape","Escape",27);
-  await waitFor('!document.querySelector("[role=menu][aria-label=\"账户操作菜单\"]")');
+  await waitFor(`!document.querySelector('[role=menu][aria-label="账户操作菜单"]')`);
   assert.equal(await evalJS('document.activeElement?.classList.contains("account-trigger")'),true,"Escape restores trigger");
-  await navigate("/stats",'!!document.querySelector(".rare-select[aria-label=\"修改时间\"]")');
+  await navigate("/stats",`!!document.querySelector('.rare-select[aria-label="修改时间"]')`);
   await click('.rare-select[aria-label="修改时间"]');
   await waitFor('!!document.querySelector(".rare-select-menu [role=option]")');
   const select=await evalJS(`(()=>{const b=document.querySelector('.rare-select[aria-label="修改时间"]');const m=document.querySelector(".rare-select-menu");const r=m.getBoundingClientRect();return{role:b.getAttribute("role"),expanded:b.getAttribute("aria-expanded"),count:m.querySelectorAll('[role=option]').length,rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom},overflow:document.documentElement.scrollWidth-innerWidth};})()`);
