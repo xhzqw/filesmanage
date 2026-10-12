@@ -55,3 +55,20 @@
 .seal-permission-header{background:var(--surface-header);color:var(--text-secondary)}
 .seal-permission-row .rare-button{min-height:30px;width:100%}
 @media(max-width:570px){.seal-permission-row{grid-template-columns:minmax(80px,1fr) minmax(92px,115px) minmax(92px,115px);gap:3px;padding:6px 3px}.seal-permission-row .rare-button{padding:3px}.seal-permission-matrix{padding:3px}}
+/* Zoom controls stay fixed while the document canvas alone scrolls/pans. */
+.seal-file-preview{min-height:0;overflow:hidden;padding:0;display:flex;flex-direction:column;background:var(--surface-header)}
+.seal-page-toolbar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 10px;flex-wrap:wrap;border-bottom:1px solid var(--border-hairline);background:var(--surface-panel)}
+.seal-page-toolbar strong{font-size:12px;white-space:nowrap}
+.seal-page-tools{display:flex;align-items:center;gap:5px;flex-wrap:wrap;min-width:0}
+.seal-page-tools .rare-button{min-height:28px;height:28px;padding:0 7px;white-space:nowrap}
+.seal-page-tools .rare-button[aria-pressed="true"]{background:var(--surface-row-selected);color:var(--brand-blue);font-weight:650}
+.seal-page-zoom{min-width:41px;text-align:center;font-size:11px;font-variant-numeric:tabular-nums;color:var(--text-secondary)}
+.seal-page-viewport{min-width:0;min-height:0;flex:1 1 auto;overflow:auto;overscroll-behavior:contain;padding:12px}
+.seal-page-viewport .seal-page-surface{position:relative;margin:auto;max-width:none;width:fit-content;overflow:hidden;cursor:crosshair;background:#fff;box-shadow:var(--shadow-panel)}
+.seal-page-viewport .seal-page-surface.is-panning{cursor:grab}
+.seal-page-viewport .seal-page-surface>img{display:block;width:100%;max-width:none;max-height:none;height:auto;pointer-events:none;user-select:none}
+.seal-page-tip{font-size:10px;color:var(--text-secondary);padding:5px 10px;background:var(--surface-panel);border-top:1px solid var(--border-hairline)}
+.seal-asset-empty{font-size:12px;color:var(--text-secondary);margin:0}
+.seal-asset-empty a{color:var(--brand-blue);font-weight:600;text-decoration:underline}
+@media(max-width:1050px){.seal-file-preview{min-height:420px}.seal-file-workspace{height:auto;min-height:620px}}
+@media(max-width:700px){.seal-page-viewport{height:470px;flex:0 0 470px}.seal-page-toolbar{align-items:flex-start}.seal-page-tools{justify-content:flex-start}}

@@ -301,7 +301,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
      {tab==="seals"&&<section id="file-panel-seals" role="tabpanel" aria-labelledby="file-tab-seals" className="file-workbench-panel">
       {isOfficeName(preview.name)?
        <DocxSealConversion fileId={id} versionSeq={currentSeq} sha={preview.sha256} name={preview.name}/>:
-       <FileSealsPanel fileId={id} seq={currentSeq} sha={preview.sha256} name={preview.name}/>}
+       <FileSealsPanel fileId={id} seq={currentSeq} sha={preview.sha256} name={preview.name} isAdmin={user.isAdmin}/>}
      </section>}
      {tab==="versions"&&<section id="file-panel-versions" role="tabpanel" aria-labelledby="file-tab-versions" className="file-workbench-panel file-versions-panel">
       <div className="file-section-caption"><strong>版本记录</strong><span>所有历史均保留 · 回滚会创建新版本</span></div>

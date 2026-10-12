@@ -336,17 +336,18 @@ func (s *Service) SignFile(ctx context.Context, actor domain.User, fileID string
 	if err != nil {
 		return domain.FileSealMark{}, notFoundOr(err)
 	}
-	if !asset.Active {
-		return domain.FileSealMark{}, domain.ErrForbidden
-	}
 	permission, err := store.SealUserPermission(ctx, actor.ID)
 	if err != nil {
 		return domain.FileSealMark{}, notFoundOr(err)
 	}
-	if asset.Kind == "personal" && !permission.CanSign {
-		return domain.FileSealMark{}, domain.ErrForbidden
+	var hasCompanyGrant bool
+	if !actor.IsAdmin && asset.Kind == "company" {
+		hasCompanyGrant, err = store.HasSealGrant(ctx, asset.ID, actor.ID)
+		if err != nil {
+			return domain.FileSealMark{}, err
+		}
 	}
-	if asset.Kind == "company" && !permission.CanStamp {
+	if !sealCanApply(actor, asset, permission, hasCompanyGrant) {
 		return domain.FileSealMark{}, domain.ErrForbidden
 	}
 	alreadyUsed, err := store.FileHasSeal(ctx, file.ID, asset.ID)
@@ -356,27 +357,12 @@ func (s *Service) SignFile(ctx context.Context, actor domain.User, fileID string
 	if alreadyUsed {
 		return domain.FileSealMark{}, domain.ErrNameConflict
 	}
-	if asset.Kind == "personal" {
-		if asset.OwnerID != actor.ID {
-			return domain.FileSealMark{}, domain.ErrForbidden
-		}
-	} else {
-		if !actor.IsAdmin {
-			allowed, err := store.HasSealGrant(ctx, asset.ID, actor.ID)
-			if err != nil {
-				return domain.FileSealMark{}, err
-			}
-			if !allowed {
-				return domain.FileSealMark{}, domain.ErrForbidden
-			}
-		}
-	}
 	mark := domain.FileSealMark{ID: NewID("mark"), FileID: file.ID, VersionSeq: p.VersionSeq, FileSha256: version.Sha256, AssetID: asset.ID, AssetSha256: asset.Sha256, SignerID: actor.ID, PageNumber: p.PageNumber, X: p.X, Y: p.Y, Width: p.Width, Height: p.Height, AngleDegrees: p.AngleDegrees}
 	if err = store.InsertSealMark(ctx, mark); err != nil {
 		return domain.FileSealMark{}, err
 	}
 	if err = auditRequired(ctx, tx, actor, "seal.apply", "file", file.ID, "success", map[string]any{
-		"markId": mark.ID, "fileSha256": mark.FileSha256, "versionSeq": mark.VersionSeq, "assetId": mark.AssetID, "assetSha256": mark.AssetSha256, "page": mark.PageNumber, "x": mark.X, "y": mark.Y, "width": mark.Width, "height": mark.Height, "angleDegrees": mark.AngleDegrees,
+		"markId": mark.ID, "fileSha256": mark.FileSha256, "versionSeq": mark.VersionSeq, "assetId": mark.AssetID, "assetSha256": mark.AssetSha256, "assetKind": asset.Kind, "assetOwnerId": asset.OwnerID, "performedBy": actor.ID, "adminOverride": actor.IsAdmin && (asset.Kind == "personal" && asset.OwnerID != actor.ID || asset.Kind == "company"), "page": mark.PageNumber, "x": mark.X, "y": mark.Y, "width": mark.Width, "height": mark.Height, "angleDegrees": mark.AngleDegrees,
 	}); err != nil {
 		return domain.FileSealMark{}, err
 	}

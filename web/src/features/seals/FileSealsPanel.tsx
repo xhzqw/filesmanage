@@ -1,13 +1,15 @@
-import {useEffect,useState,type MouseEvent} from "react";
+import {useEffect,useState} from "react";
 import {RareBadge,RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
 import {errorCopy} from "../../shared/errors";
 import {sealsApi} from "./api";
+import {SealPageCanvas} from "./SealPageCanvas";
+import {Link} from "react-router-dom";
 import {fitStampToPage,stampFitsPage} from "./sealGeometry";
 import type {SealAsset,FileSealMark,SealUserPermission} from "../../entities/seal/model";
 import "./seals.css";
 
 const clamp=(value:number,max:number)=>Math.max(0,Math.min(max,value));
-export function FileSealsPanel({fileId,seq,sha,name}:{fileId:string;seq:number;sha:string;name:string}){
+export function FileSealsPanel({fileId,seq,sha,name,isAdmin}:{fileId:string;seq:number;sha:string;name:string;isAdmin:boolean}){
  const[assets,setAssets]=useState<SealAsset[]>([]);
  const[access,setAccess]=useState<SealUserPermission|null>(null);
  const[marks,setMarks]=useState<FileSealMark[]>([]);
@@ -25,7 +27,7 @@ export function FileSealsPanel({fileId,seq,sha,name}:{fileId:string;seq:number;s
  const[revision,setRevision]=useState(0);
  const isPDF=name.toLowerCase().endsWith(".pdf");
  const selected=assets.find(a=>a.id===assetId);
- const maySign=selected?.kind==="personal"?!!access?.canSign:!!access?.canStamp;
+ const maySign=!!selected && (selected.kind!=="personal"||!!selected.ownerId) && (isAdmin || (selected.kind==="personal"?!!access?.canSign:!!access?.canStamp));
  const duplicate=!!selected&&usedAssetIds.includes(selected.id);
  const rotationFits=stampFitsPage(position,angle,pageRatio);
  function changeAngle(value:number){const next=Math.max(-180,Math.min(180,Math.round(Number.isFinite(value)?value:0)));setAngle(next);setPosition(p=>fitStampToPage(p,next,pageRatio));}
@@ -34,18 +36,11 @@ export function FileSealsPanel({fileId,seq,sha,name}:{fileId:string;seq:number;s
  useEffect(()=>{
   let live=true;
   Promise.all([sealsApi.list(),sealsApi.marks(fileId,seq),sealsApi.myPermission(),sealsApi.used(fileId)])
-   .then(([available,entries,permission,used])=>{if(!live)return;setAccess(permission);setAssets(available.filter(a=>a.active&&(a.kind==="company"||!!a.ownerId)));setMarks(entries);setUsedAssetIds(used);setAssetId(id=>available.some(a=>a.id===id&&a.active)?id:"");})
+   .then(([available,entries,permission,used])=>{if(!live)return;setAccess(permission);setAssets(available.filter(a=>a.active&&(isAdmin||a.kind==="company"||!!a.ownerId)));setMarks(entries);setUsedAssetIds(used);setAssetId(id=>available.some(a=>a.id===id&&a.active)?id:"");})
    .catch(err=>{if(live)setError(errorCopy(err,"签章资料读取失败"))});
   return()=>{live=false;};
- },[fileId,seq,revision]);
+ },[fileId,seq,revision,isAdmin]);
  useEffect(()=>setImageAvailable(true),[imageUrl]);
- function positionFromClick(event:MouseEvent<HTMLDivElement>){
-  const rect=event.currentTarget.getBoundingClientRect();
-  if(!rect.width||!rect.height)return;
-  const x=(event.clientX-rect.left)/rect.width;
-  const y=(event.clientY-rect.top)/rect.height;
-  setPosition(p=>fitStampToPage({...p,x:x-p.width/2,y:y-p.height/2},angle,rect.height/rect.width));
- }
  async function sign(){
   if(!assetId||!password||!isPDF||!maySign||duplicate||!rotationFits)return;
   setBusy(true);setError("");setNotice("");
@@ -61,9 +56,12 @@ export function FileSealsPanel({fileId,seq,sha,name}:{fileId:string;seq:number;s
    {(error||notice)&&<p role={error?"alert":"status"} className={error?"notice error":"notice"}>{error||notice}</p>}
    <label>印章 / 签名<RareSelect value={assetId} onChange={e=>setAssetId(e.target.value)}>
     <option value="">选择有权使用的签章</option>
-    {assets.map(a=><option key={a.id} disabled={(a.kind==="personal"?!access?.canSign:!access?.canStamp)||usedAssetIds.includes(a.id)} value={a.id}>{a.name}{a.kind==="personal"?"（个人）":"（公章）"}</option>)}
+    {assets.map(a=><option key={a.id} disabled={(a.kind==="personal"&&!a.ownerId)||(!isAdmin&&(a.kind==="personal"?!access?.canSign:!access?.canStamp))||usedAssetIds.includes(a.id)} value={a.id}>{a.name}{a.kind==="personal"?"（"+(a.ownerName||"待绑定")+"的签名）":"（公章）"}</option>)}
    </RareSelect></label>
-   {selected&&!maySign&&<p role="status" className="hint">当前账号没有{selected.kind==="personal"?"个人签名":"公章使用"}权限，请联系管理员授权。</p>}
+   {isAdmin&&<p className="hint" role="status">管理员可使用全部已启用签章；记录会注明操作人是管理员。</p>}
+   {assets.length===0&&<p className="seal-asset-empty" role="status">尚未导入签章素材。<Link to="/approvals?tab=seals">前往签章管理导入</Link></p>}
+   {selected&&selected.kind==="personal"&&!selected.ownerId&&<p role="status" className="hint">这份签名尚未确认所属账号，不能用于签署。</p>}
+   {selected&&!!selected.ownerId&& !maySign&&<p role="status" className="hint">当前账号没有{selected.kind==="personal"?"个人签名":"公章使用"}权限，请联系管理员授权。</p>}
    {duplicate&&<p role="status" className="hint">此文件已使用这枚签章，不能重复使用同一枚签章。</p>}
    {selected&&<div className="seal-selected-asset"><img src={sealsApi.imageUrl(selected.id)} alt={selected.name}/><span>{selected.kind==="personal"?"个人签名":"公章授权"} · {selected.name}</span></div>}
    <label>页码<RareInput type="number" min={1} max={1000} value={page} onChange={e=>setPage(clamp(Number(e.target.value)||1,1000))}/></label>
@@ -91,19 +89,10 @@ export function FileSealsPanel({fileId,seq,sha,name}:{fileId:string;seq:number;s
    <p className="hint">签署留痕固定到当前版本，原 PDF 不变；盖章版可单独下载。此为可见印章，非数字证书签名。</p>
    {marks.length>0&&<a className="rare-button" href={sealsApi.exportUrl(fileId,seq)} download={"签章版-v"+seq+".pdf"}>下载带章 PDF</a>}
   </div>
-  <div className="seal-file-preview">
-   <div className="seal-library-heading">页面定位 <span>点击页面放置签章</span></div>
-   {isPDF?<>
-    {imageAvailable?<div className="seal-page-surface" onClick={positionFromClick} role="button" tabIndex={0} aria-label="签章位置预览，可点击定位" onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();setPosition(v=>({...v,x:.7,y:.78}));}}}>
-      <img src={imageUrl} alt={"PDF 第 "+page+" 页定位图"} onError={()=>setImageAvailable(false)} onLoad={e=>{const image=e.currentTarget;const ratio=image.naturalHeight/image.naturalWidth;if(Number.isFinite(ratio)&&ratio>0){setPageRatio(ratio);setPosition(p=>fitStampToPage(p,angle,ratio));}}}/>
-      {selected&&<span className="seal-position-mark" style={{left:position.x*100+"%",top:position.y*100+"%",width:position.width*100+"%",height:position.height*100+"%",transform:"rotate("+angle+"deg)"}}>
-       <img alt="" src={sealsApi.imageUrl(selected.id)}/>
-      </span>}
-      {marks.filter(m=>m.pageNumber===page).map(m=><span key={m.id} className="seal-existing-mark" style={{left:m.x*100+"%",top:m.y*100+"%",width:m.width*100+"%",height:m.height*100+"%",transform:"rotate("+(m.angleDegrees??0)+"deg)"}}>
-       <img alt={m.assetName} src={sealsApi.markImageUrl(fileId,m.id)}/></span>)}
-     </div>:<div className="empty">页面图无法加载。请检查 PDF 预览和打印权限。</div>}
-   </>:<div className="empty">仅 PDF 支持页面定位</div>}
-  </div>
+  {isPDF?<SealPageCanvas fileId={fileId} page={page} imageUrl={imageUrl} selected={selected} marks={marks}
+   position={position} setPosition={setPosition} angle={angle} pageRatio={pageRatio} setPageRatio={setPageRatio}
+   imageAvailable={imageAvailable} setImageAvailable={setImageAvailable}/>:
+   <div className="seal-file-preview"><p className="empty">仅 PDF 支持页面定位</p></div>}
   <aside className="seal-file-history">
    <div className="seal-library-heading">签署记录 <span>{marks.length}</span></div>
    {marks.length===0&&<p className="empty">此版本尚无签章</p>}

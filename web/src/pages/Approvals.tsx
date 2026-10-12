@@ -9,7 +9,7 @@ import{AppShell}from "../shared/ui/AppShell";
 
 export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
  const[review,setReview]=useState<Approval|null>(null);
- const[screen,setScreen]=useState<"approvals"|"seals">("approvals");
+ const[screen,setScreen]=useState<"approvals"|"seals">(()=>new URLSearchParams(window.location.search).get("tab")==="seals"?"seals":"approvals");
  return <AppShell user={user} onLogout={onLogout}>
   <div className="panels">
    <main className="work">
