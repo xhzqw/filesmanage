@@ -127,6 +127,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.POST("/files", h.uploadFile)
 	api.GET("/files", h.listFiles)
 	api.GET("/files/:id", h.fileMeta)
+	api.GET("/files/:id/history", h.fileHistory)
 	api.GET("/files/:id/lifecycle", h.fileLifecycle)
 	api.PUT("/files/:id/lifecycle", h.setFileLifecycle)
 	api.GET("/lifecycle/ledger", h.lifecycleLedger)

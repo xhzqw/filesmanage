@@ -886,6 +886,15 @@ add("GET", "/api/files/{id}", operation("File metadata with version history", "F
     params=[id_param("id", "File id.")],
     responses=dict([json_ok(ref("FileMeta"), "File and its full version history."), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"])])))
 
+schema("FileHistoryEvent",obj({
+  "id":integer(),"actorId":string(),"actorName":string(),"requestId":string(),"eventType":string(),"targetKind":string(),
+  "targetId":string(),"outcome":string(),"details":{"type":"object","additionalProperties":True},"createdAt":timestamp()
+},required=["id","actorId","requestId","eventType","targetKind","targetId","outcome","details","createdAt"]))
+schema("FileHistoryPage",obj({"items":arr(ref("FileHistoryEvent")),"nextCursor":string()},required=["items","nextCursor"]))
+add("GET","/api/files/{id}/history",operation("Read ACL-scoped file operation history","Files","fileHistory",security=SESSION,
+  params=[id_param("id","Stable file identifier"),query("cursor","Descending audit event ID cursor"),query("limit","Page size 1-100",integer(minimum=1))],
+  responses=dict([json_ok(ref("FileHistoryPage"),"Authenticated and file-authorized operation timeline."),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("404",ERR["404"])])))
+
 schema("FileLifecycle",obj({
  "fileId":string(),"state":string(enum=["draft","released","archived"]),
  "publishedSeq":integer(),"publishedAt":timestamp(),"publishedBy":string(),

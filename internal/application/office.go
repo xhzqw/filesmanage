@@ -494,8 +494,10 @@ func (s *Service) HandleEditorCallback(ctx context.Context, authorization string
 	}); err != nil {
 		return 1, err
 	}
-	audit(ctx, tx, domain.User{ID: session.OwnerID}, "office.save_commit", "file", file.ID, "success",
-		map[string]any{"sessionId": session.ID, "versionSeq": version.Seq, "generation": generation})
+	if err = auditRequired(ctx, tx, domain.User{ID: session.OwnerID}, "office.save_commit", "file", file.ID, "success",
+		map[string]any{"sessionId": session.ID, "versionSeq": version.Seq, "generation": generation}); err != nil {
+		return 1, err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return 1, err
 	}

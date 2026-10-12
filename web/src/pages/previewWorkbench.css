@@ -114,3 +114,6 @@
 .file-workbench-recovery-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .file-workbench-recovery-actions .rare-button{min-height:30px;text-decoration:none}
 @media(max-width:820px){.file-preview-page{padding:7px}.file-workbench-header{padding:8px}.file-workbench-actions{justify-content:flex-start}.file-properties{grid-template-columns:1fr}.file-workbench-tabs .rare-button{padding:0 10px}.file-pdf-stage iframe{height:58vh}}
+.file-history-switch{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.file-history-switch .rare-button{font-size:11px;padding:4px 9px}
+.file-history-switch .rare-button[aria-pressed="true"]{background:var(--surface-tertiary);color:var(--text-primary);font-weight:600}

@@ -99,6 +99,7 @@ type AuditEvent struct {
 type PermissionAuditRecord struct {
 	ID         int64          `json:"id"`
 	ActorID    string         `json:"actorId"`
+	ActorName  string         `json:"actorName,omitempty"`
 	RequestID  string         `json:"requestId"`
 	EventType  string         `json:"eventType"`
 	TargetKind string         `json:"targetKind"`

@@ -88,8 +88,10 @@ func (s *Service) CommitUpload(ctx context.Context, u domain.User, folderID, fil
 	}
 	result := UploadResult{FileID: file.ID, VersionSeq: 1, Sha256: sha, Size: size, Name: fileName, FolderID: folder.ID, Dedup: dedup}
 	storeIdempotentResult(ctx, tx, u.ID, "file.upload", idempotencyKey, mustMarshal(result))
-	audit(ctx, tx, u, "file.upload", "file", file.ID, "success",
-		map[string]any{"folderId": folder.ID, "name": fileName, "sha256": sha, "size": size, "dedup": dedup})
+	if err = auditRequired(ctx, tx, u, "file.upload", "file", file.ID, "success",
+		map[string]any{"folderId": folder.ID, "name": fileName, "versionSeq": 1, "sha256": sha, "size": size, "dedup": dedup}); err != nil {
+		return UploadResult{}, err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return UploadResult{}, err
 	}
@@ -313,8 +315,10 @@ func (s *Service) Save(ctx context.Context, u domain.User, fileID string, conten
 	}
 	outcome := SaveOutcome{Result: result}
 	storeIdempotentResult(ctx, tx, u.ID, "file.save:"+fileID, idempotencyKey, mustMarshal(outcome))
-	audit(ctx, tx, u, "file.save", "file", file.ID, "success",
-		map[string]any{"versionSeq": version.Seq, "sha256": sha, "size": size, "baseSeq": baseSeq})
+	if err = auditRequired(ctx, tx, u, "file.save", "file", file.ID, "success",
+		map[string]any{"versionSeq": version.Seq, "sha256": sha, "size": size, "baseSeq": baseSeq}); err != nil {
+		return SaveOutcome{}, err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return SaveOutcome{}, err
 	}
@@ -379,8 +383,10 @@ func (s *Service) Rollback(ctx context.Context, u domain.User, fileID string, ta
 	}
 	outcome := SaveOutcome{Result: result}
 	storeIdempotentResult(ctx, tx, u.ID, "file.rollback:"+fileID, idempotencyKey, mustMarshal(outcome))
-	audit(ctx, tx, u, "file.rollback", "file", file.ID, "success",
-		map[string]any{"versionSeq": version.Seq, "targetSeq": targetSeq, "fromSeq": expectedCurrentSeq, "reason": reason})
+	if err = auditRequired(ctx, tx, u, "file.rollback", "file", file.ID, "success",
+		map[string]any{"versionSeq": version.Seq, "targetSeq": targetSeq, "fromSeq": expectedCurrentSeq, "reason": reason}); err != nil {
+		return SaveOutcome{}, err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return SaveOutcome{}, err
 	}
@@ -434,7 +440,11 @@ func (s *Service) DeleteFile(ctx context.Context, u domain.User, fileID string) 
 	if err = tx.InsertTrashEntry(ctx, entry); err != nil {
 		return domain.TrashEntry{}, err
 	}
-	audit(ctx, tx, u, "file.delete", "file", file.ID, "success", map[string]any{"trashId": entry.ID, "name": file.Name})
+	if err = auditRequired(ctx, tx, u, "file.delete", "file", file.ID, "success", map[string]any{
+		"trashId": entry.ID, "name": file.Name, "folderId": file.FolderID,
+	}); err != nil {
+		return domain.TrashEntry{}, err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return domain.TrashEntry{}, err
 	}

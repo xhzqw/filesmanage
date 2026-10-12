@@ -17,7 +17,16 @@ func (r *memoryRepo) ListDocumentAudit(_ context.Context, f domain.DocumentAudit
 		}
 		e := r.audit[i]
 		isDoc := e.TargetKind == "file" || e.TargetKind == "trash" || strings.HasPrefix(e.EventType, "office.") || strings.HasPrefix(e.EventType, "approval.")
-		if !isDoc || (f.FileID != "" && (e.TargetKind != "file" || e.TargetID != f.FileID)) ||
+		fileMatch := e.TargetKind == "file" && e.TargetID == f.FileID
+		if e.TargetKind == "trash" {
+			for _, entry := range r.trash {
+				if entry.ID == e.TargetID && entry.FileID != nil && *entry.FileID == f.FileID {
+					fileMatch = true
+					break
+				}
+			}
+		}
+		if !isDoc || (f.FileID != "" && !fileMatch) ||
 			(f.ActorID != "" && e.ActorID != f.ActorID) || (f.EventPrefix != "" && !strings.HasPrefix(e.EventType, f.EventPrefix)) {
 			continue
 		}

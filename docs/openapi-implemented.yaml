@@ -2178,6 +2178,69 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/{id}/history:
+    get:
+      summary: Read ACL-scoped file operation history
+      operationId: fileHistory
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Stable file identifier
+        schema:
+          type: string
+      - name: cursor
+        in: query
+        required: false
+        description: Descending audit event ID cursor
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        description: Page size 1-100
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Authenticated and file-authorized operation timeline.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/FileHistoryPage'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/files/{id}/lifecycle:
     get:
       summary: Read lifecycle release, archive and due-date status
@@ -10668,6 +10731,53 @@ components:
       - key
       - status
       - url
+    FileHistoryEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        actorId:
+          type: string
+        actorName:
+          type: string
+        requestId:
+          type: string
+        eventType:
+          type: string
+        targetKind:
+          type: string
+        targetId:
+          type: string
+        outcome:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - id
+      - actorId
+      - requestId
+      - eventType
+      - targetKind
+      - targetId
+      - outcome
+      - details
+      - createdAt
+    FileHistoryPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/FileHistoryEvent'
+        nextCursor:
+          type: string
+      required:
+      - items
+      - nextCursor
     FileLifecycle:
       type: object
       properties:

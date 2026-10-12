@@ -158,8 +158,10 @@ func (s *Service) DeleteFolder(ctx context.Context, u domain.User, folderID stri
 	if err = tx.InsertTrashEntry(ctx, entry); err != nil {
 		return domain.TrashEntry{}, 0, err
 	}
-	audit(ctx, tx, u, "folder.delete", "folder", folder.ID, "success",
-		map[string]any{"trashId": entry.ID, "folders": len(subtree), "files": fileCount})
+	if err = auditRequired(ctx, tx, u, "folder.delete", "folder", folder.ID, "success",
+		map[string]any{"trashId": entry.ID, "folders": len(subtree), "files": fileCount}); err != nil {
+		return domain.TrashEntry{}, 0, err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return domain.TrashEntry{}, 0, err
 	}

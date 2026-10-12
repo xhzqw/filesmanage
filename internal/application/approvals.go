@@ -280,8 +280,10 @@ func (s *Service) Approve(ctx context.Context, actor domain.User, approvalID, co
 		return SaveResult{}, domain.ErrVersionConflict
 	}
 	result := SaveResult{FileID: approval.FileID, VersionSeq: next, Sha256: approval.PayloadSha256, Size: approval.PayloadSize}
-	audit(ctx, tx, actor, "approval.approve", "file", approval.FileID, "success",
-		map[string]any{"approvalId": approvalID, "versionSeq": next, "requesterId": approval.RequesterID})
+	if err = auditRequired(ctx, tx, actor, "approval.approve", "file", approval.FileID, "success",
+		map[string]any{"approvalId": approvalID, "versionSeq": next, "requesterId": approval.RequesterID}); err != nil {
+		return SaveResult{}, err
+	}
 	if err = s.approvalEvent(ctx, tx, approval, actor, "approved", comment, approval.RequesterID); err != nil {
 		return SaveResult{}, err
 	}

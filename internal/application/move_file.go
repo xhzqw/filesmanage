@@ -71,8 +71,10 @@ func (s *Service) MoveFile(ctx context.Context, u domain.User, fileID, targetFol
 	}
 	result := MoveResult{FileID: file.ID, FromFolderID: file.FolderID, ToFolderID: target.ID}
 	storeIdempotentResult(ctx, tx, u.ID, "file.move:"+fileID, idempotencyKey, mustMarshal(result))
-	audit(ctx, tx, u, "file.move", "file", file.ID, "success",
-		map[string]any{"fromFolderId": file.FolderID, "toFolderId": target.ID, "name": file.Name})
+	if err = auditRequired(ctx, tx, u, "file.move", "file", file.ID, "success",
+		map[string]any{"fromFolderId": file.FolderID, "toFolderId": target.ID, "name": file.Name}); err != nil {
+		return MoveResult{}, err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return MoveResult{}, err
 	}
@@ -230,8 +232,10 @@ func (s *Service) MoveFilesBatch(ctx context.Context, u domain.User, fileIDs []s
 		if err = tx.MoveFile(ctx, moved.FileID, moved.ToFolderID); err != nil {
 			return MoveBatchResult{}, mapError(err)
 		}
-		audit(ctx, tx, u, "file.move", "file", moved.FileID, "success",
-			map[string]any{"fromFolderId": moved.FromFolderID, "toFolderId": moved.ToFolderID, "name": movedNames[i]})
+		if err = auditRequired(ctx, tx, u, "file.move", "file", moved.FileID, "success",
+			map[string]any{"fromFolderId": moved.FromFolderID, "toFolderId": moved.ToFolderID, "name": movedNames[i]}); err != nil {
+			return MoveBatchResult{}, err
+		}
 	}
 	result.Count = len(result.Moved)
 	storeIdempotentResult(ctx, tx, u.ID, operation, idempotencyKey, mustMarshal(result))

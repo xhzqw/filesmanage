@@ -15,6 +15,7 @@ import {resolvePreviewAdapter,ADAPTER_TITLES} from "../features/documents/previe
 import {FileEditor} from "../features/documents/FileEditor";
 import {FileMetadataEditor} from "../features/documents/FileMetadataEditor";
 import {FileLifecyclePanel} from "../features/documents/FileLifecyclePanel";
+import {FileHistoryPanel} from "../features/documents/FileHistoryPanel";
 import {VersionComparePanel} from "../features/documents/VersionComparePanel";
 import {FileSealsPanel} from "../features/seals/FileSealsPanel";
 import {FileReviewPanel} from "../features/documents/FileReviewPanel";
@@ -51,6 +52,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const[preview,setPreview]=useState<PreviewData|null>(null);
  const[file,setFile]=useState<FileItem|null>(null);
  const[versions,setVersions]=useState<FileVersion[]>([]);
+ const[historyView,setHistoryView]=useState<"activity"|"versions">("activity");
  const[status,setStatus]=useState<"loading"|"ready"|"failed">("loading");
  const[tab,setTab]=useState<Tab>(()=>new URLSearchParams(window.location.search).get("tab")==="seals"?"seals":"preview");
  const[sealRevision,setSealRevision]=useState<number|null>(null);
@@ -244,7 +246,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
      </header>
      {(notice||error)&&<p role={error?"alert":"status"} className={"notice"+(error?" error":"")}>{error||notice}</p>}
      <RareTabs className="file-workbench-tabs" label="文件详情">
-      {([["preview","预览"],["details","文件信息"],["versions","版本历史 ("+versions.length+")"],["compare","版本对比"],["review","审查批注"],["seals","签章"]] as const).map(([value,label])=>
+       {([["preview","预览"],["details","文件信息"],["versions","历史"],["compare","版本对比"],["review","审查批注"],["seals","签章"]] as const).map(([value,label])=>
        <RareButton key={value} type="button" id={"file-tab-"+value} role="tab"
         aria-selected={tab===value} tabIndex={tab===value?0:-1}
         aria-controls={"file-panel-"+value} onClick={()=>setTab(value)}>{label}</RareButton>)}
@@ -308,11 +310,16 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
        <DocxSealConversion fileId={id} versionSeq={currentSeq} sha={preview.sha256} name={preview.name}/>:
        <FileSealsPanel fileId={id} seq={currentSeq} sha={preview.sha256} name={preview.name} isAdmin={user.isAdmin} onSelectRevision={value=>{setSealRevision(value);setTab("preview")}} onChanged={()=>{setSealRevision(null);refresh();toast.success("签章版本已更新")}}/>}
      </section>}
-     {tab==="versions"&&<section id="file-panel-versions" role="tabpanel" aria-labelledby="file-tab-versions" className="file-workbench-panel file-versions-panel">
-      <div className="file-section-caption"><strong>版本记录</strong><span>所有历史均保留 · 回滚会创建新版本</span></div>
-      {preview.renderer==="pdf"&&<RareButton type="button" onClick={()=>setTab("seals")}>查看签章版本与回退</RareButton>}
-
-      <FileLifecyclePanel fileId={id} currentSeq={currentSeq} lifecycle={lifecycle} onUpdated={value=>{setLifecycle(value);announce("生命周期状态已更新");}}/>
+      {tab==="versions"&&<section id="file-panel-versions" role="tabpanel" aria-labelledby="file-tab-versions" className="file-workbench-panel file-versions-panel">
+       <div className="file-section-caption">
+        <strong>文件历史</strong>
+        <div className="file-history-switch" role="group" aria-label="历史类型">
+         <RareButton type="button" aria-pressed={historyView==="activity"} onClick={()=>setHistoryView("activity")}>操作记录</RareButton>
+         <RareButton type="button" aria-pressed={historyView==="versions"} onClick={()=>setHistoryView("versions")}>内容版本 ({versions.length})</RareButton>
+        </div>
+       </div>
+       {historyView==="activity"?<FileHistoryPanel fileId={id} revision={reloadToken}/>:<>
+       <FileLifecyclePanel fileId={id} currentSeq={currentSeq} lifecycle={lifecycle} onUpdated={value=>{setLifecycle(value);announce("生命周期状态已更新");}}/>
       {versions.length===0?<p className="empty">暂无版本记录</p>:
       <div className="table file-versions-table"><RareDataTable className="file-version-data" aria-label="历史版本">
        <thead><tr><th scope="col">版本</th><th scope="col">操作</th><th scope="col" className="file-version-secondary">文件大小</th><th scope="col" className="file-version-secondary">创建人</th><th scope="col" className="file-version-secondary">时间</th><th scope="col">版本操作</th></tr></thead>
@@ -322,7 +329,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
         <td className="file-version-secondary">{formatSize(v.sizeBytes)}</td><td className="file-version-secondary" title={v.createdBy}>{v.createdBy}</td><td className="file-version-secondary rare-data-date">{versionTime(v.createdAt)}</td>
         <td className="file-version-operations">{v.versionSeq===currentSeq?"—":<RareRowActions><RareButton type="button" disabled={!canManage||archived} onClick={()=>{announce("");setRollback(v);}}>回滚到此版本</RareButton></RareRowActions>}</td>
        </tr>)}</tbody>
-      </RareDataTable></div>}
+       </RareDataTable></div>}</>}
      </section>}
     </div>}
    </main>

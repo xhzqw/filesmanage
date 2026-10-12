@@ -1,0 +1,88 @@
+import {useEffect,useRef,useState} from "react";
+import {fileApi,type FileHistoryEvent,type FileHistoryPage} from "./api";
+import {RareButton} from "../../shared/ui/rare";
+import {errorCopy} from "../../shared/errors";
+import "./fileHistory.css";
+
+const eventLabels:Record<string,string>={
+ "file.upload":"文件上传","file.save":"内容修改","file.rollback":"版本回滚",
+ "file.rename":"文件重命名","file.move":"文件移动","file.delete":"移入回收站",
+ "file.metadata_update":"属性修改","trash.restore":"从回收站恢复","trash.purge":"永久删除",
+ "office.save_commit":"Office 内容保存","office.session_open":"开始在线编辑",
+ "office.session_close":"结束在线编辑","approval.request":"提交审批",
+ "approval.approve":"审批通过","approval.reject":"审批拒绝",
+ "approval.step_approved":"审批流转","seal.apply":"签名 / 盖章",
+ "file.lifecycle.publish":"文件发布","file.lifecycle.archive":"文件归档",
+ "file.review_comment":"新增批注","file.review_resolve":"批注处理",
+};
+const detailText=(value:unknown)=>typeof value==="string"?value:typeof value==="number"?String(value):"";
+function describe(item:FileHistoryEvent){
+ const d=item.details;
+ if(item.eventType==="file.rename")return detailText(d.oldName)+" → "+(detailText(d.newName)||detailText(d.name));
+ if(item.eventType==="file.move")return "位置变更"+(d.fromFolderId&&d.toFolderId?" · "+detailText(d.fromFolderId)+" → "+detailText(d.toFolderId):"");
+ if(item.eventType==="trash.restore")return "恢复文件"+(d.newName?" · "+detailText(d.newName):"");
+ if(item.eventType==="file.save"||item.eventType==="office.save_commit")return "保存为 v"+detailText(d.versionSeq)+(d.baseSeq?" · 原版本 v"+detailText(d.baseSeq):"");
+ if(item.eventType==="file.rollback")return "从 v"+detailText(d.fromSeq)+" 回滚至 v"+detailText(d.targetSeq)+"，生成 v"+detailText(d.versionSeq);
+ if(item.eventType==="file.upload")return detailText(d.name)||"初始文件版本";
+ if(item.eventType==="file.delete")return detailText(d.name)||"已移入回收站";
+ if(item.eventType==="file.metadata_update")return "文件分类、描述或标签发生变化";
+ if(item.eventType==="seal.apply")return "作用于 v"+detailText(d.versionSeq);
+ return d.versionSeq?"关联版本 v"+detailText(d.versionSeq):"";
+}
+
+// Read-only timeline. The single "历史" workspace reuses the existing
+// content-version actions rather than creating a second rollback flow.
+export function FileHistoryPanel({fileId,revision}:{fileId:string;revision:number}){
+ const[page,setPage]=useState<FileHistoryPage>({items:[],nextCursor:""});
+ const[loading,setLoading]=useState(true);
+ const[more,setMore]=useState(false);
+ const[error,setError]=useState("");
+ const[retry,setRetry]=useState(0);
+ const requestEpoch=useRef(0);
+ useEffect(()=>{
+  let live=true;
+  const epoch=++requestEpoch.current;
+  const controller=new AbortController();
+  setLoading(true);setPage({items:[],nextCursor:""});setError("");
+  void fileApi.history(fileId,"",controller.signal).then(value=>{
+   if(live&&epoch===requestEpoch.current)setPage(value);
+  }).catch(err=>{
+   if(live&&epoch===requestEpoch.current)setError(errorCopy(err,"读取文件历史失败"));
+  }).finally(()=>{if(live&&epoch===requestEpoch.current)setLoading(false);});
+  return()=>{live=false;controller.abort();};
+ },[fileId,revision,retry]);
+ async function nextPage(){
+  if(more||!page.nextCursor)return;
+  const epoch=requestEpoch.current;
+  setMore(true);
+  try{
+   const next=await fileApi.history(fileId,page.nextCursor);
+   if(epoch!==requestEpoch.current)return;
+   setPage(current=>({
+    items:[...current.items,...next.items.filter(x=>!current.items.some(old=>old.id===x.id))],
+    nextCursor:next.nextCursor,
+   }));
+   setError("");
+  }catch(err){if(epoch===requestEpoch.current)setError(errorCopy(err,"加载后续历史失败"));}
+  finally{if(epoch===requestEpoch.current)setMore(false);}
+ }
+ return <div className="file-history" aria-label="文件操作时间线">
+  {loading&&<p role="status" className="hint">正在读取历史…</p>}
+  {error&&<div className="file-history-error" role="alert">{error}<RareButton type="button" onClick={()=>setRetry(n=>n+1)}>重试</RareButton></div>}
+  {!loading&&page.items.length===0&&!error&&<p className="empty">暂无可查询的操作记录。内容版本仍可在「内容版本」查看。</p>}
+  <ol className="file-history-timeline">
+   {page.items.map(item=><li key={item.id} className="file-history-item">
+    <span className="file-history-point" aria-hidden="true"/>
+    <div className="file-history-entry">
+     <div className="file-history-row">
+      <strong>{eventLabels[item.eventType]??item.eventType}</strong>
+      <time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString("zh-CN")}</time>
+     </div>
+     <span className="file-history-actor">{item.actorName||item.actorId||"系统"}{item.outcome!=="success"?" · "+item.outcome:""}</span>
+     {describe(item)&&<p className="file-history-detail">{describe(item)}</p>}
+    </div>
+   </li>)}
+  </ol>
+  {page.nextCursor&&<div className="file-history-footer"><RareButton type="button" disabled={more} onClick={()=>void nextPage()}>{more?"正在加载…":"加载更早记录"}</RareButton></div>}
+ </div>;
+}

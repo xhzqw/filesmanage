@@ -78,8 +78,16 @@ func (s *Service) RestoreFromTrash(ctx context.Context, u domain.User, entryID s
 	if err = tx.MarkTrashRestored(ctx, entry.ID); err != nil {
 		return domain.TrashEntry{}, err
 	}
-	audit(ctx, tx, u, "trash.restore", "trash", entry.ID, "success",
-		map[string]any{"oldName": entry.OldName, "destination": req.DestinationFolderID, "newName": req.NewName, "explicitDestination": req.ConfirmDestination})
+	details := map[string]any{"oldName": entry.OldName, "destination": req.DestinationFolderID, "newName": req.NewName, "explicitDestination": req.ConfirmDestination}
+	if entry.FileID != nil {
+		details["fileId"] = *entry.FileID
+	}
+	if entry.FolderID != nil {
+		details["folderId"] = *entry.FolderID
+	}
+	if err = auditRequired(ctx, tx, u, "trash.restore", "trash", entry.ID, "success", details); err != nil {
+		return domain.TrashEntry{}, err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return domain.TrashEntry{}, err
 	}
@@ -204,7 +212,16 @@ func (s *Service) PurgeTrashEntry(ctx context.Context, u domain.User, entryID st
 	if err = tx.MarkTrashPurged(ctx, entry.ID); err != nil {
 		return err
 	}
-	audit(ctx, tx, u, "trash.purge", "trash", entry.ID, "success", map[string]any{"oldName": entry.OldName})
+	details := map[string]any{"oldName": entry.OldName}
+	if entry.FileID != nil {
+		details["fileId"] = *entry.FileID
+	}
+	if entry.FolderID != nil {
+		details["folderId"] = *entry.FolderID
+	}
+	if err = auditRequired(ctx, tx, u, "trash.purge", "trash", entry.ID, "success", details); err != nil {
+		return err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return err
 	}

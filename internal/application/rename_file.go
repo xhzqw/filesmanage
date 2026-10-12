@@ -28,8 +28,13 @@ func (s *Service) RenameFile(ctx context.Context, u domain.User, fileID, name st
 	if err = tx.RenameFile(ctx, file.ID, name); err != nil {
 		return domain.File{}, mapError(err)
 	}
+	oldName := file.Name
 	file.Name = name
-	audit(ctx, tx, u, "file.rename", "file", file.ID, "success", map[string]any{"name": name})
+	if err = auditRequired(ctx, tx, u, "file.rename", "file", file.ID, "success", map[string]any{
+		"oldName": oldName, "newName": name, "folderId": file.FolderID,
+	}); err != nil {
+		return domain.File{}, err
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return domain.File{}, err
 	}
