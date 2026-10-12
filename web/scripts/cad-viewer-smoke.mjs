@@ -351,12 +351,16 @@ const solidFixture=[
  "0","SOLID","8","FILLS","10","0","20","0","11","6","21","0",
  "12","0","22","4","13","6","23","4",
  "0","SOLID","8","FILLS","10","10","20","0","11","14","21","0","12","12","22","3",
+ "0","SOLID","8","FILLS","10","16","20","0","11","20","21","0",
+ "12","18","22","3","13","16","23","0",
+ "0","SOLID","8","FILLS","10","24","20","0","11","28","21","0",
+ "12","24","22","0","13","24","23","0",
  "0","ENDSEC","0","EOF",
 ].join("\n");
 const solids=parseDxf(solidFixture,THREE);
 assert.deepEqual(solids.skipped,[],"valid SOLIDs must not be silently dropped");
 const meshes=solids.object.children.flatMap(group=>group.children.filter(n=>n.isMesh&&n.name==="SOLID"));
-assert.equal(meshes.length,2);
+assert.equal(meshes.length,3);
 let solidArea=0;
 for(const mesh of meshes){
  const positions=mesh.geometry.getAttribute("position");
@@ -366,7 +370,7 @@ for(const mesh of meshes){
    (a[j+4]-a[j+1])*(a[j+6]-a[j]))/2;
  }
 }
-assert(Math.abs(solidArea-30)<.001,"quadrilateral 24 + triangle 6 must retain filled area");
+assert(Math.abs(solidArea-36)<.001,"quadrilateral and both triangle encodings must retain filled area");
 
 // HATCH is a real triangulated surface with an unpainted interior hole. A
 // translucent bounding rectangle would fail both its area and hole tests.

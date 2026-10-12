@@ -448,8 +448,15 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
   };
   const a=corner(0),b=corner(1),c=corner(2),d=corner(3);
   if(!a||!b||!c){skipped.add("SOLID: 顶点缺失或无效");return;}
-  const input=d&&Math.hypot(d.x-c.x,d.y-c.y)>1e-9
-   ?[a,b,d,c]:[a,b,c];
+  // Valid triangular SOLIDs may repeat ANY corner as the fourth point.
+  // Preserve the CAD winding while removing repeat positions, not just 12=13.
+  const ordered=d?[a,b,d,c]:[a,b,c];
+  const input:typeof ordered=[];
+  for(const point of ordered){
+   if(!input.some(existing=>Math.hypot(point.x-existing.x,point.y-existing.y)<1e-8))
+    input.push(point);
+  }
+  if(input.length<3)return; // A zero-area source is not a filled shape.
   const polygon=input.map(point=>{
    const p=transformed(point.x,point.y);
    return new THREE.Vector2(p.x,p.y);
@@ -458,6 +465,11 @@ export function parseDxf(text:string,THREE:typeof import("three"),requestedLayou
     Math.abs(p.x)>1e12||Math.abs(p.y)>1e12)){
    skipped.add("SOLID: 顶点变换越界");return;
   }
+  const area=polygon.reduce((sum,a,index)=>{
+   const b=polygon[(index+1)%polygon.length]!;
+   return sum+a.x*b.y-b.x*a.y;
+  },0)/2;
+  if(Math.abs(area)<1e-9)return;
   const faces=THREE.ShapeUtils.triangulateShape(polygon,[]);
   if(!faces.length){skipped.add("SOLID: 退化或自交");return;}
   if(hatchTriangles+faces.length>hatchBudget){
