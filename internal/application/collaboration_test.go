@@ -213,9 +213,9 @@ func TestFileShareGrantsPreviewOutsideFolderScope(t *testing.T) {
 }
 
 // TestStatsCacheMemoisesPerPrincipal pins the dashboard cache contract: within
-// the TTL the same principal+scope is served from the cache (the aggregation
-// does not re-run), the TTL bounds staleness, and a different filter is a
-// different entry. Value-level ACL isolation is the PostgreSQL scope CTE's
+// the TTL the same principal+scope is served from the cache until a committed
+// workspace change invalidates it, and a different filter is a different
+// entry. Value-level ACL isolation is the PostgreSQL scope CTE's
 // job and is asserted end-to-end by scripts/m7_security_e2e.py; here the
 // cache key itself is asserted to carry the principal and the whole filter.
 func TestStatsCacheMemoisesPerPrincipal(t *testing.T) {
@@ -243,8 +243,7 @@ func TestStatsCacheMemoisesPerPrincipal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Within the TTL the cached aggregation is returned even though the ground
-	// truth moved: that is the cache doing its job (and why the TTL exists).
+	// Stable reads remain cacheable until the next committed file mutation.
 	first, err := s.Stats(ctx, admin, SearchFilter{})
 	if err != nil {
 		t.Fatal(err)
@@ -252,15 +251,19 @@ func TestStatsCacheMemoisesPerPrincipal(t *testing.T) {
 	if first.TotalFiles != 3 {
 		t.Fatalf("baseline total = %d, want 3", first.TotalFiles)
 	}
+	cacheHit, err := s.Stats(ctx, admin, SearchFilter{})
+	if err != nil || cacheHit.TotalFiles != 3 {
+		t.Fatalf("unchanged cached total = %d, err=%v", cacheHit.TotalFiles, err)
+	}
 	if _, err := s.CommitUpload(ctx, admin, "folder_root", "d.txt", "text/plain", "", strings.NewReader("d")); err != nil {
 		t.Fatal(err)
 	}
-	cached, err := s.Stats(ctx, admin, SearchFilter{})
+	updated, err := s.Stats(ctx, admin, SearchFilter{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cached.TotalFiles != 3 {
-		t.Fatalf("within the TTL the cached aggregation must be returned: got %d, want 3", cached.TotalFiles)
+	if updated.TotalFiles != 4 {
+		t.Fatalf("committed upload must invalidate cached aggregation: got %d, want 4", updated.TotalFiles)
 	}
 
 	// A different filter is a different entry and is computed fresh.
@@ -272,7 +275,7 @@ func TestStatsCacheMemoisesPerPrincipal(t *testing.T) {
 		t.Fatalf("folder-scoped entry = %d, want 2", scoped.TotalFiles)
 	}
 
-	// Past the TTL the aggregation re-runs and sees the new file.
+	// Past the TTL the aggregation still returns the authoritative file total.
 	clock = clock.Add(31 * time.Second)
 	fresh, err := s.Stats(ctx, admin, SearchFilter{})
 	if err != nil {

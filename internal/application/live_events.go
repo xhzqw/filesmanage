@@ -76,15 +76,24 @@ func (s *Service) notifyWorkspaceChange(scopes ...string) {
 	if len(scopes) == 0 {
 		return
 	}
-	// Search and statistics caches are projections of mutable resource state.
-	// Clear them before pushing a refresh hint or the next authorized HTTP
-	// request could repeat the old cached result for 10/30 seconds.
-	s.search.mu.Lock()
-	s.search.entries = nil
-	s.search.mu.Unlock()
-	s.stats.mu.Lock()
-	s.stats.entries = nil
-	s.stats.mu.Unlock()
+	// Only resource/ACL changes invalidate cached queries. Organizational
+	// updates and comment-only activity must not flush high-cost aggregations.
+	// Real file changes clear the projections before the WebSocket refresh.
+	invalidateCache := false
+	for _, scope := range scopes {
+		switch scope {
+		case "file", "folder", "trash", "search", "stats", "permissions", "lifecycle":
+			invalidateCache = true
+		}
+	}
+	if invalidateCache {
+		s.search.mu.Lock()
+		s.search.entries = nil
+		s.search.mu.Unlock()
+		s.stats.mu.Lock()
+		s.stats.entries = nil
+		s.stats.mu.Unlock()
+	}
 	event := UserEvent{Type: "workspace.changed", Scopes: scopes}
 	s.live.mu.Lock()
 	defer s.live.mu.Unlock()
