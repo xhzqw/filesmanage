@@ -183,6 +183,7 @@ function NavLabel({
       isActive ? FADE_IN : FADE_OUT,
       SIZES[size].label,
       !isActive && "text-[#868593]",
+      isActive && href && "active",
     ),
     style: isActive ? { color: activeLabelColor } : undefined,
     onClick: onSelect,

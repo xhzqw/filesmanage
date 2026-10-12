@@ -4,7 +4,7 @@
 
 | 组件 | 来源与场景 | 改造说明 |
 | --- | --- | --- |
-| `GooeyNav` | 上游 [Gooey nav](https://www.rareui.com/components/gooeynav)；统计数量/容量切换 | React Router 替换 Next.js，CSS tokens 替换 Tailwind，蓝白品牌色、固定高度及 reduced-motion |
+| `GooeyNav` | 上游 [Gooey nav](https://www.rareui.com/components/gooeynav)；全局顶部八路由、权限视图、统计数量/容量切换 | React Router 替换 Next.js，CSS tokens 替换 Tailwind，蓝白品牌色、固定高度及 reduced-motion |
 | `NotificationBell` | 参考上游 [Notification bell](https://www.rareui.com/components/notificationbell) 的交互规范；审批/生命周期通知 | 项目重写的轻量适配版，保留计数出现/消失、收到新消息摆动以及 reduced-motion，统一品牌色，不依赖 Radix |
 | `RareButton`、`RareSelect`、`RareTabs`、`RareDataTable` | 本系统自建适配层，**不是上游组件** | 统一基础操作、输入、标签与数据表格；RareTabs 参考 Rare UI 的弹性指示方式增设不改变页面布局的 spring rail |
 | `FolderResourceIcon`、`SpringActiveRail`、`FluidOrb`、`AnimatedCounter` | 自研的 Rare UI 风格实现；FolderResourceIcon 的开合微动效参考官方 [Folder component](https://www.rareui.com/components/foldercomponent) | 兼顾黄色文件夹识别、密集文件树、统计与低功耗；与官方放大式文件夹卡片不同 |
@@ -29,3 +29,10 @@
 - 文件工具栏移除常驻的四个禁用批量按钮，只在选中文件后显示带数量、操作和撤销选择的紧凑批量工具条；未选中时保留上传、建目录、排序、筛选和搜索的主要入口。
 
 以上界面由品牌 token 控制，不引入官网示例配色；保持较低动画频次，兼容 `prefers-reduced-motion`。
+
+## 第四批：全局顶部导航的真实 Gooey Nav
+
+- `AppShell` 的单一顶部 `nav` **直接改为 Rare UI GooeyNav**；八条现有路由全部保留客户端跳转，选中状态由当前 URL 受控，不再复制 `NavLink` 冒充。源文件来自 Rare UI 上游源码的 React Router 适配（见首表）。
+- 桌面导航在品牌蓝色胶囊之间呈现连续/分离的 Rare UI 弹性连接。公共 `GooeyNav` 的链接保留历史 `.active` 类，确保既有路由门禁和 `aria-current=page` 无需重写。
+- 1210px 及以下使用**同一个 GooeyNav 实例**展开为紧凑纵向链接；隐藏动画连接、取消相互重叠并支持 Escape 返回菜单按钮焦点。方向键/Home/End 可移动链接焦点；Enter 仍由原生 React Router Link 处理。
+- 新增 Chrome 验收必须断言：八个链接、品牌选中、桌面与窄屏 DOM 实际呈现、操作区域不遮挡、三档视口无溢出，以及已有 Dialog/Select/Menu 行为。
