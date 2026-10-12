@@ -62,3 +62,7 @@ export type StructuredPreview={
  truncated:boolean;
  note:string;
 };
+// Version comparison is shared by the document viewer and approval review.
+export type CompareDiffLine={kind:"equal"|"added"|"removed";left?:number;right?:number;text:string};
+export type OfficeSemanticChange={kind:"added"|"removed"|"changed";section:string;key:string;before:string;after:string};
+export type VersionComparison={left:{seq:number;sha256:string;sizeBytes:number};right:{seq:number;sha256:string;sizeBytes:number};mode:"identical"|"metadata"|"large"|"text";detail?:"office_parts"|"office_semantic";semanticChanges?:OfficeSemanticChange[];lines:CompareDiffLine[];added:number;removed:number};

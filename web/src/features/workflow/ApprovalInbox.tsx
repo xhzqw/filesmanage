@@ -27,7 +27,7 @@ const STATE_TONES={
  cancelled:"neutral",conflicted:"danger",
 } as const;
 
-export function ApprovalInbox({currentUser}:{currentUser:User}){
+export function ApprovalInbox({currentUser,onReview}:{currentUser:User;onReview:(approval:Approval)=>void}){
  const[inbox,setInbox]=useState<Approval[]>([]);
  const[mine,setMine]=useState<Approval[]>([]);
  const[status,setStatus]=useState("loading");
@@ -241,7 +241,7 @@ export function ApprovalInbox({currentUser}:{currentUser:User}){
       <RareButton type="button" className="approval-side-close" onClick={()=>setSideOpen(false)}>关闭</RareButton>
      </div>
      {sideMode==="detail"?<ApprovalDetail approval={selectedApproval} events={events} historyLoading={historyLoading}
-      historyError={historyError} onDecision={openDecision} busy={!!busyId}
+      historyError={historyError} onDecision={openDecision} onReview={onReview} busy={!!busyId}
       canCancel={activeList==="mine"&&selectedApproval?.state==="pending"}
       canReview={activeList==="inbox"&&selectedApproval?.state==="pending"} />:<section className="approval-notification-list">
       <div className="approval-side-heading"><h3>站内通知</h3><RareButton type="button" onClick={()=>setShowAllNotes(v=>!v)}>{showAllNotes?"收起":"全部"}</RareButton></div>

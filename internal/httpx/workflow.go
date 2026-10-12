@@ -107,6 +107,44 @@ func (h *Handler) downloadApprovalDraft(c *gin.Context) {
 	http.ServeContent(c.Writer, c.Request, download.FileName, download.ModTime, download.Reader)
 }
 
+
+// previewApprovalDraft sends a bounded render model; draft bytes remain staged.
+func (h *Handler) previewApprovalDraft(c *gin.Context){
+ u,ok:=h.auth(c);if !ok{return}
+ preview,err:=h.S.PreviewApprovalDraft(c.Request.Context(),u,c.Param("id"))
+ if err!=nil{respondError(c,err);return}
+ data:=gin.H{"fileId":preview.FileID,"name":preview.Name,"contentType":preview.ContentType,
+ "size":preview.Size,"sha256":preview.Sha256,"textual":preview.Textual,"truncated":preview.Truncated,
+ "content":preview.Content,"byteMeta":preview.ByteMeta,"renderer":preview.Renderer,"mediaType":preview.MediaType}
+ if preview.Structured!=nil{data["structured"]=preview.Structured}
+ c.Header("Cache-Control","private, no-store")
+ c.JSON(200,gin.H{"ok":true,"data":data})
+}
+
+// previewApprovalDraftMedia rechecks permissions even for Range requests.
+func (h *Handler) previewApprovalDraftMedia(c *gin.Context){
+ u,ok:=h.auth(c);if !ok{return}
+ media,closeReader,err:=h.S.OpenInlineApprovalDraft(c.Request.Context(),u,c.Param("id"))
+ if err!=nil{respondError(c,err);return}
+ defer closeReader()
+ c.Header("Content-Type",media.ContentType)
+ c.Header("Content-Disposition","inline")
+ c.Header("X-Content-Type-Options","nosniff")
+ c.Header("Cross-Origin-Resource-Policy","same-origin")
+ c.Header("Referrer-Policy","no-referrer")
+ c.Header("Cache-Control","private, no-store")
+ if media.ContentType=="application/pdf"{c.Header("Content-Security-Policy","sandbox")}
+ http.ServeContent(c.Writer,c.Request,"",media.ModTime,media.Reader)
+}
+
+func (h *Handler) compareApprovalDraft(c *gin.Context){
+ u,ok:=h.auth(c);if !ok{return}
+ result,err:=h.S.CompareApprovalDraft(c.Request.Context(),u,c.Param("id"))
+ if err!=nil{respondError(c,err);return}
+ c.Header("Cache-Control","private, no-store")
+ c.JSON(200,gin.H{"ok":true,"data":result})
+}
+
 func (h *Handler) listApprovals(c *gin.Context) {
 	u, ok := h.auth(c)
 	if !ok {

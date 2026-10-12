@@ -1179,6 +1179,18 @@ add("GET","/api/approvals/{id}/draft",operation("Download exact pending proposal
  responses=dict([("200",{"description":"Pending draft bytes. Attachment only; private no-store.","content":{"application/octet-stream":{"schema":{"type":"string","format":"binary"}}}}),
                  resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
 
+
+add("GET","/api/approvals/{id}/draft/preview",operation("Preview a pending approval payload with participant/download/preview checks","Workflow","previewApprovalDraft",security=SESSION,
+ params=[id_param("id","Approval ID")],
+ responses=dict([json_ok(ref("Preview"),"Bounded staged-content preview."),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+add("GET","/api/approvals/{id}/draft/media",operation("Stream signature-verified staged media with approval permissions","Workflow","previewApprovalDraftMedia",security=SESSION,
+ params=[id_param("id","Approval ID")],
+ responses=dict([("200",{"description":"Inline passive media with no-store and range support","content":{"application/octet-stream":{"schema":{"type":"string","format":"binary"}}}}),
+                 resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+add("GET","/api/approvals/{id}/draft/compare",operation("Bounded base-versus-pending content comparison","Workflow","compareApprovalDraft",security=SESSION,
+ params=[id_param("id","Approval ID")],
+ responses=dict([json_ok(ref("VersionComparison"),"Immutable staged revision compared to approval base version."),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+
 add("GET","/api/approvals/{id}/history",operation("Read immutable per-step approval activity (participant or admin)","Workflow","approvalHistory",security=SESSION,
  params=[id_param("id","Approval ID")],
  responses=dict([json_ok(arr(ref("ApprovalEvent")),"Ordered approval events."),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))

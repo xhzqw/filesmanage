@@ -9,12 +9,13 @@ const dateTime=(value?:string)=>value?new Date(value).toLocaleString("zh-CN"):"�
 const fileSize=(size:number)=>size>=1048576?`${(size/1048576).toFixed(1)} MB`:size>=1024?`${(size/1024).toFixed(1)} KB`:`${size} B`;
 
 type Decision="approve"|"reject"|"cancel";
-export function ApprovalDetail({approval,events,historyLoading,historyError,onDecision,busy,canCancel,canReview}:{
+export function ApprovalDetail({approval,events,historyLoading,historyError,onDecision,onReview,busy,canCancel,canReview}:{
  approval:Approval|null;
  events:ApprovalEvent[];
  historyLoading:boolean;
  historyError:string;
  onDecision:(approval:Approval,action:Decision)=>void;
+ onReview:(approval:Approval)=>void;
  busy:boolean;
  canCancel:boolean;
  canReview:boolean;
@@ -29,7 +30,7 @@ export function ApprovalDetail({approval,events,historyLoading,historyError,onDe
   </div>
   <div className="approval-detail-links">
    <a href={"/preview/"+encodeURIComponent(approval.fileId)}>查看已发布文件 ↗</a>
-   {approval.state==="pending"&&<a href={"/api/approvals/"+encodeURIComponent(approval.id)+"/draft"}>下载待审稿 ↓</a>}
+   {approval.state==="pending"&&<><RareButton type="button" className="approval-review-launch" onClick={()=>onReview(approval)}>核对待审内容</RareButton><a href={"/api/approvals/"+encodeURIComponent(approval.id)+"/draft"}>下载待审稿 ↓</a></>}
   </div>
   <div className="approval-detail-section">
    <h4>申请信息</h4>

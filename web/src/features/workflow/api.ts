@@ -1,4 +1,6 @@
 import {request} from "../../shared/http";
+import type {PreviewData} from "../../entities/file/model";
+import type {VersionComparison} from "../../entities/file/model";
 import {approvalPolicyApi} from "../../entities/approval/api";
 
 export type Approval={
@@ -30,6 +32,9 @@ export const workflowApi={
  approve:(id:string,comment:string)=>request<{fileId:string;versionSeq:number;status:string}>("/approvals/"+id+"/approve",{method:"POST",body:JSON.stringify({comment})}),
  reject:(id:string,comment:string)=>request<{rejected:string}>("/approvals/"+id+"/reject",{method:"POST",body:JSON.stringify({comment})}),
  cancel:(id:string)=>request<{cancelled:string}>("/approvals/"+id+"/cancel",{method:"POST"}),
+ previewDraft:(id:string)=>request<PreviewData>("/approvals/"+encodeURIComponent(id)+"/draft/preview"),
+ compareDraft:(id:string)=>request<VersionComparison>("/approvals/"+encodeURIComponent(id)+"/draft/compare"),
+ draftMediaUrl:(id:string,sha:string)=>"/api/approvals/"+encodeURIComponent(id)+"/draft/media?v="+encodeURIComponent(sha),
  policy:approvalPolicyApi.get,
  setPolicy:approvalPolicyApi.set,
  clearPolicy:approvalPolicyApi.clear,

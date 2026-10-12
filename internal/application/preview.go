@@ -163,6 +163,11 @@ func (s *Service) Preview(ctx context.Context, u domain.User, fileID string) (Pr
 	if err != nil {
 		return Preview{}, domain.ErrNotFound
 	}
+	return s.previewBlob(file,blob)
+}
+
+// previewBlob shares the exact committed-version preview pipeline with staged drafts.
+func (s *Service) previewBlob(file domain.File,blob domain.Blob) (Preview,error) {
 	preview := Preview{
 		FileID: file.ID, Name: file.Name, ContentType: file.ContentType,
 		Size: blob.SizeBytes, Sha256: blob.Sha256,
