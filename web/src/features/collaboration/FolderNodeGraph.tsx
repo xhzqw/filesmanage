@@ -128,14 +128,15 @@ function radialLayout(root:GraphItem):Layout{
  return {items,edges,width:maxX-minX,height:maxY-minY,rootX:-minX,rootY:-minY};
 }
 
-function connector(a:GraphItem,b:GraphItem):string{
+function connector(a:GraphItem,b:GraphItem,scale:number):string{
  const dx=b.x-a.x,dy=b.y-a.y;
  const sw=a.depth===0?ROOT_W:NODE_W,sh=a.depth===0?ROOT_H:NODE_H;
  // Intersect the ray with the actual card edge so connectors do not
  // continue through the opaque rectangle at any angle.
  const dist=Math.max(.0001,Math.hypot(dx,dy));
- const startT=a.depth===0?(ROOT_W/2)/dist:Math.min((sw/2)/Math.max(.0001,Math.abs(dx)),(sh/2)/Math.max(.0001,Math.abs(dy)));
- const endT=Math.min((NODE_W/2)/Math.max(.0001,Math.abs(dx)),(NODE_H/2)/Math.max(.0001,Math.abs(dy)));
+ // Screen-space node pills retain their legible size while the graph zooms.
+ const startT=a.depth===0?(ROOT_W/2)/dist/scale:Math.min((sw/2)/Math.max(.0001,Math.abs(dx)),(sh/2)/Math.max(.0001,Math.abs(dy)))/scale;
+ const endT=Math.min((NODE_W/2)/Math.max(.0001,Math.abs(dx)),(NODE_H/2)/Math.max(.0001,Math.abs(dy)))/scale;
  const ax=a.x+dx*startT,ay=a.y+dy*startT;
  const bx=b.x-dx*endT,by=b.y-dy*endT;
  const span=Math.hypot(bx-ax,by-ay),handle=Math.min(64,span*.4);
@@ -253,7 +254,7 @@ export function FolderNodeGraph({stats,folders,onChoose}:{stats:Stats;folders:Fo
    <div className="stats-graph-plane" style={{width:layout.width,height:layout.height,transform:"translate("+view.x+"px,"+view.y+"px) scale("+view.scale+")"}}>
     <svg className="stats-graph-lines" aria-hidden="true" width={layout.width} height={layout.height}>
      {layout.edges.map(({from,to})=><path key={from.key+"->"+to.key}
-      d={connector(from,to)}
+      d={connector(from,to,view.scale)}
       className={"stats-graph-edge"+(branch.has(from.key)&&branch.has(to.key)?" is-active":"")}/>)}
     </svg>
     {layout.items.map(item=>{
@@ -268,7 +269,7 @@ export function FolderNodeGraph({stats,folders,onChoose}:{stats:Stats;folders:Fo
       title={item.label+" · "+item.count+" 个文件 · "+formatBytes(item.bytes)}
       className={"stats-graph-node"+(isRoot?" is-root":"")+(item.kind==="type"?" stats-graph-type":" stats-graph-folder")+(item.kind==="more"?" stats-graph-more":"")+(active===item.node?.id&&item.kind==="folder"?" is-selected":"")}
       style={{left:item.x-(isRoot?ROOT_W:NODE_W)/2,top:item.y-(isRoot?ROOT_H:NODE_H)/2,
-       width:isRoot?ROOT_W:NODE_W,height:isRoot?ROOT_H:NODE_H,"--stats-node-color":color} as CSSProperties}>
+       width:isRoot?ROOT_W:NODE_W,height:isRoot?ROOT_H:NODE_H,"--stats-node-color":color,"--stats-node-inverse":1/view.scale} as CSSProperties}>
       <span className="stats-graph-node-content">
        <span className="stats-graph-node-name">{item.kind==="folder"?<svg className="stats-graph-folder-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 7.2V5.8c0-.8.6-1.4 1.4-1.4H9l2.1 2.2h7.8c.9 0 1.6.7 1.6 1.6v9.6c0 .9-.7 1.6-1.6 1.6H5.1c-.9 0-1.6-.7-1.6-1.6V7.2Z"/></svg>:<i className="stats-graph-dot" aria-hidden="true"/>}<span className="stats-graph-node-label">{item.label}</span></span>
        <span className="stats-graph-node-detail">{item.kind==="more"?"展开剩余目录":formatBytes(item.bytes)+"  ·  "+item.count+" 个文件"}</span>
