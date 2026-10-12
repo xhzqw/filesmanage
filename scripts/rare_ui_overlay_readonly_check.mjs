@@ -220,9 +220,10 @@ try{
   }
   console.log("ROLE_WORKBENCH_READONLY_PASS "+checked.join("; "));
  }else{
+ const explorerOnly=process.env.EXPLORER_ONLY==="1";
  const results=[];
  let availablePreviewId="";
- for(const width of [1440,1280,1220,900,390]){
+ for(const width of (explorerOnly?[1440,820,390]:[1440,1280,1220,900,390])){
   const height=width===390?760:900;
   await viewport(width,height);
   await navigate("/doc","!!document.querySelector('.account-trigger')");
@@ -309,6 +310,7 @@ try{
    await click(".tree-search-clear");
    assert.equal(await evalJS(`document.querySelector('.tree-head input[aria-label="搜索目录"]')?.value`),"");
   }
+  if(explorerOnly){results.push(width+"px: single seam, aligned spacious search and keyboard focus OK");continue;}
   // The complete grant workflow and file-manager quick grant share the same
   // nine-choice picker and subject/scope controls; editing here is local only.
   if((width===1440||width===390)&&await evalJS('!!document.querySelector(".folder-actions .ghost-action-btn")')){
@@ -610,7 +612,7 @@ try{
    results.push(width+"px: preview actions/menu/Rare tabs OK");
   }
  }
- console.log("RARE_OVERLAY_READONLY_PASS "+results.join("; ")+"; file grid, permission Gooey, dialog and focus OK"+(availablePreviewId?"":"; preview fixture absent"));
+ console.log(explorerOnly?"EXPLORER_GEOMETRY_PASS "+results.join("; "):"RARE_OVERLAY_READONLY_PASS "+results.join("; ")+"; file grid, permission Gooey, dialog and focus OK"+(availablePreviewId?"":"; preview fixture absent"));
  }
 }catch(error){
  console.error("RARE_OVERLAY_READONLY_FAIL",error.message);
