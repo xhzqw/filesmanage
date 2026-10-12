@@ -30,14 +30,16 @@ const officeCacheMaxEntries = 8
 const officeCacheTTL = 5 * time.Minute
 
 type officePDFEntry struct {
-	pdf     []byte
-	expires time.Time
+	pdf      []byte
+	expires  time.Time
+	lastUsed uint64
 }
 
 type officePDFCache struct {
 	mu      sync.Mutex
 	entries map[string]officePDFEntry
 	used    int
+	clock   uint64
 }
 
 func (c *officePDFCache) get(key string, now time.Time) ([]byte, bool) {
@@ -52,6 +54,9 @@ func (c *officePDFCache) get(key string, now time.Time) ([]byte, bool) {
 		c.used -= len(entry.pdf)
 		return nil, false
 	}
+	c.clock++
+	entry.lastUsed = c.clock
+	c.entries[key] = entry
 	return entry.pdf, true
 }
 
@@ -76,10 +81,10 @@ func (c *officePDFCache) put(key string, pdf []byte, now time.Time) {
 	}
 	for len(c.entries) >= officeCacheMaxEntries || c.used+len(pdf) > officeCacheMaxBytes {
 		var oldestKey string
-		var oldest time.Time
+		var oldest uint64
 		for name, entry := range c.entries {
-			if oldestKey == "" || entry.expires.Before(oldest) {
-				oldest, oldestKey = entry.expires, name
+			if oldestKey == "" || entry.lastUsed < oldest {
+				oldest, oldestKey = entry.lastUsed, name
 			}
 		}
 		if oldestKey == "" {
@@ -88,7 +93,8 @@ func (c *officePDFCache) put(key string, pdf []byte, now time.Time) {
 		c.used -= len(c.entries[oldestKey].pdf)
 		delete(c.entries, oldestKey)
 	}
-	c.entries[key] = officePDFEntry{pdf: pdf, expires: now.Add(officeCacheTTL)}
+	c.clock++
+	c.entries[key] = officePDFEntry{pdf: pdf, expires: now.Add(officeCacheTTL), lastUsed: c.clock}
 	c.used += len(pdf)
 }
 
