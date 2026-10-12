@@ -102,6 +102,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  // 工作组状态
  const[groupQuery,setGroupQuery]=useState("");
  const[groupLimit,setGroupLimit]=useState(GROUP_DISPLAY_STEP);
+ const[groupMemberLimit,setGroupMemberLimit]=useState(MEMBER_DISPLAY_STEP);
  const[candidateQuery,setCandidateQuery]=useState("");
  const[addBusy,setAddBusy]=useState("");
 
