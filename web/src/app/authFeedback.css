@@ -9,3 +9,6 @@
 }
 .auth-feedback button{flex:none;color:var(--brand-blue);border-color:var(--border-subtle)}
 @media(max-width:480px){.auth-feedback{width:calc(100% - 24px);flex-wrap:wrap;justify-content:space-between}}
+.brand-loading-screen{display:flex;min-height:100dvh;align-items:center;justify-content:center;
+ flex-direction:column;gap:12px;background:var(--surface-app,#f5f8fd);
+ color:var(--text-secondary,#52647b);font-size:13px}

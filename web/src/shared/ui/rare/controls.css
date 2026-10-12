@@ -102,6 +102,8 @@
 .rare-input[data-density="standard"]:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 .rare-select[data-density="standard"]{height:32px;min-height:32px}
 .rare-button[data-rare-loading="true"]{cursor:progress}
+.rare-button[data-rare-loading="true"]>.brand-loader{margin-inline-end:5px}
+.rare-button[data-rare-intent="primary"][data-rare-loading="true"]>.brand-loader{filter:brightness(1.45)}
 .rare-button[data-rare-loading="true"]:disabled{opacity:.72}
 .rare-input[aria-invalid="true"]:focus-visible,.rare-select[aria-invalid="true"]:focus-visible,
 .rare-textarea[aria-invalid="true"]:focus-visible{outline-color:var(--status-danger)}

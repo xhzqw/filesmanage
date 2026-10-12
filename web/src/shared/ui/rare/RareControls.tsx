@@ -1,4 +1,5 @@
 import {forwardRef,type ButtonHTMLAttributes,type InputHTMLAttributes,type TextareaHTMLAttributes} from "react";
+import {BrandLoader} from "../BrandLoader";
 import "./controls.css";
 export {RareSelect} from "./RareSelect";
 
@@ -21,7 +22,9 @@ export const RareButton=forwardRef<HTMLButtonElement,RareButtonProps>(function R
     data-rare-control="button" data-rare-tone={detected}
     data-rare-intent={tone} data-density={density??"compact"}
     data-rare-loading={loading||undefined}
-    className={"rare-button"+(className?" "+className:"")}/>;
+    className={"rare-button"+(className?" "+className:"")}>
+    {loading?<BrandLoader size="xs" decorative/>:null}{props.children}
+   </button>;
 });
 RareButton.displayName="RareButton";
 

@@ -2,6 +2,7 @@ import {useEffect,useRef,useState} from "react";
 import {createPortal} from "react-dom";
 import {AnimatePresence,motion,useReducedMotion} from "motion/react";
 import {RareButton} from "./rare";
+import {BrandLoader} from "./BrandLoader";
 import {toast,useToastStore,type ToastItem} from "./feedback";
 import "./toast.css";
 
@@ -37,7 +38,7 @@ function ToastRow({item}:{item:ToastItem}){
   <span className="rare-toast-mark" aria-hidden="true">
    {item.tone==="success"?<svg viewBox="0 0 20 20"><path d="m4 10 4 4 8-8"/></svg>:
     item.tone==="danger"?<svg viewBox="0 0 20 20"><path d="M10 5v6m0 3v1M10 2l8 15H2L10 2Z"/></svg>:
-    item.tone==="loading"?<span className="rare-toast-spinner"/>:
+    item.tone==="loading"?<BrandLoader size="xs" decorative/>:
     item.tone==="warning"?<svg viewBox="0 0 20 20"><path d="M10 5v6m0 3v1M10 2l8 15H2L10 2Z"/></svg>:
     <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="8"/><path d="M10 9v5m0-8v1"/></svg>}
   </span>
