@@ -238,7 +238,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
         {([["preview","预览"],["details","文件信息"],["versions","历史记录"],["compare","版本对比"],["review","审查批注"],["seals","签名与盖章"]] as const)
          .filter(([key])=>key!=="seals"||preview.renderer==="pdf"||isOfficeName(preview.name))
          .map(([key,label])=><RareButton key={key} type="button" className={"file-workbench-nav-item"+(tab===key?" is-active":"")}
-          aria-current={tab===key?"page":undefined} aria-pressed={tab===key} onClick={()=>setTab(key)}>
+          aria-current={tab===key?"page":undefined} aria-pressed={tab===key} onClick={()=>{if(key==="seals")setHasOpenedSeals(true);setMoreOpen(false);setTab(key)}}>
           <span className="file-nav-indicator" aria-hidden="true"/><span>{label}</span>{key==="versions"&&<small>{versions.length}</small>}
          </RareButton>)}
        </nav>

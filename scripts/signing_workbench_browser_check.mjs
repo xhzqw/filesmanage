@@ -79,7 +79,16 @@ try{
  cdp=await CDP.connect(target.webSocketDebuggerUrl);
  await cdp.send("Page.enable");await cdp.send("Runtime.enable");await cdp.send("Network.enable");
  await cdp.send("Network.setCookie",{name:"fm_session",value:cookie.slice("fm_session=".length),url:BASE});
- await cdp.send("Page.navigate",{url:BASE+"/preview/"+encodeURIComponent(pdf.id)+"?tab=seals"});
+ await cdp.send("Page.navigate",{url:BASE+"/preview/"+encodeURIComponent(pdf.id)});
+ const previewReady=await cdp.waitFor(`()=>!!document.querySelector('.file-pdf-viewer .file-pdf-image')&&
+  !!document.querySelector('.file-workbench-nav-item')`,16000);
+ assert("regular PDF preview opens with visible document",Boolean(previewReady));
+ const clicked=await cdp.evaluate(`(()=>{
+  const item=[...document.querySelectorAll('.file-workbench-nav-item')]
+   .find(b=>b.textContent?.trim()==='签名与盖章');
+  if(!item)return false;item.click();return true;
+ })()`);
+ assert("sidebar signing entry can be activated from normal preview",Boolean(clicked));
  const ready=await cdp.waitFor(`()=>!!document.querySelector('#file-seals-sidebar .seal-file-controls')&&
   !!document.querySelector('.seal-page-surface>img')&&document.querySelector('.seal-page-surface>img').naturalWidth>0`,20000);
  assert("signing controls and PDF page mount in split workbench",ready);
