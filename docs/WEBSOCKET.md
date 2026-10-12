@@ -35,6 +35,7 @@
 
 - 迁移 `0028_durable_realtime_events.sql` 创建 `realtime_events`：保存 `id`、`user_id`（可空）、`event_type`、匿名 `scopes` 和时间。核心业务表的 statement-level 触发器在原事务内追加事件；个人变化使用 user-scoped 行级触发器。事务级 advisory lock 确保序号的已提交顺序不逆转。该机制不能用“提交后发一条内存消息”替代。
 - 任意实例共用相同 PostgreSQL 事件日志，WebSocket 按 `id > cursor` 读取，每次最多 128 条，连接最多每 2 秒查询一次；本实例内存事件可提前唤醒读取，但不再作为持久消息来源。即使后台通知或 `pg_notify` 丢失，轮询仍能补发。服务端缺少日志表时拒绝启动，不允许静默降级。
+- 迁移 `0030_realtime_skip_empty_mutations.sql` 使用 INSERT/UPDATE/DELETE 的 transition tables 过滤 **影响 0 行**的数据库语句。CAD worker 每 3 秒执行一次无任务轮询，不再产生假的 `workspace.changed:file` 通知；真实批量操作仍按语句合并为一个持久事件。前端只刷新受影响的数据：文件内容更新不重新加载目录树，已有文件行及预览在重新校验过程中保持可见，失败鉴权则立即移除受限预览。
 - 浏览器在 **每个标签页的 sessionStorage** 内按当前用户独立保存 `fm-live-cursor-v3:<userID>` 书签（不是凭据）。不能存入共享 localStorage：一个已同步的标签页不能替另一个未同步标签页确认游标。刷新当前标签页仍保留断点；新标签页在首次连接时全量重读。重连通过 `?cursor=<数字>` 恢复。服务端只对认证身份返回公共和该用户的私有事件。浏览器发出本地刷新提示后才前进书签，因此是可重复的 **at-least-once** 提示语义；后续 REST 读取仍有自己的失败重试机制。旧 v2 没有书签，升级时会先全量校准。
 - 首次接入、非法/未来书签、已超出保留期等情况返回 `connection.ready.resync:true` 并提供最新游标，浏览器全量读取现有有权访问的数据；不会假装可以逐条重放已清理的事件。迁移 `0029_realtime_replay_indexes.sql` 引入持久清理水位，即使事件表已经被清空也可以检测断档；长连接每个心跳周期都会核对水位，必要时发送 `state.resync`。
 - PostgreSQL 对公共事件和 `(user_id,id)` 私有事件建专用索引；单个用户的查询无需扫描其他用户的大量通知。实例级消费者使用独立的内部事件流（有用户 ID、不可通过 WebSocket 暴露），用于在**另一实例撤销会话**时清理本实例会话缓存，并在数据库中断恢复或事件被清理时整实例失效缓存。单实例消费者因启动时数据库短暂不可用不会永久停止。

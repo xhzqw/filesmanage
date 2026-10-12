@@ -52,6 +52,9 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  const[resolvedFolder,setResolvedFolder]=useState<{id:string;folder:Folder|null}|null>(null);
  const[status,setStatus]=useState("loading");
  const[reloadKey,setReloadKey]=useState(0);
+ // File contents and folder hierarchy are independently invalidated. A CAD
+ // preview finishing must never make the entire folder tree show "刷新中".
+ const[treeReloadKey,setTreeReloadKey]=useState(0);
  const[grantsFolder,setGrantsFolder]=useState<Folder|null>(null);
  // Rename/delete from the tree menu reuse FolderActions' own dialogs: the bar
  // follows the right-clicked folder until the selection moves again.
@@ -75,11 +78,14 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  const navigate=useNavigate();
  const explicitFolder=new URLSearchParams(location.search).get("folder");
  const requested=explicitFolder||"folder_root";
+ const refreshTreeAndFiles=()=>{
+  setTreeReloadKey(value=>value+1);
+  setReloadKey(value=>value+1);
+ };
  useEffect(()=>{
-  const invalidate=()=>setReloadKey(value=>value+1);
-  const fileChanged=observeResourceChange("file",invalidate);
-  const folderChanged=observeResourceChange("folder",invalidate);
-  const returned=observeWindowReturn(invalidate);
+  const fileChanged=observeResourceChange("file",()=>setReloadKey(value=>value+1));
+  const folderChanged=observeResourceChange("folder",refreshTreeAndFiles);
+  const returned=observeWindowReturn(refreshTreeAndFiles);
   return()=>{fileChanged();folderChanged();returned();};
  },[]);
  useEffect(()=>{
@@ -89,7 +95,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
    .then(data=>{if(valid){setFolders(data);setStatus("ready");}})
    .catch(()=>{if(valid)setStatus("failed");});
   return()=>{valid=false;};
- },[reloadKey]);
+ },[treeReloadKey]);
  const {folderById,visibleRoots}=useMemo(()=>{
   const folderById=new Map(folders.map(folder=>[folder.id,folder]));
   // The compatibility tree contains at most 500 hints. A membership index
@@ -162,7 +168,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
    await folderApi.move(source.id,target.id);
    closeMove();
    setMoveMessage(`已移动「${source.name}」到「${target.name}」。`);
-   setReloadKey(k=>k+1);
+   refreshTreeAndFiles();
    // The URL still names the moved folder: land on its new parent so the
    // breadcrumb and the file table never describe a stale path (WF-09).
    if(selected?.id===source.id)navigate("/doc?folder="+encodeURIComponent(target.id));
@@ -192,7 +198,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
     navigate(destination?"/doc?folder="+encodeURIComponent(destination.id):"/doc",{replace:true});
    }
   }
-  setReloadKey(k=>k+1);
+  refreshTreeAndFiles();
  }
  // Pointer capture keeps the drag alive once the cursor leaves the 4px hit area
  // (SPEC §3.1), so the width tracks the pointer instead of the handle.
@@ -270,7 +276,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
    {moveMessage&&<p role="status" className="notice">{moveMessage}</p>}
    {selected&&<DropZone folderId={selected.id} userId={user.id} onCommitted={()=>setReloadKey(k=>k+1)}>
      <FileTable folder={selected.id} folderName={selected.name} onEdit={setEditingId} reloadKey={reloadKey}
-      newFolderSlot={<NewFolderForm parentId={selected.id} onCreated={()=>setReloadKey(k=>k+1)}/>}/>
+      newFolderSlot={<NewFolderForm parentId={selected.id} onCreated={refreshTreeAndFiles}/>}/>
    </DropZone>}
    {!selected&&resolving&&<p role="status" className="empty">正在核验所选目录…</p>}
    {!selected&&inaccessible&&<p role="alert" className="empty">目录不存在或当前账号无权访问。<Link to="/doc">返回根目录</Link></p>}
@@ -294,7 +300,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
      </div>}
      footer={<div className="dialog-actions">
       {move.unknown&&<RareButton type="button" className="secondary-action" disabled={moveBusy}
-       onClick={()=>setReloadKey(k=>k+1)}>刷新查看状态</RareButton>}
+       onClick={refreshTreeAndFiles}>刷新查看状态</RareButton>}
       <RareButton type="button" className="secondary-action" disabled={moveBusy} onClick={closeMove}>取消</RareButton>
       <RareButton type="button" className="primary" disabled={moveBusy||!moveCanSubmit}
        onClick={submitMove}>{moveBusy?"移动中…":"确认移动"}</RareButton>

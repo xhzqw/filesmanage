@@ -210,6 +210,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const listKey=folder+"\u0000"+sort+"\u0000"+reloadKey;
  const listKeyRef=useRef(listKey);
  listKeyRef.current=listKey;
+ const lastViewRef=useRef(folder+"\u0000"+sort);
  const pagingRef=useRef(false);
  const completedCursor=useRef("");
  const[renaming,setRenaming]=useState<FileItem|null>(null);
@@ -256,25 +257,41 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  useEffect(()=>{
   let valid=true;
   const revision=++listRevision.current;
+  const viewKey=folder+"\u0000"+sort;
+  const viewChanged=viewKey!==lastViewRef.current;
+  const hasPreviousRows=!viewChanged&&items.length>0;
+  lastViewRef.current=viewKey;
   pagingRef.current=false;
   completedCursor.current="";
   setLoadingMore(false);
   setMoreError("");
-  setStatus("loading");
-  setItems([]);
-  setCursor("");
-  setHasMore(false);
+  // A background WebSocket revalidation is a stale-while-revalidate read.
+  // Keep existing rows visible and preserve selection while the fresh page
+  // arrives. Only directory/sort navigation resets the old list immediately.
+  if(viewChanged||status!=="ready"){
+   setStatus("loading");
+   if(viewChanged)setItems([]);
+  }
+  if(viewChanged){setCursor("");setHasMore(false);}
   const started=performance.now();
   fileApi.list(folder,sort,"",50)
    .then(page=>{
     if(!valid||revision!==listRevision.current||listKeyRef.current!==listKey)return;
     setItems(page.items);
+    setSelectedIds(current=>{
+     const ids=new Set(page.items.map(item=>item.id));
+     const kept=new Set([...current].filter(id=>ids.has(id)));
+     return kept.size===current.size?current:kept;
+    });
     setHasMore(page.nextCursor!=="");
     setCursor(page.nextCursor);
     setStatus("ready");
     setLatencyMs(Math.max(0,Math.round(performance.now()-started)));
    })
-   .catch(()=>{if(valid&&revision===listRevision.current&&listKeyRef.current===listKey){setStatus("failed");setLatencyMs(null);}});
+   .catch(()=>{if(valid&&revision===listRevision.current&&listKeyRef.current===listKey){
+    // Keep last successfully rendered rows on a transient refresh failure.
+    setStatus(hasPreviousRows?"ready":"failed");setLatencyMs(null);
+   }});
   return()=>{valid=false;};
  },[folder,sort,reloadKey]);
 
@@ -285,7 +302,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   setFocusedId(null);
   setAnchorId(null);
   setRowMenu(null);
- },[folder,sort,reloadKey]);
+ },[folder,sort]);
 
  // The favorite marks are read once per list revision. A failed read leaves the
  // row action disabled: the button must not claim "not favorited" when the

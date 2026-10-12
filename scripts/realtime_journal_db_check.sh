@@ -30,6 +30,14 @@ DECLARE
  marker text;
 BEGIN
  SELECT COALESCE(max(id),0) INTO first_id FROM realtime_events;
+ -- An empty worker claim is NOT a resource update: a statement trigger
+ -- without transition-table filtering used to create a "file" event here
+ -- every three seconds, continually blanking previews and file lists.
+ UPDATE model_derivatives SET state=state WHERE id='missing_worker_poll_job';
+ UPDATE folders SET name=name WHERE false;
+ IF EXISTS (SELECT 1 FROM realtime_events WHERE id>first_id) THEN
+    RAISE EXCEPTION 'zero-row mutation emitted phantom realtime event';
+ END IF;
  -- Statement trigger proves a mutation enters the transaction's journal.
  UPDATE folders SET name=name WHERE id=(SELECT id FROM folders ORDER BY id LIMIT 1);
  IF NOT EXISTS (SELECT 1 FROM realtime_events

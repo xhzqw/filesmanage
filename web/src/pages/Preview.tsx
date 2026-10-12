@@ -1,5 +1,5 @@
 import {RareBadge,RareButton,RareDataTable,RareInput,RareRowActions,RareTabs,MicroHoldToDelete} from "../shared/ui/rare";
-import {useEffect,useState,type FormEvent} from "react";
+import {useEffect,useRef,useState,type FormEvent} from "react";
 import {Link,useNavigate,useParams} from "react-router-dom";
 import {fileApi,formatSize,type FileLifecycle} from "../features/documents/api";
 import {MediaPreview} from "../features/documents/MediaPreview";
@@ -61,6 +61,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const[favoriteBusy,setFavoriteBusy]=useState(false);
  const[wrapText,setWrapText]=useState(true);
  const[reloadToken,setReloadToken]=useState(0);
+ const loadedPreviewId=useRef("");
  const[lifecycle,setLifecycle]=useState<FileLifecycle|null>(null);
  const archived=lifecycle?.state==="archived";
  const currentSeq=Math.max(file?.currentVersionSeq??1,...versions.map(v=>v.versionSeq));
@@ -82,18 +83,30 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
 
  useEffect(()=>{
   let valid=true;
-  setStatus("loading");setError("");
-  setPreview(null);setFile(null);setVersions([]);
+  const switchingFile=loadedPreviewId.current!==id;
+  loadedPreviewId.current=id;
+  // Retain the prior authorized preview while background invalidation
+  // fetches the new revision. Clearing the media component on every event
+  // makes PDF, video, Office and CAD previews visibly flash.
+  if(switchingFile||!preview){
+   setStatus("loading");
+   setPreview(null);setFile(null);setVersions([]);
+  }
+  setError("");
   Promise.all([fileApi.preview(id),fileApi.versions(id),fileApi.meta(id).catch(()=>null)])
    .then(([data,history,meta])=>{
     if(!valid)return;
     setPreview(data);setVersions(history);setFile(meta?.file??null);setStatus("ready");
-   }).catch(err=>{if(valid){setStatus("failed");setError(errorCopy(err,"无法读取文件，请检查访问权限。"));}});
+   }).catch(err=>{if(valid){
+    // Revoked access must never leave the last successful preview visible.
+    setPreview(null);setFile(null);setVersions([]);
+    setStatus("failed");setError(errorCopy(err,"无法读取文件，请检查访问权限。"));
+   }});
   return()=>{valid=false;};
  },[id,reloadToken]);
 
  useEffect(()=>{
-  let live=true;setLifecycle(null);
+  let live=true;
   void fileApi.lifecycle(id).then(value=>{if(live)setLifecycle(value);})
    .catch(()=>{if(live)setLifecycle(null);});
   return()=>{live=false;};
