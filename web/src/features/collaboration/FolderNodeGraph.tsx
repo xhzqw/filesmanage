@@ -13,7 +13,7 @@ type GraphItem={
 type Edge={from:GraphItem;to:GraphItem};
 type Layout={items:GraphItem[];edges:Edge[];width:number;height:number;rootX:number;rootY:number};
 type View={x:number;y:number;scale:number};
-const NODE_W=150,NODE_H=44,ROOT_W=132,ROOT_H=132,MAX_NODES=110;
+const NODE_W=150,NODE_H=44,ROOT_W=102,ROOT_H=102,MAX_NODES=110;
 const DEFAULT_CHILDREN=7;
 const TAU=Math.PI*2;
 
@@ -234,6 +234,14 @@ export function FolderNodeGraph({stats,folders,onChoose}:{stats:Stats;folders:Fo
    setLimits(old=>{const next=new Map(old);next.set(item.node!.id,(next.get(item.node!.id)??DEFAULT_CHILDREN)+12);return next;});return;
   }
   if(item.kind!=="folder"||!item.node||item.node.virtual)return;
+  if(item.node.id===ROOT_ID){
+   setExpanded(defaultExpanded(root));
+   setLimits(new Map());
+   setRevealTypes(new Set());
+   setActive(ROOT_ID);
+   setView(fit(layout,viewport.width,viewport.height));
+   return;
+  }
   setActive(item.node.id);
   setRevealTypes(old=>new Set(old).add(item.node!.id));
   setExpanded(old=>{const next=new Set(old);if(next.has(item.node!.id))next.delete(item.node!.id);else next.add(item.node!.id);return next;});
@@ -264,17 +272,17 @@ export function FolderNodeGraph({stats,folders,onChoose}:{stats:Stats;folders:Fo
      const color=item.kind==="type"&&item.category?categoryInfo(item.category).color:"var(--folder-fill)";
      return <RareButton key={item.key} type="button" tone="ghost" onClick={()=>select(item)}
       disabled={item.node?.virtual||item.kind==="type"}
-      aria-expanded={canExpand?open:undefined}
-      aria-label={item.label+"，"+item.count+" 个文件，"+formatBytes(item.bytes)+(canExpand?"，点击展开或折叠":"")}
-      title={item.label+" · "+item.count+" 个文件 · "+formatBytes(item.bytes)}
+      aria-expanded={canExpand&&!isRoot?open:undefined}
+      aria-label={isRoot?"全部可见目录，"+item.count+" 个文件，点击返回目录总览":item.label+"，"+item.count+" 个文件，"+formatBytes(item.bytes)+(canExpand?"，点击展开或折叠":"")}
+      title={isRoot?"返回目录总览":item.label+" · "+item.count+" 个文件 · "+formatBytes(item.bytes)}
       className={"stats-graph-node"+(isRoot?" is-root":"")+(item.kind==="type"?" stats-graph-type":" stats-graph-folder")+(item.kind==="more"?" stats-graph-more":"")+(active===item.node?.id&&item.kind==="folder"?" is-selected":"")}
       style={{left:item.x-(isRoot?ROOT_W:NODE_W)/2,top:item.y-(isRoot?ROOT_H:NODE_H)/2,
        width:isRoot?ROOT_W:NODE_W,height:isRoot?ROOT_H:NODE_H,"--stats-node-color":color,"--stats-node-inverse":1/view.scale} as CSSProperties}>
       <span className="stats-graph-node-content">
-       <span className="stats-graph-node-name">{item.kind==="folder"?<svg className="stats-graph-folder-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 7.2V5.8c0-.8.6-1.4 1.4-1.4H9l2.1 2.2h7.8c.9 0 1.6.7 1.6 1.6v9.6c0 .9-.7 1.6-1.6 1.6H5.1c-.9 0-1.6-.7-1.6-1.6V7.2Z"/></svg>:<i className="stats-graph-dot" aria-hidden="true"/>}<span className="stats-graph-node-label">{item.label}</span></span>
-       <span className="stats-graph-node-detail">{item.kind==="more"?"展开剩余目录":formatBytes(item.bytes)+"  ·  "+item.count+" 个文件"}</span>
+       <span className="stats-graph-node-name">{item.kind==="folder"?<svg className="stats-graph-folder-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 7.2V5.8c0-.8.6-1.4 1.4-1.4H9l2.1 2.2h7.8c.9 0 1.6.7 1.6 1.6v9.6c0 .9-.7 1.6-1.6 1.6H5.1c-.9 0-1.6-.7-1.6-1.6V7.2Z"/></svg>:<i className="stats-graph-dot" aria-hidden="true"/>}<span className="stats-graph-node-label">{isRoot?"全部目录":item.label}</span></span>
+       <span className="stats-graph-node-detail">{isRoot?item.count+" 个文件":item.kind==="more"?"展开剩余目录":formatBytes(item.bytes)+"  ·  "+item.count+" 个文件"}</span>
       </span>
-      {canExpand&&<span className="stats-graph-toggle" aria-hidden="true">{open?"−":"+"}</span>}
+      {canExpand&&!isRoot&&<span className="stats-graph-toggle" aria-hidden="true">{open?"−":"+"}</span>}
      </RareButton>;
     })}
    </div>

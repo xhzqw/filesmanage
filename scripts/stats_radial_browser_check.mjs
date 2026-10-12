@@ -34,6 +34,9 @@ try{
   const g=await cdp.eval("(()=>{const canvas=document.querySelector('.stats-graph-viewport').getBoundingClientRect(),r=document.querySelector('.stats-graph-node.is-root').getBoundingClientRect();const nodes=[...document.querySelectorAll('.stats-graph-node:not(.is-root)')].map(e=>{const n=e.getBoundingClientRect();return {x:n.left+n.width/2,y:n.top+n.height/2};});const cx=canvas.left+canvas.width/2,cy=canvas.top+canvas.height/2,rx=r.left+r.width/2,ry=r.top+r.height/2;return {cx,cy,rx,ry,nodes:nodes.length+1,edges:document.querySelectorAll('.stats-graph-lines path').length,left:nodes.some(n=>n.x<rx-12),right:nodes.some(n=>n.x>rx+12),above:nodes.some(n=>n.y<ry-12),below:nodes.some(n=>n.y>ry+12),overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,width:canvas.width,height:canvas.height};})()");
   check(g.width>260&&g.height>260,v.name+" responsive viewport",JSON.stringify(g));
   check(Math.abs(g.cx-g.rx)<3&&Math.abs(g.cy-g.ry)<3,v.name+" root exactly centred");
+  const hub=await cdp.eval("(()=>{const el=document.querySelector('.stats-graph-node.is-root');const r=el.getBoundingClientRect();const name=el.querySelector('.stats-graph-node-label')?.textContent;const detail=el.querySelector('.stats-graph-node-detail')?.textContent;return {width:r.width,height:r.height,toggle:!!el.querySelector('.stats-graph-toggle'),name,detail,aria:el.getAttribute('aria-label')};})()");
+  check(hub.width>=90&&hub.width<=112&&hub.height>=90&&hub.height<=112,v.name+" compact centre hub",JSON.stringify(hub));
+  check(!hub.toggle&&hub.name==="全部目录"&&!!hub.detail?.includes("文件"),v.name+" no floating plus or duplicate detail");
   check(g.edges===g.nodes-1,v.name+" parent-child lines",JSON.stringify(g));
   check(g.nodes<4||(g.left&&g.right&&g.above&&g.below),v.name+" radial quadrants",JSON.stringify(g));
   check(g.overflow<=1,v.name+" no horizontal overflow",JSON.stringify(g));
