@@ -93,7 +93,7 @@ try{
   const select=await evalJS(`(()=>{const b=document.querySelector('.rare-select[aria-label="修改时间"]');const m=document.querySelector(".rare-select-menu");const r=m.getBoundingClientRect();return{role:b.getAttribute("role"),expanded:b.getAttribute("aria-expanded"),count:m.querySelectorAll('[role=option]').length,rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom},overflow:document.documentElement.scrollWidth-innerWidth};})()`);
   assert(select.role==="combobox"&&select.expanded==="true"&&select.count>=3&&inside(select.rect,width,height)&&select.overflow<=1,"time dropdown at "+width+": "+JSON.stringify(select));
   await click('.rare-select-menu [role="option"]:nth-child(2)');
-  assert.equal(await evalJS('document.querySelector(".rare-select[aria-label=\"修改时间\"]').getAttribute("aria-expanded")'),"false");
+  assert.equal(await evalJS(`document.querySelector('.rare-select[aria-label="修改时间"]').getAttribute("aria-expanded")`),"false");
   results.push(width+"px: menu/combobox viewport and escape OK");
  }
  await viewport(1440,900);
