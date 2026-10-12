@@ -414,11 +414,42 @@ func (s *Service) Search(ctx context.Context, u domain.User, filter SearchFilter
 	// The epoch invalidates every cached read the moment authorisation
 	// changes, so a revocation or a new grant is visible on the next request
 	// (PE04) instead of after the TTL.
-	key := fmt.Sprintf("%d|%s", s.epoch(), searchCacheKey(u, filter))
-	if cached, ok, revision := s.search.get(key, s.now()); ok {
-		return SearchPage{Items: cached.files, Total: cached.total, NextCursor: cached.nextCursor}, nil
-	} else {
-		return s.searchUncached(ctx, u, filter, key, revision)
+	for {
+		if err := ctx.Err(); err != nil {
+			return SearchPage{}, err
+		}
+		epoch := s.epoch()
+		key := fmt.Sprintf("%d|%s", epoch, searchCacheKey(u, filter))
+		cached, ok, revision := s.search.get(key, s.now())
+		if ok {
+			if s.epoch() == epoch && s.search.currentRevision() == revision {
+				return SearchPage{Items: cached.files, Total: cached.total, NextCursor: cached.nextCursor}, nil
+			}
+			continue
+		}
+		// The revision makes a post-invalidation query a new flight.
+		// Canceled callers don't cancel a still-needed shared SQL query.
+		flightKey := fmt.Sprintf("%d|%s", revision, key)
+		results := s.searchFlights.DoChan(flightKey, func() (any, error) {
+			workCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 12*time.Second)
+			defer cancel()
+			if existing, hit, _ := s.search.get(key, s.now()); hit {
+				return SearchPage{Items: existing.files, Total: existing.total, NextCursor: existing.nextCursor}, nil
+			}
+			return s.searchUncached(workCtx, u, filter, key, revision)
+		})
+		select {
+		case <-ctx.Done():
+			return SearchPage{}, ctx.Err()
+		case result := <-results:
+			if s.epoch() != epoch || s.search.currentRevision() != revision {
+				continue
+			}
+			if result.Err != nil {
+				return SearchPage{}, result.Err
+			}
+			return result.Val.(SearchPage), nil
+		}
 	}
 }
 
@@ -499,11 +530,40 @@ func searchQuery(u domain.User, groups []string, filter SearchFilter) ports.File
 }
 
 func (s *Service) Stats(ctx context.Context, u domain.User, filter SearchFilter) (domain.Stats, error) {
-	key := fmt.Sprintf("%d|%s", s.epoch(), statsCacheKey(u, filter))
-	if cached, ok, revision := s.stats.get(key, s.now()); ok {
-		return cached, nil
-	} else {
-		return s.statsUncached(ctx, u, filter, key, revision)
+	for {
+		if err := ctx.Err(); err != nil {
+			return domain.Stats{}, err
+		}
+		epoch := s.epoch()
+		key := fmt.Sprintf("%d|%s", epoch, statsCacheKey(u, filter))
+		cached, ok, revision := s.stats.get(key, s.now())
+		if ok {
+			if s.epoch() == epoch && s.stats.currentRevision() == revision {
+				return cached, nil
+			}
+			continue
+		}
+		flightKey := fmt.Sprintf("%d|%s", revision, key)
+		results := s.statsFlights.DoChan(flightKey, func() (any, error) {
+			workCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 12*time.Second)
+			defer cancel()
+			if existing, hit, _ := s.stats.get(key, s.now()); hit {
+				return existing, nil
+			}
+			return s.statsUncached(workCtx, u, filter, key, revision)
+		})
+		select {
+		case <-ctx.Done():
+			return domain.Stats{}, ctx.Err()
+		case result := <-results:
+			if s.epoch() != epoch || s.stats.currentRevision() != revision {
+				continue
+			}
+			if result.Err != nil {
+				return domain.Stats{}, result.Err
+			}
+			return result.Val.(domain.Stats), nil
+		}
 	}
 }
 

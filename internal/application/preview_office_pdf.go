@@ -22,6 +22,106 @@ const maxOfficePDFBytes = 32 << 20
 
 var officeRenderSlots = make(chan struct{}, 2)
 
+// The derivative cache is process-local and bounded: an authorized request
+// always checks ACLs before a cached PDF is returned. Content-addressed keys
+// prevent a saved new version from observing its predecessor's derivative.
+const officeCacheMaxBytes = 64 << 20
+const officeCacheMaxEntries = 8
+const officeCacheTTL = 5 * time.Minute
+
+type officePDFEntry struct {
+	pdf     []byte
+	expires time.Time
+}
+
+type officePDFCache struct {
+	mu      sync.Mutex
+	entries map[string]officePDFEntry
+	used    int
+}
+
+func (c *officePDFCache) get(key string, now time.Time) ([]byte, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	entry, found := c.entries[key]
+	if !found {
+		return nil, false
+	}
+	if !now.Before(entry.expires) {
+		delete(c.entries, key)
+		c.used -= len(entry.pdf)
+		return nil, false
+	}
+	return entry.pdf, true
+}
+
+func (c *officePDFCache) put(key string, pdf []byte, now time.Time) {
+	if len(pdf) == 0 || len(pdf) > maxOfficePDFBytes {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.entries == nil {
+		c.entries = make(map[string]officePDFEntry)
+	}
+	if previous, ok := c.entries[key]; ok {
+		c.used -= len(previous.pdf)
+		delete(c.entries, key)
+	}
+	for name, entry := range c.entries {
+		if !now.Before(entry.expires) {
+			delete(c.entries, name)
+			c.used -= len(entry.pdf)
+		}
+	}
+	for len(c.entries) >= officeCacheMaxEntries || c.used+len(pdf) > officeCacheMaxBytes {
+		var oldestKey string
+		var oldest time.Time
+		for name, entry := range c.entries {
+			if oldestKey == "" || entry.expires.Before(oldest) {
+				oldest, oldestKey = entry.expires, name
+			}
+		}
+		if oldestKey == "" {
+			return
+		}
+		c.used -= len(c.entries[oldestKey].pdf)
+		delete(c.entries, oldestKey)
+	}
+	c.entries[key] = officePDFEntry{pdf: pdf, expires: now.Add(officeCacheTTL)}
+	c.used += len(pdf)
+}
+
+// Work lives independently of the first HTTP caller: its renderer owns fresh
+// blob handles. Individual waiters still honor their own cancellation.
+func (s *Service) cachedOfficePDF(ctx context.Context, key string, render func(context.Context) ([]byte, error)) ([]byte, error) {
+	if cached, ok := s.officeCache.get(key, s.now()); ok {
+		return cached, nil
+	}
+	results := s.officeFlights.DoChan(key, func() (any, error) {
+		if cached, ok := s.officeCache.get(key, s.now()); ok {
+			return cached, nil
+		}
+		workCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+		defer cancel()
+		pdf, err := render(workCtx)
+		if err != nil {
+			return nil, err
+		}
+		s.officeCache.put(key, pdf, s.now())
+		return pdf, nil
+	})
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case result := <-results:
+		if result.Err != nil {
+			return nil, result.Err
+		}
+		return result.Val.([]byte), nil
+	}
+}
+
 // OfficePDFPreview is a best-effort, read-only derivative from the immutable
 // current blob. It uses ActionPreview (not ActionDownload) and never publishes
 // a file version. Conversion never runs with host network or writable mounts.
@@ -31,7 +131,20 @@ func (s *Service) OfficePDFPreview(ctx context.Context, u domain.User, fileID st
 		return nil, err
 	}
 	defer done()
-	return renderOfficePDFSource(ctx, source)
+	key := source.Sha256 + "|" + extensionOf(source.FileName) + "|"
+	return s.cachedOfficePDF(ctx, key, func(workCtx context.Context) ([]byte, error) {
+		// Do not capture the original request's reader: it is closed if its
+		// caller disconnects while another subscriber still needs the PDF.
+		fresh, finish, err := s.openFileBytes(workCtx, u, fileID, domain.ActionPreview)
+		if err != nil {
+			return nil, err
+		}
+		defer finish()
+		if fresh.Sha256 != source.Sha256 {
+			return nil, domain.ErrVersionConflict
+		}
+		return renderOfficePDFSource(workCtx, fresh)
+	})
 }
 
 func renderOfficePDFSource(ctx context.Context, source Download) ([]byte, error) {

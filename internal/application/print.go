@@ -137,5 +137,13 @@ func (s *Service) BrowserPrintOfficePDFSheet(ctx context.Context, u domain.User,
 		return nil, err
 	}
 	defer done()
-	return renderOfficePDFSourceWithSheet(ctx, source, sheetName)
+	key := source.Sha256 + "|" + extensionOf(source.FileName) + "|" + sheetName
+	return s.cachedOfficePDF(ctx, key, func(workCtx context.Context) ([]byte, error) {
+		fresh, finish, err := s.openBrowserPrintSource(workCtx, u, id, sha)
+		if err != nil {
+			return nil, err
+		}
+		defer finish()
+		return renderOfficePDFSourceWithSheet(workCtx, fresh, sheetName)
+	})
 }

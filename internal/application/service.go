@@ -12,6 +12,7 @@ import (
 	"filesmanage/internal/ports"
 	"fmt"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/sync/singleflight"
 	"io"
 	"strings"
 	"sync"
@@ -30,15 +31,19 @@ var (
 // obtained from the unit of work; blob bytes are staged outside transactions
 // and only referenced inside them.
 type Service struct {
-	uow     ports.UnitOfWork
-	blobs   ports.BlobStore
-	office  OfficeConfig
-	now     func() time.Time
-	stats   statsCache
-	search  searchCache
-	session sessionCache
-	live    userEventHub
-	durable DurableEventStore
+	uow           ports.UnitOfWork
+	blobs         ports.BlobStore
+	office        OfficeConfig
+	now           func() time.Time
+	stats         statsCache
+	search        searchCache
+	searchFlights singleflight.Group
+	statsFlights  singleflight.Group
+	officeCache   officePDFCache
+	officeFlights singleflight.Group
+	session       sessionCache
+	live          userEventHub
+	durable       DurableEventStore
 	// aclEpoch changes whenever an authorisation decision could change: grants,
 	// shares, user disabling, folder moves and trash restores all bump it, and
 	// every cached read key includes it. That is what makes "the next request
@@ -214,6 +219,12 @@ func (c *searchCache) invalidate() {
 	c.entries = nil
 }
 
+func (c *searchCache) currentRevision() uint64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.revision
+}
+
 func (c *statsCache) get(key string, now time.Time) (domain.Stats, bool, uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -247,6 +258,12 @@ func (c *statsCache) invalidate() {
 	defer c.mu.Unlock()
 	c.revision++
 	c.entries = nil
+}
+
+func (c *statsCache) currentRevision() uint64 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.revision
 }
 
 func New(uow ports.UnitOfWork, blobs ports.BlobStore) *Service {

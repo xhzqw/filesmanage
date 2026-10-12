@@ -11,9 +11,13 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 )
 
@@ -51,6 +55,8 @@ func isLoopbackAddr(addr string) bool {
 }
 
 func main() {
+	runCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stopSignals()
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
 		log.Fatal("DATABASE_URL required")
@@ -69,6 +75,11 @@ func main() {
 		}
 	}
 	config.MaxConns = int32(maxConns)
+	// Recycle long-held pooled connections gradually, without a reconnect
+	// storm. The shared PostgreSQL budget remains operator-controlled.
+	config.MaxConnLifetime = 30 * time.Minute
+	config.MaxConnLifetimeJitter = 5 * time.Minute
+	config.MaxConnIdleTime = 10 * time.Minute
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	pool, err := pgxpool.NewWithConfig(ctx, config)
@@ -124,13 +135,26 @@ func main() {
 		}
 	}
 	cleanupResumable()
-	go func() {
+	var maintenance sync.WaitGroup
+	startMaintenance := func(fn func()) {
+		maintenance.Add(1)
+		go func() {
+			defer maintenance.Done()
+			fn()
+		}()
+	}
+	startMaintenance(func() {
 		tick := time.NewTicker(time.Hour)
 		defer tick.Stop()
-		for range tick.C {
-			cleanupResumable()
+		for {
+			select {
+			case <-runCtx.Done():
+				return
+			case <-tick.C:
+				cleanupResumable()
+			}
 		}
-	}()
+	})
 	service := application.New(postgres.New(pool), store).WithDurableEvents(postgres.New(pool)).WithOffice(application.OfficeConfig{
 		EditorURL:     os.Getenv("FILESMANAGE_OFFICE_URL"),
 		Secret:        os.Getenv("FILESMANAGE_OFFICE_SECRET"),
@@ -139,7 +163,7 @@ func main() {
 	})
 	// App replicas must also invalidate HTTP read caches without connected WS
 	// clients; each process follows the same committed PostgreSQL journal.
-	go service.WatchDurableCache(context.Background())
+	startMaintenance(func() { service.WatchDurableCache(runCtx) })
 	// Durable due-date reminders. At startup and hourly; duplicate instances
 	// are safe because PostgreSQL enforces one notification per due date/phase.
 	remindLifecycle := func() {
@@ -152,13 +176,18 @@ func main() {
 		}
 	}
 	remindLifecycle()
-	go func() {
+	startMaintenance(func() {
 		tick := time.NewTicker(time.Hour)
 		defer tick.Stop()
-		for range tick.C {
-			remindLifecycle()
+		for {
+			select {
+			case <-runCtx.Done():
+				return
+			case <-tick.C:
+				remindLifecycle()
+			}
 		}
-	}()
+	})
 	// Persistent event retention: defaults to 90 days. Set 0 for indefinite
 	// retention; deletion is capped to keep each maintenance pass bounded.
 	retentionDays := 90
@@ -180,16 +209,51 @@ func main() {
 		}
 	}
 	pruneRealtime()
-	go func() {
+	startMaintenance(func() {
 		tick := time.NewTicker(24 * time.Hour)
 		defer tick.Stop()
-		for range tick.C {
-			pruneRealtime()
+		for {
+			select {
+			case <-runCtx.Done():
+				return
+			case <-tick.C:
+				pruneRealtime()
+			}
 		}
-	}()
+	})
 	r := httpx.New(service, secure, "web/dist")
 	log.Println("filesmanage isolated development server listening ", addr)
-	if err = r.Run(addr); err != nil {
-		log.Fatal(err)
+	server := &http.Server{
+		Addr: addr, Handler: r,
+		ReadHeaderTimeout: 5 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		// No global WriteTimeout: Range downloads and large uploads must
+		// remain streaming; their individual handlers enforce limits.
+		BaseContext: func(net.Listener) context.Context { return runCtx },
 	}
+	stopped := make(chan struct{})
+	shutdownDone := make(chan struct{})
+	go func() {
+		defer close(shutdownDone)
+		select {
+		case <-runCtx.Done():
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+			if err := server.Shutdown(shutdownCtx); err != nil {
+				log.Printf("graceful HTTP shutdown exceeded deadline: %v", err)
+				_ = server.Close()
+			}
+		case <-stopped:
+		}
+	}()
+	err = server.ListenAndServe()
+	close(stopped)
+	stopSignals()
+	// Shutdown may still be draining HTTP requests after the listener closes.
+	// Do not close the database pool until that drain has completed.
+	<-shutdownDone
+	if err != nil && err != http.ErrServerClosed {
+		log.Printf("HTTP listener stopped unexpectedly: %v", err)
+	}
+	maintenance.Wait()
 }
