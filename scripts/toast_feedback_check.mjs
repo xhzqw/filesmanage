@@ -58,7 +58,7 @@ const labels={loading:"保存中",success:"已保存",error:"保存失败"};
  const task=h.toast.track(async()=>42,labels);
  assert.equal(await task,42);
  assert.deepEqual(Array.from(h.items(),x=>x.tone),["success"]);
- assert.equal(h.items()[0].duration,4000);
+ assert.equal(h.items()[0].duration,2800);
 }
 {
  const h=harness(),a=deferred(),b=deferred();

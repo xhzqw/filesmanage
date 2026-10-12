@@ -54,6 +54,8 @@ if [ "${1:-}" = "--with-tests" ]; then
   node web/scripts/cad-viewer-smoke.mjs
   echo "== cad: isolated Chrome WebGL viewport regression =="
   node web/scripts/cad-browser-smoke.mjs
+  echo "== ui: centered Rare toast browser geometry regression =="
+  node scripts/toast_visual_readonly_check.mjs
   echo "== go: full test suite =="
   go test ./...
   echo "== migrations: checksum re-verify =="

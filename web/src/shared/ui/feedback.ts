@@ -10,7 +10,7 @@ let identityEpoch=0;
 const MAX_VISIBLE=4;
 const DUPLICATE_WINDOW_MS=900;
 const priority:Record<ToastTone,number>={info:0,success:0,loading:1,warning:2,danger:3};
-function durationOf(tone:ToastTone){return tone==="loading"?0:tone==="danger"?7000:tone==="warning"?6000:4000;}
+function durationOf(tone:ToastTone){return tone==="loading"?0:tone==="danger"?6500:tone==="warning"?5500:2800;}
 
 function publish(tone:ToastTone,text:string,{dedupe=true}:{dedupe?:boolean}={}){
  const copy=text.trim();

@@ -362,11 +362,11 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   return()=>window.removeEventListener(MOVE_DROP_EVENT,onMoveDrop);
  },[items]);
 
- function announce(text:string,tone:"info"|"error"){
+ function announce(text:string,tone:"info"|"error",toastText=text){
   setMessage(text);
   setMessageTone(tone);
   // Queue admission is announced by uploadStore for both toolbar and drag uploads.
-  if(text.trim()&&!text.startsWith("已加入上传队列："))(tone==="error"?toast.error:toast.success)(text);
+  if(toastText.trim()&&!text.startsWith("已加入上传队列："))(tone==="error"?toast.error:toast.success)(toastText);
  }
 
 
@@ -384,7 +384,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   });
   try{
    await request<{id:string;favorited:boolean}>("/favorites/file/"+file.id,{method:on?"PUT":"DELETE"});
-   announce(on?`已收藏：${file.name}`:`已取消收藏：${file.name}`,"info");
+   announce(on?`已收藏：${file.name}`:`已取消收藏：${file.name}`,"info",on?"已收藏":"已取消收藏");
   }catch(error){
    setFavoriteIds(prev=>{
     const next=new Set(prev);
