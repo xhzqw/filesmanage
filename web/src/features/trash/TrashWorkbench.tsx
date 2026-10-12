@@ -13,7 +13,7 @@ import {RestoreDialog} from "./RestoreDialog";
 import "./trashWorkbench.css";
 
 const PAGE_SIZE=40;
-type Notice={text:string;error:boolean};
+type Notice={text:string;error:boolean;warning?:boolean;announced?:boolean};
 type MenuState={entry:TrashEntry;anchor:HTMLElement};
 
 function since(period:string):string{
@@ -120,9 +120,9 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
  function updateKind(value:string){setKind(value);setOffset(0);}
  function updatePeriod(value:string){setPeriod(value);setOffset(0);}
  function updateSort(value:string){setSort(value);setOffset(0);}
- function notify(text:string,error=false){
-  setNotice({text,error});
-  (error?toast.error:toast.success)(text);
+ function notify(text:string,tone:"success"|"warning"|"danger"="success"){
+  setNotice({text,error:tone==="danger",warning:tone==="warning",announced:true});
+  (tone==="danger"?toast.error:tone==="warning"?toast.warning:toast.success)(text);
  }
  function chooseOne(id:string,checked:boolean){
   setSelected(current=>{const next=new Set(current);if(checked)next.add(id);else next.delete(id);return next;});
@@ -134,7 +134,7 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
  async function batchRestore(){
   if(locked||!selectedRows.length)return;
   setBusy(true);setNotice(null);
-  let ok=0;const errors:string[]=[];
+  let ok=0;const errors:string[]=[];let uncertain=false;
   for(const entry of selectedRows){
    if(!entry.oldParentTrail?.length){
     errors.push(entry.oldName+"：历史位置未记录，请单独选择恢复目录");
@@ -142,30 +142,36 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
    }
    try{await trashApi.restore(entry.id,"","");ok++;}
    catch(error){
+    if(errorCode(error)==="E_NETWORK"){
+     errors.push(entry.oldName+"：请求中断，恢复结果未确认");
+     uncertain=true;break;
+    }
     errors.push(entry.oldName+"："+errorCopy(error,"恢复失败"));
-    if(errorCode(error)==="E_NETWORK")break;
    }
   }
   setBusy(false);setSelected(new Set());refresh();
   if(ok)onRestored();
-  notify(`恢复成功 ${ok} 项`+(errors.length?`，失败 ${errors.length} 项。请逐项处理冲突：${errors.slice(0,2).join("；")}`:""),errors.length>0);
+  const summary=`已确认恢复 ${ok} 项`+
+   (errors.length?`；${uncertain?"包含结果未确认项":"未恢复"} ${errors.length} 项：${errors.slice(0,2).join("；")}`:"");
+  notify(summary,uncertain||ok>0&&errors.length>0?"warning":errors.length>0?"danger":"success");
  }
  async function confirmPurge(){
   if(busy||purgeTargets.length===0)return;
   setBusy(true);setPurgeError("");
-  let ok=0;const errors:string[]=[];
+  let ok=0;const errors:string[]=[];let uncertain=false;
   for(const entry of purgeTargets){
    try{await trashApi.purge(entry.id);ok++;}
    catch(error){
-    errors.push(entry.oldName+"："+errorCopy(error,"永久删除失败"));
     if(errorCode(error)==="E_NETWORK"){
-     errors.push("网络中断，最后一项结果不确定，请刷新核实");
-     break;
+     errors.push(entry.oldName+"：请求中断，永久删除结果未确认；请刷新核实");
+     uncertain=true;break;
     }
+    errors.push(entry.oldName+"："+errorCopy(error,"永久删除失败"));
    }
   }
   setBusy(false);setPurgeTargets([]);setSelected(new Set());refresh();
-  notify(`已永久删除 ${ok} 项`+(errors.length?`；${errors.slice(0,3).join("；")}`:""),errors.length>0);
+  notify(`已确认永久删除 ${ok} 项`+(errors.length?`；${errors.slice(0,3).join("；")}`:""),
+   uncertain||ok>0&&errors.length>0?"warning":errors.length>0?"danger":"success");
  }
 
  return <section className="trash-workbench" aria-label="回收站">
@@ -191,7 +197,7 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
   {expanded&&<div className="trash-extra"><label htmlFor="trash-delete-user">删除人</label><RareInput id="trash-delete-user" placeholder="按删除人筛选" maxLength={80} value={deletedBy} onChange={e=>setDeletedBy(e.target.value)}/>
    <RareButton type="button" onClick={()=>{setDeletedBy("");setSearch("");updateKind("all");updatePeriod("all");updateSort("recent");}}>重置筛选</RareButton>
   </div>}
-  {notice&&<div role={notice.error?"alert":"status"} className={"trash-notice"+(notice.error?" error":"")}>{notice.text}<RareButton type="button" aria-label="关闭提示" onClick={()=>setNotice(null)}>×</RareButton></div>}
+  {notice&&<div role={notice.announced?undefined:notice.error?"alert":"status"} className={"trash-notice"+(notice.error?" error":notice.warning?" warning":"")}>{notice.text}<RareButton type="button" aria-label="关闭提示" onClick={()=>setNotice(null)}>×</RareButton></div>}
   {selected.size>0&&<div className="trash-selection">
    <span>已选 {selectedRows.length} 项</span>
    <RareButton type="button" disabled={locked} onClick={batchRestore}>批量恢复</RareButton>
@@ -227,7 +233,7 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
    <RareButton type="button" disabled={locked||status!=="ready"||!hasMore} onClick={()=>setOffset(v=>v+PAGE_SIZE)}>下一页</RareButton>
   </div>
   <Menu open={menu!==null} onClose={()=>setMenu(null)} label="回收站操作" anchor={menu?.anchor} items={menu?[{id:"purge",label:"永久删除",danger:true,onSelect:()=>askPurge([menu.entry])}]:[]}/>
-  {restoring&&<RestoreDialog entry={restoring} onClose={()=>setRestoring(null)} onReload={()=>{setRestoring(null);refresh();}} onRestored={()=>{setRestoring(null);refresh();notify("恢复成功");onRestored();}}/>}
+  {restoring&&<RestoreDialog entry={restoring} onClose={()=>setRestoring(null)} onReload={()=>{setRestoring(null);refresh();}} onRestored={()=>{setRestoring(null);refresh();onRestored();}}/>}
   {purgeTargets.length>0&&<Dialog open title={purgeTargets.length===1?"永久删除":"批量永久删除"} onClose={()=>{if(!busy)setPurgeTargets([]);}} closeGuard={()=>!busy} className="dialog">
    <p role="alert" className="trash-danger-note">将永久移除 {purgeTargets.length} 项资源及其版本历史，无法撤销。</p>
    <p className="trash-purge-summary">{purgeTargets.slice(0,3).map(e=>e.oldName).join("、")}{purgeTargets.length>3?` 等 ${purgeTargets.length} 项`:""}</p>

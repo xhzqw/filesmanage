@@ -1,5 +1,6 @@
 import {RareButton,RareDataTable,RareInput,RareSelect} from "../../shared/ui/rare";
 import {toast} from "../../shared/ui/feedback";
+import {errorCode,errorCopy} from "../../shared/errors";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useEffect,useMemo,useRef,useState,type FormEvent} from "react";
 import {Link} from "react-router-dom";
@@ -103,7 +104,11 @@ export function SearchPanel({userId}:{userId:string}){
   try{
    setPresets(await searchPresetsApi.save(title,fields));
    setPresetName("");setMessage(`已同步搜索条件：${title}`);toast.success("搜索预设已保存");
-  }catch{setPresetError("保存失败或已达到 12 条限制");toast.error("搜索预设保存失败或已达到 12 条限制");}
+  }catch(error){
+   setPresetError(errorCode(error)==="E_NETWORK"
+    ?"网络中断，预设保存结果未确认；请重新读取预设后核对"
+    :errorCopy(error,"保存搜索预设失败，请检查名称或数量限制"));
+  }
   finally{setPresetBusy(false);}
  }
  function loadPreset(preset:SearchPresetFields){
@@ -120,9 +125,14 @@ export function SearchPanel({userId}:{userId:string}){
   setPresetBusy(true);setPresetError("");
   try{
    await searchPresetsApi.remove(id);
-   setPresets(await searchPresetsApi.list());
+   try{setPresets(await searchPresetsApi.list());}
+   catch{setPresetError("预设已删除，但列表刷新失败；请重新读取预设");setPresetToken(n=>n+1);return;}
    toast.success("搜索预设已删除");
-  }catch{setPresetError("删除失败，请重试");toast.error("删除搜索预设失败，请重试");}
+  }catch(error){
+   setPresetError(errorCode(error)==="E_NETWORK"
+    ?"网络中断，删除结果未确认；请先核对预设列表，勿重复操作"
+    :errorCopy(error,"删除搜索预设失败，请重试"));
+  }
   finally{setPresetBusy(false);}
  }
  useEffect(()=>{

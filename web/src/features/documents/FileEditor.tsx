@@ -24,6 +24,7 @@ export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileIte
  const[content,setContent]=useState("");
  const[loaded,setLoaded]=useState("");
  const[message,setMessage]=useState("");
+ const[messageTone,setMessageTone]=useState<"success"|"warning"|"danger">("danger");
  const[busy,setBusy]=useState(false);
  const[lockToken,setLockToken]=useState("");
  const[baseSeq,setBaseSeq]=useState(file.currentVersionSeq);
@@ -93,12 +94,14 @@ export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileIte
    if(requiresApproval){
     await fileApi.submitForApproval(file.id,baseSeq,data);
     setLoaded(content);
+    setMessageTone("success");
     setMessage("已提交审批，通过后生成新版本；当前生效版本未变。");
     toast.success("修改已提交审批，当前生效版本未变");
     onSaved();
     return;
    }
    if(!lockToken){
+    setMessageTone("danger");
     setMessage("编辑锁未就绪，请重新打开编辑器");
     return;
    }
@@ -106,13 +109,19 @@ export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileIte
    setLockToken("");
    setBaseSeq(result.versionSeq);
    setLoaded(content);
+   setMessageTone("success");
    setMessage(`已保存为 v${result.versionSeq}`);
    toast.success(`文件已保存为 v${result.versionSeq}`);
    onSaved();
   }catch(error){
    const code=errorCode(error);
-   const detail=code==="E_VERSION_CONFLICT"?"文件已被其他人修改，请刷新后重试":code==="E_LOCKED"?"编辑锁已失效，请重新打开编辑器":errorCopy(error,"保存失败");
-   setMessage(detail);toast.error(detail);
+   const unknown=code==="E_NETWORK";
+   const detail=unknown?"网络中断，保存结果未确认；请先检查最新版本，切勿直接重复提交"
+    :code==="E_VERSION_CONFLICT"?"文件已被其他人修改，请刷新后重试"
+    :code==="E_LOCKED"?"编辑锁已失效，请重新打开编辑器":errorCopy(error,"保存失败");
+   setMessageTone(unknown?"warning":"danger");
+   // The editor remains open with an actionable live announcement.
+   setMessage(detail);
   }finally{setBusy(false);}
  }
 
@@ -130,7 +139,7 @@ export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileIte
     <label htmlFor="editor-content">内容</label>
     <RareTextarea id="editor-content" value={content} rows={16} onChange={e=>setContent(e.target.value)}/>
    </>}
-   {message&&status!=="failed"&&<p role="alert" className="notice error">{message}</p>}
+   {message&&status!=="failed"&&<p role={messageTone==="success"?undefined:messageTone==="warning"?"status":"alert"} className={"notice"+(messageTone==="danger"?" error":"")}>{message}</p>}
    {pending&&<p role="alert" className="notice error">有未保存的修改，放弃后将丢失本次编辑。</p>}
    <div className="dialog-actions">
     {pending===null&&<>

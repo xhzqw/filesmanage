@@ -6,6 +6,7 @@ import type {User} from "../entities/user/model";
 import {AppShell} from "../shared/ui/AppShell";
 import {Dialog} from "../shared/ui/Dialog";
 import {sessionApi,type DeviceSession,type AuthActivity} from "../features/auth/sessionsApi";
+import {errorCode,errorCopy} from "../shared/errors";
 import "./SessionDevices.css";
 
 function dateTime(value:string):string{
@@ -58,7 +59,12 @@ export function SessionDevices({user,onLogout}:{user:User;onLogout:()=>void}){
    }
    setConfirm(null);
    await refresh();
-  }catch{setError("撤销未完成，服务器未确认操作成功。请重试。");toast.warning("服务器未确认会话撤销结果，请刷新后核对")}
+  }catch(cause){
+   setError(errorCode(cause)==="E_NETWORK"
+    ?"网络中断，撤销结果未确认；请刷新设备列表核对后再重试"
+    :errorCopy(cause,"撤销会话失败，请核对设备状态后重试"));
+   // Local actionable error is authoritative; avoid a duplicate global alert.
+  }
   finally{setBusy(false)}
  }
  const others=sessions.filter(row=>!row.current);

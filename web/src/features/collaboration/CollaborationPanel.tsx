@@ -5,7 +5,7 @@ import {useEffect,useMemo,useRef,useState} from "react";
 import {Link} from "react-router-dom";
 import {collaborationApi,type Favorite,type Share} from "./api";
 import {ShareDialog,type ShareResource} from "./ShareDialog";
-import {errorCopy} from "../../shared/errors";
+import {errorCode,errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
 import type {FileItem} from "../../entities/file/model";
 import type {Folder} from "../../entities/folder/model";
@@ -248,10 +248,10 @@ export function CollaborationPanel(){
  },[favorites]);
  const chosenFavorited=chosen!==null&&favoriteKeys.has(chosen.kind+":"+chosen.id);
 
- function say(text:string,tone:"info"|"error"="info"){
+ function say(text:string,tone:"info"|"error"|"warning"="info"){
   setMessage(text);
-  setMessageTone(tone);
-  if(text.trim())(tone==="error"?toast.error:toast.success)(text);
+  setMessageTone(tone==="info"?"info":"error");
+  if(text.trim())(tone==="error"?toast.error:tone==="warning"?toast.warning:toast.success)(text);
  }
 
  function refresh(){
@@ -293,7 +293,7 @@ export function CollaborationPanel(){
    await collaborationApi.setFavorite(kind,id,false);
    say("已取消关注");
    refresh();
-  }catch(error){say(errorCopy(error,"操作失败"),"error");}
+  }catch(error){say(errorCode(error)==="E_NETWORK"?"网络中断，取消关注结果未确认；请刷新列表核对":errorCopy(error,"操作失败"),errorCode(error)==="E_NETWORK"?"warning":"error");}
  }
 
  function askRevoke(share:Share){
@@ -312,8 +312,11 @@ export function CollaborationPanel(){
   try{
    await collaborationApi.revokeShare(share.id);
   }catch(error){
-   const detail=errorCopy(error,"撤销失败");
-   setRevokeMessage(detail);toast.error(detail);
+   if(errorCode(error)==="E_NETWORK"){
+    setRevokeTarget(null);
+    say("网络中断，撤销分享结果未确认；请刷新分享列表核对","warning");
+    refresh();
+   }else setRevokeMessage(errorCopy(error,"撤销失败"));
    setRevokeBusy(false);
    return;
   }
@@ -332,7 +335,7 @@ export function CollaborationPanel(){
    say(`已关注「${target.name}」`);
    refresh();
   }catch(error){
-   say(errorCopy(error,"关注失败"),"error");
+    say(errorCode(error)==="E_NETWORK"?"网络中断，关注结果未确认；请刷新列表核对":errorCopy(error,"关注失败"),errorCode(error)==="E_NETWORK"?"warning":"error");
   }finally{
    setPickBusy(false);
   }
@@ -359,7 +362,7 @@ export function CollaborationPanel(){
    </div>
    <RareButton type="button" className="primary collab-create-action" onClick={openCreate}>创建分享</RareButton>
   </div>
-  {message&&<p role="status" className={"notice"+(messageTone==="error"?" error":"")}>{message}</p>}
+  {message&&<p className={"notice"+(messageTone==="error"?" error":"")}>{message}</p>}
   <div className={"collab-workspace"+(tab==="favorites"?" with-picker":"")}>
   {tab==="favorites"&&<section className={"share-workbench"+(pickKind==="file"?" is-file-mode":"")} aria-label="选择关注或分享资源">
    <div className="share-workbench-head"><h3>选择资源</h3></div>

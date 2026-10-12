@@ -174,9 +174,12 @@ export function DelegatedRolesWorkspace(){
    await permissionsApi.create(targetFolder,{subjectKind:"user",subjectId:subject.trim(),actions:[effectiveAction],scopeOnly:true,
     ...(expiry?{expiresAt:new Date(expiry).toISOString()}:{})});
    setConfirm("");setSubject("");setRefresh(v=>v+1);
+   toast.success("目录直接授权已添加");
   }catch(e){
    setConfirm("");
-   setError(errorCopy(e,"授权失败")+(errorCode(e)==="E_NETWORK"?" 结果可能已提交，请先核对授权列表，勿直接重复操作。":""));
+   setError(errorCode(e)==="E_NETWORK"
+    ?"网络中断，授权结果未确认；请先核对授权列表，勿直接重复操作"
+    :errorCopy(e,"授权失败"));
    setRefresh(v=>v+1);
   }finally{mutationBusy.current=false;setIsMutating(false);}
  }
@@ -184,16 +187,18 @@ export function DelegatedRolesWorkspace(){
   if(mutationBusy.current)return;
   if(revokeTarget!==id){setRevokeTarget(id);return;}
   mutationBusy.current=true;setIsMutating(true);setError("");
-  try{await permissionsApi.revoke(id);setRevokeTarget("");setRefresh(v=>v+1);}
+  try{await permissionsApi.revoke(id);setRevokeTarget("");setRefresh(v=>v+1);toast.success("目录直接授权已撤销");}
   catch(e){
    setRevokeTarget("");
-   setError(errorCopy(e,"撤销直接 ACL 失败")+(errorCode(e)==="E_NETWORK"?" 结果未确认，请先核对记录。":""));
+   setError(errorCode(e)==="E_NETWORK"
+    ?"网络中断，撤销结果未确认；请先核对记录"
+    :errorCopy(e,"撤销直接授权失败"));
    setRefresh(v=>v+1);
   }finally{mutationBusy.current=false;setIsMutating(false);}
  }
  return <div className="work-body">
   {busy&&<p role="status" className="hint">正在读取委派职责…</p>}
-   {error&&<RareNotice tone="danger">{error}</RareNotice>}
+   {error&&<RareNotice tone={error.includes("结果未确认")?"warning":"danger"}>{error}</RareNotice>}
    {!busy&&roles.length===0&&<RareNotice tone="info">没有有效管理角色；部门、用户和工作组管理需要系统管理员权限。</RareNotice>}
   {canAudit&&<PermissionAudit users={[]}/>}
   {permissionRoles.length>0&&<section className="perm-detail org-delegated-workspace">

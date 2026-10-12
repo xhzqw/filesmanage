@@ -122,8 +122,16 @@ export function ApprovalInbox({currentUser,onReview}:{currentUser:User;onReview:
    if(code==="E_VERSION_CONFLICT"||code==="E_APPROVAL_PENDING"){
     setDecision(null);setMessage("审批状态已变化，请刷新");toast.warning("审批状态已变化，正在刷新列表");
     setReloadToken(token=>token+1);
+   }else if(code==="E_NETWORK"){
+    // Lost response is not a rejection; do not leave the confirmation button
+    // active for an accidental duplicate approval or withdrawal.
+    setDecision(null);setMessage("网络中断，本次审批结果未确认；已重新读取审批列表，请核对后操作");
+    toast.warning("审批结果未确认，正在刷新审批列表");
+    setReloadToken(token=>token+1);
    }else{
-    const detail=errorCopy(error,"操作失败");setDecisionError(detail);toast.error(detail);
+    // The modal's actionable alert is authoritative. A second global alert
+    // would read out the same error twice.
+    const detail=errorCopy(error,"操作失败");setDecisionError(detail);
    }
   }finally{
    setBusyId("");
@@ -183,7 +191,7 @@ export function ApprovalInbox({currentUser,onReview}:{currentUser:User;onReview:
     </RareButton>
    </div>
   </div>
-  {message&&<div role="status" className="approval-notice">{message}</div>}
+  {message&&<div className="approval-notice">{message}</div>}
   <div className={"approval-workbench"+(sideOpen?" side-open":"")}>
    <div className="approval-main" id={"approval-panel-"+activeList} role="tabpanel" aria-labelledby={"approval-tab-"+activeList}>
     <div className="approval-result-count">{activeList==="inbox"?"待处理":"我的申请"} · {activeApprovals.length} 条</div>

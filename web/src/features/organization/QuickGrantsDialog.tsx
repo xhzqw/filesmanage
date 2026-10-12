@@ -28,9 +28,6 @@ export function QuickGrantsDialog({folder,onClose}:{folder:Folder;onClose:()=>vo
  const [busy,setBusy]=useState(false);
  const [unknown,setUnknown]=useState(false);
  const [notice,setNotice]=useState<{text:string;error:boolean}|null>(null);
- useEffect(()=>{
-  if(notice)(notice.error?toast.error:toast.success)(notice.text);
- },[notice]);
  const [kind,setKind]=useState<"user"|"group">("group");
  const [subject,setSubject]=useState("");
  const [actions,setActions]=useState<string[]>(["list"]);
@@ -77,6 +74,7 @@ export function QuickGrantsDialog({folder,onClose}:{folder:Folder;onClose:()=>vo
     ...(exp!==null?{expiresAt:new Date(exp).toISOString()}:{})});
    setSubject("");setActions(["list"]);setScopeOnly(true);setExpiresAt("");setReview(false);setAck(false);
    setNotice({text:"授权已添加",error:false});setRefreshKey(n=>n+1);
+   toast.success("授权已添加");
   }catch(error){
    const uncertain=errorCode(error)==="E_NETWORK";if(uncertain)setUnknown(true);
    setReview(false);setNotice({text:uncertain?"网络中断，结果未知，请刷新授权记录确认":errorCopy(error,"添加授权失败"),error:true});
@@ -87,6 +85,7 @@ export function QuickGrantsDialog({folder,onClose}:{folder:Folder;onClose:()=>vo
   setBusy(true);setNotice(null);
   try{
    await permissionsApi.revoke(grant.id);setRevokeId(null);setNotice({text:"直接授权已撤销",error:false});setRefreshKey(n=>n+1);
+   toast.success("直接授权已撤销");
   }catch(error){
    const uncertain=errorCode(error)==="E_NETWORK";if(uncertain)setUnknown(true);
    setNotice({text:uncertain?"网络中断，结果未知，请刷新授权记录确认":errorCopy(error,"撤销失败"),error:true});
@@ -100,7 +99,7 @@ export function QuickGrantsDialog({folder,onClose}:{folder:Folder;onClose:()=>vo
     <div><RareButton type="button" className="secondary-action" onClick={refresh} disabled={busy}>刷新</RareButton>
      {grantsState==="ready"&&<span className="quick-grants-count">{grants.length} 条</span>}</div>
    </div>
-   {notice?.error&&<RareNotice tone="danger">{notice.text}</RareNotice>}
+   {notice?.error&&<RareNotice tone={unknown?"warning":"danger"}>{notice.text}</RareNotice>}
    {grantsState==="loading"&&<p role="status" className="hint">正在读取授权…</p>}
    {grantsState==="failed"&&<RareNotice tone="danger">读取失败，已暂停授权修改。请刷新重试。</RareNotice>}
    {grantsState==="ready"&&<div className="quick-grants-list">

@@ -16,6 +16,7 @@
 .trash-extra .rare-button{margin-left:auto}
 .trash-notice{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;padding:6px 10px;background:var(--surface-header);border-radius:var(--radius-sm)}
 .trash-notice.error{color:var(--status-danger);background:var(--surface-danger-soft)}
+.trash-notice.warning{color:var(--status-warning);background:var(--surface-header)}
 .trash-notice .rare-button{margin-left:auto;padding:0 7px;min-height:22px}
 .trash-selection{display:flex;align-items:center;gap:8px;min-height:35px;padding:4px 9px;background:var(--surface-row-selected);border-radius:var(--radius-sm)}
 .trash-selection>span{font-weight:600;margin-right:6px}

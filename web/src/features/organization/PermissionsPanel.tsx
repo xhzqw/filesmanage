@@ -39,9 +39,6 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
  const [mode,setMode]=useState<"list"|"effective"|"create">("list");
  const [grantQuery,setGrantQuery]=useState("");
 
- useEffect(()=>{
-  if(notice)(notice.error?toast.error:toast.success)(notice.text);
- },[notice]);
  const [subjectKind,setSubjectKind]=useState<"user"|"group">("group");
  const [subjectId,setSubjectId]=useState("");
  const [actions,setActions]=useState<string[]>(["list"]);
@@ -125,6 +122,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
    setNotice({text:"直接授权已提交，请以刷新后的服务端记录为准。",error:false});
    setSubjectKind("group");setSubjectId("");setExpiresAt("");setActions(["list"]);setScopeOnly(true);
    reload();setMode("list");
+   toast.success("直接授权已提交，请以刷新后的服务端记录为准");
   }catch(e){
    if(currentFolderRef.current!==folderId)return;
    setNotice({text:errorCode(e)==="E_NETWORK"
@@ -140,12 +138,12 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
    await permissionsApi.revoke(revokeTarget.id);
    if(currentFolderRef.current!==revokeFolder)return;
    setRevokeTarget(null);setNotice({text:"直接授权已撤销，已重新读取服务端记录。",error:false});reload();
+   toast.success("直接授权已撤销");
   }catch(e){
    if(currentFolderRef.current!==revokeFolder)return;
    setRevokeError(errorCode(e)==="E_NETWORK"
     ?"网络中断，撤销结果未知。关闭弹窗并刷新授权后确认。"
     :errorCopy(e,"撤销失败"));
-   toast.warning(errorCode(e)==="E_NETWORK"?"撤销结果未确认，请刷新授权记录核对":"撤销授权失败，请重试");
   }finally{setRevokeBusy(false);}
  }
  return <div className="perm-content-root">
@@ -201,6 +199,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
       </div>}
      </section>}
      {mode==="create"&&<div className="perm-create-view">
+      {notice?.error&&<RareNotice tone={notice.text.includes("结果未知")?"warning":"danger"}>{notice.text}</RareNotice>}
       <div className="perm-create-heading"><strong>为当前目录新增授权</strong>
        <RareButton type="button" onClick={()=>requestNavigation(()=>setMode("list"))}>返回列表</RareButton>
       </div>
@@ -222,7 +221,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
    {revokeTarget&&<>
     <p>确定撤销 {names.get(revokeTarget.subjectKind+":"+revokeTarget.subjectId)??revokeTarget.subjectId} 的「{displayActions(revokeTarget.actions)}」直接授权？</p>
     <p className="hint">只撤销这一条记录。工作组、父目录及共享仍可能赋予相同权限。</p>
-    {revokeError&&<RareNotice tone="danger">{revokeError}</RareNotice>}
+    {revokeError&&<RareNotice tone={revokeError.includes("结果未知")?"warning":"danger"}>{revokeError}</RareNotice>}
     <div className="dialog-actions"><RareButton type="button" className="secondary-action" disabled={revokeBusy} onClick={()=>setRevokeTarget(null)}>取消</RareButton>
      <RareButton type="button" tone="danger" className="danger" loading={revokeBusy} onClick={()=>void revoke()}>{revokeBusy?"撤销中…":"确认撤销"}</RareButton></div>
    </>}

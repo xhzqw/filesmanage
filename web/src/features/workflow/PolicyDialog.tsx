@@ -1,7 +1,8 @@
-import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
+import {RareButton,RareInput,RareNotice,RareSelect} from "../../shared/ui/rare";
+import {toast} from "../../shared/ui/feedback";
 import {useEffect,useState,type FormEvent} from "react";
 import {workflowApi} from "./api";
-import {errorCopy} from "../../shared/errors";
+import {errorCode,errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
 import type {Folder} from "../../entities/folder/model";
 import "./policyDialog.css";
@@ -14,6 +15,8 @@ export function PolicyDialog({folder,approvers,onClose}:{folder:Folder;approvers
  const[chain,setChain]=useState<string[]>([""]);
  const[enabled,setEnabled]=useState(true);
  const[message,setMessage]=useState("");
+ const[messageTone,setMessageTone]=useState<"danger"|"warning">("danger");
+ const[writeUnknown,setWriteUnknown]=useState(false);
  const[configured,setConfigured]=useState(false);
  const[busy,setBusy]=useState(false);
 
@@ -32,26 +35,30 @@ export function PolicyDialog({folder,approvers,onClose}:{folder:Folder;approvers
 
  async function submit(event:FormEvent<HTMLFormElement>){
   event.preventDefault();
-  if(chain.some(id=>!id)||new Set(chain).size!==chain.length||busy)return;
+  if(chain.some(id=>!id)||new Set(chain).size!==chain.length||busy||writeUnknown)return;
   setMessage("");setBusy(true);
   try{
    await workflowApi.setPolicy(folder.id,chain,enabled);
    setConfigured(true);
-   setMessage("策略已保存");
+   toast.success("审批策略已保存");
   }catch(error){
-   setMessage(errorCopy(error,"保存策略失败"));
+   const unknown=errorCode(error)==="E_NETWORK";
+   setWriteUnknown(unknown);setMessageTone(unknown?"warning":"danger");
+   setMessage(unknown?"网络中断，保存结果未确认；请关闭弹窗并核对策略后再操作":errorCopy(error,"保存策略失败"));
   }finally{setBusy(false);}
  }
 
  async function clear(){
-  if(busy)return;
+  if(busy||writeUnknown)return;
   setMessage("");setBusy(true);
   try{
    await workflowApi.clearPolicy(folder.id);
    setConfigured(false);
-   setMessage("策略已移除");
+   toast.success("审批策略已移除");
   }catch(error){
-   setMessage(errorCopy(error,"移除策略失败"));
+   const unknown=errorCode(error)==="E_NETWORK";
+   setWriteUnknown(unknown);setMessageTone(unknown?"warning":"danger");
+   setMessage(unknown?"网络中断，移除结果未确认；请关闭弹窗并核对策略后再操作":errorCopy(error,"移除策略失败"));
   }finally{setBusy(false);}
  }
 
@@ -74,11 +81,11 @@ export function PolicyDialog({folder,approvers,onClose}:{folder:Folder;approvers
     <RareInput type="checkbox" checked={enabled} onChange={e=>setEnabled(e.target.checked)} disabled={busy}/>
     启用审批
    </label>
-   {message&&<p role="alert" className="notice error">{message}</p>}
+   {message&&<RareNotice tone={messageTone}>{message}</RareNotice>}
    <div className="dialog-actions">
-    {configured&&<RareButton type="button" className="secondary-action" onClick={clear} disabled={busy}>移除策略</RareButton>}
+    {configured&&<RareButton type="button" className="secondary-action" onClick={clear} disabled={busy||writeUnknown}>移除策略</RareButton>}
     <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>关闭</RareButton>
-    <RareButton type="submit" className="primary" disabled={busy||chain.some(id=>!id)||new Set(chain).size!==chain.length}>{busy?"保存中…":"保存策略"}</RareButton>
+    <RareButton type="submit" className="primary" disabled={busy||writeUnknown||chain.some(id=>!id)||new Set(chain).size!==chain.length}>{busy?"保存中…":"保存策略"}</RareButton>
    </div>
   </form>
  </Dialog>;
