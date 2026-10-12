@@ -4,12 +4,18 @@ export function decodeCadText(source:string):string{
  return source
   .replace(/%%[dD]/g,"°")
   .replace(/%%[pP]/g,"±")
-  .replace(/%%[cC]/g,"⌀")
+  // U+2300 (diameter sign) lacks glyph coverage in common CAD fallback fonts.
+  // Use the widely supported slashed O for a readable mechanical diameter.
+  .replace(/%%[cC]/g,"Ø")
+  // Read the four-digit CAD escape before the generic variable-length parser:
+  // otherwise \\U+23002.00 can swallow the leading digit of the dimension.
+  .replace(/\\U\+2300/gi,"Ø")
   .replace(/\\U\+([0-9A-Fa-f]{4,6})/g,(_,hex:string)=>{
    const cp=Number.parseInt(hex,16);
    return cp>=0x20&&cp<=0x10ffff&&!(cp>=0xd800&&cp<=0xdfff)
     ?String.fromCodePoint(cp):"�";
   })
+  .replace(/⌀/g,"Ø")
   .replace(/\\[PX]/g,"\n")
   .replace(/\\S([^;]{1,60});/g,(_,fraction:string)=>fraction.replace(/[#^]/g,"/"))
   // Alignment, height, width, tracking, font and color are markup, not text.

@@ -41,6 +41,17 @@ assert.equal(cadDerivativeDisposition({found:false,class:"converted"}),"request"
 assert.equal(cadDerivativeDisposition({found:true,class:"native"}),"existing");
 assert.equal(cadDerivativeDisposition({found:true,class:"licensed"}),"unsupported");
 
+const cadTextBundle=await build({
+ entryPoints:[fileURLToPath(new URL("../src/features/modelViewer/cadText2d.ts",import.meta.url))],
+ bundle:true,write:false,format:"esm",platform:"node",target:"es2022",logLevel:"silent",
+});
+const {decodeCadText}=await import("data:text/javascript;base64,"+
+ Buffer.from(cadTextBundle.outputFiles[0].text).toString("base64"));
+assert.equal(decodeCadText("%%c2.00"),"Ø2.00",
+ "mechanical diameter must not render as the unsupported U+2300 glyph");
+assert.equal(decodeCadText(String.raw`\U+23002.00`),"Ø2.00");
+assert.equal(decodeCadText("%%p0.05 %%d"),"±0.05 °");
+
 // Bundle the parser with its pure NURBS evaluator. The Three dependency is
 // type-only and is erased; this remains a remote-only headless regression.
 const parsedBundle=await build({
