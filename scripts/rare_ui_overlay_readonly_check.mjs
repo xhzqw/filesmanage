@@ -117,12 +117,36 @@ try{
    assert(modal.role&&modal.subject&&modal.actions===0
     &&inside(modal.rect,width,width===390?760:900),
     "clean modal for an audit-only role: "+JSON.stringify(modal));
-   if(width===1440){
+   if(width===1440||width===900||width===390){
     await click('.org-role-editor .perm-form-row>label:nth-child(2) .rare-select');
     await waitFor('!!document.querySelector(".rare-select-menu [role=option]")');
-    await evalJS(`(()=>{const option=[...document.querySelectorAll(".rare-select-menu [role=option]")].find(x=>x.textContent.includes("目录权限管理员"));if(!option)throw Error("role missing");option.click();return true})()`);
+    const popup=await evalJS(`(()=>{const dialog=document.querySelector('dialog.org-role-dialog'),m=dialog.querySelector('.rare-select-menu'),
+      b=dialog.querySelector('.perm-form-row>label:nth-child(2) .rare-select'),
+      option=[...m.querySelectorAll('[role=option]')].find(x=>x.textContent.includes('目录权限管理员'));
+      if(!option)throw Error('role missing');
+      const mr=m.getBoundingClientRect(),br=b.getBoundingClientRect(),or=option.getBoundingClientRect(),dr=dialog.getBoundingClientRect();
+      const hit=document.elementFromPoint(or.x+or.width/2,or.y+or.height/2);
+      return{menu:{x:mr.x,y:mr.y,w:mr.width,h:mr.height},btn:{x:br.x,y:br.y},option:{x:or.x,y:or.y,w:or.width,h:or.height},
+        dialog:{x:dr.x,y:dr.y,w:dr.width,h:dr.height,scrollLeft:dialog.scrollLeft,scrollTop:dialog.scrollTop},
+        hit:hit?.outerHTML?.slice(0,160),style:getComputedStyle(m).position};})()`);
+    assert(popup.hit?.includes('role="option"')||popup.hit?.includes('rare-select-option'),
+     "role popup option must be the real mouse hit target at "+width+": "+JSON.stringify(popup));
+    await click('.rare-select-menu [role=option]:last-child');
     await waitFor('!!document.querySelector(".org-role-editor .permission-action-picker")');
     assert.equal(await evalJS('document.querySelectorAll(".org-role-editor .permission-action-picker input[type=checkbox]").length'),9);
+    await click('.org-role-editor .perm-form-row:first-child label:first-child .rare-select');
+    await waitFor('!!document.querySelector(".rare-select-menu [role=option]")');
+    const firstMember=await evalJS(`(()=>{const m=document.querySelector('.rare-select-menu'),items=[...m.querySelectorAll('[role=option]:not(:disabled)')].filter(x=>x.textContent.trim()&&!x.textContent.includes('选择成员'));
+     const e=items[0],r=e?.getBoundingClientRect();
+     return{count:items.length,rect:r&&{x:r.x,y:r.y,w:r.width,h:r.height},
+      hit:r?document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.outerHTML?.slice(0,180):null};})()`);
+    assert(firstMember.count>0&&firstMember.rect,
+     "there must be a selectable member in the real user directory: "+JSON.stringify(firstMember));
+    const memberIndex=await evalJS(`(()=>[...document.querySelectorAll('.rare-select-menu [role=option]')].findIndex(x=>!x.disabled&&x.textContent.trim()&&!x.textContent.includes('选择成员')))()`);
+    await click('.rare-select-menu [role=option]:nth-child('+(memberIndex+1)+')');
+    await waitFor(`document.querySelector('.org-role-editor .perm-form-row:first-child label:first-child .rare-select')?.textContent.includes('（')`);
+    assert.equal(await evalJS('document.querySelector(".org-role-editor button[type=submit]")?.disabled'),true,
+     "delegation must still require a folder scope for directory permission administrator");
    }
    await click("dialog.org-role-dialog .dialog-close");
    await waitFor('!document.querySelector("dialog.org-role-dialog")');
