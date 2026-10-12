@@ -47,3 +47,18 @@ func TestConvertedDXFRejectsEmptyAndTruncated(t *testing.T) {
 		})
 	}
 }
+
+// Optional remote-only fixture checks the output of a real DWG converter.
+func TestConvertedDXFExternalFixture(t *testing.T) {
+	path := os.Getenv("FILESMANAGE_DXF_TEST_FIXTURE")
+	if path == "" {
+		t.Skip("no external DWG-to-DXF fixture configured")
+	}
+	good, err := outputHasDxfGeometry(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !good {
+		t.Fatalf("converted DXF is empty or malformed: %s", path)
+	}
+}
