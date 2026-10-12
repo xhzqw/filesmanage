@@ -254,6 +254,22 @@ try{
   }
   results.push(width+"px: workgroup master/detail OK");
  }
+ // Role ACL action presets are presentation-only until the separate preview
+ // and confirmation workflow is submitted. Never submit a form in this test.
+ await viewport(1440,900);
+ await navigate("/org?tab=roles",'!!document.querySelector(".org-role-editor")');
+ await click(".org-role-editor .perm-form-row>label:nth-child(2) .rare-select");
+ await waitFor('!!document.querySelector(".rare-select-menu [role=option]")');
+ await evalJS(`(()=>{const option=[...document.querySelectorAll(".rare-select-menu [role=option]")].find(x=>x.textContent.includes("目录权限管理员"));if(!option)throw Error("permission-admin role missing");option.click();return true})()`);
+ await waitFor('!!document.querySelector(".org-role-action-tools")');
+ const actionsBefore=await evalJS(`(()=>({total:document.querySelectorAll(".org-role-editor .perm-action-grid input[type=checkbox]").length,
+  selected:[...document.querySelectorAll(".org-role-editor .perm-action-grid input[type=checkbox]")].filter(x=>x.checked).length}))()`);
+ assert(actionsBefore.total>=8,"role action choices visible: "+JSON.stringify(actionsBefore));
+ await click(".org-role-action-tools .rare-button:first-of-type");
+ await waitFor(`[...document.querySelectorAll(".org-role-editor .perm-action-grid input[type=checkbox]")].every(x=>x.checked)`);
+ await click(".org-role-action-tools .rare-button:last-of-type");
+ await waitFor(`[...document.querySelectorAll(".org-role-editor .perm-action-grid input[type=checkbox]")].every(x=>!x.checked)`);
+ results.push("1440px: role ACL select-all/clear without submission OK");
  // Deep-linking to the seal library must not lose its selected view on reload.
  for(const width of [1440,900,390]){
   await viewport(width,width===390?760:900);
