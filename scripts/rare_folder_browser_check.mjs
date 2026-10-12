@@ -135,6 +135,30 @@ try{
    assert(alignment,"icon-grid test needs at least one file or folder");
    assert(Object.values(alignment.deltas).every(delta=>delta<=1),"icon, label, and metadata must align for short and two-line names: "+JSON.stringify(alignment));
    console.log("EXPLORER_ICON_ALIGNMENT_PASS",JSON.stringify(alignment.deltas));
+   // Move the real Chrome pointer onto the NAME, not onto the folder glyph:
+   // the complete tile owns hover. Selection then locks the open animation.
+   const tile=await evaluate(`(()=>{
+    const el=document.querySelector(".explorer-icon-grid .explorer-folder:not(.selected)");
+    if(!el)return null;
+    const n=el.querySelector(".explorer-item-name").getBoundingClientRect();
+    const art=el.querySelector(".explorer-item-art").getBoundingClientRect();
+    const name={x:n.left+n.width/2,y:n.top+n.height/2};
+    return {name,outsideIcon:!(name.x>=art.left&&name.x<=art.right&&name.y>=art.top&&name.y<=art.bottom)};
+   })()`);
+   assert(tile&&tile.outsideIcon,"hover fixture needs a non-selected folder NAME distinct from the icon");
+   await send("Input.dispatchMouseEvent",{type:"mouseMoved",x:0,y:0});
+   await wait(140);
+   assert.equal(await evaluate('document.querySelector(".explorer-icon-grid .explorer-folder:not(.selected) [data-slot=rare-folder-component]")?.dataset.folderOpen'),"false","unselected folder starts closed");
+   await send("Input.dispatchMouseEvent",{type:"mouseMoved",x:tile.name.x,y:tile.name.y});
+   await until('document.querySelector(".explorer-icon-grid .explorer-folder:not(.selected) [data-slot=rare-folder-component]")?.dataset.folderOpen==="true"');
+   await send("Input.dispatchMouseEvent",{type:"mouseMoved",x:0,y:0});
+   await until('document.querySelector(".explorer-icon-grid .explorer-folder:not(.selected) [data-slot=rare-folder-component]")?.dataset.folderOpen==="false"');
+   await send("Input.dispatchMouseEvent",{type:"mouseMoved",x:tile.name.x,y:tile.name.y});
+   await send("Input.dispatchMouseEvent",{type:"mousePressed",button:"left",x:tile.name.x,y:tile.name.y,clickCount:1});
+   await send("Input.dispatchMouseEvent",{type:"mouseReleased",button:"left",x:tile.name.x,y:tile.name.y,clickCount:1});
+   await send("Input.dispatchMouseEvent",{type:"mouseMoved",x:0,y:0});
+   await until('document.querySelector(".explorer-icon-grid .explorer-folder.selected [data-slot=rare-folder-component]")?.dataset.folderOpen==="true"');
+   console.log("RARE_FOLDER_TILE_HOVER_PASS name/empty-area hover, exit, selected-open");
   }
   if(mode!=="list"){
    const count=await evaluate('document.querySelectorAll(".explorer-folder [data-slot=rare-folder-component]").length');

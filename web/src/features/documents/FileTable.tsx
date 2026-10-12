@@ -121,6 +121,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const selectAllRef=useRef<HTMLInputElement>(null);
  const[focusedId,setFocusedId]=useState<string|null>(null);
  const[focusedFolderId,setFocusedFolderId]=useState<string|null>(null);
+ const[hoveredFolderId,setHoveredFolderId]=useState<string|null>(null);
  const[anchorId,setAnchorId]=useState<string|null>(null);
  const[pendingDelete,setPendingDelete]=useState<FileItem[]>([]);
  const[printingBatch,setPrintingBatch]=useState<FileItem[]|null>(null);
@@ -216,9 +217,12 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   setSelectedIds(new Set<string>());
   setFocusedId(null);
   setFocusedFolderId(null);
+  setHoveredFolderId(null);
   setAnchorId(null);
   setRowMenu(null);
  },[folder,sort]);
+ // Hover is a transient presentation state and cannot leak between views.
+ useEffect(()=>setHoveredFolderId(null),[viewMode]);
 
  // The favorite marks are read once per list revision. A failed read leaves the
  // row action disabled: the button must not claim "not favorited" when the
@@ -784,15 +788,21 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   </div>;
  }
  function renderFolderEntry(entry:Folder){
+  const selected=focusedFolderId===entry.id;
+  const hovered=hoveredFolderId===entry.id;
   return <div key={"folder-"+entry.id} data-folder-id={entry.id} role="row"
-   tabIndex={0} aria-selected={focusedFolderId===entry.id}
-   className={"explorer-item explorer-folder"+(focusedFolderId===entry.id?" selected":"")}
+   tabIndex={0} aria-selected={selected}
+   className={"explorer-item explorer-folder"+(selected?" selected":"")}
+   onMouseEnter={()=>setHoveredFolderId(entry.id)}
+   onMouseLeave={()=>setHoveredFolderId(current=>current===entry.id?null:current)}
+   onFocus={()=>setHoveredFolderId(entry.id)}
+   onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget))setHoveredFolderId(current=>current===entry.id?null:current);}}
    onClick={()=>{setFocusedFolderId(entry.id);setFocusedId(null);setSelectedIds(new Set());}}
    onDoubleClick={()=>navigate("/doc?folder="+encodeURIComponent(entry.id))}
    onKeyDown={event=>{
     if(event.key==="Enter"){event.preventDefault();event.stopPropagation();navigate("/doc?folder="+encodeURIComponent(entry.id));}
    }}>
-   <div className="explorer-item-art" aria-hidden="true"><FolderResourceIcon open={focusedFolderId===entry.id} size={viewMode==="columns"?24:52}/></div>
+   <div className="explorer-item-art" aria-hidden="true"><FolderResourceIcon open={selected} hovered={hovered} size={viewMode==="columns"?24:52}/></div>
    <span className="explorer-item-name" title={entry.name}>{entry.name}</span>
    <span className="explorer-item-sub">文件夹</span>
   </div>;

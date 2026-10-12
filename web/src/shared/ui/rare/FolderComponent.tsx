@@ -7,11 +7,11 @@
  * Only host sizing and passive folder-list behavior are adapted. There is no
  * competing onClick: selection, double-open and dragging belong to the row.
  */
-import {useId,useState} from "react";
+import {useId} from "react";
 import {motion,useReducedMotion} from "motion/react";
 import "./folderComponent.css";
 
-type Props={open?:boolean;size?:number;className?:string};
+type Props={open?:boolean;hovered?:boolean;size?:number;className?:string};
 const W=321,H=270;
 const FLAP="M0 25C0 11.1929 11.1929 0 25 0H136.084C143.044 0 149.689 2.90139 154.42 8.00608L178.08 33.5343C182.811 38.639 189.456 41.5404 196.416 41.5404H296C309.807 41.5404 321 52.7333 321 66.5404V216C321 229.807 309.807 241 296 241H25C11.1929 241 0 229.807 0 216V25Z";
 const FLAP_OUTLINE="M25 0.5H136.084C142.905 0.5 149.417 3.3431 154.054 8.3457L177.713 33.874C182.539 39.0808 189.317 42.04 196.416 42.04H296C309.531 42.04 320.5 53.0092 320.5 66.54V216C320.5 229.531 309.531 240.5 296 240.5H25C11.469 240.5 0.5 229.531 0.5 216V25C0.5 11.469 11.469 0.5 25 0.5Z";
@@ -40,14 +40,11 @@ function PaperCard({filterId}:{filterId:string}){
  </svg>;
 }
 
-export function RareFolderComponent({open=false,size=16,className=""}:Props){
- const [hover,setHover]=useState(false);
+export function RareFolderComponent({open=false,hovered=false,size=16,className=""}:Props){
  const reducedMotion=useReducedMotion();
  const uid=useId().replace(/:/g,"");
- // Upstream has THREE states, not two. Hover presents the shallow glass flap
- // and subtly fanned cards shown in RareUI's demo; clicked/open is a separate
- // deeper fan-out. Never map hover onto the clicked-open animation.
- const hovered=hover&&size>=32;
+ // Hover belongs to the entire parent folder tile, not this tiny icon.
+ // Preserve Rare UI's three levels: idle, hovered and selected/open.
  const active=open||hovered;
  const paperStates=[
   {x:open?70:40,y:open?-160:hovered?-30:-10,rotate:open?18:hovered?14:10,delay:open?.1:hovered?.12:0},
@@ -59,8 +56,7 @@ export function RareFolderComponent({open=false,size=16,className=""}:Props){
   data-folder-scale={size<32?"compact":"large"}
   className={"resource-folder-icon rare-folder-component"+(className?" "+className:"")}
   style={{width:size,height:size}}
-  onMouseEnter={()=>{if(size>=32)setHover(true);}}
-  onMouseLeave={()=>setHover(false)} aria-hidden="true">
+  aria-hidden="true">
   <span className="rare-folder-stage" style={{width:W,height:H,transform:`translate(-50%,-50%) scale(${size/W})`}}>
    <span className="rare-folder-back"/>
    <span className="rare-folder-papers">
