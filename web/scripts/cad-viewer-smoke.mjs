@@ -7,6 +7,18 @@ import {fileURLToPath} from "node:url";
 import {build,transform} from "esbuild";
 import * as THREE from "three";
 
+// The screen-space XY ruler occupies the bottom/left of the CAD stage.
+// A separately-positioned instruction pill used to sit behind it, producing
+// a cropped white blob in the lower-left corner of the user's drawing.
+const viewerPage=readFileSync(new URL("../src/pages/ModelViewer.tsx",import.meta.url),"utf8");
+const viewerCss=readFileSync(new URL("../src/features/modelViewer/viewer.css",import.meta.url),"utf8");
+assert(!viewerPage.includes('className="cad-hint"'),
+ "CAD instructions must not be rendered behind the XY ruler");
+assert(!viewerCss.includes(".cad-hint{"),
+ "CAD must not retain the bottom-anchored white instruction pill");
+assert(viewerPage.includes('aria-label="工程视图工具"'),
+ "short in-toolbar action labels must remain accessible");
+
 // Bundle the parser with its pure NURBS evaluator. The Three dependency is
 // type-only and is erased; this remains a remote-only headless regression.
 const parsedBundle=await build({

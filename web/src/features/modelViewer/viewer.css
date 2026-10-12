@@ -34,7 +34,6 @@
 .cad-cubeface-right{transform:rotateY(90deg) translateZ(33px)}
 .cad-cubeface-top{transform:rotateX(90deg) translateZ(33px)}
 .cad-cubeface-bottom{transform:rotateX(-90deg) translateZ(33px)}
-.cad-hint{position:absolute;left:12px;bottom:10px;color:#334b63;font-size:11px;line-height:1.35;padding:5px 10px;border:1px solid rgba(137,165,188,.35);border-radius:var(--radius-pill);background:rgba(255,255,255,.88);pointer-events:none;max-width:calc(100% - 24px)}
 .cad-status{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;color:var(--text-secondary);font-size:13px;background:var(--surface-panel)}
 .cad-status a{color:var(--brand-blue);text-decoration:underline;text-underline-offset:2px}
 .cad-inspector{flex:0 0 235px;min-width:190px;max-width:260px;display:flex;flex-direction:column;gap:8px;min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 2px 2px 0}

@@ -277,7 +277,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
        {(status==="too-large"||status==="webgl-lost")&&<a href={"/api/files/"+id+"/bytes"}>下载原文件</a>}
       </div>}
       {status==="ready"&&<div className="cad-toolbar" role="group" aria-label="工程视图工具">
-       <RareButton type="button" onClick={()=>{
+       <RareButton type="button" title="将当前图形居中并适合画布" onClick={()=>{
         controls.current?.resetView();
         setView(v=>({...v,axes:false,measure:false,projection:drawing?"orthographic":"perspective"}));
        }}>适合窗口</RareButton>
@@ -308,7 +308,7 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
           onClick={()=>setView(v=>({...v,projection:controls.current?.toggleProjection()??v.projection}))}>{view.projection==="orthographic"?"正交":"透视"}</RareButton>
         </>}
        </div>
-       <RareButton type="button" className={view.measure?"on":""} aria-pressed={view.measure}
+       <RareButton type="button" title={drawing?"依次点击两个点测量距离":"点击两个模型点测量距离"} className={view.measure?"on":""} aria-pressed={view.measure}
         onClick={()=>setView(v=>({...v,measure:controls.current?.toggleMeasure()??v.measure}))}>测距</RareButton>
        {drawing&&<RareButton type="button" onClick={()=>{
         const image=controls.current?.exportPng();
@@ -339,10 +339,6 @@ export function ModelViewer({user,onLogout}:{user:User;onLogout:()=>void}){
            setView(v=>({...v,projection:"orthographic"}));
           }}>{["前","后","左","右","上","下"][index]}</RareButton>)}
        </div>
-      </div>}
-      {status==="ready"&&<div className="cad-hint">
-       {view.measure?(drawing?"连续点击两个点测距 · 左键拖动画布 · 滚轮缩放":"点击模型两点测量网格近似距离 · 左键平移 / 右键旋转"):
-        drawing?"点击线段查看长度 · 左键拖动平移 · 滚轮缩放":"左键旋转 · 右键平移 · 滚轮缩放"}
       </div>}
      </section>
      {status==="ready"&&<aside className="cad-inspector" aria-label="工程文件属性">
