@@ -90,6 +90,10 @@ case "$ACTION" in
    DATABASE_URL="$TEST_DSN" psql "$TEST_DSN" -v ON_ERROR_STOP=1 -q \
     -c "UPDATE users SET must_change_password=false WHERE id='u_admin'"
    touch "$MARK_FILE"
+  else
+   # A previously initialized QA database must follow new migrations too.
+   # The main service database is never touched by this lab command.
+   DATABASE_URL="$TEST_DSN" go run ./cmd/migrate -dir migrations
   fi
   [[ -r "$PASS_FILE" ]] || { echo "LAB_REFUSED: QA password missing" >&2; exit 2; }
   DATABASE_URL="$TEST_DSN" FILESMANAGE_ADDR="$TEST_ADDR" \
