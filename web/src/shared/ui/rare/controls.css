@@ -108,3 +108,7 @@
 .rare-input[aria-invalid="true"]:focus-visible,.rare-select[aria-invalid="true"]:focus-visible,
 .rare-textarea[aria-invalid="true"]:focus-visible{outline-color:var(--status-danger)}
 .rare-button[data-rare-intent]{border-radius:var(--radius-sm)}
+/* Globally reusable destructive primary action: explicit semantic danger tone. */
+.rare-button[data-rare-intent="danger"][data-rare-emphasis="solid"]{background:var(--status-danger);border-color:var(--status-danger);color:var(--text-inverse);font-weight:600}
+.rare-button[data-rare-intent="danger"][data-rare-emphasis="solid"]:hover:not(:disabled){background:var(--status-danger);filter:brightness(.9);color:var(--text-inverse)}
+.rare-button[data-rare-intent="danger"][data-rare-emphasis="solid"]:disabled{opacity:.5}

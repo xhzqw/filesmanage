@@ -4,6 +4,7 @@ import (
 	"errors"
 	"filesmanage/internal/domain"
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -46,15 +47,15 @@ func TestNonAdminCanOnlyPrepareOwnPersonalSignature(t *testing.T) {
 	}
 }
 
-func TestSignaturePasswordAndVersionFieldsMandatory(t *testing.T) {
+func TestSignatureBatchRejectsBadVersionAndOversizedPassword(t *testing.T) {
 	s := &Service{}
 	invalid := SealPlacement{AssetID: "seal_1", PageNumber: 1, VersionSeq: 1, FileSha256: "wrong", Password: "test", X: .6, Y: .6, Width: .2, Height: .2}
 	if _, err := s.SignFile(nil, domain.User{}, "file", invalid); !errors.Is(err, domain.ErrInvalidInput) {
 		t.Fatalf("invalid version digest: %v", err)
 	}
-	invalid.FileSha256 = "a234567890123456789012345678901234567890123456789012345678901234"
-	invalid.Password = ""
+	invalid.FileSha256 = strings.Repeat("a", 64)
+	invalid.Password = strings.Repeat("x", 1025)
 	if _, err := s.SignFile(nil, domain.User{}, "file", invalid); !errors.Is(err, domain.ErrInvalidInput) {
-		t.Fatalf("empty password: %v", err)
+		t.Fatalf("oversized password: %v", err)
 	}
 }

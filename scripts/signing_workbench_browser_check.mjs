@@ -210,6 +210,35 @@ try{
    return !!history&&!history.open&&!document.querySelector('#file-seals-sidebar .seal-submit-panel');
   })()`);
   assert("signing sidebar defaults to compact controls with history collapsed",compact);
+  const redDelete=await cdp.evaluate(`(()=>{
+    const button=document.querySelector('.seal-page-toolbar .seal-delete-action');
+    if(!button)return null;
+    return {tone:button.dataset.rareIntent,emphasis:button.dataset.rareEmphasis,
+      label:button.textContent.trim(),visible:button.getBoundingClientRect().height>26};
+  })()`);
+  if(redDelete){
+   assert("global solid red danger button appears in the bottom signing capsule",
+    redDelete.tone==='danger'&&redDelete.emphasis==='solid'&&redDelete.visible,
+    JSON.stringify(redDelete));
+   await cdp.evaluate(`(()=>document.querySelector('.seal-delete-action')?.click())()`);
+   const target=await cdp.waitFor(`()=>!!document.querySelector('.seal-delete-target')`,3500);
+   if(target){
+    await cdp.evaluate(`(()=>document.querySelector('.seal-delete-target')?.click())()`);
+    const highlighted=await cdp.evaluate(`(()=>{
+     const t=document.querySelector('.seal-delete-target');
+     return !!t?.classList.contains('is-selected')&&t.getAttribute('aria-pressed')==='true';
+    })()`);
+    assert("clicking a signed personal mark highlights it for deletion",highlighted);
+    await cdp.evaluate(`(()=>document.querySelector('.seal-delete-action')?.click())()`);
+    const revokeModal=await cdp.waitFor(`()=>!!document.querySelector('dialog.seal-confirm-dialog[open] input[aria-label="删除签名密码"]')`,3500);
+    assert("deleting an existing signature asks for password",Boolean(revokeModal));
+    await cdp.evaluate(`(()=>[...document.querySelectorAll('dialog.seal-confirm-dialog[open] button')].find(b=>b.textContent?.includes('取消'))?.click())()`);
+    const revokedNone=await cdp.waitFor(`()=>!document.querySelector('dialog.seal-confirm-dialog[open]')`,2500);
+    assert("canceling removal preserves original signed PDF evidence",Boolean(revokedNone));
+   }else console.log("SKIP signed signature selection: none removable on current page");
+   await cdp.evaluate(`(()=>document.querySelector('.seal-cancel-delete')?.click())()`);
+  }else console.log("SKIP signature-removal button: no personal signatures exist");
+
   const enabled=await cdp.evaluate(`(()=>{
    const list=document.querySelector('#file-seals-sidebar select');
    return [...(list?.options??[])].filter(o=>o.value&&!o.disabled).length;
@@ -219,7 +248,16 @@ try{
    const chose=await cdp.waitFor(`()=>[...document.querySelectorAll('[role="option"]')].some(o=>!o.disabled&&o.textContent.trim()!=='选择人员或公章')`,4500);
    assert("signing asset selection opens RareUI listbox",Boolean(chose));
    if(chose){
-    await cdp.evaluate(`(()=>{[...document.querySelectorAll('[role="option"]')].find(o=>!o.disabled&&o.textContent.trim()!=='选择人员或公章')?.click()})()`);
+    await cdp.evaluate(`(()=>{
+      const options=[...document.querySelectorAll('[role="option"]')].filter(o=>!o.disabled&&o.textContent.trim()!=='选择人员或公章');
+      // Prefer a personal signature for a password-modal test. Never submit a
+      // company-only stamp during the browser regression: that would be real.
+      (options.find(o=>!o.textContent.trim().startsWith('公章 ·'))||options[0])?.click();
+    })()`);
+    const selectedType=await cdp.evaluate(`(()=>{
+      const native=document.querySelector('#file-seals-sidebar select');
+      return native?.selectedOptions?.[0]?.textContent.trim().startsWith('公章 ·')?'company':'personal';
+    })()`);
     const mark=await cdp.waitFor(`()=>!!document.querySelector('.seal-position-mark.is-editable')`,4500);
     assert("selected signing asset has movable page overlay",Boolean(mark));
     const advanced=await cdp.evaluate(`(()=>{
@@ -268,16 +306,22 @@ try{
        !document.querySelector('#file-seals-sidebar input[type=password]');
      })()`);
      assert("single blue signing action lives in the bottom capsule without sidebar password",bottomConfirm);
-     await cdp.evaluate(`(()=>document.querySelector('.seal-confirm-action')?.click())()`);
-     const modal=await cdp.waitFor(`()=>!!document.querySelector('dialog.seal-confirm-dialog[open] input[type=password]')`,3200);
-     assert("password prompt opens as modal after bottom confirm",Boolean(modal));
-     await cdp.evaluate(`(()=>{
-      [...document.querySelectorAll('dialog.seal-confirm-dialog button')].find(b=>b.textContent?.includes('取消'))?.click();
-     })()`);
-     const canceled=await cdp.waitFor(`()=>!document.querySelector('dialog.seal-confirm-dialog[open]')`,3000);
-     assert("cancelling password modal preserves all uncommitted placements",
-      Boolean(canceled)&&await cdp.evaluate(`(()=>document.querySelectorAll('.seal-draft-row').length===1)()`));
-
+     if(selectedType==='personal'){
+      await cdp.evaluate(`(()=>document.querySelector('.seal-confirm-action')?.click())()`);
+      const modal=await cdp.waitFor(`()=>!!document.querySelector('dialog.seal-confirm-dialog[open] input[type=password]')`,3200);
+      assert("personal signature prompts for password at bottom confirmation",Boolean(modal));
+      await cdp.evaluate(`(()=>{
+       [...document.querySelectorAll('dialog.seal-confirm-dialog button')].find(b=>b.textContent?.includes('取消'))?.click();
+      })()`);
+      const canceled=await cdp.waitFor(`()=>!document.querySelector('dialog.seal-confirm-dialog[open]')`,3000);
+      assert("cancelling personal signing modal preserves draft",
+       Boolean(canceled)&&await cdp.evaluate(`(()=>document.querySelectorAll('.seal-draft-row').length===1)()`));
+     }else{
+      // Never click "confirm" for a company stamp in tests. Company stamping
+      // is intentionally passwordless and would immediately persist a mark.
+      assert("company stamp offers direct confirmation with no password entry",
+       await cdp.evaluate(`(()=>!document.querySelector('#file-seals-sidebar input[type=password]')&&!document.querySelector('dialog.seal-confirm-dialog[open]'))()`));
+     }
      await cdp.evaluate(`(()=>document.querySelector('.seal-remove-mark')?.click())()`);
      const removed=await cdp.waitFor(`()=>document.querySelectorAll('.seal-draft-row').length===0&&!document.querySelector('.seal-position-mark')`,3500);
      assert("upper-right X removes staged seal without signing",Boolean(removed));

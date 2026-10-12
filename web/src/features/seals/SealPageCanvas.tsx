@@ -10,6 +10,8 @@ type Props={
  drafts?:StagedCanvasMark[];
  onSelectDraft:(assetId:string)=>void;onRemoveDraft:(assetId:string)=>void;
  pendingCount:number;onConfirm:()=>void;canConfirm:boolean;
+ deleteMode:boolean;deletableMarkIds:string[];deleteIds:string[];
+ onToggleDeleteMode:()=>void;onToggleDeleteMark:(id:string)=>void;onRequestDelete:()=>void;
  fileId:string;page:number;pageCount:number;onPageChange:(page:number)=>void;onRetry:()=>void;
  imageUrl:string;selected?:SealAsset;marks:FileSealMark[];
  position:StampPosition;setPosition:(update:(value:StampPosition)=>StampPosition)=>void;
@@ -22,7 +24,8 @@ const limit=(value:number)=>Math.max(.6,Math.min(5,Math.round(value*100)/100));
 /** All mark coordinates remain normalized to the unscaled PDF page. */
 export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,imageUrl,selected,marks,
  position,setPosition,angle,pageRatio,setPageRatio,imageAvailable,setImageAvailable,drafts=[],
- onSelectDraft,onRemoveDraft,pendingCount,onConfirm,canConfirm}:Props){
+ onSelectDraft,onRemoveDraft,pendingCount,onConfirm,canConfirm,
+ deleteMode,deletableMarkIds,deleteIds,onToggleDeleteMode,onToggleDeleteMark,onRequestDelete}:Props){
  const viewportRef=useRef<HTMLDivElement>(null);
  const surfaceRef=useRef<HTMLDivElement>(null);
  const dragRef=useRef<{x:number;y:number;left:number;top:number}|null>(null);
@@ -111,7 +114,7 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
   if(viewport?.hasPointerCapture(e.pointerId))viewport.releasePointerCapture(e.pointerId);
  }
  function place(e:MouseEvent<HTMLDivElement>){
-  if(panMode||!selected||!imageAvailable)return;
+  if(deleteMode||panMode||!selected||!imageAvailable)return;
   const rect=e.currentTarget.getBoundingClientRect();
   if(!rect.width||!rect.height)return;
   const x=(e.clientX-rect.left)/rect.width,y=(e.clientY-rect.top)/rect.height;
@@ -174,7 +177,7 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
   const viewport=viewportRef.current;if(viewport){viewport.scrollLeft=0;viewport.scrollTop=0}
  }
  const stagedPage=drafts.find(d=>d.assetId===selected?.id)?.pageNumber;
- const activeOnPage=!!selected&&(stagedPage===undefined||stagedPage===page);
+ const activeOnPage=!deleteMode&&!!selected&&(stagedPage===undefined||stagedPage===page);
  return <div className="seal-file-preview">
   <div className="seal-page-toolbar">
    <div className="seal-toolbar-reader" role="group" aria-label="签章页面工具">
@@ -191,10 +194,18 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
     <RareButton type="button" aria-pressed={panMode} onClick={()=>setPanMode(value=>!value)}>{panMode?"退出平移":"平移"}</RareButton>
     </div>
    </div>
-   {pendingCount>0&&<RareButton type="button" className="seal-confirm-action primary"
+   {!deleteMode&&pendingCount>0&&<RareButton type="button" tone="primary" className="seal-confirm-action"
     aria-label={"确认签署 "+pendingCount+" 枚签章"} disabled={!canConfirm} onClick={onConfirm}>
     确认签署 · {pendingCount}
    </RareButton>}
+   {marks.some(m=>m.assetKind==="personal")&&<>
+    {deleteMode&&<RareButton type="button" tone="ghost" className="seal-cancel-delete" onClick={onToggleDeleteMode}>取消</RareButton>}
+    <RareButton type="button" tone="danger" emphasis="solid" className="seal-delete-action"
+     aria-pressed={deleteMode} aria-label={deleteMode?(deleteIds.length?"删除选中的 "+deleteIds.length+" 处签名":"退出签名删除模式"):"选择删除已签名"}
+     onClick={()=>{if(!deleteMode||!deleteIds.length)onToggleDeleteMode();else onRequestDelete()}}>
+     {deleteMode?(deleteIds.length?"删除选中 · "+deleteIds.length:"退出删除"):"删除签名"}
+    </RareButton>
+   </>}
   </div>
   <div className="seal-page-viewport" ref={viewportRef} onPointerDown={pointerDown} onPointerMove={pointerMove}
    onPointerUp={pointerEnd} onPointerCancel={pointerEnd} aria-label="PDF 签章页面，可放大并拖动平移"
@@ -226,9 +237,19 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
      {(["nw","ne","sw","se"] as const).map(corner=>
       <span key={corner} className={"seal-resize-handle is-"+corner} data-corner={corner} aria-hidden="true"/>)}
     </span>}
-    {marks.filter(m=>m.pageNumber===page).map(m=><span key={m.id} className="seal-existing-mark"
-     style={{left:m.x*100+"%",top:m.y*100+"%",width:m.width*100+"%",height:m.height*100+"%",transform:"rotate("+(m.angleDegrees??0)+"deg)"}}>
-     <img alt={m.assetName} src={sealsApi.markImageUrl(fileId,m.id)}/></span>)}
+    {marks.filter(m=>m.pageNumber===page).map(m=>{
+     const style={left:m.x*100+"%",top:m.y*100+"%",width:m.width*100+"%",height:m.height*100+"%",transform:"rotate("+(m.angleDegrees??0)+"deg)"};
+     const selectable=deleteMode&&m.assetKind==="personal"&&deletableMarkIds.includes(m.id);
+     return selectable?
+      <RareButton key={m.id} type="button"
+       className={"seal-existing-mark seal-delete-target"+(deleteIds.includes(m.id)?" is-selected":"")}
+       aria-label={"选择删除签名 "+m.assetName} aria-pressed={deleteIds.includes(m.id)}
+       style={style} onClick={event=>{event.stopPropagation();onToggleDeleteMark(m.id)}}>
+       <img alt="" draggable={false} src={sealsApi.markImageUrl(fileId,m.id)}/>
+      </RareButton>:
+      <span key={m.id} className="seal-existing-mark" style={style}>
+       <img alt={m.assetName} src={sealsApi.markImageUrl(fileId,m.id)}/></span>;
+    })}
    </div>:
     <div className="seal-page-error" role="alert">此页无法显示
      <RareButton type="button" onClick={()=>{setImageAvailable(true);onRetry()}}>重试加载</RareButton>

@@ -38,7 +38,7 @@ export function SealRevisionControls({fileId,seq,sha,isAdmin,refreshKey,onSelect
     {history.revisions.map(item=><div key={item.revision} className="seal-revision-row">
      <div className="seal-revision-meta">
       <strong>{item.revision===0?"原始未签章":"签章 r"+item.revision}{item.revision===history.current?" · 当前":""}</strong>
-      <small>{item.markCount} 枚 · {item.action==="restore"?"回退":item.action==="sign"?"签署":item.action==="legacy"?"历史导入":"原件"}</small>
+      <small>{item.markCount} 枚 · {item.action==="restore"?"回退":item.action==="sign"?"签署":item.action==="legacy"?"历史导入":item.action==="revoke"?"删除签名":"原件"}</small>
       {item.actorName&&<small>{item.actorName}{item.createdAt?" · "+new Date(item.createdAt).toLocaleString("zh-CN"):""}</small>}
      </div>
      <div className="seal-revision-actions">

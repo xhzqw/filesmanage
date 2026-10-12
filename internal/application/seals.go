@@ -284,7 +284,7 @@ func (s *Service) SignFileBatch(ctx context.Context, actor domain.User, fileID s
 		return nil, domain.ErrInvalidInput
 	}
 	first := placements[0]
-	if first.VersionSeq < 1 || len(first.FileSha256) != 64 || len(first.Password) < 1 || len(first.Password) > 1024 {
+	if first.VersionSeq < 1 || len(first.FileSha256) != 64 || len(first.Password) > 1024 {
 		return nil, domain.ErrInvalidInput
 	}
 	ids := make(map[string]bool, len(placements))
@@ -300,10 +300,6 @@ func (s *Service) SignFileBatch(ctx context.Context, actor domain.User, fileID s
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
-	identity, hash, err := tx.UserByLogin(ctx, actor.Login)
-	if err != nil || identity.ID != actor.ID || bcrypt.CompareHashAndPassword([]byte(hash), []byte(first.Password)) != nil {
-		return nil, ErrInvalidCredentials
-	}
 	file, err := s.visibleFile(ctx, tx, actor, fileID, domain.ActionPrint)
 	if err != nil {
 		return nil, err
@@ -358,6 +354,7 @@ func (s *Service) SignFileBatch(ctx context.Context, actor domain.User, fileID s
 		asset domain.SealAsset
 	}
 	prepared := make([]preparedMark, 0, len(placements))
+	requiresPassword := false
 	hashes := make(map[string]bool, len(placements))
 	for _, p := range placements {
 		if document.NumPage() < p.PageNumber || p.PageNumber > len(dims) ||
@@ -378,6 +375,9 @@ func (s *Service) SignFileBatch(ctx context.Context, actor domain.User, fileID s
 		if !sealCanApply(actor, asset, permission, companyGranted) {
 			return nil, domain.ErrForbidden
 		}
+		if asset.Kind == "personal" {
+			requiresPassword = true
+		}
 		if hashes[asset.Sha256] {
 			return nil, domain.ErrNameConflict
 		}
@@ -395,6 +395,18 @@ func (s *Service) SignFileBatch(ctx context.Context, actor domain.User, fileID s
 			X: p.X, Y: p.Y, Width: p.Width, Height: p.Height, AngleDegrees: p.AngleDegrees,
 		}
 		prepared = append(prepared, preparedMark{mark: mark, asset: asset})
+	}
+	// A personal signature authenticates the operator. Company-stamp-only
+	// batches are authorized by the active session and seal-specific grants,
+	// without asking for the login password.
+	if requiresPassword {
+		if first.Password == "" {
+			return nil, ErrInvalidCredentials
+		}
+		identity, hash, authErr := tx.UserByLogin(ctx, actor.Login)
+		if authErr != nil || identity.ID != actor.ID || bcrypt.CompareHashAndPassword([]byte(hash), []byte(first.Password)) != nil {
+			return nil, ErrInvalidCredentials
+		}
 	}
 	// Preserve the previously visible revision and atomically add this batch.
 	currentRevision, err := store.SealRevision(ctx, file.ID, first.VersionSeq, -1)

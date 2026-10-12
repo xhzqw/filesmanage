@@ -9,18 +9,19 @@ export type RareDensity="compact"|"standard";
 export type RareButtonTone="primary"|"neutral"|"danger"|"ghost";
 export type RareButtonProps=ButtonHTMLAttributes<HTMLButtonElement> & {
   tone?:RareButtonTone;
+  emphasis?:"solid"|"soft";
   density?:RareDensity;
   loading?:boolean;
 };
 export const RareButton=forwardRef<HTMLButtonElement,RareButtonProps>(function RareButton(
-  {className="",tone,density,loading=false,disabled,...props},ref){
+  {className="",tone,emphasis,density,loading=false,disabled,...props},ref){
   // Migration adapter only: new code MUST pass tone explicitly for actions
   // that differ from neutral. Old class names are still rendered as-is.
   const detected=tone??(/\bprimary\b|\bprimary-btn\b/.test(className)?"primary":/\bdanger\b/.test(className)?"danger":/\bghost\b|\bsecondary-action\b|\baction-link\b/.test(className)?"ghost":"neutral");
   return <button {...props} ref={ref} disabled={disabled||loading}
     aria-busy={loading||props["aria-busy"]||undefined}
     data-rare-control="button" data-rare-tone={detected}
-    data-rare-intent={tone} data-density={density??"compact"}
+    data-rare-intent={tone} data-rare-emphasis={emphasis} data-density={density??"compact"}
     data-rare-loading={loading||undefined}
     className={"rare-button"+(className?" "+className:"")}>
     {loading?<BrandLoader size="xs" decorative/>:null}{props.children}

@@ -33,11 +33,18 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
  const[staged,setStaged]=useState<DraftSeal[]>([]);
  const[password,setPassword]=useState("");
  const[confirmOpen,setConfirmOpen]=useState(false);
+ const[deleteMode,setDeleteMode]=useState(false);
+ const[deleteIds,setDeleteIds]=useState<string[]>([]);
+ const[deleteOpen,setDeleteOpen]=useState(false);
+ const[deletePassword,setDeletePassword]=useState("");
+ const[deleteBusy,setDeleteBusy]=useState(false);
  const[busy,setBusy]=useState(false);
  const[error,setError]=useState("");
  const[imageAvailable,setImageAvailable]=useState(true);
  const[revision,setRevision]=useState(0);
  const isPDF=name.toLowerCase().endsWith(".pdf");
+ const requiresPassword=staged.some(item=>assets.find(asset=>asset.id===item.assetId)?.kind==="personal");
+ const removable=marks.filter(mark=>mark.assetKind==="personal"&&(isAdmin||mark.signerId===access?.userId));
  const selected=assets.find(a=>a.id===assetId);
  const maySign=!!selected&&(selected.kind!=="personal"||!!selected.ownerId)&&
   (isAdmin||(selected.kind==="personal"?!!access?.canSign:!!access?.canStamp));
@@ -48,7 +55,7 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
 
  useEffect(()=>{
   let live=true;
-  setStaged([]);setAssetId("");setPassword("");setConfirmOpen(false);
+  setStaged([]);setAssetId("");setPassword("");setConfirmOpen(false);setDeleteMode(false);setDeleteIds([]);setDeleteOpen(false);setDeletePassword("");
   Promise.all([sealsApi.list(),sealsApi.marks(fileId,seq),sealsApi.myPermission(),sealsApi.used(fileId)])
    .then(([available,entries,permission,used])=>{
     if(!live)return;
@@ -98,6 +105,7 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
   setPage(Math.max(1,Math.min(pageCount||1,next)));
  }
  function pickAsset(id:string){
+  if(deleteMode)return;
   if(!id){setAssetId("");return;}
   const asset=assets.find(a=>a.id===id);
   if(!asset||usedAssetIds.includes(id)||!isPDF||busy||!pageCount||!imageAvailable)return;
@@ -124,20 +132,48 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
   setStaged(list=>list.filter(item=>item.assetId!==id));
   if(assetId===id)setAssetId("");
  }
- async function sign(){
-  if(!password||!isPDF||busy||!pageCount||!staged.length||!imageAvailable)return;
+ async function sign(pass=password){
+  if((requiresPassword&&!pass)||!isPDF||busy||!pageCount||!staged.length||!imageAvailable)return;
   setBusy(true);setError("");
   try{
-   const marks=await sealsApi.applyBatch(fileId,{versionSeq:seq,fileSha256:sha,password,placements:staged});
+   const marks=await sealsApi.applyBatch(fileId,{versionSeq:seq,fileSha256:sha,password:pass,placements:staged});
    setStaged([]);setAssetId("");setConfirmOpen(false);setRevision(n=>n+1);onChanged();
    toast.success("已保存 "+marks.length+" 枚签章");
   }catch(err){setError(errorCopy(err,"签署失败，未保存本次签章，请检查密码、权限和位置"))}
   finally{setPassword("");setBusy(false)}
  }
+ function requestSign(){
+  if(!staged.length||busy)return;
+  setError("");
+  if(requiresPassword){setPassword("");setConfirmOpen(true);}
+  else void sign("");
+ }
+ function toggleDeleteMode(){
+  if(deleteMode){setDeleteMode(false);setDeleteIds([]);setDeleteOpen(false);}
+  else{setAssetId("");setDeleteIds([]);setDeleteMode(true);}
+ }
+ function toggleDeleteMark(id:string){
+  setDeleteIds(items=>items.includes(id)?items.filter(value=>value!==id):[...items,id]);
+ }
+ async function revoke(){
+  if(deleteBusy||!deletePassword||!deleteIds.length)return;
+  setDeleteBusy(true);setError("");
+  try{
+   const history=await sealsApi.history(fileId,seq);
+   await sealsApi.revokeSignatures(fileId,{
+    versionSeq:seq,fileSha256:sha,expectedRevision:history.current,
+    markIds:deleteIds,password:deletePassword
+   });
+   toast.success("已删除 "+deleteIds.length+" 处签名");
+   setDeleteOpen(false);setDeleteMode(false);setDeleteIds([]);setDeletePassword("");
+   setRevision(value=>value+1);onChanged();
+  }catch(err){setError(errorCopy(err,"删除签名失败，请检查密码和签名权限"))}
+  finally{setDeletePassword("");setDeleteBusy(false)}
+ }
  const controls = <div className="seal-file-controls">
-   {error&&!confirmOpen&&<p role="alert" className="notice error">{error}</p>}
+   {error&&!confirmOpen&&!deleteOpen&&<p role="alert" className="notice error">{error}</p>}
    <label>签名 / 公章
-    <RareSelect value={assetId} onChange={e=>pickAsset(e.target.value)}>
+    <RareSelect value={assetId} disabled={deleteMode} onChange={e=>pickAsset(e.target.value)}>
      <option value="">选择人员或公章</option>
      {assets.map(a=><option key={a.id} value={a.id}
       disabled={(a.kind==="personal"&&!a.ownerId)||(!isAdmin&&(a.kind==="personal"?!access?.canSign:!access?.canStamp))||usedAssetIds.includes(a.id)||
@@ -195,7 +231,7 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
   <aside className="seal-file-history">
    <SealRevisionControls fileId={fileId} seq={seq} sha={sha} isAdmin={isAdmin}
     refreshKey={revision} onSelect={onSelectRevision} onRestored={()=>{
-     setStaged([]);setAssetId("");setRevision(n=>n+1);onChanged();
+     setStaged([]);setAssetId("");setDeleteMode(false);setDeleteIds([]);setRevision(n=>n+1);onChanged();
     }}/>
 
    {marks.length===0&&<p className="empty">此版本尚无签章</p>}
@@ -212,11 +248,15 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
    position={position} setPosition={updatePosition} angle={angle} pageRatio={pageRatio} setPageRatio={setPageRatio}
    pageCount={pageCount} onPageChange={changePage} onRetry={()=>setImageRetry(n=>n+1)}
    onSelectDraft={pickAsset} onRemoveDraft={removeDraft} pendingCount={staged.length}
-   onConfirm={()=>{setError("");setPassword("");setConfirmOpen(true)}} canConfirm={!busy&&!!pageCount&&imageAvailable&&staged.length>0&&staged.every(item=>stampFitsPage(item,item.angleDegrees,pageRatio))}
+   onConfirm={requestSign} canConfirm={!busy&&!!pageCount&&imageAvailable&&staged.length>0&&staged.every(item=>stampFitsPage(item,item.angleDegrees,pageRatio))}
+   deleteMode={deleteMode} deletableMarkIds={removable.map(mark=>mark.id)}
+   deleteIds={deleteIds} onToggleDeleteMode={toggleDeleteMode}
+   onToggleDeleteMark={toggleDeleteMark}
+   onRequestDelete={()=>{setError("");setDeletePassword("");setDeleteOpen(true)}}
    imageAvailable={imageAvailable} setImageAvailable={setImageAvailable}
    drafts={staged.map(item=>({...item,asset:assets.find(a=>a.id===item.assetId)}))}/>:
    <div className="seal-file-preview"><p className="empty">仅 PDF 支持页面定位</p></div>}
-  <Dialog open={confirmOpen} title={"确认签署 · "+staged.length+" 枚"} onClose={()=>{setConfirmOpen(false);setPassword("");setError("")}}
+  <Dialog open={confirmOpen} title={"确认签名 · "+staged.length+" 枚"} onClose={()=>{setConfirmOpen(false);setPassword("");setError("")}}
    closeGuard={()=>!busy} initialFocus='input[aria-label="本人登录密码"]' className="seal-confirm-dialog">
    <form onSubmit={event=>{event.preventDefault();void sign()}}>
     <label>登录密码
@@ -226,8 +266,26 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
     {error&&<p className="notice error" role="alert">{error}</p>}
     <div className="dialog-actions">
      <RareButton type="button" disabled={busy} onClick={()=>{setConfirmOpen(false);setPassword("");setError("")}}>取消</RareButton>
-     <RareButton type="submit" className="primary" disabled={busy||!password||!staged.length}>
+     <RareButton type="submit" className="primary" disabled={busy||(requiresPassword&&!password)||!staged.length}>
       {busy?"正在签署…":"确认签署（"+staged.length+"）"}
+     </RareButton>
+    </div>
+   </form>
+  </Dialog>
+  <Dialog open={deleteOpen} title={"删除签名 · "+deleteIds.length+" 处"}
+   onClose={()=>{if(!deleteBusy){setDeleteOpen(false);setDeletePassword("");setError("")}}}
+   closeGuard={()=>!deleteBusy} initialFocus='input[aria-label="删除签名密码"]' className="seal-confirm-dialog">
+   <form onSubmit={event=>{event.preventDefault();void revoke()}}>
+    <label>登录密码
+     <RareInput type="password" aria-label="删除签名密码" autoComplete="current-password"
+      value={deletePassword} placeholder="输入密码确认删除" disabled={deleteBusy}
+      onChange={event=>setDeletePassword(event.target.value)}/>
+    </label>
+    {error&&<p className="notice error" role="alert">{error}</p>}
+    <div className="dialog-actions">
+     <RareButton type="button" disabled={deleteBusy} onClick={()=>{setDeleteOpen(false);setDeletePassword("");setError("")}}>取消</RareButton>
+     <RareButton type="submit" tone="danger" emphasis="solid" disabled={deleteBusy||!deletePassword||!deleteIds.length}>
+      {deleteBusy?"正在删除…":"确认删除"}
      </RareButton>
     </div>
    </form>
