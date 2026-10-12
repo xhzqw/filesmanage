@@ -101,20 +101,27 @@ try{
  assert("PDF reader tools float in a compact bottom dock",
   workspaceUI.dockBottom!==null&&workspaceUI.dockBottom>=0&&workspaceUI.dockBottom<55&&workspaceUI.dockWidth<workspaceUI.viewerWidth*.94,
   JSON.stringify(workspaceUI));
+ await cdp.evaluate(`(()=>document.querySelector('.file-sidebar-collapse')?.click())()`);
+ const collapsedReady=await cdp.waitFor(`()=>{
+  const layout=document.querySelector('.file-workbench-layout');
+  const sidebar=document.querySelector('.file-workbench-sidebar');
+  return !!layout?.classList.contains('is-collapsed')&&sidebar?.getBoundingClientRect().width<90;
+ }`,4000);
  const collapsed=await cdp.evaluate(`(()=>{
-  document.querySelector('.file-sidebar-collapse')?.click();
   const sidebar=document.querySelector('.file-workbench-sidebar');
   return {collapsed:document.querySelector('.file-workbench-layout')?.classList.contains('is-collapsed'),
-   width:sidebar?.getBoundingClientRect().width,
-   icon:!!sidebar?.querySelector('.file-workbench-nav-icon')};
+   width:sidebar?.getBoundingClientRect().width,icon:!!sidebar?.querySelector('.file-workbench-nav-icon')};
  })()`);
  assert("sidebar top toggle collapses to icon-only rail",
-  collapsed.collapsed&&collapsed.width<90&&collapsed.icon,JSON.stringify(collapsed));
- const restoredSidebar=await cdp.evaluate(`(()=>{
-  document.querySelector('.file-sidebar-collapse')?.click();
-  return document.querySelector('.file-workbench-sidebar')?.getBoundingClientRect().width;
- })()`);
- assert("sidebar toggle restores full navigation",restoredSidebar>180,String(restoredSidebar));
+  Boolean(collapsedReady)&&collapsed.collapsed&&collapsed.width<90&&collapsed.icon,JSON.stringify(collapsed));
+ await cdp.evaluate(`(()=>document.querySelector('.file-sidebar-collapse')?.click())()`);
+ const restoredReady=await cdp.waitFor(`()=>{
+  const layout=document.querySelector('.file-workbench-layout');
+  const sidebar=document.querySelector('.file-workbench-sidebar');
+  return !layout?.classList.contains('is-collapsed')&&sidebar?.getBoundingClientRect().width>180;
+ }`,4000);
+ const restoredSidebar=await cdp.evaluate(`(()=>document.querySelector('.file-workbench-sidebar')?.getBoundingClientRect().width)()`);
+ assert("sidebar toggle restores full navigation",Boolean(restoredReady)&&restoredSidebar>180,String(restoredSidebar));
 
  const clicked=await cdp.evaluate(`(()=>{
   const item=[...document.querySelectorAll('.file-workbench-nav-item')]
