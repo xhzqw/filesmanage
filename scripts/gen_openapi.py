@@ -1175,6 +1175,53 @@ add("GET", "/api/files/{id}/lock", operation("Lock status", "Workflow", "lockSta
     params=[id_param("id", "File id.")],
     responses=dict([json_ok(ref("LockStatus"), "Lock state."), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"])])))
 
+
+# --- Signature and stamp permissions ---
+schema("SealUserPermission",obj({"userId":string(),"displayName":string(),"canSign":boolean(),"canStamp":boolean()},required=["userId","displayName","canSign","canStamp"]))
+add("GET","/api/seal-permissions/me",operation("Read my individual signing and stamping authority","Seals","mySealPermission",security=SESSION,
+ responses=dict([json_ok(ref("SealUserPermission"),"Permission flags"),resp("401",ERR["401"])])))
+add("GET","/api/seal-permissions",operation("Admin list of active users and independent seal authorities","Seals","listSealUserPermissions",security=SESSION,
+ responses=dict([json_ok(arr(ref("SealUserPermission")),"Admin-managed permissions"),resp("401",ERR["401"]),resp("403",ERR["403"])])))
+add("PUT","/api/seal-permissions/{id}",operation("Admin assign personal-sign and company-stamp privileges separately","Seals","updateSealUserPermission",security=SESSION,
+ params=[id_param("id","User ID")],
+ request={"application/json":{"schema":obj({"canSign":boolean(),"canStamp":boolean()},required=["canSign","canStamp"])}},
+ responses=dict([json_ok(ref("SealUserPermission"),"Saved permission decision"),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+
+# --- Document signatures and company seals ---
+schema("SealAsset",obj({"id":string(),"kind":string(),"name":string(),"ownerId":string(),"ownerName":string(),"grantedUserIds":arr(string()),"createdBy":string(),"sha256":string(),"active":boolean(),"createdAt":timestamp()},required=["id","kind","name","createdBy","sha256","active"]))
+schema("FileSealMark",obj({"id":string(),"fileId":string(),"versionSeq":integer(),"fileSha256":string(),"assetId":string(),"assetSha256":string(),"assetName":string(),"assetKind":string(),"signerId":string(),"signerName":string(),"pageNumber":integer(),"x":{"type":"number"},"y":{"type":"number"},"width":{"type":"number"},"height":{"type":"number"},"createdAt":timestamp()},required=["id","fileId","versionSeq","fileSha256","assetId","assetSha256","signerId","pageNumber","x","y","width","height"]))
+seal_bin={"description":"Permission-gated immutable PNG image; private no-store.","content":{"image/png":{"schema":{"type":"string","format":"binary"}}}}
+add("GET","/api/seals",operation("List available signature and seal assets","Seals","listSealAssets",security=SESSION,
+ responses=dict([json_ok(arr(ref("SealAsset")),"Admin inventory or caller-authorized assets"),resp("401",ERR["401"]),resp("403",ERR["403"])])))
+add("POST","/api/seals",operation("Admin import of an immutable PNG personal signature or company seal","Seals","createSealAsset",security=SESSION,
+ request={"application/json":{"schema":obj({"kind":string(),"name":string(),"ownerId":string(),"pngBase64":string()},required=["kind","name","pngBase64"])}},
+ responses=dict([("201",{"description":"New immutable seal asset"}),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"])])))
+add("POST","/api/seals/{id}/manage",operation("Admin bind, grant, revoke or retire a seal","Seals","manageSealAsset",security=SESSION,
+ params=[id_param("id","Seal ID")],request={"application/json":{"schema":obj({"action":string(),"userId":string()},required=["action"])}},
+ responses=dict([json_ok(obj({"updated":string()}),"Updated"),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+add("GET","/api/seals/{id}/image",operation("Access assigned or authorized seal image","Seals","sealImage",security=SESSION,
+ params=[id_param("id","Seal ID")],responses=dict([("200",seal_bin),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+add("GET","/api/files/{id}/seals/used",operation("Find seal assets already used by this file across all versions, including equivalent image digests","Seals","usedFileSeals",security=SESSION,
+ params=[id_param("id","File ID")],
+ responses=dict([json_ok(arr(string()),"Assets unavailable for repeated application to this file"),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+add("GET","/api/files/{id}/seals",operation("List immutable version-anchored signing evidence","Seals","listFileSealMarks",security=SESSION,
+ params=[id_param("id","File ID"),query("version","Version sequence",integer(minimum=1),required=True)],
+ responses=dict([json_ok(arr(ref("FileSealMark")),"Version signature evidence"),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+add("POST","/api/files/{id}/seals",operation("Verify current user password and append version-specific signing evidence","Seals","signFileSeal",security=SESSION,
+ params=[id_param("id","File ID")],
+ request={"application/json":{"schema":obj({"assetId":string(),"versionSeq":integer(),"fileSha256":string(),"password":string(),"pageNumber":integer(),"x":{"type":"number"},"y":{"type":"number"},"width":{"type":"number"},"height":{"type":"number"}},required=["assetId","versionSeq","fileSha256","password","pageNumber","x","y","width","height"])}},
+ responses=dict([("201",{"description":"New append-only mark"}),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
+add("GET","/api/files/{id}/seals/page",operation("Permission-gated PDF page image for exact seal placement","Seals","fileSealPageImage",security=SESSION,
+ params=[id_param("id","File ID"),query("version","Version",integer(minimum=1),required=True),query("page","Page",integer(minimum=1),required=True),query("sha256","Exact file SHA",required=True)],
+ responses=dict([("200",seal_bin),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+add("GET","/api/files/{id}/seals/{mid}/image",operation("Render seal image from authorized file signing evidence","Seals","fileSealMarkImage",security=SESSION,
+ params=[id_param("id","File ID"),id_param("mid","Mark ID")],
+ responses=dict([("200",seal_bin),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
+
+add("GET","/api/files/{id}/seals/export",operation("Export actual visually stamped PDF derivative for a signed immutable version","Seals","exportFileSealPDF",security=SESSION,
+ params=[id_param("id","File ID"),query("version","Signed file version",integer(minimum=1),required=True)],
+ responses=dict([("200",{"description":"Download separate signed visual PDF; original file bytes stay immutable.","content":{"application/pdf":{"schema":{"type":"string","format":"binary"}}}}),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
+
 # --- Approvals ---
 add("GET", "/api/approvals", operation("List approvals visible to the caller", "Workflow", "listApprovals", security=SESSION,
     params=[query("scope", "mine = requested by me; pending = awaiting my decision; empty = both.", {"type": "string", "enum": ["mine", "pending"]})],

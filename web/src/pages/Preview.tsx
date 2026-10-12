@@ -12,6 +12,7 @@ import {FileEditor} from "../features/documents/FileEditor";
 import {FileMetadataEditor} from "../features/documents/FileMetadataEditor";
 import {FileLifecyclePanel} from "../features/documents/FileLifecyclePanel";
 import {VersionComparePanel} from "../features/documents/VersionComparePanel";
+import {FileSealsPanel} from "../features/seals/FileSealsPanel";
 import {FileReviewPanel} from "../features/documents/FileReviewPanel";
 import {PrintDialog} from "../features/documents/PrintDialog";
 import {MoveDialog} from "../features/documents/FileTable";
@@ -27,7 +28,7 @@ import type {User} from "../entities/user/model";
 import {AppShell} from "../shared/ui/AppShell";
 import "./previewWorkbench.css";
 
-type Tab="preview"|"details"|"versions"|"compare"|"review";
+type Tab="preview"|"details"|"versions"|"compare"|"review"|"seals";
 const ACTION_LABELS:Record<string,string>={upload:"上传",edit:"编辑",rollback:"回滚",restore:"恢复"};
 const CAD_EXTENSIONS=[".stl",".obj",".glb",".gltf",".step",".stp",".iges",".igs",".dxf",".dwg",".3mf",".ply"];
 function isCadName(name:string){return CAD_EXTENSIONS.some(ext=>name.toLowerCase().endsWith(ext));}
@@ -217,7 +218,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
      </header>
      {(notice||error)&&<p role={error?"alert":"status"} className={"notice"+(error?" error":"")}>{error||notice}</p>}
      <RareTabs className="file-workbench-tabs" label="文件详情">
-      {([["preview","预览"],["details","文件信息"],["versions","版本历史 ("+versions.length+")"],["compare","版本对比"],["review","审查批注"]] as const).map(([value,label])=>
+      {([["preview","预览"],["details","文件信息"],["versions","版本历史 ("+versions.length+")"],["compare","版本对比"],["review","审查批注"],["seals","签章"]] as const).map(([value,label])=>
        <RareButton key={value} type="button" id={"file-tab-"+value} role="tab"
         aria-selected={tab===value} tabIndex={tab===value?0:-1}
         aria-controls={"file-panel-"+value} onClick={()=>setTab(value)}>{label}</RareButton>)}
@@ -279,6 +280,9 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
      </section>}
      {tab==="review"&&<section id="file-panel-review" role="tabpanel" aria-labelledby="file-tab-review" className="file-workbench-panel">
       <FileReviewPanel fileId={id} versions={versions}/>
+     </section>}
+     {tab==="seals"&&<section id="file-panel-seals" role="tabpanel" aria-labelledby="file-tab-seals" className="file-workbench-panel">
+      <FileSealsPanel fileId={id} seq={currentSeq} sha={preview.sha256} name={preview.name}/>
      </section>}
      {tab==="versions"&&<section id="file-panel-versions" role="tabpanel" aria-labelledby="file-tab-versions" className="file-workbench-panel file-versions-panel">
       <div className="file-section-caption"><strong>版本记录</strong><span>所有历史均保留 · 回滚会创建新版本</span></div>

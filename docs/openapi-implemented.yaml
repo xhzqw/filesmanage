@@ -5221,6 +5221,660 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/seal-permissions/me:
+    get:
+      summary: Read my individual signing and stamping authority
+      operationId: mySealPermission
+      tags:
+      - Seals
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Permission flags
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/SealUserPermission'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/seal-permissions:
+    get:
+      summary: Admin list of active users and independent seal authorities
+      operationId: listSealUserPermissions
+      tags:
+      - Seals
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Admin-managed permissions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SealUserPermission'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/seal-permissions/{id}:
+    put:
+      summary: Admin assign personal-sign and company-stamp privileges separately
+      operationId: updateSealUserPermission
+      tags:
+      - Seals
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: User ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                canSign:
+                  type: boolean
+                canStamp:
+                  type: boolean
+              required:
+              - canSign
+              - canStamp
+      responses:
+        '200':
+          description: Saved permission decision
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/SealUserPermission'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/seals:
+    get:
+      summary: List available signature and seal assets
+      operationId: listSealAssets
+      tags:
+      - Seals
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Admin inventory or caller-authorized assets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SealAsset'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      summary: Admin import of an immutable PNG personal signature or company seal
+      operationId: createSealAsset
+      tags:
+      - Seals
+      security:
+      - cookieSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kind:
+                  type: string
+                name:
+                  type: string
+                ownerId:
+                  type: string
+                pngBase64:
+                  type: string
+              required:
+              - kind
+              - name
+              - pngBase64
+      responses:
+        '201':
+          description: New immutable seal asset
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/seals/{id}/manage:
+    post:
+      summary: Admin bind, grant, revoke or retire a seal
+      operationId: manageSealAsset
+      tags:
+      - Seals
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Seal ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                userId:
+                  type: string
+              required:
+              - action
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      updated:
+                        type: string
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/seals/{id}/image:
+    get:
+      summary: Access assigned or authorized seal image
+      operationId: sealImage
+      tags:
+      - Seals
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Seal ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Permission-gated immutable PNG image; private no-store.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/{id}/seals:
+    get:
+      summary: List immutable version-anchored signing evidence
+      operationId: listFileSealMarks
+      tags:
+      - Seals
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      - name: version
+        in: query
+        required: true
+        description: Version sequence
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Version signature evidence
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FileSealMark'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      summary: Verify current user password and append version-specific signing evidence
+      operationId: signFileSeal
+      tags:
+      - Seals
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                assetId:
+                  type: string
+                versionSeq:
+                  type: integer
+                fileSha256:
+                  type: string
+                password:
+                  type: string
+                pageNumber:
+                  type: integer
+                x:
+                  type: number
+                y:
+                  type: number
+                width:
+                  type: number
+                height:
+                  type: number
+              required:
+              - assetId
+              - versionSeq
+              - fileSha256
+              - password
+              - pageNumber
+              - x
+              - y
+              - width
+              - height
+      responses:
+        '201':
+          description: New append-only mark
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/{id}/seals/page:
+    get:
+      summary: Permission-gated PDF page image for exact seal placement
+      operationId: fileSealPageImage
+      tags:
+      - Seals
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      - name: version
+        in: query
+        required: true
+        description: Version
+        schema:
+          type: integer
+          minimum: 1
+      - name: page
+        in: query
+        required: true
+        description: Page
+        schema:
+          type: integer
+          minimum: 1
+      - name: sha256
+        in: query
+        required: true
+        description: Exact file SHA
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Permission-gated immutable PNG image; private no-store.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/{id}/seals/{mid}/image:
+    get:
+      summary: Render seal image from authorized file signing evidence
+      operationId: fileSealMarkImage
+      tags:
+      - Seals
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      - name: mid
+        in: path
+        required: true
+        description: Mark ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Permission-gated immutable PNG image; private no-store.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/{id}/seals/export:
+    get:
+      summary: Export actual visually stamped PDF derivative for a signed immutable version
+      operationId: exportFileSealPDF
+      tags:
+      - Seals
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      - name: version
+        in: query
+        required: true
+        description: Signed file version
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Download separate signed visual PDF; original file bytes stay immutable.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/approvals:
     get:
       summary: List approvals visible to the caller
@@ -9601,3 +10255,101 @@ components:
       required:
       - name
       - fields
+    SealUserPermission:
+      type: object
+      properties:
+        userId:
+          type: string
+        displayName:
+          type: string
+        canSign:
+          type: boolean
+        canStamp:
+          type: boolean
+      required:
+      - userId
+      - displayName
+      - canSign
+      - canStamp
+    SealAsset:
+      type: object
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+        name:
+          type: string
+        ownerId:
+          type: string
+        ownerName:
+          type: string
+        grantedUserIds:
+          type: array
+          items:
+            type: string
+        createdBy:
+          type: string
+        sha256:
+          type: string
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - id
+      - kind
+      - name
+      - createdBy
+      - sha256
+      - active
+    FileSealMark:
+      type: object
+      properties:
+        id:
+          type: string
+        fileId:
+          type: string
+        versionSeq:
+          type: integer
+        fileSha256:
+          type: string
+        assetId:
+          type: string
+        assetSha256:
+          type: string
+        assetName:
+          type: string
+        assetKind:
+          type: string
+        signerId:
+          type: string
+        signerName:
+          type: string
+        pageNumber:
+          type: integer
+        x:
+          type: number
+        y:
+          type: number
+        width:
+          type: number
+        height:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+      required:
+      - id
+      - fileId
+      - versionSeq
+      - fileSha256
+      - assetId
+      - assetSha256
+      - signerId
+      - pageNumber
+      - x
+      - y
+      - width
+      - height
