@@ -6810,11 +6810,11 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
-  /api/files/{id}/seals/signatures/revoke:
+  /api/files/{id}/seals/marks/revoke:
     post:
-      summary: Password-confirmed selective removal of currently visible personal signatures. Append an immutable revision;
-        never delete evidence rows or company stamps.
-      operationId: revokeFileSignatures
+      summary: Selectively revoke any authorized existing company seal or personal signature by mark ID; signature deletion
+        needs a password, company-only deletion does not. Original evidence stays immutable.
+      operationId: revokeFileMarks
       tags:
       - Seals
       security:
@@ -6852,10 +6852,9 @@ paths:
               - fileSha256
               - expectedRevision
               - markIds
-              - password
       responses:
         '201':
-          description: New audited signing revision without selected personal signatures; older evidence retained
+          description: New audited signing revision without only the selected stamps and signatures; older evidence retained
           content:
             application/json:
               schema:
