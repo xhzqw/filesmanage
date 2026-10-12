@@ -147,6 +147,7 @@ window.__cad={
   drawingLayers:actualDrawing?.layers.length??0,
   drawingLayout:actualDrawing?.layout??null,layoutCount:actualDrawing?.layouts.length??0,
   dxfWarnings:actualDrawing?.skipped.length??0,
+  dxfWarningDetails:actualDrawing?.skipped??[],
   dimensionSprites:actualDrawing?.object.children.reduce((sum,g)=>sum+
    g.children.filter(n=>n.isSprite).length,0)??0,
   dimensionSegments:actualDrawing?.object.children.reduce((sum,g)=>sum+
@@ -409,6 +410,7 @@ const fonts=await cdp.eval("window.__cad.fonts()");
   assert.equal(real.coordinateRulers,1);
   assert.equal(await cdp.eval("window.__cad.png()"),true);
   console.log(`CAD_REAL_FIXTURE_PASS layout=${real.drawingLayout} layouts=${real.layoutCount} width=${real.metrics.size[0]} height=${real.metrics.size[1]} dimension_segments=${real.dimensionSegments} text_sprites=${real.dimensionSprites} warnings=${real.dxfWarnings}`);
+  if(real.dxfWarnings)console.log("CAD_REAL_SKIPPED",JSON.stringify(real.dxfWarningDetails));
  }
  assert.equal(fonts.length,2);
  assert.match(fonts[0].family,/Comic Sans MS/);
