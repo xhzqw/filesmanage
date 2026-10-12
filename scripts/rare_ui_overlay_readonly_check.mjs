@@ -131,7 +131,12 @@ try{
  assert(permissions.count===3&&permissions.selected==="资源授权"&&permissions.activeFill!=="rgba(0, 0, 0, 0)"&&permissions.scroll<=1,
   "real branded Gooey nav in permission workbench: "+JSON.stringify(permissions));
  await evalJS(`(()=>{document.querySelectorAll('.perm-view-nav [data-slot="gooey-nav-item"]')[1].click();return true})()`);
- await waitFor(`new URLSearchParams(location.search).get("view")==="audit"`);
+ await sleep(350);
+ const navResult=await evalJS(`(()=>({url:location.href,view:new URLSearchParams(location.search).get("view"),
+  modal:document.querySelector('dialog:modal')?.textContent?.slice(0,100),
+  selected:document.querySelector('.perm-view-nav [aria-current="page"]')?.textContent?.trim(),
+  count:document.querySelectorAll('.perm-view-nav [data-slot="gooey-nav-item"]').length}))()`);
+ assert.equal(navResult.view,"audit","Gooey nav must navigate without unexpected dirty guard: "+JSON.stringify(navResult));
  assert.equal(await evalJS(`document.querySelector('.perm-view-nav [aria-current="page"]')?.textContent?.trim()`),"权限变更审计");
  console.log("RARE_OVERLAY_READONLY_PASS "+results.join("; ")+"; file table/selected actions, permission Gooey nav, dialog/close/focus OK");
 }catch(error){console.error("RARE_OVERLAY_READONLY_FAIL",error.message);process.exitCode=1;}
