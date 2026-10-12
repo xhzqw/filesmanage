@@ -67,6 +67,7 @@ export type GooeyNavProps = Omit<ComponentProps<"nav">, "onChange"> & {
   value?: number;
   defaultValue?: number;
   onChange?: (index: number) => void;
+  appearance?: "gooey" | "pill";
   size?: GooeyNavSize;
   activeColor?: string;
   activeLabelColor?: string;
@@ -207,6 +208,7 @@ export function GooeyNav({
   value,
   defaultValue = 0,
   onChange,
+  appearance = "gooey",
   size = "md",
   activeColor = "#FC4C01",
   activeLabelColor = "#ffffff",
@@ -233,6 +235,40 @@ export function GooeyNav({
   const active = value ?? uncontrolled;
   const span = separation ?? SIZES[size].separation;
   const corner = radius ?? SIZES[size].radius;
+  const pillId = useId();
+
+  // Connected Rare-style pill for high-frequency global navigation. Other
+  // GooeyNav instances retain their original independent spring segments.
+  if (appearance === "pill") {
+    return (
+      <nav data-slot="gooey-nav" data-appearance="pill"
+        className={cn("rare-gooey-nav rare-pill-nav", className)} {...props}>
+        <ul>
+          {items.map((item, i) => {
+            const navItem = toItem(item);
+            const selected = i === active;
+            const label = <>
+              {selected && <motion.span aria-hidden="true" className="rare-pill-nav-active"
+                layoutId={`rare-pill-${pillId}`} initial={false}
+                transition={reduced ? { duration: 0 } : { type: "spring", stiffness: 390, damping: 34 }}/>}
+              <span className="rare-pill-nav-label">{navItem.icon}{navItem.label}</span>
+            </>;
+            const shared = {
+              "data-slot": "gooey-nav-item",
+              "data-active": selected,
+              "aria-current": selected ? "page" as const : undefined,
+              className: selected ? "active" : "",
+              onClick: () => { if (value === undefined) setUncontrolled(i); onChange?.(i); },
+            };
+            return <li key={navItem.href ?? navItem.label} data-slot="gooey-nav-segment">
+              {navItem.href ? <Link to={navItem.href} {...shared}>{label}</Link>
+                : <RareButton type="button" {...shared}>{label}</RareButton>}
+            </li>;
+          })}
+        </ul>
+      </nav>
+    );
+  }
 
   const open = (seam: number) =>
     seam === 0 ||

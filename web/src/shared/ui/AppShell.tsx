@@ -1,12 +1,13 @@
 import {GooeyNav,RareButton} from "./rare";
 import {useContext,useEffect,useRef,useState,type ReactNode} from "react";
 import {ShellAccessories} from "./ShellAccessories";
-import {useLocation,useNavigate} from "react-router-dom";
+import {Link,useLocation,useNavigate} from "react-router-dom";
 import {Menu} from "./Menu";
 import {FolderResourceIcon} from "./ResourceIcons";
 import {lifecycleWorkspaceEnabled} from "../featureFlags";
 import "./previewAutoHeader.css";
 import "./globalUtilityDock.css";
+import "./shellHeader.css";
 
 // The shell only needs the display name; keeping the type structural avoids a
 // shared -> entities dependency, which the architecture gate forbids.
@@ -43,7 +44,7 @@ const GOOEY_MAIN_ITEMS=NAV.map(item=>({label:item.label,href:item.to}));
 // The selected GooeyNav item already names the page. Do not repeat it in a
 // separate breadcrumb/title strip. The Documents folder path remains a genuine
 // navigable breadcrumb in its own workbench, below the shell navigation.
-export function AppShell({user,onLogout,product,actions,children}:{user:ShellUser;onLogout:()=>void;product?:string;actions?:ReactNode;children:ReactNode}){
+export function AppShell({user,onLogout,actions,children}:{user:ShellUser;onLogout:()=>void;product?:string;actions?:ReactNode;children:ReactNode}){
  const[open,setOpen]=useState(false);
  const[accountOpen,setAccountOpen]=useState(false);
  const accountRef=useRef<HTMLButtonElement>(null);
@@ -111,12 +112,11 @@ export function AppShell({user,onLogout,product,actions,children}:{user:ShellUse
    onKeyDown={event=>{if(previewRoute&&event.key==="Escape"&&!open){
     event.preventDefault();cancelHeaderHide();setPreviewHeaderOpen(false);document.querySelector<HTMLButtonElement>(".file-sidebar-collapse")?.focus();
    }}}>
-   <RareButton ref={navToggleRef} type="button" className="nav-toggle" aria-label="导航菜单" aria-controls="shell-main-navigation"
-    aria-expanded={open} onClick={()=>setOpen(v=>!v)}>☰</RareButton>
-   <div className="brand"><BrandLogo size={22} className="brand-logo"/>中晟生物科技<span className="product">{product??"文档管理系统"}</span></div>
+   <Link to="/doc" className="brand shell-home-pill" aria-label="中晟生物 · 返回文档首页" onClick={()=>setOpen(false)}>
+    <BrandLogo size={26} className="brand-logo"/><span className="shell-brand-name">中晟生物</span>
+   </Link>
    <GooeyNav id="shell-main-navigation" aria-label="主导航" className={"header-gooey-nav"+(open?" open":"")}
-    items={GOOEY_MAIN_ITEMS} value={activeNav} size="xs" radius={8} separation={12}
-    activeColor="var(--brand-blue)" activeLabelColor="var(--text-inverse)"
+    appearance="pill" items={GOOEY_MAIN_ITEMS} value={activeNav} size="xs"
     onChange={()=>setOpen(false)}
     onKeyDown={event=>{
      if(event.key==="Escape"&&open){setOpen(false);navToggleRef.current?.focus();event.preventDefault();return;}
@@ -129,6 +129,10 @@ export function AppShell({user,onLogout,product,actions,children}:{user:ShellUse
      const target=event.key==="Home"?0:event.key==="End"?links.length-1:(index+step+links.length)%links.length;
      links[target]?.focus();
     }}/>
+   <RareButton ref={navToggleRef} type="button" className="nav-toggle" aria-label="导航菜单" aria-controls="shell-main-navigation"
+    aria-expanded={open} onClick={()=>setOpen(v=>!v)}>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+   </RareButton>
    <div className="header-right global-utility-dock" role="group" aria-label="系统快捷工具">
     <RareButton type="button" className="command-trigger" aria-label="快速跳转" onClick={()=>window.dispatchEvent(new CustomEvent("filesmanage:command-spotlight"))}>
      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>

@@ -310,14 +310,21 @@ try{
    "all seven enabled global Rare UI navigation links");
   assert(shellNav.count===7&&shellNav.active.length===1&&shellNav.active[0]==="文档管理"&&shellNav.overflow<=1,
    "Rare shell nav selection/layout at "+width+": "+JSON.stringify(shellNav));
+  const capsules=await evalJS("(()=>{const h=document.querySelector('header.header'),b=h.querySelector('a.shell-home-pill'),n=h.querySelector('nav[data-appearance=pill]'),hr=h.getBoundingClientRect(),nr=n.getBoundingClientRect();return{home:b.getAttribute('href'),brand:b.innerText.trim(),pill:getComputedStyle(b).borderRadius,offset:Math.abs((nr.left+nr.right-hr.left-hr.right)/2),headerBg:getComputedStyle(h).backgroundColor}})()");
+  assert(capsules.home==="/doc"&&capsules.brand==="中晟生物"&&capsules.pill.endsWith("px"),
+   "independent brand home capsule at "+width+": "+JSON.stringify(capsules));
   if(width>1210){
    assert(shellNav.rendered!=="none"&&shellNav.lastRight<=shellNav.rightStart+2,
     "desktop GooeyNav fits before header actions at "+width+": "+JSON.stringify(shellNav));
+   assert(capsules.offset<=3&&capsules.headerBg==="rgba(0, 0, 0, 0)",
+    "header has centered navigation and no full-width backplate at "+width+": "+JSON.stringify(capsules));
    await evalJS(`(()=>document.querySelector('header.header nav[data-slot="gooey-nav"] a')?.focus())()`);
    await key("ArrowRight","ArrowRight",39);
    assert.equal(await evalJS("document.activeElement?.getAttribute('href')"),"/search","arrow moves focus between Rare navigation links");
    await click('header.header nav[data-slot="gooey-nav"] a[href="/search"]');
    await waitFor('location.pathname==="/search"');
+   await click("a.shell-home-pill");
+   await waitFor('location.pathname==="/doc"');
   }else{
    assert.equal(shellNav.rendered,"none","narrow shell hides GooeyNav until requested");
    await click(".nav-toggle");
