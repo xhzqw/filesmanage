@@ -26,6 +26,11 @@ export const RareSelect=forwardRef<HTMLSelectElement,RareSelectProps>(function R
  const firstEnabled=visible.findIndex(o=>!o.disabled);
  const activeIndex=visible[active]&&!visible[active]!.disabled?active:firstEnabled;
  const activeDescendant=open&&activeIndex>=0?menuId+"-option-"+activeIndex:undefined;
+ // A modal dialog is in the browser's top layer. A fixed-position descendant
+ // uses the dialog as its containing block, not the page viewport. Therefore
+ // CSS viewport coordinates must be converted to dialog-local coordinates
+ // and the menu must use absolute positioning when portaled into a dialog.
+ const dialog=button.current?.closest("dialog[open]")??null;
  function positionMenu(){
   const rect=button.current?.getBoundingClientRect();if(!rect)return;
   const modal=button.current?.closest("dialog[open]");
@@ -39,8 +44,11 @@ export const RareSelect=forwardRef<HTMLSelectElement,RareSelectProps>(function R
   const above=below<150&&aboveSpace>below;
   const maxHeight=Math.min(240,above?aboveSpace:below);
   const width=Math.min(Math.max(200,rect.width),rightEdge-leftEdge);
-  setPosition({top:above?rect.top-maxHeight-5:rect.bottom+5,
-   left:Math.max(leftEdge,Math.min(rect.left,rightEdge-width)),width,maxHeight:Math.max(0,maxHeight)});
+  const viewportTop=above?rect.top-maxHeight-5:rect.bottom+5;
+  const viewportLeft=Math.max(leftEdge,Math.min(rect.left,rightEdge-width));
+  setPosition({top:modal&&bounds?viewportTop-bounds.top+modal.scrollTop:viewportTop,
+   left:modal&&bounds?viewportLeft-bounds.left+modal.scrollLeft:viewportLeft,
+   width,maxHeight:Math.max(0,maxHeight)});
  }
  function show(){
   if(disabled)return;
@@ -108,7 +116,8 @@ export const RareSelect=forwardRef<HTMLSelectElement,RareSelectProps>(function R
   </button>
   {open&&createPortal(<div ref={menu} id={menuId} className="rare-select-menu" role="listbox"
    aria-label={rest["aria-label"]??"选项"} onKeyDown={onKeyDown}
-   style={{top:position.top,left:position.left,width:position.width,maxHeight:position.maxHeight}}>
+   style={{position:dialog?"absolute":"fixed",top:position.top,left:position.left,
+    width:position.width,maxHeight:position.maxHeight}}>
    {searchable&&<div className="rare-select-search"><input ref={searchRef} aria-label="搜索选项"
     aria-controls={menuId} aria-activedescendant={activeDescendant} aria-autocomplete="list"
     type="search" value={query} placeholder="搜索选项…"
@@ -126,7 +135,7 @@ export const RareSelect=forwardRef<HTMLSelectElement,RareSelectProps>(function R
     </button>)}
     {!visible.length&&<p className="rare-select-empty">没有匹配项</p>}
    </div>
-  </div>,button.current?.closest('dialog[open]')??document.body)}
+  </div>,dialog??document.body)}
  </span>;
 });
 RareSelect.displayName="RareSelect";
