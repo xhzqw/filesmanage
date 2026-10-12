@@ -66,13 +66,21 @@ func (s *Service) MoveFile(ctx context.Context, u domain.User, fileID, targetFol
 	} else if !isRowMissing(err) {
 		return MoveResult{}, err
 	}
+	fromPath, err := historicalFolderPath(ctx, tx, file.FolderID)
+	if err != nil {
+		return MoveResult{}, err
+	}
+	toPath, err := historicalFolderPath(ctx, tx, target.ID)
+	if err != nil {
+		return MoveResult{}, err
+	}
 	if err = tx.MoveFile(ctx, file.ID, target.ID); err != nil {
 		return MoveResult{}, mapError(err)
 	}
 	result := MoveResult{FileID: file.ID, FromFolderID: file.FolderID, ToFolderID: target.ID}
 	storeIdempotentResult(ctx, tx, u.ID, "file.move:"+fileID, idempotencyKey, mustMarshal(result))
 	if err = auditRequired(ctx, tx, u, "file.move", "file", file.ID, "success",
-		map[string]any{"fromFolderId": file.FolderID, "toFolderId": target.ID, "name": file.Name}); err != nil {
+		map[string]any{"fromFolderId": file.FolderID, "toFolderId": target.ID, "fromPath": fromPath, "toPath": toPath, "name": file.Name}); err != nil {
 		return MoveResult{}, err
 	}
 	if err = tx.Commit(ctx); err != nil {
@@ -228,12 +236,31 @@ func (s *Service) MoveFilesBatch(ctx context.Context, u domain.User, fileIDs []s
 		result.Count = len(result.Conflicts)
 		return result, nil
 	}
+	pathCache := map[string]string{}
+	pathFor := func(id string) (string, error) {
+		if path, ok := pathCache[id]; ok {
+			return path, nil
+		}
+		path, e := historicalFolderPath(ctx, tx, id)
+		if e == nil {
+			pathCache[id] = path
+		}
+		return path, e
+	}
 	for i, moved := range result.Moved {
+		fromPath, pathErr := pathFor(moved.FromFolderID)
+		if pathErr != nil {
+			return MoveBatchResult{}, pathErr
+		}
+		toPath, pathErr := pathFor(moved.ToFolderID)
+		if pathErr != nil {
+			return MoveBatchResult{}, pathErr
+		}
 		if err = tx.MoveFile(ctx, moved.FileID, moved.ToFolderID); err != nil {
 			return MoveBatchResult{}, mapError(err)
 		}
 		if err = auditRequired(ctx, tx, u, "file.move", "file", moved.FileID, "success",
-			map[string]any{"fromFolderId": moved.FromFolderID, "toFolderId": moved.ToFolderID, "name": movedNames[i]}); err != nil {
+			map[string]any{"fromFolderId": moved.FromFolderID, "toFolderId": moved.ToFolderID, "fromPath": fromPath, "toPath": toPath, "name": movedNames[i]}); err != nil {
 			return MoveBatchResult{}, err
 		}
 	}

@@ -202,6 +202,36 @@ async function main() {
       check("file uploaded through the UI", false, "no upload input");
     }
 
+    // Same-name upload is never an implicit overwrite. The queue exposes an
+    // explicit CAS-confirmed replacement with the original file ID preserved.
+    if(inputPresent){
+      writeFileSync(uploadPath,`已替换的旅程内容 ${stamp}`);
+      await cdp.setFileInputFiles("input[type=file]",uploadPath);
+      const conflict=await cdp.waitFor(`()=>[...document.querySelectorAll('.upload-item.failed')].some(li=>li.textContent?.includes('journey-${stamp}.txt'))`,30000);
+      check("same-name upload requires explicit resolution",Boolean(conflict),"failed queue row rather than silent overwrite");
+      if(conflict)await cdp.evaluate(`(()=>{
+       const li=[...document.querySelectorAll('.upload-item.failed')].find(item=>item.textContent?.includes('journey-${stamp}.txt'));
+       [...(li?.querySelectorAll('button')??[])].find(b=>b.textContent?.includes('替换为新版本'))?.click();
+      })()`);
+      const ready=conflict&&await cdp.waitFor(`()=>[...document.querySelectorAll('[aria-label="确认替换现有文件"]')].some(el=>el.textContent?.includes('v1'))`,9000);
+      check("replacement confirmation names original version",Boolean(ready),"user must confirm v1 replacement");
+      if(ready)await cdp.evaluate(`(()=>{
+       const area=document.querySelector('[aria-label="确认替换现有文件"]');
+       [...(area?.querySelectorAll('button')??[])].find(b=>b.textContent?.includes('确认替换'))?.click();
+      })()`);
+      const replaced=ready&&await cdp.waitFor(`()=>[...document.querySelectorAll('.upload-item.committed')].some(li=>li.textContent?.includes('journey-${stamp}.txt')&&li.textContent?.includes('v2'))`,30000);
+      check("replacement creates v2 through real upload queue",Boolean(replaced),"new immutable version");
+      const historical=replaced&&await cdp.evaluate(`(async()=>{
+       const files=await(await fetch('/api/files?folder=folder_root&limit=200')).json();
+       const file=files.data?.items?.find(f=>f.name==='journey-${stamp}.txt');
+       if(!file)return false;
+       const meta=await(await fetch('/api/files/'+file.id)).json();
+       const history=await(await fetch('/api/files/'+file.id+'/history')).json();
+       return meta.data?.versions?.length===2&&history.data?.items?.some(row=>row.eventType==='file.replace'&&row.details?.baseSeq===1&&row.details?.versionSeq===2);
+      })()`);
+      check("replacement is traceable to stable file ID",Boolean(historical),"v1 and v2 retained with file.replace event");
+    }
+
     // 7. open the preview page from the row (DESKTOP-INTERACTION-v1: the file
     // name is no longer a single-click navigation link; the row offers an
     // explicit 打开 action and double-click instead)
@@ -332,7 +362,7 @@ async function main() {
       if(!item)return 'not-listed';
       const bytes=await fetch('/api/files/'+item.id+'/bytes',{credentials:'same-origin'});
       const text=await bytes.text();
-      return text==='旅程上传内容 ${stamp}'?'exact':'mismatch:'+text.slice(0,20);
+      return text==='已替换的旅程内容 ${stamp}'?'exact':'mismatch:'+text.slice(0,20);
     })()`);
     check("download round-trips the exact bytes", download === "exact", String(download));
 

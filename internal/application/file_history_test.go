@@ -105,3 +105,32 @@ func TestFileHistoryCapturesFolderCascadeAtEventTime(t *testing.T) {
 		t.Fatal("folder history disappeared after moving the file")
 	}
 }
+
+func TestFileHistoryMoveStoresHistoricalPathSnapshot(t *testing.T) {
+	s, _ := testService(t)
+	ctx := context.Background()
+	admin := domain.User{ID: "u_admin", IsAdmin: true}
+	uploaded, err := s.CommitUpload(ctx, admin, "folder_market", "move-history.txt", "text/plain", "", strings.NewReader("v1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.MoveFile(ctx, admin, uploaded.FileID, "folder_root", "folder_market", ""); err != nil {
+		t.Fatal(err)
+	}
+	page, err := s.FileHistory(ctx, admin, uploaded.FileID, "", 20)
+	if err != nil || len(page.Items) != 2 || page.Items[0].EventType != "file.move" {
+		t.Fatalf("move history missing: %+v %v", page, err)
+	}
+	before, okA := page.Items[0].Details["fromPath"].(string)
+	after, okB := page.Items[0].Details["toPath"].(string)
+	if !okA || !okB || before == "" || after == "" || before == after {
+		t.Fatalf("move path snapshot missing: %+v", page.Items[0].Details)
+	}
+	if _, err = s.RenameFolder(ctx, admin, "folder_market", "Renamed after move"); err != nil {
+		t.Fatal(err)
+	}
+	page, err = s.FileHistory(ctx, admin, uploaded.FileID, "", 20)
+	if err != nil || page.Items[0].Details["fromPath"] != before {
+		t.Fatalf("historical path changed after folder rename: %+v %v", page, err)
+	}
+}

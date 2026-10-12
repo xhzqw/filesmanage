@@ -21,10 +21,10 @@ const eventLabels:Record<string,string>={
 const detailText=(value:unknown)=>typeof value==="string"?value:typeof value==="number"?String(value):"";
 function describe(item:FileHistoryEvent){
  const d=item.details;
- if(item.eventType==="file.rename")return detailText(d.oldName)+" → "+(detailText(d.newName)||detailText(d.name));
+ if(item.eventType==="file.rename")return d.oldName?detailText(d.oldName)+" → "+(detailText(d.newName)||detailText(d.name)):"新名称："+(detailText(d.newName)||detailText(d.name))+" · 旧名称未留存";
  if(item.eventType==="folder.rename")return detailText(d.oldName)&&detailText(d.newName)?detailText(d.oldName)+" → "+detailText(d.newName):"文件所在路径受到影响";
  if(item.eventType==="folder.move"||item.eventType==="folder.delete")return "此操作影响了文件所在目录";
- if(item.eventType==="file.move")return "位置变更"+(d.fromFolderId&&d.toFolderId?" · "+detailText(d.fromFolderId)+" → "+detailText(d.toFolderId):"");
+ if(item.eventType==="file.move")return d.fromPath&&d.toPath?detailText(d.fromPath)+" → "+detailText(d.toPath):"位置变更 · 旧记录无路径快照";
  if(item.eventType==="trash.restore")return "恢复文件"+(d.newName?" · "+detailText(d.newName):"");
  if(item.eventType==="file.save"||item.eventType==="office.save_commit")return "保存为 v"+detailText(d.versionSeq)+(d.baseSeq?" · 原版本 v"+detailText(d.baseSeq):"");
  if(item.eventType==="file.replace")return "v"+detailText(d.baseSeq)+" → v"+detailText(d.versionSeq)+" · 旧内容保留";

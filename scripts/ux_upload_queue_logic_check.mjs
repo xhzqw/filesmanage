@@ -35,6 +35,16 @@ const remaining=queue.clearFinishedTasks(bounded);
 assert.deepEqual(remaining.map(x=>x.status),["failed","interrupted","queued","uploading"]);
 assert.equal(queue.limitFinishedHistory(remaining).length,4);
 
+// A same-name upload must not silently replace an existing document. Only an
+// explicit confirmed target transitions the failed task into a new operation.
+const conflict={...row(61,"failed"),file:{name:"part.step"},failureCode:"E_NAME_CONFLICT"};
+assert.equal(queue.replaceTask([conflict],conflict.queueId,{fileId:"file_1",versionSeq:3})[0].status,"queued");
+const confirmed=queue.replaceTask([conflict],conflict.queueId,{fileId:"file_1",versionSeq:3})[0];
+assert.deepEqual(confirmed.replacement,{fileId:"file_1",versionSeq:3});
+assert.notEqual(confirmed.idempotencyKey,conflict.idempotencyKey,"replacement has its own replay identity");
+assert.deepEqual(queue.replaceTask([{...conflict,failureCode:"E_FORBIDDEN"}],conflict.queueId,{fileId:"file_1",versionSeq:3})[0].status,"failed");
+assert.equal(queue.renameTask([confirmed],confirmed.queueId,"other.step")[0].replacement,undefined);
+
 const merged=folders.mergeDistinctById(
  [{id:"a",name:"original"},{id:"b",name:"B"}],
  [{id:"b",name:"other"},{id:"c",name:"C"},{id:"c",name:"duplicate"}]
