@@ -5,7 +5,7 @@
  align-items:center;column-gap:14px;height:var(--height-header);min-height:var(--height-header);
  width:100%;max-width:1520px;margin:0 auto;
  padding:0 4px;border:0;border-radius:var(--radius-lg);background:transparent;box-shadow:none;
- overflow:visible;isolation:isolate;
+ overflow:visible;isolation:isolate;z-index:70;
 }
 .header .shell-home-pill{
  display:inline-flex;align-items:center;justify-self:start;gap:9px;width:max-content;

@@ -348,6 +348,8 @@ try{
    assert.equal(await evalJS('document.activeElement?.classList.contains("nav-toggle")'),true,"escape returns focus to nav toggle");
    await click(".nav-toggle");
    await waitFor(`getComputedStyle(document.querySelector('header.header nav[data-slot="gooey-nav"]')).display!=="none"`);
+   const mobileHit=await evalJS("(()=>{const a=document.querySelector('header.header nav a[href$=search]'),r=a.getBoundingClientRect(),e=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return{linkHit:a.contains(e),hit:e?.outerHTML?.slice(0,220),left:r.left,top:r.top}})()");
+   assert(mobileHit.linkHit,"collapsed navigation must be clickable above workbench at "+width+": "+JSON.stringify(mobileHit));
    await click('header.header nav[data-slot="gooey-nav"] a[href="/search"]');
    console.log("NAV_AFTER_CLICK",width,await evalJS("location.pathname"));
    await waitFor('location.pathname==="/search"');
