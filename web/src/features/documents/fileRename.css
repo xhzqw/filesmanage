@@ -1,0 +1,7 @@
+.file-rename-extension-change{display:flex;align-items:center;gap:12px;margin:8px 0 10px;min-width:0;color:var(--text-secondary);font-size:13px}
+.file-rename-extension-change span:first-child,.file-rename-extension-change strong{min-width:0;overflow-wrap:anywhere;color:var(--text-primary);font-weight:600}
+.file-rename-extension-change strong{color:var(--status-warning)}
+.file-rename-extension-hint{margin:0 0 18px;line-height:1.5}
+.upload-rename.file-rename-inline-confirm{flex-wrap:wrap;align-items:center;gap:8px}
+.upload-rename.file-rename-inline-confirm .file-rename-extension-change{margin:0}
+.upload-rename.file-rename-inline-confirm .file-rename-extension-hint{width:100%;margin:0}

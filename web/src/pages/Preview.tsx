@@ -1,7 +1,7 @@
-import {RareBadge,RareButton,RareDataTable,RareInput,RareRowActions,RareTabs,MicroHoldToDelete} from "../shared/ui/rare";
+import {RareBadge,RareButton,RareDataTable,RareRowActions,RareTabs,MicroHoldToDelete} from "../shared/ui/rare";
 import {toast} from "../shared/ui/feedback";
 import {BrandLoadingLabel} from "../shared/ui/BrandLoader";
-import {useEffect,useRef,useState,type FormEvent} from "react";
+import {useEffect,useRef,useState} from "react";
 import {Link,useNavigate,useParams} from "react-router-dom";
 import {fileApi,formatSize,type FileLifecycle} from "../features/documents/api";
 import {reuseVerifiedPreview} from "../features/documents/revalidate";
@@ -20,6 +20,7 @@ import {FileSealsPanel} from "../features/seals/FileSealsPanel";
 import {FileReviewPanel} from "../features/documents/FileReviewPanel";
 import {PrintDialog} from "../features/documents/PrintDialog";
 import {MoveDialog} from "../features/documents/FileTable";
+import {FileRenameDialog} from "../features/documents/FileRenameDialog";
 import {RollbackDialog} from "../features/documents/RollbackDialog";
 import {ShareDialog} from "../features/collaboration/ShareDialog";
 import {workflowApi} from "../features/workflow/api";
@@ -63,7 +64,6 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const[printing,setPrinting]=useState(()=>new URLSearchParams(window.location.search).get("print")==="1");
  const[moving,setMoving]=useState(false);
  const[renaming,setRenaming]=useState(false);
- const[renameValue,setRenameValue]=useState("");
  const[deleting,setDeleting]=useState(false);
  const[busy,setBusy]=useState(false);
  const[moreOpen,setMoreOpen]=useState(false);
@@ -182,16 +182,6 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
   }catch(err){announce(errorCopy(err,"收藏操作失败"),true);}
   finally{setFavoriteBusy(false);}
  }
- async function rename(event:FormEvent<HTMLFormElement>){
-  event.preventDefault();
-  if(!file||busy||!renameValue.trim())return;
-  setBusy(true);
-  try{
-   await fileApi.rename(file.id,renameValue.trim());
-   setRenaming(false);announce("文件已重命名");refresh();
-  }catch(err){announce(errorCopy(err,"重命名失败"),true);}
-  finally{setBusy(false);}
- }
  async function remove(){
   if(!file||busy)return;
   setBusy(true);
@@ -207,7 +197,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
    disabled:!canManage||favorite===null||favoriteBusy,onSelect:()=>void toggleFavorite()},
   ...(preview?.textual&&canManage&&!archived?[{id:"edit-text",label:"编辑文本内容",
     disabled:requiresApproval===null,onSelect:()=>setEditing(true)}]:[]),
-  ...(canManage&&!archived?[{id:"rename",label:"重命名",onSelect:()=>{setRenameValue(preview?.name??"");setRenaming(true);}},
+  ...(canManage&&!archived?[{id:"rename",label:"重命名",onSelect:()=>setRenaming(true)},
     {id:"move",label:"移动文件",onSelect:()=>setMoving(true)}]:[]),
   ...(canManage&&user.isAdmin?[{id:"share",label:"分享文件",onSelect:()=>setSharing(true)}]:[]),
   ...(canManage&&!archived?[{id:"delete",label:"移入回收站",danger:true,onSelect:()=>setDeleting(true)}]:[]),
@@ -343,13 +333,8 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
    {sharing&&file&&<ShareDialog resource={{kind:"file",id:file.id,name:file.name}}
     onClose={()=>setSharing(false)} onCreated={()=>{setSharing(false);announce("分享已创建");}}/>}
    {printing&&preview&&<PrintDialog preview={preview} sealRevision={sealRevision} onClose={()=>setPrinting(false)}/>}
-  {renaming&&<Dialog open title="重命名文件" onClose={()=>{if(!busy)setRenaming(false);}} closeGuard={()=>!busy}>
-   <form onSubmit={rename}>
-    <label htmlFor="file-workbench-rename">新文件名</label>
-    <RareInput id="file-workbench-rename" value={renameValue} maxLength={200} required disabled={busy} onChange={e=>setRenameValue(e.target.value)}/>
-    <div className="dialog-actions"><RareButton type="button" disabled={busy} onClick={()=>setRenaming(false)}>取消</RareButton><RareButton type="submit" className="primary" disabled={busy||!renameValue.trim()}>保存</RareButton></div>
-   </form>
-  </Dialog>}
+  {renaming&&file&&<FileRenameDialog file={file} onClose={()=>setRenaming(false)}
+   onRenamed={()=>{setRenaming(false);refresh();}}/>}
   {deleting&&file&&<Dialog open title="移入回收站" onClose={()=>{if(!busy)setDeleting(false);}} closeGuard={()=>!busy}>
    <p>确定将「{file.name}」移入回收站吗？文件及版本记录可以从回收站恢复。</p>
    <div className="dialog-actions"><RareButton type="button" disabled={busy} onClick={()=>setDeleting(false)}>取消</RareButton><MicroHoldToDelete tone="danger" label={busy?"正在删除…":"确认删除"} disabled={busy} onConfirm={()=>void remove()}/></div>

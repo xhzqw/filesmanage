@@ -1,7 +1,7 @@
 import {RareButton,RareDataTable,RareInput,RareSelect} from "../../shared/ui/rare";
 import {toast} from "../../shared/ui/feedback";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
-import {useCallback,useEffect,useMemo,useRef,useState,type ChangeEvent,type DragEvent,type FormEvent,type KeyboardEvent,type MouseEvent,type ReactNode}from "react";
+import {useCallback,useEffect,useMemo,useRef,useState,type ChangeEvent,type DragEvent,type KeyboardEvent,type MouseEvent,type ReactNode}from "react";
 import {useNavigate}from "react-router-dom";
 import type {FileItem} from "../../entities/file/model";
 import type {Folder} from "../../entities/folder/model";
@@ -9,6 +9,7 @@ import {fileApi,formatSize} from "./api";
 import {revalidateFileWindow} from "./revalidate";
 import {useUploadStore} from "./uploadStore";
 import {downloadZip,type ZipProgress} from "./zipDownload";
+import {FileRenameDialog} from "./FileRenameDialog";
 import {batchConflict,batchExcluded,batchFailed,batchMoveInvalidTarget,batchPickTarget,batchSubmitStarted,batchSucceeded,failed,fileMoveInvalidTarget,openBatch,openFlow,pickTarget,preflightConflict,preflightReady,preflightStarted,submitStarted,succeeded,type BatchMoveFlow,type MoveFlow,type MovePreflight}from"./moveFileFlow";
 import {errorCode,errorCopy} from "../../shared/errors";
 import {request} from "../../shared/http";
@@ -216,8 +217,6 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const pagingRef=useRef(false);
  const completedCursor=useRef("");
  const[renaming,setRenaming]=useState<FileItem|null>(null);
- const[renameValue,setRenameValue]=useState("");
- const[renameBusy,setRenameBusy]=useState(false);
  const[selectedIds,setSelectedIds]=useState<Set<string>>(()=>new Set<string>());
  const selectAllRef=useRef<HTMLInputElement>(null);
  const[focusedId,setFocusedId]=useState<string|null>(null);
@@ -688,7 +687,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    case "F2":
     if(selectedIds.size!==1)return;
     event.preventDefault();
-    {const only=visibleItems.find(i=>selectedIds.has(i.id));if(only){setRenaming(only);setRenameValue(only.name);}}
+    {const only=visibleItems.find(i=>selectedIds.has(i.id));if(only)setRenaming(only);}
     break;
    case "F10":
     // Shift+F10 is the keyboard equivalent of a right-click on the focused
@@ -731,7 +730,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    const file:FileItem=single;
    items.push({id:"open",label:"打开",hint:"Enter",onSelect:()=>navigate("/preview/"+file.id)});
    items.push({id:"edit",label:"编辑",onSelect:()=>onEdit(file.id)});
-   items.push({id:"rename",label:"重命名",hint:"F2",onSelect:()=>{setRenaming(file);setRenameValue(file.name);}});
+   items.push({id:"rename",label:"重命名",hint:"F2",onSelect:()=>setRenaming(file)});
    items.push({id:"move",label:"移动到…",onSelect:()=>startMove(file)});
    items.push({id:"download",label:"下载",onSelect:()=>startDownload(file)});
    items.push({id:"print",label:"打印",onSelect:()=>navigate("/preview/"+file.id+"?print=1")});
@@ -752,21 +751,6 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   document.body.append(link);
   link.click();
   link.remove();
- }
-
- async function submitRename(event:FormEvent<HTMLFormElement>){
-  event.preventDefault();
-  if(!renaming||renameBusy)return;
-  announce("","info");
-  setRenameBusy(true);
-  try{
-   const updated=await fileApi.rename(renaming.id,renameValue);
-   setItems(prev=>prev.map(f=>f.id===updated.id?updated:f));
-   setRenaming(null);
-   announce("重命名成功","info");
-  }catch(error){
-   announce(errorCode(error)==="E_NAME_CONFLICT"?"目标名称已存在":"重命名失败：名称冲突或无权操作","error");
-  }finally{setRenameBusy(false);}
  }
 
  // Deletion runs per item: the API has no batch endpoint, so each result is
@@ -1015,16 +999,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    <span className="file-page-hint">{hasMore?"已加载 "+items.length+" 项 · 后面还有文件":"已显示全部 "+items.length+" 项"}</span>
    {moreError&&<span className="file-page-error" role="alert">{moreError}</span>}
   </div>}
-  {renaming&&<Dialog open title="重命名文件" onClose={()=>setRenaming(null)} closeGuard={()=>!renameBusy} className="dialog">
-   <form onSubmit={submitRename}>
-    <label htmlFor="rename-input">新名称</label>
-    <RareInput id="rename-input" value={renameValue} maxLength={200} onChange={e=>setRenameValue(e.target.value)} required disabled={renameBusy}/>
-    <div className="dialog-actions">
-     <RareButton type="button" className="secondary-action" onClick={()=>setRenaming(null)} disabled={renameBusy}>取消</RareButton>
-     <RareButton type="submit" className="primary" disabled={renameBusy}>{renameBusy?"保存中…":"保存"}</RareButton>
-    </div>
-   </form>
-  </Dialog>}
+  {renaming&&<FileRenameDialog file={renaming} onClose={()=>setRenaming(null)}
+   onRenamed={updated=>{setItems(prev=>prev.map(item=>item.id===updated.id?updated:item));setRenaming(null);}}/>}
   {pendingDelete.length>0&&<Dialog open title={Object.keys(deleteFailures).length?"删除部分失败":"删除确认"} onClose={closeDelete} closeGuard={()=>!deleteBusy} className="dialog">
    <form onSubmit={event=>{event.preventDefault();confirmDelete();}}>
     <p className="hint">以下 {pendingDelete.length} 项将移入回收站。按文件逐项处理，失败项可单独重试。</p>

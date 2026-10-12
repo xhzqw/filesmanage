@@ -2,6 +2,8 @@ import {RareButton,RareInput} from "../../shared/ui/rare";
 import{useEffect,useRef,useState,type DragEvent,type FormEvent,type ReactNode}from"react";
 import{formatSize}from"./api";
 import{useUploadStore}from"./uploadStore";
+import {extensionChange} from "./fileExtensionChange";
+import {ExtensionChangeNotice} from "./FileRenameDialog";
 import"./dropZone.css";
 
 // DESKTOP-INTERACTION-v1 §7.1: a drop onto a text-entry surface must not be
@@ -48,6 +50,7 @@ export function DropZone({folderId,userId,disabled,onCommitted,children}:{folder
  const[queueExpanded,setQueueExpanded]=useState(true);
  const[renamingId,setRenamingId]=useState<string|null>(null);
  const[renameValue,setRenameValue]=useState("");
+ const[pendingRename,setPendingRename]=useState<{queueId:string;name:string}|null>(null);
  const dragDepth=useRef(0);
  const seenReload=useRef(reloadTick);
  useEffect(()=>{if(tasks.length>0)setQueueExpanded(true);},[tasks.length]);
@@ -102,13 +105,22 @@ export function DropZone({folderId,userId,disabled,onCommitted,children}:{folder
   enqueueFiles(Array.from(event.dataTransfer.files),folderId);
  }
 
+ function finishRename(queueId:string,name:string){
+  rename(queueId,name);
+  setRenamingId(null);
+  setRenameValue("");
+  setPendingRename(null);
+ }
  function submitRename(event:FormEvent<HTMLFormElement>){
   event.preventDefault();
   const name=renameValue.trim();
-  if(renamingId===null||name==="")return;
-  rename(renamingId,name);
-  setRenamingId(null);
-  setRenameValue("");
+  const task=tasks.find(item=>item.queueId===renamingId);
+  if(!task||name==="")return;
+  if(extensionChange(task.name,name)){
+   setPendingRename({queueId:task.queueId,name});
+   return;
+  }
+  finishRename(task.queueId,name);
  }
 
  const committed=tasks.filter(task=>task.status==="committed").length;
@@ -174,7 +186,7 @@ export function DropZone({folderId,userId,disabled,onCommitted,children}:{folder
        {task.status==="uploading"&&<RareButton type="button" title="取消只中断本地请求；服务端已提交的结果无法撤销" onClick={()=>cancel(task.queueId)}>取消</RareButton>}
        {task.status==="failed"&&<>
         <RareButton type="button" onClick={()=>retry(task.queueId)}>重试</RareButton>
-        <RareButton type="button" onClick={()=>{setRenamingId(task.queueId);setRenameValue(task.name);}}>改名重试</RareButton>
+        <RareButton type="button" onClick={()=>{setPendingRename(null);setRenamingId(task.queueId);setRenameValue(task.name);}}>改名重试</RareButton>
         <RareButton type="button" onClick={()=>skip(task.queueId)}>跳过</RareButton>
        </>}
       </div>
@@ -188,11 +200,17 @@ export function DropZone({folderId,userId,disabled,onCommitted,children}:{folder
       >
        <div className="upload-progress-fill" style={sent?{width:percent+"%"}:undefined}/>
       </div>}
-      {renamingId===task.queueId&&<form className="upload-rename" onSubmit={submitRename}>
-       <RareInput aria-label="新文件名" value={renameValue} maxLength={200} onChange={e=>setRenameValue(e.target.value)} autoFocus required/>
-       <RareButton type="submit" className="primary">确认改名</RareButton>
-       <RareButton type="button" className="secondary-action" onClick={()=>setRenamingId(null)}>取消</RareButton>
-      </form>}
+      {renamingId===task.queueId&&(pendingRename?.queueId===task.queueId?
+       <div className="upload-rename file-rename-inline-confirm" role="group" aria-label="确认更改文件后缀">
+        {extensionChange(task.name,pendingRename.name)&&<ExtensionChangeNotice change={extensionChange(task.name,pendingRename.name)!}/>}
+        <RareButton type="button" onClick={()=>setPendingRename(null)}>返回修改</RareButton>
+        <RareButton type="button" className="primary" onClick={()=>finishRename(task.queueId,pendingRename.name)}>确认更改</RareButton>
+       </div>:
+       <form className="upload-rename" onSubmit={submitRename}>
+        <RareInput aria-label="新文件名" value={renameValue} maxLength={200} onChange={e=>setRenameValue(e.target.value)} autoFocus required/>
+        <RareButton type="submit" className="primary">确认改名</RareButton>
+        <RareButton type="button" className="secondary-action" onClick={()=>{setRenamingId(null);setPendingRename(null);}}>取消</RareButton>
+       </form>)}
      </li>;
     })}
    </ul>}
