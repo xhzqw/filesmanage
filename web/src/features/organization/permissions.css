@@ -236,7 +236,7 @@
 .perm-manage-toolbar .rare-button.active{color:var(--brand-blue);background:var(--surface-row-selected);border-color:var(--border-hairline)}
 .perm-manage-toolbar .perm-create-trigger{margin-left:auto}
 .perm-view-body{flex:1;min-height:0;overflow:auto;background:var(--surface-panel)}
-.perm-view-body>.perm-card{margin:0;border:0;border-radius:0;box-shadow:none}
+.perm-view-body>.perm-card{margin:0;border:0;border-radius:var(--radius-sm);box-shadow:none}
 .perm-overview{min-height:100%}
 .perm-list-filter{padding:10px 13px;display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);border-bottom:1px solid var(--border-hairline)}
 .perm-list-heading{font-size:13px;font-weight:650}
@@ -249,9 +249,9 @@
 .perm-grant-tags{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .perm-grant-tags .rare-badge{white-space:nowrap}
 .perm-create-view{max-width:750px;margin:0 auto;padding:12px}
-.perm-create-view .perm-compose-card{border:0;border-radius:0;box-shadow:none;max-height:none;overflow:visible}
+.perm-create-view .perm-compose-card{border:0;border-radius:var(--radius-sm);box-shadow:none;max-height:none;overflow:visible}
 .perm-create-heading{display:flex;justify-content:space-between;align-items:center;padding:3px 6px 12px;border-bottom:1px solid var(--border-hairline)}
-.perm-view-body .perm-insight{border:0;border-radius:0}
+.perm-view-body .perm-insight{border:0;border-radius:var(--radius-sm)}
 @container perm-panel (max-width:620px){
  .perm-manage-toolbar{flex-wrap:wrap}
  .perm-manage-toolbar .rare-button{font-size:12px}
