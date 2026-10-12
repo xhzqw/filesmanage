@@ -1,9 +1,5 @@
-/* FolderTree extras (PRECISION-WORKBENCH-V2-SPEC §5/§6.1): only the pieces the
-   shared theme has no class for — the tree header search, the per-node
-   loading/empty/error notes and the search result rows. The 28px rows, the
-   14px-per-level indent, the 1px guide rails, the rotating chevron and the
-   spring rail all live in theme.css; every colour here comes from the token
-   layer, never a literal. */
+/* Explorer-only tree styles: one quiet selected surface, no decorative rail.
+   Keyboard focus and live drag targets retain their independent feedback. */
 .tree-head{display:grid;gap:2px;margin:0 0 var(--space-2)}
 .tree-search-control{display:flex;align-items:center;gap:4px;min-width:0;border:1px solid var(--border-subtle);background:var(--surface-panel);border-radius:var(--radius-sm);padding:0 6px;color:var(--text-tertiary)}
 .tree-search-control:focus-within{border-color:var(--border-focus);box-shadow:0 0 0 2px var(--surface-row-selected)}
@@ -19,9 +15,10 @@
 .tree-folder-icon{width:14px;min-width:14px;height:14px;min-height:14px;flex:none;margin-right:5px;color:var(--folder-stroke,#C28B21);fill:var(--folder-fill,#FFF0C9);opacity:1;transition:color .12s linear,opacity .12s linear}
 .tree-row:hover .tree-folder-icon{opacity:1}
 .tree-row.on .tree-folder-icon{color:var(--folder-stroke,#C28B21);opacity:1}
-/* One selection surface, no stacked left borders, guide rails or underline. */
-.tree-row.on{box-shadow:inset 0 0 0 1px var(--border-selected);background:var(--surface-row-selected);font-weight:650}
-.tree-row.on:focus-within{background:var(--surface-row-selected)}
+/* Selected state has exactly one signal: a softly tinted, inset row.
+   Never add a left rail or inset stroke, including when the item is focused. */
+.sidebar .tree .tree-row.on{box-shadow:none;background:var(--surface-subtle);font-weight:600}
+.sidebar .tree .tree-row.on:hover,.sidebar .tree .tree-row.on:focus-within{background:var(--surface-subtle)}
 .tree li[aria-current="page"]>.tree-row{transition:background-color .12s ease,border-color .12s ease}
 .tree li[aria-current="page"]>.tree-row .tree-node-link{color:var(--brand-blue)}
 .tree li[role="treeitem"]:focus-visible>.tree-row{outline:2px solid var(--border-focus);outline-offset:-2px}
@@ -49,8 +46,6 @@
  .tree-drop-arrow{animation:none}
 }
 
-.tree>.spring-rail-host{display:block}
-.tree .spring-rail{width:3px;background:var(--brand-cyan);border-radius:var(--radius-pill)}
 .tree-note{display:flex;align-items:center;gap:var(--space-2);min-height:24px;color:var(--text-secondary);font-size:11px}
 .tree-note-error{color:var(--status-danger)}
 .tree-note .secondary-action{padding:0;font-size:11px}

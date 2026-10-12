@@ -1,11 +1,10 @@
 import {RareButton,RareInput} from "../../shared/ui/rare";
 import {FolderResourceIcon} from "../../shared/ui/ResourceIcons";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
-import {useEffect,useId,useLayoutEffect,useMemo,useRef,useState,type CSSProperties,type DragEvent,type KeyboardEvent,type ReactNode}from "react";
+import {useEffect,useId,useMemo,useRef,useState,type CSSProperties,type DragEvent,type KeyboardEvent,type ReactNode}from "react";
 import {Link,useNavigate}from "react-router-dom";
 import type{Folder}from"../../entities/folder/model";
 import {Menu,type MenuItem,type MenuPoint}from"../../shared/ui/Menu";
-import {SpringActiveRail}from"../../shared/ui/rare";
 import {request}from"../../shared/http";
 import {mergeDistinctById}from"./folderPageMerge";
 import "./folderTree.css";
@@ -138,9 +137,6 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
  const[session,setSession]=useState<MoveSessionDetail|null>(null);
  const[dropHover,setDropHover]=useState<{id:string;legal:boolean}|null>(null);
  const treeRef=useRef<HTMLUListElement|null>(null);
- // Spec §6.1: measured offset of the selected row inside the tree list, or -1
- // when nothing is selected or that row is not rendered.
- const[railTop,setRailTop]=useState(-1);
  const autoScroll=useRef<{timer:number;step:number}|null>(null);
  const hoverExpand=useRef<{timer:number;id:string}|null>(null);
  // Paged mode only: parent id -> loaded level. Small-tree mode never fills it.
@@ -236,16 +232,6 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
   const node=document.querySelector<HTMLElement>(`li[data-folder-id="${focusedId}"]`);
   node?.focus();
  },[focusedId,nodeMenu]);
-
- // Spec §6.1: the laser rail must sit on the selected row, so it is measured
- // from the DOM after every change that can move a row — the flattened rows,
- // the open levels, the selection and a level's load status. A row that is not
- // rendered (collapsed ancestor, paged level not loaded) parks the rail off.
- useLayoutEffect(()=>{
-  if(selected===""){setRailTop(-1);return;}
-  const row=treeRef.current?.querySelector<HTMLElement>('li[data-folder-id="'+CSS.escape(selected)+'"]>.tree-row');
-  setRailTop(row?row.offsetTop:-1);
- },[rows,expanded,selected,levels]);
 
  // Unmount: nothing in flight may write state afterwards. Aborting rejects the
  // fetch; clearing the map makes the late rejection a no-op even synchronously.
@@ -789,9 +775,6 @@ export function FolderTree({items,selected,isAdmin=false,onRenameFolder,onMoveFo
    onKeyDown={onTreeKeyDown}
    onDragOver={onTreeDragOver}
    onDragLeave={onTreeDragLeave}>
-   {/* Spec §6.1 laser rail: inside the list so it scrolls with the rows. The
-       host li keeps it a legal, out-of-flow child of the tree. */}
-   <li role="none" aria-hidden="true" className="spring-rail-host"><SpringActiveRail offset={railTop<0?0:railTop} visible={railTop>=0}/></li>
    {levelItems("").map(entry=>renderNode(entry,0))}
    {paged&&levelNotes("",-1,levelItems("").length)}
   </ul>

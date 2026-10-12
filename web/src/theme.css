@@ -526,12 +526,12 @@ tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions 
 .tree li[data-depth="0"]>.tree-row::before{display:none}
 .tree-row:hover{background:var(--surface-subtle, #F1F5F9)}
 .tree-row.on{
-  background:var(--surface-row-selected, #E2EFFE);
+  background:var(--surface-subtle);
   color:var(--brand-blue);
   font-weight:600;
-  box-shadow:inset 2px 0 0 var(--brand-blue);
+  box-shadow:none;
 }
-.tree-row.on:hover{background:var(--surface-row-selected, #E2EFFE)}
+.tree-row.on:hover{background:var(--surface-subtle)}
 .tree-row button{width:16px;min-width:16px;height:16px;min-height:16px;padding:0;border:0;background:none;font-size:10px;line-height:1;color:var(--text-tertiary);display:inline-flex;align-items:center;justify-content:center;transition:transform .12s linear;flex:none}
 .tree-row button:hover{background:none;color:var(--brand-blue)}
 .tree-row button[aria-expanded="true"]{transform:rotate(90deg)}
@@ -545,15 +545,9 @@ tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions 
   outline:none !important;border:none !important;box-shadow:none !important;
 }
 .tree li:focus-visible > .tree-row{
-  background:var(--surface-row-selected, #E2EFFE);
-  box-shadow:inset 2px 0 0 var(--brand-blue);
+  outline:2px solid var(--border-focus);
+  outline-offset:-2px;
 }
-
-/* SpringActiveRail (spec §6.1): 2px 激光高亮轨, spring 480/32. The host li
-   keeps the rail a legal child of ul[role=tree] (a bare div inside a ul is
-   invalid HTML) while staying out of the accessibility tree and out of flow. */
-.spring-rail-host{position:absolute;left:0;right:0;top:0;bottom:0;margin:0;padding:0;list-style:none;pointer-events:none}
-.spring-rail{position:absolute;left:0;width:2px;height:var(--height-tree-row);border-radius:var(--radius-pill);background:var(--brand-cyan);pointer-events:none;z-index:1}
 
 /* ================= 提示/通知/表单 ================= */
 .hint{color:var(--text-tertiary);font-size:11px;margin:0}
