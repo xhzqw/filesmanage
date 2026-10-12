@@ -115,6 +115,27 @@ try{
   const clicked=await evaluate(`(()=>{const button=[...document.querySelectorAll(".folder-view-switch button")].find(e=>e.getAttribute("aria-label")===${JSON.stringify(label)});if(!button)return false;button.click();return true})()`);
   assert(clicked,"view mode button missing: "+label);
   await until(`document.querySelector(".work-body")?.dataset.explorerView===${JSON.stringify(mode)}`);
+  if(mode==="icons"){
+   const alignment=await evaluate(`(()=>{
+    const source=document.querySelector(".explorer-icon-grid > .explorer-item");
+    if(!source)return null;
+    const fixture=document.createElement("div");
+    fixture.className="explorer-icon-grid";
+    Object.assign(fixture.style,{position:"fixed",top:"0px",left:"0px",width:"320px",visibility:"hidden",pointerEvents:"none"});
+    const short=source.cloneNode(true),long=source.cloneNode(true);
+    short.querySelector(".explorer-item-name").textContent="hammer.iges";
+    long.querySelector(".explorer-item-name").textContent="pe11-verify-1791469382.step";
+    fixture.append(short,long);
+    document.body.append(fixture);
+    const positions=card=>Object.fromEntries([".explorer-item-art",".explorer-item-name",".explorer-item-sub"].map(selector=>[selector,card.querySelector(selector).getBoundingClientRect().top]));
+    const a=positions(short),b=positions(long);
+    fixture.remove();
+    return {short:a,long:b,deltas:Object.fromEntries(Object.keys(a).map(key=>[key,Math.abs(a[key]-b[key])]))};
+   })()`);
+   assert(alignment,"icon-grid test needs at least one file or folder");
+   assert(Object.values(alignment.deltas).every(delta=>delta<=1),"icon, label, and metadata must align for short and two-line names: "+JSON.stringify(alignment));
+   console.log("EXPLORER_ICON_ALIGNMENT_PASS",JSON.stringify(alignment.deltas));
+  }
   if(mode!=="list"){
    const count=await evaluate('document.querySelectorAll(".explorer-folder [data-slot=rare-folder-component]").length');
    assert(count>0,"folder visuals absent from "+mode+" view");

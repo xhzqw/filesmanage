@@ -81,6 +81,19 @@
  display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));
  gap:10px;padding:14px;align-content:start;
 }
+/* Finder icon view: reserve the same two-line filename slot for every tile.
+   Otherwise the vertically centered column shifts long-name icons upward
+   (and their metadata follows), even though the glyphs are identical. */
+.explorer-icon-grid>.explorer-item{
+ justify-content:flex-start;
+ box-sizing:border-box;
+}
+.explorer-icon-grid>.explorer-item .explorer-item-name{
+ box-sizing:border-box;
+ height:calc(2 * 1.35em);
+ min-height:calc(2 * 1.35em);
+ flex:none;
+}
 .explorer-item{
  position:relative;display:flex;align-items:center;justify-content:center;flex-direction:column;
  gap:6px;padding:11px 8px 9px;min-width:0;min-height:127px;
