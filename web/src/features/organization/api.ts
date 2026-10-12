@@ -41,6 +41,7 @@ export const organizationApi={
  groups:()=>allPages<Workgroup>("/groups").then(groups=>
   groups.sort((a,b)=>a.name.localeCompare(b.name,"zh-CN")||a.id.localeCompare(b.id))),
  createGroup:(name:string,departmentId:string)=>request<Created>("/groups",{method:"POST",body:JSON.stringify({name,departmentId})}),
+ deleteGroup:(id:string)=>request<{id:string;deleted:boolean}>("/groups/"+encodeURIComponent(id),{method:"DELETE"}),
  members:(groupId:string)=>request<User[]>("/groups/"+groupId+"/members"),
  addMember:(groupId:string,userId:string)=>request<{groupId:string;userId:string}>("/groups/"+groupId+"/members",{method:"POST",body:JSON.stringify({userId})}),
  removeMember:(groupId:string,userId:string)=>request<{removed:boolean}>("/groups/"+groupId+"/members/"+userId,{method:"DELETE"}),

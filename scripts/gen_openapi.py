@@ -1127,6 +1127,10 @@ add("POST", "/api/groups/{id}/members", operation("Add a workgroup member", "Org
     responses=dict([resp("201", "Member added", obj({"ok": {"type": "boolean", "enum": [True]}, "data": obj({"groupId": string(), "userId": string()}, required=["groupId", "userId"])}, required=["ok", "data"])),
                     resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"])])))
 
+add("DELETE", "/api/groups/{id}", operation("Delete a workgroup (blocked while ACL or shares reference it)", "Organization", "deleteWorkgroup", security=SESSION,
+    params=[id_param("id", "Workgroup id.")],
+    responses=dict([json_ok(obj({"id": string(), "deleted": {"type": "boolean", "enum": [True]}}, required=["id","deleted"]), "Workgroup deleted."),
+                    resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"]), resp("409", ERR["409"])])))
 add("DELETE", "/api/groups/{id}/members/{uid}", operation("Remove a workgroup member", "Organization", "removeWorkgroupMember", security=SESSION,
     params=[id_param("id", "Workgroup id."), id_param("uid", "User id.")],
     responses=dict([json_ok(obj({"groupId": string(), "userId": string(), "removed": {"type": "boolean", "enum": [True]}}, required=["groupId", "userId", "removed"]), "Member removed."),

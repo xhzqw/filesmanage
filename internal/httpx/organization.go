@@ -202,6 +202,19 @@ func (h *Handler) createWorkgroup(c *gin.Context) {
 	c.JSON(201, gin.H{"ok": true, "data": gin.H{"id": group.ID, "name": group.Name}})
 }
 
+func (h *Handler) deleteWorkgroup(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	id := c.Param("id")
+	if err := h.S.DeleteWorkgroup(c.Request.Context(), u, id); err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true, "data": gin.H{"id": id, "deleted": true}})
+}
+
 func (h *Handler) workgroupMembers(c *gin.Context) {
 	u, ok := h.auth(c)
 	if !ok {

@@ -230,6 +230,22 @@ func (r *Repository) CreateWorkgroup(ctx context.Context, g domain.Workgroup) er
 	return err
 }
 
+// Deleting a group cascades its memberships; the database trigger blocks deletion
+// when direct ACL grants or folder shares still reference the group.
+func (r *Repository) DeleteWorkgroup(ctx context.Context, id string) error {
+	tag, err := r.Q.Exec(ctx, "DELETE FROM workgroups WHERE id=$1", id)
+	if isForeignKeyViolation(err) {
+		return domain.ErrConflict
+	}
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ports.ErrRowMissing
+	}
+	return nil
+}
+
 func (r *Repository) RenameWorkgroup(ctx context.Context, id, name string) error {
 	tag, err := r.Q.Exec(ctx, "UPDATE workgroups SET name=$2 WHERE id=$1", id, name)
 	if err != nil {

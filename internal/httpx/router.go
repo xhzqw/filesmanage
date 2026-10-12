@@ -182,6 +182,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.POST("/departments", h.createDepartment)
 	api.GET("/groups", h.listWorkgroups)
 	api.POST("/groups", h.createWorkgroup)
+	api.DELETE("/groups/:id", h.deleteWorkgroup)
 	api.GET("/groups/:id/members", h.workgroupMembers)
 	api.POST("/groups/:id/members", h.addWorkgroupMember)
 	api.DELETE("/groups/:id/members/:uid", h.removeWorkgroupMember)

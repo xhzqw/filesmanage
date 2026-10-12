@@ -211,6 +211,44 @@ func (r *memoryRepo) CreateWorkgroup(_ context.Context, g domain.Workgroup) erro
 	return nil
 }
 
+func (r *memoryRepo) DeleteWorkgroup(_ context.Context, id string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	index := -1
+	for i, g := range r.workgroupList {
+		if g.ID == id {
+			index = i
+			break
+		}
+	}
+	if index < 0 {
+		return ports.ErrRowMissing
+	}
+	// Match the DB referential guard: never delete a group referenced by a grant/share.
+	for _, acl := range r.grants {
+		if acl.SubjectKind == "group" && acl.SubjectID == id {
+			return domain.ErrConflict
+		}
+	}
+	for _, share := range r.shares {
+		if share.RecipientKind == "group" && share.RecipientID == id {
+			return domain.ErrConflict
+		}
+	}
+	r.workgroupList = append(r.workgroupList[:index], r.workgroupList[index+1:]...)
+	for _, userID := range r.groupMembers[id] {
+		old := r.workgroups[userID]
+		for i, g := range old {
+			if g == id {
+				r.workgroups[userID] = append(old[:i], old[i+1:]...)
+				break
+			}
+		}
+	}
+	delete(r.groupMembers, id)
+	return nil
+}
+
 func (r *memoryRepo) RenameWorkgroup(_ context.Context, id, name string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

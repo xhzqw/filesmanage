@@ -36,6 +36,9 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
  const [refresh,setRefresh]=useState(0);
  useEffect(()=>observeWorkspaceChange(()=>setRefresh(n=>n+1),["permissions","folder"]),[]);
  const [notice,setNotice]=useState<{text:string;error:boolean}|null>(null);
+ const [mode,setMode]=useState<"list"|"effective"|"create">("list");
+ const [grantQuery,setGrantQuery]=useState("");
+
  useEffect(()=>{
   if(notice)(notice.error?toast.error:toast.success)(notice.text);
  },[notice]);
@@ -60,7 +63,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
  useEffect(()=>{
   setSubmitState("edit");setReviewFolderId("");setRiskAcknowledged(false);
   setSubjectId("");setActions(["list"]);setScopeOnly(true);setExpiresAt("");
-  setRevokeTarget(null);setRevokeError("");
+  setRevokeTarget(null);setRevokeError("");setMode("list");setGrantQuery("");
  },[folderId]);
 
  useEffect(()=>{
@@ -76,6 +79,13 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
    ?users.filter(u=>!u.disabled).map(u=>({id:u.id,name:u.displayName+(u.login?`（${u.login}）`:"")}))
    :groups.map(g=>({id:g.id,name:g.name}));
  },[users,groups,subjectKind]);
+ const visibleGrants=useMemo(()=>{
+  const q=grantQuery.trim().toLocaleLowerCase("zh-CN");
+  if(!q)return grants;
+  const lookup=new Map([...users.map(u=>["user:"+u.id,u.displayName+(u.login??"")] as const),
+   ...groups.map(g=>["group:"+g.id,g.name] as const)]);
+  return grants.filter(g=>(lookup.get(g.subjectKind+":"+g.subjectId)??g.subjectId).toLocaleLowerCase("zh-CN").includes(q));
+ },[grants,grantQuery,users,groups]);
  const names=useMemo(()=>{
   const out=new Map<string,string>();
   users.forEach(u=>out.set("user:"+u.id,u.displayName));
@@ -92,7 +102,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
   requestNavigation(()=>{
    setSelectedName({id:folder.id,name:folder.path||folder.name});
    setParams(old=>{const next=new URLSearchParams(old);next.set("tab","permissions");next.set("view","folder");next.set("folder",folder.id);return next;});
-   setSubmitState("edit");setRiskAcknowledged(false);setRevokeTarget(null);setNotice(null);
+   setSubmitState("edit");setRiskAcknowledged(false);setRevokeTarget(null);setNotice(null);setMode("list");
   });
  }
  async function submit(event:FormEvent<HTMLFormElement>){
@@ -114,7 +124,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
    if(currentFolderRef.current!==folderId)return;
    setNotice({text:"直接授权已提交，请以刷新后的服务端记录为准。",error:false});
    setSubjectKind("group");setSubjectId("");setExpiresAt("");setActions(["list"]);setScopeOnly(true);
-   reload();
+   reload();setMode("list");
   }catch(e){
    if(currentFolderRef.current!==folderId)return;
    setNotice({text:errorCode(e)==="E_NETWORK"
@@ -150,40 +160,60 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
   {documentAuditView?<DocumentActivityPanel/>:auditView?<PermissionAudit users={users}/>:<div className="perm-workspace">
   <ResourceBrowser selected={folderId} onSelect={selectFolder}/>
   <section className="perm-detail" aria-label="目录权限">
-   {!folderId?<div className="perm-empty-state"><strong>选择一个资源目录</strong><p>从左侧目录树选择需要管理的目录，然后查看直接授权、实际有效权限和新增授权。</p></div>:<>
+   {!folderId?<div className="perm-empty-state"><strong>选择左侧目录开始管理权限</strong></div>:<>
     <div className="perm-detail-heading">
      <div className="perm-heading-copy"><h2 className="perm-path" title={selectedName?.id===folderId?selectedName.name:folderId}>{selectedName?.id===folderId?selectedName.name:folderId}</h2></div>
      <div className="perm-heading-actions"><Link to={"/doc?folder="+encodeURIComponent(folderId)}>在文档中打开</Link>
       <RareButton type="button" className="secondary-action" onClick={reload}>刷新授权</RareButton></div>
     </div>
-    <div className="perm-detail-layout">
-     <div className="perm-inspection-column">
-      <section className="perm-card perm-card-grants" aria-label="直接授权记录">
-       <div className="perm-section-title"><span>直接授权记录</span>{state==="ready"&&<span className="perm-count">{grants.length} 条</span>}</div>
-    {notice?.error&&<RareNotice tone="danger">{notice.text}</RareNotice>}
-    {state==="loading"&&<p role="status" className="hint">正在读取直接授权…</p>}
-    {state==="failed"&&<RareNotice tone="danger">读取失败，不能编辑该目录的授权。</RareNotice>}
-    {state==="ready"&&<div className="perm-grants-scroller">{grants.length>0?<RareDataTable className="perm-table perm-grants-table"><thead><tr><th>授权主体</th><th>动作</th><th className="perm-grant-optional">范围</th><th className="perm-grant-optional">到期</th><th>操作</th></tr></thead>
-     <tbody>{grants.map(g=><tr key={g.id}><td className="perm-grant-subject"><strong title={names.get(g.subjectKind+":"+g.subjectId)??g.subjectId}>{names.get(g.subjectKind+":"+g.subjectId)??g.subjectId}</strong><small>{g.subjectKind==="user"?"用户":"工作组"} · {g.scopeOnly?"仅当前目录":"包含子目录"}<span className="perm-grant-mobile-expiry">{g.expiresAt?" · "+new Date(g.expiresAt).toLocaleDateString("zh-CN"):""}</span></small></td>
-      <td className="perm-grant-actions" title={displayActions(g.actions)}>{displayActions(g.actions)}</td><td className="perm-grant-optional"><RareBadge tone={g.scopeOnly?"neutral":"info"}>{g.scopeOnly?"当前目录":"包含子目录"}</RareBadge></td>
-      <td className="perm-grant-optional rare-data-date">{g.expiresAt?new Date(g.expiresAt).toLocaleString("zh-CN"):"不过期"}</td>
-      <td className="perm-grant-controls"><RareRowActions><RareButton type="button" tone="danger" className="danger" onClick={()=>{setRevokeError("");setRevokeTarget(g);}}>撤销</RareButton></RareRowActions></td></tr>)}</tbody></RareDataTable>
-     :<div className="perm-empty-grants"><strong>暂无直接授权</strong><p>可在右侧添加授权。</p></div>}
-    </div>}
-      </section>
-    <PermissionInsights folderId={folderId} users={users} usersState={usersState} refreshToken={refresh}/>
-     </div>
-     <DirectGrantForm
-      folderName={selectedName?.id===folderId?selectedName.name:folderId}
-      usersState={usersState} groupsState={groupsState} onRetryUsers={onRetryUsers} onRetryGroups={onRetryGroups}
-      subjectKind={subjectKind} setSubjectKind={setSubjectKind} subjectId={subjectId} setSubjectId={setSubjectId}
-      actions={actions} setActions={setActions} scopeOnly={scopeOnly} setScopeOnly={setScopeOnly}
-      expiresAt={expiresAt} setExpiresAt={setExpiresAt} submitState={submitState} setSubmitState={setSubmitState}
-      riskAcknowledged={riskAcknowledged} setRiskAcknowledged={setRiskAcknowledged}
-      subjectSourceState={subjectSourceState} candidates={candidates} names={names}
-      riskyActions={riskyActions} needsRiskConsent={needsRiskConsent} displayActions={displayActions}
-      grantLoadState={state} onSubmit={submit}/>
-
+    <div className="perm-manage-toolbar" role="tablist" aria-label="目录权限视图">
+     <RareButton type="button" role="tab" aria-selected={mode==="list"} className={mode==="list"?"active":""}
+      onClick={()=>setMode("list")}>授权列表 <RareBadge tone="neutral">{grants.length}</RareBadge></RareButton>
+     <RareButton type="button" role="tab" aria-selected={mode==="effective"} className={mode==="effective"?"active":""}
+      onClick={()=>requestNavigation(()=>setMode("effective"))}>查看生效权限</RareButton>
+     <RareButton type="button" className="primary perm-create-trigger" tone="primary"
+      onClick={()=>setMode("create")}>+ 新增授权</RareButton>
+    </div>
+    <div className="perm-view-body">
+     {mode==="effective"&&<PermissionInsights folderId={folderId} users={users} usersState={usersState} refreshToken={refresh}/>}
+     {mode==="list"&&<section className="perm-card perm-overview" aria-label="直接授权记录">
+      <div className="perm-list-filter">
+       <span className="perm-list-heading">当前目录的直接授权</span>
+       <RareInput type="search" className="perm-grant-search" aria-label="筛选授权用户或工作组" placeholder="搜索用户或工作组"
+        value={grantQuery} onChange={event=>setGrantQuery(event.target.value)}/>
+      </div>
+      {notice?.error&&<RareNotice tone="danger">{notice.text}</RareNotice>}
+      {state==="loading"&&<p role="status" className="hint perm-list-hint">正在读取授权…</p>}
+      {state==="failed"&&<RareNotice tone="danger">读取授权失败，无法管理当前目录。<RareButton type="button" onClick={reload}>重试</RareButton></RareNotice>}
+      {state==="ready"&&<div className="perm-grants-scroller">{visibleGrants.length
+       ?<RareDataTable className="perm-table perm-grants-table"><thead><tr><th>授权对象</th><th>允许的操作</th><th>适用范围</th><th>有效期</th><th>操作</th></tr></thead>
+       <tbody>{visibleGrants.map(g=><tr key={g.id}>
+        <td className="perm-grant-subject"><strong>{names.get(g.subjectKind+":"+g.subjectId)??g.subjectId}</strong>
+         <small>{g.subjectKind==="user"?"用户":"工作组"}</small></td>
+        <td><div className="perm-grant-tags">{g.actions.map(action=><RareBadge key={action} tone="neutral">{LABELS.get(action)??action}</RareBadge>)}</div></td>
+        <td><RareBadge tone={g.scopeOnly?"neutral":"info"}>{g.scopeOnly?"本目录":"包含子目录"}</RareBadge></td>
+        <td className="rare-data-date">{g.expiresAt?new Date(g.expiresAt).toLocaleDateString("zh-CN"):"长期有效"}</td>
+        <td><RareRowActions><RareButton type="button" className="danger" tone="danger"
+         onClick={()=>{setRevokeError("");setRevokeTarget(g);}}>撤销</RareButton></RareRowActions></td>
+       </tr>)}</tbody></RareDataTable>
+       :<div className="perm-empty-grants"><strong>{grantQuery?"没有匹配的授权":"暂无直接授权"}</strong>
+        {!grantQuery&&<RareButton type="button" className="primary" onClick={()=>setMode("create")}>新增授权</RareButton>}</div>}
+      </div>}
+     </section>}
+     {mode==="create"&&<div className="perm-create-view">
+      <div className="perm-create-heading"><strong>为当前目录新增授权</strong>
+       <RareButton type="button" onClick={()=>requestNavigation(()=>setMode("list"))}>返回列表</RareButton>
+      </div>
+      <DirectGrantForm folderName={selectedName?.id===folderId?selectedName.name:folderId}
+       usersState={usersState} groupsState={groupsState} onRetryUsers={onRetryUsers} onRetryGroups={onRetryGroups}
+       subjectKind={subjectKind} setSubjectKind={setSubjectKind} subjectId={subjectId} setSubjectId={setSubjectId}
+       actions={actions} setActions={setActions} scopeOnly={scopeOnly} setScopeOnly={setScopeOnly}
+       expiresAt={expiresAt} setExpiresAt={setExpiresAt} submitState={submitState} setSubmitState={setSubmitState}
+       riskAcknowledged={riskAcknowledged} setRiskAcknowledged={setRiskAcknowledged}
+       subjectSourceState={subjectSourceState} candidates={candidates} names={names}
+       riskyActions={riskyActions} needsRiskConsent={needsRiskConsent} displayActions={displayActions}
+       grantLoadState={state} onSubmit={submit}/>
+     </div>}
     </div>
    </>}
   </section>

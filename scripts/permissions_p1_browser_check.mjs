@@ -226,6 +226,16 @@ try{
  await cdp.evaluate("(()=>{document.querySelector('#org-tab-groups').click();return true})()");
  assert(await cdp.waitFor("()=>!!document.querySelector('.org-group-cards-list')"),
   "workgroup list available for scope checks");
+ assert(await cdp.waitFor("()=>!!document.querySelector('.org-group-banner-actions button')"),
+  "workgroup detail exposes delete action with explicit confirmation");
+ await cdp.evaluate("(()=>{document.querySelector('.org-group-banner-actions button').click();return true})()");
+ assert(await cdp.waitFor("()=>!!document.querySelector('dialog[open]')"),
+  "workgroup deletion requires confirmation");
+ assert(await cdp.evaluate("(()=>!!document.querySelector('dialog[open]')?.textContent?.includes('关联'))()"),
+  "delete confirmation explains workgroup membership impact");
+ await cdp.evaluate("(()=>{[...document.querySelectorAll('dialog[open] button')].find(b=>b.textContent?.includes('取消'))?.click();return true})()");
+ assert(await cdp.waitFor("()=>!document.querySelector('dialog[open]')"),
+  "cancelling delete leaves existing workgroup unchanged");
  // Hold the workgroup API response and confirm the previous list stays mounted
  // throughout websocket revalidation; release every held promise before proceeding.
  const groupsBeforeRefresh=await cdp.evaluate("(()=>document.querySelectorAll('.org-group-cards-list > li').length)()");
@@ -289,6 +299,10 @@ try{
    getComputedStyle(panel).marginTop==='0px';
  })()`),"permissions avoid redundant nested workspace borders");
  await cdp.evaluate("(()=>{document.querySelector('.perm-tree-name')?.click();return true;})()");
+ assert(await cdp.waitFor("()=>!!document.querySelector('.perm-manage-toolbar')"),"permissions list-first workbench renders");
+ assert(await cdp.evaluate("(()=>!!document.querySelector('.perm-overview')&&!document.querySelector('.perm-compose-card'))()"),
+  "permission editor stays closed until explicitly requested");
+ await cdp.evaluate("(()=>{[...document.querySelectorAll('.perm-manage-toolbar button')].find(b=>b.textContent?.includes('查看生效权限')).click();return true})()");
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-insight select')"),"effective permission explanation renders");
  await cdp.evaluate(`(()=>{
   const select=document.querySelector('.perm-insight select');
@@ -302,6 +316,7 @@ try{
  const actions=await cdp.evaluate("(()=>document.querySelectorAll('.perm-action-token').length)()");
  assert(Number.isInteger(actions)&&actions>=0,"effective actions are rendered as read-only labels");
  // Do not create an ACL entry: drive only the form's preview and consent gate.
+ await cdp.evaluate("(()=>{[...document.querySelectorAll('.perm-manage-toolbar button')].find(b=>b.textContent?.includes('新增授权')).click();return true})()");
  assert(await cdp.waitFor("()=>document.querySelector('.perm-form')&&!document.querySelector('.perm-form select').disabled"),
   "direct ACL form available for review");
  await cdp.evaluate(`(()=>{

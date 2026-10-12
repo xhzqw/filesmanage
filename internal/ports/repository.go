@@ -121,6 +121,7 @@ type Repository interface {
 	PageWorkgroups(context.Context, string, int) ([]domain.Workgroup, error)
 	WorkgroupByID(context.Context, string) (domain.Workgroup, error)
 	CreateWorkgroup(context.Context, domain.Workgroup) error
+	DeleteWorkgroup(context.Context, string) error
 	RenameWorkgroup(context.Context, string, string) error
 	WorkgroupMembers(context.Context, string) ([]domain.User, error)
 	AddWorkgroupMember(context.Context, string, string) error

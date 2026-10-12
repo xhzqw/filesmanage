@@ -172,6 +172,21 @@ function mutationCopy(error:unknown,fallback:string):string{
   return{ok:`已创建部门“${name}”。部门成员与工作组需要另行指派。`};
  }
 
+ async function deleteGroup(group:Workgroup):Promise<DialogResult>{
+  try{
+   await organizationApi.deleteGroup(group.id);
+  }catch(error){
+   const code=errorCode(error);
+   if(code==="E_NETWORK"||code==="E_NOT_FOUND")await refreshGroups("工作组删除结果尚未确认，刷新工作组列表失败。");
+   if(code==="E_CONFLICT")return {error:"该工作组仍被文件夹授权或共享引用。请先在权限管理中撤销相关授权后再删除。"};
+   return {error:mutationCopy(error,"删除工作组失败")};
+  }
+  setCandidateQuery("");
+  const refreshed=await reloadGroups();
+  if(refreshed==="failed")return {ok:"工作组已删除，但列表未能刷新；请手动重试读取。"};
+  return {ok:"工作组「"+group.name+"」已删除，成员关系也已解除。"};
+ }
+
  async function createGroup(name:string,departmentId:string):Promise<DialogResult>{
   try{
    await organizationApi.createGroup(name,departmentId);
@@ -194,5 +209,6 @@ function mutationCopy(error:unknown,fallback:string):string{
   addMember:(user:User)=>singleFlight("addMember:"+(selectedGroupRow?.id??"")+":"+user.id,()=>addMember(user)),
   createDepartment:(name:string,parentId:string)=>singleFlight("createDepartment",()=>createDepartment(name,parentId)),
   createGroup:(name:string,departmentId:string)=>singleFlight("createGroup",()=>createGroup(name,departmentId)),
+  deleteGroup:(group:Workgroup)=>singleFlight("deleteGroup:"+group.id,()=>deleteGroup(group)),
  };
 }

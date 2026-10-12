@@ -17,7 +17,7 @@ import {loginOf} from "./organizationUserLabel";
 import {CANDIDATE_CAP,useOrganizationSelectors,type StatusFilter} from "./useOrganizationSelectors";
 import {WorkgroupMemberRow} from "./WorkgroupMemberRow";
 import {IconUsers,IconSearch} from "./OrganizationIcons";
-import {ResetPasswordDialog,SetDisabledDialog,RemoveMemberDialog,CreateUserConfirmDialog,CreateDepartmentDialog,CreateGroupDialog} from "./OrganizationDialogs";
+import {ResetPasswordDialog,SetDisabledDialog,RemoveMemberDialog,CreateUserConfirmDialog,CreateDepartmentDialog,CreateGroupDialog,DeleteWorkgroupDialog} from "./OrganizationDialogs";
 
 type Tone="info"|"error";
 type Notice={text:string;tone:Tone};
@@ -41,6 +41,7 @@ function IconPlus(){
 
 export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;currentUserId:string}){
  const[selectedGroup,setSelectedGroup]=useState("");
+ const[deleteGroupTarget,setDeleteGroupTarget]=useState<{id:string;name:string;departmentId:string|null}|null>(null);
  const {users,departments,groups,
   usersState,departmentsState,groupsState,
   setUsersToken,setDepartmentsToken,setGroupsToken,groupMembers,setGroupMembers,
@@ -108,7 +109,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  const selectedGroupRow=filteredGroups.find(g=>g.id===selectedGroup)??null;
  const deptFilter=departmentsState==="ready"||departments.length>0?selectedDepartment:"";
 
- const {addBusy,createUser,resetPassword,applyDisabled,removeMember,addMember,createDepartment,createGroup}=
+ const {addBusy,createUser,resetPassword,applyDisabled,removeMember,addMember,createDepartment,createGroup,deleteGroup}=
   useOrganizationMutations({
    newUser,setNewUser,resetTarget,stateTarget,removeTarget,selectedGroup,selectedGroupRow,
    setNotice,setCandidateQuery,setGroupMembers,
@@ -414,7 +415,10 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
           <h4 className="org-group-detail-title">{selectedGroupRow.name}</h4>
            <RareBadge className="org-dept-pill" tone="neutral">{selectedGroupRow.departmentId?departmentLabel(selectedGroupRow.departmentId):"公共工作组"}</RareBadge>
          </div>
-         <span className="toolbar-hint">当前成员 {groupMembers.length} 人</span>
+         <div className="org-group-banner-actions">
+          <span className="toolbar-hint">当前成员 {groupMembers.length} 人</span>
+          <RareButton type="button" tone="danger" className="danger" onClick={()=>setDeleteGroupTarget(selectedGroupRow)}>删除工作组</RareButton>
+         </div>
         </div>
 
         {/* 组内成员列表 */}
@@ -483,6 +487,11 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
     }}>放弃修改并离开</RareButton>
    </div>
   </Dialog>
+  {deleteGroupTarget&&<DeleteWorkgroupDialog name={deleteGroupTarget.name}
+   count={deleteGroupTarget.id===selectedGroup?groupMembers.length:0}
+   onClose={()=>setDeleteGroupTarget(null)}
+   onSubmit={()=>deleteGroup(deleteGroupTarget)}
+   onOpenPermissions={()=>{setDeleteGroupTarget(null);requestNavigation(()=>setQueryParams(old=>{const next=new URLSearchParams(old);next.set("tab","permissions");next.set("view","folder");return next;}));}}/>}
   {/* 对话框保持原样 */}
   {resetTarget&&<ResetPasswordDialog target={resetTarget} department={departmentLabel(resetTarget.departmentId)}
    onClose={()=>setResetTarget(null)} onSubmit={resetPassword}/>}

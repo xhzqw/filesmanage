@@ -346,6 +346,38 @@ func (s *Service) CreateWorkgroup(ctx context.Context, actor domain.User, name, 
 	return group, nil
 }
 
+func (s *Service) DeleteWorkgroup(ctx context.Context, actor domain.User, groupID string) error {
+	if err := s.requireAdmin(actor); err != nil {
+		return err
+	}
+	if groupID == "" {
+		return domain.ErrInvalidInput
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	group, err := tx.WorkgroupByID(ctx, groupID)
+	if err != nil {
+		return notFoundOr(err)
+	}
+	if err = tx.DeleteWorkgroup(ctx, groupID); err != nil {
+		return mapError(err)
+	}
+	if err = auditRequired(ctx, tx, actor, "workgroup.delete", "workgroup", groupID, "success",
+		map[string]any{"name": group.Name, "departmentId": group.DepartmentID, "membersRemoved": "cascade"}); err != nil {
+		return err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return err
+	}
+	s.bumpACLEpoch()
+	s.notifyWorkspaceChange("organization")
+	s.notifyWorkspaceChange("permissions")
+	return nil
+}
+
 func (s *Service) WorkgroupMembers(ctx context.Context, actor domain.User, groupID string) ([]domain.User, error) {
 	if err := s.requireAdmin(actor); err != nil {
 		return nil, err

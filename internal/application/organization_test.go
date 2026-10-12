@@ -176,3 +176,48 @@ func TestGroupGrantTakesEffectImmediately(t *testing.T) {
 		t.Fatalf("revoked grant must take effect immediately, got %v", visible)
 	}
 }
+
+// Workgroups may be deleted by admins only. Memberships are cascaded, but
+// ACL references are protected so that deleting a group cannot silently revoke
+// access to a folder without first explicitly removing its grants.
+func TestDeleteWorkgroupRequiresAdminAndUnreferencedGroup(t *testing.T) {
+	s, _ := testService(t)
+	ctx := context.Background()
+	admin := domain.User{ID: "u_admin", Login: "admin", IsAdmin: true}
+	ordinary := domain.User{ID: "u_user", Login: "user1"}
+	group, err := s.CreateWorkgroup(ctx, admin, "临时组", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.AddWorkgroupMember(ctx, admin, group.ID, ordinary.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.DeleteWorkgroup(ctx, ordinary, group.ID); !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("nonadmin deleted group: %v", err)
+	}
+	grant, err := s.CreateGrant(ctx, admin, "folder_market", GrantRequest{
+		SubjectKind: "group", SubjectID: group.ID, Actions: []domain.Action{domain.ActionList},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.DeleteWorkgroup(ctx, admin, group.ID); !errors.Is(err, domain.ErrConflict) {
+		t.Fatalf("referenced group deleted: %v", err)
+	}
+	members, err := s.WorkgroupMembers(ctx, admin, group.ID)
+	if err != nil || len(members) != 1 {
+		t.Fatalf("conflict should leave memberships untouched: %v %v", err, members)
+	}
+	if err = s.RevokeGrant(ctx, admin, grant.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.DeleteWorkgroup(ctx, admin, group.ID); err != nil {
+		t.Fatalf("unreferenced workgroup deletion failed: %v", err)
+	}
+	if _, err = s.WorkgroupMembers(ctx, admin, group.ID); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("deleted group was still available: %v", err)
+	}
+	if err = s.DeleteWorkgroup(ctx, admin, group.ID); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("duplicate deletion should return not found: %v", err)
+	}
+}

@@ -849,3 +849,6 @@
   .org-create-form>.rare-button{width:100%}
   .org-table-container{max-height:48vh}
 }
+
+.org-group-banner-actions{display:flex;gap:var(--space-2);align-items:center;flex-wrap:wrap;margin-left:auto}
+.org-group-banner-actions .rare-button{min-height:30px}

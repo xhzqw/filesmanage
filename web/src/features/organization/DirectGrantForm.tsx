@@ -26,7 +26,7 @@ export function DirectGrantForm({folderName,usersState,groupsState,onRetryUsers,
 }){
  return <>
      <section className="perm-card perm-compose-card" aria-label="新增直接授权">
-      <div className="perm-section-title">新增直接授权</div>
+
   <form className="perm-form" onSubmit={onSubmit} onChange={event=>{
    if((event.target as HTMLElement).classList.contains("perm-risk-consent"))return;
    if(submitState==="review"){setSubmitState("edit");setRiskAcknowledged(false);}

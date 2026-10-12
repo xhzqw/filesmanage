@@ -996,7 +996,7 @@ func (r *Repository) ListPermissionAudit(ctx context.Context, beforeID int64, li
 	rows, err := r.Q.Query(ctx, `SELECT id,coalesce(actor_id,''),request_id,event_type,target_kind,target_id,outcome,
 	  details,created_at FROM audit_events
 	  WHERE ($1::bigint=0 OR id<$1)
-	  AND event_type IN ('acl.create','acl.revoke','workgroup.member_add','workgroup.member_remove',
+	  AND event_type IN ('acl.create','acl.revoke','workgroup.member_add','workgroup.member_remove','workgroup.delete',
 	    'user.create','user.disable','user.enable','user.password_reset','share.create','share.revoke',
 	    'role.assign','role.revoke')
 	  ORDER BY id DESC LIMIT $2`, beforeID, limit)

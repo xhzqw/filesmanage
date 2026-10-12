@@ -288,3 +288,43 @@ export function CreateGroupDialog({options,defaultDepartmentId,listAvailable,onC
    </form>}
  </Dialog>;
 }
+
+
+/** Explicit group deletion confirmation; no mutation occurs on opening the dialog. */
+export function DeleteWorkgroupDialog({name,count,onClose,onSubmit,onOpenPermissions}:{
+ name:string;count:number;onClose:()=>void;onSubmit:()=>Promise<DialogResult>;
+ onOpenPermissions:()=>void;
+}){
+ const[busy,setBusy]=useState(false);
+ const[result,setResult]=useState<{text:string;tone:Tone}|null>(null);
+ async function run(){
+  if(busy)return;
+  setBusy(true);
+  try{
+   const outcome=await onSubmit();
+   if("error" in outcome)setResult({text:outcome.error,tone:"error"});
+   else setResult({text:outcome.ok,tone:"info"});
+  }finally{setBusy(false);}
+ }
+ return <Dialog open title="删除工作组" className="org-dialog" onClose={onClose} closeGuard={()=>!busy}>
+  {result
+   ?<>
+    <RareNotice tone={result.tone==="error"?"danger":"success"}>{result.text}</RareNotice>
+    <div className="dialog-actions">
+     {result.tone==="error"&&<RareButton type="button" onClick={onOpenPermissions}>查看权限管理</RareButton>}
+     <RareButton type="button" tone="primary" className="primary" onClick={onClose}>关闭</RareButton>
+    </div>
+   </>
+   :<>
+    <p>确定删除工作组「{name}」？</p>
+    <p>将解除该组的 {count} 个成员关联。成员账号及其个人授权不会被删除。</p>
+    <p className="hint">如果该组仍有文件夹授权或共享引用，服务端会拒绝删除。</p>
+    <div className="dialog-actions">
+     <RareButton type="button" onClick={onClose}>取消</RareButton>
+     <RareButton type="button" tone="danger" className="danger" disabled={busy} loading={busy} onClick={()=>void run()}>
+      {busy?"删除中…":"确认删除工作组"}
+     </RareButton>
+    </div>
+   </>}
+ </Dialog>;
+}

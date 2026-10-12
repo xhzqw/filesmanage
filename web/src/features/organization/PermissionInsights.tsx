@@ -14,7 +14,7 @@ const SOURCES:Record<string,string>={
 };
 const EVENTS:Record<string,string>={
  "acl.create":"新增目录授权","acl.revoke":"撤销目录授权",
- "workgroup.member_add":"加入工作组","workgroup.member_remove":"移出工作组",
+ "workgroup.member_add":"加入工作组","workgroup.member_remove":"移出工作组","workgroup.delete":"删除工作组",
  "user.create":"创建账号","user.disable":"禁用账号","user.enable":"启用账号",
  "user.password_reset":"重置登录密码",
  "share.create":"新增共享","share.revoke":"撤销共享",
