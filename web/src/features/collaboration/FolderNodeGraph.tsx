@@ -4,80 +4,212 @@ import {RareButton} from "../../shared/ui/rare";
 import {formatBytes,type FileCategory,type Stats} from "./api";
 import {assetTree,categoryInfo,ROOT_ID,type AssetNode} from "./statsTree";
 
-type Item={
- key:string;parent:string|null;x:number;y:number;
- label:string;count:number;bytes:number;
- node?:AssetNode;kind?:"folder"|"type"|"more";category?:FileCategory;
- extra?:string;
+type Kind="folder"|"type"|"more";
+type GraphItem={
+ key:string;parent:string|null;label:string;count:number;bytes:number;
+ kind:Kind;category?:FileCategory;node?:AssetNode;children:GraphItem[];
+ depth:number;angle:number;x:number;y:number;
 };
-const STEP_X=232,STEP_Y=72,WIDTH=198,HEIGHT=54,MAX_NODES=140;
-const defaultExpanded=(root:AssetNode)=>new Set([ROOT_ID,...(root.children.length<=3?root.children.slice(0,2).filter(n=>!n.virtual).map(n=>n.id):[])]);
-function graphLayout(root:AssetNode,expanded:Set<string>,limits:Map<string,number>):{items:Item[];edges:{a:Item;b:Item}[];width:number;height:number}{
- const items:Item[]=[];
- let row=0;
- function visit(node:AssetNode,depth:number,parent:string|null):Item{
+type Edge={from:GraphItem;to:GraphItem};
+type Layout={items:GraphItem[];edges:Edge[];width:number;height:number;rootX:number;rootY:number};
+type View={x:number;y:number;scale:number};
+const NODE_W=158,NODE_H=50,ROOT_W=174,ROOT_H=60,MAX_NODES=110;
+const DEFAULT_CHILDREN=8;
+const TAU=Math.PI*2;
+
+function defaultExpanded(root:AssetNode):Set<string>{
+ const expanded=new Set<string>([ROOT_ID]);
+ let current=root;
+ // Reveal a real branching point when all files sit under one wrapper folder.
+ for(let i=0;i<3&&current.children.length===1;i++){
+  const child=current.children[0];
+  if(!child||child.virtual)break;
+  expanded.add(child.id);
+  current=child;
+ }
+ return expanded;
+}
+
+function makeVisible(root:AssetNode,expanded:Set<string>,limits:Map<string,number>):GraphItem{
+ let total=0;
+ function folder(node:AssetNode,parent:string|null):GraphItem{
   const key="folder:"+node.id;
-  const item:Item={key,parent,x:24+depth*STEP_X,y:0,label:node.name,bytes:node.bytes,count:node.count,node,kind:"folder"};
-  items.push(item);
-  const children:Item[]=[];
-  if(expanded.has(node.id)&&!node.virtual){
-   const limit=limits.get(node.id)??7;
-   const visibleFolders=node.children.slice(0,limit);
-   for(const child of visibleFolders){if(items.length>=MAX_NODES)break;children.push(visit(child,depth+1,key));}
-   const hidden=node.children.length-visibleFolders.length;
-   if(hidden>0&&items.length<MAX_NODES){
-    const extra:Item={key:"more:"+node.id,parent:key,x:24+(depth+1)*STEP_X,y:0,label:"其余 "+hidden+" 个目录",count:0,bytes:0,kind:"more",node};
-    items.push(extra);extra.y=24+row++*STEP_Y;children.push(extra);
-   }
-   // File-type leaves are actual aggregates of direct files, not estimates
-   // derived from a folder's dominant extension or a global percentage.
-   for(const type of node.directTypes.filter(t=>t.count>0)){
-    if(items.length>=MAX_NODES)break;
-    const leaf:Item={key:"type:"+node.id+":"+type.category,parent:key,x:24+(depth+1)*STEP_X,y:0,
-      label:categoryInfo(type.category).label,count:type.count,bytes:type.bytes,kind:"type",category:type.category,node};
-    items.push(leaf);leaf.y=24+row++*STEP_Y;children.push(leaf);
-   }
+  const item:GraphItem={key,parent,label:node.name,count:node.count,bytes:node.bytes,kind:"folder",
+   node,children:[],depth:0,angle:0,x:0,y:0};
+  total++;
+  if(!expanded.has(node.id)||node.virtual)return item;
+  const limit=limits.get(node.id)??DEFAULT_CHILDREN;
+  const children=node.children.slice(0,limit);
+  for(const child of children){
+   if(total>=MAX_NODES-1)break;
+   item.children.push(folder(child,key));
   }
-  item.y=children.length>0?(children[0]!.y+children[children.length-1]!.y)/2:24+row++*STEP_Y;
+  const remaining=node.children.length-children.length;
+  if(remaining>0&&total<MAX_NODES){
+   item.children.push({key:"more:"+node.id,parent:key,label:"其余 "+remaining+" 个目录",
+    count:0,bytes:0,kind:"more",node,children:[],depth:0,angle:0,x:0,y:0});
+   total++;
+  }
+  // Only draw file-class leaves of this exact directory, never global estimates.
+  for(const type of node.directTypes.filter(t=>t.count>0)){
+   if(total>=MAX_NODES)break;
+   item.children.push({key:"type:"+node.id+":"+type.category,parent:key,
+    label:categoryInfo(type.category).label,count:type.count,bytes:type.bytes,
+    kind:"type",category:type.category,node,children:[],depth:0,angle:0,x:0,y:0});
+   total++;
+  }
   return item;
  }
- visit(root,0,null);
- const byKey=new Map(items.map(n=>[n.key,n]));
- return {items,edges:items.flatMap(item=>item.parent&&byKey.has(item.parent)?[{a:byKey.get(item.parent)!,b:item}]:[]),
-  width:Math.max(690,...items.map(n=>n.x+WIDTH+26)),height:Math.max(450,row*STEP_Y+46)};
+ return folder(root,null);
 }
+
+/**
+ * Radial tidy-tree: assign disjoint angular sectors in proportion to the
+ * number of visible terminal nodes, then place every depth on a concentric
+ * ring. Expand the ring radius if any axis-aligned cards would overlap.
+ * Unlike a horizontal layered tree, all quadrants can contain descendants.
+ */
+function radialLayout(root:GraphItem):Layout{
+ const items:GraphItem[]=[];
+ const edges:Edge[]=[];
+ const byDepth=new Map<number,GraphItem[]>();
+ function leaves(item:GraphItem):number{
+  return item.children.length?item.children.reduce((sum,child)=>sum+leaves(child),0):1;
+ }
+ function position(item:GraphItem,depth:number,start:number,end:number):void{
+  item.depth=depth;
+  item.angle=(start+end)/2;
+  items.push(item);
+  const peers=byDepth.get(depth)??[];
+  peers.push(item);byDepth.set(depth,peers);
+  const n=leaves(item);
+  let used=start;
+  for(const child of item.children){
+   const next=used+(end-start)*leaves(child)/n;
+   position(child,depth+1,used,next);
+   edges.push({from:item,to:child});
+   used=next;
+  }
+ }
+ // Top of the circle first; child sectors grow clockwise around the hub.
+ position(root,0,-Math.PI/2,-Math.PI/2+TAU);
+ // A sole first child sits above the hub, while its own children still spread
+ // over the full 360-degree sector.
+ if(root.children.length===1)root.children[0]!.angle=-Math.PI/2;
+ root.x=0;root.y=0;
+ for(const [depth,peers] of byDepth){
+  if(depth===0)continue;
+  // Position is based on angular density, not on alphabetical row order.
+  const minimum=depth===1?168:168+(depth-1)*166;
+  let radius=Math.max(minimum,peers.length*170/TAU);
+  for(let step=0;step<90;step++){
+   for(const node of peers){node.x=Math.cos(node.angle)*radius;node.y=Math.sin(node.angle)*radius;}
+   let collision=false;
+   for(let i=0;i<peers.length&&!collision;i++){
+    const a=peers[i]!;
+    for(let j=i+1;j<peers.length;j++){
+     const b=peers[j]!;
+     if(Math.abs(a.x-b.x)<NODE_W+18&&Math.abs(a.y-b.y)<NODE_H+17){collision=true;break;}
+    }
+   }
+   if(!collision)break;
+   radius+=18;
+  }
+ }
+ const pad=32;
+ const minX=Math.min(...items.map(n=>n.x-(n===root?ROOT_W:NODE_W)/2))-pad;
+ const minY=Math.min(...items.map(n=>n.y-(n===root?ROOT_H:NODE_H)/2))-pad;
+ const maxX=Math.max(...items.map(n=>n.x+(n===root?ROOT_W:NODE_W)/2))+pad;
+ const maxY=Math.max(...items.map(n=>n.y+(n===root?ROOT_H:NODE_H)/2))+pad;
+ for(const item of items){item.x-=minX;item.y-=minY;}
+ return {items,edges,width:maxX-minX,height:maxY-minY,rootX:-minX,rootY:-minY};
+}
+
+function connector(a:GraphItem,b:GraphItem):string{
+ const dx=b.x-a.x,dy=b.y-a.y;
+ const sw=a.depth===0?ROOT_W:NODE_W,sh=a.depth===0?ROOT_H:NODE_H;
+ // Intersect the ray with the actual card edge so connectors do not
+ // continue through the opaque rectangle at any angle.
+ const startT=Math.min((sw/2)/Math.max(.0001,Math.abs(dx)),(sh/2)/Math.max(.0001,Math.abs(dy)));
+ const endT=Math.min((NODE_W/2)/Math.max(.0001,Math.abs(dx)),(NODE_H/2)/Math.max(.0001,Math.abs(dy)));
+ const ax=a.x+dx*startT,ay=a.y+dy*startT;
+ const bx=b.x-dx*endT,by=b.y-dy*endT;
+ const span=Math.hypot(bx-ax,by-ay),handle=Math.min(64,span*.4);
+ const distance=Math.max(.0001,Math.hypot(dx,dy));
+ const vx=dx/distance,vy=dy/distance;
+ const bend=Math.sin(b.angle-a.angle)*Math.min(22,span*.16);
+ const px=-vy*bend,py=vx*bend;
+ return "M"+ax+" "+ay+" C"+(ax+vx*handle+px)+" "+(ay+vy*handle+py)+" "+(bx-vx*handle+px)+" "+(by-vy*handle+py)+" "+bx+" "+by;
+}
+
+function fit(layout:Layout,width:number,height:number):View{
+ const scale=Math.max(.4,Math.min(1.12,(width-28)/layout.width,(height-28)/layout.height));
+ // Anchor the semantic root, not the asymmetric bounding box, at viewport centre.
+ return {scale,x:width/2-layout.rootX*scale,y:height/2-layout.rootY*scale};
+}
+const clamp=(x:number)=>Math.max(.4,Math.min(2.2,x));
 
 export function FolderNodeGraph({stats,folders,onChoose}:{stats:Stats;folders:Folder[];onChoose:(id:string)=>void}){
  const root=useMemo(()=>assetTree(stats,folders),[stats,folders]);
  const [expanded,setExpanded]=useState<Set<string>>(()=>defaultExpanded(root));
- const [limits,setLimits]=useState<Map<string,number>>(new Map());
- const [active,setActive]=useState<string>(ROOT_ID);
- const [zoom,setZoom]=useState(1);
- const [offset,setOffset]=useState({x:18,y:24});
+ const [limits,setLimits]=useState<Map<string,number>>(()=>new Map());
+ const [active,setActive]=useState(ROOT_ID);
+ const [viewport,setViewport]=useState({width:0,height:0});
+ const [view,setView]=useState<View>({x:0,y:0,scale:1});
+ const viewportRef=useRef<HTMLDivElement>(null);
  const drag=useRef<{x:number;y:number;ox:number;oy:number}|null>(null);
+ const [dragging,setDragging]=useState(false);
  useEffect(()=>{setExpanded(defaultExpanded(root));setLimits(new Map());setActive(ROOT_ID);},[root]);
- const {items,edges,width,height}=useMemo(()=>graphLayout(root,expanded,limits),[root,expanded,limits]);
- const activeNode=items.find(n=>n.node?.id===active)?.node;
- const changeZoom=(factor:number)=>setZoom(z=>Math.min(1.8,Math.max(.45,Math.round((z+factor)*100)/100)));
+ const model=useMemo(()=>makeVisible(root,expanded,limits),[root,expanded,limits]);
+ const layout=useMemo(()=>radialLayout(model),[model]);
+ const byKey=useMemo(()=>new Map(layout.items.map(item=>[item.key,item])),[layout]);
+ const activeNode=byKey.get("folder:"+active)?.node;
+ const branch=useMemo(()=>{
+  const keys=new Set<string>();let item=byKey.get("folder:"+active);
+  while(item&&!keys.has(item.key)){keys.add(item.key);item=item.parent?byKey.get(item.parent):undefined;}
+  return keys;
+ },[active,byKey]);
+ useEffect(()=>{
+  const el=viewportRef.current;if(!el)return;
+  const observer=new ResizeObserver(entries=>{
+   const box=entries[0]?.contentRect;
+   if(box)setViewport(old=>Math.abs(old.width-box.width)<1&&Math.abs(old.height-box.height)<1?old:{width:box.width,height:box.height});
+  });
+  observer.observe(el);
+  return ()=>observer.disconnect();
+ },[]);
+ useEffect(()=>{
+  if(viewport.width>0&&viewport.height>0)setView(fit(layout,viewport.width,viewport.height));
+ },[layout,viewport]);
+ function zoomBy(factor:number,clientX?:number,clientY?:number){
+  setView(old=>{
+   const scale=clamp(old.scale*factor),ratio=scale/old.scale;
+   const fx=clientX??viewport.width/2,fy=clientY??viewport.height/2;
+   return {scale,x:fx-(fx-old.x)*ratio,y:fy-(fy-old.y)*ratio};
+  });
+ }
  function handlePointerDown(event:PointerEvent<HTMLDivElement>){
   if(event.button!==0||(event.target as HTMLElement).closest("button"))return;
-  drag.current={x:event.clientX,y:event.clientY,ox:offset.x,oy:offset.y};
-  event.currentTarget.setPointerCapture(event.pointerId);
+  drag.current={x:event.clientX,y:event.clientY,ox:view.x,oy:view.y};
+  setDragging(true);event.currentTarget.setPointerCapture(event.pointerId);
  }
  function handlePointerMove(event:PointerEvent<HTMLDivElement>){
   if(!drag.current)return;
-  setOffset({x:drag.current.ox+event.clientX-drag.current.x,y:drag.current.oy+event.clientY-drag.current.y});
+  setView(old=>({...old,x:drag.current!.ox+event.clientX-drag.current!.x,y:drag.current!.oy+event.clientY-drag.current!.y}));
  }
- function handlePointerUp(event:PointerEvent<HTMLDivElement>){drag.current=null;if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);}
- function onWheel(event:WheelEvent<HTMLDivElement>){
-  // Ctrl+wheel zooms; ordinary wheel continues scrolling the page.
+ function handlePointerUp(event:PointerEvent<HTMLDivElement>){
+  drag.current=null;setDragging(false);
+  if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);
+ }
+ function handleWheel(event:WheelEvent<HTMLDivElement>){
   if(!event.ctrlKey)return;
   event.preventDefault();
-  changeZoom(event.deltaY<0?.12:-.12);
+  const rect=event.currentTarget.getBoundingClientRect();
+  zoomBy(event.deltaY<0?1.12:1/1.12,event.clientX-rect.left,event.clientY-rect.top);
  }
- function select(item:Item){
+ function select(item:GraphItem){
   if(item.kind==="more"&&item.node){
-   setLimits(old=>{const next=new Map(old);next.set(item.node!.id,(next.get(item.node!.id)??7)+30);return next;});return;
+   setLimits(old=>{const next=new Map(old);next.set(item.node!.id,(next.get(item.node!.id)??DEFAULT_CHILDREN)+12);return next;});return;
   }
   if(item.kind!=="folder"||!item.node||item.node.virtual)return;
   setActive(item.node.id);
@@ -85,45 +217,47 @@ export function FolderNodeGraph({stats,folders,onChoose}:{stats:Stats;folders:Fo
  }
  return <div className="stats-graph">
   <div className="stats-graph-toolbar">
-   <span className="stats-graph-hint">点击节点展开 · 拖动画布 · Ctrl + 滚轮缩放</span>
+   <span className="stats-graph-hint">点击展开 · 拖拽平移 · Ctrl + 滚轮缩放</span>
    <div className="stats-graph-tools" aria-label="图谱缩放">
-    <RareButton type="button" tone="ghost" aria-label="缩小图谱" onClick={()=>changeZoom(-.2)}>－</RareButton>
-    <span aria-label="图谱缩放比例">{Math.round(zoom*100)}%</span>
-    <RareButton type="button" tone="ghost" aria-label="放大图谱" onClick={()=>changeZoom(.2)}>＋</RareButton>
-    <RareButton type="button" tone="ghost" onClick={()=>{setZoom(1);setOffset({x:18,y:24});}}>重置</RareButton>
+    <RareButton type="button" tone="ghost" aria-label="缩小图谱" onClick={()=>zoomBy(1/1.2)}>－</RareButton>
+    <span aria-label="图谱缩放比例">{Math.round(view.scale*100)}%</span>
+    <RareButton type="button" tone="ghost" aria-label="放大图谱" onClick={()=>zoomBy(1.2)}>＋</RareButton>
+    <RareButton type="button" tone="ghost" onClick={()=>setView(fit(layout,viewport.width,viewport.height))}>适应</RareButton>
    </div>
   </div>
-  <div className="stats-graph-viewport" role="group" aria-label="包含父子连线的目录与文件类型树图谱"
-   onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp} onWheel={onWheel}>
-   <div className="stats-graph-plane" style={{width,height,transform:"translate("+offset.x+"px,"+offset.y+"px) scale("+zoom+")"}}>
-    <svg className="stats-graph-lines" aria-hidden="true" width={width} height={height}>
-     {edges.map(({a,b})=><path key={a.key+"->"+b.key}
-      d={"M"+(a.x+WIDTH)+" "+(a.y+HEIGHT/2)+" C"+(a.x+WIDTH+35)+" "+(a.y+HEIGHT/2)+","+(b.x-35)+" "+(b.y+HEIGHT/2)+","+b.x+" "+(b.y+HEIGHT/2)}
-      fill="none" stroke="var(--border-strong)" strokeOpacity=".48" strokeWidth="1.5"/>)}
+  <div className={"stats-graph-viewport"+(dragging?" is-dragging":"")} role="group"
+   aria-label="从中心向四周放射的目录与文件类型径向树图谱" ref={viewportRef}
+   onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp} onWheel={handleWheel}>
+   <div className="stats-graph-plane" style={{width:layout.width,height:layout.height,transform:"translate("+view.x+"px,"+view.y+"px) scale("+view.scale+")"}}>
+    <svg className="stats-graph-lines" aria-hidden="true" width={layout.width} height={layout.height}>
+     {layout.edges.map(({from,to})=><path key={from.key+"->"+to.key}
+      d={connector(from,to)}
+      className={"stats-graph-edge"+(branch.has(from.key)&&branch.has(to.key)?" is-active":"")}/>)}
     </svg>
-    {items.map(item=>{
-     const isType=item.kind==="type";
+    {layout.items.map(item=>{
+     const isRoot=item.node?.id===ROOT_ID;
      const open=item.node?expanded.has(item.node.id):false;
-     const hasChildren=Boolean(item.node&&!item.node.virtual&&(item.node.children.length>0||item.node.directTypes.length>0));
-     const color=isType&&item.category?categoryInfo(item.category).color:"var(--folder-fill)";
+     const canExpand=Boolean(item.node&&!item.node.virtual&&(item.node.children.length>0||item.node.directTypes.length>0));
+     const color=item.kind==="type"&&item.category?categoryInfo(item.category).color:"var(--folder-fill)";
      return <RareButton key={item.key} type="button" tone="ghost" onClick={()=>select(item)}
-      disabled={item.node?.virtual||isType}
-      aria-expanded={hasChildren?open:undefined}
-      aria-label={item.label+"，"+item.count+" 个文件，"+formatBytes(item.bytes)+(hasChildren?",点击展开或折叠":"")}
+      disabled={item.node?.virtual||item.kind==="type"}
+      aria-expanded={canExpand?open:undefined}
+      aria-label={item.label+"，"+item.count+" 个文件，"+formatBytes(item.bytes)+(canExpand?"，点击展开或折叠":"")}
       title={item.label+" · "+item.count+" 个文件 · "+formatBytes(item.bytes)}
-      className={"stats-graph-node "+(isType?"stats-graph-type":"stats-graph-folder")+(item.kind==="more"?" stats-graph-more":"")+(active===item.node?.id?" is-selected":"")}
-      style={{left:item.x,top:item.y,width:WIDTH,height:HEIGHT,"--stats-node-color":color} as CSSProperties}>
+      className={"stats-graph-node"+(isRoot?" is-root":"")+(item.kind==="type"?" stats-graph-type":" stats-graph-folder")+(item.kind==="more"?" stats-graph-more":"")+(active===item.node?.id&&item.kind==="folder"?" is-selected":"")}
+      style={{left:item.x-(isRoot?ROOT_W:NODE_W)/2,top:item.y-(isRoot?ROOT_H:NODE_H)/2,
+       width:isRoot?ROOT_W:NODE_W,height:isRoot?ROOT_H:NODE_H,"--stats-node-color":color} as CSSProperties}>
       <span className="stats-graph-node-content">
        <span className="stats-graph-node-name"><i className="stats-graph-dot" aria-hidden="true"/>{item.label}</span>
        <span className="stats-graph-node-detail">{item.kind==="more"?"点击显示更多":formatBytes(item.bytes)+" · "+item.count+" 个"}</span>
       </span>
-      {hasChildren&&<span className="stats-graph-toggle" aria-hidden="true">{open?"−":"+"}</span>}
+      {canExpand&&<span className="stats-graph-toggle" aria-hidden="true">{open?"−":"+"}</span>}
      </RareButton>;
     })}
    </div>
   </div>
   <div className="stats-graph-footer">
-   <span>{items.length} 个节点 · {stats.treeTruncated?"仅含已统计目录":"当前筛选范围"}</span>
+   <span>{layout.items.length} 个节点{stats.treeTruncated?" · 部分目录已合并":""}</span>
    {activeNode&&activeNode.id!==ROOT_ID&&!activeNode.virtual&&
     <><span className="stats-graph-current" title={activeNode.name}>{activeNode.name}</span>
      <RareButton type="button" tone="ghost" onClick={()=>onChoose(activeNode.id)}>筛选此目录 ↗</RareButton></>}
