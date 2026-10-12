@@ -102,6 +102,29 @@ try{
    !!folder.querySelector('path[fill]')&&!!label&&
    getComputedStyle(label).justifyContent==='flex-start';
  })()`),"organization chart, warm folder icons and left-aligned tree labels");
+ const pressKey=async(key,virtualKeyCode)=>{
+  await cdp.send("Input.dispatchKeyEvent",{type:"keyDown",key,code:key,windowsVirtualKeyCode:virtualKeyCode});
+  await cdp.send("Input.dispatchKeyEvent",{type:"keyUp",key,code:key,windowsVirtualKeyCode:virtualKeyCode});
+ };
+ await cdp.evaluate("(()=>{document.querySelector('.org-dept-card .tree > li[role=treeitem]').focus();return true})()");
+ await pressKey("ArrowDown",40);
+ assert(await cdp.waitFor("()=>!!document.activeElement?.dataset.deptId"),
+  "department tree ArrowDown focuses first visible department");
+ await pressKey("ArrowUp",38);
+ assert(await cdp.waitFor("()=>document.activeElement?.dataset.treeId==='__all'"),
+  "department tree ArrowUp returns to all organization");
+ await pressKey("End",35);
+ assert(await cdp.waitFor("()=>document.activeElement?.dataset.treeId==='__unassigned'"),
+  "department tree End includes unassigned accounts");
+ await pressKey("Enter",13);
+ assert(await cdp.waitFor("()=>document.querySelector('.org-dept-card li[data-tree-id=__unassigned]')?.getAttribute('aria-selected')==='true'"),
+  "department tree Enter selects unassigned");
+ await pressKey("Home",36);
+ await pressKey("Enter",13);
+ assert(await cdp.waitFor("()=>document.querySelector('.org-dept-card li[data-tree-id=__all]')?.getAttribute('aria-selected')==='true'"),
+  "department tree Home and Enter restore all-organization scope");
+ assert(await cdp.evaluate(`(()=>document.querySelectorAll('.org-dept-card li[role=treeitem][tabindex="0"]').length===1)()`),
+  "department hierarchy exposes exactly one keyboard tab stop");
  await cdp.evaluate("window.__orgShellTree=document.querySelector('.org-dept-card');window.__orgShellTabs=document.querySelector('.org-tabs-bar');true");
  for(const tab of ["members","groups","approvals","roles","permissions"]){
   await cdp.evaluate(`document.querySelector('#org-tab-${tab}').click()`);
@@ -116,6 +139,18 @@ try{
   })()`),tab+" changes only the right panel");
  }
  assert(await cdp.waitFor("()=>!!document.querySelector('.perm-tree-name')"),"resource folder browser loads");
+ assert(await cdp.evaluate("(()=>!!document.querySelector('.perm-tree[role=tree] li[role=treeitem] .perm-folder-glyph[stroke]'))()"),
+  "resource browser uses shared warm folder glyph and ARIA tree structure");
+ await cdp.evaluate("(()=>{document.querySelector('.perm-tree li[role=treeitem]').focus();return true})()");
+ await pressKey("End",35);
+ assert(await cdp.waitFor("()=>document.activeElement?.matches('.perm-tree li[role=treeitem]:last-of-type')"),
+  "resource browser End reaches last visible folder");
+ await pressKey("Home",36);
+ assert(await cdp.waitFor("()=>document.activeElement?.matches('.perm-tree li[role=treeitem]:first-child')"),
+  "resource browser Home returns to first folder");
+ await pressKey("Enter",13);
+ assert(await cdp.waitFor("()=>document.activeElement?.getAttribute('aria-selected')==='true'"),
+  "resource tree Enter selects focused resource");
  for(const width of [1100,1024,900,820]){
   await cdp.send("Emulation.setDeviceMetricsOverride",{width,height:900,deviceScaleFactor:1,mobile:false});
   assert(await cdp.evaluate(`(()=>{
