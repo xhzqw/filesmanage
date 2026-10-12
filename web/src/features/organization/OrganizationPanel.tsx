@@ -1,7 +1,7 @@
 import {RareTabs} from "../../shared/ui/rare/RareTabs";
 import {RareBadge,RareButton,RareDataTable,RareInput,RareNotice,RareRowActions,RareSelect} from "../../shared/ui/rare";
-import {useCallback,useEffect,useMemo,useRef,useState,type FormEvent} from "react";
-import {organizationApi,type Department} from "./api";
+import {useCallback,useEffect,useRef,useState,type FormEvent} from "react";
+import {organizationApi} from "./api";
 import {errorCode,errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
 import type {User} from "../../entities/user/model";
@@ -13,30 +13,18 @@ import {ApprovalPoliciesPanel} from "./ApprovalPoliciesPanel";
 import {RoleBindingsPanel,DelegatedRolesWorkspace} from "./RoleWorkspace";
 import {DepartmentNavigator} from "./DepartmentNavigator";
 import {useOrganizationDirectory} from "./useOrganizationDirectory";
+import {useOrganizationSelectors,type StatusFilter} from "./useOrganizationSelectors";
 import {WorkgroupMemberRow} from "./WorkgroupMemberRow";
 import {IconUsers,IconSearch} from "./OrganizationIcons";
-import {fullPathOf} from "./organizationTreeUtils";
 import {ResetPasswordDialog,SetDisabledDialog,RemoveMemberDialog,CreateUserConfirmDialog,CreateDepartmentDialog,CreateGroupDialog,type DialogResult} from "./OrganizationDialogs";
 
 type Tone="info"|"error";
 type Notice={text:string;tone:Tone};
-type StatusFilter="all"|"normal"|"disabled"|"admin";
 
-const CANDIDATE_CAP=50;
 const MEMBER_DISPLAY_STEP=100;
 const GROUP_DISPLAY_STEP=60;
 
 function loginOf(user:User):string{return user.login??"";}
-
-function matchesQuery(user:User,needle:string):boolean{
- return user.displayName.toLowerCase().includes(needle)||loginOf(user).toLowerCase().includes(needle);
-}
-
-function departmentLabelOf(byId:Map<string,Department>,id:string|undefined):string{
- const key=id??"";
- if(key==="")return "未分配部门";
- return byId.get(key)?.name??`未知部门（${key}）`;
-}
 
 function mutationCopy(error:unknown,fallback:string):string{
  const code=errorCode(error);
@@ -65,10 +53,12 @@ function IconPlus(){
 
 export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;currentUserId:string}){
  const[selectedGroup,setSelectedGroup]=useState("");
+ const selectedGroupRef=useRef(selectedGroup);
+ selectedGroupRef.current=selectedGroup;
  const {users,setUsers,departments,setDepartments,groups,setGroups,
   usersState,setUsersState,departmentsState,setDepartmentsState,groupsState,setGroupsState,
   setUsersToken,setDepartmentsToken,setGroupsToken,groupMembers,setGroupMembers,
-  membersState,setMembersState,setMembersToken}=useOrganizationDirectory(isAdmin,selectedGroup);
+  membersState,setMembersToken,reloadMembers}=useOrganizationDirectory(isAdmin,selectedGroup);
  const[notice,setNotice]=useState<Notice|null>(null);
 
  // 视图与筛选状态：默认 Tab 1 为部门成员，Tab 2 为工作组管理
@@ -116,108 +106,19 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  const[createDepartmentOpen,setCreateDepartmentOpen]=useState(false);
  const[createGroupOpen,setCreateGroupOpen]=useState(false);
 
- const deptById=useMemo(()=>new Map(departments.map(d=>[d.id,d])),[departments]);
- const deptIndex=useMemo(()=>{
-  const ids=new Set(departments.map(d=>d.id));
-  const childrenOf=new Map<string,Department[]>();
-  for(const d of departments){
-   const key=d.parentId!==null&&ids.has(d.parentId)?d.parentId:"";
-   const list=childrenOf.get(key);
-   if(list)list.push(d);else childrenOf.set(key,[d]);
-  }
-  return childrenOf;
- },[departments]);
-
- const departmentLabel=(id:string|undefined):string=>departmentLabelOf(deptById,id);
- const departmentOptions=useMemo(
-  ()=>departments.map(d=>({id:d.id,label:fullPathOf(deptById,d.id)})),
-  [departments,deptById]);
-
- const selectedDeptIds=useMemo(()=>{
-  if(selectedDepartment===""||selectedDepartment==="__unassigned")return null;
-  const out=new Set<string>();
-  const walk=(id:string)=>{
-   if(out.has(id))return;
-   out.add(id);
-   for(const child of deptIndex.get(id)??[])walk(child.id);
-  };
-  walk(selectedDepartment);
-  return out;
- },[selectedDepartment,deptIndex]);
-
- const unassignedCount=useMemo(
-  ()=>users.filter(u=>!u.departmentId||!deptById.has(u.departmentId)).length,
-  [users,deptById]);
-
- const deptCounts=useMemo(()=>{
-  const direct=new Map<string,number>();
-  for(const user of users){
-   const key=user.departmentId??"";
-   if(key!=="")direct.set(key,(direct.get(key)??0)+1);
-  }
-  const totals=new Map<string,number>();
-  const visiting=new Set<string>();
-  const sum=(id:string):number=>{
-   if(visiting.has(id))return 0;
-   const cached=totals.get(id);
-   if(cached!==undefined)return cached;
-   visiting.add(id);
-   let total=direct.get(id)??0;
-   for(const child of deptIndex.get(id)??[])total+=sum(child.id);
-   visiting.delete(id);
-   totals.set(id,total);
-   return total;
-  };
-  for(const d of departments)sum(d.id);
-  return totals;
- },[users,departments,deptIndex]);
-
- const deptFilter=departmentsState==="ready"||departments.length>0?selectedDepartment:"";
- const activeDeptIds=deptFilter!==""&&deptFilter!=="__unassigned"?selectedDeptIds:null;
- const needle=memberQuery.trim().toLowerCase();
-
- const filteredMembers=useMemo(()=>{
-  return users.filter(user=>{
-   if(selectedDepartment==="__unassigned"){
-    const dId=user.departmentId??"";
-    if(dId!==""&&deptById.has(dId))return false;
-   }else if(activeDeptIds&&!activeDeptIds.has(user.departmentId??"")){
-    return false;
-   }
-   if(statusFilter==="normal"&&user.disabled===true)return false;
-   if(statusFilter==="disabled"&&user.disabled!==true)return false;
-   if(statusFilter==="admin"&&!user.isAdmin)return false;
-   if(needle==="")return true;
-   return matchesQuery(user,needle);
-  });
- },[users,activeDeptIds,selectedDepartment,deptById,statusFilter,needle]);
+ const {deptById,deptIndex,departmentLabel,departmentOptions,unassignedCount,deptCounts,
+  needle,filteredMembers,filteredGroups,candidates}=useOrganizationSelectors({
+  users,departments,groups,groupMembers,selectedDepartment,memberQuery,statusFilter,groupQuery,candidateQuery
+ });
  useEffect(()=>setMemberLimit(MEMBER_DISPLAY_STEP),[selectedDepartment,statusFilter,memberQuery]);
-
- const filteredGroups=useMemo(()=>{
-  const keyword=groupQuery.trim().toLowerCase();
-  return groups.filter(group=>{
-   if(selectedDepartment==="__unassigned"){
-    if(group.departmentId&&deptById.has(group.departmentId))return false;
-   }else if(selectedDeptIds&&!selectedDeptIds.has(group.departmentId??""))return false;
-   return keyword===""||group.name.toLowerCase().includes(keyword);
-  });
- },[groups,groupQuery,selectedDepartment,selectedDeptIds,deptById]);
  useEffect(()=>{
   if(!filteredGroups.some(group=>group.id===selectedGroup))
    setSelectedGroup(filteredGroups[0]?.id??"");
  },[filteredGroups,selectedGroup]);
  useEffect(()=>setGroupLimit(GROUP_DISPLAY_STEP),[groupQuery,selectedDepartment]);
  useEffect(()=>setGroupMemberLimit(MEMBER_DISPLAY_STEP),[selectedGroup]);
-
  const selectedGroupRow=filteredGroups.find(g=>g.id===selectedGroup)??null;
-
- const candidates=useMemo(()=>{
-  const keyword=candidateQuery.trim().toLowerCase();
-  const current=new Set(groupMembers.map(m=>m.id));
-  return users
-   .filter(user=>user.disabled!==true&&!current.has(user.id)&&(keyword===""||matchesQuery(user,keyword)))
-   .slice(0,CANDIDATE_CAP);
- },[users,groupMembers,candidateQuery]);
+ const deptFilter=departmentsState==="ready"||departments.length>0?selectedDepartment:"";
 
  const canCreateUser=
   newUser.login.trim()!==""&&newUser.displayName.trim()!==""&&newUser.password.length>=16;
@@ -227,7 +128,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    setUsers(await organizationApi.users());
    setUsersState("ready");
   }catch{
-   setUsers([]);
    setUsersState("failed");
    setNotice({tone:"error",text:failure});
   }
@@ -238,7 +138,6 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    setDepartments(await organizationApi.departments());
    setDepartmentsState("ready");
   }catch{
-   setDepartments([]);
    setDepartmentsState("failed");
    setNotice({tone:"error",text:failure});
   }
@@ -249,24 +148,15 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    setGroups(await organizationApi.groups());
    setGroupsState("ready");
   }catch{
-   setGroups([]);
    setGroupsState("failed");
    setNotice({tone:"error",text:failure});
   }
  }
 
- async function refreshMembers(failure:string):Promise<boolean>{
-  if(selectedGroup==="")return false;
-  try{
-   setGroupMembers(await organizationApi.members(selectedGroup));
-   setMembersState("ready");
-   return true;
-  }catch{
-   setGroupMembers([]);
-   setMembersState("failed");
-   setNotice({tone:"error",text:failure});
-   return false;
-  }
+ async function refreshMembers(failure:string,groupId=selectedGroup):Promise<boolean>{
+  const result=await reloadMembers(groupId);
+  if(result==="failed")setNotice({tone:"error",text:failure});
+  return result==="ok";
  }
 
  async function createUser():Promise<DialogResult>{
@@ -328,11 +218,13 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   }catch(error){
    const code=errorCode(error);
    if(code==="E_NETWORK"||code==="E_NOT_FOUND")
-    await refreshMembers("移除成员的结果未确认，工作组成员刷新失败，请重试。");
+    await refreshMembers("移除成员的结果未确认，工作组成员刷新失败，请重试。",group.id);
    return{error:mutationCopy(error,"移除成员失败")};
   }
-  setGroupMembers(prev=>prev.filter(member=>member.id!==target.id));
-  setNotice({tone:"info",text:`已把 ${target.displayName} 从工作组 ${group.name} 移除。`});
+  if(selectedGroupRef.current===group.id)
+   setGroupMembers(prev=>prev.filter(member=>member.id!==target.id));
+  if(selectedGroupRef.current===group.id)
+   setNotice({tone:"info",text:`已把 ${target.displayName} 从工作组 ${group.name} 移除。`});
   return{ok:`已把 ${target.displayName} 从工作组 ${group.name} 移除；其直接授权不受影响，最终生效权限由服务端判定。`};
  }
 
@@ -346,16 +238,18 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   }catch(error){
    const code=errorCode(error);
    if(code==="E_NETWORK"||code==="E_NOT_FOUND"||code==="E_INTERNAL"||code==="E_NAME_CONFLICT")
-    await refreshMembers("添加成员未成功，工作组成员刷新失败，请重试。");
-   setNotice({tone:"error",text:code==="E_INTERNAL"||code==="E_NAME_CONFLICT"
+    await refreshMembers("添加成员未成功，工作组成员刷新失败，请重试。",group.id);
+   if(selectedGroupRef.current===group.id)
+    setNotice({tone:"error",text:code==="E_INTERNAL"||code==="E_NAME_CONFLICT"
     ?"服务端未接受该成员变更；已重新读取成员列表，请确认该账号是否已在工作组中。"
     :mutationCopy(error,"添加成员失败")});
    setAddBusy("");
    return;
   }
   setAddBusy("");
-  const refreshed=await refreshMembers(`已把 ${user.displayName} 加入工作组 ${group.name}，但成员列表刷新失败，请点击重试。`);
-  if(refreshed)setNotice({tone:"info",text:`已把 ${user.displayName} 加入工作组 ${group.name}。`});
+  const refreshed=await refreshMembers(`已把 ${user.displayName} 加入工作组 ${group.name}，但成员列表刷新失败，请点击重试。`,group.id);
+  if(refreshed&&selectedGroupRef.current===group.id)
+   setNotice({tone:"info",text:`已把 ${user.displayName} 加入工作组 ${group.name}。`});
  }
 
  async function createDepartment(name:string,parentId:string):Promise<DialogResult>{
@@ -394,9 +288,10 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
  if(!isAdmin)
   return <DelegatedRolesWorkspace/>;
 
- const usersReady=usersState==="ready";
- const departmentsReady=departmentsState==="ready";
- const groupsReady=groupsState==="ready";
+ const usersReady=usersState==="ready"||users.length>0;
+ const membersAvailable=membersState==="ready"||groupMembers.length>0;
+ const departmentsReady=departmentsState==="ready"||departments.length>0;
+ const groupsReady=groupsState==="ready"||groups.length>0;
 
  const memberEmpty=users.length===0
   ?"还没有账号。"
@@ -408,7 +303,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
      ?"该部门（含子部门）暂无成员。"
      :"没有成员。";
 
- const scopeText=departmentsState==="failed"
+ const scopeText=departmentsState==="failed"&&departments.length===0
   ?"范围：全部账号（部门数据不可用，暂不能按部门筛选）"
   :selectedDepartment==="__unassigned"
    ?`范围：未分配部门（${unassignedCount} 人）`
@@ -689,12 +584,12 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
          </div>
 
          {membersState==="loading"&&<p className="hint">正在读取工作组成员…</p>}
-         {membersState==="ready"&&<div className="org-member-grid">
+         {membersAvailable&&<div className="org-member-grid">
           {groupMembers.slice(0,groupMemberLimit).map(member=><WorkgroupMemberRow key={member.id}
            user={member} kind="member" onAction={()=>{setNotice(null);setRemoveTarget(member);}}/>)}
           {groupMembers.length===0&&<p className="empty org-grid-empty">该工作组暂无成员，可在下方添加成员。</p>}
          </div>}
-         {membersState==="ready"&&groupMembers.length>groupMemberLimit&&
+         {membersAvailable&&groupMembers.length>groupMemberLimit&&
           <div className="org-list-more">
            <span className="hint">已显示 {groupMemberLimit} / {groupMembers.length} 位工作组成员</span>
            <RareButton type="button" onClick={()=>setGroupMemberLimit(n=>n+MEMBER_DISPLAY_STEP)}>

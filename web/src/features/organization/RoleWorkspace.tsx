@@ -118,12 +118,15 @@ export function DelegatedRolesWorkspace(){
  const[error,setError]=useState("");
  const[folder,setFolder]=useState("");
  const[grants,setGrants]=useState<DirectGrant[]>([]);
+ const[grantsFolder,setGrantsFolder]=useState("");
  const[subject,setSubject]=useState("");
  const[action,setAction]=useState("list");
  const[expiry,setExpiry]=useState("");
  const[refresh,setRefresh]=useState(0);
- useEffect(()=>observeWorkspaceChange(()=>setRefresh(n=>n+1),["permissions"]),[]);
  const[confirm,setConfirm]=useState("");
+ useEffect(()=>observeWorkspaceChange(()=>{
+  setConfirm("");setRevokeTarget("");setRefresh(n=>n+1);
+ },["permissions"]),[]);
  const[revokeTarget,setRevokeTarget]=useState("");
  useEffect(()=>{let live=true;roleAPI.mine().then(r=>{if(live){setRoles(r);setBusy(false);}})
   .catch(e=>{if(live){setBusy(false);setError(errorCopy(e,"读取管理职责失败"));}});
@@ -133,11 +136,18 @@ export function DelegatedRolesWorkspace(){
  const chosen=permissionRoles.find(r=>r.scopeId===folder);
  const effectiveAction=chosen?.allowedActions.includes(action)?action:(chosen?.allowedActions[0]??"");
  useEffect(()=>{if(!folder&&permissionRoles[0])setFolder(permissionRoles[0].scopeId);},[folder,permissionRoles]);
- useEffect(()=>{if(!chosen)return;let live=true;permissionsApi.grants(folder)
-  .then(v=>{if(live)setGrants(v)}).catch(e=>{if(live)setError(errorCopy(e,"读取直接 ACL 失败"));});
-  return()=>{live=false};},[folder,refresh,chosen?.id]);
+ useEffect(()=>{
+  // Do not display a previous folder's ACL while the new folder is being read.
+  setGrantsFolder("");
+  if(!chosen)return;
+  let live=true;
+  permissionsApi.grants(folder)
+   .then(v=>{if(live){setGrants(v);setGrantsFolder(folder);}})
+   .catch(e=>{if(live)setError(errorCopy(e,"读取直接 ACL 失败"));});
+  return()=>{live=false};
+ },[folder,refresh,chosen?.id]);
  async function create(e:FormEvent){
-  e.preventDefault();if(!chosen||!subject)return;
+  e.preventDefault();if(!chosen||!subject||!effectiveAction)return;
   if(!confirm){setConfirm("yes");return;}
   try{await permissionsApi.create(folder,{subjectKind:"user",subjectId:subject,actions:[effectiveAction],scopeOnly:true,
    ...(expiry?{expiresAt:new Date(expiry).toISOString()}:{})});
@@ -157,12 +167,14 @@ export function DelegatedRolesWorkspace(){
   {permissionRoles.length>0&&<section className="perm-detail org-delegated-workspace">
    <div className="perm-section-title">委派目录 ACL 管理</div>
    <p className="perm-hint">只能维护所选目录的直接授权。角色自身不赋予浏览或下载文件的权限。</p>
-   <label>管理目录<RareSelect value={folder} onChange={e=>setFolder(e.target.value)}>
+   <label>管理目录<RareSelect value={folder} onChange={e=>{
+    setFolder(e.target.value);setConfirm("");setRevokeTarget("");setSubject("");setExpiry("");
+   }}>
     {permissionRoles.map(r=><option key={r.id} value={r.scopeId}>{r.scopeId}</option>)}
    </RareSelect></label>
    {chosen&&<><p>可授权动作：{chosen.allowedActions.map(actionName).join("、")}</p>
      <RareDataTable className="perm-table"><thead><tr><th>主体 ID</th><th>动作</th><th>范围</th><th>到期</th><th>操作</th></tr></thead>
-     <tbody>{grants.map(g=><tr key={g.id}><td>{g.subjectId}</td><td>{g.actions.map(actionName).join("、")}</td>
+     <tbody>{(grantsFolder===folder?grants:[]).map(g=><tr key={g.id}><td>{g.subjectId}</td><td>{g.actions.map(actionName).join("、")}</td>
       <td>{g.scopeOnly?"仅本目录":"包含子目录"}</td><td>{g.expiresAt||"不过期"}</td>
       <td>{g.scopeOnly&&g.actions.every(a=>chosen.allowedActions.includes(a))&&
         (!chosen.expiresAt||Boolean(g.expiresAt&&new Date(g.expiresAt)<=new Date(chosen.expiresAt)))&&
@@ -182,7 +194,7 @@ export function DelegatedRolesWorkspace(){
      </div>
      {confirm&&<p className="perm-review">确认向 {subject} 授予 {actionName(effectiveAction)}，仅当前目录。</p>}
      <RareButton type="button" className="secondary-action" onClick={()=>setRefresh(v=>v+1)}>刷新</RareButton>
-     <RareButton className="primary" type="submit" disabled={!subject}>{confirm?"确认授权":"预览授权"}</RareButton>
+     <RareButton className="primary" type="submit" disabled={!subject||!effectiveAction}>{confirm?"确认授权":"预览授权"}</RareButton>
     </form>
    </>}
   </section>}

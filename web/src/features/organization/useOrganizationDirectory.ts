@@ -1,4 +1,4 @@
-import {useEffect,useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import type {User} from "../../entities/user/model";
 import {organizationApi,type Department,type Workgroup} from "./api";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
@@ -20,6 +20,10 @@ export function useOrganizationDirectory(isAdmin:boolean,selectedGroup:string){
  const[groupMembers,setGroupMembers]=useState<User[]>([]);
  const[membersState,setMembersState]=useState<LoadState>("loading");
  const[membersToken,setMembersToken]=useState(0);
+ const[membersGroupId,setMembersGroupId]=useState("");
+ const selectedGroupRef=useRef(selectedGroup);
+ selectedGroupRef.current=selectedGroup;
+ const membersGeneration=useRef(0);
 
  useEffect(()=>{
   if(!isAdmin)return;
@@ -55,18 +59,38 @@ export function useOrganizationDirectory(isAdmin:boolean,selectedGroup:string){
   setGroupsToken(token=>token+1);setMembersToken(token=>token+1);
  },["organization","permissions"]),[]);
 
+ /** Every membership load, including manual post-mutation reconciliation,
+  * participates in a single latest-request-wins sequence. */
+ async function reloadMembers(groupId:string):Promise<"ok"|"failed"|"stale">{
+  if(!groupId||!isAdmin||selectedGroupRef.current!==groupId)return "stale";
+  const generation=++membersGeneration.current;
+  try{
+   const data=await organizationApi.members(groupId);
+   if(generation!==membersGeneration.current||selectedGroupRef.current!==groupId)return "stale";
+   setGroupMembers(data);
+   setMembersGroupId(groupId);
+   setMembersState("ready");
+   return "ok";
+  }catch{
+   if(generation!==membersGeneration.current||selectedGroupRef.current!==groupId)return "stale";
+   setMembersState("failed");
+   return "failed";
+  }
+ }
  useEffect(()=>{
-  if(!isAdmin||selectedGroup==="")return;
-  let valid=true;
+  if(!isAdmin||selectedGroup===""){
+   ++membersGeneration.current;
+   setMembersState("ready");
+   return;
+  }
   setMembersState("loading");
-  organizationApi.members(selectedGroup)
-   .then(data=>{if(valid){setGroupMembers(data);setMembersState("ready");}})
-   .catch(()=>{if(valid){setGroupMembers([]);setMembersState("failed");}});
-  return()=>{valid=false;};
+  void reloadMembers(selectedGroup);
+  return()=>{++membersGeneration.current;};
  },[isAdmin,selectedGroup,membersToken]);
 
  return {users,setUsers,departments,setDepartments,groups,setGroups,
   usersState,setUsersState,departmentsState,setDepartmentsState,groupsState,setGroupsState,
   setUsersToken,setDepartmentsToken,setGroupsToken,
-  groupMembers,setGroupMembers,membersState,setMembersState,setMembersToken};
+  groupMembers:membersGroupId===selectedGroup?groupMembers:[],
+  setGroupMembers,membersState,setMembersState,setMembersToken,reloadMembers};
 }

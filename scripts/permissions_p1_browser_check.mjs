@@ -226,6 +226,32 @@ try{
  await cdp.evaluate("(()=>{document.querySelector('#org-tab-groups').click();return true})()");
  assert(await cdp.waitFor("()=>!!document.querySelector('.org-group-cards-list')"),
   "workgroup list available for scope checks");
+ // Hold the workgroup API response and confirm the previous list stays mounted
+ // throughout websocket revalidation; release every held promise before proceeding.
+ const groupsBeforeRefresh=await cdp.evaluate("(()=>document.querySelectorAll('.org-group-cards-list > li').length)()");
+ await cdp.evaluate(`(()=>{
+  const previous=window.fetch;
+  window.__heldOrgResponses=[];
+  window.fetch=(input,init)=>{
+   const url=new URL(typeof input==='string'?input:input.url,location.href);
+   if(url.pathname==='/api/groups'){
+    return new Promise(resolve=>window.__heldOrgResponses.push(()=>resolve(previous(input,init))));
+   }
+   return previous(input,init);
+  };
+  window.__releaseHeldOrg=()=>{
+   window.fetch=previous;
+   const requests=window.__heldOrgResponses.splice(0);
+   requests.forEach(release=>release());
+  };
+  window.dispatchEvent(new CustomEvent('filesmanage:workspace-changed',{detail:{scopes:['organization']}}));
+  return true;
+ })()`);
+ const groupRefreshStarted=await cdp.waitFor("()=>window.__heldOrgResponses?.length>0");
+ const groupRowsRetained=await cdp.evaluate("(()=>document.querySelectorAll('.org-group-cards-list > li').length)()");
+ await cdp.evaluate("(()=>{window.__releaseHeldOrg?.();return true})()");
+ assert(groupRefreshStarted&&groupRowsRetained===groupsBeforeRefresh&&groupsBeforeRefresh>0,
+  "live workgroup refresh keeps existing rows while network response is pending");
  assert(await cdp.evaluate(`(()=>{
   const card=document.querySelector('.org-group-cards-list .org-group-card');
   const badge=card?.querySelector('.org-dept-pill[data-rare-badge-tone]');
