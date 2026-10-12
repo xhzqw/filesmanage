@@ -370,6 +370,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", default="http://127.0.0.1:18091")
     parser.add_argument("--admin-password-file", default=".secrets/admin.password")
+    parser.add_argument("--existing-file-id", default="", help="Probe one existing CAD derivative without uploading test files")
     args = parser.parse_args()
     host = up.urlsplit(args.base).hostname
     if host not in ("127.0.0.1", "localhost", "::1"):
@@ -397,6 +398,44 @@ def main():
                       ("igs", "converted")):
         check(f"MC matrix class {fmt}", classes.get(fmt) == want, f"{classes.get(fmt)} != {want}")
     check("MC11 DWG capability is explicit", classes.get("dwg") in ("licensed", "converted"), classes.get("dwg"))
+    if args.existing_file_id:
+        # Use the already-authenticated loopback acceptance session. This
+        # creates only a preview derivative, never edits the original version.
+        import hashlib
+        path = "/api/files/" + up.quote(args.existing_file_id, safe="") + "/derivative"
+        code, envelope = admin.json("GET", path)
+        if code != 200:
+            print(f"DWG_PROBE_FAILED status_http={code}")
+            return 1
+        data = (envelope or {}).get("data") or {}
+        print(f"DWG_PROBE_FORMAT format={data.get('format')} class={data.get('class')}")
+        if data.get("class") != "converted" or data.get("format") != "dwg":
+            print("DWG_PROBE_UNSUPPORTED")
+            return 2
+        if not data.get("found") or data.get("state") == "failed":
+            code, _ = admin.json("POST", path)
+            if code != 202:
+                print(f"DWG_PROBE_REQUEST_FAILED http={code}")
+                return 2
+        for _ in range(46):
+            code, envelope = admin.json("GET", path)
+            if code != 200:
+                print(f"DWG_PROBE_STATUS_FAILED http={code}")
+                return 2
+            data = (envelope or {}).get("data") or {}
+            state = data.get("state")
+            if state == "ready":
+                code, output = admin.request("GET", path + "/bytes")
+                verified = code == 200 and len(output) > 0 and hashlib.sha256(output).hexdigest() == data.get("outputSha256")
+                print(f"DWG_PROBE_READY http={code} output_kind={data.get('outputKind')} bytes={len(output)} sha_verified={verified}")
+                return 0 if verified and data.get("outputKind") == "dxf" else 2
+            if state == "failed":
+                print(f"DWG_PROBE_FAILED error_code={data.get('errorCode')}")
+                return 2
+            time.sleep(2)
+        print("DWG_PROBE_TIMEOUT")
+        return 3
+
 
     stamp = str(int(time.time()))
     status, tree = admin.json("GET", "/api/folders/tree")
