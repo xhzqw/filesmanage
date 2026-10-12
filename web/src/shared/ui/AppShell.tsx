@@ -94,13 +94,13 @@ export function AppShell({user,onLogout,product,actions,children}:{user:ShellUse
   {previewRoute&&<div className="preview-header-hotzone"
    onPointerEnter={event=>{if(event.pointerType==="mouse"||event.pointerType==="pen")showPreviewHeader()}}
    onPointerLeave={schedulePreviewHeaderHide}>
-   <button ref={revealRef} type="button" className="preview-header-reveal"
+   <RareButton ref={revealRef} type="button" className="preview-header-reveal"
     aria-label="显示系统顶部菜单" aria-controls="shell-main-navigation"
     aria-expanded={previewHeaderOpen}
     onFocus={showPreviewHeader} onClick={showPreviewHeader}
     onKeyDown={event=>{if(event.key==="Escape"){event.preventDefault();cancelHeaderHide();setPreviewHeaderOpen(false);event.currentTarget.blur()}}}>
     <span aria-hidden="true"/>
-   </button>
+   </RareButton>
   </div>}
   <header ref={previewHeaderRef} className={"header"+(previewRoute&&previewHeaderOpen?" is-preview-header-open":"")}
    onPointerEnter={event=>{if(previewRoute&&(event.pointerType==="mouse"||event.pointerType==="pen"))showPreviewHeader()}}
