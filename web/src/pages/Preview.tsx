@@ -1,6 +1,6 @@
 import {RareBadge,RareButton,MicroHoldToDelete} from "../shared/ui/rare";
 import {toast} from "../shared/ui/feedback";
-import {BrandLoadingLabel} from "../shared/ui/BrandLoader";
+import {BrandLoader,BrandLoadingLabel} from "../shared/ui/BrandLoader";
 import {lazy,Suspense,useEffect,useRef,useState} from "react";
 import {Link,useNavigate,useParams} from "react-router-dom";
 import {fileApi,formatSize,type FileLifecycle} from "../features/documents/api";
@@ -363,7 +363,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
        preview.structured&&adapter==="archive"?
         <StructuredFilePreview value={preview.structured}/>:
        adapter==="cad"?
-        <Suspense fallback={<div className="cad-preview-loading" role="status">正在加载模型查看器…</div>}>
+        <Suspense fallback={<div className="cad-preview-loading" role="status"><BrandLoader size="lg" decorative/><span>正在加载三维查看器…</span></div>}>
          <CadViewer key={preview.fileId+":"+preview.sha256} fileId={preview.fileId}/>
         </Suspense>:
        preview.textual?

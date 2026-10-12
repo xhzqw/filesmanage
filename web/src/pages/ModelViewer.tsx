@@ -1,4 +1,5 @@
 import {RareButton,RareInput,RareSelect} from "../shared/ui/rare";
+import {BrandLoader} from "../shared/ui/BrandLoader";
 import {useEffect,useRef,useState} from "react";
 import {useNavigate,useParams} from "react-router-dom";
 import {fileApi} from "../features/documents/api";
@@ -49,6 +50,9 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
  const navigate=useNavigate();
  const[status,setStatus]=useState("loading");
  const[retryEpoch,setRetryEpoch]=useState(0);
+ const[loadPhase,setLoadPhase]=useState<"initial"|"fetching"|"downloading"|"parsing"|"scene">("initial");
+ const[downloadProgress,setDownloadProgress]=useState<number|null>(null);
+ const[conversionSeconds,setConversionSeconds]=useState(0);
  const[message,setMessage]=useState("");
  const[info,setInfo]=useState<DerivativeInfo|null>(null);
  const[fileMeta,setFileMeta]=useState<{sha256:string;versionSeq:number;name:string}|null>(null);
@@ -123,6 +127,7 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
   controls.current?.dispose();controls.current=null;
   mshRoot.current=null;dxfRoot.current=null;drawingSession.current=null;
   setStatus("loading");setMessage("");setInfo(null);setFileMeta(null);
+  setLoadPhase("initial");setDownloadProgress(null);setConversionSeconds(0);
   setMetrics(null);setLayers([]);setLayouts([]);setActiveLayout("Model");
   setPaperViewports({total:0,projected:0});
   setPlotScale(1);setPlotError("");
@@ -216,6 +221,15 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
   return()=>{active=false;if(timer!==undefined)clearTimeout(timer);};
  },[id,status]);
 
+ // Show measured elapsed time, not a fabricated conversion percentage.
+ useEffect(()=>{
+  if(status!=="converting")return;
+  const since=Date.now();
+  setConversionSeconds(0);
+  const timer=window.setInterval(()=>setConversionSeconds(Math.floor((Date.now()-since)/1000)),1000);
+  return()=>window.clearInterval(timer);
+ },[id,status]);
+
  // Parsing can outlive navigation. Every asynchronous boundary checks the
  // effect's lifetime; a parsed but unmounted scene owns disposable geometry.
  useEffect(()=>{
@@ -229,6 +243,7 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
      const THREE=await import("three");
      const {OrbitControls}=await import("three/examples/jsm/controls/OrbitControls.js");
      if(!valid)return;
+     setLoadPhase("fetching");
      const res=await fetch("/api/files/"+id+"/derivative/bytes",{
       credentials:"same-origin",signal:abort.signal,
      });
@@ -240,8 +255,13 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
      if(valid)setStatus("too-large");
      return;
     }
-     const buffer=await readBoundedModel(res,abort.signal);
+     if(valid)setLoadPhase("downloading");
+     const buffer=await readBoundedModel(res,abort.signal,(loaded,total)=>{
+      if(!valid)return;
+      setDownloadProgress(total===null?null:Math.min(100,Math.floor(loaded/total*100)));
+     });
      if(!valid)return;
+     setLoadPhase("parsing");
     const format=(info?.outputKind??info?.format??"stl").toLowerCase();
      setUnit(declaredUnit(buffer,format));
     let object:import("three").Object3D;
@@ -297,6 +317,7 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
     }
      pendingObject=object;
      if(!valid)return;
+     setLoadPhase("scene");
      let mountedControls:ViewerControls|null=null;
      mountedControls=mountEngineeringScene(THREE,OrbitControls,holder.current!,object,format==="dxf",setMetrics,()=>{
       // The loading effect is cleaned up as soon as status becomes ready.
@@ -341,13 +362,27 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
      <section className="cad-viewport" aria-label={drawing?"工程图查看区域":"三维模型查看区域"}>
       <div className="viewer-stage" ref={holder}/>
       {status!=="ready"&&<div className="cad-status" role={status==="failed"||status==="webgl-lost"?"alert":"status"}>
-       {status==="unsupported"?(info?.note??"该格式当前不支持在线预览"):
-        status==="converting"?"正在转换模型…":
-        status==="too-large"?"模型过大，已停止浏览器预览":
-        status==="webgl-lost"?(message||"WebGL 上下文丢失"):
-        status==="failed"?(message||"预览失败"):"正在载入几何数据…"}
-       {(status==="failed"||status==="webgl-lost")&&<RareButton type="button" onClick={()=>setRetryEpoch(value=>value+1)}>重试</RareButton>}
-       {status==="too-large"&&<span>请下载后使用桌面 CAD 软件打开</span>}
+       {(status==="loading"||status==="converting"||status==="loading-model")?
+        <div className="cad-loading-body" aria-busy="true">
+         <BrandLoader size="lg" decorative/>
+         <strong>{status==="loading"?"正在准备模型":status==="converting"?
+          (info?.state==="queued"?"正在排队转换":info?.state==="running"?"正在转换模型":"正在准备转换"):
+          loadPhase==="fetching"?"正在获取几何数据":loadPhase==="downloading"?"正在下载模型":
+          loadPhase==="parsing"?"正在解析几何结构":loadPhase==="scene"?"正在建立三维场景":"正在载入模型"}</strong>
+         <div className="cad-loading-progress" role="progressbar" aria-label={status==="loading-model"&&loadPhase==="downloading"&&downloadProgress!==null?"模型下载进度":"模型加载进度"}
+          aria-valuemin={0} aria-valuemax={100} aria-valuenow={status==="loading-model"&&loadPhase==="downloading"&&downloadProgress!==null?downloadProgress:undefined}>
+          <span className={"cad-loading-progress-fill"+(status==="loading-model"&&loadPhase==="downloading"&&downloadProgress!==null?" is-measured":"")}
+           style={status==="loading-model"&&loadPhase==="downloading"&&downloadProgress!==null?{transform:"scaleX("+downloadProgress/100+")"}:undefined}/>
+         </div>
+         {status==="loading-model"&&loadPhase==="downloading"&&downloadProgress!==null?
+          <span className="cad-loading-caption">{downloadProgress}%</span>:
+          status==="converting"&&conversionSeconds>=3?<span className="cad-loading-caption">已等待 {conversionSeconds} 秒</span>:null}
+        </div>:
+        <><strong>{status==="unsupported"?(info?.note??"该格式当前不支持在线预览"):
+          status==="too-large"?"模型过大，已停止浏览器预览":
+          status==="webgl-lost"?(message||"WebGL 上下文丢失"):(message||"预览失败")}</strong>
+         {(status==="failed"||status==="webgl-lost")&&<RareButton type="button" onClick={()=>setRetryEpoch(value=>value+1)}>重试</RareButton>}
+         {status==="too-large"&&<span>请下载后使用桌面 CAD 软件打开</span>}</>}
       </div>}
       {status==="ready"&&<div className="cad-toolbar" role="group" aria-label="工程视图工具">
        <RareButton type="button" title="将当前图形居中并适合画布" onClick={()=>{
@@ -574,15 +609,18 @@ class ModelSizeLimitError extends Error{}
 // HTTP Content-Length is optional and untrusted. Refuse an oversized *stream*
 // before its bytes can accumulate in RAM, even for chunked transfer responses.
 // Cancellation also releases a reader when the user navigates away.
-async function readBoundedModel(response:Response,signal:AbortSignal):Promise<ArrayBuffer>{
+async function readBoundedModel(response:Response,signal:AbortSignal,onProgress?:(bytes:number,total:number|null)=>void):Promise<ArrayBuffer>{
+ const length=Number(response.headers.get("Content-Length"));
+ const total=Number.isSafeInteger(length)&&length>0&&length<=MAX_INLINE_MODEL_BYTES?length:null;
  if(!response.body){
   const data=await response.arrayBuffer();
   if(data.byteLength>MAX_INLINE_MODEL_BYTES)throw new ModelSizeLimitError();
+  onProgress?.(data.byteLength,total);
   return data;
  }
  const reader=response.body.getReader();
  const chunks:Uint8Array[]=[];
- let size=0;
+ let size=0,lastReported=-1;
  try{
   for(;;){
    if(signal.aborted)throw new DOMException("Aborted","AbortError");
@@ -592,11 +630,14 @@ async function readBoundedModel(response:Response,signal:AbortSignal):Promise<Ar
    size+=value.byteLength;
    if(size>MAX_INLINE_MODEL_BYTES)throw new ModelSizeLimitError();
    chunks.push(value);
+   const percent=total===null?-1:Math.min(100,Math.floor(size/total*100));
+   if(percent!==lastReported){lastReported=percent;onProgress?.(size,total);}
   }
  }finally{
   reader.releaseLock();
   if(size>MAX_INLINE_MODEL_BYTES||signal.aborted)void response.body.cancel().catch(()=>{});
  }
+ onProgress?.(size,total);
  const result=new Uint8Array(size);
  let offset=0;
  for(const chunk of chunks){result.set(chunk,offset);offset+=chunk.byteLength;}
