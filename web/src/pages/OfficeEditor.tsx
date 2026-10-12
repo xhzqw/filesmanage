@@ -5,6 +5,7 @@ import {useEffect,useRef,useState} from "react";
 import {useParams} from "react-router-dom";
 import {fileApi} from "../features/documents/api";
 import {errorCopy} from "../shared/errors";
+import {observeResourceChange,observeWorkspaceChange} from "../shared/resourceSync";
 import type {OfficeSessionData} from "../features/documents/api";
 import type {FileItem} from "../entities/file/model";
 import type {User} from "../entities/user/model";
@@ -36,6 +37,7 @@ export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
  const changeNumber=useRef(0);
  const nativeSavedCount=useRef(0);
  const nativeFailedCount=useRef(0);
+ const receiptProbe=useRef<(()=>void)|null>(null);
 
  useEffect(()=>{
   const beforeUnload=(event:BeforeUnloadEvent)=>{
@@ -93,11 +95,19 @@ export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
       setStatus("ready");
      },
      onDocumentStateChange:(event:{data?:boolean})=>{
-      if(!valid||event.data!==true)return;
-      changeNumber.current++;
-      dirty.current=true;
-      setSaveState("dirty");
-      setSaveMessage("有修改未保存至文档库");
+      if(!valid)return;
+      if(event.data===true){
+       changeNumber.current++;
+       dirty.current=true;
+       setSaveState("dirty");
+       setSaveMessage("有修改未保存至文档库");
+      }else if(event.data===false&&dirty.current){
+       // This ONLYOFFICE event confirms its own cache, NOT a committed
+       // document version. Never mark clean before the server receipt.
+       setSaveState("dirty");
+       setSaveMessage("编辑器已暂存 · 等待文档库保存确认");
+       receiptProbe.current?.();
+      }
      },
      onError:(event:{data?:{errorDescription?:string}})=>{
       if(!valid)return;
@@ -128,15 +138,18 @@ export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
   return()=>{valid=false;window.clearTimeout(waitForDocument);editor.current?.destroyEditor?.();editor.current=null;};
  },[file]);
 
- // The native floppy-disk Save button triggers status=6 (forcesavetype=1).
- // The app checks its persisted receipt. No second command and no blocking
- // 45-second save overlay are needed.
+ // The built-in Save button triggers status=6 (forcesavetype=1). Listen for
+ // the committed change hint to remove the old 0–1200ms polling delay, but
+ // ALWAYS verify the durable receipt before showing success. Polling remains
+ // as a fallback if WebSocket messages are delayed or unavailable.
  useEffect(()=>{
   if(!sessionId||!file)return;
   let active=true;
   let inFlight=false;
+  let queued=false;
   const check=async()=>{
-   if(!dirty.current||inFlight)return;
+   if(!dirty.current||!active)return;
+   if(inFlight){queued=true;return;}
    inFlight=true;
    const revision=changeNumber.current;
    try{
@@ -164,10 +177,30 @@ export function OfficeEditor({user,onLogout}:{user:User;onLogout:()=>void}){
     }
    }catch{
     if(active){setSaveState("failed");setSaveMessage("无法确认服务器保存状态，请检查网络");}
-   }finally{inFlight=false;}
+   }finally{
+    inFlight=false;
+    if(queued&&active){queued=false;void check();}
+   }
   };
+  receiptProbe.current=()=>void check();
+  const onChange=({id}: {id?:string})=>{
+   if(id&&id!==file.id)return;
+   void check();
+  };
+  const unobserveFile=observeResourceChange("file",onChange);
+  const unobserveWorkspace=observeWorkspaceChange(()=>void check(),["file"]);
+  // Check immediately on focus return, including when the editor temporarily
+  // masks the page or the browser was put to sleep during a save.
+  const focus=()=>void check();
+  window.addEventListener("focus",focus);
   const timer=window.setInterval(()=>void check(),1200);
-  return()=>{active=false;window.clearInterval(timer);};
+  return()=>{
+   active=false;
+   if(receiptProbe.current)receiptProbe.current=null;
+   unobserveFile();unobserveWorkspace();
+   window.removeEventListener("focus",focus);
+   window.clearInterval(timer);
+  };
  },[file,sessionId]);
 
  async function close(){

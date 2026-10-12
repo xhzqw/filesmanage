@@ -360,6 +360,50 @@ func (s *Service) HandleEditorCallback(ctx context.Context, authorization string
 	if payload.Key == "" {
 		return 1, domain.ErrInvalidInput
 	}
+	var content []byte
+	if payload.Status == domain.CallbackStatusSaveReady || payload.Status == domain.CallbackStatusForceSave {
+		if payload.URL == "" {
+			return 1, domain.ErrInvalidInput
+		}
+		// The editor may take several seconds to produce and send the OOXML
+		// snapshot. Check its session first, but DO NOT hold a PostgreSQL
+		// transaction or its FOR UPDATE lock across the network download.
+		// A second locked check below prevents stale/cancelled callbacks from
+		// committing if the session changes while the document downloads.
+		probe, probeErr := s.uow.Begin(ctx)
+		if probeErr != nil {
+			return 1, probeErr
+		}
+		prior, priorErr := probe.OfficeSessionByKey(ctx, payload.Key)
+		if priorErr == nil && (prior.ClosedAt != nil || prior.State == domain.OfficeStateAbandoned) {
+			priorErr = domain.ErrVersionConflict
+		}
+		var seen bool
+		if priorErr == nil {
+			seen, priorErr = probe.SaveEventExists(ctx, prior.ID,
+				callbackEventHash(prior.ID, payload.Key, payload.Status, payload.URL, payload.UserData))
+		}
+		rollbackErr := probe.Rollback(ctx)
+		if priorErr != nil {
+			if errors.Is(priorErr, ports.ErrRowMissing) {
+				return 1, domain.ErrUnauthorized
+			}
+			return 1, priorErr
+		}
+		if rollbackErr != nil {
+			return 1, rollbackErr
+		}
+		if seen {
+			return 0, nil
+		}
+		content, err = s.downloadFromEditor(ctx, payload.URL)
+		if err != nil {
+			return 1, err
+		}
+		if !looksLikeOOXML(content) {
+			return 1, domain.ErrInvalidInput
+		}
+	}
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
 		return 1, err
@@ -398,22 +442,12 @@ func (s *Service) HandleEditorCallback(ctx context.Context, authorization string
 	if payload.Status != domain.CallbackStatusSaveReady && payload.Status != domain.CallbackStatusForceSave {
 		return 0, nil
 	}
-	if payload.URL == "" {
-		return 1, domain.ErrInvalidInput
-	}
 	eventHash := callbackEventHash(session.ID, payload.Key, payload.Status, payload.URL, payload.UserData)
 	if exists, err := tx.SaveEventExists(ctx, session.ID, eventHash); err != nil {
 		return 1, err
 	} else if exists {
 		// Replay of an already processed callback.
 		return 0, nil
-	}
-	content, err := s.downloadFromEditor(ctx, payload.URL)
-	if err != nil {
-		return 1, err
-	}
-	if !looksLikeOOXML(content) {
-		return 1, domain.ErrInvalidInput
 	}
 	file, err := tx.FileByID(ctx, session.FileID)
 	if err != nil {

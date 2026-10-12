@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"filesmanage/internal/domain"
 	"net/http"
 	"net/http/httptest"
@@ -184,5 +185,65 @@ func TestOfficeNativeSaveCallbackReceipts(t *testing.T) {
 	}
 	if _, err := s.OfficeNativeSaveStatus(ctx, domain.User{ID: "u_other"}, uploaded.FileID, view.SessionID); err == nil {
 		t.Fatal("unrelated user must not view the native save receipt")
+	}
+}
+
+// A save snapshot can take seconds to arrive from ONLYOFFICE. Cancelling the
+// editor while it is downloading must not be blocked by a long transaction,
+// nor may a now-stale snapshot publish a new version when the download ends.
+func TestOfficeCallbackCancelledDuringSnapshotDownload(t *testing.T) {
+	ctx := context.Background()
+	admin := domain.User{ID: "u_admin", Login: "admin", IsAdmin: true}
+	started := make(chan struct{})
+	release := make(chan struct{})
+	docServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		<-release
+		_, _ = w.Write([]byte("PK\x03\x04[Content_Types].xml-After-Cancel"))
+	}))
+	defer docServer.Close()
+	s, _ := officeService(t)
+	s.office.EditorURL = docServer.URL
+	uploaded, err := s.CommitUpload(ctx, admin, "folder_root", "cancel-race.docx",
+		"application/vnd.openxmlformats-officedocument.wordprocessingml.document", "",
+		bytes.NewReader([]byte("PK\x03\x04[Content_Types].xml-Original")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, err := s.OpenOfficeSession(ctx, admin, uploaded.FileID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, err := signJWT(s.office.Secret, map[string]any{"key": view.DocumentKey}, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := make(chan error, 1)
+	go func() {
+		_, callbackErr := s.HandleEditorCallback(ctx, token, EditorCallbackPayload{
+			Key: view.DocumentKey, Status: domain.CallbackStatusForceSave, URL: docServer.URL + "/saved", ForceSaveType: 1,
+		})
+		result <- callbackErr
+	}()
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("snapshot downloader did not start")
+	}
+	if err := s.CloseOfficeSession(ctx, admin, view.SessionID); err != nil {
+		t.Fatal(err)
+	}
+	close(release)
+	select {
+	case err := <-result:
+		if !errors.Is(err, domain.ErrVersionConflict) {
+			t.Fatalf("expected stale callback rejected, got %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("callback did not terminate after cancellation")
+	}
+	_, versions, err := s.FileMeta(ctx, admin, uploaded.FileID)
+	if err != nil || len(versions) != 1 {
+		t.Fatalf("cancelled callback committed version: %d, %v", len(versions), err)
 	}
 }
