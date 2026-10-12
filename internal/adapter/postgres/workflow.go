@@ -95,6 +95,24 @@ func (r *Repository) ListApprovalsForApprover(ctx context.Context, approverID st
 	return out, rows.Err()
 }
 
+// Admin oversight lists pending decisions without widening ordinary user scopes.
+func (r *Repository) ListPendingApprovalsForAdmin(ctx context.Context) ([]domain.Approval, error) {
+	rows, err := r.Q.Query(ctx, approvalSelect+" WHERE a.state='pending' ORDER BY a.created_at DESC LIMIT 200")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]domain.Approval, 0)
+	for rows.Next() {
+		a, err := scanApproval(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
 func (r *Repository) ListApprovalsByRequester(ctx context.Context, requesterID string) ([]domain.Approval, error) {
 	rows, err := r.Q.Query(ctx,
 		approvalSelect+" WHERE a.requester_id=$1 ORDER BY a.created_at DESC LIMIT 200", requesterID)
@@ -139,9 +157,12 @@ func (r *Repository) DecideApproval(ctx context.Context, id, state, comment stri
 
 // Optimistic single-step advance; another approver or cancellation cannot win
 // the same step. The caller commits this update with its audit event.
-func (r *Repository) AdvanceApproval(ctx context.Context,id string,step int,nextID string)(bool,error){
- tag,err:=r.Q.Exec(ctx,"UPDATE approvals SET step_index=$2+1,approver_id=$3 WHERE id=$1 AND state='pending' AND step_index=$2 AND approver_id=approver_chain[$2+1]",id,step,nextID)
- if err!=nil{return false,err};return tag.RowsAffected()==1,nil
+func (r *Repository) AdvanceApproval(ctx context.Context, id string, step int, nextID string) (bool, error) {
+	tag, err := r.Q.Exec(ctx, "UPDATE approvals SET step_index=$2+1,approver_id=$3 WHERE id=$1 AND state='pending' AND step_index=$2 AND approver_id=approver_chain[$2+1]", id, step, nextID)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() == 1, nil
 }
 
 // ---------- edit locks ----------

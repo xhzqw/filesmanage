@@ -106,6 +106,8 @@ async function run(){
   idempotencyKey:"rare-wf31-"+stamp,
  });
  check(changed?.status==="pending"||changed?.status==="awaiting_approval","new version awaits approval");
+ const adminQueue=await api("GET","/approvals?scope=all_pending");
+ check(adminQueue.some(item=>item.fileId===fileId&&item.state==="pending"),"admin can enumerate pending requests");
  chrome=spawn("/usr/bin/google-chrome",[
   "--headless=new","--no-sandbox","--disable-gpu","--window-size=1440,900",
   "--remote-debugging-port="+PORT,"about:blank",
@@ -124,6 +126,10 @@ async function run(){
  const rowQuery=JSON.stringify(filename);
  await cdp.waitFor("()=>[...document.querySelectorAll('.approval-list-row')].some(r=>r.textContent?.includes("+rowQuery+"))",25000);
  check(true,"pending document row rendered in Finder inbox");
+ await cdp.evaluate("(()=>{[...document.querySelectorAll('.approval-nav-item')].find(b=>b.textContent?.includes('全部待审批'))?.click();return true;})()");
+ await cdp.waitFor("()=>document.querySelector('.approval-heading')?.textContent?.includes('全部待审批')");
+ await cdp.waitFor("()=>[...document.querySelectorAll('.approval-list-row')].some(r=>r.textContent?.includes("+rowQuery+"))");
+ check(true,"admin pending queue renders file rows");
  await cdp.evaluate("(()=>{const r=[...document.querySelectorAll('.approval-list-row')].find(r=>r.textContent?.includes("+rowQuery+"));r.click();return true;})()");
  await cdp.waitFor("()=>document.querySelector('.approval-detail-content')?.textContent?.includes("+rowQuery+")");
  await cdp.evaluate("(()=>{[...document.querySelectorAll('.approval-detail-actions button')].find(b=>b.textContent?.trim()==='通过')?.click();return true;})()");
@@ -148,6 +154,9 @@ async function run(){
  await delay(450);
  const mobile=await cdp.evaluate("(()=>{const row=[...document.querySelectorAll('.approval-list-row')].find(r=>r.textContent?.includes("+rowQuery+"));const file=row?.querySelector('.approval-row-core strong')?.getBoundingClientRect();const state=row?.querySelector('.rare-badge')?.getBoundingClientRect();const side=document.querySelector('.approval-side');return {file:!!file&&file.width>60&&file.left>=0&&file.right<=innerWidth+1,state:!!state&&state.width>30&&state.right<=innerWidth+1,inspector:getComputedStyle(side).display!=='none',overflow:document.documentElement.scrollWidth-innerWidth};})()");
  check(mobile.file&&mobile.state&&mobile.inspector&&mobile.overflow<=1,"390px file/status/inspector accessible without page overflow: "+JSON.stringify(mobile));
+ await cdp.send("Page.navigate",{url:BASE+"/approvals?item="+encodeURIComponent(approved.id)});
+ await cdp.waitFor("()=>document.querySelector('.approval-detail-content')?.textContent?.includes("+rowQuery+")&&getComputedStyle(document.querySelector('.approval-side')).display!=='none'",25000);
+ check(true,"390px deep link opens completed approval inspector immediately");
  console.log("UX_APPROVAL_PASS");
 }
 try{

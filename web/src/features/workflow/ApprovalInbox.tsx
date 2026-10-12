@@ -11,7 +11,7 @@ import {errorCode,errorCopy} from "../../shared/errors";
 import type {User} from "../../entities/user/model";
 import "./approvalActivity.css";
 
-export type ApprovalView="inbox"|"mine"|"notifications";
+export type ApprovalView="inbox"|"mine"|"notifications"|"all_pending";
 const stateLabels:Record<string,string>={pending:"待审批",approved:"已通过",rejected:"已拒绝",cancelled:"已撤回",conflicted:"已失效"};
 const stateTones={pending:"warning",approved:"success",rejected:"danger",cancelled:"neutral",conflicted:"danger"} as const;
 const actionLabels:Record<string,string>={edit:"内容修改",rollback:"版本回滚"};
@@ -22,6 +22,7 @@ type Decision={approval:Approval;action:"approve"|"reject"|"cancel"};
 export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:User;view:ApprovalView;onReview:(approval:Approval)=>void;onCounts:(value:{pending:number;unread:number})=>void}){
  const[inbox,setInbox]=useState<Approval[]>([]);
  const[mine,setMine]=useState<Approval[]>([]);
+ const[adminPending,setAdminPending]=useState<Approval[]>([]);
  const[loading,setLoading]=useState(true);
  const[loadError,setLoadError]=useState("");
  const[refreshKey,setRefreshKey]=useState(0);
@@ -51,12 +52,13 @@ export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:
   // Revalidate in place on live events. Don't blank the whole list each time.
   if(!everLoaded.current)setLoading(true);
   setLoadError("");
-  Promise.all([workflowApi.approvals("inbox"),workflowApi.approvals("mine")])
-   .then(([todo,own])=>{if(active){setInbox(todo);setMine(own);}})
+  Promise.all([workflowApi.approvals("inbox"),workflowApi.approvals("mine"),
+   currentUser.isAdmin?workflowApi.approvals("all_pending"):Promise.resolve([] as Approval[])])
+   .then(([todo,own,pending])=>{if(active){setInbox(todo);setMine(own);setAdminPending(pending);}})
    .catch(error=>{if(active)setLoadError(errorCopy(error,"审批列表加载失败"));})
    .finally(()=>{if(active){everLoaded.current=true;setLoading(false);}});
   return()=>{active=false;};
- },[refreshKey]);
+ },[refreshKey,currentUser.isAdmin]);
  useEffect(()=>{
   let active=true;
   const update=()=>approvalActivityApi.notifications().then(items=>{if(active){setNotifications(items);setNoticeError("");}})
@@ -72,25 +74,30 @@ export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:
  useEffect(()=>onCounts({pending:inbox.length,unread}),[inbox.length,unread,onCounts]);
 
  const list=useMemo(()=>{
-  const source=view==="mine"?mine:inbox;
+  const source=view==="mine"?mine:view==="all_pending"?adminPending:inbox;
   const term=query.trim().toLocaleLowerCase();
   return source.filter(a=>(view!=="mine"||statusFilter==="all"||a.state===statusFilter)&&
    (typeFilter==="all"||a.action===typeFilter)&&
    (!term||[a.fileName,a.requesterName,a.approverName,a.reason,actionLabels[a.action]||""]
     .some(text=>text.toLocaleLowerCase().includes(term))))
    .sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
- },[view,inbox,mine,query,statusFilter,typeFilter]);
+ },[view,inbox,mine,adminPending,query,statusFilter,typeFilter]);
  const matchingNotes=useMemo(()=>notifications.filter(note=>
   !query.trim()||[note.fileName,eventLabels[note.kind]||note.kind].some(text=>text.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
  ),[notifications,query]);
- const allApprovals=useMemo(()=>[...inbox,...mine.filter(a=>!inbox.some(b=>b.id===a.id))],[inbox,mine]);
+ const allApprovals=useMemo(()=>{
+  const records=new Map<string,Approval>();
+  for(const record of [...inbox,...mine,...adminPending])records.set(record.id,record);
+  return [...records.values()];
+ },[inbox,mine,adminPending]);
  const currentItems=view==="notifications"?matchingNotes.map(n=>n.approvalId):list.map(a=>a.id);
  useEffect(()=>{if(deepLink){setSelected(deepLink);setMobileDetail(true);}},[deepLink]);
  useEffect(()=>{
   // Keep notification deep links even when a completed request left the inbox.
   setSelected(previous=>currentItems.includes(previous)||previous===deepLink?previous:currentItems[0]||"");
- },[view,query,statusFilter,typeFilter,inbox,mine,notifications,deepLink]);
- useEffect(()=>setMobileDetail(false),[view]);
+ },[view,query,statusFilter,typeFilter,inbox,mine,adminPending,notifications,deepLink]);
+ // Preserve direct notification links when mounting the mobile inspector.
+ useEffect(()=>setMobileDetail(Boolean(deepLink)),[view,deepLink]);
  useEffect(()=>{
   if(!selected||allApprovals.some(a=>a.id===selected)){setRecord(null);setRecordError("");return;}
   let active=true;setRecord(null);setRecordError("");
@@ -144,9 +151,12 @@ export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:
  }
  const isInboxItem=!!selectedApproval&&inbox.some(a=>a.id===selectedApproval.id);
  const isMineItem=!!selectedApproval&&mine.some(a=>a.id===selectedApproval.id);
- const canReview=!!selectedApproval&&selectedApproval.state==="pending"&&isInboxItem&&selectedApproval.approverId===currentUser.id;
+ const isAdminItem=!!selectedApproval&&adminPending.some(a=>a.id===selectedApproval.id);
+ const canReview=!!selectedApproval&&selectedApproval.state==="pending"&&
+  (isInboxItem||(isAdminItem&&currentUser.isAdmin))&&
+  (selectedApproval.approverId===currentUser.id||currentUser.isAdmin);
  const canCancel=!!selectedApproval&&selectedApproval.state==="pending"&&isMineItem&&selectedApproval.requesterId===currentUser.id;
- const title=view==="inbox"?"待我审批":view==="mine"?"我发起的":"通知";
+ const title=view==="inbox"?"待我审批":view==="mine"?"我发起的":view==="all_pending"?"全部待审批":"通知";
  const count=view==="notifications"?matchingNotes.length:list.length;
  const hasFilters=query.trim()||typeFilter!=="all"||(view==="mine"&&statusFilter!=="all");
  return <div className="approval-page">
@@ -173,16 +183,16 @@ export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:
       {matchingNotes.map(note=><RareButton type="button" key={note.id}
        className={"approval-list-row approval-notification-row"+(selected===note.approvalId?" is-selected":"")+(note.read?"":" is-unread")}
        aria-pressed={selected===note.approvalId} onClick={()=>void openNote(note)}>
-       <span className="approval-file-mark"><FileResourceIcon size={21}/></span>
+       <span className="approval-file-mark"><FileResourceIcon name={note.fileName} size={21}/></span>
        <span className="approval-row-core"><strong>{note.fileName||"文件"}</strong><small>{eventLabels[note.kind]||note.kind}</small></span>
        <span className="approval-row-end">{!note.read&&<i className="approval-unread-dot" aria-label="未读"/>}<small>{timeLabel(note.createdAt)}</small></span>
       </RareButton>)}
      </>:<>
-      {list.length===0&&<div className="approval-list-empty">{hasFilters?"没有匹配的审批":view==="inbox"?"当前没有待处理的申请":"还没有发起过审批"}</div>}
+      {list.length===0&&<div className="approval-list-empty">{hasFilters?"没有匹配的审批":view==="inbox"||view==="all_pending"?"当前没有待处理的申请":"还没有发起过审批"}</div>}
       {list.map(approval=><RareButton type="button" key={approval.id}
        className={"approval-list-row"+(selected===approval.id?" is-selected":"")}
        aria-pressed={selected===approval.id} onClick={()=>{setSelected(approval.id);setMobileDetail(true);}}>
-       <span className="approval-file-mark"><FileResourceIcon size={21}/></span>
+       <span className="approval-file-mark"><FileResourceIcon name={approval.fileName} size={21}/></span>
        <span className="approval-row-core"><strong title={approval.fileName}>{approval.fileName}</strong><small>{view==="mine"?"审批人："+approval.approverName:"申请人："+approval.requesterName} · {actionLabels[approval.action]}{approval.rollbackTargetSeq?" · 目标 v"+approval.rollbackTargetSeq:""}</small></span>
        <span className="approval-row-end">{view==="mine"?<RareBadge tone={stateTones[approval.state]} dot>{stateLabels[approval.state]}</RareBadge>:<small>第 {approval.stepIndex+1}/{approval.stepTotal} 级</small>}<small>{timeLabel(approval.createdAt)}</small></span>
       </RareButton>)}
@@ -206,7 +216,7 @@ export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:
    <p className="approval-decision-file" title={decision.approval.fileName}>{decision.approval.fileName}</p>
    {decision.action!=="cancel"&&<label className="approval-decision-label" htmlFor="approval-decision-comment">
     {decision.action==="reject"?"拒绝原因":"审批意见（选填）"}
-    <RareTextarea id="approval-decision-comment" value={comment} disabled={!!busyId} rows={3}
+    <RareTextarea id="approval-decision-comment" value={comment} disabled={!!busyId} rows={3} maxLength={2000}
      placeholder={decision.action==="reject"?"填写拒绝原因":"填写审批意见"} onChange={e=>{setComment(e.target.value);setDecisionError("");}}/>
    </label>}
    {decisionError&&<p role="alert" className="approval-error">{decisionError}</p>}

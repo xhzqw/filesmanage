@@ -19,6 +19,7 @@ type ApprovalStore interface {
 	CreateApproval(context.Context, domain.Approval) error
 	ApprovalByID(context.Context, string) (domain.Approval, error)
 	ListApprovalsForApprover(context.Context, string) ([]domain.Approval, error)
+	ListPendingApprovalsForAdmin(context.Context) ([]domain.Approval, error)
 	ListApprovalsByRequester(context.Context, string) ([]domain.Approval, error)
 	PendingApprovalForFile(context.Context, string) (domain.Approval, bool, error)
 	// DecideApproval flips a pending request to its terminal state and reports

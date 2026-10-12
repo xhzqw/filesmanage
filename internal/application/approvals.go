@@ -4,6 +4,8 @@ import (
 	"context"
 	"filesmanage/internal/domain"
 	"filesmanage/internal/ports"
+	"strings"
+	"unicode/utf8"
 )
 
 // Approval use cases. Under an active folder policy, saves and rollbacks become
@@ -304,6 +306,10 @@ func (s *Service) Approve(ctx context.Context, actor domain.User, approvalID, co
 // Reject closes the request without publishing anything; the committed
 // version stays as-is.
 func (s *Service) Reject(ctx context.Context, actor domain.User, approvalID, comment string) error {
+	comment = strings.TrimSpace(comment)
+	if comment == "" || utf8.RuneCountInString(comment) > 2000 {
+		return domain.ErrInvalidInput
+	}
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
 		return err
@@ -318,6 +324,9 @@ func (s *Service) Reject(ctx context.Context, actor domain.User, approvalID, com
 	}
 	if actor.ID != approval.ApproverID && !actor.IsAdmin {
 		return domain.ErrForbidden
+	}
+	if _, err = s.authorizedFileForApproval(ctx, tx, actor, approval); err != nil {
+		return err
 	}
 	won, err := tx.DecideApproval(ctx, approvalID, domain.ApprovalRejected, comment)
 	if err != nil {
@@ -417,10 +426,12 @@ func (s *Service) ListApprovals(ctx context.Context, u domain.User, scope string
 	defer tx.Rollback(ctx)
 	switch scope {
 	case "inbox":
-		if !u.IsAdmin {
-			// non-admin approvers only see requests assigned to them
-		}
 		return tx.ListApprovalsForApprover(ctx, u.ID)
+	case "all_pending":
+		if !u.IsAdmin {
+			return nil, domain.ErrForbidden
+		}
+		return tx.ListPendingApprovalsForAdmin(ctx)
 	case "mine":
 		return tx.ListApprovalsByRequester(ctx, u.ID)
 	default:

@@ -14,7 +14,7 @@ export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
  const[review,setReview]=useState<Approval|null>(null);
  const[params,setParams]=useSearchParams();
  const requested=params.get("tab");
- const section:Section=requested==="mine"||requested==="notifications"||requested==="seals"?requested:"inbox";
+ const section:Section=requested==="mine"||requested==="notifications"||requested==="seals"||(user.isAdmin&&requested==="all_pending")?requested:"inbox";
  function changeSection(next:Section){
   setParams(previous=>{
    const updated=new URLSearchParams(previous);
@@ -26,6 +26,7 @@ export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
  const[counts,setCounts]=useState({pending:0,unread:0});
  const navigation:{id:Section;label:string;count?:number}[]=[
   {id:"inbox",label:"待我审批",count:counts.pending},
+  ...(user.isAdmin?[{id:"all_pending" as const,label:"全部待审批"}]:[]),
   {id:"mine",label:"我发起的"},
   {id:"notifications",label:"通知",count:counts.unread},
   {id:"seals",label:user.isAdmin?"签章管理":"我的签章"},
