@@ -13,7 +13,7 @@ import {ApprovalPoliciesPanel} from "./ApprovalPoliciesPanel";
 import {RoleBindingsPanel,DelegatedRolesWorkspace} from "./RoleWorkspace";
 import {DepartmentNavigator} from "./DepartmentNavigator";
 import {useOrganizationDirectory} from "./useOrganizationDirectory";
-import {useOrganizationSelectors,type StatusFilter} from "./useOrganizationSelectors";
+import {CANDIDATE_CAP,useOrganizationSelectors,type StatusFilter} from "./useOrganizationSelectors";
 import {WorkgroupMemberRow} from "./WorkgroupMemberRow";
 import {IconUsers,IconSearch} from "./OrganizationIcons";
 import {ResetPasswordDialog,SetDisabledDialog,RemoveMemberDialog,CreateUserConfirmDialog,CreateDepartmentDialog,CreateGroupDialog,type DialogResult} from "./OrganizationDialogs";

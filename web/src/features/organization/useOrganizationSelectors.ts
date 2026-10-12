@@ -4,7 +4,7 @@ import type {Department,Workgroup} from "./api";
 import {fullPathOf} from "./organizationTreeUtils";
 
 export type StatusFilter="all"|"normal"|"disabled"|"admin";
-const CANDIDATE_CAP=50;
+export const CANDIDATE_CAP=50;
 
 function matchesQuery(user:User,needle:string):boolean{
  return user.displayName.toLowerCase().includes(needle)||(user.login??"").toLowerCase().includes(needle);
