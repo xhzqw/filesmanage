@@ -147,14 +147,15 @@ try{
    await waitFor('document.querySelector(".file-pdf-zoom-value")?.textContent?.trim()==="125%"');
    const enlarged=await readLayout("page");
    console.log("PDF_STAGE",width,"zoom",JSON.stringify(enlarged));
-   assert(enlarged.width>initial.width*1.2&&Math.abs(enlarged.height/enlarged.width-enlarged.expectedRatio)<.02,
+   // Scrollbars can slightly reduce the available fit base after zoom.
+   assert(enlarged.width>initial.width*1.15&&Math.abs(enlarged.height/enlarged.width-enlarged.expectedRatio)<.02,
     "PDF zoom preserves aspect ratio at "+width+": "+JSON.stringify(enlarged));
    const toggle=await evalJS(`(()=>{document.querySelector('.file-pdf-tools button[aria-label^="PDF 适配方式"]')?.click();return true})()`);
    assert(toggle,"PDF fit toggle exists");
    await waitFor('document.querySelector(".file-pdf-paper")?.dataset.fitMode==="width" && !!document.querySelector(".file-pdf-paper img.file-pdf-image:not(.is-pending)")?.naturalWidth');
    const fullWidth=await readLayout("width");
    console.log("PDF_STAGE",width,"width",JSON.stringify(fullWidth));
-   assert(fullWidth&&fullWidth.width>=initial.width&&Math.abs(fullWidth.height/fullWidth.width-fullWidth.expectedRatio)<.02,
+   assert(fullWidth&&Math.abs(fullWidth.width-fullWidth.maxWidth)<2&&Math.abs(fullWidth.height/fullWidth.width-fullWidth.expectedRatio)<.02,
     "PDF fit-width preserves ratio at "+width+": "+JSON.stringify(fullWidth));
    checked.push(width+"px");
   }
