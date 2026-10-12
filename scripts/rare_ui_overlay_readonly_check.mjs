@@ -87,6 +87,20 @@ try{
   await key("Escape","Escape",27);
   await waitFor(`!document.querySelector('[role=menu][aria-label="账户操作菜单"]')`);
   assert.equal(await evalJS('document.activeElement?.classList.contains("account-trigger")'),true,"Escape restores trigger");
+  await waitFor('!!document.querySelector(".file-toolbar")');
+  const grid=await evalJS(`(()=>{const table=document.querySelector(".file-table"),bar=document.querySelector(".file-toolbar"),r=bar.getBoundingClientRect();return{role:table?.getAttribute("role"),shared:table?.hasAttribute("data-rare-table"),idleBatch:!!bar.querySelector(".batch-actions-group"),rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom},overflow:document.documentElement.scrollWidth-innerWidth};})()`);
+  assert(grid.role==="grid"&&grid.shared&&!grid.idleBatch&&inside(grid.rect,width,height)&&grid.overflow<=1,
+   "shared file grid + tidy idle toolbar at "+width+": "+JSON.stringify(grid));
+  if(width===1440&&await evalJS('!!document.querySelector(".file-table tbody tr[data-id] .col-select input[type=checkbox]")')){
+   await click(".file-table tbody tr[data-id] .col-select input[type=checkbox]");
+   await waitFor('!!document.querySelector(".file-toolbar .batch-actions-group .file-selected-count")');
+   const batch=await evalJS(`(()=>({count:document.querySelector(".file-selected-count")?.textContent?.trim(),
+    buttons:[...document.querySelectorAll(".batch-actions-group button")].map(x=>x.textContent?.trim()||x.getAttribute("aria-label"))}))()`);
+   assert(batch.count?.includes("1")&&batch.buttons.includes("移动")&&batch.buttons.includes("删除")&&batch.buttons.includes("取消全部选中"),
+    "selection reveals actionable batch toolbar: "+JSON.stringify(batch));
+   await click(".batch-clear-selection");
+   await waitFor('!document.querySelector(".batch-actions-group")');
+  }
   await navigate("/stats",`!!document.querySelector('.rare-select[aria-label="修改时间"]')`);
   await click('.rare-select[aria-label="修改时间"]');
   await waitFor('!!document.querySelector(".rare-select-menu [role=option]")');
@@ -105,6 +119,20 @@ try{
  await click("dialog:modal .dialog-close");
  await waitFor('!document.querySelector("dialog:modal")');
  assert.equal(await evalJS('document.activeElement?.classList.contains("action-btn-secondary")'),true,"dialog close restores trigger");
- console.log("RARE_OVERLAY_READONLY_PASS "+results.join("; ")+"; dialog/close/focus OK");
+ await navigate("/org?tab=permissions&view=folder",`!!document.querySelector(".perm-subnav .perm-view-nav[data-slot=gooey-nav]")`);
+ const permissions=await evalJS(`(()=>{const nav=document.querySelector(".perm-view-nav");
+  const segments=[...nav.querySelectorAll('[data-slot="gooey-nav-segment"]')];
+  const selected=nav.querySelector('[data-slot="gooey-nav-item"][aria-current="page"]');
+  const tabs=document.querySelector(".perm-manage-tabs");
+  return{count:segments.length,selected:selected?.textContent?.trim(),
+   activeFill:getComputedStyle(segments[0]).backgroundColor,
+   panelWidth:document.querySelector(".perm-workspace")?.getBoundingClientRect().width,
+   tabs:!!tabs,scroll:document.documentElement.scrollWidth-innerWidth};})()`);
+ assert(permissions.count===3&&permissions.selected==="资源授权"&&permissions.activeFill!=="rgba(0, 0, 0, 0)"&&permissions.scroll<=1,
+  "real branded Gooey nav in permission workbench: "+JSON.stringify(permissions));
+ await evalJS(`(()=>{document.querySelectorAll('.perm-view-nav [data-slot="gooey-nav-item"]')[1].click();return true})()`);
+ await waitFor(`new URLSearchParams(location.search).get("view")==="audit"`);
+ assert.equal(await evalJS(`document.querySelector('.perm-view-nav [aria-current="page"]')?.textContent?.trim()`),"权限变更审计");
+ console.log("RARE_OVERLAY_READONLY_PASS "+results.join("; ")+"; file table/selected actions, permission Gooey nav, dialog/close/focus OK");
 }catch(error){console.error("RARE_OVERLAY_READONLY_FAIL",error.message);process.exitCode=1;}
 finally{ws?.close();chrome.kill("SIGTERM");}

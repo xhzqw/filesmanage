@@ -298,10 +298,13 @@
   color:var(--text-primary);
 }
 .org-tab.active{
-  background:var(--surface-row-selected);
-  color:var(--brand-blue);
+  background:var(--brand-blue);
+  color:var(--text-inverse);
   font-weight:600;
+  box-shadow:var(--shadow-panel);
 }
+.org-tab.active:hover,.org-tab[aria-selected="true"]:hover{background:var(--color-action-hover);color:var(--text-inverse)}
+.org-tabs-nav .org-tab[aria-selected="true"]{color:var(--text-inverse)}
 
 .org-field>.rare-select-root{width:100%}
 .org-filter-left>.rare-select-root{min-width:112px}
@@ -319,8 +322,8 @@
   font-weight:normal;
 }
 .org-tab.active .org-tab-badge{
-  background:var(--brand-cyan-muted);
-  color:var(--brand-blue);
+  background:rgba(255,255,255,.18);
+  color:var(--text-inverse);
 }
 
 .org-tab-stage{

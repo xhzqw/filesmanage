@@ -97,11 +97,21 @@
 }
 .action-btn-secondary:hover{background:var(--surface-row-hover);border-color:var(--border-focus);color:var(--brand-blue)}
 .file-toolbar .batch-actions-group{
-  display:inline-flex;align-items:center;gap:2px;
+  display:inline-flex;align-items:center;gap:3px;
   min-width:0;max-width:100%;flex-wrap:wrap;
-  margin-left:3px;border-left:1px solid var(--border-hairline);
-  padding-left:6px;
+  margin-left:4px;border:1px solid var(--border-hairline);
+  border-radius:var(--radius-md);background:var(--surface-row-selected);
+  padding:2px 5px;
 }
+.file-selected-count{display:inline-flex;align-items:center;gap:4px;padding:0 6px 0 4px;font-size:11px;font-weight:500;color:var(--brand-blue);white-space:nowrap}
+.file-selected-count strong{font-size:12px;font-variant-numeric:tabular-nums}
+.file-toolbar .batch-actions-group .rare-button{height:26px;min-height:26px}
+.file-toolbar .batch-actions-group .batch-btn{border-color:transparent;color:var(--brand-blue)}
+.file-toolbar .batch-actions-group .batch-btn:hover:not(:disabled){background:var(--surface-panel);border-color:var(--border-hairline)}
+.file-toolbar .batch-actions-group .batch-btn.danger{color:var(--status-danger);background:transparent}
+.file-toolbar .batch-actions-group .batch-btn.danger:hover{background:var(--surface-danger-soft)}
+.file-toolbar .batch-actions-group .batch-clear-selection{flex:none;padding:0;width:25px;justify-content:center}
+.file-toolbar .batch-actions-group .batch-clear-selection:hover{background:var(--surface-panel)}
 .batch-btn{
   height:26px;min-height:26px;line-height:26px;padding:0 6px;font-size:11px;
   border:1px solid transparent;background:transparent;

@@ -4,10 +4,10 @@
  */
 /* All views share the two-column organization workbench geometry. */
 .perm-content-root{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;background:var(--surface-canvas)}
-.perm-subnav{display:flex;align-items:center;gap:7px;padding:9px 15px;border-bottom:1px solid var(--border-hairline);min-height:50px;flex:none;min-width:0;overflow-x:auto;background:var(--surface-panel)}
-.perm-subnav button{flex:none;border:1px solid transparent;border-radius:var(--radius-sm);background:transparent;font-size:13px;color:var(--text-secondary);padding:8px 14px;min-height:34px}
-.perm-subnav button:hover{background:var(--surface-row-hover)}
-.perm-subnav button.active{background:var(--surface-row-selected);border-color:var(--border-hairline);color:var(--brand-blue);font-weight:650}
+.perm-subnav{display:flex;align-items:center;padding:6px 12px;border-bottom:1px solid var(--border-hairline);min-height:45px;flex:none;min-width:0;overflow-x:auto;background:var(--surface-panel)}
+.perm-subnav .perm-view-nav{flex:none}
+.perm-subnav .perm-view-nav [data-slot="gooey-nav-segment"]{height:32px;min-height:32px}
+.perm-subnav .perm-view-nav [data-slot="gooey-nav-item"]{height:32px;min-height:32px;font-size:12px;padding:0 12px}
 .perm-workspace{display:grid;grid-template-columns:220px minmax(0,1fr);flex:1;min-height:0;min-width:0;overflow:hidden;margin:0;border:0;background:var(--surface-panel)}
 .perm-browser{display:flex;flex-direction:column;min-width:0;min-height:0;border-right:1px solid var(--border-hairline);background:var(--surface-panel)}
 .perm-browser-title{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid var(--border-hairline);padding:10px 13px;min-height:50px}
@@ -138,8 +138,8 @@
  .perm-browser-search input{flex:1;min-width:0}
  .perm-detail-heading{align-items:flex-start;flex-direction:column}
  .perm-detail{min-height:0;overflow:hidden}
- .perm-subnav{padding:7px}
- .perm-subnav button{font-size:12px;padding:7px 10px}
+ .perm-subnav{padding:6px;min-height:42px}
+ .perm-subnav .perm-view-nav [data-slot="gooey-nav-item"]{padding:0 8px;font-size:11px}
  .perm-form{padding:12px}
  .perm-form-row{grid-template-columns:minmax(0,1fr)}
  .perm-action-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -231,10 +231,14 @@
 
 
 /* Clear list-first permission workspace; editor and inspection are deliberate actions. */
-.perm-manage-toolbar{display:flex;align-items:center;gap:var(--space-1);padding:8px 12px;border-bottom:1px solid var(--border-hairline);background:var(--surface-panel);flex:none}
-.perm-manage-toolbar .rare-button{min-height:34px;border:1px solid transparent}
-.perm-manage-toolbar .rare-button.active{color:var(--brand-blue);background:var(--surface-row-selected);border-color:var(--border-hairline)}
+.perm-manage-toolbar{display:flex;align-items:center;gap:var(--space-2);padding:6px 12px;border-bottom:1px solid var(--border-hairline);background:var(--surface-panel);flex:none}
+.perm-manage-tabs{display:flex;align-items:center;gap:2px;padding:3px;min-width:0;max-width:100%;border-radius:var(--radius-md);background:var(--surface-header)}
+.perm-manage-tabs .rare-button{min-height:30px;height:30px;padding:0 10px;border:1px solid transparent;border-radius:var(--radius-sm);font-size:12px}
+.perm-manage-tabs .rare-button[aria-selected="true"]{color:var(--brand-blue);background:var(--surface-panel);border-color:var(--border-hairline);box-shadow:var(--shadow-panel)}
+.perm-manage-tabs .rare-tab-active-rail{height:2px}
+.perm-manage-toolbar>.perm-create-trigger{min-height:31px;height:31px}
 .perm-manage-toolbar .perm-create-trigger{margin-left:auto}
+.perm-mode-panel{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;overflow:auto}
 .perm-view-body{flex:1;min-height:0;overflow:auto;background:var(--surface-panel)}
 .perm-view-body>.perm-card{margin:0;border:0;border-radius:var(--radius-sm);box-shadow:none}
 .perm-overview{min-height:100%}
@@ -254,6 +258,6 @@
 .perm-view-body .perm-insight{border:0;border-radius:var(--radius-sm)}
 @container perm-panel (max-width:620px){
  .perm-manage-toolbar{flex-wrap:wrap}
- .perm-manage-toolbar .rare-button{font-size:12px}
+ .perm-manage-toolbar .rare-button{font-size:11px}
  .perm-view-body .perm-grants-table th:nth-child(4),.perm-view-body .perm-grants-table td:nth-child(4){display:none}
 }

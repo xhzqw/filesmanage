@@ -1,4 +1,4 @@
-import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
+import {RareButton,RareDataTable,RareInput,RareSelect} from "../../shared/ui/rare";
 import {toast} from "../../shared/ui/feedback";
 import {useEffect,useMemo,useRef,useState,type ChangeEvent,type DragEvent,type FormEvent,type KeyboardEvent,type MouseEvent,type ReactNode}from "react";
 import {useNavigate}from "react-router-dom";
@@ -858,13 +858,17 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
      <RareInput type="file" multiple onChange={onUpload}/>
     </label>
     {newFolderSlot}
-    <div className="batch-actions-group">
-     <RareButton type="button" className="batch-btn" disabled={selectedIds.size===0||zipController.current!==null} onClick={()=>void batchDownload(selection)} title={selectedIds.size===0?"勾选文件后可批量下载":"批量下载已勾选文件"}>批量下载</RareButton>
-     <RareButton type="button" className="batch-btn" disabled={selectedIds.size===0||selectedIds.size>20}
-      onClick={()=>setPrintingBatch(selection)} title={selectedIds.size>20?"每批最多 20 份文件":"逐份确认并打开浏览器打印预览"}>批量打印</RareButton>
-     <RareButton type="button" className="batch-btn" disabled={selectedIds.size===0} onClick={()=>startMoveSelection(selection)} title={selectedIds.size===0?"勾选文件后可批量移动":"批量移动已勾选文件"}>批量移动</RareButton>
-     <RareButton type="button" className="batch-btn danger" disabled={selectedIds.size===0} onClick={()=>openDelete(selection)} title={selectedIds.size===0?"勾选文件后可批量删除":"批量删除已勾选文件"}>批量删除</RareButton>
-    </div>
+    {selectedIds.size>0&&<div className="batch-actions-group" role="group" aria-label={`已选 ${selectedIds.size} 个文件的批量操作`}>
+     <span className="file-selected-count" aria-live="polite">已选 <strong>{selectedIds.size}</strong></span>
+     <RareButton type="button" tone="ghost" className="batch-btn" disabled={zipController.current!==null} onClick={()=>void batchDownload(selection)} title="批量下载已勾选文件">下载</RareButton>
+     <RareButton type="button" tone="ghost" className="batch-btn" disabled={selectedIds.size>20}
+      onClick={()=>setPrintingBatch(selection)} title={selectedIds.size>20?"每批最多 20 份文件":"逐份确认并打开浏览器打印预览"}>打印</RareButton>
+     <RareButton type="button" tone="ghost" className="batch-btn" onClick={()=>startMoveSelection(selection)} title="批量移动已勾选文件">移动</RareButton>
+     <RareButton type="button" tone="danger" className="batch-btn danger" onClick={()=>openDelete(selection)} title="批量删除已勾选文件">删除</RareButton>
+     <RareButton type="button" tone="ghost" className="batch-clear-selection" onClick={()=>{setSelectedIds(new Set<string>());setAnchorId(null);}} aria-label="取消全部选中" title="取消选择">
+      <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg>
+     </RareButton>
+    </div>}
    </div>
    <div className="toolbar-views">
     <label className="sort-label">排序
@@ -909,7 +913,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   </div>}
   {message&&<p role="status" className={"notice "+messageTone}>{message}</p>}
   <div className="table" onClick={event=>{if(!(event.target as HTMLElement).closest("tr")){setSelectedIds(new Set<string>());setAnchorId(null);}}}>
-   <table role="grid" aria-label={folderName+" 文件列表"} className="file-table file-table-ultra">
+   <RareDataTable role="grid" aria-label={folderName+" 文件列表"} density="compact" className="file-table file-table-ultra">
     <thead><tr>
      <th className="col-select" scope="col"><RareInput type="checkbox" tabIndex={-1} checked={allLoadedSelected} onChange={toggleSelectAllLoaded} aria-label="选择当前已加载的文件"/></th>
      <th className="col-name" scope="col">文件名</th>
@@ -981,7 +985,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       </div></td>
      </tr>)}
     </tbody>
-   </table>
+   </RareDataTable>
   </div>
   {(hasMore||loadingMore||moreError)&&<div className="file-page-controls" role="group" aria-label="文件分页">
    <RareButton type="button" className="secondary-action" disabled={loadingMore||status!=="ready"||!hasMore} aria-busy={loadingMore} onClick={()=>void loadMore()}>{loadingMore?"正在加载…":moreError?"重试加载":"加载更多"}</RareButton>

@@ -12,6 +12,8 @@
 }
 .rare-data-table :where(tbody tr:last-child td){border-bottom:0}
 .rare-data-table :where(tbody tr:hover){background:var(--surface-row-hover)}
+.rare-data-table :where(tbody tr[aria-selected="true"]){background:var(--surface-row-selected);box-shadow:inset 2px 0 0 var(--brand-blue)}
+.rare-data-table :where(tbody tr:focus-visible){outline:2px solid var(--border-focus);outline-offset:-2px}
 .rare-data-table[data-rare-density="standard"] :where(td){height:40px}
 .rare-data-table .rare-data-primary{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rare-data-table .rare-data-date{font-variant-numeric:tabular-nums;color:var(--text-secondary)}

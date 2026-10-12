@@ -175,7 +175,9 @@ function NavLabel({
   const props = {
     "data-slot": "gooey-nav-item",
     "data-active": isActive,
-    "aria-current": isActive ? (href ? "page" : true) : undefined,
+    // These entries navigate between application views even when driven by
+    // local buttons rather than <Link>; expose the active view consistently.
+    "aria-current": isActive ? "page" : undefined,
     className: cn(
       "flex cursor-pointer items-center whitespace-nowrap font-medium [&_svg]:shrink-0",
       isActive ? FADE_IN : FADE_OUT,
