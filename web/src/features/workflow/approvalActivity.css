@@ -1,9 +1,9 @@
 /* Finder-like, task-first approval workspace. No nested card or page headings. */
 .approval-work{min-width:0;min-height:0;overflow:hidden}
-.approval-shell{display:grid;grid-template-columns:188px minmax(0,1fr);height:100%;min-height:0;min-width:0;overflow:hidden}
+.approval-shell{display:grid;grid-template-columns:188px minmax(0,1fr);flex:1;min-height:0;min-width:0;overflow:hidden}
 .approval-nav{display:flex;flex-direction:column;align-items:stretch;gap:3px;min-width:0;padding:19px 10px;background:var(--surface-header);border-right:1px solid var(--border-hairline)}
 .approval-nav-heading{padding:0 12px 13px;font-size:14px;font-weight:700;letter-spacing:.01em}
-.approval-nav .approval-nav-item{display:flex;justify-content:space-between;align-items:center;text-align:left;height:37px;min-height:37px;width:100%;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-secondary);font-size:12px;font-weight:550;box-shadow:none}
+.approval-nav .approval-nav-item{display:flex;justify-content:space-between;align-items:center;text-align:left;height:37px;min-height:37px;width:100%;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-secondary);font-size:12px;font-weight:550;box-shadow:none;transition:background-color .16s ease,color .16s ease}
 .approval-nav .approval-nav-item:hover{background:var(--surface-row-hover);color:var(--text-primary)}
 .approval-nav .approval-nav-item[aria-current=page]{color:var(--brand-blue);background:var(--surface-row-selected);font-weight:700}
 .approval-nav-count{font-size:11px;font-variant-numeric:tabular-nums;padding:2px 7px;border-radius:var(--radius-pill);background:var(--surface-panel);color:var(--text-secondary)}

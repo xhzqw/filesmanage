@@ -18,8 +18,8 @@ const approval=absent("features/workflow/ApprovalInbox.tsx",[
  [/approval-notice/,"old approval result banner"],
  [/setMessage\(/,"duplicate operation message state"],
 ]);
-assert.match(approval,/toast\.success\("审批已拒绝/,"rejection must still acknowledge completion");
-assert.match(approval,/toast\.warning\("网络中断，审批结果未确认/,"unknown approval outcome must remain a warning");
+assert.match(approval,/toast\.success\("已拒绝，文件版本未改变/,"rejection must still acknowledge completion");
+assert.match(approval,/toast\.warning\(code==="E_NETWORK"\?"操作结果未确认/,"unknown approval outcome must remain a warning");
 
 const collab=absent("features/collaboration/CollaborationPanel.tsx",[
  [/setMessage\(/,"duplicate shared/favorite result banner"],

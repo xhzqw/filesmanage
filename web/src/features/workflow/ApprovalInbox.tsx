@@ -85,7 +85,7 @@ export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:
  ),[notifications,query]);
  const allApprovals=useMemo(()=>[...inbox,...mine.filter(a=>!inbox.some(b=>b.id===a.id))],[inbox,mine]);
  const currentItems=view==="notifications"?matchingNotes.map(n=>n.approvalId):list.map(a=>a.id);
- useEffect(()=>{if(deepLink)setSelected(deepLink);},[deepLink]);
+ useEffect(()=>{if(deepLink){setSelected(deepLink);setMobileDetail(true);}},[deepLink]);
  useEffect(()=>{
   // Keep notification deep links even when a completed request left the inbox.
   setSelected(previous=>currentItems.includes(previous)||previous===deepLink?previous:currentItems[0]||"");

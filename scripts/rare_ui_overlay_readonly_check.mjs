@@ -650,41 +650,35 @@ try{
  await click("dialog.org-role-dialog .dialog-close");
  await waitFor('!document.querySelector("dialog.org-role-dialog")');
  results.push("1440px: role ACL select-all/clear without submission OK");
- // Deep-linking to the seal library must not lose its selected view on reload.
+ // Seal library deep link is preserved while the Finder-style approval rail changes views.
  for(const width of [1440,900,390]){
   await viewport(width,width===390?760:900);
-  await navigate("/approvals?tab=seals",`!!document.querySelector(".approval-root-nav [data-slot=gooey-nav-item]")`);
+  await navigate("/approvals?tab=seals",'!!document.querySelector(".approval-nav .approval-nav-item")');
   await waitFor('!!document.querySelector(".seal-library-container")');
-  const approval=await evalJS(`(()=>{const n=document.querySelector(".approval-root-nav"),links=[...n.querySelectorAll('[data-slot="gooey-nav-item"]')];
-   const s=[...n.querySelectorAll('[data-slot="gooey-nav-segment"]')];
-   return{labels:links.map(x=>x.textContent.trim()),active:n.querySelector('[aria-current="page"]')?.textContent.trim(),
-    activeFill:getComputedStyle(s[1]).backgroundColor,overflow:document.documentElement.scrollWidth-innerWidth};})()`);
-  assert(approval.labels.length===2&&approval.active.includes("签章")&&approval.activeFill!=="rgba(0, 0, 0, 0)"&&approval.overflow<=1,
-   "approval Rare view switch at "+width+": "+JSON.stringify(approval));
-  await click('.approval-root-nav [data-slot="gooey-nav-item"]:first-child');
-  await waitFor('new URLSearchParams(location.search).get("tab")!=="seals"');
-  await waitFor('!!document.querySelector(".approval-page")');
-  if(width<=900){
-   await click(".approval-mobile-notes");
-   await waitFor('getComputedStyle(document.querySelector(".approval-side")).display!=="none"');
-  }
-  const sideNav=await evalJS(`(()=>{const n=document.querySelector(".approval-side-nav"),
-   items=[...n.querySelectorAll('[data-slot="gooey-nav-item"]')];
-   return{count:items.length,current:n.querySelector('[aria-current="page"]')?.textContent.trim(),
+  const approval=await evalJS(`(()=>{const n=document.querySelector(".approval-nav"),items=[...n.querySelectorAll(".approval-nav-item")];
+   const selected=n.querySelector('[aria-current="page"]');
+   return{labels:items.map(x=>x.textContent.trim()),active:selected?.textContent.trim(),
+    activeFill:selected?getComputedStyle(selected).backgroundColor:"",
     overflow:document.documentElement.scrollWidth-innerWidth};})()`);
-  assert(sideNav.count===2&&sideNav.current==="申请详情"&&sideNav.overflow<=1,
-   "approval inspector Rare navigation at "+width+": "+JSON.stringify(sideNav));
-  await click('.approval-side-nav [data-slot="gooey-nav-item"]:nth-child(2)');
-  await waitFor('!!document.querySelector(".approval-notification-list")');
-  await click('.approval-side-nav [data-slot="gooey-nav-item"]:first-child');
-  await waitFor('!!document.querySelector(".approval-side-nav [aria-current=page]")');
-  const approvalRow=await evalJS('document.querySelector(".approval-table tbody tr .approval-file-name")?.closest("tr")?.getAttribute("tabindex")');
-  if(approvalRow!==undefined&&approvalRow!==null)assert.equal(approvalRow,"0","approval rows keyboard-focusable");
-  assert.equal(await evalJS('document.querySelector(".approval-root-nav [aria-current=page]")?.textContent.trim()'),"审批工作台");
+  assert(approval.labels.length===4&&approval.active.includes("签章")&&approval.activeFill!=="rgba(0, 0, 0, 0)"&&approval.overflow<=1,
+   "Finder approval rail and seal deep link at "+width+": "+JSON.stringify(approval));
+  await click(".approval-nav-item:first-of-type");
+  await waitFor('new URLSearchParams(location.search).get("tab")===null');
+  await waitFor('!!document.querySelector(".approval-page")');
+  const inspector=await evalJS(`(()=>{const side=document.querySelector(".approval-side"),list=document.querySelector(".approval-main");
+   return{hasInspector:!!side?.querySelector(".approval-side-header"),hasList:!!list,
+    inspectorVisible:getComputedStyle(side).display!=="none",overflow:document.documentElement.scrollWidth-innerWidth};})()`);
+  assert(inspector.hasList&&inspector.hasInspector&&inspector.overflow<=1,
+   "Finder approval list and inspector at "+width+": "+JSON.stringify(inspector));
+  await click(".approval-nav-item:nth-of-type(3)");
+  await waitFor('new URLSearchParams(location.search).get("tab")==="notifications"');
+  await waitFor('document.querySelector(".approval-heading strong")?.textContent==="通知"');
+  await evalJS("history.back()");
+  await waitFor('new URLSearchParams(location.search).get("tab")===null');
   await evalJS("history.back()");
   await waitFor('new URLSearchParams(location.search).get("tab")==="seals"');
   await waitFor('!!document.querySelector(".seal-library-container")');
-  results.push(width+"px: approval URL/Gooey view switch OK");
+  results.push(width+"px: Finder approval rail, inspector, URL history OK");
  }
  if(availablePreviewId){
   for(const width of [1440,390]){
