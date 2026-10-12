@@ -223,15 +223,20 @@ func (w *worker) process(ctx context.Context, job domain.DerivativeJob) error {
 	if err != nil || info.Size() == 0 {
 		return errors.New("converter produced no output")
 	}
-	// gmsh exits 0 on unreadable or empty geometry and still writes a valid
+	// Some converters exit 0 on unreadable or empty geometry and still write a valid
 	// but empty mesh, which would otherwise be published as a successful
 	// derivative and shown as a blank view (MC04 demands a clear error).
-	geometric, err := outputHasGeometry(output)
+	var geometric bool
+	if job.OutputKind == "dxf" {
+		geometric, err = outputHasDxfGeometry(output)
+	} else {
+		geometric, err = outputHasGeometry(output)
+	}
 	if err != nil {
 		return err
 	}
 	if !geometric {
-		return errors.New("converter produced an empty mesh")
+		return errors.New("converter produced empty or invalid geometry")
 	}
 	stage, err := w.store.Stage()
 	if err != nil {
@@ -250,6 +255,13 @@ func (w *worker) process(ctx context.Context, job domain.DerivativeJob) error {
 }
 
 func conversionArgs(format, input, output string) []string {
+	if format == "dwg" {
+		bin := strings.TrimSpace(os.Getenv("FILESMANAGE_DWGREAD"))
+		if bin == "" {
+			bin = "dwgread"
+		}
+		return []string{bin, "-O", "DXF", "-o", output, input}
+	}
 	// gmsh reads STEP/IGES through OpenCASCADE and tessellates with an explicit
 	// chordal tolerance. The mesh is written as MSH 2.2 ASCII: it keeps shared
 	// node indices, so the viewer can recover the assembly's connected

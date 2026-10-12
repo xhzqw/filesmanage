@@ -3,6 +3,8 @@ package application
 import (
 	"context"
 	"filesmanage/internal/domain"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -30,8 +32,20 @@ func FormatMatrix() []CADSupport {
 		{Format: "ply", Class: "native", Engine: "three.js PLYLoader", Note: "浏览器直接渲染点云/网格"},
 		{Format: "3mf", Class: "native", Engine: "three.js 3MFLoader", Note: "浏览器直接渲染多部件 3MF"},
 		{Format: "dxf", Class: "native", Engine: "内置 DXF 二维渲染器", Note: "浏览器解析二维工程图实体与图层"},
-		{Format: "dwg", Class: "licensed", Engine: "—", Note: "需要商业 SDK（ODA Teigha）；LibreDwg 仅部分兼容，未验证"},
+		dwgCADSupport(),
 	}
+}
+
+// DWG is available only when an executable is installed and usable.
+func dwgCADSupport() CADSupport {
+	bin := strings.TrimSpace(os.Getenv("FILESMANAGE_DWGREAD"))
+	if bin == "" {
+		bin = "dwgread"
+	}
+	if _, err := exec.LookPath(bin); err == nil {
+		return CADSupport{Format: "dwg", Class: "converted", Engine: "LibreDWG dwgread", Note: "服务端转为 DXF；专有对象或 SHX 字体可能存在兼容限制"}
+	}
+	return CADSupport{Format: "dwg", Class: "licensed", Engine: "—", Note: "当前未安装 DWG 转换器"}
 }
 
 // RequestDerivative queues a conversion for a file version. Native formats are
@@ -64,6 +78,8 @@ func (s *Service) RequestDerivative(ctx context.Context, u domain.User, fileID s
 	outputKind := "msh"
 	if support.Class == "native" {
 		outputKind = format
+	} else if format == "dwg" {
+		outputKind = "dxf"
 	}
 	derivative, err := tx.EnsureDerivative(ctx, domain.ModelDerivative{
 		ID: NewID("deriv"), FileID: file.ID, VersionSeq: version.Seq,
@@ -116,6 +132,12 @@ func (s *Service) DerivativeStatus(ctx context.Context, u domain.User, fileID st
 	derivative, found, err := tx.DerivativeForFile(ctx, file.ID, currentSeq(file))
 	if err != nil || !found {
 		return domain.ModelDerivative{}, support, false, nil
+	}
+	// Previously converted DXF remains previewable after removal of the tool.
+	if format == "dwg" && derivative.State == "ready" && derivative.OutputKind == "dxf" && derivative.BlobID != "" {
+		support.Class = "converted"
+		support.Engine = derivative.Converter
+		support.Note = "使用已缓存的 DWG 转 DXF 预览"
 	}
 	return derivative, support, true, nil
 }

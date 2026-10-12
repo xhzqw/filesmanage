@@ -1,12 +1,12 @@
 # Open blockers
 
-Status date: 2026-10-09 (BLK-11..BLK-16 all closed; the caching optimisation largely resolved BLK-07's 100-user tier; matrix now 123 PASS / 2 PARTIAL / 1 EXTERNAL). The two remaining PARTIAL ids are S12 (systemd install, folded into BLK-05) and S20 (VS01–VS18 visual sign-off re-run on the remote now that the official Logo is imported — BLK-01 closed); no implementable code gap remains.
+Status date: 2026-10-12 (MC11 新增可选 LibreDWG 转换链路；矩阵仍有 S12、S20 和 MC11 三项 PARTIAL)。MC11 当前仅表示可选技术路径，尚未完成所有 DWG 版本、专有对象、SHX 与机械尺寸的高保真验收。
 
 | ID | Blocker | Impact | Needed from customer / next probe |
 |---|---|---|---|
 | ~~BLK-01~~ | ~~Official 中晟生物科技 Logo binary~~ RESOLVED (2026-10-09) | 品牌页曾显示"标志待入库"占位；现已替换为官方资产 | 客户交付的附件 SHA-256 与 BRAND-02 记录一致，已可信入库 `web/public/assets/brand/logo-source.jpg`，并由 `scripts/brand_assets.py` 派生 favicon 16/32/48px 与登录页/顶栏 PNG（派生清单见同目录 `BRAND-ASSETS.md`）；S20 余留 VS01–VS18 远端截图签收 |
 | BLK-02 | ~~DOCX editor engine~~ RESOLVED | — | ONLYOFFICE 8.2.2 (AGPL) self-hosted in Docker on 18080 with JWT; DO01–DO14-style E2E verified in M5 |
-| BLK-03 | DWG preview requires a commercial SDK/license (ODA Teigha or similar) | DWG support stays licence-blocked; DXF (native 2D) is delivered | Customer decision: license purchase or accept DWG = documented unsupported |
+| BLK-03 | DWG 与 AutoCAD 的高保真兼容性 | 可选 LibreDWG 逐文件转 DXF；未安装转换器则维持不可用，复杂专有实体和 SHX 字体仍可能失真（MC11 PARTIAL） | 用真实机械 DWG 验证尺寸、字体、图层和布局；若不达标再评估 ODA 等受许可支持的 SDK |
 | BLK-04 | ~~STEP/IGES converter toolchain~~ RESOLVED | — | gmsh + OpenCASCADE 7.8 installed in the worker; real geometry verified (544 triangles) |
 | BLK-05 | Production port 8091 / systemd cutover not authorized (covers the remaining part of S12: units written and syntax-verified but not installed; the other two S12 parts are now evidenced — LAN reachability and the upgrade/rollback drill, `scripts/upgrade_rollback_drill.py` 12/12 incl. a cross-format rollback) | Delivery stays on dev port 18091; production switch requires explicit approval + backup/rollback drill | Explicit go-live authorization after acceptance gates |
 | BLK-06 | 2026-10-08 ~22:00: host unreachable on 192.168.1.22 (100% packet loss, no ARP entry) for ~40 min | Implementation paused; resumed over 10.144.144.1 with no data or service loss | Customer to confirm the network path; add a second management route if this recurs |

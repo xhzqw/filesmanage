@@ -394,9 +394,9 @@ def main():
     for fmt, want in (("stl", "native"), ("obj", "native"), ("glb", "native"), ("gltf", "native"),
                       ("ply", "native"), ("3mf", "native"), ("dxf", "native"),
                       ("step", "converted"), ("stp", "converted"), ("iges", "converted"),
-                      ("igs", "converted"), ("dwg", "licensed")):
+                      ("igs", "converted")):
         check(f"MC matrix class {fmt}", classes.get(fmt) == want, f"{classes.get(fmt)} != {want}")
-    check("MC11 DWG marked licence-blocked", classes.get("dwg") == "licensed", classes.get("dwg"))
+    check("MC11 DWG capability is explicit", classes.get("dwg") in ("licensed", "converted"), classes.get("dwg"))
 
     stamp = str(int(time.time()))
     status, tree = admin.json("GET", "/api/folders/tree")
@@ -436,7 +436,7 @@ def main():
         ("mc08_tri.ply", ply_triangle(), "native"),
         ("mc09_tri.3mf", threemf_triangle(), "native"),
         ("mc10_drawing.dxf", dxf_drawing(), "native"),
-        ("mc11_fake.dwg", b"AC1021 fake dwg payload for licence check", "licensed"),
+        ("mc11_fake.dwg", b"AC1021 fake dwg payload for failure-path check", classes.get("dwg")),
     ] + iges_samples
 
     ids = {}
@@ -451,9 +451,11 @@ def main():
         status, body = admin.json("POST", f"/api/files/{file_id}/derivative") if file_id else (None, None)
         data = (body or {}).get("data") or {}
         if expected_class == "licensed":
-            # DWG: the request must be refused with a controlled error, and the
-            # matrix must keep advertising it as licence-required.
+            # Without dwgread, unsupported DWG must be rejected.
             check("MC11 DWG derivative refused", status in (400, 422), f"HTTP {status}")
+            continue
+        if name.endswith(".dwg") and expected_class == "converted":
+            check("MC11 DWG converter queues malformed sample", status == 202 and data.get("state") == "queued", f"HTTP {status} {data.get('state')}")
             continue
         if expected_class == "native":
             # The endpoint answers 202 (accepted) with the derivative already

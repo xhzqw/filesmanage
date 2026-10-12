@@ -68,7 +68,7 @@ MATRIX = {
     "S19": ("PASS", "S14–S19 阶段标题"),
     "S20": ("PARTIAL", "官方 Logo 已按 BRAND-03 可信入库（SHA-256 与 BRAND-02 一致，BLK-01 关闭），登录/顶栏/favicon 已使用该资产；VS01–VS18 截图签收待在远端重跑"),
     "S21": ("PASS", "DO01–DO14 全矩阵 + office_session_check.py 12/12 + do05_header_footer_check.py 15/15"),
-    "S22": ("PASS", "真实查看器（three.js）渲染原生格式、STEP/IGES 经 worker 转换后渲染；无提示页代替；DWG 属 MC11 外部项"),
+    "S22": ("PASS", "真实查看器渲染 DXF/网格格式，STEP/IGES 由 worker 转换；DWG 可选 LibreDWG 转 DXF，限制见 MC11"),
     # ---- PT ----
     "PT01": ("PASS", "pt_samples_e2e.py：UTF-8+LF 预览/下载 SHA 一致（112/112 全量）"),
     "PT02": ("PASS", "pt_samples_e2e.py：CRLF 逐行 0d0a 保留，保存后行尾不丢失"),
@@ -106,7 +106,7 @@ MATRIX = {
     "MC08": ("PASS", "PLYLoader 覆盖 ascii/binary 点/网格几何，浏览器实测渲染"),
     "MC09": ("PASS", "mc_multiasset_check.mjs：双部件 3MF 渲染 24 三角形（2x12），多部件解析生效"),
     "MC10": ("PASS", "自研 DXF 解析器渲染图层/圆弧/文字，浏览器实测图层开关面板"),
-    "MC11": ("EXTERNAL", "DWG 需商业 SDK 许可（ODA Teigha 等），维持 licence-blocked（BLK-03）"),
+    "MC11": ("PARTIAL", "DWG 可选 LibreDWG dwgread→DXF Worker 转换；缺少转换器时能力矩阵保持禁用，部分专有对象和 SHX 字体仍需与 AutoCAD 对照验收"),
     "MC12": ("PASS", "worker 内存/超时/并发上限 + pe12_cad_saturation.py 7/7（API p95 劣化 x0.93–x1.14）"),
     "MC13": ("PASS", "mc_cad_e2e.py：'MC13 ungranted derivative status refused' / 'bytes refused'"),
     "MC14": ("PASS", "mc_cad_e2e.py：5 个并发转换请求全部返回同一 derivativeId（EnsureDerivative ON CONFLICT 收敛）"),
