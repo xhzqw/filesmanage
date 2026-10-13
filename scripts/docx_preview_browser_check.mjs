@@ -93,18 +93,27 @@ try{
   await delay(250);
   const state=await evalJS(`(()=>{
    const stage=document.querySelector(".office-layout-preview");
+   const viewport=document.querySelector(".office-layout-pdf");
    const image=document.querySelector(".office-layout-pdf img");
    const rect=stage?.getBoundingClientRect(),paper=image?.getBoundingClientRect();
+   const view=viewport?.getBoundingClientRect();
+   const style=viewport&&getComputedStyle(viewport);
+   const insideHeight=(view?.height??0)-(style?parseFloat(style.paddingTop)+parseFloat(style.paddingBottom):0);
+   const insideWidth=(view?.width??0)-(style?parseFloat(style.paddingLeft)+parseFloat(style.paddingRight):0);
+   const ratio=image?.naturalWidth/image?.naturalHeight;
+   const displayedRatio=paper?.width/paper?.height;
    const selected=[...document.querySelectorAll(".office-layout-switch button")]
     .find(button=>button.getAttribute("aria-pressed")==="true")?.textContent?.trim();
    return {selected,stageWidth:rect?.width,pageWidth:paper?.width,pageHeight:paper?.height,
+    insideWidth,insideHeight,ratio,displayedRatio,
     isPNG:!!image?.complete&&image.naturalWidth>0&&image.getAttribute("src")?.includes("/preview/office/page?"),
     hasPDFFrame:!!document.querySelector(".office-layout-pdf iframe"),
     summaryVisible:!!document.querySelector(".office-layout-outline"),
     overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth};
   })()`);
-  assert(state.selected==="页面布局"&&state.isPNG&&!state.hasPDFFrame&&!state.summaryVisible&&state.pageHeight>250&&
-   state.pageWidth>200&&state.pageWidth<=state.stageWidth+2&&state.overflow<=1,
+  assert(state.selected==="页面布局"&&state.isPNG&&!state.hasPDFFrame&&!state.summaryVisible&&state.pageHeight>220&&
+   state.pageWidth>150&&state.pageWidth<=state.insideWidth+2&&state.pageHeight<=state.insideHeight+2&&
+   Math.abs(state.ratio-state.displayedRatio)<0.01&&state.overflow<=1,
    "DOCX paged layout geometry "+width+": "+JSON.stringify(state));
   console.log("PASS DOCX page layout "+width);
  }
