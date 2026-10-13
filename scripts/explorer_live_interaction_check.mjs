@@ -268,6 +268,24 @@ try{
  await until('document.querySelector(".work-body")?.dataset.explorerView==="icons"');
  const fileIconStar='.explorer-icon-grid [data-id="'+tested+'"] .explorer-item-star';
  await until(`!!document.querySelector(${JSON.stringify(fileIconStar)}+":not(:disabled)")`,"icon file star");
+ await evaluate(`(()=>{
+  window.__starTrace=[];
+  for(const type of ["pointerdown","mousedown","pointerup","mouseup","click"]){
+   document.addEventListener(type,event=>{
+    if(event.target.closest?.(".explorer-item-star"))
+     window.__starTrace.push({type,target:event.target.tagName,
+      button:event.target.closest("button")?.className,
+      defaultPrevented:event.defaultPrevented});
+   },true);
+  }
+  const nativeFetch=window.fetch.bind(window);
+  window.fetch=(...args)=>{
+   if(String(args[0]).includes("/favorites"))
+    window.__starTrace.push({type:"fetch",url:String(args[0]),method:args[1]?.method||"GET"});
+   return nativeFetch(...args);
+  };
+  return true;
+ })()`);
  const iconStarGeometry=await evaluate(`(()=>{
   const button=document.querySelector(${JSON.stringify(fileIconStar)});
   const rect=button.getBoundingClientRect();
@@ -293,6 +311,7 @@ try{
  console.log("EXPLORER_ICON_STAR_AFTER_CLICK",JSON.stringify(await evaluate(`(()=>{
   const button=document.querySelector(${JSON.stringify(fileIconStar)});
   return {buttonClass:button?.className,disabled:button?.disabled,
+   trace:window.__starTrace,
    toasts:[...document.querySelectorAll("[role=status],[role=alert]")].map(e=>e.textContent?.trim().slice(0,90)).filter(Boolean)};
  })()`)));
  await until(`document.querySelector(${JSON.stringify(fileIconStar)})?.classList.contains("favorited")===${originalFavorite}`,"icon file favorite feedback");
