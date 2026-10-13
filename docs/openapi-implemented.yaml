@@ -485,7 +485,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
       description: Origin must match Host, scheme and port; uses HttpOnly cookie, no URL token. Browser clients connect via
-        ws:// on HTTP or wss:// on HTTPS. Up to 128 live connections per server process and 12-second heartbeat. Server-to-client
+        ws:// on HTTP or wss:// on HTTPS. Up to 512 live connections per server process and 6-second heartbeat. Server-to-client
         JSON messages only; each event revalidates the session. Existing HTTP APIs remain authoritative.
   /api/folders/tree:
     get:

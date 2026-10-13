@@ -751,7 +751,7 @@ add("GET", "/api/events/ws", operation("Subscribe to live session events (WebSoc
                "403": {"description": "E_ORIGIN"},
                "426": {"description": "E_UPGRADE_REQUIRED — WebSocket Upgrade required"},
                "503": {"description": "E_LIVE_CAPACITY — live connection limit reached"}},
-    auth_note="Origin must match Host, scheme and port; uses HttpOnly cookie, no URL token. Browser clients connect via ws:// on HTTP or wss:// on HTTPS. Up to 128 live connections per server process and 12-second heartbeat. Server-to-client JSON messages only; each event revalidates the session. Existing HTTP APIs remain authoritative."))
+    auth_note="Origin must match Host, scheme and port; uses HttpOnly cookie, no URL token. Browser clients connect via ws:// on HTTP or wss:// on HTTPS. Up to 512 live connections per server process and 6-second heartbeat. Server-to-client JSON messages only; each event revalidates the session. Existing HTTP APIs remain authoritative."))
 
 # --- Folders ---
 add("GET", "/api/folders/tree", operation("Authorized folder tree", "Folders", "folderTree", security=SESSION,

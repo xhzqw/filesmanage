@@ -13,7 +13,7 @@ export function connectSessionEvents(onIdentity:(user:User|null)=>void,userID=""
  let retry:number|undefined;
  let flushTimer:number|undefined;
  let watchdog:number|undefined;
- let reconnectDelay=1000;
+ let reconnectDelay=250;
  let lastValidation=0;
  let validationSequence=0;
  let revoked=false;
@@ -67,11 +67,11 @@ export function connectSessionEvents(onIdentity:(user:User|null)=>void,userID=""
  function acknowledge(value:unknown){
   if(!validCursor(value))return;
   pendingCursor=value;
-  if(flushTimer===undefined)flushTimer=window.setTimeout(flush,120);
+  if(flushTimer===undefined)flushTimer=window.setTimeout(flush,16);
  }
  function invalidate(scopes:WorkspaceScope[]){
   for(const scope of scopes)pending.add(scope);
-  if(flushTimer===undefined)flushTimer=window.setTimeout(flush,120);
+  if(flushTimer===undefined)flushTimer=window.setTimeout(flush,16);
  }
  function fullResync(){
   invalidate(ALL_SCOPES);
@@ -83,7 +83,7 @@ export function connectSessionEvents(onIdentity:(user:User|null)=>void,userID=""
   if(!active||revoked||retry!==undefined)return;
   const delay=Math.round(reconnectDelay*(0.8+Math.random()*0.4));
   retry=window.setTimeout(()=>{retry=undefined;open();},delay);
-  reconnectDelay=Math.min(reconnectDelay*2,30000);
+  reconnectDelay=Math.min(reconnectDelay*2,12000);
  }
  function open(){
   if(!active||revoked||socket)return;
@@ -93,7 +93,9 @@ export function connectSessionEvents(onIdentity:(user:User|null)=>void,userID=""
    const connection=new WebSocket(protocol+"//"+window.location.host+path);
    socket=connection;
    connectingSince=Date.now();
-   connection.onopen=()=>{reconnectDelay=1000;lastFrameAt=Date.now();};
+   // TCP open is not session-ready. A quick server rejection must not
+   // repeatedly reset exponential backoff.
+   connection.onopen=()=>{lastFrameAt=Date.now();};
    connection.onmessage=event=>{
     if(!active||revoked||socket!==connection)return;
     lastFrameAt=Date.now();
@@ -117,6 +119,7 @@ export function connectSessionEvents(onIdentity:(user:User|null)=>void,userID=""
      }
      case "state.resync":fullResync();acknowledge(data.cursor);break;
      case "connection.ready":{
+      reconnectDelay=250;
       if(data.version===3){
        if(data.resync===true){
         fullResync();
@@ -153,11 +156,11 @@ export function connectSessionEvents(onIdentity:(user:User|null)=>void,userID=""
  // close it and engage the normal reconnect/reconciliation path.
  watchdog=window.setInterval(()=>{
   if(!active||revoked||!socket||document.visibilityState==="hidden")return;
-  if(socket.readyState===WebSocket.OPEN&&Date.now()-lastFrameAt>40000)
+  if(socket.readyState===WebSocket.OPEN&&Date.now()-lastFrameAt>21000)
    socket.close();
-  else if(socket.readyState===WebSocket.CONNECTING&&Date.now()-connectingSince>25000)
+  else if(socket.readyState===WebSocket.CONNECTING&&Date.now()-connectingSince>10000)
    socket.close();
- },12000);
+ },5000);
  open();
  return ()=>{
   active=false;

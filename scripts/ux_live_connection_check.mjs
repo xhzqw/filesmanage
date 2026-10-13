@@ -21,7 +21,9 @@ browser.sessionStorage={
  setItem:(key,value)=>cursorStore.set(key,value),
 };
 browser.setTimeout=(callback,ms)=>{
- if(ms>500){const id=++nextId;pendingLong.set(id,callback);return id;}
+ // Keep fast 16ms invalidation on a real timer; hold back the 250ms
+ // reconnect delay so the test can deterministically advance it.
+ if(ms>30){const id=++nextId;pendingLong.set(id,callback);return id;}
  return realSetTimeout(callback,ms);
 };
 browser.clearTimeout=id=>{
@@ -80,7 +82,7 @@ assert.deepEqual(identities,["new-user"],"stale identity responses never overwri
 
 first.message({type:"workspace.changed",scopes:["file","stats"]});
 first.message({type:"workspace.changed",scopes:["file","trash"]});
-await new Promise(resolve=>realSetTimeout(resolve,180));
+await new Promise(resolve=>realSetTimeout(resolve,65));
 assert.equal(scoped.length,1,"WebSocket events within one flush window coalesce");
 assert.deepEqual(scoped[0].sort(),["file","folder","trash","permissions","collaboration","organization","search","stats","review","lifecycle","approval-policy","presets"].sort(),
  "initial reconnect triggers complete state revalidation");

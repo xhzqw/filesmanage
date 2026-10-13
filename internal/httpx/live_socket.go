@@ -16,13 +16,13 @@ import (
 )
 
 const (
-	maxLiveConnections = 128
-	liveHeartbeat      = 12 * time.Second
-	liveWriteTimeout   = 4 * time.Second
+	maxLiveConnections = 512
+	liveHeartbeat      = 6 * time.Second
+	liveWriteTimeout   = 2 * time.Second
 	// The instance-wide observer polls PostgreSQL every 2s and wakes only
 	// relevant sockets; this watchdog covers missed wake-ups and outages.
-	liveDurablePoll = 30 * time.Second
-	liveReplayBatch = 128
+	liveDurablePoll = 15 * time.Second
+	liveReplayBatch = 256
 )
 
 // Coalesce contiguous known workspace invalidations before WebSocket writes.
@@ -230,11 +230,15 @@ func (h *Handler) streamLiveEvents(req *http.Request, ws *websocket.Conn, userID
 	defer ticker.Stop()
 	poll := time.NewTicker(liveDurablePoll)
 	defer poll.Stop()
+	// Retention is maintained daily, not on each heartbeat. At 512 sockets
+	// checking bounds every 6 seconds would waste ~85 SQL round trips/sec
+	// while the instance observer already watches the journal centrally.
+	lastBoundsCheck := time.Now()
 	// Database is the single source of truth, including events produced by
 	// other API replicas. Local notifications only wake this reader promptly.
 	// Cursors advance after successful sends, never before.
 	replay := func() bool {
-		// Bound one wake-up to 512 events. A huge backlog must not starve
+		// Bound one wake-up to 1024 events. A huge backlog must not starve
 		// heartbeat and disconnect handling while the user catches up.
 		for page := 0; page < 4; page++ {
 			batch, err := store.RealtimeAfter(req.Context(), userID, resumeCursor, liveReplayBatch)
@@ -257,8 +261,9 @@ func (h *Handler) streamLiveEvents(req *http.Request, ws *websocket.Conn, userID
 				return true
 			}
 		}
-		// A backlog over 512 events continues promptly with bounded work.
-		poll.Reset(time.Second)
+		// Drain large backlogs promptly, yielding between batches for
+		// heartbeats/disconnects rather than waiting a whole second.
+		poll.Reset(10 * time.Millisecond)
 		return true
 	}
 	if store != nil && !replay() {
@@ -288,7 +293,7 @@ func (h *Handler) streamLiveEvents(req *http.Request, ws *websocket.Conn, userID
 			if !checkSession() {
 				return
 			}
-			if store != nil {
+			if store != nil && time.Since(lastBoundsCheck) >= 30*time.Second {
 				// Retention can advance while a socket stays connected. Its
 				// cursor may fall outside the journal before the next replay.
 				oldest, newest, err := store.RealtimeBounds(req.Context())
@@ -298,6 +303,7 @@ func (h *Handler) streamLiveEvents(req *http.Request, ws *websocket.Conn, userID
 					}
 					continue
 				}
+				lastBoundsCheck = time.Now()
 				if replayCursorExpired(resumeCursor, oldest, newest) {
 					if !send(map[string]any{"type": "state.resync", "cursor": strconv.FormatInt(newest, 10)}) {
 						return
