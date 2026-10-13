@@ -81,8 +81,10 @@ try{
   const li=[...document.querySelectorAll('dialog[open] .folder-picker-tree [data-folder-id]')]
     .find(row=>row.dataset.folderId===${JSON.stringify(expandableRoot.id)});
   const btn=li?.querySelector('.folder-picker-chevron');
-  if(btn?.getAttribute('aria-expanded')==='true')btn.click();
-  btn?.click();return Boolean(btn);
+  // The picker auto-expands a sole company root. Never toggle it twice
+  // synchronously: React would read the same stale closure and leave it shut.
+  if(btn?.getAttribute('aria-expanded')!=='true')btn?.click();
+  return Boolean(btn);
  })()`);
  assert.ok(rootButton,"root folder must render an actionable expand control");
  const childPage=await evaluate(`(async()=>{
