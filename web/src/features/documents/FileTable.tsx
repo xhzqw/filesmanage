@@ -1382,7 +1382,12 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    <RareButton type="button" tone="ghost" className={"explorer-item-star"+(favoriteIds.has(item.id)?" favorited":"")}
     aria-label={favoriteIds.has(item.id)?"取消收藏 "+item.name:"收藏 "+item.name}
     disabled={favoriteBusy!==""}
-    onMouseDown={event=>event.stopPropagation()}
+    onMouseDown={event=>{
+     // Native mouse focus scrolls the icon grid to the button between
+     // pointerdown and pointerup, sending the click to the card instead.
+     // Keep Tab/Space/Enter focus handling; only pointer focus is suppressed.
+     event.preventDefault();event.stopPropagation();
+    }}
     onKeyDown={event=>event.stopPropagation()}
     onClick={event=>{event.stopPropagation();void toggleFavorite(item);}}>
     <svg width="15" height="15" viewBox="0 0 24 24" fill={favoriteIds.has(item.id)?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.8 1.2 6.9L12 17.8l-6.2 3.2L7 14.1 2 9.3l6.9-1z"/></svg>
@@ -1419,7 +1424,9 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    <RareButton type="button" tone="ghost" className={"explorer-item-star"+(favoriteFolderIds.has(entry.id)?" favorited":"")}
     aria-label={(favoriteFolderIds.has(entry.id)?"取消收藏文件夹 ":"收藏文件夹 ")+entry.name}
     disabled={favoriteBusy!==""}
-    onMouseDown={event=>event.stopPropagation()}
+    onMouseDown={event=>{
+     event.preventDefault();event.stopPropagation();
+    }}
     onKeyDown={event=>event.stopPropagation()}
     onClick={event=>{event.stopPropagation();void toggleFavoriteResource("folder",entry.id);}}>
     <svg width="15" height="15" viewBox="0 0 24 24" fill={favoriteFolderIds.has(entry.id)?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.8 1.2 6.9L12 17.8l-6.2 3.2L7 14.1 2 9.3l6.9-1z"/></svg>
