@@ -58,14 +58,14 @@ export function FileRenameDialog({file,onClose,onRenamed}:{file:FileItem;onClose
     <RareInput id="file-rename-input" value={name} maxLength={200} onChange={event=>setName(event.target.value)} required disabled={busy}/>
     <div className="dialog-actions">
      <RareButton type="button" className="secondary-action" disabled={busy} onClick={onClose}>取消</RareButton>
-     <RareButton type="submit" className="primary" disabled={busy||!name.trim()}>{busy?"保存中…":"保存"}</RareButton>
+     <RareButton type="submit" className="primary" loading={busy} disabled={!name.trim()}>保存</RareButton>
     </div>
    </form>:
    <>
     {change&&<ExtensionChangeNotice change={change}/>}
     <div className="dialog-actions">
      <RareButton type="button" disabled={busy} onClick={()=>setConfirmName(null)}>返回修改</RareButton>
-     <RareButton type="button" tone="primary" className="primary file-rename-confirm" disabled={busy} onClick={()=>void save(confirmName)}>{busy?"保存中…":"确认更改"}</RareButton>
+     <RareButton type="button" tone="primary" className="primary file-rename-confirm" loading={busy} onClick={()=>void save(confirmName)}>确认更改</RareButton>
     </div>
    </>}
  </Dialog>;

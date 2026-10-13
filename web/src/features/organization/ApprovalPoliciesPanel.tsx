@@ -74,7 +74,7 @@ export function ApprovalPoliciesPanel({users,usersState,onRetryUsers,onDirtyChan
           <RareButton type="button" onClick={()=>setConfirmRemove(false)} disabled={locked}>取消</RareButton>
           <RareButton type="button" className="danger" disabled={locked} onClick={()=>void remove()}>确定移除</RareButton>
          </>)}
-        <RareButton type="submit" className="primary" disabled={locked||approverIds.some(id=>!id)||new Set(approverIds).size!==approverIds.length||missing}>{busy?"保存中…":"保存策略"}</RareButton>
+        <RareButton type="submit" className="primary" loading={busy} disabled={locked||approverIds.some(id=>!id)||new Set(approverIds).size!==approverIds.length||missing}>保存策略</RareButton>
        </div>
       </form>
      </div>

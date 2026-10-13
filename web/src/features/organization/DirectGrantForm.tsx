@@ -64,7 +64,7 @@ export function DirectGrantForm({folderName,usersState,groupsState,onRetryUsers,
      <div className="perm-form-actions">
       {submitState==="review"&&<RareButton type="button" className="secondary-action" onClick={()=>{setSubmitState("edit");setRiskAcknowledged(false);}}>返回修改</RareButton>}
       <RareButton type="submit" tone="primary" className="primary" loading={submitState==="saving"} disabled={submitState==="saving"||!subjectId||!actions.length||grantLoadState!=="ready"||subjectSourceState!=="ready"||(submitState==="review"&&needsRiskConsent&&!riskAcknowledged)}>
-       {submitState==="saving"?"提交中…":submitState==="review"?"确认添加授权":"预览授权"}</RareButton>
+       {submitState==="review"?"确认添加授权":"预览授权"}</RareButton>
      </div>
     </form>
      </section>

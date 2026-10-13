@@ -56,8 +56,8 @@ export function SealRevisionControls({fileId,seq,sha,isAdmin,refreshKey,onSelect
    </label>
    <div className="seal-revision-actions">
     <RareButton type="button" disabled={busy} onClick={()=>{setTarget(null);setPassword("")}}>取消</RareButton>
-    <RareButton type="button" className="primary" disabled={busy||!password} onClick={()=>void restore()}>
-     {busy?"正在回退…":"确认回退"}
+    <RareButton type="button" className="primary" loading={busy} disabled={!password} onClick={()=>void restore()}>
+     确认回退
     </RareButton>
    </div>
    <small>生成新签章修订版，不修改原始 PDF，也不删除旧签章记录。</small>

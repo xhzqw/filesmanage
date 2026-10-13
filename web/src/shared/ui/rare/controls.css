@@ -102,9 +102,18 @@
 .rare-input[data-density="standard"]:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 .rare-select[data-density="standard"]{height:32px;min-height:32px}
 .rare-button[data-rare-loading="true"]{cursor:progress}
-.rare-button[data-rare-loading="true"]>.brand-loader{margin-inline-end:0}
-.rare-button[data-rare-intent="primary"][data-rare-loading="true"]>.brand-loader{filter:brightness(1.45)}
-.rare-button[data-rare-loading="true"]:disabled{opacity:.72}
+/* Keep action text in flow while the absolutely-positioned loader replaces
+   only its paint. Loading can never resize neighboring toolbar controls. */
+.rare-button[data-rare-loadable="true"]{position:relative;min-inline-size:84px}
+.rare-button-content{display:inline-flex;align-items:center;justify-content:center;gap:inherit;min-width:0}
+.rare-button-content[data-rare-hidden="true"]{visibility:hidden}
+.rare-button-pending{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.rare-button-pending .brand-loader{color:currentColor}
+.rare-button[data-rare-tone="primary"][data-rare-loading="true"] .brand-loader,
+.rare-button[data-rare-tone="danger"][data-rare-emphasis="solid"][data-rare-loading="true"] .brand-loader{color:var(--text-inverse)}
+.rare-button[data-rare-tone="primary"][data-rare-loading="true"] .brand-loader-ink,
+.rare-button[data-rare-tone="danger"][data-rare-emphasis="solid"][data-rare-loading="true"] .brand-loader-ink{filter:brightness(0) invert(1)}
+.rare-button[data-rare-loading="true"]:disabled{opacity:1}
 .rare-input[aria-invalid="true"]:focus-visible,.rare-select[aria-invalid="true"]:focus-visible,
 .rare-textarea[aria-invalid="true"]:focus-visible{outline-color:var(--status-danger)}
 .rare-button[data-rare-intent]{border-radius:var(--radius-sm)}

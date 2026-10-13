@@ -197,7 +197,7 @@ export function ShareDialog({resource,onClose,onCreated}:{
    {recipientOk&&<p className="hint">将分享给{recipientKind==="user"?"用户":"工作组"}「{recipientName}」。</p>}
    <div className="dialog-actions">
     <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</RareButton>
-    <RareButton type="submit" className="primary" disabled={!canSubmit}>{busy?"创建中…":"创建分享"}</RareButton>
+    <RareButton type="submit" className="primary" loading={busy} disabled={!canSubmit}>创建分享</RareButton>
    </div>
   </form>
  </Dialog>;

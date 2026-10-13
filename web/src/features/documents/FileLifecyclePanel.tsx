@@ -88,7 +88,7 @@ export function FileLifecyclePanel({fileId,currentSeq,lifecycle,onUpdated}:{file
    </label>
    {retentionDays>0&&<p>保留期内无法解除归档或删除，且保留期限不可缩短。</p>}
    <div className="dialog-actions"><RareButton disabled={busy} onClick={()=>setConfirmArchive(false)}>取消</RareButton>
-    <RareButton className="primary" disabled={busy} onClick={()=>void update("archive")}>{busy?"归档中…":"确认归档"}</RareButton></div>
+    <RareButton className="primary" loading={busy} onClick={()=>void update("archive")}>确认归档</RareButton></div>
   </Dialog>}
  </section>;
 }

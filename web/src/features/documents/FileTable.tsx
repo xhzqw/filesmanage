@@ -1486,7 +1486,7 @@ function BatchMoveDialog({files,presetTargetId,onClose,onMoved,onReload}:{
      <RareButton type="button" className="secondary-action" onClick={close} disabled={busy}>取消</RareButton>
      {flow.state==="conflict"&&pendingIds.length>0&&
       <RareButton type="button" className="secondary-action" onClick={excludeConflicts} disabled={busy}>排除问题项并重试</RareButton>}
-     <RareButton type="button" className="primary" onClick={submit} disabled={!canSubmit}>{busy?"移动中…":"确认移动"}</RareButton>
+     <RareButton type="button" className="primary" onClick={submit} loading={busy} disabled={!canSubmit}>确认移动</RareButton>
     </>}
   />}
  </Dialog>;

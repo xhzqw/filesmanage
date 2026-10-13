@@ -23,6 +23,7 @@
 .rare-toast-mark svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .rare-toast-text{flex:0 1 auto;min-width:0;font-size:12px;font-weight:500;line-height:1.5;
  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rare-toast[data-toast-tone="loading"] .rare-toast-text{color:var(--text-secondary);font-weight:400}
 .rare-toast[data-toast-tone="warning"],.rare-toast[data-toast-tone="danger"]{border-radius:var(--radius-md)}
 .rare-toast[data-toast-tone="warning"] .rare-toast-text,.rare-toast[data-toast-tone="danger"] .rare-toast-text{
  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:normal;overflow-wrap:anywhere}

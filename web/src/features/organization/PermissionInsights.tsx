@@ -72,7 +72,7 @@ export function PermissionInsights({folderId,users,usersState,refreshToken}:{
   </div>
   {!activeUser&&usersState==="ready"&&<div className="perm-insight-empty">选择用户后显示有效权限。</div>}
   {usersState==="failed"&&<RareNotice tone="danger">用户列表读取失败，请先在授权表单处重试。</RareNotice>}
-  {busy&&<p role="status" className="hint">正在计算有效权限…</p>}
+  {busy&&<p role="status" className="hint"><BrandLoadingLabel decorative showContext>正在计算有效权限…</BrandLoadingLabel></p>}
   {error&&<RareNotice tone="danger">{error}</RareNotice>}
   {result&&result.folderId===folderId&&result.subjectId===activeUser&&<>
    {result.subjectDisabled&&<RareNotice tone="warning">该账号已禁用，没有可使用的文件权限。</RareNotice>}

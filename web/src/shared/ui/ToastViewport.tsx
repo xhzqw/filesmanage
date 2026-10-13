@@ -9,6 +9,10 @@ import "./toast.css";
 // The final portion of the existing TTL is reserved for the actual exit.
 // Keeping one budget makes the background fade and removal agree on timing.
 const EXIT_MS=450;
+// The loader already says 加载中...; keep only the useful operation name.
+function loadingContext(text:string){
+ return text.replace(/^正在/,"").replace(/(?:进行中|中)?[.…。]*$/,"").replace(/^加载/,"").trim();
+}
 function ToastRow({item}:{item:ToastItem}){
  const reduced=useReducedMotion();
  const[hovered,setHovered]=useState(false);
@@ -38,6 +42,7 @@ function ToastRow({item}:{item:ToastItem}){
   exit={{opacity:0,y:reduced?0:-4,transition:{duration:reduced?0:EXIT_MS/1000,ease:[.4,0,.2,1]}}}
   transition={reduced?{duration:0}:{duration:.18,ease:[.18,1,.32,1]}}
   role={item.tone==="danger"?"alert":"status"}
+  aria-label={item.tone==="loading"?"加载中："+item.text:undefined}
   onMouseEnter={()=>setHovered(true)} onMouseLeave={()=>setHovered(false)}
   onFocusCapture={()=>setFocused(true)} onBlurCapture={event=>{if(!event.currentTarget.contains(event.relatedTarget))setFocused(false);}}>
   <span key={`${item.id}-${item.revision}`} className="rare-toast-surface" aria-hidden="true"
@@ -49,7 +54,8 @@ function ToastRow({item}:{item:ToastItem}){
     item.tone==="warning"?<svg viewBox="0 0 20 20"><path d="M10 5v6m0 3v1M10 2l8 15H2L10 2Z"/></svg>:
     <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="8"/><path d="M10 9v5m0-8v1"/></svg>}
   </span>
-  <span className="rare-toast-text" title={item.text}>{item.text}</span>
+  {(item.tone!=="loading"||loadingContext(item.text))&&
+   <span className="rare-toast-text" title={item.text}>{item.tone==="loading"?loadingContext(item.text):item.text}</span>}
   {(item.tone==="warning"||item.tone==="danger"||item.tone==="loading")&&<RareButton type="button" tone="ghost" className="rare-toast-close" aria-label="关闭通知" onClick={()=>toast.dismiss(item.id)}>
    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 4 8 8M12 4l-8 8"/></svg>
   </RareButton>}

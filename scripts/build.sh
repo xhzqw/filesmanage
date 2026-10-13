@@ -62,6 +62,8 @@ if [ "${1:-}" = "--with-tests" ]; then
   node web/scripts/cad-browser-smoke.mjs
   echo "== ui: centered Rare toast browser geometry regression =="
   node scripts/toast_visual_readonly_check.mjs
+  echo "== ui: stationary brand loading and button geometry regression =="
+  node scripts/loading_visual_browser_check.mjs
   echo "== ui: global authenticated file drop and folder destination regression =="
   node scripts/global_upload_browser_check.mjs
   echo "== go: full test suite =="

@@ -78,7 +78,7 @@ export function FileReviewPanel({fileId,versions}:{fileId:string;versions:FileVe
    <RareTextarea aria-label="批注内容" value={body} onChange={e=>setBody(e.target.value)} placeholder="填写审查意见…" rows={3} maxLength={2000} required disabled={busy}/>
    <div className="file-review-actions">
     <RareInput aria-label="关联行号（可选）" value={line} onChange={e=>setLine(e.target.value)} placeholder="行号（可选）" inputMode="numeric" disabled={busy}/>
-    <RareButton type="submit" className="primary" disabled={busy||!body.trim()}>{busy?"提交中…":"添加批注"}</RareButton>
+    <RareButton type="submit" className="primary" loading={busy} disabled={!body.trim()}>添加批注</RareButton>
    </div>
   </form>}
   {error&&<p role="alert" className="notice error">{error}</p>}

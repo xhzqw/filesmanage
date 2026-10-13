@@ -85,7 +85,7 @@ export function PolicyDialog({folder,approvers,onClose}:{folder:Folder;approvers
    <div className="dialog-actions">
     {configured&&<RareButton type="button" className="secondary-action" onClick={clear} disabled={busy||writeUnknown}>移除策略</RareButton>}
     <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>关闭</RareButton>
-    <RareButton type="submit" className="primary" disabled={busy||writeUnknown||chain.some(id=>!id)||new Set(chain).size!==chain.length}>{busy?"保存中…":"保存策略"}</RareButton>
+    <RareButton type="submit" className="primary" loading={busy} disabled={writeUnknown||chain.some(id=>!id)||new Set(chain).size!==chain.length}>保存策略</RareButton>
    </div>
   </form>
  </Dialog>;

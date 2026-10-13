@@ -67,7 +67,7 @@ export function ResetPasswordDialog({target,department,onClose,onSubmit}:{
      <p className="hint">至少 16 个字符（客户端只校验长度，密码策略以服务端判定为准）。</p>
      <div className="dialog-actions">
       <RareButton type="button" className="secondary-action" onClick={requestClose} disabled={busy}>取消</RareButton>
-      <RareButton type="submit" tone="primary" className="primary" loading={busy} disabled={busy||password.length<16}>{busy?"重置中…":"确认重置密码"}</RareButton>
+      <RareButton type="submit" tone="primary" className="primary" loading={busy} disabled={password.length<16}>确认重置密码</RareButton>
      </div>
     </form>}
  </Dialog>;
@@ -147,7 +147,7 @@ export function RemoveMemberDialog({member,groupName,department,onClose,onSubmit
     <p>影响：移除后该账号不再通过本工作组获得授权；直接授予该账号的权限不受影响，最终生效权限由服务端判定。之后可以重新加入。</p>
     <div className="dialog-actions">
      <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</RareButton>
-     <RareButton type="submit" tone="danger" loading={busy}>{busy?"移除中…":"确认移除"}</RareButton>
+     <RareButton type="submit" tone="danger" loading={busy}>确认移除</RareButton>
     </div>
    </form>}
  </Dialog>;
@@ -185,7 +185,7 @@ export function CreateUserConfirmDialog({draft,department,onClose,onSubmit}:{
     <p className="hint">取消不会清空表单内容，可以修改后再提交。</p>
     <div className="dialog-actions">
      <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>返回修改</RareButton>
-     <RareButton type="submit" tone="primary" loading={busy}>{busy?"创建中…":"确认创建"}</RareButton>
+     <RareButton type="submit" tone="primary" loading={busy}>确认创建</RareButton>
     </div>
    </form>}
  </Dialog>;
@@ -234,7 +234,7 @@ export function CreateDepartmentDialog({options,defaultParentId,listAvailable,on
      :"部门列表不可用，只能创建顶层部门。"}名称最多 80 个字符；成员与工作组需要另行指派。</p>
     <div className="dialog-actions">
      <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</RareButton>
-     <RareButton type="submit" tone="primary" className="primary" loading={busy} disabled={busy||name.trim()===""}>{busy?"创建中…":"创建部门"}</RareButton>
+     <RareButton type="submit" tone="primary" className="primary" loading={busy} disabled={name.trim()===""}>创建部门</RareButton>
     </div>
    </form>}
  </Dialog>;
@@ -283,7 +283,7 @@ export function CreateGroupDialog({options,defaultDepartmentId,listAvailable,onC
      :"部门列表不可用，只能创建不指定部门的工作组。"}名称最多 80 个字符；成员在创建后于“添加成员”中维护。</p>
     <div className="dialog-actions">
      <RareButton type="button" className="secondary-action" onClick={onClose} disabled={busy}>取消</RareButton>
-     <RareButton type="submit" tone="primary" className="primary" loading={busy} disabled={busy||name.trim()===""}>{busy?"创建中…":"创建工作组"}</RareButton>
+     <RareButton type="submit" tone="primary" className="primary" loading={busy} disabled={name.trim()===""}>创建工作组</RareButton>
     </div>
    </form>}
  </Dialog>;

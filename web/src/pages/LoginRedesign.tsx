@@ -142,7 +142,7 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
      {resetHint&&<p className="login-reset-hint">请联系系统管理员重置密码。</p>}
      {error&&<RareNotice tone="danger">{error}</RareNotice>}
      <RareButton className="login-submit" tone="primary" type="submit"
-      tabIndex={open?0:-1} loading={busy}>{busy?"验证中…":"登录"}</RareButton>
+      tabIndex={open?0:-1} loading={busy}>登录</RareButton>
     </form>
    </section>
   </div>
