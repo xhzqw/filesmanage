@@ -362,8 +362,8 @@ try{
   assert.equal(sample.rowSurfaces[3],"rgb(36, 92, 181)","selected row uses deep blue at "+sample.width);
   assert.equal(sample.selectedNameColor,"rgb(255, 255, 255)","selected filename is white at "+sample.width);
   assert.equal(sample.cellBorder,"0px","no file-row separator line at "+sample.width);
-  assert.equal(sample.firstRadius,"12px","row start rounded at "+sample.width);
-  assert.equal(sample.lastRadius,"12px","row end rounded at "+sample.width);
+  assert.equal(sample.firstRadius,"11px","row start rounded at "+sample.width);
+  assert.equal(sample.lastRadius,"11px","row end rounded at "+sample.width);
  }
  console.log("EXPLORER_LONG_NAMES_160_PASS",JSON.stringify(longNameLayout));
  // Verify paging and large selection in the actual React component without

@@ -77,10 +77,12 @@
   transition:background-color .16s ease;
 }
 .explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder) > td:first-child{
-  border-radius:12px 0 0 12px;
+  border-top-left-radius:var(--radius-md);
+  border-bottom-left-radius:var(--radius-md);
 }
 .explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder) > td:last-child{
-  border-radius:0 12px 12px 0;
+  border-top-right-radius:var(--radius-md);
+  border-bottom-right-radius:var(--radius-md);
 }
 .explorer-striped-list table.file-table tbody tr.selected > td,
 .explorer-striped-list table.file-table tbody tr.selected .file-name{
@@ -110,7 +112,7 @@
   filter:drop-shadow(0 1px 1px rgba(9,31,79,.34));
 }
 .explorer-striped-list table.file-table tbody tr:focus-visible{
-  outline:2px solid var(--border-focus);outline-offset:-2px;border-radius:12px;
+  outline:2px solid var(--border-focus);outline-offset:-2px;border-radius:var(--radius-md);
 }
 @media(prefers-reduced-motion:reduce){
   .explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder) > td{transition:none}
@@ -540,5 +542,5 @@ table.file-table-folders-only tbody td.col-name{padding-left:14px}
 /* Folder-only directories hide the other columns: the visible name cell
    becomes both outside edges of the zebra stripe. */
 .explorer-striped-list table.file-table-folders-only tbody tr.explorer-list-folder > td.col-name{
-  border-radius:12px;
+  border-radius:var(--radius-md);
 }
