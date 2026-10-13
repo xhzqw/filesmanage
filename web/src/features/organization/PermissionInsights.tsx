@@ -1,4 +1,5 @@
 import {RareBadge,RareButton,RareDataTable,RareNotice,RareSelect} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {useEffect,useMemo,useRef,useState} from "react";
 import type {User} from "../../entities/user/model";
 import {errorCopy} from "../../shared/errors";
@@ -132,7 +133,7 @@ export function PermissionAudit({users}:{users:User[]}){
    <RareButton type="button" className="secondary-action" disabled={busy} onClick={()=>{
     queryGeneration.current++;setVersion(v=>v+1);
    }}>刷新</RareButton></div>
-  {busy&&<p role="status" className="hint">正在读取审计记录…</p>}
+  {busy&&<p role="status" className="hint"><BrandLoadingLabel>正在读取审计记录…</BrandLoadingLabel></p>}
   {error&&<RareNotice tone="danger">{error}</RareNotice>}
   {!busy&&<div className="perm-audit-scroll">
    <RareDataTable className="perm-table"><thead><tr><th>时间</th><th>变更</th><th>操作人</th><th>资源</th><th>变更前 → 变更后</th><th>结果</th><th>请求追踪</th></tr></thead>
@@ -148,7 +149,7 @@ export function PermissionAudit({users}:{users:User[]}){
    </RareDataTable>
    {page.items.length===0&&<p className="empty">暂无权限变更审计记录。</p>}
    {page.nextCursor&&<RareButton className="perm-more" type="button" disabled={moreBusy} onClick={()=>void more()}>
-    {moreBusy?"正在加载…":"加载更多"}</RareButton>}
+    {moreBusy?<BrandLoadingLabel>正在加载…</BrandLoadingLabel>:"加载更多"}</RareButton>}
   </div>}
  </section>;
 }

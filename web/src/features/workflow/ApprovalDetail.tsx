@@ -1,4 +1,5 @@
 import {RareBadge,RareButton} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import type {Approval} from "./api";
 import type {ApprovalEvent} from "./activityApi";
 
@@ -62,7 +63,7 @@ export function ApprovalDetail({approval,events,historyLoading,historyError,onDe
   </div>
   <div className="approval-detail-section">
    <h4>流转记录</h4>
-   {historyLoading&&<p className="approval-history-muted" role="status">正在读取记录…</p>}
+   {historyLoading&&<p className="approval-history-muted" role="status"><BrandLoadingLabel>正在读取记录…</BrandLoadingLabel></p>}
    {historyError&&<p className="approval-error" role="alert">{historyError}</p>}
    {!historyLoading&&!historyError&&history.length===0&&<p className="approval-history-muted">暂无记录</p>}
    {!historyLoading&&!historyError&&history.map(event=><div className="approval-event" key={event.id}>

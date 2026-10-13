@@ -1,4 +1,5 @@
 import {GooeyNav,RareBadge,RareButton,RareDataTable,RareInput,RareNotice,RareRowActions,RareSelect,RareTabs} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {toast} from "../../shared/ui/feedback";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useEffect,useMemo,useRef,useState,type FormEvent} from "react";
@@ -194,7 +195,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
         value={grantQuery} onChange={event=>setGrantQuery(event.target.value)}/>
       </div>}
       {notice?.error&&<RareNotice tone="danger">{notice.text}</RareNotice>}
-      {state==="loading"&&<p role="status" className="hint perm-list-hint">正在读取授权…</p>}
+      {state==="loading"&&<p role="status" className="hint perm-list-hint"><BrandLoadingLabel>正在读取授权…</BrandLoadingLabel></p>}
       {state==="failed"&&<RareNotice tone="danger">读取授权失败，无法管理当前目录。<RareButton type="button" onClick={reload}>重试</RareButton></RareNotice>}
       {state==="ready"&&<div className="perm-grants-scroller">{visibleGrants.length
        ?<RareDataTable className="perm-table perm-grants-table"><thead><tr><th>授权对象</th><th>允许的操作</th><th>适用范围</th><th>有效期</th><th>操作</th></tr></thead>

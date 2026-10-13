@@ -173,7 +173,7 @@ export function CollaborationBrowser({tab,favorites,shares,status,nextCursor,mor
   </div>
   {(nextCursor||moreStatus==="failed")&&<div className="collab-pagination">
    <span>已加载 {entries.length} 项</span>
-   <RareButton type="button" tone="ghost" disabled={moreStatus==="loading"} onClick={onLoadMore}>{moreStatus==="loading"?"加载中…":moreStatus==="failed"?"重试加载":"加载更多"}</RareButton>
+   <RareButton type="button" tone="ghost" disabled={moreStatus==="loading"} loading={moreStatus==="loading"} onClick={onLoadMore}>{moreStatus==="failed"?"重试加载":"加载更多"}</RareButton>
    {moreStatus==="failed"&&<span role="alert">后续记录加载失败</span>}
   </div>}
   <Menu open={menu!==null} label="资源操作" anchor={menu?.anchor} items={menuItems} onClose={()=>setMenu(null)}/>

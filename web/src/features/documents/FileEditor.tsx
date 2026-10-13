@@ -1,4 +1,5 @@
 import {RareButton,RareTextarea} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {toast} from "../../shared/ui/feedback";
 import {useEffect,useState,type FormEvent}from "react";
 import {fileApi,formatSize}from "./api";
@@ -124,7 +125,7 @@ export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileIte
  return <Dialog open title={`编辑 ${file.name}`} onClose={requestClose} closeGuard={()=>!busy} className="dialog editor-dialog">
   <form onSubmit={submit}>
    <p className="hint">{requiresApproval?"该目录的修改需要审批：提交后由审批人通过才生成新版本。":"保存将创建新的不可变版本；当前为 v"+baseSeq+"。"}</p>
-   {status==="loading"&&<p className="empty">正在加载内容…</p>}
+   {status==="loading"&&<p className="empty"><BrandLoadingLabel size="sm">正在加载内容…</BrandLoadingLabel></p>}
    {status==="failed"&&<p role="alert" className="notice error">{message||"无法读取文件内容。"}</p>}
    {status==="blocked"&&assessment&&!assessment.editable&&<>
     <p role="alert" className="notice error">{assessment.reason}</p>

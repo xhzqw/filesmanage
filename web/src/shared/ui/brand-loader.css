@@ -40,3 +40,33 @@
  .brand-loader-glow{animation:none;display:none}
  .brand-loader-ink{opacity:1;filter:none}
 }
+
+/* All size variants now contain the same transparent mark + three staggered
+   glyphs. Keep the old mark sweep unchanged, but scope it to its own box. */
+.brand-loader{
+ --loader-font:12px;--loader-gap:8px;
+ display:inline-flex;align-items:center;justify-content:center;gap:var(--loader-gap);
+ width:auto;height:auto;aspect-ratio:auto;max-width:100%;
+ color:var(--brand-blue,#2167af);white-space:nowrap;
+}
+.brand-loader[data-loader-size="xs"]{--loader-font:10px;--loader-gap:5px}
+.brand-loader[data-loader-size="sm"]{--loader-font:11px;--loader-gap:6px}
+.brand-loader[data-loader-size="lg"]{--loader-font:15px;--loader-gap:12px}
+.brand-loading-screen>.brand-loader{flex-direction:column}
+.brand-loader-mark{position:relative;display:block;flex:none;width:var(--loader-size);height:var(--loader-size);aspect-ratio:1}
+.brand-loading-content{min-width:0}
+.brand-loader-caption{display:inline-flex;align-items:baseline;font-size:var(--loader-font);font-weight:600;letter-spacing:.045em;line-height:1.35}
+.brand-loader-glyph{
+ display:inline-block;transform-origin:50% 85%;
+ animation:brand-loader-rhythm 1.8s cubic-bezier(.33,0,.2,1) infinite;
+ animation-delay:calc(var(--glyph-order) * 150ms);
+}
+.brand-loader-dots{display:inline-block;letter-spacing:.04em;margin-inline-start:1px;opacity:.65}
+@keyframes brand-loader-rhythm{
+ 0%,14%,62%,100%{opacity:.5;filter:blur(.7px) drop-shadow(0 0 0 transparent);transform:translateY(1.5px) scale(.96)}
+ 28%{opacity:1;filter:blur(0) drop-shadow(0 1px 4px rgba(42,129,214,.3));transform:translateY(-2.5px) scale(1.09)}
+ 42%{opacity:.91;filter:blur(0) drop-shadow(0 0 1px rgba(42,129,214,.12));transform:translateY(-.6px) scale(1.02)}
+}
+@media(prefers-reduced-motion:reduce){
+ .brand-loader-glyph{animation:none;opacity:1;filter:none;transform:none}
+}

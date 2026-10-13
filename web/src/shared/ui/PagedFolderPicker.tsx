@@ -1,5 +1,6 @@
 import {useEffect,useMemo,useRef,useState,type KeyboardEvent,type ReactNode} from "react";
 import {RareButton,RareInput} from "./rare";
+import {BrandLoadingLabel} from "./BrandLoader";
 import {FolderResourceIcon} from "./ResourceIcons";
 import type {FolderPickerProps,FolderPickerPageFolder,FolderPickerRemote} from "./FolderPicker";
 
@@ -190,7 +191,7 @@ export function PagedFolderPicker({
   const level=levels.get(parentId);
   if(!level)return null;
   return <>
-   {level.status==="loading"&&<li role="none" className="folder-picker-level-status">正在加载…</li>}
+   {level.status==="loading"&&<li role="none" className="folder-picker-level-status"><BrandLoadingLabel>正在加载目录…</BrandLoadingLabel></li>}
    {level.status==="error"&&<li role="none" className="folder-picker-level-status">读取失败 <RareButton type="button" className="folder-picker-page-action" onClick={()=>loadLevel(parentId,level.nextCursor,Boolean(level.items.length&&level.nextCursor))}>重试</RareButton></li>}
    {level.status==="ready"&&level.nextCursor&&<li role="none" className="folder-picker-level-status"><RareButton type="button" className="folder-picker-page-action" onClick={()=>loadLevel(parentId,level.nextCursor,true)}>加载更多</RareButton></li>}
   </>;

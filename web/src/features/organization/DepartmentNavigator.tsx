@@ -1,5 +1,6 @@
 import {useEffect,useLayoutEffect,useMemo,useRef,useState,type KeyboardEvent,type ReactNode} from "react";
 import {RareBadge,RareButton,RareInput,RareNotice} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {FolderResourceIcon} from "../../shared/ui/ResourceIcons";
 import type {Department} from "./api";
 import {IconChevron,IconOrganization,IconSearch,IconUsers} from "./OrganizationIcons";
@@ -141,7 +142,7 @@ export function DepartmentNavigator({departments,departmentsState,deptIndex,dept
    <IconOrganization/><span>组织架构</span>
    <RareBadge tone="neutral" className="org-count-pill">{departments.length} 部门</RareBadge>
   </h3></div>
-  {departmentsState==="loading"&&departments.length===0&&<p className="hint org-inline-message">正在读取部门…</p>}
+  {departmentsState==="loading"&&departments.length===0&&<p className="hint org-inline-message"><BrandLoadingLabel>正在读取部门…</BrandLoadingLabel></p>}
   {departmentsState==="failed"&&<div className="org-inline-message">
    <RareNotice tone="danger">读取部门失败，可重试；已有组织树将暂时保留。</RareNotice>
    <RareButton type="button" className="secondary-action" onClick={onRetry}>重试</RareButton>

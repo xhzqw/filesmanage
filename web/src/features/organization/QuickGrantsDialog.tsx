@@ -3,6 +3,7 @@ import {toast} from "../../shared/ui/feedback";
 import type {Folder} from "../../entities/folder/model";
 import type {User} from "../../entities/user/model";
 import {RareButton,RareInput,RareNotice} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {Dialog} from "../../shared/ui/Dialog";
 import {errorCode,errorCopy} from "../../shared/errors";
 import {PermissionActionPicker} from "./PermissionActionPicker";
@@ -100,7 +101,7 @@ export function QuickGrantsDialog({folder,onClose}:{folder:Folder;onClose:()=>vo
      {grantsState==="ready"&&<span className="quick-grants-count">{grants.length} 条</span>}</div>
    </div>
    {notice?.error&&<RareNotice tone={unknown?"warning":"danger"}>{notice.text}</RareNotice>}
-   {grantsState==="loading"&&<p role="status" className="hint">正在读取授权…</p>}
+   {grantsState==="loading"&&<p role="status" className="hint"><BrandLoadingLabel>正在读取授权…</BrandLoadingLabel></p>}
    {grantsState==="failed"&&<RareNotice tone="danger">读取失败，已暂停授权修改。请刷新重试。</RareNotice>}
    {grantsState==="ready"&&<div className="quick-grants-list">
     {grants.length===0?<p className="quick-grants-empty">暂无直接授权</p>:grants.map(grant=>

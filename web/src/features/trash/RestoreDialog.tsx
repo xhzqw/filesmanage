@@ -1,4 +1,5 @@
 import {RareButton,RareInput} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {toast} from "../../shared/ui/feedback";
 import {useEffect,useMemo,useState}from"react";
 import {request}from"../../shared/http";
@@ -123,7 +124,7 @@ export function RestoreDialog({entry,onClose,onRestored,onReload}:{
  }
 
  return <Dialog open title={`恢复 — ${entry.oldName}`} onClose={onClose} closeGuard={()=>!busy} className="dialog restore-dialog">
-  {stage==="loading"&&treeState==="loading"&&<p className="empty">正在读取目录…</p>}
+  {stage==="loading"&&treeState==="loading"&&<p className="empty"><BrandLoadingLabel>正在读取目录…</BrandLoadingLabel></p>}
   {treeState==="failed"&&<>
    <p role="alert" className="notice error">获取目录失败，无法确认原位置是否可用。</p>
    <RareButton type="button" className="secondary-action" onClick={()=>setReloadToken(token=>token+1)} disabled={busy}>重试</RareButton>

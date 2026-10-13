@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useRef,useState} from "react";
+import {BrandLoadingLabel} from "./BrandLoader";
 import {request} from "../http";
 export type FileHistoryEvent={id:number;actorId:string;actorName?:string;requestId:string;eventType:string;targetKind:string;targetId:string;outcome:string;details:Record<string,unknown>;createdAt:string};
 export type FileHistoryPage={items:FileHistoryEvent[];nextCursor:string};
@@ -113,7 +114,7 @@ export function FileHistoryPanel({fileId,revision}:{fileId:string;revision:numbe
    {([["all","全部"],["content","内容"],["location","文件操作"],["workflow","审批签章"]] as const).map(([key,label])=>
     <RareButton key={key} type="button" aria-pressed={filter===key} onClick={()=>setFilter(key)}>{label}</RareButton>)}
   </div>
-  {loading&&<p role="status" className="hint">正在读取历史…</p>}
+  {loading&&<p role="status" className="hint"><BrandLoadingLabel>正在读取历史…</BrandLoadingLabel></p>}
   {error&&<div className="file-history-error" role="alert">{error}<RareButton type="button" onClick={()=>setRetry(n=>n+1)}>重试</RareButton></div>}
   {!loading&&shown.length===0&&!error&&<p className="empty">暂无匹配记录</p>}
   <div className="file-history-rail-layout">
@@ -138,7 +139,7 @@ export function FileHistoryPanel({fileId,revision}:{fileId:string;revision:numbe
    </li>)}
   </ol>
   </section>)}
-  {page.nextCursor&&<div className="file-history-footer"><RareButton type="button" disabled={more} onClick={()=>void nextPage()}>{more?"正在加载…":"加载更早记录"}</RareButton></div>}
+  {page.nextCursor&&<div className="file-history-footer"><RareButton type="button" disabled={more} loading={more} onClick={()=>void nextPage()}>加载更早记录</RareButton></div>}
    </div>
   </div>
  </div>;

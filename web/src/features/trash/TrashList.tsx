@@ -1,4 +1,5 @@
 import {RareButton,RareNotice} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {toast} from "../../shared/ui/feedback";
 import {useEffect,useState} from "react";
 import type {TrashEntry} from "../../entities/trash/model";
@@ -80,7 +81,7 @@ export function TrashList({onRestored}:{onRestored:()=>void}){
    <table>
     <thead><tr><th scope="col">名称</th><th scope="col">类型</th><th scope="col">删除人</th><th scope="col">删除时间</th><th scope="col">操作</th></tr></thead>
     <tbody>
-     {status==="loading"&&<tr><td colSpan={5} className="empty">正在加载回收站…</td></tr>}
+     {status==="loading"&&<tr><td colSpan={5} className="empty"><BrandLoadingLabel size="sm">正在加载回收站…</BrandLoadingLabel></td></tr>}
      {status==="failed"&&<tr><td colSpan={5} className="empty" role="alert">获取回收站失败，请刷新重试</td></tr>}
      {status==="ready"&&entries.length===0&&<tr><td colSpan={5} className="empty">回收站为空。</td></tr>}
      {status==="ready"&&entries.map(entry=><tr key={entry.id}>

@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState,type KeyboardEvent,type ReactNode} from "react";
 import {RareButton,RareInput,RareNotice} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {FolderResourceIcon} from "../../shared/ui/ResourceIcons";
 import {errorCopy} from "../../shared/errors";
 import {permissionsApi,type FolderPage,type ResourceFolder} from "./permissionsApi";
@@ -154,7 +155,7 @@ export function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(f
       onClick={()=>{setFocusedId(folder.id);onSelect(folder);}} title={folder.name}>{folder.name}</RareButton>
     </div>
     {open&&<>
-     {loading[folder.id]&&<p className="hint perm-tree-info">正在读取…</p>}
+     {loading[folder.id]&&<p className="hint perm-tree-info"><BrandLoadingLabel>正在读取子目录…</BrandLoadingLabel></p>}
      {errors[folder.id]&&<p role="alert" className="perm-tree-info">{errors[folder.id]} <RareButton type="button" onClick={()=>void load(folder.id)}>重试</RareButton></p>}
      <ul role="group">{rows(folder.id,depth+1,nextAncestors)}</ul>
      {pages[folder.id]?.nextCursor&&<RareButton type="button" className="perm-more" disabled={loading[folder.id]}
@@ -178,7 +179,7 @@ export function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(f
      <span>{f.name}</span><small>{f.path||"资源目录"}</small></RareButton>)}
     {searchState==="ready"&&searchPage.nextCursor&&<RareButton type="button" className="perm-more" disabled={moreSearch} onClick={()=>void loadMoreSearch()}>加载更多结果</RareButton>}
    </>:<>
-    {loading[""]&&<p className="hint">正在读取资源目录…</p>}
+    {loading[""]&&<p className="hint"><BrandLoadingLabel>正在读取资源目录…</BrandLoadingLabel></p>}
     {errors[""]&&<RareNotice tone="danger">{errors[""]} <RareButton type="button" onClick={()=>void load("")}>重试</RareButton></RareNotice>}
     {pages[""]?.items.length===0&&<p className="hint">没有目录</p>}
     <ul className="perm-tree" ref={treeRef} role="tree" aria-label="资源目录树" onKeyDown={onTreeKeyDown}>{rows("",0,new Set())}</ul>

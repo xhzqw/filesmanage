@@ -72,8 +72,8 @@ export function PrintDialog({preview,onClose,sealRevision=null}:{preview:Preview
    <div className="document-print-preview" aria-label="文件打印内容预览">
     {isImage?<img className="document-print-image" src={previewUrl} alt={"图片预览："+preview.name}/>:
      isPdf?<div className="document-print-pdf-stage" aria-busy={!pdfImageReady&&!pdfImageError}>
-      {!pdfImageReady&&!pdfImageError&&<div className="document-print-pdf-loading" role="status">
-       <BrandLoader size="md" decorative/><span>正在渲染 PDF 首页…</span>
+      {!pdfImageReady&&!pdfImageError&&<div className="document-print-pdf-loading" role="status" aria-label="正在渲染 PDF 首页">
+       <BrandLoader size="md" decorative/>
       </div>}
       {pdfImageError&&<div className="document-print-pdf-loading" role="alert">
        <span>首页预览失败</span><RareButton type="button" onClick={()=>{setPdfImageRetry(i=>i+1);setPdfImageError(false);}}>重试</RareButton>
@@ -106,7 +106,7 @@ export function PrintDialog({preview,onClose,sealRevision=null}:{preview:Preview
       <option value="">全部可见工作表</option>
       {sheets.map(sheet=><option key={sheet.name} value={sheet.name}>{sheet.name}</option>)}
      </RareSelect>
-     <small>{sheetState==="loading"?"正在读取工作表…":sheetState==="failed"?"工作表列表不可用，可直接打印整个工作簿":
+     <small>{sheetState==="loading"?<BrandLoadingLabel>正在读取工作表…</BrandLoadingLabel>:sheetState==="failed"?"工作表列表不可用，可直接打印整个工作簿":
       "单独打印工作表时，原预览仍显示整个工作簿。输出采用文档原有打印区域与分页设置。"}</small>
     </label>}
     {isImage&&<small>图片按比例缩放适应纸张，不裁切原图。</small>}

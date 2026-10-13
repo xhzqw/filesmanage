@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState,type FormEvent} from "react";
 import {RareButton,RareInput,RareSelect,RareTextarea} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {toast} from "../../shared/ui/feedback";
 import {errorCopy} from "../../shared/errors";
 import {fileApi,type FileReviewComment} from "./api";
@@ -81,7 +82,7 @@ export function FileReviewPanel({fileId,versions}:{fileId:string;versions:FileVe
    </div>
   </form>}
   {error&&<p role="alert" className="notice error">{error}</p>}
-  {state==="loading"&&<p role="status" className="hint">正在加载审查记录…</p>}
+  {state==="loading"&&<p role="status" className="hint"><BrandLoadingLabel>正在加载审查记录…</BrandLoadingLabel></p>}
   {state==="failed"&&<RareButton type="button" onClick={()=>setRefresh(x=>x+1)}>重试</RareButton>}
   {state==="ready"&&<div className="file-review-list">
    {items.length===0&&<p className="empty">当前版本暂无批注。</p>}
@@ -95,7 +96,7 @@ export function FileReviewPanel({fileId,versions}:{fileId:string;versions:FileVe
     <p>{item.body}</p>
     {!item.resolvedAt&&<RareButton type="button" disabled={busy} onClick={()=>void resolve(item)}>标记已解决</RareButton>}
    </article>)}
-   {next&&<RareButton type="button" disabled={moreBusy} onClick={()=>void loadMore()}>{moreBusy?"加载中…":"加载更多"}</RareButton>}
+   {next&&<RareButton type="button" disabled={moreBusy} loading={moreBusy} onClick={()=>void loadMore()}>加载更多</RareButton>}
   </div>}
  </div>;
 }

@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useState} from "react";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {toast} from "../../shared/ui/feedback";
 import type {TrashEntry} from "../../entities/trash/model";
 import type {Folder} from "../../entities/folder/model";
@@ -209,7 +210,7 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
      <th scope="col">名称 / 原位置</th><th scope="col">类型</th><th scope="col">删除人</th><th scope="col">删除时间</th><th scope="col">操作</th>
     </tr></thead>
     <tbody>
-     {status==="loading"&&<tr><td colSpan={6} className="trash-empty">正在加载…</td></tr>}
+     {status==="loading"&&<tr><td colSpan={6} className="trash-empty"><BrandLoadingLabel size="sm">正在加载回收站…</BrandLoadingLabel></td></tr>}
      {status==="failed"&&<tr><td colSpan={6} className="trash-empty"><span role="alert">加载失败</span> <RareButton type="button" onClick={refresh}>重试</RareButton></td></tr>}
      {status==="ready"&&entries.length===0&&<tr><td colSpan={6} className="trash-empty">{offset>0?"当前页无记录，请返回上一页":"没有符合条件的记录"}</td></tr>}
      {status==="ready"&&entries.map(entry=><tr key={entry.id}>

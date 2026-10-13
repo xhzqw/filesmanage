@@ -1,4 +1,5 @@
 import {RareButton,RareInput} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {useEffect,useMemo,useState,type FormEvent} from "react";
 import {collaborationApi,type Workgroup} from "./api";
 import {errorCode,errorCopy} from "../../shared/errors";
@@ -141,7 +142,7 @@ export function ShareDialog({resource,onClose,onCreated}:{
       disabled={busy} onClick={()=>{setRecipientKind("group");setRecipientId("");}}>工作组</RareButton>
     </div>
    </fieldset>
-   {recipients==="loading"&&<p className="hint">正在读取接收方…</p>}
+   {recipients==="loading"&&<p className="hint"><BrandLoadingLabel>正在读取接收方…</BrandLoadingLabel></p>}
    {recipients==="denied"&&<p role="alert" className="notice error">当前账号无法读取用户/工作组列表（服务端仅对管理员开放），暂时不能选择接收方。</p>}
    {recipients==="failed"&&<>
     <p role="alert" className="notice error">接收方列表加载失败。</p>

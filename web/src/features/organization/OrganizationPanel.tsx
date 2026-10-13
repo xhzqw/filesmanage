@@ -1,4 +1,5 @@
 import {RareTabs} from "../../shared/ui/rare/RareTabs";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {toast} from "../../shared/ui/feedback";
 import {RareBadge,RareButton,RareDataTable,RareInput,RareNotice,RareRowActions,RareSelect} from "../../shared/ui/rare";
 import {useCallback,useEffect,useRef,useState,type FormEvent} from "react";
@@ -306,7 +307,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
              onClick={()=>{setNotice(null);setStateTarget(user);}}>{user.disabled===true?"启用":"禁用"}</RareButton>}
          </RareRowActions></td>
         </tr>)}
-        {filteredMembers.length===0&&<tr><td colSpan={5} className="empty">{memberTableEmpty}</td></tr>}
+        {filteredMembers.length===0&&<tr><td colSpan={5} className="empty">{usersState==="loading"?<BrandLoadingLabel size="sm">正在读取用户…</BrandLoadingLabel>:memberTableEmpty}</td></tr>}
        </tbody>
       </RareDataTable>
      </div>
@@ -378,7 +379,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
         onClick={()=>setGroupQuery("")}>×</RareButton>}
       </div>
 
-       {groupsState==="loading"&&<p className="hint org-inline-message">正在读取工作组…</p>}
+       {groupsState==="loading"&&<p className="hint org-inline-message"><BrandLoadingLabel>正在读取工作组…</BrandLoadingLabel></p>}
        {groupsState==="failed"&&<div className="org-inline-message">
        <RareNotice tone="danger">读取工作组列表失败。</RareNotice>
        <RareButton type="button" className="secondary-action" onClick={()=>setGroupsToken(t=>t+1)}>重试</RareButton>
@@ -432,7 +433,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
           {membersState==="failed"&&<RareButton type="button" className="secondary-action" onClick={()=>setMembersToken(t=>t+1)}>重试</RareButton>}
          </div>
 
-         {membersState==="loading"&&<p className="hint">正在读取工作组成员…</p>}
+         {membersState==="loading"&&<p className="hint"><BrandLoadingLabel>正在读取工作组成员…</BrandLoadingLabel></p>}
          {membersAvailable&&<div className="org-member-grid">
           {groupMembers.slice(0,groupMemberLimit).map(member=><WorkgroupMemberRow key={member.id}
            user={member} kind="member" onAction={()=>{setNotice(null);setRemoveTarget(member);}}/>)}
@@ -454,7 +455,7 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
          </div>
 
          {!usersReady
-          ?<p className="hint">{usersState==="loading"?"正在读取可选择的账号…":"账号列表不可用，无法选择新成员。"}</p>
+          ?<p className="hint">{usersState==="loading"?<BrandLoadingLabel>正在读取可选择的账号…</BrandLoadingLabel>:"账号列表不可用，无法选择新成员。"}</p>
           :<>
            <div className="org-search-box org-candidate-search">
             <IconSearch/>

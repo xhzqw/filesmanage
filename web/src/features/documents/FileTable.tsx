@@ -1104,7 +1104,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    </div>}
   </div>}
   {(hasMore||loadingMore||moreError)&&<div className="file-page-controls" role="group" aria-label="文件分页">
-   <RareButton type="button" className="secondary-action" disabled={loadingMore||status!=="ready"||!hasMore} aria-busy={loadingMore} onClick={()=>void loadMore()}>{loadingMore?"正在加载…":moreError?"重试加载":"加载更多"}</RareButton>
+   <RareButton type="button" className="secondary-action" disabled={loadingMore||status!=="ready"||!hasMore} loading={loadingMore} onClick={()=>void loadMore()}>{moreError?"重试加载":"加载更多"}</RareButton>
    <span className="file-page-hint">{hasMore?"已加载 "+items.length+" 项 · 后面还有文件":"已显示全部 "+items.length+" 项"}</span>
    {moreError&&<span className="file-page-error" role="alert">{moreError}</span>}
   </div>}

@@ -135,13 +135,13 @@ export function PDFPageViewer({fileId,sha,name,seq,revision,onRevisionChange,epo
    </div>
   </div>
   {loading&&<div className="file-pdf-paper is-pending" aria-busy="true">
-   <div className="file-pdf-placeholder" role="status"><BrandLoader size="lg" decorative/><span>正在加载 PDF 页面…</span></div>
+   <div className="file-pdf-placeholder" role="status" aria-label="正在加载 PDF 页面"><BrandLoader size="lg" decorative/></div>
   </div>}
   {error&&<div className="file-pdf-message"><p role="alert">{error}</p><RareButton type="button" onClick={()=>setRetry(i=>i+1)}>重试</RareButton></div>}
   {pages>0&&!error&&<div className={"file-pdf-paper"+(!imageReady?" is-pending":"")+(panMode?" is-panning":"")} ref={viewportRef} data-fit-mode={fitMode} aria-busy={!imageReady} onPointerDown={panDown} onPointerMove={panMove} onPointerUp={panEnd} onPointerCancel={panEnd} style={{touchAction:panMode?"none":"auto"}}>
    {retained&&!pageError&&<img className="file-pdf-retained" src={retained.url} alt="" aria-hidden="true"/>}
-   {!imageReady&&!pageError&&<div className={"file-pdf-placeholder"+(retained?" is-overlaid":"")} role="status">
-    <BrandLoader size="lg" decorative/><span>正在渲染第 {page} 页…</span>
+   {!imageReady&&!pageError&&<div className={"file-pdf-placeholder"+(retained?" is-overlaid":"")} role="status" aria-label={"正在渲染第 "+page+" 页"}>
+    <BrandLoader size="lg" decorative/>
    </div>}
    {pageError&&<div className="file-pdf-page-error" role="alert">
     <span>{pageError}</span>

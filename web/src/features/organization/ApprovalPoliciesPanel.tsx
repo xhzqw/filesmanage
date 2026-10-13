@@ -2,6 +2,7 @@ import {useEffect,useState} from "react";
 import {useSearchParams} from "react-router-dom";
 import type {User} from "../../entities/user/model";
 import {RareBadge,RareButton,RareInput,RareNotice,RareSelect} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {ResourceBrowser} from "./ResourceBrowser";
 import type {ResourceFolder} from "./permissionsApi";
 import {useApprovalPolicyEditor} from "./useApprovalPolicyEditor";
@@ -40,7 +41,7 @@ export function ApprovalPoliciesPanel({users,usersState,onRetryUsers,onDirtyChan
       {editingReady&&<RareBadge className="approval-state" tone={!configured?"neutral":enabled?"success":"warning"} dot>{!configured?"未配置":enabled?"已启用":"已停用"}</RareBadge>}
      </div>
      <div className="approval-editor">
-      {status==="loading"&&<p role="status" className="hint">正在读取审批策略…</p>}
+      {status==="loading"&&<p role="status" className="hint"><BrandLoadingLabel>正在读取审批策略…</BrandLoadingLabel></p>}
       {notice&&!unknown&&<RareNotice tone={notice.error?"danger":"success"}>{notice.message}</RareNotice>}
       {status==="failed"&&<RareButton type="button" onClick={()=>requestNavigation(discardAndReload)}>重新读取</RareButton>}
       {(unknown||remoteChanged)&&<RareNotice tone="warning">
