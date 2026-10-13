@@ -64,7 +64,9 @@ export const collaborationApi={
  favoritesPage:(cursor="")=>request<CollaborationPage<Favorite>>("/favorites?"+new URLSearchParams({limit:"50",...(cursor?{cursor}:{})}).toString()),
  // During a rolling deployment the previous server returns the legacy array.
  // After the backend restart the same route returns the authorized sidebar page.
- favoritesSidebar:()=>request<{items:Favorite[]}|Favorite[]>("/favorites?view=sidebar").then(page=>{
+ // The sidebar is a live, user-scoped view: a cached response can retain an
+ // empty folder resourceName even after the server name mapping is repaired.
+ favoritesSidebar:()=>request<{items:Favorite[]}|Favorite[]>("/favorites?view=sidebar",{cache:"no-store"}).then(page=>{
   if(Array.isArray(page))return {items:page.filter(item=>!item.unavailable).slice(0,8)};
   // An API/worker version mismatch must not turn a sidebar refresh into a
   // full-page React render crash (undefined.slice in FinderSidebar).
