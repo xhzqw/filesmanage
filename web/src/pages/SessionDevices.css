@@ -1,3 +1,4 @@
+.work.sessions-work{overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain;scrollbar-gutter:stable}
 .sessions-page{width:min(100%,980px);padding:24px;margin:0 auto;display:flex;flex-direction:column;gap:18px;color:var(--text-primary)}
 .sessions-heading,.sessions-panel-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
 .sessions-heading-actions{display:flex;align-items:center;gap:8px;flex:none;flex-wrap:wrap;justify-content:flex-end}

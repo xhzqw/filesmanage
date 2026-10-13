@@ -232,6 +232,33 @@ try{
  await evaluate(`(()=>{document.querySelector('.login-entry').click();return true})()`);
  await delay(560);
  await inspect("login",[["card",".login-panel",18],["button",".login-panel .login-submit",6]]);
+ // Verify the account-security page scrolls inside its bounded work area.
+ // Duplicate rendered session rows in the DOM to make overflow deterministic,
+ // regardless of how many real devices happen to be logged in.
+ for(const width of [1440,900,390]){
+  await compactViewport(width);
+  await navigate("/account/sessions",".sessions-page");
+  for(let i=0;i<35;i++){
+   if(await evaluate('!!document.querySelector(".sessions-item")'))break;
+   await delay(100);
+  }
+  const result=await evaluate('(()=>{'+
+   'const scroll=document.querySelector(".sessions-work"),list=document.querySelector(".sessions-list");'+
+   'const first=list?.querySelector(".sessions-item");if(!scroll||!first)return null;'+
+   'while(list.children.length<24)list.append(first.cloneNode(true));'+
+   'const overflow=getComputedStyle(scroll).overflowY;'+
+   'scroll.scrollTop=scroll.scrollHeight;'+
+   'return {overflow,clientHeight:scroll.clientHeight,scrollHeight:scroll.scrollHeight,'+
+   'scrollTop:scroll.scrollTop,atBottom:scroll.scrollTop+scroll.clientHeight>=scroll.scrollHeight-3,'+
+   'noHorizontalOverflow:scroll.scrollWidth<=scroll.clientWidth+2,'+
+   'rootWidth:document.documentElement.scrollWidth,rootOverflowX:getComputedStyle(document.documentElement).overflowX,viewport:innerWidth};'+
+   '})()');
+  check('account sessions '+width+'px vertical scrolling reaches the bottom',
+   !!result&&result.overflow==="auto"&&result.scrollHeight>result.clientHeight+100&&
+   result.scrollTop>20&&result.atBottom&&result.noHorizontalOverflow&&
+   (result.rootWidth<=width+2||result.rootOverflowX==="clip"),JSON.stringify(result));
+ }
+ await send("Emulation.clearDeviceMetricsOverride");
  await navigate("/doc",".sidebar");
  await inspect("documents",[
   ["header",".header",14],["sidebar",".sidebar",14],["workspace",".work",14],

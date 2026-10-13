@@ -70,7 +70,7 @@ export function SessionDevices({user,onLogout}:{user:User;onLogout:()=>void}){
  const others=sessions.filter(row=>!row.current);
  return <AppShell user={user} onLogout={onLogout} product="账号安全">
   <div className="panels">
-   <main className="work">
+   <main className="work sessions-work">
     <div className="sessions-page">
      <div className="sessions-heading">
       <div><h1>登录设备与安全</h1><p>管理你自己的登录会话。撤销后，其他设备将通过实时通知或下次请求退出。</p></div>
