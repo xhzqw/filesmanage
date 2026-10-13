@@ -26,9 +26,10 @@ async function evaluate(expression){
  if(result.exceptionDetails)throw Error("browser evaluation error: "+JSON.stringify(result.exceptionDetails).slice(0,240));
  return result.result.value;
 }
-async function waitFor(expression){
- for(let n=0;n<80;n++){if(await evaluate(expression))return;await sleep(150);}
- throw Error("browser state timeout: "+expression.slice(0,110));
+async function waitFor(expression,maxAttempts=80){
+ for(let n=0;n<maxAttempts;n++){if(await evaluate(expression))return;await sleep(150);}
+ const page=await evaluate("({path:location.pathname,query:location.search,explorer:!!document.querySelector('.document-explorer'),body:document.body?.textContent?.slice(0,180)})").catch(()=>null);
+ throw Error("browser state timeout: "+expression.slice(0,110)+"; page="+JSON.stringify(page));
 }
 const dropScript=(selector,type)=>`(()=>{
  const el=document.querySelector(${JSON.stringify(selector)})||document.body;
@@ -144,7 +145,9 @@ try{
  console.log("PASS document view: resolved directory direct destination, internal move isolation");
 
  await send("Page.navigate",{url:base+"/doc?view=favorites"});
- await waitFor("location.search.includes('view=favorites')&&!!document.querySelector('.document-explorer')");
+ // Route bundles and auth revalidation can take longer under the full build's
+ // WebGL/browser test load than in standalone Chrome. Do not time out early.
+ await waitFor("location.search.includes('view=favorites')&&!!document.querySelector('.document-explorer')",200);
  await evaluate(`(()=>{window.__fmDrag=${dropScript("main","file")};return true;})()`);
  await waitFor("!!document.querySelector('.global-upload-hint')");
  assert.match(await evaluate("document.querySelector('.global-upload-hint')?.textContent"),/选择目标文件夹/);
