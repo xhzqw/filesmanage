@@ -118,6 +118,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const completedCursor=useRef("");
  const[renaming,setRenaming]=useState<FileItem|null>(null);
  const[selectedIds,setSelectedIds]=useState<Set<string>>(()=>new Set<string>());
+ const checkboxShiftRef=useRef(false);
  const selectAllRef=useRef<HTMLInputElement>(null);
  const[focusedId,setFocusedId]=useState<string|null>(null);
  const[focusedFolderId,setFocusedFolderId]=useState<string|null>(null);
@@ -452,7 +453,9 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  // visibleRange the row click uses. Modifiers come from the native event (React
  // fires a checkbox onChange from the click) and focus always follows.
  function onCheckToggle(event:ChangeEvent<HTMLInputElement>,item:FileItem){
-  if((event.nativeEvent as {shiftKey?:boolean}).shiftKey&&anchorId){
+  const extend=checkboxShiftRef.current||(event.nativeEvent as {shiftKey?:boolean}).shiftKey===true;
+  checkboxShiftRef.current=false;
+  if(extend&&anchorId){
    setSelectedIds(new Set(visibleRange(anchorId,item.id)));
    setFocusedId(item.id);
    return;
@@ -463,6 +466,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    return next;
   });
   setFocusedId(item.id);
+  setAnchorId(item.id);
  }
 
  // The header box acts on the whole loaded page; selecting all also sets the
@@ -540,13 +544,15 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   event.stopPropagation();
  }
 
- function moveFocus(index:number,extend:boolean){
+ function moveFocus(index:number,extend:boolean,originId:string|null=null){
   if(visibleItems.length===0)return;
   const next=Math.max(0,Math.min(visibleItems.length-1,index));
   const target=visibleItems[next];
   if(!target)return;
-  if(extend&&anchorId){
-   setSelectedIds(new Set(visibleRange(anchorId,target.id)));
+  const rangeAnchor=anchorId&&visibleItems.some(item=>item.id===anchorId)?anchorId:originId;
+  if(extend&&rangeAnchor){
+   setSelectedIds(new Set(visibleRange(rangeAnchor,target.id)));
+   setAnchorId(rangeAnchor);
   }else{
    setSelectedIds(new Set([target.id]));
    setAnchorId(target.id);
@@ -571,13 +577,13 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   const current=index>=0?visibleItems[index]:null;
   switch(event.key){
    case "ArrowDown":
-    event.preventDefault();moveFocus(index+1,event.shiftKey);break;
+    event.preventDefault();moveFocus(index+1,event.shiftKey,current?.id??null);break;
    case "ArrowUp":
-    event.preventDefault();moveFocus(index-1,event.shiftKey);break;
+    event.preventDefault();moveFocus(index-1,event.shiftKey,current?.id??null);break;
    case "Home":
-    event.preventDefault();moveFocus(0,event.shiftKey);break;
+    event.preventDefault();moveFocus(0,event.shiftKey,current?.id??null);break;
    case "End":
-    event.preventDefault();moveFocus(visibleItems.length-1,event.shiftKey);break;
+    event.preventDefault();moveFocus(visibleItems.length-1,event.shiftKey,current?.id??null);break;
    case " ":
     if(!current)return;
     event.preventDefault();
@@ -586,6 +592,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
      if(next.has(current.id))next.delete(current.id);else next.add(current.id);
      return next;
     });
+    setAnchorId(current.id);
     break;
    case "Enter":
     if(!current)return;
@@ -622,6 +629,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     if((event.metaKey||event.ctrlKey)&&(event.key==="a"||event.key==="A")){
      event.preventDefault();
      setSelectedIds(new Set(visibleItems.map(i=>i.id)));
+     setAnchorId(visibleItems[0]?.id??null);
     }
   }
  }
@@ -786,7 +794,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    <span className="explorer-item-name" title={item.name}>{item.name}</span>
    <span className="explorer-item-sub">{formatSize(item.sizeBytes)} · v{item.currentVersionSeq}</span>
    <RareInput className="explorer-item-check" type="checkbox" checked={selectedIds.has(item.id)}
-    aria-label={"选择 "+item.name} onClick={event=>event.stopPropagation()} onChange={event=>onCheckToggle(event,item)}/>
+    aria-label={"选择 "+item.name} onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}} onChange={event=>onCheckToggle(event,item)}/>
    <RareButton type="button" tone="ghost" className={"explorer-item-star"+(favoriteIds.has(item.id)?" favorited":"")}
     aria-label={favoriteIds.has(item.id)?"取消收藏 "+item.name:"收藏 "+item.name}
     disabled={favoritesState!=="ready"||favoriteBusy!==""}
@@ -960,7 +968,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       onDoubleClick={()=>navigate("/preview/"+item.id)}
       onDragStart={event=>onRowDragStart(event,item)}
       onDragEnd={onRowDragEnd}>
-      <td className="col-select"><RareInput type="checkbox" checked={selectedIds.has(item.id)} aria-label={"选择 "+item.name} onClick={event=>event.stopPropagation()} onChange={event=>onCheckToggle(event,item)}/></td>
+      <td className="col-select"><RareInput type="checkbox" checked={selectedIds.has(item.id)} aria-label={"选择 "+item.name} onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}} onChange={event=>onCheckToggle(event,item)}/></td>
       <td className="col-name"><div className="file-cell-wrap">
        <FileTypeIcon name={item.name} size={19}/><span className="file-name" title={item.name}>{item.name}</span>
        <small className="file-mobile-meta">v{item.currentVersionSeq} · {formatSize(item.sizeBytes)}</small>

@@ -247,6 +247,105 @@ try{
  await setLocalFilter("");
  await until('!!document.querySelector("table.file-table:not(.file-table-folders-only) tr.file-entry")');
  console.log("EXPLORER_FOLDER_ONLY_REACT_PASS",JSON.stringify(folderOnlyColumns));
+
+ // Read-only interaction checks run against the actual React rows. Pick a
+ // folder with multiple loaded files if the root does not contain enough.
+ let fileCount=await evaluate('document.querySelectorAll("tr.file-entry").length');
+ if(fileCount<4){
+  const folderCount=await evaluate('document.querySelectorAll(".explorer-list-folder").length');
+  for(let index=0;index<Math.min(folderCount,24)&&fileCount<4;index++){
+   await navigate("/doc",'!!document.querySelector(".explorer-list-folder .folder-inline-open")');
+   await evaluate(`document.querySelectorAll(".explorer-list-folder .folder-inline-open")[${index}]?.click()`);
+   await wait(650);
+   fileCount=await evaluate('document.querySelectorAll("tr.file-entry").length');
+  }
+ }
+ assert(fileCount>=4,"read-only multi-selection check requires four real files; loaded="+fileCount);
+ const selection=()=>evaluate(`(()=>{
+  const rows=[...document.querySelectorAll("tr.file-entry")];
+  const active=document.activeElement?.closest(".file-entry");
+  const header=document.querySelector('thead .col-select input[type="checkbox"]');
+  return {count:rows.filter(row=>row.getAttribute("aria-selected")==="true").length,
+   total:rows.length,activeIndex:rows.indexOf(active),headerChecked:header?.checked,
+   headerMixed:header?.indeterminate,selected:[...rows].map((row,i)=>row.getAttribute("aria-selected")==="true"?i:-1).filter(i=>i>=0)};
+ })()`);
+ const key=(code,options={})=>evaluate(`(()=>{
+  const row=document.activeElement?.closest(".file-entry")||document.querySelector("tr.file-entry");
+  row.focus();
+  row.dispatchEvent(new KeyboardEvent("keydown",{bubbles:true,cancelable:true,key:${JSON.stringify(code)},...(${JSON.stringify(options)})}));
+  return true;
+ })()`);
+ await evaluate('document.querySelectorAll("tr.file-entry input[type=checkbox]")[0].click()');
+ await until('[...document.querySelectorAll("tr.file-entry")].filter(row=>row.getAttribute("aria-selected")==="true").length===1');
+ await evaluate('document.querySelectorAll("tr.file-entry input[type=checkbox]")[3].dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,shiftKey:true}))');
+ await until('[...document.querySelectorAll("tr.file-entry")].filter(row=>row.getAttribute("aria-selected")==="true").length===4');
+ let state=await selection();
+ assert.deepEqual(state.selected,[0,1,2,3],"Shift+checkbox must select the anchor range");
+ assert(state.headerMixed&&!state.headerChecked,"header checkbox must become indeterminate");
+ await evaluate('document.querySelectorAll("tr.file-entry")[0].focus()');
+ await key("a",{ctrlKey:true});
+ await until('document.querySelector("thead .col-select input[type=checkbox]")?.checked');
+ state=await selection();
+ assert.equal(state.count,state.total,"Ctrl+A selects exactly the visible loaded file rows");
+ await key("Escape");
+ await until('[...document.querySelectorAll("tr.file-entry")].every(row=>row.getAttribute("aria-selected")!=="true")');
+ await evaluate('document.querySelectorAll("tr.file-entry")[0].focus()');
+ await key("ArrowDown");
+ await until('document.activeElement===document.querySelectorAll("tr.file-entry")[1]');
+ await key("ArrowDown",{shiftKey:true});
+ await until('document.activeElement===document.querySelectorAll("tr.file-entry")[2]');
+ state=await selection();
+ assert.deepEqual(state.selected,[1,2],"Shift+ArrowDown must extend from the focused row");
+ await key("End");
+ await until('document.activeElement===document.querySelectorAll("tr.file-entry")[document.querySelectorAll("tr.file-entry").length-1]');
+ await key("Home");
+ await until('document.activeElement===document.querySelectorAll("tr.file-entry")[0]');
+ console.log("EXPLORER_KEYBOARD_SELECTION_PASS",JSON.stringify({loaded:state.total,range:state.selected,homeEnd:true,ctrlA:true}));
+
+ // Render a 160-row, mixed CJK/ASCII long-name fixture only in an inert,
+ // offscreen DOM clone. This measures CSS and scroll behavior without writing
+ // any server data or simulating nonexistent API results.
+ const longNameLayout=await evaluate(`(()=>{
+  const sample=document.querySelector("tr.file-entry");
+  const header=document.querySelector("table.file-table thead").cloneNode(true);
+  const results=[];
+  for(const width of [360,720,1240]){
+   const host=document.createElement("div");
+   host.className="work-body";
+   Object.assign(host.style,{position:"fixed",left:"-20000px",top:"0",width:width+"px",height:"600px",pointerEvents:"none"});
+   host.setAttribute("aria-hidden","true");
+   const scroller=document.createElement("div");
+   scroller.className="table";
+   const table=document.createElement("table");
+   table.className="file-table file-table-ultra rare-data-table";
+   const body=document.createElement("tbody");
+   table.append(header.cloneNode(true),body);
+   for(let i=0;i<160;i++){
+    const row=sample.cloneNode(true);
+    row.querySelector(".file-name").textContent="超长文件名称-机械设计版本-工程审计-"+("ABC0123456789".repeat(16))+"-"+i+".docx";
+    body.append(row);
+   }
+   scroller.append(table);host.append(scroller);document.body.append(host);
+   const label=body.querySelector(".file-name"),cell=body.querySelector(".col-name");
+   const style=getComputedStyle(label);
+   results.push({width,rows:body.rows.length,nameSize:label.clientWidth,nameScroll:label.scrollWidth,
+    cellWidth:cell.clientWidth,tableWidth:table.getBoundingClientRect().width,
+    viewportScroll:document.documentElement.scrollWidth-innerWidth,
+    ellipsis:style.textOverflow,nowrap:style.whiteSpace,
+    scrollerWidth:scroller.clientWidth,scrollerScroll:scroller.scrollWidth});
+   host.remove();
+  }
+  return results;
+ })()`);
+ for(const sample of longNameLayout){
+  assert.equal(sample.rows,160);
+  assert(sample.nameSize<sample.nameScroll,"long filename should ellipsize at "+sample.width);
+  assert.equal(sample.ellipsis,"ellipsis");
+  assert.equal(sample.nowrap,"nowrap");
+  assert(sample.cellWidth<=sample.scrollerWidth,"filename cell overflow at "+sample.width);
+  assert(sample.viewportScroll<=2,"long-name clone caused page overflow");
+ }
+ console.log("EXPLORER_LONG_NAMES_160_PASS",JSON.stringify(longNameLayout));
  console.log("RARE_FOLDER_BROWSER_PASS: layered folders, low-noise toolbar, 4 views, 1440/980/700/390px");
 }catch(error){
  console.error("RARE_FOLDER_BROWSER_FAIL",error?.stack??error);
