@@ -17,6 +17,7 @@ const chrome=spawn("/usr/bin/google-chrome",[
 ],{stdio:"ignore"});
 let ws,id=0;
 const pending=new Map();
+const browserFailures=[];
 function send(method,params={}){
  const key=++id;
  return new Promise((resolve,reject)=>{pending.set(key,{resolve,reject});ws.send(JSON.stringify({id:key,method,params}));});
@@ -51,9 +52,15 @@ try{
  await new Promise((resolve,reject)=>{ws.addEventListener("open",resolve,{once:true});ws.addEventListener("error",reject,{once:true});});
  ws.addEventListener("message",event=>{
   const m=JSON.parse(event.data),task=pending.get(m.id);
+  if(m.method==="Runtime.exceptionThrown")
+   browserFailures.push({kind:"exception",message:m.params?.exceptionDetails?.exception?.description||m.params?.exceptionDetails?.text});
+  if(m.method==="Network.loadingFailed")
+   browserFailures.push({kind:"resource",message:m.params?.errorText,url:m.params?.requestId});
+  if(m.method==="Network.responseReceived"&&m.params?.response?.status>=400)
+   browserFailures.push({kind:"http",status:m.params.response.status,url:m.params.response.url});
   if(task){pending.delete(m.id);m.error?task.reject(Error(m.error.message)):task.resolve(m.result);}
  });
- await send("Page.enable");await send("Runtime.enable");
+ await send("Page.enable");await send("Runtime.enable");await send("Network.enable");
  await send("Page.navigate",{url:base+"/login"});
  await waitFor("location.pathname==='/login' && !!document.querySelector('body')");
  await evaluate(`(()=>{const dt=new DataTransfer();dt.items.add(new File(["x"],"login.txt"));document.body.dispatchEvent(new DragEvent("dragenter",{bubbles:true,dataTransfer:dt}));return true;})()`);
@@ -155,6 +162,7 @@ try{
  console.log("GLOBAL_UPLOAD_BROWSER_PASS");
 }catch(error){
  console.error("GLOBAL_UPLOAD_BROWSER_FAIL",error.message);
+ if(browserFailures.length)console.error("GLOBAL_UPLOAD_BROWSER_ERRORS",JSON.stringify(browserFailures.slice(-12)));
  process.exitCode=1;
 }finally{
  ws?.close();
