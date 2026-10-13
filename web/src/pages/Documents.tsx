@@ -24,6 +24,7 @@ import{FolderPicker}from "../shared/ui/FolderPicker";
 import type {FileItem} from "../entities/file/model";
 import type {ExplorerViewMode} from "../features/documents/explorerView";
 import {EXPLORER_VIEWS,readExplorerViewMode,saveExplorerViewMode} from "../features/documents/explorerView";
+import {ExplorerViewGlyph} from "../shared/ui/ExplorerView";
 import "../features/documents/explorerChrome.css";
 
 // The sidebar width is a user preference, not layout state (SPEC §3.1: 240px
@@ -272,7 +273,7 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
     onKeyDown={onResizeKey}/>
    </aside>
    <main className="work">
-   {section!=="files"&&<CollaborationPanel embedded activeTab={section}
+    {section!=="files"&&<CollaborationPanel embedded activeTab={section} viewMode={viewMode} onViewModeChange={switchView}
     onSelectTab={tab=>navigate("/doc?view="+tab)}
     onChanged={()=>setCollaborationRevision(value=>value+1)}/>}
    {section==="files"&&<>
@@ -340,14 +341,6 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
      </div>}/>
    </Dialog>}
   </AppShell>;
-}
-
-function ExplorerViewGlyph({mode}:{mode:ExplorerViewMode}){
- const common={width:16,height:16,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:1.8,strokeLinecap:"round" as const,strokeLinejoin:"round" as const,"aria-hidden":true as const};
- if(mode==="icons")return <svg {...common}><rect x="3" y="3" width="7" height="7" rx="1.3"/><rect x="14" y="3" width="7" height="7" rx="1.3"/><rect x="3" y="14" width="7" height="7" rx="1.3"/><rect x="14" y="14" width="7" height="7" rx="1.3"/></svg>;
- if(mode==="list")return <svg {...common}><path d="M9 5h12M9 12h12M9 19h12"/><path d="M3 5h2M3 12h2M3 19h2"/></svg>;
- if(mode==="columns")return <svg {...common}><rect x="2.5" y="3.5" width="19" height="17" rx="2"/><path d="M9 3.5v17M15.5 3.5v17"/></svg>;
- return <svg {...common}><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 16.5h18M8 20.5v-4M11 7h6M11 10h5"/></svg>;
 }
 
 // FileEditorBridge loads the file row for the editor dialog; the page owns the

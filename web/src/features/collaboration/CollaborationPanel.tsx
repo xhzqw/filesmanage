@@ -1,9 +1,10 @@
-import {RareBadge,RareButton,RareDataTable,RareInput,RareRowActions} from "../../shared/ui/rare";
+import {RareButton,RareInput} from "../../shared/ui/rare";
 import {toast} from "../../shared/ui/feedback";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useEffect,useMemo,useRef,useState} from "react";
-import {Link} from "react-router-dom";
+import {CollaborationBrowser} from "./CollaborationBrowser";
+import {readExplorerViewMode,saveExplorerViewMode,type ExplorerViewMode} from "../../shared/ui/ExplorerView";
 import {collaborationApi,type Favorite,type Share} from "./api";
 import {ShareDialog,type ShareResource} from "./ShareDialog";
 import {errorCode,errorCopy} from "../../shared/errors";
@@ -27,12 +28,19 @@ type PickRow={folder:Folder;depth:number;path:string};
 // write is submitted to the server, which stays the authority on recipients,
 // actions and expiry.
 type CollaborationTab="received"|"sent"|"favorites";
-export function CollaborationPanel({embedded=false,activeTab,onSelectTab,onChanged}:{
+export function CollaborationPanel({embedded=false,activeTab,onSelectTab,onChanged,viewMode,onViewModeChange}:{
  embedded?:boolean;activeTab?:CollaborationTab;onSelectTab?:(tab:CollaborationTab)=>void;onChanged?:()=>void;
+ viewMode?:ExplorerViewMode;onViewModeChange?:(mode:ExplorerViewMode)=>void;
 }){
  const[localTab,setLocalTab]=useState<CollaborationTab>("favorites");
  const tab=activeTab??localTab;
  const setTab=(next:CollaborationTab)=>{if(onSelectTab)onSelectTab(next);else setLocalTab(next);};
+ const[localViewMode,setLocalViewMode]=useState<ExplorerViewMode>(readExplorerViewMode);
+ const displayMode=viewMode??localViewMode;
+ const setDisplayMode=(mode:ExplorerViewMode)=>{
+  if(onViewModeChange)onViewModeChange(mode);
+  else{setLocalViewMode(mode);saveExplorerViewMode(mode);}
+ };
  const[pickerOpen,setPickerOpen]=useState(!embedded);
  const[shares,setShares]=useState<Share[]>([]);
  const[favorites,setFavorites]=useState<Favorite[]>([]);
@@ -370,7 +378,6 @@ export function CollaborationPanel({embedded=false,activeTab,onSelectTab,onChang
    <RareButton type="button" role="tab" aria-selected={tab==="received"} className={tab==="received"?"on":""} onClick={()=>setTab("received")}>与我共享</RareButton>
    <RareButton type="button" role="tab" aria-selected={tab==="sent"} className={tab==="sent"?"on":""} onClick={()=>setTab("sent")}>我共享的</RareButton>
    </div>
-   <RareButton type="button" className="primary collab-create-action" onClick={openCreate}>创建分享</RareButton>
   </div>}
   <div className={"collab-workspace"+(tab==="favorites"&&pickerOpen?" with-picker":"")}>
   {tab==="favorites"&&pickerOpen&&<section className={"share-workbench"+(pickKind==="file"?" is-file-mode":"")} aria-label="选择关注或分享资源">
@@ -450,63 +457,11 @@ export function CollaborationPanel({embedded=false,activeTab,onSelectTab,onChang
     </div>
    </>}
   </section>}
-  <div className="table collab-results">
-  <div className="collab-results-head">
-    <strong>{tab==="favorites"?"我的关注":tab==="received"?"与我共享":"我共享的"}</strong>
-    <span className="collab-results-count">{status==="ready"?"已加载 "+(tab==="favorites"?favorites.length:shares.length)+" 项"+(nextCursor?" · 还有更多":""):""}</span>
-    {embedded&&<RareButton type="button" className="primary collab-create-action"
-     aria-expanded={tab==="favorites"&&pickerOpen} onClick={toggleCreate}>
-     {tab==="favorites"?(pickerOpen?"收起":"添加关注 / 分享"):"创建分享"}
-    </RareButton>}
-    <RareButton type="button" className="secondary-action" onClick={refresh}>刷新</RareButton>
-   </div>
-   <div className="collab-table-scroll">
-   {tab==="favorites"?<RareDataTable className="collab-favorites-table">
-    <thead><tr><th scope="col">资源</th><th className="collab-optional" scope="col">类型</th><th scope="col">状态</th><th className="collab-optional" scope="col">关注时间</th><th scope="col">操作</th></tr></thead>
-    <tbody>
-     {status==="loading"&&<tr><td colSpan={5} className="empty"><BrandLoadingLabel>正在加载…</BrandLoadingLabel></td></tr>}
-     {status==="failed"&&<tr><td colSpan={5} className="empty" role="alert">获取关注列表失败，请刷新重试。</td></tr>}
-     {status==="ready"&&favorites.length===0&&<tr><td colSpan={5} className="empty">没有关注内容。</td></tr>}
-     {status==="ready"&&favorites.map(f=><tr key={f.id}>
-      <td>{f.unavailable?<span className="collab-unavailable-name" title="当前资源不能访问">{f.resourceName||"不可访问的资源"}</span>:f.kind==="file"?<Link to={"/preview/"+f.fileId}><FileResourceIcon name={f.resourceName} size={17}/> {f.resourceName}</Link>:<Link to={"/doc?folder="+f.folderId}><FolderResourceIcon size={17}/> {f.resourceName}</Link>}<span className="collab-mobile-meta">{f.kind==="file"?"文件":"目录"} · {f.createdAt.slice(0,10)}</span></td>
-      <td className="collab-optional">{f.kind==="file"?"文件":"目录"}</td>
-      <td>{f.unavailable
-       ?<RareBadge tone="danger" dot title="资源已删除、失效或当前账号无权访问">已删除或不可访问</RareBadge>
-       :<RareBadge tone="success" dot>正常</RareBadge>}</td>
-      <td className="collab-optional rare-data-date">{f.createdAt.replace("T"," ").slice(0,16)}</td>
-      <td className="collab-action-cell"><RareRowActions>
-       <RareButton type="button" disabled={f.unavailable}
-        title={f.unavailable?"资源已删除或不可访问，无法分享":undefined}
-        onClick={()=>shareFavorite(f)}>分享</RareButton>
-       <RareButton type="button" onClick={()=>unfavorite(f.kind==="file"?f.fileId??"":f.folderId??"",f.kind)}>取消关注</RareButton>
-      </RareRowActions></td>
-     </tr>)}
-    </tbody>
-   </RareDataTable>:<RareDataTable className="collab-shares-table">
-    <thead><tr><th scope="col">资源</th><th className="collab-optional" scope="col">类型</th><th className="collab-optional" scope="col">接收方/来源</th><th className="collab-optional" scope="col">权限</th><th className="collab-optional" scope="col">继承子目录</th><th className="collab-optional" scope="col">截止</th><th scope="col">状态</th><th scope="col">操作</th></tr></thead>
-    <tbody>
-     {status==="loading"&&<tr><td colSpan={8} className="empty"><BrandLoadingLabel>正在加载…</BrandLoadingLabel></td></tr>}
-     {status==="failed"&&<tr><td colSpan={8} className="empty" role="alert">获取分享列表失败，请刷新重试。</td></tr>}
-     {status==="ready"&&shares.length===0&&<tr><td colSpan={8} className="empty">没有{tab==="received"?"收到的":"发出的"}分享。</td></tr>}
-     {status==="ready"&&shares.map(s=><tr key={s.id}>
-      <td>{s.resourceKind==="file"?<Link to={"/preview/"+s.resourceId}><FileResourceIcon name={s.resourceName} size={17}/> {s.resourceName}</Link>:<Link to={"/doc?folder="+s.resourceId}><FolderResourceIcon size={17}/> {s.resourceName}</Link>}<span className="collab-mobile-meta">{s.resourceKind==="file"?"文件":"目录"} · {s.recipientName||"—"} · {s.actions.join("、")}</span></td>
-      <td className="collab-optional">{s.resourceKind==="file"?"文件":"目录"}</td>
-      <td className="collab-optional">{tab==="received"?s.recipientName:(s.recipientName||"—")}</td>
-      <td className="collab-optional">{s.actions.join("、")}</td>
-      <td className="collab-optional">{s.includeDescendants?"是":"否"}</td>
-      <td className="collab-optional">{s.expiresAt?s.expiresAt.slice(0,10):"长期"}</td>
-      <td><RareBadge tone={s.revoked?"danger":s.expiresAt&&Date.parse(s.expiresAt)<=Date.now()?"warning":"success"} dot>{s.revoked?"已撤销":s.expiresAt&&Date.parse(s.expiresAt)<=Date.now()?"已过期":"有效"}</RareBadge></td>
-      <td className="collab-action-cell"><RareRowActions>{tab==="sent"&&!s.revoked&&<RareButton type="button" className="danger" onClick={()=>askRevoke(s)}>撤销</RareButton>}</RareRowActions></td>
-     </tr>)}
-    </tbody>
-   </RareDataTable>}
-   </div>
-   {(nextCursor||moreStatus==="failed")&&<div className="collab-pagination">
-    <span>已加载 {tab==="favorites"?favorites.length:shares.length} 项</span>
-    <RareButton type="button" className="secondary-action" disabled={moreStatus==="loading"} onClick={()=>void loadMore()}>{moreStatus==="loading"?"加载中…":moreStatus==="failed"?"重试加载":"加载更多"}</RareButton>
-    {moreStatus==="failed"&&<span role="alert">读取后续记录失败，已加载内容不受影响。</span>}
-   </div>}
-  </div>
+  <CollaborationBrowser tab={tab} favorites={favorites} shares={shares} status={status}
+   nextCursor={nextCursor} moreStatus={moreStatus} viewMode={displayMode}
+   onViewModeChange={setDisplayMode} pickerOpen={pickerOpen} onCreate={toggleCreate}
+   onRefresh={refresh} onLoadMore={()=>void loadMore()} onShareFavorite={shareFavorite}
+   onUnfavorite={(id,kind)=>void unfavorite(id,kind)} onRevoke={askRevoke}/>
   </div>
   {shareTarget&&<ShareDialog resource={shareTarget} onClose={()=>setShareTarget(null)} onCreated={createdShare}/>}
   {revokeTarget&&<Dialog open title="撤销分享确认" onClose={()=>setRevokeTarget(null)} closeGuard={()=>!revokeBusy} className="dialog">

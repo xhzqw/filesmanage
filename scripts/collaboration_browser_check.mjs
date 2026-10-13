@@ -92,6 +92,16 @@ try{
   check(layout.beside&&layout.mainVisible&&layout.rightInside,vp.name+" responsive workbench",JSON.stringify(layout));
   check(layout.overflow<=1,vp.name+" no document horizontal overflow",JSON.stringify(layout));
   check(layout.tones&&layout.allBadUnlinked,vp.name+" status badges and invalid links",JSON.stringify(layout));
+  check(await cdp.evaluate("(()=>!!document.querySelector('.collab-filter-controls input[type=search]')&&!!document.querySelector('[aria-label=\"资源显示方式\"]')&&!!document.querySelector('.collab-resource-table'))()"),
+   vp.name+" unified Finder commands and resource rows");
+  await cdp.evaluate("(()=>{document.querySelector('[aria-label=\"资源显示方式\"] button[aria-label=\"图标视图\"]')?.click();return true;})()");
+  check(await cdp.waitFor("()=>!!document.querySelector('.collab-visual .explorer-icon-grid')"),vp.name+" icon scope render");
+  await cdp.evaluate("(()=>{document.querySelector('[aria-label=\"资源显示方式\"] button[aria-label=\"分栏视图\"]')?.click();return true;})()");
+  check(await cdp.waitFor("()=>!!document.querySelector('.collab-visual .explorer-columns .collab-resource-detail')"),vp.name+" columns scope detail");
+  await cdp.evaluate("(()=>{document.querySelector('[aria-label=\"资源显示方式\"] button[aria-label=\"画廊视图\"]')?.click();return true;})()");
+  check(await cdp.waitFor("()=>!!document.querySelector('.collab-visual .explorer-gallery')"),vp.name+" gallery scope render");
+  await cdp.evaluate("(()=>{document.querySelector('[aria-label=\"资源显示方式\"] button[aria-label=\"列表视图\"]')?.click();return true;})()");
+  check(await cdp.waitFor("()=>!!document.querySelector('.collab-resource-table')"),vp.name+" list scope restored");
   const shot=await cdp.send("Page.captureScreenshot",{format:"png",captureBeyondViewport:false});
   writeFileSync(SHOTS+"/"+vp.name+".png",Buffer.from(shot.data,"base64"));
   await cdp.evaluate(`(()=>{document.querySelector('.collab-create-action')?.click();return true;})()`);
@@ -103,6 +113,8 @@ try{
  await cdp.evaluate(`(()=>{document.querySelector('.finder-nav-item[href="/doc?view=sent"]')?.click();return true;})()`);
  check(await cdp.waitFor("()=>document.querySelector('.collab-results-head strong')?.textContent==='我共享的' && document.querySelector('.collab-results-count')?.textContent?.includes('已加载')"),"sent shares page reads");
  check(await cdp.evaluate("(()=>location.pathname==='/doc' && new URLSearchParams(location.search).get('view')==='sent')()"),"shared view stays in documents");
+ await cdp.evaluate("(()=>{document.querySelector('.finder-nav-item[href=\"/doc?view=received\"]')?.click();return true;})()");
+ check(await cdp.waitFor("()=>document.querySelector('.collab-results-head strong')?.textContent==='与我共享' && !!document.querySelector('.collab-filter-controls')"),"received shares reuse Finder browser");
  console.log("COLLABORATION_BROWSER_CHECK_PASS");
 }finally{
  cdp?.close();chrome.kill();
