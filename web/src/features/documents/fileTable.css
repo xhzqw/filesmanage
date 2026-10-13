@@ -17,25 +17,103 @@
 .file-page-error{color:var(--status-danger);min-width:0;overflow-wrap:anywhere}
 .file-table{table-layout:fixed;width:100%}
 .file-table th{padding:0 8px;height:var(--height-table-header)}
-.file-table tbody tr{height:var(--height-row-ultra, 26px)}
+.file-table tbody tr{height:44px}
 .file-table tbody td:not(.empty){
   display:table-cell;
-  height:var(--height-row-ultra, 26px);
+  height:44px;
   vertical-align:middle;
   padding:0 8px;
   box-sizing:border-box;
 }
 .col-select{text-align:center}
-/* Quiet explorer selection: the checked control carries the strong signal.
-   A row is not a giant focus rectangle just because it was clicked. */
-.table table.file-table tbody tr.selected,
-.table table.file-table tbody tr.selected:hover,
-.table table.file-table tbody tr.selected.focused{
- background:color-mix(in srgb,var(--surface-row-selected) 58%,var(--surface-panel));
- box-shadow:none;
+/* Finder-style continuous zebra list. The displayed DOM order includes
+   folders AND files; nth-child keeps stripes continuous after filtering. */
+.work-body>.explorer-striped-list{
+  --explorer-list-canvas:#F8FAFD;
+  --explorer-list-stripe:#E9EEF6;
+  --explorer-list-hover:#DFE9F7;
+  --explorer-list-selection:#245CB5;
+  background:var(--explorer-list-canvas);
+  border:0;
 }
-.table table.file-table tbody tr.selected:hover{
- background:color-mix(in srgb,var(--surface-row-selected) 76%,var(--surface-panel));
+.explorer-striped-list table.file-table{
+  border-collapse:separate;
+  border-spacing:0;
+  background:transparent;
+}
+.explorer-striped-list table.file-table thead th{
+  background:var(--explorer-list-canvas);
+  border-bottom:1px solid var(--border-hairline);
+}
+.explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder){
+  --explorer-row-surface:var(--explorer-list-canvas);
+  height:44px;
+  background:transparent;
+  box-shadow:none;
+  transition:none;
+}
+.explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder):nth-child(even){
+  --explorer-row-surface:var(--explorer-list-stripe);
+}
+.explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder):hover:not(.selected){
+  --explorer-row-surface:var(--explorer-list-hover);
+  background:transparent;
+}
+.explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder).selected,
+.explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder).selected:hover{
+  --explorer-row-surface:var(--explorer-list-selection);
+  background:transparent;
+  box-shadow:none;
+}
+/* Fill adjacent cells with one surface. Only the two outside cells are
+   rounded, so the row is a single band and never six separate pills. */
+.explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder) > td{
+  box-sizing:border-box;
+  height:44px;
+  padding-top:0;
+  padding-bottom:0;
+  border:0;
+  background:var(--explorer-row-surface);
+  transition:background-color .16s ease;
+}
+.explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder) > td:first-child{
+  border-radius:12px 0 0 12px;
+}
+.explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder) > td:last-child{
+  border-radius:0 12px 12px 0;
+}
+.explorer-striped-list table.file-table tbody tr.selected > td,
+.explorer-striped-list table.file-table tbody tr.selected .file-name{
+  color:#FFFFFF;
+}
+.explorer-striped-list table.file-table tbody tr.selected .file-name{font-weight:600}
+.explorer-striped-list table.file-table tbody tr.selected :is(.file-mobile-meta,.folder-inline-open){color:#E2ECFF}
+.explorer-striped-list table.file-table tbody tr.selected .version-badge{
+  color:#FFFFFF;background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.24);
+}
+.explorer-striped-list table.file-table tbody tr.selected .col-select input[type="checkbox"]{
+  background:#FFFFFF;border-color:#FFFFFF;
+}
+.explorer-striped-list table.file-table tbody tr.selected .col-select input[type="checkbox"]::after{
+  border-color:var(--explorer-list-selection);
+}
+.explorer-striped-list table.file-table tbody tr.selected .row-actions :is(button,a),
+.explorer-striped-list table.file-table tbody tr.selected .folder-inline-open{color:#FFFFFF !important}
+.explorer-striped-list table.file-table tbody tr.selected .row-actions :is(button,a):hover,
+.explorer-striped-list table.file-table tbody tr.selected .folder-inline-open:hover{
+  color:#FFFFFF !important;background:rgba(255,255,255,.16) !important;
+}
+.explorer-striped-list table.file-table tbody tr.selected .row-actions .action-star-btn.favorited{
+  color:#FCE08B !important;
+}
+.explorer-striped-list table.file-table tbody tr.selected .file-type-icon{
+  filter:drop-shadow(0 1px 1px rgba(9,31,79,.34));
+}
+.explorer-striped-list table.file-table tbody tr:focus-visible{
+  outline:2px solid var(--border-focus);outline-offset:-2px;border-radius:12px;
+}
+@media(prefers-reduced-motion:reduce){
+  .explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder) > td{transition:none}
 }
 .table table.file-table tbody tr.focused:not(:focus-visible){box-shadow:none}
 /* Visible focus is reserved for keyboard traversal; mouse selection has no
@@ -248,8 +326,8 @@
   .file-table :is(th,td).col-date,.file-table :is(th,td).col-size,.file-table :is(th,td).col-version{display:none}
   .file-table th.col-select{width:34px}
   .file-table th.col-actions{width:62px}
-  .file-table tbody tr{height:42px}
-  .file-table tbody td:not(.empty){height:42px}
+  .file-table tbody tr{height:44px}
+  .file-table tbody td:not(.empty){height:44px}
   .file-table .file-cell-wrap{
     display:grid;grid-template-columns:16px minmax(0,1fr) 24px;
     grid-template-rows:18px 14px;column-gap:5px;align-content:center;
@@ -371,12 +449,12 @@ table.file-table tbody tr .row-actions:focus-within .actions-hover-group{
   font-variant-numeric:tabular-nums;
 }
 
-/* 兼容超紧凑和密度开关 */
-table.file-table-ultra tbody tr{height:26px}
-table.file-table-ultra tbody td:not(.empty){height:26px;padding:0 8px}
+/* Legacy ultra class retains one height contract for folders and files. */
+table.file-table-ultra tbody tr{height:44px}
+table.file-table-ultra tbody td:not(.empty){height:44px;padding:0 8px}
 @container file-list (max-width:560px){
- table.file-table-ultra tbody tr{height:42px}
- table.file-table-ultra tbody td:not(.empty){height:42px;padding:0 5px}
+ table.file-table-ultra tbody tr{height:44px}
+ table.file-table-ultra tbody td:not(.empty){height:44px;padding:0 5px}
  /* Override the explicit table-cell display contract in the base grid. */
  table.file-table-ultra tbody td.col-size,
  table.file-table-ultra tbody td.col-version,
@@ -399,3 +477,8 @@ table.file-table-folders-only th.col-name{width:100%;padding-left:14px}
 table.file-table-folders-only tbody td.col-name{padding-left:14px}
 .file-finder-marks{display:inline-flex;align-items:center;gap:4px;flex:none;max-width:90px}
 .file-finder-mark{display:inline-block;width:9px;height:9px;flex:none;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.05)}
+/* Folder-only directories hide the other columns: the visible name cell
+   becomes both outside edges of the zebra stripe. */
+.explorer-striped-list table.file-table-folders-only tbody tr.explorer-list-folder > td.col-name{
+  border-radius:12px;
+}

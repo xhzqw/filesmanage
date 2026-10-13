@@ -315,24 +315,36 @@ try{
    Object.assign(host.style,{position:"fixed",left:"-20000px",top:"0",width:width+"px",height:"600px",pointerEvents:"none"});
    host.setAttribute("aria-hidden","true");
    const scroller=document.createElement("div");
-   scroller.className="table";
+   scroller.className="table explorer-striped-list";
    const table=document.createElement("table");
    table.className="file-table file-table-ultra rare-data-table";
    const body=document.createElement("tbody");
    table.append(header.cloneNode(true),body);
    for(let i=0;i<160;i++){
     const row=sample.cloneNode(true);
+    // Include a folder in the same DOM order as regular files; the zebra
+    // pattern must not restart at the folder/file boundary.
+    if(i===0){row.className="explorer-list-folder";row.removeAttribute("data-file-entry");}
+    if(i===3){row.classList.add("selected");row.setAttribute("aria-selected","true");}
     row.querySelector(".file-name").textContent="超长文件名称-机械设计版本-工程审计-"+("ABC0123456789".repeat(16))+"-"+i+".docx";
     body.append(row);
    }
    scroller.append(table);host.append(scroller);document.body.append(host);
    const label=body.querySelector(".file-name"),cell=body.querySelector(".col-name");
    const style=getComputedStyle(label);
+   const rows=[...body.rows],firstCell=row=>row.cells[0],nameCell=row=>row.querySelector(".file-name");
+   const surface=row=>getComputedStyle(firstCell(row)).backgroundColor;
    results.push({width,rows:body.rows.length,nameSize:label.clientWidth,nameScroll:label.scrollWidth,
     cellWidth:cell.clientWidth,tableWidth:table.getBoundingClientRect().width,
     viewportScroll:document.documentElement.scrollWidth-innerWidth,
     ellipsis:style.textOverflow,nowrap:style.whiteSpace,
-    scrollerWidth:scroller.clientWidth,scrollerScroll:scroller.scrollWidth});
+    scrollerWidth:scroller.clientWidth,scrollerScroll:scroller.scrollWidth,
+    rowHeights:rows.slice(0,4).map(row=>row.getBoundingClientRect().height),
+    rowSurfaces:rows.slice(0,4).map(surface),
+    selectedNameColor:getComputedStyle(nameCell(rows[3])).color,
+    cellBorder:getComputedStyle(firstCell(rows[1])).borderBottomWidth,
+    firstRadius:getComputedStyle(firstCell(rows[1])).borderTopLeftRadius,
+    lastRadius:getComputedStyle(rows[1].cells[rows[1].cells.length-1]).borderTopRightRadius});
    host.remove();
   }
   return results;
@@ -344,6 +356,14 @@ try{
   assert.equal(sample.nowrap,"nowrap");
   assert(sample.cellWidth<=sample.scrollerWidth,"filename cell overflow at "+sample.width);
   assert(sample.viewportScroll<=2,"long-name clone caused page overflow");
+  assert(sample.rowHeights.every(height=>Math.abs(height-44)<=.5),"folder/file row heights must all be 44px at "+sample.width);
+  assert.equal(sample.rowSurfaces[0],sample.rowSurfaces[2],"base stripes match at "+sample.width);
+  assert.notEqual(sample.rowSurfaces[0],sample.rowSurfaces[1],"adjacent row stripes differ at "+sample.width);
+  assert.equal(sample.rowSurfaces[3],"rgb(36, 92, 181)","selected row uses deep blue at "+sample.width);
+  assert.equal(sample.selectedNameColor,"rgb(255, 255, 255)","selected filename is white at "+sample.width);
+  assert.equal(sample.cellBorder,"0px","no file-row separator line at "+sample.width);
+  assert.equal(sample.firstRadius,"12px","row start rounded at "+sample.width);
+  assert.equal(sample.lastRadius,"12px","row end rounded at "+sample.width);
  }
  console.log("EXPLORER_LONG_NAMES_160_PASS",JSON.stringify(longNameLayout));
  // Verify paging and large selection in the actual React component without

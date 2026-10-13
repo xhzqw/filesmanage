@@ -43,9 +43,6 @@ const SORT_KEYS:SortKey[]=["updated_desc","name_asc","name_desc","size_desc"];
 export {classifyFile} from "../../shared/fileTypes";
 export type {FileCategory} from "../../shared/fileTypes";
 
-// Locked ultra-compact density (26px rows): permanent high-density layout
-type Density="compact";
-
 // Internal file→folder move gesture (DESKTOP-INTERACTION-v1 §7.2, DI-17). The
 // folder tree is a sibling feature and neither feature may import the other
 // (scripts/check_architecture.py), so the two halves of one gesture speak over
@@ -969,7 +966,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     {zipProgress.phase==="failed"||zipProgress.phase==="handoff"?"关闭":"取消"}
    </RareButton>
   </div>}
-  {viewMode==="list"&&<div className="table" onClick={event=>{if(!(event.target as HTMLElement).closest("tr")){setSelectedIds(new Set<string>());setAnchorId(null);}}}>
+  {viewMode==="list"&&<div className="table explorer-striped-list" onClick={event=>{if(!(event.target as HTMLElement).closest("tr")){setSelectedIds(new Set<string>());setAnchorId(null);}}}>
    <RareDataTable role="grid" aria-label={folderName+" 文件列表"} density="compact"
     className={"file-table file-table-ultra"+(status==="ready"&&visibleFolders.length>0&&visibleItems.length===0?" file-table-folders-only":"")}>
     <thead><tr>
