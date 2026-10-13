@@ -32,6 +32,7 @@ import {FolderResourceIcon} from "../../shared/ui/ResourceIcons";
 import {FinderPathColumn} from "./FinderPathColumn";
 import"./fileTable.css";
 import type {ExplorerViewMode} from "./explorerView";
+import {compactExplorerName} from "./explorerDisplayName";
 
 type SortKey="updated_desc"|"name_asc"|"name_desc"|"size_desc";
 
@@ -139,10 +140,6 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
  labelId?:string;taggedItems?:FileItem[];onTagRefresh?:()=>Promise<void>;
 }){
  const[items,setItems]=useState<FileItem[]>([]);
-// Round-trip of the list read the status bar reports (spec §3.1). It is an
-// observation of the request that already runs below — never an extra one —
-// so a failed read shows "—" instead of a stale number.
-const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const[status,setStatus]=useState("loading");
  const[sort,setSort]=useState<SortKey>("updated_desc");
  const[categoryFilter,setCategoryFilter]=useState<FileCategory>("all");
@@ -304,14 +301,13 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    if(folderChanged)setItems([]);
   }
   if(viewChanged){setCursor("");setHasMore(false);}
-  const started=performance.now();
   // Preserve all loaded pages across remote updates; re-query the visible
   // ordered window instead of merging stale cursor pages with a fresh page.
   const visibleCount=hasPreviousRows?items.length:50;
   if(labelId){
    setItems(taggedItems??[]);
    setSelectedIds(prev=>new Set([...prev].filter(id=>(taggedItems??[]).some(file=>file.id===id))));
-   setHasMore(false);setCursor("");setStatus("ready");setLatencyMs(null);
+   setHasMore(false);setCursor("");setStatus("ready");
    return()=>{valid=false;controller.abort();};
   }
   revalidateFileWindow((next,limit,signal)=>fileApi.list(folder,sort,next,limit,signal),visibleCount,controller.signal)
@@ -334,14 +330,13 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     setHasMore(page.nextCursor!=="");
     setCursor(page.nextCursor);
     setStatus("ready");
-    setLatencyMs(Math.max(0,Math.round(performance.now()-started)));
    })
    .catch(error=>{if(valid&&revision===listRevision.current&&listKeyRef.current===listKey){
     if(["E_FORBIDDEN","E_NOT_FOUND","E_AUTH"].includes(errorCode(error))){
      setItems([]);setSelectedIds(new Set());setCursor("");setHasMore(false);setStatus("failed");return;
     }
     // Keep last successfully rendered rows on a transient refresh failure.
-    setStatus(hasPreviousRows?"ready":"failed");setLatencyMs(null);
+    setStatus(hasPreviousRows?"ready":"failed");
    }});
   return()=>{valid=false;controller.abort();};
  },[folder,sort,reloadKey,labelId,taggedItems]);
@@ -1392,7 +1387,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     {image&&<img src={fileApi.mediaUrl(item.id,item.sha256)} alt="" loading="lazy" decoding="async"
      onError={event=>{event.currentTarget.hidden=true;}}/>}
    </div>
-   <span className="explorer-item-name" title={item.name}>{item.name}</span>
+   <span className="explorer-item-name" title={item.name}>{compactExplorerName(item.name)}</span>
    <span className="explorer-item-meta"><span className="explorer-item-sub">{formatSize(item.sizeBytes)} · v{item.currentVersionSeq}</span>{finderDots(item)}</span>
    {showCheckboxes&&<RareInput className="explorer-item-check" type="checkbox" checked={selectedIds.has(item.id)}
     aria-label={"选择 "+item.name} onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}} onChange={event=>onCheckToggle(event,item)}/>}
@@ -1421,6 +1416,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  function renderFolderEntry(entry:Folder){
   const selected=selectedFolderIds.has(entry.id);
   const hovered=hoveredFolderId===entry.id;
+  const folderTags=finderFolderDots(entry);
  return <div key={"folder-"+entry.id} data-folder-id={entry.id} data-upload-folder-id={entry.id} role="row"
    tabIndex={0} aria-selected={selected}
    className={"explorer-item explorer-folder"+(selected?" selected":"")+(dropHoveredFolderId===entry.id?" drop-target":"")}
@@ -1439,8 +1435,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    onDoubleClick={()=>navigate("/doc?folder="+encodeURIComponent(entry.id))}
    onKeyDown={event=>onFolderKeyDown(event,entry)}>
    <div className="explorer-item-art" aria-hidden="true"><FolderResourceIcon open={selected} hovered={hovered} size={viewMode==="columns"?24:52}/></div>
-   <span className="explorer-item-name" title={entry.name}>{entry.name}</span>
-   <span className="explorer-item-meta"><span className="explorer-item-sub">文件夹</span>{finderFolderDots(entry)}</span>
+   <span className="explorer-item-name" title={entry.name}>{compactExplorerName(entry.name)}</span>
+   {folderTags&&<span className="explorer-item-meta">{folderTags}</span>}
    {showCheckboxes&&<RareInput className="explorer-item-check" type="checkbox" checked={selected}
     aria-label={"选择文件夹 "+entry.name} onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}}
     onChange={event=>{selectResource("folder",entry.id,true,checkboxShiftRef.current);checkboxShiftRef.current=false;setFocusedFolderId(entry.id);setFocusedId(null);}}/>}
@@ -1808,9 +1804,6 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   <footer className="status-bar">
    <div className="status-left">
     <span>已选 <span className="status-strong">{selectedTotal}</span> 项{selectedIds.size>0&&<> / <span className="status-strong">{formatSize(selectedBytes)}</span></>} · {hasMore?"已加载":"共"} <span className="status-strong">{items.length}</span> 个文件{childFolders.length>0&&<> · <span className="status-strong">{childFolders.length}</span> 个文件夹</>}{(categoryFilter!=="all"||nameFilter.trim())&&<> · 匹配 <span className="status-strong">{visibleItems.length+visibleFolders.length}</span> 项（已加载范围）</>}</span>
-   </div>
-   <div className="status-right">
-    <span>延迟: <span className="status-strong">{latencyMs===null?"—":latencyMs+"ms"}</span> · <span className="status-build">v2.1.0</span></span>
    </div>
   </footer>
  </div>;

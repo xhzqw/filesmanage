@@ -123,6 +123,26 @@ try{
   assert(clicked,"view mode button missing: "+label);
   await until(`document.querySelector(".work-body")?.dataset.explorerView===${JSON.stringify(mode)}`);
   if(mode==="icons"){
+   const visual=await evaluate(`(()=>{
+    const grid=document.querySelector(".explorer-icon-grid");
+    const tiles=[...grid.querySelectorAll(".explorer-item")];
+    const first=tiles[0]?.getBoundingClientRect(),second=tiles[1]?.getBoundingClientRect();
+    const folder=tiles.find(tile=>tile.classList.contains("explorer-folder"));
+    const code=tiles.map(tile=>tile.querySelector(".explorer-item-name"))
+     .find(label=>label?.title?.match(/\d{10,}$/));
+    return {
+     columns:getComputedStyle(grid).gridTemplateColumns,
+     gap:getComputedStyle(grid).columnGap,
+     leftAligned:!!first&&!!second&&first.top===second.top,
+     folderHasRedundantType:!!folder?.querySelector(".explorer-item-sub"),
+     timestampFull:code?.title??null,timestampVisual:code?.textContent??null,
+     technicalFooter:/延迟\s*[:：]|v2\.1\.0/.test(document.querySelector(".status-bar")?.textContent??""),
+    };
+   })()`);
+   assert(visual?.leftAligned&&visual?.gap==="18px"&&!visual.folderHasRedundantType&&!visual.technicalFooter,
+    "compact icon grid, folder metadata and non-technical footer: "+JSON.stringify(visual));
+   if(visual.timestampFull)assert(visual.timestampVisual.includes("…")&&visual.timestampVisual!==visual.timestampFull,
+    "long timestamp IDs must use middle ellipsis and preserve full title: "+JSON.stringify(visual));
    const wrapping=await evaluate(`(()=>{
     const name=document.querySelector(".explorer-icon-grid .explorer-item-name");
     if(!name)return null;
@@ -144,7 +164,9 @@ try{
     long.querySelector(".explorer-item-name").textContent="pe11-verify-1791469382.step";
     fixture.append(short,long);
     document.body.append(fixture);
-    const positions=card=>Object.fromEntries([".explorer-item-art",".explorer-item-name",".explorer-item-sub"].map(selector=>[selector,card.querySelector(selector).getBoundingClientRect().top]));
+    const positions=card=>Object.fromEntries([".explorer-item-art",".explorer-item-name"]
+     .filter(selector=>card.querySelector(selector))
+     .map(selector=>[selector,card.querySelector(selector).getBoundingClientRect().top]));
     const a=positions(short),b=positions(long);
     fixture.remove();
     return {short:a,long:b,deltas:Object.fromEntries(Object.keys(a).map(key=>[key,Math.abs(a[key]-b[key])]))};

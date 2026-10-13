@@ -1,5 +1,5 @@
-/* RareUI-inspired connected pills: the chrome has three independent groups,
-   without a fourth full-width bar or duplicate page title. */
+/* Finder-like restrained segmented navigation: three independent shell groups,
+   no extra header row, solid white slider on one neutral trough. */
 .shell>.header{
  display:grid;grid-template-columns:minmax(190px,1fr) auto minmax(190px,1fr);
  align-items:center;column-gap:14px;height:var(--height-header);min-height:var(--height-header);
@@ -25,10 +25,10 @@
 /* The pill appearance extends Rare UI GooeyNav; all other uses stay gooey. */
 .header nav[data-slot="gooey-nav"][data-appearance="pill"]{
  position:relative;display:flex;justify-self:center;flex:none;
- align-items:center;width:max-content;max-width:100%;height:42px;
- margin:0;padding:4px;background:var(--ui-bg-sidebar);color:var(--text-secondary);
- border:1px solid var(--ui-border-hairline);border-radius:var(--radius-pill);
- box-shadow:0 2px 9px rgba(15,39,92,.045);
+ align-items:center;width:max-content;max-width:100%;height:40px;
+ margin:0;padding:3px;background:#F1F5F9;color:var(--text-secondary);
+ border:1px solid rgba(148,163,184,.12);border-radius:var(--radius-pill);
+ box-shadow:0 1px 2px rgba(15,23,42,.025);
 }
 .header nav[data-slot="gooey-nav"][data-appearance="pill"]>ul{
  display:flex;flex-direction:row;align-items:center;gap:2px;width:max-content;
@@ -46,15 +46,15 @@
  transition:color 140ms ease;
 }
 .header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-item"].active{
- background:transparent;color:#fff;font-weight:650;
+ background:transparent;color:var(--text-primary);font-weight:650;
 }
 .header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-item"]:hover:not(.active){
- background:transparent;color:var(--brand-blue);
+ background:transparent;color:var(--text-primary);
 }
 .rare-pill-nav-label{position:relative;z-index:1;display:inline-flex;align-items:center;gap:4px}
 .rare-pill-nav-active{
  position:absolute;inset:0;z-index:0;border-radius:var(--radius-pill);
- background:var(--brand-blue);box-shadow:0 1px 3px rgba(15,39,92,.14);
+ background:#FFFFFF;box-shadow:0 1px 3px rgba(15,23,42,.12),0 0 0 1px rgba(148,163,184,.10);
  pointer-events:none;
 }
 .header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-item"]:focus-visible{
@@ -139,6 +139,9 @@
  .header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-item"]{
   display:flex;justify-content:flex-start;width:100%;height:38px;min-height:38px;
   padding:0 13px;color:var(--text-secondary);font-size:13px;
+ }
+ .header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-item"].active{
+  color:var(--text-primary);
  }
 }
 @media(max-width:600px){
