@@ -14,6 +14,7 @@ import{MotionFeedback}from "../shared/ui/MotionFeedback";
 import{toast}from "../shared/ui/feedback";
 import{useUploadStore}from "../features/documents/uploadStore";
 import{GlobalUploadDrop,type DocumentUploadTarget}from "../features/documents/GlobalUploadDrop";
+import{folderApi}from "../features/folders/api";
 import{useSession}from "./session";
 import{Login}from "../pages/Login";
 import{Documents}from "../pages/Documents";
@@ -52,7 +53,7 @@ export function App(){
  }
  const feedback=logoutError?<div className="auth-feedback" role="alert"><span>{logoutError}</span><RareButton type="button" onClick={()=>void logout()}>重试退出</RareButton></div>:null;
  if(loading)return <main className="brand-loading-screen" aria-busy="true"><BrandLoader size="lg" label="正在检查会话"/><span>正在检查会话…</span></main>;
- return <><MotionFeedback/>{feedback}<ToastViewport/>{user&&<GlobalUploadDrop key={user.id} userId={user.id} documentTarget={documentUploadTarget}/>}<ShellAccessories.Provider value={user?<NotificationCenter key={user.id}/>:null}><Routes><Route path="/login" element={user?<Navigate to="/doc" replace/>:<Login onSuccess={setUser}/>}/>
+ return <><MotionFeedback/>{feedback}<ToastViewport/>{user&&<GlobalUploadDrop key={user.id} userId={user.id} documentTarget={documentUploadTarget} fetchFolderTree={folderApi.tree}/>}<ShellAccessories.Provider value={user?<NotificationCenter key={user.id}/>:null}><Routes><Route path="/login" element={user?<Navigate to="/doc" replace/>:<Login onSuccess={setUser}/>}/>
   <Route path="/doc" element={user?<Documents user={user} onLogout={logout} onUploadFolderChange={setDocumentUploadTarget}/>:<Navigate to="/login" replace/>}/>
   <Route path="/account/sessions" element={user?<SessionDevices user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/preview/:id" element={user?<Preview user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>

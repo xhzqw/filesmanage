@@ -1,6 +1,5 @@
 import {useEffect,useRef,useState} from "react";
 import {useLocation,useNavigate} from "react-router-dom";
-import {folderApi} from "../folders/api";
 import type {Folder} from "../../entities/folder/model";
 import {useUploadStore} from "./uploadStore";
 import {toast} from "../../shared/ui/feedback";
@@ -53,7 +52,7 @@ function transferredFiles(transfer:DataTransfer):{files:File[];skippedFolders:bo
 }
 
 /** One OS-file gesture across every authenticated route; internal moves pass through. */
-export function GlobalUploadDrop({userId,documentTarget}:{userId:string;documentTarget:DocumentUploadTarget|null}){
+export function GlobalUploadDrop({userId,documentTarget,fetchFolderTree}:{userId:string;documentTarget:DocumentUploadTarget|null;fetchFolderTree:()=>Promise<Folder[]>}){
  const location=useLocation();
  const navigate=useNavigate();
  const [dragging,setDragging]=useState(false);
@@ -75,7 +74,7 @@ export function GlobalUploadDrop({userId,documentTarget}:{userId:string;document
   const requestId=++activeRequest.current;
   setFolderStatus("loading");
   setFolderError("");
-  void folderApi.tree().then(items=>{
+  void fetchFolderTree().then(items=>{
    if(requestId!==activeRequest.current)return;
    setFolders(items);
    setFolderStatus("ready");

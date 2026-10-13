@@ -1,7 +1,7 @@
 import {RareButton} from "../shared/ui/rare";
 import {BrandLoadingLabel} from "../shared/ui/BrandLoader";
 import {observeResourceChange,observeWindowReturn} from "../shared/resourceSync";
-import{useEffect,useMemo,useRef,useState,type KeyboardEvent as ReactKeyboardEvent,type PointerEvent as ReactPointerEvent}from "react";
+import{useEffect,useLayoutEffect,useMemo,useRef,useState,type KeyboardEvent as ReactKeyboardEvent,type PointerEvent as ReactPointerEvent}from "react";
 import{Link,useLocation,useNavigate}from "react-router-dom";
 import type{User}from "../entities/user/model";
 import type{Folder}from "../entities/folder/model";
@@ -155,7 +155,7 @@ export function Documents({user,onLogout,onUploadFolderChange}:{user:User;onLogo
  // Only the visible, resolved directory is a direct OS-file drop destination.
  // A favorites/shared view always asks for a target folder, even when the URL
  // retains an older ?folder= selection.
- useEffect(()=>{
+ useLayoutEffect(()=>{
   onUploadFolderChange(section==="files"&&selected?{
    routeKey:location.pathname+location.search,folderId:selected.id,folderName:selected.name,userId:user.id,
   }:null);
