@@ -62,6 +62,11 @@
 .folder-picker-result.candidate,.folder-picker-result.candidate:hover{border-color:transparent;background:var(--surface-subtle);box-shadow:none}
 .folder-picker-result-path{flex:1;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .folder-picker-name:hover{text-decoration:none}
+.folder-picker-paged .folder-picker-tree{min-height:112px;max-height:min(45vh,340px)}
+.folder-picker-paged .folder-picker-chevron{font-size:14px;cursor:pointer}
+.folder-picker-paged .folder-picker-level-status{list-style:none;padding:7px 10px 7px 34px;font-size:12px;color:var(--text-secondary)}
+.folder-picker-paged .folder-picker-page-action{padding:4px 9px;min-height:28px;font-size:12px;color:var(--brand-blue);border:0;background:transparent;border-radius:var(--radius-control)}
+.folder-picker-paged .folder-picker-page-action:hover{background:var(--surface-subtle)}
 .folder-picker-empty{border:0;background:var(--surface-header);padding:20px 12px}
 .folder-picker-footer{border-top:0;padding-top:6px}
 @media(max-width:600px){

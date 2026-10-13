@@ -1,6 +1,7 @@
 import {request} from "../../shared/http";
 import {publishResourceChange} from "../../shared/resourceSync";
 import type {Folder} from "../../entities/folder/model";
+import type {FolderPickerPage} from "../../shared/ui/FolderPicker";
 
 export type Grant={id:string;subjectKind:"user"|"group";subjectId:string;actions:string[];scopeOnly:boolean;grantedByName:string;expiresAt?:string};
 
@@ -14,6 +15,10 @@ function folderChanged<T>(promise:Promise<T>,deleted=false):Promise<T>{
 
 export const folderApi={
  tree:()=>request<Folder[]>("/folders/tree"),
+ children:(parentId:string,cursor="")=>request<FolderPickerPage>(
+  "/folders/children?"+new URLSearchParams({parentId,cursor,limit:"50"}).toString()),
+ search:(q:string,cursor="")=>request<FolderPickerPage>(
+  "/folders/search?"+new URLSearchParams({q,cursor,limit:"50"}).toString()),
  get:(id:string)=>request<Folder>("/folders/"+encodeURIComponent(id)),
  create:(parentId:string,name:string)=>folderChanged(request<Folder>("/folders",{method:"POST",body:JSON.stringify({parentId,name})})),
  rename:(id:string,name:string)=>folderChanged(request<Folder>("/folders/"+id,{method:"PATCH",body:JSON.stringify({name})})),

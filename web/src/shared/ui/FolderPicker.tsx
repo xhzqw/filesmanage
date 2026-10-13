@@ -1,12 +1,19 @@
 import {RareButton,RareInput} from "./rare";
 import {FolderResourceIcon} from "./ResourceIcons";
 import {useEffect,useMemo,useRef,useState,type KeyboardEvent,type ReactNode}from "react";
+import {PagedFolderPicker} from "./PagedFolderPicker";
 import "./folderPicker.css";
 
 // Structural copy of entities/folder/model `Folder`: a shared -> entities import
 // fails scripts/check_architecture.py and the shape is identical, so hosts keep
 // passing Folder[] unchanged (same reason as shared/ui/AppShell.tsx).
 export type FolderPickerFolder={id:string;name:string;parentId:string|null};
+export type FolderPickerPageFolder=FolderPickerFolder&{hasChildren:boolean;canSelect:boolean;disabledReason?:string;path?:string};
+export type FolderPickerPage={items:FolderPickerPageFolder[];nextCursor:string};
+export type FolderPickerRemote={
+ children:(parentId:string,cursor?:string)=>Promise<FolderPickerPage>;
+ search:(query:string,cursor?:string)=>Promise<FolderPickerPage>;
+};
 
 export type FolderPickerProps={
  open:boolean;
@@ -23,6 +30,9 @@ export type FolderPickerProps={
  busy?:boolean;
  footer?:ReactNode;
  detail?:ReactNode;
+ // Opt-in paginated browsing. The legacy `folders` mode remains unchanged for
+ // existing move/stats pickers; uploads can traverse beyond the 500-row hint.
+ remote?:FolderPickerRemote;
 };
 
 // A broad keyword stays bounded: the remainder is reachable by narrowing it.
@@ -38,7 +48,12 @@ type SearchRow={folder:FolderPickerFolder;path:string;hay:string;tight:string};
 // never a second dialog or a second focus trap. The host owns preflight state
 // (notice/detail/busy/footer), the commit, and the close policy (closeGuard):
 // this panel only calls onSelect/onClose and never decides them.
-export function FolderPicker({open,title,folders,selectedId,onSelect,onClose,invalidTarget,notice,busy=false,footer,detail}:FolderPickerProps){
+export function FolderPicker(props:FolderPickerProps){
+ if(props.remote)return <PagedFolderPicker {...props} remote={props.remote}/>;
+ return <LocalFolderPicker {...props}/>;
+}
+
+function LocalFolderPicker({open,title,folders,selectedId,onSelect,onClose,invalidTarget,notice,busy=false,footer,detail}:FolderPickerProps){
  const panel=useRef<HTMLDivElement>(null);
  const tree=useRef<HTMLUListElement>(null);
  const search=useRef<HTMLInputElement>(null);

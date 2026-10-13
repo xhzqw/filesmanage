@@ -71,11 +71,51 @@ try{
  await evaluate(`(()=>{document.querySelector("main").dispatchEvent(new DragEvent("drop",{bubbles:true,cancelable:true,dataTransfer:window.__fmDrag,clientX:60,clientY:100}));return true;})()`);
  await waitFor("!!document.querySelector('dialog[open]')");
  assert.match(await evaluate("document.querySelector('dialog[open]')?.textContent"),/选择上传位置/);
- await waitFor("!!document.querySelector('dialog[open] .folder-picker')||!!document.querySelector('dialog[open] .global-upload-pick-error')");
+ await waitFor("!!document.querySelector('dialog[open] .folder-picker-paged .folder-picker-tree [data-folder-id]')");
+ const expandableRoot=await evaluate(`(async()=>{
+  const result=await(await fetch('/api/folders/children?limit=50')).json();
+  return result.data.items.find(item=>item.hasChildren)||null;
+ })()`);
+ assert.ok(expandableRoot,"fixture needs an expandable visible root for real folder-navigation regression");
+ const rootButton=await evaluate(`(()=>{
+  const li=[...document.querySelectorAll('dialog[open] .folder-picker-tree [data-folder-id]')]
+    .find(row=>row.dataset.folderId===${JSON.stringify(expandableRoot.id)});
+  const btn=li?.querySelector('.folder-picker-chevron');
+  btn?.click();return Boolean(btn);
+ })()`);
+ assert.ok(rootButton,"root folder must render an actionable expand control");
+ const childPage=await evaluate(`(async()=>{
+  const result=await(await fetch('/api/folders/children?parentId='+encodeURIComponent(${JSON.stringify(expandableRoot.id)})+'&limit=50')).json();
+  return result.data.items;
+ })()`);
+ assert.ok(childPage.length>0,"expanded root must have visible children");
+ const firstChild=childPage[0];
+ await waitFor(`!![...document.querySelectorAll('dialog[open] .folder-picker-tree li[data-folder-id]')].find(
+  row=>row.dataset.folderId===${JSON.stringify(firstChild.id)})`);
+ await evaluate(`(()=>{
+  const li=[...document.querySelectorAll('dialog[open] .folder-picker-tree li[data-folder-id]')]
+    .find(row=>row.dataset.folderId===${JSON.stringify(firstChild.id)});
+  li?.querySelector('.folder-picker-name')?.click();return true;
+ })()`);
+ assert.equal(await evaluate(`document.querySelector('dialog[open] .folder-picker-candidate-path')?.textContent?.includes(${JSON.stringify(firstChild.name)})`),Boolean(firstChild.canSelect),
+  "an uploadable child must be selectable, without allowing non-uploadable folders");
+ const searchTerm=firstChild.name.slice(0,Math.min(firstChild.name.length,12));
+ await evaluate(`(()=>{
+  const input=document.querySelector('dialog[open] .folder-picker-search');
+  const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
+  setter.call(input,${JSON.stringify(searchTerm)});input.dispatchEvent(new Event('input',{bubbles:true}));return true;
+ })()`);
+ await waitFor(`!![...document.querySelectorAll('dialog[open] .folder-picker-result-name')].find(
+  node=>node.textContent?.includes(${JSON.stringify(searchTerm)}))`);
+ const dialogBounds=await evaluate(`(()=>{
+  const rect=document.querySelector('dialog[open]').getBoundingClientRect();
+  return {left:rect.left,right:rect.right,viewport:innerWidth};
+ })()`);
+ assert.ok(dialogBounds.left>=0&&dialogBounds.right<=dialogBounds.viewport,"picker dialog must remain within viewport");
  await evaluate(`(()=>{document.querySelector('dialog[open] .dialog-close')?.click();return true;})()`);
  await waitFor("!document.querySelector('dialog[open]')");
  assert.equal(await evaluate("!!document.querySelector('.global-upload-overlay')"),false);
- console.log("PASS other page: drop prompts one target dialog, cancel has no upload");
+ console.log("PASS other page: paged root -> expandable children -> remote search -> cancel has no upload");
 
  for(const width of [1440,1100,820]){
   await send("Emulation.setDeviceMetricsOverride",{width,height:900,deviceScaleFactor:1,mobile:false});

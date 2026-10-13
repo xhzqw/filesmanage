@@ -1,10 +1,9 @@
 import {useEffect,useRef,useState} from "react";
 import {useLocation,useNavigate} from "react-router-dom";
-import type {Folder} from "../../entities/folder/model";
 import {useUploadStore} from "./uploadStore";
 import {toast} from "../../shared/ui/feedback";
 import {Dialog} from "../../shared/ui/Dialog";
-import {FolderPicker} from "../../shared/ui/FolderPicker";
+import {FolderPicker,type FolderPickerRemote} from "../../shared/ui/FolderPicker";
 import {RareButton} from "../../shared/ui/rare";
 import "./globalUploadDrop.css";
 
@@ -52,41 +51,22 @@ function transferredFiles(transfer:DataTransfer):{files:File[];skippedFolders:bo
 }
 
 /** One OS-file gesture across every authenticated route; internal moves pass through. */
-export function GlobalUploadDrop({userId,documentTarget,fetchFolderTree}:{userId:string;documentTarget:DocumentUploadTarget|null;fetchFolderTree:()=>Promise<Folder[]>}){
+export function GlobalUploadDrop({userId,documentTarget,browseFolders}:{userId:string;documentTarget:DocumentUploadTarget|null;browseFolders:FolderPickerRemote}){
  const location=useLocation();
  const navigate=useNavigate();
  const [dragging,setDragging]=useState(false);
  const [hoverFolder,setHoverFolder]=useState<{id:string;name:string}|null>(null);
  const [pending,setPending]=useState<PendingUpload|null>(null);
- const [folders,setFolders]=useState<Folder[]>([]);
- const [folderStatus,setFolderStatus]=useState<"loading"|"ready"|"failed">("loading");
  const [selectedId,setSelectedId]=useState("");
- const [folderError,setFolderError]=useState("");
  const tasks=useUploadStore(state=>state.tasks);
  const routeKey=location.pathname+location.search;
  const inDocumentFolder=location.pathname==="/doc"&&!(["favorites","received","sent"].includes(new URLSearchParams(location.search).get("view")||""));
  const currentTarget=inDocumentFolder&&documentTarget?.routeKey===routeKey&&documentTarget.userId===userId?documentTarget:null;
  const destination=useRef<{direct:DocumentUploadTarget|null;enabled:boolean}>({direct:currentTarget,enabled:location.pathname!=="/login"});
  destination.current={direct:currentTarget,enabled:location.pathname!=="/login"};
- const activeRequest=useRef(0);
-
- function loadFolders(){
-  const requestId=++activeRequest.current;
-  setFolderStatus("loading");
-  setFolderError("");
-  void fetchFolderTree().then(items=>{
-   if(requestId!==activeRequest.current)return;
-   setFolders(items);
-   setFolderStatus("ready");
-  }).catch(()=>{
-   if(requestId===activeRequest.current){setFolderStatus("failed");setFolderError("目录加载失败，请重试");}
-  });
- }
  function dismiss(){
-  activeRequest.current++;
   setPending(null);
   setSelectedId("");
-  setFolderError("");
  }
 
  useEffect(()=>{
@@ -123,7 +103,6 @@ export function GlobalUploadDrop({userId,documentTarget,fetchFolderTree}:{userId
    if(targetId){useUploadStore.getState().enqueueFiles(files,targetId);return;}
    setPending(previous=>({files:previous?[...previous.files,...files]:files}));
    setSelectedId("");
-   loadFolders();
   }
   function clear(){setDragging(false);setHoverFolder(null);}
   window.addEventListener("dragenter",over,true);
@@ -139,10 +118,8 @@ export function GlobalUploadDrop({userId,documentTarget,fetchFolderTree}:{userId
    window.removeEventListener("blur",clear);
   };
  },[userId]);
- useEffect(()=>()=>{activeRequest.current++;},[userId]);
-
  function confirm(){
-  if(!pending||folderStatus!=="ready"||!folders.some(folder=>folder.id===selectedId))return;
+  if(!pending||!selectedId)return;
   useUploadStore.getState().enqueueFiles(pending.files,selectedId);
   dismiss();
  }
@@ -158,14 +135,12 @@ export function GlobalUploadDrop({userId,documentTarget,fetchFolderTree}:{userId
   <Dialog open={pending!==null} title="选择上传位置" onClose={dismiss}>
    {pending&&<div className="global-upload-pick">
     <div className="global-upload-pick-summary" role="status">{pending.files.length} 个文件待上传</div>
-    {folderStatus==="failed"&&<div className="global-upload-pick-error" role="alert">{folderError} <RareButton type="button" onClick={loadFolders}>重试</RareButton></div>}
-    {folderStatus==="loading"&&<p role="status" className="global-upload-pick-loading">正在读取目录…</p>}
-    {folderStatus==="ready"&&<FolderPicker open title="选择上传位置" folders={folders}
+    <FolderPicker open title="选择上传位置" folders={[]} remote={browseFolders}
      selectedId={selectedId} onSelect={setSelectedId} onClose={dismiss}
      footer={<div className="dialog-actions">
       <RareButton type="button" tone="ghost" onClick={dismiss}>取消</RareButton>
-      <RareButton type="button" className="primary" disabled={!folders.some(folder=>folder.id===selectedId)} onClick={confirm}>上传到此目录</RareButton>
-     </div>}/>}
+      <RareButton type="button" className="primary" disabled={!selectedId} onClick={confirm}>上传到此目录</RareButton>
+     </div>}/>
    </div>}
   </Dialog>
   {!showingLocalQueue&&outstanding.length>0&&<div className="global-upload-queue" role="status" aria-live="polite">
