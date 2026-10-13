@@ -425,6 +425,10 @@ try{
  await until('document.activeElement===document.querySelectorAll("tr.file-entry")[129]');
  const scroll=await evaluate('document.querySelector(".work-body>.table")?.scrollTop');
  assert(scroll>0,"End must scroll the actual file panel to row 130");
+ // End intentionally selects the last row. Restore an unselected state before
+ // comparing the default toolbar against the contextual selection toolbar.
+ await key("Escape");
+ await until('!!document.querySelector(".work-body>.file-toolbar .upload-button")');
  const defaultToolbar=await evaluate(`(()=>{
   const bar=document.querySelector(".work-body>.file-toolbar");
   const filters=bar?.querySelector(".toolbar-views");
