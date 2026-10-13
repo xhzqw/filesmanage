@@ -406,6 +406,24 @@ try{
  await key("a",{ctrlKey:true});
  await until('document.querySelector("thead .col-select input[type=checkbox]")?.checked');
  assert.equal((await selection()).count,130);
+ const batch=await evaluate(`(()=>{
+  const group=document.querySelector(".batch-actions-group");
+  return {text:group?.textContent||"",actions:[...(group?.querySelectorAll("button")||[])].map(b=>b.textContent.trim())};
+ })()`);
+ assert(batch.text.includes("已选 130"),"batch count must match the loaded selection");
+ for(const action of ["下载","移动","删除"])assert(batch.actions.includes(action),"missing batch action "+action);
+ // Open the real 130-file deletion review but NEVER activate confirmation.
+ await evaluate('document.querySelector(".batch-actions-group .batch-btn.danger")?.click()');
+ await until('document.body.textContent.includes("以下 130 项将移入回收站")');
+ const cancelled=await evaluate(`(()=>{
+  const button=[...document.querySelectorAll(".dialog button")].find(b=>b.textContent.trim()==="关闭");
+  if(!button)return false;
+  button.click();
+  return true;
+ })()`);
+ assert(cancelled,"large deletion review must provide a cancellation route");
+ await until('!document.body.textContent.includes("以下 130 项将移入回收站")');
+ assert.equal((await selection()).count,130,"cancel must preserve selected files");
  await key("Escape");
  await until('[...document.querySelectorAll("tr.file-entry")].every(row=>row.getAttribute("aria-selected")!=="true")');
  console.log("EXPLORER_PAGING_130_REACT_PASS",JSON.stringify({...mockState,scroll}));
