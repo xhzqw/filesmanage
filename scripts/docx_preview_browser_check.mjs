@@ -11,11 +11,19 @@ import {verifiedAdminSession} from "./qa_session.mjs";
 
 const base="http://127.0.0.1:18091";
 const {cookie}=await verifiedAdminSession(base);
-const query=await fetch(base+"/api/search?q=do05-sample&limit=20",{headers:{Cookie:cookie}});
-assert.equal(query.status,200);
-const data=await query.json();
-const item=data.data?.items?.find(file=>file.name==="do05-sample.docx");
-assert(item?.id,"DO05 fixture must be present for DOCX layout check");
+let item;
+if(process.env.DOCX_PREVIEW_TARGET_FILE_ID){
+ const target=await fetch(base+"/api/files/"+encodeURIComponent(process.env.DOCX_PREVIEW_TARGET_FILE_ID),{headers:{Cookie:cookie}});
+ assert.equal(target.status,200,"Requested DOCX regression target must be accessible");
+ item=(await target.json()).data?.file;
+ assert(item?.name?.toLowerCase().endsWith(".docx"),"Requested regression target must be a DOCX file");
+}else{
+ const query=await fetch(base+"/api/search?q=do05-sample&limit=20",{headers:{Cookie:cookie}});
+ assert.equal(query.status,200);
+ const data=await query.json();
+ item=data.data?.items?.find(file=>file.name==="do05-sample.docx");
+ assert(item?.id,"DO05 fixture must be present for DOCX layout check");
+}
 const probe=await fetch(base+"/api/files/"+encodeURIComponent(item.id)+"/preview/office-pdf",{headers:{Cookie:cookie},signal:AbortSignal.timeout(35000)});
 assert.equal(probe.status,200,"DOCX derivative must be available");
 assert.match(probe.headers.get("content-type")??"",/^application\/pdf/);
@@ -115,8 +123,14 @@ try{
    state.pageWidth>150&&state.pageWidth<=state.insideWidth+2&&state.pageHeight<=state.insideHeight+2&&
    Math.abs(state.ratio-state.displayedRatio)<0.01&&state.overflow<=1,
    "DOCX paged layout geometry "+width+": "+JSON.stringify(state));
-  console.log("PASS DOCX page layout "+width);
+  console.log("PASS DOCX page layout "+width+" native="+state.ratio.toFixed(3)+" displayed="+state.displayedRatio.toFixed(3));
  }
+ const beforeZoom=await evalJS('document.querySelector(".office-layout-pdf img")?.getBoundingClientRect().height');
+ await evalJS('document.querySelector("button[aria-label=放大页面]")?.click()');
+ await delay(200);
+ const afterZoom=await evalJS('document.querySelector(".office-layout-pdf img")?.getBoundingClientRect().height');
+ assert(afterZoom>beforeZoom*1.15,"Zoom must enlarge without stretching document pages");
+ console.log("PASS DOCX zoom enlarges proportional page");
  await evalJS(`(()=>{
   [...document.querySelectorAll(".office-layout-switch button")].find(b=>b.textContent?.includes("内容摘要"))?.click();
  })()`);
