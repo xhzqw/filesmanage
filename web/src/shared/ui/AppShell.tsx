@@ -67,7 +67,7 @@ export function AppShell({user,onLogout,actions,children}:{user:ShellUser;onLogo
    if(previewHeaderRef.current?.contains(document.activeElement))return;
    if(revealRef.current===document.activeElement&&revealRef.current?.matches(":focus-visible"))return;
    setPreviewHeaderOpen(false);setAccountOpen(false);
-  },320);
+  },1000);
  }
  useEffect(()=>{
   cancelHeaderHide();setPreviewHeaderOpen(false);setAccountOpen(false);

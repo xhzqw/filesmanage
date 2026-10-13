@@ -134,6 +134,12 @@ try{
   openGeometry.pushedBy>=initiallyHidden.workOffset+openGeometry.headerHeight-2,
   JSON.stringify(openGeometry));
  await cdp.send("Input.dispatchMouseEvent",{type:"mouseMoved",x:720,y:450});
+ await delay(500);
+ const headerHeld=await cdp.evaluate(`(()=>{
+  const h=document.querySelector('.shell-preview-autoheader>.header');
+  return h&&getComputedStyle(h).visibility==='visible'&&h.getBoundingClientRect().height>40;
+ })()`);
+ assert("preview menu remains visible briefly after pointer leaves",Boolean(headerHeld));
  const headerHidden=await cdp.waitFor(`()=>{
   const h=document.querySelector('.shell-preview-autoheader>.header');
   const shell=document.querySelector('.shell');
