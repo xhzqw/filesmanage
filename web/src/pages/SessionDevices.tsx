@@ -118,8 +118,8 @@ export function SessionDevices({user,onLogout}:{user:User;onLogout:()=>void}){
      <p>撤销操作会立即在服务器生效，受影响的设备需要重新登录。当前设备不会被退出。</p>
      <div className="sessions-confirm-actions">
       <RareButton type="button" className="sessions-btn" onClick={()=>setConfirm(null)} disabled={busy}>取消</RareButton>
-      <RareButton type="button" tone="danger" className="sessions-btn sessions-danger" onClick={()=>void execute()} disabled={busy}>
-       {busy?"正在撤销…":"确认退出"}
+      <RareButton type="button" tone="danger" className="sessions-btn sessions-danger" onClick={()=>void execute()} loading={busy}>
+       确认退出
       </RareButton>
      </div>
    </Dialog>}

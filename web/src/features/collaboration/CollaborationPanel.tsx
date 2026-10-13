@@ -473,7 +473,7 @@ export function CollaborationPanel({embedded=false,activeTab,onSelectTab,onChang
    {revokeMessage&&<p role="alert" className="notice error">{revokeMessage}</p>}
    <div className="dialog-actions">
     <RareButton type="button" className="secondary-action" onClick={()=>setRevokeTarget(null)} disabled={revokeBusy}>取消</RareButton>
-    <RareButton type="button" className="danger" onClick={confirmRevoke} disabled={revokeBusy}>{revokeBusy?"撤销中…":"确认撤销"}</RareButton>
+    <RareButton type="button" className="danger" onClick={confirmRevoke} loading={revokeBusy}>确认撤销</RareButton>
    </div>
   </Dialog>}
  </div>;

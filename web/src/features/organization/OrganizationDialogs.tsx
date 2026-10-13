@@ -322,7 +322,7 @@ export function DeleteWorkgroupDialog({name,count,onClose,onSubmit,onOpenPermiss
     <div className="dialog-actions">
      <RareButton type="button" onClick={onClose}>取消</RareButton>
      <RareButton type="button" tone="danger" className="danger" disabled={busy} loading={busy} onClick={()=>void run()}>
-      {busy?"删除中…":"确认删除工作组"}
+      确认删除工作组
      </RareButton>
     </div>
    </>}

@@ -234,7 +234,7 @@ export function PermissionsPanel({users,groups,usersState,groupsState,onRetryUse
     <p className="hint">只撤销这一条记录。工作组、父目录及共享仍可能赋予相同权限。</p>
     {revokeError&&<RareNotice tone={revokeError.includes("结果未知")?"warning":"danger"}>{revokeError}</RareNotice>}
     <div className="dialog-actions"><RareButton type="button" className="secondary-action" disabled={revokeBusy} onClick={()=>setRevokeTarget(null)}>取消</RareButton>
-     <RareButton type="button" tone="danger" className="danger" loading={revokeBusy} onClick={()=>void revoke()}>{revokeBusy?"撤销中…":"确认撤销"}</RareButton></div>
+     <RareButton type="button" tone="danger" className="danger" loading={revokeBusy} onClick={()=>void revoke()}>确认撤销</RareButton></div>
    </>}
   </Dialog>
  </div>;

@@ -1344,7 +1344,7 @@ export function MoveDialog({file,presetTargetId,onClose,onMoved,onReload}:{
     :<>
      <RareButton type="button" className="secondary-action" onClick={close} disabled={busy}>取消</RareButton>
      {flow.state==="conflict"&&flow.notice==="检查失败，请重试"&&<RareButton type="button" className="secondary-action" onClick={()=>void check(flow.targetId)} disabled={!canCheck}>重试检查</RareButton>}
-     <RareButton type="button" className="primary" onClick={submit} disabled={!canConfirm}>{flow.state==="validating"?"检查中…":flow.state==="submitting"?"移动中…":"确认移动"}</RareButton>
+     <RareButton type="button" className="primary" onClick={submit} loading={flow.state==="validating"||flow.state==="submitting"} disabled={!canConfirm}>确认移动</RareButton>
     </>}
   />}
  </Dialog>;
