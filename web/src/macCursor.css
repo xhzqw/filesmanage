@@ -1,0 +1,57 @@
+/*
+ * Finder-style pointer for mouse/trackpad users.
+ * All normal hover/click targets use the same black arrow with a white edge;
+ * functional text and manipulation cursors remain recognizable.
+ * !important keeps lazy-loaded feature sheets from changing the arrow.
+ */
+@media (pointer: fine) {
+  :root {
+    --mac-arrow-cursor: url("/assets/cursors/macos-arrow.svg") 2 2, default;
+  }
+
+  :where(html, body, body *, body *::before, body *::after) {
+    cursor: var(--mac-arrow-cursor) !important;
+  }
+
+  /* Native insertion caret and precision manipulation must stay usable. */
+  :where(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
+    textarea,
+    [contenteditable="true"],
+    [role="textbox"],
+    [role="searchbox"]
+  ) {
+    cursor: text !important;
+  }
+
+  :where(.sidebar-resizer) {
+    cursor: col-resize !important;
+  }
+
+  :where(.seal-page-surface, .seal-page-viewport .seal-page-surface) {
+    cursor: crosshair !important;
+  }
+
+  :where(
+    .seal-page-viewport .seal-page-surface.is-panning,
+    .seal-page-surface .seal-position-mark.is-editable,
+    .stats-graph-viewport
+  ) {
+    cursor: grab !important;
+  }
+
+  :where(
+    .seal-page-surface .seal-position-mark.is-editable:active,
+    .stats-graph-viewport.is-dragging
+  ) {
+    cursor: grabbing !important;
+  }
+
+  :where(.seal-page-surface .seal-resize-handle, .seal-page-surface .seal-resize-handle.is-nw, .seal-page-surface .seal-resize-handle.is-se) {
+    cursor: nwse-resize !important;
+  }
+
+  :where(.seal-page-surface .seal-resize-handle.is-ne, .seal-page-surface .seal-resize-handle.is-sw) {
+    cursor: nesw-resize !important;
+  }
+}
