@@ -1,7 +1,7 @@
 import {RareButton,RareDataTable,RareInput,RareSelect} from "../../shared/ui/rare";
 import {toast} from "../../shared/ui/feedback";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
-import {useCallback,useEffect,useMemo,useRef,useState,type ChangeEvent,type DragEvent,type KeyboardEvent,type MouseEvent,type ReactNode}from "react";
+import {useCallback,useEffect,useMemo,useRef,useState,type ChangeEvent,type DragEvent,type KeyboardEvent,type MouseEvent,type PointerEvent as ReactPointerEvent,type ReactNode}from "react";
 import {useNavigate}from "react-router-dom";
 import type {FileItem} from "../../entities/file/model";
 import type {Folder} from "../../entities/folder/model";
@@ -137,6 +137,10 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const[focusedFolderId,setFocusedFolderId]=useState<string|null>(null);
  const[hoveredFolderId,setHoveredFolderId]=useState<string|null>(null);
  const[anchorId,setAnchorId]=useState<string|null>(null);
+ const[marquee,setMarquee]=useState<{left:number;top:number;width:number;height:number}|null>(null);
+ const marqueeCleanup=useRef<(()=>void)|null>(null);
+ const suppressBlankClick=useRef(false);
+ useEffect(()=>()=>{marqueeCleanup.current?.();marqueeCleanup.current=null;},[folder,viewMode]);
  const[pendingDelete,setPendingDelete]=useState<FileItem[]>([]);
  const[printingBatch,setPrintingBatch]=useState<FileItem[]|null>(null);
  // Transient context-menu state (DESKTOP-INTERACTION §1.1 contextTarget): it
@@ -504,6 +508,61 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   setSelectedIds(new Set(keys.filter(key=>key.startsWith("file:")).map(key=>key.slice(5))));
   setSelectedFolderIds(new Set(keys.filter(key=>key.startsWith("folder:")).map(key=>key.slice(7))));
  }
+ function beginMarquee(event:ReactPointerEvent<HTMLElement>){
+  if(event.button!==0||!event.isPrimary||marqueeCleanup.current)return;
+  const target=event.target as HTMLElement;
+  // A drag beginning on a file is still the native move gesture. The marquee
+  // is only started on the blank list/grid background.
+  if(target.closest("tr,thead,.explorer-item,button,a,input,label,select,[role=menu]"))return;
+  const surface=event.currentTarget;
+  const origin={x:event.clientX,y:event.clientY};
+  const baseline=(event.ctrlKey||event.metaKey)
+   ?[...selectedIds].map(id=>"file:"+id).concat([...selectedFolderIds].map(id=>"folder:"+id)):[];
+  let active=false;
+  const update=(e:PointerEvent)=>{
+   const bounds=surface.getBoundingClientRect();
+   const x=Math.max(bounds.left,Math.min(e.clientX,bounds.right));
+   const y=Math.max(bounds.top,Math.min(e.clientY,bounds.bottom));
+   if(!active&&Math.hypot(x-origin.x,y-origin.y)<5)return;
+   active=true;
+   const left=Math.min(origin.x,x),right=Math.max(origin.x,x);
+   const top=Math.min(origin.y,y),bottom=Math.max(origin.y,y);
+   setMarquee({left:left-bounds.left+surface.scrollLeft,top:top-bounds.top+surface.scrollTop,
+    width:right-left,height:bottom-top});
+   const hits=[...surface.querySelectorAll<HTMLElement>("tr.explorer-list-folder,tr.file-entry,.explorer-item[role=row]")]
+    .filter(node=>{
+     const box=node.getBoundingClientRect();
+     return box.right>left&&box.left<right&&box.bottom>top&&box.top<bottom;
+    }).map(node=>{
+     const folderId=node.dataset.folderId??node.dataset.uploadFolderId;
+     return folderId?"folder:"+folderId:node.dataset.id?"file:"+node.dataset.id:null;
+    }).filter((key):key is string=>key!==null);
+   selectKeys([...new Set([...baseline,...hits])]);
+  };
+  const cleanup=()=>{
+   window.removeEventListener("pointermove",update);
+   window.removeEventListener("pointerup",end);
+   window.removeEventListener("pointercancel",end);
+   window.removeEventListener("keydown",onKey);
+   marqueeCleanup.current=null;setMarquee(null);
+  };
+  const end=()=>{
+   if(active){
+    suppressBlankClick.current=true;
+    window.setTimeout(()=>{suppressBlankClick.current=false;},0);
+   }
+   cleanup();
+  };
+  const onKey=(e:globalThis.KeyboardEvent)=>{
+   if(e.key!=="Escape")return;
+   selectKeys(baseline);cleanup();
+  };
+  marqueeCleanup.current=cleanup;
+  window.addEventListener("pointermove",update);
+  window.addEventListener("pointerup",end);
+  window.addEventListener("pointercancel",end);
+  window.addEventListener("keydown",onKey);
+ }
  function selectResource(kind:"file"|"folder",id:string,ctrl=false,shift=false){
   const key=kind+":"+id;
   if(shift&&anchorId){
@@ -514,9 +573,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     return;
    }
   }
-  // Contextual selection mode allows consecutive unmodified clicks to add
-  // or remove resources; Ctrl/Cmd still works when selection is empty.
-  if(ctrl||selectedIds.size+selectedFolderIds.size>0){
+  // Finder: ordinary click selects exactly one. Ctrl/Cmd toggles membership.
+  if(ctrl){
    const current=new Set([...selectedIds].map(id=>"file:"+id).concat([...selectedFolderIds].map(id=>"folder:"+id)));
    if(current.has(key))current.delete(key);else current.add(key);
    selectKeys([...current]);
@@ -1128,7 +1186,9 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     {zipProgress.phase==="failed"||zipProgress.phase==="handoff"?"关闭":"取消"}
    </RareButton>
   </div>}
-  {viewMode==="list"&&<div className="table explorer-striped-list" onClick={event=>{if(!(event.target as HTMLElement).closest("tr")){selectKeys([]);setAnchorId(null);}}}>
+  {viewMode==="list"&&<div className="table explorer-striped-list" onPointerDown={beginMarquee}
+   onClick={event=>{if(suppressBlankClick.current)return;if(!(event.target as HTMLElement).closest("tr")){selectKeys([]);setAnchorId(null);}}}>
+   {marquee&&<div className="explorer-marquee" aria-hidden="true" style={marquee}/>}
    <RareDataTable role="grid" aria-label={folderName+" 文件列表"} density="compact"
     className={"file-table file-table-ultra"+(status==="ready"&&visibleFolders.length>0&&visibleItems.length===0?" file-table-folders-only":"")}>
     <thead><tr>
@@ -1170,7 +1230,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
        <RareButton type="button" tone="ghost" className="folder-inline-open" aria-label={"打开文件夹 "+entry.name}
         onClick={event=>{event.stopPropagation();navigate("/doc?folder="+encodeURIComponent(entry.id));}}>打开 ↗</RareButton>
       </div></td>
-      <td className="col-size"/><td className="col-version"/><td className="col-date"/>
+      <td className="col-size"/><td className="col-version"/><td className="col-date date">{entry.updatedAt?entry.updatedAt.replace("T"," ").slice(0,16):"—"}</td>
       <td className="row-actions col-actions" onClick={event=>event.stopPropagation()}><div className="actions-cell-wrap">
        <RareButton type="button" className={"action-star-btn"+(favoriteFolderIds.has(entry.id)?" favorited":"")}
         aria-label={(favoriteFolderIds.has(entry.id)?"取消收藏文件夹 ":"收藏文件夹 ")+entry.name}
@@ -1205,14 +1265,6 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       <td className="col-version"><span className="version-badge">v{item.currentVersionSeq}</span></td>
       <td className="col-date date">{item.updatedAt.replace("T"," ").slice(0,16)}</td>
       <td className="row-actions col-actions" onClick={event=>event.stopPropagation()}><div className="actions-cell-wrap">
-       <div className="actions-hover-group">
-        <RareButton type="button" className="action-link" onClick={()=>navigate("/preview/"+item.id)}>打开</RareButton>
-        <a href={"/api/files/"+item.id+"/bytes"} download={item.name} className="action-link">下载</a>
-        <RareButton type="button" className="action-link" onClick={()=>onEdit(item.id)}>编辑</RareButton>
-        <RareButton type="button" className="action-link more-trigger"
-         aria-label={"更多操作："+item.name} aria-haspopup="menu"
-         onClick={event=>openRowMenu(item,event.currentTarget)}>···</RareButton>
-       </div>
        <RareButton type="button"
         className={"action-star-btn"+(favoriteIds.has(item.id)?" favorited":"")}
         aria-label={favoriteIds.has(item.id)?"已收藏":"收藏"}
@@ -1222,15 +1274,18 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
         <svg className="star-icon" viewBox="0 0 24 24" width="14" height="14" fill={favoriteIds.has(item.id)?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
         </svg>
-        <span className="sr-only">{favoriteIds.has(item.id)?"已收藏":"收藏"}</span>
+         <span className="sr-only">{favoriteIds.has(item.id)?"已收藏":"收藏"}</span>
        </RareButton>
+       <RareButton type="button" tone="ghost" className="folder-row-more" aria-label={"文件操作 "+item.name}
+        aria-haspopup="menu" onClick={event=>openRowMenu(item,event.currentTarget)}>···</RareButton>
       </div></td>
      </tr>)}
     </tbody>
    </RareDataTable>
   </div>}
-  {viewMode!=="list"&&<div className={"explorer-surface explorer-surface-"+viewMode}
+  {viewMode!=="list"&&<div className={"explorer-surface explorer-surface-"+viewMode} onPointerDown={beginMarquee}
    aria-label={folderName+" 文件"+(viewMode==="icons"?"图标":viewMode==="columns"?"分栏":"画廊")+"视图"}>
+   {marquee&&<div className="explorer-marquee" aria-hidden="true" style={marquee}/>}
    {status==="loading"&&<div className="explorer-empty" role="status"><BrandLoadingLabel size="sm">正在加载文件…</BrandLoadingLabel></div>}
    {status==="failed"&&<div className="explorer-empty" role="alert">获取文件失败，请刷新重试</div>}
    {status==="ready"&&visibleItems.length===0&&visibleFolders.length===0&&<div className="explorer-empty">

@@ -16,7 +16,7 @@ func (h *Handler) folderDetail(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"ok": true, "data": folderPayload(folder.ID, folder.Name, folder.ParentID)})
+	c.JSON(http.StatusOK, gin.H{"ok": true, "data": folderPayload(folder)})
 }
 
 // Folder handlers. Handlers only authenticate, validate transport input and
@@ -40,7 +40,7 @@ func (h *Handler) createFolder(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	c.JSON(201, gin.H{"ok": true, "data": folderPayload(folder.ID, folder.Name, folder.ParentID)})
+	c.JSON(201, gin.H{"ok": true, "data": folderPayload(folder)})
 }
 
 func (h *Handler) renameFolder(c *gin.Context) {
@@ -60,7 +60,7 @@ func (h *Handler) renameFolder(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	c.JSON(200, gin.H{"ok": true, "data": folderPayload(folder.ID, folder.Name, folder.ParentID)})
+	c.JSON(200, gin.H{"ok": true, "data": folderPayload(folder)})
 }
 
 func (h *Handler) moveFolder(c *gin.Context) {
@@ -80,7 +80,7 @@ func (h *Handler) moveFolder(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	c.JSON(200, gin.H{"ok": true, "data": folderPayload(folder.ID, folder.Name, folder.ParentID)})
+	c.JSON(200, gin.H{"ok": true, "data": folderPayload(folder)})
 }
 
 func (h *Handler) deleteFolder(c *gin.Context) {

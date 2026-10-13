@@ -102,19 +102,49 @@ try{
  await click("tr.file-entry .file-name",0);
  await until('(document.querySelector(".file-selected-count")?.textContent||"").includes("已选 1")');
  await click("tr.file-entry .file-name",1);
+ await until('document.querySelectorAll("tr.file-entry[aria-selected=true]").length===1');
+ assert.equal(await evaluate('document.querySelectorAll("tr.file-entry")[1]?.getAttribute("aria-selected")'),"true",
+  "Second plain click should replace the first selection");
+ await click("tr.file-entry .file-name",0,2);
  await until('(document.querySelector(".file-selected-count")?.textContent||"").includes("已选 2")');
- assert.equal(await selectedFiles(),2,"Second plain click must add a file");
+ assert.equal(await selectedFiles(),2,"Ctrl-click must add an earlier file");
  await click("tr.file-entry .file-name",2,2);
  await until('(document.querySelector(".file-selected-count")?.textContent||"").includes("已选 3")');
  assert.equal(await selectedFiles(),3,"Ctrl-click should add a third file");
  await click('tr.file-entry .col-select input[type="checkbox"]',3);
  await until('(document.querySelector(".file-selected-count")?.textContent||"").includes("已选 4")');
  assert.equal(await selectedFiles(),4,"Checkbox should preserve three earlier selections");
- await click("tr.file-entry .file-name",1);
+ await click("tr.file-entry .file-name",1,2);
  await until('(document.querySelector(".file-selected-count")?.textContent||"").includes("已选 3")');
  await click(".batch-clear-selection");
  await until('!document.querySelector(".batch-actions-group")');
- console.log("EXPLORER_LIVE_MULTI_SELECT_PASS",JSON.stringify({count:4,plainClick:true,ctrlClick:true,checkbox:true,toggleOff:true}));
+ console.log("EXPLORER_LIVE_MULTI_SELECT_PASS",JSON.stringify({count:4,plainSingle:true,ctrlClick:true,checkbox:true,toggleOff:true}));
+
+ const path=await evaluate('location.pathname+location.search');
+ await click('.folder-view-switch button[aria-label="图标视图"]');
+ await until('document.querySelector(".work-body")?.dataset.explorerView==="icons"');
+ const points=await evaluate(`(()=>{
+  const grid=document.querySelector(".explorer-icon-grid"),surface=document.querySelector(".explorer-surface");
+  const cards=[...grid.querySelectorAll(".explorer-item")];
+  if(cards.length<2)return null;
+  const g=grid.getBoundingClientRect(),a=cards[0].getBoundingClientRect(),b=cards[1].getBoundingClientRect();
+  return {start:{x:g.left+3,y:g.top+3},end:{x:Math.max(a.right,b.right)-3,y:Math.max(a.bottom,b.bottom)-2}};
+ })()`);
+ assert(points,"Icon view must have at least two resources to marquee-select");
+ await send("Input.dispatchMouseEvent",{type:"mouseMoved",...points.start});
+ await send("Input.dispatchMouseEvent",{type:"mousePressed",button:"left",clickCount:1,...points.start});
+ for(let i=1;i<=8;i++){
+  await send("Input.dispatchMouseEvent",{type:"mouseMoved",buttons:1,button:"left",
+   x:points.start.x+(points.end.x-points.start.x)*i/8,
+   y:points.start.y+(points.end.y-points.start.y)*i/8});
+ }
+ await until('!!document.querySelector(".explorer-marquee")');
+ await send("Input.dispatchMouseEvent",{type:"mouseReleased",button:"left",clickCount:1,...points.end});
+ await until('[...document.querySelectorAll(".explorer-item[aria-selected=true]")].length>=2');
+ await until('!document.querySelector(".explorer-marquee")',"Marquee should disappear on release");
+ console.log("EXPLORER_FINDER_MARQUEE_PASS");
+ await click('.folder-view-switch button[aria-label="列表视图"]');
+ await until('document.querySelector(".work-body")?.dataset.explorerView==="list"');
 
  const initial=await favoriteRead();
  assert(initial.ok&&Array.isArray(initial.rows),"Real favorites GET must succeed");
@@ -132,8 +162,7 @@ try{
  }
  const persisted=await favoriteRead();
  assert.equal(persisted.rows.some(row=>row.kind==="file"&&row.fileId===tested),expected,"Server favorite must persist after click");
- const location=await evaluate('location.pathname+location.search');
- await navigate(location,'!!document.querySelector("tr.file-entry .action-star-btn")');
+ await navigate(path,'!!document.querySelector("tr.file-entry .action-star-btn")');
  await until(`document.querySelector("tr.file-entry .action-star-btn")?.classList.contains("favorited")===${expected}`,"favorite after reload");
  console.log("EXPLORER_LIVE_FAVORITE_PERSIST_PASS",JSON.stringify({id:tested,changed:true,afterReload:true}));
 }catch(error){

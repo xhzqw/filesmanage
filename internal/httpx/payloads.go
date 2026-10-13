@@ -10,8 +10,12 @@ import (
 
 // Transport payload builders keep JSON shapes in one place.
 
-func folderPayload(id, name string, parentID *string) gin.H {
-	return gin.H{"id": id, "name": name, "parentId": parentID}
+func folderPayload(folder domain.Folder) gin.H {
+	payload := gin.H{"id": folder.ID, "name": folder.Name, "parentId": folder.ParentID}
+	if !folder.UpdatedAt.IsZero() {
+		payload["updatedAt"] = folder.UpdatedAt.UTC().Format(time.RFC3339)
+	}
+	return payload
 }
 
 // folderPageItemPayload is the FolderPicker read row: parentId is null for a

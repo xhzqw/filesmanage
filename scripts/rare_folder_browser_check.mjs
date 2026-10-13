@@ -199,12 +199,14 @@ try{
   if(geometry.fileHeight!==null)assert(Math.abs(geometry.fileHeight-32)<=.5,"file row is not 32px: "+JSON.stringify(geometry));
   assert(geometry.pageOverflow<=2,"page overflow: "+JSON.stringify(geometry));
   assert.equal(geometry.folderOnly,geometry.visibleFiles===0,"folder-only mode must follow visible file count");
-  assert(geometry.folderCells.every(text=>text===""),"folder-only columns must be blank");
+  assert(geometry.folderCells.slice(0,2).every(text=>text===""),"folder size/version columns must be blank");
   assert(geometry.buttonRight<=geometry.cellRight+1,"folder opener spills into next column: "+JSON.stringify(geometry));
   assert(geometry.columns[1].width>80,"file name collapsed: "+JSON.stringify(geometry));
   if(geometry.folderOnly){
    assert.equal(geometry.visibleFiles,0,"folder-only grid must not hide files");
-   assert.deepEqual(geometry.columns.filter(col=>col.visible).map(col=>col.key),["name"],"folder-only grid should have one meaningful column");
+   assert.deepEqual(geometry.columns.filter(col=>col.visible).map(col=>col.key),
+    geometry.pane<=560?["select","name","actions"]:["select","name","date","actions"],
+    "folder-only grid must retain selection and actions; date is visible above mobile breakpoint");
   }else if(geometry.pane>1400){
    assert(geometry.columns[1].width/geometry.tableWidth<=0.55,"name monopolizes wide mixed table");
   }
@@ -245,7 +247,7 @@ try{
    columns:[...table.querySelectorAll("thead th")].filter(e=>getComputedStyle(e).display!=="none").map(e=>e.textContent.trim()),
    overflow:document.documentElement.scrollWidth-innerWidth};
  })()`);
- assert.deepEqual(folderOnlyColumns.columns,["","文件名","操作"],"folder-only view must retain selection and context actions");
+ assert.deepEqual(folderOnlyColumns.columns,["","文件名","修改日期","操作"],"folder-only view must retain modified date and actions");
  assert.equal(folderOnlyColumns.files,0);
  assert(folderOnlyColumns.overflow<=2);
  await evaluate('document.querySelector(".batch-clear-selection")?.click()');

@@ -16,6 +16,7 @@ type Folder struct {
 	ParentID  *string
 	OwnerID   string
 	DeletedAt *time.Time
+	UpdatedAt time.Time
 }
 
 type File struct {

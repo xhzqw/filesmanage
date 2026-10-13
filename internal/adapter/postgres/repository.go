@@ -148,7 +148,7 @@ func (r *Repository) ListVisibleFolders(ctx context.Context, u domain.User) ([]d
 	var rows pgx.Rows
 	var err error
 	if u.IsAdmin {
-		rows, err = r.Q.Query(ctx, "SELECT id,name,parent_id FROM folders WHERE deleted_at IS NULL ORDER BY name,id LIMIT 500")
+		rows, err = r.Q.Query(ctx, "SELECT id,name,parent_id,updated_at FROM folders WHERE deleted_at IS NULL ORDER BY name,id LIMIT 500")
 	} else {
 		query := "WITH RECURSIVE ancestry AS (" +
 			" SELECT f.id child,f.id ancestor,f.parent_id,0 depth FROM folders f WHERE f.deleted_at IS NULL" +
@@ -160,7 +160,7 @@ func (r *Repository) ListVisibleFolders(ctx context.Context, u domain.User) ([]d
 			" AND 'list'=ANY(g.actions) AND (" +
 			" (g.subject_kind='user' AND g.subject_id=$1) OR" +
 			" (g.subject_kind='group' AND EXISTS(SELECT 1 FROM workgroup_members wm WHERE wm.group_id=g.subject_id AND wm.user_id=$1))" +
-			" )) SELECT f.id,f.name,f.parent_id FROM folders f JOIN visible v ON v.child=f.id" +
+			" )) SELECT f.id,f.name,f.parent_id,f.updated_at FROM folders f JOIN visible v ON v.child=f.id" +
 			" WHERE f.deleted_at IS NULL ORDER BY f.name,f.id LIMIT 500"
 		rows, err = r.Q.Query(ctx, query, u.ID)
 	}
@@ -171,7 +171,7 @@ func (r *Repository) ListVisibleFolders(ctx context.Context, u domain.User) ([]d
 	out := make([]domain.Folder, 0)
 	for rows.Next() {
 		var f domain.Folder
-		if err := rows.Scan(&f.ID, &f.Name, &f.ParentID); err != nil {
+		if err := rows.Scan(&f.ID, &f.Name, &f.ParentID, &f.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, f)
@@ -294,8 +294,8 @@ func (r *Repository) SearchVisibleFolders(ctx context.Context, q ports.FolderSea
 
 func (r *Repository) FolderByID(ctx context.Context, id string) (domain.Folder, error) {
 	var f domain.Folder
-	err := r.Q.QueryRow(ctx, "SELECT id,name,parent_id,owner_id,deleted_at FROM folders WHERE id=$1", id).
-		Scan(&f.ID, &f.Name, &f.ParentID, &f.OwnerID, &f.DeletedAt)
+	err := r.Q.QueryRow(ctx, "SELECT id,name,parent_id,owner_id,deleted_at,updated_at FROM folders WHERE id=$1", id).
+		Scan(&f.ID, &f.Name, &f.ParentID, &f.OwnerID, &f.DeletedAt, &f.UpdatedAt)
 	if err != nil {
 		return domain.Folder{}, err
 	}

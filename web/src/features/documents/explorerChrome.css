@@ -70,12 +70,13 @@
  border:0;border-bottom:1px solid var(--border-hairline);border-radius:var(--radius-xs);
  background:var(--surface-panel);
 }
-.work-body>.table{width:100%;max-width:100%;margin:0;border:0;border-radius:var(--radius-xs);contain:paint}
+.work-body>.table{position:relative;width:100%;max-width:100%;margin:0;border:0;border-radius:var(--radius-xs);contain:paint}
 .work-body>.file-page-controls{margin:0;border-top:1px solid var(--border-hairline)}
 .explorer-surface{
- flex:1 1 auto;min-height:0;min-width:0;
+ position:relative;flex:1 1 auto;min-height:0;min-width:0;
  margin:0;background:var(--surface-panel);overflow:auto;
 }
+.explorer-marquee{position:absolute;z-index:6;pointer-events:none;border:1px solid var(--border-focus);border-radius:3px;background:var(--surface-row-selected);opacity:.68;box-sizing:border-box}
 .explorer-empty{min-height:160px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--text-secondary);font-size:12px}
 .explorer-icon-grid{
  display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));

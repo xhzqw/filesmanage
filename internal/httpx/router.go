@@ -388,7 +388,7 @@ func (h *Handler) folders(c *gin.Context) {
 	}
 	data := make([]gin.H, 0, len(items))
 	for _, f := range items {
-		data = append(data, gin.H{"id": f.ID, "name": f.Name, "parentId": f.ParentID})
+		data = append(data, folderPayload(f))
 	}
 	c.JSON(200, gin.H{"ok": true, "data": data})
 }
