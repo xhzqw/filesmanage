@@ -1,11 +1,11 @@
 import {useEffect,useRef,useState,type DragEvent,type KeyboardEvent,type MouseEvent} from "react";
 import type {Folder} from "../../entities/folder/model";
 import type {FileItem} from "../../entities/file/model";
-import {folderApi} from "../folders/api";
 import {FolderResourceIcon} from "../../shared/ui/ResourceIcons";
 import {FileTypeIcon} from "../../shared/ui/FileTypeIcon";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {RareButton} from "../../shared/ui/rare";
+import {request} from "../../shared/http";
 import {fileApi} from "./api";
 
 // Ancestor columns share FileTable's existing action handlers instead of
@@ -24,6 +24,12 @@ type Props={
 };
 type Page={folders:Folder[];files:FileItem[];folderCursor:string;fileCursor:string};
 const EMPTY:Page={folders:[],files:[],folderCursor:"",fileCursor:""};
+type FolderPage={items:(Folder&{hasChildren?:boolean})[];nextCursor:string};
+function readFolderChildren(parentId:string,cursor=""){
+ return request<FolderPage>("/folders/children?"+new URLSearchParams({
+  parentId,cursor,limit:"50"
+ }).toString());
+}
 
 export function FinderPathColumn(props:Props){
  const {folder,reloadKey}=props;
@@ -36,7 +42,7 @@ export function FinderPathColumn(props:Props){
   let live=true;
   const controller=new AbortController();
   setStatus("loading");setData(EMPTY);setMoreFailed(false);
-  Promise.all([folderApi.children(folder.id),fileApi.list(folder.id,"name_asc","",50,controller.signal)])
+  Promise.all([readFolderChildren(folder.id),fileApi.list(folder.id,"name_asc","",50,controller.signal)])
    .then(([folders,files])=>{if(live){setData({
     folders:folders.items.map(item=>({id:item.id,name:item.name,parentId:item.parentId})),
     files:files.items,folderCursor:folders.nextCursor,fileCursor:files.nextCursor
@@ -49,7 +55,7 @@ export function FinderPathColumn(props:Props){
   setMoreBusy(true);setMoreFailed(false);
   try{
    const [folders,files]=await Promise.all([
-    data.folderCursor?folderApi.children(folder.id,data.folderCursor):Promise.resolve(null),
+    data.folderCursor?readFolderChildren(folder.id,data.folderCursor):Promise.resolve(null),
     data.fileCursor?fileApi.list(folder.id,"name_asc",data.fileCursor,50):Promise.resolve(null),
    ]);
    setData(current=>({
