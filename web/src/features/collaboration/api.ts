@@ -64,8 +64,13 @@ export const collaborationApi={
  favoritesPage:(cursor="")=>request<CollaborationPage<Favorite>>("/favorites?"+new URLSearchParams({limit:"50",...(cursor?{cursor}:{})}).toString()),
  // During a rolling deployment the previous server returns the legacy array.
  // After the backend restart the same route returns the authorized sidebar page.
- favoritesSidebar:()=>request<{items:Favorite[]}|Favorite[]>("/favorites?view=sidebar").then(page=>
-  Array.isArray(page)?{items:page.filter(item=>!item.unavailable).slice(0,8)}:page),
+ favoritesSidebar:()=>request<{items:Favorite[]}|Favorite[]>("/favorites?view=sidebar").then(page=>{
+  if(Array.isArray(page))return {items:page.filter(item=>!item.unavailable).slice(0,8)};
+  // An API/worker version mismatch must not turn a sidebar refresh into a
+  // full-page React render crash (undefined.slice in FinderSidebar).
+  if(!page||!Array.isArray(page.items))throw new Error("关注列表返回格式无效");
+  return {items:page.items};
+ }),
  setFavorite:(kind:string,id:string,on:boolean)=>request<{id:string;favorited:boolean}>("/favorites/"+kind+"/"+id,{method:on?"PUT":"DELETE"}),
  // Recipient and resource sources for the share wizard and the resource picker.
  // /users and /groups are admin-only on the server: a denied read is surfaced by

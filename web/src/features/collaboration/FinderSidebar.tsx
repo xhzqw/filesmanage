@@ -25,7 +25,7 @@ export function FinderSidebar({section,revision}:{section:DocumentSection;revisi
  useEffect(()=>{
   let active=true;
   collaborationApi.favoritesSidebar().then(page=>{
-   if(active){setFavorites(page.items);setStatus("ready");}
+   if(active){setFavorites(Array.isArray(page.items)?page.items:[]);setStatus("ready");}
   }).catch(()=>{if(active)setStatus("failed");});
   return()=>{active=false;};
  },[revision,token]);
