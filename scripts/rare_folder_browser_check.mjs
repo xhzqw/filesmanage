@@ -216,6 +216,37 @@ try{
   assert(selected.selected&&selected.opacity>=0.95,"selected folder must reveal opener: "+JSON.stringify(selected));
   console.log("EXPLORER_LIST_LAYOUT_PASS",width+"px",JSON.stringify({pane:geometry.pane,columns:geometry.columns.map(x=>Math.round(x.width)),button:Math.round(geometry.buttonWidth)}));
  }
+ // Exercise the *actual React state transition* to folder-only layout using
+ // the local filename filter; never alter a server resource to make a fixture.
+ await send("Emulation.setDeviceMetricsOverride",{width:1440,height:900,deviceScaleFactor:1,mobile:false});
+ const folderQuery=await evaluate(`(()=>{
+  const fileNames=[...document.querySelectorAll("tr.file-entry .file-name")].map(e=>e.textContent.toLocaleLowerCase());
+  return [...document.querySelectorAll(".explorer-list-folder .file-name")]
+   .map(e=>e.textContent).find(name=>name&&!fileNames.some(file=>file.includes(name.toLocaleLowerCase())))||null;
+ })()`);
+ assert(folderQuery,"a folder name distinct from loaded file names is required for read-only filtering");
+ async function setLocalFilter(value){
+  await evaluate(`(()=>{
+   const input=document.querySelector(".filter-search-input");
+   const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set;
+   setter.call(input,${JSON.stringify(value)});
+   input.dispatchEvent(new Event("input",{bubbles:true}));
+  })()`);
+ }
+ await setLocalFilter(folderQuery);
+ await until('!!document.querySelector("table.file-table-folders-only .explorer-list-folder")');
+ const folderOnlyColumns=await evaluate(`(()=>{
+  const table=document.querySelector("table.file-table-folders-only");
+  return {files:table.querySelectorAll("tr.file-entry").length,
+   columns:[...table.querySelectorAll("thead th")].filter(e=>getComputedStyle(e).display!=="none").map(e=>e.textContent.trim()),
+   overflow:document.documentElement.scrollWidth-innerWidth};
+ })()`);
+ assert.deepEqual(folderOnlyColumns.columns,["文件名"],"folder-only view must hide all meaningless column headings");
+ assert.equal(folderOnlyColumns.files,0);
+ assert(folderOnlyColumns.overflow<=2);
+ await setLocalFilter("");
+ await until('!!document.querySelector("table.file-table:not(.file-table-folders-only) tr.file-entry")');
+ console.log("EXPLORER_FOLDER_ONLY_REACT_PASS",JSON.stringify(folderOnlyColumns));
  console.log("RARE_FOLDER_BROWSER_PASS: layered folders, low-noise toolbar, 4 views, 1440/980/700/390px");
 }catch(error){
  console.error("RARE_FOLDER_BROWSER_FAIL",error?.stack??error);
