@@ -90,6 +90,11 @@ func (s *Service) PDFPreviewPageRevision(ctx context.Context, u domain.User, id,
 	}
 	raw = export.Data
 
+	return renderPDFPagePNG(ctx, raw, page)
+}
+
+// Rasterization avoids depending on the browser's native PDF viewer.
+func renderPDFPagePNG(ctx context.Context, raw []byte, page int) ([]byte, error) {
 	select {
 	case officeRenderSlots <- struct{}{}:
 		defer func() { <-officeRenderSlots }()

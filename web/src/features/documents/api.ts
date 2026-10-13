@@ -50,6 +50,8 @@ export const fileApi={
  setMetadata:(id:string,body:{category:string;description:string;tags:string[]})=>changed(request<FileMetadata>("/files/"+id+"/metadata",{method:"PUT",body:JSON.stringify(body)}),id),
 	preview:(id:string,signal?:AbortSignal)=>request<PreviewData>("/files/"+id+"/preview",{signal}),
  pdfPages:(id:string,sha:string)=>request<{pageCount:number}>("/files/"+encodeURIComponent(id)+"/preview/pdf/pages?sha256="+encodeURIComponent(sha)),
+ officePages:(id:string,sha:string)=>request<{pageCount:number}>("/files/"+encodeURIComponent(id)+"/preview/office/pages?sha256="+encodeURIComponent(sha)),
+ officePageUrl:(id:string,sha:string,page:number)=>"/api/files/"+encodeURIComponent(id)+"/preview/office/page?"+new URLSearchParams({sha256:sha,page:String(page)}),
  pdfPageUrl:(id:string,sha:string,page:number,revision:number|null=null)=>"/api/files/"+encodeURIComponent(id)+"/preview/pdf/page?"+new URLSearchParams({sha256:sha,page:String(page),...(revision===null?{}:{revision:String(revision)})}),
  sealHistory:(id:string,version:number)=>request<SealHistory>("/files/"+encodeURIComponent(id)+"/seals/revisions?version="+version),
  signedDownloadUrl:(id:string,version:number,revision:number|null=null)=>"/api/files/"+encodeURIComponent(id)+"/seals/export?"+new URLSearchParams({version:String(version),...(revision===null?{}:{revision:String(revision)})}),

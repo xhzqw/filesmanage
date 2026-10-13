@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"filesmanage/internal/domain"
+	"rsc.io/pdf"
 )
 
 const maxOfficeSourceBytes = 12 << 20
@@ -155,6 +156,66 @@ func (s *Service) OfficePDFPreview(ctx context.Context, u domain.User, fileID st
 
 func renderOfficePDFSource(ctx context.Context, source Download) ([]byte, error) {
 	return renderOfficePDFSourceWithSheet(ctx, source, "")
+}
+
+// Office page images are preview-only derivatives. Every request enforces
+// preview ACLs and fences against concurrent version replacement.
+func (s *Service) authorizedOfficePagePDF(ctx context.Context, u domain.User, id, sha string) ([]byte, int, error) {
+	if len(sha) != 64 {
+		return nil, 0, domain.ErrInvalidInput
+	}
+	source, done, err := s.openFileBytes(ctx, u, id, domain.ActionPreview)
+	if err != nil {
+		return nil, 0, err
+	}
+	currentSHA, ext := source.Sha256, extensionOf(source.FileName)
+	done()
+	if !strings.EqualFold(currentSHA, sha) {
+		return nil, 0, domain.ErrVersionConflict
+	}
+	if ext != ".docx" && ext != ".xlsx" && ext != ".pptx" {
+		return nil, 0, ErrPreviewUnsupported
+	}
+	raw, err := s.OfficePDFPreview(ctx, u, id)
+	if err != nil {
+		return nil, 0, err
+	}
+	latest, closeLatest, err := s.openFileBytes(ctx, u, id, domain.ActionPreview)
+	if err != nil {
+		return nil, 0, err
+	}
+	latestSHA := latest.Sha256
+	closeLatest()
+	if !strings.EqualFold(latestSHA, sha) {
+		return nil, 0, domain.ErrVersionConflict
+	}
+	if len(raw) < 8 || len(raw) > maxOfficePDFBytes || !bytes.HasPrefix(raw, []byte("%PDF-")) {
+		return nil, 0, ErrPreviewUnsupported
+	}
+	doc, err := pdf.NewReader(bytes.NewReader(raw), int64(len(raw)))
+	if err != nil || doc.NumPage() < 1 || doc.NumPage() > 1000 {
+		return nil, 0, ErrPreviewUnsupported
+	}
+	return raw, doc.NumPage(), nil
+}
+
+func (s *Service) OfficePreviewPages(ctx context.Context, u domain.User, id, sha string) (int, error) {
+	_, count, err := s.authorizedOfficePagePDF(ctx, u, id, sha)
+	return count, err
+}
+
+func (s *Service) OfficePreviewPage(ctx context.Context, u domain.User, id, sha string, page int) ([]byte, error) {
+	if page < 1 || page > 1000 {
+		return nil, domain.ErrInvalidInput
+	}
+	raw, count, err := s.authorizedOfficePagePDF(ctx, u, id, sha)
+	if err != nil {
+		return nil, err
+	}
+	if page > count {
+		return nil, domain.ErrInvalidInput
+	}
+	return renderPDFPagePNG(ctx, raw, page)
 }
 
 func renderOfficePDFSourceWithSheet(ctx context.Context, source Download, sheetName string) ([]byte, error) {

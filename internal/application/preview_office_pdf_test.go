@@ -60,3 +60,55 @@ func TestOfficePDFPreviewACLAndSandbox(t *testing.T) {
 		t.Fatalf("revoked preview leaked: %v", err)
 	}
 }
+
+// Edge can be configured to download PDFs instead of displaying them. Office
+// previews must therefore expose only page images, independently of download
+// permission, and reject stale revisions/revoked access.
+func TestOfficePageImagesPreviewOnly(t *testing.T) {
+	for _, binary := range []string{"bwrap", "soffice", "pdftoppm"} {
+		if _, err := exec.LookPath(binary); err != nil {
+			t.Skip(binary + " unavailable")
+		}
+	}
+	service, _ := testService(t)
+	ctx := context.Background()
+	admin := domain.User{ID: "u_admin", Login: "admin", IsAdmin: true}
+	member := domain.User{ID: "u_user", Login: "user1"}
+	uploaded, err := service.CommitUpload(ctx, admin, "folder_market", "edge-preview.docx", "application/octet-stream", "", bytes.NewReader(testOfficeDocumentZIP(t)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.OfficePreviewPages(ctx, member, uploaded.FileID, uploaded.Sha256); err != domain.ErrForbidden {
+		t.Fatalf("unshared office page count disclosed: %v", err)
+	}
+	grant, err := service.CreateShare(ctx, admin, ShareDraft{
+		ResourceKind: "file", ResourceID: uploaded.FileID, RecipientKind: "user",
+		RecipientID: member.ID, Actions: []domain.Action{domain.ActionPreview},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err = service.OpenDownload(ctx, member, uploaded.FileID); err != domain.ErrForbidden {
+		t.Fatalf("preview-only user can download Office source: %v", err)
+	}
+	count, err := service.OfficePreviewPages(ctx, member, uploaded.FileID, uploaded.Sha256)
+	if err != nil || count < 1 {
+		t.Fatalf("page count: %d, %v", count, err)
+	}
+	png, err := service.OfficePreviewPage(ctx, member, uploaded.FileID, uploaded.Sha256, 1)
+	if err != nil || !bytes.HasPrefix(png, []byte{137, 80, 78, 71, 13, 10, 26, 10}) {
+		t.Fatalf("Office preview should be a PNG, never a downloadable PDF: %v", err)
+	}
+	if _, err = service.OfficePreviewPages(ctx, member, uploaded.FileID, strings.Repeat("f", 64)); err != domain.ErrVersionConflict {
+		t.Fatalf("stale SHA accepted: %v", err)
+	}
+	if _, err = service.OfficePreviewPage(ctx, member, uploaded.FileID, uploaded.Sha256, count+1); err != domain.ErrInvalidInput {
+		t.Fatalf("invalid page accepted: %v", err)
+	}
+	if err = service.RevokeShare(ctx, admin, grant.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = service.OfficePreviewPages(ctx, member, uploaded.FileID, uploaded.Sha256); err != domain.ErrForbidden {
+		t.Fatalf("revoked preview was accessible: %v", err)
+	}
+}

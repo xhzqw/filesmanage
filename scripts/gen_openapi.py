@@ -1225,6 +1225,12 @@ add("PUT","/api/seal-permissions/{id}",operation("Admin assign personal-sign and
  responses=dict([json_ok(ref("SealUserPermission"),"Saved permission decision"),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"])])))
 
 # --- PDF safe page preview & explicit DOCX signing copy ---
+add("GET","/api/files/{id}/preview/office/pages",operation("Count read-only Office-derived image pages without browser PDF viewer","Files","officePreviewPages",security=SESSION,
+ params=[id_param("id","File ID"),query("sha256","Exact current source SHA-256",required=True)],
+ responses=dict([json_ok(obj({"pageCount":integer(minimum=1)},required=["pageCount"]),"Authorized Office page count"),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
+add("GET","/api/files/{id}/preview/office/page",operation("Render read-only Office document page as PNG with preview-only permission","Files","officePreviewPage",security=SESSION,
+ params=[id_param("id","File ID"),query("sha256","Exact current source SHA-256",required=True),query("page","Page number",integer(minimum=1),required=True)],
+ responses=dict([("200",{"description":"Private no-store bounded PNG page","content":{"image/png":{"schema":{"type":"string","format":"binary"}}}}),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
 add("GET","/api/files/{id}/preview/pdf/pages",operation("Count PDF pages for image-based preview without browser PDF plug-in","Files","pdfPreviewPages",security=SESSION,
  params=[id_param("id","File ID"),query("sha256","Exact current SHA-256",required=True)],
  responses=dict([json_ok(obj({"pageCount":integer(minimum=1)},required=["pageCount"]),"Current authorized PDF page count"),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))

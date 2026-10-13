@@ -20,6 +20,36 @@ func (h *Handler) pdfPreviewPages(c *gin.Context) {
 	c.Header("Cache-Control", "private, no-store")
 	c.JSON(http.StatusOK, gin.H{"ok": true, "data": gin.H{"pageCount": count}})
 }
+func (h *Handler) officePreviewPages(c *gin.Context) {
+	user, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	count, err := h.S.OfficePreviewPages(c.Request.Context(), user, c.Param("id"), c.Query("sha256"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "private, no-store")
+	c.JSON(http.StatusOK, gin.H{"ok": true, "data": gin.H{"pageCount": count}})
+}
+func (h *Handler) officePreviewPage(c *gin.Context) {
+	user, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	page, err := strconv.Atoi(c.Query("page"))
+	if err != nil || page < 1 {
+		respondError(c, domain.ErrInvalidInput)
+		return
+	}
+	image, err := h.S.OfficePreviewPage(c.Request.Context(), user, c.Param("id"), c.Query("sha256"), page)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	servePrivateSealPNG(c, image)
+}
 func (h *Handler) pdfPreviewPage(c *gin.Context) {
 	user, ok := h.auth(c)
 	if !ok {

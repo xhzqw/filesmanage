@@ -161,6 +161,8 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.GET("/files/:id/preview", h.previewFile)
 	api.GET("/files/:id/preview/media", h.previewMedia)
 	api.GET("/files/:id/preview/office-pdf", h.previewOfficePDF)
+	api.GET("/files/:id/preview/office/pages", h.officePreviewPages)
+	api.GET("/files/:id/preview/office/page", h.officePreviewPage)
 	api.GET("/files/:id/preview/pdf/pages", h.pdfPreviewPages)
 	api.GET("/files/:id/preview/pdf/page", h.pdfPreviewPage)
 	api.POST("/files/:id/convert-for-signing", h.convertDOCXForSigning)
