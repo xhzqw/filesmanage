@@ -33,6 +33,8 @@ const chrome=spawn("/usr/bin/google-chrome",[
 ],{stdio:"ignore"});
 let ws,sequence=0;
 const pending=new Map();
+const unexpectedDownloads=[];
+const unexpectedBytesRequests=[];
 async function send(method,params={}){
  const id=++sequence;
  return new Promise((resolve,reject)=>{
@@ -71,6 +73,12 @@ try{
  });
  ws.addEventListener("message",ev=>{
   const reply=JSON.parse(ev.data),job=pending.get(reply.id);
+  if(reply.method==="Page.downloadWillBegin"||reply.method==="Browser.downloadWillBegin"){
+   unexpectedDownloads.push(reply.params?.suggestedFilename??"download");
+  }
+  if(reply.method==="Network.requestWillBeSent"&&(reply.params?.request?.url??"").includes("/bytes")){
+   unexpectedBytesRequests.push(reply.params.request.url);
+  }
   if(!job)return;
   pending.delete(reply.id);clearTimeout(job.timer);
   reply.error?job.reject(Error(reply.error.message)):job.resolve(reply.result);
@@ -78,22 +86,24 @@ try{
  await send("Page.enable");await send("Runtime.enable");await send("Network.enable");
  await send("Network.setCookie",{name:"fm_session",value:cookie.slice("fm_session=".length),url:base});
  await send("Page.navigate",{url:base+"/preview/"+encodeURIComponent(item.id)});
- assert(await waitFor('Boolean(document.querySelector(".office-layout-pdf iframe[src^=blob]"))',25000),
-  "DOCX must open in page layout, not automatically switch to summary");
+ assert(await waitFor('Boolean(document.querySelector(".office-layout-pdf img[aria-hidden=false]"))',35000),
+  "DOCX must open as a rendered image page, without downloading");
  for(const [width,height] of [[1440,900],[1024,768],[740,740]]){
   await send("Emulation.setDeviceMetricsOverride",{width,height,deviceScaleFactor:1,mobile:false});
   await delay(250);
   const state=await evalJS(`(()=>{
    const stage=document.querySelector(".office-layout-preview");
-   const iframe=document.querySelector(".office-layout-pdf iframe");
-   const rect=stage?.getBoundingClientRect(),paper=iframe?.getBoundingClientRect();
+   const image=document.querySelector(".office-layout-pdf img");
+   const rect=stage?.getBoundingClientRect(),paper=image?.getBoundingClientRect();
    const selected=[...document.querySelectorAll(".office-layout-switch button")]
     .find(button=>button.getAttribute("aria-pressed")==="true")?.textContent?.trim();
    return {selected,stageWidth:rect?.width,pageWidth:paper?.width,pageHeight:paper?.height,
-    isBlob:iframe?.getAttribute("src")?.startsWith("blob:"),summaryVisible:!!document.querySelector(".office-layout-outline"),
+    isPNG:!!image?.complete&&image.naturalWidth>0&&image.getAttribute("src")?.includes("/preview/office/page?"),
+    hasPDFFrame:!!document.querySelector(".office-layout-pdf iframe"),
+    summaryVisible:!!document.querySelector(".office-layout-outline"),
     overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth};
   })()`);
-  assert(state.selected==="页面布局"&&state.isBlob&&!state.summaryVisible&&state.pageHeight>250&&
+  assert(state.selected==="页面布局"&&state.isPNG&&!state.hasPDFFrame&&!state.summaryVisible&&state.pageHeight>250&&
    state.pageWidth>200&&state.pageWidth<=state.stageWidth+2&&state.overflow<=1,
    "DOCX paged layout geometry "+width+": "+JSON.stringify(state));
   console.log("PASS DOCX page layout "+width);
@@ -115,9 +125,11 @@ try{
  await evalJS(`(()=>{
   [...document.querySelectorAll(".office-layout-switch button")].find(b=>b.textContent?.includes("页面布局"))?.click();
  })()`);
- assert(await waitFor('Boolean(document.querySelector(".office-layout-pdf iframe[src^=blob]"))'),
-  "DOCX switch back to pages must retain PDF");
- console.log("PASS DOCX returns to real PDF pages");
+ assert(await waitFor('Boolean(document.querySelector(".office-layout-pdf img[aria-hidden=false]"))'),
+  "DOCX switch back to pages must retain rendered page");
+ assert.deepEqual(unexpectedDownloads,[],"DOCX preview must not trigger a browser download");
+ assert.deepEqual(unexpectedBytesRequests,[],"DOCX preview must not fetch the original file");
+ console.log("PASS DOCX returns to image pages without downloading");
 }finally{
  ws?.close();
  chrome.kill("SIGTERM");
