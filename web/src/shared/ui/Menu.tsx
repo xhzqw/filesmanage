@@ -11,6 +11,7 @@ export type MenuItem={
  danger?:boolean;
  hint?:string;
 };
+export type MenuSwatch={id:string;label:string;color:string;checked:boolean;disabled?:boolean;onSelect:()=>void};
 
 export type MenuPoint={x:number;y:number};
 
@@ -21,10 +22,11 @@ export type MenuPoint={x:number;y:number};
 // Escape close instead of leaking focus into the page, and an action the
 // current user may not perform never reaches the item list because the host
 // computes it.
-export function Menu({open,onClose,items,anchor,label,point}:{
+export function Menu({open,onClose,items,swatches,anchor,label,point}:{
  open:boolean;
  onClose:()=>void;
  items:MenuItem[];
+ swatches?:MenuSwatch[];
  anchor?:HTMLElement|null;
  label:string;
  // Pointer coordinates of the triggering contextmenu event; a keyboard-opened
@@ -158,6 +160,16 @@ export function Menu({open,onClose,items,anchor,label,point}:{
    <span className="menu-label">{item.label}</span>
    {item.hint&&<span className="menu-hint">{item.hint}</span>}
   </RareButton>)}
+  {swatches&&swatches.length>0&&<div className="menu-label-colors" role="group" aria-label="标记文件颜色">
+   <span className="menu-colors-heading">标签</span>
+   <div className="menu-colors-row">{swatches.map(swatch=><RareButton key={swatch.id} type="button"
+    role="menuitemcheckbox" aria-checked={swatch.checked} aria-label={swatch.label} title={swatch.label}
+    className="menu-color-option" disabled={swatch.disabled} tabIndex={-1}
+    onClick={()=>{closeMenu(true);swatch.onSelect();}}>
+    <span className="menu-color-dot" style={{backgroundColor:swatch.color}} aria-hidden="true"/>
+    {swatch.checked&&<span className="menu-color-check" aria-hidden="true">✓</span>}
+   </RareButton>)}</div>
+  </div>}
  </div>;
  // Render above scrollable tables and folder trees. Inside a native modal,
  // the portal must remain in its top layer rather than behind the scrim.
@@ -166,5 +178,5 @@ export function Menu({open,onClose,items,anchor,label,point}:{
 
 function enabledItems(root:HTMLElement|null):HTMLButtonElement[]{
  if(!root)return[];
- return Array.from(root.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')).filter(button=>!button.disabled);
+ return Array.from(root.querySelectorAll<HTMLButtonElement>('[role="menuitem"],[role="menuitemcheckbox"]')).filter(button=>!button.disabled);
 }

@@ -5,8 +5,9 @@ import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {FileResourceIcon,FolderResourceIcon} from "../../shared/ui/ResourceIcons";
 import {RareButton} from "../../shared/ui/rare";
 import "./finderSidebar.css";
+import {FinderTags} from "./FinderTags";
 
-export type DocumentSection="files"|"favorites"|"received"|"sent";
+export type DocumentSection="files"|"favorites"|"received"|"sent"|"labels";
 
 function NavigationGlyph({kind}:{kind:"files"|"favorite"|"received"|"sent"}){
  const base={viewBox:"0 0 24 24",width:19,height:19,fill:"none",stroke:"currentColor",strokeWidth:1.8,strokeLinecap:"round" as const,strokeLinejoin:"round" as const,"aria-hidden":true as const};
@@ -59,5 +60,6 @@ export function FinderSidebar({section,revision}:{section:DocumentSection;revisi
    {link("received","与我共享","received")}
    {link("sent","我共享的","sent")}
   </div>
+  <FinderTags/>
  </nav>;
 }

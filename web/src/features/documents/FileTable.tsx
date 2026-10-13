@@ -24,6 +24,7 @@ import"./dragMove.css";
 import {setMoveDragImage} from "./dragPreview";
 import {classifyFile,type FileCategory} from "../../shared/fileTypes";
 import {FileTypeIcon} from "../../shared/ui/FileTypeIcon";
+import {FINDER_COLORS,finderColor,labelApi,type FinderLabel} from "../../shared/finderLabels";
 import {FolderResourceIcon} from "../../shared/ui/ResourceIcons";
 import"./fileTable.css";
 import type {ExplorerViewMode} from "./explorerView";
@@ -129,6 +130,30 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  // Transient context-menu state (DESKTOP-INTERACTION §1.1 contextTarget): it
  // lives only while the row menu is open and is never business state.
  const[rowMenu,setRowMenu]=useState<{targets:FileItem[];point:MenuPoint|null;anchor:HTMLElement|null}|null>(null);
+ const[finderLabels,setFinderLabels]=useState<FinderLabel[]>([]);
+ const[finderAssignments,setFinderAssignments]=useState<Record<string,string[]>>({});
+ const[finderReady,setFinderReady]=useState(false);
+ const[finderBusy,setFinderBusy]=useState(false);
+ const[finderRevision,setFinderRevision]=useState(0);
+ useEffect(()=>{
+  const refresh=()=>setFinderRevision(v=>v+1);
+  window.addEventListener("filesmanage:labels-change",refresh);
+  return()=>window.removeEventListener("filesmanage:labels-change",refresh);
+ },[]);
+ useEffect(()=>{
+  let live=true;setFinderReady(false);
+  labelApi.list().then(labels=>{if(live)setFinderLabels(labels);}).catch(()=>{if(live)setFinderLabels([]);});
+  return()=>{live=false;};
+ },[finderRevision]);
+ useEffect(()=>{
+  let live=true;setFinderReady(false);
+  const ids=items.slice(0,100).map(item=>item.id);
+  if(!ids.length){setFinderAssignments({});setFinderReady(true);return;}
+  labelApi.assignments(ids).then(assigned=>{
+   if(live){setFinderAssignments(assigned);setFinderReady(true);}
+  }).catch(()=>{if(live){setFinderAssignments({});setFinderReady(false);}});
+  return()=>{live=false;};
+ },[items,finderRevision]);
  const[deleteBusy,setDeleteBusy]=useState(false);
  const[zipProgress,setZipProgress]=useState<ZipProgress|null>(null);
  const zipController=useRef<AbortController|null>(null);
@@ -665,8 +690,42 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    if(targets.length<=20&&targets.every(canOfferPrintFromListing))
     items.push({id:"print-batch",label:"批量打印",onSelect:()=>setPrintingBatch(targets)});
   }
+  for(const label of finderLabels.filter(label=>!label.isDefault)){
+   const allMarked=targets.every(target=>(finderAssignments[target.id]??[]).includes(label.id));
+   items.push({id:"label-"+label.id,label:(allMarked?"✓ ":"")+"标签 · "+label.name,
+    disabled:finderBusy||!finderReady||targets.length>100,
+    onSelect:()=>{void markFinderFiles(label,targets);}});
+  }
   items.push({id:"delete",label:"删除",hint:"Delete",danger:true,onSelect:()=>openDelete(targets)});
   return items;
+ }
+
+ async function markFinderFiles(label:FinderLabel,targets:FileItem[]){
+  if(finderBusy||!finderReady||!targets.length||targets.length>100)return;
+  const allMarked=targets.every(target=>(finderAssignments[target.id]??[]).includes(label.id));
+  setFinderBusy(true);
+  try{
+   await labelApi.setFiles(label.id,targets.map(target=>target.id),!allMarked);
+   const nextIds=targets.map(target=>target.id);
+   setFinderAssignments(current=>{
+    const result={...current};
+    for(const id of nextIds){
+     const labels=new Set(result[id]??[]);
+     if(allMarked)labels.delete(label.id);else labels.add(label.id);
+     result[id]=Array.from(labels);
+    }
+    return result;
+   });
+   toast.success(allMarked?"已移除标签":"已添加标签");
+  }catch(error){toast.error(errorCopy(error,"设置文件标签失败"));}
+  finally{setFinderBusy(false);}
+ }
+ function finderDots(item:FileItem){
+  const assigned=new Set(finderAssignments[item.id]??[]);
+  const marks=finderLabels.filter(label=>assigned.has(label.id));
+  return marks.length?<span className="file-finder-marks" aria-label={"标签："+marks.map(m=>m.name).join("、")}>
+   {marks.slice(0,6).map(label=><span key={label.id} className="file-finder-mark" style={{backgroundColor:finderColor(label.color)}} title={label.name}/>)}
+  </span>:null;
  }
 
  // The row-actions cell downloads through a plain <a download>; the menu
@@ -791,7 +850,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     {image&&<img src={fileApi.mediaUrl(item.id,item.sha256)} alt="" loading="lazy" decoding="async"
      onError={event=>{event.currentTarget.hidden=true;}}/>}
    </div>
-   <span className="explorer-item-name" title={item.name}>{item.name}</span>
+   <span className="explorer-item-name" title={item.name}>{item.name}</span>{finderDots(item)}
    <span className="explorer-item-sub">{formatSize(item.sizeBytes)} · v{item.currentVersionSeq}</span>
    <RareInput className="explorer-item-check" type="checkbox" checked={selectedIds.has(item.id)}
     aria-label={"选择 "+item.name} onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}} onChange={event=>onCheckToggle(event,item)}/>
@@ -970,7 +1029,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       onDragEnd={onRowDragEnd}>
       <td className="col-select"><RareInput type="checkbox" checked={selectedIds.has(item.id)} aria-label={"选择 "+item.name} onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}} onChange={event=>onCheckToggle(event,item)}/></td>
       <td className="col-name"><div className="file-cell-wrap">
-       <FileTypeIcon name={item.name} size={19}/><span className="file-name" title={item.name}>{item.name}</span>
+       <FileTypeIcon name={item.name} size={19}/><span className="file-name" title={item.name}>{item.name}</span>{finderDots(item)}
        <small className="file-mobile-meta">v{item.currentVersionSeq} · {formatSize(item.sizeBytes)}</small>
        <RareButton type="button" className="file-mobile-actions" aria-label={"操作 "+item.name}
         title={"文件操作："+item.name} aria-haspopup="menu"
@@ -1068,7 +1127,13 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   {movingBatch&&<BatchMoveDialog files={movingBatch} presetTargetId={moveDropTarget} onClose={()=>{setMoveDropTarget("");setMovingBatch(null);}} onMoved={onBatchMoved} onReload={onMoveReload}/>}
    {printingBatch&&<BatchPrintDialog files={printingBatch} onClose={()=>setPrintingBatch(null)}/>}
   {rowMenu&&<Menu open label="文件操作菜单" items={rowMenuItems(rowMenu.targets)} anchor={rowMenu.anchor}
-   point={rowMenu.point} onClose={()=>setRowMenu(null)}/>}
+   point={rowMenu.point} onClose={()=>setRowMenu(null)}
+   swatches={FINDER_COLORS.map(color=>{
+    const label=finderLabels.find(item=>item.isDefault&&item.color===color.id);
+    return {id:color.id,label:color.name,color:color.hex,checked:!!label&&rowMenu.targets.every(file=>(finderAssignments[file.id]??[]).includes(label.id)),
+     disabled:!label||!finderReady||finderBusy||rowMenu.targets.length>100,
+     onSelect:()=>{if(label)void markFinderFiles(label,rowMenu.targets);}};
+   })}/>}
   <footer className="status-bar">
    <div className="status-left">
     <span>已选 <span className="status-strong">{selectedIds.size}</span> 项{selectedIds.size>0&&<> / <span className="status-strong">{formatSize(selectedBytes)}</span></>} · {hasMore?"已加载":"共"} <span className="status-strong">{items.length}</span> 个文件{childFolders.length>0&&<> · <span className="status-strong">{childFolders.length}</span> 个文件夹</>}{(categoryFilter!=="all"||nameFilter.trim())&&<> · 匹配 <span className="status-strong">{visibleItems.length+visibleFolders.length}</span> 项（已加载范围）</>}</span>
