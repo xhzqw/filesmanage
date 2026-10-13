@@ -76,7 +76,7 @@
  position:relative;flex:1 1 auto;min-height:0;min-width:0;
  margin:0;background:var(--surface-panel);overflow:auto;
 }
-.explorer-marquee{position:absolute;z-index:6;pointer-events:none;border:1px solid var(--border-focus);border-radius:3px;background:var(--surface-row-selected);opacity:.68;box-sizing:border-box}
+.explorer-marquee{position:absolute;z-index:6;pointer-events:none;border:1px solid var(--border-focus);border-radius:var(--radius-xs);background:var(--surface-row-selected);opacity:.68;box-sizing:border-box}
 .explorer-empty{min-height:160px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--text-secondary);font-size:12px}
 .explorer-icon-grid{
  display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));
