@@ -53,6 +53,8 @@ const selectionText=()=>evaluate('document.querySelector(".file-selected-count")
 const favoriteRead=()=>evaluate('(async()=>{const response=await fetch("/api/favorites",{cache:"no-store"});const json=await response.json();return {status:response.status,ok:json.ok,rows:json.data};})()');
 
 let tested=null,originalFavorite=false;
+let copiedTestId=null,copyDestination=null;
+let copyBeforeIds=[];
 try{
  for(let i=0;i<120;i++){
   await delay(90);
@@ -175,6 +177,53 @@ try{
  await click('.folder-view-switch button[aria-label="列表视图"]');
  await until('document.querySelector(".work-body")?.dataset.explorerView==="list"');
 
+ // Exercise a real Ctrl+C -> directory navigation -> Ctrl+V round-trip.
+ // The source is an existing small file; only the new duplicate is deleted.
+ const clipboardFixture=await evaluate(`(async()=>{
+  const tree=await(await fetch("/api/folders/tree")).json();
+  const sourceFolder=new URLSearchParams(location.search).get("folder")||tree.data?.find(row=>!row.parentId)?.id;
+  const source=await(await fetch("/api/files?"+new URLSearchParams({folder:sourceFolder,sort:"updated_desc",limit:"50"}))).json();
+  const rows=source.data?.items||[];
+  const file=rows.find(row=>row.sizeBytes<131072&&row.name.endsWith(".txt")&&
+    !!document.querySelector('tr.file-entry[data-id="'+row.id+'"]'));
+  const child=[...document.querySelectorAll(".explorer-list-folder")].map(row=>row.dataset.uploadFolderId)
+   .find(id=>id&&id!==sourceFolder);
+  return file&&child?{fileId:file.id,name:file.name,sha:file.sha256,target:child}:null;
+ })()`);
+ if(clipboardFixture){
+  copyDestination=clipboardFixture.target;
+  const current=await evaluate(`(async()=>{
+   const r=await fetch("/api/files?"+new URLSearchParams({folder:${JSON.stringify(copyDestination)},sort:"updated_desc",limit:"50"}));
+   const data=await r.json();return (data.data?.items||[]).map(file=>file.id);
+  })()`);
+  copyBeforeIds=current;
+  await click('tr.file-entry[data-id="'+clipboardFixture.fileId+'"] .file-name');
+  const shortcut=async(key,code)=>{
+   await send("Input.dispatchKeyEvent",{type:"keyDown",modifiers:2,key,code});
+   await send("Input.dispatchKeyEvent",{type:"keyUp",modifiers:2,key,code});
+  };
+  await shortcut("c","KeyC");
+  await navigate("/doc?folder="+encodeURIComponent(copyDestination),'!!document.querySelector(".work-body .file-toolbar")');
+  await shortcut("v","KeyV");
+  const newCopy=async()=>evaluate(`(async()=>{
+   const r=await fetch("/api/files?"+new URLSearchParams({folder:${JSON.stringify(copyDestination)},sort:"updated_desc",limit:"50"}));
+   const data=await r.json();return (data.data?.items||[]).find(row=>!${JSON.stringify(copyBeforeIds)}.includes(row.id)&&row.sha256===${JSON.stringify(clipboardFixture.sha)})||null;
+  })()`);
+  for(let i=0;i<120;i++){const copy=await newCopy();if(copy){copiedTestId=copy.id;break;}await delay(150);}
+  assert(copiedTestId,"Ctrl+V must persist a new content-identical file in the destination directory");
+  const copy=await newCopy();
+  assert(copy.name.includes("副本")||copy.name===clipboardFixture.name,"Pasted file must keep original name or use a safe copy suffix");
+  await until('!document.querySelector(".file-paste-status")',"Paste operation finished");
+  console.log("EXPLORER_LIVE_COPY_PASTE_PASS",JSON.stringify({source:clipboardFixture.fileId,destination:copyDestination,copied:copiedTestId,hashMatches:true}));
+  const cleanup=await evaluate(`(async()=>{
+   const response=await fetch("/api/files/"+${JSON.stringify(copiedTestId)},{method:"DELETE"});
+   return response.ok;
+  })()`);
+  assert(cleanup,"Temporary copied file must be cleaned up");
+  copiedTestId=null;
+  await navigate(path,'!!document.querySelector("tr.file-entry")');
+ }
+
  const initial=await favoriteRead();
  assert(initial.ok&&Array.isArray(initial.rows),"Real favorites GET must succeed");
  const target=await evaluate('(()=>{const row=document.querySelector("tr.file-entry");return row?{id:row.dataset.id,name:row.querySelector(".file-name")?.textContent}:null;})()');
@@ -198,6 +247,11 @@ try{
  console.error("EXPLORER_LIVE_INTERACTION_FAIL",error?.stack||error);
  process.exitCode=1;
 }finally{
+ if(copiedTestId&&ws?.readyState===WebSocket.OPEN){
+  try{
+   await evaluate(`(async()=>{await fetch("/api/files/"+${JSON.stringify(copiedTestId)},{method:"DELETE"});return true})()`);
+  }catch(error){console.error("COPY_FIXTURE_RESTORE_FAILED",error?.message);process.exitCode=1;}
+ }
  if(tested&&ws?.readyState===WebSocket.OPEN){
   try{
    const result=await evaluate(`(async()=>{
