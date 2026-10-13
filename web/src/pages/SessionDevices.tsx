@@ -9,21 +9,32 @@ import {sessionApi,type DeviceSession,type AuthActivity} from "../features/auth/
 import {errorCode,errorCopy} from "../shared/errors";
 import "./SessionDevices.css";
 
-const dateFormatter=new Intl.DateTimeFormat("zh-CN",{
- year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"
-});
+const dateFormatter=new Intl.DateTimeFormat("zh-CN",{year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});
+const shortFormatter=new Intl.DateTimeFormat("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});
 function dateTime(value:string):string{
  const date=new Date(value);
  return Number.isFinite(date.getTime())?dateFormatter.format(date):"未记录";
 }
-function networkValue(value?:string):string{return value?.trim()||"未获取";}
-function sessionKey(row:DeviceSession):string{
- // A group represents matching recorded metadata, NOT verified physical identity.
- return JSON.stringify([row.device||"",row.address||"",row.macAddress||""]);
+function shortTime(value:string):string{
+ const date=new Date(value);
+ return Number.isFinite(date.getTime())?shortFormatter.format(date):"未记录";
 }
-function deviceSymbol(device:string):string{
- if(/iphone|ipad|android|ios/i.test(device))return "▯";
- return "▣";
+function networkValue(value?:string){return value?.trim()||"未获取";}
+function sessionKey(row:DeviceSession){return JSON.stringify([row.device||"",row.address||"",row.macAddress||""]);}
+function DeviceIcon({device}:{device:string}){
+ const mobile=/iphone|ipad|android|ios/i.test(device);
+ return <span className="sessions-device-icon" aria-hidden="true">
+  {mobile?<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
+   <rect x="7.2" y="2.6" width="9.6" height="18.8" rx="2.2"/><path d="M10.4 18.3h3.2"/>
+  </svg>:<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
+   <rect x="3" y="4" width="18" height="13.5" rx="2"/><path d="M8 21h8M12 17.5V21"/>
+  </svg>}
+ </span>;
+}
+function Chevron({open=false}:{open?:boolean}){
+ return <svg className={"sessions-chevron"+(open?" is-open":"")} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <path d="m9 18 6-6-6-6"/>
+ </svg>;
 }
 function SessionFacts({session}:{session:DeviceSession}){
  return <dl className="sessions-facts">
@@ -39,7 +50,7 @@ const activityLabels:Record<string,string>={
  "auth.login":"登录成功","auth.logout":"退出登录",
  "auth.session_revoke":"退出指定会话","auth.sessions_revoke":"退出其他会话"
 };
-function activityTitle(event:AuthActivity):string{
+function activityTitle(event:AuthActivity){
  if(event.type==="auth.login"&&event.outcome==="denied")return "登录失败";
  return activityLabels[event.type]??"安全操作";
 }
@@ -53,28 +64,21 @@ export function SessionDevices({user,onLogout}:{user:User;onLogout:()=>void}){
  const [error,setError]=useState("");
  const [activityError,setActivityError]=useState(false);
  const [confirm,setConfirm]=useState<string|null>(null);
+ const [view,setView]=useState<"sessions"|"activity">("sessions");
+ const [currentDetails,setCurrentDetails]=useState(false);
  const [expanded,setExpanded]=useState<Record<string,boolean>>({});
+ const [allRows,setAllRows]=useState<Record<string,boolean>>({});
+ const [auditLimit,setAuditLimit]=useState(10);
 
  const refresh=useCallback(async()=>{
   setRefreshing(true);
   try{
    const [sessionResult,activityResult]=await Promise.allSettled([sessionApi.list(),sessionApi.activity()]);
-   if(sessionResult.status==="fulfilled"){
-    setSessions(sessionResult.value);
-    setError("");
-   }else{
-    setError("无法获取登录会话，请检查网络后刷新。");
-   }
-   if(activityResult.status==="fulfilled"){
-    setActivity(activityResult.value);
-    setActivityError(false);
-   }else{
-    setActivityError(true);
-   }
-  }finally{
-   setLoading(false);
-   setRefreshing(false);
-  }
+   if(sessionResult.status==="fulfilled"){setSessions(sessionResult.value);setError("");}
+   else setError("无法获取登录会话，请检查网络后重试。");
+   if(activityResult.status==="fulfilled"){setActivity(activityResult.value);setActivityError(false);}
+   else setActivityError(true);
+  }finally{setLoading(false);setRefreshing(false);}
  },[]);
  useEffect(()=>{
   void refresh();
@@ -90,8 +94,7 @@ export function SessionDevices({user,onLogout}:{user:User;onLogout:()=>void}){
  const groups=useMemo(()=>{
   const map=new Map<string,{key:string;device:string;address:string;mac:string;items:DeviceSession[]}>();
   for(const session of others){
-   const key=sessionKey(session);
-   const group=map.get(key);
+   const key=sessionKey(session),group=map.get(key);
    if(group){group.items.push(session);}
    else map.set(key,{key,device:session.device||"未知浏览器",address:session.address,
     mac:session.macAddress||"",items:[session]});
@@ -102,8 +105,7 @@ export function SessionDevices({user,onLogout}:{user:User;onLogout:()=>void}){
 
  async function revoke(){
   if(!confirm||busy)return;
-  setBusy(true);
-  setError("");
+  setBusy(true);setError("");
   try{
    if(confirm==="others"){
     const result=await sessionApi.revokeOthers();
@@ -128,96 +130,116 @@ export function SessionDevices({user,onLogout}:{user:User;onLogout:()=>void}){
      <header className="sessions-heading">
       <div className="sessions-heading-copy">
        <h1>登录设备与安全</h1>
-       <p>查看当前会话、管理其他登录及安全记录</p>
+       <p>管理当前会话、其他登录与安全记录</p>
       </div>
       <div className="sessions-heading-actions">
-       <Link to="/doc" className="sessions-btn sessions-back">返回文档</Link>
-       <RareButton className="sessions-btn" onClick={()=>void refresh()} disabled={refreshing||busy}>
-        {refreshing?"刷新中…":"刷新"}
+       <Link to="/doc" className="sessions-back">返回文档</Link>
+       <RareButton className="sessions-refresh" aria-label="刷新登录会话与安全记录" title="刷新" onClick={()=>void refresh()} disabled={refreshing||busy}>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+         <path d="M20 7v5h-5"/><path d="M4 17v-5h5"/><path d="M5.7 9a7 7 0 0 1 12.3-1.4L20 12M4 12l2 4.4A7 7 0 0 0 18.3 15"/>
+        </svg>
        </RareButton>
       </div>
      </header>
      {error&&<p className="sessions-alert" role="alert">{error}</p>}
-     <div className="sessions-grid">
-      <div className="sessions-primary">
-       <section className="sessions-panel sessions-current-panel" aria-labelledby="sessions-current-title">
-        <div className="sessions-panel-heading">
-         <div><h2 id="sessions-current-title">当前会话</h2><p>你正在使用的浏览器连接</p></div>
-         {current&&<span className="sessions-current-pill">正在使用</span>}
+
+     <section className="sessions-current" aria-labelledby="sessions-current-title">
+      <div className="sessions-current-main">
+       <div className="sessions-current-icon"><DeviceIcon device={current?.device??""}/></div>
+       <div className="sessions-current-copy">
+        <div className="sessions-current-title">
+         <h2 id="sessions-current-title">当前会话</h2>
+         {current&&<span className="sessions-live-dot" aria-label="正在使用"/>}
         </div>
-        {loading?<div className="sessions-empty">正在加载会话…</div>:
-         current?<div className="sessions-current-body">
-          <div className="sessions-device-lead">
-           <span className="sessions-device-icon" aria-hidden="true">{deviceSymbol(current.device)}</span>
-           <strong>{current.device||"未知浏览器"}</strong>
-          </div>
-          <SessionFacts session={current}/>
-         </div>:<div className="sessions-empty">
-          {error?"无法确认当前会话":"当前会话未出现在列表中，请刷新核对。"}
-         </div>}
-       </section>
-       <section className="sessions-panel sessions-others-panel" aria-labelledby="sessions-other-title">
-        <div className="sessions-panel-heading sessions-other-heading">
-         <div>
-          <h2 id="sessions-other-title">其他登录会话 <span className="sessions-count">{others.length}</span></h2>
-          <p>同来源会话归为一组，可展开查看并逐条退出</p>
-         </div>
-         <RareButton tone="danger" className="sessions-btn sessions-danger"
-          disabled={busy||refreshing||others.length===0} onClick={()=>setConfirm("others")}>
-          退出其他全部会话
-         </RareButton>
-        </div>
-        <div className="sessions-groups-scroll">
-         {loading?<div className="sessions-empty">正在加载…</div>:
-          others.length===0?<div className="sessions-empty">没有其他登录会话</div>:
-          groups.map(group=>{
-           const open=expanded[group.key]??group.items.length===1;
-           return <section className="sessions-group" key={group.key}>
-            <RareButton type="button" className="sessions-group-toggle" aria-expanded={open}
-             onClick={()=>setExpanded(prev=>({...prev,[group.key]:!open}))}>
-             <span className="sessions-device-icon" aria-hidden="true">{deviceSymbol(group.device)}</span>
-             <span className="sessions-group-info">
-              <span className="sessions-group-title">{group.device}<span className="sessions-group-count">{group.items.length} 个会话</span></span>
-              <span className="sessions-group-subtitle">IP {networkValue(group.address)} · MAC {networkValue(group.mac)}</span>
-             </span>
-             <span className={"sessions-chevron"+(open?" is-open":"")} aria-hidden="true">⌄</span>
-            </RareButton>
-            {open&&<ul className="sessions-detail-list">
-             {group.items.map(item=><li key={item.id} className="sessions-detail-item">
-              <div className="sessions-detail-head">
-               <span>登录于 {dateTime(item.createdAt)}</span>
-               <RareButton tone="danger" className="sessions-btn sessions-danger sessions-revoke"
-                disabled={busy||refreshing} onClick={()=>setConfirm(item.id)}>退出此会话</RareButton>
-              </div>
-              <SessionFacts session={item}/>
-             </li>)}
-            </ul>}
-           </section>;
-          })}
-        </div>
-       </section>
+        {loading?<p>正在获取设备信息…</p>:
+         current?<p><strong>{current.device||"未知浏览器"}</strong><span className="sessions-inline-dot">·</span> IP {networkValue(current.address)}
+          <span className="sessions-inline-dot">·</span> MAC {networkValue(current.macAddress)}</p>:
+         <p>{error?"无法确认当前会话":"当前会话暂未显示，请刷新核对。"}</p>}
+       </div>
+       {current&&<RareButton type="button" className="sessions-current-details-trigger" aria-expanded={currentDetails}
+        onClick={()=>setCurrentDetails(v=>!v)}>
+        {currentDetails?"收起":"详情"}<Chevron open={currentDetails}/>
+       </RareButton>}
       </div>
-      <aside className="sessions-panel sessions-activity-panel" aria-labelledby="sessions-activity-title">
-       <div className="sessions-panel-heading">
-        <div><h2 id="sessions-activity-title">最近安全操作</h2><p>最近 30 条登录和退出记录</p></div>
-       </div>
-       <div className="sessions-audit-scroll">
-        {activityError&&<p className="sessions-audit-error" role="status">记录获取失败，请刷新重试。</p>}
-        {!activityError&&activity.length===0?<div className="sessions-empty">暂无安全操作记录</div>:
-         <ol className="sessions-audit">
-          {activity.map((event,i)=><li key={event.occurredAt+"-"+i}>
-           <div className="sessions-event-line"><strong>{activityTitle(event)}</strong>
-            {event.count!==undefined&&event.count>0?<span> · {event.count} 个</span>:null}</div>
-           <time dateTime={event.occurredAt}>{dateTime(event.occurredAt)}</time>
-           {(event.device||event.address||event.macAddress)&&<p>
-            {[event.device,event.address?"IP "+event.address:"",event.macAddress?"MAC "+event.macAddress:""].filter(Boolean).join(" · ")}
-           </p>}
-          </li>)}
-         </ol>}
-       </div>
-       <p className="sessions-activity-footnote">MAC 仅在服务器能识别局域网邻居时记录；相同来源不代表同一实体设备。</p>
-      </aside>
+      {current&&currentDetails&&<div className="sessions-current-details"><SessionFacts session={current}/></div>}
+     </section>
+
+     <div className="sessions-toolbar">
+      <div className="sessions-segmented" role="tablist" aria-label="账号安全视图">
+       <RareButton type="button" role="tab" id="sessions-tab-list" aria-controls="sessions-tabpanel-list"
+        aria-selected={view==="sessions"} className={"sessions-tab"+(view==="sessions"?" is-active":"")}
+        onClick={()=>setView("sessions")}>登录会话 <span className="sessions-tab-count">{others.length}</span></RareButton>
+       <RareButton type="button" role="tab" id="sessions-tab-activity" aria-controls="sessions-tabpanel-activity"
+        aria-selected={view==="activity"} className={"sessions-tab"+(view==="activity"?" is-active":"")}
+        onClick={()=>setView("activity")}>安全记录 <span className="sessions-tab-count">{activity.length}</span></RareButton>
+      </div>
+      {view==="sessions"&&<RareButton type="button" tone="danger" className="sessions-revoke-all"
+       disabled={busy||refreshing||others.length===0} onClick={()=>setConfirm("others")}>退出其他全部会话</RareButton>}
      </div>
+
+     <section className="sessions-content" role="tabpanel" id="sessions-tabpanel-list" aria-labelledby="sessions-tab-list" hidden={view!=="sessions"}>
+      <div className="sessions-content-intro">
+       <span>{groups.length} 组来源 · {others.length} 个其他会话</span>
+       <span>相同来源不代表同一实体设备</span>
+      </div>
+      {loading?<p className="sessions-empty">正在获取会话…</p>:
+       others.length===0?<div className="sessions-zero">
+        <span className="sessions-zero-icon" aria-hidden="true">✓</span>
+        <strong>没有其他登录会话</strong><p>只有当前连接处于登录状态</p>
+       </div>:
+       <div className="sessions-groups">{groups.map(group=>{
+        const open=expanded[group.key]??false;
+        const showAll=allRows[group.key]??false;
+        const shown=open?(showAll?group.items:group.items.slice(0,5)):[];
+        return <div className={"sessions-group"+(open?" is-expanded":"")} key={group.key}>
+         <RareButton type="button" className="sessions-group-toggle" aria-expanded={open}
+          onClick={()=>setExpanded(prev=>({...prev,[group.key]:!open}))}>
+          <DeviceIcon device={group.device}/>
+          <span className="sessions-group-copy">
+           <span className="sessions-group-title">{group.device}<span className="sessions-group-count">{group.items.length} 个会话</span></span>
+           <span className="sessions-group-meta">IP {networkValue(group.address)} <span>·</span> MAC {networkValue(group.mac)}</span>
+          </span>
+          <span className="sessions-group-recent">最近 {shortTime(group.items[0]?.lastSeenAt??"")}</span>
+          <Chevron open={open}/>
+         </RareButton>
+         {open&&<div className="sessions-expand-content">
+          <ul className="sessions-detail-list">{shown.map(row=><li key={row.id} className="sessions-detail-item">
+           <div className="sessions-detail-top">
+            <span className="sessions-detail-time">登录于 {dateTime(row.createdAt)}</span>
+            <RareButton type="button" tone="danger" className="sessions-row-revoke" disabled={busy||refreshing}
+             onClick={()=>setConfirm(row.id)}>退出此会话</RareButton>
+           </div>
+           <SessionFacts session={row}/>
+          </li>)}</ul>
+          {group.items.length>5&&<RareButton type="button" className="sessions-show-more"
+           onClick={()=>setAllRows(prev=>({...prev,[group.key]:!showAll}))}>
+           {showAll?"收起其余记录":"查看剩余 "+(group.items.length-5)+" 条会话"} <Chevron open={showAll}/>
+          </RareButton>}
+         </div>}
+        </div>;
+       })}</div>}
+     </section>
+     <section className="sessions-content sessions-audit-content" role="tabpanel" id="sessions-tabpanel-activity" aria-labelledby="sessions-tab-activity" hidden={view!=="activity"}>
+      <div className="sessions-content-intro"><span>最近安全操作</span><span>保留最近 30 条记录</span></div>
+      {activityError?<p className="sessions-audit-error" role="status">记录获取失败，请刷新后重试。</p>:
+       activity.length===0?<div className="sessions-zero"><strong>暂无安全记录</strong><p>登录及会话撤销记录会显示在这里</p></div>:
+       <ol className="sessions-audit">{activity.slice(0,auditLimit).map((event,i)=><li key={event.occurredAt+"-"+i}>
+        <div className={"sessions-audit-mark"+(event.outcome==="denied"?" is-danger":"")} aria-hidden="true"/>
+        <div className="sessions-audit-content">
+         <div className="sessions-audit-head">
+          <strong>{activityTitle(event)}{typeof event.count==="number"&&event.count>0?" · "+event.count+" 个会话":""}</strong>
+          <time dateTime={event.occurredAt}>{dateTime(event.occurredAt)}</time>
+         </div>
+         {(event.device||event.address||event.macAddress)&&<p>
+          {[event.device,event.address?"IP "+event.address:"",event.macAddress?"MAC "+event.macAddress:""].filter(Boolean).join(" · ")}
+         </p>}
+        </div>
+       </li>)}</ol>}
+      {activity.length>auditLimit&&<RareButton className="sessions-audit-more" onClick={()=>setAuditLimit(x=>x+10)}>
+       再显示 {Math.min(10,activity.length-auditLimit)} 条 <Chevron open/>
+      </RareButton>}
+     </section>
+     <p className="sessions-footnote">MAC 仅在服务器能识别局域网邻居时记录，无法获取时不会推测设备身份。</p>
     </div>
    </main>
   </div>
