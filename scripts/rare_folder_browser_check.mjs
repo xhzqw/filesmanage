@@ -68,7 +68,11 @@ async function measure(width){
  })()`);
  assert(result,"folder toolbar and shared icon must render");
  assert(result.iconCount>0&&result.nestedCards===3&&result.flap,"RareUI layered folder needs 3 cards and a movable flap");
- assert(result.blueBack==="rgb(80, 177, 253)","RareUI original blue theme must be used, not yellow: "+result.blueBack);
+ // The folder fill is now governed by Polar Blue's shared token. Verify its
+ // hue is still blue without pinning an obsolete pre-theme RGB value.
+ const channels=result.blueBack.match(/[\d.]+/g)?.map(Number)??[];
+ assert(channels.length===3&&channels[2]>channels[0]&&channels[2]>channels[1],
+  "RareUI folder must use a blue fill, not a warm primary: "+result.blueBack);
  assert(result.glassBlur.includes("blur(6px)")&&result.flapFill==="#3A9AE8","RareUI front requires the source glass blur and translucent blue flap");
  assert(result.stageSize>0,"RareUI original component stage must have positive size");
  assert.equal(result.controls.join(","),"图标视图,列表视图,分栏视图,画廊视图");
@@ -116,6 +120,14 @@ try{
   assert(clicked,"view mode button missing: "+label);
   await until(`document.querySelector(".work-body")?.dataset.explorerView===${JSON.stringify(mode)}`);
   if(mode==="icons"){
+   const wrapping=await evaluate(`(()=>{
+    const name=document.querySelector(".explorer-icon-grid .explorer-item-name");
+    if(!name)return null;
+    const style=getComputedStyle(name);
+    return {wordBreak:style.wordBreak,overflowWrap:style.overflowWrap};
+   })()`);
+   assert(wrapping?.wordBreak==="keep-all"&&wrapping?.overflowWrap==="normal",
+    "icon view must avoid arbitrary mid-word filename breaks: "+JSON.stringify(wrapping));
    const alignment=await evaluate(`(()=>{
     const source=document.querySelector(".explorer-icon-grid > .explorer-item");
     if(!source)return null;
