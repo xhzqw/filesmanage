@@ -848,7 +848,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   }
   if(event.key==="Enter"||(viewMode==="columns"&&event.key==="ArrowRight")){event.preventDefault();navigate("/doc?folder="+encodeURIComponent(entry.id));return;}
   if(viewMode==="columns"&&event.key==="ArrowLeft"&&folderPath.length>1){
-   event.preventDefault();navigate("/doc?folder="+encodeURIComponent(folderPath[folderPath.length-2].id));return;
+   const parent=folderPath[folderPath.length-2];
+   if(parent){event.preventDefault();navigate("/doc?folder="+encodeURIComponent(parent.id));return;}
   }
   if(event.key===" "){
    event.preventDefault();selectResource("folder",entry.id,true,event.shiftKey);setFocusedFolderId(entry.id);setFocusedId(null);return;
