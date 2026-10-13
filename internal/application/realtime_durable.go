@@ -80,7 +80,17 @@ func (s *Service) WatchDurableCache(ctx context.Context) {
 	s.watchDurableCache(ctx, 2*time.Second)
 }
 
+// PostgreSQL LISTEN/NOTIFY is the low-latency path; polling stays as an
+// independent safety net for dropped notifications and listener failures.
+func (s *Service) WatchDurableCacheWithWake(ctx context.Context, wake <-chan struct{}) {
+	s.watchDurableCacheWithWake(ctx, 2*time.Second, wake)
+}
+
 func (s *Service) watchDurableCache(ctx context.Context, interval time.Duration) {
+	s.watchDurableCacheWithWake(ctx, interval, nil)
+}
+
+func (s *Service) watchDurableCacheWithWake(ctx context.Context, interval time.Duration, wake <-chan struct{}) {
 	if s.durable == nil {
 		return
 	}
@@ -99,58 +109,63 @@ func (s *Service) watchDurableCache(ctx context.Context, interval time.Duration)
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			oldest, newest, err := s.durable.RealtimeBounds(ctx)
+		case _, ok := <-wake:
+			if !ok {
+				wake = nil
+				continue
+			}
+		}
+		oldest, newest, err := s.durable.RealtimeBounds(ctx)
+		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
+			broken = true
+			log.Printf("realtime cache observer bounds retry: %v", err)
+			continue
+		}
+		if !initialized {
+			cursor = newest
+			initialized = true
+			s.invalidateAllReplicaCaches()
+			continue
+		}
+		if broken || cursor > newest || (oldest > 0 && cursor < oldest-1) {
+			// Pruning, a DB restore, or an outage may make events
+			// unreplayable. Never keep stale session/authorization caches.
+			s.invalidateAllReplicaCaches()
+			cursor = newest
+			broken = false
+			// Every subscriber replays from its own bookmark, never this
+			// observer cursor. Wake all after a watcher recovery.
+			s.wakeDurableSubscribers(true, nil)
+			continue
+		}
+		publicChanged := false
+		privateChanged := make(map[string]struct{})
+		for page := 0; page < 8; page++ {
+			events, err := feed.RealtimeFeedAfter(ctx, cursor, 256)
 			if err != nil {
 				if ctx.Err() != nil {
 					return
 				}
 				broken = true
-				log.Printf("realtime cache observer bounds retry: %v", err)
-				continue
+				log.Printf("realtime cache observer retry: %v", err)
+				break
 			}
-			if !initialized {
-				cursor = newest
-				initialized = true
-				s.invalidateAllReplicaCaches()
-				continue
-			}
-			if broken || cursor > newest || (oldest > 0 && cursor < oldest-1) {
-				// Pruning, a DB restore, or an outage may make events
-				// unreplayable. Never keep stale session/authorization caches.
-				s.invalidateAllReplicaCaches()
-				cursor = newest
-				broken = false
-				// Every subscriber replays from its own bookmark, never this
-				// observer cursor. Wake all after a watcher recovery.
-				s.wakeDurableSubscribers(true, nil)
-				continue
-			}
-			publicChanged := false
-			privateChanged := make(map[string]struct{})
-			for page := 0; page < 8; page++ {
-				events, err := feed.RealtimeFeedAfter(ctx, cursor, 256)
-				if err != nil {
-					if ctx.Err() != nil {
-						return
-					}
-					broken = true
-					log.Printf("realtime cache observer retry: %v", err)
-					break
+			for _, event := range events {
+				s.InvalidateFromDurableEvent(event)
+				if event.UserID == "" {
+					publicChanged = true
+				} else {
+					privateChanged[event.UserID] = struct{}{}
 				}
-				for _, event := range events {
-					s.InvalidateFromDurableEvent(event)
-					if event.UserID == "" {
-						publicChanged = true
-					} else {
-						privateChanged[event.UserID] = struct{}{}
-					}
-					cursor = event.ID
-				}
-				if len(events) < 256 {
-					break
-				}
+				cursor = event.ID
 			}
-			s.wakeDurableSubscribers(publicChanged, privateChanged)
+			if len(events) < 256 {
+				break
+			}
 		}
+		s.wakeDurableSubscribers(publicChanged, privateChanged)
 	}
 }

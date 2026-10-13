@@ -165,9 +165,11 @@ func main() {
 		SourceBaseURL: os.Getenv("FILESMANAGE_OFFICE_SOURCE_BASE"),
 		EditorVersion: os.Getenv("FILESMANAGE_OFFICE_VERSION"),
 	})
-	// App replicas must also invalidate HTTP read caches without connected WS
-	// clients; each process follows the same committed PostgreSQL journal.
-	startMaintenance(func() { service.WatchDurableCache(runCtx) })
+	// One dedicated LISTEN connection wakes the per-process journal reader.
+	// The journal remains authoritative; missed signals trigger polling.
+	realtimeWake := make(chan struct{}, 1)
+	startMaintenance(func() { postgres.WatchRealtimeNotifications(runCtx, dsn, realtimeWake) })
+	startMaintenance(func() { service.WatchDurableCacheWithWake(runCtx, realtimeWake) })
 	startMaintenance(func() { service.RunFileIndexJobs(runCtx) })
 	// Durable due-date reminders. At startup and hourly; duplicate instances
 	// are safe because PostgreSQL enforces one notification per due date/phase.

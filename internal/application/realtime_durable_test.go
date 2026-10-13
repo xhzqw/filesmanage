@@ -186,3 +186,29 @@ func TestDurableObserverWakesOnlyAuthorizedRecipients(t *testing.T) {
 		}
 	}
 }
+
+// The fast path must not accidentally wait for the watchdog ticker. The
+// journal reader is still the authorization boundary (not the wake token).
+func TestDurableObserverWakeBypassesPollingInterval(t *testing.T) {
+	journal := &replayJournalProbe{}
+	journal.add(domain.RealtimeEvent{ID: 1, Type: "workspace.changed", Scopes: []string{"file"}})
+	s := New(nil, nil).WithDurableEvents(journal)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	wake := make(chan struct{}, 1)
+	go s.watchDurableCacheWithWake(ctx, 10*time.Second, wake)
+	wake <- struct{}{} // initial scan
+	untilRealtime(t, func() bool { return s.epoch() > 1 })
+	ch, stop := s.SubscribeUserEvents("u_target")
+	defer stop()
+	journal.add(domain.RealtimeEvent{ID: 2, UserID: "u_target", Type: "session.changed"})
+	wake <- struct{}{}
+	select {
+	case event := <-ch:
+		if event.Type != "journal.wakeup" {
+			t.Fatalf("unexpected event: %+v", event)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("journal did not wake immediately")
+	}
+}
