@@ -338,12 +338,22 @@ schema("ShareRecipientPage", obj({
 schema("Favorite", obj({
     "id": string(),
     "resourceName": string(),
-    "unavailable": boolean("Resource was deleted; kept for stable ids."),
+    "unavailable": boolean("Legacy alias for status != active; never discloses delete state."),
+    "status": string(enum=["active","trashed","inaccessible"]),
+    "trashEntryId": string("Visible only when current user is authorized to inspect the direct trash entry."),
+    "capabilities": obj({"open": boolean(), "share": boolean(), "unfavorite": boolean()}),
     "createdAt": timestamp(),
     "fileId": string("Present for file favorites."),
     "folderId": string("Present for folder favorites."),
     "kind": string(enum=["file", "folder"]),
 }, required=["id", "resourceName", "unavailable", "createdAt"]))
+
+schema("FavoriteChangeNotification", obj({
+    "id": integer(),
+    "affectedCount": integer("How many of the recipient's own favorites were affected."),
+    "createdAt": timestamp(),
+    "read": boolean(),
+}, required=["id","affectedCount","createdAt","read"]))
 
 schema("Preview", obj({
     "fileId": string(),
@@ -1419,8 +1429,18 @@ add("GET", "/api/share-recipients", operation("List share recipients (minimal pi
 
 add("GET", "/api/favorites", operation("List favorites", "Collaboration", "listFavorites", security=SESSION,
     params=[query("limit", "Opt-in keyset paging, 1–100; omitting it returns the legacy array.", {"type": "integer", "minimum": 1, "maximum": 100}),
-            query("cursor", "Opaque cursor, only valid with limit.")],
-    responses=dict([json_ok({"oneOf": [arr(ref("Favorite")), obj({"items": arr(ref("Favorite")), "nextCursor": string()},required=["items","nextCursor"])]}, "Legacy array or paged items and nextCursor. Unreadable resource names are masked."), resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"])])))
+            query("cursor", "Opaque cursor, only valid with limit."),
+            query("view", "Optional 'sidebar': first eight authorized shortcuts.", {"type":"string","enum":["sidebar"]})],
+    responses=dict([json_ok({"oneOf": [arr(ref("Favorite")), obj({"items": arr(ref("Favorite")), "nextCursor": string()},required=["items","nextCursor"]),
+                                   obj({"items": arr(ref("Favorite"))},required=["items"])]}, "Legacy array, paged list, or sidebar shortcuts. Inaccessible names are masked."), resp("400", ERR["400"]), resp("401", ERR["401"]), resp("403", ERR["403"])])))
+
+add("GET", "/api/favorites/notifications", operation("List private favorite-change notifications", "Collaboration", "listFavoriteNotifications", security=SESSION,
+    responses=dict([json_ok(obj({"items": arr(ref("FavoriteChangeNotification")), "unreadCount": integer()},required=["items","unreadCount"]), "Recipient-only notifications; no resource names."),
+                    resp("401", ERR["401"]), resp("403", ERR["403"])])))
+
+add("POST", "/api/favorites/notifications/{id}/read", operation("Mark favorite notification read", "Collaboration", "readFavoriteNotification", security=SESSION,
+    params=[id_param("id", "Notification id.")],
+    responses=dict([json_ok(obj({"read": integer()},required=["read"]), "Marked read."), resp("400", ERR["400"]), resp("401", ERR["401"]), resp("404", ERR["404"])])))
 
 add("PUT", "/api/favorites/{kind}/{id}", operation("Add a favorite", "Collaboration", "setFavoriteOn", security=SESSION,
     params=[{"name": "kind", "in": "path", "required": True, "schema": {"type": "string", "enum": ["file", "folder"]}, "description": "Resource kind."}, id_param("id", "Resource id.")],

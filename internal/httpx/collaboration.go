@@ -3,6 +3,7 @@ package httpx
 import (
 	"encoding/csv"
 	"filesmanage/internal/application"
+	"filesmanage/internal/domain"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"time"
@@ -136,6 +137,23 @@ func (h *Handler) shareRecipients(c *gin.Context) {
 func (h *Handler) listFavorites(c *gin.Context) {
 	u, ok := h.auth(c)
 	if !ok {
+		return
+	}
+	if c.Query("view") != "" {
+		if c.Query("view") != "sidebar" || c.Query("cursor") != "" {
+			respondError(c, domain.ErrInvalidInput)
+			return
+		}
+		items, err := h.S.ListSidebarFavorites(c.Request.Context(), u)
+		if err != nil {
+			respondError(c, err)
+			return
+		}
+		data := make([]gin.H, 0, len(items))
+		for _, item := range items {
+			data = append(data, favoritePayload(item))
+		}
+		c.JSON(200, gin.H{"ok": true, "data": gin.H{"items": data}})
 		return
 	}
 	limit, paged, valid := collaborationPageLimit(c)

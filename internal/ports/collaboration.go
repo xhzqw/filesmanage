@@ -85,6 +85,9 @@ type CollaborationStore interface {
 	FavoriteExists(context.Context, string, string, string) (bool, error)
 	AddFavorite(context.Context, domain.Favorite) error
 	RemoveFavorite(context.Context, string, string, string) error
+	RemoveFavoritesForTrash(context.Context, string, []string) error
+	ListFavoriteNotifications(context.Context, string, int) ([]domain.FavoriteNotification, int, error)
+	ReadFavoriteNotification(context.Context, string, int64) error
 	SearchFiles(context.Context, FileSearchQuery) ([]domain.File, int, error)
 	Stats(context.Context, StatsQuery) (domain.Stats, error)
 	// ExportFilesStream yields every authorized row for the filter without

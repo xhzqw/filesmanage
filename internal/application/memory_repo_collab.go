@@ -85,6 +85,29 @@ func (r *memoryRepo) ListFavorites(_ context.Context, userID string) ([]domain.F
 	out := make([]domain.Favorite, 0)
 	for _, f := range r.favorites {
 		if f.UserID == userID {
+			// Simulate PostgreSQL's resource and active trash left joins, so
+			// security/status tests exercise the same resolver in both stores.
+			if f.FileID != nil {
+				if file, ok := r.files[*f.FileID]; ok {
+					f.ResourceName = file.Name
+					f.Deleted = file.DeletedAt != nil
+				}
+			} else if f.FolderID != nil {
+				if folder, ok := r.folders[*f.FolderID]; ok {
+					f.ResourceName = folder.Name
+					f.Deleted = folder.DeletedAt != nil
+				}
+			}
+			for _, t := range r.trash {
+				if t.RestoredAt != nil || t.PurgedAt != nil {
+					continue
+				}
+				if (f.FileID != nil && t.FileID != nil && *f.FileID == *t.FileID) ||
+					(f.FolderID != nil && t.FolderID != nil && *f.FolderID == *t.FolderID) {
+					f.TrashEntryID = t.ID
+					f.DeletedBy = t.DeletedBy
+				}
+			}
 			out = append(out, f)
 		}
 	}
@@ -127,6 +150,40 @@ func (r *memoryRepo) RemoveFavorite(_ context.Context, userID, fileID, folderID 
 			return nil
 		}
 	}
+	return ports.ErrRowMissing
+}
+
+// Match PostgreSQL's single-transaction purge: no surviving favorites for
+// affected files, folders, or files inside a deleted directory subtree.
+func (r *memoryRepo) RemoveFavoritesForTrash(_ context.Context, fileID string, folderIDs []string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	inside := make(map[string]bool, len(folderIDs))
+	for _, id := range folderIDs {
+		inside[id] = true
+	}
+	kept := r.favorites[:0]
+	for _, f := range r.favorites {
+		remove := f.FileID != nil && *f.FileID == fileID && fileID != ""
+		if f.FolderID != nil && inside[*f.FolderID] {
+			remove = true
+		}
+		if f.FileID != nil && inside[r.files[*f.FileID].FolderID] {
+			remove = true
+		}
+		if !remove {
+			kept = append(kept, f)
+		}
+	}
+	r.favorites = kept
+	return nil
+}
+
+func (r *memoryRepo) ListFavoriteNotifications(context.Context, string, int) ([]domain.FavoriteNotification, int, error) {
+	return []domain.FavoriteNotification{}, 0, nil
+}
+
+func (r *memoryRepo) ReadFavoriteNotification(context.Context, string, int64) error {
 	return ports.ErrRowMissing
 }
 

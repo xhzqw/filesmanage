@@ -30,6 +30,18 @@ type Favorite struct {
 	CreatedAt    time.Time
 	ResourceName string
 	Unavailable  bool
+	Status       string // active, trashed (authorized), inaccessible
+	Deleted      bool   // internal: never disclose without delete-record visibility
+	DeletedBy    string // internal: never serialize
+	TrashEntryID string // direct entry only; disclosed only to its authorized viewer
+}
+
+type FavoriteNotification struct {
+	ID            int64
+	RecipientID   string
+	AffectedCount int
+	CreatedAt     time.Time
+	Read          bool
 }
 
 // Stats is the aggregation result for the stats page and CSV export.

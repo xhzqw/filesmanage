@@ -8,7 +8,7 @@ import {Menu,type MenuItem} from "../../shared/ui/Menu";
 import type {Favorite,Share} from "./api";
 
 type Scope="favorites"|"received"|"sent";
-type StateTone="success"|"warning"|"danger";
+type StateTone="success"|"warning"|"danger"|"neutral";
 type ResourceEntry={
  key:string;kind:"file"|"folder";name:string;url:string|null;createdAt:string;
  status:string;tone:StateTone;description:string;permission:string;
@@ -28,17 +28,18 @@ export function CollaborationBrowser({tab,favorites,shares,status,nextCursor,mor
  const navigate=useNavigate();
  const[query,setQuery]=useState("");
  const[sort,setSort]=useState<"recent"|"oldest"|"name">("recent");
+ const[favoriteFilter,setFavoriteFilter]=useState<"all"|"active"|"issues">("all");
  const[selectedId,setSelectedId]=useState<string|null>(null);
  const[menu,setMenu]=useState<{id:string;anchor:HTMLElement}|null>(null);
- useEffect(()=>{setQuery("");setSelectedId(null);setMenu(null);},[tab]);
+ useEffect(()=>{setQuery("");setFavoriteFilter("all");setSelectedId(null);setMenu(null);},[tab]);
  const entries=useMemo<ResourceEntry[]>(()=>{
   if(tab==="favorites")return favorites.map((f):ResourceEntry=>{
    const resourceId=f.kind==="file"?f.fileId:f.folderId;
    return {
     key:f.id,kind:f.kind,name:f.resourceName||"不可访问的资源",
-    url:!f.unavailable&&resourceId?(f.kind==="file"?"/preview/":"/doc?folder=")+encodeURIComponent(resourceId):null,
-    createdAt:f.createdAt,status:f.unavailable?"已删除或不可访问":"可访问",
-    tone:f.unavailable?"danger":"success",description:f.kind==="file"?"文件":"文件夹",
+    url:!f.unavailable&&f.capabilities?.open!==false&&resourceId?(f.kind==="file"?"/preview/":"/doc?folder=")+encodeURIComponent(resourceId):null,
+    createdAt:f.createdAt,status:f.status==="trashed"?"已删除":f.unavailable?"不可访问":"正常",
+    tone:f.status==="trashed"?"warning":f.unavailable?"neutral":"success",description:f.kind==="file"?"文件":"文件夹",
     permission:"",favorite:f
    };
   });
@@ -57,15 +58,18 @@ export function CollaborationBrowser({tab,favorites,shares,status,nextCursor,mor
  },[tab,favorites,shares]);
  const visible=useMemo(()=>{
   const needle=query.trim().toLocaleLowerCase();
-  const result=entries.filter(item=>!needle||[item.name,item.description,item.permission,item.status].some(text=>text.toLocaleLowerCase().includes(needle)));
+  const result=entries.filter(item=>(tab!=="favorites"||favoriteFilter==="all"||(favoriteFilter==="active"?Boolean(item.url):!item.url))
+   &&(!needle||[item.name,item.description,item.permission,item.status].some(text=>text.toLocaleLowerCase().includes(needle))));
   return result.sort((a,b)=>sort==="name"?a.name.localeCompare(b.name,"zh-CN"):sort==="oldest"?a.createdAt.localeCompare(b.createdAt):b.createdAt.localeCompare(a.createdAt));
- },[entries,query,sort]);
+ },[entries,query,sort,tab,favoriteFilter]);
  const selected=visible.find(item=>item.key===selectedId)??visible[0]??null;
  const menuEntry=entries.find(item=>item.key===menu?.id);
  const menuItems:MenuItem[]=[];
  if(menuEntry){
   if(menuEntry.url)menuItems.push({id:"open",label:"打开",onSelect:()=>navigate(menuEntry.url!)});
   if(menuEntry.favorite){
+   if(menuEntry.favorite.status==="trashed"&&menuEntry.favorite.trashEntryId)
+    menuItems.push({id:"trash",label:"前往回收站",onSelect:()=>navigate("/trash")});
    menuItems.push({id:"share",label:"分享",disabled:!menuEntry.url,onSelect:()=>onShareFavorite(menuEntry.favorite!)});
    menuItems.push({id:"unfavorite",label:"取消关注",onSelect:()=>onUnfavorite(menuEntry.kind==="file"?menuEntry.favorite?.fileId??"":menuEntry.favorite?.folderId??"",menuEntry.kind)});
   }
@@ -76,8 +80,10 @@ export function CollaborationBrowser({tab,favorites,shares,status,nextCursor,mor
  const actions=(entry:ResourceEntry)=> <RareRowActions className="collab-inline-actions">
   {entry.url&&<Link className="collab-action" to={entry.url}>打开</Link>}
   {entry.favorite&&<>
-   <RareButton type="button" tone="ghost" className="collab-action" disabled={!entry.url}
-    onClick={()=>onShareFavorite(entry.favorite!)}>分享</RareButton>
+   {entry.favorite.status==="trashed"&&entry.favorite.trashEntryId&&
+    <Link className="collab-action" to="/trash">前往回收站</Link>}
+   {entry.url&&<RareButton type="button" tone="ghost" className="collab-action"
+    onClick={()=>onShareFavorite(entry.favorite!)}>分享</RareButton>}
    <RareButton type="button" tone="ghost" className="collab-action"
     onClick={()=>onUnfavorite(entry.kind==="file"?entry.favorite?.fileId??"":entry.favorite?.folderId??"",entry.kind)}>取消关注</RareButton>
   </>}
@@ -117,6 +123,9 @@ export function CollaborationBrowser({tab,favorites,shares,status,nextCursor,mor
     onClick={onCreate}>{tab==="favorites"?(pickerOpen?"收起选择":"添加关注 / 分享"):"新建共享"}</RareButton>}
    <span className="collab-results-count" aria-live="polite">{status==="ready"?"已加载 "+entries.length+" 项"+(nextCursor?" · 还有更多":""):""}</span>
    <div className="collab-filter-controls">
+    {tab==="favorites"&&<RareSelect aria-label="关注状态" value={favoriteFilter} onChange={event=>setFavoriteFilter(event.target.value as typeof favoriteFilter)}>
+     <option value="all">全部关注</option><option value="active">正常</option><option value="issues">待处理</option>
+    </RareSelect>}
     <RareInput type="search" aria-label="过滤当前已加载的关注与分享" placeholder="筛选名称…" value={query}
      onChange={event=>setQuery(event.target.value)}/>
     <RareSelect aria-label="资源排序" value={sort} onChange={event=>setSort(event.target.value as typeof sort)}>

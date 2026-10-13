@@ -25,6 +25,9 @@ export type Favorite={
  folderId?:string;
  resourceName:string;
  unavailable:boolean;
+ status?:"active"|"trashed"|"inaccessible";
+ trashEntryId?:string;
+ capabilities?:{open:boolean;share:boolean;unfavorite:boolean};
  createdAt:string;
 };
 
@@ -59,6 +62,7 @@ export const collaborationApi={
  revokeShare:(id:string)=>request<{revoked:string}>("/shares/"+id,{method:"DELETE"}),
  favorites:()=>request<Favorite[]>("/favorites"),
  favoritesPage:(cursor="")=>request<CollaborationPage<Favorite>>("/favorites?"+new URLSearchParams({limit:"50",...(cursor?{cursor}:{})}).toString()),
+ favoritesSidebar:()=>request<{items:Favorite[]}>("/favorites?view=sidebar"),
  setFavorite:(kind:string,id:string,on:boolean)=>request<{id:string;favorited:boolean}>("/favorites/"+kind+"/"+id,{method:on?"PUT":"DELETE"}),
  // Recipient and resource sources for the share wizard and the resource picker.
  // /users and /groups are admin-only on the server: a denied read is surfaced by

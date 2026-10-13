@@ -8408,9 +8408,17 @@ paths:
         description: Opaque cursor, only valid with limit.
         schema:
           type: string
+      - name: view
+        in: query
+        required: false
+        description: 'Optional ''sidebar'': first eight authorized shortcuts.'
+        schema:
+          type: string
+          enum:
+          - sidebar
       responses:
         '200':
-          description: Legacy array or paged items and nextCursor. Unreadable resource names are masked.
+          description: Legacy array, paged list, or sidebar shortcuts. Inaccessible names are masked.
           content:
             application/json:
               schema:
@@ -8436,6 +8444,14 @@ paths:
                       required:
                       - items
                       - nextCursor
+                    - type: object
+                      properties:
+                        items:
+                          type: array
+                          items:
+                            $ref: '#/components/schemas/Favorite'
+                      required:
+                      - items
                 required:
                 - ok
                 - data
@@ -8453,6 +8469,108 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '403':
           description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/favorites/notifications:
+    get:
+      summary: List private favorite-change notifications
+      operationId: listFavoriteNotifications
+      tags:
+      - Collaboration
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Recipient-only notifications; no resource names.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/FavoriteChangeNotification'
+                      unreadCount:
+                        type: integer
+                    required:
+                    - items
+                    - unreadCount
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/favorites/notifications/{id}/read:
+    post:
+      summary: Mark favorite notification read
+      operationId: readFavoriteNotification
+      tags:
+      - Collaboration
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Notification id.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Marked read.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      read:
+                        type: integer
+                    required:
+                    - read
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
           content:
             application/json:
               schema:
@@ -10056,7 +10174,25 @@ components:
           type: string
         unavailable:
           type: boolean
-          description: Resource was deleted; kept for stable ids.
+          description: Legacy alias for status != active; never discloses delete state.
+        status:
+          type: string
+          enum:
+          - active
+          - trashed
+          - inaccessible
+        trashEntryId:
+          type: string
+          description: Visible only when current user is authorized to inspect the direct trash entry.
+        capabilities:
+          type: object
+          properties:
+            open:
+              type: boolean
+            share:
+              type: boolean
+            unfavorite:
+              type: boolean
         createdAt:
           type: string
           format: date-time
@@ -10076,6 +10212,24 @@ components:
       - resourceName
       - unavailable
       - createdAt
+    FavoriteChangeNotification:
+      type: object
+      properties:
+        id:
+          type: integer
+        affectedCount:
+          type: integer
+          description: How many of the recipient's own favorites were affected.
+        createdAt:
+          type: string
+          format: date-time
+        read:
+          type: boolean
+      required:
+      - id
+      - affectedCount
+      - createdAt
+      - read
     Preview:
       type: object
       properties:

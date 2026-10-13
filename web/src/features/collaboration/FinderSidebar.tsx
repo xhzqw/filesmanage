@@ -23,8 +23,8 @@ export function FinderSidebar({section,revision}:{section:DocumentSection;revisi
  useEffect(()=>observeWorkspaceChange(()=>setToken(n=>n+1),["collaboration","permissions","file","folder"]),[]);
  useEffect(()=>{
   let active=true;
-  collaborationApi.favoritesPage().then(page=>{
-   if(active){setFavorites(page.items.filter(item=>!item.unavailable));setStatus("ready");}
+  collaborationApi.favoritesSidebar().then(page=>{
+   if(active){setFavorites(page.items);setStatus("ready");}
   }).catch(()=>{if(active)setStatus("failed");});
   return()=>{active=false;};
  },[revision,token]);
@@ -50,7 +50,7 @@ export function FinderSidebar({section,revision}:{section:DocumentSection;revisi
      <span>{item.resourceName}</span>
     </Link>;
    })}
-   {status==="ready"&&favorites.length>8&&<Link to="/doc?view=favorites" className="finder-nav-more">查看全部关注</Link>}
+   {status==="ready"&&favorites.length>=8&&<Link to="/doc?view=favorites" className="finder-nav-more">查看全部关注</Link>}
    {status==="ready"&&favorites.length===0&&<span className="finder-nav-empty">暂无关注</span>}
    {status==="failed"&&<RareButton type="button" className="finder-nav-retry" onClick={()=>setToken(n=>n+1)}>重试加载关注</RareButton>}
   </div>

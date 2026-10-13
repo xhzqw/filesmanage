@@ -199,7 +199,7 @@ func (s *Service) PurgeTrashEntry(ctx context.Context, u domain.User, entryID st
 	if err != nil {
 		return domain.ErrNotFound
 	}
-	if entry.PurgedAt != nil {
+	if entry.PurgedAt != nil || entry.RestoredAt != nil {
 		return domain.ErrNotFound
 	}
 	if entry.FileID != nil {
@@ -209,7 +209,31 @@ func (s *Service) PurgeTrashEntry(ctx context.Context, u domain.User, entryID st
 			return e
 		}
 	}
+	var affectedFolders []string
+	if entry.FolderID != nil {
+		// Purging a folder must clear favorites for its whole deleted subtree.
+		subtree, e := tx.FolderSubtreeIncludingDeleted(ctx, *entry.FolderID)
+		if e != nil {
+			return e
+		}
+		if len(subtree) == 0 {
+			return domain.ErrNotFound
+		}
+		affectedFolders = folderIDs(subtree)
+		if protected, e := tx.HasProtectedLifecycleInFolders(ctx, affectedFolders, s.now()); e != nil {
+			return e
+		} else if protected {
+			return domain.ErrConflict
+		}
+	}
 	if err = tx.MarkTrashPurged(ctx, entry.ID); err != nil {
+		return err
+	}
+	fileID := ""
+	if entry.FileID != nil {
+		fileID = *entry.FileID
+	}
+	if err = tx.RemoveFavoritesForTrash(ctx, fileID, affectedFolders); err != nil {
 		return err
 	}
 	details := map[string]any{"oldName": entry.OldName}
@@ -225,7 +249,7 @@ func (s *Service) PurgeTrashEntry(ctx context.Context, u domain.User, entryID st
 	if err = tx.Commit(ctx); err != nil {
 		return err
 	}
-	s.notifyWorkspaceChange("trash", "file", "stats")
+	s.notifyWorkspaceChange("trash", "file", "folder", "collaboration", "stats")
 	return nil
 }
 

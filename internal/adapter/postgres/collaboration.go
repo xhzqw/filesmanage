@@ -115,12 +115,24 @@ func (r *Repository) RevokeShare(ctx context.Context, id string) error {
 
 // ---------- favorites ----------
 
-const favoriteSelect = "SELECT fa.id,fa.user_id,fa.file_id,fa.folder_id,fa.created_at,coalesce(f.name,''),coalesce(d.name,''),(f.deleted_at IS NOT NULL OR d.deleted_at IS NOT NULL) FROM favorites fa LEFT JOIN files f ON f.id=fa.file_id LEFT JOIN folders d ON d.id=fa.folder_id"
+const favoriteSelect = `SELECT fa.id,fa.user_id,fa.file_id,fa.folder_id,fa.created_at,
+ coalesce(f.name,''),coalesce(d.name,''),
+ coalesce(f.deleted_at IS NOT NULL OR d.deleted_at IS NOT NULL,false),
+ coalesce(tr.deleted_by,''),coalesce(tr.id,'')
+ FROM favorites fa
+ LEFT JOIN files f ON f.id=fa.file_id
+ LEFT JOIN folders d ON d.id=fa.folder_id
+ LEFT JOIN LATERAL (
+   SELECT t.id,t.deleted_by FROM trash_entries t
+   WHERE t.restored_at IS NULL AND t.purged_at IS NULL
+   AND (t.file_id=fa.file_id OR t.folder_id=fa.folder_id)
+   ORDER BY t.deleted_at DESC LIMIT 1
+ ) tr ON true`
 
 func scanFavorite(row rowScanner) (domain.Favorite, error) {
 	var f domain.Favorite
 	var fileName, folderName *string
-	err := row.Scan(&f.ID, &f.UserID, &f.FileID, &f.FolderID, &f.CreatedAt, &fileName, &folderName, &f.Unavailable)
+	err := row.Scan(&f.ID, &f.UserID, &f.FileID, &f.FolderID, &f.CreatedAt, &fileName, &folderName, &f.Deleted, &f.DeletedBy, &f.TrashEntryID)
 	if err != nil {
 		return domain.Favorite{}, err
 	}
@@ -175,6 +187,18 @@ func (r *Repository) RemoveFavorite(ctx context.Context, userID, fileID, folderI
 		return err
 	}
 	_, err := r.Q.Exec(ctx, "DELETE FROM favorites WHERE user_id=$1 AND folder_id=$2", userID, folderID)
+	return err
+}
+
+// RemoveFavoritesForTrash runs inside the purge transaction. Subtree purge
+// removes both descendant-folder and contained-file favorites in one write.
+func (r *Repository) RemoveFavoritesForTrash(ctx context.Context, fileID string, folderIDs []string) error {
+	if fileID == "" && len(folderIDs) == 0 {
+		return nil
+	}
+	_, err := r.Q.Exec(ctx, `DELETE FROM favorites
+ WHERE file_id=$1 OR folder_id=ANY($2::text[])
+ OR file_id IN (SELECT id FROM files WHERE folder_id=ANY($2::text[]))`, fileID, folderIDs)
 	return err
 }
 

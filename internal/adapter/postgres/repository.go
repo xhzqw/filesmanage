@@ -965,7 +965,7 @@ func (r *Repository) MarkTrashRestored(ctx context.Context, id string) error {
 }
 
 func (r *Repository) MarkTrashPurged(ctx context.Context, id string) error {
-	tag, err := r.Q.Exec(ctx, "UPDATE trash_entries SET purged_at=now() WHERE id=$1 AND purged_at IS NULL", id)
+	tag, err := r.Q.Exec(ctx, "UPDATE trash_entries SET purged_at=now() WHERE id=$1 AND restored_at IS NULL AND purged_at IS NULL", id)
 	if err != nil {
 		return err
 	}

@@ -63,6 +63,42 @@ type FavoritePage struct {
 	NextCursor string
 }
 
+// ListSidebarFavorites searches until it has enough *authorized* favorites,
+// rather than slicing the first 50 records and then hiding inaccessible ones.
+// Only eight links are sent to the navigation; the rest remain in the main
+// paginated browser. Work is bounded by this user's own favorite rows.
+func (s *Service) ListSidebarFavorites(ctx context.Context, u domain.User) ([]domain.Favorite, error) {
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	items := make([]domain.Favorite, 0, 8)
+	after := ports.CollaborationCursor{}
+	for {
+		rows, err := tx.PageFavorites(ctx, u.ID, after, collaborationMaxPage)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.markUnavailableFavorites(ctx, tx, u, rows); err != nil {
+			return nil, err
+		}
+		for _, f := range rows {
+			if f.Status == "active" && !f.Unavailable {
+				items = append(items, f)
+				if len(items) == 8 {
+					return items, nil
+				}
+			}
+		}
+		if len(rows) < collaborationMaxPage {
+			return items, nil
+		}
+		last := rows[len(rows)-1]
+		after = ports.CollaborationCursor{CreatedAt: last.CreatedAt, ID: last.ID}
+	}
+}
+
 func (s *Service) ListSharesPage(ctx context.Context, u domain.User, scope, raw string, limit int) (SharePage, error) {
 	page := SharePage{Items: []domain.Share{}}
 	after, err := decodeCollaborationCursor(raw, "shares:"+scope)
@@ -135,8 +171,20 @@ func (s *Service) ListFavoritesPage(ctx context.Context, u domain.User, raw stri
 func (s *Service) markUnavailableFavorites(ctx context.Context, tx ports.Repository, u domain.User, rows []domain.Favorite) error {
 	for i := range rows {
 		f := &rows[i]
+		f.Status = "active"
+		// Deleted resources are distinguishable from revoked access only to the
+		// administrator or the user who deleted this exact trash entry.
+		if f.Deleted {
+			if u.IsAdmin || (f.TrashEntryID != "" && f.DeletedBy == u.ID) {
+				f.Status = "trashed"
+				f.Unavailable = true
+				continue
+			}
+		}
 		if f.Unavailable {
+			f.Status = "inaccessible"
 			f.ResourceName = "不可访问的资源"
+			f.TrashEntryID = ""
 			continue
 		}
 		var err error
@@ -156,7 +204,9 @@ func (s *Service) markUnavailableFavorites(ctx context.Context, tx ports.Reposit
 		}
 		if errors.Is(err, domain.ErrForbidden) || errors.Is(err, domain.ErrNotFound) || errors.Is(err, ports.ErrRowMissing) {
 			f.Unavailable = true
+			f.Status = "inaccessible"
 			f.ResourceName = "不可访问的资源"
+			f.TrashEntryID = ""
 		} else {
 			return err
 		}

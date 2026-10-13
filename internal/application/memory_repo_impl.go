@@ -852,7 +852,7 @@ func (r *memoryRepo) MarkTrashPurged(_ context.Context, id string) error {
 	defer r.mu.Unlock()
 	for i, t := range r.trash {
 		if t.ID == id {
-			if t.PurgedAt != nil {
+			if t.PurgedAt != nil || t.RestoredAt != nil {
 				return ports.ErrRowMissing
 			}
 			now := time.Now()

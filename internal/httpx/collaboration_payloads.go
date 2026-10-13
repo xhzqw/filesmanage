@@ -41,7 +41,16 @@ func favoritePayload(f domain.Favorite) gin.H {
 	payload := gin.H{
 		"id": f.ID, "resourceName": f.ResourceName,
 		"unavailable": f.Unavailable,
+		"status":      f.Status,
+		"capabilities": gin.H{
+			"open":       f.Status == "active",
+			"share":      f.Status == "active",
+			"unfavorite": true,
+		},
 		"createdAt": f.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"),
+	}
+	if f.Status == "trashed" && f.TrashEntryID != "" {
+		payload["trashEntryId"] = f.TrashEntryID
 	}
 	if f.FileID != nil {
 		payload["fileId"] = *f.FileID
