@@ -136,7 +136,9 @@ try{
     if(!source)return null;
     const fixture=document.createElement("div");
     fixture.className="explorer-icon-grid";
-    Object.assign(fixture.style,{position:"fixed",top:"0px",left:"0px",width:"320px",visibility:"hidden",pointerEvents:"none"});
+    // Two 154px Finder tiles plus the grid gap and padding need > 356px.
+    // Keeping both fixture items on one row makes vertical alignment measurable.
+    Object.assign(fixture.style,{position:"fixed",top:"0px",left:"0px",width:"440px",visibility:"hidden",pointerEvents:"none"});
     const short=source.cloneNode(true),long=source.cloneNode(true);
     short.querySelector(".explorer-item-name").textContent="hammer.iges";
     long.querySelector(".explorer-item-name").textContent="pe11-verify-1791469382.step";
