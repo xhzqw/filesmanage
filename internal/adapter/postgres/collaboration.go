@@ -143,9 +143,12 @@ func scanFavorite(row rowScanner) (domain.Favorite, error) {
 	if err != nil {
 		return domain.Favorite{}, err
 	}
-	if fileName != nil {
+	// favoriteSelect coalesces BOTH joined names to non-NULL strings. Testing
+	// fileName != nil would always win (with "") for folder favorites.
+	// Select by the actual resource kind, not by joined name nullability.
+	if f.FileID != nil && fileName != nil {
 		f.ResourceName = *fileName
-	} else if folderName != nil {
+	} else if f.FolderID != nil && folderName != nil {
 		f.ResourceName = *folderName
 	}
 	return f, nil

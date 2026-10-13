@@ -89,6 +89,25 @@ try{
     badCount:bad.length,allBadUnlinked};
   })()`);
   check(layout.first==="我的关注"&&layout.selected==="page",vp.name+" 关注 in Finder sidebar");
+  // Verify actual API names reach the Finder labels, including folder
+  // favorites. The DB query coalesces file and folder names independently;
+  // checking for a rendered row alone misses empty folder labels.
+  const sidebarNames=await cdp.evaluate(`(async()=>{
+   const response=await fetch("/api/favorites?view=sidebar",{cache:"no-store"});
+   const json=await response.json();
+   const rows=json.data?.items||[];
+   return {ok:response.ok&&json.ok,count:rows.length,
+    folderCount:rows.filter(row=>row.kind==="folder").length,
+    named:rows.every(row=>typeof row.resourceName==="string"&&row.resourceName.trim().length>0),
+    matches:rows.every(row=>{
+     const id=row.kind==="folder"?row.folderId:row.fileId;
+     const href=row.kind==="folder"?"/doc?folder="+encodeURIComponent(id):"/preview/"+encodeURIComponent(id);
+     const link=[...document.querySelectorAll(".finder-favorite-item")].find(node=>node.getAttribute("href")===href);
+     return link&&link.title===row.resourceName&&link.querySelector("span")?.textContent?.trim()===row.resourceName;
+    })};
+  })()`);
+  check(sidebarNames.ok&&sidebarNames.count>0&&sidebarNames.folderCount>0&&sidebarNames.named&&sidebarNames.matches,
+   vp.name+" sidebar folder and file favorite names match API",JSON.stringify(sidebarNames));
   check(layout.beside&&layout.mainVisible&&layout.rightInside,vp.name+" responsive workbench",JSON.stringify(layout));
   check(layout.overflow<=1,vp.name+" no document horizontal overflow",JSON.stringify(layout));
   check(layout.tones&&layout.allBadUnlinked,vp.name+" status badges and invalid links",JSON.stringify(layout));
