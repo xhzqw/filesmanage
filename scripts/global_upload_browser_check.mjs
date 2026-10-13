@@ -112,7 +112,11 @@ try{
  ws?.close();
  if(chrome.exitCode===null){
   const ended=new Promise(resolve=>chrome.once("exit",resolve));
-  chrome.kill("SIGTERM");await Promise.race([ended,sleep(1500)]);
+  chrome.kill("SIGTERM");await Promise.race([ended,sleep(4000)]);
+  if(chrome.exitCode===null){chrome.kill("SIGKILL");await sleep(500);}
  }
- rmSync(profile,{recursive:true,force:true,maxRetries:10,retryDelay:150});
+ // Chromium's crashpad can briefly retain a profile handle after the parent
+ // exits. Cleanup cannot turn an otherwise passed functional assertion red.
+ try{rmSync(profile,{recursive:true,force:true,maxRetries:30,retryDelay:200});}
+ catch(error){if(error?.code!=="ENOTEMPTY"&&error?.code!=="EBUSY")throw error;}
 }
