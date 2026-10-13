@@ -13,7 +13,7 @@
  background:var(--surface-header);border-radius:var(--radius-md);
 }
 .folder-history-controls{
- gap:2px;padding:0;border:0;border-radius:0;background:transparent;
+ gap:2px;padding:0;border:0;border-radius:var(--radius-xs);background:transparent;
 }
 .folder-history-controls .rare-button,.folder-view-switch .rare-button{
  width:27px;height:26px;min-height:26px;padding:0;display:grid;place-items:center;
@@ -40,7 +40,7 @@
 .document-explorer .work .folder-context-bar{
  box-sizing:border-box;width:100%;max-width:100%;height:40px;min-height:40px;max-height:40px;
  margin:0;padding:0 12px;gap:12px;flex-wrap:nowrap;justify-content:flex-start;
- border:0;border-bottom:1px solid var(--border-hairline);border-radius:0;
+ border:0;border-bottom:1px solid var(--border-hairline);border-radius:var(--radius-xs);
  background:var(--surface-panel);box-shadow:none;
 }
 .document-explorer .work .folder-context-bar .breadcrumb a{
