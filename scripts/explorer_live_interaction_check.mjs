@@ -203,13 +203,28 @@ try{
    await send("Input.dispatchKeyEvent",{type:"keyUp",modifiers:2,key,code});
   };
   await shortcut("c","KeyC");
+  const afterCopy=await evaluate('({toasts:[...document.querySelectorAll("[role=status],[role=alert]")].map(x=>x.textContent.slice(0,140)),selected:document.querySelector(".file-selected-count")?.textContent,active:document.activeElement?.tagName})');
+  console.log("COPY_SHORTCUT_DEBUG",JSON.stringify(afterCopy));
   await navigate("/doc?folder="+encodeURIComponent(copyDestination),'!!document.querySelector(".work-body .file-toolbar")');
   await shortcut("v","KeyV");
+  await delay(350);
+  const afterPaste=await evaluate('({toasts:[...document.querySelectorAll("[role=status],[role=alert]")].map(x=>x.textContent.slice(0,140)),progress:document.querySelector(".file-paste-status")?.textContent,path:location.pathname+location.search,active:document.activeElement?.tagName})');
+  console.log("PASTE_SHORTCUT_DEBUG",JSON.stringify(afterPaste));
   const newCopy=async()=>evaluate(`(async()=>{
    const r=await fetch("/api/files?"+new URLSearchParams({folder:${JSON.stringify(copyDestination)},sort:"updated_desc",limit:"50"}));
    const data=await r.json();return (data.data?.items||[]).find(row=>!${JSON.stringify(copyBeforeIds)}.includes(row.id)&&row.sha256===${JSON.stringify(clipboardFixture.sha)})||null;
   })()`);
   for(let i=0;i<120;i++){const copy=await newCopy();if(copy){copiedTestId=copy.id;break;}await delay(150);}
+  if(!copiedTestId){
+   const diagnostic=await evaluate(`(async()=>{
+    const r=await fetch("/api/files?"+new URLSearchParams({folder:${JSON.stringify(copyDestination)},sort:"updated_desc",limit:"50"}));
+    const body=await r.json();
+    return {items:(body.data?.items||[]).map(item=>({id:item.id,name:item.name,sha:item.sha256})).slice(0,10),
+     toasts:[...document.querySelectorAll("[role=alert],[role=status]")].map(x=>x.textContent.slice(0,130)),
+     progress:document.querySelector(".file-paste-status")?.textContent};
+   })()`);
+   console.log("PASTE_FAILURE_DIAGNOSTIC",JSON.stringify(diagnostic));
+  }
   assert(copiedTestId,"Ctrl+V must persist a new content-identical file in the destination directory");
   const copy=await newCopy();
   assert(copy.name.includes("副本")||copy.name===clipboardFixture.name,"Pasted file must keep original name or use a safe copy suffix");
