@@ -28,6 +28,7 @@ import {classifyFile,type FileCategory} from "../../shared/fileTypes";
 import {FileTypeIcon} from "../../shared/ui/FileTypeIcon";
 import {FINDER_COLORS,finderColor,labelApi,type FinderLabel} from "../../shared/finderLabels";
 import {FolderResourceIcon} from "../../shared/ui/ResourceIcons";
+import {FinderPathColumn} from "./FinderPathColumn";
 import"./fileTable.css";
 import type {ExplorerViewMode} from "./explorerView";
 
@@ -132,7 +133,7 @@ type FavoriteRow={kind:string;fileId?:string;folderId?:string};
 // current visible order, and the keyboard mirrors every mouse action. The
 // selection model keeps focus, anchor and membership separate so a stale
 // anchor can never resurrect after a re-sort.
-export function FileTable({folder,folderName,childFolders=[],onEdit,reloadKey,newFolderSlot,onFolderChanged,viewMode="list"}:{folder:string;folderName:string;childFolders?:Folder[];onEdit:(fileId:string)=>void;reloadKey:number;newFolderSlot?:ReactNode;onFolderChanged?:()=>void;viewMode?:ExplorerViewMode}){
+export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdit,reloadKey,newFolderSlot,onFolderChanged,viewMode="list"}:{folder:string;folderName:string;childFolders?:Folder[];folderPath?:Folder[];onEdit:(fileId:string)=>void;reloadKey:number;newFolderSlot?:ReactNode;onFolderChanged?:()=>void;viewMode?:ExplorerViewMode}){
  const[items,setItems]=useState<FileItem[]>([]);
 // Round-trip of the list read the status bar reports (spec §3.1). It is an
 // observation of the request that already runs below — never an extra one —
@@ -172,6 +173,19 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const selectAllRef=useRef<HTMLInputElement>(null);
  const[focusedId,setFocusedId]=useState<string|null>(null);
  const[focusedFolderId,setFocusedFolderId]=useState<string|null>(null);
+ const[ancestorFile,setAncestorFile]=useState<FileItem|null>(null);
+ const[ancestorFolder,setAncestorFolder]=useState<Folder|null>(null);
+ const columnViewportRef=useRef<HTMLDivElement>(null);
+ const folderDragRef=useRef<Folder|null>(null);
+ useEffect(()=>{setAncestorFile(null);setAncestorFolder(null);},[folder]);
+ useEffect(()=>{
+  if(viewMode!=="columns")return;
+  const frame=requestAnimationFrame(()=>{
+   const viewport=columnViewportRef.current;
+   if(viewport)viewport.scrollLeft=viewport.scrollWidth-viewport.clientWidth;
+  });
+  return()=>cancelAnimationFrame(frame);
+ },[folder,viewMode,ancestorFile?.id]);
  const[hoveredFolderId,setHoveredFolderId]=useState<string|null>(null);
  const[anchorId,setAnchorId]=useState<string|null>(null);
  const[marquee,setMarquee]=useState<{left:number;top:number;width:number;height:number}|null>(null);
@@ -359,7 +373,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    // The captured set must still be exactly what the list shows: a reload
    // during the drag means those rows are no longer the visible ones, so the
    // gesture stops instead of opening a dialog about a stale set.
-   const sources=items.filter(file=>captured.ids.includes(file.id));
+   const sources=[...items,...(ancestorFile?[ancestorFile]:[])].filter(file=>captured.ids.includes(file.id));
    if(sources.length!==captured.ids.length){
     announce("文件列表已变化，移动未开始，请重试","error");
     return;
@@ -370,7 +384,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   }
   window.addEventListener(MOVE_DROP_EVENT,onMoveDrop);
   return()=>window.removeEventListener(MOVE_DROP_EVENT,onMoveDrop);
- },[items]);
+ },[items,ancestorFile]);
 
  function announce(text:string,tone:"info"|"error",toastText=text){
   if(toastText.trim())(tone==="error"?toast.error:toast.success)(toastText);
@@ -550,7 +564,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   const target=event.target as HTMLElement;
   // A drag beginning on a file is still the native move gesture. The marquee
   // is only started on the blank list/grid background.
-  if(target.closest("tr,thead,.explorer-item,button,a,input,label,select,[role=menu]"))return;
+  if(target.closest("tr,thead,.explorer-item,.finder-column-row,button,a,input,label,select,[role=menu]"))return;
   const surface=event.currentTarget;
   const origin={x:event.clientX,y:event.clientY};
   const baseline=(event.ctrlKey||event.metaKey)
@@ -620,6 +634,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  }
 
  function onRowClick(event:MouseEvent<HTMLElement>,item:FileItem){
+  setAncestorFile(null);setAncestorFolder(null);
   setFocusedFolderId(null);
   selectResource("file",item.id,event.metaKey||event.ctrlKey,event.shiftKey);
   setFocusedId(item.id);
@@ -810,6 +825,10 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  }
 
  function onFolderClick(event:MouseEvent<HTMLElement>,entry:Folder){
+  if(viewMode==="columns"&&!event.metaKey&&!event.ctrlKey&&!event.shiftKey){
+   navigate("/doc?folder="+encodeURIComponent(entry.id));return;
+  }
+  setAncestorFile(null);setAncestorFolder(null);
   selectResource("folder",entry.id,event.metaKey||event.ctrlKey,event.shiftKey);
   setFocusedFolderId(entry.id);setFocusedId(null);
  }
@@ -827,7 +846,10 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==="a"){
    event.preventDefault();selectKeys(visibleKeys);setAnchorId(visibleKeys[0]??null);return;
   }
-  if(event.key==="Enter"){event.preventDefault();navigate("/doc?folder="+encodeURIComponent(entry.id));return;}
+  if(event.key==="Enter"||(viewMode==="columns"&&event.key==="ArrowRight")){event.preventDefault();navigate("/doc?folder="+encodeURIComponent(entry.id));return;}
+  if(viewMode==="columns"&&event.key==="ArrowLeft"&&folderPath.length>1){
+   event.preventDefault();navigate("/doc?folder="+encodeURIComponent(folderPath[folderPath.length-2].id));return;
+  }
   if(event.key===" "){
    event.preventDefault();selectResource("folder",entry.id,true,event.shiftKey);setFocusedFolderId(entry.id);setFocusedId(null);return;
   }
@@ -911,7 +933,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   const dataTransfer=event.dataTransfer;
   // An empty set is never draggable.
   if(ids.length===0||!dataTransfer){event.preventDefault();return;}
-  const session:MoveDragSession={ids,sourceFolderId:folder,focusId:item.id};
+  const session:MoveDragSession={ids,sourceFolderId:item.folderId,focusId:item.id};
   dragSession.current=session;
   setDraggingIds(new Set(ids));
   // "move" and never "copy"/"copyMove": this phase offers no copy, and a copy
@@ -938,6 +960,45 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  function suppressInternalDrag(event:DragEvent<HTMLDivElement>){
   if(!dragSession.current||!isInternalMoveDrag(event.dataTransfer))return;
   event.stopPropagation();
+ }
+ // Both file and folder drags use their existing confirmation flows. Dropping
+ // never performs a server write, and OS file uploads are left to DropZone.
+ function onFolderDragStart(event:DragEvent<HTMLElement>,entry:Folder){
+  if((event.target as HTMLElement).closest("button,input")){event.preventDefault();return;}
+  folderDragRef.current=entry;
+  event.dataTransfer.effectAllowed="move";
+  event.dataTransfer.setData("application/x-filesmanage-folder",entry.id);
+  event.dataTransfer.setData("text/plain",entry.name);
+  setMoveDragImage(event.dataTransfer,entry.name,1);
+ }
+ function onFolderDragEnd(){folderDragRef.current=null;}
+ function onFolderDragOver(event:DragEvent<HTMLElement>){
+  if(!dragSession.current&&!folderDragRef.current)return;
+  const types=Array.from(event.dataTransfer.types);
+  if(!isInternalMoveDrag(event.dataTransfer)&&!types.includes("application/x-filesmanage-folder"))return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect="move";
+ }
+ function onFolderDrop(event:DragEvent<HTMLElement>,target:Folder){
+  const types=Array.from(event.dataTransfer.types);
+  const source=folderDragRef.current;
+  if(source&&types.includes("application/x-filesmanage-folder")){
+   event.preventDefault();event.stopPropagation();
+   folderDragRef.current=null;
+   if(source.id===target.id||source.parentId===target.id){
+    toast.warning("请选择其他目标文件夹");return;
+   }
+   openFolderAction(source,"move");
+   setFolderMoveTarget(target.id);
+   return;
+  }
+  if(dragSession.current&&isInternalMoveDrag(event.dataTransfer)){
+   event.preventDefault();event.stopPropagation();
+   if(dragSession.current.sourceFolderId===target.id){
+    toast.warning("文件已在此文件夹");return;
+   }
+   window.dispatchEvent(new CustomEvent<MoveDropDetail>(MOVE_DROP_EVENT,{detail:{targetFolderId:target.id}}));
+  }
  }
 
  function moveFocus(index:number,extend:boolean,originId:string|null=null){
@@ -1207,15 +1268,20 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
 
  // Context actions always target all selected loaded files, including those
  // currently hidden by the client's name or file-type filter.
- const selection=items.filter(i=>selectedIds.has(i.id));
- const selectedFolders=childFolders.filter(i=>selectedFolderIds.has(i.id));
+ const selection=[...items.filter(i=>selectedIds.has(i.id)),
+  ...(ancestorFile&&selectedIds.has(ancestorFile.id)&&!items.some(i=>i.id===ancestorFile.id)?[ancestorFile]:[])];
+ const selectedFolders=[...childFolders.filter(i=>selectedFolderIds.has(i.id)),
+  ...(ancestorFolder&&selectedFolderIds.has(ancestorFolder.id)&&!childFolders.some(i=>i.id===ancestorFolder.id)?[ancestorFolder]:[])];
  const selectedTotal=selectedIds.size+selectedFolderIds.size;
- const hiddenSelectedCount=selection.length-visibleItems.filter(i=>selectedIds.has(i.id)).length;
+ const hiddenSelectedCount=Math.max(0,selection.length-visibleItems.filter(i=>selectedIds.has(i.id)).length-(ancestorFile&&selectedIds.has(ancestorFile.id)?1:0));
  const visibleFolders=childFolders.filter(entry=>entry.name.toLocaleLowerCase().includes(nameFilter.trim().toLocaleLowerCase()));
  const activeFolder=visibleFolders.find(entry=>entry.id===focusedFolderId)
   ??(focusedId===null?visibleFolders[0]??null:null);
  const activePreview=visibleItems.find(item=>item.id===focusedId)
-  ??visibleItems.find(item=>selectedIds.has(item.id))??visibleItems[0]??null;
+  ??(ancestorFile?.id===focusedId?ancestorFile:null)
+  ??visibleItems.find(item=>selectedIds.has(item.id))??(viewMode==="columns"?null:visibleItems[0]??null);
+ const ancestorPreviewIndex=ancestorFile?folderPath.findIndex(entry=>entry.id===ancestorFile.folderId):-1;
+ const showingAncestorPreview=ancestorPreviewIndex>=0&&ancestorFile?.folderId!==folder;
  // Non-table entries intentionally reuse the same row selection, context menu,
  // move, download, favorite and deletion state machines above.
  function renderVisualEntry(item:FileItem,index:number){
@@ -1255,6 +1321,11 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   return <div key={"folder-"+entry.id} data-folder-id={entry.id} data-upload-folder-id={entry.id} role="row"
    tabIndex={0} aria-selected={selected}
    className={"explorer-item explorer-folder"+(selected?" selected":"")}
+   draggable={viewMode==="columns"}
+   onDragStart={event=>onFolderDragStart(event,entry)}
+   onDragEnd={onFolderDragEnd}
+   onDragOver={onFolderDragOver}
+   onDrop={event=>onFolderDrop(event,entry)}
    onMouseEnter={()=>setHoveredFolderId(entry.id)}
    onMouseLeave={()=>setHoveredFolderId(current=>current===entry.id?null:current)}
    onFocus={()=>setHoveredFolderId(entry.id)}
@@ -1478,9 +1549,9 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   {viewMode!=="list"&&<div className={"explorer-surface explorer-surface-"+viewMode} onPointerDown={beginMarquee}
    aria-label={folderName+" 文件"+(viewMode==="icons"?"图标":viewMode==="columns"?"分栏":"画廊")+"视图"}>
    {marquee&&<div className="explorer-marquee" aria-hidden="true" style={marquee}/>}
-   {status==="loading"&&<div className="explorer-empty" role="status"><BrandLoadingLabel size="sm">正在加载文件…</BrandLoadingLabel></div>}
-   {status==="failed"&&<div className="explorer-empty" role="alert">获取文件失败，请刷新重试</div>}
-   {status==="ready"&&visibleItems.length===0&&visibleFolders.length===0&&<div className="explorer-empty">
+   {viewMode!=="columns"&&status==="loading"&&<div className="explorer-empty" role="status"><BrandLoadingLabel size="sm">正在加载文件…</BrandLoadingLabel></div>}
+   {viewMode!=="columns"&&status==="failed"&&<div className="explorer-empty" role="alert">获取文件失败，请刷新重试</div>}
+   {viewMode!=="columns"&&status==="ready"&&visibleItems.length===0&&visibleFolders.length===0&&<div className="explorer-empty">
     <span>{items.length===0&&childFolders.length===0?"目录为空":"没有匹配的文件"}</span>
     {items.length>0&&<RareButton type="button" tone="ghost" onClick={()=>{setCategoryFilter("all");setNameFilter("");setSelectedIds(new Set());}}>清除筛选</RareButton>}
    </div>}
@@ -1488,14 +1559,30 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     {visibleFolders.map(renderFolderEntry)}
     {visibleItems.map(renderVisualEntry)}
    </div>}
-   {status==="ready"&&(visibleItems.length>0||visibleFolders.length>0)&&viewMode==="columns"&&<div className="explorer-columns">
-    <div className="explorer-column-list" role="grid" aria-label="当前目录文件" onKeyDown={onGridKeyDown}>{visibleFolders.map(renderFolderEntry)}{visibleItems.map(renderVisualEntry)}</div>
-    {activeFolder&&<div className="explorer-column-detail" aria-label="所选文件夹详情">
-     <div className="explorer-preview-art"><FolderResourceIcon open size={96}/></div>
-     <strong>{activeFolder.name}</strong>
-     <RareButton type="button" tone="neutral" onClick={()=>navigate("/doc?folder="+encodeURIComponent(activeFolder.id))}>打开文件夹</RareButton>
+   {viewMode==="columns"&&<div className="explorer-columns" ref={columnViewportRef} aria-label="逐级文件夹分栏">
+    {folderPath.slice(0,showingAncestorPreview?ancestorPreviewIndex+1:-1).map((directory,index)=><FinderPathColumn key={directory.id} folder={directory}
+     activeChildId={folderPath[index+1]?.id??null} activeFileId={ancestorFile?.folderId===directory.id?ancestorFile.id:null} reloadKey={reloadKey}
+     onOpenFolder={entry=>navigate("/doc?folder="+encodeURIComponent(entry.id))}
+     onSelectFile={item=>{
+      setAncestorFile(item);setAncestorFolder(null);
+      setSelectedIds(new Set([item.id]));setSelectedFolderIds(new Set());setFocusedId(item.id);setFocusedFolderId(null);
+      setAnchorId("file:"+item.id);
+     }}
+     onOpenFile={item=>navigate("/preview/"+item.id)}
+     onFileMenu={(event,item)=>{setAncestorFile(item);setAncestorFolder(null);onRowContextMenu(event,item);}}
+     onFolderMenu={(event,entry)=>{setAncestorFolder(entry);setAncestorFile(null);onFolderContextMenu(event,entry);}}
+     onFileDragStart={(event,item)=>{setAncestorFile(item);setAncestorFolder(null);onRowDragStart(event,item);}}
+     onFileDragEnd={onRowDragEnd}
+     onFolderDragStart={onFolderDragStart} onFolderDragEnd={onFolderDragEnd}
+     onDropFolder={onFolderDrop}/>)}
+    {!showingAncestorPreview&&<div className="explorer-column-list explorer-current-column" role="grid" aria-label={folderName+" 的内容"} onKeyDown={onGridKeyDown}>
+     {status==="loading"&&<div className="finder-column-status" role="status"><BrandLoadingLabel size="sm">加载中…</BrandLoadingLabel></div>}
+     {status==="failed"&&<div className="finder-column-status" role="alert">获取文件失败，请刷新重试</div>}
+     {status==="ready"&&visibleFolders.map(renderFolderEntry)}
+     {status==="ready"&&visibleItems.map(renderVisualEntry)}
+     {status==="ready"&&!visibleFolders.length&&!visibleItems.length&&<div className="finder-column-status">空文件夹</div>}
     </div>}
-    {!activeFolder&&activePreview&&<div className="explorer-column-detail" aria-label="所选文件详情">
+    {activePreview&&<div className="explorer-column-detail" aria-label="所选文件详情">
      {previewArt(activePreview)}
      <strong title={activePreview.name}>{activePreview.name}</strong>
      <dl><dt>大小</dt><dd>{formatSize(activePreview.sizeBytes)}</dd><dt>版本</dt><dd>v{activePreview.currentVersionSeq}</dd><dt>修改</dt><dd>{activePreview.updatedAt.replace("T"," ").slice(0,16)}</dd></dl>

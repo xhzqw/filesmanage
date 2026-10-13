@@ -319,6 +319,7 @@ export function Documents({user,onLogout,onUploadFolderChange}:{user:User;onLogo
    {moveMessage&&<p role="status" className="notice">{moveMessage}</p>}
    {selected&&<DropZone folderId={selected.id} userId={user.id} onCommitted={()=>setReloadKey(k=>k+1)}>
      <FileTable folder={selected.id} folderName={selected.name} childFolders={knownFolders.filter(item=>item.parentId===selected.id)}
+      folderPath={ancestorPath(knownFolders,selected.id)}
       onEdit={setEditingId} reloadKey={reloadKey} viewMode={viewMode} onFolderChanged={refreshTreeAndFiles}
       newFolderSlot={<NewFolderForm parentId={selected.id} onCreated={refreshTreeAndFiles}/>}/>
    </DropZone>}
