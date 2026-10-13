@@ -346,6 +346,70 @@ try{
   assert(sample.viewportScroll<=2,"long-name clone caused page overflow");
  }
  console.log("EXPLORER_LONG_NAMES_160_PASS",JSON.stringify(longNameLayout));
+ // Verify paging and large selection in the actual React component without
+ // modifying the shared dev database. This Chrome tab alone substitutes
+ // GET /api/files responses with a 130-item, three-page synthetic corpus.
+ const mockBase=await evaluate(`(async()=>{
+  const folder=new URLSearchParams(location.search).get("folder")||"folder_root";
+  const response=await fetch("/api/files?folder="+encodeURIComponent(folder)+"&sort=updated_desc&limit=1");
+  const reply=await response.json();
+  return {folder,file:reply.data?.items?.[0]??null};
+ })()`);
+ assert(mockBase.file,"large-list browser check requires an existing authorized file template");
+ const source=`(()=>{
+  const original=window.fetch.bind(window);
+  const folder=${JSON.stringify(mockBase.folder)};
+  const base=${JSON.stringify(mockBase.file)};
+  const corpus=Array.from({length:130},(_,index)=>({
+   ...base,id:"browser-readonly-"+String(index).padStart(4,"0"),
+   name:index%11===0?"审计-"+String(index).padStart(4,"0")+"-"+("CAD机械长文件名ABC123".repeat(24))+".docx":
+    "审计模拟文件-"+String(index).padStart(4,"0")+".txt"
+  }));
+  window.fetch=(input,init)=>{
+   const url=new URL(input instanceof Request?input.url:input,location.href);
+   if(url.pathname==="/api/files"&&url.searchParams.get("folder")===folder&&(!init?.method||init.method==="GET")){
+    const cursor=url.searchParams.get("cursor")||"";
+    const offset=cursor.startsWith("audit-page-")?Number(cursor.slice(11)):0;
+    const limit=Math.min(200,Math.max(1,Number(url.searchParams.get("limit")||50)));
+    const next=Math.min(corpus.length,offset+limit);
+    return Promise.resolve(new Response(JSON.stringify({ok:true,data:{
+     items:corpus.slice(offset,next),nextCursor:next<corpus.length?"audit-page-"+next:""
+    }}),{status:200,headers:{"Content-Type":"application/json"}}));
+   }
+   return original(input,init);
+  };
+ })()`;
+ const injection=await send("Page.addScriptToEvaluateOnNewDocument",{source});
+ await navigate("/doc?folder="+encodeURIComponent(mockBase.folder),
+  'document.querySelectorAll("tr.file-entry").length===50');
+ for(const expected of [100,130]){
+  await evaluate('document.querySelector(".file-page-controls button")?.click()');
+  await until('document.querySelectorAll("tr.file-entry").length==='+expected);
+ }
+ const mockState=await evaluate(`(()=>{
+  const rows=[...document.querySelectorAll("tr.file-entry")];
+  const names=rows.map(row=>row.querySelector(".file-name")?.textContent);
+  const long=rows.find(row=>row.querySelector(".file-name")?.scrollWidth>row.querySelector(".file-name")?.clientWidth);
+  return {loaded:rows.length,unique:new Set(rows.map(row=>row.dataset.id)).size,
+   longClipped:!!long&&long.querySelector(".file-name").title===long.querySelector(".file-name").textContent,
+   pageOverflow:document.documentElement.scrollWidth-innerWidth};
+ })()`);
+ assert.equal(mockState.loaded,130);
+ assert.equal(mockState.unique,130,"pagination must not duplicate file IDs");
+ assert(mockState.longClipped,"React rows must clip long file names while preserving full titles");
+ assert(mockState.pageOverflow<=2,"130 React rows widened the page");
+ await evaluate('document.querySelector("tr.file-entry").focus()');
+ await key("End");
+ await until('document.activeElement===document.querySelectorAll("tr.file-entry")[129]');
+ const scroll=await evaluate('document.querySelector(".work-body>.table")?.scrollTop');
+ assert(scroll>0,"End must scroll the actual file panel to row 130");
+ await key("a",{ctrlKey:true});
+ await until('document.querySelector("thead .col-select input[type=checkbox]")?.checked');
+ assert.equal((await selection()).count,130);
+ await key("Escape");
+ await until('[...document.querySelectorAll("tr.file-entry")].every(row=>row.getAttribute("aria-selected")!=="true")');
+ console.log("EXPLORER_PAGING_130_REACT_PASS",JSON.stringify({...mockState,scroll}));
+ await send("Page.removeScriptToEvaluateOnNewDocument",{identifier:injection.identifier});
  console.log("RARE_FOLDER_BROWSER_PASS: layered folders, low-noise toolbar, 4 views, 1440/980/700/390px");
 }catch(error){
  console.error("RARE_FOLDER_BROWSER_FAIL",error?.stack??error);
