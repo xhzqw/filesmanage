@@ -274,55 +274,7 @@ try{
  await until('document.querySelector(".work-body")?.dataset.explorerView==="icons"');
  const fileIconStar='.explorer-icon-grid [data-id="'+tested+'"] .explorer-item-star';
  await until(`!!document.querySelector(${JSON.stringify(fileIconStar)}+":not(:disabled)")`,"icon file star");
- await evaluate(`(()=>{
-  window.__starTrace=[];
-  for(const type of ["pointerdown","mousedown","pointerup","mouseup","click"]){
-   document.addEventListener(type,event=>{
-    window.__starTrace.push({type,target:event.target.tagName,
-      targetClass:event.target.closest?.(".explorer-item")?.className,
-      button:event.target.closest("button")?.className,
-      defaultPrevented:event.defaultPrevented});
-   },true);
-  }
-  const nativeFetch=window.fetch.bind(window);
-  window.fetch=(...args)=>{
-   if(String(args[0]).includes("/favorites"))
-    window.__starTrace.push({type:"fetch",url:String(args[0]),method:args[1]?.method||"GET"});
-   return nativeFetch(...args);
-  };
-  return true;
- })()`);
- const iconStarGeometry=await evaluate(`(()=>{
-  const button=document.querySelector(${JSON.stringify(fileIconStar)});
-  const rect=button.getBoundingClientRect();
-  const x=rect.left+rect.width/2,y=rect.top+rect.height/2;
-  return {x,y,rect:{width:rect.width,height:rect.height},disabled:button.disabled,
-   opacity:getComputedStyle(button).opacity,pointer:getComputedStyle(button).pointerEvents,
-   target:document.elementFromPoint(x,y)?.outerHTML?.slice(0,260)};
- })()`);
- console.log("EXPLORER_ICON_STAR_BEFORE_HOVER",JSON.stringify(iconStarGeometry));
- await send("Input.dispatchMouseEvent",{type:"mouseMoved",x:iconStarGeometry.x,y:iconStarGeometry.y});
- await delay(140);
- const iconHit=await evaluate(`(()=>{
-  const button=document.querySelector(${JSON.stringify(fileIconStar)});
-  const x=${iconStarGeometry.x},y=${iconStarGeometry.y};
-  const hit=document.elementFromPoint(x,y);
-  return {starPointer:getComputedStyle(button).pointerEvents,starOpacity:getComputedStyle(button).opacity,
-   hitTag:hit?.tagName,hitClass:hit?.getAttribute("class"),hitButton:hit?.closest("button")?.getAttribute("class"),
-   parentHover:button.closest(".explorer-item")?.matches(":hover")};
- })()`);
- console.log("EXPLORER_ICON_STAR_HIT",JSON.stringify(iconHit));
  await click(fileIconStar);
- await delay(350);
- console.log("EXPLORER_ICON_STAR_AFTER_CLICK",JSON.stringify(await evaluate(`(()=>{
-  const button=document.querySelector(${JSON.stringify(fileIconStar)});
-  const rect=button?.getBoundingClientRect();
-  return {buttonClass:button?.className,disabled:button?.disabled,
-   afterRect:rect?{x:rect.x+rect.width/2,y:rect.y+rect.height/2}:null,
-   hitNow:document.elementFromPoint(${iconStarGeometry.x},${iconStarGeometry.y})?.outerHTML?.slice(0,180),
-   trace:window.__starTrace,
-   toasts:[...document.querySelectorAll("[role=status],[role=alert]")].map(e=>e.textContent?.trim().slice(0,90)).filter(Boolean)};
- })()`)));
  await until(`document.querySelector(${JSON.stringify(fileIconStar)})?.classList.contains("favorited")===${originalFavorite}`,"icon file favorite feedback");
  for(let i=0;i<50;i++){
   const read=await favoriteRead();

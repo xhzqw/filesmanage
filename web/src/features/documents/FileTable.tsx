@@ -1389,9 +1389,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
      event.currentTarget.setPointerCapture(event.pointerId);
     }}
     onMouseDown={event=>{
-     // Native mouse focus scrolls the icon grid to the button between
-     // pointerdown and pointerup, sending the click to the card instead.
-     // Keep Tab/Space/Enter focus handling; only pointer focus is suppressed.
+     // Avoid native mouse-focus scrolling while a tile is being clicked.
+     // Keyboard Tab/Space/Enter still use normal button focus behavior.
      event.preventDefault();event.stopPropagation();
     }}
     onKeyDown={event=>event.stopPropagation()}
