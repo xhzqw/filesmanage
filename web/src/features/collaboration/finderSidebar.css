@@ -20,7 +20,7 @@
 .finder-nav-retry{border:0;background:transparent;text-align:left;cursor:pointer}
 .finder-nav-heading{display:flex;align-items:center;justify-content:space-between;padding-right:7px}
 .finder-nav-heading .finder-nav-label{padding-bottom:0}
-.finder-tag-add{border:0;background:transparent;color:var(--text-secondary);font-size:19px;width:27px;height:27px;padding:0;border-radius:8px}
+.finder-tag-add{border:0;background:transparent;color:var(--text-secondary);font-size:19px;width:27px;height:27px;padding:0;border-radius:var(--radius-sm)}
 .finder-tag-line{display:flex;align-items:center;min-width:0;border-radius:var(--radius-md);transition:background .15s}
 .finder-tag-line:hover,.finder-tag-line.is-current{background:var(--surface-row-hover)}
 .finder-tag-line.is-current{background:var(--surface-row-selected)}
@@ -35,7 +35,7 @@
 .finder-tag-editor{display:grid;gap:8px;margin:6px 2px;padding:10px;border-radius:var(--radius-md);background:var(--surface-card);box-shadow:var(--shadow-overlay);min-width:0}
 .finder-tag-editor input{min-width:0;width:100%;box-sizing:border-box}
 .finder-tag-palette{display:flex;justify-content:space-between;gap:1px}
-.finder-tag-palette-item{width:26px;min-width:26px;height:28px;padding:0;display:grid;place-items:center;border:0;background:transparent;border-radius:8px}
+.finder-tag-palette-item{width:26px;min-width:26px;height:28px;padding:0;display:grid;place-items:center;border:0;background:transparent;border-radius:var(--radius-sm)}
 .finder-tag-palette-item[aria-pressed="true"]{background:var(--surface-row-selected);box-shadow:inset 0 0 0 1px var(--brand-blue)}
 .finder-tag-palette-item span{width:16px;height:16px;display:block;border-radius:50%}
 .finder-tag-editor-actions{display:flex;justify-content:flex-end;gap:5px}

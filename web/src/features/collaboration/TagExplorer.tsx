@@ -1,6 +1,6 @@
 import {useEffect,useState,type MouseEvent} from "react";
 import {Link,useLocation} from "react-router-dom";
-import type {FileItem} from "../../entities/file/model";
+import type {TaggedFile} from "../../shared/finderLabels";
 import {RareButton} from "../../shared/ui/rare";
 import {Menu,type MenuPoint} from "../../shared/ui/Menu";
 import {FileTypeIcon} from "../../shared/ui/FileTypeIcon";
@@ -14,12 +14,12 @@ export function TagExplorer(){
  const location=useLocation();
  const labelId=new URLSearchParams(location.search).get("label")||"";
  const [labels,setLabels]=useState<FinderLabel[]>([]);
- const [files,setFiles]=useState<FileItem[]>([]);
+ const [files,setFiles]=useState<TaggedFile[]>([]);
  const [assignments,setAssignments]=useState<Record<string,string[]>>({});
  const [loading,setLoading]=useState(true);
  const [failure,setFailure]=useState("");
  const [revision,setRevision]=useState(0);
- const [menu,setMenu]=useState<{file:FileItem;point:MenuPoint;anchor:HTMLElement}|null>(null);
+ const [menu,setMenu]=useState<{file:TaggedFile;point:MenuPoint;anchor:HTMLElement}|null>(null);
  const [busy,setBusy]=useState(false);
  const active=labels.find(label=>label.id===labelId);
  useEffect(()=>{
@@ -43,7 +43,7 @@ export function TagExplorer(){
   }).catch(error=>{if(mounted){setFailure(errorCopy(error,"加载标签文件失败"));setLoading(false);}});
   return()=>{mounted=false;};
  },[labelId,revision]);
- async function mark(label:FinderLabel,file:FileItem){
+ async function mark(label:FinderLabel,file:TaggedFile){
   if(busy)return;
   const add=!(assignments[file.id]??[]).includes(label.id);
   setBusy(true);
@@ -53,7 +53,7 @@ export function TagExplorer(){
   }catch(error){toast.error(errorCopy(error,"修改标签失败"));}
   finally{setBusy(false);}
  }
- function context(event:MouseEvent<HTMLElement>,file:FileItem){
+ function context(event:MouseEvent<HTMLElement>,file:TaggedFile){
   event.preventDefault();
   setMenu({file,point:{x:event.clientX,y:event.clientY},anchor:event.currentTarget});
  }

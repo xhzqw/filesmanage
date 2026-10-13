@@ -1,6 +1,7 @@
 import {request} from "./http";
 import {publishResourceChange} from "./resourceSync";
-import type {FileItem} from "../entities/file/model";
+// Keep the transport DTO in shared; shared cannot import the entities layer.
+export type TaggedFile={id:string;folderId:string;name:string;uploadedBy:string;contentType:string;sizeBytes:number;sha256:string;currentVersionSeq:number;updatedAt:string};
 
 export const FINDER_COLORS=[
  {id:"red",name:"红色",hex:"#ff5a58"},
@@ -20,7 +21,7 @@ export const labelApi={
  create:(name:string,color:FinderColor)=>request<FinderLabel>("/labels",{method:"POST",body:JSON.stringify({name,color})}).then(value=>{changedLabels();return value;}),
  update:(id:string,name:string,color:FinderColor)=>request<FinderLabel>("/labels/"+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify({name,color})}).then(value=>{changedLabels();return value;}),
  remove:(id:string)=>request<{deleted:boolean}>("/labels/"+encodeURIComponent(id),{method:"DELETE"}).then(value=>{changedLabels();return value;}),
- files:(id:string)=>request<{items:FileItem[]}>("/labels/"+encodeURIComponent(id)+"/files"),
+ files:(id:string)=>request<{items:TaggedFile[]}>("/labels/"+encodeURIComponent(id)+"/files"),
  assignments:(fileIds:string[])=>request<Record<string,string[]>>("/labels/assignments",{method:"POST",body:JSON.stringify({fileIds})}),
  setFiles:(id:string,fileIds:string[],add:boolean)=>request<{updated:number}>("/labels/"+encodeURIComponent(id)+"/files",{method:"PUT",body:JSON.stringify({fileIds,add})}).then(data=>{
   for(const fileId of fileIds)publishResourceChange({scope:"file",id:fileId});
