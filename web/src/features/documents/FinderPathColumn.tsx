@@ -5,6 +5,7 @@ import {folderApi} from "../folders/api";
 import {FolderResourceIcon} from "../../shared/ui/ResourceIcons";
 import {FileTypeIcon} from "../../shared/ui/FileTypeIcon";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
+import {RareButton} from "../../shared/ui/rare";
 import {fileApi} from "./api";
 
 // Ancestor columns share FileTable's existing action handlers instead of
@@ -107,7 +108,7 @@ export function FinderPathColumn(props:Props){
     <span className="finder-column-name" title={file.name}>{file.name}</span>
    </div>)}
    {!data.folders.length&&!data.files.length&&<div className="finder-column-status">空文件夹</div>}
-   {(data.folderCursor||data.fileCursor)&&<button className="finder-column-more" type="button" disabled={moreBusy} onClick={()=>void more()}>{moreBusy?"加载中…":moreFailed?"重试加载":"加载更多"}</button>}
+   {(data.folderCursor||data.fileCursor)&&<RareButton tone="ghost" className="finder-column-more" type="button" disabled={moreBusy} onClick={()=>void more()}>{moreBusy?"加载中…":moreFailed?"重试加载":"加载更多"}</RareButton>}
   </>}
  </div>;
 }
