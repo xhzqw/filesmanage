@@ -53,6 +53,7 @@ const selectionText=()=>evaluate('document.querySelector(".file-selected-count")
 const favoriteRead=()=>evaluate('(async()=>{const response=await fetch("/api/favorites",{cache:"no-store"});const json=await response.json();return {status:response.status,ok:json.ok,rows:json.data};})()');
 
 let tested=null,originalFavorite=false;
+let testedFolder=null,originalFolderFavorite=false;
 let copiedTestId=null,copyDestination=null;
 let copyBeforeIds=[];
 try{
@@ -260,6 +261,54 @@ try{
  await navigate(path,'!!document.querySelector("tr.file-entry .action-star-btn")');
  await until(`document.querySelector("tr.file-entry .action-star-btn")?.classList.contains("favorited")===${expected}`,"favorite after reload");
  console.log("EXPLORER_LIVE_FAVORITE_PERSIST_PASS",JSON.stringify({id:tested,changed:true,afterReload:true}));
+
+ // Verify the same file's actual Finder icon star hit target, not only its
+ // list-row star. Clicking this second star restores the original state.
+ await click('.folder-view-switch button[aria-label="图标视图"]');
+ await until('document.querySelector(".work-body")?.dataset.explorerView==="icons"');
+ const fileIconStar='.explorer-icon-grid [data-id="'+tested+'"] .explorer-item-star';
+ await until(`!!document.querySelector(${JSON.stringify(fileIconStar)}+":not(:disabled)")`,"icon file star");
+ await click(fileIconStar);
+ await until(`document.querySelector(${JSON.stringify(fileIconStar)})?.classList.contains("favorited")===${originalFavorite}`,"icon file favorite feedback");
+ for(let i=0;i<50;i++){
+  const read=await favoriteRead();
+  if(read.ok&&read.rows.some(row=>row.kind==="file"&&row.fileId===tested)===originalFavorite)break;
+  await delay(130);
+ }
+ const iconFileFavorites=await favoriteRead();
+ assert.equal(iconFileFavorites.rows.some(row=>row.kind==="file"&&row.fileId===tested),originalFavorite,
+  "File icon star must persist its favorite change");
+ console.log("EXPLORER_ICON_FILE_FAVORITE_PASS",JSON.stringify({id:tested,persisted:true}));
+
+ // The user-facing Finder cards also have folder stars. Confirm native mouse
+ // clicks toggle one actual folder, survive navigation, and are restored.
+ await navigate("/doc",'!!document.querySelector(".folder-view-switch")');
+ await click('.folder-view-switch button[aria-label="图标视图"]');
+ await until('!!document.querySelector(".explorer-icon-grid .explorer-folder[data-folder-id] .explorer-item-star")',
+  "root folder star");
+ const folderId=await evaluate('document.querySelector(".explorer-icon-grid .explorer-folder[data-folder-id]")?.getAttribute("data-folder-id")');
+ assert(folderId,"Folder favorite fixture must have a real server id");
+ const folderInitial=await favoriteRead();
+ assert(folderInitial.ok&&Array.isArray(folderInitial.rows),"Initial folder favorites must load");
+ testedFolder=folderId;
+ originalFolderFavorite=folderInitial.rows.some(row=>row.kind==="folder"&&row.folderId===testedFolder);
+ const folderStar='.explorer-icon-grid .explorer-folder[data-folder-id="'+testedFolder+'"] .explorer-item-star';
+ await click(folderStar);
+ const folderExpected=!originalFolderFavorite;
+ await until(`document.querySelector(${JSON.stringify(folderStar)})?.classList.contains("favorited")===${folderExpected}`,"folder star feedback");
+ for(let i=0;i<50;i++){
+  const read=await favoriteRead();
+  if(read.ok&&read.rows.some(row=>row.kind==="folder"&&row.folderId===testedFolder)===folderExpected)break;
+  await delay(130);
+ }
+ const savedFolder=await favoriteRead();
+ assert.equal(savedFolder.rows.some(row=>row.kind==="folder"&&row.folderId===testedFolder),folderExpected,
+  "Folder icon star must persist its favorite change");
+ await navigate("/doc",'!!document.querySelector(".folder-view-switch")');
+ await click('.folder-view-switch button[aria-label="图标视图"]');
+ await until(`document.querySelector(${JSON.stringify(folderStar)})?.classList.contains("favorited")===${folderExpected}`,
+  "folder star after reload");
+ console.log("EXPLORER_ICON_FOLDER_FAVORITE_PASS",JSON.stringify({id:testedFolder,persisted:true,afterReload:true}));
 }catch(error){
  console.error("EXPLORER_LIVE_INTERACTION_FAIL",error?.stack||error);
  process.exitCode=1;
@@ -279,6 +328,17 @@ try{
    })()`);
    if(!result.write||!result.verified){console.error("FAVORITE_RESTORE_FAILED");process.exitCode=1;}
   }catch(error){console.error("FAVORITE_RESTORE_FAILED",error?.message);process.exitCode=1;}
+ }
+ if(testedFolder&&ws?.readyState===WebSocket.OPEN){
+  try{
+   const result=await evaluate(`(async()=>{
+    const response=await fetch("/api/favorites/folder/"+${JSON.stringify(testedFolder)},{method:${JSON.stringify(originalFolderFavorite?"PUT":"DELETE")}});
+    const read=await fetch("/api/favorites",{cache:"no-store"});
+    const json=await read.json();
+    return {write:response.ok,verified:json.ok&&json.data.some(row=>row.kind==="folder"&&row.folderId===${JSON.stringify(testedFolder)})===${originalFolderFavorite}};
+   })()`);
+   if(!result.write||!result.verified){console.error("FOLDER_FAVORITE_RESTORE_FAILED");process.exitCode=1;}
+  }catch(error){console.error("FOLDER_FAVORITE_RESTORE_FAILED",error?.message);process.exitCode=1;}
  }
  ws?.close();chrome.kill("SIGTERM");await delay(200);
  rmSync(profile,{recursive:true,force:true});
