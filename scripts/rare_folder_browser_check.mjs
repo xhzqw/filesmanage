@@ -322,6 +322,8 @@ try{
    table.append(header.cloneNode(true),body);
    for(let i=0;i<160;i++){
     const row=sample.cloneNode(true);
+    row.classList.remove("selected","focused","drag-source");
+    row.setAttribute("aria-selected","false");
     // Include a folder in the same DOM order as regular files; the zebra
     // pattern must not restart at the folder/file boundary.
     if(i===0){row.className="explorer-list-folder";row.removeAttribute("data-file-entry");}

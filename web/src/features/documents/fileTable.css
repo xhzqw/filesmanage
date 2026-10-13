@@ -229,7 +229,7 @@
   display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;
   gap:8px 12px;background:var(--surface-panel);
   border:0;border-bottom:1px solid var(--border-hairline);
-  border-radius:0;
+  border-radius:var(--radius-xs);
 }
 .file-toolbar .toolbar-actions{
   display:flex;align-items:center;justify-content:flex-start;
@@ -269,7 +269,7 @@
   background:var(--surface-row-hover);border-color:transparent;color:var(--brand-blue);
 }
 .file-toolbar .batch-actions-group{
-  gap:3px;background:transparent;border:0;border-radius:0;
+  gap:3px;background:transparent;border:0;
   margin:0;padding:0;white-space:nowrap;
 }
 .file-toolbar .file-selected-count{
