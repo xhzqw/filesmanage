@@ -12,32 +12,72 @@
  padding:2px;border:1px solid transparent;
  background:var(--surface-header);border-radius:var(--radius-md);
 }
+.folder-history-controls{
+ gap:2px;padding:0;border:0;border-radius:0;background:transparent;
+}
 .folder-history-controls .rare-button,.folder-view-switch .rare-button{
  width:27px;height:26px;min-height:26px;padding:0;display:grid;place-items:center;
  border:0;border-radius:var(--radius-pill);color:var(--text-secondary);
  transition:background-color .14s ease,color .14s ease;
 }
+.folder-history-controls .rare-button{
+ width:28px;height:28px;min-height:28px;border-radius:var(--radius-sm);
+ background:transparent;color:var(--text-secondary);box-shadow:none;
+}
+.folder-history-controls .rare-button:not(:disabled):hover,
+.folder-history-controls .rare-button:not(:disabled):focus-visible{
+ background:var(--surface-row-hover);color:var(--brand-blue);
+}
 .folder-history-controls .rare-button:disabled{
- opacity:.27;cursor:default;
+ opacity:.34;cursor:default;background:transparent;
 }
 .folder-history-controls .rare-button:disabled:active{transform:none}
-.folder-control-divider{height:15px;width:1px;background:var(--border-subtle);flex:none}
 .folder-view-switch .rare-button[aria-pressed="true"]{
  background:var(--surface-panel);color:var(--text-primary);
  box-shadow:0 1px 2px color-mix(in srgb,var(--text-primary) 12%,transparent);
 }
 .folder-view-switch .rare-button[aria-pressed="true"]:hover{background:var(--surface-panel)}
 .document-explorer .work .folder-context-bar{
- box-shadow:none;border-left:0;border-right:0;
+ box-sizing:border-box;width:100%;max-width:100%;height:40px;min-height:40px;max-height:40px;
+ margin:0;padding:0 12px;gap:12px;flex-wrap:nowrap;justify-content:flex-start;
+ border:0;border-bottom:1px solid var(--border-hairline);border-radius:0;
+ background:var(--surface-panel);box-shadow:none;
 }
 .document-explorer .work .folder-context-bar .breadcrumb a{
- color:var(--text-secondary);font-weight:500;
+ color:var(--text-secondary);font-weight:450;
 }
 .document-explorer .work .folder-context-bar .breadcrumb a:hover{
  color:var(--brand-blue);
 }
 .document-explorer .work .folder-context-bar .breadcrumb .crumb-current{
  font-weight:600;color:var(--text-primary);
+}
+.document-explorer .work .folder-context-bar .breadcrumb{
+ display:flex;align-items:center;gap:0;flex:1 1 160px;min-width:0;
+ font-size:12.5px;line-height:1.4;letter-spacing:-.01em;
+}
+.document-explorer .work .folder-context-bar .breadcrumb .crumb-root{flex:none;font-size:12px}
+.document-explorer .work .folder-context-bar .breadcrumb .crumb-segment{
+ display:inline-flex;align-items:center;min-width:0;max-width:45%;flex:0 1 auto;
+}
+.document-explorer .work .folder-context-bar .breadcrumb .crumb-segment:last-child{max-width:60%}
+.document-explorer .work .folder-context-bar .breadcrumb .crumb-segment>a{
+ flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+}
+.document-explorer .work .folder-context-bar .breadcrumb .crumb-current{
+ display:block;flex:1 1 auto;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;
+}
+.document-explorer .work .folder-context-bar .breadcrumb .crumb-sep{
+ flex:none;margin:0 8px;color:var(--text-tertiary);font-size:12px;font-weight:400;
+}
+.document-explorer .work .folder-context-bar .breadcrumb .crumb-collapse-picker{
+ appearance:none;flex:none;width:24px;height:25px;min-height:25px;padding:0;
+ border:0;border-radius:var(--radius-xs);background:transparent;
+ color:var(--text-secondary);font:inherit;text-align:center;cursor:pointer;
+}
+.document-explorer .work .folder-context-bar .breadcrumb .crumb-collapse-picker:hover,
+.document-explorer .work .folder-context-bar .breadcrumb .crumb-collapse-picker:focus-visible{
+ background:var(--surface-row-hover);color:var(--brand-blue);
 }
 .work .folder-context-bar .breadcrumb{
  flex:1 1 110px;min-width:18px;max-width:none;overflow:hidden;
@@ -254,6 +294,8 @@
  .work .folder-context-bar{gap:4px;padding:4px 5px}
  .folder-history-controls,.folder-view-switch{gap:0;padding:1px}
  .folder-history-controls .rare-button,.folder-view-switch .rare-button{width:25px;height:25px;min-height:25px}
+ .document-explorer .work .folder-context-bar{gap:7px;padding:0 7px}
+ .document-explorer .work .folder-context-bar .breadcrumb .crumb-sep{margin:0 5px}
  .work .folder-context-bar .ghost-action-btn{max-width:62px;white-space:nowrap;overflow:hidden;padding:0 3px}
 }
 @media(max-width:560px){
@@ -262,6 +304,8 @@
  .work .folder-context-bar{height:auto;min-height:41px;flex-wrap:wrap}
  .work .folder-context-bar .breadcrumb{order:4;flex:1 1 100%;min-height:20px}
  .work .folder-context-bar .folder-actions-slot{margin-left:auto}
+ .document-explorer .work .folder-context-bar{height:auto;min-height:40px;max-height:none;flex-wrap:wrap;padding-block:5px}
+ .document-explorer .work .folder-context-bar .breadcrumb{order:4;flex:1 1 100%;min-height:22px}
 }
 @media(hover:none),(pointer:coarse){
  .explorer-item-check,.explorer-item-star,.explorer-item-more{opacity:1;pointer-events:auto}

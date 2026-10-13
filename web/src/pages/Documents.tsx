@@ -297,12 +297,11 @@ export function Documents({user,onLogout,onUploadFolderChange}:{user:User;onLogo
      <div className="folder-history-controls" role="group" aria-label="目录浏览历史">
       <RareButton type="button" tone="ghost" aria-label="返回上一个目录" title="后退"
        disabled={historyIndex===0} onClick={()=>travelFolder(-1)}>
-       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14.5 5-7 7 7 7"/></svg>
+       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m14.5 5-7 7 7 7"/></svg>
       </RareButton>
-      <span className="folder-control-divider" aria-hidden="true"/>
       <RareButton type="button" tone="ghost" aria-label="前往下一个目录" title="前进"
        disabled={historyIndex>=folderHistory.current.length-1} onClick={()=>travelFolder(1)}>
-       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9.5 5 7 7-7 7"/></svg>
+       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9.5 5 7 7-7 7"/></svg>
       </RareButton>
      </div>
      <FolderBreadcrumb folders={knownFolders} folder={selected}/>
@@ -374,26 +373,33 @@ function FileEditorBridge({fileId,requiresApproval,onClose,onSaved}:{fileId:stri
 // The path belongs in the top bar (SPEC §3.1), not in a work-area row: the
 // visible ancestor chain of the selected folder, root first, current last.
 function FolderBreadcrumb({folders,folder}:{folders:Folder[];folder:Folder}){
+ const navigate=useNavigate();
  const segments:{id:string|null;name:string}[]=[{id:null,name:"文档管理"},
   ...ancestorPath(folders,folder.id).map(ancestor=>({id:ancestor.id,name:ancestor.name}))];
- // A deep chain would squeeze the command trigger out of the 40px bar, so only
- // the root and the last two segments stay, with the gap marked as a collapse.
- // The fold waits for a sixth segment: DI-15 walks root + three levels and
- // asserts every visible ancestor is still named, so folding one level earlier
- // would hide a real ancestor the gate requires.
+ // Keep shallow paths fully visible; hidden ancestors in deep paths remain
+ // reachable by keyboard and pointer rather than becoming an inert ellipsis.
  const collapsed=segments.length>5;
+ const hidden=collapsed?segments.slice(1,-2):[];
  const tail=collapsed?segments.slice(-2):segments.slice(1);
  const[root]=segments;
  return <nav className="breadcrumb crumb-bar" aria-label="当前位置">
   {tail.length===0
    ?<span className="crumb-current" aria-current="page">{root?.name??"文档管理"}</span>
-   :<Link to="/doc">{root?.name??"文档管理"}</Link>}
-  {collapsed?<span className="crumb-collapse">…</span>:null}
-  {tail.map((segment,index)=><span key={segment.id??"root"}>
+   :<Link className="crumb-root" to="/doc" title={root?.name??"文档管理"}>{root?.name??"文档管理"}</Link>}
+  {hidden.length>0&&<span className="crumb-segment crumb-hidden">
+   <span className="crumb-sep" aria-hidden="true">›</span>
+   <select className="crumb-collapse-picker" aria-label="选择隐藏的上级目录" value="" onChange={event=>{
+    if(event.target.value)navigate("/doc?folder="+encodeURIComponent(event.target.value));
+   }}>
+    <option value="">…</option>
+    {hidden.map(segment=><option key={segment.id} value={segment.id??""}>{segment.name}</option>)}
+   </select>
+  </span>}
+  {tail.map((segment,index)=><span className="crumb-segment" key={segment.id??"root"}>
    <span className="crumb-sep" aria-hidden="true">›</span>
    {index===tail.length-1
-    ?<span className="crumb-current" aria-current="page">{segment.name}</span>
-    :<Link to={segment.id===null?"/doc":"/doc?folder="+encodeURIComponent(segment.id)}>{segment.name}</Link>}
+    ?<span className="crumb-current" aria-current="page" title={segment.name}>{segment.name}</span>
+    :<Link title={segment.name} to={segment.id===null?"/doc":"/doc?folder="+encodeURIComponent(segment.id)}>{segment.name}</Link>}
   </span>)}
  </nav>;
 }
