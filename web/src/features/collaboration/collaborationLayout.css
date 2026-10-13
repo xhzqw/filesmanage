@@ -127,7 +127,7 @@
    The content takes the same single chrome + scrollport as the file browser. */
 .collab-root.is-embedded .collab-workspace{margin:0;gap:0}
 .collab-root.is-embedded .collab-workspace.with-picker{gap:0}
-.collab-workspace .collab-results{background:var(--surface-panel);border:0;border-radius:0;box-shadow:none}
+.collab-workspace .collab-results{background:var(--surface-panel);border:0;box-shadow:none}
 .collab-results-head{
  box-sizing:border-box;min-height:42px;height:auto;padding:5px 10px;
  gap:9px;background:var(--surface-panel);border-bottom:1px solid var(--border-hairline);
