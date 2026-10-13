@@ -81,6 +81,17 @@ try{
  await navigate("/doc",'!!document.querySelector(".folder-view-switch")');
  await click('.folder-view-switch button[aria-label="列表视图"]');
  await until('document.querySelector(".work-body")?.dataset.explorerView==="list"');
+ await until('document.querySelectorAll("tr.file-entry,.explorer-list-folder").length>0',
+  "Initial folder rows must finish rendering before checking file count");
+ const folderDate=await evaluate(`(async()=>{
+  const tree=await(await fetch("/api/folders/tree",{cache:"no-store"})).json();
+  const row=document.querySelector(".explorer-list-folder");
+  const data=tree.data?.find(entry=>entry.id===row?.dataset.uploadFolderId);
+  return {api:data?.updatedAt,displayed:row?.querySelector("td.col-date")?.textContent.trim()};
+ })()`);
+ assert(folderDate.api&&folderDate.displayed===folderDate.api.replace("T"," ").slice(0,16),
+  "Folder modified date must come from the actual API: "+JSON.stringify(folderDate));
+ console.log("EXPLORER_FOLDER_MTIME_PASS",JSON.stringify(folderDate));
  let count=await evaluate('document.querySelectorAll("tr.file-entry").length');
  if(count<4){
   const queue=await evaluate('[...document.querySelectorAll(".explorer-list-folder")].map(el=>el.dataset.uploadFolderId).filter(Boolean)');
