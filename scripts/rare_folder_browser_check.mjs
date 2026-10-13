@@ -378,7 +378,7 @@ try{
   assert.equal(sample.nowrap,"nowrap");
   assert(sample.cellWidth<=sample.scrollerWidth,"filename cell overflow at "+sample.width);
   assert(sample.viewportScroll<=2,"long-name clone caused page overflow");
-  assert(sample.rowHeights.every(height=>Math.abs(height-44)<=.5),"folder/file row heights must all be 44px at "+sample.width);
+  assert(sample.rowHeights.every(height=>Math.abs(height-32)<=.5),"folder/file row heights must all be 32px at "+sample.width);
   assert.equal(sample.rowSurfaces[0],sample.rowSurfaces[2],"base stripes match at "+sample.width);
   assert.notEqual(sample.rowSurfaces[0],sample.rowSurfaces[1],"adjacent row stripes differ at "+sample.width);
   assert.equal(sample.rowSurfaces[3],"rgb(36, 92, 181)","selected row uses deep blue at "+sample.width);

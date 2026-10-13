@@ -15,12 +15,12 @@
 .file-page-controls .rare-button{min-height:27px;height:27px;white-space:nowrap}
 .file-page-hint{color:var(--text-secondary)}
 .file-page-error{color:var(--status-danger);min-width:0;overflow-wrap:anywhere}
-.file-table{table-layout:fixed;width:100%}
+.file-table{--file-list-row-height:32px;table-layout:fixed;width:100%}
 .file-table th{padding:0 8px;height:var(--height-table-header)}
-.file-table tbody tr{height:44px}
+.file-table tbody tr{height:var(--file-list-row-height)}
 .file-table tbody td:not(.empty){
   display:table-cell;
-  height:44px;
+  height:var(--file-list-row-height);
   vertical-align:middle;
   padding:0 8px;
   box-sizing:border-box;
@@ -47,7 +47,7 @@
 }
 .explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder){
   --explorer-row-surface:var(--explorer-list-canvas);
-  height:44px;
+  height:var(--file-list-row-height);
   background:transparent;
   box-shadow:none;
   transition:none;
@@ -69,7 +69,7 @@
    rounded, so the row is a single band and never six separate pills. */
 .explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder) > td{
   box-sizing:border-box;
-  height:44px;
+  height:var(--file-list-row-height);
   padding-top:0;
   padding-bottom:0;
   border:0;
@@ -388,11 +388,11 @@
   .file-table :is(th,td).col-date,.file-table :is(th,td).col-size,.file-table :is(th,td).col-version{display:none}
   .file-table th.col-select{width:34px}
   .file-table th.col-actions{width:62px}
-  .file-table tbody tr{height:44px}
-  .file-table tbody td:not(.empty){height:44px}
+  .file-table tbody tr{height:var(--file-list-row-height)}
+  .file-table tbody td:not(.empty){height:var(--file-list-row-height)}
   .file-table .file-cell-wrap{
     display:grid;grid-template-columns:16px minmax(0,1fr) 24px;
-    grid-template-rows:18px 14px;column-gap:5px;align-content:center;
+    grid-template-rows:16px 12px;column-gap:5px;align-content:center;
   }
   .file-table .file-type-icon{grid-column:1;grid-row:1/3}
   .file-table .file-name{grid-column:2;grid-row:1;min-width:0}
@@ -505,12 +505,12 @@ table.file-table tbody tr .row-actions:focus-within .actions-hover-group{
   font-variant-numeric:tabular-nums;
 }
 
-/* Legacy ultra class retains one height contract for folders and files. */
-table.file-table-ultra tbody tr{height:44px}
-table.file-table-ultra tbody td:not(.empty){height:44px;padding:0 8px}
+/* One compact row-height contract across file/folder rows and narrow panes. */
+table.file-table-ultra tbody tr{height:var(--file-list-row-height)}
+table.file-table-ultra tbody td:not(.empty){height:var(--file-list-row-height);padding:0 8px}
 @container file-list (max-width:560px){
- table.file-table-ultra tbody tr{height:44px}
- table.file-table-ultra tbody td:not(.empty){height:44px;padding:0 5px}
+ table.file-table-ultra tbody tr{height:var(--file-list-row-height)}
+ table.file-table-ultra tbody td:not(.empty){height:var(--file-list-row-height);padding:0 5px}
  /* Override the explicit table-cell display contract in the base grid. */
  table.file-table-ultra tbody td.col-size,
  table.file-table-ultra tbody td.col-version,
