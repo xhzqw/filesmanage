@@ -82,6 +82,15 @@ func TestPurgeFolderRemovesDescendantFavoritesOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	page, err := s.ListFavoritesPage(ctx, admin, "", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, favorite := range page.Items {
+		if favorite.ID == "subtree-file" && (favorite.Status != "trashed" || favorite.TrashEntryID != entry.ID) {
+			t.Fatalf("nested favorite must point at ancestor's trash entry: %+v", favorite)
+		}
+	}
 	if len(repo.favorites) != 4 {
 		t.Fatal("soft deletion must not remove favorite relationships")
 	}

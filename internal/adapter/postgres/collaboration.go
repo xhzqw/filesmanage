@@ -123,11 +123,18 @@ const favoriteSelect = `SELECT fa.id,fa.user_id,fa.file_id,fa.folder_id,fa.creat
  LEFT JOIN files f ON f.id=fa.file_id
  LEFT JOIN folders d ON d.id=fa.folder_id
  LEFT JOIN LATERAL (
+   WITH RECURSIVE ancestry(id,parent_id,depth) AS (
+     SELECT root.id,root.parent_id,0 FROM folders root
+     WHERE root.id=coalesce(f.folder_id,d.id)
+     UNION ALL
+     SELECT parent.id,parent.parent_id,a.depth+1 FROM folders parent
+     JOIN ancestry a ON a.parent_id=parent.id WHERE a.depth<64
+   )
    SELECT t.id,t.deleted_by FROM trash_entries t
    WHERE t.restored_at IS NULL AND t.purged_at IS NULL
-   AND (t.file_id=fa.file_id OR t.folder_id=fa.folder_id)
+   AND (t.file_id=fa.file_id OR t.folder_id IN (SELECT id FROM ancestry))
    ORDER BY t.deleted_at DESC LIMIT 1
- ) tr ON true`
+ ) tr ON coalesce(f.deleted_at IS NOT NULL OR d.deleted_at IS NOT NULL,false)`
 
 func scanFavorite(row rowScanner) (domain.Favorite, error) {
 	var f domain.Favorite

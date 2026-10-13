@@ -227,7 +227,7 @@ func (s *Service) PurgeTrashEntry(ctx context.Context, u domain.User, entryID st
 		}
 	}
 	if err = tx.MarkTrashPurged(ctx, entry.ID); err != nil {
-		return err
+		return mapError(err)
 	}
 	fileID := ""
 	if entry.FileID != nil {

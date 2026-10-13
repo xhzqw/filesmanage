@@ -33,7 +33,7 @@ type Favorite struct {
 	Status       string // active, trashed (authorized), inaccessible
 	Deleted      bool   // internal: never disclose without delete-record visibility
 	DeletedBy    string // internal: never serialize
-	TrashEntryID string // direct entry only; disclosed only to its authorized viewer
+	TrashEntryID string // may be ancestor's entry; disclosed only to its authorized viewer
 }
 
 type FavoriteNotification struct {

@@ -970,7 +970,7 @@ func (r *Repository) MarkTrashPurged(ctx context.Context, id string) error {
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return pgx.ErrNoRows
+		return ports.ErrRowMissing
 	}
 	return nil
 }

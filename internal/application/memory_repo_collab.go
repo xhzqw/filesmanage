@@ -99,11 +99,30 @@ func (r *memoryRepo) ListFavorites(_ context.Context, userID string) ([]domain.F
 				}
 			}
 			for _, t := range r.trash {
-				if t.RestoredAt != nil || t.PurgedAt != nil {
+				if !f.Deleted || t.RestoredAt != nil || t.PurgedAt != nil {
 					continue
 				}
-				if (f.FileID != nil && t.FileID != nil && *f.FileID == *t.FileID) ||
-					(f.FolderID != nil && t.FolderID != nil && *f.FolderID == *t.FolderID) {
+				matched := f.FileID != nil && t.FileID != nil && *f.FileID == *t.FileID
+				if t.FolderID != nil {
+					id := ""
+					if f.FolderID != nil {
+						id = *f.FolderID
+					} else if f.FileID != nil {
+						id = r.files[*f.FileID].FolderID
+					}
+					for depth := 0; depth <= 64 && id != ""; depth++ {
+						if id == *t.FolderID {
+							matched = true
+							break
+						}
+						folder, ok := r.folders[id]
+						if !ok || folder.ParentID == nil {
+							break
+						}
+						id = *folder.ParentID
+					}
+				}
+				if matched {
 					f.TrashEntryID = t.ID
 					f.DeletedBy = t.DeletedBy
 				}
