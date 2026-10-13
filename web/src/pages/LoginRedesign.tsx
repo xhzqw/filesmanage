@@ -92,7 +92,7 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
    }
   }}>
   <header className="login-minimal-brand">
-   <BrandLogo size={32} className="login-minimal-logo"/>
+   <BrandLogo size={32} className="login-minimal-logo" transparent/>
    <h1>中晟生物科技</h1>
   </header>
   <div ref={zone} className={`login-reveal-zone${open?" is-expanded":""}`}

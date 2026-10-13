@@ -111,12 +111,33 @@ try{
 
  check("default center has only a login capsule",!state.open&&state.hidden&&Math.abs(state.buttonCenter-state.width/2)<1&&Math.abs(state.buttonMiddle-state.height/2)<1,JSON.stringify(state));
  check("brand stays in top left",state.brandLeft>=8&&state.brandTop>=5);
+ check("login uses true transparent corporate logo",
+  await evaluate(`(()=>{
+   const logo=document.querySelector(".login-minimal-logo");
+   return logo?.getAttribute("src")?.includes("logo-loader-256.png") &&
+    getComputedStyle(logo).backgroundColor==="rgba(0, 0, 0, 0)";
+  })()`));
  check("desktop has no horizontal overflow",state.scrollWidth<=state.width+1);
  await snap("default");
  const pt=state.zone;
- await move(pt.left+20,pt.top+22); // inside the broad hover zone, *outside* the button
+ check("hover boundary matches the form rather than the oversized old sensor",
+  Math.abs(pt.right-pt.left-362)<1 && pt.bottom-pt.top<410,
+  JSON.stringify({width:pt.right-pt.left,height:pt.bottom-pt.top}));
+ await move(pt.left-8,(pt.top+pt.bottom)/2);
+ check("pointer outside left edge does not trigger",
+  !await evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`));
+ await move((pt.left+pt.right)/2,pt.top-8);
+ check("pointer above top edge does not trigger",
+  !await evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`));
+ await move(pt.left+20,pt.top+22); // inside actual panel footprint but outside button
  check("hover anywhere within target zone opens form",await eventually(()=>evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`)));
  await sleep(500);
+ const cardGeometry=await evaluate(`(()=>{
+  const z=document.querySelector(".login-reveal-zone").getBoundingClientRect();
+  const p=document.querySelector(".login-panel").getBoundingClientRect();
+  return {dx:Math.abs(z.left-p.left),dy:Math.abs(z.top-p.top),dw:Math.abs(z.width-p.width),dh:Math.abs(z.height-p.height)};
+ })()`);
+ check("expanded panel and hover geometry coincide",Object.values(cardGeometry).every(v=>v<1),JSON.stringify(cardGeometry));
  await snap("expanded");
  await move(12,state.height/2);
  await sleep(300);

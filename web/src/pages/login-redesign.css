@@ -11,12 +11,14 @@
  position:absolute;z-index:2;top:clamp(20px,3vw,42px);left:clamp(20px,3.6vw,50px);
  display:flex;align-items:center;gap:10px;min-height:34px;color:var(--brand-navy);
 }
-.login-minimal-logo{width:32px;height:32px;object-fit:contain;flex:none;background:#fff;border-radius:5px}
+.login-minimal-logo{width:32px;height:32px;object-fit:contain;flex:none}
 .login-minimal-brand h1{margin:0;font-size:15px;line-height:1.3;font-weight:650;white-space:nowrap}
 .login-reveal-zone{
  position:absolute;z-index:3;top:50%;left:50%;transform:translate(-50%,-50%);
  display:grid;place-items:center;
- width:min(440px,calc(100vw - 24px));height:min(460px,calc(100dvh - 92px));min-height:240px;
+ /* The hidden card still occupies layout space, making the invisible hover
+    boundary exactly as large as the real login form, even as errors expand it. */
+ width:min(362px,calc(100vw - 38px));max-height:calc(100dvh - 96px);
 }
 .login-reveal-zone .login-entry{
  position:absolute!important;top:50%;left:50%;transform:translate(-50%,-50%);
@@ -36,9 +38,9 @@
  transition:opacity .2s ease,transform .35s ease,visibility 0s linear .35s;
 }
 .login-panel{
- position:absolute;top:50%;left:50%;width:min(362px,calc(100vw - 38px));
+ position:relative;width:100%;min-width:0;
  max-height:min(430px,calc(100dvh - 96px));overflow:auto;
- padding:26px 28px 27px;transform:translate(-50%,-45%) scale(.95);
+ padding:26px 28px 27px;transform:translateY(10px) scale(.95);
  opacity:0;visibility:hidden;pointer-events:none;
  border:1px solid rgba(255,255,255,.9);border-radius:21px;
  background:rgba(255,255,255,.91);
@@ -47,7 +49,7 @@
  transition:opacity .32s ease,transform .46s cubic-bezier(.2,.82,.2,1),visibility 0s linear .46s;
 }
 .login-reveal-zone.is-expanded .login-panel{
- opacity:1;transform:translate(-50%,-50%) scale(1);visibility:visible;pointer-events:auto;
+ opacity:1;transform:translateY(0) scale(1);visibility:visible;pointer-events:auto;
  transition:opacity .3s ease,transform .46s cubic-bezier(.2,.82,.2,1),visibility 0s;
 }
 .login-panel h2{margin:0 0 20px;color:var(--brand-navy);font-size:18px;font-weight:650;text-align:center}
@@ -87,7 +89,7 @@
 }
 @media(max-height:530px){
  .login-minimal{overflow:auto}
- .login-reveal-zone{height:calc(100dvh - 42px);min-height:225px}
+ .login-reveal-zone{max-height:calc(100dvh - 30px)}
  .login-panel{max-height:calc(100dvh - 30px);padding:15px 22px}
  .login-panel h2{margin-bottom:10px}
  .login-panel .login-submit{margin-top:8px}
