@@ -272,8 +272,8 @@ try{
   window.__starTrace=[];
   for(const type of ["pointerdown","mousedown","pointerup","mouseup","click"]){
    document.addEventListener(type,event=>{
-    if(event.target.closest?.(".explorer-item-star"))
-     window.__starTrace.push({type,target:event.target.tagName,
+    window.__starTrace.push({type,target:event.target.tagName,
+      targetClass:event.target.closest?.(".explorer-item")?.className,
       button:event.target.closest("button")?.className,
       defaultPrevented:event.defaultPrevented});
    },true);
@@ -310,7 +310,10 @@ try{
  await delay(350);
  console.log("EXPLORER_ICON_STAR_AFTER_CLICK",JSON.stringify(await evaluate(`(()=>{
   const button=document.querySelector(${JSON.stringify(fileIconStar)});
+  const rect=button?.getBoundingClientRect();
   return {buttonClass:button?.className,disabled:button?.disabled,
+   afterRect:rect?{x:rect.x+rect.width/2,y:rect.y+rect.height/2}:null,
+   hitNow:document.elementFromPoint(${iconStarGeometry.x},${iconStarGeometry.y})?.outerHTML?.slice(0,180),
    trace:window.__starTrace,
    toasts:[...document.querySelectorAll("[role=status],[role=alert]")].map(e=>e.textContent?.trim().slice(0,90)).filter(Boolean)};
  })()`)));
