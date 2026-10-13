@@ -4,7 +4,7 @@ import type {PreviewData} from "../../entities/file/model";
 import {Dialog} from "../../shared/ui/Dialog";
 import {FileTypeIcon} from "../../shared/ui/FileTypeIcon";
 import {RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
-import {BrandLoader} from "../../shared/ui/BrandLoader";
+import {BrandLoader,BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {errorCopy} from "../../shared/errors";
 import {fileApi} from "./api";
 import {resolvePreviewAdapter} from "./previewAdapters";
