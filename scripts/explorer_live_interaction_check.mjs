@@ -245,6 +245,8 @@ try{
  assert(target?.id,"Missing real file for favorite test");
  tested=target.id;
  originalFavorite=initial.rows.some(row=>row.kind==="file"&&row.fileId===tested);
+ await until('!!document.querySelector("tr.file-entry .action-star-btn:not(:disabled)")',
+  "Favorite control must finish loading after cross-directory navigation");
  await click("tr.file-entry .action-star-btn",0);
  const expected=!originalFavorite;
  await until(`document.querySelector("tr.file-entry .action-star-btn")?.classList.contains("favorited")===${expected}`,"favorite feedback");
