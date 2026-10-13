@@ -556,8 +556,18 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  }
 
  function onGridKeyDown(event:KeyboardEvent<HTMLElement>){
+  // The file-grid shortcuts belong to focused *file rows*, not folder rows,
+  // links, buttons or checkboxes nested in the same table/visual grid.
+  // Otherwise Enter on a folder or an action can also preview a stale file.
+  const target=event.target as HTMLElement;
+  if(target.closest("button,a,input,select,textarea,[role='menuitem']"))return;
+  if(target.closest(".explorer-list-folder,.explorer-folder"))return;
   if(visibleItems.length===0)return;
-  const index=focusedId?visibleItems.findIndex(i=>i.id===focusedId):-1;
+  // A row reached by Tab can receive Enter before React's click-selection
+  // state updates. The DOM event target is the keyboard focus authority.
+  const rowId=target.closest<HTMLElement>(".file-entry")?.dataset.id;
+  const rowIndex=rowId?visibleItems.findIndex(i=>i.id===rowId):-1;
+  const index=rowIndex>=0?rowIndex:focusedId?visibleItems.findIndex(i=>i.id===focusedId):-1;
   const current=index>=0?visibleItems[index]:null;
   switch(event.key){
    case "ArrowDown":
@@ -925,7 +935,11 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       tabIndex={0} aria-selected={focusedFolderId===entry.id}
       onClick={()=>{setFocusedFolderId(entry.id);setFocusedId(null);setSelectedIds(new Set());}}
       onDoubleClick={()=>navigate("/doc?folder="+encodeURIComponent(entry.id))}
-      onKeyDown={event=>{if(event.key==="Enter"){event.stopPropagation();navigate("/doc?folder="+encodeURIComponent(entry.id));}}}>
+      onKeyDown={event=>{
+       if(event.target!==event.currentTarget)return;
+       if(event.key==="Enter"){event.preventDefault();event.stopPropagation();navigate("/doc?folder="+encodeURIComponent(entry.id));}
+       else if(event.key===" "){event.preventDefault();event.stopPropagation();setFocusedFolderId(entry.id);setFocusedId(null);setSelectedIds(new Set());}
+      }}>
       <td className="col-select"/>
       <td className="col-name"><div className="file-cell-wrap"><FolderResourceIcon size={19}/><span className="file-name" title={entry.name}>{entry.name}</span>
        <RareButton type="button" tone="ghost" className="folder-inline-open" aria-label={"打开文件夹 "+entry.name}

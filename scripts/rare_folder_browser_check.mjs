@@ -165,6 +165,49 @@ try{
    assert(count>0,"folder visuals absent from "+mode+" view");
   }
  }
+ // Real Chrome layout and keyboard acceptance for the mixed folder/file table.
+ // Read-only: selecting a row, focusing an opener and measuring rectangles
+ // never creates, edits, moves or deletes any repository/user content.
+ for(const width of [2048,1440,1024,820,540,390]){
+  await send("Emulation.setDeviceMetricsOverride",{width,height:900,deviceScaleFactor:1,mobile:false});
+  await wait(220);
+  const geometry=await evaluate(`(()=>{
+   const table=document.querySelector("table.file-table");
+   const pane=document.querySelector(".work-body");
+   const folder=document.querySelector(".explorer-list-folder");
+   const name=folder?.querySelector(".file-name");
+   const button=folder?.querySelector(".folder-inline-open");
+   const cell=folder?.querySelector("td.col-name");
+   if(!table||!pane||!folder||!button||!name||!cell)return null;
+   const rect=el=>el.getBoundingClientRect();
+   const columns=["select","name","size","version","date","actions"]
+    .map(key=>{const th=table.querySelector("th.col-"+key);return {key,width:rect(th).width,visible:getComputedStyle(th).display!=="none"};});
+   const mobile=table.querySelector(".file-mobile-actions");
+   return {width:innerWidth,pane:pane.clientWidth,pageOverflow:document.documentElement.scrollWidth-innerWidth,
+    tableWidth:rect(table).width,columns,folderCells:[...folder.querySelectorAll("td.col-size,td.col-version,td.col-date")].map(el=>el.textContent.trim()),
+    buttonWidth:rect(button).width,buttonRight:rect(button).right,nameRight:rect(name).right,
+    cellRight:rect(cell).right,mobileDisplay:mobile?getComputedStyle(mobile).display:null,
+    buttonFont:getComputedStyle(button).fontSize};
+  })()`);
+  assert(geometry,"file-list rows must remain visible at "+width);
+  assert.equal(geometry.width,width,"emulated layout viewport mismatch");
+  assert(geometry.pageOverflow<=2,"page overflow: "+JSON.stringify(geometry));
+  assert(geometry.folderCells.every(text=>text===""),"folder-only columns must be blank");
+  assert(geometry.buttonRight<=geometry.cellRight+1,"folder opener spills into next column: "+JSON.stringify(geometry));
+  assert(geometry.columns[1].width>80,"file name collapsed: "+JSON.stringify(geometry));
+  if(geometry.pane>1400)assert(geometry.columns[1].width/geometry.tableWidth<=0.55,"name monopolizes wide table");
+  if(geometry.pane<=560){
+   assert(geometry.buttonWidth<=25&&geometry.buttonFont==="0px","compact folder opener must fit the 24px grid");
+   if(geometry.mobileDisplay)assert.notEqual(geometry.mobileDisplay,"none","compact file menu missing");
+  }else if(geometry.mobileDisplay){
+   assert.equal(geometry.mobileDisplay,"none","duplicate mobile menu in desktop layout");
+  }
+  await evaluate('document.querySelector(".explorer-list-folder").click()');
+  await wait(220);
+  const selected=await evaluate('(()=>{const row=document.querySelector(".explorer-list-folder");const button=row?.querySelector(".folder-inline-open");return {selected:row?.classList.contains("selected"),opacity:Number(getComputedStyle(button).opacity)}})()');
+  assert(selected.selected&&selected.opacity>=0.95,"selected folder must reveal opener: "+JSON.stringify(selected));
+  console.log("EXPLORER_LIST_LAYOUT_PASS",width+"px",JSON.stringify({pane:geometry.pane,columns:geometry.columns.map(x=>Math.round(x.width)),button:Math.round(geometry.buttonWidth)}));
+ }
  console.log("RARE_FOLDER_BROWSER_PASS: layered folders, low-noise toolbar, 4 views, 1440/980/700/390px");
 }catch(error){
  console.error("RARE_FOLDER_BROWSER_FAIL",error?.stack??error);
