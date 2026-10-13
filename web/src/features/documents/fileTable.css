@@ -259,9 +259,9 @@
 .file-toolbar .action-btn-secondary{
   display:inline-flex;align-items:center;justify-content:center;gap:6px;
   height:32px;min-height:32px;line-height:1;padding:0 12px;
-  font-size:12px;font-weight:500;border:1px solid transparent;
-  background:var(--surface-header);color:var(--text-primary);
-  border-radius:var(--radius-md);cursor:pointer;white-space:nowrap;
+  font-size:12px;font-weight:500;border:1px solid #E2E8F0;
+  background:#FFFFFF;color:var(--text-primary);
+  border-radius:8px;cursor:pointer;white-space:nowrap;
   transition:background-color .16s ease,color .16s ease;
 }
 .file-toolbar .action-btn-secondary:hover{
@@ -331,14 +331,16 @@
 }
 .file-toolbar .rare-select-root>.rare-select:hover{background:var(--surface-row-hover)}
 .file-toolbar .rare-select-chevron{width:12px;height:12px}
-.file-toolbar .filter-search-wrap{flex:none;width:174px;min-width:110px;max-width:100%}
-.file-toolbar .filter-search-input{
+.file-toolbar .filter-search-wrap{position:relative;display:flex;align-items:center;flex:none;width:190px;min-width:110px;max-width:100%}
+.file-toolbar .filter-search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none;color:#718096;z-index:1;flex:none}
+/* Override the global input radius with the intentional filter capsule. */
+.work-body .file-toolbar input.filter-search-input{
   display:block;box-sizing:border-box;width:100%;min-width:0;
-  height:32px;font-size:12px;padding:0 10px;
-  border:1px solid transparent;border-radius:var(--radius-md);
-  background:var(--surface-header);color:var(--text-primary);
+  height:32px;font-size:12px;padding:0 12px 0 34px;
+  border:1px solid transparent;border-radius:999px;
+  background:#F1F5F9;color:var(--text-primary);
 }
-.file-toolbar .filter-search-input:hover{background:var(--surface-row-hover)}
+.file-toolbar .filter-search-input:hover{background:#E9EFF6}
 .file-toolbar .filter-search-input:focus{
   width:100%;background:var(--surface-panel);border-color:var(--border-focus);
 }

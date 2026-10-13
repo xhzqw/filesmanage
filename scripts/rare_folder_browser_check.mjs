@@ -133,14 +133,22 @@ try{
     return {
      columns:getComputedStyle(grid).gridTemplateColumns,
      gap:getComputedStyle(grid).columnGap,
+     tileWidth:first?.width??null,
+     sidebarBg:getComputedStyle(document.querySelector(".finder-sidebar")).backgroundColor,
+     searchRadius:getComputedStyle(document.querySelector(".filter-search-input")).borderRadius,
+     searchIcon:Boolean(document.querySelector(".filter-search-icon")),
+     excessDots:tiles.some(tile=>tile.querySelectorAll(".file-finder-mark").length>2),
      leftAligned:!!first&&!!second&&first.top===second.top,
      folderHasRedundantType:!!folder?.querySelector(".explorer-item-sub"),
      timestampFull:code?.title??null,timestampVisual:code?.textContent??null,
      technicalFooter:/延迟\s*[:：]|v2\.1\.0/.test(document.querySelector(".status-bar")?.textContent??""),
     };
    })()`);
-   assert(visual?.leftAligned&&visual?.gap==="18px"&&!visual.folderHasRedundantType&&!visual.technicalFooter,
+   assert(visual?.leftAligned&&visual?.gap==="20px"&&Math.abs(visual.tileWidth-132)<1&&!visual.folderHasRedundantType&&!visual.technicalFooter,
     "compact icon grid, folder metadata and non-technical footer: "+JSON.stringify(visual));
+   assert.equal(visual.sidebarBg,"rgb(244, 245, 247)","Finder sidebar must be subtly distinct from the white file pane");
+   assert(visual.searchRadius==="999px"&&visual.searchIcon,"file filter must be a rounded, icon-leading capsule: "+JSON.stringify(visual));
+   assert(!visual.excessDots,"file/folder cards must show at most two label dots");
    if(visual.timestampFull)assert(visual.timestampVisual.includes("…")&&visual.timestampVisual!==visual.timestampFull,
     "long timestamp IDs must use middle ellipsis and preserve full title: "+JSON.stringify(visual));
    const wrapping=await evaluate(`(()=>{

@@ -119,8 +119,8 @@
 .explorer-marquee{position:absolute;z-index:6;pointer-events:none;border:1px solid var(--border-focus);border-radius:var(--radius-xs);background:var(--ui-state-selected-grid);opacity:.68;box-sizing:border-box}
 .explorer-empty{min-height:160px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--text-secondary);font-size:12px}
 .explorer-icon-grid{
- display:grid;grid-template-columns:repeat(auto-fill,152px);
- gap:12px 18px;padding:16px 20px;align-content:start;justify-content:start;
+ display:grid;grid-template-columns:repeat(auto-fill,132px);
+ gap:16px 20px;padding:16px 20px;align-content:start;justify-content:start;
 }
 /* Finder icon view: reserve the same two-line filename slot for every tile.
    Otherwise the vertically centered column shifts long-name icons upward
@@ -143,7 +143,7 @@
  background:transparent;cursor:default;user-select:none;
  color:var(--text-primary);font-size:12px;
 }
-.explorer-item:hover{background:var(--surface-row-hover)}
+.explorer-item:hover{background:#F1F5F9}
 .explorer-item.selected{background:var(--ui-state-selected-grid);border-color:var(--border-selected);box-shadow:none}
 .file-table tbody tr.explorer-list-folder.selected{background:var(--ui-state-selected-list)}
 .file-table tbody tr.explorer-list-folder{cursor:default}
@@ -167,7 +167,8 @@
 }
 /* Keep muted labels on one metadata rail rather than a separate rainbow line. */
 .explorer-item-meta{display:flex;align-items:center;justify-content:center;gap:7px;min-width:0;max-width:100%;min-height:14px}
-.explorer-item-meta .file-finder-marks{gap:3px;max-width:63px}
+.explorer-item-meta .file-finder-marks{gap:4px;max-width:74px;white-space:nowrap}
+.file-finder-mark-overflow{font-size:10px;line-height:1;color:var(--text-secondary);font-weight:550;font-variant-numeric:tabular-nums}
 .explorer-item-meta .file-finder-mark{width:6px;height:6px}
 .explorer-item-sub{font-size:11px;font-weight:400;color:#94A3B8;white-space:nowrap}
 .explorer-item-check{
@@ -176,7 +177,7 @@
 }
 .explorer-item:hover .explorer-item-check,.explorer-item.selected .explorer-item-check,.explorer-item-check:focus-visible{opacity:1}
 .explorer-item-star,.explorer-item-more{
- position:absolute;top:4px;right:5px;
+ position:absolute;top:6px;right:6px;
  width:22px;min-height:22px;height:22px;padding:0;display:grid;place-items:center;
  color:var(--text-secondary);opacity:0;pointer-events:none;z-index:2;
 }
@@ -291,7 +292,7 @@
 .explorer-gallery-strip .explorer-item-sub{display:none}
 .explorer-gallery-strip .explorer-item-meta{display:none}
 @container file-list (max-width:560px){
- .explorer-icon-grid{grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:6px;padding:10px}
+ .explorer-icon-grid{grid-template-columns:repeat(auto-fill,minmax(0,120px));gap:10px;padding:10px}
  .explorer-item{min-height:112px}
  .explorer-column-list{flex-basis:clamp(178px,43cqw,270px)}
  .explorer-column-detail{flex-basis:clamp(210px,52cqw,300px)}

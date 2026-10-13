@@ -1244,14 +1244,16 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
   const assigned=new Set(finderFolderAssignments[entry.id]??[]);
   const marked=finderLabels.filter(label=>assigned.has(label.id));
   return marked.length?<span className="file-finder-marks" aria-label={"标签："+marked.map(label=>label.name).join("、")}>
-   {marked.slice(0,6).map(label=><span key={label.id} className="file-finder-mark" style={{backgroundColor:finderColor(label.color)}} title={label.name}/>)}
+   {marked.slice(0,2).map(label=><span key={label.id} className="file-finder-mark" style={{backgroundColor:finderColor(label.color)}} title={label.name}/>)}
+   {marked.length>2&&<span className="file-finder-mark-overflow" title={marked.slice(2).map(label=>label.name).join("、")}>+{marked.length-2}</span>}
   </span>:null;
  }
  function finderDots(item:FileItem){
   const assigned=new Set(finderAssignments[item.id]??[]);
   const marks=finderLabels.filter(label=>assigned.has(label.id));
   return marks.length?<span className="file-finder-marks" aria-label={"标签："+marks.map(m=>m.name).join("、")}>
-   {marks.slice(0,6).map(label=><span key={label.id} className="file-finder-mark" style={{backgroundColor:finderColor(label.color)}} title={label.name}/>)}
+   {marks.slice(0,2).map(label=><span key={label.id} className="file-finder-mark" style={{backgroundColor:finderColor(label.color)}} title={label.name}/>)}
+   {marks.length>2&&<span className="file-finder-mark-overflow" title={marks.slice(2).map(label=>label.name).join("、")}>+{marks.length-2}</span>}
   </span>:null;
  }
 
@@ -1537,6 +1539,7 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
      </RareSelect>
     </label>
     <div className="filter-search-wrap">
+     <svg className="filter-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.4"/><path d="m16 16 4.2 4.2"/></svg>
      <RareInput type="search" className="filter-search-input" placeholder="过滤已加载文件…" aria-label="当前已加载文件名过滤"
      value={nameFilter} onChange={e=>{
       setNameFilter(e.target.value);
