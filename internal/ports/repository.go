@@ -16,6 +16,7 @@ var ErrRowMissing = errors.New("row missing")
 // every write use case runs inside one transaction that owns all of its stores.
 type Repository interface {
 	Ping(context.Context) error
+	FinderLabelsStore
 	ResumableUploadRepository
 	ApprovalActivityStore
 	SearchPresetStore

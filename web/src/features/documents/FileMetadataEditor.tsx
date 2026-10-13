@@ -1,5 +1,6 @@
 import {useEffect,useState,type FormEvent} from "react";
 import {RareBadge,RareButton,RareInput,RareTextarea} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {toast} from "../../shared/ui/feedback";
 import {errorCopy} from "../../shared/errors";
 import {fileApi} from "./api";
@@ -37,7 +38,7 @@ export function FileMetadataEditor({fileId}:{fileId:string}){
    {metadata&&!editing&&<RareButton type="button" onClick={()=>setEditing(true)}>编辑</RareButton>}
   </header>
   {error&&<p role="alert" className="notice error">{error}</p>}
-  {!metadata&&!error&&<p role="status" className="hint">正在读取…</p>}
+  {!metadata&&!error&&<p role="status" className="hint"><BrandLoadingLabel>正在读取元数据…</BrandLoadingLabel></p>}
   {metadata&&!editing&&<div className="file-metadata-summary">
    <span>分类：<strong>{metadata.category||"未分类"}</strong></span>
    <span>标签：{metadata.tags.length?metadata.tags.map(t=><RareBadge key={t}>{t}</RareBadge>):"—"}</span>

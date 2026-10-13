@@ -1,4 +1,5 @@
 import {useEffect,useState} from "react";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {Link} from "react-router-dom";
 import {RareBadge,RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
@@ -105,7 +106,7 @@ export function LifecycleLedger({isAdmin=false}:{isAdmin?:boolean}){
   <footer className="lifecycle-ledger-footer">
    <span>{items.length} 条已显示</span>
    {nextCursor&&<RareButton disabled={loading} onClick={()=>setCursor(nextCursor)}>加载更多</RareButton>}
-   {loading&&<span role="status">正在加载…</span>}
+   {loading&&<span role="status"><BrandLoadingLabel>正在加载…</BrandLoadingLabel></span>}
   </footer>
  </section></>;
 }

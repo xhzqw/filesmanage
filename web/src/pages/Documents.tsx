@@ -8,6 +8,7 @@ import type{Folder}from "../entities/folder/model";
 import{folderApi}from "../features/folders/api";
 import{ancestorPath}from "../features/folders/FolderTree";
 import{FinderSidebar,type DocumentSection}from "../features/collaboration/FinderSidebar";
+import{TagExplorer}from "../features/collaboration/TagExplorer";
 import{CollaborationPanel}from "../features/collaboration/CollaborationPanel";
 import{NewFolderForm}from "../features/folders/NewFolderForm";
 import{FolderActions}from "../features/folders/FolderActions";
@@ -84,7 +85,7 @@ export function Documents({user,onLogout,onUploadFolderChange}:{user:User;onLogo
  const params=new URLSearchParams(location.search);
  const explicitFolder=params.get("folder");
  const requestedView=params.get("view");
- const section:DocumentSection=requestedView==="favorites"||requestedView==="received"||requestedView==="sent"?requestedView:"files";
+ const section:DocumentSection=requestedView==="favorites"||requestedView==="received"||requestedView==="sent"||requestedView==="labels"?requestedView:"files";
  const requested=explicitFolder||"folder_root";
  // Only directory visits enter this history, not browser visits to preview
  // and organization pages. A new visit discards the forward branch.
@@ -283,7 +284,8 @@ export function Documents({user,onLogout,onUploadFolderChange}:{user:User;onLogo
     onKeyDown={onResizeKey}/>
    </aside>
    <main className="work">
-    {section!=="files"&&<CollaborationPanel embedded activeTab={section} viewMode={viewMode} onViewModeChange={switchView}
+    {section==="labels"&&<TagExplorer/>}
+    {section!=="files"&&section!=="labels"&&<CollaborationPanel embedded activeTab={section} viewMode={viewMode} onViewModeChange={switchView}
     onSelectTab={tab=>navigate("/doc?view="+tab)}
     onChanged={()=>setCollaborationRevision(value=>value+1)}/>}
    {section==="files"&&<>

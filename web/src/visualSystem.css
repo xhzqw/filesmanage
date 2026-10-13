@@ -225,26 +225,8 @@ input[type="checkbox"],input[type="radio"]{border-radius:var(--radius-xs)}
     padding:5px 8px;
   }
   .folder-actions-slot{min-width:0;max-width:100%}
-  .file-toolbar{
-    height:auto;
-    max-height:none;
-    min-height:30px;
-    flex-wrap:wrap;
-    gap:6px;
-    padding:5px 8px;
-  }
-  .file-toolbar .toolbar-actions,
-  .file-toolbar .toolbar-views{
-    min-width:0;
-    max-width:100%;
-    flex-wrap:wrap;
-    gap:5px;
-  }
-  .file-toolbar .batch-actions-group{
-    min-width:0;
-    margin-left:0;
-    flex-wrap:wrap;
-  }
+  /* File toolbar adapts to its pane via container queries in fileTable.css.
+     Do not overwrite its stable two-state grid from viewport breakpoints. */
   .header{padding-right:4px;min-width:0}
   .header .nav-toggle{flex:none}
   .header .brand{

@@ -1,5 +1,6 @@
 import {toast} from "../../shared/ui/feedback";
 import {RareBadge,RareButton,RareDataTable,RareInput,RareNotice,RareRowActions,RareSelect} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useEffect,useRef,useState,type FormEvent} from "react";
 import type {User} from "../../entities/user/model";
@@ -117,7 +118,7 @@ export function RoleBindingsPanel({users,onDirtyChange}:{users:User[];onDirtyCha
   </div>
    {error&&<RareNotice tone="danger">{error}</RareNotice>}
    {loadError&&<RareNotice tone="danger">{loadError} <RareButton type="button" className="secondary-action" onClick={()=>setLoad(n=>n+1)}>重试读取</RareButton></RareNotice>}
-   {loading&&items.length===0&&<p className="hint" role="status">正在读取委派角色…</p>}
+   {loading&&items.length===0&&<p className="hint" role="status"><BrandLoadingLabel>正在读取委派角色…</BrandLoadingLabel></p>}
   {!loading&&!loadError&&items.length===0&&<div className="org-role-empty" role="status">
    <span className="org-role-empty-symbol" aria-hidden="true">◇</span>
    <strong>尚未委派管理角色</strong>
@@ -220,7 +221,7 @@ export function DelegatedRolesWorkspace(){
   }finally{mutationBusy.current=false;setIsMutating(false);}
  }
  return <div className="work-body">
-  {busy&&<p role="status" className="hint">正在读取委派职责…</p>}
+  {busy&&<p role="status" className="hint"><BrandLoadingLabel>正在读取委派职责…</BrandLoadingLabel></p>}
    {error&&<RareNotice tone={error.includes("结果未确认")?"warning":"danger"}>{error}</RareNotice>}
    {!busy&&roles.length===0&&<RareNotice tone="info">没有有效管理角色；部门、用户和工作组管理需要系统管理员权限。</RareNotice>}
   {canAudit&&<PermissionAudit users={[]}/>}

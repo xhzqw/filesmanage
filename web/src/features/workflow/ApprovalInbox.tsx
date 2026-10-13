@@ -1,6 +1,7 @@
 import {useEffect,useMemo,useRef,useState} from "react";
 import {useLocation} from "react-router-dom";
 import {RareBadge,RareButton,RareInput,RareSelect,RareTextarea} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {toast} from "../../shared/ui/feedback";
 import {Dialog} from "../../shared/ui/Dialog";
 import {FileResourceIcon} from "../../shared/ui/ResourceIcons";
@@ -236,7 +237,7 @@ export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:
    <section className="approval-main" aria-label={title}>
     {loadError&&<div role="alert" className="approval-error-bar">{loadError}<RareButton onClick={()=>setRefreshKey(n=>n+1)}>重试</RareButton></div>}
     {view==="notifications"&&noticeError&&<div role="alert" className="approval-error-bar">{noticeError}</div>}
-    {loading?<div className="approval-list-empty" role="status">正在读取审批…</div>:
+    {loading?<div className="approval-list-empty" role="status"><BrandLoadingLabel size="sm">正在读取审批…</BrandLoadingLabel></div>:
      view==="notifications"?<>
       {matchingNotes.length===0&&<div className="approval-list-empty">{query?(hasMore?"已加载通知中暂无匹配，可继续加载":"没有匹配的通知"):"暂无通知"}</div>}
       {matchingNotes.map(note=><RareButton type="button" key={note.id}
@@ -258,7 +259,7 @@ export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:
      </>}
     {hasMore&&<div className="approval-load-more">
      <RareButton type="button" disabled={loadingMore} loading={loadingMore} onClick={()=>void loadMore()}>
-      {loadingMore?"正在加载…":"加载更多"}
+      加载更多
      </RareButton>
     </div>}
    </section>

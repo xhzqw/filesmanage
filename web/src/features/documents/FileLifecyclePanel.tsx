@@ -1,5 +1,6 @@
 import {useEffect,useState} from "react";
 import {RareBadge,RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {toast} from "../../shared/ui/feedback";
 import {Dialog} from "../../shared/ui/Dialog";
 import {errorCopy} from "../../shared/errors";
@@ -52,7 +53,7 @@ export function FileLifecyclePanel({fileId,currentSeq,lifecycle,onUpdated}:{file
    {lifecycle?.dueStatus==="soon"&&<RareBadge tone="warning">即将到期</RareBadge>}
    {lifecycle?.dueStatus==="overdue"&&<RareBadge tone="danger">已到期</RareBadge>}
   </div>
-  {pending?<p className="hint">正在读取状态…</p>:<>
+  {pending?<p className="hint"><BrandLoadingLabel>正在读取状态…</BrandLoadingLabel></p>:<>
    {lifecycle.state!=="draft"&&<div className="file-lifecycle-summary">
     <span>发布版本 <strong>v{lifecycle.publishedSeq}</strong>{lifecycle.publishedSeq!==currentSeq?" · 当前有未发布修改":""}</span>
     <span>到期日期 <strong>{lifecycle.dueAt?.slice(0,10)??"未设置"}</strong></span>

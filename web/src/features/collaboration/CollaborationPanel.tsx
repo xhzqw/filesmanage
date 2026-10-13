@@ -440,7 +440,7 @@ export function CollaborationPanel({embedded=false,activeTab,onSelectTab,onChang
        <span className="share-option-detail">{file.updatedAt.replace("T"," ").slice(0,16)}</span>{fileId===file.id&&<span className="share-picker-check" aria-hidden="true">✓</span>}
       </RareButton>)}
      </div>}
-     {fileCursor&&filesState==="ready"&&<RareButton type="button" className="secondary-action" disabled={fileMoreState==="loading"||pickBusy} onClick={()=>void loadFilesMore()}>{fileMoreState==="loading"?"加载中…":fileMoreState==="failed"?"重试加载文件":"加载更多文件"}</RareButton>}
+     {fileCursor&&filesState==="ready"&&<RareButton type="button" className="secondary-action" disabled={fileMoreState==="loading"||pickBusy} loading={fileMoreState==="loading"} onClick={()=>void loadFilesMore()}>{fileMoreState==="failed"?"重试加载文件":"加载更多文件"}</RareButton>}
      {fileMoreState==="failed"&&<span role="alert" className="hint">后续文件读取失败，已加载的文件仍可选择。</span>}
     </>}
     <p className="share-chosen" aria-live="polite"><span>已选：</span>

@@ -19,12 +19,13 @@ export const RareButton=forwardRef<HTMLButtonElement,RareButtonProps>(function R
   // that differ from neutral. Old class names are still rendered as-is.
   const detected=tone??(/\bprimary\b|\bprimary-btn\b/.test(className)?"primary":/\bdanger\b/.test(className)?"danger":/\bghost\b|\bsecondary-action\b|\baction-link\b/.test(className)?"ghost":"neutral");
   return <button {...props} ref={ref} disabled={disabled||loading}
+    aria-label={loading?(props["aria-label"]??(typeof props.children==="string"?props.children+"，加载中":"加载中")):props["aria-label"]}
     aria-busy={loading||props["aria-busy"]||undefined}
     data-rare-control="button" data-rare-tone={detected}
     data-rare-intent={tone} data-rare-emphasis={emphasis} data-density={density??"compact"}
     data-rare-loading={loading||undefined}
     className={"rare-button"+(className?" "+className:"")}>
-    {loading?<BrandLoader size="xs" decorative/>:null}{props.children}
+    {loading?<BrandLoader size="xs" decorative/>:props.children}
    </button>;
 });
 RareButton.displayName="RareButton";

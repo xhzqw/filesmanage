@@ -1,5 +1,6 @@
 import {useEffect,useState} from "react";
 import {RareButton,RareInput} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {errorCopy} from "../../shared/errors";
 import {sealsApi} from "./api";
 
@@ -33,7 +34,7 @@ export function SealRevisionControls({fileId,seq,sha,isAdmin,refreshKey,onSelect
   <div className="seal-library-heading">签章版本 {history?<span>r{history.current}</span>:null}</div>
   {error&&<p className="notice error" role="alert">{error}</p>}
   {message&&<p className="notice" role="status">{message}</p>}
-  {!history?<span className="seal-draft-empty">正在读取签章版本…</span>:
+  {!history?<span className="seal-draft-empty"><BrandLoadingLabel>正在读取签章版本…</BrandLoadingLabel></span>:
    <div className="seal-revision-list">
     {history.revisions.map(item=><div key={item.revision} className="seal-revision-row">
      <div className="seal-revision-meta">

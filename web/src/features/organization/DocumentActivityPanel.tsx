@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState,type FormEvent} from "react";
 import {RareBadge,RareButton,RareDataTable,RareInput,RareNotice} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {errorCopy} from "../../shared/errors";
 import {permissionsApi,type PermissionAuditPage} from "./permissionsApi";
 
@@ -50,7 +51,7 @@ export function DocumentActivityPanel(){
    <RareButton type="submit" className="primary">筛选</RareButton>
    <RareButton type="button" onClick={()=>setRevision(i=>i+1)}>刷新</RareButton>
   </form>
-  {state==="loading"&&<p role="status" className="hint">正在读取文档活动…</p>}
+  {state==="loading"&&<p role="status" className="hint"><BrandLoadingLabel>正在读取文档活动…</BrandLoadingLabel></p>}
   {error&&<RareNotice tone="danger">{error}</RareNotice>}
   {state==="failed"&&<RareButton onClick={()=>setRevision(i=>i+1)}>重试</RareButton>}
   {state==="ready"&&<div className="perm-audit-scroll">
@@ -66,7 +67,7 @@ export function DocumentActivityPanel(){
     </tr>)}</tbody>
    </RareDataTable>
    {page.items.length===0&&<p className="empty">没有符合条件的文档活动。</p>}
-   {page.nextCursor&&<RareButton className="perm-more" type="button" disabled={more} onClick={()=>void loadMore()}>{more?"加载中…":"加载更多"}</RareButton>}
+   {page.nextCursor&&<RareButton className="perm-more" type="button" disabled={more} loading={more} onClick={()=>void loadMore()}>加载更多</RareButton>}
   </div>}
  </section>;
 }

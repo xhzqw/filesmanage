@@ -363,7 +363,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
        preview.structured&&adapter==="archive"?
         <StructuredFilePreview value={preview.structured}/>:
        adapter==="cad"?
-        <Suspense fallback={<div className="cad-preview-loading" role="status"><BrandLoader size="lg" decorative/><span>正在加载三维查看器…</span></div>}>
+        <Suspense fallback={<div className="cad-preview-loading" role="status" aria-label="正在加载三维查看器"><BrandLoader size="lg" decorative/></div>}>
          <CadViewer key={preview.fileId+":"+preview.sha256} fileId={preview.fileId}/>
         </Suspense>:
        preview.textual?

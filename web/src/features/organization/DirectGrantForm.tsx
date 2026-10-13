@@ -1,4 +1,5 @@
 import {RareButton,RareInput,RareNotice} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import type {Dispatch,FormEvent,SetStateAction} from "react";
 import {PERMISSION_ACTIONS} from "./permissionActions";
 import {PermissionActionPicker} from "./PermissionActionPicker";
@@ -35,7 +36,7 @@ export function DirectGrantForm({folderName,usersState,groupsState,onRetryUsers,
   }}>
      {usersState==="failed"&&<RareNotice tone="danger">读取用户列表失败。<RareButton type="button" className="secondary-action" onClick={onRetryUsers}>重试用户列表</RareButton></RareNotice>}
      {groupsState==="failed"&&<RareNotice tone="danger">读取工作组列表失败。<RareButton type="button" className="secondary-action" onClick={onRetryGroups}>重试工作组列表</RareButton></RareNotice>}
-     {subjectSourceState==="loading"&&<p role="status" className="hint">正在读取可授权主体…</p>}
+     {subjectSourceState==="loading"&&<p role="status" className="hint"><BrandLoadingLabel>正在读取可授权主体…</BrandLoadingLabel></p>}
      <PermissionGrantSubjectFields kind={subjectKind} subject={subjectId} candidates={candidates}
       subjectDisabled={subjectSourceState!=="ready"}
       onKindChange={value=>{setSubjectKind(value);setSubjectId("");setSubmitState("edit");setRiskAcknowledged(false);}}

@@ -13,4 +13,13 @@
 @keyframes rare-menu-enter{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:translateY(0)}}
 .menu{animation:rare-menu-enter .12s cubic-bezier(.22,1,.36,1)}
 .menu-item[aria-disabled="true"]{opacity:.65}
+.menu-label-colors{border-top:1px solid var(--color-border);margin-top:4px;padding:7px 5px 3px}
+.menu-colors-heading{display:block;margin:0 4px 7px;font-size:11px;color:var(--color-text-secondary)}
+.menu-colors-row{display:flex;align-items:center;gap:5px;justify-content:space-between}
+.menu-color-option{position:relative;display:grid;place-items:center;width:27px;height:29px;min-width:27px;padding:0;border:0;border-radius:var(--radius-sm);background:transparent}
+.menu-color-option:hover:not(:disabled){background:var(--color-row-hover)}
+.menu-color-option:focus-visible{outline:2px solid var(--color-focus);outline-offset:1px}
+.menu-color-dot{width:17px;height:17px;display:block;border-radius:50%;box-shadow:0 0 0 1px rgba(20,30,50,.08) inset}
+.menu-color-check{position:absolute;inset:0;display:grid;place-items:center;font-size:12px;font-weight:800;color:#242934;text-shadow:0 1px 1px #fff}
+.menu-color-option:disabled{opacity:.45}
 @media(prefers-reduced-motion:reduce){.menu{animation:none}}

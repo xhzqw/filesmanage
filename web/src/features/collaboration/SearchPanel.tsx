@@ -350,7 +350,7 @@ export function SearchPanel({userId}:{userId:string}){
     <section className="search-results" aria-label="搜索结果">
      <div className="search-results-toolbar">
       <div className="search-results-caption"><strong>{title}</strong>
-       <span className="search-total">{status==="ready"?"已显示 "+items.length+" / 共 "+shownTotal+" 项":status==="loading"?"正在检索…":status==="failed"?"检索失败":"应用筛选查看结果"}</span>
+       <span className="search-total">{status==="ready"?"已显示 "+items.length+" / 共 "+shownTotal+" 项":status==="loading"?"":status==="failed"?"检索失败":"应用筛选查看结果"}</span>
       </div>
       <div className="search-results-actions">
        <label>排序<RareSelect id="search-sort" aria-label="搜索结果排序" value={sort} onChange={e=>{
@@ -388,8 +388,8 @@ export function SearchPanel({userId}:{userId:string}){
       </RareDataTable>}
       {hasMore&&<div className="search-more">
        {moreStatus==="failed"&&<span className="error" role="alert">加载下一页失败。</span>}
-       <RareButton type="button" disabled={moreStatus==="loading"} onClick={loadMore}>
-        {moreStatus==="loading"?"加载中…":moreStatus==="failed"?"重试加载":"加载更多"}
+       <RareButton type="button" disabled={moreStatus==="loading"} loading={moreStatus==="loading"} onClick={loadMore}>
+        {moreStatus==="failed"?"重试加载":"加载更多"}
        </RareButton>
       </div>}
       {limitReached&&<div className="search-limit-hint">已达检索上限，可进一步缩小筛选范围。</div>}
