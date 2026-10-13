@@ -107,12 +107,12 @@ try{
    return {ok:response.ok&&json.ok,count:rows.length,
     folderCount:rows.filter(row=>row.kind==="folder").length,
     named:rows.every(row=>typeof row.resourceName==="string"&&row.resourceName.trim().length>0),
-    rendered:[...document.querySelectorAll(".finder-favorite-item")].map(node=>({name:node.querySelector("span")?.textContent?.trim(),href:node.getAttribute("href")})),
+    rendered:[...document.querySelectorAll(".finder-favorite-item")].map(node=>({name:node.querySelector(".finder-favorite-name")?.textContent?.trim(),href:node.getAttribute("href")})),
     matches:rows.every(row=>{
      const id=row.kind==="folder"?row.folderId:row.fileId;
      const href=row.kind==="folder"?"/doc?folder="+encodeURIComponent(id):"/preview/"+encodeURIComponent(id);
      const link=[...document.querySelectorAll(".finder-favorite-item")].find(node=>node.getAttribute("href")===href);
-     return link&&link.title===row.resourceName&&link.querySelector("span")?.textContent?.trim()===row.resourceName;
+     return link&&link.title===row.resourceName&&link.querySelector(".finder-favorite-name")?.textContent?.trim()===row.resourceName;
     })};
   })()`);
   check(sidebarNames.ok&&sidebarNames.count>0&&sidebarNames.folderCount>0&&sidebarNames.named&&sidebarNames.matches,

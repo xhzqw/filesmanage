@@ -48,7 +48,7 @@ export function FinderSidebar({section,revision}:{section:DocumentSection;revisi
     const href=item.kind==="file"?"/preview/"+encodeURIComponent(id):"/doc?folder="+encodeURIComponent(id);
     return <Link key={item.id} className="finder-favorite-item" to={href} title={item.resourceName}>
      {item.kind==="file"?<FileResourceIcon name={item.resourceName} size={17}/>:<FolderResourceIcon size={17}/>}
-     <span>{item.resourceName}</span>
+     <span className="finder-favorite-name">{item.resourceName}</span>
     </Link>;
    })}
    {status==="ready"&&favorites.length>=8&&<Link to="/doc?view=favorites" className="finder-nav-more">查看全部关注</Link>}

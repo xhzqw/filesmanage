@@ -10,7 +10,8 @@
  transition:background-color .15s ease,color .15s ease;
 }
 .finder-nav-item svg{flex:none;color:var(--brand-blue)}
-.finder-nav-item span,.finder-favorite-item span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.finder-nav-item>span,.finder-favorite-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.finder-favorite-name{flex:1}
 .finder-nav-item:hover,.finder-favorite-item:hover{background:var(--surface-row-hover);text-decoration:none}
 .finder-nav-item.is-current{background:var(--surface-row-selected);color:var(--brand-blue);font-weight:650}
 .finder-favorite-item{min-height:31px;padding-left:29px;gap:9px;font-size:12px;font-weight:450}
