@@ -927,9 +927,12 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       onDoubleClick={()=>navigate("/doc?folder="+encodeURIComponent(entry.id))}
       onKeyDown={event=>{if(event.key==="Enter"){event.stopPropagation();navigate("/doc?folder="+encodeURIComponent(entry.id));}}}>
       <td className="col-select"/>
-      <td className="col-name"><div className="file-cell-wrap"><FolderResourceIcon size={19}/><span className="file-name" title={entry.name}>{entry.name}</span></div></td>
-      <td className="col-size">—</td><td className="col-version">—</td><td className="col-date">—</td>
-      <td className="row-actions col-actions"><RareButton type="button" tone="ghost" className="action-link" onClick={()=>navigate("/doc?folder="+encodeURIComponent(entry.id))}>打开</RareButton></td>
+      <td className="col-name"><div className="file-cell-wrap"><FolderResourceIcon size={19}/><span className="file-name" title={entry.name}>{entry.name}</span>
+       <RareButton type="button" tone="ghost" className="folder-inline-open" aria-label={"打开文件夹 "+entry.name}
+        onClick={event=>{event.stopPropagation();navigate("/doc?folder="+encodeURIComponent(entry.id));}}>打开 ↗</RareButton>
+      </div></td>
+      <td className="col-size"/><td className="col-version"/><td className="col-date"/>
+      <td className="row-actions col-actions"/>
      </tr>)}
      {status==="ready"&&visibleItems.map((item,index)=><tr key={item.id} data-id={item.id}
       data-file-entry="true"

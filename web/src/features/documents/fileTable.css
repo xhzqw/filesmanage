@@ -94,14 +94,39 @@
 .col-hash{width:90px}
 .col-date{text-align:right}
 .col-actions{text-align:right}
-.file-table th.col-select{width:32px}
-.file-table th.col-size{width:84px}
-.file-table th.col-version{width:58px}
-.file-table th.col-date{width:140px}
-.file-table th.col-actions{width:170px}
+/* Reserve balanced column space at wide desktop sizes. Metadata must not be
+   stranded at the right by an infinitely expanding filename column. */
+.file-table th.col-select{width:2%}
+.file-table th.col-name{width:48%}
+.file-table th.col-size{width:11%}
+.file-table th.col-version{width:9%}
+.file-table th.col-date{width:17%}
+.file-table th.col-actions{width:13%;text-align:left}
+.file-table tbody td.row-actions .actions-cell-wrap{justify-content:flex-start}
+@container file-list (max-width:1400px){
+  .file-table th.col-select{width:36px}
+  .file-table th.col-name{width:auto}
+  .file-table th.col-size{width:88px}
+  .file-table th.col-version{width:62px}
+  .file-table th.col-date{width:146px}
+  .file-table th.col-actions{width:176px}
+}
 
 .file-cell-wrap{display:flex;align-items:center;gap:var(--space-1);min-width:0;height:100%}
 .file-cell-wrap .file-name{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--brand-blue);font-weight:500}
+.explorer-list-folder .file-name{flex:0 1 auto}
+/* The folder action stays adjacent to its name, not at the far edge. */
+.file-table .folder-inline-open{
+  flex:none;margin-left:5px;padding:0 6px!important;height:22px;min-height:22px;
+  border:0;border-radius:var(--radius-sm);background:transparent;color:var(--brand-blue);
+  font-size:11px;opacity:0;pointer-events:none;
+  transition:opacity .14s ease,background-color .14s ease;
+}
+.file-table .folder-inline-open:hover{background:var(--surface-row-hover)}
+.explorer-list-folder:hover .folder-inline-open,
+.explorer-list-folder:focus-within .folder-inline-open{opacity:1;pointer-events:auto}
+@media(hover:none),(pointer:coarse){.file-table .folder-inline-open{opacity:1;pointer-events:auto}}
+@media(prefers-reduced-motion:reduce){.file-table .folder-inline-open{transition:none}}
 .file-mobile-meta{display:none}
 /* File names remain text, not navigation links. On a narrow or touch device
    the action column is off-screen inside the horizontal data-grid scroller;
@@ -232,6 +257,7 @@
   .file-table .file-name{grid-column:2;grid-row:1;min-width:0}
   .file-table .file-mobile-meta{display:block;grid-column:2;grid-row:2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary);font-size:10px}
   .file-table .file-mobile-actions{display:inline-flex;grid-column:3;grid-row:1/3}
+  .file-table .folder-inline-open{grid-column:3;grid-row:1/3;margin-left:0;justify-self:end;align-self:center}
 }
 @container file-list (max-width:360px){
   .file-table th.col-actions{width:44px}
