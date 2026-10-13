@@ -21,6 +21,7 @@ import type {DocumentUploadTarget} from "../features/documents/GlobalUploadDrop"
 import{FileEditor}from "../features/documents/FileEditor";
 import{workflowApi}from "../features/workflow/api";
 import{AppShell}from "../shared/ui/AppShell";
+import {Menu} from "../shared/ui/Menu";
 import{Dialog}from "../shared/ui/Dialog";
 import{FolderPicker}from "../shared/ui/FolderPicker";
 import type {FileItem} from "../entities/file/model";
@@ -374,6 +375,8 @@ function FileEditorBridge({fileId,requiresApproval,onClose,onSaved}:{fileId:stri
 // visible ancestor chain of the selected folder, root first, current last.
 function FolderBreadcrumb({folders,folder}:{folders:Folder[];folder:Folder}){
  const navigate=useNavigate();
+ const[hiddenOpen,setHiddenOpen]=useState(false);
+ const hiddenAnchor=useRef<HTMLButtonElement>(null);
  const segments:{id:string|null;name:string}[]=[{id:null,name:"文档管理"},
   ...ancestorPath(folders,folder.id).map(ancestor=>({id:ancestor.id,name:ancestor.name}))];
  // Keep shallow paths fully visible; hidden ancestors in deep paths remain
@@ -388,12 +391,16 @@ function FolderBreadcrumb({folders,folder}:{folders:Folder[];folder:Folder}){
    :<Link className="crumb-root" to="/doc" title={root?.name??"文档管理"}>{root?.name??"文档管理"}</Link>}
   {hidden.length>0&&<span className="crumb-segment crumb-hidden">
    <span className="crumb-sep" aria-hidden="true">›</span>
-   <select className="crumb-collapse-picker" aria-label="选择隐藏的上级目录" value="" onChange={event=>{
-    if(event.target.value)navigate("/doc?folder="+encodeURIComponent(event.target.value));
-   }}>
-    <option value="">…</option>
-    {hidden.map(segment=><option key={segment.id} value={segment.id??""}>{segment.name}</option>)}
-   </select>
+   <RareButton ref={hiddenAnchor} type="button" tone="ghost" className="crumb-collapse-picker"
+    aria-label="选择隐藏的上级目录" aria-haspopup="menu" aria-expanded={hiddenOpen}
+    onClick={()=>setHiddenOpen(open=>!open)}>…</RareButton>
+   <Menu open={hiddenOpen} label="隐藏的上级目录" anchor={hiddenAnchor.current}
+    onClose={()=>setHiddenOpen(false)}
+    items={hidden.map(segment=>({
+     id:segment.id??"root",
+     label:segment.name,
+     onSelect:()=>{if(segment.id)navigate("/doc?folder="+encodeURIComponent(segment.id));}
+    }))}/>
   </span>}
   {tail.map((segment,index)=><span className="crumb-segment" key={segment.id??"root"}>
    <span className="crumb-sep" aria-hidden="true">›</span>

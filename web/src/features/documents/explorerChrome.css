@@ -71,7 +71,7 @@
  flex:none;margin:0 8px;color:var(--text-tertiary);font-size:12px;font-weight:400;
 }
 .document-explorer .work .folder-context-bar .breadcrumb .crumb-collapse-picker{
- appearance:none;flex:none;width:24px;height:25px;min-height:25px;padding:0;
+ flex:none;width:24px;height:25px;min-height:25px;padding:0;
  border:0;border-radius:var(--radius-xs);background:transparent;
  color:var(--text-secondary);font:inherit;text-align:center;cursor:pointer;
 }
