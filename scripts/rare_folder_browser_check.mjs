@@ -478,6 +478,8 @@ try{
  await key("a",{ctrlKey:true});
  await until('document.querySelector("thead .col-select input[type=checkbox]")?.checked');
  assert.equal((await selection()).count,130);
+ const selectedFoldersAtLarge=await evaluate('[...document.querySelectorAll(".explorer-list-folder")].filter(row=>row.getAttribute("aria-selected")==="true").length');
+ const selectedTotalAtLarge=130+selectedFoldersAtLarge;
  const batch=await evaluate(`(()=>{
   const group=document.querySelector(".batch-actions-group");
   const bar=document.querySelector(".work-body>.file-toolbar");
@@ -487,12 +489,17 @@ try{
    filtersLeft:bar?.querySelector(".toolbar-views")?.getBoundingClientRect().left,
    printDisabled:group?.querySelector(".batch-btn[title*='打印']")?.disabled};
  })()`);
- assert(batch.text.includes("已选 130"),"batch count must match the loaded selection");
+ assert(batch.text.includes("已选 "+selectedTotalAtLarge+" 项"),
+  "batch count must include selected folders and the 130 loaded files");
  for(const action of ["下载","移动","删除"])assert(batch.actions.includes(action),"missing batch action "+action);
  assert(!batch.upload&&!batch.newFolder,"selection must replace upload/create in place");
  assert.equal(batch.height,defaultToolbar.height,"selection must not resize the toolbar");
  assert.equal(batch.filtersLeft,defaultToolbar.filtersLeft,"selection must not shift browse controls");
  assert(batch.printDisabled,"batch printing beyond 20 items must be disabled");
+ if(selectedFoldersAtLarge){
+  assert(await evaluate('document.querySelector(".batch-btn[title*=\"混合多选\"]")?.disabled===true'),
+   "unsupported mixed folder/file batch move must be disabled");
+ }
  // Client-side filtering may hide a selected file, never silently remove it.
  await evaluate(`(()=>{
   const input=document.querySelector(".filter-search-input");
@@ -500,7 +507,7 @@ try{
   input.dispatchEvent(new Event("input",{bubbles:true}));
  })()`);
  await until('document.querySelector(".file-selection-hidden")?.textContent.includes("隐藏")');
- assert((await evaluate('document.querySelector(".file-selected-count")?.textContent')).includes("已选 130"),
+ assert((await evaluate('document.querySelector(".file-selected-count")?.textContent')).includes("已选 "+selectedTotalAtLarge),
   "filtering must preserve the full selection including hidden files");
  await evaluate(`(()=>{
   const input=document.querySelector(".filter-search-input");
@@ -525,17 +532,19 @@ try{
  }
  await send("Emulation.setDeviceMetricsOverride",{width:1440,height:900,deviceScaleFactor:1,mobile:false});
  await wait(160);
- // Open the real 130-file deletion review but NEVER activate confirmation.
+ // Open the real deletion review but NEVER activate confirmation. With a
+ // selected folder the mixed-resource review replaces the file-only dialog.
  await evaluate('document.querySelector(".batch-actions-group .batch-btn.danger")?.click()');
- await until('document.body.textContent.includes("以下 130 项将移入回收站")');
+ const reviewText=selectedFoldersAtLarge?"个文件夹":"以下 130 项将移入回收站";
+ await until('document.querySelector(".dialog")?.textContent.includes('+JSON.stringify(reviewText)+')');
  const cancelled=await evaluate(`(()=>{
-  const button=[...document.querySelectorAll(".dialog button")].find(b=>b.textContent.trim()==="关闭");
+  const button=[...document.querySelectorAll(".dialog button")].find(b=>["关闭","取消"].includes(b.textContent.trim()));
   if(!button)return false;
   button.click();
   return true;
  })()`);
  assert(cancelled,"large deletion review must provide a cancellation route");
- await until('!document.body.textContent.includes("以下 130 项将移入回收站")');
+ await until('!document.querySelector(".dialog")?.textContent.includes('+JSON.stringify(reviewText)+')');
  assert.equal((await selection()).count,130,"cancel must preserve selected files");
  await key("Escape");
  await until('[...document.querySelectorAll("tr.file-entry")].every(row=>row.getAttribute("aria-selected")!=="true")');
