@@ -1382,6 +1382,12 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    <RareButton type="button" tone="ghost" className={"explorer-item-star"+(favoriteIds.has(item.id)?" favorited":"")}
     aria-label={favoriteIds.has(item.id)?"取消收藏 "+item.name:"收藏 "+item.name}
     disabled={favoriteBusy!==""}
+    onPointerDown={event=>{
+     // The tile may shift while a browser focuses or scrolls a nested
+     // control. Keep pointerup/click on the star, never the draggable card.
+     event.stopPropagation();
+     event.currentTarget.setPointerCapture(event.pointerId);
+    }}
     onMouseDown={event=>{
      // Native mouse focus scrolls the icon grid to the button between
      // pointerdown and pointerup, sending the click to the card instead.
@@ -1424,6 +1430,10 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    <RareButton type="button" tone="ghost" className={"explorer-item-star"+(favoriteFolderIds.has(entry.id)?" favorited":"")}
     aria-label={(favoriteFolderIds.has(entry.id)?"取消收藏文件夹 ":"收藏文件夹 ")+entry.name}
     disabled={favoriteBusy!==""}
+    onPointerDown={event=>{
+     event.stopPropagation();
+     event.currentTarget.setPointerCapture(event.pointerId);
+    }}
     onMouseDown={event=>{
      event.preventDefault();event.stopPropagation();
     }}
