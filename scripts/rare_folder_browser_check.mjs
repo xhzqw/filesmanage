@@ -497,7 +497,7 @@ try{
  assert.equal(batch.filtersLeft,defaultToolbar.filtersLeft,"selection must not shift browse controls");
  assert(batch.printDisabled,"batch printing beyond 20 items must be disabled");
  if(selectedFoldersAtLarge){
-  assert(await evaluate('document.querySelector(".batch-btn[title*=\"混合多选\"]")?.disabled===true'),
+  assert(await evaluate('document.querySelectorAll(".batch-actions-group .batch-btn")[2]?.disabled===true'),
    "unsupported mixed folder/file batch move must be disabled");
  }
  // Client-side filtering may hide a selected file, never silently remove it.
