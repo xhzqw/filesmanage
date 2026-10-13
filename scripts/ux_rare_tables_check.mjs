@@ -135,7 +135,7 @@ async function run(){
   await cdp.goto("/search","#search-q");
   await setInput("#search-q",fileName);
   await cdp.eval("(()=>{document.querySelector('.search-primary button[type=submit]').click();return true;})()");
-  await inspect("search "+width+"px",".search-data-table",fileName,"td:first-child a","td:last-child a");
+  await inspect("search "+width+"px",".search-data-table",fileName,".search-file-label",".search-row-action");
   await cdp.goto("/doc?folder="+encodeURIComponent(folderId),".file-table");
   await cdp.wait("()=>[...document.querySelectorAll('.file-table tbody tr')].some(r=>r.textContent?.includes("+JSON.stringify(fileName)+"))");
   const files=await cdp.eval("(()=>{const tr=[...document.querySelectorAll('.file-table tbody tr')].find(x=>x.textContent?.includes("+JSON.stringify(fileName)+"));const name=tr?.querySelector('.file-name'),menu=tr?.querySelector('.file-mobile-actions'),r=name?.getBoundingClientRect(),m=menu?.getBoundingClientRect();return {width:innerWidth,overflow:document.documentElement.scrollWidth-innerWidth,nameVisible:r?.width>35&&r.left>=0&&r.right<=innerWidth+1,menuVisible:m?.width>0&&m.left>=0&&m.right<=innerWidth+1,nameRect:r?{left:r.left,right:r.right,width:r.width}:null,tableRect:tr?.closest('table')?.getBoundingClientRect().toJSON(),paneRect:tr?.closest('.table')?.getBoundingClientRect().toJSON(),version:tr?.querySelector('.version-badge')?.textContent,hasGrid:!!tr?.closest('[role=grid]')};})()");

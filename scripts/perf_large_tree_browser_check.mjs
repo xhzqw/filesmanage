@@ -121,7 +121,7 @@ try{
     const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
     setter.call(input,${JSON.stringify(term)});input.dispatchEvent(new Event('input',{bubbles:true}));return true;})()`);
   await wait(`document.querySelector('.search-total')?.textContent&&document.querySelectorAll('.search-data-table tbody tr').length===${expected}&&
-    ${expected===0?"document.querySelector('.search-results .empty')?.textContent?.includes('没有匹配')":"true"}`);
+    ${expected===0?"document.querySelector('.search-empty')?.textContent?.includes('没有找到匹配')":"true"}`);
   const measured={term,rows:expected,visibleWallMs:Date.now()-started};
   instant.push(measured);
   console.log("REAL_SEARCH_TYPEAHEAD "+JSON.stringify(measured));

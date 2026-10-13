@@ -1626,10 +1626,10 @@ async function finaleSuite() {
     check("WF-30 加载更多 appears with a cursor", moreVisible === true, String(moreVisible));
     await cdp.evaluate(`(()=>{document.querySelector('.search-more button')?.click();return true;})()`);
     const allRows = await cdp.waitFor(`()=>document.querySelectorAll('.search-data-table tbody tr').length>=60`, 30000);
-    const uniqueRows = await cdp.evaluate(`(()=>{const names=[...document.querySelectorAll('.search-data-table tbody tr')].map(tr=>tr.querySelector('td a')?.textContent?.trim());return {rows:names.length,unique:new Set(names).size};})()`);
+    const uniqueRows = await cdp.evaluate(`(()=>{const names=[...document.querySelectorAll('.search-data-table tbody tr')].map(tr=>tr.querySelector('.search-file-label')?.textContent?.trim());return {rows:names.length,unique:new Set(names).size};})()`);
     check("WF-30 加载更多 appends the rest without duplicates",
       allRows === true && uniqueRows.rows === 60 && uniqueRows.unique === 60, JSON.stringify(uniqueRows));
-    const countLine = await cdp.evaluate(`(()=>document.querySelector('.search-total')?.textContent||'')()`);
+    const countLine = await cdp.evaluate(`(()=>document.querySelector('.search-results-footer')?.textContent||'')()`);
     check("WF-30 the count line reflects the loaded pages", /已显示 60/.test(countLine), String(countLine));
 
     // ---- G2: file explorer cursor paging is not the search paging path ----
