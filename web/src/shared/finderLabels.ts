@@ -5,17 +5,17 @@ export type TaggedFile={id:string;folderId:string;name:string;uploadedBy:string;
 export type TaggedFolder={id:string;name:string;parentId:string|null;updatedAt?:string};
 
 export const FINDER_COLORS=[
- {id:"red",name:"红色",hex:"#ff5a58"},
- {id:"orange",name:"橙色",hex:"#ffb900"},
- {id:"yellow",name:"黄色",hex:"#f6e300"},
- {id:"green",name:"绿色",hex:"#00d96b"},
- {id:"blue",name:"蓝色",hex:"#0aa5f8"},
- {id:"purple",name:"紫色",hex:"#db60e9"},
- {id:"gray",name:"灰色",hex:"#aeb1bb"},
+ {id:"red",name:"红色",hex:"var(--ui-tag-red)"},
+ {id:"orange",name:"橙色",hex:"var(--ui-tag-orange)"},
+ {id:"yellow",name:"黄色",hex:"var(--ui-tag-yellow)"},
+ {id:"green",name:"绿色",hex:"var(--ui-tag-green)"},
+ {id:"blue",name:"蓝色",hex:"var(--ui-tag-blue)"},
+ {id:"purple",name:"紫色",hex:"var(--ui-tag-purple)"},
+ {id:"gray",name:"灰色",hex:"var(--ui-tag-gray)"},
 ] as const;
 export type FinderColor=typeof FINDER_COLORS[number]["id"];
 export type FinderLabel={id:string;name:string;color:FinderColor;sortOrder:number;isDefault:boolean};
-export const finderColor=(color:string)=>FINDER_COLORS.find(entry=>entry.id===color)?.hex??"#aeb1bb";
+export const finderColor=(color:string)=>FINDER_COLORS.find(entry=>entry.id===color)?.hex??"var(--ui-tag-gray)";
 function changedLabels(){window.dispatchEvent(new Event("filesmanage:labels-change"));}
 export const labelApi={
  list:()=>request<FinderLabel[]>("/labels"),

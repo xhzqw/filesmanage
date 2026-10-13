@@ -116,7 +116,7 @@
  position:relative;flex:1 1 auto;min-height:0;min-width:0;
  margin:0;background:var(--surface-panel);overflow:auto;
 }
-.explorer-marquee{position:absolute;z-index:6;pointer-events:none;border:1px solid var(--border-focus);border-radius:var(--radius-xs);background:var(--surface-row-selected);opacity:.68;box-sizing:border-box}
+.explorer-marquee{position:absolute;z-index:6;pointer-events:none;border:1px solid var(--border-focus);border-radius:var(--radius-xs);background:var(--ui-state-selected-grid);opacity:.68;box-sizing:border-box}
 .explorer-empty{min-height:160px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--text-secondary);font-size:12px}
 .explorer-icon-grid{
  display:grid;grid-template-columns:repeat(auto-fill,minmax(122px,1fr));
@@ -143,8 +143,8 @@
  color:var(--text-primary);font-size:12px;
 }
 .explorer-item:hover{background:var(--surface-row-hover)}
-.explorer-item.selected{background:var(--surface-row-selected);border-color:var(--border-selected)}
-.file-table tbody tr.explorer-list-folder.selected{background:var(--surface-row-selected)}
+.explorer-item.selected{background:var(--ui-state-selected-grid);border-color:var(--border-selected);box-shadow:none}
+.file-table tbody tr.explorer-list-folder.selected{background:var(--ui-state-selected-list)}
 .file-table tbody tr.explorer-list-folder{cursor:default}
 .file-table tbody tr.explorer-list-folder:focus-visible{outline:1px solid var(--border-focus);outline-offset:-1px}
 .explorer-item:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px}
@@ -204,7 +204,7 @@
  font-size:21px;line-height:1;color:var(--text-tertiary);pointer-events:none;
 }
 .explorer-columns :is(.explorer-item,.finder-column-row).selected{
- background:color-mix(in srgb,var(--brand-blue) 86%,#003b88);
+ background:var(--ui-state-selected-list);
  color:#fff;border-color:transparent;
 }
 .explorer-columns .explorer-folder.selected::after{color:rgba(255,255,255,.92)}
@@ -217,7 +217,7 @@
 .finder-column-row>svg{flex:none}
 .finder-column-row:hover,.explorer-column-list .explorer-item:hover{background:var(--surface-row-hover)}
 .explorer-columns :is(.explorer-item,.finder-column-row).selected:hover{
- background:color-mix(in srgb,var(--brand-blue) 86%,#003b88);
+ background:var(--ui-state-selected-list);
 }
 .finder-column-row:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px}
 .finder-column-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

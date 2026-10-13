@@ -28,10 +28,10 @@
 /* Finder-style continuous zebra list. The displayed DOM order includes
    folders AND files; nth-child keeps stripes continuous after filtering. */
 .work-body>.explorer-striped-list{
-  --explorer-list-canvas:#F8FAFD;
-  --explorer-list-stripe:#E9EEF6;
-  --explorer-list-hover:#DFE9F7;
-  --explorer-list-selection:#245CB5;
+  --explorer-list-canvas:var(--ui-bg-canvas);
+  --explorer-list-stripe:var(--ui-bg-sidebar);
+  --explorer-list-hover:var(--ui-state-hover);
+  --explorer-list-selection:var(--ui-state-selected-list);
   background:var(--explorer-list-canvas);
   border:0;
 }
@@ -192,7 +192,7 @@
 }
 
 .file-cell-wrap{display:flex;align-items:center;gap:var(--space-1);min-width:0;height:100%}
-.file-cell-wrap .file-name{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--brand-blue);font-weight:500}
+.file-cell-wrap .file-name{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-primary);font-weight:500}
 .explorer-list-folder .file-name{flex:0 1 auto}
 /* The folder action stays adjacent to its name, not at the far edge. */
 .file-table .folder-inline-open{

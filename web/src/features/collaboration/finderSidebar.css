@@ -1,8 +1,8 @@
 /* Finder hierarchy, adapted to the system's existing blue/neutral RareUI tokens. */
-.document-explorer .finder-sidebar{background:var(--surface-header);border-color:var(--border-hairline)}
+.document-explorer .finder-sidebar{background:var(--ui-bg-sidebar);border-color:var(--ui-border-hairline)}
 .finder-navigation{display:flex;flex-direction:column;gap:17px;min-width:0;padding:15px 10px 20px}
 .finder-nav-section{display:flex;flex-direction:column;gap:3px;min-width:0}
-.finder-nav-label{padding:0 12px 5px;font-size:11px;font-weight:650;color:var(--text-tertiary);letter-spacing:.025em}
+.finder-nav-label{padding:0 12px 5px;font-size:11px;font-weight:600;color:var(--text-tertiary);letter-spacing:.025em}
 .finder-nav-item,.finder-favorite-item{
  box-sizing:border-box;display:flex;align-items:center;gap:11px;width:100%;min-width:0;min-height:36px;
  padding:6px 11px;border:0;border-radius:var(--radius-md);background:transparent;text-decoration:none;
@@ -13,7 +13,7 @@
 .finder-nav-item>span,.finder-favorite-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .finder-favorite-name{flex:1}
 .finder-nav-item:hover,.finder-favorite-item:hover{background:var(--surface-row-hover);text-decoration:none}
-.finder-nav-item.is-current{background:var(--surface-row-selected);color:var(--brand-blue);font-weight:650}
+.finder-nav-item.is-current{background:var(--ui-state-selected-sidebar);color:var(--ui-brand-strong);font-weight:650}
 .finder-favorite-item{min-height:31px;padding-left:29px;gap:9px;font-size:12px;font-weight:450}
 .finder-favorite-item svg{flex:none}
 .finder-nav-empty,.finder-nav-more,.finder-nav-retry{display:block;padding:5px 12px 5px 29px;font-size:11px;color:var(--text-tertiary)}
@@ -23,12 +23,13 @@
 .finder-nav-heading .finder-nav-label{padding-bottom:0}
 .finder-tag-add{border:0;background:transparent;color:var(--text-secondary);font-size:19px;width:27px;height:27px;padding:0;border-radius:var(--radius-sm)}
 .finder-tag-line{display:flex;align-items:center;min-width:0;border-radius:var(--radius-md);transition:background .15s}
-.finder-tag-line:hover,.finder-tag-line.is-current{background:var(--surface-row-hover)}
-.finder-tag-line.is-current{background:var(--surface-row-selected)}
-.finder-tag-line.is-drop-target{background:var(--surface-row-selected);outline:2px solid var(--brand-blue);outline-offset:-2px}
+.finder-tag-line:hover{background:var(--ui-state-hover)}
+.finder-tag-line.is-current{background:var(--ui-state-selected-sidebar);color:var(--ui-brand-strong)}
+.finder-tag-line.is-current .finder-tag-link{color:var(--ui-brand-strong);font-weight:600}
+.finder-tag-line.is-drop-target{background:var(--ui-state-selected-grid);outline:2px solid var(--ui-state-focus);outline-offset:-2px}
 .finder-tag-link{display:flex;align-items:center;gap:11px;flex:1;min-width:0;min-height:34px;padding:5px 10px;color:var(--text-primary);text-decoration:none;font-size:13px}
 .finder-tag-link:hover{text-decoration:none}
-.finder-tag-dot{width:14px;height:14px;flex:none;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.05)}
+.finder-tag-dot{width:14px;height:14px;flex:none;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(15,39,92,.13)}
 .finder-tag-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .finder-tag-more{opacity:0;flex:none;width:26px;min-width:26px;min-height:27px;margin-right:4px;padding:0;border:0;background:transparent}
 .finder-tag-line:hover .finder-tag-more,.finder-tag-more:focus-visible{opacity:1}
@@ -38,7 +39,7 @@
 .finder-tag-editor input{min-width:0;width:100%;box-sizing:border-box}
 .finder-tag-palette{display:flex;justify-content:space-between;gap:1px}
 .finder-tag-palette-item{width:26px;min-width:26px;height:28px;padding:0;display:grid;place-items:center;border:0;background:transparent;border-radius:var(--radius-sm)}
-.finder-tag-palette-item[aria-pressed="true"]{background:var(--surface-row-selected);box-shadow:inset 0 0 0 1px var(--brand-blue)}
+.finder-tag-palette-item[aria-pressed="true"]{background:var(--ui-state-selected-sidebar);box-shadow:inset 0 0 0 1px var(--ui-brand-primary)}
 .finder-tag-palette-item span{width:16px;height:16px;display:block;border-radius:50%}
 .finder-tag-editor-actions{display:flex;justify-content:flex-end;gap:5px}
 .finder-tag-editor-actions button{font-size:11px;padding:5px 9px}

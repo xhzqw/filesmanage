@@ -54,7 +54,7 @@ export function modelPrintSheetHtml(input:ModelPrintData):string{
   'figcaption{border-top:1px solid #b6c2cc;background:#f5f7fa;padding:1.3mm 2mm;font-size:11px}'+
   'footer{display:flex;justify-content:space-between;gap:5mm;border-top:1px solid #657687;padding-top:2mm;font-size:10px}'+
   '.warn{color:#87491f}.controls{font:13px system-ui;padding:10px 16px;background:#e9eff5;color:#142638;display:flex;gap:15px;align-items:center}'+
-  '.controls button{font:inherit;background:#174098;border:0;border-radius:7px;color:white;padding:7px 17px;cursor:pointer}'+
+  '.controls button{font:inherit;background:#2459B2;border:0;border-radius:7px;color:white;padding:7px 17px;cursor:pointer}'+
   '@media screen{body{background:#dfe6ed}.sheet{margin:14px auto;background:white;box-shadow:0 5px 30px #10203030}}'+
   '@media print{.controls{display:none}figure{break-inside:avoid}}'+
   '</style></head><body><div class="controls"><button id="print-now" type="button">打印本页</button>'+

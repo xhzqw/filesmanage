@@ -1,26 +1,13 @@
 /* ==========================================================================
-   Precision Workbench 2.0 — Core Tokens & Reset
-   (docs/design/PRECISION-WORKBENCH-V2-SPEC.md §2/§3/§7.1)
+   Polar Blue · Global color and interaction tokens
+   (docs/design/POLAR-BLUE-THEME.md).
 
-   Preserves compact engineering metrics (13px type, 32/26px data rows,
-   28px tree rows, 40px top bar and 24px status bar). Visual System V3
-   replaces the obsolete zero-gap square-corner arrangement; the radius and
-   elevation tokens below are canonical for both shell and feature sheets.
-
-   Colour deviations from the spec's §2.1 sketch are deliberate and are the
-   only places this file does not copy the spec verbatim; each one is forced
-   by the VIS-03 gate in scripts/ux_visual_check.mjs, which measures real
-   computed styles in the browser:
-     · text >= 4.5:1, so --text-tertiary is #5E7185, not #94A3B8 (2.56:1);
-     · interactive boundaries >= 3:1, so --border-subtle is #6C8BA6, not
-       #CBD5E1 (1.48:1), and --border-focus is #1473B8, not #02A0EA (2.91:1).
-   --brand-cyan (#02A0EA) therefore never draws a focus ring, an input
-   border or any other measured boundary: it stays the laser accent for
-   decorative rails, underlines and micro-interactions.
-   Legacy --color-, --space-, --height- and --radius- names are kept as
-   aliases at the end of the token block so the component sheets and the
-   three inline styles in FolderTree.tsx keep resolving; new code uses the
-   spec names.
+   Keep the compact engineering density while applying an Apple-like neutral
+   canvas, calm chrome and one deep-blue interactive hierarchy. The theme
+   owns the semantic palette; feature modules consume it. Contrast-qualified
+   input and focus boundaries remain stronger than decorative hairlines.
+   Legacy --brand-, --surface-, --color- aliases preserve existing modules
+   while they migrate incrementally to --ui-*.
    ========================================================================== */
 
 *{box-sizing:border-box}
@@ -34,24 +21,50 @@
   text-rendering:optimizeLegibility;
 }
 
+/* Polar Blue: the canonical semantic palette. Contrast-critical controls
+   use their own borders; quiet hairlines are only decorative separators. */
+:root{
+  --ui-bg-app:#F7F9FC;
+  --ui-bg-sidebar:#F4F7FA;
+  --ui-bg-canvas:#FFFFFF;
+  --ui-bg-subtle:#F8FAFC;
+  --ui-state-hover:#EDF2F8;
+  --ui-state-selected-sidebar:#DFEBFA;
+  --ui-state-selected-grid:#D7E8FC;
+  --ui-state-selected-list:#2459B2;
+  --ui-state-focus:#2459B2;
+  --ui-border-hairline:#E5EAF1;
+  --ui-brand-primary:#2459B2;
+  --ui-brand-strong:#193F81;
+  --ui-text-primary:#1D2A3D;
+  --ui-text-secondary:#5E6F85;
+  --ui-tag-red:#F45F65;
+  --ui-tag-orange:#F3AD35;
+  --ui-tag-yellow:#E7C900;
+  --ui-tag-green:#2ABF76;
+  --ui-tag-blue:#369CE5;
+  --ui-tag-purple:#B563D4;
+  --ui-tag-gray:#A2A9B4;
+}
+
 /* ================= 品牌核心色 (Brand Archetype) ================= */
 :root{
-  --brand-navy:#0F275C;            /* 权威深海蓝 */
-  --brand-blue:#174098;            /* 工业工程蓝: 主交互/行选中/主要链接 */
-  --brand-cyan:#02A0EA;            /* 激光极客亮蓝: 装饰轨/下划线/微交互 */
-  --brand-cyan-muted:#E0F2FE;      /* 激光蓝微透底色 */
-  --folder-fill:#F5BF43;           /* 文件夹统一暖黄色填充 */
-  --folder-stroke:#AD7410;         /* 文件夹轮廓，浅底可辨 */
-  --folder-open-fill:#F9D47C;      /* 展开目录前缘 */
+  --brand-navy:var(--ui-brand-strong);            /* 权威深海蓝 */
+  --brand-blue:var(--ui-brand-primary);            /* 工业工程蓝: 主交互/行选中/主要链接 */
+  --brand-cyan:#369CE5;            /* 激光极客亮蓝: 装饰轨/下划线/微交互 */
+  --brand-cyan-muted:#EEF5FC;      /* 激光蓝微透底色 */
+  --folder-fill:#6BADEA;           /* 文件夹统一暖黄色填充 */
+  --folder-stroke:#286AB4;         /* 文件夹轮廓，浅底可辨 */
+  --folder-open-fill:#A0CBF2;      /* 展开目录前缘 */
 
   /* ================= 表面与层级 (Surface & Elevation) ================= */
-  --surface-canvas:#F8FAFC;        /* 工作台底衬冷白 (Slate 50) */
-  --surface-panel:#FFFFFF;         /* 数据面板/表格纯白背景 */
-  --surface-header:#F1F5F9;        /* 表头/工具栏/状态栏淡冷灰底 (Slate 100) */
-  --surface-subtle:#F1F5F9;        /* 控件悬停底色 */
-  --surface-row-hover:#F0F7FF;     /* 极轻微蓝行悬停底色 */
-  --surface-row-selected:#E2EFFE;  /* 明确选中的蓝白高亮底 */
-  --surface-active:#DBEAFE;        /* 按下/激活态底色 */
+  --surface-canvas:var(--ui-bg-app);        /* 工作台底衬冷白 (Slate 50) */
+  --surface-panel:var(--ui-bg-canvas);         /* 数据面板/表格纯白背景 */
+  --surface-header:var(--ui-bg-sidebar);        /* 表头/工具栏/状态栏淡冷灰底 (Slate 100) */
+  --surface-subtle:var(--ui-state-hover);        /* 控件悬停底色 */
+  --surface-row-hover:var(--ui-state-hover);     /* 极轻微蓝行悬停底色 */
+  --surface-row-selected:var(--ui-state-selected-sidebar);  /* 明确选中的蓝白高亮底 */
+  --surface-active:var(--ui-state-selected-grid);        /* 按下/激活态底色 */
   --surface-success-soft:#E8F7ED; /* 轻量正反馈，不承担单独的语义 */
   --surface-warning-soft:#FFF3E7; /* 警告只作辅助，文本传递语义 */
   --surface-danger-soft:#FDECEF;     /* 错误通知底色: tokenised so the one
@@ -59,29 +72,29 @@
                                       governed like every other colour */
 
   /* ================= 结构线条与边界 (Hairline Borders) ================= */
-  --border-hairline:#E2E8F0;       /* 1px 精细分界线 (Slate 200) */
+  --border-hairline:var(--ui-border-hairline);       /* 1px 精细分界线 (Slate 200) */
   --border-subtle:#6C8BA6;         /* 控件未激活边框 (VIS-03: >=3:1, spec's
                                       #CBD5E1 measures 1.48:1) */
   --border-strong:#5E7C93;         /* 强对比边框 (VIS-03 >=3:1, spec's
                                       #94A3B8 measures 2.56:1) */
-  --border-focus:#1473B8;          /* 激光焦点线 (1px + 1px inset; VIS-03
+  --border-focus:var(--ui-state-focus);          /* 激光焦点线 (1px + 1px inset; VIS-03
                                       >=3:1, spec's #02A0EA measures 2.91:1) */
-  --border-selected:#2A6FDD;       /* 选中项外廓线 (VIS-03: 4.08:1 on the
+  --border-selected:#3473C3;       /* 选中项外廓线 (VIS-03: 4.08:1 on the
                                       selected row; the spec's #3B82F6 only 3.16:1) */
 
   /* ================= 文字与数据排印 (Typography Hierarchy) ================= */
-  --text-primary:#0F172A;          /* Slate 900: 文件名/主要输入 */
-  --text-secondary:#475569;        /* Slate 600: 大小/版本/更新时间 */
+  --text-primary:var(--ui-text-primary);          /* Slate 900: 文件名/主要输入 */
+  --text-secondary:var(--ui-text-secondary);        /* Slate 600: 大小/版本/更新时间 */
   --text-tertiary:#5A6C80;         /* 哈希短码/表头标题/禁用文字 (VIS-03:
                                       4.93:1 on the header surface; the spec's
                                       #94A3B8 measures 2.34:1 there) */
   --text-inverse:#FFFFFF;          /* 反白文字 */
 
   /* ================= 语义状态色 (Functional Indicators) ================= */
-  --status-success:#15803D;        /* 正常/通过 */
-  --status-warning:#A34B08;        /* 待审核/锁定 (VIS-03: 5.37:1 on the header
+  --status-success:#236B4D;        /* 正常/通过 */
+  --status-warning:#946015;        /* 待审核/锁定 (VIS-03: 5.37:1 on the header
                                       surface, the spec's #B45309 only 4.58:1) */
-  --status-danger:#B91C1C;         /* 冲突/删除/严重警告 */
+  --status-danger:#B42333;         /* 冲突/删除/严重警告 */
 
   /* Semantic file-class glyph colors: visual continuity during Rare migration. */
   --file-icon-cad:#0284c7;
@@ -139,7 +152,7 @@
   --color-text:var(--text-primary);
   --color-text-secondary:var(--text-secondary);
   --color-action:var(--brand-blue);
-  --color-action-hover:#11347D;
+  --color-action-hover:var(--ui-brand-strong);
   --color-focus:var(--border-focus);
   --color-row-hover:var(--surface-row-hover);
   --color-row-selected:var(--surface-row-selected);
@@ -192,7 +205,7 @@ button.danger:hover{background:var(--status-danger);color:var(--text-inverse);bo
 button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,[tabindex]:focus-visible{
   outline:1px solid var(--border-focus);
   outline-offset:1px;
-  box-shadow:0 0 0 3px rgba(2,160,234,.16);
+  box-shadow:0 0 0 3px rgba(36,89,178,.12);
 }
 input,select,textarea{
   height:var(--height-control);
@@ -621,7 +634,7 @@ tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions 
 /* Reserve space for the leading icon. Must outrank the login card's
    input:not() shorthand padding, otherwise text/placeholder overlays it. */
 .login-card .input-wrap input:not([type="checkbox"]):not([type="radio"]){padding-left:36px}
-.input-wrap input:focus{outline:1px solid var(--border-focus);outline-offset:0;border-color:var(--border-focus);box-shadow:0 0 0 3px rgba(2,160,234,.16)}
+.input-wrap input:focus{outline:1px solid var(--border-focus);outline-offset:0;border-color:var(--border-focus);box-shadow:0 0 0 3px rgba(36,89,178,.12)}
 .form-extras{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);font-size:12px}
 .form-extras .remember{display:inline-flex;align-items:center;gap:6px;flex:none;white-space:nowrap;line-height:1.25;font-weight:400;color:var(--text-secondary);cursor:pointer}
 .form-extras .remember input[type="checkbox"]{width:16px;height:16px;min-width:16px;flex:none;margin:0;padding:0;accent-color:var(--brand-blue);cursor:pointer}

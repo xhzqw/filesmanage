@@ -11,7 +11,7 @@
 }
 .rare-folder-back{
  position:absolute;inset:0;display:block;
- background:#50b1fd;border-radius:var(--radius-xl);
+ background:var(--folder-fill);border-radius:var(--radius-xl);
  box-shadow:inset 0 0 6px 2px rgba(255,255,255,.35);
 }
 .rare-folder-papers{

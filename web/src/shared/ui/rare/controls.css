@@ -5,7 +5,7 @@
 .rare-button[data-density="standard"]{min-height:32px}
 .rare-button:focus-visible,.rare-input:focus-visible,.rare-select:focus-visible,.rare-textarea:focus-visible{
   outline:1px solid var(--border-focus);outline-offset:1px;
-  box-shadow:0 0 0 3px rgba(2,160,234,.16);
+  box-shadow:0 0 0 3px rgba(36,89,178,.12);
 }
 .rare-button[data-rare-tone="danger"]:focus-visible{outline-color:var(--status-danger)}
 .rare-button[aria-busy="true"]{cursor:progress}
