@@ -44,6 +44,25 @@ const SORT_KEYS:SortKey[]=["updated_desc","name_asc","name_desc","size_desc"];
 
 type CopiedResource={kind:"file"|"folder";id:string;name:string};
 let explorerCopiedResources:CopiedResource[]=[];
+const EXPLORER_CLIPBOARD_KEY="filesmanage.explorer.clipboard.v1";
+function setExplorerClipboard(resources:CopiedResource[]){
+ explorerCopiedResources=resources;
+ try{sessionStorage.setItem(EXPLORER_CLIPBOARD_KEY,JSON.stringify(resources));}catch{}
+}
+function getExplorerClipboard():CopiedResource[]{
+ if(explorerCopiedResources.length)return explorerCopiedResources;
+ try{
+  const loaded:unknown=JSON.parse(sessionStorage.getItem(EXPLORER_CLIPBOARD_KEY)??"null");
+  if(!Array.isArray(loaded))return [];
+  const validated=loaded.filter((item:unknown):item is CopiedResource=>
+   !!item&&typeof item==="object"&&
+   ("kind" in item)&&(item.kind==="file"||item.kind==="folder")&&
+   ("id" in item)&&typeof item.id==="string"&&item.id.length<=256&&
+   ("name" in item)&&typeof item.name==="string"&&item.name.length<=300).slice(0,500);
+  explorerCopiedResources=validated;
+  return validated;
+ }catch{return [];}
+}
 function isTextEditingTarget(target:EventTarget|null){
  const el=target instanceof HTMLElement?target:null;
  return !!el?.closest("input,textarea,select,[contenteditable=true],[role=textbox]");
@@ -637,12 +656,12 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    ...childFolders.filter(item=>selectedFolderIds.has(item.id)).map(item=>({kind:"folder" as const,id:item.id,name:item.name}))
   ];
   if(!chosen.length)return;
-  explorerCopiedResources=chosen;
+  setExplorerClipboard(chosen);
   toast.success("已复制 "+chosen.length+" 项 · 可前往其他目录粘贴");
  }
  async function pasteSelection(){
-  if(pasteBusy||pasteAbort.current||!explorerCopiedResources.length)return;
-  const captured=[...explorerCopiedResources];
+  const captured=[...getExplorerClipboard()];
+  if(pasteBusy||pasteAbort.current||!captured.length)return;
   const controller=new AbortController();
   pasteAbort.current=controller;
   setPasteBusy(true);
@@ -763,7 +782,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     event.preventDefault();selectKeys(visibleKeys);setAnchorId(visibleKeys[0]??null);
    }else if(key==="c"&&selectedIds.size+selectedFolderIds.size>0){
     event.preventDefault();copySelection();
-   }else if(key==="v"&&explorerCopiedResources.length>0){
+   }else if(key==="v"&&getExplorerClipboard().length>0){
     event.preventDefault();void pasteSelection();
    }
   };
@@ -1032,7 +1051,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   const single=targets.length===1?targets[0]:null;
   const items:MenuItem[]=[];
   if(targets.length>0)items.push({id:"copy",label:"复制",hint:"Ctrl/Cmd+C",onSelect:()=>{
-   explorerCopiedResources=targets.map(target=>({kind:"file",id:target.id,name:target.name}));
+   setExplorerClipboard(targets.map(target=>({kind:"file",id:target.id,name:target.name})));
    toast.success("已复制 "+targets.length+" 项");
   }});
   if(single){
@@ -1524,10 +1543,10 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    onClose={()=>setFolderMenu(null)} items={[
     {id:"open",label:"打开",onSelect:()=>navigate("/doc?folder="+encodeURIComponent(folderMenu.target.id))},
     {id:"copy",label:"复制",hint:"Ctrl/Cmd+C",onSelect:()=>{
-     explorerCopiedResources=selectedFolderIds.has(folderMenu.target.id)
+     setExplorerClipboard(selectedFolderIds.has(folderMenu.target.id)
       ?[...selectedFolders.map(row=>({kind:"folder" as const,id:row.id,name:row.name})),...selection.map(row=>({kind:"file" as const,id:row.id,name:row.name}))]
-      :[{kind:"folder",id:folderMenu.target.id,name:folderMenu.target.name}];
-     toast.success("已复制 "+explorerCopiedResources.length+" 项");
+      :[{kind:"folder",id:folderMenu.target.id,name:folderMenu.target.name}]);
+     toast.success("已复制 "+getExplorerClipboard().length+" 项");
     }},
     {id:"favorite",label:favoriteFolderIds.has(folderMenu.target.id)?"取消收藏":"收藏",disabled:favoritesState!=="ready"||favoriteBusy!=="",onSelect:()=>{void toggleFavoriteResource("folder",folderMenu.target.id);}},
     {id:"rename",label:"重命名",onSelect:()=>openFolderAction(folderMenu.target,"rename")},
