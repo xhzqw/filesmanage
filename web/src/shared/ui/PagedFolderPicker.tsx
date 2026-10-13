@@ -16,6 +16,7 @@ export function PagedFolderPicker({
  const tree=useRef<HTMLUListElement>(null);
  const searchInput=useRef<HTMLInputElement>(null);
  const versions=useRef(new Map<string,number>());
+ const requestSequence=useRef(0);
  const searchVersion=useRef(0);
  const[levels,setLevels]=useState<Map<string,PageLevel>>(()=>new Map());
  const[expanded,setExpanded]=useState<Set<string>>(()=>new Set());
@@ -27,7 +28,7 @@ export function PagedFolderPicker({
  const keyword=query.trim();
 
  function loadLevel(parentId:string,cursor="",append=false){
-  const version=(versions.current.get(parentId)??0)+1;
+  const version=++requestSequence.current;
   versions.current.set(parentId,version);
   setLevels(old=>{
    const next=new Map(old),current=old.get(parentId);
@@ -42,6 +43,13 @@ export function PagedFolderPicker({
     next.set(parentId,{items,nextCursor:page.nextCursor===cursor&&cursor!==""?"":page.nextCursor,status:"ready"});
     return next;
    });
+   // Automatically reveal the only company root instead of presenting it as
+   // the sole destination. Other branches remain lazy and paginated.
+   const singleRoot=parentId===""&&!cursor&&page.items.length===1?page.items[0]:undefined;
+   if(singleRoot?.hasChildren&&!versions.current.has(singleRoot.id)){
+    setExpanded(old=>new Set(old).add(singleRoot.id));
+    loadLevel(singleRoot.id);
+   }
   }).catch(()=>{
    if(versions.current.get(parentId)!==version)return;
    setLevels(old=>{

@@ -81,6 +81,7 @@ try{
   const li=[...document.querySelectorAll('dialog[open] .folder-picker-tree [data-folder-id]')]
     .find(row=>row.dataset.folderId===${JSON.stringify(expandableRoot.id)});
   const btn=li?.querySelector('.folder-picker-chevron');
+  if(btn?.getAttribute('aria-expanded')==='true')btn.click();
   btn?.click();return Boolean(btn);
  })()`);
  assert.ok(rootButton,"root folder must render an actionable expand control");
