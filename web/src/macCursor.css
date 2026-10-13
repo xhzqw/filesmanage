@@ -6,7 +6,7 @@
  */
 @media (pointer: fine) {
   :root {
-    --mac-arrow-cursor: url("/assets/cursors/macos-arrow.svg") 2 2, default;
+    --mac-arrow-cursor: url("/assets/cursors/macos-arrow.svg?v=compact") 1 1, default;
   }
 
   :where(html, body, body *, body *::before, body *::after) {
