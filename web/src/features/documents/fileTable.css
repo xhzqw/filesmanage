@@ -1,6 +1,5 @@
-/* Precision Workbench 2.0 high-density DataGrid (spec §4): a fixed-layout
-   six-column grid (select/name/size/version/date/actions) built only on
-   the shared token layer. */
+/* Finder default: five-column compact DataGrid. An opt-in checkbox column
+   makes it six columns without changing row membership or keyboard actions. */
 .batch-delete-failure{font-size:11px;color:var(--status-danger);overflow-wrap:anywhere}
 .zip-download-status{display:flex;align-items:center;gap:9px;min-height:32px;padding:5px 10px;font-size:12px;min-width:0;color:var(--text-secondary)}
 .zip-download-status>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis}
@@ -544,4 +543,22 @@ table.file-table-folders-only tbody td.col-name{padding-left:8px}
    becomes both outside edges of the zebra stripe. */
 .explorer-striped-list table.file-table-folders-only tbody tr.explorer-list-folder > td.col-name{
   border-radius:var(--radius-xs);
+}
+.file-toolbar .checkbox-visibility-toggle{
+ display:inline-flex;flex:none;align-items:center;justify-content:center;gap:5px;
+ min-height:32px;height:32px;padding:0 8px;
+ border:1px solid transparent;border-radius:var(--radius-md);
+ background:transparent;color:var(--text-secondary);font-size:11px;white-space:nowrap;
+}
+.file-toolbar .checkbox-visibility-toggle:hover{background:var(--surface-row-hover)}
+.file-toolbar .checkbox-visibility-toggle[aria-pressed="true"]{background:var(--surface-header);color:var(--brand-blue)}
+.file-paste-status{
+ display:flex;align-items:center;gap:12px;justify-content:center;
+ padding:5px 12px;font-size:12px;color:var(--text-secondary);
+ border-bottom:1px solid var(--border-hairline);
+}
+.file-paste-status .rare-button{min-height:26px;height:26px}
+@container file-list (max-width:720px){
+ .file-toolbar .checkbox-visibility-toggle span{display:none}
+ .file-toolbar .checkbox-visibility-toggle{width:32px;padding:0}
 }

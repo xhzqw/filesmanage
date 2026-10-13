@@ -13,6 +13,7 @@ import {FileRenameDialog} from "./FileRenameDialog";
 import {batchConflict,batchExcluded,batchFailed,batchMoveInvalidTarget,batchPickTarget,batchSubmitStarted,batchSucceeded,failed,fileMoveInvalidTarget,openBatch,openFlow,pickTarget,preflightConflict,preflightReady,preflightStarted,submitStarted,succeeded,type BatchMoveFlow,type MoveFlow,type MovePreflight}from"./moveFileFlow";
 import {errorCode,errorCopy} from "../../shared/errors";
 import {request} from "../../shared/http";
+import {uploadFileWithProgress} from "../../shared/uploadClient";
 import {publishResourceChange,publishWorkspaceChange} from "../../shared/resourceSync";
 import {newIdempotencyKey} from "../../shared/ids";
 import {Dialog} from "../../shared/ui/Dialog";
@@ -40,6 +41,13 @@ const SORT_LABELS:Record<SortKey,string>={
 };
 
 const SORT_KEYS:SortKey[]=["updated_desc","name_asc","name_desc","size_desc"];
+
+type CopiedResource={kind:"file"|"folder";id:string;name:string};
+let explorerCopiedResources:CopiedResource[]=[];
+function isTextEditingTarget(target:EventTarget|null){
+ const el=target instanceof HTMLElement?target:null;
+ return !!el?.closest("input,textarea,select,[contenteditable=true],[role=textbox]");
+}
 
 type ToolbarIconName="selected"|"download"|"print"|"move"|"delete"|"close";
 function ToolbarIcon({name}:{name:ToolbarIconName}){
@@ -131,6 +139,16 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const[renaming,setRenaming]=useState<FileItem|null>(null);
  const[selectedIds,setSelectedIds]=useState<Set<string>>(()=>new Set<string>());
  const[selectedFolderIds,setSelectedFolderIds]=useState<Set<string>>(()=>new Set<string>());
+ const[showCheckboxes,setShowCheckboxes]=useState(()=>{
+  try{return localStorage.getItem("filesmanage.explorer.show-checkboxes")==="true";}catch{return false;}
+ });
+ useEffect(()=>{
+  try{localStorage.setItem("filesmanage.explorer.show-checkboxes",String(showCheckboxes));}catch{}
+ },[showCheckboxes]);
+ const[pasteBusy,setPasteBusy]=useState(false);
+ const[pasteProgress,setPasteProgress]=useState("");
+ const pasteAbort=useRef<AbortController|null>(null);
+ useEffect(()=>()=>pasteAbort.current?.abort(),[]);
  const checkboxShiftRef=useRef(false);
  const selectAllRef=useRef<HTMLInputElement>(null);
  const[focusedId,setFocusedId]=useState<string|null>(null);
@@ -613,6 +631,145 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   selectKeys([...new Set([...selectedIds].map(id=>"file:"+id).concat([...selectedFolderIds].map(id=>"folder:"+id),visibleKeys))]);
   setAnchorId(visibleKeys[0]??null);
  }
+ function copySelection(){
+  const chosen:CopiedResource[]=[
+   ...items.filter(item=>selectedIds.has(item.id)).map(item=>({kind:"file" as const,id:item.id,name:item.name})),
+   ...childFolders.filter(item=>selectedFolderIds.has(item.id)).map(item=>({kind:"folder" as const,id:item.id,name:item.name}))
+  ];
+  if(!chosen.length)return;
+  explorerCopiedResources=chosen;
+  toast.success("已复制 "+chosen.length+" 项 · 可前往其他目录粘贴");
+ }
+ async function pasteSelection(){
+  if(pasteBusy||pasteAbort.current||!explorerCopiedResources.length)return;
+  const captured=[...explorerCopiedResources];
+  const controller=new AbortController();
+  pasteAbort.current=controller;
+  setPasteBusy(true);
+  let copied=0;
+  let failed=0;
+  let firstFailure="";
+  const check=()=>{if(controller.signal.aborted)throw new Error("已取消复制");};
+  const requestNames=async(folderId:string)=>{
+   const reserved=new Set<string>();
+   let cursor="";
+   do{
+    check();
+    const page=await fileApi.list(folderId,"name_asc",cursor,50,controller.signal);
+    for(const item of page.items)reserved.add(item.name);
+    cursor=page.nextCursor;
+   }while(cursor);
+   return reserved;
+  };
+  const uniqueName=(original:string,used:Set<string>,asFolder:boolean)=>{
+   if(!used.has(original)){used.add(original);return original;}
+   const at=asFolder?-1:original.lastIndexOf(".");
+   const stem=at>0?original.slice(0,at):original;
+   const ext=at>0?original.slice(at):"";
+   let index=1;
+   let name="";
+   do{name=stem+" 副本"+(index===1?"":" "+index)+ext;index++;}while(used.has(name));
+   used.add(name);
+   return name;
+  };
+  const uploadSource=async(id:string,sourceName:string,targetFolder:string,newName:string)=>{
+   check();
+   const response=await fetch("/api/files/"+encodeURIComponent(id)+"/bytes",{credentials:"same-origin",signal:controller.signal});
+   if(!response.ok)throw new Error("无权读取「"+sourceName+"」或源文件已失效");
+   const data=await response.blob();
+   check();
+   const file=new File([data],newName,{type:data.type||"application/octet-stream"});
+   await uploadFileWithProgress(targetFolder,file,crypto.randomUUID(),{signal:controller.signal});
+   copied++;
+   setPasteProgress("已复制 "+copied+" 项");
+  };
+  try{
+   const tree=await request<Folder[]>("/folders/tree");
+   const targetFolder=tree.find(f=>f.id===folder);
+   if(!targetFolder)throw new Error("目标目录已失效");
+   const children=new Map<string,Folder[]>();
+   for(const item of tree){
+    if(!item.parentId)continue;
+    const list=children.get(item.parentId)??[];
+    list.push(item);children.set(item.parentId,list);
+   }
+   const reservedByFolder=new Map<string,Set<string>>();
+   const namesFor=async(id:string)=>{
+    const existing=reservedByFolder.get(id);
+    if(existing)return existing;
+    const names=await requestNames(id);
+    for(const entry of children.get(id)??[])names.add(entry.name);
+    reservedByFolder.set(id,names);
+    return names;
+   };
+   // Freeze the source folder hierarchy before creating any descendants.
+   const copyFolder=async(sourceId:string,newParentId:string,name:string,visited:Set<string>)=>{
+    check();
+    if(visited.has(sourceId))throw new Error("源文件夹层级异常");
+    if(visited.size>60)throw new Error("复制层级过深");
+    const source=tree.find(f=>f.id===sourceId);
+    if(!source)throw new Error("源文件夹已不存在");
+    const created=await request<Folder>("/folders",{method:"POST",body:JSON.stringify({parentId:newParentId,name})});
+    copied++;setPasteProgress("已复制 "+copied+" 项");
+    const path=new Set(visited);path.add(sourceId);
+    const sourceFiles:string[]=[];
+    let cursor="";
+    do{
+     check();
+     const page=await fileApi.list(sourceId,"name_asc",cursor,50,controller.signal);
+     for(const file of page.items)sourceFiles.push(file.id+"\u0000"+file.name);
+     cursor=page.nextCursor;
+    }while(cursor);
+    for(const encoded of sourceFiles){
+     const [fileId,filename]=encoded.split("\u0000");
+     if(!fileId||!filename)continue;
+     try{await uploadSource(fileId,filename,created.id,filename);}
+     catch(error){if(controller.signal.aborted)throw error;failed++;firstFailure ||= error instanceof Error?error.message:"复制文件失败";}
+    }
+    for(const child of children.get(sourceId)??[]){
+     try{await copyFolder(child.id,created.id,child.name,path);}
+     catch(error){if(controller.signal.aborted)throw error;failed++;firstFailure ||= error instanceof Error?error.message:"复制文件夹失败";}
+    }
+   };
+   const names=await namesFor(folder);
+   for(const source of captured){
+    check();
+    const newName=uniqueName(source.name,names,source.kind==="folder");
+    try{
+     if(source.kind==="file")await uploadSource(source.id,source.name,folder,newName);
+     else await copyFolder(source.id,folder,newName,new Set());
+    }catch(error){
+     if(controller.signal.aborted)throw error;
+     failed++;firstFailure ||= error instanceof Error?error.message:"复制失败";
+    }
+   }
+   if(copied)toast.success("粘贴完成 · "+copied+" 项");
+   if(failed)toast.error("有 "+failed+" 项复制失败 · "+firstFailure);
+   if(copied){onFolderChanged?.();await reload();}
+  }catch(error){
+   if(controller.signal.aborted)toast.warning("已取消粘贴 · 已完成的副本保留");
+   else toast.error(error instanceof Error?error.message:"粘贴失败");
+   if(copied){onFolderChanged?.();void reload();}
+  }finally{
+   setPasteBusy(false);setPasteProgress("");pasteAbort.current=null;
+  }
+ }
+ useEffect(()=>{
+  const onKeys=(event:globalThis.KeyboardEvent)=>{
+   if(!(event.metaKey||event.ctrlKey)||event.altKey||isTextEditingTarget(event.target))return;
+   if(event.target instanceof HTMLElement&&event.target.closest("dialog,[role=dialog],[role=menu]"))return;
+   const key=event.key.toLowerCase();
+   if(key==="a"){
+    event.preventDefault();selectKeys(visibleKeys);setAnchorId(visibleKeys[0]??null);
+   }else if(key==="c"&&selectedIds.size+selectedFolderIds.size>0){
+    event.preventDefault();copySelection();
+   }else if(key==="v"&&explorerCopiedResources.length>0){
+    event.preventDefault();void pasteSelection();
+   }
+  };
+  window.addEventListener("keydown",onKeys);
+  return()=>window.removeEventListener("keydown",onKeys);
+ });
 
  function focusRow(id:string){
   const row=document.querySelector<HTMLElement>(`.file-entry[data-id="${CSS.escape(id)}"]`);
@@ -874,6 +1031,10 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  function rowMenuItems(targets:FileItem[]):MenuItem[]{
   const single=targets.length===1?targets[0]:null;
   const items:MenuItem[]=[];
+  if(targets.length>0)items.push({id:"copy",label:"复制",hint:"Ctrl/Cmd+C",onSelect:()=>{
+   explorerCopiedResources=targets.map(target=>({kind:"file",id:target.id,name:target.name}));
+   toast.success("已复制 "+targets.length+" 项");
+  }});
   if(single){
    const file:FileItem=single;
    items.push({id:"open",label:"打开",hint:"Enter",onSelect:()=>navigate("/preview/"+file.id)});
@@ -1057,8 +1218,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    </div>
    <span className="explorer-item-name" title={item.name}>{item.name}</span>{finderDots(item)}
    <span className="explorer-item-sub">{formatSize(item.sizeBytes)} · v{item.currentVersionSeq}</span>
-   <RareInput className="explorer-item-check" type="checkbox" checked={selectedIds.has(item.id)}
-    aria-label={"选择 "+item.name} onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}} onChange={event=>onCheckToggle(event,item)}/>
+   {showCheckboxes&&<RareInput className="explorer-item-check" type="checkbox" checked={selectedIds.has(item.id)}
+    aria-label={"选择 "+item.name} onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}} onChange={event=>onCheckToggle(event,item)}/>}
    <RareButton type="button" tone="ghost" className={"explorer-item-star"+(favoriteIds.has(item.id)?" favorited":"")}
     aria-label={favoriteIds.has(item.id)?"取消收藏 "+item.name:"收藏 "+item.name}
     disabled={favoritesState==="loading"||favoriteBusy!==""}
@@ -1086,9 +1247,9 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    <div className="explorer-item-art" aria-hidden="true"><FolderResourceIcon open={selected} hovered={hovered} size={viewMode==="columns"?24:52}/></div>
    <span className="explorer-item-name" title={entry.name}>{entry.name}</span>
    <span className="explorer-item-sub">文件夹</span>
-   <RareInput className="explorer-item-check" type="checkbox" checked={selected}
+   {showCheckboxes&&<RareInput className="explorer-item-check" type="checkbox" checked={selected}
     aria-label={"选择文件夹 "+entry.name} onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}}
-    onChange={event=>{selectResource("folder",entry.id,true,checkboxShiftRef.current);checkboxShiftRef.current=false;setFocusedFolderId(entry.id);setFocusedId(null);}}/>
+    onChange={event=>{selectResource("folder",entry.id,true,checkboxShiftRef.current);checkboxShiftRef.current=false;setFocusedFolderId(entry.id);setFocusedId(null);}}/>}
    <RareButton type="button" tone="ghost" className={"explorer-item-star"+(favoriteFolderIds.has(entry.id)?" favorited":"")}
     aria-label={(favoriteFolderIds.has(entry.id)?"取消收藏文件夹 ":"收藏文件夹 ")+entry.name}
     disabled={favoritesState==="loading"||favoriteBusy!==""}
@@ -1148,6 +1309,14 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
      </div>}
    </div>
    <div className="toolbar-views">
+    <RareButton type="button" tone="ghost" className="checkbox-visibility-toggle"
+     aria-pressed={showCheckboxes} aria-label={showCheckboxes?"隐藏勾选框":"显示勾选框"}
+     title={showCheckboxes?"隐藏勾选框":"显示勾选框"} onClick={()=>setShowCheckboxes(value=>!value)}>
+     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+      <rect x="3" y="3" width="18" height="18" rx="4"/>
+      {showCheckboxes&&<path d="m7 12 3 3 7-7"/>}
+     </svg><span>勾选框</span>
+    </RareButton>
     <label className="sort-label"><span className="toolbar-filter-caption">排序</span>
      <RareSelect aria-label="排序方式" value={sort} onChange={e=>setSort(e.target.value as SortKey)}>
       {SORT_KEYS.map(key=><option key={key} value={key}>{SORT_LABELS[key]}</option>)}
@@ -1179,6 +1348,10 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     </div>
    </div>
   </div>
+  {pasteBusy&&<div className="file-paste-status" role="status">
+   <span>{pasteProgress||"正在复制文件…"}</span>
+   <RareButton type="button" tone="ghost" onClick={()=>pasteAbort.current?.abort()}>取消</RareButton>
+  </div>}
   {zipProgress&&<div className="zip-download-status" role="status">
    <span>{zipProgress.phase==="preparing"?"正在鉴权并准备 ZIP…":zipProgress.phase==="receiving"?`ZIP 已接收 ${formatSize(zipProgress.bytes)}（压缩总量未知）`:zipProgress.phase==="saving"?"准备保存 ZIP…":zipProgress.phase==="handoff"?"已交由浏览器下载管理器（可在下载列表查看进度及取消）":zipProgress.error}</span>
    {zipProgress.phase!=="failed"&&zipProgress.phase!=="handoff"&&<span className="zip-progress-track" aria-label="正在下载 ZIP"><span/></span>}
@@ -1192,7 +1365,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    <RareDataTable role="grid" aria-label={folderName+" 文件列表"} density="compact"
     className={"file-table file-table-ultra"+(status==="ready"&&visibleFolders.length>0&&visibleItems.length===0?" file-table-folders-only":"")}>
     <thead><tr>
-     <th className="col-select" scope="col"><RareInput ref={selectAllRef} type="checkbox" checked={allLoadedSelected} onChange={toggleSelectAllLoaded} aria-label="选择当前显示的文件及文件夹"/></th>
+     {showCheckboxes&&<th className="col-select" scope="col"><RareInput ref={selectAllRef} type="checkbox" checked={allLoadedSelected} onChange={toggleSelectAllLoaded} aria-label="选择当前显示的文件及文件夹"/></th>}
      <th className="col-name" scope="col">文件名</th>
      <th className="col-size" scope="col">大小</th>
      <th className="col-version" scope="col">版本</th>
@@ -1200,14 +1373,14 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
      <th className="col-actions" scope="col">操作</th>
     </tr></thead>
     <tbody onKeyDown={onGridKeyDown}>
-     {status==="loading"&&<tr><td colSpan={6} className="empty"><BrandLoadingLabel size="sm">正在加载文件…</BrandLoadingLabel></td></tr>}
-     {status==="failed"&&<tr><td colSpan={6} className="empty" role="alert">获取文件失败，请刷新重试</td></tr>}
-     {status==="ready"&&items.length===0&&visibleFolders.length===0&&<tr><td colSpan={6} className="empty">
+     {status==="loading"&&<tr><td colSpan={showCheckboxes?6:5} className="empty"><BrandLoadingLabel size="sm">正在加载文件…</BrandLoadingLabel></td></tr>}
+     {status==="failed"&&<tr><td colSpan={showCheckboxes?6:5} className="empty" role="alert">获取文件失败，请刷新重试</td></tr>}
+     {status==="ready"&&items.length===0&&visibleFolders.length===0&&<tr><td colSpan={showCheckboxes?6:5} className="empty">
       <svg className="empty-mark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.5h8A1.5 1.5 0 0 1 20 10v7.5A1.5 1.5 0 0 1 18.5 19h-14A1.5 1.5 0 0 1 3 17.5z"/></svg>
       <span className="empty-title">目录为空</span>
       <span className="empty-hint">上传第一个文件开始使用。</span>
      </td></tr>}
-     {status==="ready"&&items.length>0&&visibleItems.length===0&&visibleFolders.length===0&&<tr><td colSpan={6} className="empty">
+     {status==="ready"&&items.length>0&&visibleItems.length===0&&visibleFolders.length===0&&<tr><td colSpan={showCheckboxes?6:5} className="empty">
      <span className="empty-title">无匹配文件</span>
       <span className="empty-hint">已加载的文件中没有匹配项{hasMore?"，可继续加载后查找":""}。</span>
       <RareButton type="button" className="secondary-action" style={{marginTop:6}} onClick={()=>{
@@ -1223,9 +1396,9 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       onContextMenu={event=>onFolderContextMenu(event,entry)}
       onDoubleClick={()=>navigate("/doc?folder="+encodeURIComponent(entry.id))}
       onKeyDown={event=>onFolderKeyDown(event,entry)}>
-      <td className="col-select"><RareInput type="checkbox" checked={selectedFolderIds.has(entry.id)} aria-label={"选择文件夹 "+entry.name}
+      {showCheckboxes&&<td className="col-select"><RareInput type="checkbox" checked={selectedFolderIds.has(entry.id)} aria-label={"选择文件夹 "+entry.name}
        onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}}
-       onChange={()=>{selectResource("folder",entry.id,true,checkboxShiftRef.current);checkboxShiftRef.current=false;setFocusedFolderId(entry.id);setFocusedId(null);}}/></td>
+       onChange={()=>{selectResource("folder",entry.id,true,checkboxShiftRef.current);checkboxShiftRef.current=false;setFocusedFolderId(entry.id);setFocusedId(null);}}/></td>}
       <td className="col-name"><div className="file-cell-wrap"><FolderResourceIcon size={19}/><span className="file-name" title={entry.name}>{entry.name}</span>
        <RareButton type="button" tone="ghost" className="folder-inline-open" aria-label={"打开文件夹 "+entry.name}
         onClick={event=>{event.stopPropagation();navigate("/doc?folder="+encodeURIComponent(entry.id));}}>打开 ↗</RareButton>
@@ -1253,7 +1426,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       onDoubleClick={()=>navigate("/preview/"+item.id)}
       onDragStart={event=>onRowDragStart(event,item)}
       onDragEnd={onRowDragEnd}>
-      <td className="col-select"><RareInput type="checkbox" checked={selectedIds.has(item.id)} aria-label={"选择 "+item.name} onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}} onChange={event=>onCheckToggle(event,item)}/></td>
+      {showCheckboxes&&<td className="col-select"><RareInput type="checkbox" checked={selectedIds.has(item.id)} aria-label={"选择 "+item.name} onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}} onChange={event=>onCheckToggle(event,item)}/></td>}
       <td className="col-name"><div className="file-cell-wrap">
        <FileTypeIcon name={item.name} size={19}/><span className="file-name" title={item.name}>{item.name}</span>{finderDots(item)}
        <small className="file-mobile-meta">v{item.currentVersionSeq} · {formatSize(item.sizeBytes)}</small>
@@ -1350,6 +1523,12 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   {folderMenu&&<Menu open label={"文件夹操作："+folderMenu.target.name} anchor={folderMenu.anchor} point={folderMenu.point}
    onClose={()=>setFolderMenu(null)} items={[
     {id:"open",label:"打开",onSelect:()=>navigate("/doc?folder="+encodeURIComponent(folderMenu.target.id))},
+    {id:"copy",label:"复制",hint:"Ctrl/Cmd+C",onSelect:()=>{
+     explorerCopiedResources=selectedFolderIds.has(folderMenu.target.id)
+      ?[...selectedFolders.map(row=>({kind:"folder" as const,id:row.id,name:row.name})),...selection.map(row=>({kind:"file" as const,id:row.id,name:row.name}))]
+      :[{kind:"folder",id:folderMenu.target.id,name:folderMenu.target.name}];
+     toast.success("已复制 "+explorerCopiedResources.length+" 项");
+    }},
     {id:"favorite",label:favoriteFolderIds.has(folderMenu.target.id)?"取消收藏":"收藏",disabled:favoritesState!=="ready"||favoriteBusy!=="",onSelect:()=>{void toggleFavoriteResource("folder",folderMenu.target.id);}},
     {id:"rename",label:"重命名",onSelect:()=>openFolderAction(folderMenu.target,"rename")},
     {id:"move",label:"移动到…",onSelect:()=>openFolderAction(folderMenu.target,"move")},

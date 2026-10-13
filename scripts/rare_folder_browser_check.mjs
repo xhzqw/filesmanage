@@ -168,6 +168,14 @@ try{
  // Real Chrome layout and keyboard acceptance for the mixed folder/file table.
  // Read-only: selecting a row, focusing an opener and measuring rectangles
  // never creates, edits, moves or deletes any repository/user content.
+ assert(await evaluate('!document.querySelector("table.file-table th.col-select")'),
+  "Finder mode defaults to no checkbox column");
+ assert(await evaluate('document.querySelector(".checkbox-visibility-toggle")?.getAttribute("aria-pressed")==="false"'),
+  "checkbox option must default off");
+ await evaluate('document.querySelector(".checkbox-visibility-toggle")?.click()');
+ await until('!!document.querySelector("table.file-table th.col-select input[type=checkbox]")');
+ assert(await evaluate('document.querySelector(".checkbox-visibility-toggle")?.getAttribute("aria-pressed")==="true"'),
+  "checkbox visibility must be opt-in");
  for(const width of [2048,1440,1024,820,540,390]){
   await send("Emulation.setDeviceMetricsOverride",{width,height:900,deviceScaleFactor:1,mobile:false});
   await wait(220);

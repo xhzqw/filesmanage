@@ -134,6 +134,10 @@ try{
  await click("tr.file-entry .file-name",2,2);
  await until('(document.querySelector(".file-selected-count")?.textContent||"").includes("已选 3")');
  assert.equal(await selectedFiles(),3,"Ctrl-click should add a third file");
+ assert(await evaluate('!document.querySelector("tr.file-entry input[type=checkbox]")'),
+  "checkboxes must not exist before enabling the option");
+ await click(".checkbox-visibility-toggle");
+ await until('!!document.querySelector("tr.file-entry input[type=checkbox]")');
  await click('tr.file-entry .col-select input[type="checkbox"]',3);
  await until('(document.querySelector(".file-selected-count")?.textContent||"").includes("已选 4")');
  assert.equal(await selectedFiles(),4,"Checkbox should preserve three earlier selections");
@@ -141,6 +145,8 @@ try{
  await until('(document.querySelector(".file-selected-count")?.textContent||"").includes("已选 3")');
  await click(".batch-clear-selection");
  await until('!document.querySelector(".batch-actions-group")');
+ await click(".checkbox-visibility-toggle");
+ await until('!document.querySelector("tr.file-entry input[type=checkbox]")');
  console.log("EXPLORER_LIVE_MULTI_SELECT_PASS",JSON.stringify({count:4,plainSingle:true,ctrlClick:true,checkbox:true,toggleOff:true}));
 
  const path=await evaluate('location.pathname+location.search');
