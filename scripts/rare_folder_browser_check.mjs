@@ -414,7 +414,7 @@ try{
   assert(sample.rowHeights.every(height=>Math.abs(height-32)<=.5),"folder/file row heights must all be 32px at "+sample.width);
   assert.equal(sample.rowSurfaces[0],sample.rowSurfaces[2],"base stripes match at "+sample.width);
   assert.notEqual(sample.rowSurfaces[0],sample.rowSurfaces[1],"adjacent row stripes differ at "+sample.width);
-  assert.equal(sample.rowSurfaces[3],"rgb(36, 92, 181)","selected row uses deep blue at "+sample.width);
+  assert.equal(sample.rowSurfaces[3],"rgb(36, 89, 178)","selected row uses Polar Blue's deep selection at "+sample.width);
   assert.equal(sample.selectedNameColor,"rgb(255, 255, 255)","selected filename is white at "+sample.width);
   assert.equal(sample.cellBorder,"0px","no file-row separator line at "+sample.width);
   assert.equal(sample.firstRadius,"11px","row start rounded at "+sample.width);
