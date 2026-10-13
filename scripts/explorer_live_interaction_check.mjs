@@ -36,10 +36,16 @@ async function navigate(path,selector){
  await until(selector);
 }
 async function click(selector,index=0,modifiers=0){
+ // An animated scroll can move an icon tile between the mouse press and
+ // release; wait for the target coordinates to settle before dispatching.
+ await evaluate(`(()=>{
+  const node=document.querySelectorAll(${JSON.stringify(selector)})[${index}];
+  node?.scrollIntoView({behavior:"instant",block:"center",inline:"center"});
+ })()`);
+ await delay(100);
  const rect=await evaluate(`(()=>{
   const node=document.querySelectorAll(${JSON.stringify(selector)})[${index}];
   if(!node)return null;
-  node.scrollIntoView({block:"center",inline:"center"});
   const b=node.getBoundingClientRect();
   return {x:b.left+b.width/2,y:b.top+b.height/2};
  })()`);
