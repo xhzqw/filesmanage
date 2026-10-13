@@ -530,17 +530,24 @@ table.file-table-ultra tbody td:not(.empty){height:44px;padding:0 8px}
 /* The root can contain only directories. In that case, don't show a
    select-all control for unselectable folders or four empty file metadata
    columns. The normal six-column grid returns as soon as files are visible. */
-table.file-table-folders-only :is(th,td).col-select,
 table.file-table-folders-only :is(th,td).col-size,
 table.file-table-folders-only :is(th,td).col-version,
-table.file-table-folders-only :is(th,td).col-date,
-table.file-table-folders-only :is(th,td).col-actions{display:none}
-table.file-table-folders-only th.col-name{width:100%;padding-left:14px}
-table.file-table-folders-only tbody td.col-name{padding-left:14px}
+table.file-table-folders-only :is(th,td).col-date{display:none}
+table.file-table-folders-only th.col-select{width:36px}
+table.file-table-folders-only th.col-actions{width:86px}
+table.file-table-folders-only th.col-name{width:auto}
+table.file-table-folders-only tbody td.col-name{padding-left:8px}
+.file-table .folder-row-more{
+ display:inline-flex;align-items:center;justify-content:center;
+ min-height:24px;width:24px;padding:0;flex:none;
+ border:0;background:transparent;color:var(--text-secondary);
+ border-radius:var(--radius-sm);cursor:pointer;
+}
+.file-table .folder-row-more:hover{background:var(--surface-row-hover);color:var(--brand-blue)}
 .file-finder-marks{display:inline-flex;align-items:center;gap:4px;flex:none;max-width:90px}
 .file-finder-mark{display:inline-block;width:9px;height:9px;flex:none;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.05)}
 /* Folder-only directories hide the other columns: the visible name cell
    becomes both outside edges of the zebra stripe. */
 .explorer-striped-list table.file-table-folders-only tbody tr.explorer-list-folder > td.col-name{
-  border-radius:var(--radius-md);
+  border-radius:var(--radius-xs);
 }

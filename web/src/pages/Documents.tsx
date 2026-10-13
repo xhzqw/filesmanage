@@ -319,7 +319,7 @@ export function Documents({user,onLogout,onUploadFolderChange}:{user:User;onLogo
    {moveMessage&&<p role="status" className="notice">{moveMessage}</p>}
    {selected&&<DropZone folderId={selected.id} userId={user.id} onCommitted={()=>setReloadKey(k=>k+1)}>
      <FileTable folder={selected.id} folderName={selected.name} childFolders={knownFolders.filter(item=>item.parentId===selected.id)}
-      onEdit={setEditingId} reloadKey={reloadKey} viewMode={viewMode}
+      onEdit={setEditingId} reloadKey={reloadKey} viewMode={viewMode} onFolderChanged={refreshTreeAndFiles}
       newFolderSlot={<NewFolderForm parentId={selected.id} onCreated={refreshTreeAndFiles}/>}/>
    </DropZone>}
    {!selected&&resolving&&<p role="status" className="empty"><BrandLoadingLabel decorative>正在核验所选目录…</BrandLoadingLabel></p>}

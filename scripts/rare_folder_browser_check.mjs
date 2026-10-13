@@ -241,9 +241,20 @@ try{
    columns:[...table.querySelectorAll("thead th")].filter(e=>getComputedStyle(e).display!=="none").map(e=>e.textContent.trim()),
    overflow:document.documentElement.scrollWidth-innerWidth};
  })()`);
- assert.deepEqual(folderOnlyColumns.columns,["文件名"],"folder-only view must hide all meaningless column headings");
+ assert.deepEqual(folderOnlyColumns.columns,["","文件名","操作"],"folder-only view must retain selection and context actions");
  assert.equal(folderOnlyColumns.files,0);
  assert(folderOnlyColumns.overflow<=2);
+ await evaluate('document.querySelector("table.file-table-folders-only .explorer-list-folder")?.click()');
+ await until('document.querySelector("table.file-table-folders-only .explorer-list-folder")?.getAttribute("aria-selected")==="true"');
+ assert((await evaluate('document.querySelector(".file-selected-count")?.textContent')).includes("已选 1"),
+  "folder single selection must enter the contextual toolbar");
+ await evaluate('document.querySelector("table.file-table-folders-only .explorer-list-folder")?.dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true,clientX:280,clientY:340}))');
+ await until('!!document.querySelector("[role=menu][aria-label^=文件夹操作]")');
+ const folderMenuLabels=await evaluate('[...document.querySelectorAll("[role=menu] .menu-label")].map(el=>el.textContent)');
+ for(const label of ["打开","收藏","重命名","移动到…","删除"])assert(folderMenuLabels.includes(label),"missing folder context action: "+label);
+ await evaluate('document.querySelector("[role=menu]")?.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true,cancelable:true}))');
+ await evaluate('document.querySelector(".batch-clear-selection")?.click()');
+ await until('!document.querySelector(".batch-actions-group")');
  await setLocalFilter("");
  await until('!!document.querySelector("table.file-table:not(.file-table-folders-only) tr.file-entry")');
  console.log("EXPLORER_FOLDER_ONLY_REACT_PASS",JSON.stringify(folderOnlyColumns));
@@ -261,6 +272,15 @@ try{
   }
  }
  assert(fileCount>=4,"read-only multi-selection check requires four real files; loaded="+fileCount);
+ if(await evaluate('!!document.querySelector(".explorer-list-folder")')){
+  await evaluate('document.querySelector(".explorer-list-folder").click()');
+  await evaluate('document.querySelector("tr.file-entry").dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,ctrlKey:true}))');
+  await until('document.querySelector(".explorer-list-folder")?.getAttribute("aria-selected")==="true"&&document.querySelector("tr.file-entry")?.getAttribute("aria-selected")==="true"');
+  assert((await evaluate('document.querySelector(".file-selected-count")?.textContent')).includes("已选 2"),
+   "Ctrl+click must combine folder and file selection");
+  await evaluate('document.querySelector(".batch-clear-selection")?.click()');
+  await until('!document.querySelector(".batch-actions-group")');
+ }
  const selection=()=>evaluate(`(()=>{
   const rows=[...document.querySelectorAll("tr.file-entry")];
   const active=document.activeElement?.closest(".file-entry");
@@ -380,6 +400,8 @@ try{
  assert(mockBase.file,"large-list browser check requires an existing authorized file template");
  const source=`(()=>{
   const original=window.fetch.bind(window);
+  const favoriteWrites=[];
+  window.__favoriteWrites=favoriteWrites;
   const folder=${JSON.stringify(mockBase.folder)};
   const base=${JSON.stringify(mockBase.file)};
   const corpus=Array.from({length:130},(_,index)=>({
@@ -389,6 +411,11 @@ try{
   }));
   window.fetch=(input,init)=>{
    const url=new URL(input instanceof Request?input.url:input,location.href);
+   if(url.pathname.startsWith("/api/favorites/file/browser-readonly-")){
+    const method=init?.method??"GET";
+    favoriteWrites.push({method,id:url.pathname.split("/").pop()});
+    return Promise.resolve(new Response(JSON.stringify({ok:true,data:{id:url.pathname.split("/").pop(),favorited:method==="PUT"}}),{status:200,headers:{"Content-Type":"application/json"}}));
+   }
    if(url.pathname==="/api/files"&&url.searchParams.get("folder")===folder&&(!init?.method||init.method==="GET")){
     const cursor=url.searchParams.get("cursor")||"";
     const offset=cursor.startsWith("audit-page-")?Number(cursor.slice(11)):0;
@@ -420,6 +447,14 @@ try{
  assert.equal(mockState.unique,130,"pagination must not duplicate file IDs");
  assert(mockState.longClipped,"React rows must clip long file names while preserving full titles");
  assert(mockState.pageOverflow<=2,"130 React rows widened the page");
+ await until('!!document.querySelector("tr.file-entry .action-star-btn:not(:disabled)")');
+ await evaluate('document.querySelector("tr.file-entry .action-star-btn").click()');
+ await until('document.querySelector("tr.file-entry .action-star-btn")?.classList.contains("favorited")');
+ await evaluate('document.querySelector("tr.file-entry .action-star-btn").click()');
+ await until('!document.querySelector("tr.file-entry .action-star-btn")?.classList.contains("favorited")');
+ assert.deepEqual((await evaluate('window.__favoriteWrites.map(item=>item.method)')),["PUT","DELETE"],
+  "favorite must issue persistence requests, not just animate the SVG");
+ console.log("EXPLORER_FAVORITE_TOGGLE_PASS");
  await evaluate('document.querySelector("tr.file-entry").focus()');
  await key("End");
  await until('document.activeElement===document.querySelectorAll("tr.file-entry")[129]');

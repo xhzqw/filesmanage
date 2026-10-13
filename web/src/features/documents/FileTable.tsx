@@ -13,6 +13,7 @@ import {FileRenameDialog} from "./FileRenameDialog";
 import {batchConflict,batchExcluded,batchFailed,batchMoveInvalidTarget,batchPickTarget,batchSubmitStarted,batchSucceeded,failed,fileMoveInvalidTarget,openBatch,openFlow,pickTarget,preflightConflict,preflightReady,preflightStarted,submitStarted,succeeded,type BatchMoveFlow,type MoveFlow,type MovePreflight}from"./moveFileFlow";
 import {errorCode,errorCopy} from "../../shared/errors";
 import {request} from "../../shared/http";
+import {publishResourceChange,publishWorkspaceChange} from "../../shared/resourceSync";
 import {newIdempotencyKey} from "../../shared/ids";
 import {Dialog} from "../../shared/ui/Dialog";
 import {FolderPicker} from "../../shared/ui/FolderPicker";
@@ -97,14 +98,14 @@ function isInternalMoveDrag(dataTransfer:DataTransfer|null):boolean{
 // features/documents -> features/collaboration would fail
 // scripts/check_architecture.py (the same reason RestoreDialog reads
 // /folders/tree directly).
-type FavoriteRow={kind:string;fileId?:string};
+type FavoriteRow={kind:string;fileId?:string;folderId?:string};
 
 // Desktop resource-explorer semantics (DESKTOP-INTERACTION-v1 §1-§3): single
 // click selects, double click opens, Ctrl/Cmd toggles, Shift ranges over the
 // current visible order, and the keyboard mirrors every mouse action. The
 // selection model keeps focus, anchor and membership separate so a stale
 // anchor can never resurrect after a re-sort.
-export function FileTable({folder,folderName,childFolders=[],onEdit,reloadKey,newFolderSlot,viewMode="list"}:{folder:string;folderName:string;childFolders?:Folder[];onEdit:(fileId:string)=>void;reloadKey:number;newFolderSlot?:ReactNode;viewMode?:ExplorerViewMode}){
+export function FileTable({folder,folderName,childFolders=[],onEdit,reloadKey,newFolderSlot,onFolderChanged,viewMode="list"}:{folder:string;folderName:string;childFolders?:Folder[];onEdit:(fileId:string)=>void;reloadKey:number;newFolderSlot?:ReactNode;onFolderChanged?:()=>void;viewMode?:ExplorerViewMode}){
  const[items,setItems]=useState<FileItem[]>([]);
 // Round-trip of the list read the status bar reports (spec §3.1). It is an
 // observation of the request that already runs below — never an extra one —
@@ -129,6 +130,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const completedCursor=useRef("");
  const[renaming,setRenaming]=useState<FileItem|null>(null);
  const[selectedIds,setSelectedIds]=useState<Set<string>>(()=>new Set<string>());
+ const[selectedFolderIds,setSelectedFolderIds]=useState<Set<string>>(()=>new Set<string>());
  const checkboxShiftRef=useRef(false);
  const selectAllRef=useRef<HTMLInputElement>(null);
  const[focusedId,setFocusedId]=useState<string|null>(null);
@@ -140,6 +142,16 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  // Transient context-menu state (DESKTOP-INTERACTION §1.1 contextTarget): it
  // lives only while the row menu is open and is never business state.
  const[rowMenu,setRowMenu]=useState<{targets:FileItem[];point:MenuPoint|null;anchor:HTMLElement|null}|null>(null);
+ const[folderMenu,setFolderMenu]=useState<{target:Folder;point:MenuPoint|null;anchor:HTMLElement|null}|null>(null);
+ const[folderEditing,setFolderEditing]=useState<{folder:Folder;action:"rename"|"delete"|"move"}|null>(null);
+ const[folderNameDraft,setFolderNameDraft]=useState("");
+ const[folderOperationBusy,setFolderOperationBusy]=useState(false);
+ const[folderOperationError,setFolderOperationError]=useState("");
+ const[folderMoveTarget,setFolderMoveTarget]=useState("");
+ const[folderMoveOptions,setFolderMoveOptions]=useState<Folder[]>([]);
+ const[pendingFolderDelete,setPendingFolderDelete]=useState<Folder[]>([]);
+ const[resourceDeleteBusy,setResourceDeleteBusy]=useState(false);
+ const[resourceDeleteError,setResourceDeleteError]=useState("");
  const[finderLabels,setFinderLabels]=useState<FinderLabel[]>([]);
  const[finderAssignments,setFinderAssignments]=useState<Record<string,string[]>>({});
  const[finderReady,setFinderReady]=useState(false);
@@ -189,6 +201,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  // WF-23: ids favorited by the caller, the load state of that list, and the row
  // whose toggle is in flight.
  const[favoriteIds,setFavoriteIds]=useState<Set<string>>(()=>new Set<string>());
+ const[favoriteFolderIds,setFavoriteFolderIds]=useState<Set<string>>(()=>new Set<string>());
  const[favoritesState,setFavoritesState]=useState<"loading"|"ready"|"failed">("loading");
  const[favoriteBusy,setFavoriteBusy]=useState("");
  // Favorite and unfavorite are mutually exclusive states; never stack their
@@ -252,11 +265,13 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  // selected file identities.
  useEffect(()=>{
   setSelectedIds(new Set<string>());
+  setSelectedFolderIds(new Set<string>());
   setFocusedId(null);
   setFocusedFolderId(null);
   setHoveredFolderId(null);
   setAnchorId(null);
   setRowMenu(null);
+  setFolderMenu(null);
  },[folder]);
  // Hover is a transient presentation state and cannot leak between views.
  useEffect(()=>setHoveredFolderId(null),[viewMode]);
@@ -267,14 +282,17 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  useEffect(()=>{
   let valid=true;
   setFavoritesState("loading");
-  request<FavoriteRow[]>("/favorites")
+ request<FavoriteRow[]>("/favorites")
    .then(rows=>{
     if(!valid)return;
     const next=new Set<string>();
+    const folders=new Set<string>();
     for(const row of rows){
      if(row.kind==="file"&&row.fileId)next.add(row.fileId);
+     if(row.kind==="folder"&&row.folderId)folders.add(row.folderId);
     }
     setFavoriteIds(next);
+    setFavoriteFolderIds(folders);
     setFavoritesState("ready");
    })
    .catch(()=>{if(valid)setFavoritesState("failed");});
@@ -319,22 +337,24 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  // The toggle is optimistic because the endpoint is idempotent in both
  // directions; a failed write restores the previous local state instead of
  // leaving the row showing a favorite the server never recorded.
- async function toggleFavorite(file:FileItem){
+ async function toggleFavoriteResource(kind:"file"|"folder",id:string){
   if(favoritesState!=="ready"||favoriteBusy!=="")return;
-  const on=!favoriteIds.has(file.id);
-  setFavoriteBusy(file.id);
-  setFavoriteIds(prev=>{
+  const on=!(kind==="file"?favoriteIds:favoriteFolderIds).has(id);
+  const update=kind==="file"?setFavoriteIds:setFavoriteFolderIds;
+  setFavoriteBusy(kind+":"+id);
+  update(prev=>{
    const next=new Set(prev);
-   if(on)next.add(file.id);else next.delete(file.id);
+   if(on)next.add(id);else next.delete(id);
    return next;
   });
   try{
-   await request<{id:string;favorited:boolean}>("/favorites/file/"+file.id,{method:on?"PUT":"DELETE"});
+   await request<{id:string;favorited:boolean}>("/favorites/"+kind+"/"+encodeURIComponent(id),{method:on?"PUT":"DELETE"});
+   publishWorkspaceChange(["collaboration"]);
    favoriteFeedback(on?"已收藏":"已取消收藏");
   }catch(error){
-   setFavoriteIds(prev=>{
+   update(prev=>{
     const next=new Set(prev);
-    if(on)next.delete(file.id);else next.add(file.id);
+    if(on)next.delete(id);else next.add(id);
     return next;
    });
    favoriteFeedback(errorCode(error)==="E_NETWORK"
@@ -345,6 +365,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    setFavoriteBusy("");
   }
  }
+ function toggleFavorite(file:FileItem){return toggleFavoriteResource("file",file.id);}
 
  async function reload(){
   const revision=++listRevision.current;
@@ -453,35 +474,34 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   return map;
  },[items]);
 
- function visibleRange(fromId:string,toId:string):string[]{
-  const from=visibleItems.findIndex(i=>i.id===fromId);
-  const to=visibleItems.findIndex(i=>i.id===toId);
-  if(from<0||to<0)return[toId];
-  const low=Math.min(from,to);
-  const high=Math.max(from,to);
-  return visibleItems.slice(low,high+1).map(i=>i.id);
+ const visibleKeys=[...visibleFoldersIds(),...visibleItems.map(i=>"file:"+i.id)];
+ function visibleFoldersIds(){return childFolders.filter(entry=>entry.name.toLocaleLowerCase().includes(nameFilter.trim().toLocaleLowerCase())).map(entry=>"folder:"+entry.id);}
+ function selectKeys(keys:string[]){
+  setSelectedIds(new Set(keys.filter(key=>key.startsWith("file:")).map(key=>key.slice(5))));
+  setSelectedFolderIds(new Set(keys.filter(key=>key.startsWith("folder:")).map(key=>key.slice(7))));
+ }
+ function selectResource(kind:"file"|"folder",id:string,ctrl=false,shift=false){
+  const key=kind+":"+id;
+  if(shift&&anchorId){
+   const a=visibleKeys.indexOf(anchorId),b=visibleKeys.indexOf(key);
+   if(a>=0&&b>=0){
+    // Shift extends the current range, including both resource kinds.
+    selectKeys(visibleKeys.slice(Math.min(a,b),Math.max(a,b)+1));
+    return;
+   }
+  }
+  if(ctrl){
+   const current=new Set([...selectedIds].map(id=>"file:"+id).concat([...selectedFolderIds].map(id=>"folder:"+id)));
+   if(current.has(key))current.delete(key);else current.add(key);
+   selectKeys([...current]);
+  }else selectKeys([key]);
+  setAnchorId(key);
  }
 
  function onRowClick(event:MouseEvent<HTMLElement>,item:FileItem){
   setFocusedFolderId(null);
-  if(event.metaKey||event.ctrlKey){
-   setSelectedIds(prev=>{
-    const next=new Set(prev);
-    if(next.has(item.id))next.delete(item.id);else next.add(item.id);
-    return next;
-   });
-   setFocusedId(item.id);
-   setAnchorId(item.id);
-   return;
-  }
-  if(event.shiftKey&&anchorId){
-   setSelectedIds(new Set(visibleRange(anchorId,item.id)));
-   setFocusedId(item.id);
-   return;
-  }
-  setSelectedIds(new Set([item.id]));
+  selectResource("file",item.id,event.metaKey||event.ctrlKey,event.shiftKey);
   setFocusedId(item.id);
-  setAnchorId(item.id);
  }
 
  // The checkbox column mirrors the row model but never replaces the selection:
@@ -491,34 +511,23 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  function onCheckToggle(event:ChangeEvent<HTMLInputElement>,item:FileItem){
   const extend=checkboxShiftRef.current||(event.nativeEvent as {shiftKey?:boolean}).shiftKey===true;
   checkboxShiftRef.current=false;
-  if(extend&&anchorId){
-   setSelectedIds(new Set(visibleRange(anchorId,item.id)));
-   setFocusedId(item.id);
-   return;
-  }
-  setSelectedIds(prev=>{
-   const next=new Set(prev);
-   if(next.has(item.id))next.delete(item.id);else next.add(item.id);
-   return next;
-  });
+  selectResource("file",item.id,true,extend);
+  setFocusedFolderId(null);
   setFocusedId(item.id);
-  setAnchorId(item.id);
  }
 
  // The header box acts on the whole loaded page; selecting all also sets the
  // anchor to the first row so a following Shift range has a base.
  function toggleSelectAllLoaded(){
   if(allLoadedSelected){
-   setSelectedIds(current=>{
-    const next=new Set(current);
-    for(const item of visibleItems)next.delete(item.id);
-    return next;
-   });
+   const visible=new Set(visibleKeys);
+   const current=[...selectedIds].map(id=>"file:"+id).concat([...selectedFolderIds].map(id=>"folder:"+id));
+   selectKeys(current.filter(key=>!visible.has(key)));
    setAnchorId(null);
    return;
   }
-  setSelectedIds(current=>new Set([...current,...visibleItems.map(i=>i.id)]));
-  setAnchorId(visibleItems[0]?.id??null);
+  selectKeys([...new Set([...selectedIds].map(id=>"file:"+id).concat([...selectedFolderIds].map(id=>"folder:"+id),visibleKeys))]);
+  setAnchorId(visibleKeys[0]??null);
  }
 
  function focusRow(id:string){
@@ -533,10 +542,93 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   const inside=selectedIds.has(item.id);
   if(!inside){
    setSelectedIds(new Set([item.id]));
+   setSelectedFolderIds(new Set());
    setFocusedId(item.id);
-   setAnchorId(item.id);
+   setAnchorId("file:"+item.id);
   }
   setRowMenu({targets:inside?selection:[item],point:{x:event.clientX,y:event.clientY},anchor:event.currentTarget});
+ }
+
+ function onFolderClick(event:MouseEvent<HTMLElement>,entry:Folder){
+  selectResource("folder",entry.id,event.metaKey||event.ctrlKey,event.shiftKey);
+  setFocusedFolderId(entry.id);setFocusedId(null);
+ }
+ function openFolderContext(entry:Folder,anchor:HTMLElement,point:MenuPoint|null=null){
+  if(!selectedFolderIds.has(entry.id))selectResource("folder",entry.id);
+  setFocusedFolderId(entry.id);setFocusedId(null);setRowMenu(null);
+  setFolderMenu({target:entry,anchor,point});
+ }
+ function onFolderContextMenu(event:MouseEvent<HTMLElement>,entry:Folder){
+  event.preventDefault();event.stopPropagation();
+  openFolderContext(entry,event.currentTarget,{x:event.clientX,y:event.clientY});
+ }
+ function onFolderKeyDown(event:KeyboardEvent<HTMLElement>,entry:Folder){
+  if(event.target!==event.currentTarget)return;
+  if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==="a"){
+   event.preventDefault();selectKeys(visibleKeys);setAnchorId(visibleKeys[0]??null);return;
+  }
+  if(event.key==="Enter"){event.preventDefault();navigate("/doc?folder="+encodeURIComponent(entry.id));return;}
+  if(event.key===" "){
+   event.preventDefault();selectResource("folder",entry.id,true,event.shiftKey);setFocusedFolderId(entry.id);setFocusedId(null);return;
+  }
+  if(event.key==="ContextMenu"||(event.key==="F10"&&event.shiftKey)){
+   event.preventDefault();openFolderContext(entry,event.currentTarget);return;
+  }
+  if(event.key==="Escape"){event.preventDefault();selectKeys([]);setAnchorId(null);}
+ }
+
+ function openFolderAction(entry:Folder,action:"rename"|"delete"|"move"){
+  setFolderMenu(null);setFolderOperationError("");setFolderOperationBusy(false);
+  setFolderEditing({folder:entry,action});setFolderNameDraft(entry.name);setFolderMoveTarget("");setFolderMoveOptions([]);
+  if(action==="move"){
+   request<Folder[]>("/folders/tree").then(setFolderMoveOptions)
+    .catch(error=>setFolderOperationError(errorCopy(error,"无法读取目标目录")));
+  }
+ }
+ async function submitFolderAction(){
+  if(!folderEditing||folderOperationBusy)return;
+  const {folder:entry,action}=folderEditing;
+  const name=folderNameDraft.trim();
+  if(action==="rename"&&(!name||name===entry.name)){if(name===entry.name)setFolderEditing(null);return;}
+  if(action==="move"&&!folderMoveTarget)return;
+  setFolderOperationBusy(true);setFolderOperationError("");
+  try{
+   if(action==="rename")await request("/folders/"+encodeURIComponent(entry.id),{method:"PATCH",body:JSON.stringify({name})});
+   else if(action==="move")await request("/folders/"+encodeURIComponent(entry.id)+"/move",{method:"POST",body:JSON.stringify({targetParentId:folderMoveTarget})});
+   else await request("/folders/"+encodeURIComponent(entry.id),{method:"DELETE"});
+   publishResourceChange({scope:"folder"});
+   if(action==="delete"){publishResourceChange({scope:"trash"});publishResourceChange({scope:"file"});}
+   onFolderChanged?.();
+   setSelectedFolderIds(prev=>{const next=new Set(prev);next.delete(entry.id);return next;});
+   setFolderEditing(null);
+   toast.success(action==="rename"?"文件夹已重命名":action==="move"?"文件夹已移动":"文件夹已移入回收站");
+  }catch(error){setFolderOperationError(errorCopy(error,"文件夹操作失败，请重试"));}
+  finally{setFolderOperationBusy(false);}
+ }
+
+ async function confirmFolderBulkDelete(){
+  if(resourceDeleteBusy||pendingFolderDelete.length===0)return;
+  setResourceDeleteBusy(true);
+  const failedFolders:Folder[]=[],failedFiles:FileItem[]=[];
+  for(const item of selection){
+   try{await fileApi.remove(item.id);}catch{failedFiles.push(item);}
+  }
+  for(const entry of pendingFolderDelete){
+   try{await request("/folders/"+encodeURIComponent(entry.id),{method:"DELETE"});}
+   catch{failedFolders.push(entry);}
+  }
+  const succeeded=selection.length+pendingFolderDelete.length-failedFiles.length-failedFolders.length;
+  if(succeeded){
+   publishResourceChange({scope:"folder"});publishResourceChange({scope:"file"});publishResourceChange({scope:"trash"});
+   onFolderChanged?.();
+   toast.success("已移入回收站 "+succeeded+" 项");
+  }
+  setSelectedIds(new Set(failedFiles.map(i=>i.id)));
+  setSelectedFolderIds(new Set(failedFolders.map(i=>i.id)));
+  setPendingFolderDelete(failedFolders);
+  setResourceDeleteError(failedFiles.length+failedFolders.length?"有 "+(failedFiles.length+failedFolders.length)+" 项失败，请核对后重试":"");
+  setResourceDeleteBusy(false);
+  if(failedFolders.length===0)void reload().catch(()=>{});
  }
 
  // DESKTOP-INTERACTION §7.2: dragstart only creates the session — the source
@@ -593,13 +685,14 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   const next=Math.max(0,Math.min(visibleItems.length-1,index));
   const target=visibleItems[next];
   if(!target)return;
-  const rangeAnchor=anchorId&&visibleItems.some(item=>item.id===anchorId)?anchorId:originId;
+  const rangeAnchor=anchorId&&visibleKeys.includes(anchorId)?anchorId:originId?"file:"+originId:null;
   if(extend&&rangeAnchor){
-   setSelectedIds(new Set(visibleRange(rangeAnchor,target.id)));
+   const a=visibleKeys.indexOf(rangeAnchor),b=visibleKeys.indexOf("file:"+target.id);
+   selectKeys(a>=0?visibleKeys.slice(Math.min(a,b),Math.max(a,b)+1):["file:"+target.id]);
    setAnchorId(rangeAnchor);
   }else{
-   setSelectedIds(new Set([target.id]));
-   setAnchorId(target.id);
+   selectKeys(["file:"+target.id]);
+   setAnchorId("file:"+target.id);
   }
   setFocusedId(target.id);
   focusRow(target.id);
@@ -636,7 +729,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
      if(next.has(current.id))next.delete(current.id);else next.add(current.id);
      return next;
     });
-    setAnchorId(current.id);
+    setAnchorId("file:"+current.id);
     break;
    case "Enter":
     if(!current)return;
@@ -646,12 +739,13 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    case "Escape":
     // Escape unwinds the topmost cancelable layer only; with no dialog or
     // menu open it clears the explorer selection.
-    if(selectedIds.size>0){event.preventDefault();setSelectedIds(new Set<string>());setAnchorId(null);}
+    if(selectedIds.size+selectedFolderIds.size>0){event.preventDefault();selectKeys([]);setAnchorId(null);}
     break;
    case "Delete":
-    if(selectedIds.size===0)return;
+    if(selectedIds.size+selectedFolderIds.size===0)return;
     event.preventDefault();
-    openDelete(visibleItems.filter(i=>selectedIds.has(i.id)));
+    if(selectedIds.size)openDelete(selection);
+    else if(selectedFolderIds.size===1){const entry=childFolders.find(f=>selectedFolderIds.has(f.id));if(entry)openFolderAction(entry,"delete");}
     break;
    case "F2":
     if(selectedIds.size!==1)return;
@@ -672,8 +766,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    default:
     if((event.metaKey||event.ctrlKey)&&(event.key==="a"||event.key==="A")){
      event.preventDefault();
-     setSelectedIds(new Set(visibleItems.map(i=>i.id)));
-     setAnchorId(visibleItems[0]?.id??null);
+     selectKeys(visibleKeys);
+     setAnchorId(visibleKeys[0]??null);
     }
   }
  }
@@ -715,7 +809,10 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     disabled:finderBusy||!finderReady||targets.length>100,
     onSelect:()=>{void markFinderFiles(label,targets);}});
   }
-  items.push({id:"delete",label:"删除",hint:"Delete",danger:true,onSelect:()=>openDelete(targets)});
+  items.push({id:"delete",label:"删除",hint:"Delete",danger:true,onSelect:()=>{
+   if(selectedFolders.length>0){setResourceDeleteError("");setPendingFolderDelete(selectedFolders);}
+   else openDelete(targets);
+  }});
   return items;
  }
 
@@ -847,6 +944,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  // Context actions always target all selected loaded files, including those
  // currently hidden by the client's name or file-type filter.
  const selection=items.filter(i=>selectedIds.has(i.id));
+ const selectedFolders=childFolders.filter(i=>selectedFolderIds.has(i.id));
+ const selectedTotal=selectedIds.size+selectedFolderIds.size;
  const hiddenSelectedCount=selection.length-visibleItems.filter(i=>selectedIds.has(i.id)).length;
  const visibleFolders=childFolders.filter(entry=>entry.name.toLocaleLowerCase().includes(nameFilter.trim().toLocaleLowerCase()));
  const activeFolder=visibleFolders.find(entry=>entry.id===focusedFolderId)
@@ -887,7 +986,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   </div>;
  }
  function renderFolderEntry(entry:Folder){
-  const selected=focusedFolderId===entry.id;
+  const selected=selectedFolderIds.has(entry.id);
   const hovered=hoveredFolderId===entry.id;
   return <div key={"folder-"+entry.id} data-folder-id={entry.id} data-upload-folder-id={entry.id} role="row"
    tabIndex={0} aria-selected={selected}
@@ -896,14 +995,24 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    onMouseLeave={()=>setHoveredFolderId(current=>current===entry.id?null:current)}
    onFocus={()=>setHoveredFolderId(entry.id)}
    onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget))setHoveredFolderId(current=>current===entry.id?null:current);}}
-   onClick={()=>{setFocusedFolderId(entry.id);setFocusedId(null);setSelectedIds(new Set());}}
+   onClick={event=>onFolderClick(event,entry)}
+   onContextMenu={event=>onFolderContextMenu(event,entry)}
    onDoubleClick={()=>navigate("/doc?folder="+encodeURIComponent(entry.id))}
-   onKeyDown={event=>{
-    if(event.key==="Enter"){event.preventDefault();event.stopPropagation();navigate("/doc?folder="+encodeURIComponent(entry.id));}
-   }}>
+   onKeyDown={event=>onFolderKeyDown(event,entry)}>
    <div className="explorer-item-art" aria-hidden="true"><FolderResourceIcon open={selected} hovered={hovered} size={viewMode==="columns"?24:52}/></div>
    <span className="explorer-item-name" title={entry.name}>{entry.name}</span>
    <span className="explorer-item-sub">文件夹</span>
+   <RareInput className="explorer-item-check" type="checkbox" checked={selected}
+    aria-label={"选择文件夹 "+entry.name} onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}}
+    onChange={event=>{selectResource("folder",entry.id,true,checkboxShiftRef.current);checkboxShiftRef.current=false;setFocusedFolderId(entry.id);setFocusedId(null);}}/>
+   <RareButton type="button" tone="ghost" className={"explorer-item-star"+(favoriteFolderIds.has(entry.id)?" favorited":"")}
+    aria-label={(favoriteFolderIds.has(entry.id)?"取消收藏文件夹 ":"收藏文件夹 ")+entry.name}
+    disabled={favoritesState!=="ready"||favoriteBusy!==""}
+    onClick={event=>{event.stopPropagation();void toggleFavoriteResource("folder",entry.id);}}>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill={favoriteFolderIds.has(entry.id)?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.8 1.2 6.9L12 17.8l-6.2 3.2L7 14.1 2 9.3l6.9-1z"/></svg>
+   </RareButton>
+   <RareButton type="button" tone="ghost" className="explorer-item-more" aria-label={"文件夹操作 "+entry.name}
+    aria-haspopup="menu" onClick={event=>{event.stopPropagation();openFolderContext(entry,event.currentTarget);}}>···</RareButton>
   </div>;
  }
  const previewArt=(item:FileItem)=><div className="explorer-preview-art">
@@ -913,8 +1022,9 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   <FileTypeIcon name={item.name} size={90}/>
  </div>;
  const selectedBytes=selection.reduce((sum,file)=>sum+file.sizeBytes,0);
- const selectedVisibleCount=visibleItems.reduce((count,item)=>count+(selectedIds.has(item.id)?1:0),0);
- const allLoadedSelected=visibleItems.length>0&&selectedVisibleCount===visibleItems.length;
+ const selectedVisibleCount=visibleItems.reduce((count,item)=>count+(selectedIds.has(item.id)?1:0),0)
+  +visibleFolders.reduce((count,item)=>count+(selectedFolderIds.has(item.id)?1:0),0);
+ const allLoadedSelected=visibleItems.length+visibleFolders.length>0&&selectedVisibleCount===visibleItems.length+visibleFolders.length;
  // Mixed selection is a real native indeterminate checkbox state, including
  // screen-reader semantics. Never fake it with another selected-row border.
  useEffect(()=>{
@@ -931,8 +1041,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   onDragLeave={suppressInternalDrag}
   onDrop={suppressInternalDrag}>
   <div className="toolbar file-toolbar">
-   <div className="toolbar-actions" data-selection-mode={selectedIds.size>0?"selected":"default"}>
-    {selectedIds.size===0?
+   <div className="toolbar-actions" data-selection-mode={selectedTotal>0?"selected":"default"}>
+    {selectedTotal===0?
      <div className="file-toolbar-mode" key="default">
       <label className="upload-button primary-btn">
        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>
@@ -941,15 +1051,16 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       </label>
       {newFolderSlot}
      </div>:
-     <div className="file-toolbar-mode batch-actions-group" key="selected" role="group" aria-label={`已选 ${selection.length} 个文件的批量操作`}>
-      <span className="file-selected-count" aria-live="polite" title={hiddenSelectedCount>0?`已选 ${selection.length} 项，其中 ${hiddenSelectedCount} 项被筛选隐藏`:undefined}><ToolbarIcon name="selected"/>已选 <strong>{selection.length}</strong> 项{hiddenSelectedCount>0&&<span className="file-selection-hidden">（含隐藏 {hiddenSelectedCount} 项）</span>}</span>
+     <div className="file-toolbar-mode batch-actions-group" key="selected" role="group" aria-label={`已选 ${selectedTotal} 项资源的操作`}>
+      <span className="file-selected-count" aria-live="polite" title={hiddenSelectedCount>0?`已选 ${selectedTotal} 项，其中 ${hiddenSelectedCount} 个文件被筛选隐藏`:undefined}><ToolbarIcon name="selected"/>已选 <strong>{selectedTotal}</strong> 项{hiddenSelectedCount>0&&<span className="file-selection-hidden">（含隐藏 {hiddenSelectedCount} 项）</span>}</span>
       <span className="file-toolbar-separator" aria-hidden="true"/>
-      <RareButton type="button" tone="ghost" className="batch-btn" disabled={selection.length===0||selection.length>30||zipController.current!==null} onClick={()=>void batchDownload(selection)} title={selection.length>30?"每批最多下载 30 份文件":"下载已选文件"}><ToolbarIcon name="download"/><span className="batch-action-label">下载</span></RareButton>
-      <RareButton type="button" tone="ghost" className="batch-btn" disabled={selection.length===0||selection.length>20||!selection.every(canOfferPrintFromListing)}
+      <RareButton type="button" tone="ghost" className="batch-btn" disabled={selection.length===0||selectedFolderIds.size>0||selection.length>30||zipController.current!==null} onClick={()=>void batchDownload(selection)} title={selectedFolderIds.size>0?"含文件夹时不能批量下载":selection.length>30?"每批最多下载 30 份文件":"下载已选文件"}><ToolbarIcon name="download"/><span className="batch-action-label">下载</span></RareButton>
+      <RareButton type="button" tone="ghost" className="batch-btn" disabled={selection.length===0||selectedFolderIds.size>0||selection.length>20||!selection.every(canOfferPrintFromListing)}
        onClick={()=>setPrintingBatch(selection)} title={selection.length>20?"每批最多打印 20 份文件":!selection.every(canOfferPrintFromListing)?"选中的文件包含不支持打印的类型":"打印已选文件"}><ToolbarIcon name="print"/><span className="batch-action-label">打印</span></RareButton>
-      <RareButton type="button" tone="ghost" className="batch-btn" disabled={selection.length===0} onClick={()=>startMoveSelection(selection)} title="移动已选文件"><ToolbarIcon name="move"/><span className="batch-action-label">移动</span></RareButton>
-      <RareButton type="button" tone="ghost" className="batch-btn danger" disabled={selection.length===0} onClick={()=>openDelete(selection)} title="删除已选文件"><ToolbarIcon name="delete"/><span className="batch-action-label">删除</span></RareButton>
-      <RareButton type="button" tone="ghost" className="batch-clear-selection" onClick={()=>{setSelectedIds(new Set<string>());setAnchorId(null);}} aria-label="取消全部选中" title="取消选择"><ToolbarIcon name="close"/></RareButton>
+      <RareButton type="button" tone="ghost" className="batch-btn" disabled={selectedTotal!==selection.length&&!(selection.length===0&&selectedFolders.length===1)}
+       onClick={()=>{if(selectedFolders.length===1)openFolderAction(selectedFolders[0],"move");else startMoveSelection(selection);}} title={selectedTotal!==selection.length?"混合多选不支持批量移动":"移动已选资源"}><ToolbarIcon name="move"/><span className="batch-action-label">移动</span></RareButton>
+      <RareButton type="button" tone="ghost" className="batch-btn danger" disabled={selectedTotal===0} onClick={()=>{if(selectedFolders.length===1&&selection.length===0)openFolderAction(selectedFolders[0],"delete");else if(selectedFolders.length>0){setResourceDeleteError("");setPendingFolderDelete(selectedFolders);}else openDelete(selection);}} title="删除已选资源"><ToolbarIcon name="delete"/><span className="batch-action-label">删除</span></RareButton>
+      <RareButton type="button" tone="ghost" className="batch-clear-selection" onClick={()=>{selectKeys([]);setAnchorId(null);}} aria-label="取消全部选中" title="取消选择"><ToolbarIcon name="close"/></RareButton>
      </div>}
    </div>
    <div className="toolbar-views">
@@ -991,11 +1102,11 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     {zipProgress.phase==="failed"||zipProgress.phase==="handoff"?"关闭":"取消"}
    </RareButton>
   </div>}
-  {viewMode==="list"&&<div className="table explorer-striped-list" onClick={event=>{if(!(event.target as HTMLElement).closest("tr")){setSelectedIds(new Set<string>());setAnchorId(null);}}}>
+  {viewMode==="list"&&<div className="table explorer-striped-list" onClick={event=>{if(!(event.target as HTMLElement).closest("tr")){selectKeys([]);setAnchorId(null);}}}>
    <RareDataTable role="grid" aria-label={folderName+" 文件列表"} density="compact"
     className={"file-table file-table-ultra"+(status==="ready"&&visibleFolders.length>0&&visibleItems.length===0?" file-table-folders-only":"")}>
     <thead><tr>
-     <th className="col-select" scope="col"><RareInput ref={selectAllRef} type="checkbox" checked={allLoadedSelected} onChange={toggleSelectAllLoaded} aria-label="选择当前已加载的文件"/></th>
+     <th className="col-select" scope="col"><RareInput ref={selectAllRef} type="checkbox" checked={allLoadedSelected} onChange={toggleSelectAllLoaded} aria-label="选择当前显示的文件及文件夹"/></th>
      <th className="col-name" scope="col">文件名</th>
      <th className="col-size" scope="col">大小</th>
      <th className="col-version" scope="col">版本</th>
@@ -1020,22 +1131,30 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
        setAnchorId(null);
       }}>清除筛选（显示已加载 {items.length} 个文件）</RareButton>
      </td></tr>}
-     {status==="ready"&&visibleFolders.map(entry=><tr key={"folder-"+entry.id} data-upload-folder-id={entry.id} className={"explorer-list-folder"+(focusedFolderId===entry.id?" selected":"")}
-      tabIndex={0} aria-selected={focusedFolderId===entry.id}
-      onClick={()=>{setFocusedFolderId(entry.id);setFocusedId(null);setSelectedIds(new Set());}}
+     {status==="ready"&&visibleFolders.map(entry=><tr key={"folder-"+entry.id} data-upload-folder-id={entry.id} className={"explorer-list-folder"+(selectedFolderIds.has(entry.id)?" selected":"")}
+      tabIndex={0} aria-selected={selectedFolderIds.has(entry.id)}
+      onClick={event=>onFolderClick(event,entry)}
+      onContextMenu={event=>onFolderContextMenu(event,entry)}
       onDoubleClick={()=>navigate("/doc?folder="+encodeURIComponent(entry.id))}
-      onKeyDown={event=>{
-       if(event.target!==event.currentTarget)return;
-       if(event.key==="Enter"){event.preventDefault();event.stopPropagation();navigate("/doc?folder="+encodeURIComponent(entry.id));}
-       else if(event.key===" "){event.preventDefault();event.stopPropagation();setFocusedFolderId(entry.id);setFocusedId(null);setSelectedIds(new Set());}
-      }}>
-      <td className="col-select"/>
+      onKeyDown={event=>onFolderKeyDown(event,entry)}>
+      <td className="col-select"><RareInput type="checkbox" checked={selectedFolderIds.has(entry.id)} aria-label={"选择文件夹 "+entry.name}
+       onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}}
+       onChange={()=>{selectResource("folder",entry.id,true,checkboxShiftRef.current);checkboxShiftRef.current=false;setFocusedFolderId(entry.id);setFocusedId(null);}}/></td>
       <td className="col-name"><div className="file-cell-wrap"><FolderResourceIcon size={19}/><span className="file-name" title={entry.name}>{entry.name}</span>
        <RareButton type="button" tone="ghost" className="folder-inline-open" aria-label={"打开文件夹 "+entry.name}
         onClick={event=>{event.stopPropagation();navigate("/doc?folder="+encodeURIComponent(entry.id));}}>打开 ↗</RareButton>
       </div></td>
       <td className="col-size"/><td className="col-version"/><td className="col-date"/>
-      <td className="row-actions col-actions"/>
+      <td className="row-actions col-actions" onClick={event=>event.stopPropagation()}><div className="actions-cell-wrap">
+       <RareButton type="button" className={"action-star-btn"+(favoriteFolderIds.has(entry.id)?" favorited":"")}
+        aria-label={(favoriteFolderIds.has(entry.id)?"取消收藏文件夹 ":"收藏文件夹 ")+entry.name}
+        disabled={favoritesState!=="ready"||favoriteBusy!==""}
+        onClick={()=>void toggleFavoriteResource("folder",entry.id)}>
+        <svg className="star-icon" width="14" height="14" viewBox="0 0 24 24" fill={favoriteFolderIds.has(entry.id)?"currentColor":"none"} stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.8 1.2 6.9L12 17.8l-6.2 3.2L7 14.1 2 9.3l6.9-1z"/></svg>
+       </RareButton>
+       <RareButton type="button" tone="ghost" className="folder-row-more" aria-label={"文件夹操作 "+entry.name}
+        aria-haspopup="menu" onClick={event=>openFolderContext(entry,event.currentTarget)}>···</RareButton>
+      </div></td>
      </tr>)}
      {status==="ready"&&visibleItems.map((item,index)=><tr key={item.id} data-id={item.id}
       data-file-entry="true"
@@ -1147,6 +1266,46 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   {moving&&<MoveDialog file={moving} presetTargetId={moveDropTarget} onClose={()=>{setMoveDropTarget("");setMoving(null);}} onMoved={onMoved} onReload={onMoveReload}/>}
   {movingBatch&&<BatchMoveDialog files={movingBatch} presetTargetId={moveDropTarget} onClose={()=>{setMoveDropTarget("");setMovingBatch(null);}} onMoved={onBatchMoved} onReload={onMoveReload}/>}
    {printingBatch&&<BatchPrintDialog files={printingBatch} onClose={()=>setPrintingBatch(null)}/>}
+  {folderMenu&&<Menu open label={"文件夹操作："+folderMenu.target.name} anchor={folderMenu.anchor} point={folderMenu.point}
+   onClose={()=>setFolderMenu(null)} items={[
+    {id:"open",label:"打开",onSelect:()=>navigate("/doc?folder="+encodeURIComponent(folderMenu.target.id))},
+    {id:"favorite",label:favoriteFolderIds.has(folderMenu.target.id)?"取消收藏":"收藏",disabled:favoritesState!=="ready"||favoriteBusy!=="",onSelect:()=>{void toggleFavoriteResource("folder",folderMenu.target.id);}},
+    {id:"rename",label:"重命名",onSelect:()=>openFolderAction(folderMenu.target,"rename")},
+    {id:"move",label:"移动到…",onSelect:()=>openFolderAction(folderMenu.target,"move")},
+    {id:"delete",label:"删除",danger:true,onSelect:()=>{if(selectedFolderIds.size>1){setPendingFolderDelete(selectedFolders);setResourceDeleteError("");}else openFolderAction(folderMenu.target,"delete");}}
+   ]}/>}
+  {folderEditing&&<Dialog open title={folderEditing.action==="rename"?"重命名文件夹":folderEditing.action==="delete"?"删除文件夹":"移动文件夹"}
+   onClose={()=>{if(!folderOperationBusy)setFolderEditing(null);}} closeGuard={()=>!folderOperationBusy} className="dialog">
+   {folderEditing.action==="rename"&&<form onSubmit={event=>{event.preventDefault();void submitFolderAction();}}>
+    <RareInput autoFocus aria-label="新文件夹名称" maxLength={200} value={folderNameDraft} onChange={event=>setFolderNameDraft(event.target.value)} disabled={folderOperationBusy}/>
+    <div className="dialog-actions"><RareButton type="button" className="secondary-action" disabled={folderOperationBusy} onClick={()=>setFolderEditing(null)}>取消</RareButton>
+     <RareButton type="submit" className="primary" disabled={folderOperationBusy||!folderNameDraft.trim()}>保存</RareButton></div>
+   </form>}
+   {folderEditing.action==="delete"&&<><p>将「{folderEditing.folder.name}」及其内容移入回收站？</p>
+    <div className="dialog-actions"><RareButton type="button" className="secondary-action" disabled={folderOperationBusy} onClick={()=>setFolderEditing(null)}>取消</RareButton>
+     <RareButton type="button" tone="danger" disabled={folderOperationBusy} onClick={()=>void submitFolderAction()}>确认删除</RareButton></div>
+   </>}
+   {folderEditing.action==="move"&&<FolderPicker open title="目标文件夹" folders={folderMoveOptions} selectedId={folderMoveTarget}
+    onSelect={setFolderMoveTarget} onClose={()=>{if(!folderOperationBusy)setFolderEditing(null);}} busy={folderOperationBusy}
+    invalidTarget={candidate=>{
+     let current:Folder|undefined=candidate;
+     const seen=new Set<string>();
+     while(current&&!seen.has(current.id)){
+      if(current.id===folderEditing.folder.id)return "不能移动到自身或子目录";
+      seen.add(current.id);current=folderMoveOptions.find(row=>row.id===current?.parentId);
+     }
+     return null;
+    }}
+    footer={<><RareButton type="button" className="secondary-action" disabled={folderOperationBusy} onClick={()=>setFolderEditing(null)}>取消</RareButton>
+     <RareButton type="button" className="primary" disabled={!folderMoveTarget||folderOperationBusy} onClick={()=>void submitFolderAction()}>确认移动</RareButton></>}/>}
+   {folderOperationError&&<p role="alert" className="notice error">{folderOperationError}</p>}
+  </Dialog>}
+  {pendingFolderDelete.length>0&&<Dialog open title="批量删除确认" onClose={()=>{if(!resourceDeleteBusy)setPendingFolderDelete([]);}} closeGuard={()=>!resourceDeleteBusy} className="dialog">
+   <p>将 {pendingFolderDelete.length} 个文件夹{selection.length>0?"及 "+selection.length+" 个文件":""}移入回收站？逐项执行，失败项会保留。</p>
+   {resourceDeleteError&&<p role="alert" className="notice error">{resourceDeleteError}</p>}
+   <div className="dialog-actions"><RareButton type="button" className="secondary-action" disabled={resourceDeleteBusy} onClick={()=>setPendingFolderDelete([])}>取消</RareButton>
+    <RareButton type="button" tone="danger" disabled={resourceDeleteBusy} onClick={()=>void confirmFolderBulkDelete()}>确认删除</RareButton></div>
+  </Dialog>}
   {rowMenu&&<Menu open label="文件操作菜单" items={rowMenuItems(rowMenu.targets)} anchor={rowMenu.anchor}
    point={rowMenu.point} onClose={()=>setRowMenu(null)}
    swatches={FINDER_COLORS.map(color=>{
@@ -1157,7 +1316,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    })}/>}
   <footer className="status-bar">
    <div className="status-left">
-    <span>已选 <span className="status-strong">{selectedIds.size}</span> 项{selectedIds.size>0&&<> / <span className="status-strong">{formatSize(selectedBytes)}</span></>} · {hasMore?"已加载":"共"} <span className="status-strong">{items.length}</span> 个文件{childFolders.length>0&&<> · <span className="status-strong">{childFolders.length}</span> 个文件夹</>}{(categoryFilter!=="all"||nameFilter.trim())&&<> · 匹配 <span className="status-strong">{visibleItems.length+visibleFolders.length}</span> 项（已加载范围）</>}</span>
+    <span>已选 <span className="status-strong">{selectedTotal}</span> 项{selectedIds.size>0&&<> / <span className="status-strong">{formatSize(selectedBytes)}</span></>} · {hasMore?"已加载":"共"} <span className="status-strong">{items.length}</span> 个文件{childFolders.length>0&&<> · <span className="status-strong">{childFolders.length}</span> 个文件夹</>}{(categoryFilter!=="all"||nameFilter.trim())&&<> · 匹配 <span className="status-strong">{visibleItems.length+visibleFolders.length}</span> 项（已加载范围）</>}</span>
    </div>
    <div className="status-right">
     <span>延迟: <span className="status-strong">{latencyMs===null?"—":latencyMs+"ms"}</span> · <span className="status-build">v2.1.0</span></span>

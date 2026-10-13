@@ -17,6 +17,12 @@ export function receiveRemoteResourceChanges(scopes:WorkspaceScope[]):void{
  window.dispatchEvent(new CustomEvent<{scopes:WorkspaceScope[]}>("filesmanage:workspace-changed",{detail:{scopes}}));
 }
 
+// Refresh mounted workspace consumers immediately after a successful local write.
+export function publishWorkspaceChange(scopes:WorkspaceScope[]):void{
+ if(typeof window==="undefined")return;
+ window.dispatchEvent(new CustomEvent<{scopes:WorkspaceScope[]}>("filesmanage:workspace-changed",{detail:{scopes}}));
+}
+
 function validChange(input:unknown):input is ResourceChange{
  if(!input||typeof input!=="object")return false;
  const change=input as Partial<ResourceChange>;
