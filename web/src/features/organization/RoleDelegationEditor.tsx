@@ -63,7 +63,7 @@ export function RoleDelegationEditor({users,userId,setUserId,role,setRole,scopeI
     <small>委派不附带文件读取权限。</small>
    </div>}
    <div className="perm-form-actions">
-    <RareButton type="submit" tone="primary" className="primary" disabled={!valid||busy}>{busy?"提交中…":review?"确认委派":"核对委派"}</RareButton>
+    <RareButton type="submit" tone="primary" className="primary" loading={busy} disabled={!valid}>{review?"确认委派":"核对委派"}</RareButton>
    </div>
   </form>
   </section>

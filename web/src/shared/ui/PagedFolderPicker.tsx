@@ -236,7 +236,7 @@ export function PagedFolderPicker({
   </p>
   {blocked&&<p className="folder-picker-blocked" role="status">{blocked}</p>}
   {keyword?<>
-   {searchState.status==="loading"&&!searchState.items.length&&<p className="folder-picker-level-status" role="status">正在搜索…</p>}
+   {searchState.status==="loading"&&!searchState.items.length&&<p className="folder-picker-level-status" role="status"><BrandLoadingLabel decorative>正在搜索…</BrandLoadingLabel></p>}
    {searchState.status==="error"&&<p className="folder-picker-level-status" role="alert">搜索失败 <RareButton type="button" className="folder-picker-page-action" onClick={()=>loadSearch(keyword,searchState.nextCursor,Boolean(searchState.items.length&&searchState.nextCursor))}>重试</RareButton></p>}
    {searchState.status==="ready"&&!searchState.items.length&&<p className="folder-picker-empty">没有匹配的目录</p>}
    {searchState.items.length>0&&<ul className="folder-picker-results" aria-label="搜索结果">

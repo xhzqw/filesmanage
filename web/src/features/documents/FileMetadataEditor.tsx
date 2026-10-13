@@ -50,7 +50,7 @@ export function FileMetadataEditor({fileId}:{fileId:string}){
    <label>描述<RareTextarea rows={2} maxLength={2000} value={description} onChange={e=>setDescription(e.target.value)} disabled={busy}/></label>
    <div className="file-metadata-actions">
     <RareButton type="button" disabled={busy} onClick={()=>{setEditing(false);setError("");}}>取消</RareButton>
-    <RareButton type="submit" className="primary" disabled={busy}>{busy?"保存中…":"保存"}</RareButton>
+    <RareButton type="submit" className="primary" loading={busy}>保存</RareButton>
    </div>
   </form>}
  </section>;

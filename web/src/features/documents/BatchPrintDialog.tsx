@@ -87,8 +87,8 @@ export function BatchPrintDialog({files,onClose}:{files:FileItem[];onClose:()=>v
   </div>
   <div className="dialog-actions">
    <RareButton type="button" disabled={busy} onClick={onClose}>关闭</RareButton>
-   <RareButton type="button" className="primary" disabled={busy||!item} onClick={()=>void openSelected()}>
-    {busy?"正在检查…":"打开当前打印预览"}
+   <RareButton type="button" className="primary" loading={busy} disabled={!item} onClick={()=>void openSelected()}>
+    打开当前打印预览
    </RareButton>
   </div>
  </Dialog>;

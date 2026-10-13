@@ -1,6 +1,7 @@
 import {useEffect,useState,type FormEvent} from "react";
 import {Link,useLocation,useNavigate} from "react-router-dom";
 import {RareButton,RareInput} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {toast} from "../../shared/ui/feedback";
 import {errorCopy} from "../../shared/errors";
 import {FINDER_COLORS,labelApi,finderColor,type FinderColor,type FinderLabel} from "../../shared/finderLabels";
@@ -62,7 +63,7 @@ export function FinderTags(){
     aria-label={"编辑标签 "+label.name} onClick={()=>edit(label)}>···</RareButton>
   </div>)}
   {state==="error"&&<RareButton type="button" className="finder-tag-retry" onClick={()=>{setState("loading");labelApi.list().then(items=>{setLabels(items);setState("ready");}).catch(()=>setState("error"));}}>重新加载标签</RareButton>}
-  {state==="loading"&&<span className="finder-nav-empty">正在加载标签…</span>}
+  {state==="loading"&&<span className="finder-nav-empty"><BrandLoadingLabel>正在加载标签…</BrandLoadingLabel></span>}
   <Link className={"finder-tag-all"+(params.get("view")==="labels"&&!active?" is-current":"")} to="/doc?view=labels">所有标签…</Link>
   {draft&&<form className="finder-tag-editor" onSubmit={submit} onKeyDown={event=>{if(event.key==="Escape")setDraft(null);}}>
    <RareInput autoFocus aria-label="标签名称" maxLength={40} value={draft.name}
@@ -75,7 +76,7 @@ export function FinderTags(){
    <div className="finder-tag-editor-actions">
     {!draft.isDefault&&draft.id&&<RareButton type="button" className="finder-tag-remove" disabled={busy} onClick={()=>void remove()}>删除</RareButton>}
     <RareButton type="button" tone="ghost" disabled={busy} onClick={()=>setDraft(null)}>取消</RareButton>
-    <RareButton type="submit" className="primary" disabled={busy}>{busy?"保存中":"保存"}</RareButton>
+    <RareButton type="submit" className="primary" loading={busy}>保存</RareButton>
    </div>
   </form>}
  </div>;

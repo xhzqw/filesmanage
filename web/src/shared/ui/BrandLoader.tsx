@@ -5,10 +5,14 @@ import {type CSSProperties,type ReactNode} from "react";
  *  low-resolution SVG contours, white matte, or external animation runtime.
  */
 export type BrandLoaderSize="xs"|"sm"|"md"|"lg";
-/** Inline wait text, without introducing a new block or disturbing table cells. */
-export function BrandLoadingLabel({children,size="xs"}:{children:ReactNode;size?:BrandLoaderSize}){
- return <span className="brand-loading-content" role="status" aria-label={typeof children==="string"?children:"加载中"}>
+/** One stable loading caption. Only slow, multi-stage jobs need a visual detail. */
+export function BrandLoadingLabel({children,size="xs",showContext=false,decorative=false}:{
+ children:ReactNode;size?:BrandLoaderSize;showContext?:boolean;decorative?:boolean;
+}){
+ return <span className="brand-loading-content" role={decorative?undefined:"status"}
+  aria-hidden={decorative||undefined} aria-label={decorative?undefined:typeof children==="string"?children:"加载中"}>
   <BrandLoader decorative size={size}/>
+  {showContext&&<span className="brand-loading-context" aria-hidden="true">{children}</span>}
  </span>;
 }
 export function BrandLoader({size="md",label="加载中",decorative=false,className=""}:{

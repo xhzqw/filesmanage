@@ -170,7 +170,7 @@ export function ResourceBrowser({selected,onSelect}:{selected:string;onSelect:(f
   <label className="perm-browser-search"><span>搜索目录</span><RareInput type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="输入目录名称"/></label>
   <div className="perm-browser-scroll">
    {needle?<>
-    {searchState==="loading"&&<p className="hint">正在搜索…</p>}
+    {searchState==="loading"&&<p className="hint"><BrandLoadingLabel>正在搜索…</BrandLoadingLabel></p>}
     {searchState==="failed"&&<RareNotice tone="danger">{searchError}</RareNotice>}
     {searchState==="ready"&&searchPage.items.length===0&&<p className="hint">没有匹配的目录</p>}
     {searchState==="ready"&&searchPage.items.map(f=><RareButton type="button" key={f.id}

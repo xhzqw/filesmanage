@@ -2,6 +2,7 @@ import {useEffect,useState,type MouseEvent} from "react";
 import {Link,useLocation} from "react-router-dom";
 import type {TaggedFile} from "../../shared/finderLabels";
 import {RareButton} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {Menu,type MenuPoint} from "../../shared/ui/Menu";
 import {FileTypeIcon} from "../../shared/ui/FileTypeIcon";
 import {toast} from "../../shared/ui/feedback";
@@ -72,7 +73,7 @@ export function TagExplorer(){
    </Link>)}
    <p className="tag-explorer-hint">选择标签即可查看所有目录中符合权限的文件。</p>
   </div>}
-  {labelId&&loading&&<p className="tag-explorer-message" role="status">正在加载标签文件…</p>}
+  {labelId&&loading&&<p className="tag-explorer-message" role="status"><BrandLoadingLabel decorative>正在加载标签文件…</BrandLoadingLabel></p>}
   {labelId&&failure&&<div className="tag-explorer-message" role="alert">{failure} <RareButton type="button" onClick={()=>setRevision(v=>v+1)}>重试</RareButton></div>}
   {labelId&&!loading&&!failure&&files.length===0&&<p className="tag-explorer-message">暂无文件。在文档列表中右键文件，即可添加颜色标签。</p>}
   {labelId&&!loading&&!failure&&files.length>0&&<div className="tag-explorer-list" role="list" aria-label={active?.name+" 标签文件"}>

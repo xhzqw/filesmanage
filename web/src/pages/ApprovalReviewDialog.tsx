@@ -1,5 +1,6 @@
 import {useEffect,useMemo,useState} from "react";
 import {RareBadge,RareButton,RareTabs} from "../shared/ui/rare";
+import {BrandLoadingLabel} from "../shared/ui/BrandLoader";
 import {Dialog} from "../shared/ui/Dialog";
 import type {Approval} from "../features/workflow/api";
 import {workflowApi} from "../features/workflow/api";
@@ -51,7 +52,7 @@ export function ApprovalReviewDialog({approval,onClose}:{approval:Approval;onClo
    </RareTabs>
    <RareButton type="button" disabled={loading} onClick={()=>setRetry(n=>n+1)}>刷新</RareButton>
   </div>
-  {loading&&<p role="status" className="approval-review-empty">正在核对待审内容…</p>}
+  {loading&&<p role="status" className="approval-review-empty"><BrandLoadingLabel decorative showContext>正在核对待审内容…</BrandLoadingLabel></p>}
   {error&&<p role="alert" className="approval-error">{error}</p>}
   {!loading&&!error&&comparison&&draft&&<>
    <div className="approval-review-version-bar">

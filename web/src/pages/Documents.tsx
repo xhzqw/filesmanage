@@ -322,7 +322,7 @@ export function Documents({user,onLogout,onUploadFolderChange}:{user:User;onLogo
       onEdit={setEditingId} reloadKey={reloadKey} viewMode={viewMode}
       newFolderSlot={<NewFolderForm parentId={selected.id} onCreated={refreshTreeAndFiles}/>}/>
    </DropZone>}
-   {!selected&&resolving&&<p role="status" className="empty">正在核验所选目录…</p>}
+   {!selected&&resolving&&<p role="status" className="empty"><BrandLoadingLabel decorative>正在核验所选目录…</BrandLoadingLabel></p>}
    {!selected&&status==="loading"&&!resolving&&<p role="status" className="empty"><BrandLoadingLabel>正在加载目录…</BrandLoadingLabel></p>}
    {!selected&&inaccessible&&<p role="alert" className="empty">目录不存在或当前账号无权访问。<Link to="/doc">返回根目录</Link></p>}
    {!selected&&!resolving&&!inaccessible&&status!=="loading"&&<p className="empty">当前账号没有可访问的目录，请联系管理员授权。</p>}

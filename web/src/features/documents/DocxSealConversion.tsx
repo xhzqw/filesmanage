@@ -25,8 +25,8 @@ export function DocxSealConversion({fileId,versionSeq,sha,name}:{fileId:string;v
    <p>DOCX 先转换为 PDF，原始 Word 文件保持不变。转换后即可选页、放置签章和输入密码确认。</p>
    <small title={name}>源文件：{name} · v{versionSeq}</small>
   </div>
-  <RareButton type="button" className="primary" disabled={busy} onClick={()=>void convert()}>
-   {busy?"正在转换为 PDF…":"转换为 PDF 并继续签章"}
+  <RareButton type="button" className="primary" loading={busy} onClick={()=>void convert()}>
+   转换为 PDF 并继续签章
   </RareButton>
   {error&&<p role="alert" className="notice error">{error}</p>}
  </div>;

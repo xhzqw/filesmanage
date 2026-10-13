@@ -14,7 +14,8 @@ export type RareButtonProps=ButtonHTMLAttributes<HTMLButtonElement> & {
   loading?:boolean;
 };
 export const RareButton=forwardRef<HTMLButtonElement,RareButtonProps>(function RareButton(
-  {className="",tone,emphasis,density,loading=false,disabled,...props},ref){
+  {className="",tone,emphasis,density,loading:loadingProp,disabled,...props},ref){
+  const loading=Boolean(loadingProp);
   // Migration adapter only: new code MUST pass tone explicitly for actions
   // that differ from neutral. Old class names are still rendered as-is.
   const detected=tone??(/\bprimary\b|\bprimary-btn\b/.test(className)?"primary":/\bdanger\b/.test(className)?"danger":/\bghost\b|\bsecondary-action\b|\baction-link\b/.test(className)?"ghost":"neutral");
@@ -23,9 +24,11 @@ export const RareButton=forwardRef<HTMLButtonElement,RareButtonProps>(function R
     aria-busy={loading||props["aria-busy"]||undefined}
     data-rare-control="button" data-rare-tone={detected}
     data-rare-intent={tone} data-rare-emphasis={emphasis} data-density={density??"compact"}
-    data-rare-loading={loading||undefined}
+    data-rare-loading={loading||undefined} data-rare-loadable={loadingProp!==undefined||undefined}
     className={"rare-button"+(className?" "+className:"")}>
-    {loading?<BrandLoader size="xs" decorative/>:props.children}
+    {loadingProp!==undefined?<><span className="rare-button-content" aria-hidden={loading||undefined}
+      data-rare-hidden={loading||undefined}>{props.children}</span>
+      {loading&&<span className="rare-button-pending" aria-hidden="true"><BrandLoader size="xs" decorative/></span>}</>:props.children}
    </button>;
 });
 RareButton.displayName="RareButton";

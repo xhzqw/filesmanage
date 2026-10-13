@@ -289,7 +289,7 @@ export function ApprovalInbox({currentUser,view,onReview,onCounts}:{currentUser:
     <RareButton type="button" disabled={!!busyId} onClick={()=>setDecision(null)}>取消</RareButton>
     <RareButton type="button" tone={decision.action==="reject"?"danger":decision.action==="approve"?"primary":"neutral"}
      disabled={!!busyId||(decision.action==="reject"&&!comment.trim())} loading={!!busyId} onClick={()=>void submitDecision()}>
-     {busyId?"处理中…":decision.action==="approve"?"确认通过":decision.action==="reject"?"确认拒绝":"确认撤回"}</RareButton>
+     {decision.action==="approve"?"确认通过":decision.action==="reject"?"确认拒绝":"确认撤回"}</RareButton>
    </div>
   </Dialog>}
  </div>;

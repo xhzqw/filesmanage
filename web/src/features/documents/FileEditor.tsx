@@ -142,8 +142,8 @@ export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileIte
     {pending===null&&<>
      <RareButton type="button" className="secondary-action" onClick={requestClose} disabled={busy}>关闭</RareButton>
      {lockPending&&<RareButton type="button" className="secondary-action" onClick={requestReload} disabled={busy}>重新加载</RareButton>}
-     {editable&&<RareButton type="submit" className="primary" disabled={busy||(!requiresApproval&&lockToken==="")}>
-      {busy?"保存中…":requiresApproval?"提交审批":"保存新版本"}
+     {editable&&<RareButton type="submit" className="primary" loading={busy} disabled={!requiresApproval&&lockToken===""}>
+      {requiresApproval?"提交审批":"保存新版本"}
      </RareButton>}
     </>}
     {pending!==null&&<>

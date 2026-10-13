@@ -163,9 +163,9 @@ export function RestoreDialog({entry,onClose,onRestored,onReload}:{
    {treeState==="ready"&&stage==="pick"&&<RareButton type="button" className="primary" disabled={busy||targetId===""} onClick={()=>setStage("confirm")}>使用所选目录</RareButton>}
    {treeState==="ready"&&stage==="confirm"&&<>
     <RareButton type="button" className="secondary-action" onClick={()=>setStage("pick")} disabled={busy}>更改目标目录</RareButton>
-    <RareButton type="button" className="primary" onClick={submit} disabled={busy||targetId===""}>{busy?"恢复中…":"确认恢复"}</RareButton>
+    <RareButton type="button" className="primary" onClick={submit} loading={busy} disabled={targetId===""}>确认恢复</RareButton>
    </>}
-   {treeState==="ready"&&stage==="rename"&&<RareButton type="button" className="primary" onClick={submit} disabled={busy||newName.trim()===""}>{busy?"恢复中…":"以新名称恢复"}</RareButton>}
+   {treeState==="ready"&&stage==="rename"&&<RareButton type="button" className="primary" onClick={submit} loading={busy} disabled={newName.trim()===""}>以新名称恢复</RareButton>}
   </div>
  </Dialog>;
 }

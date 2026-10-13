@@ -145,7 +145,7 @@ export function QuickGrantsDialog({folder,onClose}:{folder:Folder;onClose:()=>vo
     <div className="quick-grants-footer">
      {review&&<RareButton type="button" disabled={busy} onClick={()=>setReview(false)}>返回修改</RareButton>}
      <RareButton type="submit" tone="primary" className="primary" loading={busy}
-      disabled={!canSave||(review&&risk.length>0&&!ack)}>{busy?"保存中…":review?"确认添加":"添加授权"}</RareButton>
+      disabled={!canSave||(review&&risk.length>0&&!ack)}>{review?"确认添加":"添加授权"}</RareButton>
     </div>
    </form>
   </div>

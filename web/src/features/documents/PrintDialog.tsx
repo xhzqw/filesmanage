@@ -124,7 +124,7 @@ export function PrintDialog({preview,onClose,sealRevision=null}:{preview:Preview
   <div className="dialog-actions">
    <RareButton type="button" disabled={busy} onClick={onClose}>取消</RareButton>
    {isCad?<RareButton type="button" className="primary" onClick={()=>{onClose();navigate("/model/"+encodeURIComponent(preview.fileId));}}>打开工程图</RareButton>:
-    <RareButton type="button" className="primary" disabled={!printable||busy} onClick={()=>void print()}>{busy?"正在准备…":isPdf||isOffice?"打开打印预览":"打印"}</RareButton>}
+    <RareButton type="button" className="primary" loading={busy} disabled={!printable} onClick={()=>void print()}>{isPdf||isOffice?"打开打印预览":"打印"}</RareButton>}
   </div>
  </Dialog>;
 }

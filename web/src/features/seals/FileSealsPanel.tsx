@@ -270,8 +270,8 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
     {error&&<p className="notice error" role="alert">{error}</p>}
     <div className="dialog-actions">
      <RareButton type="button" disabled={busy} onClick={()=>{setConfirmOpen(false);setPassword("");setError("")}}>取消</RareButton>
-     <RareButton type="submit" className="primary" disabled={busy||(requiresPassword&&!password)||!staged.length}>
-      {busy?"正在签署…":"确认签署（"+staged.length+"）"}
+     <RareButton type="submit" className="primary" loading={busy} disabled={(requiresPassword&&!password)||!staged.length}>
+      {"确认签署（"+staged.length+"）"}
      </RareButton>
     </div>
    </form>
@@ -288,8 +288,8 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
     {error&&<p className="notice error" role="alert">{error}</p>}
     <div className="dialog-actions">
      <RareButton type="button" disabled={deleteBusy} onClick={()=>{setDeleteOpen(false);setDeletePassword("");setError("")}}>取消</RareButton>
-     <RareButton type="submit" tone="danger" emphasis="solid" disabled={deleteBusy||(deleteNeedsPassword&&!deletePassword)||!deleteIds.length}>
-      {deleteBusy?"正在删除…":"确认删除"}
+     <RareButton type="submit" tone="danger" emphasis="solid" loading={deleteBusy} disabled={(deleteNeedsPassword&&!deletePassword)||!deleteIds.length}>
+      确认删除
      </RareButton>
     </div>
    </form>

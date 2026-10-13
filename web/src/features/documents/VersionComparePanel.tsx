@@ -1,5 +1,6 @@
 import {useEffect,useMemo,useRef,useState} from "react";
 import {RareButton,RareSelect} from "../../shared/ui/rare";
+import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {errorCopy} from "../../shared/errors";
 import {fileApi,type VersionComparison} from "./api";
 import type {FileVersion} from "../../entities/file/model";
@@ -79,7 +80,7 @@ export function VersionComparePanel({fileId,versions}:{fileId:string;versions:Fi
     </div>}
    </div>
    {left===right&&<p className="file-compare-feedback">请选择不同的版本。</p>}
-   {state==="loading"&&left!==right&&<p role="status" className="file-compare-feedback">正在比较…</p>}
+   {state==="loading"&&left!==right&&<p role="status" className="file-compare-feedback"><BrandLoadingLabel decorative showContext>正在比较…</BrandLoadingLabel></p>}
    {state==="failed"&&<div role="alert" className="file-compare-feedback file-compare-failed"><span>{error}</span><RareButton type="button" onClick={()=>setRetry(x=>x+1)}>重试</RareButton></div>}
    {result&&<div className="file-compare-result">
    {result.detail==="office_semantic"&&<p className="hint">语义差异：DOCX 按可提取段落、XLSX 按工作表及单元格值比较；不涵盖样式、公式重新计算或排版。</p>}
