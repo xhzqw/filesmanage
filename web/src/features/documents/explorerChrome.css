@@ -129,12 +129,12 @@
 .explorer-item-star,.explorer-item-more{
  position:absolute;top:4px;right:5px;
  width:22px;min-height:22px;height:22px;padding:0;display:grid;place-items:center;
- color:var(--text-secondary);opacity:0;
+ color:var(--text-secondary);opacity:0;pointer-events:none;z-index:2;
 }
 .explorer-item-more{top:auto;bottom:5px;right:5px;font-size:17px}
 .explorer-item:hover :is(.explorer-item-star,.explorer-item-more),
 .explorer-item:focus-within :is(.explorer-item-star,.explorer-item-more),
-.explorer-item-star.favorited{opacity:1}
+.explorer-item-star.favorited{opacity:1;pointer-events:auto}
 .explorer-item-star.favorited{color:var(--brand-star,#f59e0b)}
 .explorer-surface-columns{overflow:hidden}
 .explorer-columns{
@@ -254,7 +254,7 @@
  .work .folder-context-bar .folder-actions-slot{margin-left:auto}
 }
 @media(hover:none),(pointer:coarse){
- .explorer-item-check,.explorer-item-star,.explorer-item-more{opacity:1}
+ .explorer-item-check,.explorer-item-star,.explorer-item-more{opacity:1;pointer-events:auto}
 }
 @media(prefers-reduced-motion:reduce){
  .folder-history-controls .rare-button,.folder-view-switch .rare-button{transition:none}

@@ -272,6 +272,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const[favoriteFolderIds,setFavoriteFolderIds]=useState<Set<string>>(()=>new Set<string>());
  const[favoritesState,setFavoritesState]=useState<"loading"|"ready"|"failed">("loading");
  const[favoriteBusy,setFavoriteBusy]=useState("");
+ const favoriteBusyRef=useRef(false);
  const[favoriteRetryToken,setFavoriteRetryToken]=useState(0);
  // Favorite and unfavorite are mutually exclusive states; never stack their
  // transient success messages in the center of the screen.
@@ -419,47 +420,60 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  // directions; a failed write restores the previous local state instead of
  // leaving the row showing a favorite the server never recorded.
  async function toggleFavoriteResource(kind:"file"|"folder",id:string){
-  if(favoriteBusy!=="")return;
-  if(favoritesState!=="ready"){
-   if(favoritesState==="failed"){
-    toast.warning("正在重新获取收藏状态…");
-    setFavoriteRetryToken(current=>current+1);
-   }
-   return;
-  }
-  const on=!(kind==="file"?favoriteIds:favoriteFolderIds).has(id);
+  if(favoriteBusyRef.current)return;
+  favoriteBusyRef.current=true;
   const update=kind==="file"?setFavoriteIds:setFavoriteFolderIds;
   setFavoriteBusy(kind+":"+id);
-  update(prev=>{
-   const next=new Set(prev);
-   if(on)next.add(id);else next.delete(id);
-   return next;
-  });
+  let desired:boolean|null=null;
+  let writeCommitted=false;
   try{
-   const response=await request<{id:string;favorited:boolean}>("/favorites/"+kind+"/"+encodeURIComponent(id),{method:on?"PUT":"DELETE"});
-   if(response?.id!==id||response.favorited!==on)throw new Error("收藏接口响应不一致");
-   // The saved state must survive a round-trip to the authorized API.
-   const rows=await request<FavoriteRow[]>("/favorites",{cache:"no-store"});
-   if(!Array.isArray(rows))throw new Error("收藏状态读取失败");
-   const persisted=rows.some(row=>kind==="file"?row.kind==="file"&&row.fileId===id:row.kind==="folder"&&row.folderId===id);
-   if(persisted!==on)throw new Error("收藏保存尚未生效");
-   setFavoriteIds(new Set(rows.filter(row=>row.kind==="file"&&row.fileId).map(row=>row.fileId!)));
-   setFavoriteFolderIds(new Set(rows.filter(row=>row.kind==="folder"&&row.folderId).map(row=>row.folderId!)));
-   publishWorkspaceChange(["collaboration"]);
-   favoriteFeedback(on?"已收藏":"已取消收藏");
-  }catch(error){
+   // If the initial list is missing/failed, recover it on this very click;
+   // do not silently return while leaving a visible star apparently active.
+   let currentlyOn=(kind==="file"?favoriteIds:favoriteFolderIds).has(id);
+   if(favoritesState!=="ready"){
+    const rows=await request<FavoriteRow[]>("/favorites",{cache:"no-store"});
+    if(!Array.isArray(rows))throw new Error("无法获取收藏状态，请重试");
+    currentlyOn=rows.some(row=>kind==="file"?row.kind==="file"&&row.fileId===id:row.kind==="folder"&&row.folderId===id);
+    setFavoriteIds(new Set(rows.filter(row=>row.kind==="file"&&row.fileId).map(row=>row.fileId!)));
+    setFavoriteFolderIds(new Set(rows.filter(row=>row.kind==="folder"&&row.folderId).map(row=>row.folderId!)));
+    setFavoritesState("ready");
+   }
+   desired=!currentlyOn;
    update(prev=>{
     const next=new Set(prev);
-    if(on)next.delete(id);else next.add(id);
+    if(desired)next.add(id);else next.delete(id);
+    return next;
+   });
+   const response=await request<{id:string;favorited:boolean}>("/favorites/"+kind+"/"+encodeURIComponent(id),{method:desired?"PUT":"DELETE"});
+   if(response?.id!==id||response.favorited!==desired)throw new Error("收藏接口响应不一致");
+   writeCommitted=true;
+   publishWorkspaceChange(["collaboration"]);
+   favoriteFeedback(desired?"已收藏":"已取消收藏");
+   try{
+    const rows=await request<FavoriteRow[]>("/favorites",{cache:"no-store"});
+    if(!Array.isArray(rows))throw new Error("收藏状态读取失败");
+    const persisted=rows.some(row=>kind==="file"?row.kind==="file"&&row.fileId===id:row.kind==="folder"&&row.folderId===id);
+    setFavoriteIds(new Set(rows.filter(row=>row.kind==="file"&&row.fileId).map(row=>row.fileId!)));
+    setFavoriteFolderIds(new Set(rows.filter(row=>row.kind==="folder"&&row.folderId).map(row=>row.folderId!)));
+    if(persisted!==desired)favoriteFeedback("收藏状态已同步，请核对","warning");
+   }catch{
+    // An acknowledged write must not roll back when only the readback fails.
+    setFavoriteRetryToken(current=>current+1);
+   }
+  }catch(error){
+   if(desired!==null&&!writeCommitted)update(prev=>{
+    const next=new Set(prev);
+    if(desired)next.delete(id);else next.add(id);
     return next;
    });
    favoriteFeedback(errorCode(error)==="E_NETWORK"
     ?"网络中断，收藏状态未确认；请刷新后核对"
-    :error instanceof Error&&error.message.startsWith("收藏")?error.message:errorCopy(error,on?"收藏失败，请重试":"取消收藏失败，请重试"),
+    :error instanceof Error&&/收藏状态|收藏接口/.test(error.message)?error.message:errorCopy(error,desired===false?"取消收藏失败，请重试":"收藏失败，请重试"),
     errorCode(error)==="E_NETWORK"?"warning":"danger");
-   // An uncertain write may have committed. Reconcile the canonical state.
+   // Uncertain failures still require canonical reconciliation.
    setFavoriteRetryToken(current=>current+1);
   }finally{
+   favoriteBusyRef.current=false;
    setFavoriteBusy("");
   }
  }
@@ -1367,7 +1381,9 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     aria-label={"选择 "+item.name} onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}} onChange={event=>onCheckToggle(event,item)}/>}
    <RareButton type="button" tone="ghost" className={"explorer-item-star"+(favoriteIds.has(item.id)?" favorited":"")}
     aria-label={favoriteIds.has(item.id)?"取消收藏 "+item.name:"收藏 "+item.name}
-    disabled={favoritesState==="loading"||favoriteBusy!==""}
+    disabled={favoriteBusy!==""}
+    onMouseDown={event=>event.stopPropagation()}
+    onKeyDown={event=>event.stopPropagation()}
     onClick={event=>{event.stopPropagation();void toggleFavorite(item);}}>
     <svg width="15" height="15" viewBox="0 0 24 24" fill={favoriteIds.has(item.id)?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.8 1.2 6.9L12 17.8l-6.2 3.2L7 14.1 2 9.3l6.9-1z"/></svg>
    </RareButton>
@@ -1402,7 +1418,9 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     onChange={event=>{selectResource("folder",entry.id,true,checkboxShiftRef.current);checkboxShiftRef.current=false;setFocusedFolderId(entry.id);setFocusedId(null);}}/>}
    <RareButton type="button" tone="ghost" className={"explorer-item-star"+(favoriteFolderIds.has(entry.id)?" favorited":"")}
     aria-label={(favoriteFolderIds.has(entry.id)?"取消收藏文件夹 ":"收藏文件夹 ")+entry.name}
-    disabled={favoritesState==="loading"||favoriteBusy!==""}
+    disabled={favoriteBusy!==""}
+    onMouseDown={event=>event.stopPropagation()}
+    onKeyDown={event=>event.stopPropagation()}
     onClick={event=>{event.stopPropagation();void toggleFavoriteResource("folder",entry.id);}}>
     <svg width="15" height="15" viewBox="0 0 24 24" fill={favoriteFolderIds.has(entry.id)?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.8 1.2 6.9L12 17.8l-6.2 3.2L7 14.1 2 9.3l6.9-1z"/></svg>
    </RareButton>
@@ -1558,7 +1576,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       <td className="row-actions col-actions" onClick={event=>event.stopPropagation()}><div className="actions-cell-wrap">
        <RareButton type="button" className={"action-star-btn"+(favoriteFolderIds.has(entry.id)?" favorited":"")}
         aria-label={(favoriteFolderIds.has(entry.id)?"取消收藏文件夹 ":"收藏文件夹 ")+entry.name}
-        disabled={favoritesState==="loading"||favoriteBusy!==""}
+        disabled={favoriteBusy!==""}
         onClick={()=>void toggleFavoriteResource("folder",entry.id)}>
         <svg className="star-icon" width="14" height="14" viewBox="0 0 24 24" fill={favoriteFolderIds.has(entry.id)?"currentColor":"none"} stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.8 1.2 6.9L12 17.8l-6.2 3.2L7 14.1 2 9.3l6.9-1z"/></svg>
        </RareButton>
@@ -1590,10 +1608,10 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       <td className="col-date date">{item.updatedAt.replace("T"," ").slice(0,16)}</td>
       <td className="row-actions col-actions" onClick={event=>event.stopPropagation()}><div className="actions-cell-wrap">
        <RareButton type="button"
-        className={"action-star-btn"+(favoriteIds.has(item.id)?" favorited":"")}
-        aria-label={favoriteIds.has(item.id)?"已收藏":"收藏"}
-        title={favoritesState==="failed"?"收藏状态加载失败，请刷新重试":favoriteIds.has(item.id)?"已收藏（点击取消）":"收藏"}
-        disabled={favoritesState==="loading"||favoriteBusy!==""}
+       className={"action-star-btn"+(favoriteIds.has(item.id)?" favorited":"")}
+       aria-label={favoriteIds.has(item.id)?"已收藏":"收藏"}
+        title={favoritesState==="failed"?"点击重新获取收藏状态":favoriteIds.has(item.id)?"已收藏（点击取消）":"收藏"}
+        disabled={favoriteBusy!==""}
         onClick={()=>toggleFavorite(item)}>
         <svg className="star-icon" viewBox="0 0 24 24" width="14" height="14" fill={favoriteIds.has(item.id)?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
@@ -1696,7 +1714,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       :[{kind:"folder",id:folderMenu.target.id,name:folderMenu.target.name}]);
      toast.success("已复制 "+getExplorerClipboard().length+" 项");
     }},
-    {id:"favorite",label:favoriteFolderIds.has(folderMenu.target.id)?"取消收藏":"收藏",disabled:favoritesState!=="ready"||favoriteBusy!=="",onSelect:()=>{void toggleFavoriteResource("folder",folderMenu.target.id);}},
+    {id:"favorite",label:favoriteFolderIds.has(folderMenu.target.id)?"取消收藏":"收藏",disabled:favoriteBusy!=="",onSelect:()=>{void toggleFavoriteResource("folder",folderMenu.target.id);}},
     {id:"rename",label:"重命名",onSelect:()=>openFolderAction(folderMenu.target,"rename")},
     {id:"move",label:"移动到…",onSelect:()=>openFolderAction(folderMenu.target,"move")},
     ...finderLabels.filter(label=>!label.isDefault).map(label=>({
