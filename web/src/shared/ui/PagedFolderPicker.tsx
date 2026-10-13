@@ -141,6 +141,10 @@ export function PagedFolderPicker({
    if(node.dataset.folderId===id){node.focus();return;}
   }
  }
+ function focusIndex(position:number){
+  const row=visibleRows[Math.max(0,Math.min(position,visibleRows.length-1))];
+  if(row)focusFolder(row.id);
+ }
  function onTreeKeyDown(event:KeyboardEvent<HTMLUListElement>){
   const item=event.target instanceof Element?event.target.closest<HTMLElement>('li[data-folder-id]'):null;
   const id=item?.dataset.folderId??focusedId;
@@ -150,12 +154,15 @@ export function PagedFolderPicker({
   if(!current)return;
   const parent=current.parentId?byId.get(current.parentId):undefined;
   switch(event.key){
-   case "ArrowDown":event.preventDefault();focusFolder(visibleRows[Math.min(index+1,visibleRows.length-1)].id);break;
-   case "ArrowUp":event.preventDefault();focusFolder(visibleRows[Math.max(index-1,0)].id);break;
+   case "ArrowDown":event.preventDefault();focusIndex(index+1);break;
+   case "ArrowUp":event.preventDefault();focusIndex(index-1);break;
    case "ArrowRight":
     event.preventDefault();
     if(current.hasChildren&&!expanded.has(id))toggle(current,true);
-    else if(expanded.has(id)&&levels.get(id)?.items.length)focusFolder(levels.get(id)!.items[0].id);
+    else if(expanded.has(id)){
+     const first=levels.get(id)?.items[0];
+     if(first)focusFolder(first.id);
+    }
     break;
    case "ArrowLeft":
     event.preventDefault();
@@ -163,8 +170,8 @@ export function PagedFolderPicker({
     else if(parent)focusFolder(parent.id);
     break;
    case "Enter":event.preventDefault();choose(current);break;
-   case "Home":event.preventDefault();focusFolder(visibleRows[0].id);break;
-   case "End":event.preventDefault();focusFolder(visibleRows[visibleRows.length-1].id);break;
+   case "Home":event.preventDefault();focusIndex(0);break;
+   case "End":event.preventDefault();focusIndex(visibleRows.length-1);break;
   }
  }
  const selected=byId.get(selectedId);
