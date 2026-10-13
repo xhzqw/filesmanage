@@ -268,7 +268,33 @@ try{
  await until('document.querySelector(".work-body")?.dataset.explorerView==="icons"');
  const fileIconStar='.explorer-icon-grid [data-id="'+tested+'"] .explorer-item-star';
  await until(`!!document.querySelector(${JSON.stringify(fileIconStar)}+":not(:disabled)")`,"icon file star");
+ const iconStarGeometry=await evaluate(`(()=>{
+  const button=document.querySelector(${JSON.stringify(fileIconStar)});
+  const rect=button.getBoundingClientRect();
+  const x=rect.left+rect.width/2,y=rect.top+rect.height/2;
+  return {x,y,rect:{width:rect.width,height:rect.height},disabled:button.disabled,
+   opacity:getComputedStyle(button).opacity,pointer:getComputedStyle(button).pointerEvents,
+   target:document.elementFromPoint(x,y)?.outerHTML?.slice(0,260)};
+ })()`);
+ console.log("EXPLORER_ICON_STAR_BEFORE_HOVER",JSON.stringify(iconStarGeometry));
+ await send("Input.dispatchMouseEvent",{type:"mouseMoved",x:iconStarGeometry.x,y:iconStarGeometry.y});
+ await delay(140);
+ const iconHit=await evaluate(`(()=>{
+  const button=document.querySelector(${JSON.stringify(fileIconStar)});
+  const x=${iconStarGeometry.x},y=${iconStarGeometry.y};
+  const hit=document.elementFromPoint(x,y);
+  return {starPointer:getComputedStyle(button).pointerEvents,starOpacity:getComputedStyle(button).opacity,
+   hitTag:hit?.tagName,hitClass:hit?.getAttribute("class"),hitButton:hit?.closest("button")?.getAttribute("class"),
+   parentHover:button.closest(".explorer-item")?.matches(":hover")};
+ })()`);
+ console.log("EXPLORER_ICON_STAR_HIT",JSON.stringify(iconHit));
  await click(fileIconStar);
+ await delay(350);
+ console.log("EXPLORER_ICON_STAR_AFTER_CLICK",JSON.stringify(await evaluate(`(()=>{
+  const button=document.querySelector(${JSON.stringify(fileIconStar)});
+  return {buttonClass:button?.className,disabled:button?.disabled,
+   toasts:[...document.querySelectorAll("[role=status],[role=alert]")].map(e=>e.textContent?.trim().slice(0,90)).filter(Boolean)};
+ })()`)));
  await until(`document.querySelector(${JSON.stringify(fileIconStar)})?.classList.contains("favorited")===${originalFavorite}`,"icon file favorite feedback");
  for(let i=0;i<50;i++){
   const read=await favoriteRead();
