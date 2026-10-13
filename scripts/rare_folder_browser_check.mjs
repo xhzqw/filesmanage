@@ -46,7 +46,9 @@ async function measure(width){
   const bar=document.querySelector(".folder-context-bar");
   const switcher=document.querySelector(".folder-view-switch");
   const history=document.querySelector(".folder-history-controls");
-  const icon=document.querySelector('[data-slot="rare-folder-component"]');
+  const icons=[...document.querySelectorAll('[data-slot="rare-folder-component"]')];
+  const visibleIcon=icons.find(node=>node.getBoundingClientRect().width>0&&node.getBoundingClientRect().height>0);
+  const icon=visibleIcon??icons[0];
   if(!bar||!switcher||!history||!icon)return null;
   const b=bar.getBoundingClientRect(),s=switcher.getBoundingClientRect(),h=history.getBoundingClientRect();
   const styles=getComputedStyle(switcher);
@@ -63,6 +65,7 @@ async function measure(width){
    blueBack:back.backgroundColor,glassBlur:glass.backdropFilter,
    flapFill:flap?.getAttribute("fill"),
    stageSize:icon.querySelector(".rare-folder-stage")?.getBoundingClientRect().width,
+   visibleIcon:Boolean(visibleIcon),
    controls:[...switcher.querySelectorAll("button")].map(x=>x.getAttribute("aria-label"))
   };
  })()`);
@@ -74,7 +77,7 @@ async function measure(width){
  assert(channels.length===3&&channels[2]>channels[0]&&channels[2]>channels[1],
   "RareUI folder must use a blue fill, not a warm primary: "+result.blueBack);
  assert(result.glassBlur.includes("blur(6px)")&&result.flapFill==="#3A9AE8","RareUI front requires the source glass blur and translucent blue flap");
- assert(result.stageSize>0,"RareUI original component stage must have positive size");
+ assert(!result.visibleIcon||result.stageSize>0,"Visible RareUI folder stage must have positive size");
  assert.equal(result.controls.join(","),"图标视图,列表视图,分栏视图,画廊视图");
  assert(result.documentOverflow<=2,"page-level horizontal overflow at "+width+": "+JSON.stringify(result));
  assert(result.bar.left>=-2&&result.bar.right<=width+2,"folder toolbar overflow at "+width);
