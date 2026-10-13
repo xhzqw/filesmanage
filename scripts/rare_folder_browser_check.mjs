@@ -183,7 +183,9 @@ try{
    const columns=["select","name","size","version","date","actions"]
     .map(key=>{const th=table.querySelector("th.col-"+key);return {key,width:rect(th).width,visible:getComputedStyle(th).display!=="none"};});
    const mobile=table.querySelector(".file-mobile-actions");
+   const firstFile=table.querySelector("tr.file-entry");
    return {width:innerWidth,pane:pane.clientWidth,pageOverflow:document.documentElement.scrollWidth-innerWidth,
+    folderHeight:rect(folder).height,fileHeight:firstFile?rect(firstFile).height:null,
     tableWidth:rect(table).width,columns,folderOnly:table.classList.contains("file-table-folders-only"),
     visibleFiles:table.querySelectorAll("tr.file-entry").length,
     folderCells:[...folder.querySelectorAll("td.col-size,td.col-version,td.col-date")].map(el=>el.textContent.trim()),
@@ -193,6 +195,8 @@ try{
   })()`);
   assert(geometry,"file-list rows must remain visible at "+width);
   assert.equal(geometry.width,width,"emulated layout viewport mismatch");
+  assert(Math.abs(geometry.folderHeight-32)<=.5,"folder row is not 32px: "+JSON.stringify(geometry));
+  if(geometry.fileHeight!==null)assert(Math.abs(geometry.fileHeight-32)<=.5,"file row is not 32px: "+JSON.stringify(geometry));
   assert(geometry.pageOverflow<=2,"page overflow: "+JSON.stringify(geometry));
   assert.equal(geometry.folderOnly,geometry.visibleFiles===0,"folder-only mode must follow visible file count");
   assert(geometry.folderCells.every(text=>text===""),"folder-only columns must be blank");
