@@ -89,7 +89,9 @@ try{
  console.log("PASS widths: 1440 / 1100 / 820 without overlay overflow");
 
  await send("Page.navigate",{url:base+"/doc"});
- await waitFor("location.pathname==='/doc'&&!!document.querySelector('.document-explorer')");
+ // Wait for the resolved file list, not the explorer shell: the early loading
+ // state correctly has no directory target and would open the picker.
+ await waitFor("location.pathname==='/doc'&&!!document.querySelector('.work-body')");
  await evaluate(`(()=>{window.__fmDrag=${dropScript(".work-body","file")};return true;})()`);
  await waitFor("!!document.querySelector('.global-upload-hint')");
  assert.match(await evaluate("document.querySelector('.global-upload-hint')?.textContent"),/上传至/);
