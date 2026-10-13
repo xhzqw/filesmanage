@@ -13,7 +13,6 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
  const [login,setLogin]=useState(()=>localStorage.getItem(REMEMBER_KEY)??"");
  const [password,setPassword]=useState("");
  const [remember,setRemember]=useState(()=>localStorage.getItem(REMEMBER_KEY)!==null);
- const [resetHint,setResetHint]=useState(false);
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState("");
  const [open,setOpen]=useState(false);
@@ -31,15 +30,14 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
   cancelClose();focusOnOpen.current=focus;suppressHover.current=false;setOpen(true);
  }
  function collapse(){
-  cancelClose();setOpen(false);setResetHint(false);setError("");
+  cancelClose();setOpen(false);setError("");
  }
  function collapseAndReturnFocus(){
   suppressHover.current=true;
   collapse();
   // Do not focus the button while it still has visibility:hidden from the
   // expanded state; let React commit the collapsed view first.
-  // React commits visibility after the close event. Blur the now-hidden
-  // close action and restore keyboard focus once the entry is focusable.
+  // Blur the focused control and restore focus once the entry is available.
   if(document.activeElement instanceof HTMLElement)document.activeElement.blur();
   window.setTimeout(()=>entry.current?.focus({preventScroll:true}),90);
  }
@@ -120,11 +118,7 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
     onFocus={()=>{if(!open&&!suppressHover.current)expand(true);}}
     onClick={()=>expand(true)}>登录</RareButton>
    <section id="login-panel" className="login-panel" aria-hidden={!open}>
-    <RareButton type="button" className="login-panel-close" tabIndex={open?0:-1}
-     aria-label="关闭登录窗口" onClick={()=>{
-      collapseAndReturnFocus();
-     }}>×</RareButton>
-    <h2>账号登录</h2>
+    <h2>登陆</h2>
     <form onSubmit={submit} autoComplete="on">
      <label htmlFor="login-account">账号</label>
      <RareInput id="login-account" autoComplete="username" required tabIndex={open?0:-1}
@@ -136,10 +130,7 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
      <div className="login-minimal-extras">
       <label><RareInput type="checkbox" tabIndex={open?0:-1}
        checked={remember} onChange={e=>setRemember(e.target.checked)}/>记住账号</label>
-      <RareButton type="button" className="login-forgot" tabIndex={open?0:-1}
-       onClick={()=>setResetHint(v=>!v)}>忘记密码？</RareButton>
      </div>
-     {resetHint&&<p className="login-reset-hint">请联系系统管理员重置密码。</p>}
      {error&&<RareNotice tone="danger">{error}</RareNotice>}
      <RareButton className="login-submit" tone="primary" type="submit"
       tabIndex={open?0:-1} loading={busy}>登录</RareButton>
