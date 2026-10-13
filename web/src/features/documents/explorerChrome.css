@@ -65,9 +65,9 @@
 /* The file commands remain where they were, but lose the extra nested-card
    outline. Their sorting/filtering controls are never replicated in a view. */
 .work-body>.file-toolbar{
- box-sizing:border-box;width:100%;max-width:100%;min-height:39px;
- margin:0;padding:5px 10px;gap:5px 9px;
- border:0;border-bottom:1px solid var(--border-hairline);border-radius:var(--radius-xs);
+ box-sizing:border-box;width:100%;max-width:100%;min-height:44px;
+ margin:0;padding:5px 12px;gap:8px 12px;
+ border:0;border-bottom:1px solid var(--border-hairline);border-radius:0;
  background:var(--surface-panel);
 }
 .work-body>.table{width:100%;max-width:100%;margin:0;border:0;border-radius:var(--radius-xs);contain:paint}

@@ -423,15 +423,67 @@ try{
  await until('document.activeElement===document.querySelectorAll("tr.file-entry")[129]');
  const scroll=await evaluate('document.querySelector(".work-body>.table")?.scrollTop');
  assert(scroll>0,"End must scroll the actual file panel to row 130");
+ const defaultToolbar=await evaluate(`(()=>{
+  const bar=document.querySelector(".work-body>.file-toolbar");
+  const filters=bar?.querySelector(".toolbar-views");
+  return {height:bar?.getBoundingClientRect().height,
+   filtersLeft:filters?.getBoundingClientRect().left,
+   upload:!!bar?.querySelector(".upload-button"),
+   newFolder:!!bar?.querySelector(".new-folder-wrapper"),
+   selected:!!bar?.querySelector(".batch-actions-group")};
+ })()`);
+ assert(defaultToolbar.upload&&defaultToolbar.newFolder&&!defaultToolbar.selected,
+  "default toolbar must expose upload/create without a batch capsule");
  await key("a",{ctrlKey:true});
  await until('document.querySelector("thead .col-select input[type=checkbox]")?.checked');
  assert.equal((await selection()).count,130);
  const batch=await evaluate(`(()=>{
   const group=document.querySelector(".batch-actions-group");
-  return {text:group?.textContent||"",actions:[...(group?.querySelectorAll("button")||[])].map(b=>b.textContent.trim())};
+  const bar=document.querySelector(".work-body>.file-toolbar");
+  return {text:group?.textContent||"",actions:[...(group?.querySelectorAll("button")||[])].map(b=>b.textContent.trim()),
+   upload:!!bar?.querySelector(".upload-button"),newFolder:!!bar?.querySelector(".new-folder-wrapper"),
+   height:bar?.getBoundingClientRect().height,
+   filtersLeft:bar?.querySelector(".toolbar-views")?.getBoundingClientRect().left,
+   printDisabled:group?.querySelector(".batch-btn[title*='打印']")?.disabled};
  })()`);
  assert(batch.text.includes("已选 130"),"batch count must match the loaded selection");
  for(const action of ["下载","移动","删除"])assert(batch.actions.includes(action),"missing batch action "+action);
+ assert(!batch.upload&&!batch.newFolder,"selection must replace upload/create in place");
+ assert.equal(batch.height,defaultToolbar.height,"selection must not resize the toolbar");
+ assert.equal(batch.filtersLeft,defaultToolbar.filtersLeft,"selection must not shift browse controls");
+ assert(batch.printDisabled,"batch printing beyond 20 items must be disabled");
+ // Client-side filtering may hide a selected file, never silently remove it.
+ await evaluate(`(()=>{
+  const input=document.querySelector(".filter-search-input");
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(input,"审计模拟文件-0001");
+  input.dispatchEvent(new Event("input",{bubbles:true}));
+ })()`);
+ await until('document.querySelector(".file-selection-hidden")?.textContent.includes("隐藏")');
+ assert((await evaluate('document.querySelector(".file-selected-count")?.textContent')).includes("已选 130"),
+  "filtering must preserve the full selection including hidden files");
+ await evaluate(`(()=>{
+  const input=document.querySelector(".filter-search-input");
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(input,"");
+  input.dispatchEvent(new Event("input",{bubbles:true}));
+ })()`);
+ await until('document.querySelectorAll("tr.file-entry").length===130');
+ for(const width of [1440,980,700,390]){
+  await send("Emulation.setDeviceMetricsOverride",{width,height:900,deviceScaleFactor:1,mobile:false});
+  await wait(160);
+  const geometry=await evaluate(`(()=>{
+   const bar=document.querySelector(".work-body>.file-toolbar");
+   const left=bar?.getBoundingClientRect().left??0;
+   const right=bar?.getBoundingClientRect().right??0;
+   return {overflow:document.documentElement.scrollWidth-innerWidth,
+    toolbarRight:right,viewportRight:innerWidth,
+    actionsRight:bar?.querySelector(".batch-actions-group")?.getBoundingClientRect().right??0,
+    toolbarLeft:left};
+  })()`);
+  assert(geometry.overflow<=2&&geometry.actionsRight<=geometry.toolbarRight+1&&geometry.toolbarRight<=geometry.viewportRight+1,
+   "selected toolbar must fit at "+width+": "+JSON.stringify(geometry));
+ }
+ await send("Emulation.setDeviceMetricsOverride",{width:1440,height:900,deviceScaleFactor:1,mobile:false});
+ await wait(160);
  // Open the real 130-file deletion review but NEVER activate confirmation.
  await evaluate('document.querySelector(".batch-actions-group .batch-btn.danger")?.click()');
  await until('document.body.textContent.includes("以下 130 项将移入回收站")');
@@ -446,6 +498,7 @@ try{
  assert.equal((await selection()).count,130,"cancel must preserve selected files");
  await key("Escape");
  await until('[...document.querySelectorAll("tr.file-entry")].every(row=>row.getAttribute("aria-selected")!=="true")');
+ await until('!!document.querySelector(".file-toolbar .upload-button")&&!document.querySelector(".batch-actions-group")');
  console.log("EXPLORER_PAGING_130_REACT_PASS",JSON.stringify({...mockState,scroll}));
  await send("Page.removeScriptToEvaluateOnNewDocument",{identifier:injection.identifier});
  console.log("RARE_FOLDER_BROWSER_PASS: layered folders, low-noise toolbar, 4 views, 1440/980/700/390px");

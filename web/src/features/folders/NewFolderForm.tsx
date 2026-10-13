@@ -31,7 +31,10 @@ export function NewFolderForm({parentId,onCreated}:{parentId:string;onCreated:(n
  }
 
  return <div className="new-folder-wrapper">
-  <RareButton type="button" className="action-btn-secondary" onClick={()=>setOpen(true)}>+ 新建文件夹</RareButton>
+  <RareButton type="button" className="action-btn-secondary" onClick={()=>setOpen(true)}>
+   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M3 8V6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v3M3 10v9a2 2 0 0 0 2 2h7m6-6v8m-4-4h8"/></svg>
+   <span>新建文件夹</span>
+  </RareButton>
   {open&&<Dialog open title="新建文件夹" onClose={()=>setOpen(false)} closeGuard={()=>!busy} className="dialog">
    <form onSubmit={submit}>
     <label htmlFor="new-folder-modal-input">文件夹名称</label>

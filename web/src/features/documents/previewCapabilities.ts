@@ -19,5 +19,5 @@ export function previewCapabilities(preview:PreviewData,versionCount:number){
  * Conservative whitelist avoids offering 'Print' for known media/CAD/archives. */
 export function canOfferPrintFromListing(file:FileItem){
  if(/^(video|audio)\//i.test(file.contentType))return false;
- return /\.(?:pdf|docx?|xlsx?|pptx?|png|jpe?g|gif|webp|bmp|tiff?|txt|md|markdown|csv|json|xml|ya?ml|log|ini|cfg|css|jsx?|tsx?|py|go|rs|java|c|cc|cpp|h|hpp|sh|sql)$/i.test(file.name);
+ return /\.(?:pdf|docx|txt|png|jpe?g|gif|webp|bmp|tiff?)$/i.test(file.name);
 }
