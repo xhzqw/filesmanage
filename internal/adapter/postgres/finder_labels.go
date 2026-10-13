@@ -106,3 +106,45 @@ func (r *Repository) SetFinderFileLabel(ctx context.Context, labelID, fileID str
 	_, err := r.Q.Exec(ctx, `DELETE FROM finder_file_labels WHERE label_id=$1 AND file_id=$2`, labelID, fileID)
 	return err
 }
+func (r *Repository) FinderLabelFolderIDs(ctx context.Context, user, labelID string) ([]string, error) {
+	rows, err := r.Q.Query(ctx, `SELECT a.folder_id FROM finder_folder_labels a JOIN finder_labels l ON l.id=a.label_id
+ WHERE a.label_id=$1 AND l.user_id=$2 ORDER BY a.folder_id LIMIT 2000`, labelID, user)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if err = rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+func (r *Repository) FinderFolderLabelIDs(ctx context.Context, user, folderID string) ([]string, error) {
+	rows, err := r.Q.Query(ctx, `SELECT l.id FROM finder_labels l JOIN finder_folder_labels a ON a.label_id=l.id
+ WHERE l.user_id=$1 AND a.folder_id=$2 ORDER BY l.sort_order`, user, folderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if err = rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+func (r *Repository) SetFinderFolderLabel(ctx context.Context, labelID, folderID string, add bool) error {
+	if add {
+		_, err := r.Q.Exec(ctx, `INSERT INTO finder_folder_labels(label_id,folder_id) VALUES($1,$2) ON CONFLICT DO NOTHING`, labelID, folderID)
+		return err
+	}
+	_, err := r.Q.Exec(ctx, `DELETE FROM finder_folder_labels WHERE label_id=$1 AND folder_id=$2`, labelID, folderID)
+	return err
+}

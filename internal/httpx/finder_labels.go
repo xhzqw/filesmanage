@@ -139,3 +139,81 @@ func (h *Handler) finderTaggedFiles(c *gin.Context) {
 	}
 	c.JSON(200, gin.H{"ok": true, "data": gin.H{"items": payload}})
 }
+func (h *Handler) finderFolderAssignments(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 8192)
+	var body struct {
+		FolderIDs []string `json:"folderIds"`
+	}
+	if c.ShouldBindJSON(&body) != nil {
+		respondError(c, domain.ErrInvalidInput)
+		return
+	}
+	ids, err := h.S.FinderFolderAssignments(c.Request.Context(), u, body.FolderIDs)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true, "data": ids})
+}
+func (h *Handler) finderTaggedResources(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	files, err := h.S.FinderTaggedFiles(c.Request.Context(), u, c.Param("id"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	folders, err := h.S.FinderTaggedFolders(c.Request.Context(), u, c.Param("id"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	fileData := make([]gin.H, 0, len(files))
+	for _, file := range files {
+		fileData = append(fileData, filePayload(file))
+	}
+	folderData := make([]gin.H, 0, len(folders))
+	for _, folder := range folders {
+		folderData = append(folderData, folderPayload(folder))
+	}
+	c.JSON(200, gin.H{"ok": true, "data": gin.H{"items": fileData, "folders": folderData}})
+}
+func (h *Handler) setFinderResources(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16384)
+	var body struct {
+		FileIDs   []string `json:"fileIds"`
+		FolderIDs []string `json:"folderIds"`
+		Add       bool     `json:"add"`
+	}
+	if c.ShouldBindJSON(&body) != nil {
+		respondError(c, domain.ErrInvalidInput)
+		return
+	}
+	if err := h.S.SetFinderResources(c.Request.Context(), u, c.Param("id"), body.FileIDs, body.FolderIDs, body.Add); err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true, "data": gin.H{"updated": len(body.FileIDs) + len(body.FolderIDs)}})
+}
+func (h *Handler) finderFolderLabels(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	ids, err := h.S.FinderFolderLabels(c.Request.Context(), u, c.Param("id"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"ok": true, "data": ids})
+}

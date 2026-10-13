@@ -12,6 +12,9 @@ type FinderLabelsStore interface {
 	UpdateFinderLabel(context.Context, domain.FinderLabel) (bool, error)
 	DeleteFinderLabel(context.Context, string, string) (bool, error)
 	FinderLabelFileIDs(context.Context, string, string) ([]string, error)
+	FinderLabelFolderIDs(context.Context, string, string) ([]string, error)
 	FinderFileLabelIDs(context.Context, string, string) ([]string, error)
+	FinderFolderLabelIDs(context.Context, string, string) ([]string, error)
 	SetFinderFileLabel(context.Context, string, string, bool) error
+	SetFinderFolderLabel(context.Context, string, string, bool) error
 }

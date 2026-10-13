@@ -217,6 +217,136 @@ func (s *Service) SetFinderFiles(ctx context.Context, u domain.User, labelID str
 }
 
 // Only authorized, non-deleted files are returned; labels never widen ACLs.
+// A mixed drag is validated then committed as a single database transaction.
+func (s *Service) SetFinderResources(ctx context.Context, u domain.User, labelID string, fileIDs, folderIDs []string, add bool) error {
+	if labelID == "" || len(fileIDs)+len(folderIDs) == 0 || len(fileIDs)+len(folderIDs) > 100 {
+		return domain.ErrInvalidInput
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	labels, err := tx.ListFinderLabels(ctx, u.ID)
+	if err != nil {
+		return err
+	}
+	if !finderLabelIn(labels, labelID) {
+		return domain.ErrNotFound
+	}
+	seen := map[string]bool{}
+	for _, id := range fileIDs {
+		if id == "" || seen["file:"+id] {
+			return domain.ErrInvalidInput
+		}
+		seen["file:"+id] = true
+		if _, err = s.visibleFile(ctx, tx, u, id, domain.ActionList); err != nil {
+			return err
+		}
+	}
+	for _, id := range folderIDs {
+		if id == "" || seen["folder:"+id] {
+			return domain.ErrInvalidInput
+		}
+		seen["folder:"+id] = true
+		if _, err = s.activeFolder(ctx, tx, id); err != nil {
+			return err
+		}
+		if err = s.require(ctx, tx, u, id, domain.ActionList); err != nil {
+			return err
+		}
+	}
+	for _, id := range fileIDs {
+		if err = tx.SetFinderFileLabel(ctx, labelID, id, add); err != nil {
+			return err
+		}
+	}
+	for _, id := range folderIDs {
+		if err = tx.SetFinderFolderLabel(ctx, labelID, id, add); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
+}
+func (s *Service) FinderFolderLabels(ctx context.Context, u domain.User, id string) ([]string, error) {
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	if _, err = s.activeFolder(ctx, tx, id); err != nil {
+		return nil, err
+	}
+	if err = s.require(ctx, tx, u, id, domain.ActionList); err != nil {
+		return nil, err
+	}
+	return tx.FinderFolderLabelIDs(ctx, u.ID, id)
+}
+func (s *Service) FinderFolderAssignments(ctx context.Context, u domain.User, folderIDs []string) (map[string][]string, error) {
+	if len(folderIDs) > 100 {
+		return nil, domain.ErrInvalidInput
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	result := make(map[string][]string, len(folderIDs))
+	for _, id := range folderIDs {
+		if id == "" {
+			return nil, domain.ErrInvalidInput
+		}
+		if _, exists := result[id]; exists {
+			return nil, domain.ErrInvalidInput
+		}
+		if _, err = s.activeFolder(ctx, tx, id); err != nil {
+			return nil, err
+		}
+		if err = s.require(ctx, tx, u, id, domain.ActionList); err != nil {
+			return nil, err
+		}
+		ids, e := tx.FinderFolderLabelIDs(ctx, u.ID, id)
+		if e != nil {
+			return nil, e
+		}
+		result[id] = ids
+	}
+	return result, nil
+}
+func (s *Service) FinderTaggedFolders(ctx context.Context, u domain.User, labelID string) ([]domain.Folder, error) {
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	labels, err := tx.ListFinderLabels(ctx, u.ID)
+	if err != nil {
+		return nil, err
+	}
+	if !finderLabelIn(labels, labelID) {
+		return nil, domain.ErrNotFound
+	}
+	ids, err := tx.FinderLabelFolderIDs(ctx, u.ID, labelID)
+	if errors.Is(err, ports.ErrRowMissing) {
+		return nil, domain.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	result := make([]domain.Folder, 0, len(ids))
+	for _, id := range ids {
+		folder, e := s.activeFolder(ctx, tx, id)
+		if e == nil {
+			e = s.require(ctx, tx, u, id, domain.ActionList)
+		}
+		if e == nil {
+			result = append(result, folder)
+		} else if !errors.Is(e, domain.ErrForbidden) && !errors.Is(e, domain.ErrNotFound) {
+			return nil, e
+		}
+	}
+	return result, nil
+}
 func (s *Service) FinderTaggedFiles(ctx context.Context, u domain.User, labelID string) ([]domain.File, error) {
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {

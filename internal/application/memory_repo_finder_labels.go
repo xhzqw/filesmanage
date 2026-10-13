@@ -75,6 +75,7 @@ func (r *memoryRepo) DeleteFinderLabel(_ context.Context, user, id string) (bool
 	}
 	delete(r.finderLabels, id)
 	delete(r.finderAssignments, id)
+	delete(r.finderFolderAssignments, id)
 	return true, nil
 }
 func (r *memoryRepo) FinderLabelFileIDs(_ context.Context, user, id string) ([]string, error) {
@@ -110,6 +111,42 @@ func (r *memoryRepo) SetFinderFileLabel(_ context.Context, labelID, fileID strin
 		r.finderAssignments[labelID][fileID] = true
 	} else {
 		delete(r.finderAssignments[labelID], fileID)
+	}
+	return nil
+}
+func (r *memoryRepo) FinderLabelFolderIDs(_ context.Context, user, id string) ([]string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if l, ok := r.finderLabels[id]; !ok || l.UserID != user {
+		return nil, ports.ErrRowMissing
+	}
+	ids := []string{}
+	for folderID := range r.finderFolderAssignments[id] {
+		ids = append(ids, folderID)
+	}
+	return ids, nil
+}
+func (r *memoryRepo) FinderFolderLabelIDs(_ context.Context, user, folderID string) ([]string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	ids := []string{}
+	for id, folders := range r.finderFolderAssignments {
+		if l, ok := r.finderLabels[id]; ok && l.UserID == user && folders[folderID] {
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
+}
+func (r *memoryRepo) SetFinderFolderLabel(_ context.Context, labelID, folderID string, add bool) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.finderFolderAssignments[labelID] == nil {
+		r.finderFolderAssignments[labelID] = map[string]bool{}
+	}
+	if add {
+		r.finderFolderAssignments[labelID][folderID] = true
+	} else {
+		delete(r.finderFolderAssignments[labelID], folderID)
 	}
 	return nil
 }

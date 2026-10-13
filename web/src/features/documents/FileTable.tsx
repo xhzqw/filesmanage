@@ -27,6 +27,7 @@ import {setMoveDragImage} from "./dragPreview";
 import {classifyFile,type FileCategory} from "../../shared/fileTypes";
 import {FileTypeIcon} from "../../shared/ui/FileTypeIcon";
 import {FINDER_COLORS,finderColor,labelApi,type FinderLabel} from "../../shared/finderLabels";
+import {LABEL_DRAG_MIME} from "../../shared/labelDrag";
 import {FolderResourceIcon} from "../../shared/ui/ResourceIcons";
 import {FinderPathColumn} from "./FinderPathColumn";
 import"./fileTable.css";
@@ -133,7 +134,10 @@ type FavoriteRow={kind:string;fileId?:string;folderId?:string};
 // current visible order, and the keyboard mirrors every mouse action. The
 // selection model keeps focus, anchor and membership separate so a stale
 // anchor can never resurrect after a re-sort.
-export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdit,reloadKey,newFolderSlot,onFolderChanged,viewMode="list"}:{folder:string;folderName:string;childFolders?:Folder[];folderPath?:Folder[];onEdit:(fileId:string)=>void;reloadKey:number;newFolderSlot?:ReactNode;onFolderChanged?:()=>void;viewMode?:ExplorerViewMode}){
+export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdit,reloadKey,newFolderSlot,onFolderChanged,viewMode="list",labelId,taggedItems,onTagRefresh}:{
+ folder:string;folderName:string;childFolders?:Folder[];folderPath?:Folder[];onEdit:(fileId:string)=>void;reloadKey:number;newFolderSlot?:ReactNode;onFolderChanged?:()=>void;viewMode?:ExplorerViewMode;
+ labelId?:string;taggedItems?:FileItem[];onTagRefresh?:()=>Promise<void>;
+}){
  const[items,setItems]=useState<FileItem[]>([]);
 // Round-trip of the list read the status bar reports (spec §3.1). It is an
 // observation of the request that already runs below — never an extra one —
@@ -150,7 +154,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  // A page response belongs to a particular directory/order revision. React
  // state alone cannot prevent a late response after navigating elsewhere.
  const listRevision=useRef(0);
- const listKey=folder+"\u0000"+sort+"\u0000"+reloadKey;
+ const listKey=folder+"\u0000"+(labelId??"")+"\u0000"+sort+"\u0000"+reloadKey;
  const listKeyRef=useRef(listKey);
  listKeyRef.current=listKey;
  const lastViewRef=useRef(folder+"\u0000"+sort);
@@ -231,6 +235,14 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   }).catch(()=>{if(live){setFinderAssignments({});setFinderReady(false);}});
   return()=>{live=false;};
  },[items,finderRevision]);
+ useEffect(()=>{
+  let live=true;
+  const ids=childFolders.slice(0,100).map(folder=>folder.id);
+  labelApi.folderAssignments(ids).then(assignments=>{
+   if(live)setFinderFolderAssignments(assignments);
+  }).catch(()=>{if(live)setFinderFolderAssignments({});});
+  return()=>{live=false;};
+ },[childFolders,finderRevision]);
  const[deleteBusy,setDeleteBusy]=useState(false);
  const[zipProgress,setZipProgress]=useState<ZipProgress|null>(null);
  const zipController=useRef<AbortController|null>(null);
@@ -250,6 +262,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  // The native drag image is a separate filename-only surface, not a table row.
  const dragSession=useRef<MoveDragSession|null>(null);
  const[draggingIds,setDraggingIds]=useState<Set<string>>(()=>new Set<string>());
+ const[finderFolderAssignments,setFinderFolderAssignments]=useState<Record<string,string[]>>({});
  // A target preselected by a drop; "" is the menu entry, which opens the same
  // dialog with no candidate.
  const[moveDropTarget,setMoveDropTarget]=useState("");
@@ -291,6 +304,12 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   // Preserve all loaded pages across remote updates; re-query the visible
   // ordered window instead of merging stale cursor pages with a fresh page.
   const visibleCount=hasPreviousRows?items.length:50;
+  if(labelId){
+   setItems(taggedItems??[]);
+   setSelectedIds(prev=>new Set([...prev].filter(id=>(taggedItems??[]).some(file=>file.id===id))));
+   setHasMore(false);setCursor("");setStatus("ready");setLatencyMs(null);
+   return()=>{valid=false;controller.abort();};
+  }
   revalidateFileWindow((next,limit,signal)=>fileApi.list(folder,sort,next,limit,signal),visibleCount,controller.signal)
    .then(page=>{
     if(!valid||revision!==listRevision.current||listKeyRef.current!==listKey)return;
@@ -321,7 +340,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     setStatus(hasPreviousRows?"ready":"failed");setLatencyMs(null);
    }});
   return()=>{valid=false;controller.abort();};
- },[folder,sort,reloadKey]);
+ },[folder,sort,reloadKey,labelId,taggedItems]);
 
  // Directory navigation resets selection; sorting alone does not change the
  // selected file identities.
@@ -447,6 +466,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  function toggleFavorite(file:FileItem){return toggleFavoriteResource("file",file.id);}
 
  async function reload(){
+  if(labelId){await onTagRefresh?.();return;}
   const revision=++listRevision.current;
   pagingRef.current=false;
   completedCursor.current="";
@@ -532,6 +552,9 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
 
   const visibleItems=useMemo(()=>{
    let list=items;
+   if(labelId){
+    list=[...list].sort((a,b)=>sort==="name_asc"?a.name.localeCompare(b.name,"zh"):sort==="name_desc"?b.name.localeCompare(a.name,"zh"):sort==="size_desc"?b.sizeBytes-a.sizeBytes:b.updatedAt.localeCompare(a.updatedAt));
+   }
    if(nameFilter.trim()){
     const q=nameFilter.trim().toLowerCase();
     list=list.filter(item=>item.name.toLowerCase().includes(q));
@@ -540,7 +563,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     list=list.filter(item=>classifyFile(item.name).category===categoryFilter);
    }
    return list;
-  },[items,categoryFilter,nameFilter]);
+  },[items,categoryFilter,nameFilter,labelId,sort]);
 
  const categoryCounts=useMemo(()=>{
   const map:Record<FileCategory,number>={
@@ -939,8 +962,12 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   setDraggingIds(new Set(ids));
   // "move" and never "copy"/"copyMove": this phase offers no copy, and a copy
   // cursor over a gesture that moves would misstate the outcome (§7.2).
-  dataTransfer.effectAllowed="move";
+  dataTransfer.effectAllowed="copyMove";
   dataTransfer.setData(DRAG_MIME,JSON.stringify(session));
+  dataTransfer.setData(LABEL_DRAG_MIME,JSON.stringify({
+   fileIds:sources.map(file=>file.id),
+   folderIds:inside?selectedFolders.map(entry=>entry.id):[],
+  }));
   // Native text fallback mirrors the filename-only visual ghost.
   dataTransfer.setData("text/plain",ids.length===1?item.name:`${item.name} +${ids.length-1}`);
   setMoveDragImage(dataTransfer,item.name,ids.length);
@@ -965,12 +992,18 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  // Both file and folder drags use their existing confirmation flows. Dropping
  // never performs a server write, and OS file uploads are left to DropZone.
  function onFolderDragStart(event:DragEvent<HTMLElement>,entry:Folder){
-  if((event.target as HTMLElement).closest("button,input")){event.preventDefault();return;}
+  if((event.target as HTMLElement).closest("a,button,input,select,textarea")){event.preventDefault();return;}
+  const inside=selectedFolderIds.has(entry.id);
+  const folderIds=inside?selectedFolders.map(item=>item.id):[entry.id];
+  const fileIds=inside?selection.map(item=>item.id):[];
+  if(folderIds.length+fileIds.length>100){event.preventDefault();toast.error("每次最多标记 100 个资源");return;}
+  if(!inside){selectKeys(["folder:"+entry.id]);setFocusedFolderId(entry.id);setFocusedId(null);}
   folderDragRef.current=entry;
-  event.dataTransfer.effectAllowed="move";
+  event.dataTransfer.effectAllowed="copyMove";
   event.dataTransfer.setData("application/x-filesmanage-folder",entry.id);
+  event.dataTransfer.setData(LABEL_DRAG_MIME,JSON.stringify({fileIds,folderIds}));
   event.dataTransfer.setData("text/plain",entry.name);
-  setMoveDragImage(event.dataTransfer,entry.name,1);
+  setMoveDragImage(event.dataTransfer,entry.name,folderIds.length+fileIds.length);
  }
  function onFolderDragEnd(){folderDragRef.current=null;}
  function onFolderDragOver(event:DragEvent<HTMLElement>){
@@ -1162,6 +1195,32 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   }catch(error){toast.error(errorCopy(error,"设置文件标签失败"));}
   finally{setFinderBusy(false);}
  }
+ async function markFinderFolders(label:FinderLabel,targets:Folder[]){
+  if(finderBusy||!targets.length||targets.length>100)return;
+  const allMarked=targets.every(folder=>(finderFolderAssignments[folder.id]??[]).includes(label.id));
+  setFinderBusy(true);
+  try{
+   await labelApi.setResources(label.id,[],targets.map(folder=>folder.id),!allMarked);
+   setFinderFolderAssignments(current=>{
+    const next={...current};
+    for(const folder of targets){
+     const labels=new Set(next[folder.id]??[]);
+     if(allMarked)labels.delete(label.id);else labels.add(label.id);
+     next[folder.id]=[...labels];
+    }
+    return next;
+   });
+   toast.success(allMarked?"已移除文件夹标签":"已添加文件夹标签");
+  }catch(error){toast.error(errorCopy(error,"修改文件夹标签失败"));}
+  finally{setFinderBusy(false);}
+ }
+ function finderFolderDots(entry:Folder){
+  const assigned=new Set(finderFolderAssignments[entry.id]??[]);
+  const marked=finderLabels.filter(label=>assigned.has(label.id));
+  return marked.length?<span className="file-finder-marks" aria-label={"标签："+marked.map(label=>label.name).join("、")}>
+   {marked.slice(0,6).map(label=><span key={label.id} className="file-finder-mark" style={{backgroundColor:finderColor(label.color)}} title={label.name}/>)}
+  </span>:null;
+ }
  function finderDots(item:FileItem){
   const assigned=new Set(finderAssignments[item.id]??[]);
   const marks=finderLabels.filter(label=>assigned.has(label.id));
@@ -1319,10 +1378,10 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  function renderFolderEntry(entry:Folder){
   const selected=selectedFolderIds.has(entry.id);
   const hovered=hoveredFolderId===entry.id;
-  return <div key={"folder-"+entry.id} data-folder-id={entry.id} data-upload-folder-id={entry.id} role="row"
+ return <div key={"folder-"+entry.id} data-folder-id={entry.id} data-upload-folder-id={entry.id} role="row"
    tabIndex={0} aria-selected={selected}
    className={"explorer-item explorer-folder"+(selected?" selected":"")}
-   draggable={viewMode==="columns"}
+   draggable
    onDragStart={event=>onFolderDragStart(event,entry)}
    onDragEnd={onFolderDragEnd}
    onDragOver={onFolderDragOver}
@@ -1336,7 +1395,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    onDoubleClick={()=>navigate("/doc?folder="+encodeURIComponent(entry.id))}
    onKeyDown={event=>onFolderKeyDown(event,entry)}>
    <div className="explorer-item-art" aria-hidden="true"><FolderResourceIcon open={selected} hovered={hovered} size={viewMode==="columns"?24:52}/></div>
-   <span className="explorer-item-name" title={entry.name}>{entry.name}</span>
+   <span className="explorer-item-name" title={entry.name}>{entry.name}</span>{finderFolderDots(entry)}
    <span className="explorer-item-sub">文件夹</span>
    {showCheckboxes&&<RareInput className="explorer-item-check" type="checkbox" checked={selected}
     aria-label={"选择文件夹 "+entry.name} onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}}
@@ -1380,11 +1439,11 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    <div className="toolbar-actions" data-selection-mode={selectedTotal>0?"selected":"default"}>
     {selectedTotal===0?
      <div className="file-toolbar-mode" key="default">
-      <label className="upload-button primary-btn">
+      {!labelId&&<label className="upload-button primary-btn">
        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>
        <span>上传文件</span>
        <RareInput type="file" multiple onChange={onUpload}/>
-      </label>
+      </label>}
       {newFolderSlot}
      </div>:
      <div className="file-toolbar-mode batch-actions-group" key="selected" role="group" aria-label={`已选 ${selectedTotal} 项资源的操作`}>
@@ -1468,8 +1527,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
      {status==="failed"&&<tr><td colSpan={showCheckboxes?6:5} className="empty" role="alert">获取文件失败，请刷新重试</td></tr>}
      {status==="ready"&&items.length===0&&visibleFolders.length===0&&<tr><td colSpan={showCheckboxes?6:5} className="empty">
       <svg className="empty-mark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.5h8A1.5 1.5 0 0 1 20 10v7.5A1.5 1.5 0 0 1 18.5 19h-14A1.5 1.5 0 0 1 3 17.5z"/></svg>
-      <span className="empty-title">目录为空</span>
-      <span className="empty-hint">上传第一个文件开始使用。</span>
+      <span className="empty-title">{labelId?"标签为空":"目录为空"}</span>
+      <span className="empty-hint">{labelId?"拖拽文件或文件夹至左侧标签即可添加。":"上传第一个文件开始使用。"}</span>
      </td></tr>}
      {status==="ready"&&items.length>0&&visibleItems.length===0&&visibleFolders.length===0&&<tr><td colSpan={showCheckboxes?6:5} className="empty">
      <span className="empty-title">无匹配文件</span>
@@ -1482,6 +1541,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       }}>清除筛选（显示已加载 {items.length} 个文件）</RareButton>
      </td></tr>}
      {status==="ready"&&visibleFolders.map(entry=><tr key={"folder-"+entry.id} data-upload-folder-id={entry.id} className={"explorer-list-folder"+(selectedFolderIds.has(entry.id)?" selected":"")}
+      draggable onDragStart={event=>onFolderDragStart(event,entry)}
       tabIndex={0} aria-selected={selectedFolderIds.has(entry.id)}
       onClick={event=>onFolderClick(event,entry)}
       onContextMenu={event=>onFolderContextMenu(event,entry)}
@@ -1490,7 +1550,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       {showCheckboxes&&<td className="col-select"><RareInput type="checkbox" checked={selectedFolderIds.has(entry.id)} aria-label={"选择文件夹 "+entry.name}
        onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}}
        onChange={()=>{selectResource("folder",entry.id,true,checkboxShiftRef.current);checkboxShiftRef.current=false;setFocusedFolderId(entry.id);setFocusedId(null);}}/></td>}
-      <td className="col-name"><div className="file-cell-wrap"><FolderResourceIcon size={19}/><span className="file-name" title={entry.name}>{entry.name}</span>
+      <td className="col-name"><div className="file-cell-wrap"><FolderResourceIcon size={19}/><span className="file-name" title={entry.name}>{entry.name}</span>{finderFolderDots(entry)}
        <RareButton type="button" tone="ghost" className="folder-inline-open" aria-label={"打开文件夹 "+entry.name}
         onClick={event=>{event.stopPropagation();navigate("/doc?folder="+encodeURIComponent(entry.id));}}>打开 ↗</RareButton>
       </div></td>
@@ -1553,7 +1613,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    {viewMode!=="columns"&&status==="loading"&&<div className="explorer-empty" role="status"><BrandLoadingLabel size="sm">正在加载文件…</BrandLoadingLabel></div>}
    {viewMode!=="columns"&&status==="failed"&&<div className="explorer-empty" role="alert">获取文件失败，请刷新重试</div>}
    {viewMode!=="columns"&&status==="ready"&&visibleItems.length===0&&visibleFolders.length===0&&<div className="explorer-empty">
-    <span>{items.length===0&&childFolders.length===0?"目录为空":"没有匹配的文件"}</span>
+    <span>{items.length===0&&childFolders.length===0?(labelId?"标签为空":"目录为空"):"没有匹配的文件"}</span>
     {items.length>0&&<RareButton type="button" tone="ghost" onClick={()=>{setCategoryFilter("all");setNameFilter("");setSelectedIds(new Set());}}>清除筛选</RareButton>}
    </div>}
    {status==="ready"&&(visibleItems.length>0||visibleFolders.length>0)&&viewMode==="icons"&&<div className="explorer-icon-grid" role="grid" aria-label="文件图标" onKeyDown={onGridKeyDown}>
@@ -1639,8 +1699,19 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     {id:"favorite",label:favoriteFolderIds.has(folderMenu.target.id)?"取消收藏":"收藏",disabled:favoritesState!=="ready"||favoriteBusy!=="",onSelect:()=>{void toggleFavoriteResource("folder",folderMenu.target.id);}},
     {id:"rename",label:"重命名",onSelect:()=>openFolderAction(folderMenu.target,"rename")},
     {id:"move",label:"移动到…",onSelect:()=>openFolderAction(folderMenu.target,"move")},
+    ...finderLabels.filter(label=>!label.isDefault).map(label=>({
+     id:"tag-"+label.id,label:"标签 · "+label.name,disabled:finderBusy,
+     onSelect:()=>void markFinderFolders(label,selectedFolderIds.has(folderMenu.target.id)?selectedFolders:[folderMenu.target])
+    })),
     {id:"delete",label:"删除",danger:true,onSelect:()=>{if(selectedFolderIds.size>1){setPendingFolderDelete(selectedFolders);setResourceDeleteError("");}else openFolderAction(folderMenu.target,"delete");}}
-   ]}/>}
+   ]}
+   swatches={FINDER_COLORS.map(color=>{
+    const label=finderLabels.find(l=>l.isDefault&&l.color===color.id);
+    const targets=selectedFolderIds.has(folderMenu.target.id)?selectedFolders:[folderMenu.target];
+    return {id:color.id,label:color.name,color:color.hex,
+     checked:!!label&&targets.every(folder=>(finderFolderAssignments[folder.id]??[]).includes(label.id)),
+     disabled:!label||finderBusy,onSelect:()=>{if(label)void markFinderFolders(label,targets);}};
+   })}/>}
   {folderEditing&&<Dialog open title={folderEditing.action==="rename"?"重命名文件夹":folderEditing.action==="delete"?"删除文件夹":"移动文件夹"}
    onClose={()=>{if(!folderOperationBusy)setFolderEditing(null);}} closeGuard={()=>!folderOperationBusy} className="dialog">
    {folderEditing.action==="rename"&&<form onSubmit={event=>{event.preventDefault();void submitFolderAction();}}>

@@ -1,10 +1,11 @@
-import {useEffect,useState,type FormEvent} from "react";
+import {useEffect,useState,type FormEvent,type DragEvent} from "react";
 import {Link,useLocation,useNavigate} from "react-router-dom";
 import {RareButton,RareInput} from "../../shared/ui/rare";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {toast} from "../../shared/ui/feedback";
 import {errorCopy} from "../../shared/errors";
 import {FINDER_COLORS,labelApi,finderColor,type FinderColor,type FinderLabel} from "../../shared/finderLabels";
+import {LABEL_DRAG_MIME,readLabelDrag} from "../../shared/labelDrag";
 
 type Draft={id:string;name:string;color:FinderColor;isDefault:boolean};
 export function FinderTags(){
@@ -12,6 +13,7 @@ export function FinderTags(){
  const [state,setState]=useState<"loading"|"ready"|"error">("loading");
  const [draft,setDraft]=useState<Draft|null>(null);
  const [busy,setBusy]=useState(false);
+ const [dropLabel,setDropLabel]=useState<string|null>(null);
  const location=useLocation(),navigate=useNavigate();
  const params=new URLSearchParams(location.search);
  const active=params.get("view")==="labels"?params.get("label"):null;
@@ -48,12 +50,38 @@ export function FinderTags(){
   }catch(error){toast.error(errorCopy(error,"删除标签失败"));}
   finally{setBusy(false);}
  }
+ function accepting(event:DragEvent<HTMLElement>){
+  return Array.from(event.dataTransfer.types).includes(LABEL_DRAG_MIME)&&!Array.from(event.dataTransfer.types).includes("Files");
+ }
+ function onDragOver(event:DragEvent<HTMLElement>,label:FinderLabel){
+  if(busy||!accepting(event))return;
+  event.preventDefault();event.stopPropagation();
+  event.dataTransfer.dropEffect="copy";
+  setDropLabel(label.id);
+ }
+ async function onDrop(event:DragEvent<HTMLElement>,label:FinderLabel){
+  if(!accepting(event))return;
+  event.preventDefault();event.stopPropagation();setDropLabel(null);
+  if(busy)return;
+  const resources=readLabelDrag(event.dataTransfer);
+  if(!resources){toast.error("无法识别拖拽资源，请重试");return;}
+  setBusy(true);
+  try{
+   await labelApi.setResources(label.id,resources.fileIds,resources.folderIds,true);
+   toast.success(`已添加到「${label.name}」`);
+  }catch(error){toast.error(errorCopy(error,"标签添加失败"));}
+  finally{setBusy(false);}
+ }
  return <div className="finder-nav-section finder-tags-section">
   <div className="finder-nav-heading"><span className="finder-nav-label">标签</span>
    <RareButton type="button" tone="ghost" className="finder-tag-add" title="新建标签" aria-label="新建标签"
     onClick={()=>setDraft({id:"",name:"",color:"blue",isDefault:false})}>＋</RareButton>
   </div>
-  {labels.map(label=><div key={label.id} className={"finder-tag-line"+(active===label.id?" is-current":"")}>
+  {labels.map(label=><div key={label.id} className={"finder-tag-line"+(active===label.id?" is-current":"")+(dropLabel===label.id?" is-drop-target":"")}
+   onDragEnter={event=>{if(accepting(event)){event.preventDefault();setDropLabel(label.id);}}}
+   onDragOver={event=>onDragOver(event,label)}
+   onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node))setDropLabel(null);}}
+   onDrop={event=>{void onDrop(event,label);}}>
    <Link to={"/doc?view=labels&label="+encodeURIComponent(label.id)} title={label.name}
     className="finder-tag-link" onContextMenu={event=>{event.preventDefault();edit(label);}}>
     <span className="finder-tag-dot" style={{backgroundColor:finderColor(label.color)}} aria-hidden="true"/>

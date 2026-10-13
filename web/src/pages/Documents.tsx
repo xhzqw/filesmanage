@@ -8,7 +8,7 @@ import type{Folder}from "../entities/folder/model";
 import{folderApi}from "../features/folders/api";
 import{ancestorPath}from "../features/folders/FolderTree";
 import{FinderSidebar,type DocumentSection}from "../features/collaboration/FinderSidebar";
-import{TagExplorer}from "../features/collaboration/TagExplorer";
+import{TagExplorer}from "../features/documents/TagExplorer";
 import{CollaborationPanel}from "../features/collaboration/CollaborationPanel";
 import{NewFolderForm}from "../features/folders/NewFolderForm";
 import{FolderActions}from "../features/folders/FolderActions";
@@ -284,7 +284,7 @@ export function Documents({user,onLogout,onUploadFolderChange}:{user:User;onLogo
     onKeyDown={onResizeKey}/>
    </aside>
    <main className="work">
-    {section==="labels"&&<TagExplorer/>}
+    {section==="labels"&&<TagExplorer viewMode={viewMode} onViewModeChange={switchView} onEdit={setEditingId}/>}
     {section!=="files"&&section!=="labels"&&<CollaborationPanel embedded activeTab={section} viewMode={viewMode} onViewModeChange={switchView}
     onSelectTab={tab=>navigate("/doc?view="+tab)}
     onChanged={()=>setCollaborationRevision(value=>value+1)}/>}
