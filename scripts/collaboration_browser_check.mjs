@@ -71,7 +71,7 @@ try{
   domain:"127.0.0.1",path:"/",httpOnly:true,sameSite:"Strict",
  });
  mkdirSync(SHOTS,{recursive:true});
- for(const vp of [{name:"wide",w:1920,h:1080},{name:"desktop",w:1366,h:768},{name:"narrow",w:720,h:900}]){
+ for(const vp of [{name:"wide",w:2048,h:900},{name:"desktop",w:1366,h:768},{name:"narrow",w:720,h:900}]){
   await cdp.send("Emulation.setDeviceMetricsOverride",{width:vp.w,height:vp.h,deviceScaleFactor:1,mobile:false});
   await cdp.navigate(BASE+"/doc?view=favorites");
   check(await cdp.waitFor("()=>!!document.querySelector('.collab-workspace .collab-results') && !!document.querySelector('.finder-sidebar') && document.querySelectorAll('.collab-results tbody .rare-badge').length>0"),vp.name+" favorites render");
@@ -92,6 +92,21 @@ try{
   check(layout.beside&&layout.mainVisible&&layout.rightInside,vp.name+" responsive workbench",JSON.stringify(layout));
   check(layout.overflow<=1,vp.name+" no document horizontal overflow",JSON.stringify(layout));
   check(layout.tones&&layout.allBadUnlinked,vp.name+" status badges and invalid links",JSON.stringify(layout));
+  const chromeGeometry=await cdp.evaluate(`(()=>{
+   const rect=selector=>document.querySelector(selector)?.getBoundingClientRect();
+   const head=rect('.collab-results-head'),create=rect('.collab-create-action'),
+    search=rect('.collab-filter-controls input[type=search]'),
+    tools=rect('.collab-filter-controls'),table=rect('.collab-resource-table'),
+    panel=rect('.collab-results'),side=rect('.finder-sidebar');
+   const inside=r=>r&&r.width>0&&r.left>=-1&&r.right<=innerWidth+1;
+   return {createAtStart:!!head&&!!create&&Math.abs(create.left-head.left)<=20,
+    searchVisible:inside(search),toolsVisible:inside(tools),tableInside:!!table&&!!panel&&table.right<=panel.right+2,
+    sidebarSized:!!side&&(innerWidth<=700||side.width>=180),
+    createLeft:create?.left,headLeft:head?.left,searchRight:search?.right,tableRight:table?.right,
+    panelRight:panel?.right,sidebarWidth:side?.width};
+  })()`);
+  check(chromeGeometry.createAtStart&&chromeGeometry.searchVisible&&chromeGeometry.toolsVisible&&chromeGeometry.tableInside&&chromeGeometry.sidebarSized,
+   vp.name+" actual toolbar alignment, sidebar and table bounds",JSON.stringify(chromeGeometry));
   check(await cdp.evaluate("(()=>!!document.querySelector('.collab-filter-controls input[type=search]')&&!!document.querySelector('[aria-label=\"资源显示方式\"]')&&!!document.querySelector('.collab-resource-table'))()"),
    vp.name+" unified Finder commands and resource rows");
   await cdp.evaluate("(()=>{document.querySelector('[aria-label=\"资源显示方式\"] button[aria-label=\"图标视图\"]')?.click();return true;})()");
@@ -115,6 +130,20 @@ try{
  check(await cdp.evaluate("(()=>location.pathname==='/doc' && new URLSearchParams(location.search).get('view')==='sent')()"),"shared view stays in documents");
  await cdp.evaluate("(()=>{document.querySelector('.finder-nav-item[href=\"/doc?view=received\"]')?.click();return true;})()");
  check(await cdp.waitFor("()=>document.querySelector('.collab-results-head strong')?.textContent==='与我共享' && !!document.querySelector('.collab-filter-controls')"),"received shares reuse Finder browser");
+ check(await cdp.waitFor("()=>document.querySelector('.collab-results-count')?.textContent?.includes('已加载')"),"received shares finished loading");
+ const received=await cdp.evaluate(`(()=>{
+  const head=document.querySelector('.collab-results-head')?.getBoundingClientRect();
+  const tools=document.querySelector('.collab-filter-controls')?.getBoundingClientRect();
+  const count=document.querySelector('.collab-results-count')?.getBoundingClientRect();
+  const empty=document.querySelector('.collab-empty-state');
+  return {noCreate:!document.querySelector('.collab-create-action'),
+   controlsInside:!!head&&!!tools&&tools.left>=head.left&&tools.right<=head.right+2,
+   countAtStart:!!head&&!!count&&count.left<=head.left+20,
+   noEmptyTableHeaders:!empty||!document.querySelector('.collab-resource-table thead'),
+   emptyState:empty?.textContent?.trim()||''};
+ })()`);
+ check(received.noCreate&&received.controlsInside&&received.countAtStart&&received.noEmptyTableHeaders,
+  "received scope without create action, centered empty state or old table",JSON.stringify(received));
  console.log("COLLABORATION_BROWSER_CHECK_PASS");
 }finally{
  cdp?.close();chrome.kill();

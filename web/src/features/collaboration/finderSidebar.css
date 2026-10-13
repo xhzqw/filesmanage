@@ -25,8 +25,7 @@
 .document-explorer .collab-root{flex:1}
 .document-explorer .collab-root.is-embedded .collab-workspace{margin:0;gap:0}
 .document-explorer .collab-root.is-embedded .collab-results{border:0;border-radius:var(--radius-sm)}
-.document-explorer .collab-root.is-embedded .collab-results-head .collab-create-action{margin-left:auto;flex:none}
-.document-explorer .collab-root.is-embedded .collab-results-head .secondary-action{margin-left:0}
+.document-explorer .collab-root.is-embedded .collab-results-head .collab-create-action{margin-left:0;flex:none}
 .document-explorer .collab-root.is-embedded .share-workbench{margin:8px;border-radius:var(--radius-md)}
 @media(max-width:700px){
  /* A short Finder location strip leaves the document grid visible on phones.

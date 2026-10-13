@@ -135,7 +135,7 @@
 }
 .collab-results-head>strong.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
 .collab-results-head .collab-create-action{
- flex:none;min-height:28px;padding:0 10px;border-radius:var(--radius-sm);font-size:12px;
+ flex:none;margin-left:0;min-height:28px;padding:0 10px;border-radius:var(--radius-sm);font-size:12px;
 }
 .collab-results-head .collab-results-count{flex:none;white-space:nowrap;color:var(--text-tertiary);font-variant-numeric:tabular-nums}
 .collab-filter-controls{margin-left:auto;display:flex;align-items:center;justify-content:flex-end;gap:7px;min-width:0;max-width:100%;flex-wrap:wrap}
@@ -154,6 +154,13 @@
 }
 .collab-filter-controls .collab-refresh:hover{background:var(--surface-row-hover);color:var(--brand-blue)}
 .collab-workspace .collab-table-scroll{display:flex;flex-direction:column;flex:1;min-height:0;overflow:auto;background:var(--surface-panel)}
+.collab-empty-state{
+ flex:1;min-height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+ gap:12px;padding:20px;color:var(--text-secondary);font-size:13px;font-weight:500;
+}
+.collab-empty-glyph{display:grid;place-items:center;width:46px;height:46px;
+ border-radius:var(--radius-lg);color:var(--text-tertiary);background:var(--surface-subtle)}
+.collab-results-head>.collab-results-count:first-of-type{margin-left:0}
 .collab-table-scroll .collab-resource-table{width:100%;table-layout:fixed;min-width:0;border-collapse:collapse}
 .collab-resource-table thead{background:var(--surface-panel)}
 .collab-resource-table thead th{

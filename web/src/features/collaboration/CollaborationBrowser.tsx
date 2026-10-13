@@ -109,11 +109,12 @@ export function CollaborationBrowser({tab,favorites,shares,status,nextCursor,mor
   {actions(entry)}
  </div>;
  const empty=status==="ready"&&visible.length===0;
+ const hasCreate=tab!=="received";
  return <section className="collab-results" aria-label={tab==="favorites"?"我的关注":tab==="received"?"与我共享":"我共享的"}>
   <div className="collab-results-head">
    <strong className="sr-only">{tab==="favorites"?"我的关注":tab==="received"?"与我共享":"我共享的"}</strong>
-   <RareButton type="button" className="primary collab-create-action" aria-expanded={tab==="favorites"&&pickerOpen}
-    onClick={onCreate}>{tab==="favorites"?(pickerOpen?"收起选择":"添加关注 / 分享"):"创建分享"}</RareButton>
+   {hasCreate&&<RareButton type="button" className="primary collab-create-action" aria-expanded={tab==="favorites"&&pickerOpen}
+    onClick={onCreate}>{tab==="favorites"?(pickerOpen?"收起选择":"添加关注 / 分享"):"新建共享"}</RareButton>}
    <span className="collab-results-count" aria-live="polite">{status==="ready"?"已加载 "+entries.length+" 项"+(nextCursor?" · 还有更多":""):""}</span>
    <div className="collab-filter-controls">
     <RareInput type="search" aria-label="过滤当前已加载的关注与分享" placeholder="筛选名称…" value={query}
@@ -132,11 +133,16 @@ export function CollaborationBrowser({tab,favorites,shares,status,nextCursor,mor
    </div>
   </div>
   <div className="collab-table-scroll">
-   {viewMode==="list"&&<RareDataTable className={"collab-resource-table "+(tab==="favorites"?"collab-favorites-table":"collab-shares-table")}>
+   {empty&&<div className="collab-empty-state" role="status">
+    <span className="collab-empty-glyph" aria-hidden="true">
+     <svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 10h10M7 14h7"/></svg>
+    </span>
+    <span>{query?"没有匹配的资源":tab==="favorites"?"暂无关注":tab==="received"?"暂无收到的共享":"暂无发出的共享"}</span>
+   </div>}
+   {viewMode==="list"&&!empty&&<RareDataTable className={"collab-resource-table "+(tab==="favorites"?"collab-favorites-table":"collab-shares-table")}>
     <thead><tr><th scope="col">名称</th><th scope="col" className="collab-description-column">{tab==="favorites"?"关注时间":tab==="sent"?"接收方":"权限"}</th><th scope="col">状态</th><th scope="col">操作</th></tr></thead>
     <tbody>
      {status!=="ready"&&<tr><td colSpan={4} className="empty" role="status">{status==="loading"?<BrandLoadingLabel size="sm">正在加载…</BrandLoadingLabel>:"加载失败，请刷新重试"}</td></tr>}
-     {empty&&<tr><td colSpan={4} className="empty"><span className="empty-title">{query?"没有匹配的资源":tab==="favorites"?"暂无关注":tab==="received"?"暂无收到的分享":"暂无发出的分享"}</span></td></tr>}
      {status==="ready"&&visible.map(entry=><tr key={entry.key} className="collab-resource-row">
       <td><div className="file-cell-wrap">{resourceIcon(entry,20)}
        <div className="collab-resource-name">{entry.url?<Link to={entry.url} title={entry.name}>{entry.name}</Link>:<span className="collab-muted-name" title="资源已失效或无权访问">{entry.name}</span>}
@@ -152,9 +158,8 @@ export function CollaborationBrowser({tab,favorites,shares,status,nextCursor,mor
      </tr>)}
     </tbody>
    </RareDataTable>}
-   {viewMode!=="list"&&<div className={"collab-visual explorer-surface explorer-surface-"+viewMode}>
+   {viewMode!=="list"&&!empty&&<div className={"collab-visual explorer-surface explorer-surface-"+viewMode}>
     {status!=="ready"&&<div className="explorer-empty" role="status">{status==="loading"?<BrandLoadingLabel size="sm">正在加载…</BrandLoadingLabel>:"加载失败，请刷新重试"}</div>}
-    {empty&&<div className="explorer-empty">{query?"没有匹配的资源":tab==="favorites"?"暂无关注":tab==="received"?"暂无收到的分享":"暂无发出的分享"}</div>}
     {status==="ready"&&visible.length>0&&viewMode==="icons"&&<div className="explorer-icon-grid" role="grid" aria-label="资源图标">{visible.map(tile)}</div>}
     {status==="ready"&&visible.length>0&&viewMode==="columns"&&<div className="explorer-columns">
      <div className="explorer-column-list" role="grid" aria-label="资源分栏">{visible.map(tile)}</div>
