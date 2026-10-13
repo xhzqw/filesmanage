@@ -255,7 +255,7 @@ export function DelegatedRolesWorkspace(){
      </div>
      {confirm===reviewSignature&&<p className="perm-review">确认向 {subject} 授予 {actionName(effectiveAction)}，仅当前目录。</p>}
      <RareButton type="button" className="secondary-action" onClick={()=>setRefresh(v=>v+1)}>刷新</RareButton>
-     <RareButton className="primary" type="submit" disabled={!subject||!effectiveAction||isMutating}>{isMutating?"提交中…":confirm===reviewSignature?"确认授权":"预览授权"}</RareButton>
+     <RareButton className="primary" type="submit" loading={isMutating} disabled={!subject||!effectiveAction}>{confirm===reviewSignature?"确认授权":"预览授权"}</RareButton>
     </form>
    </>}
   </section>}

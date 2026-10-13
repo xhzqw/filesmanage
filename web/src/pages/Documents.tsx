@@ -348,8 +348,8 @@ export function Documents({user,onLogout,onUploadFolderChange}:{user:User;onLogo
       {move.unknown&&<RareButton type="button" className="secondary-action" disabled={moveBusy}
        onClick={refreshTreeAndFiles}>刷新查看状态</RareButton>}
       <RareButton type="button" className="secondary-action" disabled={moveBusy} onClick={closeMove}>取消</RareButton>
-      <RareButton type="button" className="primary" disabled={moveBusy||!moveCanSubmit}
-       onClick={submitMove}>{moveBusy?"移动中…":"确认移动"}</RareButton>
+      <RareButton type="button" className="primary" loading={moveBusy} disabled={!moveCanSubmit}
+       onClick={submitMove}>确认移动</RareButton>
      </div>}/>
    </Dialog>}
   </AppShell>;

@@ -143,7 +143,7 @@ export function DropZone({folderId,userId,onCommitted,children}:{folderId:string
        {task.status==="uploading"&&<RareButton type="button" title="取消只中断本地请求；服务端已提交的结果无法撤销" onClick={()=>cancel(task.queueId)}>取消</RareButton>}
        {task.status==="failed"&&<>
         {task.failureCode!=="E_NAME_CONFLICT"&&!task.replacement&&<RareButton type="button" onClick={()=>{setReplaceConfirm(null);retry(task.queueId);}}>重试</RareButton>}
-        {(task.failureCode==="E_NAME_CONFLICT"||task.replacement)&&task.file&&<RareButton type="button" disabled={preparingReplace===task.queueId} onClick={()=>void prepareReplace(task.queueId)}>{preparingReplace===task.queueId?"正在检查…":task.replacement?"重新确认替换":"替换为新版本"}</RareButton>}
+        {(task.failureCode==="E_NAME_CONFLICT"||task.replacement)&&task.file&&<RareButton type="button" loading={preparingReplace===task.queueId} onClick={()=>void prepareReplace(task.queueId)}>{task.replacement?"重新确认替换":"替换为新版本"}</RareButton>}
         <RareButton type="button" onClick={()=>{setPendingRename(null);setRenamingId(task.queueId);setRenameValue(task.name);}}>改名重试</RareButton>
         <RareButton type="button" onClick={()=>{setReplaceConfirm(null);skip(task.queueId);}}>跳过</RareButton>
        </>}
