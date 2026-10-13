@@ -454,13 +454,7 @@ table.file-table tbody tr .row-actions:focus-within .actions-hover-group{
 .action-star-btn:disabled{
   opacity:0.4;cursor:not-allowed;
 }
-.star-icon{
-  display:block;
-  transition:transform .12s ease;
-}
-.action-star-btn:hover .star-icon{
-  transform:scale(1.15);
-}
+.star-icon{display:block}
 
 .sr-only{
   position:absolute;width:1px;height:1px;padding:0;margin:-1px;

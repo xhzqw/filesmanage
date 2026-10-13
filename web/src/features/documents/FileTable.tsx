@@ -204,6 +204,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  const[favoriteFolderIds,setFavoriteFolderIds]=useState<Set<string>>(()=>new Set<string>());
  const[favoritesState,setFavoritesState]=useState<"loading"|"ready"|"failed">("loading");
  const[favoriteBusy,setFavoriteBusy]=useState("");
+ const[favoriteRetryToken,setFavoriteRetryToken]=useState(0);
  // Favorite and unfavorite are mutually exclusive states; never stack their
  // transient success messages in the center of the screen.
  const favoriteToastId=useRef(-1);
@@ -245,7 +246,13 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
      return kept.size===current.size?current:kept;
     });
     setFocusedId(current=>current&&page.items.some(item=>item.id===current)?current:null);
-    setAnchorId(current=>current&&page.items.some(item=>item.id===current)?current:null);
+    // Anchors are typed keys (file: or folder:), not bare file ids.
+    setAnchorId(current=>{
+     if(!current)return null;
+     if(current.startsWith("folder:"))return childFolders.some(row=>row.id===current.slice(7))?current:null;
+     if(current.startsWith("file:"))return page.items.some(row=>row.id===current.slice(5))?current:null;
+     return null;
+    });
     setHasMore(page.nextCursor!=="");
     setCursor(page.nextCursor);
     setStatus("ready");
@@ -297,7 +304,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    })
    .catch(()=>{if(valid)setFavoritesState("failed");});
   return()=>{valid=false;};
- },[folder,reloadKey]);
+ },[folder,reloadKey,favoriteRetryToken]);
 
  // A legal drop on a tree node opens the same move dialog the row menu opens,
  // with the dropped folder as the pre-selected candidate; the preflight and the
@@ -338,7 +345,14 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  // directions; a failed write restores the previous local state instead of
  // leaving the row showing a favorite the server never recorded.
  async function toggleFavoriteResource(kind:"file"|"folder",id:string){
-  if(favoritesState!=="ready"||favoriteBusy!=="")return;
+  if(favoriteBusy!=="")return;
+  if(favoritesState!=="ready"){
+   if(favoritesState==="failed"){
+    toast.warning("正在重新获取收藏状态…");
+    setFavoriteRetryToken(current=>current+1);
+   }
+   return;
+  }
   const on=!(kind==="file"?favoriteIds:favoriteFolderIds).has(id);
   const update=kind==="file"?setFavoriteIds:setFavoriteFolderIds;
   setFavoriteBusy(kind+":"+id);
@@ -348,7 +362,15 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    return next;
   });
   try{
-   await request<{id:string;favorited:boolean}>("/favorites/"+kind+"/"+encodeURIComponent(id),{method:on?"PUT":"DELETE"});
+   const response=await request<{id:string;favorited:boolean}>("/favorites/"+kind+"/"+encodeURIComponent(id),{method:on?"PUT":"DELETE"});
+   if(response?.id!==id||response.favorited!==on)throw new Error("收藏接口响应不一致");
+   // The saved state must survive a round-trip to the authorized API.
+   const rows=await request<FavoriteRow[]>("/favorites",{cache:"no-store"});
+   if(!Array.isArray(rows))throw new Error("收藏状态读取失败");
+   const persisted=rows.some(row=>kind==="file"?row.kind==="file"&&row.fileId===id:row.kind==="folder"&&row.folderId===id);
+   if(persisted!==on)throw new Error("收藏保存尚未生效");
+   setFavoriteIds(new Set(rows.filter(row=>row.kind==="file"&&row.fileId).map(row=>row.fileId!)));
+   setFavoriteFolderIds(new Set(rows.filter(row=>row.kind==="folder"&&row.folderId).map(row=>row.folderId!)));
    publishWorkspaceChange(["collaboration"]);
    favoriteFeedback(on?"已收藏":"已取消收藏");
   }catch(error){
@@ -359,8 +381,10 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    });
    favoriteFeedback(errorCode(error)==="E_NETWORK"
     ?"网络中断，收藏状态未确认；请刷新后核对"
-    :errorCopy(error,on?"收藏失败，请重试":"取消收藏失败，请重试"),
+    :error instanceof Error&&error.message.startsWith("收藏")?error.message:errorCopy(error,on?"收藏失败，请重试":"取消收藏失败，请重试"),
     errorCode(error)==="E_NETWORK"?"warning":"danger");
+   // An uncertain write may have committed. Reconcile the canonical state.
+   setFavoriteRetryToken(current=>current+1);
   }finally{
    setFavoriteBusy("");
   }
@@ -490,7 +514,9 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     return;
    }
   }
-  if(ctrl){
+  // Contextual selection mode allows consecutive unmodified clicks to add
+  // or remove resources; Ctrl/Cmd still works when selection is empty.
+  if(ctrl||selectedIds.size+selectedFolderIds.size>0){
    const current=new Set([...selectedIds].map(id=>"file:"+id).concat([...selectedFolderIds].map(id=>"folder:"+id)));
    if(current.has(key))current.delete(key);else current.add(key);
    selectKeys([...current]);
@@ -977,7 +1003,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     aria-label={"选择 "+item.name} onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}} onChange={event=>onCheckToggle(event,item)}/>
    <RareButton type="button" tone="ghost" className={"explorer-item-star"+(favoriteIds.has(item.id)?" favorited":"")}
     aria-label={favoriteIds.has(item.id)?"取消收藏 "+item.name:"收藏 "+item.name}
-    disabled={favoritesState!=="ready"||favoriteBusy!==""}
+    disabled={favoritesState==="loading"||favoriteBusy!==""}
     onClick={event=>{event.stopPropagation();void toggleFavorite(item);}}>
     <svg width="15" height="15" viewBox="0 0 24 24" fill={favoriteIds.has(item.id)?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.8 1.2 6.9L12 17.8l-6.2 3.2L7 14.1 2 9.3l6.9-1z"/></svg>
    </RareButton>
@@ -1007,7 +1033,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     onChange={event=>{selectResource("folder",entry.id,true,checkboxShiftRef.current);checkboxShiftRef.current=false;setFocusedFolderId(entry.id);setFocusedId(null);}}/>
    <RareButton type="button" tone="ghost" className={"explorer-item-star"+(favoriteFolderIds.has(entry.id)?" favorited":"")}
     aria-label={(favoriteFolderIds.has(entry.id)?"取消收藏文件夹 ":"收藏文件夹 ")+entry.name}
-    disabled={favoritesState!=="ready"||favoriteBusy!==""}
+    disabled={favoritesState==="loading"||favoriteBusy!==""}
     onClick={event=>{event.stopPropagation();void toggleFavoriteResource("folder",entry.id);}}>
     <svg width="15" height="15" viewBox="0 0 24 24" fill={favoriteFolderIds.has(entry.id)?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.8 1.2 6.9L12 17.8l-6.2 3.2L7 14.1 2 9.3l6.9-1z"/></svg>
    </RareButton>
@@ -1148,7 +1174,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
       <td className="row-actions col-actions" onClick={event=>event.stopPropagation()}><div className="actions-cell-wrap">
        <RareButton type="button" className={"action-star-btn"+(favoriteFolderIds.has(entry.id)?" favorited":"")}
         aria-label={(favoriteFolderIds.has(entry.id)?"取消收藏文件夹 ":"收藏文件夹 ")+entry.name}
-        disabled={favoritesState!=="ready"||favoriteBusy!==""}
+        disabled={favoritesState==="loading"||favoriteBusy!==""}
         onClick={()=>void toggleFavoriteResource("folder",entry.id)}>
         <svg className="star-icon" width="14" height="14" viewBox="0 0 24 24" fill={favoriteFolderIds.has(entry.id)?"currentColor":"none"} stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.8 1.2 6.9L12 17.8l-6.2 3.2L7 14.1 2 9.3l6.9-1z"/></svg>
        </RareButton>
@@ -1191,7 +1217,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
         className={"action-star-btn"+(favoriteIds.has(item.id)?" favorited":"")}
         aria-label={favoriteIds.has(item.id)?"已收藏":"收藏"}
         title={favoritesState==="failed"?"收藏状态加载失败，请刷新重试":favoriteIds.has(item.id)?"已收藏（点击取消）":"收藏"}
-        disabled={favoritesState!=="ready"||favoriteBusy!==""}
+        disabled={favoritesState==="loading"||favoriteBusy!==""}
         onClick={()=>toggleFavorite(item)}>
         <svg className="star-icon" viewBox="0 0 24 24" width="14" height="14" fill={favoriteIds.has(item.id)?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
