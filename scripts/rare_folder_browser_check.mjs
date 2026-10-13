@@ -536,15 +536,22 @@ try{
  // selected folder the mixed-resource review replaces the file-only dialog.
  await evaluate('document.querySelector(".batch-actions-group .batch-btn.danger")?.click()');
  const reviewText=selectedFoldersAtLarge?"个文件夹":"以下 130 项将移入回收站";
- await until('document.querySelector(".dialog")?.textContent.includes('+JSON.stringify(reviewText)+')');
+ await wait(250);
+ const reviewState=await evaluate(`(()=>{
+  return {folders:[...document.querySelectorAll(".explorer-list-folder[aria-selected=true]")].length,
+   dialogs:[...document.querySelectorAll("dialog")].map(d=>({open:d.open,text:d.textContent.slice(0,220)})),
+   dangerDisabled:document.querySelector(".batch-actions-group .batch-btn.danger")?.disabled};
+ })()`);
+ console.log("EXPLORER_DELETE_REVIEW_OBSERVED",JSON.stringify(reviewState));
+ await until('[...document.querySelectorAll("dialog[open]")].some(d=>d.textContent.includes('+JSON.stringify(reviewText)+'))');
  const cancelled=await evaluate(`(()=>{
-  const button=[...document.querySelectorAll(".dialog button")].find(b=>["关闭","取消"].includes(b.textContent.trim()));
+  const button=[...document.querySelectorAll("dialog[open] button")].find(b=>["关闭","取消"].includes(b.textContent.trim()));
   if(!button)return false;
   button.click();
   return true;
  })()`);
  assert(cancelled,"large deletion review must provide a cancellation route");
- await until('!document.querySelector(".dialog")?.textContent.includes('+JSON.stringify(reviewText)+')');
+ await until('![...document.querySelectorAll("dialog[open]")].some(d=>d.textContent.includes('+JSON.stringify(reviewText)+'))');
  assert.equal((await selection()).count,130,"cancel must preserve selected files");
  await key("Escape");
  await until('[...document.querySelectorAll("tr.file-entry")].every(row=>row.getAttribute("aria-selected")!=="true")');
