@@ -8,8 +8,8 @@ export function compactExplorerName(name:string):string{
  if(stem.length<20||!/^[\x21-\x7E]+$/.test(stem))return name;
  const timestamp=stem.match(/^(.*?)[-_]?(\d{10,})$/);
  if(timestamp){
-  const head=timestamp[1].replace(/[-_.]+$/,"").slice(0,12);
-  if(head.length>=3)return head+"…"+timestamp[2].slice(-4)+extension;
+  const head=(timestamp[1]??"").replace(/[-_.]+$/,"").slice(0,12);
+  if(head.length>=3)return head+"…"+(timestamp[2]??"").slice(-4)+extension;
  }
  if(stem.length<=23)return name;
  return stem.slice(0,12).replace(/[-_.]+$/,"")+"…"+stem.slice(-5)+extension;
