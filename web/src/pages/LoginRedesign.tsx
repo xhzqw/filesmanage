@@ -12,7 +12,6 @@ const CLOSE_DELAY_MS=900;
 export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
  const [login,setLogin]=useState(()=>localStorage.getItem(REMEMBER_KEY)??"");
  const [password,setPassword]=useState("");
- const [remember,setRemember]=useState(()=>localStorage.getItem(REMEMBER_KEY)!==null);
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState("");
  const [open,setOpen]=useState(false);
@@ -65,7 +64,7 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
   e.preventDefault();if(busy)return;cancelClose();setOpen(true);setBusy(true);setError("");
   try{
    const user=await authApi.login(login,password);
-   if(remember)localStorage.setItem(REMEMBER_KEY,login);else localStorage.removeItem(REMEMBER_KEY);
+   localStorage.setItem(REMEMBER_KEY,login);
    onSuccess(user);
   }catch(cause){
    if(cause instanceof ApiError&&cause.code==="E_RATE_LIMIT"){
@@ -127,10 +126,6 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
      <RareInput id="login-password" type="password" autoComplete="current-password"
       required invalid={Boolean(error)} tabIndex={open?0:-1}
       placeholder="请输入登录密码" value={password} onChange={e=>setPassword(e.target.value)}/>
-     <div className="login-minimal-extras">
-      <label><RareInput type="checkbox" tabIndex={open?0:-1}
-       checked={remember} onChange={e=>setRemember(e.target.checked)}/>记住账号</label>
-     </div>
      {error&&<RareNotice tone="danger">{error}</RareNotice>}
      <RareButton className="login-submit" tone="primary" type="submit"
       tabIndex={open?0:-1} loading={busy}>登录</RareButton>
