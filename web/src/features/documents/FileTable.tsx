@@ -1392,8 +1392,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
     {image&&<img src={fileApi.mediaUrl(item.id,item.sha256)} alt="" loading="lazy" decoding="async"
      onError={event=>{event.currentTarget.hidden=true;}}/>}
    </div>
-   <span className="explorer-item-name" title={item.name}>{item.name}</span>{finderDots(item)}
-   <span className="explorer-item-sub">{formatSize(item.sizeBytes)} · v{item.currentVersionSeq}</span>
+   <span className="explorer-item-name" title={item.name}>{item.name}</span>
+   <span className="explorer-item-meta"><span className="explorer-item-sub">{formatSize(item.sizeBytes)} · v{item.currentVersionSeq}</span>{finderDots(item)}</span>
    {showCheckboxes&&<RareInput className="explorer-item-check" type="checkbox" checked={selectedIds.has(item.id)}
     aria-label={"选择 "+item.name} onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}} onChange={event=>onCheckToggle(event,item)}/>}
    <RareButton type="button" tone="ghost" className={"explorer-item-star"+(favoriteIds.has(item.id)?" favorited":"")}
@@ -1439,8 +1439,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    onDoubleClick={()=>navigate("/doc?folder="+encodeURIComponent(entry.id))}
    onKeyDown={event=>onFolderKeyDown(event,entry)}>
    <div className="explorer-item-art" aria-hidden="true"><FolderResourceIcon open={selected} hovered={hovered} size={viewMode==="columns"?24:52}/></div>
-   <span className="explorer-item-name" title={entry.name}>{entry.name}</span>{finderFolderDots(entry)}
-   <span className="explorer-item-sub">文件夹</span>
+   <span className="explorer-item-name" title={entry.name}>{entry.name}</span>
+   <span className="explorer-item-meta"><span className="explorer-item-sub">文件夹</span>{finderFolderDots(entry)}</span>
    {showCheckboxes&&<RareInput className="explorer-item-check" type="checkbox" checked={selected}
     aria-label={"选择文件夹 "+entry.name} onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}}
     onChange={event=>{selectResource("folder",entry.id,true,checkboxShiftRef.current);checkboxShiftRef.current=false;setFocusedFolderId(entry.id);setFocusedId(null);}}/>}

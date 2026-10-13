@@ -24,8 +24,8 @@
 /* Polar Blue: the canonical semantic palette. Contrast-critical controls
    use their own borders; quiet hairlines are only decorative separators. */
 :root{
-  --ui-bg-app:#F7F9FC;
-  --ui-bg-sidebar:#F4F7FA;
+  --ui-bg-app:#F8FAFC;
+  --ui-bg-sidebar:#F8FAFC;
   --ui-bg-canvas:#FFFFFF;
   --ui-bg-subtle:#F8FAFC;
   --ui-state-hover:#EDF2F8;
@@ -38,13 +38,14 @@
   --ui-brand-strong:#193F81;
   --ui-text-primary:#1D2A3D;
   --ui-text-secondary:#5E6F85;
-  --ui-tag-red:#F45F65;
-  --ui-tag-orange:#F3AD35;
-  --ui-tag-yellow:#E7C900;
-  --ui-tag-green:#2ABF76;
-  --ui-tag-blue:#369CE5;
-  --ui-tag-purple:#B563D4;
-  --ui-tag-gray:#A2A9B4;
+  /* Quiet Finder label palette: preserve hue identity without neon noise. */
+  --ui-tag-red:#C4757C;
+  --ui-tag-orange:#C9906A;
+  --ui-tag-yellow:#BDA563;
+  --ui-tag-green:#78A493;
+  --ui-tag-blue:#789DC4;
+  --ui-tag-purple:#A28BB8;
+  --ui-tag-gray:#99A2AC;
 }
 
 /* ================= 品牌核心色 (Brand Archetype) ================= */
@@ -128,7 +129,7 @@
   --height-row-ultra:26px;         /* 极限紧凑数据行 (极客模式) */
   --height-tree-row:28px;          /* 目录树节点行高 */
   --height-control:28px;           /* 紧凑标准按钮/输入框高度 */
-  --height-statusbar:24px;         /* 极细状态底栏 */
+  --height-statusbar:28px;         /* 克制的状态底栏 */
   --height-command:36px;           /* 指令台输入条 */
 
   --width-sidebar:240px;           /* 目录树侧边栏 (可拖拽 180~360) */
@@ -499,11 +500,11 @@ tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions 
 /* ================= 状态底栏 (spec §3.1) ================= */
 .status-bar{
   flex:none;display:flex;align-items:center;justify-content:space-between;
-  height:var(--height-statusbar, 24px);min-height:24px;max-height:24px;
+  height:var(--height-statusbar, 28px);min-height:28px;max-height:28px;
   padding:0 var(--space-3);
   background:var(--surface-header);
   border-top:1px solid var(--border-hairline);
-  font-size:11px;color:var(--text-secondary);
+  font-size:12px;font-weight:400;color:var(--text-secondary);
   white-space:nowrap;overflow:hidden;box-sizing:border-box;
 }
 .status-left,.status-right{display:flex;align-items:center;gap:var(--space-2)}
