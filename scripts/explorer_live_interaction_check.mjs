@@ -83,13 +83,19 @@ try{
  await until('document.querySelector(".work-body")?.dataset.explorerView==="list"');
  let count=await evaluate('document.querySelectorAll("tr.file-entry").length');
  if(count<4){
-  const folderRows=await evaluate('document.querySelectorAll(".explorer-list-folder").length');
-  for(let i=0;i<Math.min(folderRows,30)&&count<4;i++){
-   await navigate("/doc",'!!document.querySelector(".folder-view-switch")');
-   await click(".explorer-list-folder .folder-inline-open",i);
-   await until('!!document.querySelector(".work-body .file-toolbar")');
-   await delay(240);
+  const queue=await evaluate('[...document.querySelectorAll(".explorer-list-folder")].map(el=>el.dataset.uploadFolderId).filter(Boolean)');
+  const visited=new Set();
+  while(queue.length&&count<4&&visited.size<60){
+   const id=queue.shift();
+   if(visited.has(id))continue;
+   visited.add(id);
+   await navigate("/doc?folder="+encodeURIComponent(id),'!!document.querySelector(".work-body .file-toolbar")');
+   await delay(380);
    count=await evaluate('document.querySelectorAll("tr.file-entry").length');
+   if(count<4){
+    const children=await evaluate('[...document.querySelectorAll(".explorer-list-folder")].map(el=>el.dataset.uploadFolderId).filter(Boolean)');
+    queue.push(...children.filter(child=>!visited.has(child)));
+   }
   }
  }
  assert(count>=4,"Need at least four authorized file rows for real input regression; loaded="+count);
