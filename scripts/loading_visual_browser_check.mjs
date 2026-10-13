@@ -100,7 +100,7 @@ try{
    assert.equal(a.transform,"none","glyph must not transform");
    assert.equal(a.filter,"none","glyph must not blur");
    for(const key of ["left","top","width","height"])
-    assert.ok(Math.abs(a.rect[key]-b.rect[key)<.2,"glyph "+i+" jumped in "+key);
+    assert.ok(Math.abs(a.rect[key]-b.rect[key])<.2,"glyph "+i+" jumped in "+key);
   }
   assert.equal(end.foreground,"rgb(255, 255, 255)","primary button loading text must be white");
   assert.match(end.inkFilter,/invert\(1\)/,"primary button logo must be white");
