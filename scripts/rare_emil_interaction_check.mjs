@@ -45,6 +45,6 @@ const trash=read("web/src/features/trash/TrashWorkbench.tsx");
 assert.doesNotMatch(trash,/className="trash-heading"/,"trash page must not allocate a title-only row");
 assert.match(trash,/className="trash-filters"/,"trash controls must still have an accessible primary toolbar");
 assert.match(trash,/aria-label="刷新回收站"/,"trash refresh must remain available after merging the toolbar");
-assert.match(read("web/src/pages/SessionDevices.tsx"),/className="sessions-btn sessions-back"/,"account page must retain its real return path");
+assert.match(read("web/src/pages/SessionDevices.tsx"),/<Link to="\/doc" className="sessions-back"/,"account page must retain its real return path");
 assert.match(read("web/src/pages/Documents.tsx"),/<FolderBreadcrumb folders=/,"folder path is a functional breadcrumb, not a page title");
 console.log("RARE_EMIL_INTERACTION_PASS: drag, selection, toast lifecycle, preview actions, no redundant page title rows");
