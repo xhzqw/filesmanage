@@ -83,7 +83,7 @@ try{
  const previewReady=await cdp.waitFor(`()=>!!document.querySelector('.file-pdf-viewer .file-pdf-image')&&
   !!document.querySelector('.file-workbench-nav-item')`,16000);
  assert("regular PDF preview opens with visible document",Boolean(previewReady));
- // Preview uses a real hidden shell header, not a fixed bar consuming content height.
+ // Preview header collapses in normal flow, then pushes the workbench down.
  const initiallyHidden=await cdp.evaluate(`(()=>{
   const h=document.querySelector('.shell-preview-autoheader>.header');
   const shell=document.querySelector('.shell');
@@ -91,11 +91,11 @@ try{
   if(!h||!shell||!work)return null;
   const style=getComputedStyle(h);
   const rect=work.getBoundingClientRect(),parent=shell.getBoundingClientRect();
-  return {hidden:style.visibility==='hidden',headBottom:h.getBoundingClientRect().bottom,
+  return {hidden:style.visibility==='hidden',headerHeight:h.getBoundingClientRect().height,
    workOffset:Math.round(rect.top-parent.top),trigger:!!document.querySelector('.preview-header-reveal')};
  })()`);
  assert("preview initially hides system menu without reserving its height",
-  !!initiallyHidden&&initiallyHidden.hidden&&initiallyHidden.trigger&&initiallyHidden.workOffset<24,
+  !!initiallyHidden&&initiallyHidden.hidden&&initiallyHidden.trigger&&initiallyHidden.headerHeight<=1&&initiallyHidden.workOffset<24,
   JSON.stringify(initiallyHidden));
  const identityGeometry=await cdp.evaluate(`(()=>{
   const card=document.querySelector('.file-preview-identity');
@@ -115,15 +115,51 @@ try{
  await cdp.send("Input.dispatchMouseEvent",{type:"mouseMoved",x:720,y:2});
  const headerShown=await cdp.waitFor(`()=>{
   const h=document.querySelector('.shell-preview-autoheader>.header');
-  return h&&getComputedStyle(h).visibility==='visible'&&h.getBoundingClientRect().top>0;
+  const work=document.querySelector('.file-preview-page');
+  return h&&work&&getComputedStyle(h).visibility==='visible'&&
+   h.getBoundingClientRect().height>40&&
+   work.getBoundingClientRect().top>=h.getBoundingClientRect().bottom-1;
  }`,3500);
  assert("moving mouse to screen top reveals header with animation",Boolean(headerShown));
+ const openGeometry=await cdp.evaluate(`(()=>{
+  const h=document.querySelector('.shell-preview-autoheader>.header');
+  const work=document.querySelector('.file-preview-page');
+  const shell=document.querySelector('.shell');
+  if(!h||!work||!shell)return null;
+  return {position:getComputedStyle(h).position,headerHeight:h.getBoundingClientRect().height,
+   pushedBy:work.getBoundingClientRect().top-shell.getBoundingClientRect().top};
+ })()`);
+ assert("revealed menu pushes the entire preview workbench below navigation",
+  !!openGeometry&&openGeometry.position==='relative'&&
+  openGeometry.pushedBy>=initiallyHidden.workOffset+openGeometry.headerHeight-2,
+  JSON.stringify(openGeometry));
  await cdp.send("Input.dispatchMouseEvent",{type:"mouseMoved",x:720,y:450});
  const headerHidden=await cdp.waitFor(`()=>{
   const h=document.querySelector('.shell-preview-autoheader>.header');
-  return h&&getComputedStyle(h).visibility==='hidden'&&h.getBoundingClientRect().bottom<=0;
+  const shell=document.querySelector('.shell');
+  const work=document.querySelector('.file-preview-page');
+  return h&&work&&shell&&getComputedStyle(h).visibility==='hidden'&&
+   h.getBoundingClientRect().height<=1&&
+   work.getBoundingClientRect().top-shell.getBoundingClientRect().top<24;
  }`,3500);
  assert("moving away from top dismisses header automatically",Boolean(headerHidden));
+
+ for(const width of [1280,820,390]){
+  await cdp.send("Emulation.setDeviceMetricsOverride",{width,height:900,deviceScaleFactor:1,mobile:false});
+  await cdp.evaluate(`(()=>document.querySelector('.preview-header-reveal')?.click())()`);
+  const pushed=await cdp.waitFor(`()=>{
+   const h=document.querySelector('.shell-preview-autoheader>.header');
+   const work=document.querySelector('.file-preview-page');
+   if(!h||!work)return false;
+   const hRect=h.getBoundingClientRect(),workRect=work.getBoundingClientRect();
+   return getComputedStyle(h).visibility==='visible'&&
+    hRect.height>=50&&workRect.top>=hRect.bottom-1;
+  }`,3500);
+  assert(`preview navigation never overlays the workbench at ${width}px`,Boolean(pushed));
+ }
+ await cdp.send("Emulation.clearDeviceMetricsOverride");
+ await cdp.send("Input.dispatchMouseEvent",{type:"mouseMoved",x:720,y:450});
+ await cdp.waitFor(`()=>document.querySelector('.shell-preview-autoheader>.header')?.getBoundingClientRect().height<=1`,3500);
 
  const workspaceUI=await cdp.evaluate(`(()=>{
   const dock=document.querySelector('.header .global-utility-dock');

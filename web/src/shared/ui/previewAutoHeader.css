@@ -1,16 +1,18 @@
-/* The system menu yields its layout space in file preview, returning on edge hover/focus.
-   Only transform and opacity animate; other pages retain the normal static header. */
+/* The preview navigation is in normal flow: opening it pushes the workbench
+   down, never over the file identity or viewer toolbar. Animating height is
+   intentional for this layout displacement; other pages stay unchanged. */
 .shell.shell-preview-autoheader{position:relative;gap:0}
 .shell.shell-preview-autoheader>.header{
- position:absolute;top:8px;left:8px;right:8px;width:auto;z-index:70;
- transform:translate3d(0,calc(-100% - 14px),0);opacity:0;
+ position:relative;flex:none;min-height:0;height:0;z-index:70;
+ transform:translate3d(0,-14px,0);opacity:0;
  visibility:hidden;pointer-events:none;
- transition:transform 260ms cubic-bezier(.22,1,.36,1),opacity 180ms ease,visibility 0s linear 260ms;
+ transition:height 260ms cubic-bezier(.22,1,.36,1),transform 260ms cubic-bezier(.22,1,.36,1),opacity 180ms ease,visibility 0s linear 260ms;
 }
 .shell.shell-preview-autoheader>.header.is-preview-header-open,
 .shell.shell-preview-autoheader>.header:focus-within{
- transform:translate3d(0,0,0);opacity:1;visibility:visible;pointer-events:auto;
- transition:transform 260ms cubic-bezier(.22,1,.36,1),opacity 180ms ease,visibility 0s;
+ height:var(--height-header);transform:translate3d(0,0,0);
+ opacity:1;visibility:visible;pointer-events:auto;
+ transition:height 260ms cubic-bezier(.22,1,.36,1),transform 260ms cubic-bezier(.22,1,.36,1),opacity 180ms ease,visibility 0s;
 }
 .shell.shell-preview-autoheader>.preview-header-hotzone{
  position:absolute;z-index:71;top:0;left:0;right:0;height:13px;
@@ -31,7 +33,11 @@
 .shell.shell-preview-autoheader:has(.header.is-preview-header-open) .preview-header-reveal>span{
  width:44px;opacity:.9;background:var(--brand-blue)
 }
-.shell.shell-preview-autoheader>.work{min-height:0;flex:1 1 auto}
+.shell.shell-preview-autoheader>.panels{min-height:0;flex:1 1 auto}
+@media(max-width:600px){
+ .shell.shell-preview-autoheader>.header.is-preview-header-open,
+ .shell.shell-preview-autoheader>.header:focus-within{height:52px}
+}
 @media(prefers-reduced-motion:reduce){
  .shell.shell-preview-autoheader>.header,
  .shell.shell-preview-autoheader>.header.is-preview-header-open,
