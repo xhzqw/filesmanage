@@ -3,6 +3,7 @@ import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useNavigate} from "react-router-dom";
 import {RareButton,NotificationBell} from "../../shared/ui/rare";
 import {toast} from "../../shared/ui/feedback";
+import {errorCode} from "../../shared/errors";
 import {approvalActivityApi,type ApprovalNotification} from "./activityApi";
 import {lifecycleNotificationApi,type LifecycleNotice} from "./lifecycleNotificationApi";
 import {favoriteNotificationApi,type FavoriteChangeNotice} from "./favoriteNotificationApi";
@@ -28,7 +29,10 @@ export function NotificationCenter(){
   let valid=true;
   async function refresh(){
    try{
-    const [page,due,favorite]=await Promise.all([approvalActivityApi.notificationsPage(0,50),lifecycleWorkspaceEnabled?lifecycleNotificationApi.notifications():Promise.resolve([] as LifecycleNotice[]),favoriteNotificationApi.list()]);
+    const [page,due,favorite]=await Promise.all([approvalActivityApi.notificationsPage(0,50),lifecycleWorkspaceEnabled?lifecycleNotificationApi.notifications():Promise.resolve([] as LifecycleNotice[]),favoriteNotificationApi.list().catch(error=>{
+     if(errorCode(error)==="E_NOT_FOUND")return {items:[],unreadCount:0};
+     throw error;
+    })]);
     if(valid){setNotes(page.items);setApprovalUnread(page.unreadCount);setLifecycleNotes(due);setFavoriteNotes(favorite.items);setFavoriteUnread(favorite.unreadCount);setError("");}
    }catch{if(valid)setError("通知暂时不可用");}
   }

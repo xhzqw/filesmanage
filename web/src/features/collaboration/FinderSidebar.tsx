@@ -52,7 +52,7 @@ export function FinderSidebar({section,revision}:{section:DocumentSection;revisi
     </Link>;
    })}
    {status==="ready"&&favorites.length>=8&&<Link to="/doc?view=favorites" className="finder-nav-more">查看全部关注</Link>}
-   {status==="ready"&&favorites.length===0&&<span className="finder-nav-empty">暂无关注</span>}
+   {status==="ready"&&favorites.length===0&&<Link to="/doc?view=favorites" className="finder-nav-more">查看全部关注</Link>}
    {status==="failed"&&<RareButton type="button" className="finder-nav-retry" onClick={()=>setToken(n=>n+1)}>重试加载关注</RareButton>}
   </div>
   <div className="finder-nav-section">
