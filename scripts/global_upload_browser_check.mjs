@@ -121,4 +121,7 @@ try{
  // exits. Cleanup cannot turn an otherwise passed functional assertion red.
  try{rmSync(profile,{recursive:true,force:true,maxRetries:30,retryDelay:200});}
  catch(error){if(error?.code!=="ENOTEMPTY"&&error?.code!=="EBUSY")throw error;}
+ // Native WebSocket may retain its closing timer after the browser exits.
+ // The process is a standalone CLI and all its assertions/cleanup are done.
+ process.exit(process.exitCode??0);
 }
