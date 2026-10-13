@@ -92,6 +92,14 @@ try{
   // Verify actual API names reach the Finder labels, including folder
   // favorites. The DB query coalesces file and folder names independently;
   // checking for a rendered row alone misses empty folder labels.
+  const sidebarCount=await cdp.evaluate(`(async()=>{
+   const response=await fetch("/api/favorites?view=sidebar",{cache:"no-store"});
+   const json=await response.json();
+   return response.ok&&json.ok?json.data?.items?.length:-1;
+  })()`);
+  check(sidebarCount>0,vp.name+" sidebar API returned favorites");
+  check(await cdp.waitFor("()=>document.querySelectorAll('.finder-favorite-item').length==="+sidebarCount),
+   vp.name+" Finder sidebar finished rendering favorites");
   const sidebarNames=await cdp.evaluate(`(async()=>{
    const response=await fetch("/api/favorites?view=sidebar",{cache:"no-store"});
    const json=await response.json();
@@ -99,6 +107,7 @@ try{
    return {ok:response.ok&&json.ok,count:rows.length,
     folderCount:rows.filter(row=>row.kind==="folder").length,
     named:rows.every(row=>typeof row.resourceName==="string"&&row.resourceName.trim().length>0),
+    rendered:[...document.querySelectorAll(".finder-favorite-item")].map(node=>({name:node.querySelector("span")?.textContent?.trim(),href:node.getAttribute("href")})),
     matches:rows.every(row=>{
      const id=row.kind==="folder"?row.folderId:row.fileId;
      const href=row.kind==="folder"?"/doc?folder="+encodeURIComponent(id):"/preview/"+encodeURIComponent(id);
