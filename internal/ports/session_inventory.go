@@ -11,6 +11,7 @@ type SessionRow struct {
 	ID         string    `json:"id"`
 	Device     string    `json:"device"`
 	Address    string    `json:"address"`
+	MACAddress string    `json:"macAddress"`
 	CreatedAt  time.Time `json:"createdAt"`
 	LastSeenAt time.Time `json:"lastSeenAt"`
 	ExpiresAt  time.Time `json:"expiresAt"`
@@ -22,6 +23,7 @@ type AuthActivity struct {
 	Outcome    string    `json:"outcome"`
 	Device     string    `json:"device"`
 	Address    string    `json:"address"`
+	MACAddress string    `json:"macAddress"`
 	Count      int       `json:"count,omitempty"`
 	OccurredAt time.Time `json:"occurredAt"`
 }
@@ -30,9 +32,9 @@ type AuthActivity struct {
 // must scope all reads and revocations to the authenticated user inside SQL.
 type SessionInventory interface {
 	SessionOwner(context.Context, string) (string, error)
-	SetSessionMetadata(context.Context, string, string, string) error
+	SetSessionMetadata(context.Context, string, string, string, string) error
 	TouchSession(context.Context, string) error
-	ListOwnSessions(context.Context, string) ([]SessionRow, error)
+	ListOwnSessions(context.Context, string, string) ([]SessionRow, error)
 	RevokeOwnSession(context.Context, string, string, string) (bool, error)
 	RevokeOtherSessions(context.Context, string, string) (int64, error)
 	ListOwnAuthActivity(context.Context, string) ([]AuthActivity, error)

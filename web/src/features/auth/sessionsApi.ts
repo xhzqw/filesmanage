@@ -1,11 +1,11 @@
 import {request} from "../../shared/http";
 
 export type DeviceSession={
- id:string;device:string;address:string;createdAt:string;lastSeenAt:string;
+ id:string;device:string;address:string;macAddress?:string;createdAt:string;lastSeenAt:string;
  expiresAt:string;current:boolean;
 };
 export type AuthActivity={
- type:string;outcome:string;device:string;address:string;count?:number;occurredAt:string;
+ type:string;outcome:string;device:string;address:string;macAddress?:string;count?:number;occurredAt:string;
 };
 export const sessionApi={
  list:()=>request<DeviceSession[]>("/me/sessions"),

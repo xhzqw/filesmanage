@@ -21,12 +21,12 @@ type sessionAccessTx struct {
 func (t sessionAccessTx) UserBySessionHash(context.Context, string) (domain.Authenticated, error) {
 	return domain.Authenticated{User: t.user, ExpiresAt: time.Now().Add(time.Hour)}, nil
 }
-func (t sessionAccessTx) SetSessionMetadata(context.Context, string, string, string) error {
+func (t sessionAccessTx) SetSessionMetadata(context.Context, string, string, string, string) error {
 	return nil
 }
 func (t sessionAccessTx) TouchSession(context.Context, string) error           { return nil }
 func (t sessionAccessTx) SessionOwner(context.Context, string) (string, error) { return t.user.ID, nil }
-func (t sessionAccessTx) ListOwnSessions(_ context.Context, id string) ([]ports.SessionRow, error) {
+func (t sessionAccessTx) ListOwnSessions(_ context.Context, id, currentHash string) ([]ports.SessionRow, error) {
 	return []ports.SessionRow{{ID: strings.Repeat("a", 24), Device: "Test", CreatedAt: time.Now(), LastSeenAt: time.Now(), ExpiresAt: time.Now().Add(time.Hour)}}, nil
 }
 func (t sessionAccessTx) RevokeOwnSession(context.Context, string, string, string) (bool, error) {

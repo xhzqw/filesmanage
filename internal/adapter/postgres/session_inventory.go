@@ -10,8 +10,8 @@ import (
 
 // Session inventory never returns token hashes. The 96-bit public ID prefix is
 // a selector only and cannot be supplied as an authentication credential.
-func (r *Repository) SetSessionMetadata(ctx context.Context, hash, address, device string) error {
-	_, err := r.Q.Exec(ctx, "UPDATE sessions SET client_ip=$2,device_label=$3 WHERE sid_hash=$1", hash, address, device)
+func (r *Repository) SetSessionMetadata(ctx context.Context, hash, address, mac, device string) error {
+	_, err := r.Q.Exec(ctx, "UPDATE sessions SET client_ip=$2,mac_address=$3,device_label=$4 WHERE sid_hash=$1", hash, address, mac, device)
 	return err
 }
 func (r *Repository) TouchSession(ctx context.Context, hash string) error {
@@ -27,10 +27,10 @@ func (r *Repository) SessionOwner(ctx context.Context, hash string) (string, err
 	}
 	return id, err
 }
-func (r *Repository) ListOwnSessions(ctx context.Context, userID string) ([]ports.SessionRow, error) {
-	rows, err := r.Q.Query(ctx, `SELECT left(sid_hash,24),device_label,client_ip,created_at,last_seen_at,expires_at
+func (r *Repository) ListOwnSessions(ctx context.Context, userID, currentHash string) ([]ports.SessionRow, error) {
+	rows, err := r.Q.Query(ctx, `SELECT left(sid_hash,24),device_label,client_ip,mac_address,created_at,last_seen_at,expires_at
  FROM sessions WHERE user_id=$1 AND revoked_at IS NULL AND expires_at>now()
- ORDER BY created_at DESC,sid_hash DESC LIMIT 50`, userID)
+ ORDER BY (sid_hash=$2) DESC,created_at DESC,sid_hash DESC LIMIT 50`, userID, currentHash)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func (r *Repository) ListOwnSessions(ctx context.Context, userID string) ([]port
 	items := make([]ports.SessionRow, 0, 8)
 	for rows.Next() {
 		var row ports.SessionRow
-		if err = rows.Scan(&row.ID, &row.Device, &row.Address, &row.CreatedAt, &row.LastSeenAt, &row.ExpiresAt); err != nil {
+		if err = rows.Scan(&row.ID, &row.Device, &row.Address, &row.MACAddress, &row.CreatedAt, &row.LastSeenAt, &row.ExpiresAt); err != nil {
 			return nil, err
 		}
 		items = append(items, row)
@@ -67,7 +67,7 @@ func (r *Repository) RevokeOtherSessions(ctx context.Context, userID, currentHas
 }
 func (r *Repository) ListOwnAuthActivity(ctx context.Context, userID string) ([]ports.AuthActivity, error) {
 	rows, err := r.Q.Query(ctx, `SELECT event_type,outcome,
- coalesce(details->>'device',''),coalesce(details->>'ip',''),coalesce((details->>'count')::integer,0),created_at
+ coalesce(details->>'device',''),coalesce(details->>'ip',''),coalesce(details->>'mac',''),coalesce((details->>'count')::integer,0),created_at
  FROM audit_events WHERE actor_id=$1 AND event_type IN
  ('auth.login','auth.logout','auth.session_revoke','auth.sessions_revoke')
  ORDER BY created_at DESC,id DESC LIMIT 30`, userID)
@@ -78,7 +78,7 @@ func (r *Repository) ListOwnAuthActivity(ctx context.Context, userID string) ([]
 	items := make([]ports.AuthActivity, 0, 12)
 	for rows.Next() {
 		var row ports.AuthActivity
-		if err = rows.Scan(&row.Type, &row.Outcome, &row.Device, &row.Address, &row.Count, &row.OccurredAt); err != nil {
+		if err = rows.Scan(&row.Type, &row.Outcome, &row.Device, &row.Address, &row.MACAddress, &row.Count, &row.OccurredAt); err != nil {
 			return nil, err
 		}
 		items = append(items, row)

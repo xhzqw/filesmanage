@@ -7,18 +7,29 @@ import (
 )
 
 type loginMetadataKey struct{}
-type loginMetadata struct{ address, device string }
+type loginMetadata struct{ address, device, mac string }
 
 // WithLoginMetadata is used by the HTTP ingress only; the value never comes
 // from a JSON login request. User-Agent is a label, not a trusted device ID.
 func WithLoginMetadata(ctx context.Context, address, agent string) context.Context {
+	return WithLoginNetworkMetadata(ctx, address, agent, "")
+}
+
+// MAC is observational network metadata, never authentication evidence.
+func WithLoginNetworkMetadata(ctx context.Context, address, agent, mac string) context.Context {
 	if net.ParseIP(address) == nil {
 		address = ""
 	}
 	if len(address) > 48 {
 		address = ""
 	}
-	return context.WithValue(ctx, loginMetadataKey{}, loginMetadata{address: address, device: deviceLabel(agent)})
+	hw, err := net.ParseMAC(mac)
+	if err != nil || len(hw) != 6 {
+		mac = ""
+	} else {
+		mac = hw.String()
+	}
+	return context.WithValue(ctx, loginMetadataKey{}, loginMetadata{address: address, device: deviceLabel(agent), mac: mac})
 }
 func deviceLabel(agent string) string {
 	a := strings.ToLower(agent)

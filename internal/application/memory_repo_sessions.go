@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func (r *memoryRepo) SetSessionMetadata(_ context.Context, hash, address, device string) error {
+func (r *memoryRepo) SetSessionMetadata(_ context.Context, hash, address, mac, device string) error {
 	// Tests persist session ownership in memory. Device metadata is not used
 	// for authorization; production stores it in the database.
 	return nil
@@ -22,7 +22,7 @@ func (r *memoryRepo) SessionOwner(_ context.Context, hash string) (string, error
 	}
 	return v.userID, nil
 }
-func (r *memoryRepo) ListOwnSessions(_ context.Context, userID string) ([]ports.SessionRow, error) {
+func (r *memoryRepo) ListOwnSessions(_ context.Context, userID, currentHash string) ([]ports.SessionRow, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	rows := make([]ports.SessionRow, 0, 4)
@@ -78,6 +78,9 @@ func (r *memoryRepo) ListOwnAuthActivity(_ context.Context, userID string) ([]po
 		}
 		if v, ok := event.Details["ip"].(string); ok {
 			item.Address = v
+		}
+		if v, ok := event.Details["mac"].(string); ok {
+			item.MACAddress = v
 		}
 		if v, ok := event.Details["count"].(int64); ok {
 			item.Count = int(v)

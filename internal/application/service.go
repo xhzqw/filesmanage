@@ -366,7 +366,7 @@ func (s *Service) Login(ctx context.Context, login, password string) (string, do
 		// persisting submitted passwords or raw User-Agent values.
 		meta := metadataOf(ctx)
 		if err = auditRequired(ctx, tx, u, "auth.login", "user", u.ID, "denied",
-			map[string]any{"device": meta.device, "ip": meta.address}); err != nil {
+			map[string]any{"device": meta.device, "ip": meta.address, "mac": meta.mac}); err != nil {
 			return "", domain.User{}, err
 		}
 		if err = tx.Commit(ctx); err != nil {
@@ -383,12 +383,12 @@ func (s *Service) Login(ctx context.Context, login, password string) (string, do
 	}
 	meta := metadataOf(ctx)
 	if store, ok := tx.(ports.SessionInventory); ok {
-		if err = store.SetSessionMetadata(ctx, HashToken(token), meta.address, meta.device); err != nil {
+		if err = store.SetSessionMetadata(ctx, HashToken(token), meta.address, meta.mac, meta.device); err != nil {
 			return "", domain.User{}, err
 		}
 	}
 	if err = auditRequired(ctx, tx, u, "auth.login", "session", HashToken(token)[:24], "success",
-		map[string]any{"device": meta.device, "ip": meta.address}); err != nil {
+		map[string]any{"device": meta.device, "ip": meta.address, "mac": meta.mac}); err != nil {
 		return "", domain.User{}, err
 	}
 	if err = tx.Commit(ctx); err != nil {

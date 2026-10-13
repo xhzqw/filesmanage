@@ -32,7 +32,7 @@ func (s *Service) ListMySessions(ctx context.Context, token string) ([]ports.Ses
 	}
 	hash := HashToken(token)
 	_ = store.TouchSession(ctx, hash) // Last-seen is best effort, with DB 60s throttle.
-	items, err := store.ListOwnSessions(ctx, a.User.ID)
+	items, err := store.ListOwnSessions(ctx, a.User.ID, hash)
 	if err != nil {
 		return nil, err
 	}

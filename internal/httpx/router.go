@@ -354,7 +354,7 @@ func (h *Handler) login(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 4*time.Second)
 	defer cancel()
 	peerIP, _, _ := net.SplitHostPort(loginClientAddr(c.Request))
-	ctx = application.WithLoginMetadata(ctx, peerIP, c.Request.UserAgent())
+	ctx = application.WithLoginNetworkMetadata(ctx, peerIP, c.Request.UserAgent(), clientMACFromARP(peerIP))
 	token, user, err := h.S.Login(ctx, req.Login, req.Password)
 	if err != nil {
 		if errors.Is(err, application.ErrInvalidCredentials) || errors.Is(err, application.ErrInvalidInput) {
