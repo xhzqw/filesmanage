@@ -279,6 +279,12 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 			c.JSON(404, gin.H{"ok": false, "error": gin.H{"code": "E_UI_NOT_BUILT"}})
 			return
 		}
+		// Revalidate the SPA entry on every navigation so UI updates and removed
+		// actions never linger behind a heuristically cached index.html.
+		// Fingerprinted JS/CSS assets retain their normal cache behavior.
+		if filepath.Base(full) == "index.html" {
+			c.Header("Cache-Control", "no-store")
+		}
 		c.File(full)
 	})
 	return r

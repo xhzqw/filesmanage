@@ -146,8 +146,16 @@ try{
  check("mouseleave closes after 900ms",!await evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`));
  await evaluate(`(()=>{document.querySelector(".login-entry").click();return true})()`);
  check("click can open form",await eventually(()=>evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`)));
- await evaluate(`(()=>{document.querySelector(".login-panel-close").click();return true})()`);
- check("close control collapses form",!await evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`));
+ check("obsolete close and remember actions are absent",
+  await evaluate(`(()=>!document.querySelector(".login-panel-close,.login-forgot,.login-minimal-extras"))()`));
+ check("native required field bubbles disabled, required semantics remain",
+  await evaluate(`(()=>{const f=document.querySelector(".login-panel form");return f.noValidate&&f.querySelector("#login-account").required&&f.querySelector("#login-password").required})()`));
+ await evaluate(`(()=>{document.querySelector(".login-panel form").requestSubmit();return true})()`);
+ check("empty account prompts via unified toast",await eventually(()=>evaluate(`(()=>[...document.querySelectorAll(".rare-toast-text")].some(e=>e.textContent.includes("请输入账号")))()`)));
+ check("empty account receives focus",await evaluate(`(()=>document.activeElement?.id==="login-account")()`));
+ await send("Input.dispatchKeyEvent",{type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
+ await send("Input.dispatchKeyEvent",{type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
+ check("Escape closes login panel",!await evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`));
 
  // Real mouse click + typing: programmatic .click() misses focus traps.
  async function physicalClick(x,y){
@@ -167,6 +175,9 @@ try{
  check("real pointer can focus account input",await evaluate(`(()=>document.activeElement?.id==="login-account")()`));
  await send("Input.insertText",{text:"interaction-check"});
  check("real keyboard can type account",await evaluate(`(()=>document.querySelector("#login-account").value==="interaction-check")()`));
+ await evaluate(`(()=>{document.querySelector(".login-panel form").requestSubmit();return true})()`);
+ check("missing password prompts via unified toast",await eventually(()=>evaluate(`(()=>[...document.querySelectorAll(".rare-toast-text")].some(e=>e.textContent.includes("请输入密码")))()`)));
+ check("missing password receives focus",await evaluate(`(()=>document.activeElement?.id==="login-password")()`));
  await move(5,5);
  await sleep(300);
  check("editing window persists for close grace",await evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`));
@@ -175,28 +186,10 @@ try{
  await move(720,380);
  check("can reopen after timed close",await eventually(()=>evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`)));
  await sleep(570);
- const closePosition=await evaluate(`(()=>{
-  const r=document.querySelector(".login-panel-close").getBoundingClientRect();
-  return {x:r.left+r.width/2,y:r.top+r.height/2};
- })()`);
-
- await physicalClick(closePosition.x,closePosition.y);
- await sleep(220);
- check("real close click closes",!await evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`));
- await sleep(120);
- check("close restores focus to visible login entry",
-  await evaluate(`(()=>document.activeElement?.classList.contains("login-entry")&&getComputedStyle(document.activeElement).visibility==="visible")()`));
-
- await move(730,385);
- await sleep(300);
- check("manually closed card stays closed until pointer reenters",!await evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`));
- await move(5,5);
- await move(700,370);
- check("re-entering after close can reopen",await eventually(()=>evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`)));
- // Clicking outside is always an explicit dismissal, regardless of focus.
+ // Outside click replaces the removed X as the pointer dismissal path.
  await physicalClick(10,10);
+ await sleep(220);
  check("outside click closes",!await evaluate(`(()=>document.querySelector(".login-reveal-zone")?.classList.contains("is-expanded"))()`));
-
 
  // Touch: a real tap must not lose the target to RareUI :active transforms.
  await move(5,5);await navigate();

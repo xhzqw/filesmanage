@@ -3,6 +3,7 @@ import {RareButton,RareInput,RareNotice} from "../shared/ui/rare";
 import type {User} from "../entities/user/model";
 import {authApi} from "../features/auth/api";
 import {ApiError} from "../shared/http";
+import {toast} from "../shared/ui/feedback";
 import {BrandLogo} from "../shared/ui/AppShell";
 import "./login-redesign.css";
 
@@ -61,10 +62,20 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
   return ()=>window.clearTimeout(timer);
  },[open]);
  async function submit(e:FormEvent<HTMLFormElement>){
-  e.preventDefault();if(busy)return;cancelClose();setOpen(true);setBusy(true);setError("");
+  e.preventDefault();
+  if(busy)return;
+  const account=login.trim();
+  if(!account||!password){
+   setError("");
+   const missingId=!account?"login-account":"login-password";
+   toast.warning(!account?"请输入账号":"请输入密码");
+   document.getElementById(missingId)?.focus();
+   return;
+  }
+  cancelClose();setOpen(true);setBusy(true);setError("");
   try{
-   const user=await authApi.login(login,password);
-   localStorage.setItem(REMEMBER_KEY,login);
+   const user=await authApi.login(account,password);
+   localStorage.setItem(REMEMBER_KEY,account);
    onSuccess(user);
   }catch(cause){
    if(cause instanceof ApiError&&cause.code==="E_RATE_LIMIT"){
@@ -118,7 +129,7 @@ export function Login({onSuccess}:{onSuccess:(user:User)=>void}){
     onClick={()=>expand(true)}>登录</RareButton>
    <section id="login-panel" className="login-panel" aria-hidden={!open}>
     <h2>登陆</h2>
-    <form onSubmit={submit} autoComplete="on">
+    <form onSubmit={submit} autoComplete="on" noValidate>
      <label htmlFor="login-account">账号</label>
      <RareInput id="login-account" autoComplete="username" required tabIndex={open?0:-1}
       placeholder="请输入账号 / 工号" value={login} onChange={e=>setLogin(e.target.value)}/>
