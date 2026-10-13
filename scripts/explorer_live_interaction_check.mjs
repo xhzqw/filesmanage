@@ -90,13 +90,25 @@ try{
    if(visited.has(id))continue;
    visited.add(id);
    await navigate("/doc?folder="+encodeURIComponent(id),'!!document.querySelector(".work-body .file-toolbar")');
-   await delay(380);
+   await until('!document.querySelector(".work-body .table .brand-loading-label")');
+   await delay(450);
    count=await evaluate('document.querySelectorAll("tr.file-entry").length');
    if(count<4){
     const children=await evaluate('[...document.querySelectorAll(".explorer-list-folder")].map(el=>el.dataset.uploadFolderId).filter(Boolean)');
     queue.push(...children.filter(child=>!visited.has(child)));
    }
   }
+ }
+ if(count<4){
+  const diagnostics=await evaluate(`(async()=>{
+   const tree=await(await fetch("/api/folders/tree")).json();
+   const root=tree.data?.find(item=>item.parentId===null);
+   const files=root?await(await fetch("/api/files?folder="+encodeURIComponent(root.id)+"&sort=updated_desc&limit=50")).json():null;
+   return {path:location.pathname+location.search,treeCount:tree.data?.length,
+    root:root?.id,fileCount:files?.data?.items?.length,fileError:files?.error,
+    pageText:document.body.textContent.slice(-250)};
+  })()`);
+  console.error("EXPLORER_REAL_DATA_DIAGNOSTIC",JSON.stringify(diagnostics));
  }
  assert(count>=4,"Need at least four authorized file rows for real input regression; loaded="+count);
  await click("tr.file-entry .file-name",0);
