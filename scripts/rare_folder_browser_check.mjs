@@ -244,6 +244,8 @@ try{
  assert.deepEqual(folderOnlyColumns.columns,["","文件名","操作"],"folder-only view must retain selection and context actions");
  assert.equal(folderOnlyColumns.files,0);
  assert(folderOnlyColumns.overflow<=2);
+ await evaluate('document.querySelector(".batch-clear-selection")?.click()');
+ await until('!document.querySelector(".batch-actions-group")');
  await evaluate('document.querySelector("table.file-table-folders-only .explorer-list-folder")?.click()');
  await until('document.querySelector("table.file-table-folders-only .explorer-list-folder")?.getAttribute("aria-selected")==="true"');
  assert((await evaluate('document.querySelector(".file-selected-count")?.textContent')).includes("已选 1"),
