@@ -808,7 +808,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  function renderFolderEntry(entry:Folder){
   const selected=focusedFolderId===entry.id;
   const hovered=hoveredFolderId===entry.id;
-  return <div key={"folder-"+entry.id} data-folder-id={entry.id} role="row"
+  return <div key={"folder-"+entry.id} data-folder-id={entry.id} data-upload-folder-id={entry.id} role="row"
    tabIndex={0} aria-selected={selected}
    className={"explorer-item explorer-folder"+(selected?" selected":"")}
    onMouseEnter={()=>setHoveredFolderId(entry.id)}
@@ -940,7 +940,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
        setAnchorId(null);
       }}>清除筛选（显示已加载 {items.length} 个文件）</RareButton>
      </td></tr>}
-     {status==="ready"&&visibleFolders.map(entry=><tr key={"folder-"+entry.id} className={"explorer-list-folder"+(focusedFolderId===entry.id?" selected":"")}
+     {status==="ready"&&visibleFolders.map(entry=><tr key={"folder-"+entry.id} data-upload-folder-id={entry.id} className={"explorer-list-folder"+(focusedFolderId===entry.id?" selected":"")}
       tabIndex={0} aria-selected={focusedFolderId===entry.id}
       onClick={()=>{setFocusedFolderId(entry.id);setFocusedId(null);setSelectedIds(new Set());}}
       onDoubleClick={()=>navigate("/doc?folder="+encodeURIComponent(entry.id))}

@@ -13,6 +13,7 @@ import{BrandLoader}from "../shared/ui/BrandLoader";
 import{MotionFeedback}from "../shared/ui/MotionFeedback";
 import{toast}from "../shared/ui/feedback";
 import{useUploadStore}from "../features/documents/uploadStore";
+import{GlobalUploadDrop,type DocumentUploadTarget}from "../features/documents/GlobalUploadDrop";
 import{useSession}from "./session";
 import{Login}from "../pages/Login";
 import{Documents}from "../pages/Documents";
@@ -29,6 +30,7 @@ const ModelViewer=lazy(()=>import("../pages/ModelViewer").then(m=>({default:m.Mo
 export function App(){
  const user=useSession(s=>s.user),loading=useSession(s=>s.loading),setUser=useSession(s=>s.setUser),setLoading=useSession(s=>s.setLoading);
  const [logoutError,setLogoutError]=useState("");
+ const [documentUploadTarget,setDocumentUploadTarget]=useState<DocumentUploadTarget|null>(null);
  const logoutPending=useRef(false);
  useEffect(()=>{useUploadStore.getState().bindUser(user?.id??"");toast.bindOwner(user?.id??"");},[user?.id]);
  useEffect(()=>{let valid=true;authApi.me().then(u=>{if(valid)setUser(u)}).catch(()=>{if(valid)setUser(null)}).finally(()=>{if(valid)setLoading(false)});return()=>{valid=false}},[setLoading,setUser]);
@@ -50,8 +52,8 @@ export function App(){
  }
  const feedback=logoutError?<div className="auth-feedback" role="alert"><span>{logoutError}</span><RareButton type="button" onClick={()=>void logout()}>重试退出</RareButton></div>:null;
  if(loading)return <main className="brand-loading-screen" aria-busy="true"><BrandLoader size="lg" label="正在检查会话"/><span>正在检查会话…</span></main>;
- return <><MotionFeedback/>{feedback}<ToastViewport/><ShellAccessories.Provider value={user?<NotificationCenter key={user.id}/>:null}><Routes><Route path="/login" element={user?<Navigate to="/doc" replace/>:<Login onSuccess={setUser}/>}/>
-  <Route path="/doc" element={user?<Documents user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
+ return <><MotionFeedback/>{feedback}<ToastViewport/>{user&&<GlobalUploadDrop key={user.id} userId={user.id} documentTarget={documentUploadTarget}/>}<ShellAccessories.Provider value={user?<NotificationCenter key={user.id}/>:null}><Routes><Route path="/login" element={user?<Navigate to="/doc" replace/>:<Login onSuccess={setUser}/>}/>
+  <Route path="/doc" element={user?<Documents user={user} onLogout={logout} onUploadFolderChange={setDocumentUploadTarget}/>:<Navigate to="/login" replace/>}/>
   <Route path="/account/sessions" element={user?<SessionDevices user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/preview/:id" element={user?<Preview user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/trash" element={user?<Trash user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>

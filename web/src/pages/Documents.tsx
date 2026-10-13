@@ -16,6 +16,7 @@ import{folderMoveBusy,folderMoveCanSubmit,folderMoveFailure,folderMoveFailed,fol
 import{fileApi}from "../features/documents/api";
 import{FileTable}from "../features/documents/FileTable";
 import{DropZone}from "../features/documents/DropZone";
+import type {DocumentUploadTarget} from "../features/documents/GlobalUploadDrop";
 import{FileEditor}from "../features/documents/FileEditor";
 import{workflowApi}from "../features/workflow/api";
 import{AppShell}from "../shared/ui/AppShell";
@@ -54,7 +55,7 @@ function persistSidebarWidth(width:number){
  try{localStorage.setItem(SIDEBAR_WIDTH_KEY,String(width));}catch{}
 }
 
-export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
+export function Documents({user,onLogout,onUploadFolderChange}:{user:User;onLogout:()=>void;onUploadFolderChange:(target:DocumentUploadTarget|null)=>void}){
  const[folders,setFolders]=useState<Folder[]>([]);
  const[resolvedFolder,setResolvedFolder]=useState<{id:string;folder:Folder|null}|null>(null);
  const[status,setStatus]=useState("loading");
@@ -151,6 +152,15 @@ export function Documents({user,onLogout}:{user:User;onLogout:()=>void}){
  },[explicitFolder,requested,folderById,reloadKey]);
  const linkedFolder=resolvedFolder?.id===requested?resolvedFolder.folder:null;
  const selected=folderById.get(requested)??linkedFolder??(explicitFolder?null:visibleRoots[0]);
+ // Only the visible, resolved directory is a direct OS-file drop destination.
+ // A favorites/shared view always asks for a target folder, even when the URL
+ // retains an older ?folder= selection.
+ useEffect(()=>{
+  onUploadFolderChange(section==="files"&&selected?{
+   routeKey:location.pathname+location.search,folderId:selected.id,folderName:selected.name,userId:user.id,
+  }:null);
+  return()=>onUploadFolderChange(null);
+ },[section,selected?.id,selected?.name,location.pathname,location.search,user.id,onUploadFolderChange]);
  const knownFolders=useMemo(()=>linkedFolder?[...folders,linkedFolder]:folders,[folders,linkedFolder]);
  const resolving=Boolean(explicitFolder&&!folderById.has(requested)&&resolvedFolder?.id!==requested);
  const inaccessible=Boolean(explicitFolder&&!folderById.has(requested)&&resolvedFolder?.id===requested&&!linkedFolder);

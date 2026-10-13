@@ -1,5 +1,5 @@
 import {RareButton,RareInput} from "../../shared/ui/rare";
-import{useEffect,useRef,useState,type DragEvent,type FormEvent,type ReactNode}from"react";
+import{useEffect,useRef,useState,type FormEvent,type ReactNode}from"react";
 import{fileApi,formatSize,type ReplaceTarget}from"./api";
 import{errorCopy}from"../../shared/errors";
 import{toast}from"../../shared/ui/feedback";
@@ -8,40 +8,18 @@ import {extensionChange} from "./fileExtensionChange";
 import {ExtensionChangeNotice} from "./FileRenameDialog";
 import"./dropZone.css";
 
-// DESKTOP-INTERACTION-v1 §7.1: a drop onto a text-entry surface must not be
-// hijacked into an upload. The file <RareInput> is intentionally allowed through so
-// dropping on the existing upload button still enqueues.
-function dropOnTextEntry(event:DragEvent<HTMLDivElement>):boolean{
- const el=event.target as HTMLElement|null;
- if(!el||typeof el.closest!=="function")return false;
- if(el.closest("textarea,[contenteditable='true'],[contenteditable='']"))return true;
- const input=el.closest("input");
- return input instanceof HTMLInputElement&&input.type!=="file";
-}
-
-// Only OS files belong to the upload gesture. Internal move, text and link
-// drags must never activate the upload pane.
-function externalFiles(transfer:DataTransfer):boolean{
- const types=Array.from(transfer.types);
- if(types.includes("application/x-filesmanage-files"))return false;
- return types.includes("Files")||transfer.files.length>0||
-  Array.from(transfer.items).some(item=>item.kind==="file");
-}
-
 // Drag-and-drop upload target rendering the shared queue (DI-17, WF-24..28).
 // The queue itself lives in uploadStore, so this drop and the toolbar file
 // input in FileTable feed one queue with identical business semantics (WF-27)
 // and an upload keeps running while either component is unmounted. Each item
 // keeps its own targetFolderId, so a queue survives a folder switch; the store
 // asks for a reload only when the committed item's target is the folder this
-// zone last reported (WF-28). No window-level listeners are registered: every
-// handler is scoped to this subtree, so a drop over a text input elsewhere
-// never uploads.
-export function DropZone({folderId,userId,disabled,onCommitted,children}:{folderId:string;userId:string;disabled?:boolean;onCommitted:()=>void;children:ReactNode}){
+// zone last reported (WF-28). OS file gestures are owned by GlobalUploadDrop;
+// this component presents the *same* queue without registering a second drop.
+export function DropZone({folderId,userId,onCommitted,children}:{folderId:string;userId:string;onCommitted:()=>void;children:ReactNode}){
  const tasks=useUploadStore(state=>state.tasks);
  const reloadTick=useUploadStore(state=>state.reloadTick);
  const setCurrentFolder=useUploadStore(state=>state.setCurrentFolder);
- const enqueueFiles=useUploadStore(state=>state.enqueueFiles);
  const cancel=useUploadStore(state=>state.cancel);
  const clearFinished=useUploadStore(state=>state.clearFinished);
  const retry=useUploadStore(state=>state.retry);
@@ -49,14 +27,12 @@ export function DropZone({folderId,userId,disabled,onCommitted,children}:{folder
  const replace=useUploadStore(state=>state.replace);
  const skip=useUploadStore(state=>state.skip);
  const attach=useUploadStore(state=>state.attach);
- const[dragging,setDragging]=useState(false);
  const[queueExpanded,setQueueExpanded]=useState(true);
  const[renamingId,setRenamingId]=useState<string|null>(null);
  const[renameValue,setRenameValue]=useState("");
  const[pendingRename,setPendingRename]=useState<{queueId:string;name:string}|null>(null);
  const[replaceConfirm,setReplaceConfirm]=useState<{queueId:string;target:ReplaceTarget}|null>(null);
  const[preparingReplace,setPreparingReplace]=useState("");
- const dragDepth=useRef(0);
  const seenReload=useRef(reloadTick);
  useEffect(()=>{if(tasks.length>0)setQueueExpanded(true);},[tasks.length]);
 
@@ -75,40 +51,6 @@ export function DropZone({folderId,userId,disabled,onCommitted,children}:{folder
   seenReload.current=reloadTick;
   onCommitted();
  },[reloadTick,onCommitted]);
-
- // Without a writable target the zone is inert (no highlight, no enqueue) but
- // still renders its children and any in-flight queue unchanged.
- const active=folderId!==""&&disabled!==true;
-
- function onDragEnter(event:DragEvent<HTMLDivElement>){
-  if(!active||!externalFiles(event.dataTransfer)||dropOnTextEntry(event))return;
-  event.preventDefault();
-  dragDepth.current+=1;
-  setDragging(true);
- }
-
- function onDragOver(event:DragEvent<HTMLDivElement>){
-  if(!active||!externalFiles(event.dataTransfer)||dropOnTextEntry(event))return;
-  event.preventDefault();
-  event.dataTransfer.dropEffect="copy";
- }
-
- // A depth counter absorbs child enter/leave flicker: the highlight only clears
- // when the pointer has actually left the whole subtree.
- function onDragLeave(event:DragEvent<HTMLDivElement>){
-  if(!active||!externalFiles(event.dataTransfer))return;
-  event.preventDefault();
-  dragDepth.current=Math.max(0,dragDepth.current-1);
-  if(dragDepth.current===0)setDragging(false);
- }
-
- function onDrop(event:DragEvent<HTMLDivElement>){
-  if(!active||!externalFiles(event.dataTransfer)||dropOnTextEntry(event))return;
-  event.preventDefault();
-  dragDepth.current=0;
-  setDragging(false);
-  enqueueFiles(Array.from(event.dataTransfer.files),folderId);
- }
 
  function finishRename(queueId:string,name:string){
   rename(queueId,name);
@@ -148,13 +90,9 @@ export function DropZone({folderId,userId,disabled,onCommitted,children}:{folder
  const finished=tasks.filter(task=>task.status==="committed"||task.status==="cancelled").length;
 
  return <div
-  className={"dropzone"+(dragging?" dragging":"")}
+  className="dropzone"
   role="region"
   aria-label="文件上传拖放区"
-  onDragEnter={onDragEnter}
-  onDragOver={onDragOver}
-  onDragLeave={onDragLeave}
-  onDrop={onDrop}
  >
   {children}
   {tasks.length>0&&<section className="upload-queue" aria-label="上传任务">
