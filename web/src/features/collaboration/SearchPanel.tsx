@@ -315,15 +315,15 @@ export function SearchPanel({userId}:{userId:string}){
    </form>
    <div className={"search-workbench"+(filtersOpen?" filters-open":"")}>
     <aside id="global-search-filters" className="search-filters" aria-label="搜索筛选条件">
-     <div className="search-filter-heading"><strong>筛选</strong><button type="button" className="search-text-action" onClick={clearFilters}>重置</button></div>
+     <div className="search-filter-heading"><strong>筛选</strong><RareButton tone="ghost" type="button" className="search-text-action" onClick={clearFilters}>重置</RareButton></div>
      <section className="search-filter-group" aria-label="文件类型">
       <div className="search-group-title">文件类型</div>
       <div className="search-type-list">
-       {fileKinds.map(([value,label,symbol])=><button key={value} type="button" aria-pressed={type===value}
+       {fileKinds.map(([value,label,symbol])=><RareButton tone="ghost" key={value} type="button" aria-pressed={type===value}
         className={"search-type-choice"+(type===value?" is-active":"")} onClick={()=>chooseType(value)}>
         <span className="search-type-symbol" aria-hidden="true">{symbol}</span><span>{label}</span>
         {type===value&&<span className="search-type-check" aria-hidden="true">✓</span>}
-       </button>)}
+       </RareButton>)}
       </div>
      </section>
      <section className="search-filter-group" aria-label="搜索范围">
@@ -331,14 +331,14 @@ export function SearchPanel({userId}:{userId:string}){
       <RareSelect aria-label="搜索范围" value={scope} onChange={e=>setScope(e.target.value as "all"|"current"|"descendants")}>
        <option value="all">全部可访问文件</option><option value="current">指定目录</option><option value="descendants">包含子目录</option>
       </RareSelect>
-      {scope!=="all"&&<button type="button" className="search-folder-select" onClick={()=>{setCandidate(folder);setPickerOpen(true);}}>
+      {scope!=="all"&&<RareButton tone="ghost" type="button" className="search-folder-select" onClick={()=>{setCandidate(folder);setPickerOpen(true);}}>
        <span title={currentFolder?.name??""}>{folder?(currentFolder?.name??"已选目录"):"选择目录"}</span><span aria-hidden="true">›</span>
-      </button>}
+      </RareButton>}
      </section>
      <section className="search-filter-group">
-      <button type="button" className="search-disclosure" aria-expanded={showAdvanced} onClick={()=>setShowAdvanced(v=>!v)}>
+      <RareButton tone="ghost" type="button" className="search-disclosure" aria-expanded={showAdvanced} onClick={()=>setShowAdvanced(v=>!v)}>
        更多条件 <span className={"search-chevron"+(showAdvanced?" is-open":"")} aria-hidden="true">⌄</span>
-      </button>
+      </RareButton>
       {showAdvanced&&<div className="search-advanced-fields">
        <label>分类<RareInput id="search-category" value={category} onChange={e=>setCategory(e.target.value)} placeholder="分类名称" maxLength={80}/></label>
        <label>标签<RareInput id="search-tag" value={tag} onChange={e=>setTag(e.target.value)} placeholder="标签名称" maxLength={80}/></label>
@@ -355,8 +355,8 @@ export function SearchPanel({userId}:{userId:string}){
      <RareButton type="submit" form="advanced-search-form" className="primary search-apply">应用筛选</RareButton>
      <section className="search-saved" aria-label="搜索预设">
       <div className="search-saved-heading"><strong>已保存的搜索</strong>
-       <button type="button" className="search-preset-add" title="保存当前搜索" aria-label="保存当前搜索"
-        aria-expanded={presetEditorOpen} onClick={()=>setPresetEditorOpen(v=>!v)}>＋</button>
+       <RareButton tone="ghost" type="button" className="search-preset-add" title="保存当前搜索" aria-label="保存当前搜索"
+        aria-expanded={presetEditorOpen} onClick={()=>setPresetEditorOpen(v=>!v)}>＋</RareButton>
       </div>
       {presetEditorOpen&&<div className="search-preset-new">
        <RareInput aria-label="预设名称" placeholder="搜索名称" maxLength={48} value={presetName} onChange={e=>setPresetName(e.target.value)}/>
@@ -365,11 +365,11 @@ export function SearchPanel({userId}:{userId:string}){
       {presetError&&<span className="error" role="alert">{presetError}</span>}
       <div className="search-preset-list">
        {presets.map(preset=><div className="search-preset-item" key={preset.id}>
-        <button type="button" className="search-preset-load" title={"载入 "+preset.name} onClick={()=>loadPreset(preset.fields)}>
+        <RareButton tone="ghost" type="button" className="search-preset-load" title={"载入 "+preset.name} onClick={()=>loadPreset(preset.fields)}>
          <span aria-hidden="true">⌕</span><span>{preset.name}</span>
-        </button>
-        <button type="button" className="search-preset-delete" aria-label={"删除预设 "+preset.name}
-         onClick={()=>void deletePreset(preset.name)}>×</button>
+        </RareButton>
+        <RareButton tone="ghost" type="button" className="search-preset-delete" aria-label={"删除预设 "+preset.name}
+         onClick={()=>void deletePreset(preset.name)}>×</RareButton>
        </div>)}
        {presets.length===0&&<span className="search-preset-empty">尚未保存搜索</span>}
       </div>
