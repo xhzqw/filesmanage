@@ -210,7 +210,7 @@ try{
   }else if(geometry.mobileDisplay){
    assert.equal(geometry.mobileDisplay,"none","duplicate mobile menu in desktop layout");
   }
-  await evaluate('document.querySelector(".explorer-list-folder").click()');
+  await evaluate('(()=>{const row=document.querySelector(".explorer-list-folder");if(row&&!row.classList.contains("selected"))row.click();})()');
   await wait(220);
   const selected=await evaluate('(()=>{const row=document.querySelector(".explorer-list-folder");const button=row?.querySelector(".folder-inline-open");return {selected:row?.classList.contains("selected"),opacity:Number(getComputedStyle(button).opacity)}})()');
   assert(selected.selected&&selected.opacity>=0.95,"selected folder must reveal opener: "+JSON.stringify(selected));
