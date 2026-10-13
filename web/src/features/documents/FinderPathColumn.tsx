@@ -20,6 +20,8 @@ type Props={
  onFileDragEnd:(event:DragEvent<HTMLElement>)=>void;
  onFolderDragStart:(event:DragEvent<HTMLElement>,folder:Folder)=>void;
  onFolderDragEnd:()=>void;
+ canDropInFolder:(folder:Folder)=>boolean;
+ onFolderDragOver:(event:DragEvent<HTMLElement>,folder:Folder)=>void;
  onDropFolder:(event:DragEvent<HTMLElement>,folder:Folder)=>void;
 };
 type Page={folders:Folder[];files:FileItem[];folderCursor:string;fileCursor:string};
@@ -37,7 +39,21 @@ export function FinderPathColumn(props:Props){
  const[status,setStatus]=useState<"loading"|"ready"|"failed">("loading");
  const[moreBusy,setMoreBusy]=useState(false);
  const[moreFailed,setMoreFailed]=useState(false);
+ const[dropTargetId,setDropTargetId]=useState<string|null>(null);
  const listRef=useRef<HTMLDivElement>(null);
+ function internalMove(event:DragEvent<HTMLElement>){
+  const types=Array.from(event.dataTransfer.types);
+  return !types.includes("Files")&&(types.includes("application/x-filesmanage-files")||types.includes("application/x-filesmanage-folder"));
+ }
+ function overTarget(event:DragEvent<HTMLElement>,target:Folder){
+  if(!internalMove(event))return;
+  props.onFolderDragOver(event,target);
+  setDropTargetId(props.canDropInFolder(target)?target.id:null);
+ }
+ function leaveTarget(event:DragEvent<HTMLElement>,targetId:string){
+  if(!event.currentTarget.contains(event.relatedTarget as Node|null))
+   setDropTargetId(id=>id===targetId?null:id);
+ }
  useEffect(()=>{
   let live=true;
   const controller=new AbortController();
@@ -85,16 +101,20 @@ export function FinderPathColumn(props:Props){
    event.preventDefault();props.onOpenFolder(folder);
   }
  }
- return <div className="explorer-column-list finder-path-list" role="grid" aria-label={folder.name+" 的内容"} ref={listRef} data-column-folder-id={folder.id}>
+ return <div className={"explorer-column-list finder-path-list"+(dropTargetId===folder.id?" drop-target":"")} role="grid" aria-label={folder.name+" 的内容"} ref={listRef} data-column-folder-id={folder.id}
+  onDragOver={event=>{if(!(event.target as HTMLElement).closest(".finder-column-row"))overTarget(event,folder);}}
+  onDragLeave={event=>leaveTarget(event,folder.id)}
+  onDrop={event=>{if(!internalMove(event))return;setDropTargetId(null);props.onDropFolder(event,folder);}}>
   {status==="loading"&&<div className="finder-column-status" role="status"><BrandLoadingLabel size="sm" decorative>加载中…</BrandLoadingLabel></div>}
   {status==="failed"&&<div className="finder-column-status" role="alert">目录读取失败</div>}
   {status==="ready"&&<>
    {data.folders.map(item=><div key={"folder-"+item.id} role="row" tabIndex={0} data-row-key={"folder:"+item.id} data-folder-id={item.id} data-upload-folder-id={item.id}
-    className={"finder-column-row finder-folder-row"+(props.activeChildId===item.id?" selected":"")}
+    className={"finder-column-row finder-folder-row"+(props.activeChildId===item.id?" selected":"")+(dropTargetId===item.id?" drop-target":"")}
     aria-selected={props.activeChildId===item.id}
     draggable onDragStart={event=>props.onFolderDragStart(event,item)} onDragEnd={props.onFolderDragEnd}
-    onDragOver={event=>{if(event.dataTransfer.types.includes("application/x-filesmanage-files")||event.dataTransfer.types.includes("application/x-filesmanage-folder")){event.preventDefault();event.dataTransfer.dropEffect="move";}}}
-    onDrop={event=>props.onDropFolder(event,item)}
+    onDragOver={event=>overTarget(event,item)}
+    onDragLeave={event=>leaveTarget(event,item.id)}
+    onDrop={event=>{if(internalMove(event))event.stopPropagation();setDropTargetId(null);props.onDropFolder(event,item);}}
     onClick={()=>props.onOpenFolder(item)} onDoubleClick={()=>props.onOpenFolder(item)}
     onContextMenu={event=>props.onFolderMenu(event,item)}
     onKeyDown={event=>keyMove(event,"folder",item.id)}>

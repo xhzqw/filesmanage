@@ -183,6 +183,16 @@
 .finder-column-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .finder-column-chevron{flex:none;font-size:21px;line-height:1;color:var(--text-tertiary)}
 .finder-column-row.selected .finder-column-chevron{color:#fff}
+.explorer-columns :is(.finder-column-row,.explorer-folder).drop-target{
+ background:color-mix(in srgb,var(--brand-blue) 17%,var(--surface-panel));
+ color:var(--text-primary);
+ outline:2px solid var(--brand-blue);outline-offset:-2px;
+}
+.explorer-columns :is(.finder-column-row,.explorer-folder).drop-target:hover{
+ background:color-mix(in srgb,var(--brand-blue) 21%,var(--surface-panel));
+}
+.explorer-columns .finder-column-row.drop-target .finder-column-chevron{color:var(--brand-blue)}
+.finder-path-list.drop-target{background:color-mix(in srgb,var(--brand-blue) 7%,var(--surface-panel));}
 .finder-column-status{min-height:66px;padding:22px 9px;color:var(--text-tertiary);font-size:12px;text-align:center}
 .finder-column-more{
  display:block;width:calc(100% - 12px);margin:6px;padding:7px;

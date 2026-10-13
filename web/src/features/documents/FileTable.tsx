@@ -191,6 +191,7 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   return()=>cancelAnimationFrame(frame);
  },[folder,viewMode,ancestorFile?.id]);
  const[hoveredFolderId,setHoveredFolderId]=useState<string|null>(null);
+ const[dropHoveredFolderId,setDropHoveredFolderId]=useState<string|null>(null);
  const[anchorId,setAnchorId]=useState<string|null>(null);
  const[marquee,setMarquee]=useState<{left:number;top:number;width:number;height:number}|null>(null);
  const marqueeCleanup=useRef<(()=>void)|null>(null);
@@ -261,6 +262,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  // The live internal-move drag session (§7.2) and source-row lift state.
  // The native drag image is a separate filename-only surface, not a table row.
  const dragSession=useRef<MoveDragSession|null>(null);
+ // Preserve the exact dragged rows across ancestor-column re-renders.
+ const dragSourceFiles=useRef<FileItem[]>([]);
  const[draggingIds,setDraggingIds]=useState<Set<string>>(()=>new Set<string>());
  const[finderFolderAssignments,setFinderFolderAssignments]=useState<Record<string,string[]>>({});
  // A target preselected by a drop; "" is the menu entry, which opens the same
@@ -393,8 +396,9 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    // The captured set must still be exactly what the list shows: a reload
    // during the drag means those rows are no longer the visible ones, so the
    // gesture stops instead of opening a dialog about a stale set.
-   const sources=[...items,...(ancestorFile?[ancestorFile]:[])].filter(file=>captured.ids.includes(file.id));
-   if(sources.length!==captured.ids.length){
+   const sources=dragSourceFiles.current.filter(file=>captured.ids.includes(file.id));
+   dragSourceFiles.current=[];
+   if(sources.length!==captured.ids.length||sources.some(file=>file.folderId!==captured.sourceFolderId)){
     announce("文件列表已变化，移动未开始，请重试","error");
     return;
    }
@@ -966,13 +970,14 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    setFocusedId(item.id);
    setAnchorId(item.id);
   }
-  const sources=inside?selection:[item];
+  const sources=inside&&selection.some(file=>file.id===item.id)?selection:[item];
   const ids=sources.map(file=>file.id);
   const dataTransfer=event.dataTransfer;
   // An empty set is never draggable.
   if(ids.length===0||!dataTransfer){event.preventDefault();return;}
   const session:MoveDragSession={ids,sourceFolderId:item.folderId,focusId:item.id};
   dragSession.current=session;
+  dragSourceFiles.current=[...sources];
   setDraggingIds(new Set(ids));
   // "move" and never "copy"/"copyMove": this phase offers no copy, and a copy
   // cursor over a gesture that moves would misstate the outcome (§7.2).
@@ -991,6 +996,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
  function onRowDragEnd(){
   const ended=dragSession.current;
   dragSession.current=null;
+  dragSourceFiles.current=[];
+  setDropHoveredFolderId(null);
   setDraggingIds(current=>current.size===0?current:new Set<string>());
   window.dispatchEvent(new CustomEvent<MoveSessionDetail>(MOVE_SESSION_EVENT,{detail:{active:false,ids:[],sourceFolderId:ended?.sourceFolderId??folder,focusId:null}}));
  }
@@ -1019,15 +1026,25 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   event.dataTransfer.setData("text/plain",entry.name);
   setMoveDragImage(event.dataTransfer,entry.name,folderIds.length+fileIds.length);
  }
- function onFolderDragEnd(){folderDragRef.current=null;}
- function onFolderDragOver(event:DragEvent<HTMLElement>){
+ function onFolderDragEnd(){folderDragRef.current=null;setDropHoveredFolderId(null);}
+ function canDropInFolder(target:Folder){
+  const draggedFolder=folderDragRef.current;
+  if(draggedFolder)return draggedFolder.id!==target.id&&draggedFolder.parentId!==target.id;
+  const draggedFiles=dragSession.current;
+  return !!draggedFiles&&draggedFiles.sourceFolderId!==target.id;
+ }
+ function onFolderDragOver(event:DragEvent<HTMLElement>,target:Folder){
   if(!dragSession.current&&!folderDragRef.current)return;
   const types=Array.from(event.dataTransfer.types);
   if(!isInternalMoveDrag(event.dataTransfer)&&!types.includes("application/x-filesmanage-folder"))return;
   event.preventDefault();
-  event.dataTransfer.dropEffect="move";
+  event.stopPropagation();
+  const allowed=canDropInFolder(target);
+  event.dataTransfer.dropEffect=allowed?"move":"none";
+  setDropHoveredFolderId(allowed?target.id:null);
  }
  function onFolderDrop(event:DragEvent<HTMLElement>,target:Folder){
+  setDropHoveredFolderId(null);
   const types=Array.from(event.dataTransfer.types);
   const source=folderDragRef.current;
   if(source&&types.includes("application/x-filesmanage-folder")){
@@ -1406,11 +1423,12 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
   const hovered=hoveredFolderId===entry.id;
  return <div key={"folder-"+entry.id} data-folder-id={entry.id} data-upload-folder-id={entry.id} role="row"
    tabIndex={0} aria-selected={selected}
-   className={"explorer-item explorer-folder"+(selected?" selected":"")}
+   className={"explorer-item explorer-folder"+(selected?" selected":"")+(dropHoveredFolderId===entry.id?" drop-target":"")}
    draggable
    onDragStart={event=>onFolderDragStart(event,entry)}
    onDragEnd={onFolderDragEnd}
-   onDragOver={onFolderDragOver}
+   onDragOver={event=>onFolderDragOver(event,entry)}
+   onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node|null))setDropHoveredFolderId(current=>current===entry.id?null:current);}}
    onDrop={event=>onFolderDrop(event,entry)}
    onMouseEnter={()=>setHoveredFolderId(entry.id)}
    onMouseLeave={()=>setHoveredFolderId(current=>current===entry.id?null:current)}
@@ -1666,9 +1684,10 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
      onOpenFile={item=>navigate("/preview/"+item.id)}
      onFileMenu={(event,item)=>{setAncestorFile(item);setAncestorFolder(null);onRowContextMenu(event,item);}}
      onFolderMenu={(event,entry)=>{setAncestorFolder(entry);setAncestorFile(null);onFolderContextMenu(event,entry);}}
-     onFileDragStart={(event,item)=>{setAncestorFile(item);setAncestorFolder(null);onRowDragStart(event,item);}}
+     onFileDragStart={onRowDragStart}
      onFileDragEnd={onRowDragEnd}
      onFolderDragStart={onFolderDragStart} onFolderDragEnd={onFolderDragEnd}
+     canDropInFolder={canDropInFolder} onFolderDragOver={onFolderDragOver}
      onDropFolder={onFolderDrop}/>)}
     {!showingAncestorPreview&&<div className="explorer-column-list explorer-current-column" role="grid" aria-label={folderName+" 的内容"} onKeyDown={onGridKeyDown}>
      {status==="loading"&&<div className="finder-column-status" role="status"><BrandLoadingLabel size="sm">加载中…</BrandLoadingLabel></div>}
