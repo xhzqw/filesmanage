@@ -407,6 +407,7 @@ try{
  const source=`(()=>{
   const original=window.fetch.bind(window);
   const favoriteWrites=[];
+  const syntheticFavorites=new Set();
   window.__favoriteWrites=favoriteWrites;
   const folder=${JSON.stringify(mockBase.folder)};
   const base=${JSON.stringify(mockBase.file)};
@@ -417,10 +418,17 @@ try{
   }));
   window.fetch=(input,init)=>{
    const url=new URL(input instanceof Request?input.url:input,location.href);
+   if(url.pathname==="/api/favorites"&&(!init?.method||init.method==="GET")){
+    return Promise.resolve(new Response(JSON.stringify({ok:true,
+     data:[...syntheticFavorites].map(id=>({id:"synthetic-"+id,kind:"file",fileId:id}))
+    }),{status:200,headers:{"Content-Type":"application/json"}}));
+   }
    if(url.pathname.startsWith("/api/favorites/file/browser-readonly-")){
     const method=init?.method??"GET";
-    favoriteWrites.push({method,id:url.pathname.split("/").pop()});
-    return Promise.resolve(new Response(JSON.stringify({ok:true,data:{id:url.pathname.split("/").pop(),favorited:method==="PUT"}}),{status:200,headers:{"Content-Type":"application/json"}}));
+    const id=url.pathname.split("/").pop();
+    favoriteWrites.push({method,id});
+    if(method==="PUT")syntheticFavorites.add(id);else syntheticFavorites.delete(id);
+    return Promise.resolve(new Response(JSON.stringify({ok:true,data:{id,favorited:method==="PUT"}}),{status:200,headers:{"Content-Type":"application/json"}}));
    }
    if(url.pathname==="/api/files"&&url.searchParams.get("folder")===folder&&(!init?.method||init.method==="GET")){
     const cursor=url.searchParams.get("cursor")||"";
@@ -455,9 +463,9 @@ try{
  assert(mockState.pageOverflow<=2,"130 React rows widened the page");
  await until('!!document.querySelector("tr.file-entry .action-star-btn:not(:disabled)")');
  await evaluate('document.querySelector("tr.file-entry .action-star-btn").click()');
- await until('document.querySelector("tr.file-entry .action-star-btn")?.classList.contains("favorited")');
+ await until('document.querySelector("tr.file-entry .action-star-btn.favorited:not(:disabled)")!==null');
  await evaluate('document.querySelector("tr.file-entry .action-star-btn").click()');
- await until('!document.querySelector("tr.file-entry .action-star-btn")?.classList.contains("favorited")');
+ await until('!!document.querySelector("tr.file-entry .action-star-btn:not(.favorited):not(:disabled)")');
  assert.deepEqual((await evaluate('window.__favoriteWrites.map(item=>item.method)')),["PUT","DELETE"],
   "favorite must issue persistence requests, not just animate the SVG");
  console.log("EXPLORER_FAVORITE_TOGGLE_PASS");
