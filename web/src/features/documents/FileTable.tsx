@@ -903,7 +903,8 @@ const[latencyMs,setLatencyMs]=useState<number|null>(null);
    </RareButton>
   </div>}
   {viewMode==="list"&&<div className="table" onClick={event=>{if(!(event.target as HTMLElement).closest("tr")){setSelectedIds(new Set<string>());setAnchorId(null);}}}>
-   <RareDataTable role="grid" aria-label={folderName+" 文件列表"} density="compact" className="file-table file-table-ultra">
+   <RareDataTable role="grid" aria-label={folderName+" 文件列表"} density="compact"
+    className={"file-table file-table-ultra"+(status==="ready"&&visibleFolders.length>0&&visibleItems.length===0?" file-table-folders-only":"")}>
     <thead><tr>
      <th className="col-select" scope="col"><RareInput ref={selectAllRef} type="checkbox" checked={allLoadedSelected} onChange={toggleSelectAllLoaded} aria-label="选择当前已加载的文件"/></th>
      <th className="col-name" scope="col">文件名</th>

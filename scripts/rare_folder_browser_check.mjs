@@ -184,7 +184,9 @@ try{
     .map(key=>{const th=table.querySelector("th.col-"+key);return {key,width:rect(th).width,visible:getComputedStyle(th).display!=="none"};});
    const mobile=table.querySelector(".file-mobile-actions");
    return {width:innerWidth,pane:pane.clientWidth,pageOverflow:document.documentElement.scrollWidth-innerWidth,
-    tableWidth:rect(table).width,columns,folderCells:[...folder.querySelectorAll("td.col-size,td.col-version,td.col-date")].map(el=>el.textContent.trim()),
+    tableWidth:rect(table).width,columns,folderOnly:table.classList.contains("file-table-folders-only"),
+    visibleFiles:table.querySelectorAll("tr.file-entry").length,
+    folderCells:[...folder.querySelectorAll("td.col-size,td.col-version,td.col-date")].map(el=>el.textContent.trim()),
     buttonWidth:rect(button).width,buttonRight:rect(button).right,nameRight:rect(name).right,
     cellRight:rect(cell).right,mobileDisplay:mobile?getComputedStyle(mobile).display:null,
     buttonFont:getComputedStyle(button).fontSize};
@@ -192,10 +194,16 @@ try{
   assert(geometry,"file-list rows must remain visible at "+width);
   assert.equal(geometry.width,width,"emulated layout viewport mismatch");
   assert(geometry.pageOverflow<=2,"page overflow: "+JSON.stringify(geometry));
+  assert.equal(geometry.folderOnly,geometry.visibleFiles===0,"folder-only mode must follow visible file count");
   assert(geometry.folderCells.every(text=>text===""),"folder-only columns must be blank");
   assert(geometry.buttonRight<=geometry.cellRight+1,"folder opener spills into next column: "+JSON.stringify(geometry));
   assert(geometry.columns[1].width>80,"file name collapsed: "+JSON.stringify(geometry));
-  if(geometry.pane>1400)assert(geometry.columns[1].width/geometry.tableWidth<=0.55,"name monopolizes wide table");
+  if(geometry.folderOnly){
+   assert.equal(geometry.visibleFiles,0,"folder-only grid must not hide files");
+   assert.deepEqual(geometry.columns.filter(col=>col.visible).map(col=>col.key),["name"],"folder-only grid should have one meaningful column");
+  }else if(geometry.pane>1400){
+   assert(geometry.columns[1].width/geometry.tableWidth<=0.55,"name monopolizes wide mixed table");
+  }
   if(geometry.pane<=560){
    assert(geometry.buttonWidth<=25&&geometry.buttonFont==="0px","compact folder opener must fit the 24px grid");
    if(geometry.mobileDisplay)assert.notEqual(geometry.mobileDisplay,"none","compact file menu missing");

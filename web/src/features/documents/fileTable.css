@@ -386,3 +386,14 @@ table.file-table-ultra tbody td:not(.empty){height:26px;padding:0 8px}
 .density-title{color:var(--text-tertiary);white-space:nowrap}
 .density-switch button{height:22px;min-height:22px;padding:0 var(--space-2);font-size:11px}
 .toolbar .density-switch button[aria-pressed="true"]{background:var(--surface-row-selected);border-color:var(--border-selected);color:var(--brand-blue);font-weight:600}
+
+/* The root can contain only directories. In that case, don't show a
+   select-all control for unselectable folders or four empty file metadata
+   columns. The normal six-column grid returns as soon as files are visible. */
+table.file-table-folders-only :is(th,td).col-select,
+table.file-table-folders-only :is(th,td).col-size,
+table.file-table-folders-only :is(th,td).col-version,
+table.file-table-folders-only :is(th,td).col-date,
+table.file-table-folders-only :is(th,td).col-actions{display:none}
+table.file-table-folders-only th.col-name{width:100%;padding-left:14px}
+table.file-table-folders-only tbody td.col-name{padding-left:14px}
