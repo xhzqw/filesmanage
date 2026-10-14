@@ -96,15 +96,15 @@
 .shell.shell-finder>.panels.document-explorer{
  margin-top:calc(-1 * var(--height-header));gap:0;
  background:var(--surface-panel);border:1px solid rgba(15,23,42,.065);
- border-radius:12px;overflow:hidden;
+ border-radius:var(--radius-md);overflow:hidden;
 }
 .shell.shell-finder .document-explorer>.finder-sidebar{
  box-sizing:border-box;padding-top:var(--height-header);
  border:0;border-right:1px solid rgba(15,23,42,.07);
- border-radius:0;box-shadow:none;
+ border-radius:var(--radius-xs);box-shadow:none;
 }
 .shell.shell-finder .document-explorer>.work{
- margin-top:var(--height-header);border:0;border-radius:0;box-shadow:none;
+ margin-top:var(--height-header);border:0;border-radius:var(--radius-xs);box-shadow:none;
 }
 .document-explorer .finder-sidebar-home{
  position:absolute;top:0;left:0;right:0;z-index:2;
@@ -121,7 +121,7 @@
 @media(max-width:700px){
  .shell.shell-finder>.header{width:100%;align-self:stretch}
  .shell.shell-finder>.header>.shell-home-pill{display:inline-flex}
- .shell.shell-finder>.panels.document-explorer{margin-top:0;flex-direction:column;border-radius:10px}
+ .shell.shell-finder>.panels.document-explorer{margin-top:0;flex-direction:column;border-radius:var(--radius-md)}
  .shell.shell-finder .document-explorer>.finder-sidebar{padding-top:0;border-right:0;border-bottom:1px solid rgba(15,23,42,.07)}
  .shell.shell-finder .document-explorer>.work{margin-top:0}
  .document-explorer .finder-sidebar-home{display:none}
