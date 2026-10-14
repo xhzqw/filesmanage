@@ -119,24 +119,23 @@
 .explorer-marquee{position:absolute;z-index:6;pointer-events:none;border:1px solid var(--border-focus);border-radius:var(--radius-xs);background:var(--ui-state-selected-grid);opacity:.68;box-sizing:border-box}
 .explorer-empty{min-height:160px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--text-secondary);font-size:12px}
 .explorer-icon-grid{
- display:grid;grid-template-columns:repeat(auto-fill,132px);
- gap:16px 20px;padding:16px 20px;align-content:start;justify-content:start;
+ display:grid;grid-template-columns:repeat(auto-fill,minmax(124px,1fr));
+ gap:18px 16px;padding:20px;align-content:start;
 }
-/* Finder icon view: reserve the same two-line filename slot for every tile.
-   Otherwise the vertically centered column shifts long-name icons upward
-   (and their metadata follows), even though the glyphs are identical. */
+/* Match the icon rail, not the title length. One-line names must not leave an
+   empty second line before Finder dots; the row aligns by its fixed artwork. */
 .explorer-icon-grid>.explorer-item{
- justify-content:flex-start;
- box-sizing:border-box;
+ justify-self:center;align-items:center;justify-content:flex-start;
+ box-sizing:border-box;width:100%;max-width:136px;gap:0;
 }
 .explorer-icon-grid>.explorer-item .explorer-item-name{
- box-sizing:border-box;
- height:calc(2 * 1.35em);
- min-height:calc(2 * 1.35em);
- flex:none;
+ box-sizing:border-box;flex:none;margin-top:6px;
+ height:auto;min-height:0;
 }
-.explorer-icon-grid>.explorer-item .explorer-item-meta{min-height:15px}
-.explorer-icon-grid>.explorer-item .explorer-item-meta{height:15px;max-height:15px;flex:0 0 15px}
+.explorer-icon-grid>.explorer-item .explorer-item-meta{
+ height:15px;min-height:15px;max-height:15px;flex:0 0 15px;
+ margin-top:4px;
+}
 .explorer-item{
  position:relative;display:flex;align-items:center;justify-content:center;flex-direction:column;
  gap:6px;padding:9px 9px 8px;min-width:0;min-height:137px;
@@ -169,8 +168,18 @@
 .explorer-name-extension{color:var(--text-secondary);opacity:.6}
 .explorer-columns .selected .explorer-name-extension{color:inherit;opacity:.76}
 .explorer-icon-grid .explorer-item-star{
- /* Anchor the star to the 70px artwork rail, not the 132px tile edge. */
- top:8px;right:calc(50% - 38px);
+ /* White Finder badge, positioned relative to the 70px artwork rail. */
+ top:9px;right:calc(50% - 31px);
+ box-sizing:border-box;width:18px;height:18px;min-height:18px;padding:0;
+ background:#fff;border-radius:var(--radius-pill);
+ box-shadow:0 1px 3px rgba(15,23,42,.16);
+}
+.explorer-icon-grid .file-entry>.explorer-item-star{
+ /* A 46px document glyph is narrower than the 52px folder silhouette. */
+ right:calc(50% - 22px);
+}
+.explorer-icon-grid .explorer-item-star svg{
+ width:13px;height:13px;
 }
 /* Keep muted labels on one metadata rail rather than a separate rainbow line. */
 .explorer-item-meta{display:flex;align-items:center;justify-content:center;gap:7px;min-width:0;max-width:100%;min-height:14px}
@@ -192,13 +201,31 @@
 .explorer-item:focus-within :is(.explorer-item-star,.explorer-item-more),
 .explorer-item-star.favorited{opacity:1;pointer-events:auto}
 .explorer-item-star.favorited{color:var(--brand-star,#f59e0b)}
-.explorer-surface-columns{overflow:hidden;scrollbar-gutter:stable}
+.explorer-surface-columns{
+ overflow:hidden;scrollbar-gutter:stable;
+ container:finder-columns-pane / inline-size;
+}
 .explorer-columns{
  display:flex;align-items:stretch;height:100%;min-height:0;min-width:0;
  overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;
  scrollbar-width:thin;scrollbar-color:var(--border-subtle) transparent;scrollbar-gutter:stable;
- --finder-column-width:clamp(230px,25vw,310px);
+ /* Column tracks derive from the CONTENT pane, never the full viewport. */
+ --finder-column-count:2;
+ --finder-column-width:clamp(220px,calc(100cqw / var(--finder-column-count)),280px);
 }
+/* Full tracks where feasible, without an incomplete filler rail at 2K/4K. */
+@container finder-columns-pane (min-width:660px){.explorer-columns{--finder-column-count:3}}
+@container finder-columns-pane (min-width:840px){.explorer-columns{--finder-column-count:4}}
+@container finder-columns-pane (min-width:1120px){.explorer-columns{--finder-column-count:5}}
+@container finder-columns-pane (min-width:1400px){.explorer-columns{--finder-column-count:6}}
+@container finder-columns-pane (min-width:1680px){.explorer-columns{--finder-column-count:7}}
+@container finder-columns-pane (min-width:1960px){.explorer-columns{--finder-column-count:8}}
+@container finder-columns-pane (min-width:2240px){.explorer-columns{--finder-column-count:9}}
+@container finder-columns-pane (min-width:2520px){.explorer-columns{--finder-column-count:10}}
+@container finder-columns-pane (min-width:2800px){.explorer-columns{--finder-column-count:11}}
+@container finder-columns-pane (min-width:3080px){.explorer-columns{--finder-column-count:12}}
+@container finder-columns-pane (min-width:3360px){.explorer-columns{--finder-column-count:13}}
+@container finder-columns-pane (min-width:3640px){.explorer-columns{--finder-column-count:14}}
 .explorer-column-list{
  flex:0 0 var(--finder-column-width);box-sizing:border-box;
  height:100%;min-height:0;overflow-x:hidden;overflow-y:auto;
@@ -207,10 +234,19 @@
 }
 .explorer-column-list .explorer-item{
  flex-direction:row;justify-content:flex-start;gap:4px;min-height:34px;height:34px;
- padding:3px 15px 3px 7px;margin:0 2px;border:0;border-radius:var(--radius-sm);
+ padding:3px 7px;margin:0 2px;border:0;border-radius:var(--radius-sm);
 }
 .explorer-column-list .explorer-item-art{width:23px;height:25px;flex:0 0 23px}
-.explorer-column-list .explorer-item-name{text-align:left;display:block;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;flex:1 1 auto;min-width:0}
+.explorer-column-list .explorer-item-name{
+ text-align:left;display:flex;white-space:nowrap;text-overflow:clip;
+ overflow:hidden;flex:1 1 auto;min-width:0;
+}
+.explorer-column-list .explorer-item-name .explorer-name-stem{
+ overflow:hidden;min-width:0;text-overflow:clip;white-space:nowrap;
+}
+.explorer-column-list .explorer-item-name .explorer-name-extension{
+ flex:none;white-space:nowrap;
+}
 .explorer-column-list .explorer-item-meta{min-height:0;flex:0 1 auto;min-width:0;max-width:70px;overflow:hidden}
 .explorer-column-list .explorer-item-sub{display:none}
 .explorer-folder .explorer-item-art img{display:none}
@@ -220,11 +256,16 @@
  position:relative;inset:auto;top:auto;right:auto;bottom:auto;
  transform:none;flex:0 0 21px;width:21px;height:22px;min-height:22px;padding:0;
 }
-.explorer-column-list .explorer-folder::after{
- content:"";position:absolute;right:5px;top:50%;width:6px;height:6px;
- border-top:1.5px solid currentColor;border-right:1.5px solid currentColor;
- transform:translateY(-50%) rotate(45deg);color:var(--text-tertiary);
+.explorer-column-list .explorer-item::after{
+ content:"";position:relative;top:auto;right:auto;
+ flex:0 0 6px;width:6px;height:6px;margin-inline:4px 4px;
+ border:1.5px solid transparent;
+ box-sizing:border-box;transform:rotate(45deg);
  pointer-events:none;
+}
+.explorer-column-list .explorer-folder::after{
+ border-top-color:currentColor;border-right-color:currentColor;
+ color:var(--text-tertiary);
 }
 .explorer-column-list .explorer-folder:is(:hover,:focus-within)::after{opacity:0}
 .explorer-columns :is(.explorer-item,.finder-column-row).selected{
@@ -312,9 +353,9 @@
 .explorer-gallery-strip .explorer-item-sub{display:none}
 .explorer-gallery-strip .explorer-item-meta{display:none}
 @container file-list (max-width:560px){
- .explorer-icon-grid{grid-template-columns:repeat(auto-fill,minmax(0,120px));gap:10px;padding:10px}
+ .explorer-icon-grid{grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:12px;padding:12px}
  .explorer-item{min-height:112px}
- .explorer-columns{--finder-column-width:clamp(178px,43cqw,270px)}
+ .explorer-columns{--finder-column-width:clamp(178px,50cqw,270px)}
  .explorer-column-detail{flex-basis:clamp(210px,52cqw,300px)}
  .explorer-column-detail{padding:12px 8px}
  .explorer-column-detail dl{grid-template-columns:1fr;gap:2px}
@@ -439,7 +480,7 @@
 .document-explorer .folder-file-toolbar-host .file-toolbar .filter-search-wrap,
 .document-explorer .folder-file-toolbar-host .file-toolbar .new-folder-wrapper{align-items:center}
 .document-explorer .folder-file-toolbar-host .file-toolbar .file-selected-count{font-size:11px}
-@container file-work (max-width:1040px){
+@container file-work (max-width:900px){
  .folder-file-toolbar-host .file-toolbar .batch-action-label{display:none}
  .folder-file-toolbar-host .file-toolbar .batch-actions-group .rare-button{width:30px;padding:0}
  .document-explorer .folder-current-title{flex-basis:105px;font-size:13px}

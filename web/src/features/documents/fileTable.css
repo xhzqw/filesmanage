@@ -174,12 +174,12 @@
 .col-date{text-align:left}
 .col-actions{text-align:right}
 /* Only the filename grows; fixed metadata aligns at the far right edge. */
-.file-table :is(th,td).col-select{width:32px;text-align:center}
+.file-table :is(th,td).col-select{width:36px;text-align:center}
 .file-table :is(th,td).col-name{width:auto;text-align:left}
 .file-table :is(th,td).col-size{width:96px;text-align:right!important;font-variant-numeric:tabular-nums;padding-right:16px!important}
 .file-table :is(th,td).col-version{width:72px;text-align:center}
 .file-table :is(th,td).col-date{width:148px;text-align:left;font-variant-numeric:tabular-nums;padding-left:12px!important}
-.file-table :is(th,td).col-actions{width:72px;text-align:right;padding-right:14px!important}
+.file-table :is(th,td).col-actions{width:56px;text-align:right;padding-right:8px!important}
 .file-table tbody td.row-actions .actions-cell-wrap{justify-content:flex-end}
 
 .file-cell-wrap{display:flex;align-items:center;gap:var(--space-1);min-width:0;height:100%}
@@ -365,10 +365,6 @@
   .file-toolbar .file-toolbar-mode{animation:none}
 }
 @container file-list (max-width:820px){
-  .file-table :is(th,td).col-actions{width:66px}
-  .file-table :is(th,td).col-date{width:130px}
-  .file-table :is(th,td).col-size{width:76px}
-  .file-table :is(th,td).col-version{width:54px}
   .file-table .actions-hover-group{opacity:1;pointer-events:auto}
   .file-table .actions-hover-group>.action-link:not(.more-trigger){display:none}
 }
@@ -523,7 +519,7 @@ table.file-table-ultra tbody td:not(.empty){height:var(--file-list-row-height);p
 table.file-table-folders-only :is(th,td).col-size,
 table.file-table-folders-only :is(th,td).col-version{display:none}
 table.file-table-folders-only th.col-select{width:36px}
-table.file-table-folders-only th.col-actions{width:86px}
+table.file-table-folders-only th.col-actions{width:56px}
 table.file-table-folders-only th.col-name{width:auto}
 table.file-table-folders-only tbody td.col-name{padding-left:8px}
 .file-table .folder-row-more{

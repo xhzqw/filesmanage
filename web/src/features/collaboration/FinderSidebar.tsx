@@ -3,6 +3,7 @@ import {Link} from "react-router-dom";
 import {collaborationApi,type Favorite} from "./api";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {FinderLineIcon} from "../../shared/ui/ResourceIcons";
+import {compactExplorerName} from "../../shared/explorerDisplayName";
 import {RareButton} from "../../shared/ui/rare";
 import "./finderSidebar.css";
 import {FinderTags} from "./FinderTags";
@@ -47,7 +48,7 @@ export function FinderSidebar({section,revision}:{section:DocumentSection;revisi
     const href=item.kind==="file"?"/preview/"+encodeURIComponent(id):"/doc?folder="+encodeURIComponent(id);
     return <Link key={item.id} className="finder-favorite-item" to={href} title={item.resourceName}>
      <FinderLineIcon kind={item.kind==="file"?"file":"folder"}/>
-     <span className="finder-favorite-name">{item.resourceName}</span>
+     <span className="finder-favorite-name">{compactExplorerName(item.resourceName,"sidebar")}</span>
     </Link>;
    })}
    {status==="ready"&&favorites.length>=8&&<Link to="/doc?view=favorites" className="finder-nav-more">查看全部关注</Link>}

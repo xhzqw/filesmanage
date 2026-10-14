@@ -15,7 +15,7 @@ function load(path){
 }
 const {compareFinderFolders,compareFinderFiles}=load("web/src/features/documents/finderSort.ts");
 const {readFinderAssignmentBatches}=load("web/src/features/documents/finderAssignmentBatches.ts");
-const {compactExplorerName}=load("web/src/features/documents/explorerDisplayName.ts");
+const {compactExplorerName}=load("web/src/shared/explorerDisplayName.ts");
 const folders=[
  {id:"a",name:"旅程目录-2",updatedAt:"2026-10-01T00:00:00Z"},
  {id:"b",name:"旅程目录-10",updatedAt:"2026-10-10T00:00:00Z"},

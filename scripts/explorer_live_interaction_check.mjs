@@ -241,6 +241,78 @@ try{
    }
   }
  }
+ // Resolution-independent Finder geometry. Validate paint boxes rather than
+ // merely checking computed CSS: sidebars may be resized, and cqw != vw.
+ for(const width of [780,980,1280,1440,1920,2560,3840]){
+  await send("Emulation.setDeviceMetricsOverride",{width,height:900,deviceScaleFactor:1,mobile:false});
+  for(const [mode,label] of [["list","列表视图"],["icons","图标视图"],["columns","分栏视图"]]){
+   await evaluate('document.querySelector('+JSON.stringify('.folder-view-switch button[aria-label="'+label+'"]')+')?.click()');
+   await until('document.querySelector(".work-body")?.dataset.explorerView==='+JSON.stringify(mode));
+   const dimensions=await evaluate(`(()=>{
+    const rect=e=>e?.getBoundingClientRect(),css=(e,pseudo)=>e&&getComputedStyle(e,pseudo);
+    const work=document.querySelector('.work-body'),surface=document.querySelector('.explorer-surface');
+    if(document.querySelector('.work-body')?.dataset.explorerView==='list'){
+     const header=document.querySelector('table.file-table thead'),table=header?.closest('table');
+     const widths={};
+     for(const key of ['select','size','version','date','actions']){
+      const cell=header?.querySelector('th.col-'+key);
+      widths[key]=cell?rect(cell)?.width:null;
+     }
+     return {mode:'list',widths,nameWidth:rect(header?.querySelector('th.col-name'))?.width,tableWidth:rect(table)?.width,
+      canvasWidth:rect(work)?.width};
+    }
+    if(document.querySelector('.work-body')?.dataset.explorerView==='icons'){
+     const grid=document.querySelector('.explorer-icon-grid'),cards=[...grid.querySelectorAll(':scope>.explorer-item')];
+     const top=rect(cards[0])?.top,firstRow=cards.filter(card=>Math.abs(rect(card).top-top)<1);
+     const last=firstRow.at(-1),a=rect(firstRow[0]),b=rect(last),g=rect(grid);
+     const selected=cards.find(card=>card.querySelector('.file-finder-marks'));
+     const title=rect(selected?.querySelector('.explorer-item-name')),tags=rect(selected?.querySelector('.explorer-item-meta'));
+     const star=rect(cards.find(card=>card.classList.contains('file-entry'))?.querySelector('.explorer-item-star'));
+     const art=rect(cards.find(card=>card.classList.contains('file-entry'))?.querySelector('.explorer-item-art'));
+     return {mode:'icons',gridColumns:css(grid).gridTemplateColumns,firstRow:firstRow.length,
+      edgeDelta:Math.abs((a.left-g.left)-(g.right-b.right)),
+      tagsGap:tags&&title?tags.top-title.bottom:null,
+      starWidth:star?.width,starInner:star&&art?star.right<art.right:null,
+      artWidth:art?.width,overflow:grid.scrollWidth>grid.clientWidth+2};
+    }
+    const pane=document.querySelector('.explorer-surface-columns'),columns=document.querySelector('.explorer-columns');
+    const col=columns?.querySelector('.explorer-column-list');
+    const folder=columns?.querySelector('.explorer-current-column .explorer-folder');
+    const file=columns?.querySelector('.explorer-current-column .file-entry');
+    const starA=rect(folder?.querySelector('.explorer-item-star')),starB=rect(file?.querySelector('.explorer-item-star'));
+    const colWidth=rect(col)?.width,paneWidth=pane?.clientWidth;
+    return {mode:'columns',paneWidth,colWidth,
+     numberOfTracks:css(columns).getPropertyValue('--finder-column-count').trim(),
+     trackRemainder:colWidth?Math.min(paneWidth%colWidth,colWidth-(paneWidth%colWidth)):null,
+     starsAligned:starA&&starB?Math.abs(starA.left-starB.left)<=.75:null,
+     arrowSlots:!!folder&&!!file&&css(folder,'::after').width===css(file,'::after').width};
+   })()`);
+   if(mode==="list"&&width>=980){
+    for(const [name,value] of [["size",96],["version",72],["date",148],["actions",56]]){
+     assert(dimensions.widths[name]!==null&&Math.abs(dimensions.widths[name]-value)<=1,
+      "File metadata grew with screen size "+width+": "+JSON.stringify(dimensions));
+    }
+    assert(dimensions.nameWidth>120);
+   }
+   if(mode==="icons"){
+    assert(dimensions.firstRow>=1&&dimensions.edgeDelta<=2&&!dimensions.overflow,
+     "Finder responsive grid edge imbalance "+width+": "+JSON.stringify(dimensions));
+    if(dimensions.tagsGap!==null)assert(Math.abs(dimensions.tagsGap-4)<=1,
+     "Finder one-line tags detached from name "+width+": "+JSON.stringify(dimensions));
+    assert(dimensions.starWidth===18&&dimensions.starInner,
+     "Finder favorite badge outside document artwork "+width+": "+JSON.stringify(dimensions));
+   }
+   if(mode==="columns"){
+    assert(dimensions.colWidth>170&&dimensions.colWidth<=281&&
+     dimensions.starsAligned!==false&&dimensions.arrowSlots,
+     "Finder column star/track width diverged "+width+": "+JSON.stringify(dimensions));
+    if(width>=980)assert(dimensions.trackRemainder<=20,
+     "Finder trailing column track clipped "+width+": "+JSON.stringify(dimensions));
+   }
+   console.log("FINDER_RESOLUTION_GEOMETRY_PASS",width,mode,JSON.stringify(dimensions));
+  }
+ }
+ await send("Emulation.clearDeviceMetricsOverride");
  // Sort is one shared state across all four views. Verify the actual row
  // order, not merely that the sort glyph remains mounted.
  await send("Emulation.setDeviceMetricsOverride",{width:1366,height:900,deviceScaleFactor:1,mobile:false});

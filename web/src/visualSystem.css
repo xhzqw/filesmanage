@@ -186,8 +186,9 @@ input[type="checkbox"],input[type="radio"]{border-radius:var(--radius-xs)}
 
 /* Small widths retain the same geometry with less inset and no horizontal
    scrollbar induced by outer panel margins. */
-@media(max-width:1050px){
-  .header nav{
+@media(max-width:1210px){
+  /* The GooeyNav has its own 1210px dropdown contract in shellHeader.css. */
+  .header nav:not([data-slot="gooey-nav"]){
     top:calc(var(--height-header) + 4px);
     left:0;right:0;
     border:1px solid var(--border-hairline);
@@ -195,8 +196,8 @@ input[type="checkbox"],input[type="radio"]{border-radius:var(--radius-xs)}
     box-shadow:var(--shadow-overlay);
     padding:6px;
   }
-  .header nav a{height:32px;border:0;border-radius:var(--radius-sm)}
-  .header nav a.active{border:0;box-shadow:none}
+  .header nav:not([data-slot="gooey-nav"]) a{height:32px;border:0;border-radius:var(--radius-sm)}
+  .header nav:not([data-slot="gooey-nav"]) a.active{border:0;box-shadow:none}
 }
 @media(max-width:960px) and (min-width:701px){
   /* The persisted 240–360px sidebar width is for desktop; cap it when a
