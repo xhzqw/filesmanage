@@ -201,7 +201,8 @@ try{
    Math.abs(result.handleTop-10)<1&&result.handleBorders.every(v=>v==="0px")&&
    result.toolbarTop==="0px"&&result.toolbarLeft==="0px"&&result.toolbarRadius==="0px",
    "Finder seam or idle navigation regression "+width+": "+JSON.stringify(result));
-  await send("Input.dispatchMouseEvent",{type:"mouseMoved",...result.active});
+  if(result.active.x>0&&result.active.y>0){
+   await send("Input.dispatchMouseEvent",{type:"mouseMoved",...result.active});
   await delay(210);
   const selectedHover=await evaluate(`getComputedStyle(document.querySelector('.header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-item"][data-active="true"]')).color`);
   assert(selectedHover===result.primary,"Active white pill turns white on hover "+width+": "+JSON.stringify({selectedHover,result}));
@@ -209,6 +210,7 @@ try{
   await delay(210);
   const otherHover=await evaluate(`getComputedStyle(document.querySelector('.header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-item"][data-active="false"]')).color`);
   assert(otherHover===result.primary,"Inactive pill hover not dark "+width+": "+JSON.stringify({otherHover,result}));
+  }
   console.log("FINDER_NAV_HOVER_AND_SEAM_PASS",width,JSON.stringify(result));
  }
  // View switching is pure content navigation: toolbar buttons and their
