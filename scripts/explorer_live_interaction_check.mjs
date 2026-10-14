@@ -101,6 +101,33 @@ try{
  assert(folderDate.api&&folderDate.raw===folderDate.api&&/^(?:今天|昨天|(?:\d{4}年)?\d{1,2}月\d{1,2}日) \d{2}:\d{2}$/.test(folderDate.displayed),
   "Folder modified date must preserve the API time and show Finder-style local text: "+JSON.stringify(folderDate));
  console.log("EXPLORER_FOLDER_MTIME_PASS",JSON.stringify(folderDate));
+ // Inspect the real Finder rail in every view instead of assuming presence
+ // of a sidebar node means its content is visible. Keep probes long enough
+ // to catch repeated remounts or collapsing scroll ports.
+ for(const mode of ["icons","list"]){
+  await evaluate(`(()=>document.querySelector('.folder-view-switch button[aria-label="${mode==="icons"?"图标视图":"列表视图"}"]')?.click())()`);
+  await until(`document.querySelector('.work-body')?.dataset.explorerView==="${mode}"`);
+  for(let pass=0;pass<12;pass++){
+   await delay(250);
+   const rail=await evaluate(`(()=>{
+    const get=selector=>document.querySelector(selector);
+    const rect=element=>element?.getBoundingClientRect();
+    const sidebar=get('.finder-sidebar'),scroll=get('.finder-sidebar .sidebar-scroll'),
+     nav=get('.finder-navigation'),item=get('.finder-nav-item'),home=get('.finder-sidebar-home');
+    const s=rect(scroll),n=rect(nav),r=rect(item),h=rect(home);
+    const over=r?document.elementFromPoint(r.left+12,r.top+r.height/2):null;
+    return {mode:get('.work-body')?.dataset.explorerView,
+     sidebar:rect(sidebar)?.width,scrollHeight:s?.height,navTop:n?.top,navHeight:n?.height,
+     itemTop:r?.top,itemHeight:r?.height,homeHeight:h?.height,
+     hit:over?.className??null,hidden:nav?getComputedStyle(nav).visibility:'missing',
+     visible:!!s&&!!r&&r.top>=s.top-1&&r.bottom<=s.bottom+1&&r.height>=27&&
+      !!over&&(over===item||item.contains(over))};
+   })()`);
+   console.log("EXPLORER_SIDEBAR_STABILITY",mode,pass,JSON.stringify(rail));
+   assert(rail.visible&&rail.homeHeight===48,
+    "Finder sidebar disappeared or is occluded in "+mode+" view: "+JSON.stringify(rail));
+  }
+ }
  // The command row is portalled into the folder toolbar. Verify its actual
  // geometry, not just the absence of a page-wide overflow scrollbar.
  for(const viewport of [{name:"wide",width:1920},{name:"laptop",width:1366},{name:"compact",width:820}]){
