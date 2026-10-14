@@ -224,7 +224,7 @@
  content:"";position:absolute;right:5px;top:50%;width:6px;height:6px;
  border-top:1.5px solid currentColor;border-right:1.5px solid currentColor;
  transform:translateY(-50%) rotate(45deg);color:var(--text-tertiary);
- pointer-events:none;transition:opacity .12s ease;
+ pointer-events:none;
 }
 .explorer-column-list .explorer-folder:is(:hover,:focus-within)::after{opacity:0}
 .explorer-columns :is(.explorer-item,.finder-column-row).selected{
