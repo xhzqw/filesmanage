@@ -161,6 +161,53 @@ try{
    }
   }
  }
+ // Finder white slider needs dark hover text, and the work canvas must be the
+ // only edge painter at the rounded sidebar/work seam.
+ for(const width of [1920,1366,820]){
+  await send("Emulation.setDeviceMetricsOverride",{width,height:900,deviceScaleFactor:1,mobile:false});
+  await delay(130);
+  const result=await evaluate(`(()=>{
+   const nav=document.querySelector('.header nav[data-slot="gooey-nav"][data-appearance="pill"]');
+   const active=nav?.querySelector('[data-slot="gooey-nav-item"][data-active="true"]');
+   const inactive=nav?.querySelector('[data-slot="gooey-nav-item"][data-active="false"]');
+   const pane=document.querySelector('.panels.document-explorer');
+   const side=pane?.querySelector('.finder-sidebar'),work=pane?.querySelector('.work');
+   const handle=side?.querySelector('.sidebar-resizer'),bar=work?.querySelector('.folder-context-bar');
+   const style=e=>e&&getComputedStyle(e),box=e=>e?.getBoundingClientRect();
+   const token=document.createElement('span');token.style.color='var(--text-primary)';document.body.appendChild(token);
+   const primary=style(token).color;token.style.color='var(--text-secondary)';
+   const secondary=style(token).color;token.remove();
+   const borders=e=>['Top','Right','Bottom','Left'].map(part=>style(e)?.['border'+part+'Width']);
+   const r=box(active),n=box(inactive);
+   return {primary,secondary,activeColor:style(active)?.color,inactiveColor:style(inactive)?.color,
+    active:r&&{x:r.x+r.width/2,y:r.y+r.height/2},
+    inactive:n&&{x:n.x+n.width/2,y:n.y+n.height/2},
+    panelBorders:borders(pane),sideBorders:borders(side),workBorders:borders(work),
+    sideRadius:style(side)?.borderTopRightRadius,sideShadow:style(side)?.boxShadow,
+    workRadius:style(work)?.borderTopLeftRadius,workOverflow:style(work)?.overflow,
+    handleTop:box(handle)?.top-box(work)?.top,handleBorders:borders(handle),
+    handleBackground:style(handle)?.backgroundColor,
+    toolbarTop:style(bar)?.borderTopWidth,toolbarLeft:style(bar)?.borderLeftWidth,
+    toolbarRadius:style(bar)?.borderTopLeftRadius};
+  })()`);
+  assert(result.active&&result.inactive&&result.activeColor===result.primary&&
+   result.inactiveColor===result.secondary&&result.panelBorders.every(v=>v==="0px")&&
+   result.sideBorders.every(v=>v==="0px")&&result.sideRadius==="0px"&&result.sideShadow==="none"&&
+   JSON.stringify(result.workBorders)===JSON.stringify(["1px","0px","0px","1px"])&&
+   result.workRadius==="10px"&&result.workOverflow==="hidden"&&
+   Math.abs(result.handleTop-10)<1&&result.handleBorders.every(v=>v==="0px")&&
+   result.toolbarTop==="0px"&&result.toolbarLeft==="0px"&&result.toolbarRadius==="0px",
+   "Finder seam or idle navigation regression "+width+": "+JSON.stringify(result));
+  await send("Input.dispatchMouseEvent",{type:"mouseMoved",...result.active});
+  await delay(210);
+  const selectedHover=await evaluate(`getComputedStyle(document.querySelector('.header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-item"][data-active="true"]')).color`);
+  assert(selectedHover===result.primary,"Active white pill turns white on hover "+width+": "+JSON.stringify({selectedHover,result}));
+  await send("Input.dispatchMouseEvent",{type:"mouseMoved",...result.inactive});
+  await delay(210);
+  const otherHover=await evaluate(`getComputedStyle(document.querySelector('.header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-item"][data-active="false"]')).color`);
+  assert(otherHover===result.primary,"Inactive pill hover not dark "+width+": "+JSON.stringify({otherHover,result}));
+  console.log("FINDER_NAV_HOVER_AND_SEAM_PASS",width,JSON.stringify(result));
+ }
  // View switching is pure content navigation: toolbar buttons and their
  // painted positions must remain exactly fixed through all four layouts.
  for(const width of [1920,1366,820]){

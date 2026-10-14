@@ -45,10 +45,12 @@
  font-size:12px;font-weight:510;letter-spacing:0;line-height:1;white-space:nowrap;
  transition:color 140ms ease;
 }
-.header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-item"].active{
+.header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-item"]:is(.active,[data-active="true"]),
+.header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-item"]:is(.active,[data-active="true"]):hover{
+ /* White selected slider always needs a dark foreground, even on hover. */
  background:transparent;color:var(--text-primary);font-weight:650;
 }
-.header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-item"]:hover:not(.active){
+.header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-item"]:hover:not(.active):not([data-active="true"]){
  background:transparent;color:var(--text-primary);
 }
 .rare-pill-nav-label{position:relative;z-index:1;display:inline-flex;align-items:center;gap:4px}

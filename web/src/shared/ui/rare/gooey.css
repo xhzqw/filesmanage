@@ -7,5 +7,8 @@
 .rare-gooey-nav [data-slot="gooey-nav-item"]{display:inline-flex;align-items:center;justify-content:center;gap:5px;height:27px;min-height:27px;padding:0 9px;white-space:nowrap;background:transparent;border:0;border-radius:inherit;font-size:11px;font-weight:600;text-decoration:none;color:var(--text-secondary);cursor:pointer;transition:color .12s ease}
 .rare-gooey-nav [data-slot="gooey-nav-item"]:hover{background:transparent;color:var(--brand-blue)}
 .rare-gooey-nav [data-slot="gooey-nav-item"][data-active="true"],.rare-gooey-nav [data-slot="gooey-nav-item"][data-active="true"]:hover{color:var(--text-inverse)}
+/* Inverse color is for filled GooeyNav, not the white segmented slider. */
+.rare-gooey-nav[data-appearance="pill"] [data-slot="gooey-nav-item"][data-active="true"],
+.rare-gooey-nav[data-appearance="pill"] [data-slot="gooey-nav-item"][data-active="true"]:hover{color:var(--text-primary)}
 .rare-gooey-nav [data-slot="gooey-nav-item"]:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px;box-shadow:none}
 @media(prefers-reduced-motion:reduce){.rare-gooey-nav [data-slot="gooey-nav-item"]{transition:none}}

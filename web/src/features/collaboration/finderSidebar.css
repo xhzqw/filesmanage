@@ -112,20 +112,29 @@
 .shell.shell-finder>.panels.document-explorer{
  margin-top:calc(-1 * var(--height-header) - var(--finder-shell-gap));gap:0;
  background:var(--finder-chrome-bg);
- border:1px solid rgba(15,23,42,.065);border-top:0;border-right:0;
- border-radius:var(--radius-md);border-bottom-left-radius:0;border-bottom-right-radius:0;
+ /* The panel wrapper is not an outlined card: the work canvas is the only
+    painted seam. A leftover outer left border produced a second 1px stub. */
+ border:0;border-radius:0;
  overflow:hidden;
 }
 .shell.shell-finder .document-explorer>.finder-sidebar{
  box-sizing:border-box;padding-top:var(--height-header);
- border:0;border-right:1px solid rgba(15,23,42,.07);
- border-radius:var(--radius-xs);box-shadow:none;
+ border:0;border-radius:0;box-shadow:none;
 }
 .shell.shell-finder .document-explorer>.work{
- margin-top:var(--height-header);border:0;border-radius:0;
- border-top-left-radius:var(--radius-finder-canvas);box-shadow:none;
+ margin-top:var(--height-header);border:0;
+ border-top:1px solid var(--border-hairline);
+ border-left:1px solid var(--border-hairline);
+ border-radius:0;border-top-left-radius:var(--radius-finder-canvas);
+ box-shadow:none;
  overflow:hidden;background:var(--surface-panel);
 }
+/* Keep the pointer handle, but not over the branded header or round shoulder. */
+.shell.shell-finder .document-explorer .finder-sidebar>.sidebar-resizer{
+ top:calc(var(--height-header) + var(--radius-finder-canvas));
+ background:transparent;border:0;box-shadow:none;
+}
+.shell.shell-finder .document-explorer .finder-sidebar>.sidebar-resizer::after{top:0}
 .document-explorer .finder-sidebar-home{
  position:absolute;top:0;left:0;right:0;z-index:2;
  box-sizing:border-box;height:var(--height-header);min-height:var(--height-header);
