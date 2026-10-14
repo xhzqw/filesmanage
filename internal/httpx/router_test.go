@@ -59,7 +59,7 @@ func TestLanGuardAdmitsConfiguredPeerOnly(t *testing.T) {
 		{"127.0.0.1:51000", http.StatusOK},
 		{"203.0.113.9:51000", http.StatusOK},
 		{"10.0.0.5:51000", http.StatusForbidden},
-		{"203.0.113.7:51000", http.StatusForbidden},
+		{"198.51.100.7:51000", http.StatusForbidden},
 		{"garbage", http.StatusForbidden},
 	}
 	for _, tc := range cases {

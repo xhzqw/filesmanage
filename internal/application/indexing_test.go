@@ -12,13 +12,13 @@ import (
 
 func TestSpaceCJKKeepsAdjacency(t *testing.T) {
 	cases := map[string]string{
-		"预算":     "预 算",
-		"年度预算":   "年 度 预 算",
+		"预算":    "预 算",
+		"年度预算":  "年 度 预 算",
 		"项目-预算": "项 目-预 算",
-		"ABC测试":  "ABC测 试",
-		"plain":  "plain",
-		"":       "",
-		"示例科技": "示 例 科 技",
+		"ABC测试": "ABC测 试",
+		"plain": "plain",
+		"":      "",
+		"示例科技":  "示 例 科 技",
 	}
 	for input, want := range cases {
 		if got := SpaceCJK(input); got != want {
