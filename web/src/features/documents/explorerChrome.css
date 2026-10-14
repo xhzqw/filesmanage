@@ -417,7 +417,9 @@
    and a 26px fixed navigation pair; no second overflow trigger. */
 .document-explorer .work{container:file-work / inline-size}
 .document-explorer .work .folder-context-bar{
- height:44px;min-height:44px;max-height:44px;padding:0 12px;gap:8px;
+ /* 8px canvas inset + 1px canvas border + 11px toolbar inset = 20px,
+    exactly matching the global account dock's header padding-right. */
+ height:44px;min-height:44px;max-height:44px;padding:0 11px 0 12px;gap:8px;
  border-bottom:1px solid rgba(15,23,42,.065);
 }
 .document-explorer .folder-context-bar .folder-history-controls{flex:0 0 auto;gap:2px;margin-right:0}
