@@ -99,11 +99,17 @@ try{
   await delay(220);
   const geometry=await cdp.evaluate(`(()=>{
    const main=document.querySelector('.file-workbench-main');
+   const shell=document.querySelector('.file-workbench');
+   const layout=document.querySelector('.file-workbench-layout');
+   const sidebar=document.querySelector('.file-workbench-sidebar');
+   const topbar=document.querySelector('.file-workbench-toolbar');
+   const collapseIcon=document.querySelector('.file-sidebar-collapse svg');
+   const navIcon=document.querySelector('.file-workbench-nav .file-workbench-nav-icon');
    const title=document.querySelector('.file-preview-identity');
    const dock=document.querySelector('.file-preview-action-dock .file-workbench-actions');
    const toolbar=document.querySelector('.file-compare-toolbar');
    const controls=[...document.querySelectorAll('.file-compare-controls button.rare-select')];
-   if(!main||!title||!dock||!toolbar||controls.length!==2)return null;
+   if(!main||!shell||!layout||!sidebar||!topbar||!collapseIcon||!navIcon||!title||!dock||!toolbar||controls.length!==2)return null;
    const rect=element=>element.getBoundingClientRect();
    const overlap=(a,b)=>a.left<b.right-1&&a.right>b.left+1&&a.top<b.bottom-1&&a.bottom>b.top+1;
    const rTitle=rect(title),rDock=rect(dock),rBar=rect(toolbar),rMain=rect(main);
@@ -112,6 +118,15 @@ try{
     mainWidth:Math.round(rMain.width),viewport:document.documentElement.clientWidth,
     rootOverflow:document.documentElement.scrollWidth>document.documentElement.clientWidth+2,
     mainOverflow:main.scrollWidth>main.clientWidth+2,
+    shellGrey:getComputedStyle(shell).backgroundColor==='rgb(242, 244, 247)',
+    sidebarGrey:getComputedStyle(sidebar).backgroundColor==='rgb(242, 244, 247)',
+    frameRadii:['borderTopLeftRadius','borderTopRightRadius','borderBottomLeftRadius','borderBottomRightRadius'].every(prop=>getComputedStyle(main)[prop]==='12px'),
+    toolbarHeight:Math.round(rect(topbar).height),
+    toolbarInFlow:getComputedStyle(title).position==='static'&&getComputedStyle(topbar).position==='relative',
+    frameInset:Math.round(parseFloat(getComputedStyle(layout).paddingRight))===8,
+    iconOffset:Math.round(rect(collapseIcon).left-rect(navIcon).left),
+    actionHeights:[...dock.querySelectorAll('button')].map(button=>Math.round(rect(button).height)),
+    noSubtitleDots:[...title.querySelectorAll('.file-workbench-subtitle span+span')].every(span=>getComputedStyle(span,'::before').content==='none'),
     covered:overlap(rTitle,rBar)||overlap(rDock,rBar),
     selectorVisible:controls.every(control=>{
      const box=rect(control);
@@ -126,6 +141,11 @@ try{
   assert(label+" has no root/main horizontal overflow",
    !!geometry&&!geometry.rootOverflow&&!geometry.mainOverflow,
    JSON.stringify(geometry));
+  assert(label+" matches Finder canvas, toolbar and navigation geometry",
+   !!geometry&&geometry.shellGrey&&geometry.sidebarGrey&&geometry.frameRadii&&
+   geometry.toolbarHeight===48&&geometry.toolbarInFlow&&geometry.frameInset&&
+   Math.abs(geometry.iconOffset)<=1&&geometry.actionHeights.every(height=>height===28)&&
+   geometry.noSubtitleDots,JSON.stringify(geometry));
  }
  await cdp.send("Emulation.clearDeviceMetricsOverride");
  await cdp.evaluate(`(()=>{
