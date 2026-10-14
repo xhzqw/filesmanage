@@ -119,7 +119,8 @@
 .header .global-utility-dock .account-avatar{
  display:inline-flex;justify-content:center;align-items:center;flex:none;
  box-sizing:border-box;
- border-radius:50%!important;
+ --account-avatar-circle-radius:50%;
+ border-radius:var(--account-avatar-circle-radius)!important;
  background:rgba(0,100,225,.10);border:0;color:var(--ui-brand-primary);
 }
 .header .global-utility-dock .account-avatar svg{
