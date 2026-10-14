@@ -13,8 +13,8 @@ function NavigationGlyph({kind}:{kind:"files"|"favorite"|"received"|"sent"}){
  const base={viewBox:"0 0 24 24",width:19,height:19,fill:"none",stroke:"currentColor",strokeWidth:1.8,strokeLinecap:"round" as const,strokeLinejoin:"round" as const,"aria-hidden":true as const};
  if(kind==="files")return <svg {...base}><path d="M3 8a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9H3z"/><path d="M3 10h18"/></svg>;
  if(kind==="favorite")return <svg {...base}><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z"/></svg>;
- if(kind==="received")return <svg {...base}><rect x="3" y="4" width="18" height="15" rx="3"/><path d="m8 10 4 4 4-4M12 7v7"/></svg>;
- return <svg {...base}><rect x="3" y="4" width="18" height="15" rx="3"/><path d="m8 13 4-4 4 4M12 9v7"/></svg>;
+ if(kind==="received")return <svg {...base}><circle cx="9" cy="9" r="3"/><path d="M3 19v-1c0-2.6 2.5-4 6-4s6 1.4 6 4v1M16 7a3 3 0 0 1 0 6M17 15c2.5.2 4 1.6 4 4"/></svg>;
+ return <svg {...base}><rect x="3" y="5" width="12" height="14" rx="2"/><path d="M9 12h12m-4-4 4 4-4 4"/></svg>;
 }
 
 export function FinderSidebar({section,revision}:{section:DocumentSection;revision:number}){
@@ -40,8 +40,7 @@ export function FinderSidebar({section,revision}:{section:DocumentSection;revisi
    {link("files","全部文档","files")}
   </div>
   <div className="finder-nav-section">
-   <div className="finder-nav-label">个人收藏</div>
-   {link("favorites","我的关注","favorite")}
+   <Link to="/doc?view=favorites" className="finder-nav-label finder-nav-section-link" aria-current={section==="favorites"?"page":undefined}>个人收藏</Link>
    {favorites.slice(0,8).map(item=>{
     const id=item.kind==="file"?item.fileId:item.folderId;
     if(!id)return null;

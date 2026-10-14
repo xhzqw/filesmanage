@@ -1,8 +1,10 @@
 /* Finder hierarchy, adapted to the system's existing blue/neutral RareUI tokens. */
-.document-explorer .finder-sidebar{background:#F4F5F7;border-color:var(--ui-border-hairline)}
+.document-explorer .finder-sidebar{background:var(--ui-bg-sidebar);border-color:rgba(15,23,42,.07);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
 .finder-navigation{display:flex;flex-direction:column;gap:17px;min-width:0;padding:15px 10px 20px}
 .finder-nav-section{display:flex;flex-direction:column;gap:3px;min-width:0}
 .finder-nav-label{padding:0 12px 5px;font-size:11px;font-weight:600;color:var(--text-tertiary);letter-spacing:.025em}
+.finder-nav-section-link{text-decoration:none;align-self:flex-start}
+.finder-nav-section-link:hover,.finder-nav-section-link[aria-current="page"]{color:var(--brand-blue);text-decoration:none}
 .finder-nav-item,.finder-favorite-item{
  box-sizing:border-box;display:flex;align-items:center;gap:11px;width:100%;min-width:0;min-height:36px;
  padding:6px 11px;border:0;border-radius:var(--radius-md);background:transparent;text-decoration:none;
@@ -13,28 +15,30 @@
 .finder-nav-item>span,.finder-favorite-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .finder-favorite-name{flex:1}
 .finder-nav-item:hover,.finder-favorite-item:hover{background:var(--surface-row-hover);text-decoration:none}
-.finder-nav-item.is-current{background:#E6EBF2;color:var(--text-primary);font-weight:650}
-.finder-favorite-item{min-height:31px;padding-left:29px;gap:9px;font-size:12px;font-weight:450}
+.finder-nav-item.is-current{background:var(--ui-state-selected-sidebar);color:#0058D0;font-weight:500}
+.finder-favorite-item{min-height:31px;padding-left:11px;padding-right:12px;gap:9px;font-size:12px;font-weight:450}
 .finder-favorite-item svg{flex:none}
 .finder-nav-empty,.finder-nav-more,.finder-nav-retry{display:block;padding:5px 12px 5px 29px;font-size:11px;color:var(--text-tertiary)}
 .finder-nav-more{color:var(--brand-blue);text-decoration:none}
 .finder-nav-retry{border:0;background:transparent;text-align:left;cursor:pointer}
 .finder-nav-heading{display:flex;align-items:center;justify-content:space-between;padding-right:7px}
+.finder-nav-heading .finder-tag-add{opacity:0;pointer-events:none;transition:opacity .12s ease}
+.finder-nav-heading:hover .finder-tag-add,.finder-nav-heading:focus-within .finder-tag-add{opacity:1;pointer-events:auto}
 .finder-nav-heading .finder-nav-label{padding-bottom:0}
-.finder-tag-add{border:0;background:transparent;color:var(--text-secondary);font-size:19px;width:27px;height:27px;padding:0;border-radius:var(--radius-sm)}
+.finder-tag-add{border:0;background:transparent;color:var(--text-secondary);font-size:15px;font-weight:400;width:25px;height:25px;padding:0;border-radius:var(--radius-sm)}
 .finder-tag-line{display:flex;align-items:center;min-width:0;border-radius:var(--radius-md);transition:background .15s}
 .finder-tag-line:hover{background:var(--ui-state-hover)}
-.finder-tag-line.is-current{background:#E6EBF2;color:var(--text-primary)}
+.finder-tag-line.is-current{background:var(--ui-state-selected-sidebar);color:#0058D0}
 .finder-tag-line.is-current .finder-tag-link{color:var(--text-primary);font-weight:600}
 .finder-tag-line.is-drop-target{background:var(--ui-state-selected-grid);outline:2px solid var(--ui-state-focus);outline-offset:-2px}
 .finder-tag-link{display:flex;align-items:center;gap:11px;flex:1;min-width:0;min-height:34px;padding:5px 10px;color:var(--text-primary);text-decoration:none;font-size:13px}
 .finder-tag-link:hover{text-decoration:none}
-.finder-tag-dot{width:8px;height:8px;flex:none;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(15,39,92,.10)}
+.finder-tag-dot{width:8px;height:8px;flex:none;border-radius:50%;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.18)}
 .finder-tag-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .finder-tag-more{opacity:0;flex:none;width:26px;min-width:26px;min-height:27px;margin-right:4px;padding:0;border:0;background:transparent}
 .finder-tag-line:hover .finder-tag-more,.finder-tag-more:focus-visible{opacity:1}
 .finder-tag-all{font-size:12px;color:var(--text-secondary);text-decoration:none;padding:6px 11px;border-radius:var(--radius-md)}
-.finder-tag-all:hover,.finder-tag-all.is-current{background:#E6EBF2;color:var(--text-primary);text-decoration:none}
+.finder-tag-all:hover,.finder-tag-all.is-current{background:var(--ui-state-selected-sidebar);color:#0058D0;text-decoration:none}
 .finder-tag-editor{display:grid;gap:8px;margin:6px 2px;padding:10px;border-radius:var(--radius-md);background:var(--surface-card);box-shadow:var(--shadow-overlay);min-width:0}
 .finder-tag-editor input{min-width:0;width:100%;box-sizing:border-box}
 .finder-tag-palette{display:flex;justify-content:space-between;gap:1px}
@@ -54,6 +58,7 @@
 .document-explorer .collab-root.is-embedded .collab-results-head .collab-create-action{margin-left:0;flex:none}
 .document-explorer .collab-root.is-embedded .share-workbench{margin:8px;border-radius:var(--radius-md)}
 @media(max-width:700px){
+ .finder-nav-heading .finder-tag-add{opacity:1;pointer-events:auto}
  /* A short Finder location strip leaves the document grid visible on phones.
     All four locations remain reachable by horizontal scrolling rather than
     burying Shared below the fold in a 180px vertical tree viewport. */
@@ -76,6 +81,48 @@
  .finder-tag-editor{position:fixed;z-index:88;top:74px;left:12px;width:min(280px,calc(100vw - 24px));display:grid}
  .finder-nav-item{width:auto;min-height:39px;flex:none;padding:7px 11px;white-space:nowrap}
 }
+@media(hover:none),(pointer:coarse){.finder-nav-heading .finder-tag-add{opacity:1;pointer-events:auto}}
 @media(prefers-reduced-motion:reduce){
  .finder-nav-item,.finder-favorite-item{transition:none}
+}
+
+/* On document routes this is a genuine full-height rail. The corporate home
+   pill lives in its top 56px, while global navigation starts to its right. */
+.shell.shell-finder>.header{
+ align-self:flex-end;width:calc(100% - var(--finder-sidebar-width));
+ grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+}
+.shell.shell-finder>.header>.shell-home-pill{display:none}
+.shell.shell-finder>.panels.document-explorer{
+ margin-top:calc(-1 * var(--height-header));gap:0;
+ background:var(--surface-panel);border:1px solid rgba(15,23,42,.065);
+ border-radius:12px;overflow:hidden;
+}
+.shell.shell-finder .document-explorer>.finder-sidebar{
+ box-sizing:border-box;padding-top:var(--height-header);
+ border:0;border-right:1px solid rgba(15,23,42,.07);
+ border-radius:0;box-shadow:none;
+}
+.shell.shell-finder .document-explorer>.work{
+ margin-top:var(--height-header);border:0;border-radius:0;box-shadow:none;
+}
+.document-explorer .finder-sidebar-home{
+ position:absolute;top:0;left:0;right:0;z-index:2;
+ height:var(--height-header);display:flex;align-items:center;gap:9px;
+ padding:0 17px;text-decoration:none;white-space:nowrap;
+ color:var(--text-primary);font-size:14px;font-weight:650;
+}
+.document-explorer .finder-sidebar-home:hover{color:var(--brand-blue)}
+.document-explorer .finder-sidebar-home:focus-visible{outline:2px solid var(--border-focus);outline-offset:-4px}
+.document-explorer .finder-sidebar-logo{width:27px;height:27px;object-fit:contain;flex:none}
+@media(max-width:1000px){
+ .shell.shell-finder>.header{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}
+}
+@media(max-width:700px){
+ .shell.shell-finder>.header{width:100%;align-self:stretch}
+ .shell.shell-finder>.header>.shell-home-pill{display:inline-flex}
+ .shell.shell-finder>.panels.document-explorer{margin-top:0;flex-direction:column;border-radius:10px}
+ .shell.shell-finder .document-explorer>.finder-sidebar{padding-top:0;border-right:0;border-bottom:1px solid rgba(15,23,42,.07)}
+ .shell.shell-finder .document-explorer>.work{margin-top:0}
+ .document-explorer .finder-sidebar-home{display:none}
 }

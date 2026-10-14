@@ -1,8 +1,9 @@
-import {RareButton,RareDataTable,RareInput,RareSelect} from "../../shared/ui/rare";
+import {RareButton,RareDataTable,RareInput} from "../../shared/ui/rare";
 import {toast} from "../../shared/ui/feedback";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
-import {useCallback,useEffect,useMemo,useRef,useState,type ChangeEvent,type DragEvent,type KeyboardEvent,type MouseEvent,type PointerEvent as ReactPointerEvent,type ReactNode}from "react";
-import {useNavigate}from "react-router-dom";
+import {useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState,type ChangeEvent,type DragEvent,type KeyboardEvent,type MouseEvent,type PointerEvent as ReactPointerEvent,type ReactNode}from "react";
+import {createPortal} from "react-dom";
+import {Link,useNavigate}from "react-router-dom";
 import type {FileItem} from "../../entities/file/model";
 import type {Folder} from "../../entities/folder/model";
 import {fileApi,formatSize} from "./api";
@@ -44,6 +45,24 @@ const SORT_LABELS:Record<SortKey,string>={
 };
 
 const SORT_KEYS:SortKey[]=["updated_desc","name_asc","name_desc","size_desc"];
+const CATEGORY_KEYS:{id:FileCategory;name:string}[]=[
+ {id:"all",name:"全部类型"},{id:"cad",name:"CAD / 3D 图纸"},{id:"doc",name:"办公文档"},
+ {id:"image",name:"图片文件"},{id:"media",name:"音视频"},{id:"archive",name:"压缩包"},
+ {id:"code",name:"代码与数据"},{id:"other",name:"其他文件"},
+];
+function finderModifiedTime(value?:string){
+ if(!value)return "—";
+ const when=new Date(value);
+ if(Number.isNaN(when.getTime()))return value.replace("T"," ").slice(0,16);
+ const today=new Date(),yesterday=new Date(today);
+ yesterday.setDate(today.getDate()-1);
+ const sameDay=(date:Date)=>date.getFullYear()===when.getFullYear()&&date.getMonth()===when.getMonth()&&date.getDate()===when.getDate();
+ const time=String(when.getHours()).padStart(2,"0")+":"+String(when.getMinutes()).padStart(2,"0");
+ if(sameDay(today))return "今天 "+time;
+ if(sameDay(yesterday))return "昨天 "+time;
+ const date=(when.getFullYear()===today.getFullYear()?"":when.getFullYear()+"年")+(when.getMonth()+1)+"月"+when.getDate()+"日";
+ return date+" "+time;
+}
 
 type CopiedResource={kind:"file"|"folder";id:string;name:string};
 let explorerCopiedResources:CopiedResource[]=[];
@@ -135,10 +154,20 @@ type FavoriteRow={kind:string;fileId?:string;folderId?:string};
 // current visible order, and the keyboard mirrors every mouse action. The
 // selection model keeps focus, anchor and membership separate so a stale
 // anchor can never resurrect after a re-sort.
-export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdit,reloadKey,newFolderSlot,onFolderChanged,viewMode="list",labelId,taggedItems,onTagRefresh}:{
+export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdit,reloadKey,newFolderSlot,onFolderChanged,viewMode="list",labelId,taggedItems,onTagRefresh,toolbarHostId,viewControls}:{
  folder:string;folderName:string;childFolders?:Folder[];folderPath?:Folder[];onEdit:(fileId:string)=>void;reloadKey:number;newFolderSlot?:ReactNode;onFolderChanged?:()=>void;viewMode?:ExplorerViewMode;
- labelId?:string;taggedItems?:FileItem[];onTagRefresh?:()=>Promise<void>;
+ labelId?:string;taggedItems?:FileItem[];onTagRefresh?:()=>Promise<void>;toolbarHostId?:string;viewControls?:ReactNode;
 }){
+ const[toolbarHost,setToolbarHost]=useState<HTMLElement|null>(null);
+ useLayoutEffect(()=>{
+  setToolbarHost(toolbarHostId?document.getElementById(toolbarHostId):null);
+ },[toolbarHostId]);
+ const[sortMenuOpen,setSortMenuOpen]=useState(false);
+ const[filterMenuOpen,setFilterMenuOpen]=useState(false);
+ const[displayMenuOpen,setDisplayMenuOpen]=useState(false);
+ const sortMenuAnchor=useRef<HTMLButtonElement>(null);
+ const filterMenuAnchor=useRef<HTMLButtonElement>(null);
+ const displayMenuAnchor=useRef<HTMLButtonElement>(null);
  const[items,setItems]=useState<FileItem[]>([]);
  const[status,setStatus]=useState("loading");
  const[sort,setSort]=useState<SortKey>("updated_desc");
@@ -1480,12 +1509,7 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
  // ("拖回来源", §7.2) and it must not light up the upload zone either, so its
  // drag events are stopped before the DropZone sees them. External file drags
  // are untouched and keep bubbling (DI-17: upload intent stays with §7.1).
- return <div className="work-body" data-explorer-view={viewMode}
-  onDragEnter={suppressInternalDrag}
-  onDragOver={suppressInternalDrag}
-  onDragLeave={suppressInternalDrag}
-  onDrop={suppressInternalDrag}>
-  <div className="toolbar file-toolbar">
+ const toolbar=<div className="toolbar file-toolbar" role="toolbar" aria-label="文件浏览操作">
    <div className="toolbar-actions" data-selection-mode={selectedTotal>0?"selected":"default"}>
     {selectedTotal===0?
      <div className="file-toolbar-mode" key="default">
@@ -1498,7 +1522,6 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
      </div>:
      <div className="file-toolbar-mode batch-actions-group" key="selected" role="group" aria-label={`已选 ${selectedTotal} 项资源的操作`}>
       <span className="file-selected-count" aria-live="polite" title={hiddenSelectedCount>0?`已选 ${selectedTotal} 项，其中 ${hiddenSelectedCount} 个文件被筛选隐藏`:undefined}><ToolbarIcon name="selected"/>已选 <strong>{selectedTotal}</strong> 项{hiddenSelectedCount>0&&<span className="file-selection-hidden">（含隐藏 {hiddenSelectedCount} 项）</span>}</span>
-      <span className="file-toolbar-separator" aria-hidden="true"/>
       <RareButton type="button" tone="ghost" className="batch-btn" disabled={selection.length===0||selectedFolderIds.size>0||selection.length>30||zipController.current!==null} onClick={()=>void batchDownload(selection)} title={selectedFolderIds.size>0?"含文件夹时不能批量下载":selection.length>30?"每批最多下载 30 份文件":"下载已选文件"}><ToolbarIcon name="download"/><span className="batch-action-label">下载</span></RareButton>
       <RareButton type="button" tone="ghost" className="batch-btn" disabled={selection.length===0||selectedFolderIds.size>0||selection.length>20||!selection.every(canOfferPrintFromListing)}
        onClick={()=>setPrintingBatch(selection)} title={selection.length>20?"每批最多打印 20 份文件":!selection.every(canOfferPrintFromListing)?"选中的文件包含不支持打印的类型":"打印已选文件"}><ToolbarIcon name="print"/><span className="batch-action-label">打印</span></RareButton>
@@ -1509,46 +1532,40 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
      </div>}
    </div>
    <div className="toolbar-views">
-    <RareButton type="button" tone="ghost" className="checkbox-visibility-toggle"
-     aria-pressed={showCheckboxes} aria-label={showCheckboxes?"隐藏勾选框":"显示勾选框"}
-     title={showCheckboxes?"隐藏勾选框":"显示勾选框"} onClick={()=>setShowCheckboxes(value=>!value)}>
-     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-      <rect x="3" y="3" width="18" height="18" rx="4"/>
-      {showCheckboxes&&<path d="m7 12 3 3 7-7"/>}
-     </svg><span>勾选框</span>
+    {viewControls}
+    {viewMode!=="list"&&<>
+     <RareButton ref={sortMenuAnchor} type="button" tone="ghost" className="explorer-tool-icon" aria-haspopup="menu" aria-expanded={sortMenuOpen}
+      aria-label="排序方式" title={SORT_LABELS[sort]} onClick={()=>setSortMenuOpen(open=>!open)}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 7h16M7 12h10M10 17h4"/></svg>
+     </RareButton>
+     <Menu open={sortMenuOpen} label="排序方式" anchor={sortMenuAnchor.current} onClose={()=>setSortMenuOpen(false)}
+      items={SORT_KEYS.map(key=>({id:key,label:(sort===key?"✓ ":"")+SORT_LABELS[key],onSelect:()=>setSort(key)}))}/>
+    </>}
+    <RareButton ref={filterMenuAnchor} type="button" tone="ghost" className={"explorer-tool-icon"+(categoryFilter!=="all"?" has-filter":"")}
+     aria-label="文件类型筛选" title={CATEGORY_KEYS.find(item=>item.id===categoryFilter)?.name??"筛选类型"} aria-haspopup="menu" aria-expanded={filterMenuOpen}
+     onClick={()=>setFilterMenuOpen(open=>!open)}>
+     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h16l-6.5 7.5V19l-3 1v-6.5z"/></svg>
     </RareButton>
-    <label className="sort-label"><span className="toolbar-filter-caption">排序</span>
-     <RareSelect aria-label="排序方式" value={sort} onChange={e=>setSort(e.target.value as SortKey)}>
-      {SORT_KEYS.map(key=><option key={key} value={key}>{SORT_LABELS[key]}</option>)}
-     </RareSelect>
-    </label>
-    <label className="filter-label"><span className="toolbar-filter-caption">类型</span>
-     <RareSelect aria-label="文件类型筛选" value={categoryFilter} onChange={e=>{
-      setCategoryFilter(e.target.value as FileCategory);
-      setFocusedId(null);
-      setAnchorId(null);
-     }}>
-      <option value="all">全部类型 ({categoryCounts.all})</option>
-      <option value="cad">CAD / 3D 图纸 ({categoryCounts.cad})</option>
-      <option value="doc">办公文档 ({categoryCounts.doc})</option>
-      <option value="image">图片文件 ({categoryCounts.image})</option>
-      <option value="media">音视频 ({categoryCounts.media})</option>
-      <option value="archive">压缩包 ({categoryCounts.archive})</option>
-      <option value="code">代码与数据 ({categoryCounts.code})</option>
-      <option value="other">其他文件 ({categoryCounts.other})</option>
-     </RareSelect>
-    </label>
+    <Menu open={filterMenuOpen} label="文件类型筛选" anchor={filterMenuAnchor.current} onClose={()=>setFilterMenuOpen(false)}
+     items={CATEGORY_KEYS.map(item=>({id:item.id,label:(categoryFilter===item.id?"✓ ":"")+item.name+`（${categoryCounts[item.id]}）`,onSelect:()=>{setCategoryFilter(item.id);setFocusedId(null);setAnchorId(null);}}))}/>
     <div className="filter-search-wrap">
      <svg className="filter-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.4"/><path d="m16 16 4.2 4.2"/></svg>
-     <RareInput type="search" className="filter-search-input" placeholder="过滤已加载文件…" aria-label="当前已加载文件名过滤"
-     value={nameFilter} onChange={e=>{
-      setNameFilter(e.target.value);
-      setFocusedId(null);
-      setAnchorId(null);
-      }}/>
+     <RareInput type="search" className="filter-search-input" placeholder="筛选当前目录" aria-label="筛选当前目录的文件名"
+      value={nameFilter} onChange={e=>{setNameFilter(e.target.value);setFocusedId(null);setAnchorId(null);}}/>
     </div>
+    <RareButton ref={displayMenuAnchor} type="button" tone="ghost" className="explorer-tool-icon" aria-haspopup="menu" aria-expanded={displayMenuOpen} aria-label="更多显示选项" title="更多显示选项" onClick={()=>setDisplayMenuOpen(open=>!open)}>···</RareButton>
+    <Menu open={displayMenuOpen} label="显示选项" anchor={displayMenuAnchor.current} onClose={()=>setDisplayMenuOpen(false)} items={[
+     {id:"checkboxes",label:showCheckboxes?"隐藏勾选框":"显示勾选框",onSelect:()=>setShowCheckboxes(value=>!value)},
+     {id:"clear",label:"清除筛选",disabled:categoryFilter==="all"&&!nameFilter.trim(),onSelect:()=>{setCategoryFilter("all");setNameFilter("");}}
+    ]}/>
    </div>
-  </div>
+  </div>;
+ return <div className="work-body" data-explorer-view={viewMode}
+  onDragEnter={suppressInternalDrag}
+  onDragOver={suppressInternalDrag}
+  onDragLeave={suppressInternalDrag}
+  onDrop={suppressInternalDrag}>
+  {toolbarHost?createPortal(toolbar,toolbarHost):toolbar}
   {pasteBusy&&<div className="file-paste-status" role="status">
    <span>{pasteProgress||"正在复制文件…"}</span>
    <RareButton type="button" tone="ghost" onClick={()=>pasteAbort.current?.abort()}>取消</RareButton>
@@ -1567,11 +1584,11 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
     className={"file-table file-table-ultra"+(status==="ready"&&visibleFolders.length>0&&visibleItems.length===0?" file-table-folders-only":"")}>
     <thead><tr>
      {showCheckboxes&&<th className="col-select" scope="col"><RareInput ref={selectAllRef} type="checkbox" checked={allLoadedSelected} onChange={toggleSelectAllLoaded} aria-label="选择当前显示的文件及文件夹"/></th>}
-     <th className="col-name" scope="col">文件名</th>
-     <th className="col-size" scope="col">大小</th>
+     <th className="col-name" scope="col"><button type="button" className="file-column-sort" aria-label="按文件名排序" onClick={()=>setSort(current=>current==="name_asc"?"name_desc":"name_asc")}>文件名 <span aria-hidden="true">{sort==="name_asc"?"↑":sort==="name_desc"?"↓":""}</span></button></th>
+     <th className="col-size" scope="col"><button type="button" className="file-column-sort" aria-label="按文件大小降序排序" onClick={()=>setSort("size_desc")}>大小 <span aria-hidden="true">{sort==="size_desc"?"↓":""}</span></button></th>
      <th className="col-version" scope="col">版本</th>
-     <th className="col-date" scope="col">修改日期</th>
-     <th className="col-actions" scope="col">操作</th>
+     <th className="col-date" scope="col"><button type="button" className="file-column-sort" aria-label="按最近修改排序" onClick={()=>setSort("updated_desc")}>修改日期 <span aria-hidden="true">{sort==="updated_desc"?"↓":""}</span></button></th>
+     <th className="col-actions" scope="col"><span className="sr-only">操作</span></th>
     </tr></thead>
     <tbody onKeyDown={onGridKeyDown}>
      {status==="loading"&&<tr><td colSpan={showCheckboxes?6:5} className="empty"><BrandLoadingLabel size="sm">正在加载文件…</BrandLoadingLabel></td></tr>}
@@ -1601,11 +1618,11 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
       {showCheckboxes&&<td className="col-select"><RareInput type="checkbox" checked={selectedFolderIds.has(entry.id)} aria-label={"选择文件夹 "+entry.name}
        onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}}
        onChange={()=>{selectResource("folder",entry.id,true,checkboxShiftRef.current);checkboxShiftRef.current=false;setFocusedFolderId(entry.id);setFocusedId(null);}}/></td>}
-      <td className="col-name"><div className="file-cell-wrap"><FolderResourceIcon size={19}/><span className="file-name" title={entry.name}>{entry.name}</span>{finderFolderDots(entry)}
+      <td className="col-name"><div className="file-cell-wrap"><FolderResourceIcon size={19}/><span className="file-name-group"><span className="file-name" title={entry.name}>{entry.name}</span>{finderFolderDots(entry)}</span>
        <RareButton type="button" tone="ghost" className="folder-inline-open" aria-label={"打开文件夹 "+entry.name}
         onClick={event=>{event.stopPropagation();navigate("/doc?folder="+encodeURIComponent(entry.id));}}>打开 ↗</RareButton>
       </div></td>
-      <td className="col-size"/><td className="col-version"/><td className="col-date date">{entry.updatedAt?entry.updatedAt.replace("T"," ").slice(0,16):"—"}</td>
+      <td className="col-size empty-metadata">—</td><td className="col-version empty-metadata">—</td><td className="col-date date" title={entry.updatedAt??undefined}>{finderModifiedTime(entry.updatedAt)}</td>
       <td className="row-actions col-actions" onClick={event=>event.stopPropagation()}><div className="actions-cell-wrap">
        <RareButton type="button" className={"action-star-btn"+(favoriteFolderIds.has(entry.id)?" favorited":"")}
         aria-label={(favoriteFolderIds.has(entry.id)?"取消收藏文件夹 ":"收藏文件夹 ")+entry.name}
@@ -1630,7 +1647,7 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
       onDragEnd={onRowDragEnd}>
       {showCheckboxes&&<td className="col-select"><RareInput type="checkbox" checked={selectedIds.has(item.id)} aria-label={"选择 "+item.name} onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}} onChange={event=>onCheckToggle(event,item)}/></td>}
       <td className="col-name"><div className="file-cell-wrap">
-       <FileTypeIcon name={item.name} size={19}/><span className="file-name" title={item.name}>{item.name}</span>{finderDots(item)}
+       <FileTypeIcon name={item.name} size={19}/><span className="file-name-group"><span className="file-name" title={item.name}>{item.name}</span>{finderDots(item)}</span>
        <small className="file-mobile-meta">v{item.currentVersionSeq} · {formatSize(item.sizeBytes)}</small>
        <RareButton type="button" className="file-mobile-actions" aria-label={"操作 "+item.name}
         title={"文件操作："+item.name} aria-haspopup="menu"
@@ -1638,7 +1655,7 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
       </div></td>
       <td className="col-size num">{formatSize(item.sizeBytes)}</td>
       <td className="col-version"><span className="version-badge">v{item.currentVersionSeq}</span></td>
-      <td className="col-date date">{item.updatedAt.replace("T"," ").slice(0,16)}</td>
+      <td className="col-date date" title={item.updatedAt}>{finderModifiedTime(item.updatedAt)}</td>
       <td className="row-actions col-actions" onClick={event=>event.stopPropagation()}><div className="actions-cell-wrap">
        <RareButton type="button"
        className={"action-star-btn"+(favoriteIds.has(item.id)?" favorited":"")}
@@ -1804,10 +1821,15 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
      disabled:!label||!finderReady||finderBusy||rowMenu.targets.length>100,
      onSelect:()=>{if(label)void markFinderFiles(label,rowMenu.targets);}};
    })}/>}
+  {!labelId&&<nav className="finder-bottom-path" aria-label="当前位置完整路径">
+   <Link to="/doc">文档管理</Link>
+   {folderPath.map((segment,index)=><span className="finder-bottom-segment" key={segment.id}>
+    <span aria-hidden="true">›</span>
+    {index===folderPath.length-1?<strong title={segment.name} aria-current="page">{segment.name}</strong>:<Link title={segment.name} to={"/doc?folder="+encodeURIComponent(segment.id)}>{segment.name}</Link>}
+   </span>)}
+  </nav>}
   <footer className="status-bar">
-   <div className="status-left">
-    <span>已选 <span className="status-strong">{selectedTotal}</span> 项{selectedIds.size>0&&<> / <span className="status-strong">{formatSize(selectedBytes)}</span></>} · {hasMore?"已加载":"共"} <span className="status-strong">{items.length}</span> 个文件{childFolders.length>0&&<> · <span className="status-strong">{childFolders.length}</span> 个文件夹</>}{(categoryFilter!=="all"||nameFilter.trim())&&<> · 匹配 <span className="status-strong">{visibleItems.length+visibleFolders.length}</span> 项（已加载范围）</>}</span>
-   </div>
+   <span>{hasMore?"已加载":"共"} <span className="status-strong">{items.length+childFolders.length}</span> 项（{items.length} 个文件，{childFolders.length} 个文件夹）{selectedTotal>0&&<>，已选 {selectedTotal} 项{selectedIds.size>0&&<>（{formatSize(selectedBytes)}）</>}</>}{(categoryFilter!=="all"||nameFilter.trim())&&<> · 当前匹配 {visibleItems.length+visibleFolders.length} 项</>}</span>
   </footer>
  </div>;
 }

@@ -20,8 +20,7 @@ import{DropZone}from "../features/documents/DropZone";
 import type {DocumentUploadTarget} from "../features/documents/GlobalUploadDrop";
 import{FileEditor}from "../features/documents/FileEditor";
 import{workflowApi}from "../features/workflow/api";
-import{AppShell}from "../shared/ui/AppShell";
-import {Menu} from "../shared/ui/Menu";
+import{AppShell,BrandLogo}from "../shared/ui/AppShell";
 import{Dialog}from "../shared/ui/Dialog";
 import{FolderPicker}from "../shared/ui/FolderPicker";
 import type {FileItem} from "../entities/file/model";
@@ -271,8 +270,9 @@ export function Documents({user,onLogout,onUploadFolderChange}:{user:User;onLogo
   setSidebarWidth(width);
   persistSidebarWidth(width);
  }
- return <AppShell user={user} onLogout={onLogout}>
+ return <AppShell user={user} onLogout={onLogout} finderSidebarWidth={sidebarWidth}>
   <div className="panels document-explorer"><aside className="sidebar finder-sidebar" style={{width:sidebarWidth+"px"}}>
+   <Link to="/doc" className="finder-sidebar-home" aria-label="中晟生物 · 返回文档首页"><BrandLogo size={27} className="finder-sidebar-logo" transparent/><span>中晟生物</span></Link>
    <div className="sidebar-scroll">
     <FinderSidebar section={section} revision={collaborationRevision}/>
    </div>
@@ -290,10 +290,7 @@ export function Documents({user,onLogout,onUploadFolderChange}:{user:User;onLogo
     onSelectTab={tab=>navigate("/doc?view="+tab)}
     onChanged={()=>setCollaborationRevision(value=>value+1)}/>}
    {section==="files"&&<>
-   {/* The path is a docked strip here, not inside the 40px top bar: it has to
-       stay a <nav> landmark (DI-15) and VIS-11 allows only one nav in the
-       header. Docked at 24px it costs a fraction of the row the old 44px
-       breadcrumb bar used to take. */}
+   {/* Unified Finder command row; the complete ancestor path is below the list. */}
    {selected&&<div className="folder-context-bar">
      <div className="folder-history-controls" role="group" aria-label="目录浏览历史">
       <RareButton type="button" tone="ghost" aria-label="返回上一个目录" title="后退"
@@ -305,12 +302,8 @@ export function Documents({user,onLogout,onUploadFolderChange}:{user:User;onLogo
        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m9.5 5 7 7-7 7"/></svg>
       </RareButton>
      </div>
-     <FolderBreadcrumb folders={knownFolders} folder={selected}/>
-     <div className="folder-view-switch" role="group" aria-label="文件显示方式">
-      {EXPLORER_VIEWS.map(mode=><RareButton type="button" key={mode.id} tone="ghost"
-       aria-label={mode.label} title={mode.label} aria-pressed={viewMode===mode.id}
-       onClick={()=>switchView(mode.id)}><ExplorerViewGlyph mode={mode.id}/></RareButton>)}
-     </div>
+     <strong className="folder-current-title" title={selected.name}>{selected.name}</strong>
+     <div id="document-file-toolbar-host" className="folder-file-toolbar-host"/>
      <div className="folder-actions-slot">
       <FolderActions folder={selected} isAdmin={user.isAdmin} onChanged={folderActionChanged}
        onMove={()=>openMove(selected)} onManageGrants={()=>setGrantsFolder(selected)}/>
@@ -321,6 +314,12 @@ export function Documents({user,onLogout,onUploadFolderChange}:{user:User;onLogo
      <FileTable folder={selected.id} folderName={selected.name} childFolders={knownFolders.filter(item=>item.parentId===selected.id)}
       folderPath={ancestorPath(knownFolders,selected.id)}
       onEdit={setEditingId} reloadKey={reloadKey} viewMode={viewMode} onFolderChanged={refreshTreeAndFiles}
+      toolbarHostId="document-file-toolbar-host"
+      viewControls={<div className="folder-view-switch" role="group" aria-label="文件显示方式">
+       {EXPLORER_VIEWS.map(mode=><RareButton type="button" key={mode.id} tone="ghost"
+        aria-label={mode.label} title={mode.label} aria-pressed={viewMode===mode.id}
+        onClick={()=>switchView(mode.id)}><ExplorerViewGlyph mode={mode.id}/></RareButton>)}
+      </div>}
       newFolderSlot={<NewFolderForm parentId={selected.id} onCreated={refreshTreeAndFiles}/>}/>
    </DropZone>}
    {!selected&&resolving&&<p role="status" className="empty"><BrandLoadingLabel decorative>正在核验所选目录…</BrandLoadingLabel></p>}
@@ -369,46 +368,6 @@ function FileEditorBridge({fileId,requiresApproval,onClose,onSaved}:{fileId:stri
  },[fileId,onClose]);
  if(!file)return null;
  return <FileEditor file={file} requiresApproval={requiresApproval} onClose={onClose} onSaved={onSaved}/>;
-}
-
-// The path belongs in the top bar (SPEC §3.1), not in a work-area row: the
-// visible ancestor chain of the selected folder, root first, current last.
-function FolderBreadcrumb({folders,folder}:{folders:Folder[];folder:Folder}){
- const navigate=useNavigate();
- const[hiddenOpen,setHiddenOpen]=useState(false);
- const hiddenAnchor=useRef<HTMLButtonElement>(null);
- const segments:{id:string|null;name:string}[]=[{id:null,name:"文档管理"},
-  ...ancestorPath(folders,folder.id).map(ancestor=>({id:ancestor.id,name:ancestor.name}))];
- // Keep shallow paths fully visible; hidden ancestors in deep paths remain
- // reachable by keyboard and pointer rather than becoming an inert ellipsis.
- const collapsed=segments.length>5;
- const hidden=collapsed?segments.slice(1,-2):[];
- const tail=collapsed?segments.slice(-2):segments.slice(1);
- const[root]=segments;
- return <nav className="breadcrumb crumb-bar" aria-label="当前位置">
-  {tail.length===0
-   ?<span className="crumb-current" aria-current="page">{root?.name??"文档管理"}</span>
-   :<Link className="crumb-root" to="/doc" title={root?.name??"文档管理"}>{root?.name??"文档管理"}</Link>}
-  {hidden.length>0&&<span className="crumb-segment crumb-hidden">
-   <span className="crumb-sep" aria-hidden="true">›</span>
-   <RareButton ref={hiddenAnchor} type="button" tone="ghost" className="crumb-collapse-picker"
-    aria-label="选择隐藏的上级目录" aria-haspopup="menu" aria-expanded={hiddenOpen}
-    onClick={()=>setHiddenOpen(open=>!open)}>…</RareButton>
-   <Menu open={hiddenOpen} label="隐藏的上级目录" anchor={hiddenAnchor.current}
-    onClose={()=>setHiddenOpen(false)}
-    items={hidden.map(segment=>({
-     id:segment.id??"root",
-     label:segment.name,
-     onSelect:()=>{if(segment.id)navigate("/doc?folder="+encodeURIComponent(segment.id));}
-    }))}/>
-  </span>}
-  {tail.map((segment,index)=><span className="crumb-segment" key={segment.id??"root"}>
-   <span className="crumb-sep" aria-hidden="true">›</span>
-   {index===tail.length-1
-    ?<span className="crumb-current" aria-current="page" title={segment.name}>{segment.name}</span>
-    :<Link title={segment.name} to={segment.id===null?"/doc":"/doc?folder="+encodeURIComponent(segment.id)}>{segment.name}</Link>}
-  </span>)}
- </nav>;
 }
 
 // Visible-ancestor path only (the tree's own walk), so a path segment the

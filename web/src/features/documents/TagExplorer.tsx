@@ -59,11 +59,7 @@ export function TagExplorer({viewMode,onViewModeChange,onEdit}:{
     <Link to="/doc?view=labels" className="tag-path-all">所有标签</Link>
     {active&&<><span className="tag-path-divider">/</span><span className="finder-tag-dot" style={{backgroundColor:finderColor(active.color)}}/><strong>{active.name}</strong></>}
    </div>
-   {labelId&&<div className="folder-view-switch" role="group" aria-label="文件显示方式">
-    {EXPLORER_VIEWS.map(mode=><RareButton key={mode.id} type="button" tone="ghost"
-     title={mode.label} aria-label={mode.label} aria-pressed={viewMode===mode.id}
-     onClick={()=>onViewModeChange(mode.id)}><ExplorerViewGlyph mode={mode.id}/></RareButton>)}
-   </div>}
+   {labelId&&<div id="tag-file-toolbar-host" className="folder-file-toolbar-host"/>}
   </div>
   {!labelId&&state==="ready"&&<div className="tag-explorer-overview">
    {labels.map(label=><Link key={label.id} to={"/doc?view=labels&label="+encodeURIComponent(label.id)} className="tag-explorer-choice">
@@ -78,6 +74,11 @@ export function TagExplorer({viewMode,onViewModeChange,onEdit}:{
   </div>}
   {labelId&&state==="ready"&&<FileTable key={labelId} folder="folder_root" folderName={active?.name??"标签"}
    childFolders={folders} labelId={labelId} taggedItems={files} reloadKey={revision}
-   onTagRefresh={refresh} viewMode={viewMode} onEdit={onEdit}/>}
+   onTagRefresh={refresh} viewMode={viewMode} onEdit={onEdit} toolbarHostId="tag-file-toolbar-host"
+   viewControls={<div className="folder-view-switch" role="group" aria-label="文件显示方式">
+    {EXPLORER_VIEWS.map(mode=><RareButton key={mode.id} type="button" tone="ghost"
+     title={mode.label} aria-label={mode.label} aria-pressed={viewMode===mode.id}
+     onClick={()=>onViewModeChange(mode.id)}><ExplorerViewGlyph mode={mode.id}/></RareButton>)}
+   </div>}/>}
  </section>;
 }

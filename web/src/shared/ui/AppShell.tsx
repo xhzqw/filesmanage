@@ -1,5 +1,5 @@
 import {GooeyNav,RareButton} from "./rare";
-import {useContext,useEffect,useRef,useState,type ReactNode} from "react";
+import {useContext,useEffect,useRef,useState,type CSSProperties,type ReactNode} from "react";
 import {ShellAccessories} from "./ShellAccessories";
 import {Link,useLocation,useNavigate} from "react-router-dom";
 import {Menu} from "./Menu";
@@ -42,7 +42,7 @@ const GOOEY_MAIN_ITEMS=NAV.map(item=>({label:item.label,href:item.to}));
 // The selected GooeyNav item already names the page. Do not repeat it in a
 // separate breadcrumb/title strip. The Documents folder path remains a genuine
 // navigable breadcrumb in its own workbench, below the shell navigation.
-export function AppShell({user,onLogout,actions,children}:{user:ShellUser;onLogout:()=>void;product?:string;actions?:ReactNode;children:ReactNode}){
+export function AppShell({user,onLogout,actions,children,finderSidebarWidth}:{user:ShellUser;onLogout:()=>void;product?:string;actions?:ReactNode;children:ReactNode;finderSidebarWidth?:number}){
  const[open,setOpen]=useState(false);
  const[accountOpen,setAccountOpen]=useState(false);
  const accountRef=useRef<HTMLButtonElement>(null);
@@ -83,7 +83,8 @@ export function AppShell({user,onLogout,actions,children}:{user:ShellUser;onLogo
   if(open)document.querySelector<HTMLAnchorElement>("#shell-main-navigation a[href]")?.focus();
  },[open]);
 
- return <div className={"shell"+(previewRoute?" shell-preview-autoheader":"")}
+ return <div className={"shell"+(finderSidebarWidth?" shell-finder":"")+(previewRoute?" shell-preview-autoheader":"")}
+  style={finderSidebarWidth?{"--finder-sidebar-width":finderSidebarWidth+"px"} as CSSProperties:undefined}
   onPointerDownCapture={event=>{
    if(!previewRoute||event.pointerType==="mouse"||!previewHeaderOpen)return;
    const target=event.target as HTMLElement;

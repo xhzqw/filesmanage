@@ -109,7 +109,7 @@ try{
    const id=queue.shift();
    if(visited.has(id))continue;
    visited.add(id);
-   await navigate("/doc?folder="+encodeURIComponent(id),'!!document.querySelector(".work-body .file-toolbar")');
+   await navigate("/doc?folder="+encodeURIComponent(id),'!!document.querySelector(".folder-file-toolbar-host .file-toolbar")');
    await until('!document.querySelector(".work-body .table .brand-loading-label")');
    await delay(450);
    count=await evaluate('document.querySelectorAll("tr.file-entry").length');
@@ -212,7 +212,7 @@ try{
   await shortcut("c","KeyC");
   const afterCopy=await evaluate('({toasts:[...document.querySelectorAll("[role=status],[role=alert]")].map(x=>x.textContent.slice(0,140)),selected:document.querySelector(".file-selected-count")?.textContent,active:document.activeElement?.tagName})');
   console.log("COPY_SHORTCUT_DEBUG",JSON.stringify(afterCopy));
-  await navigate("/doc?folder="+encodeURIComponent(copyDestination),'!!document.querySelector(".work-body .file-toolbar")');
+  await navigate("/doc?folder="+encodeURIComponent(copyDestination),'!!document.querySelector(".folder-file-toolbar-host .file-toolbar")');
   await shortcut("v","KeyV");
   await delay(350);
   const afterPaste=await evaluate('({toasts:[...document.querySelectorAll("[role=status],[role=alert]")].map(x=>x.textContent.slice(0,140)),progress:document.querySelector(".file-paste-status")?.textContent,path:location.pathname+location.search,active:document.activeElement?.tagName})');

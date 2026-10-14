@@ -25,27 +25,27 @@
    use their own borders; quiet hairlines are only decorative separators. */
 :root{
   --ui-bg-app:#F8FAFC;
-  --ui-bg-sidebar:#F8FAFC;
+  --ui-bg-sidebar:rgba(241,245,249,.85);
   --ui-bg-canvas:#FFFFFF;
   --ui-bg-subtle:#F8FAFC;
-  --ui-state-hover:#EDF2F8;
-  --ui-state-selected-sidebar:#DFEBFA;
+  --ui-state-hover:rgba(15,23,42,.035);
+  --ui-state-selected-sidebar:rgba(0,100,225,.10);
   --ui-state-selected-grid:#D7E8FC;
-  --ui-state-selected-list:#2459B2;
-  --ui-state-focus:#2459B2;
+  --ui-state-selected-list:#0064E1;
+  --ui-state-focus:#0064E1;
   --ui-border-hairline:#E5EAF1;
-  --ui-brand-primary:#2459B2;
+  --ui-brand-primary:#0064E1;
   --ui-brand-strong:#193F81;
   --ui-text-primary:#1D2A3D;
   --ui-text-secondary:#5E6F85;
-  /* Quiet Finder label palette: preserve hue identity without neon noise. */
-  --ui-tag-red:#C4757C;
-  --ui-tag-orange:#C9906A;
-  --ui-tag-yellow:#BDA563;
-  --ui-tag-green:#78A493;
-  --ui-tag-blue:#789DC4;
-  --ui-tag-purple:#A28BB8;
-  --ui-tag-gray:#99A2AC;
+  /* Finder label palette: distinct hues on light canvases. */
+  --ui-tag-red:#FF5F57;
+  --ui-tag-orange:#FE9F45;
+  --ui-tag-yellow:#FFD60A;
+  --ui-tag-green:#28C840;
+  --ui-tag-blue:#0A84FF;
+  --ui-tag-purple:#BF5AF2;
+  --ui-tag-gray:#8E8E93;
 }
 
 /* ================= 品牌核心色 (Brand Archetype) ================= */

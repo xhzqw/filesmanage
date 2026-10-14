@@ -56,12 +56,12 @@ export function FolderActions({folder,actionRequest,onActionHandled,onActionComp
   finally{setRemoveBusy(false);}
  }
  const menuItems:MenuItem[]=[
+  ...(isAdmin?[{id:"grants",label:"授权管理",onSelect:onManageGrants}]:[]),
   {id:"rename",label:"重命名目录",onSelect:()=>{setRenaming(true);setRenameValue(folder.name);}},
   ...(onMove?[{id:"move",label:"移动目录",onSelect:onMove}]:[]),
   {id:"delete",label:"删除目录",danger:true,onSelect:()=>setDeleting(true)}
  ];
  return <div className="folder-actions">
-  {isAdmin&&<RareButton type="button" className="ghost-action-btn" onClick={onManageGrants}>授权管理</RareButton>}
   <div className="folder-more-wrapper">
    <RareButton ref={moreRef} type="button" className="ghost-more-btn" aria-label="更多目录操作"
     aria-haspopup="menu" aria-expanded={moreOpen} onClick={()=>setMoreOpen(v=>!v)}>···</RareButton>
