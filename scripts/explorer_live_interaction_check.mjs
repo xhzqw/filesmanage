@@ -130,6 +130,21 @@ try{
    const group=document.querySelector('.finder-nav-section'),heading=group?.querySelector('.finder-nav-label'),sideIcon=group?.querySelector('.finder-nav-item svg');
    const footer=document.querySelector('.finder-bottom-bar'),footerCount=footer?.querySelector('.finder-bottom-count'),footerPath=footer?.querySelector('.finder-bottom-path');
    const names=document.querySelectorAll('.file-entry .finder-list-filename');
+   const brand=bounds('.finder-sidebar-home'),brandLogo=bounds('.finder-sidebar-logo'),brandName=bounds('.finder-sidebar-home>span');
+   const work=bounds('.document-explorer>.work'),pane=bounds('.panels.document-explorer');
+   const workStyle=getComputedStyle(document.querySelector('.document-explorer>.work'));
+   const paneStyle=getComputedStyle(document.querySelector('.panels.document-explorer'));
+   const headerStyle=getComputedStyle(document.querySelector('.shell>.header'));
+   const railStyle=getComputedStyle(document.querySelector('.finder-sidebar'));
+   const centre=rect=>(rect.top+rect.bottom)/2;
+   const tagFixture=document.createElement('span');
+   tagFixture.className='file-finder-mark-overflow';tagFixture.textContent='+4';
+   (document.querySelector('.file-table .file-name-group')||document.querySelector('.work-body')).append(tagFixture);
+   const tagStyle=getComputedStyle(tagFixture);
+   const tagPill=tagStyle.marginLeft==='4px'&&tagStyle.paddingTop==='1px'&&tagStyle.paddingLeft==='5px'&&
+    tagStyle.borderTopLeftRadius==='999px'&&tagStyle.backgroundColor==='rgba(15, 23, 42, 0.05)'&&
+    tagStyle.fontSize==='11px'&&tagStyle.fontWeight==='500'&&tagStyle.color===getComputedStyle(document.querySelector('.finder-bottom-count')).color;
+   tagFixture.remove();
    const getTextRect=element=>{const node=[...element?.childNodes||[]].find(x=>x.nodeType===3&&x.textContent.trim());if(!node)return null;const r=document.createRange();r.selectNodeContents(node);return r.getBoundingClientRect();};
    const nameHead=getTextRect(document.querySelector('th.col-name .file-column-sort')),nameIcon=bounds('.explorer-list-folder .file-cell-wrap>.resource-folder-icon');
    const dateHead=getTextRect(document.querySelector('th.col-date .file-column-sort')),dateCell=document.querySelector('tbody td.col-date'),dateRange=document.createRange();
@@ -159,7 +174,19 @@ try{
     footer28:!!footer&&Math.abs(footer.getBoundingClientRect().height-28)<1&&
      !!footerPath&&!!footerCount&&Math.abs((footerCount.getBoundingClientRect().left+footerCount.getBoundingClientRect().right)/2-(footer.getBoundingClientRect().left+footer.getBoundingClientRect().right)/2)<1.5&&
      footer.querySelectorAll('.finder-bottom-node svg').length>0&&document.querySelectorAll('.work-body>.finder-bottom-path').length===0,
-    nameTokens:names.length===0||[...names].every(el=>el.querySelector('.finder-name-prefix')&&(!el.textContent.match(/\.[a-z0-9]+$/i)||el.querySelector('.finder-name-extension')))};
+    nameTokens:names.length===0||[...names].every(el=>el.querySelector('.finder-name-prefix')&&(!el.textContent.match(/\.[a-z0-9]+$/i)||el.querySelector('.finder-name-extension')),
+    brandHeaderAligned:!!brand&&!!header&&!!brandLogo&&!!brandName&&
+     Math.abs(brand.top-header.top)<=1&&Math.abs(brand.height-48)<=.5&&Math.abs(header.height-48)<=.5&&
+     Math.abs(centre(brandLogo)-centre(header))<=1&&Math.abs(centre(brandName)-centre(header))<=1&&
+     (!nav?.width||Math.abs(centre(nav)-centre(header))<=1),
+    greyChrome:headerStyle.backgroundColor==='rgb(244, 245, 247)'&&
+     railStyle.backgroundColor==='rgb(244, 245, 247)'&&paneStyle.backgroundColor==='rgb(244, 245, 247)',
+    insetCanvas:!!work&&workStyle.borderTopLeftRadius==='10px'&&workStyle.borderBottomLeftRadius==='0px'&&
+     workStyle.borderBottomRightRadius==='0px'&&workStyle.overflowX==='hidden'&&workStyle.backgroundColor==='rgb(255, 255, 255)',
+    bottomFlush:!!work&&!!pane&&!!footer&&Math.abs(footer.getBoundingClientRect().bottom-work.bottom)<=1.5&&
+     paneStyle.borderBottomLeftRadius==='0px'&&paneStyle.borderBottomRightRadius==='0px'&&
+     statusStyle.borderBottomLeftRadius==='0px'&&statusStyle.borderBottomRightRadius==='0px',
+    tagOverflowPill:tagPill};
   })()`);
   console.log('EXPLORER_UNIFIED_TOOLBAR_GEOMETRY',viewport.name,JSON.stringify(layout));
   assert(layout.portalled&&layout.barHeight>=43&&layout.barHeight<=45&&layout.oneRow&&layout.uploads&&layout.folders&&layout.views&&layout.search&&layout.overflow<=1,
@@ -171,6 +198,8 @@ try{
   assert(layout.singleMore&&layout.controls28&&layout.corners6&&layout.nav26&&layout.nameLine&&layout.dateLine&&
    layout.sidebarLine&&layout.monochrome&&layout.footer28&&layout.nameTokens,
    'Sonoma/Sequoia pixel contract at '+viewport.width+': '+JSON.stringify(layout));
+  assert(layout.brandHeaderAligned&&layout.greyChrome&&layout.insetCanvas&&layout.bottomFlush&&layout.tagOverflowPill,
+   '48px Finder shared baseline, 10px inset canvas, seamless footer, +N tag pill at '+viewport.width+': '+JSON.stringify(layout));
  }
  await send('Emulation.clearDeviceMetricsOverride');
  await click('.folder-file-toolbar-host button[aria-label="更多操作"]');

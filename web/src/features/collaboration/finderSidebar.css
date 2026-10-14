@@ -86,21 +86,27 @@
  .finder-nav-item,.finder-favorite-item{transition:none}
 }
 
-/* On document routes this is a genuine full-height rail. The corporate home
-   pill lives in its top 56px, while global navigation starts to its right. */
+/* Finder uses one 48px header reference line across the full-height rail
+   and the main navigation. The outer surface supplies the inset grey. */
+.shell.shell-finder{--height-header:48px;--finder-chrome-bg:#F4F5F7}
+.shell.shell-finder .document-explorer .finder-sidebar{
+ background:var(--finder-chrome-bg);
+}
 .shell.shell-finder>.header{
  align-self:flex-end;width:calc(100% - var(--finder-sidebar-width));
- display:grid;grid-template-columns:minmax(0,1fr) auto;
- padding-inline:16px;background:rgba(241,245,249,.85);border-radius:0;
+ box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) auto;
+ align-items:center;height:var(--height-header);min-height:var(--height-header);
+ padding:0 16px;background:var(--finder-chrome-bg);border-radius:0;
 }
 .shell.shell-finder>.header>.shell-home-pill{display:none}
 .shell.shell-finder>.header nav[data-slot="gooey-nav"][data-appearance="pill"]{grid-column:1;grid-row:1;justify-self:start}
 .shell.shell-finder>.header .global-utility-dock{grid-column:2;grid-row:1;justify-self:end;margin-left:auto}
-.shell.shell-finder{--height-header:48px}
 .shell.shell-finder>.panels.document-explorer{
  margin-top:calc(-1 * var(--height-header) - var(--space-2));gap:0;
- background:var(--surface-panel);border:1px solid rgba(15,23,42,.065);
- border-radius:var(--radius-md);overflow:hidden;
+ background:var(--finder-chrome-bg);
+ border:1px solid rgba(15,23,42,.065);border-top:0;
+ border-radius:var(--radius-md);border-bottom-left-radius:0;border-bottom-right-radius:0;
+ overflow:hidden;
 }
 .shell.shell-finder .document-explorer>.finder-sidebar{
  box-sizing:border-box;padding-top:var(--height-header);
@@ -108,14 +114,16 @@
  border-radius:var(--radius-xs);box-shadow:none;
 }
 .shell.shell-finder .document-explorer>.work{
- margin-top:var(--height-header);border:0;border-radius:var(--radius-xs);box-shadow:none;
- background:var(--surface-panel);
+ margin-top:var(--height-header);border:0;border-radius:0;
+ border-top-left-radius:var(--radius-finder-canvas);box-shadow:none;
+ overflow:hidden;background:var(--surface-panel);
 }
 .document-explorer .finder-sidebar-home{
  position:absolute;top:0;left:0;right:0;z-index:2;
- height:var(--height-header);display:flex;align-items:center;gap:9px;
+ box-sizing:border-box;height:var(--height-header);min-height:var(--height-header);
+ display:flex;align-items:center;gap:9px;
  padding:0 17px;text-decoration:none;white-space:nowrap;
- color:var(--text-primary);font-size:14px;font-weight:650;
+ color:var(--text-primary);font-size:14px;font-weight:650;line-height:1;
 }
 .document-explorer .finder-sidebar-home:hover{color:var(--brand-blue)}
 .document-explorer .finder-sidebar-home:focus-visible{outline:2px solid var(--border-focus);outline-offset:-4px}

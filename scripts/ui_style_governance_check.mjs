@@ -48,7 +48,7 @@ function walkTheme(){
   const line=uncommented.slice(0,match.index).split("\n").length;
   errors.push(`theme.css:${line}: unsupported border-radius ${match[1].trim()}`);
  }
- const expected={xs:"4px",finder:"6px",sm:"7px",md:"11px",lg:"15px",xl:"20px",pill:"999px"};
+ const expected={xs:"4px",finder:"6px","finder-canvas":"10px",sm:"7px",md:"11px",lg:"15px",xl:"20px",pill:"999px"};
  for(const [name,value] of Object.entries(expected)){
   const occurrences=[...uncommented.matchAll(new RegExp(`--radius-${name}\\s*:\\s*([^;]+)`, "g"))];
   if(occurrences.length!==1||occurrences[0][1].trim()!==value){

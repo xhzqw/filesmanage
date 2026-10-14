@@ -43,6 +43,19 @@ html{overflow-x:clip}
   border-radius:0;
   box-shadow:none;
 }
+/* The full-height Finder rail and navigation share their chrome. The white
+   workspace owns only the upper-left inset; its bottom stays welded to the
+   single path/status bar, not to a second rounded surface. */
+.shell.shell-finder .document-explorer>.work{
+  border-radius:0;
+  border-top-left-radius:var(--radius-finder-canvas);
+  overflow:hidden;
+}
+.shell.shell-finder .work-body>.finder-bottom-bar{
+  border-radius:0;
+  border-bottom-left-radius:0;
+  border-bottom-right-radius:0;
+}
 .document-explorer>.sidebar{border-right:1px solid var(--border-hairline)}
 .document-explorer .sidebar-resizer::after{opacity:0;transition:opacity .12s ease}
 .document-explorer .sidebar-resizer:is(:hover,:focus-visible)::after,

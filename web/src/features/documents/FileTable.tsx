@@ -1282,17 +1282,17 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
  function finderFolderDots(entry:Folder){
   const assigned=new Set(finderFolderAssignments[entry.id]??[]);
   const marked=finderLabels.filter(label=>assigned.has(label.id));
-  return marked.length?<span className="file-finder-marks" aria-label={"标签："+marked.map(label=>label.name).join("、")}>
+  return marked.length?<span className="file-finder-marks" role="img" aria-label={"标签："+marked.map(label=>label.name).join("、")}>
    {marked.slice(0,2).map(label=><span key={label.id} className="file-finder-mark" style={{backgroundColor:finderColor(label.color)}} title={label.name}/>)}
-   {marked.length>2&&<span className="file-finder-mark-overflow" title={marked.slice(2).map(label=>label.name).join("、")}>+{marked.length-2}</span>}
+   {marked.length>2&&<span className="file-finder-mark-overflow" aria-hidden="true" title={marked.slice(2).map(label=>label.name).join("、")}>+{marked.length-2}</span>}
   </span>:null;
  }
  function finderDots(item:FileItem){
   const assigned=new Set(finderAssignments[item.id]??[]);
   const marks=finderLabels.filter(label=>assigned.has(label.id));
-  return marks.length?<span className="file-finder-marks" aria-label={"标签："+marks.map(m=>m.name).join("、")}>
+  return marks.length?<span className="file-finder-marks" role="img" aria-label={"标签："+marks.map(m=>m.name).join("、")}>
    {marks.slice(0,2).map(label=><span key={label.id} className="file-finder-mark" style={{backgroundColor:finderColor(label.color)}} title={label.name}/>)}
-   {marks.length>2&&<span className="file-finder-mark-overflow" title={marks.slice(2).map(label=>label.name).join("、")}>+{marks.length-2}</span>}
+   {marks.length>2&&<span className="file-finder-mark-overflow" aria-hidden="true" title={marks.slice(2).map(label=>label.name).join("、")}>+{marks.length-2}</span>}
   </span>:null;
  }
 

@@ -168,7 +168,6 @@
 /* Keep muted labels on one metadata rail rather than a separate rainbow line. */
 .explorer-item-meta{display:flex;align-items:center;justify-content:center;gap:7px;min-width:0;max-width:100%;min-height:14px}
 .explorer-item-meta .file-finder-marks{gap:4px;max-width:74px;white-space:nowrap}
-.file-finder-mark-overflow{font-size:10px;line-height:1;color:var(--text-secondary);font-weight:550;font-variant-numeric:tabular-nums}
 .explorer-item-meta .file-finder-mark{width:6px;height:6px}
 .explorer-item-sub{font-size:11px;font-weight:400;color:#94A3B8;white-space:nowrap}
 .explorer-item-check{
