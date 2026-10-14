@@ -104,7 +104,7 @@
  align-self:flex-end;width:calc(100% - var(--finder-sidebar-width));
  box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) auto;
  align-items:center;height:var(--height-header);min-height:var(--height-header);
- padding:0 16px;background:var(--finder-chrome-bg);border-radius:0;
+ padding:0 14px 0 16px;background:var(--finder-chrome-bg);border-radius:0;
 }
 .shell.shell-finder>.header>.shell-home-pill{display:none}
 .shell.shell-finder>.header nav[data-slot="gooey-nav"][data-appearance="pill"]{grid-column:1;grid-row:1;justify-self:start}
@@ -112,7 +112,7 @@
 .shell.shell-finder>.panels.document-explorer{
  margin-top:calc(-1 * var(--height-header) - var(--finder-shell-gap));gap:0;
  background:var(--finder-chrome-bg);
- border:1px solid rgba(15,23,42,.065);border-top:0;
+ border:1px solid rgba(15,23,42,.065);border-top:0;border-right:0;
  border-radius:var(--radius-md);border-bottom-left-radius:0;border-bottom-right-radius:0;
  overflow:hidden;
 }

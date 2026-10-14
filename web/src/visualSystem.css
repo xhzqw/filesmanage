@@ -9,6 +9,9 @@
 /* A wide, independently scrollable data grid must never enlarge Chrome's
    layout viewport. All full-height pages already own their scroll regions. */
 html{overflow-x:clip}
+/* Document Finder alone is welded to the viewport's right edge. All other
+   application workbenches retain their standard outer shell inset. */
+.shell.shell-finder{padding-right:0}
 
 /* Shell surface geometry now lives in theme.css. */
 .header nav{gap:3px}
@@ -37,6 +40,12 @@ html{overflow-x:clip}
   border-radius:var(--radius-lg);
   background:var(--surface-panel);
   box-shadow:var(--shadow-panel);
+}
+.shell.shell-finder>.panels.document-explorer{
+ border-right:0;margin-right:0;padding-right:0;
+}
+.shell.shell-finder .document-explorer>.work{
+ margin-right:0;padding-right:0;border-right:0;
 }
 .document-explorer>.sidebar,.document-explorer>.work{
   border:0;

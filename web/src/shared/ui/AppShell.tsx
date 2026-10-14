@@ -133,10 +133,9 @@ export function AppShell({user,onLogout,actions,children,finderSidebarWidth}:{us
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
    </RareButton>
    <div className="header-right global-utility-dock" role="group" aria-label="系统快捷工具">
-    <RareButton type="button" className="command-trigger" aria-label="快速跳转" onClick={()=>window.dispatchEvent(new CustomEvent("filesmanage:command-spotlight"))}>
-     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="10.8" cy="10.8" r="6.7"/><path d="m16 16 4.4 4.4"/></svg>
-     <span>快速跳转</span>
-     <span className="command-keys"><kbd>Ctrl</kbd><kbd>K</kbd></span>
+    <RareButton type="button" className="command-trigger" aria-label="快速跳转" title="快速跳转（⌘K / Ctrl+K）" onClick={()=>window.dispatchEvent(new CustomEvent("filesmanage:command-spotlight"))}>
+     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="10.8" cy="10.8" r="6.7"/><path d="m16 16 4.4 4.4"/></svg>
+     <span className="command-keys"><kbd>⌘K</kbd></span>
     </RareButton>
     {notificationSlot}
     <div className="account-dropdown-wrapper">
@@ -144,7 +143,7 @@ export function AppShell({user,onLogout,actions,children,finderSidebarWidth}:{us
       onClick={()=>setAccountOpen(v=>!v)}>
       <span className="account">
        <span className="account-avatar" aria-hidden="true">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 19c.5-3.2 3-5 6.5-5s6 1.8 6.5 5"/></svg>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 19c.5-3.2 3-5 6.5-5s6 1.8 6.5 5"/></svg>
        </span>
        <span className="account-name">{user.displayName}</span>
        <svg className="account-caret" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>

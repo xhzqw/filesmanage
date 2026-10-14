@@ -63,37 +63,49 @@
 /* Detached controls, one quiet pill per interaction, no nested utility box. */
 .header .global-utility-dock{
  display:flex;align-items:center;justify-self:end;gap:7px;flex:none;
- margin:0;height:38px;padding:0;border:0;background:transparent;box-shadow:none;
+ margin:0;height:30px;min-height:30px;padding:0;border:0;background:transparent;box-shadow:none;
 }
 .header .global-utility-dock .command-trigger,
 .header .global-utility-dock .notification-trigger,
-.header .global-utility-dock button[aria-label*="通知"]{
- width:36px;min-width:36px;height:36px;min-height:36px;padding:0;
- border:1px solid var(--ui-border-hairline);border-radius:var(--radius-pill);
+ .header .global-utility-dock .rare-notification-bell,
+ .header .global-utility-dock button[aria-label*="通知"]{
+ box-sizing:border-box;width:30px;min-width:30px;height:30px;min-height:30px;padding:0;
+ border:1px solid rgba(15,23,42,.08);border-radius:var(--radius-pill);
  color:var(--text-secondary);background:var(--surface-panel);
- box-shadow:0 1px 5px rgba(15,23,42,.045);
+ box-shadow:0 1px 2px rgba(15,23,42,.03);
 }
 .header .global-utility-dock .command-trigger:hover,
 .header .global-utility-dock .notification-trigger:hover,
 .header .global-utility-dock .account-trigger:hover{background:var(--surface-row-hover)}
 .header .global-utility-dock .account-trigger{
- height:36px;min-height:36px;padding:0 9px 0 5px;
- border:1px solid var(--ui-border-hairline);border-radius:var(--radius-pill);
- background:var(--surface-panel);box-shadow:0 1px 5px rgba(15,23,42,.045);
+ box-sizing:border-box;height:30px;min-height:30px;padding:0 11px 0 5px;
+ border:1px solid rgba(15,23,42,.08);border-radius:var(--radius-pill);
+ background:var(--surface-panel);box-shadow:0 1px 2px rgba(15,23,42,.03);
 }
-.header .global-utility-dock .account-avatar{width:25px;height:25px;font-size:12px}
-.header .global-utility-dock .account{gap:6px;color:var(--text-primary)}
-.header .global-utility-dock .account-name{max-width:96px}
+.header .global-utility-dock .account-avatar{width:22px;height:22px;font-size:11px}
+.header .global-utility-dock .account{gap:7px;color:var(--text-primary)}
+.header .global-utility-dock .account-name{max-width:96px;font-size:12.5px;font-weight:500}
 .header .global-utility-dock .command-trigger{
  display:inline-flex;justify-content:center;align-items:center;flex:none;
+ box-sizing:border-box;width:auto;min-width:0;gap:5px;padding:0 9px;
+ border-radius:var(--radius-pill);
 }
-.header .global-utility-dock .command-trigger>span{display:none}
-.header .global-utility-dock .command-trigger>svg{display:block;flex:none;width:18px;height:18px}
-.header .global-utility-dock .notification-center{flex:none;margin:0;min-width:36px;width:36px;height:36px}
+.header .global-utility-dock .command-trigger>.command-keys{
+ display:inline-flex;align-items:center;margin:0;
+}
+.header .global-utility-dock .command-trigger .command-keys kbd{
+ font-family:inherit;font-size:11px;font-weight:500;line-height:1;
+ padding:0;margin:0;border:0;border-radius:0;box-shadow:none;
+ background:transparent;color:var(--text-tertiary);
+}
+.header .global-utility-dock .command-trigger>svg{display:block;flex:none;width:14px;height:14px}
+.header .global-utility-dock .notification-center{flex:none;margin:0;min-width:30px;width:30px;height:30px}
 .header .global-utility-dock .notification-trigger{
  display:inline-flex;align-items:center;justify-content:center;flex:none;
 }
-.header .global-utility-dock .notification-trigger>svg{display:block;width:18px;height:18px;flex:none}
+.header .global-utility-dock :is(.notification-trigger,.rare-notification-bell)>svg{
+ display:block;width:15px;height:15px;flex:none;
+}
 .header .global-utility-dock .rare-notification-bell-badge{
  top:0;right:0;z-index:1;min-width:15px;height:15px;
  padding:0 3px;line-height:15px;font-size:9px;
@@ -102,15 +114,19 @@
 .header .global-utility-dock .account-dropdown-wrapper{flex:none;min-width:0}
 .header .global-utility-dock .account-trigger{
  display:inline-flex;justify-content:center;align-items:center;
- min-width:36px;max-width:154px;white-space:nowrap;
+ min-width:30px;max-width:154px;white-space:nowrap;
 }
 .header .global-utility-dock .account-avatar{
  display:inline-flex;justify-content:center;align-items:center;flex:none;
- background:#eaf2ff;border:0;color:var(--brand-blue);
+ box-sizing:border-box;
+ border-radius:50%!important;
+ background:rgba(0,100,225,.10);border:0;color:var(--ui-brand-primary);
 }
-.header .global-utility-dock .account-avatar svg{display:block;width:18px;height:18px}
+.header .global-utility-dock .account-avatar svg{
+ display:block;width:13px;height:13px;stroke-width:1.8;
+}
 .header .global-utility-dock .account-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.header .global-utility-dock .account-caret{flex:none}
+.header .global-utility-dock .account-caret{flex:none;margin-left:0}
 .header .header-page-actions{justify-self:end}
 @media(max-width:1210px){
  .shell>.header{display:flex;gap:8px;justify-content:space-between}
@@ -148,13 +164,15 @@
  .shell>.header{height:52px;min-height:52px;gap:5px}
  .shell>.header .shell-home-pill{height:40px;min-height:40px;padding:0 11px 0 9px;gap:6px;font-size:13px}
  .header .shell-home-pill .brand-logo{width:23px;height:23px}
- .shell>.header .global-utility-dock{height:36px;gap:4px;padding:0;flex:none}
- .header .global-utility-dock .notification-center{min-width:36px;margin:0 1px}
- .header .global-utility-dock .account-trigger{width:36px;min-width:36px;padding:0;justify-content:center}
+ .shell>.header .global-utility-dock{height:30px;min-height:30px;gap:4px;padding:0;flex:none}
+ .header .global-utility-dock .notification-center{min-width:30px;width:30px;height:30px;margin:0}
+ .header .global-utility-dock .account-trigger{width:30px;min-width:30px;padding:0;justify-content:center}
  .header .global-utility-dock .account-name,.header .global-utility-dock .account-caret{display:none}
  .header .nav-toggle{width:36px;min-width:36px;height:36px;min-height:36px}
- .header .global-utility-dock .command-trigger,.header .global-utility-dock .notification-trigger,
- .header .global-utility-dock button[aria-label*="通知"]{width:36px;min-width:36px;height:36px;min-height:36px}
+ .header .global-utility-dock .command-trigger{width:auto;min-width:0;height:30px;min-height:30px}
+ .header .global-utility-dock .notification-trigger,
+ .header .global-utility-dock .rare-notification-bell,
+ .header .global-utility-dock button[aria-label*="通知"]{width:30px;min-width:30px;height:30px;min-height:30px}
 }
 @media(max-width:400px){
  .shell>.header .shell-home-pill{font-size:12px;gap:5px;padding-inline:8px}

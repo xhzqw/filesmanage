@@ -166,6 +166,51 @@ try{
  for(const width of [1920,1366,820]){
   await send("Emulation.setDeviceMetricsOverride",{width,height:900,deviceScaleFactor:1,mobile:false});
   await delay(130);
+  const dock=await evaluate(`(()=>{
+   const select=selector=>document.querySelector(selector);
+   const rect=selector=>select(selector)?.getBoundingClientRect();
+   const style=selector=>{const e=select(selector);return e?getComputedStyle(e):null};
+   const shell=rect('.shell.shell-finder'),panels=rect('.shell.shell-finder>.panels.document-explorer'),
+    work=rect('.document-explorer>.work'),header=rect('.shell.shell-finder>.header'),
+    bar=rect('.document-explorer .folder-context-bar'),
+    account=rect('.global-utility-dock .account-trigger'),
+    avatar=rect('.global-utility-dock .account-avatar'),
+    avatarGlyph=rect('.global-utility-dock .account-avatar svg'),
+    bell=rect('.global-utility-dock .rare-notification-bell'),
+    bellGlyph=rect('.global-utility-dock .rare-notification-bell svg'),
+    command=rect('.global-utility-dock .command-trigger'),
+    commandGlyph=rect('.global-utility-dock .command-trigger svg'),
+    more=rect('.document-explorer .folder-context-bar button[aria-label="更多操作"]');
+   return {viewport:window.innerWidth,
+    shellRight:shell?.right,panelsRight:panels?.right,workRight:work?.right,
+    headerRight:header?.right,barRight:bar?.right,
+    accountRight:account?.right,moreRight:more?.right,
+    accountHeight:account?.height,commandHeight:command?.height,
+    commandWidth:command?.width,bellHeight:bell?.height,bellWidth:bell?.width,
+    avatarWidth:avatar?.width,avatarHeight:avatar?.height,
+    avatarRadius:style('.global-utility-dock .account-avatar')?.borderRadius,
+    avatarGlyph:avatarGlyph?.width,bellGlyph:bellGlyph?.width,commandGlyph:commandGlyph?.width,
+    commandLabel:select('.global-utility-dock .command-keys')?.textContent?.trim(),
+    accountFont:style('.global-utility-dock .account-name')?.fontSize,
+    dockHeight:rect('.global-utility-dock')?.height,
+    workBorder:style('.document-explorer>.work')?.borderRightWidth,
+    panelsBorder:style('.panels.document-explorer')?.borderRightWidth,
+    shellPadding:style('.shell.shell-finder')?.paddingRight,
+    scrollbarOverflow:document.documentElement.scrollWidth>window.innerWidth+1};
+  })()`);
+  assert(dock.avatarWidth===22&&dock.avatarHeight===22&&dock.avatarRadius==="50%"&&dock.avatarGlyph===13&&
+   dock.commandHeight===30&&dock.bellHeight===30&&dock.accountHeight===30&&dock.dockHeight===30&&
+   dock.bellWidth===30&&dock.bellGlyph===15&&dock.commandGlyph===14&&dock.commandLabel==="⌘K"&&
+   dock.accountFont==="12.5px"&&dock.commandWidth>30,
+   "Finder global utility geometry at "+width+": "+JSON.stringify(dock));
+  assert(Math.abs(dock.accountRight-dock.moreRight)<=.5&&
+   Math.abs(dock.workRight-dock.viewport)<=.5&&
+   Math.abs(dock.panelsRight-dock.viewport)<=.5&&
+   Math.abs(dock.headerRight-dock.viewport)<=.5&&
+   dock.shellPadding==="0px"&&dock.workBorder==="0px"&&dock.panelsBorder==="0px"&&
+   !dock.scrollbarOverflow,
+   "Finder header/footer right reference line or canvas seam at "+width+": "+JSON.stringify(dock));
+  console.log("FINDER_GLOBAL_DOCK_PIXEL_PASS",width,JSON.stringify(dock));
   let baseline=null;
   for(const [mode,label] of [["icons","图标视图"],["list","列表视图"],["columns","分栏视图"],["gallery","画廊视图"]]){
    await evaluate(`(()=>document.querySelector('.folder-view-switch button[aria-label="${label}"]')?.click())()`);
