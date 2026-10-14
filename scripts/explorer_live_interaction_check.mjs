@@ -96,10 +96,10 @@ try{
   const tree=await(await fetch("/api/folders/tree",{cache:"no-store"})).json();
   const row=document.querySelector(".explorer-list-folder");
   const data=tree.data?.find(entry=>entry.id===row?.dataset.uploadFolderId);
-  return {api:data?.updatedAt,displayed:row?.querySelector("td.col-date")?.textContent.trim()};
+  return {api:data?.updatedAt,displayed:row?.querySelector("td.col-date")?.textContent.trim(),raw:row?.querySelector("td.col-date")?.getAttribute("title")};
  })()`);
- assert(folderDate.api&&folderDate.displayed===folderDate.api.replace("T"," ").slice(0,16),
-  "Folder modified date must come from the actual API: "+JSON.stringify(folderDate));
+ assert(folderDate.api&&folderDate.raw===folderDate.api&&/^(?:今天|昨天|(?:\d{4}年)?\d{1,2}月\d{1,2}日) \d{2}:\d{2}$/.test(folderDate.displayed),
+  "Folder modified date must preserve the API time and show Finder-style local text: "+JSON.stringify(folderDate));
  console.log("EXPLORER_FOLDER_MTIME_PASS",JSON.stringify(folderDate));
  let count=await evaluate('document.querySelectorAll("tr.file-entry").length');
  if(count<4){
@@ -145,7 +145,9 @@ try{
  assert.equal(await selectedFiles(),3,"Ctrl-click should add a third file");
  assert(await evaluate('!document.querySelector("tr.file-entry input[type=checkbox]")'),
   "checkboxes must not exist before enabling the option");
- await click(".checkbox-visibility-toggle");
+ await click('button[aria-label="更多显示选项"]');
+ await until('!!document.querySelector(\'[role="menu"][aria-label="显示选项"]\')');
+ await click('[role="menu"][aria-label="显示选项"] [role="menuitem"]',0);
  await until('!!document.querySelector("tr.file-entry input[type=checkbox]")');
  await click('tr.file-entry .col-select input[type="checkbox"]',3);
  await until('(document.querySelector(".file-selected-count")?.textContent||"").includes("已选 4")');
@@ -154,7 +156,9 @@ try{
  await until('(document.querySelector(".file-selected-count")?.textContent||"").includes("已选 3")');
  await click(".batch-clear-selection");
  await until('!document.querySelector(".batch-actions-group")');
- await click(".checkbox-visibility-toggle");
+ await click('button[aria-label="更多显示选项"]');
+ await until('!!document.querySelector(\'[role="menu"][aria-label="显示选项"]\')');
+ await click('[role="menu"][aria-label="显示选项"] [role="menuitem"]',0);
  await until('!document.querySelector("tr.file-entry input[type=checkbox]")');
  console.log("EXPLORER_LIVE_MULTI_SELECT_PASS",JSON.stringify({count:4,plainSingle:true,ctrlClick:true,checkbox:true,toggleOff:true}));
 
