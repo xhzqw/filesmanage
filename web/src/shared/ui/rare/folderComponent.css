@@ -1,0 +1,46 @@
+/* The geometry and blue glass styling follow the upstream Rare UI Folder
+   Component. Size scales the entire original stage, never the individual
+   paper cards, so closed/open silhouettes preserve their proportions. */
+.rare-folder-component{
+ position:relative;display:inline-block;flex:none;vertical-align:middle;
+ overflow:visible;isolation:isolate;user-select:none;
+}
+.rare-folder-stage{
+ position:absolute;top:50%;left:50%;transform-origin:center center;
+ display:block;pointer-events:none;perspective:800px;
+}
+.rare-folder-back{
+ position:absolute;inset:0;display:block;
+ background:var(--folder-fill);border-radius:var(--radius-xl);
+ box-shadow:inset 0 0 6px 2px rgba(255,255,255,.35);
+}
+.rare-folder-papers{
+ position:absolute;top:50%;left:50%;display:block;
+ width:0;height:0;
+}
+.rare-folder-card{
+ position:absolute;left:-82px;top:-107px;display:block;
+ width:164px;height:214px;transform-origin:center;
+}
+.rare-folder-card svg{display:block;width:164px;height:214px;overflow:visible}
+.rare-folder-front{
+ position:absolute;top:50%;left:50%;
+ margin-left:-160.5px;margin-top:-104.5px;
+ width:321px;height:241px;display:block;
+ transform-origin:bottom center;transform-style:preserve-3d;
+ backface-visibility:hidden;
+}
+.rare-folder-front svg{position:absolute;inset:0;display:block;width:321px;height:241px;overflow:visible}
+.rare-folder-glass{
+ position:absolute;inset:0;display:block;
+ backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+ background:
+  radial-gradient(ellipse at 48% 45%,rgba(255,255,255,.31),transparent 56%),
+  linear-gradient(100deg,rgba(11,70,121,.18),rgba(98,182,251,.07) 35%,rgba(41,126,201,.19) 90%);
+ backface-visibility:hidden;
+}
+/* Micro glyphs retain the source shape, but are not independent buttons. */
+.rare-folder-component[data-folder-scale="compact"]{cursor:inherit}
+@media(prefers-reduced-motion:reduce){
+ .rare-folder-component .rare-folder-stage{perspective:none}
+}

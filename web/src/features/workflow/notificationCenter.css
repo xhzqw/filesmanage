@@ -1,0 +1,19 @@
+.notification-center{position:relative;display:inline-flex;align-items:center;flex:none}
+.header .notification-trigger{position:relative;display:inline-flex;align-items:center;justify-content:center;width:30px;min-width:30px;height:30px;padding:0;border:1px solid transparent;border-radius:var(--radius-md);color:var(--text-secondary);background:transparent}
+.header .notification-trigger:hover,.header .notification-trigger[aria-expanded=true]{background:var(--surface-row-hover);color:var(--text-primary)}
+.notification-count{position:absolute;top:-3px;right:-6px;min-width:17px;height:16px;padding:0 3px;border-radius:var(--radius-pill);background:var(--status-danger);color:#fff;font-size:10px;line-height:16px;font-weight:700;pointer-events:none}
+.notification-popover{position:absolute;right:-22px;top:calc(100% + 9px);width:min(350px,calc(100vw - 24px));max-height:min(520px,75dvh);display:flex;flex-direction:column;z-index:1000;min-width:0;border:1px solid var(--border-strong);border-radius:var(--radius-lg);background:var(--surface-panel);box-shadow:var(--shadow-panel);overflow:hidden}
+.notification-head,.notification-footer{padding:9px 11px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.notification-head{border-bottom:1px solid var(--border-hairline)}
+.notification-footer{border-top:1px solid var(--border-hairline);justify-content:flex-end}
+.notification-scroll{overflow:auto;min-height:0;max-height:360px}
+.header .notification-row{display:flex;width:100%;height:auto!important;min-height:50px!important;text-align:left;justify-content:space-between;align-items:center;gap:7px;padding:9px 12px!important;border:0;border-radius:var(--radius-xs);background:transparent;color:var(--text-primary);font-size:12px;white-space:normal}
+.header .notification-row+.notification-row{border-top:1px solid var(--border-hairline)}
+.header .notification-row:hover{background:var(--surface-row-hover)}
+.notification-row.is-unread{font-weight:650}
+.notification-row-main{min-width:0;display:grid;gap:4px;text-align:left;overflow-wrap:anywhere}
+.notification-row-main small{font-weight:400;font-size:11px;color:var(--text-tertiary)}
+.notification-dot{width:7px;height:7px;border-radius:50%;background:var(--brand-cyan);flex:none}
+.notification-empty,.notification-error{padding:14px 12px;margin:0;font-size:12px;color:var(--text-secondary)}
+.notification-error{color:var(--status-danger)}
+@media(max-width:600px){.notification-popover{position:fixed;left:12px;right:12px;top:calc(var(--height-header) + 5px);width:auto;max-height:calc(100dvh - var(--height-header) - 20px)}}

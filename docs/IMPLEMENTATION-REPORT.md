@@ -1,0 +1,453 @@
+# Implementation report
+
+Date: 2026-10-08 (Milestones 1 and 2). Host: 203.0.113.10. Workspace: /srv/filesmanage.
+
+---
+
+## Milestone 1 — real login (GO for development)
+
+Report: admin bootstrap on `filesmanage_v21`, real bcrypt auth, httpOnly SameSite=Strict session cookies, forced first-login password change, LAN-bounded dev service on 0.0.0.0:18091, browser acceptance over http://203.0.113.10:18091. Full acceptance matrix (14 checks), FirstSignIn E2E with a disposable account, negative network control. Evidence in TEST-EVIDENCE.md §M1; commit `6266512`.
+
+Defect found and fixed during M1: FolderTree rendered only from `parentId===null`, so a user whose grant starts below an invisible root saw an empty tree. Granted folders whose parent is outside the visible set now render as top level.
+
+---
+
+## Milestone 2 — file/folder vertical slice (verified end-to-end)
+
+### What was built
+- Unit-of-work architecture: `ports.UnitOfWork/Tx`; every write use case runs in one transaction (TX-01). Reads use the same contract through a tx handle; blob bytes stage outside transactions and are only referenced inside them (TX-02).
+- Blob adapter (`internal/adapter/blob`): content-addressed store (`.blobs/ready/<2hex>/<sha256>`), random staging names, atomic rename publish, digest re-computed from disk, dedup of identical content, traversal-proof key validation.
+- Folders: create (upload on parent), rename, move (cycle guard trigger), recursive soft delete collapsing into exactly one top-level trash entry, restore of whole subtree.
+- Files: multipart streaming upload (1 GiB cap), upload → blob → file + v1 in one transaction, name-conflict rejection, idempotency-key replay; keyset-paginated list (5 sorts, cursor includes sort key + id, limit clamp 1–200); preview with byte-fidelity metadata (encoding/BOM/EOL/trailing newline, 256 KiB truncation flag); authoritative byte download (SHA-256 header); save with baseSeq CAS; append-only rollback (DEC-13); soft delete; versions history; rename.
+- Trash: list (own entries + restorable entries via upload grant on the original parent chain), restore with optional destination/new name (E_PARENT_MISSING / E_NAME_CONFLICT), purge (admin only, marks GC).
+- Grants: list/create/revoke, admin-only, subject existence + action whitelist validated, audit on every mutation. Audit events cover upload/save/rollback/delete/restore/purge/folder and ACL operations with request ids.
+- Migrations 0004 (files.content_type, folders.created_by) and 0005 (trash purged_at/purge_after) applied; checksums re-verified by `migrate -check`.
+- Frontend: FSD-compliant Documents page (FolderTree + NewFolderForm + FolderActions + FileTable), Preview page (content, byte meta, version table, raw-byte download), Trash page (list + restore), shared error-code mapping, shared idempotency-key generator that works on non-secure-context LAN http.
+
+### Verification (executed, all PASS)
+- Go: `go build ./...`, `go vet ./...`, `go test ./...` (application use cases incl. DEC-13 append-only rollback, idempotent replay, permission matrix; domain ACL rules; cursor pagination; byte-fidelity analysis; httpx allowlist tests; cmd/server tests) — PASS.
+- `scripts/check_architecture.py` — PASS (31 Go files, 24 TS modules, negative self-tests).
+- Web: `tsc --noEmit` + `vite build` — PASS.
+- API E2E over loopback: create folder → upload (checksum match on download bytes) → preview (meta correct) → save v2 (CAS) → rollback to v1 producing v4 with SHA(v4)=SHA(v1) and v1/v2/v3 intact → idempotent replay of the same rollback key returned the same seq (no duplicate version) → delete → trash → restore → folder subtree delete/restore → grant create/list/revoke. Error paths: 401 unauthenticated, 404 unknown file, 409 stale baseSeq, 400 over-limit, 403 ungranted action.
+- Browser E2E over LAN (headless Chromium): login → create folder via form → enter folder → upload via hidden input (row + notice) → preview page with byte fidelity (mixed EOL correctly reported) → delete with confirm → trash page → restore.
+- DB assertions after E2E: users=6, folders=15, files=3, versions=6, blobs=3 (all ready, content-addressed on disk), trash=3 all restored, audit_events=22 across 10 event types, idempotency_keys=6, staging directory empty (no orphaned staging files).
+
+### Defects found and fixed during M2
+1. File list first page returned empty: an absent cursor was passed as a keyset filter. Cursor is now omitted entirely when empty (regression covered by `TestListFilesAppliesPaginationLimit`).
+2. `GET /api/trash` returned 500 because `trash_entries.purged_at` was referenced but not in the schema; migration 0005 adds `purged_at` and the reserved `purge_after`.
+3. Trash payloads reported a zero `deleted_at` because the insert result was not reflected back; the use case now stamps the entry with the service clock.
+4. Browser upload failed on LAN http because `crypto.randomUUID` requires a secure context; a shared fallback key generator is used.
+
+---
+
+## Milestone 3 — organization and permission closure (verified end-to-end)
+
+### What was built
+- Organization use cases and stores: users (create with issued credential, list, disable/enable with immediate session kill, admin password reset with forced re-change), departments (list/create), workgroups (list/create, member add/remove). Every entry point is admin-only and audited; non-admin callers get 403.
+- Grant management surfaced through the existing admin-only ACL endpoints plus a browser dialog (subject picker across users and groups, nine action checkboxes, scope_only, expiry).
+- OrganizationPanel at /org with live user states, department name resolution, group membership management.
+
+### Verification (executed, all PASS)
+- Issued credentials force a change on first login (business reads 403 until changed); wrong old password 401; old password dead after change.
+- Password reset kills every session of the account and forces a change again; disable kills sessions immediately and blocks login; enable restores access.
+- Cross-user isolation: an ungranted user sees an empty tree, gets 403 on the granted folder, and every indirect attempt on another user's file (preview/download/delete/save/rollback/rename/versions) is rejected; restore of another user's trash entry is 404; admin-only endpoints 403 for non-admins.
+- Group grants apply on the next request: member added → folder visible, list 200, ungranted action still 403; member removed → invisible again.
+- Browser: /org renders real states and department names; grant dialog lists/creates/revokes grants.
+- Fixes during the slice: `workgroups` has no `created_at` column (500 on list), empty department string hit the FK (500 on user create), and use cases mapped real query failures to 404 — now only missing rows map to 404.
+
+---
+
+## Milestone 4 — approvals, locks and version closure (verified end-to-end)
+
+### What was built
+- Approval policies (admin-only): one approver per folder with an enabled flag; while enabled, save and rollback create pending approvals (202 + approvalId) instead of versions, and the committed content stays authoritative for preview/download.
+- Approval decisions: approve commits the pending payload as a new immutable version attributed to the requester; reject and cancel publish nothing; the state predicate on the UPDATE is the concurrency gate, so concurrent deciders produce exactly one winner and losers get a controlled 409 (conflicted requests are auto-marked).
+- Edit locks: file-level single-writer lease (30 min server-side TTL, generation counter). Direct saves require the live token; a successful save releases the lock; expired leases are taken over (old token dies); stale tokens cannot release a newer holder's lock; own-lock re-acquire issues a fresh token so a stale tab cannot free the new lock. Admin-only paths are still role-checked.
+- Migration 0006 adds the approval decision trail (reason, decision_comment, decided_at).
+- Frontend: /approvals workbench (inbox + my requests, approve/reject/cancel), lock-aware plain-text editor (acquire on open, save with token, auto-release, approval submit under policy), admin approval-policy dialog. Feature modules stay FSD-clean: file endpoints in features/documents, approval endpoints in features/workflow, pages compose.
+
+### Verification (executed, all PASS)
+- Full matrix in TEST-EVIDENCE.md §M4: policy set/non-admin deny, 202 submission, no leak while pending, duplicate 409, approver-only 403, approve commits v2 with requester authorship, double-approve 409, reject keeps current version, rollback approval appends v3 with target=1.
+- Lock lifecycle: acquire/status/foreign-holder 409/save-without-token 409/save-with-token 200/auto-release/stale-token 409; acquire under an approval folder is 409 E_APPROVAL_PENDING.
+- Concurrency: 3 parallel approvals -> exactly one 200, file ends with exactly 2 versions.
+- Browser: workbench, editor (v3 -> v4 with notice), policy dialog with active approvers.
+- Unit tests cover lock lifecycle, takeover, submit/approve/reject, and the single-winner race.
+
+---
+
+## Milestone 5 — real DOCX editing and CAD preview (verified end-to-end)
+
+### What was built
+- Document editor integration (SPEC §19): ONLYOFFICE Document Server 8.2.2 (AGPL community edition, no licence cost) self-hosted in Docker with JWT; session open/close, short-lived signed source tokens, callback endpoint with SSRF-pinned downloads (only the configured editor host, no redirects, single resolved IP), OOXML structural validation, idempotent save-event ledger, version attribution to the requester, edit-lock and approval interplay.
+- CAD pipeline (SPEC §20): separate worker process claiming `conversion_jobs` with concurrency cap, subprocess timeout and memory limit; gmsh + OpenCASCADE converts STEP/IGES to mesh derivatives; native STL/OBJ/GLB stream directly; three.js viewer with OrbitControls; honest format matrix (native / converted / licensed / unverified).
+- Migrations 0007–0009 for office session state, approval decision trail and derivative columns.
+
+### Verification (executed, all PASS)
+- DOCX: real editor in the browser, edit + save → v2 with valid DOCX bytes containing the edit and the original text; save-event ledger exactly 1 committed; audit recorded.
+- CAD: 108016-byte converted mesh with 544 triangles from a real STEP source; STL/OBJ derivative bytes byte-identical to source; DWG refused as licence-blocked; viewer canvas renders the geometry.
+
+---
+
+## Milestone 6 — collaboration (shares, favorites, search, stats, CSV)
+
+### What was built
+- Shares: create (file or folder, user or group, passive actions only, optional expiry and descendant inheritance), list received/sent, revoke. The recipient's visibility resolves through the shared scope CTE.
+- Favorites: idempotent add/remove, per-user listing with unavailable flags for deleted resources.
+- Search/stats/export: one shared visibility scope (READ-01) with folder scope (current/descendants/all), query, uploader, type and time filters; CSV with UTF-8 BOM, attachment disposition and formula-injection neutralisation.
+- Web: /workspace (sharing + favorites tabs) and /stats (aggregates + CSV export) pages.
+
+### Verification (executed, all PASS)
+- Search returns the caller's visible files; stats aggregate totals, by type, by month and by uploader; CSV downloads with a BOM and 17 rows.
+- Share create → list → revoke verified; favorites add → list → remove verified idempotent.
+
+### Plain Text fidelity (SPEC §8)
+- Preview metadata (encoding, BOM, EOL, trailing newline, truncation) is computed from raw bytes; rawBase64 carries the exact prefix so editors round-trip without normalisation. 12 byte samples verified plus a 300KB truncation case and a byte-exact save round-trip.
+
+### Brand shell (DEC-14)
+- Blue/white engineering palette, yellow folder SVG; the milestone shipped with an explicit "待入库" logo placeholder (BLK-01), which the customer-verified official asset replaced on 2026-10-09 (SPEC §18 BRAND-03: SHA-256 checked, favicon 16/32/48 + login/topbar PNG derived by `scripts/brand_assets.py`). Responsive navigation verified at 768px.
+
+### Test data hygiene
+- The redundant full-permission grant created during browser acceptance was revoked; the test workgroup was removed; clerkA/clerkB were disabled. Hard deletion of principals with audit history is blocked by foreign keys by design, so the audit chain stays intact.
+
+### Known gaps (deliberate scope)
+- Edit locks, approval workflow, sharing, favorites, full-text search, stats/CSV, DOCX/CAD: later milestones. Writes on approval-policy folders are already blocked with `E_APPROVAL_PENDING` so review can never be bypassed.
+- Seeded staff accounts still have unusable passwords; user management ships in Milestone 3.
+
+---
+
+## Milestone 7 — security and performance acceptance (2026-10-08, on target)
+
+Dataset gate (SPEC §24.2): **12/12 PASS** — `scripts/perf_dataset.sql` regenerated
+the full distribution (100,392 files / 402,564 versions / 10,000 folders depth 21 /
+5,000-file hot folder / 350 ordinary 50-file folders / 1,000-version file /
+50,305 ACLs / 20,000 shares / 100,000 favorites / edge-case names), behind a
+`current_database()='filesmanage_perf'` fail-closed guard. Read-only audit:
+`scripts/perf_readiness_audit.py`.
+
+Defects found and fixed (all verified by re-running the affected suites):
+
+| Defect | Fix |
+|---|---|
+| folder-filtered search/stats/export bypassed the visibility scope (and 500'd on a placeholder mismatch) | scope intersection; placeholder indices follow the emitted bindings |
+| folder shares ignored `include_descendants`; shares absent from `require()`/`visibleFile()` | unified share resolution across search and direct reads |
+| CSV export clamped at 200 rows and fully buffered | batched streaming export (ids → path map → 500-row PK batches) |
+| search index never written; content match was a sequential ILIKE scan | indexing pipeline (upload/save/rollback/approval) + bounded OOXML reader + tsvector GIN phrase search + snippets |
+| `domain.Snippet` mixed byte/rune indices (multibyte panic) | rune-space rewrite |
+| concurrent lock acquisition 500'd | file row lock inside the transaction (SPEC §7.2) |
+| download endpoint ignored Range | `http.ServeContent` with per-version modtime |
+| CAD worker failed on content-addressed blob conflicts (+ stale tag check) | adopt the existing blob; UPDATE's own RowsAffected |
+| non-admin export path resolution dropped the scope binding | pass the caller id (caught by the security E2E) |
+
+Performance: endpoint budgets met at 1/10 users (11/11), 10/11 at 30 sustained
+users for 15 minutes (rps 111, RSS flat, zero 5xx); search p95 over budget at 30
+users on this shared host. Bottleneck analysis and the full matrix are in
+`docs/M7-PERF-DATASET-GATE.md`; machine-readable reports under `.secrets/perf/`.
+Checks: CSV export 9/9, 10×100MB uploads 10/10, MP4 Range 10/10, Office sessions
+12/12, CAD STEP→STL verified (incl. the dedup path), backup restore drill PASS,
+security E2E 31/31, `/search` page browser-verified, viewport timings recorded.
+
+## Milestone 8 — delivery readiness (dev level, 2026-10-08)
+
+- Backup/restore drill: **PASS** (snapshot-derived media manifest; 26 tables,
+  41 immutable blobs restored to a scratch database and verified, scratch DB
+  removed). Artifacts under `.secrets/backup-drills/`.
+- Manifest unit tests: **12/12 OK** (`scripts/test_backup_manifest.py`).
+- Dev systemd units written and syntax-verified (`deploy/filesmanage-v21-*.service`);
+  not installed — production cutover remains unauthorized (BLK-05).
+- `FILESMANAGE_DB_MAX_CONNS` added as the pool capacity knob (default 10).
+- Migrations 0001–0011 applied to both databases; `migrate -check` re-verifies
+  checksums; `cmd/reindex` backfilled the business text index (35 files).
+
+## S1–S22 traceability (where each acceptance item is proven)
+
+| Item | Evidence |
+|---|---|
+| S1 login/session | TEST-EVIDENCE §M1 (+ M1 re-verification in §M7); executable re-run in `scripts/s_matrix_e2e.py` (35/35) |
+| S2 create group/members | §M3 |
+| S3 workgroup grant | §M3; executable re-run (s_matrix_e2e.py) |
+| S4 user grants union | §M3; executable re-run (s_matrix_e2e.py) |
+| S5 cross-department isolation | §M3 + §M7 security E2E; executable re-run (s_matrix_e2e.py) |
+| S6 format previews | §M2/M6 + §M7 PE09 |
+| S7 lock + version under policy | §M4 + §M7 (lock race fix) |
+| S8 approval commits | §M4 |
+| S8b append-only rollback | §M4 + `scripts/rb_rollback_e2e.py` (RB-T01–RB-T12, 72/72) |
+| S9 Chinese search + safe summary | §M7 (tsvector, snippets, totals) |
+| S10 expiry boundaries | §M3; executable re-run with a real 70s expiry (s_matrix_e2e.py) |
+| S11 org/user admin | §M3; executable re-run (s_matrix_e2e.py) |
+| S12 remote/systemd | §M8 (dev units; remote S12 pending production authorization) |
+| S13 brand/tokens/layering | §M6c + architecture check in §M7 |
+| S14 trash | §M2 |
+| S15 sharing | §M6 + §M7 (descendants, revocation immediacy) |
+| S16 favorites | §M6; executable re-run (s_matrix_e2e.py) |
+| S17 stats | §M6 + §M7 (single-pass aggregation); executable re-run (s_matrix_e2e.py) |
+| S18 CSV export | §M6 + §M7 (streaming contract 9/9); executable re-run (s_matrix_e2e.py) |
+| S19 plain text | §M6 + `scripts/pt_samples_e2e.py` (PT01–PT12, 112/112) |
+| S20 logo | 官方 Logo 已按 BRAND-03 入库（BLK-01 关闭，SHA-256 校验）；余留 VS01–VS18 远端截图签收 |
+| S21 DOCX editing | §M5 + §M7 PE10 |
+| S22 CAD preview | §M5 + §M7 PE11 + `scripts/mc_cad_e2e.py` (78/78 incl. IGES bearing/hammer) |
+
+---
+
+## DO01–DO14 traceability (DOCX editing, SPEC §19)
+
+API/callback-level items are covered by Go unit tests and the executable
+scripts; formatting-fidelity items were verified in M5 inside the real
+ONLYOFFICE editor (screenshot evidence in TEST-EVIDENCE §M5).
+
+| Item | Evidence |
+|---|---|
+| DO01 edit → valid DOCX, old SHA unchanged | M5 real-editor E2E (v2 bytes re-opened, original text intact); `office_session_check.py` (12/12) |
+| DO02 bold/italic/size/color/underline fidelity | M5 real-editor verification (ONLYOFFICE native formatting) |
+| DO03 lists/alignment/heading changes | M5 real-editor verification |
+| DO04 tables and images survive edits | M5 real-editor verification |
+| DO05 header/footer/pagination compatibility report | **PASS** — `scripts/do05_header_footer_check.py` (15/15): header/footer/page-break survive the real status-2 commit path |
+| DO06 long document + concurrent readers | `office_session_check.py` (5/10-session runs); PE10 measurements |
+| DO07 A edits while B reads the committed version | M5 + `TestEditLockLifecycle`/`TestLockExpiryTakeover` |
+| DO08 close and force-save callbacks, no duplicate versions | `TestEditorCallbackIdempotencyAndConflict` |
+| DO09 callback replay/restart/bad signature | `TestJWTRejectsTampering` + `TestEditorCallbackIdempotencyAndConflict` |
+| DO10 approval-directory save → pending, preview stays old | M4 `TestApprovalWorkflow` + `s_matrix_e2e.py` |
+| DO11 rejection leaves the current version, lock recovers | M4 `TestApprovalRejectKeepsCurrentVersion` |
+| DO12 late callback after delete/revoke/version change | `TestEditorCallbackIdempotencyAndConflict` (conflict paths) + `m7_security_e2e.py` revocation immediacy |
+| DO13 forged URL / redirect / ZIP bomb | `TestJWTRejectsTampering`, source-token rejection tests, SSRF-pinned download host (code-level, M5) |
+| DO14 two tabs / lock expiry / save retry, no double commit | `TestEditorCallbackIdempotencyAndConflict` + idempotency replay pattern proven in `rb_rollback_e2e.py` |
+
+## AG01–AG16 traceability (architecture gate, SPEC §23)
+
+| Item | Evidence |
+|---|---|
+| AG01/02 domain free of Gin/pgx; application free of the postgres adapter | `scripts/check_architecture.py` import-graph scan (71 Go files) |
+| AG03 no SQL in handlers | same scan |
+| AG04 shared does not import pages | same scan (41 TS modules) |
+| AG05 services unit-testable with fakes | the whole `go test ./...` suite runs on `memoryRepo` without HTTP or PostgreSQL |
+| AG06 repo integration tests on isolated PostgreSQL | `scripts/integration_acl.sql`, `scripts/integration_versions.sql`, perf-DB drills |
+| AG07 multi-table transaction rollback | service tests + integration SQL |
+| AG08 staged blob + DB failure leaves no ghost | staging protocol (TX-06) + `perf_upload_stress.py` (staging directory empty, no orphans) |
+| AG09 crash between commit and rename recovers | staging/reconciliation protocol; M2 evidence |
+| AG10 approval vs rollback concurrency, one winner | `TestApprovalWorkflow` single-winner + `rb_rollback_e2e.py` |
+| AG11 share revocation visible on the next request | `m7_security_e2e.py` (31/31, revocation immediacy) |
+| AG12 CAD worker saturation vs login/list p95 | `scripts/pe12_cad_saturation.py` (final re-run 2026-10-09: 7/7 PASS, ratios x0.93–x1.14 with the perf instance stopped; one failing run traced to perf-instance baseline contamination) |
+| AG13 editor disconnect recovery via TTL + callback | office session lifecycle tests + TTL design |
+| AG14 stale frontend requests never overwrite | PT10 A/B 409 in `pt_samples_e2e.py`; request-key/cursor fixes from M2 |
+| AG15 new APIs traceable to use cases | `docs/openapi-implemented.yaml` + the S/RB-T/PT/MC matrices above |
+| AG16 injected cross-layer import fails CI | `check_architecture.py` negative rule self-tests (fail-closed) |
+
+
+---
+
+## Final full-gate re-run and OpenAPI delivery (2026-10-09, commit 1b91ba7)
+
+Scope: re-execute every acceptance gate on the target against the live
+services, and close the last contract gap.
+
+- **OpenAPI contract delivered.** `docs/openapi-implemented.yaml` documented
+  7 routes while the router served 66. `scripts/gen_openapi.py` now derives
+  the contract from the implemented route table and handler payload builders:
+  50 paths, 66 operations, 46 component schemas, session/JWT/source-token
+  security schemes, the SPEC 5.3 error envelope on every >=400 response, and
+  per-operation admin-only / mustChangePassword semantics. `--check` fails on
+  drift so the contract cannot silently diverge from the router.
+- **All gates re-executed and green** (details and numbers in TEST-EVIDENCE.md
+  "Final full-gate re-run"): architecture 71 Go / 41 TS; `go test ./...`;
+  migration contract; unauth smoke 17/17; security E2E 31/31; S matrix 35/35;
+  rollback 72/72; PT fidelity 112/112; CAD matrix 78/78; DO05 15/15; dataset
+  gate 12/12; CSV export 9/9 (100,433 rows, TTFB 1548 ms); 10×100 MB uploads
+  10/10; MP4 Range 10/10; office sessions 12/12; PE12 7/7; backup/restore
+  drill PASS (26 tables, 384 blobs) + manifest 12/12; loadtest 11/11 at 10
+  users.
+- **PE12 contamination found and documented.** The first re-run of the
+  saturation gate failed (x1.64) because the loopback perf instance was
+  running concurrently and sharing CPU/PostgreSQL; with it stopped the same
+  script measures x0.93–x1.14. Latency gates must run with the perf instance
+  stopped — now recorded in TEST-EVIDENCE and OPEN-BLOCKERS (BLK-10).
+- **100-user capacity fact re-confirmed** (BLK-07): the shared PostgreSQL
+  instance (max_connections=100, other projects attached) bounds concurrency;
+  this is a capacity/environment constraint, not a code defect, and is the
+  only reason G-PERF stays PARTIAL.
+
+No gate was carried over on trust from earlier runs; every number above comes
+from a command executed during this pass on 203.0.113.10.
+
+---
+
+## Acceptance matrix ledger (2026-10-09)
+
+The SPEC declares 126 acceptance ids. Until now evidence was tracked per
+suite ("57/57", "31/31"), which could not answer "which id is covered by
+what". `scripts/gen_acceptance_matrix.py` now emits
+`docs/ACCEPTANCE-MATRIX.md`: every declared id with its SPEC wording, a
+status and a concrete evidence reference — 101 PASS / 24 PARTIAL / 1 EXTERNAL.
+
+The value is in what it exposed rather than what it confirmed. Cross-checking
+each id against the actual code found real gaps that the suite-level counts
+hid: the model viewer has no MTLLoader and parses multi-file glTF with an
+empty resource path (MC06/MC07), no unit hints or measurement labels
+(MC05/MOD03-05), no reset/fit/axes/projection controls or WebGL-failure
+handling (MOD01/MOD07), the STEP converter emits one merged mesh so there is
+no assembly tree (MC02/MOD02), and the rollback/concurrency/crash-recovery
+edge cases plus several CAD negative paths have only construction-level
+guarantees (RB-T06-08/10/11, AG09, MC04/14/16/17, MOD10).
+
+All 24 are registered as BLK-11..BLK-16 (S12 folded into BLK-05, S20 into
+BLK-01), and the gate fails the build on an unmapped id, matrix drift, or an
+unregistered PARTIAL — so the gaps can no longer rot silently. Both this gate
+and the OpenAPI drift gate run inside `scripts/build.sh`.
+
+---
+
+## BLK-14 closed: viewer control surface (2026-10-09)
+
+The acceptance matrix's first actionable gap was the model viewer's control
+surface. `web/src/pages/ModelViewer.tsx` now implements, and
+`scripts/mod01_controls_check.mjs` verifies through the real page over CDP:
+
+- reset/fit framing that flushes OrbitControls damping residue first — the
+  check caught that a naive `camera.position.set()` reset was immediately
+  dragged away by the residual `sphericalDelta`, so the naive version really
+  did not work;
+- axes helper and grid toggles (aria-pressed + pixel-hash change, reversible);
+- perspective/orthographic camera swap with rebound controls;
+- a `webglcontextlost` listener that surfaces an actionable error plus a
+  download entry instead of a frozen canvas;
+- a 256 MB inline guard on the derivative response (fault-injected via the
+  Fetch domain in the check) that refuses to buffer and offers the download.
+
+10/10 checks pass; MOD01 and MOD07 moved to PASS in the acceptance matrix
+(103 PASS / 22 PARTIAL / 1 EXTERNAL) and BLK-14 is struck from the blocker
+list. Full `npm run build` (tsc + vite) re-run green.
+
+
+---
+
+## BLK-16 closed: CAD negative paths, and a real defect they exposed (2026-10-09)
+
+Adding the missing negative-path assertions to `scripts/mc_cad_e2e.py`
+immediately paid for itself: a malformed IGES and a truncated STEP both
+converted to `state=ready` with a 47-byte **empty** STL, because gmsh exits 0
+on unreadable geometry and still writes a valid-but-empty mesh while the
+worker only checked `Size() == 0`. MC04 explicitly forbids exactly this
+("clear error, not an empty view"). `cmd/worker` now verifies the STL output
+really contains facets (binary count at offset 80 / `facet` keywords) and
+fails the derivative with `CONVERT_FAILED`.
+
+With that fixed, the negative-path matrix passes 78/78: malformed input fails
+loudly and serves no mesh bytes; five concurrent conversion requests converge
+on one derivative id; a save under an approval policy pends while the
+derivative keeps the checked-in version's digest *and bytes*, then rebinds
+after approval; a glTF referencing an external texture URL is served natively
+and byte-identical with no worker job (the server never fetches textures); a
+traversal/quote filename is refused at upload; and a corrupt zip is never
+extracted server-side. MC04/MC14/MC16/MC17/MOD10 move to PASS (108 PASS / 17
+PARTIAL / 1 EXTERNAL) and BLK-16 is struck.
+
+---
+
+## BLK-12 closed: multi-resource models, and a pagination bug they exposed (2026-10-09)
+
+Multi-resource models (OBJ+MTL+textures, glTF+.bin+textures) reference their
+companions by relative name, and in this system every companion is a separate
+file in the same folder. `ModelViewer` now resolves those references through a
+`siblingResolver` that lists the folder once and installs a
+`LoadingManager.setURLModifier` callback — MTLLoader for OBJ `mtllib`,
+GLTFLoader for glTF. Absolute http(s) URLs are refused with a same-origin
+miss, so the viewer never becomes a fetch surface for attacker-controlled
+texture URLs (the MC17 property is preserved by construction).
+
+`scripts/mc_multiasset_check.mjs` builds the samples, uploads each companion
+as its own file and verifies over CDP: OBJ+MTL+PNG renders 12 triangles with
+both companions fetched through the API, glTF+.bin+PNG renders 1 triangle
+with both companions fetched, two-part 3MF renders 24 triangles, no request
+leaves for an external host, and no page raises an error — 15/15.
+
+The work immediately exposed a second real defect: the new resolver's
+`limit=200` list request was answered **400 E_BAD**, i.e. the documented
+maximum page size did not work. The service asks the repository for page+1
+lookahead rows while the PostgreSQL guard rejected anything above 200, so a
+200-page (201 internally) was refused. Fixed with a shared
+`ports.MaxFilePage` constant, a Go boundary test and HTTP-level checks in
+`s_matrix_e2e.py` (200/201/5000 all honoured, 35/35). The same pass corrected
+the generated OpenAPI contract, which had documented the wrong sort enums.
+
+MC06/MC07/MC09 move to PASS (111 PASS / 14 PARTIAL / 1 EXTERNAL); BLK-12 is
+struck. Regressions re-run: mod01 10/10, PE15 PASS, mc_cad 78/78,
+`go test ./...` + vet green.
+
+---
+
+## BLK-13 closed: model metadata panel, honest units, approximate dimensions (2026-10-09)
+
+The viewer published only triangle/vertex counts, so a user could easily read a
+unit-less mesh as millimetres and the system could not state what it actually
+knew about a model. It now renders a metadata panel — 来源格式, 版本, 源 SHA,
+尺寸, 组件数, 派生 SHA and the format-matrix warning — and
+`scripts/mod03_meta_check.mjs` verifies every field against the API on three
+samples with exactly known geometry (unit STL cube, two-cube 3MF declaring
+millimetre, one-triangle glTF): 30/30.
+
+Two honesty rules are now enforced by construction and asserted by the check:
+mesh formats report 未知单位（不按毫米计算） — only a 3MF's declared unit is
+shown — and every dimension readout carries 近似（三角化网格）, so the system
+never claims B-Rep precision it does not have (MOD04/MOD05). Component counts
+are computed from the parsed scene (a converted STEP honestly reports 1, the
+two-part 3MF reports 2).
+
+MC05/MOD03/MOD04/MOD05 move to PASS (115 PASS / 10 PARTIAL / 1 EXTERNAL);
+BLK-13 is struck. Regressions re-run: mod01 10/10, multi-asset 15/15, PE15
+PASS, `go test ./...` green.
+
+---
+
+## BLK-15 closed: rollback edges, and the crash-recovery sweep they needed (2026-10-09)
+
+`scripts/rb_rollback_e2e.py` grew from 27 to 72 checks, closing the
+concurrency/approval intersection of append-only rollback: three racing
+rollback requests produce exactly one committed version with a gap-free seq
+series (RB-T06); a rollback under an approval policy pends without creating a
+version, keeps serving the old current version to download and search, and
+appends exactly one `action=rollback` version only after approval (RB-T07);
+rejections, duplicate decisions and stale bases never move the version count
+(RB-T08); rollback restores byte-exact content across plain UTF-8, BOM, CRLF,
+DOCX and STEP with the search index pointing at the new current (RB-T10); and
+history plus the shared content-addressed blob survive (RB-T11).
+
+AG09 needed a mechanism, not just a test. `CommitUpload` already stages,
+renames into the content-addressed ready location and only then commits the
+database row — the safe order — but a crash before that commit left a staging
+file behind forever. `Store.SweepStaging` now removes staging files older
+than an hour at startup (in-flight uploads of a concurrent process survive),
+and `scripts/ag09_recovery_drill.py` proves it: a planted two-hour-old orphan
+is swept, a fresh staging file is preserved, and a committed upload remains
+readable after the restart — 4/4.
+
+RB-T06/07/08/10/11 and AG09 move to PASS (121 PASS / 4 PARTIAL / 1
+EXTERNAL); BLK-15 is struck. Regressions re-run: `go test ./...`, vet and the
+architecture gate green.
+
+---
+
+## BLK-11 closed: STEP assembly recovered from the mesh (2026-10-09)
+
+The converter emitted a single merged STL, so a multi-solid STEP could only be
+viewed as one blob. Two experiments shaped the fix: gmsh on this target
+rejects OBJ and PLY output outright (the usual group-preserving routes are
+closed), while MSH 2.2 keeps shared node indices — and gmsh's per-solid
+triangle sets are exactly the connected components of that node graph, so the
+assembly can be recovered without any CAD-side assembly export.
+
+`cmd/worker` now writes MSH 2.2 for converted formats (`outputKind: msh`, with
+the empty-mesh guard generalised to count MSH triangles), and the viewer's
+`parseMsh` clusters triangles through a union-find over node tags, emitting one
+named part per component plus a part tree with per-part visibility, selection
+highlight, restore-all and per-part bounding boxes. Legacy STL derivatives and
+native formats are untouched.
+
+`scripts/mc02_assembly_check.mjs` proves it end-to-end (8/8) with a two-solid
+STEP built by gmsh: the tree shows 组件 1 / 组件 2 with the true bounding boxes
+(10.00x10.00x10.00 and 5.00x5.00x5.00) and triangle counts (260 / 84), hiding
+a part changes the composited frame, restore-all returns the exact original
+frame hash, and selecting a part highlights it.
+
+MC02/MOD02 move to PASS (123 PASS / 2 PARTIAL / 1 EXTERNAL); BLK-11 is struck
+and **no implementable code gap remains** — the two PARTIAL ids (S12, S20) are
+customer-input items already registered under BLK-05/BLK-01. Regressions
+re-run: mc_cad 78/78, mod01 10/10, multi-asset 15/15, MOD03 30/30, PE15 PASS,
+rb_rollback 72/72, `go test ./...`, vet and the architecture gate green.

@@ -1,0 +1,24 @@
+/* Native filename-only drag image; the original table never appears as a
+   ghost. Relative layout follows RareUI tokens, independent of row width. */
+.file-drag-ghost{
+ position:fixed;top:4px;left:4px;z-index:2147483647;pointer-events:none;
+ display:flex;align-items:center;gap:10px;
+ width:max-content;max-width:min(320px,75vw);min-height:42px;
+ padding:0 14px;border:1px solid var(--border-selected);
+ border-radius:var(--radius-lg);
+ background:var(--surface-panel);color:var(--text-primary);
+ box-shadow:0 18px 45px rgba(14,35,65,.18),0 4px 12px rgba(14,35,65,.12);
+ font-size:13px;font-weight:650;letter-spacing:.005em;
+ white-space:nowrap;overflow:hidden;
+}
+.file-drag-ghost-name{min-width:0;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-drag-ghost-count{flex:none;border-radius:var(--radius-pill);padding:2px 7px;background:var(--surface-row-selected);color:var(--brand-blue);font-size:11px;font-weight:700;line-height:1.5}
+.table tbody tr.drag-source{opacity:.52;transform:translateX(3px);transition:opacity .16s ease,transform .24s cubic-bezier(.2,.75,.25,1)}
+.table tbody tr.drag-source .file-name{font-weight:700}
+/* During the gesture the source row also reduces to its file label; hidden
+   cells retain column geometry, preventing the table from jumping. */
+.table tbody tr.drag-source td:not(.col-name){visibility:hidden}
+.table tbody tr.drag-source .file-mobile-meta,.table tbody tr.drag-source .file-mobile-actions{visibility:hidden}
+@media(prefers-reduced-motion:reduce){
+ .table tbody tr.drag-source{transform:none;transition:none}
+}

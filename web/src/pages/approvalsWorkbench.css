@@ -1,0 +1,14 @@
+/* Two independently deep workflows, one URL-addressable compact Rare UI view
+   switch. Keep the existing approval list + side inspector untouched. */
+.approval-root{min-width:0;min-height:0}
+.approval-root-switch{display:flex;align-items:center;gap:8px;flex:none;min-width:0;min-height:43px;padding:5px 9px;background:var(--surface-panel);border-bottom:1px solid var(--border-hairline)}
+.approval-root-nav{flex:none}
+.approval-root-nav [data-slot="gooey-nav-segment"]{height:32px;min-height:32px}
+.approval-root-nav [data-slot="gooey-nav-item"]{height:32px;min-height:32px;font-size:12px;padding:0 12px}
+.approval-root-stage{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;overflow:hidden}
+.approval-root-stage>.approval-page{flex:1;min-height:0}
+.approval-root-stage>.seal-library-container{flex:1;min-width:0;min-height:0;overflow:auto}
+@media(max-width:600px){
+ .approval-root-switch{padding:4px 6px;min-height:41px}
+ .approval-root-nav [data-slot="gooey-nav-item"]{font-size:11px;padding:0 10px}
+}

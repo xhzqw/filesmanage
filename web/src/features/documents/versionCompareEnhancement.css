@@ -1,0 +1,19 @@
+.file-compare-toolbar{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;min-width:0;padding:7px 0 12px;margin-bottom:8px;border-bottom:1px solid var(--border-hairline)}
+.file-compare-toolbar .file-compare-controls{display:flex;align-items:center;flex-wrap:nowrap;gap:7px;min-width:0}
+.file-compare-toolbar .file-compare-controls label{min-width:0;display:flex;flex-direction:row;align-items:center;gap:5px;white-space:nowrap;color:var(--text-secondary);font-size:11px}
+.file-compare-toolbar .file-compare-controls .rare-select{min-width:73px;max-width:105px}
+.file-compare-toolbar .file-compare-arrow{font-size:12px}
+.file-compare-summary{display:flex;align-items:center;gap:9px;min-width:0;font-size:11px;color:var(--text-secondary);font-variant-numeric:tabular-nums}
+.file-compare-summary strong{font-weight:650;color:var(--text-primary)}
+.file-compare-quicknav{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-left:auto}
+.file-compare-quicknav .rare-button{min-height:29px;height:29px;padding-inline:9px;font-size:11px}
+.file-compare-quicknav .rare-button[aria-pressed="true"]{color:var(--brand-blue);background:var(--surface-row-selected)}
+.file-compare-feedback{display:flex;align-items:center;gap:12px;min-height:42px;margin:0;padding:8px 3px;font-size:12px;color:var(--text-secondary)}
+.file-compare-failed{color:var(--status-danger);flex-wrap:wrap}
+.file-compare-failed .rare-button{min-height:28px}
+.file-diff-fold{display:block;padding:6px 12px;text-align:center;font-size:11px;color:var(--text-secondary);background:var(--surface-subtle);border-top:1px solid var(--border-hairline);border-bottom:1px solid var(--border-hairline)}
+.file-diff-line.active-change{outline:2px solid var(--brand-blue);outline-offset:-2px}
+.file-compare-hashes{display:flex;flex-wrap:wrap;gap:6px 20px;padding:8px;color:var(--text-secondary);font-size:11px;min-width:0}
+.file-compare-hashes>span{display:flex;flex-direction:column;min-width:0}
+.file-compare-hashes code{font-size:10px;word-break:break-all;user-select:text}
+@media(max-width:900px){.file-compare-quicknav{margin-left:0}}

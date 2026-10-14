@@ -1,0 +1,244 @@
+package httpx
+
+import (
+	"context"
+	"filesmanage/internal/application"
+	"filesmanage/internal/domain"
+	"golang.org/x/net/websocket"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+)
+
+type replayStore struct{ events []domain.RealtimeEvent }
+
+func (r replayStore) RealtimeBounds(context.Context) (int64, int64, error) {
+	if len(r.events) == 0 {
+		return 0, 0, nil
+	}
+	return r.events[0].ID, r.events[len(r.events)-1].ID, nil
+}
+func (r replayStore) RealtimeAfter(_ context.Context, userID string, cursor int64, limit int) ([]domain.RealtimeEvent, error) {
+	var out []domain.RealtimeEvent
+	for _, e := range r.events {
+		if e.ID > cursor {
+			out = append(out, e)
+			if len(out) == limit {
+				break
+			}
+		}
+	}
+	return out, nil
+}
+
+func TestWebSocketSameOriginSecurity(t *testing.T) {
+	for _, tc := range []struct {
+		name, origin, host, peer, proto string
+		want                            bool
+	}{
+		{"HTTP same origin", "http://203.0.113.10:18091", "203.0.113.10:18091", "203.0.113.40:5000", "", true},
+		{"HTTPS via Nginx", "https://203.0.113.1:18443", "203.0.113.1:18443", "127.0.0.1:5000", "https", true},
+		{"other LAN origin", "http://203.0.113.30:18091", "203.0.113.10:18091", "203.0.113.40:5000", "", false},
+		{"missing origin", "", "203.0.113.10:18091", "203.0.113.40:5000", "", false},
+		{"null origin", "null", "203.0.113.10:18091", "203.0.113.40:5000", "", false},
+		{"scheme downgrade", "http://203.0.113.1:18443", "203.0.113.1:18443", "127.0.0.1:5000", "https", false},
+		{"spoofed forwarding from LAN", "https://203.0.113.10:18091", "203.0.113.10:18091", "203.0.113.40:5000", "https", false},
+		{"wrong port", "http://203.0.113.10:18092", "203.0.113.10:18091", "203.0.113.40:5000", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := httptest.NewRequest("GET", "http://"+tc.host+"/api/events/ws", nil)
+			r.RemoteAddr = tc.peer
+			r.Header.Set("Origin", tc.origin)
+			r.Header.Set("X-Forwarded-Proto", tc.proto)
+			if got := websocketSameOrigin(r); got != tc.want {
+				t.Fatalf("origin check=%v want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestWebSocketHandshakeAndSessionGate(t *testing.T) {
+	t.Setenv("FILESMANAGE_LAN_ALLOW_CIDRS", "127.0.0.1/32")
+	svc := application.New(authGateTestUOW{user: domain.User{ID: "u_1", Login: "user1"}}, nil)
+	server := httptest.NewServer(New(svc, false, t.TempDir()))
+	defer server.Close()
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/api/events/ws"
+
+	request := func(origin string, cookie bool) (*websocket.Conn, error) {
+		config, err := websocket.NewConfig(wsURL, origin)
+		if err != nil {
+			return nil, err
+		}
+		if cookie {
+			config.Header.Set("Cookie", "fm_session=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+		}
+		return websocket.DialConfig(config)
+	}
+	if conn, err := request("http://attacker.example", true); err == nil {
+		conn.Close()
+		t.Fatal("cross-origin cookie WebSocket accepted")
+	}
+	if conn, err := request(server.URL, false); err == nil {
+		conn.Close()
+		t.Fatal("anonymous WebSocket accepted")
+	}
+	conn, err := request(server.URL, true)
+	if err != nil {
+		t.Fatalf("valid WebSocket rejected: %v", err)
+	}
+	defer conn.Close()
+	if err := conn.SetReadDeadline(time.Now().Add(3 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	var payload struct {
+		Type             string `json:"type"`
+		Version          int    `json:"version"`
+		Resync           bool   `json:"resync"`
+		HeartbeatSeconds int    `json:"heartbeatSeconds"`
+	}
+	if err := websocket.JSON.Receive(conn, &payload); err != nil {
+		t.Fatalf("reading greeting: %v", err)
+	}
+	if payload.Type != "connection.ready" || payload.Version != 2 || !payload.Resync || payload.HeartbeatSeconds <= 0 {
+		t.Fatalf("unexpected greeting: %+v", payload)
+	}
+
+	resp, err := http.Get(server.URL + "/api/events/ws")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("missing-origin HTTP request returned %d", resp.StatusCode)
+	}
+}
+
+func TestDurableWebSocketCursorReplayAndGapReconciliation(t *testing.T) {
+	t.Setenv("FILESMANAGE_LAN_ALLOW_CIDRS", "127.0.0.1/32")
+	events := replayStore{events: []domain.RealtimeEvent{
+		{ID: 11, Type: "workspace.changed", Scopes: []string{"file"}},
+		{ID: 12, Type: "workspace.changed", Scopes: []string{"folder"}},
+		{ID: 13, Type: "session.changed"},
+	}}
+	svc := application.New(authGateTestUOW{user: domain.User{ID: "u_1", Login: "user1"}}, nil).WithDurableEvents(events)
+	server := httptest.NewServer(New(svc, false, t.TempDir()))
+	defer server.Close()
+	connect := func(cursor string) *websocket.Conn {
+		t.Helper()
+		url := "ws" + strings.TrimPrefix(server.URL, "http") + "/api/events/ws?cursor=" + cursor
+		config, err := websocket.NewConfig(url, server.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		config.Header.Set("Cookie", "fm_session=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+		conn, err := websocket.DialConfig(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := conn.SetReadDeadline(time.Now().Add(3 * time.Second)); err != nil {
+			t.Fatal(err)
+		}
+		return conn
+	}
+	read := func(c *websocket.Conn) map[string]any {
+		t.Helper()
+		var payload map[string]any
+		if err := websocket.JSON.Receive(c, &payload); err != nil {
+			t.Fatal(err)
+		}
+		return payload
+	}
+	conn := connect("11")
+	first := read(conn)
+	if first["version"] != float64(3) || first["resync"] != false || first["cursor"] != "11" {
+		t.Fatalf("unexpected durable hello: %+v", first)
+	}
+	second := read(conn)
+	third := read(conn)
+	if second["type"] != "workspace.changed" || second["cursor"] != "12" ||
+		third["type"] != "session.changed" || third["cursor"] != "13" {
+		t.Fatalf("durable replay out of order: %+v %+v", second, third)
+	}
+	conn.Close()
+	// A bookmark older than the retained floor must never pretend that
+	// an incomplete replay represents a complete current state.
+	conn = connect("8")
+	defer conn.Close()
+	gap := read(conn)
+	if gap["version"] != float64(3) || gap["resync"] != true || gap["cursor"] != "13" {
+		t.Fatalf("retention gap not reconciled: %+v", gap)
+	}
+}
+
+func TestReplayCursorExpiryOnRetentionOrDatabaseRestore(t *testing.T) {
+	cases := []struct {
+		name                   string
+		cursor, oldest, newest int64
+		expired                bool
+	}{
+		{"normal cursor", 11, 10, 14, false},
+		{"last pruned cursor", 10, 11, 14, false},
+		{"too old", 9, 11, 14, true},
+		{"future after restore", 99, 11, 14, true},
+		{"fully pruned", 4, 11, 10, true},
+		{"new journal empty", 0, 0, 0, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := replayCursorExpired(tc.cursor, tc.oldest, tc.newest); got != tc.expired {
+				t.Fatalf("cursor=%d oldest=%d newest=%d expired=%v want=%v", tc.cursor, tc.oldest, tc.newest, got, tc.expired)
+			}
+		})
+	}
+}
+
+func TestCompactLiveBatchPreservesCursorsAndSecurityBoundaries(t *testing.T) {
+	journal := []domain.RealtimeEvent{
+		{ID: 10, Type: "workspace.changed", Scopes: []string{"file", "search"}},
+		{ID: 11, Type: "workspace.changed", Scopes: []string{"file", "stats"}},
+		{ID: 12, Type: "workspace.changed", Scopes: []string{"folder", "permissions"}},
+		{ID: 13, Type: "session.changed"},
+		{ID: 14, Type: "workspace.changed", Scopes: []string{"review"}},
+		{ID: 15, Type: "workspace.changed", Scopes: []string{"unrecognized.extension"}},
+		{ID: 16, Type: "workspace.changed", Scopes: []string{"lifecycle"}},
+		{ID: 17, Type: "approval.changed"},
+		{ID: 18, Type: "workspace.changed", Scopes: []string{"file"}},
+	}
+	result := compactLiveBatch(journal)
+	if len(result) != 7 {
+		t.Fatalf("grouped frames=%d want 7: %+v", len(result), result)
+	}
+	for i, want := range []struct {
+		id       int64
+		typeName string
+	}{
+		{12, "workspace.changed"}, {13, "session.changed"},
+		{14, "workspace.changed"}, {15, "workspace.changed"},
+		{16, "workspace.changed"}, {17, "approval.changed"},
+		{18, "workspace.changed"},
+	} {
+		if result[i].ID != want.id || result[i].Type != want.typeName {
+			t.Fatalf("frame[%d] = %+v want id=%d type=%s", i, result[i], want.id, want.typeName)
+		}
+	}
+	if got := result[0].Scopes; len(got) != 5 ||
+		got[0] != "file" || got[1] != "search" || got[2] != "stats" ||
+		got[3] != "folder" || got[4] != "permissions" {
+		t.Fatalf("scope union incorrect: %v", got)
+	}
+	if journal[0].ID != 10 || len(journal[0].Scopes) != 2 {
+		t.Fatalf("compaction mutated durable store input: %+v", journal[0])
+	}
+	// Extremely high event rates cannot grow the outbound socket queue: a
+	// full replay page of identical file updates becomes one invalidation.
+	many := make([]domain.RealtimeEvent, 128)
+	for i := range many {
+		many[i] = domain.RealtimeEvent{ID: int64(i + 1), Type: "workspace.changed", Scopes: []string{"file"}}
+	}
+	merged := compactLiveBatch(many)
+	if len(merged) != 1 || merged[0].ID != 128 || len(merged[0].Scopes) != 1 {
+		t.Fatalf("128-event replay page not reduced to one monotonic hint: %+v", merged)
+	}
+}

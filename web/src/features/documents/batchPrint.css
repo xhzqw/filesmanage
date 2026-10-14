@@ -1,0 +1,19 @@
+.batch-print-dialog{width:min(780px,calc(100vw - 30px));max-width:780px}
+.batch-print-layout{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(220px,.85fr);gap:16px;margin:12px 0}
+.batch-print-files{min-width:0;max-height:min(52vh,420px);overflow:auto;border:1px solid var(--border-hairline);border-radius:var(--radius-md)}
+.batch-print-count{position:sticky;top:0;z-index:1;background:var(--surface-header);color:var(--text-secondary);padding:10px 12px;font-size:12px;border-bottom:1px solid var(--border-hairline)}
+.batch-print-files .batch-print-row{width:100%;display:flex;align-items:center;justify-content:flex-start;gap:8px;min-width:0;text-align:left;border-radius:var(--radius-xs);padding:8px 10px}
+.batch-print-files .batch-print-row.active{background:var(--surface-row-selected)}
+.batch-print-index{color:var(--text-tertiary);font-variant-numeric:tabular-nums;min-width:15px;font-size:11px}
+.batch-print-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.batch-print-state{font-size:11px;color:var(--text-tertiary)}
+.batch-print-state.opened{color:var(--status-success)}
+.batch-print-state.failed{color:var(--status-danger)}
+.batch-print-settings{min-width:0;display:flex;flex-direction:column;gap:10px}
+.batch-print-current{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.batch-print-settings label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600}
+.batch-print-settings label.batch-print-mark{flex-direction:row;align-items:center;gap:7px}
+.batch-print-note,.batch-print-result{font-size:12px;line-height:1.5;color:var(--text-tertiary);margin:0}
+.batch-print-result{color:var(--text-secondary)}
+.batch-print-navigation{display:flex;gap:8px;margin-top:auto}
+@media(max-width:610px){.batch-print-layout{grid-template-columns:1fr}.batch-print-files{max-height:190px}}

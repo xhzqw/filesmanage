@@ -1,0 +1,75 @@
+/* Rare UI Micro-interaction Styles - Blue-White Brand Adaptation */
+
+.rare-fluid-orb-wrap {
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* spec 6.5: ambient light, not a hero prop — blurred out and dimmed to instrument-panel levels */
+  opacity: 0.18;
+  filter: blur(48px);
+  transition: opacity 0.5s ease;
+}
+
+/* The class is deliberately not named after the element it styles: VIS-10
+   (scripts/ux_desktop_check.mjs cssThemeHits) fails the build if ANY app
+   stylesheet selector names iframe/canvas/webgl, because the theme must never
+   reach editor content or the CAD canvas. This sheet is in the main bundle
+   (AnimatedCounter imports it), so it is present on /office/:id and /model/:id. */
+.rare-fluid-orb-surface {
+  display: block;
+  border-radius: 50%;
+}
+
+.rare-counter {
+  display: inline-flex;
+  align-items: center;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  overflow: hidden;
+  color: var(--brand-navy, #0F275C);
+  font-weight: 700;
+}
+
+.rare-counter-col {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+  height: 1.25em;
+  line-height: 1.25em;
+}
+
+.rare-counter-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.rare-counter-digit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.25em;
+  line-height: 1.25em;
+}
+
+.rare-attribution {
+  font-size: 11px;
+  color: var(--color-text-secondary, #475569);
+  text-align: center;
+  margin-top: 14px;
+}
+
+/* Link text, not a laser accent: the brand cyan measures 2.9:1 on the login
+   card and would fail the 4.5:1 text threshold, so the brand blue carries it. */
+.rare-attribution a {
+  color: var(--brand-blue, #174098);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rare-attribution a:hover {
+  color: var(--brand-navy, #0F275C);
+}

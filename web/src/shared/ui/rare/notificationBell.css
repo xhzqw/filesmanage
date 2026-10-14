@@ -1,0 +1,6 @@
+.rare-notification-bell{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:none;width:30px;min-width:30px;height:30px;min-height:30px;padding:0;border:1px solid transparent;border-radius:var(--radius-md);background:transparent;color:var(--text-secondary)}
+.rare-notification-bell:hover,.rare-notification-bell[aria-expanded="true"]{background:var(--surface-row-hover);color:var(--brand-blue)}
+.rare-notification-bell-badge{position:absolute;top:-3px;right:-6px;display:grid;place-items:center;min-width:17px;height:16px;padding:0 3px;border-radius:var(--radius-pill);background:var(--status-danger);color:var(--text-inverse);font-weight:700;font-size:10px;line-height:16px;pointer-events:none;font-variant-numeric:tabular-nums}
+.rare-notification-bell[data-unread="true"] .rare-notification-bell-badge:empty{min-width:7px;width:7px;height:7px;padding:0;top:1px;right:1px}
+.rare-notification-bell-number{display:block;white-space:nowrap}
+@media(prefers-reduced-motion:reduce){.rare-notification-bell{transition:none}}

@@ -1,0 +1,13 @@
+.secrets/
+.blobs/
+.env
+node_modules/
+web/dist/
+*.test
+
+.bin/
+scripts/__pycache__/
+.blobs-perf/
+scripts/__pycache__/
+.blobs-perf/
+.stepcode/

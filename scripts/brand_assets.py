@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""Regenerate the derived brand assets from the verified official logo source.
+
+SPEC v2.1 §18: the customer-delivered JPEG stays byte-identical at
+web/public/assets/brand/logo-source.jpg (sha256 b307a0ab...4592c21, BRAND-02);
+every derived PNG is an explicit, replayable conversion of that source — no
+redraw. The website logo retains its original white matte; favicons and the
+full-resolution loading mark are transparent. Running
+this script re-verifies the source hash, regenerates the derived files and
+rewrites the BRAND-ASSETS.md manifest (BRAND-08, BG05).
+
+Usage: python3 scripts/brand_assets.py   (macOS; conversion uses sips)
+"""
+from __future__ import annotations
+
+import hashlib
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+BRAND_DIR = ROOT / "web" / "public" / "assets" / "brand"
+SOURCE = BRAND_DIR / "logo-source.jpg"
+MANIFEST = BRAND_DIR / "BRAND-ASSETS.md"
+SOURCE_SHA256 = "b307a0ab8ecdbd365afc75b322f97efb1b67777530d49bd7339dd17fa4592c21"
+
+# (derived file, sips resample long edge in px, purpose)
+DERIVED = [
+    ("favicon-16.png", 16, "browser tab favicon (BRAND-04)"),
+    ("favicon-32.png", 32, "browser tab favicon, high-density (BRAND-04)"),
+    ("favicon-48.png", 48, "browser tab favicon, largest declared size (BRAND-04)"),
+    ("logo-256.png", 256, "login page and topbar brand mark (BRAND-04)"),
+    ("logo-loader-256.png", 256, "full-resolution transparent loader mark (BRAND-04)"),
+]
+
+
+def fail(message: str) -> None:
+    print(f"BRAND ASSETS FAIL: {message}")
+    sys.exit(1)
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 16), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def main() -> int:
+    if shutil.which("sips") is None:
+        fail("sips not found; regenerate the derived PNGs on a macOS operator "
+             "machine with: sips -s format png -Z <px> logo-source.jpg --out <file>")
+    if not SOURCE.is_file():
+        fail(f"missing verified source {SOURCE.relative_to(ROOT)}; import the "
+             "customer-delivered JPEG there first and re-check its hash")
+
+    source_hash = sha256(SOURCE)
+    if source_hash != SOURCE_SHA256:
+        fail(f"{SOURCE.relative_to(ROOT)} sha256 {source_hash} does not match "
+             f"the verified original {SOURCE_SHA256} (BRAND-02); refusing to derive")
+
+    # The website logo keeps its white background; loading and tab assets are cut out.
+    with tempfile.TemporaryDirectory(prefix="filesmanage-favicon-") as temp_dir:
+        temp = Path(temp_dir)
+        logo = BRAND_DIR / "logo-256.png"
+        result = subprocess.run(
+            ["sips", "-s", "format", "png", "-Z", "256",
+             str(SOURCE), "--out", str(logo)],
+            capture_output=True, text=True)
+        if result.returncode != 0 or not logo.is_file():
+            fail(f"sips failed for logo-256.png: {result.stderr.strip()}")
+        bmp = temp / "logo.bmp"
+        result = subprocess.run(
+            ["sips", "-s", "format", "bmp", str(logo), "--out", str(bmp)],
+            capture_output=True, text=True)
+        if result.returncode != 0 or not bmp.is_file():
+            fail(f"sips failed for temporary BMP: {result.stderr.strip()}")
+        master = temp / "favicon-master.png"
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "favicon_alpha.py"),
+             str(bmp), str(master)],
+            capture_output=True, text=True)
+        if result.returncode != 0 or not master.is_file():
+            fail(f"favicon transparency extraction failed: {result.stderr.strip()}")
+        # The loading indicator needs the full-resolution transparent mark.
+        # Upscaling the 48px favicon visibly pixelates its curved edges.
+        shutil.copyfile(master, BRAND_DIR / "logo-loader-256.png")
+        for name, pixels, _ in DERIVED:
+            if not name.startswith("favicon-"):
+                continue
+            target = BRAND_DIR / name
+            result = subprocess.run(
+                ["sips", "-s", "format", "png", "-Z", str(pixels),
+                 str(master), "--out", str(target)],
+                capture_output=True, text=True)
+            if result.returncode != 0 or not target.is_file():
+                fail(f"sips failed for {name}: {result.stderr.strip()}")
+
+    rows = []
+    for name, pixels, purpose in DERIVED:
+        target = BRAND_DIR / name
+        size = target.stat().st_size
+        rows.append(f"| `{name}` | {pixels}x{pixels} | {purpose} | {size} B | "
+                    f"`{sha256(target)}` |")
+
+    MANIFEST.write_text(
+        "# Brand assets — official logo (SPEC v2.1 §18)\n"
+        "\n"
+        "Source: `logo-source.jpg` — the customer-delivered official logo, kept\n"
+        "byte-identical to the verified original (BRAND-02): JPEG, 1080x1080,\n"
+        "36 KB, white background.\n"
+        f"\n"
+        f"- SHA-256: `{SOURCE_SHA256}`\n"
+        "\n"
+        "Derived files are regenerated by `python3 scripts/brand_assets.py`\n"
+        "(sips resample of the source; no logo geometry is redrawn. Favicons\n"
+        "and the full-resolution loader mark have transparent mattes; the\n"
+        "larger login/topbar logo retains its original white background):\n"
+        "\n"
+        "| file | pixels | purpose | size | SHA-256 |\n"
+        "|---|---|---|---|---|\n"
+        + "\n".join(rows)
+        + "\n\nServing: `web/public/` maps to the build root, so these load as\n"
+        "local static files from `/assets/brand/...` (BRAND-07). Screenshots and\n"
+        "built-path evidence for VS01 / BG01–BG06 are captured on the remote\n"
+        "during acceptance (BRAND-08).\n",
+        encoding="utf-8")
+
+    print(f"BRAND ASSETS OK: source hash verified; {len(DERIVED)} derived files "
+          f"regenerated; manifest rewritten")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

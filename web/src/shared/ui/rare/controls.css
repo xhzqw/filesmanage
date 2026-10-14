@@ -1,0 +1,123 @@
+/* Rare Workbench controls: material and geometry follow the system's tokens.
+   Keep selector specificity below contextual business states; native DOM stays intact. */
+.rare-button{position:relative;transition:background-color .12s ease,border-color .12s ease,color .12s ease,transform .16s cubic-bezier(.22,1,.36,1)}
+.rare-button:active:not(:disabled){transform:scale(.985)}
+.rare-button[data-density="standard"]{min-height:32px}
+.rare-button:focus-visible,.rare-input:focus-visible,.rare-select:focus-visible,.rare-textarea:focus-visible{
+  outline:1px solid var(--border-focus);outline-offset:1px;
+  box-shadow:0 0 0 3px rgba(36,89,178,.12);
+}
+.rare-button[data-rare-tone="danger"]:focus-visible{outline-color:var(--status-danger)}
+.rare-button[aria-busy="true"]{cursor:progress}
+/* Text-like secondary actions remain low-emphasis in toolbars, but in modal
+   footers both actions must be recognizable, consistent rounded controls. */
+.dialog-actions .rare-button.secondary-action,
+.sessions-confirm-actions .rare-button.secondary-action{
+  text-decoration:none;color:var(--text-primary);background:var(--surface-panel);
+  border:1px solid var(--border-subtle);padding:0 var(--space-3);
+  min-height:var(--height-control);border-radius:var(--radius-sm);
+}
+.dialog-actions .rare-button.secondary-action:hover,
+.sessions-confirm-actions .rare-button.secondary-action:hover{
+  background:var(--surface-row-hover);color:var(--brand-blue);
+}
+/* Consistent feedback across feature panels and dialogs without altering
+   native accessibility semantics or adding expensive perpetual animation. */
+.rare-button[data-rare-tone="primary"]:not(:disabled):active{filter:brightness(.97)}
+.rare-select-root{display:inline-flex;position:relative;min-width:0;vertical-align:middle;max-width:100%;align-items:stretch}
+.rare-select-native{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important;clip-path:inset(50%)!important;padding:0!important;border:0!important}
+.rare-select-root>.rare-select{display:flex;align-items:center;gap:8px;justify-content:space-between;width:100%;min-height:var(--height-control);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:0 9px;background:var(--surface-panel);text-align:left;cursor:pointer;line-height:1.2}
+.rare-select-root>.rare-select:hover:not(:disabled){background:var(--surface-row-hover);border-color:var(--border-strong)}
+.rare-select-root>.rare-select:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px;box-shadow:none}
+.rare-select-root>.rare-select[aria-expanded="true"]{border-color:var(--border-focus);box-shadow:none}
+.rare-select-root>.rare-select:disabled{cursor:not-allowed;opacity:.55}
+.rare-select-label{display:block;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.rare-select-label.placeholder{color:var(--text-tertiary)}
+.rare-select-chevron{height:14px;width:14px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.rare-select-menu{position:fixed;z-index:21000;display:flex;flex-direction:column;overflow:hidden;border-radius:var(--radius-sm);background:var(--surface-panel);border:1px solid var(--border-subtle);box-shadow:var(--shadow-panel);padding:4px}
+.rare-select-menu{animation:rare-select-enter .12s cubic-bezier(.22,1,.36,1)}
+@keyframes rare-select-enter{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:translateY(0)}}
+.rare-select-search{padding:3px 3px 7px}
+.rare-select-search input{width:100%;height:30px;padding:0 8px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm)}
+.rare-select-options{overflow:auto;min-height:0}
+.rare-select-option{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:31px;text-align:left;border:0;background:transparent;padding:5px 9px;border-radius:var(--radius-sm);color:var(--text-primary);cursor:pointer}
+.rare-select-option span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rare-select-option:hover,.rare-select-option.highlighted{background:var(--surface-row-hover)}
+.rare-select-option[aria-selected="true"]{background:var(--surface-row-selected);color:var(--brand-blue);font-weight:600}
+.rare-select-option:disabled{opacity:.4;cursor:not-allowed}
+.rare-select-option:focus-visible{outline:2px solid var(--border-focus);outline-offset:-2px}
+.rare-select-check{flex:none;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.rare-select-empty{padding:8px;color:var(--text-secondary);margin:0}
+@media(prefers-reduced-motion:reduce){.rare-select-menu{animation:none}}
+@media(prefers-reduced-motion:reduce){.rare-button,.rare-button:active:not(:disabled){transform:none;transition:none}}
+.rare-tab-panel{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;overflow:hidden}
+.rare-tabs[data-rare-tabs]{position:relative;isolation:isolate}
+.rare-tab-active-rail{position:absolute;bottom:0;height:2px;border-radius:var(--radius-pill);background:var(--brand-cyan);pointer-events:none;z-index:1}
+.rare-tabs [role="tab"]{transition:color .12s ease,background-color .12s ease,box-shadow .18s cubic-bezier(.22,1,.36,1)}
+.rare-tabs [role="tab"][aria-selected="true"]{color:var(--brand-blue)}
+@media(prefers-reduced-motion:reduce){.rare-tabs [role="tab"]{transition:none}}
+
+
+/* An explicit tone has one canonical material/contrast contract. Legacy class
+   names may coexist during migration, but cannot redefine explicit intent. */
+.rare-button[data-rare-intent="primary"]{
+  background:var(--brand-blue);border-color:var(--brand-navy);color:var(--text-inverse);
+  font-weight:600;
+}
+.rare-button[data-rare-intent="primary"]:hover:not(:disabled){
+  background:var(--color-action-hover);border-color:var(--brand-navy);
+}
+.rare-button[data-rare-intent="neutral"]{
+  background:var(--surface-panel);color:var(--text-primary);border-color:var(--border-subtle);
+}
+.rare-button[data-rare-intent="neutral"]:hover:not(:disabled){background:var(--surface-row-hover)}
+.rare-button[data-rare-intent="danger"]{
+  background:var(--surface-danger-soft);color:var(--status-danger);border-color:var(--status-danger);
+}
+.rare-button[data-rare-intent="danger"]:hover:not(:disabled){
+  background:var(--status-danger);color:var(--text-inverse);
+}
+.rare-button[data-rare-intent="ghost"]{
+  background:transparent;border-color:transparent;color:var(--text-secondary);
+}
+.rare-button[data-rare-intent="ghost"]:hover:not(:disabled){
+  background:var(--surface-row-hover);color:var(--brand-blue);
+}
+/* Inputs preserve their native types and page-specific widths; ownership of
+   base geometry, disabled states and focus is central. */
+:where(.rare-input:not([type="checkbox"]):not([type="radio"]):not([type="file"])),
+:where(.rare-select),:where(.rare-textarea){
+  border:1px solid var(--border-subtle);border-radius:var(--radius-sm);
+  background:var(--surface-panel);color:var(--text-primary);
+}
+.rare-input:disabled,.rare-select:disabled,.rare-textarea:disabled{opacity:.55;cursor:not-allowed}
+.rare-input[aria-invalid="true"],.rare-select[aria-invalid="true"],.rare-textarea[aria-invalid="true"]{
+  border-color:var(--status-danger);
+}
+
+
+/* Explicit density only changes the native control's height. Feature layouts
+   retain width/padding ownership until their legacy rules are migrated. */
+.rare-button[data-density="standard"]{height:32px;min-height:32px}
+.rare-input[data-density="standard"]:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.rare-select[data-density="standard"]{height:32px;min-height:32px}
+.rare-button[data-rare-loading="true"]{cursor:progress}
+/* Keep action text in flow while the absolutely-positioned loader replaces
+   only its paint. Loading can never resize neighboring toolbar controls. */
+.rare-button[data-rare-loadable="true"]{position:relative;min-inline-size:84px}
+.rare-button-content{display:inline-flex;align-items:center;justify-content:center;gap:inherit;min-width:0}
+.rare-button-content[data-rare-hidden="true"]{visibility:hidden}
+.rare-button-pending{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.rare-button-pending .brand-loader{color:currentColor}
+.rare-button[data-rare-tone="primary"][data-rare-loading="true"] .brand-loader,
+.rare-button[data-rare-tone="danger"][data-rare-emphasis="solid"][data-rare-loading="true"] .brand-loader{color:var(--text-inverse)}
+.rare-button[data-rare-tone="primary"][data-rare-loading="true"] .brand-loader-ink,
+.rare-button[data-rare-tone="danger"][data-rare-emphasis="solid"][data-rare-loading="true"] .brand-loader-ink{filter:brightness(0) invert(1)}
+.rare-button[data-rare-loading="true"]:disabled{opacity:1}
+.rare-input[aria-invalid="true"]:focus-visible,.rare-select[aria-invalid="true"]:focus-visible,
+.rare-textarea[aria-invalid="true"]:focus-visible{outline-color:var(--status-danger)}
+.rare-button[data-rare-intent]{border-radius:var(--radius-sm)}
+/* Globally reusable destructive primary action: explicit semantic danger tone. */
+.rare-button[data-rare-intent="danger"][data-rare-emphasis="solid"]{background:var(--status-danger);border-color:var(--status-danger);color:var(--text-inverse);font-weight:600}
+.rare-button[data-rare-intent="danger"][data-rare-emphasis="solid"]:hover:not(:disabled){background:var(--status-danger);filter:brightness(.9);color:var(--text-inverse)}
+.rare-button[data-rare-intent="danger"][data-rare-emphasis="solid"]:disabled{opacity:.5}

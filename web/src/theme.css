@@ -1,0 +1,748 @@
+/* ==========================================================================
+   Polar Blue · Global color and interaction tokens
+   (docs/design/POLAR-BLUE-THEME.md).
+
+   Keep the compact engineering density while applying an Apple-like neutral
+   canvas, calm chrome and one deep-blue interactive hierarchy. The theme
+   owns the semantic palette; feature modules consume it. Contrast-qualified
+   input and focus boundaries remain stronger than decorative hairlines.
+   Legacy --brand-, --surface-, --color- aliases preserve existing modules
+   while they migrate incrementally to --ui-*.
+   ========================================================================== */
+
+*{box-sizing:border-box}
+
+:root{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-size:13px;
+  color:var(--text-primary);
+  background:var(--surface-canvas);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+
+/* Polar Blue: the canonical semantic palette. Contrast-critical controls
+   use their own borders; quiet hairlines are only decorative separators. */
+:root{
+  --ui-bg-app:#F8FAFC;
+  --ui-bg-sidebar:#F8FAFC;
+  --ui-bg-canvas:#FFFFFF;
+  --ui-bg-subtle:#F8FAFC;
+  --ui-state-hover:#EDF2F8;
+  --ui-state-selected-sidebar:#DFEBFA;
+  --ui-state-selected-grid:#D7E8FC;
+  --ui-state-selected-list:#2459B2;
+  --ui-state-focus:#2459B2;
+  --ui-border-hairline:#E5EAF1;
+  --ui-brand-primary:#2459B2;
+  --ui-brand-strong:#193F81;
+  --ui-text-primary:#1D2A3D;
+  --ui-text-secondary:#5E6F85;
+  /* Quiet Finder label palette: preserve hue identity without neon noise. */
+  --ui-tag-red:#C4757C;
+  --ui-tag-orange:#C9906A;
+  --ui-tag-yellow:#BDA563;
+  --ui-tag-green:#78A493;
+  --ui-tag-blue:#789DC4;
+  --ui-tag-purple:#A28BB8;
+  --ui-tag-gray:#99A2AC;
+}
+
+/* ================= 品牌核心色 (Brand Archetype) ================= */
+:root{
+  --brand-navy:var(--ui-brand-strong);            /* 权威深海蓝 */
+  --brand-blue:var(--ui-brand-primary);            /* 工业工程蓝: 主交互/行选中/主要链接 */
+  --brand-cyan:#369CE5;            /* 激光极客亮蓝: 装饰轨/下划线/微交互 */
+  --brand-cyan-muted:#EEF5FC;      /* 激光蓝微透底色 */
+  --folder-fill:#6BADEA;           /* 文件夹统一暖黄色填充 */
+  --folder-stroke:#286AB4;         /* 文件夹轮廓，浅底可辨 */
+  --folder-open-fill:#A0CBF2;      /* 展开目录前缘 */
+
+  /* ================= 表面与层级 (Surface & Elevation) ================= */
+  --surface-canvas:var(--ui-bg-app);        /* 工作台底衬冷白 (Slate 50) */
+  --surface-panel:var(--ui-bg-canvas);         /* 数据面板/表格纯白背景 */
+  --surface-header:var(--ui-bg-sidebar);        /* 表头/工具栏/状态栏淡冷灰底 (Slate 100) */
+  --surface-subtle:var(--ui-state-hover);        /* 控件悬停底色 */
+  --surface-row-hover:var(--ui-state-hover);     /* 极轻微蓝行悬停底色 */
+  --surface-row-selected:var(--ui-state-selected-sidebar);  /* 明确选中的蓝白高亮底 */
+  --surface-active:var(--ui-state-selected-grid);        /* 按下/激活态底色 */
+  --surface-success-soft:#E8F7ED; /* 轻量正反馈，不承担单独的语义 */
+  --surface-warning-soft:#FFF3E7; /* 警告只作辅助，文本传递语义 */
+  --surface-danger-soft:#FDECEF;     /* 错误通知底色: tokenised so the one
+                                      surface a measured pair depends on is
+                                      governed like every other colour */
+
+  /* ================= 结构线条与边界 (Hairline Borders) ================= */
+  --border-hairline:var(--ui-border-hairline);       /* 1px 精细分界线 (Slate 200) */
+  --border-subtle:#6C8BA6;         /* 控件未激活边框 (VIS-03: >=3:1, spec's
+                                      #CBD5E1 measures 1.48:1) */
+  --border-strong:#5E7C93;         /* 强对比边框 (VIS-03 >=3:1, spec's
+                                      #94A3B8 measures 2.56:1) */
+  --border-focus:var(--ui-state-focus);          /* 激光焦点线 (1px + 1px inset; VIS-03
+                                      >=3:1, spec's #02A0EA measures 2.91:1) */
+  --border-selected:#3473C3;       /* 选中项外廓线 (VIS-03: 4.08:1 on the
+                                      selected row; the spec's #3B82F6 only 3.16:1) */
+
+  /* ================= 文字与数据排印 (Typography Hierarchy) ================= */
+  --text-primary:var(--ui-text-primary);          /* Slate 900: 文件名/主要输入 */
+  --text-secondary:var(--ui-text-secondary);        /* Slate 600: 大小/版本/更新时间 */
+  --text-tertiary:#5A6C80;         /* 哈希短码/表头标题/禁用文字 (VIS-03:
+                                      4.93:1 on the header surface; the spec's
+                                      #94A3B8 measures 2.34:1 there) */
+  --text-inverse:#FFFFFF;          /* 反白文字 */
+
+  /* ================= 语义状态色 (Functional Indicators) ================= */
+  --status-success:#236B4D;        /* 正常/通过 */
+  --status-warning:#946015;        /* 待审核/锁定 (VIS-03: 5.37:1 on the header
+                                      surface, the spec's #B45309 only 4.58:1) */
+  --status-danger:#B42333;         /* 冲突/删除/严重警告 */
+
+  /* Semantic file-class glyph colors: visual continuity during Rare migration. */
+  --file-icon-cad:#0284c7;
+  --file-icon-word:#2563eb;
+  --file-icon-sheet:#16a34a;
+  --file-icon-slide:#ea580c;
+  --file-icon-pdf:#dc2626;
+  --file-icon-image:#7c3aed;
+  --file-icon-media:#e11d48;
+  --file-icon-archive:#d97706;
+  --file-icon-code:#0d9488;
+  --file-icon-text:#64748b;
+  --file-icon-file:#94a3b8;
+  --color-star-hover:#d97706;
+  --surface-media-video:#111827;
+
+  /* ================= 几何与紧凑度标尺 (Compact Metrics) ================= */
+  --radius-xs:4px;                 /* 紧凑标签/复选框 */
+  --radius-sm:7px;                 /* 按钮/输入框/行条 */
+  --radius-md:11px;                /* 弹出菜单/轻量对话框 */
+  --radius-lg:15px;                /* 工作区/卡片 */
+  --radius-xl:20px;                /* 模态框/登录 */
+  --radius-pill:999px;             /* 胶囊徽记 */
+  --shadow-panel:0 1px 2px rgba(15,39,92,.045),0 4px 16px rgba(15,39,92,.035);
+  --shadow-overlay:0 12px 40px rgba(15,39,92,.15),0 2px 8px rgba(15,39,92,.07);
+
+  --height-header:56px;            /* 独立悬浮导航胶囊的占位高度 */
+  --height-toolbar:34px;           /* 操作工具栏 */
+  --height-table-header:30px;      /* 表头高度 */
+  --height-row-standard:32px;      /* 标准紧凑数据行 */
+  --height-row-ultra:26px;         /* 极限紧凑数据行 (极客模式) */
+  --height-tree-row:28px;          /* 目录树节点行高 */
+  --height-control:28px;           /* 紧凑标准按钮/输入框高度 */
+  --height-statusbar:28px;         /* 克制的状态底栏 */
+  --height-command:36px;           /* 指令台输入条 */
+
+  --width-sidebar:240px;           /* 目录树侧边栏 (可拖拽 180~360) */
+  --width-sidebar-min:180px;
+  --width-sidebar-max:360px;
+  --width-command:480px;           /* CommandSpotlight 悬浮框宽度 */
+
+  --tree-indent:14px;              /* 目录树每级缩进 */
+
+  /* ================= 间距与字体 ================= */
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px;
+  --space-6:24px; --space-8:32px;
+  --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --font-mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+
+  /* ---- Legacy aliases (component sheets + FolderTree inline styles) ---- */
+  --color-panel:var(--surface-panel);
+  --color-panel-subtle:var(--surface-header);
+  --color-border:var(--border-hairline);
+  --color-border-strong:var(--border-subtle);
+  --color-text:var(--text-primary);
+  --color-text-secondary:var(--text-secondary);
+  --color-action:var(--brand-blue);
+  --color-action-hover:var(--ui-brand-strong);
+  --color-focus:var(--border-focus);
+  --color-row-hover:var(--surface-row-hover);
+  --color-row-selected:var(--surface-row-selected);
+  --color-row-selected-border:var(--border-selected);
+  --color-danger:var(--status-danger);
+  --color-success:var(--status-success);
+  --color-warning:var(--status-warning);
+  --radius-control:var(--radius-sm);
+  --radius-surface:var(--radius-sm);
+}
+
+html,body{height:100%}
+body{margin:0;overflow:hidden;background:var(--surface-canvas);color:var(--text-primary);font-family:var(--font-ui);font-size:13px;line-height:1.45}
+a{color:inherit;text-decoration:none}
+img,svg{vertical-align:middle}
+
+/* ================= 基础控件紧凑化 ================= */
+button,input,select,textarea{font:inherit;font-size:12px;font-family:var(--font-ui);color:var(--text-primary)}
+button{
+  cursor:pointer;
+  height:var(--height-control);
+  min-height:var(--height-control);
+  padding:0 var(--space-2);
+  border:1px solid var(--border-subtle);
+  border-radius:var(--radius-sm);
+  background:var(--surface-panel);
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:var(--space-1);
+  white-space:nowrap;
+  transition:background-color .1s ease,border-color .1s ease,color .1s ease;
+}
+button:hover{background:var(--surface-subtle);border-color:var(--border-subtle)}
+button:active{background:var(--surface-active)}
+button:disabled{cursor:not-allowed;opacity:.55}
+button.primary,.primary{
+  background:var(--brand-blue);
+  color:var(--text-inverse);
+  border-color:var(--brand-navy);
+  font-weight:500;
+}
+button.primary:hover,.primary:hover{background:var(--color-action-hover);border-color:var(--brand-navy)}
+button.danger,.danger{color:var(--status-danger);border-color:var(--status-danger)}
+button.danger:hover{background:var(--status-danger);color:var(--text-inverse);border-color:var(--status-danger)}
+
+/* HairlineFocusBeam (spec §6.2): a 1px laser edge glow instead of a fat ring.
+   The outline carries the keyboard affordance at >=3:1; the outer cyan bloom
+   is decorative and non-inset, so it never reads as a control boundary. */
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,[tabindex]:focus-visible{
+  outline:1px solid var(--border-focus);
+  outline-offset:1px;
+  box-shadow:0 0 0 3px rgba(36,89,178,.12);
+}
+input,select,textarea{
+  height:var(--height-control);
+  padding:0 var(--space-2);
+  border:1px solid var(--border-subtle);
+  border-radius:var(--radius-sm);
+  background:var(--surface-panel);
+}
+input[type=checkbox],input[type=radio]{height:14px;width:14px;padding:0;accent-color:var(--brand-blue)}
+input[type=file]{height:auto;padding:0;border:0;background:none}
+textarea{height:auto;padding:var(--space-1) var(--space-2);line-height:1.5;resize:vertical}
+
+/* ================= 一体化嵌合外壳 (Docked Paneling) ================= */
+.shell{height:100vh;display:flex;flex-direction:column;background:var(--surface-canvas);overflow:hidden;padding:8px;gap:8px}
+
+/* ---- 顶栏 38px ---- */
+.header{
+  height:var(--height-header);
+  flex:none;
+  position:relative;
+  display:flex;
+  align-items:center;
+  padding:0 var(--space-2) 0 0;
+  background:var(--surface-panel);
+  border:1px solid var(--border-hairline);
+  border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-panel);
+  box-sizing:border-box;
+}
+.brand{display:flex;align-items:center;gap:var(--space-2);width:auto;flex:none;padding-left:var(--space-3);padding-right:var(--space-2);font-weight:700;font-size:13px;color:var(--brand-navy);white-space:nowrap;overflow:hidden}
+.brand-logo{display:block;flex:none;width:22px;height:22px}
+.product{font-weight:500;font-size:11px;color:var(--text-tertiary);overflow:hidden;text-overflow:ellipsis}
+.header nav{flex:1;display:flex;align-items:center;gap:4px;height:100%;margin-left:var(--space-3)}
+.header nav a{
+  display:inline-flex;align-items:center;gap:0;
+  height:100%;padding:0 var(--space-3);
+  font-size:13px;font-weight:500;color:var(--text-secondary);
+  border-bottom:2px solid transparent;
+  background:transparent;
+  text-decoration:none;
+  transition:color .12s ease;
+}
+.header nav a:hover{color:var(--brand-blue);background:transparent}
+.header nav a.active{color:var(--brand-blue);background:transparent;border-bottom-color:var(--brand-blue);font-weight:600}
+/* The global eight-route navigation actually renders Rare UI GooeyNav.
+   Override the legacy link underline rules without altering other navs. */
+.header nav[data-slot="gooey-nav"]{display:flex;flex:1 1 auto;align-items:center;min-width:0;max-width:100%;height:100%;margin-left:var(--space-2);color:var(--surface-header);overflow:visible}
+.header nav[data-slot="gooey-nav"]>ul{display:flex;flex-direction:row;align-items:center;width:max-content;max-width:100%;height:100%;margin:0;padding:0;gap:0}
+.header nav[data-slot="gooey-nav"] [data-slot="gooey-nav-segment"]{height:30px;min-height:30px;flex:none}
+.header nav[data-slot="gooey-nav"] [data-slot="gooey-nav-item"]{
+ display:inline-flex;align-items:center;justify-content:center;
+ min-height:30px;height:30px;padding:0 10px;
+ font-size:12px;font-weight:550;line-height:1;letter-spacing:0;
+ color:var(--text-secondary);background:transparent;border:0;
+ border-radius:inherit;text-decoration:none;white-space:nowrap;
+}
+.header nav[data-slot="gooey-nav"] [data-slot="gooey-nav-item"]:hover:not(.active){color:var(--brand-blue);background:transparent}
+.header nav[data-slot="gooey-nav"] [data-slot="gooey-nav-item"].active,
+.header nav[data-slot="gooey-nav"] [data-slot="gooey-nav-item"].active:hover{
+ color:var(--text-inverse);background:transparent;border:0;font-weight:650;
+}
+.header nav[data-slot="gooey-nav"] [data-slot="gooey-nav-item"]:focus-visible{outline:2px solid var(--border-focus);outline-offset:2px}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:var(--space-2);padding-right:var(--space-2);height:100%}
+.account-dropdown-wrapper{position:relative;display:inline-flex;align-items:center}
+.account-trigger{
+  border:none;background:transparent;padding:2px 4px;cursor:pointer;
+  border-radius:var(--radius-xs);display:inline-flex;align-items:center;
+}
+.account-trigger:hover{background:var(--surface-subtle)}
+.account{display:inline-flex;align-items:center;gap:var(--space-1);min-width:0;white-space:nowrap;font-size:12px;color:var(--text-secondary)}
+.account-avatar{flex:none;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:var(--radius-xs);background:var(--surface-row-selected);border:1px solid var(--border-hairline);color:var(--brand-blue);font-size:10px;font-weight:600}
+.account-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.account-caret{color:var(--text-tertiary);margin-left:2px;flex:none}
+.account-dropdown-menu{
+  position:absolute;top:calc(100% + 4px);right:0;
+  background:var(--surface-panel);border:1px solid var(--border-subtle);
+  border-radius:var(--radius-md);box-shadow:var(--shadow-overlay);
+  z-index:50;min-width:130px;padding:4px;
+}
+.account-menu-info{padding:6px 12px}
+.account-menu-name{font-size:12px;font-weight:600;color:var(--text-primary)}
+.account-menu-role{font-size:11px;color:var(--text-tertiary);margin-top:1px}
+.account-menu-divider{height:1px;background:var(--border-hairline);margin:4px 0}
+.account-menu-item{
+  width:100%;border:none;background:transparent;padding:6px 12px;
+  font-size:12px;color:var(--text-primary);cursor:pointer;
+  display:flex;align-items:center;gap:6px;text-align:left;
+  border-radius:var(--radius-sm);height:auto;min-height:26px;
+}
+.account-menu-item:hover{background:var(--surface-row-hover);color:var(--brand-blue)}
+.account-menu-item.danger{color:var(--status-danger)}
+.account-menu-item.danger:hover{background:var(--surface-danger-soft);color:var(--status-danger)}
+.header-exit-btn{
+  border:none;background:transparent;color:var(--text-secondary);
+  font-size:11px;height:26px;min-height:26px;padding:0 6px;
+  cursor:pointer;border-radius:var(--radius-xs);display:inline-flex;align-items:center;gap:3px;
+}
+.header-exit-btn:hover{color:var(--status-danger);background:var(--surface-danger-soft)}
+.header-exit-label{font-size:11px}
+.header button:not(.header-exit-btn):not(.nav-toggle):not(.command-trigger):not(.notification-trigger):not(.account-trigger){height:26px;min-height:26px;padding:0 var(--space-2);font-size:12px}
+
+/* 面包屑条 (spec §3.1): 停靠在工具列上方的 24px 路径条。它必须是 <nav>
+   地标 (DI-15)，而 VIS-11 只允许 header.header 内有一个 nav，所以路径不住
+   在 40px 顶栏里，而是作为工作区第一条停靠行。 */
+.crumb-bar{min-height:24px;padding:2px var(--space-3);border-bottom:1px solid var(--border-hairline)}
+/* 目录上下文与配置条 (高度 32px) */
+.folder-context-bar{
+  height:32px;min-height:32px;max-height:32px;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 var(--space-3);background:var(--surface-panel);
+  border-bottom:1px solid var(--border-hairline);box-sizing:border-box;
+}
+.folder-context-bar .breadcrumb{
+  display:flex;align-items:center;gap:0;
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:12px;color:var(--text-secondary);
+  padding:0;border:none;background:transparent;
+}
+.folder-context-bar .breadcrumb a{color:var(--brand-blue);font-weight:500;text-decoration:none}
+.folder-context-bar .breadcrumb a:hover{text-decoration:underline;text-underline-offset:2px}
+.folder-context-bar .breadcrumb .crumb-sep{margin:0 6px;color:var(--text-tertiary);font-size:11px;user-select:none;flex:none}
+.folder-context-bar .breadcrumb .crumb-current{font-weight:600;color:var(--text-primary)}
+.folder-actions-slot{flex:none;display:flex;align-items:center}
+.folder-actions{display:flex;align-items:center;gap:var(--space-1);position:relative;height:32px;min-height:32px;padding:0;border:none;background:transparent}
+.ghost-action-btn{
+  border:1px solid transparent;background:transparent;color:var(--brand-blue);
+  font-size:12px;font-weight:500;height:24px;line-height:24px;padding:0 var(--space-2);
+  cursor:pointer;border-radius:var(--radius-xs);display:inline-flex;align-items:center;
+  transition:all .1s ease;
+}
+.ghost-action-btn:hover{background:var(--surface-row-hover);color:var(--color-action-hover);border-color:var(--border-hairline)}
+.folder-more-wrapper{position:relative;display:inline-flex}
+.ghost-more-btn{
+  border:1px solid var(--border-hairline);background:var(--surface-panel);
+  color:var(--text-secondary);font-size:12px;font-weight:700;
+  height:24px;min-height:24px;width:26px;padding:0;
+  display:inline-flex;align-items:center;justify-content:center;
+  border-radius:var(--radius-xs);cursor:pointer;
+}
+.ghost-more-btn:hover{background:var(--surface-row-hover);color:var(--brand-blue);border-color:var(--border-subtle)}
+.folder-more-menu{
+  display:none;position:absolute;top:calc(100% + 4px);right:0;
+  background:var(--surface-panel);border:1px solid var(--border-subtle);
+  border-radius:var(--radius-md);box-shadow:var(--shadow-overlay);
+  z-index:50;min-width:110px;padding:4px;
+}
+.folder-more-menu.open{display:flex;flex-direction:column}
+.folder-more-menu button{
+  border:none;background:transparent;text-align:left;padding:5px 12px;
+  font-size:12px;color:var(--text-primary);cursor:pointer;width:100%;
+  border-radius:var(--radius-sm);height:auto;min-height:24px;
+}
+.folder-more-menu button:hover{background:var(--surface-row-hover);color:var(--brand-blue)}
+.folder-more-menu button.danger{color:var(--status-danger)}
+.folder-more-menu button.danger:hover{background:var(--surface-danger-soft);color:var(--status-danger)}
+
+/* CommandSpotlight 触发器 (spec §6.4) */
+.command-trigger{
+  flex:none;width:200px;height:26px;min-height:26px;
+  justify-content:flex-start;gap:var(--space-2);
+  padding:0 var(--space-2);font-size:12px;font-weight:400;
+  color:var(--text-tertiary);background:var(--surface-panel);
+  border:1px solid var(--border-subtle);border-radius:var(--radius-sm);
+}
+.command-trigger:hover{color:var(--text-secondary);background:var(--surface-subtle);border-color:var(--border-strong)}
+.command-trigger .command-keys{margin-left:auto;display:inline-flex;gap:2px}
+.command-trigger kbd{font-family:var(--font-mono);font-size:10px;line-height:14px;padding:0 3px;color:var(--text-tertiary);background:var(--surface-header);border:1px solid var(--border-hairline);border-radius:var(--radius-xs)}
+
+.nav-toggle{display:none;background:none;border:0;font-size:16px;height:26px;min-height:26px;padding:0 var(--space-1)}
+
+.panels{display:flex;flex:1;min-height:0;padding:0;gap:8px;background:transparent}
+
+/* ---- 侧边栏: 贴边, 240px, 可拖拽 ---- */
+.sidebar{
+  position:relative;
+  width:var(--width-sidebar);
+  min-width:var(--width-sidebar-min);
+  max-width:var(--width-sidebar-max);
+  flex:none;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  background:var(--surface-panel);
+  border:1px solid var(--border-hairline);
+  border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-panel);
+  min-height:0;
+  padding:0;
+}
+/* The scroll port. It is a child of .sidebar rather than .sidebar itself, so
+   the resize handle below never scrolls away with a deep tree and its 4px hot
+   zone is never clipped. FolderTree's scrollHost() still finds it, because it
+   walks up for the first overflow-y:auto ancestor. */
+.sidebar-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:var(--space-1) 0}
+.sidebar h2{font-size:11px;margin:0;padding:var(--space-1) var(--space-3);color:var(--text-tertiary);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.sidebar p{color:var(--text-secondary);font-size:12px;margin:0;padding:0 var(--space-3)}
+.sidebar-resizer{
+  position:absolute;top:0;right:0;bottom:0;width:4px;z-index:3;
+  background:transparent;border:0;padding:0;cursor:col-resize;
+}
+.sidebar-resizer::after{content:"";position:absolute;top:0;bottom:0;left:1px;width:2px;background:var(--border-hairline)}
+.sidebar-resizer:hover::after,.sidebar-resizer[data-dragging="true"]::after{background:var(--brand-cyan)}
+.sidebar-resizer:focus-visible::after{background:var(--border-focus)}
+.sidebar-resizer:focus-visible{outline:1px solid var(--border-focus);outline-offset:0;box-shadow:none}
+
+/* ---- 主工作区 ---- */
+.work{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:0;background:var(--surface-canvas);border:1px solid var(--border-hairline);border-radius:var(--radius-lg);box-shadow:var(--shadow-panel)}
+.work-body{display:flex;flex-direction:column;gap:0;flex:1;min-height:0}
+
+/* 工具栏/面包屑/目录操作条: 与表格无缝, 仅 1px 水平分割线 */
+.breadcrumb,.toolbar,.folder-actions{
+  flex:none;
+  min-height:var(--height-toolbar);
+  padding:var(--space-1) var(--space-3);
+  background:var(--surface-panel);
+  border:0;
+  border-bottom:1px solid var(--border-hairline);
+  border-radius:var(--radius-sm);
+  display:flex;
+  align-items:center;
+  gap:var(--space-2);
+  flex-wrap:wrap;
+  font-size:12px;
+}
+.folder-actions{min-height:var(--height-toolbar)}
+.work .notice{border-bottom:1px solid var(--border-hairline)}
+.toolbar-hint{color:var(--text-tertiary);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* 面包屑: 极细 › 分割 */
+.breadcrumb{display:flex;align-items:center;gap:var(--space-1);min-width:0;color:var(--text-secondary);font-size:12px}
+.breadcrumb a{color:var(--brand-blue);font-weight:500;white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.breadcrumb a:hover{text-decoration:underline;text-underline-offset:2px}
+.breadcrumb .crumb-sep{color:var(--text-tertiary);font-size:11px;user-select:none;flex:none}
+.breadcrumb .crumb-current{color:var(--text-primary);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 0 auto}
+.breadcrumb .crumb-collapse{color:var(--text-tertiary);user-select:none}
+
+/* ================= 极高密度数据表格 ================= */
+.table{flex:1;min-height:0;background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-md);overflow:auto}
+table{border-collapse:collapse;width:100%}
+th,td{padding:6px 10px;border-bottom:1px solid var(--border-hairline);text-align:left;font-size:12px;color:var(--text-primary)}
+th{
+  position:sticky;top:0;z-index:2;
+  height:var(--height-table-header);
+  padding:0 10px;
+  background:var(--surface-header);
+  color:var(--text-secondary);
+  font-weight:600;font-size:11px;letter-spacing:.02em;
+  white-space:nowrap;
+}
+td{vertical-align:middle}
+tbody tr{height:var(--height-row-standard);transition:background-color .05s ease}
+
+/* Table selection is one surface; keyboard focus is the only extra outline. */
+.table tbody tr{cursor:default;user-select:none}
+.table tbody tr:hover{background:var(--surface-row-hover)}
+.table tbody tr.selected,.table tbody tr.selected:hover{background:var(--surface-row-selected);box-shadow:none}
+.table tbody tr.focused,.table tbody tr.selected.focused{box-shadow:none}
+.table tbody tr:focus-visible{outline:1px solid var(--border-focus);outline-offset:-1px}
+
+/* 等宽数字与哈希排印 (spec §4.1) */
+td.num,td.date,.num,.date{font-variant-numeric:tabular-nums;text-align:right}
+.hash{font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);white-space:nowrap}
+td.hash,.hash{font-variant-numeric:tabular-nums}
+.file-name{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--brand-blue);font-weight:500}
+
+/* 版本徽章: 18px 高, 2px 圆角 */
+.version-badge{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:18px;padding:0 var(--space-1);border-radius:var(--radius-xs);background:var(--surface-header);color:var(--text-secondary);font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;border:1px solid var(--border-hairline)}
+
+/* 行操作: 平时低调, 悬停/聚焦显露 (spec §4.1). The reveal is carried by
+   colour, never by opacity: an alpha fade drops the rendered contrast below
+   4.5:1 (the gate reads the declared colour, the user reads the composite),
+   so the resting state is --text-secondary (7.58:1) and hover/focus raises it
+   to the brand blue (9.45:1). */
+.row-actions{display:flex;gap:var(--space-1);white-space:nowrap;justify-content:center}
+.row-actions a:not(.primary):not(.danger),.row-actions button:not(.primary):not(.danger){color:var(--text-secondary);font-weight:500;transition:color .1s ease}
+.row-actions .danger,.folder-actions .danger{color:var(--status-danger);border-color:var(--status-danger)}
+tr:hover .row-actions a:not(.primary):not(.danger),tr:hover .row-actions button:not(.primary):not(.danger),
+tr:focus-within .row-actions a:not(.primary):not(.danger),tr:focus-within .row-actions button:not(.primary):not(.danger),
+.row-actions a:not(.primary):not(.danger):focus-visible,.row-actions button:not(.primary):not(.danger):focus-visible{color:var(--brand-blue)}
+tr:hover .row-actions .danger,tr:focus-within .row-actions .danger,.row-actions .danger:focus-visible{color:var(--status-danger)}
+
+/* 空状态: 16px 极简工程线框小标 + 精致文字排版 (spec §1.1/§4) */
+.empty{color:var(--text-tertiary);text-align:center;padding:var(--space-8) var(--space-4)}
+.empty-mark{display:block;margin:0 auto var(--space-2);color:var(--border-strong)}
+.empty-title{display:block;font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:2px}
+.empty-hint{display:block;font-size:12px;color:var(--text-tertiary)}
+
+/* 选择列: 14px 微型复选框 */
+.col-select input[type=checkbox]{height:14px;width:14px}
+
+/* ================= 状态底栏 (spec §3.1) ================= */
+.status-bar{
+  flex:none;display:flex;align-items:center;justify-content:space-between;
+  height:var(--height-statusbar, 28px);min-height:28px;max-height:28px;
+  padding:0 var(--space-3);
+  background:var(--surface-header);
+  border-top:1px solid var(--border-hairline);
+  font-size:12px;font-weight:400;color:var(--text-secondary);
+  white-space:nowrap;overflow:hidden;box-sizing:border-box;
+}
+.status-left,.status-right{display:flex;align-items:center;gap:var(--space-2)}
+.status-bar .status-strong{color:var(--text-primary);font-weight:600;font-variant-numeric:tabular-nums}
+.status-bar .status-sep{color:var(--text-tertiary);user-select:none}
+.status-bar .status-spacer{flex:1}
+.status-bar .status-build{font-family:var(--font-mono);color:var(--text-tertiary)}
+
+/* ================= 目录树 (Compact FolderTree, spec §5) ================= */
+.tree,.tree ul{padding:0;list-style:none;margin:0}
+.tree{position:relative}
+.tree-row{
+  position:relative;
+  display:flex;align-items:center;
+  height:var(--height-tree-row);
+  padding:0 var(--space-2);
+  padding-left:calc(var(--tree-depth,0)*var(--tree-indent) + var(--space-2));
+  border-radius:var(--radius-sm);
+  font-size:12px;color:var(--text-primary);
+  cursor:pointer;
+  transition:background-color .12s ease;
+  box-sizing:border-box;
+  width:100%;
+}
+/* 1px 层级导轨虚线 */
+.tree-row::before{
+  content:"";position:absolute;top:0;bottom:0;
+  left:calc(var(--tree-depth,0)*var(--tree-indent) - 1px);
+  border-left:1px dashed var(--border-subtle);
+  opacity:0.6;
+}
+.tree li[data-depth="0"]>.tree-row::before{display:none}
+.tree-row:hover{background:var(--surface-subtle, #F1F5F9)}
+.tree-row.on{
+  background:var(--surface-subtle);
+  color:var(--brand-blue);
+  font-weight:600;
+  box-shadow:none;
+}
+.tree-row.on:hover{background:var(--surface-subtle)}
+.tree-row button{width:16px;min-width:16px;height:16px;min-height:16px;padding:0;border:0;background:none;font-size:10px;line-height:1;color:var(--text-tertiary);display:inline-flex;align-items:center;justify-content:center;transition:transform .12s linear;flex:none}
+.tree-row button:hover{background:none;color:var(--brand-blue)}
+.tree-row button[aria-expanded="true"]{transform:rotate(90deg)}
+.tree-row a,.tree-node-link{
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  flex:1;min-width:0;padding:0 var(--space-1);color:inherit;text-decoration:none;
+  outline:none !important;border:none !important;box-shadow:none !important;
+}
+.tree-row a:focus,.tree-row a:focus-visible,.tree-node-link:focus,.tree-node-link:focus-visible,
+.tree li:focus,.tree li:focus-visible{
+  outline:none !important;border:none !important;box-shadow:none !important;
+}
+.tree li:focus-visible > .tree-row{
+  outline:2px solid var(--border-focus);
+  outline-offset:-2px;
+}
+
+/* ================= 提示/通知/表单 ================= */
+.hint{color:var(--text-tertiary);font-size:11px;margin:0}
+.error{color:var(--status-danger)}
+.notice{margin:0;padding:var(--space-2) var(--space-3);border:0;border-bottom:1px solid var(--border-hairline);border-left:2px solid var(--brand-blue);background:var(--brand-cyan-muted);color:var(--brand-blue);font-size:12px}
+.notice.error{background:var(--surface-danger-soft);border-left-color:var(--status-danger);color:var(--status-danger)}
+.inline-form{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap}
+.inline-form input{border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:0 var(--space-2);height:var(--height-control)}
+.upload-button{position:relative;overflow:hidden;display:inline-flex;align-items:center;height:var(--height-control)}
+.upload-button input{position:absolute;left:0;top:0;opacity:0;width:100%;height:100%;cursor:pointer}
+.sort-label{color:var(--text-secondary);display:inline-flex;align-items:center;gap:var(--space-1);font-size:11px;white-space:nowrap}
+.sort-label select{height:var(--height-control);padding:0 var(--space-1);font-size:12px}
+.secondary-action{background:transparent;border:0;color:var(--brand-blue);text-decoration:underline;text-underline-offset:2px;height:auto;min-height:20px;padding:2px 0;font-size:12px}
+.secondary-action:hover{background:transparent;color:var(--color-action-hover)}
+
+
+/* ================= 对话框 / 菜单 ================= */
+.dialog{border:1px solid var(--border-subtle);border-radius:var(--radius-xl);box-shadow:var(--shadow-overlay);padding:var(--space-4);min-width:380px;background:var(--surface-panel);color:var(--text-primary)}
+.dialog::backdrop{background:#0d2a4a44}
+.dialog:focus-visible{outline:none}
+.dialog form{display:grid;gap:var(--space-3)}
+.dialog h3{margin:0;color:var(--brand-navy);font-size:13px}
+.dialog-title{margin:0;color:var(--brand-navy);font-size:14px;font-weight:600}
+.restore-dialog,.rollback-dialog{min-width:480px}
+.dialog input,.dialog select,.dialog textarea{border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:0 var(--space-2);height:var(--height-control);width:100%}
+.dialog input[type="checkbox"],.dialog input[type="radio"]{width:16px;height:16px;min-width:16px;padding:0;flex:none;margin:0}
+.dialog .checkbox-label{display:inline-flex;align-items:center;justify-content:flex-start;justify-self:start;gap:8px;width:fit-content;white-space:nowrap}
+.dialog textarea{height:auto;padding:var(--space-2)}
+.dialog-actions{display:flex;justify-content:flex-end;gap:var(--space-2);margin-top:var(--space-1);flex-wrap:wrap}
+.preview-text{background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-sm);padding:var(--space-3);margin:0;overflow:auto;flex:1;white-space:pre-wrap;font-family:var(--font-mono);font-size:12px}
+.delete-list{margin:0;padding-left:var(--space-4);display:grid;gap:var(--space-1);max-height:180px;overflow:auto;font-size:12px}
+.checkbox-label{display:inline-flex;align-items:center;gap:var(--space-1);font-weight:400;font-size:12px}
+
+/* MicroHoldToDelete (spec §6.3): 26px 高 / 64px 宽硬朗长按按钮 */
+.micro-hold{
+  position:relative;overflow:hidden;
+  width:64px;min-width:64px;height:26px;min-height:26px;
+  padding:0;font-size:11px;font-weight:600;
+  border-radius:var(--radius-sm);
+  isolation:isolate;
+}
+.micro-hold .micro-hold-fill{position:absolute;inset:0 auto 0 0;width:0;background:var(--status-danger);z-index:-1}
+.micro-hold[data-tone="brand"] .micro-hold-fill{background:var(--brand-blue)}
+.micro-hold[data-armed="true"]{border-color:var(--status-danger)}
+.micro-hold[data-tone="brand"][data-armed="true"]{border-color:var(--brand-navy)}
+.micro-hold:disabled{opacity:.55}
+.micro-hold .micro-hold-label{position:relative;font-variant-numeric:tabular-nums}
+/* The countdown turns white only where the fill already covers it: --hold is
+   the 0..1 progress the component writes onto the button, so the label is
+   mixed against the fill instead of flashing white-on-white for the first
+   third of the press. */
+.micro-hold[data-armed="true"] .micro-hold-label{color:color-mix(in oklab,var(--text-inverse) calc(var(--hold,0)*100%),var(--status-danger))}
+.micro-hold[data-tone="brand"][data-armed="true"] .micro-hold-label{color:color-mix(in oklab,var(--text-inverse) calc(var(--hold,0)*100%),var(--brand-blue))}
+
+/* ================= 登录 / 首次登录 ================= */
+.login-bg{height:100vh;display:grid;place-items:center;position:relative;isolation:isolate;overflow:hidden;background:linear-gradient(135deg,#EEF2F6 0%,#F8FAFC 100%)}
+.bg-glow{position:absolute;border-radius:50%;filter:blur(48px);opacity:.18;pointer-events:none}
+.bg-glow-blue{width:320px;height:320px;background:#02A0EA;top:-80px;left:-60px}
+.bg-glow-amber{width:320px;height:320px;background:#E3AD3D;bottom:-90px;right:-70px}
+.login-card{background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-md);padding:var(--space-8) var(--space-6);width:92%;max-width:380px;box-shadow:0 1px 2px rgba(15,39,92,.06),0 12px 32px rgba(15,39,92,.08)}
+.login-card p{color:var(--text-secondary);font-size:12px}
+.login-card form{display:grid;gap:var(--space-2);margin-top:var(--space-2)}
+.login-card input:not([type="checkbox"]):not([type="radio"]){border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:0 var(--space-3);height:var(--height-control);width:100%}
+.login-card label{font-weight:600;font-size:12px;color:var(--text-secondary)}
+.brand-lockup{display:grid;justify-items:center;gap:var(--space-1);text-align:center}
+.brand-lockup .login-logo{width:40px;height:40px}
+.brand-lockup .system-name{margin:0;font-size:16px;color:var(--brand-navy)}
+.brand-lockup .organization-line{font-size:11px;color:var(--text-tertiary);margin:0}
+.page-purpose{font-size:15px;color:var(--text-primary);margin:var(--space-3) 0 var(--space-1)}
+.input-wrap{position:relative}
+.input-icon{position:absolute;left:var(--space-2);top:50%;transform:translateY(-50%);color:var(--text-tertiary);pointer-events:none}
+/* Reserve space for the leading icon. Must outrank the login card's
+   input:not() shorthand padding, otherwise text/placeholder overlays it. */
+.login-card .input-wrap input:not([type="checkbox"]):not([type="radio"]){padding-left:36px}
+.input-wrap input:focus{outline:1px solid var(--border-focus);outline-offset:0;border-color:var(--border-focus);box-shadow:0 0 0 3px rgba(36,89,178,.12)}
+.form-extras{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);font-size:12px}
+.form-extras .remember{display:inline-flex;align-items:center;gap:6px;flex:none;white-space:nowrap;line-height:1.25;font-weight:400;color:var(--text-secondary);cursor:pointer}
+.form-extras .remember input[type="checkbox"]{width:16px;height:16px;min-width:16px;flex:none;margin:0;padding:0;accent-color:var(--brand-blue);cursor:pointer}
+.form-extras .forgot{flex:none;margin-left:auto;white-space:nowrap}
+.forgot{background:none;border:0;color:var(--brand-blue);font-size:12px;height:auto;min-height:0;padding:2px 0;text-decoration:underline;text-underline-offset:2px}
+.forgot:hover{background:none;color:var(--color-action-hover)}
+.reset-hint{margin:0;font-size:11px;color:var(--status-warning)}
+.primary{display:inline-flex;align-items:center;justify-content:center;height:var(--height-control);padding:0 var(--space-4);border-radius:var(--radius-sm);font-weight:600}
+.primary:disabled{opacity:.6;cursor:progress}
+.login-card .primary{height:34px;font-size:13px;letter-spacing:.04em}
+
+/* ================= 组织 / 编辑器 / 预览 / 统计 / 检索 ================= */
+.org-columns{display:grid;grid-template-columns:1.4fr 1fr;gap:0;flex:1;min-height:0}
+.org-columns .table{padding:0;overflow:auto}
+.org-columns h3{font-size:12px;margin:0;padding:var(--space-2) var(--space-3);color:var(--text-secondary);border-bottom:1px solid var(--border-hairline);position:sticky;top:var(--height-table-header);background:var(--surface-panel);z-index:1}
+.org-form{gap:var(--space-2)}
+.org-form input{min-width:120px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:0 var(--space-2);height:var(--height-control)}
+.group-list,.member-list{list-style:none;padding:0;margin:0 0 var(--space-3);display:grid;gap:2px}
+.group-list button{width:100%;text-align:left;justify-content:flex-start;font-weight:400}
+.group-list button.on{background:var(--surface-subtle);border-color:transparent;color:var(--brand-blue);font-weight:600}
+.member-list li{display:flex;justify-content:space-between;align-items:center;gap:var(--space-2);padding:var(--space-1) var(--space-2);border:1px solid var(--border-hairline);border-radius:var(--radius-sm);font-size:12px}
+.member-list li.empty{border:0;display:block}
+.grant-dialog{min-width:560px}
+.grant-existing{display:grid;gap:2px;max-height:180px;overflow:auto}
+.grant-row{display:grid;grid-template-columns:1.2fr 2fr auto;gap:var(--space-2);align-items:center;padding:var(--space-1) var(--space-2);border:1px solid var(--border-hairline);border-radius:var(--radius-sm);font-size:12px}
+.grant-form{display:grid;gap:var(--space-2)}
+.grant-form select{border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:0 var(--space-2);height:var(--height-control);background:var(--surface-panel)}
+.grant-form fieldset{border:1px solid var(--border-hairline);border-radius:var(--radius-sm);display:flex;flex-wrap:wrap;gap:var(--space-2);padding:var(--space-2)}
+.grant-form legend{color:var(--text-tertiary);font-size:11px;padding:0 var(--space-1)}
+
+.editor-dialog{min-width:640px}
+.editor-dialog form{display:flex;flex-direction:column;gap:var(--space-2)}
+.editor-dialog textarea{font-family:var(--font-mono);font-size:12px;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:var(--space-2);resize:vertical;width:100%}
+
+.office-stage{flex:1;min-height:0;padding:0;display:flex;flex-direction:column}
+.office-edit-strip{height:36px;flex-shrink:0;display:flex;align-items:center;gap:12px;justify-content:space-between;padding:0 10px;border-bottom:1px solid var(--border-hairline);background:var(--surface-panel);font-size:12px}
+.office-edit-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary)}
+.office-save-state{flex-shrink:0;color:var(--text-secondary);font-weight:500}
+.office-save-dirty{color:var(--status-warning)}
+.office-save-failed{color:var(--status-danger)}
+.office-save-saved{color:var(--status-success)}
+/* flex:1 (not height:100%) so the editor takes the space left after the
+   breadcrumb instead of the stage's full height, which used to push its own
+   bottom chrome 43px past the viewport at every gate resolution. */
+.office-holder{flex:1;min-height:0;position:relative;background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-md);box-shadow:var(--shadow-panel);overflow:hidden}
+.office-holder #docx-editor-target{width:100%;height:100%;min-height:0}
+.office-loading-cover{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;background:var(--surface-panel);color:var(--text-secondary);text-align:center}
+.office-loading-cover strong{color:var(--text-primary)}
+@media(max-width:820px){.office-edit-strip{gap:6px;padding-inline:6px}.office-save-state{font-size:11px;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+.viewer-stage{flex:1;min-height:480px;background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-md);box-shadow:var(--shadow-panel);overflow:hidden}
+
+.stat-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-bottom:1px solid var(--border-hairline)}
+.stat-card{background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-md);box-shadow:var(--shadow-panel);padding:var(--space-3);display:grid;gap:2px;justify-items:start}
+.stat-card:last-child{border-right:1px solid var(--border-hairline)}
+.stat-num{font-size:20px;font-weight:700;color:var(--brand-navy);font-variant-numeric:tabular-nums}
+.toolbar button.on{background:var(--surface-subtle);border-color:transparent;color:var(--brand-blue);font-weight:600}
+
+.search-bar input{border:1px solid var(--border-subtle);border-radius:var(--radius-sm);padding:0 var(--space-2);height:var(--height-control)}
+.search-total{color:var(--text-secondary);font-size:11px;padding:var(--space-2) var(--space-3)}
+.snippet{color:var(--text-secondary);font-size:11px;max-width:560px;margin-top:2px}
+.snippet mark{background:var(--brand-cyan-muted);color:var(--brand-navy);padding:0 2px;border-radius:var(--radius-xs)}
+.selection-bar{border-bottom-color:var(--border-selected);background:var(--surface-row-selected)}
+.selection-bar .toolbar-hint{color:var(--text-secondary)}
+
+/* Row density lives in features/documents/fileTable.css: the switch only ever
+   puts file-table-ultra on the <table> itself, so a body-level hook here would
+   be dead weight competing with that sheet on specificity. */
+
+/* ================= 响应式 ================= */
+@media(max-width:1210px){
+  .nav-toggle{display:inline-flex}
+  .header nav{display:none;position:absolute;top:var(--height-header);left:0;right:0;background:var(--surface-panel);border-bottom:1px solid var(--border-hairline);flex-direction:column;align-items:stretch;padding:var(--space-1) var(--space-3);z-index:20;height:auto;gap:0}
+  .header nav.open{display:flex}
+  .header nav a{height:32px;padding:0 var(--space-2);border:0}
+  .header nav a.active{border:0;box-shadow:none}
+  .header nav[data-slot="gooey-nav"]{
+   display:none;flex:none;position:absolute;top:calc(100% + 4px);left:4px;right:4px;
+   height:auto;min-width:0;width:auto;max-width:none;margin:0;padding:6px;
+   z-index:30;overflow:visible;background:var(--surface-panel);
+   border:1px solid var(--border-hairline);border-radius:var(--radius-md);
+   box-shadow:var(--shadow-overlay);
+  }
+  .header nav[data-slot="gooey-nav"].open{display:flex}
+  .header nav[data-slot="gooey-nav"]>ul{flex-direction:column;align-items:stretch;width:100%;max-width:100%;height:auto;gap:2px}
+  .header nav[data-slot="gooey-nav"] [data-slot="gooey-nav-segment"]{
+   width:100%;height:35px;min-height:35px;
+   margin-left:0!important;border-radius:var(--radius-sm);
+  }
+  .header nav[data-slot="gooey-nav"] [data-slot="gooey-nav-segment"]>svg{display:none}
+  .header nav[data-slot="gooey-nav"] [data-slot="gooey-nav-item"]{
+   display:flex;justify-content:flex-start;width:100%;height:35px;min-height:35px;
+   padding:0 12px;font-size:13px;border:0;
+  }
+  .header nav[data-slot="gooey-nav"] [data-slot="gooey-nav-item"].active{color:var(--text-inverse);border:0}
+  .sidebar{width:200px}
+  .command-trigger{width:140px}
+  .command-trigger .command-keys{display:none}
+  .product{display:none}
+}
+@media(max-width:820px){
+  .crumb-bar{display:none}
+  .stat-cards{grid-template-columns:repeat(2,1fr)}
+}
+
+/* ================= VIS-07: prefers-reduced-motion ================= */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+  .upload-progress.indeterminate .upload-progress-fill{animation:none!important;width:100%!important}
+  .tree-row button{transform:none!important}
+}

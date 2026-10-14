@@ -1,0 +1,278 @@
+/*
+ * Filesmanage Visual System 3 — compact, continuous, softly resolved geometry.
+ *
+ * The earlier workbench used 0-radius welded panels and 2/4/6px controls.
+ * Shared geometry and shadow tokens live in theme.css alongside colours.
+ * This layer governs layout and responsive compositions without changing
+ * dense data rows, contrast or accessibility focus.
+ */
+/* A wide, independently scrollable data grid must never enlarge Chrome's
+   layout viewport. All full-height pages already own their scroll regions. */
+html{overflow-x:clip}
+
+/* Shell surface geometry now lives in theme.css. */
+.header nav{gap:3px}
+.header nav a{
+  height:calc(100% - 8px);
+  border:0;
+  border-radius:var(--radius-sm);
+  padding:0 var(--space-3);
+}
+.header nav a.active{
+  background:var(--surface-row-selected);
+  color:var(--brand-blue);
+  border:0;
+  box-shadow:none;
+}
+.header nav a:hover{background:var(--surface-row-hover)}
+.work{overflow:hidden;background:var(--surface-canvas)}
+.work.file-preview-page{overflow-y:auto;overflow-x:hidden}
+.sidebar-scroll{padding:5px 4px}
+/* File explorer: one continuous workspace, not two outlined cards plus a
+   permanent resize rail. The only internal stroke is the pane separator. */
+.panels.document-explorer{
+  gap:0;
+  overflow:hidden;
+  border:1px solid var(--border-hairline);
+  border-radius:var(--radius-lg);
+  background:var(--surface-panel);
+  box-shadow:var(--shadow-panel);
+}
+.document-explorer>.sidebar,.document-explorer>.work{
+  border:0;
+  border-radius:0;
+  box-shadow:none;
+}
+.document-explorer>.sidebar{border-right:1px solid var(--border-hairline)}
+.document-explorer .sidebar-resizer::after{opacity:0;transition:opacity .12s ease}
+.document-explorer .sidebar-resizer:is(:hover,:focus-visible)::after,
+.document-explorer .sidebar-resizer[data-dragging="true"]::after{opacity:1}
+@media(max-width:700px){
+  .document-explorer>.sidebar{border-right:0;border-bottom:1px solid var(--border-hairline)}
+}
+.sidebar .tree-row{
+  width:calc(100% - 8px);
+  margin-inline:4px;
+  border-radius:var(--radius-sm);
+}
+.status-bar{
+  border:1px solid var(--border-hairline);
+  border-radius:var(--radius-md);
+  background:var(--surface-panel);
+  padding-inline:var(--space-3);
+}
+
+/* Floating controls are compact and softly rectangular, never bubbles. */
+button,input:not([type="checkbox"]):not([type="radio"]),select,textarea,
+.primary,.command-trigger,.ghost-action-btn,.ghost-more-btn,
+.toolbar-views select,.filter-search-input,
+.tree-search,.org-header-btn{
+  border-radius:var(--radius-sm);
+}
+input[type="checkbox"],input[type="radio"]{border-radius:var(--radius-xs)}
+/* Selection appearance belongs to its component, never a global inset rail. */
+.toolbar button.on,.group-list button.on{box-shadow:none}
+.nav-toggle,.account-trigger{border-radius:var(--radius-sm)}
+
+/* Independent content bands gain air and rounded edges without sacrificing
+   scroll ownership or table density. No sticky ancestor gets overflow:auto. */
+.breadcrumb,.toolbar,.folder-actions{
+  margin:6px 7px 0;
+  padding:4px var(--space-2);
+  min-height:30px;
+  border:1px solid var(--border-hairline);
+  background:var(--surface-panel);
+}
+.work-body{min-height:0}
+/* Align the folder context with the file toolbar and table. Generic panel
+   styling previously added margins/borders to children of a fixed 32px bar,
+   creating the detached, overflowing permission-action capsule. */
+.work .folder-context-bar{
+  box-sizing:border-box;width:calc(100% - 14px);max-width:calc(100% - 14px);
+  height:auto;min-height:36px;max-height:none;
+  margin:6px 7px 0;padding:4px 8px;
+  flex-wrap:wrap;gap:5px 10px;
+  border:1px solid var(--border-hairline);border-radius:var(--radius-md);
+}
+.work .folder-context-bar .breadcrumb{
+  flex:1 1 140px;min-width:0;max-width:100%;
+  margin:0;padding:0;min-height:0;border:0;border-radius:0;
+  background:transparent;
+}
+.work .folder-context-bar .folder-actions-slot{
+  min-width:0;max-width:100%;margin-left:auto;
+}
+.work .folder-context-bar .folder-actions{
+  height:auto;min-height:26px;max-width:100%;
+  margin:0;padding:0;gap:4px;flex-wrap:wrap;
+  border:0;border-radius:0;background:transparent;
+}
+.work .folder-context-bar .ghost-action-btn{
+  height:26px;min-height:26px;padding:0 8px;
+}
+@media(max-width:820px){
+  .work .folder-context-bar{width:calc(100% - 8px);max-width:calc(100% - 8px);margin:4px 4px 0}
+}
+.table{
+  min-height:0;
+  min-width:0;
+  margin:6px 7px 7px;
+  overflow:auto;
+}
+/* Preserve six-column table density on narrow screens: the full-width grid
+   scrolls inside its bounded panel, never the entire document viewport. */
+.work-body>.table{
+  box-sizing:border-box;
+  width:calc(100% - 14px);
+  max-width:calc(100% - 14px);
+  min-width:0;
+  overflow-x:auto;
+  /* Keep wide colgroup/table overflow out of the document's scrollable
+     overflow area. Without paint containment mobile Chrome widens the CSS
+     layout viewport to 725px even though the visible scrollport is 390px. */
+  contain:paint;
+}
+.table table{border-collapse:separate;border-spacing:0}
+.table thead tr:first-child th:first-child{border-top-left-radius:var(--radius-sm)}
+.table thead tr:first-child th:last-child{border-top-right-radius:var(--radius-sm)}
+.table tbody tr:focus-visible{border-radius:var(--radius-xs)}
+.org-count-pill{border-radius:var(--radius-pill)}
+.file-preview-page .table{margin-top:6px}
+.preview-text{
+  min-height:180px;
+  margin:6px 7px;
+  border-radius:var(--radius-md);
+}
+.notice,.hint:not(.toolbar-hint){border-radius:var(--radius-sm)}
+
+/* Legacy shell menus and dialogs now own their geometry in theme.css. */
+.login-card{border-radius:var(--radius-xl);box-shadow:var(--shadow-overlay)}
+.dialog{
+  max-width:calc(100vw - 32px);
+  max-height:calc(100dvh - 32px);
+  overflow:auto;
+}
+.dialog form fieldset,.grant-form fieldset,.perm-form fieldset{
+  border-radius:var(--radius-md);
+}
+
+/* Dashboard, organization and permission screens have the same card shape. */
+.stat-cards{
+  gap:8px;
+  padding:8px;
+  border-bottom:0;
+}
+/* Preview stages must not end as boxy exceptions to the global shell. */
+.media-image-stage,.media-video-stage,.media-audio-stage{overflow:auto}
+.office-holder,.viewer-stage{
+  margin:6px 7px 7px;
+}
+
+/* Small widths retain the same geometry with less inset and no horizontal
+   scrollbar induced by outer panel margins. */
+@media(max-width:1050px){
+  .header nav{
+    top:calc(var(--height-header) + 4px);
+    left:0;right:0;
+    border:1px solid var(--border-hairline);
+    border-radius:var(--radius-md);
+    box-shadow:var(--shadow-overlay);
+    padding:6px;
+  }
+  .header nav a{height:32px;border:0;border-radius:var(--radius-sm)}
+  .header nav a.active{border:0;box-shadow:none}
+}
+@media(max-width:960px) and (min-width:701px){
+  /* The persisted 240–360px sidebar width is for desktop; cap it when a
+     tablet needs to display a useful document workspace beside the tree. */
+  .sidebar{max-width:200px}
+}
+@media(max-width:820px){
+  .shell{padding:5px;gap:5px}
+  .panels{gap:5px}
+  .sidebar,.work,.header{border-radius:var(--radius-md)}
+  .breadcrumb,.toolbar,.folder-actions{margin:4px 4px 0}
+  .table,.media-preview,.preview-text,.office-holder,.viewer-stage{margin:4px}
+  .work-body>.table{
+    width:calc(100% - 8px);
+    max-width:calc(100% - 8px);
+  }
+  .stat-cards{gap:5px;padding:5px}
+  .org-workbench{gap:6px;padding:6px}
+}
+@media(max-width:700px){
+  /* Never allow a persisted desktop sidebar width to consume a phone view.
+     Stacking keeps the folder tree reachable and the file grid independently
+     scrollable in the remaining height. The resizer no longer has meaning. */
+  .panels{flex-direction:column;overflow:hidden}
+  .panels>.sidebar{
+    min-width:100%;
+    max-width:100%;
+    width:100%;
+    height:clamp(128px,24vh,180px);
+    min-height:128px;
+    flex:none;
+  }
+  .sidebar-resizer{display:none}
+  .panels>.work{flex:1;min-width:0;min-height:0}
+  .work .folder-context-bar{min-width:0}
+  .work .folder-context-bar{
+    height:auto;
+    max-height:none;
+    min-height:32px;
+    flex-wrap:wrap;
+    gap:4px;
+    padding:5px 8px;
+  }
+  .folder-actions-slot{min-width:0;max-width:100%}
+  /* File toolbar adapts to its pane via container queries in fileTable.css.
+     Do not overwrite its stable two-state grid from viewport breakpoints. */
+  .header{padding-right:4px;min-width:0}
+  .header .nav-toggle{flex:none}
+  .header .brand{
+    min-width:0;
+    flex:1;
+    padding-left:5px;
+    padding-right:4px;
+    text-overflow:ellipsis;
+  }
+  .header-right{
+    min-width:0;
+    flex:none;
+    gap:3px;
+    padding-right:0;
+  }
+  .header .command-trigger{
+    width:30px;
+    min-width:30px;
+    height:28px;
+    justify-content:center;
+    padding:0;
+  }
+  .header .command-trigger span{display:none}
+  .header .account-trigger{padding:2px}
+  .header .account-name{max-width:70px}
+  .header .header-exit-btn{width:28px;padding:0;justify-content:center}
+  .header .header-exit-label{display:none}
+  .header nav{z-index:60}
+  .dialog,.dialog.share-dialog,.editor-dialog,.restore-dialog,.rollback-dialog{
+    min-width:0;
+    width:calc(100vw - 20px);
+    max-width:calc(100vw - 20px);
+    padding:12px;
+  }
+  .dialog form{min-width:0}
+  .dialog .dialog-actions{flex-wrap:wrap}
+  .org-member-grid,.org-candidate-grid{
+    grid-template-columns:minmax(0,1fr);
+  }
+}
+@media(max-width:400px){
+  .header .brand{font-size:12px;gap:4px}
+  .header .brand-logo{width:19px;height:19px}
+  .header .account-name{display:none}
+  .header .account-caret{display:none}
+  .header .header-right{gap:2px}
+  .status-bar{padding-inline:6px}
+  .status-bar .status-right{display:none}
+}

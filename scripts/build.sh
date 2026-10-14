@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Reproducible build for filesmanage v2.1 (SPEC §14.3 Step C / M8).
+#
+# Order matters: the frontend must be built first because the dev server serves
+# web/dist from disk, and the Go binaries are built afterwards so they never
+# embed a stale bundle.
+#
+# Usage: scripts/build.sh [--with-tests]
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+echo "== brand: high-resolution transparent logo loader =="
+python3 scripts/brand_loader_asset_check.py
+
+echo "== web: npm ci + vite build =="
+if [ -d web/node_modules ]; then
+  (cd web && npm run build)
+else
+  (cd web && npm ci && npm run build)
+fi
+
+echo "== ui: component geometry governance gate =="
+node scripts/ui_style_governance_check.mjs
+
+echo "== ui: Rare component ownership gate =="
+node scripts/ui_component_governance_check.mjs
+node --test scripts/ux_fixture_guard.test.mjs
+
+echo "== ux: folder cursor and upload history state contracts =="
+node scripts/ux_upload_queue_logic_check.mjs
+node scripts/ux_resumable_reconcile_check.mjs
+node scripts/ux_resource_sync_logic_check.mjs
+node scripts/ux_live_connection_check.mjs
+node scripts/ux_session_identity_check.mjs
+node scripts/ux_file_revalidation_check.mjs
+node scripts/file_rename_extension_check.mjs
+node scripts/toast_feedback_check.mjs
+node scripts/toast_surface_governance_check.mjs
+node scripts/rare_emil_interaction_check.mjs
+
+echo "== go: build server and worker =="
+go build -o .bin/server ./cmd/server
+go build -o .bin/worker ./cmd/worker
+
+echo "== go: vet =="
+go vet ./...
+
+echo "== architecture gate =="
+python3 scripts/check_architecture.py
+
+echo "== openapi contract drift gate =="
+python3 scripts/gen_openapi.py --check
+
+echo "== acceptance matrix gate =="
+python3 scripts/gen_acceptance_matrix.py --check
+
+if [ "${1:-}" = "--with-tests" ]; then
+  echo "== cad: DXF geometry / snap regression =="
+  node web/scripts/cad-viewer-smoke.mjs
+  echo "== cad: isolated Chrome WebGL viewport regression =="
+  node web/scripts/cad-browser-smoke.mjs
+  echo "== ui: centered Rare toast browser geometry regression =="
+  node scripts/toast_visual_readonly_check.mjs
+  echo "== ui: stationary brand loading and button geometry regression =="
+  node scripts/loading_visual_browser_check.mjs
+  echo "== ui: global authenticated file drop and folder destination regression =="
+  node scripts/global_upload_browser_check.mjs
+  echo "== go: full test suite =="
+  go test ./...
+  echo "== migrations: checksum re-verify =="
+  set -a; . .secrets/server.env; set +a
+  go run ./cmd/migrate -dir migrations -check
+  echo "== realtime: transactional PostgreSQL journal == "
+  bash scripts/realtime_journal_db_check.sh
+fi
+
+echo "BUILD_OK server=$(du -h .bin/server | cut -f1) worker=$(du -h .bin/worker | cut -f1)"

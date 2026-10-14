@@ -1,0 +1,570 @@
+/* Finder default: five-column compact DataGrid. An opt-in checkbox column
+   makes it six columns without changing row membership or keyboard actions. */
+.batch-delete-failure{font-size:11px;color:var(--status-danger);overflow-wrap:anywhere}
+.zip-download-status{display:flex;align-items:center;gap:9px;min-height:32px;padding:5px 10px;font-size:12px;min-width:0;color:var(--text-secondary)}
+.zip-download-status>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.zip-progress-track{position:relative;flex:1 1 60px;max-width:180px;height:3px;background:var(--border-hairline);border-radius:var(--radius-pill);overflow:hidden}
+.zip-progress-track>span{position:absolute;left:0;top:0;bottom:0;width:35%;background:var(--brand-blue);animation:zip-progress 1.2s ease-in-out infinite alternate}
+@keyframes zip-progress{from{transform:translateX(0)}to{transform:translateX(180%)}}
+.file-page-controls{
+ display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;
+ padding:7px 12px;border-top:1px solid var(--border-hairline);
+ background:var(--surface-panel);font-size:11px;min-width:0;
+}
+.file-page-controls .rare-button{min-height:27px;height:27px;white-space:nowrap}
+.file-page-hint{color:var(--text-secondary)}
+.file-page-error{color:var(--status-danger);min-width:0;overflow-wrap:anywhere}
+.file-table{--file-list-row-height:32px;table-layout:fixed;width:100%}
+.file-table th{padding:0 8px;height:var(--height-table-header)}
+.file-table tbody tr{height:var(--file-list-row-height)}
+.file-table tbody td:not(.empty){
+  display:table-cell;
+  height:var(--file-list-row-height);
+  vertical-align:middle;
+  padding:0 8px;
+  box-sizing:border-box;
+}
+.col-select{text-align:center}
+/* Finder-style continuous zebra list. The displayed DOM order includes
+   folders AND files; nth-child keeps stripes continuous after filtering. */
+.work-body>.explorer-striped-list{
+  --explorer-list-canvas:var(--ui-bg-canvas);
+  --explorer-list-stripe:var(--ui-bg-sidebar);
+  --explorer-list-hover:var(--ui-state-hover);
+  --explorer-list-selection:var(--ui-state-selected-list);
+  background:var(--explorer-list-canvas);
+  border:0;
+}
+.explorer-striped-list table.file-table{
+  border-collapse:separate;
+  border-spacing:0;
+  background:transparent;
+}
+.explorer-striped-list table.file-table thead th{
+  background:var(--explorer-list-canvas);
+  border-bottom:1px solid var(--border-hairline);
+}
+.explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder){
+  --explorer-row-surface:var(--explorer-list-canvas);
+  height:var(--file-list-row-height);
+  background:transparent;
+  box-shadow:none;
+  transition:none;
+}
+.explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder):nth-child(even){
+  --explorer-row-surface:var(--explorer-list-stripe);
+}
+.explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder):hover:not(.selected){
+  --explorer-row-surface:var(--explorer-list-hover);
+  background:transparent;
+}
+.explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder).selected,
+.explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder).selected:hover{
+  --explorer-row-surface:var(--explorer-list-selection);
+  background:transparent;
+  box-shadow:none;
+}
+/* Fill adjacent cells with one surface. Only the two outside cells are
+   rounded, so the row is a single band and never six separate pills. */
+.explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder) > td{
+  box-sizing:border-box;
+  height:var(--file-list-row-height);
+  padding-top:0;
+  padding-bottom:0;
+  border:0;
+  background:var(--explorer-row-surface);
+  transition:background-color .16s ease;
+}
+.explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder) > td:first-child{
+  border-top-left-radius:var(--radius-md);
+  border-bottom-left-radius:var(--radius-md);
+}
+.explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder) > td:last-child{
+  border-top-right-radius:var(--radius-md);
+  border-bottom-right-radius:var(--radius-md);
+}
+.explorer-striped-list table.file-table tbody tr.selected > td,
+.explorer-striped-list table.file-table tbody tr.selected .file-name{
+  color:#FFFFFF;
+}
+.explorer-striped-list table.file-table tbody tr.selected .file-name{font-weight:600}
+.explorer-striped-list table.file-table tbody tr.selected :is(.file-mobile-meta,.folder-inline-open){color:#E2ECFF}
+.explorer-striped-list table.file-table tbody tr.selected .version-badge{
+  color:#FFFFFF;background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.24);
+}
+.explorer-striped-list table.file-table tbody tr.selected .col-select input[type="checkbox"]{
+  background:#FFFFFF;border-color:#FFFFFF;
+}
+.explorer-striped-list table.file-table tbody tr.selected .col-select input[type="checkbox"]::after{
+  border-color:var(--explorer-list-selection);
+}
+.explorer-striped-list table.file-table tbody tr.selected .row-actions :is(button,a),
+.explorer-striped-list table.file-table tbody tr.selected .folder-inline-open{color:#FFFFFF !important}
+.explorer-striped-list table.file-table tbody tr.selected .row-actions :is(button,a):hover,
+.explorer-striped-list table.file-table tbody tr.selected .folder-inline-open:hover{
+  color:#FFFFFF !important;background:rgba(255,255,255,.16) !important;
+}
+.explorer-striped-list table.file-table tbody tr.selected .row-actions .action-star-btn.favorited{
+  color:#FCE08B !important;
+}
+.explorer-striped-list table.file-table tbody tr.selected .file-type-icon{
+  filter:drop-shadow(0 1px 1px rgba(9,31,79,.34));
+}
+.explorer-striped-list table.file-table tbody tr:focus-visible{
+  outline:2px solid var(--border-focus);outline-offset:-2px;border-radius:var(--radius-md);
+}
+@media(prefers-reduced-motion:reduce){
+  .explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder) > td{transition:none}
+}
+.table table.file-table tbody tr.focused:not(:focus-visible){box-shadow:none}
+/* Visible focus is reserved for keyboard traversal; mouse selection has no
+   full-row outline. The checkbox has its own independently visible focus. */
+.table table.file-table tbody tr:focus-visible{
+ outline:1px solid var(--border-focus);
+ outline-offset:-1px;
+ box-shadow:none;
+}
+.file-table .col-select input[type="checkbox"]{
+ -webkit-appearance:none;appearance:none;
+ display:inline-grid;place-content:center;
+ vertical-align:middle;cursor:pointer;
+ width:16px;height:16px;margin:0;padding:0;
+ border:1px solid var(--border-strong);
+ border-radius:var(--radius-xs);
+ background:var(--surface-panel);
+ box-shadow:none;
+ transition:background-color .16s ease,border-color .16s ease,box-shadow .16s ease;
+}
+.file-table .col-select input[type="checkbox"]:hover:not(:disabled){
+ border-color:var(--brand-blue);background:var(--surface-row-hover);
+}
+.file-table .col-select input[type="checkbox"]:is(:checked,:indeterminate){
+ background:var(--surface-panel);border-color:var(--brand-blue);
+}
+.file-table .col-select input[type="checkbox"]::after{
+ content:"";display:block;opacity:0;
+ width:5px;height:8px;
+ border-right:2px solid var(--brand-blue);
+ border-bottom:2px solid var(--brand-blue);
+ transform:translateY(-1px) rotate(45deg) scale(.7);
+ transition:opacity .12s ease,transform .16s ease;
+}
+.file-table .col-select input[type="checkbox"]:checked::after{
+ opacity:1;transform:translateY(-1px) rotate(45deg) scale(1);
+}
+.file-table .col-select input[type="checkbox"]:indeterminate::after{
+ opacity:1;width:8px;height:2px;
+ border:0;background:var(--brand-blue);
+ transform:none;
+}
+.file-table .col-select input[type="checkbox"]:focus-visible{
+ outline:2px solid var(--border-focus);
+ outline-offset:2px;box-shadow:none;
+}
+.file-table .col-select input[type="checkbox"]:disabled{cursor:not-allowed;opacity:.5}
+@media(prefers-reduced-motion:reduce){
+ .file-table .col-select input[type="checkbox"],
+ .file-table .col-select input[type="checkbox"]::after{transition:none}
+}
+
+.col-name{min-width:0}
+.col-size{text-align:right !important}
+.col-version{text-align:center}
+.col-hash{width:90px}
+.col-date{text-align:right}
+.col-actions{text-align:right}
+/* Reserve balanced column space at wide desktop sizes. Metadata must not be
+   stranded at the right by an infinitely expanding filename column. */
+.file-table th.col-select{width:2%}
+.file-table th.col-name{width:48%}
+.file-table th.col-size{width:11%}
+.file-table th.col-version{width:9%}
+.file-table th.col-date{width:17%}
+.file-table th.col-actions{width:86px;text-align:right}
+.file-table tbody td.row-actions .actions-cell-wrap{justify-content:flex-end}
+@container file-list (max-width:1400px){
+  .file-table th.col-select{width:36px}
+  .file-table th.col-name{width:auto}
+  .file-table th.col-size{width:88px}
+  .file-table th.col-version{width:62px}
+  .file-table th.col-date{width:146px}
+  .file-table th.col-actions{width:86px}
+}
+
+.file-cell-wrap{display:flex;align-items:center;gap:var(--space-1);min-width:0;height:100%}
+.file-cell-wrap .file-name{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-primary);font-weight:500}
+.explorer-list-folder .file-name{flex:0 1 auto}
+/* The folder action stays adjacent to its name, not at the far edge. */
+.file-table .folder-inline-open{
+  flex:none;margin-left:5px;padding:0 6px!important;height:22px;min-height:22px;
+  border:0;border-radius:var(--radius-sm);background:transparent;color:var(--brand-blue);
+  font-size:11px;opacity:0;pointer-events:none;
+  transition:opacity .14s ease,background-color .14s ease;
+}
+.file-table .folder-inline-open:hover{background:var(--surface-row-hover)}
+.explorer-list-folder:hover .folder-inline-open,
+.explorer-list-folder.selected .folder-inline-open,
+.explorer-list-folder:focus-within .folder-inline-open{opacity:1;pointer-events:auto}
+@media(hover:none),(pointer:coarse){.file-table .folder-inline-open{opacity:1;pointer-events:auto}}
+@media(prefers-reduced-motion:reduce){.file-table .folder-inline-open{transition:none}}
+.file-mobile-meta{display:none}
+/* File names remain text, not navigation links. On a narrow or touch device
+   the action column is off-screen inside the horizontal data-grid scroller;
+   expose a primary-column menu that uses the shared keyboard-safe Menu. */
+.file-mobile-actions{
+  display:none;flex:none;align-items:center;justify-content:center;
+  width:24px;height:24px;min-height:24px;padding:0;
+  border:1px solid var(--border-subtle);border-radius:var(--radius-sm);
+  background:var(--surface-panel);color:var(--brand-blue);font-weight:700;
+}
+.file-mobile-actions:hover{background:var(--surface-row-hover)}
+.file-type-icon{flex:none;display:block;overflow:visible}
+/* This bar tracks the actual file-pane width, not the browser viewport.
+   A resized folder tree must never push controls outside the panel. */
+.work-body{container:file-list / inline-size;min-width:0}
+.work-body>.file-toolbar{
+  box-sizing:border-box;width:100%;max-width:100%;
+  min-height:44px;margin:0;padding:5px 12px;
+  display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;
+  gap:8px 12px;background:var(--surface-panel);
+  border:0;border-bottom:1px solid var(--border-hairline);
+  border-radius:var(--radius-xs);
+}
+.file-toolbar .toolbar-actions{
+  display:flex;align-items:center;justify-content:flex-start;
+  min-width:0;max-width:100%;
+}
+.file-toolbar .file-toolbar-mode{
+  display:flex;align-items:center;justify-content:flex-start;
+  flex-wrap:nowrap;gap:7px;min-width:0;max-width:100%;
+  animation:file-toolbar-enter .18s ease-out both;
+}
+@keyframes file-toolbar-enter{
+  from{opacity:0;transform:translateY(3px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.file-toolbar .upload-button.primary-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  height:32px;min-height:32px;line-height:1;padding:0 12px;font-size:12px;font-weight:600;
+  background:var(--brand-blue);color:var(--text-inverse);
+  border:1px solid transparent;border-radius:var(--radius-md);
+  cursor:pointer;user-select:none;white-space:nowrap;
+  transition:background-color .16s ease,box-shadow .16s ease;
+}
+.file-toolbar .upload-button.primary-btn:hover{background:var(--color-action-hover)}
+.file-toolbar .upload-button.primary-btn:focus-within{
+  outline:2px solid var(--border-focus);outline-offset:2px;
+}
+.file-toolbar .new-folder-wrapper{display:flex;min-width:0}
+.file-toolbar .action-btn-secondary{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  height:32px;min-height:32px;line-height:1;padding:0 12px;
+  font-size:12px;font-weight:500;border:1px solid #E2E8F0;
+  background:#FFFFFF;color:var(--text-primary);
+  border-radius:8px;cursor:pointer;white-space:nowrap;
+  transition:background-color .16s ease,color .16s ease;
+}
+.file-toolbar .action-btn-secondary:hover{
+  background:var(--surface-row-hover);border-color:transparent;color:var(--brand-blue);
+}
+.file-toolbar .batch-actions-group{
+  gap:3px;background:transparent;border:0;
+  margin:0;padding:0;white-space:nowrap;
+}
+.file-toolbar .file-selected-count{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:0 5px 0 2px;font-size:12px;font-weight:500;
+  color:var(--text-secondary);white-space:nowrap;
+}
+.file-toolbar .file-selected-count strong{
+  font-size:12px;color:var(--text-primary);font-variant-numeric:tabular-nums;
+}
+.file-toolbar .file-selected-count .file-toolbar-icon{color:var(--brand-blue)}
+.file-selection-hidden{font-size:11px;color:var(--text-secondary)}
+.file-toolbar-separator{
+  flex:none;width:1px;height:17px;margin:0 3px;
+  background:var(--border-hairline);
+}
+.file-toolbar-icon{display:block;flex:none;width:16px;height:16px}
+.file-toolbar .batch-actions-group .rare-button{
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;
+  flex:none;height:32px;min-height:32px;padding:0 7px;
+  border:1px solid transparent;border-radius:var(--radius-sm);
+  background:transparent;color:var(--text-secondary);font-size:12px;
+  transition:background-color .16s ease,color .16s ease;
+}
+.file-toolbar .batch-actions-group .batch-btn:hover:not(:disabled){
+  color:var(--brand-blue);background:var(--surface-row-hover);border-color:transparent;
+}
+.file-toolbar .batch-actions-group .batch-btn.danger{color:var(--status-danger);background:transparent}
+.file-toolbar .batch-actions-group .batch-btn.danger:hover:not(:disabled){
+  background:var(--surface-danger-soft);border-color:transparent;
+}
+.file-toolbar .batch-actions-group .batch-btn:disabled{
+  opacity:.38;cursor:not-allowed;background:transparent;
+}
+.file-toolbar .batch-actions-group .batch-clear-selection{
+  width:30px;padding:0;color:var(--text-tertiary);
+}
+.file-toolbar .batch-actions-group .batch-clear-selection:hover{
+  background:var(--surface-header);color:var(--text-primary);
+}
+
+.file-toolbar .toolbar-views{
+  display:flex;align-items:center;justify-content:flex-end;
+  flex:none;min-width:0;max-width:100%;flex-wrap:nowrap;gap:7px;
+  margin-left:auto;
+}
+.file-toolbar .sort-label,.file-toolbar .filter-label{
+  display:inline-flex;align-items:center;gap:5px;
+  min-width:0;white-space:nowrap;font-size:11px;color:var(--text-secondary);
+}
+/* RareSelect's visible control is a button inside .rare-select-root, not the
+   hidden native select. Constrain both the wrapper and the visible button. */
+.file-toolbar .rare-select-root{width:120px;min-width:0;flex:none}
+.file-toolbar .filter-label .rare-select-root{width:154px}
+.file-toolbar .rare-select-root>.rare-select{
+  height:32px;min-height:32px;max-height:32px;
+  padding:0 9px;gap:5px;font-size:12px;min-width:0;
+  border-color:transparent;background:var(--surface-header);
+  border-radius:var(--radius-md);
+}
+.file-toolbar .rare-select-root>.rare-select:hover{background:var(--surface-row-hover)}
+.file-toolbar .rare-select-chevron{width:12px;height:12px}
+.file-toolbar .filter-search-wrap{position:relative;display:flex;align-items:center;flex:none;width:190px;min-width:110px;max-width:100%}
+.file-toolbar .filter-search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);pointer-events:none;color:#718096;z-index:1;flex:none}
+/* Override the global input radius with the intentional filter capsule. */
+.work-body .file-toolbar input.filter-search-input{
+  display:block;box-sizing:border-box;width:100%;min-width:0;
+  height:32px;font-size:12px;padding:0 12px 0 34px;
+  border:1px solid transparent;border-radius:999px;
+  background:#F1F5F9;color:var(--text-primary);
+}
+.file-toolbar .filter-search-input:hover{background:#E9EFF6}
+.file-toolbar .filter-search-input:focus{
+  width:100%;background:var(--surface-panel);border-color:var(--border-focus);
+}
+
+/* Break at the actual pane width, including wide browsers with a sidebar. */
+@container file-list (max-width:1180px){
+  .work-body>.file-toolbar{grid-template-columns:minmax(0,1fr);min-height:78px}
+  .file-toolbar .toolbar-actions,.file-toolbar .toolbar-views{
+    justify-content:flex-start;margin-left:0;
+  }
+}
+@container file-list (max-width:660px){
+  .file-toolbar .batch-action-label{display:none}
+  .file-toolbar .batch-actions-group .rare-button{width:32px;padding:0}
+  .file-toolbar .toolbar-filter-caption{display:none}
+  .file-toolbar .rare-select-root{width:104px}
+  .file-toolbar .filter-label .rare-select-root{width:124px}
+  .file-toolbar .filter-search-wrap{width:clamp(110px,29%,174px)}
+  .file-toolbar .file-selection-hidden{font-size:10px}
+}
+@container file-list (max-width:420px){
+  .file-toolbar .file-selected-count{font-size:11px}
+  .file-toolbar .file-selected-count .file-toolbar-icon{display:none}
+  .file-toolbar .file-selection-hidden{display:none}
+  .file-toolbar .toolbar-views{gap:4px}
+  .file-toolbar .rare-select-root{width:90px}
+  .file-toolbar .filter-label .rare-select-root{width:103px}
+  .file-toolbar .filter-search-wrap{width:110px}
+}
+@media(prefers-reduced-motion:reduce){
+  .file-toolbar .file-toolbar-mode{animation:none}
+}
+@container file-list (max-width:820px){
+  .file-table th.col-actions{width:66px}
+  .file-table th.col-date{width:130px}
+  .file-table th.col-size{width:76px}
+  .file-table th.col-version{width:54px}
+  .file-table .actions-hover-group{opacity:1;pointer-events:auto}
+  .file-table .actions-hover-group>.action-link:not(.more-trigger){display:none}
+}
+@container file-list (max-width:560px){
+  .file-toolbar .filter-search-wrap{flex:1 1 150px}
+  /* Fixed column groups keep reserving width for hidden cells in Chrome.
+     Instead only the visible semantic header cells control table sizing. */
+  .file-table{table-layout:fixed}
+  .file-table :is(th,td).col-date,.file-table :is(th,td).col-size,.file-table :is(th,td).col-version{display:none}
+  .file-table th.col-select{width:34px}
+  .file-table th.col-actions{width:62px}
+  .file-table tbody tr{height:var(--file-list-row-height)}
+  .file-table tbody td:not(.empty){height:var(--file-list-row-height)}
+  .file-table .file-cell-wrap{
+    /* Explicit slots keep optional Finder dots from creating a third grid
+       row and stretching file rows beyond the shared 32px folder height. */
+    display:grid;grid-template-columns:16px minmax(0,1fr) auto 24px;
+    grid-template-rows:16px 12px;column-gap:5px;align-content:center;
+  }
+  .file-table .file-type-icon{grid-column:1;grid-row:1/3}
+  .file-table .file-name{grid-column:2;grid-row:1;min-width:0}
+  .file-table .file-mobile-meta{display:block;grid-column:2;grid-row:2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary);font-size:10px}
+  .file-table .file-finder-marks{grid-column:3;grid-row:1/3;align-self:center;max-width:48px;gap:3px}
+  .file-table .file-finder-mark{width:6px;height:6px}
+  .file-table .file-mobile-actions{display:inline-flex;grid-column:4;grid-row:1/3;align-self:center;height:24px;min-height:24px}
+  /* The compact grid allocates exactly 24px for its trailing affordance.
+     Replace the text label visually with a chevron; keep the aria-label. */
+  .file-table .folder-inline-open{
+    grid-column:4;grid-row:1/3;justify-self:end;align-self:center;
+    box-sizing:border-box;width:24px;min-width:24px;height:24px;
+    margin:0;padding:0!important;font-size:0;
+  }
+  .file-table .folder-inline-open::after{content:"›";font-size:21px;font-weight:400;line-height:1}
+}
+@container file-list (max-width:360px){
+  .file-table th.col-actions{width:44px}
+  .file-table .actions-hover-group{display:none}
+}
+
+/* ---- 核心文件表格：彻底拆除操作列边框围墙、Hover 唤出、收纳分流、常驻收藏星标 ---- */
+.file-table tbody td.row-actions{display:table-cell;vertical-align:middle;text-align:right}
+.actions-cell-wrap{
+  display:flex;align-items:center;justify-content:flex-end;gap:4px;height:100%;
+}
+.actions-hover-group{
+  display:flex;align-items:center;gap:2px;
+  opacity:0;pointer-events:none;
+  transition:opacity .12s ease;
+}
+table.file-table tbody tr:hover .actions-hover-group,
+table.file-table tbody tr:focus-visible .actions-hover-group,
+table.file-table tbody tr .row-actions:focus-within .actions-hover-group{
+  opacity:1;pointer-events:auto;
+}
+@media(hover:none),(pointer:coarse){
+  .actions-hover-group{opacity:1;pointer-events:auto}
+}
+
+.action-star-btn{
+  border:none !important;background:transparent !important;box-shadow:none !important;
+  color:var(--text-tertiary) !important;
+  width:22px;height:20px;padding:0 !important;
+  cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;
+  border-radius:var(--radius-xs);
+  transition:all .12s ease;
+  flex:none;
+}
+.action-star-btn:hover{
+  background:var(--surface-row-hover) !important;
+  color:var(--brand-star, #f59e0b) !important;
+}
+.action-star-btn.favorited{
+  color:var(--brand-star, #f59e0b) !important;
+}
+.action-star-btn.favorited:hover{
+  color:var(--color-star-hover) !important;
+}
+.action-star-btn:disabled{
+  opacity:0.4;cursor:not-allowed;
+}
+.star-icon{display:block}
+
+.sr-only{
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;
+}
+
+.action-link,
+.file-table tbody td.row-actions button,
+.file-table tbody td.row-actions a{
+  border:none !important;background:transparent !important;box-shadow:none !important;
+  color:var(--brand-blue);font-size:11px;font-weight:500;padding:0 4px !important;
+  height:20px;line-height:20px;cursor:pointer;text-decoration:none;
+  border-radius:var(--radius-xs);display:inline-flex;align-items:center;
+  transition:background-color .1s ease, color .1s ease;
+}
+.action-link:hover,
+.file-table tbody td.row-actions button:hover,
+.file-table tbody td.row-actions a:hover{
+  background:var(--surface-row-hover) !important;color:var(--color-action-hover);
+}
+.action-link.danger,
+.file-table tbody td.row-actions button.danger{
+  color:var(--status-danger) !important;
+}
+.action-link.danger:hover,
+.file-table tbody td.row-actions button.danger:hover{
+  background:var(--surface-danger-soft) !important;color:var(--status-danger) !important;
+}
+
+.action-link.more-trigger{width:18px;justify-content:center;font-weight:700}
+
+/* ---- 字段对齐与细节 ---- */
+.col-size,
+.file-table th.col-size,
+.file-table tbody td.col-size{
+  text-align:right !important;font-variant-numeric:tabular-nums;
+}
+.col-hash,
+.file-table tbody td.col-hash,
+.hash{
+  font-family:var(--font-mono);font-size:11px;color:var(--text-tertiary);font-variant-numeric:tabular-nums;
+}
+.version-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  height:18px;padding:0 6px;border-radius:var(--radius-pill);
+  background:var(--surface-header);color:var(--text-secondary);
+  font-size:11px;font-weight:500;border:1px solid var(--border-subtle);
+  font-variant-numeric:tabular-nums;
+}
+
+/* One compact row-height contract across file/folder rows and narrow panes. */
+table.file-table-ultra tbody tr{height:var(--file-list-row-height)}
+table.file-table-ultra tbody td:not(.empty){height:var(--file-list-row-height);padding:0 8px}
+@container file-list (max-width:560px){
+ table.file-table-ultra tbody tr{height:var(--file-list-row-height)}
+ table.file-table-ultra tbody td:not(.empty){height:var(--file-list-row-height);padding:0 5px}
+ /* Override the explicit table-cell display contract in the base grid. */
+ table.file-table-ultra tbody td.col-size,
+ table.file-table-ultra tbody td.col-version,
+ table.file-table-ultra tbody td.col-date{display:none}
+}
+.density-switch{display:inline-flex;align-items:center;gap:var(--space-1);font-size:11px;color:var(--text-tertiary)}
+.density-title{color:var(--text-tertiary);white-space:nowrap}
+.density-switch button{height:22px;min-height:22px;padding:0 var(--space-2);font-size:11px}
+.toolbar .density-switch button[aria-pressed="true"]{background:var(--surface-row-selected);border-color:var(--border-selected);color:var(--brand-blue);font-weight:600}
+
+/* The root can contain only directories. In that case, don't show a
+   select-all control for unselectable folders or four empty file metadata
+   columns. The normal six-column grid returns as soon as files are visible. */
+table.file-table-folders-only :is(th,td).col-size,
+table.file-table-folders-only :is(th,td).col-version{display:none}
+table.file-table-folders-only th.col-select{width:36px}
+table.file-table-folders-only th.col-actions{width:86px}
+table.file-table-folders-only th.col-name{width:auto}
+table.file-table-folders-only tbody td.col-name{padding-left:8px}
+.file-table .folder-row-more{
+ display:inline-flex;align-items:center;justify-content:center;
+ min-height:24px;width:24px;padding:0;flex:none;
+ border:0;background:transparent;color:var(--text-secondary);
+ border-radius:var(--radius-sm);cursor:pointer;
+}
+.file-table .folder-row-more:hover{background:var(--surface-row-hover);color:var(--brand-blue)}
+.file-table .folder-row-more{color:var(--text-tertiary);font-size:17px;line-height:1}
+.file-finder-marks{display:inline-flex;align-items:center;gap:4px;flex:none;max-width:90px}
+.file-finder-mark{display:inline-block;width:9px;height:9px;flex:none;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.05)}
+/* Folder-only directories hide the other columns: the visible name cell
+   becomes both outside edges of the zebra stripe. */
+.explorer-striped-list table.file-table-folders-only tbody tr.explorer-list-folder > td.col-name{
+  border-radius:var(--radius-xs);
+}
+.file-toolbar .checkbox-visibility-toggle{
+ display:inline-flex;flex:none;align-items:center;justify-content:center;gap:5px;
+ min-height:32px;height:32px;padding:0 8px;
+ border:1px solid transparent;border-radius:var(--radius-md);
+ background:transparent;color:var(--text-secondary);font-size:11px;white-space:nowrap;
+}
+.file-toolbar .checkbox-visibility-toggle:hover{background:var(--surface-row-hover)}
+.file-toolbar .checkbox-visibility-toggle[aria-pressed="true"]{background:var(--surface-header);color:var(--brand-blue)}
+.file-paste-status{
+ display:flex;align-items:center;gap:12px;justify-content:center;
+ padding:5px 12px;font-size:12px;color:var(--text-secondary);
+ border-bottom:1px solid var(--border-hairline);
+}
+.file-paste-status .rare-button{min-height:26px;height:26px}
+@container file-list (max-width:720px){
+ .file-toolbar .checkbox-visibility-toggle span{display:none}
+ .file-toolbar .checkbox-visibility-toggle{width:32px;padding:0}
+}

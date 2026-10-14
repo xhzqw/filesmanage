@@ -1,0 +1,12 @@
+/* Rare Workbench modal header: one source of truth for dismissal, title and
+   focus treatment across file, approval, permission and print workflows. */
+.dialog-header{display:flex;align-items:center;gap:var(--space-2);min-width:0;margin-bottom:var(--space-3)}
+.dialog-header .dialog-title{flex:1;min-width:0;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dialog-header .dialog-close{flex:none;width:28px;height:28px;min-height:28px;padding:0;border-radius:var(--radius-sm)}
+.dialog-header .dialog-close:hover{color:var(--brand-blue)}
+.dialog-header .dialog-close:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px}
+/* Command palette has its own minimal input-first chrome; Escape remains its
+   dismissal affordance. Do not place a floating X over typed text. */
+.command-native-dialog .dialog-header{position:absolute;width:1px;height:1px;margin:0;padding:0;overflow:hidden;clip-path:inset(50%)}
+.command-native-dialog .dialog-close{display:none}
+@media(max-width:600px){.dialog-header{margin-bottom:var(--space-2)}}

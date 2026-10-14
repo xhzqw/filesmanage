@@ -1,0 +1,12 @@
+.lifecycle-policy-manager{border:1px solid var(--border-hairline);border-radius:var(--radius-lg);background:var(--surface-panel);margin:8px 14px;min-width:0;overflow:hidden}
+.lifecycle-policy-body{display:flex;flex-wrap:wrap;align-items:flex-end;gap:9px;padding:9px 12px}
+.lifecycle-policy-body label{display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--text-secondary);flex:1 1 130px;min-width:100px;max-width:230px}
+.lifecycle-policy-actions{display:flex;gap:5px;align-items:center}
+.lifecycle-policy-source{font-size:11px;color:var(--text-secondary);margin:0;padding:0 12px 10px}
+.lifecycle-bulk-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--border-hairline);font-size:12px}
+.lifecycle-bulk-bar .rare-input{max-width:180px}
+.lifecycle-stats{display:flex;flex-wrap:wrap;gap:10px;margin:10px 14px 0}
+.lifecycle-stats span{padding:8px 12px;font-size:12px;border:1px solid var(--border-hairline);border-radius:var(--radius-md);background:var(--surface-panel)}
+.lifecycle-stats strong{font-size:15px;margin-left:8px}
+.lifecycle-ledger .lifecycle-row-select{min-width:24px;width:24px;height:24px;padding:0;font-size:13px}
+.lifecycle-ledger .lifecycle-row-select[aria-pressed=true]{color:var(--brand-cyan);border-color:var(--brand-cyan)}

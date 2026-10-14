@@ -1,0 +1,75 @@
+/* FolderPicker panel (DESIGN-SYSTEM-v1 §4.2 Tree/Dialog/EmptyState,
+   DESKTOP-INTERACTION-v1 §6, COMPLEX-WORKFLOWS-v1 §2). Component-owned styles;
+   every value comes from the semantic token layer in theme.css :root. The panel
+   is not a dialog: it renders inside the host's modal Dialog, so there is no
+   backdrop and no second focus trap here. */
+.dialog.move-file-dialog{width:min(620px,calc(100vw - 28px));min-width:0;padding:var(--space-3)}
+.folder-picker{display:grid;gap:var(--space-2);min-width:0;width:100%;background:var(--color-panel);color:var(--color-text)}
+.folder-picker-search-row{display:grid;gap:var(--space-1);min-width:0}
+.folder-picker .folder-picker-search{width:100%;min-width:0;min-height:var(--height-control);padding:var(--space-1) var(--space-2);border:1px solid var(--color-border-strong);border-radius:var(--radius-control);background:var(--color-panel);color:var(--color-text)}
+.folder-picker .folder-picker-search:disabled{background:var(--color-panel-subtle);color:var(--color-text-secondary)}
+.folder-picker-hint{margin:0;color:var(--color-text-secondary);font-size:11px}
+.folder-picker-notice{margin:0;padding:var(--space-2) var(--space-3);border:1px solid var(--color-border);border-left:3px solid var(--color-row-selected-border);border-radius:var(--radius-control);background:var(--color-panel-subtle);color:var(--color-text)}
+.folder-picker-candidate{display:flex;align-items:baseline;gap:var(--space-1) var(--space-2);margin:0;padding:var(--space-1) 0 var(--space-2);border-bottom:1px solid var(--color-border);min-width:0}
+.folder-picker-candidate-label,.folder-picker-candidate-none{color:var(--color-text-secondary);font-size:12px;white-space:nowrap}
+.folder-picker-candidate-path{font-weight:600;color:var(--color-text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.folder-picker-candidate-reason,.folder-picker-blocked{font-size:12px;color:var(--color-danger)}
+.folder-picker-candidate-reason{flex-basis:100%}
+.folder-picker-blocked{margin:0}
+/* Search results: a flat list over the loaded visible set only. */
+.folder-picker-results{list-style:none;margin:0;padding:var(--space-1);display:grid;gap:2px;max-height:200px;overflow:auto;border:1px solid var(--color-border);border-radius:var(--radius-control);background:var(--color-panel)}
+.folder-picker-result{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--space-1) var(--space-2);width:100%;min-height:var(--height-tree-row);padding:var(--space-1) var(--space-2);border:1px solid transparent;border-radius:var(--radius-control);background:transparent;color:var(--color-text);text-align:left}
+.folder-picker-result:hover{background:var(--color-row-hover)}
+.folder-picker-result.candidate,.folder-picker-result.candidate:hover{border-color:transparent;background:var(--surface-subtle);color:var(--color-action)}
+.folder-picker-result-name{font-weight:600}
+.folder-picker-result-path{font-size:11px;color:var(--color-text-secondary);overflow-wrap:anywhere}
+/* Tree: 28px rows (--height-tree-row), one roving tab stop, hover never impersonates selection. */
+.folder-picker-tree{list-style:none;margin:0;padding:var(--space-1);max-height:min(42vh,320px);overflow:auto;border:1px solid var(--color-border);border-radius:var(--radius-control);background:var(--color-panel)}
+.folder-picker-tree ul{list-style:none;margin:0;padding:0}
+.folder-picker-tree[aria-busy="true"]{opacity:.6}
+.folder-picker-row{display:flex;align-items:center;gap:var(--space-1);min-height:var(--height-tree-row);padding-right:var(--space-2);border-radius:var(--radius-control)}
+.folder-picker-row:hover{background:var(--color-row-hover)}
+.folder-picker-row.candidate,.folder-picker-row.candidate:hover{background:var(--surface-subtle);box-shadow:none;color:var(--color-action)}
+.folder-picker-row.invalid{color:var(--color-text-secondary)}
+.folder-picker li:focus-visible{outline:3px solid var(--color-focus);outline-offset:-2px;border-radius:var(--radius-control)}
+.folder-picker-chevron{display:flex;align-items:center;justify-content:center;align-self:stretch;width:28px;min-width:28px;min-height:32px;padding:0;border:0;border-radius:var(--radius-control);background:transparent;color:inherit;font-size:11px;line-height:1}
+.folder-picker-chevron:hover{background:var(--color-row-selected)}
+.folder-picker-chevron-spacer{display:inline-block;align-self:stretch;width:28px;min-width:28px}
+.folder-picker-name{flex:1 1 auto;min-width:0;min-height:32px;padding:0 var(--space-1);border:0;background:transparent;color:inherit;font-size:inherit;font-weight:inherit;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.folder-picker-name:hover{background:transparent;color:var(--color-action);text-decoration:underline}
+.folder-picker-name{display:flex;align-items:center;gap:7px}
+.folder-picker-name svg,.folder-picker-result svg{flex:none}
+.folder-picker-name-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.folder-picker-result{align-items:center}
+.folder-picker-result-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.folder-picker-name[aria-disabled="true"],.folder-picker-name[aria-disabled="true"]:hover{background:transparent;color:var(--color-text-secondary);cursor:not-allowed;text-decoration:none}
+/* Invalid target reason appears only after interaction, not as a global red warning. */
+.folder-picker-empty{margin:0;padding:var(--space-6) var(--space-3);border:1px dashed var(--color-border-strong);border-radius:var(--radius-control);color:var(--color-text-secondary);text-align:center}
+.folder-picker-detail{display:grid;gap:var(--space-2);min-width:0}
+/* The host action row stays visible while the dialog content scrolls. */
+.folder-picker-footer{position:sticky;bottom:0;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:var(--space-2);padding:var(--space-2) 0;background:var(--color-panel);border-top:1px solid var(--color-border)}
+/* Folder selection is one location picker, not nested outlined cards. Only
+   the chosen destination carries a strong marker. */
+.folder-picker{gap:9px}
+.folder-picker .folder-picker-search{height:34px;min-height:34px;border-color:var(--border-subtle);background:var(--surface-header);font-size:12px}
+.folder-picker .folder-picker-search:focus-visible{outline:2px solid var(--border-focus);outline-offset:0}
+.folder-picker-candidate{gap:5px 9px;padding:2px 3px 8px;border-bottom:0}
+.folder-picker-candidate-path{color:var(--brand-blue);font-weight:650}
+.folder-picker-tree,.folder-picker-results{padding:5px;border:0;background:var(--surface-header);border-radius:var(--radius-md)}
+.folder-picker-row{margin:1px 0}
+.folder-picker-row.candidate,.folder-picker-row.candidate:hover{background:var(--surface-subtle);box-shadow:none}
+.folder-picker-result{flex-wrap:nowrap;min-height:36px;padding:6px 9px}
+.folder-picker-result.candidate,.folder-picker-result.candidate:hover{border-color:transparent;background:var(--surface-subtle);box-shadow:none}
+.folder-picker-result-path{flex:1;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.folder-picker-name:hover{text-decoration:none}
+.folder-picker-paged .folder-picker-tree{min-height:112px;max-height:min(45vh,340px)}
+.folder-picker-paged .folder-picker-chevron{font-size:14px;cursor:pointer}
+.folder-picker-paged .folder-picker-level-status{list-style:none;padding:7px 10px 7px 34px;font-size:12px;color:var(--text-secondary)}
+.folder-picker-paged .folder-picker-page-action{padding:4px 9px;min-height:28px;font-size:12px;color:var(--brand-blue);border:0;background:transparent;border-radius:var(--radius-control)}
+.folder-picker-paged .folder-picker-page-action:hover{background:var(--surface-subtle)}
+.folder-picker-empty{border:0;background:var(--surface-header);padding:20px 12px}
+.folder-picker-footer{border-top:0;padding-top:6px}
+@media(max-width:600px){
+ .folder-picker-candidate{display:flex}
+ .folder-picker-tree,.folder-picker-results{max-height:34vh}
+}

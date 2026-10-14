@@ -1,0 +1,81 @@
+/* Rare UI motion layer: composited transitions, not layout animation. */
+:root{
+ --fm-ease-out:cubic-bezier(.18,1,.32,1);
+ --fm-ease-smooth:cubic-bezier(.4,0,.2,1);
+ --fm-fast:130ms;
+ --fm-normal:220ms;
+ --fm-gentle:300ms;
+}
+/* Enter only the new work surfaces; never fade the entire shell or header.
+   Data refreshes within a mounted page do not replay page transitions. */
+.shell > .panels > .work,
+.shell > .panels > .sidebar,
+.shell > .office-stage{
+ animation:fm-work-arrive var(--fm-gentle) var(--fm-ease-out) both;
+}
+.shell > .panels > .sidebar{animation-delay:25ms}
+@keyframes fm-work-arrive{
+ from{opacity:.72;transform:translate3d(0,7px,0)}
+ to{opacity:1;transform:translate3d(0,0,0)}
+}
+/* Tactile, short button feedback. Explicit styles preserve each tone. */
+.rare-button:not(:disabled):not([aria-disabled="true"]):not([role="tab"]){
+ transition:background-color var(--fm-fast) ease,border-color var(--fm-fast) ease,
+ color var(--fm-fast) ease,box-shadow var(--fm-normal) var(--fm-ease-out),
+ transform var(--fm-normal) var(--fm-ease-out);
+}
+.rare-button:not(:disabled):not([aria-disabled="true"]):not([role="tab"]):active{transform:scale(.972)}
+.rare-button[data-rare-intent="primary"]:hover:not(:disabled){
+ box-shadow:0 3px 9px rgba(15,39,92,.17);
+}
+.rare-button[data-rare-loading="true"]{animation:fm-pending-breathe 1.9s ease-in-out infinite}
+@keyframes fm-pending-breathe{50%{box-shadow:inset 0 0 0 1px var(--border-focus)}}
+.rare-button{isolation:isolate}
+.fm-click-wave{
+ position:absolute;z-index:-1;pointer-events:none;border-radius:50%;
+ background:currentColor;opacity:0;contain:paint;
+}
+.rare-button:has(> .fm-click-wave),.toolbar button:has(> .fm-click-wave),
+.folder-actions button:has(> .fm-click-wave),.tree-row button:has(> .fm-click-wave){
+ position:relative;overflow:hidden;
+}
+/* Native showModal() keeps focus trapping and top-layer semantics intact. */
+.dialog[open]{animation:fm-dialog-arrive var(--fm-gentle) var(--fm-ease-out) both}
+.dialog[open]::backdrop{animation:fm-scrim-arrive var(--fm-normal) ease-out both}
+@keyframes fm-dialog-arrive{
+ from{opacity:.35;transform:translateY(10px) scale(.975)}
+ to{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes fm-scrim-arrive{from{opacity:0}to{opacity:1}}
+.menu,.rare-select-menu{animation:fm-menu-arrive 170ms var(--fm-ease-out)}
+@keyframes fm-menu-arrive{
+ from{opacity:0;transform:translateY(-5px) scale(.985)}
+ to{opacity:1;transform:translateY(0) scale(1)}
+}
+.menu-item,.rare-select-option{transition:background-color var(--fm-fast) ease,color var(--fm-fast) ease}
+/* Selection is composited as paint, not translated: dense row geometry stays put. */
+.table tbody tr,.rare-data-table tbody tr{
+ transition:background-color var(--fm-fast) ease,box-shadow var(--fm-normal) ease;
+}
+.tree-row,.rare-tabs [role="tab"]{
+ transition:background-color var(--fm-fast) ease,color var(--fm-fast) ease,
+ box-shadow var(--fm-normal) var(--fm-ease-smooth);
+}
+.status-pill,.status-badge,.tag,.badge{
+ transition:background-color var(--fm-normal) ease,color var(--fm-normal) ease,
+ border-color var(--fm-normal) ease;
+}
+.rare-toast{animation:none;will-change:transform,opacity}
+/* Panels appear when selected, not while inactive and hidden. */
+.rare-tab-panel,[role="tabpanel"]{animation:fm-tab-arrive 190ms var(--fm-ease-out)}
+@keyframes fm-tab-arrive{from{opacity:.78;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+.stat-card{transition:box-shadow var(--fm-normal) ease,border-color var(--fm-normal) ease}
+.stat-card:hover{box-shadow:var(--shadow-panel)}
+.rare-toast-mark{animation:fm-mark-pop 240ms var(--fm-ease-out)}
+@keyframes fm-mark-pop{from{transform:scale(.7);opacity:.45}to{transform:scale(1);opacity:1}}
+@media(prefers-reduced-motion:reduce){
+ .shell > .panels > .work,.shell > .panels > .sidebar,.shell > .office-stage,
+ .dialog[open],.dialog[open]::backdrop,.menu,.rare-select-menu,
+ .rare-toast-mark,.rare-button[data-rare-loading="true"],.rare-tab-panel,[role="tabpanel"]{animation:none!important}
+ .rare-button:not(:disabled):active{transform:none!important}
+}

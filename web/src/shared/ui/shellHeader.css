@@ -1,0 +1,167 @@
+/* Finder-like restrained segmented navigation: three independent shell groups,
+   no extra header row, solid white slider on one neutral trough. */
+.shell>.header{
+ display:grid;grid-template-columns:minmax(190px,1fr) auto minmax(190px,1fr);
+ align-items:center;column-gap:14px;height:var(--height-header);min-height:var(--height-header);
+ /* Brand and actions anchor to the page edges; only the navigation stays centered. */
+ width:100%;max-width:none;margin:0;
+ padding:0 4px;border:0;border-radius:var(--radius-lg);background:transparent;box-shadow:none;
+ overflow:visible;isolation:isolate;z-index:70;
+}
+.header .shell-home-pill{
+ display:inline-flex;align-items:center;justify-self:start;gap:9px;width:max-content;
+ height:42px;min-height:42px;padding:0 17px 0 12px;
+ border:1px solid var(--ui-border-hairline);border-radius:var(--radius-pill);
+ color:var(--brand-navy);background:var(--surface-panel);font-size:14px;font-weight:670;white-space:nowrap;
+ box-shadow:0 2px 9px rgba(15,39,92,.045);
+ transition:background-color 150ms ease,box-shadow 150ms ease,transform 150ms ease;
+}
+.header .shell-home-pill:hover{color:var(--brand-blue);background:var(--ui-state-hover);box-shadow:0 3px 12px rgba(15,39,92,.08);transform:translateY(-1px)}
+.header .shell-home-pill:active{transform:translateY(0)}
+.header .shell-home-pill:focus-visible{outline:2px solid var(--border-focus);outline-offset:3px}
+.header .shell-home-pill .brand-logo{width:29px;height:29px;object-fit:contain}
+.header .shell-brand-name{color:inherit;letter-spacing:.015em}
+
+/* The pill appearance extends Rare UI GooeyNav; all other uses stay gooey. */
+.header nav[data-slot="gooey-nav"][data-appearance="pill"]{
+ position:relative;display:flex;justify-self:center;flex:none;
+ align-items:center;width:max-content;max-width:100%;height:40px;
+ margin:0;padding:3px;background:#F1F5F9;color:var(--text-secondary);
+ border:1px solid rgba(148,163,184,.12);border-radius:var(--radius-pill);
+ box-shadow:0 1px 2px rgba(15,23,42,.025);
+}
+.header nav[data-slot="gooey-nav"][data-appearance="pill"]>ul{
+ display:flex;flex-direction:row;align-items:center;gap:2px;width:max-content;
+ max-width:none;height:100%;padding:0;margin:0;list-style:none;
+}
+.header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-segment"]{
+ position:relative;flex:none;width:auto;height:100%;min-height:0;margin:0;
+ background:transparent;border-radius:var(--radius-pill);list-style:none;
+}
+.header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-item"]{
+ position:relative;isolation:isolate;display:inline-flex;justify-content:center;
+ align-items:center;width:auto;height:100%;min-height:0;padding:0 12px;
+ border:0;border-radius:var(--radius-pill);background:transparent;color:var(--text-secondary);
+ font-size:12px;font-weight:510;letter-spacing:0;line-height:1;white-space:nowrap;
+ transition:color 140ms ease;
+}
+.header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-item"].active{
+ background:transparent;color:var(--text-primary);font-weight:650;
+}
+.header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-item"]:hover:not(.active){
+ background:transparent;color:var(--text-primary);
+}
+.rare-pill-nav-label{position:relative;z-index:1;display:inline-flex;align-items:center;gap:4px}
+.rare-pill-nav-active{
+ position:absolute;inset:0;z-index:0;border-radius:var(--radius-pill);
+ background:#FFFFFF;box-shadow:0 1px 3px rgba(15,23,42,.12),0 0 0 1px rgba(148,163,184,.10);
+ pointer-events:none;
+}
+.header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-item"]:focus-visible{
+ outline:2px solid var(--ui-state-focus);outline-offset:2px;
+}
+/* Detached controls, one quiet pill per interaction, no nested utility box. */
+.header .global-utility-dock{
+ display:flex;align-items:center;justify-self:end;gap:7px;flex:none;
+ margin:0;height:38px;padding:0;border:0;background:transparent;box-shadow:none;
+}
+.header .global-utility-dock .command-trigger,
+.header .global-utility-dock .notification-trigger,
+.header .global-utility-dock button[aria-label*="通知"]{
+ width:36px;min-width:36px;height:36px;min-height:36px;padding:0;
+ border:1px solid var(--ui-border-hairline);border-radius:var(--radius-pill);
+ color:var(--text-secondary);background:var(--surface-panel);
+ box-shadow:0 1px 5px rgba(15,23,42,.045);
+}
+.header .global-utility-dock .command-trigger:hover,
+.header .global-utility-dock .notification-trigger:hover,
+.header .global-utility-dock .account-trigger:hover{background:var(--surface-row-hover)}
+.header .global-utility-dock .account-trigger{
+ height:36px;min-height:36px;padding:0 9px 0 5px;
+ border:1px solid var(--ui-border-hairline);border-radius:var(--radius-pill);
+ background:var(--surface-panel);box-shadow:0 1px 5px rgba(15,23,42,.045);
+}
+.header .global-utility-dock .account-avatar{width:25px;height:25px;font-size:12px}
+.header .global-utility-dock .account{gap:6px;color:var(--text-primary)}
+.header .global-utility-dock .account-name{max-width:96px}
+.header .global-utility-dock .command-trigger{
+ display:inline-flex;justify-content:center;align-items:center;flex:none;
+}
+.header .global-utility-dock .command-trigger>span{display:none}
+.header .global-utility-dock .command-trigger>svg{display:block;flex:none;width:18px;height:18px}
+.header .global-utility-dock .notification-center{flex:none;margin:0;min-width:36px;width:36px;height:36px}
+.header .global-utility-dock .notification-trigger{
+ display:inline-flex;align-items:center;justify-content:center;flex:none;
+}
+.header .global-utility-dock .notification-trigger>svg{display:block;width:18px;height:18px;flex:none}
+.header .global-utility-dock .rare-notification-bell-badge{
+ top:0;right:0;z-index:1;min-width:15px;height:15px;
+ padding:0 3px;line-height:15px;font-size:9px;
+ box-shadow:0 0 0 2px var(--surface-panel);
+}
+.header .global-utility-dock .account-dropdown-wrapper{flex:none;min-width:0}
+.header .global-utility-dock .account-trigger{
+ display:inline-flex;justify-content:center;align-items:center;
+ min-width:36px;max-width:154px;white-space:nowrap;
+}
+.header .global-utility-dock .account-avatar{
+ display:inline-flex;justify-content:center;align-items:center;flex:none;
+ background:#eaf2ff;border:0;color:var(--brand-blue);
+}
+.header .global-utility-dock .account-avatar svg{display:block;width:18px;height:18px}
+.header .global-utility-dock .account-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.header .global-utility-dock .account-caret{flex:none}
+.header .header-page-actions{justify-self:end}
+@media(max-width:1210px){
+ .shell>.header{display:flex;gap:8px;justify-content:space-between}
+ .shell>.header .shell-home-pill{flex:none;margin-right:auto}
+ .header .nav-toggle{
+  order:2;display:inline-flex;align-items:center;justify-content:center;
+  width:40px;min-width:40px;height:40px;min-height:40px;padding:0;
+  border:1px solid var(--ui-border-hairline);border-radius:var(--radius-pill);
+  background:var(--surface-panel);box-shadow:0 2px 8px rgba(15,23,42,.055);
+ }
+ .header .global-utility-dock{order:3;flex:none;margin-left:0;min-width:0}
+ .header .header-page-actions{order:4}
+ .header nav[data-slot="gooey-nav"][data-appearance="pill"]{
+  display:none;position:absolute;top:calc(100% + 6px);left:auto;right:0;z-index:80;
+  width:min(280px,calc(100vw - 20px));max-width:calc(100vw - 20px);
+  height:auto;max-height:min(460px,calc(100dvh - 85px));overflow-y:auto;
+  padding:6px;margin:0;border-radius:var(--radius-xl);box-shadow:0 14px 38px rgba(15,23,42,.22);
+ }
+ .header nav[data-slot="gooey-nav"][data-appearance="pill"].open{display:flex}
+ .header nav[data-slot="gooey-nav"][data-appearance="pill"]>ul{
+  display:flex;flex-direction:column;align-items:stretch;gap:2px;width:100%;height:auto;
+ }
+ .header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-segment"]{
+  width:100%;height:38px;min-height:38px;margin:0!important;
+ }
+ .header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-item"]{
+  display:flex;justify-content:flex-start;width:100%;height:38px;min-height:38px;
+  padding:0 13px;color:var(--text-secondary);font-size:13px;
+ }
+ .header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-item"].active{
+  color:var(--text-primary);
+ }
+}
+@media(max-width:600px){
+ .shell>.header{height:52px;min-height:52px;gap:5px}
+ .shell>.header .shell-home-pill{height:40px;min-height:40px;padding:0 11px 0 9px;gap:6px;font-size:13px}
+ .header .shell-home-pill .brand-logo{width:23px;height:23px}
+ .shell>.header .global-utility-dock{height:36px;gap:4px;padding:0;flex:none}
+ .header .global-utility-dock .notification-center{min-width:36px;margin:0 1px}
+ .header .global-utility-dock .account-trigger{width:36px;min-width:36px;padding:0;justify-content:center}
+ .header .global-utility-dock .account-name,.header .global-utility-dock .account-caret{display:none}
+ .header .nav-toggle{width:36px;min-width:36px;height:36px;min-height:36px}
+ .header .global-utility-dock .command-trigger,.header .global-utility-dock .notification-trigger,
+ .header .global-utility-dock button[aria-label*="通知"]{width:36px;min-width:36px;height:36px;min-height:36px}
+}
+@media(max-width:400px){
+ .shell>.header .shell-home-pill{font-size:12px;gap:5px;padding-inline:8px}
+ .shell>.header .global-utility-dock{gap:2px}
+ .header .global-utility-dock .notification-center{margin:0}
+}
+@media(prefers-reduced-motion:reduce){
+ .header .shell-home-pill{transition:none;transform:none}
+ .header nav[data-slot="gooey-nav"][data-appearance="pill"] [data-slot="gooey-nav-item"]{transition:none}
+}

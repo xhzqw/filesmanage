@@ -1,0 +1,66 @@
+/*
+ * Login artwork: neutral gradient backdrop for the public build. The original
+ * company photograph is not distributed (see web/public/assets/brand/BRAND-ASSETS.md);
+ * the brand mark and inputs remain real HTML elements.
+ */
+.login-bg.login-hero{
+  min-height:100dvh;
+  height:100dvh;
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  padding:32px clamp(32px,8.5vw,160px);
+  background-color:#edf5fd;
+  background-image:linear-gradient(135deg,#dbeafe 0%,#eff6ff 45%,#f8fbff 100%);
+  background-repeat:no-repeat;
+  background-position:center center;
+  background-size:cover;
+}
+
+.login-hero::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:linear-gradient(90deg,transparent 45%,rgba(244,249,255,.08) 58%,rgba(247,251,255,.32) 100%);
+}
+
+.login-hero .login-card{
+  position:relative;
+  z-index:1;
+  width:min(100%,380px);
+  flex:none;
+  margin:0;
+  background:rgba(255,255,255,.96);
+  box-shadow:0 18px 60px rgba(18,59,100,.13),0 2px 8px rgba(18,59,100,.06);
+}
+
+@media(max-width:900px){
+  .login-bg.login-hero{
+    padding:24px;
+    background-position:37% center;
+  }
+  .login-hero::before{background:rgba(247,251,255,.32)}
+}
+
+@media(max-width:620px){
+  .login-bg.login-hero{
+    justify-content:center;
+    align-items:center;
+    padding:20px;
+    background-position:31% center;
+  }
+  .login-hero::before{background:rgba(247,251,255,.62)}
+  .login-hero .login-card{
+    width:min(100%,380px);
+    padding:24px 20px;
+  }
+}
+
+@media(max-height:540px){
+  .login-bg.login-hero{
+    height:auto;
+    min-height:100dvh;
+    overflow-y:auto;
+  }
+}

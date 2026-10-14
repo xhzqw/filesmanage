@@ -1,0 +1,14 @@
+/* Authentication feedback stays above the workbench without changing its layout. */
+.auth-feedback{
+ position:fixed;top:16px;left:50%;transform:translateX(-50%);
+ z-index:1000;display:flex;align-items:center;gap:12px;
+ max-width:min(92vw,540px);padding:12px 16px;
+ background:var(--surface-panel);border:1px solid var(--status-danger);
+ border-radius:var(--radius-md);box-shadow:0 8px 24px rgba(15,39,92,.16);
+ color:var(--status-danger);font-size:13px;
+}
+.auth-feedback button{flex:none;color:var(--brand-blue);border-color:var(--border-subtle)}
+@media(max-width:480px){.auth-feedback{width:calc(100% - 24px);flex-wrap:wrap;justify-content:space-between}}
+.brand-loading-screen{display:flex;min-height:100dvh;align-items:center;justify-content:center;
+ flex-direction:column;gap:12px;background:var(--surface-app,#f5f8fd);
+ color:var(--text-secondary,#52647b);font-size:13px}
