@@ -173,6 +173,22 @@ try{
    'Sonoma/Sequoia pixel contract at '+viewport.width+': '+JSON.stringify(layout));
  }
  await send('Emulation.clearDeviceMetricsOverride');
+ await click('.folder-file-toolbar-host button[aria-label="更多操作"]');
+ await until('!!document.querySelector(\'[role="menu"][aria-label="更多操作"]\')');
+ const mergedMenuLabels=await evaluate('[...document.querySelectorAll(\'[role="menu"][aria-label="更多操作"] [role="menuitem"]\')].map(item=>item.textContent.trim())');
+ assert(mergedMenuLabels.some(label=>label.includes("显示勾选框"))&&
+  mergedMenuLabels.some(label=>label.includes("授权管理"))&&
+  mergedMenuLabels.some(label=>label.includes("重命名当前目录"))&&
+  mergedMenuLabels.some(label=>label.includes("移动当前目录"))&&
+  mergedMenuLabels.some(label=>label.includes("删除当前目录")),
+  "One overflow popup must retain all display and folder management actions: "+JSON.stringify(mergedMenuLabels));
+ await click('[role="menu"][aria-label="更多操作"] [role="menuitem"]',mergedMenuLabels.findIndex(label=>label.includes("重命名当前目录")));
+ await until('!!document.querySelector("dialog[open]")',"Rename modal must open from the unified popup");
+ assert(await evaluate('document.querySelector("dialog[open]")?.textContent.includes("重命名目录")'),
+  "Existing folder rename workflow must remain reachable");
+ await click('dialog[open] .dialog-close');
+ await until('!document.querySelector("dialog[open]")');
+ console.log("EXPLORER_UNIFIED_FOLDER_ACTIONS_PASS",JSON.stringify(mergedMenuLabels));
  let count=await evaluate('document.querySelectorAll("tr.file-entry").length');
  if(count<4){
   const queue=await evaluate('[...document.querySelectorAll(".explorer-list-folder")].map(el=>el.dataset.uploadFolderId).filter(Boolean)');
