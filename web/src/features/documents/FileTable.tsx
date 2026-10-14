@@ -33,7 +33,7 @@ import {FinderLineIcon,FolderResourceIcon} from "../../shared/ui/ResourceIcons";
 import {FinderPathColumn} from "./FinderPathColumn";
 import"./fileTable.css";
 import type {ExplorerViewMode} from "./explorerView";
-import {compactExplorerName} from "./explorerDisplayName";
+import {ExplorerCompactName} from "./ExplorerCompactName";
 
 type SortKey="updated_desc"|"name_asc"|"name_desc"|"size_desc";
 
@@ -1428,7 +1428,7 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
     {image&&<img src={fileApi.mediaUrl(item.id,item.sha256)} alt="" loading="lazy" decoding="async"
      onError={event=>{event.currentTarget.hidden=true;}}/>}
    </div>
-   <span className="explorer-item-name" title={item.name}>{compactExplorerName(item.name)}</span>
+   <span className="explorer-item-name" title={item.name}><ExplorerCompactName name={item.name}/></span>
    <span className="explorer-item-meta"><span className="explorer-item-sub">{formatSize(item.sizeBytes)} · v{item.currentVersionSeq}</span>{finderDots(item)}</span>
    {showCheckboxes&&<RareInput className="explorer-item-check" type="checkbox" checked={selectedIds.has(item.id)}
     aria-label={"选择 "+item.name} onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}} onChange={event=>onCheckToggle(event,item)}/>}
@@ -1476,8 +1476,8 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
    onDoubleClick={()=>navigate("/doc?folder="+encodeURIComponent(entry.id))}
    onKeyDown={event=>onFolderKeyDown(event,entry)}>
    <div className="explorer-item-art" aria-hidden="true"><FolderResourceIcon open={selected} hovered={hovered} size={viewMode==="columns"?24:52}/></div>
-   <span className="explorer-item-name" title={entry.name}>{compactExplorerName(entry.name)}</span>
-   {folderTags&&<span className="explorer-item-meta">{folderTags}</span>}
+   <span className="explorer-item-name" title={entry.name}><ExplorerCompactName name={entry.name}/></span>
+   <span className="explorer-item-meta">{folderTags}</span>
    {showCheckboxes&&<RareInput className="explorer-item-check" type="checkbox" checked={selected}
     aria-label={"选择文件夹 "+entry.name} onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}}
     onChange={event=>{selectResource("folder",entry.id,true,checkboxShiftRef.current);checkboxShiftRef.current=false;setFocusedFolderId(entry.id);setFocusedId(null);}}/>}
@@ -1543,14 +1543,12 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
    </div>
    <div className="toolbar-views">
     {viewControls}
-    {viewMode!=="list"&&<>
      <RareButton ref={sortMenuAnchor} type="button" tone="ghost" className="explorer-tool-icon" aria-haspopup="menu" aria-expanded={sortMenuOpen}
       aria-label="排序方式" title={SORT_LABELS[sort]} onClick={()=>setSortMenuOpen(open=>!open)}>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 7h16M7 12h10M10 17h4"/></svg>
      </RareButton>
      <Menu open={sortMenuOpen} label="排序方式" anchor={sortMenuAnchor.current} onClose={()=>setSortMenuOpen(false)}
       items={SORT_KEYS.map(key=>({id:key,label:(sort===key?"✓ ":"")+SORT_LABELS[key],onSelect:()=>setSort(key)}))}/>
-    </>}
     <RareButton ref={filterMenuAnchor} type="button" tone="ghost" className={"explorer-tool-icon"+(categoryFilter!=="all"?" has-filter":"")}
      aria-label="文件类型筛选" title={CATEGORY_KEYS.find(item=>item.id===categoryFilter)?.name??"筛选类型"} aria-haspopup="menu" aria-expanded={filterMenuOpen}
      onClick={()=>setFilterMenuOpen(open=>!open)}>
@@ -1729,6 +1727,7 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
      <dl><dt>大小</dt><dd>{formatSize(activePreview.sizeBytes)}</dd><dt>版本</dt><dd>v{activePreview.currentVersionSeq}</dd><dt>修改</dt><dd>{activePreview.updatedAt.replace("T"," ").slice(0,16)}</dd></dl>
      <RareButton type="button" tone="neutral" onClick={()=>navigate("/preview/"+activePreview.id)}>打开预览</RareButton>
     </div>}
+    <div className="explorer-column-filler" aria-hidden="true"/>
    </div>}
    {status==="ready"&&(visibleItems.length>0||visibleFolders.length>0)&&viewMode==="gallery"&&<div className="explorer-gallery">
     {activeFolder&&<div className="explorer-gallery-stage">

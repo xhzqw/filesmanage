@@ -161,6 +161,68 @@ try{
    }
   }
  }
+ // View switching is pure content navigation: toolbar buttons and their
+ // painted positions must remain exactly fixed through all four layouts.
+ for(const width of [1920,1366,820]){
+  await send("Emulation.setDeviceMetricsOverride",{width,height:900,deviceScaleFactor:1,mobile:false});
+  await delay(130);
+  let baseline=null;
+  for(const [mode,label] of [["icons","图标视图"],["list","列表视图"],["columns","分栏视图"],["gallery","画廊视图"]]){
+   await evaluate(`(()=>document.querySelector('.folder-view-switch button[aria-label="${label}"]')?.click())()`);
+   await until(`document.querySelector('.work-body')?.dataset.explorerView==="${mode}"`);
+   await delay(125);
+   const geometry=await evaluate(`(()=>{
+    const bar=document.querySelector('.folder-context-bar');
+    const paths=['.upload-button','.new-folder-wrapper','.folder-view-switch',
+     'button[aria-label="排序方式"]','button[aria-label="文件类型筛选"]',
+     '.filter-search-input','button[aria-label="更多操作"]'];
+    const shapes=paths.map(selector=>{
+     const e=bar?.querySelector(selector),r=e?.getBoundingClientRect();
+     return {selector,x:r?.left??null,y:r?.top??null,w:r?.width??null,h:r?.height??null};
+    });
+    const active=bar?.querySelector('.folder-view-switch button[aria-pressed="true"]');
+    return {shapes,sortCount:bar?.querySelectorAll('button[aria-label="排序方式"]').length,
+     focusOutline:active?getComputedStyle(active).outlineStyle:null,
+     scrollGutter:getComputedStyle(document.querySelector('.explorer-surface')||document.querySelector('.explorer-striped-list')).scrollbarGutter};
+   })()`);
+   assert(geometry.sortCount===1&&geometry.shapes.every(shape=>shape.x!==null&&shape.h>0)&&
+    geometry.focusOutline==="none"&&geometry.scrollGutter==="stable",
+    "Finder toolbar button contract in "+mode+": "+JSON.stringify(geometry));
+   if(!baseline)baseline=geometry.shapes;
+   else assert(geometry.shapes.every((shape,i)=>Math.abs(shape.x-baseline[i].x)<=.5&&Math.abs(shape.y-baseline[i].y)<=.5),
+    "Finder toolbar shifted at "+width+" "+mode+": "+JSON.stringify({baseline,current:geometry.shapes}));
+   console.log("FINDER_FOUR_VIEW_TOOLBAR",width,mode,JSON.stringify(geometry));
+   if(mode==="columns"){
+    const point=await evaluate(`(()=>{
+     const row=document.querySelector('.explorer-current-column .explorer-folder');
+     const box=row?.getBoundingClientRect();
+     return box?{x:box.x+Math.max(30,box.width/2),y:box.y+box.height/2}:null;
+    })()`);
+    if(point){
+     await send("Input.dispatchMouseEvent",{type:"mouseMoved",x:point.x,y:point.y});
+     await delay(115);
+     const collision=await evaluate(`(()=>{
+      const row=document.querySelector('.explorer-current-column .explorer-folder');
+      if(!row)return null;
+      const nodes=['.explorer-item-name','.explorer-item-meta','.explorer-item-star','.explorer-item-more']
+       .map(sel=>row.querySelector(sel));
+      const bounds=nodes.map(n=>n?.getBoundingClientRect());
+      const intersects=(a,b)=>!!a&&!!b&&a.width>0&&b.width>0&&a.left<b.right-.5&&b.left<a.right-.5;
+      return {overlap:bounds.some((r,i)=>bounds.slice(i+1).some(s=>intersects(r,s))),
+       positions:bounds.map(r=>r&&{left:r.left,right:r.right}),
+       chevronOpacity:getComputedStyle(row,'::after').opacity,
+       filler:!!document.querySelector('.explorer-column-filler'),
+       actionPositions:getComputedStyle(nodes[2]).position+','+getComputedStyle(nodes[3]).position};
+     })()`);
+     assert(collision&&!collision.overlap&&collision.chevronOpacity==="0"&&collision.filler&&
+      collision.actionPositions==="relative,relative",
+      "Finder column hover collision at "+width+": "+JSON.stringify(collision));
+     console.log("FINDER_COLUMN_HOVER_PASS",width,JSON.stringify(collision));
+    }
+   }
+  }
+ }
+ await send("Emulation.clearDeviceMetricsOverride");
  // The command row is portalled into the folder toolbar. Verify its actual
  // geometry, not just the absence of a page-wide overflow scrollbar.
  for(const viewport of [{name:"wide",width:1920},{name:"laptop",width:1366},{name:"compact",width:820}]){

@@ -576,6 +576,7 @@ table.file-table-folders-only tbody td.col-name{padding-left:8px}
 }
 .work-body>.explorer-striped-list{
  padding-inline:8px;box-sizing:border-box;
+ scrollbar-gutter:stable;
  --explorer-list-stripe:rgba(248,250,252,.65);
  --explorer-list-hover:rgba(15,23,42,.035);
 }

@@ -7,6 +7,7 @@ import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {RareButton} from "../../shared/ui/rare";
 import {request} from "../../shared/http";
 import {fileApi} from "./api";
+import {ExplorerCompactName} from "./ExplorerCompactName";
 
 // Ancestor columns share FileTable's existing action handlers instead of
 // introducing an independent operation or permission model.
@@ -119,7 +120,7 @@ export function FinderPathColumn(props:Props){
     onContextMenu={event=>props.onFolderMenu(event,item)}
     onKeyDown={event=>keyMove(event,"folder",item.id)}>
     <FolderResourceIcon open={props.activeChildId===item.id} size={21}/>
-    <span className="finder-column-name" title={item.name}>{item.name}</span>
+    <span className="finder-column-name" title={item.name}><ExplorerCompactName name={item.name}/></span>
     <span className="finder-column-chevron" aria-hidden="true">›</span>
    </div>)}
    {data.files.map(file=><div key={"file-"+file.id} role="row" tabIndex={0} data-row-key={"file:"+file.id} data-id={file.id}
@@ -131,7 +132,7 @@ export function FinderPathColumn(props:Props){
     onContextMenu={event=>props.onFileMenu(event,file)}
     onKeyDown={event=>keyMove(event,"file",file.id)}>
     <FileTypeIcon name={file.name} size={19}/>
-    <span className="finder-column-name" title={file.name}>{file.name}</span>
+    <span className="finder-column-name" title={file.name}><ExplorerCompactName name={file.name}/></span>
    </div>)}
    {!data.folders.length&&!data.files.length&&<div className="finder-column-status">空文件夹</div>}
    {(data.folderCursor||data.fileCursor)&&<RareButton tone="ghost" className="finder-column-more" type="button" disabled={moreBusy} onClick={()=>void more()}>{moreBusy?"加载中…":moreFailed?"重试加载":"加载更多"}</RareButton>}
