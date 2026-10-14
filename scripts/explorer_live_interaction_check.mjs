@@ -241,6 +241,43 @@ try{
    }
   }
  }
+ // Sort is one shared state across all four views. Verify the actual row
+ // order, not merely that the sort glyph remains mounted.
+ await send("Emulation.setDeviceMetricsOverride",{width:1366,height:900,deviceScaleFactor:1,mobile:false});
+ const sortOptions=[{index:1,label:"名称 A→Z"},{index:2,label:"名称 Z→A"},{index:3,label:"大小降序"}];
+ for(const choice of sortOptions){
+  await evaluate('document.querySelector(".folder-view-switch button[aria-label=列表视图]")?.click()');
+  await until('document.querySelector(".work-body")?.dataset.explorerView==="list"');
+  await click('button[aria-label="排序方式"]');
+  await until('document.querySelectorAll("[role=menu] [role=menuitem]").length===4');
+  await click('[role=menu] [role=menuitem]',choice.index);
+  await delay(850);
+  const expected=await evaluate('(()=>({folders:[...document.querySelectorAll(".explorer-striped-list tr.explorer-list-folder")].map(e=>e.dataset.uploadFolderId),files:[...document.querySelectorAll(".explorer-striped-list tr.file-entry")].map(e=>e.dataset.id),sort:document.querySelector("button[aria-label=排序方式]")?.title}))()');
+  assert(expected.sort===choice.label&&expected.files.length>0,"Sorter not updated: "+JSON.stringify(expected));
+  for(const [mode,label,container] of [["icons","图标视图",".explorer-icon-grid"],["columns","分栏视图",".explorer-current-column"],["gallery","画廊视图",".explorer-gallery-strip"]]){
+   await evaluate('document.querySelector('+JSON.stringify('.folder-view-switch button[aria-label="'+label+'"]')+')?.click()');
+   await until('document.querySelector(".work-body")?.dataset.explorerView==='+JSON.stringify(mode));
+   const order=await evaluate('(()=>{const host=document.querySelector('+JSON.stringify(container)+');return {folders:[...host.querySelectorAll(".explorer-folder")].map(e=>e.dataset.folderId),files:[...host.querySelectorAll(".file-entry")].map(e=>e.dataset.id)}})()');
+   assert.deepEqual(order,{folders:expected.folders,files:expected.files},
+    "Sort differs between list and "+mode+" for "+choice.label+": "+JSON.stringify({expected,order}));
+  }
+  console.log("FINDER_CROSS_VIEW_SORT_PASS",choice.label,JSON.stringify({folders:expected.folders.length,files:expected.files.length}));
+ }
+ // Fixture-based density / zoom test: do not create real files in the LAN.
+ // Clone layout-only tiles to expose wrapping and overlay errors at 300+ items.
+ await evaluate('document.querySelector(".folder-view-switch button[aria-label=图标视图]")?.click()');
+ await until('document.querySelector(".work-body")?.dataset.explorerView==="icons"');
+ const highVolume=await evaluate('(()=>{const grid=document.querySelector(".explorer-icon-grid");const source=grid?.querySelector(".explorer-folder");if(!grid||!source)return null;const fragment=document.createDocumentFragment();for(let i=0;i<300;i++){const tile=source.cloneNode(true);tile.dataset.stressFixture=String(i);tile.removeAttribute("data-folder-id");tile.removeAttribute("data-upload-folder-id");const name=tile.querySelector(".explorer-item-name");if(name)name.textContent="长中文文件名和混合ASCII标识-"+i+"-校准项目-旅程目录-1791769428124";const meta=tile.querySelector(".explorer-item-meta");if(meta)meta.textContent="● ● +4";fragment.appendChild(tile);}grid.appendChild(fragment);const measurements=[];for(const zoom of [0.8,1,1.25,1.5]){document.documentElement.style.zoom=String(zoom);const tiles=[...grid.querySelectorAll(".explorer-item")];const art=tiles.slice(-10).map(e=>e.querySelector(".explorer-item-art")?.getBoundingClientRect());const cards=tiles.slice(-20).map(e=>e.getBoundingClientRect());const overlap=cards.some((a,i)=>cards.slice(i+1).some(b=>a.left<b.right-.5&&b.left<a.right-.5&&a.top<b.bottom-.5&&b.top<a.bottom-.5));measurements.push({zoom,tiles:tiles.length,overlap,artAligned:art.every(a=>!!a&&art.some(b=>Math.abs(a.top-b.top)<1)),scrollWidth:grid.scrollWidth,clientWidth:grid.clientWidth});}document.documentElement.style.zoom="";grid.querySelectorAll("[data-stress-fixture]").forEach(el=>el.remove());return measurements;})()');
+ assert(highVolume&&highVolume.every(item=>item.tiles>=300&&!item.overlap&&item.scrollWidth<=item.clientWidth+2),
+  "Large Finder icon-grid overflow/wrapping: "+JSON.stringify(highVolume));
+ console.log("FINDER_GRID_300_ZOOM_PASS",JSON.stringify(highVolume));
+ // Restore the initial sort for the remaining clipboard/selection tests.
+ await evaluate('document.querySelector(".folder-view-switch button[aria-label=列表视图]")?.click()');
+ await until('document.querySelector(".work-body")?.dataset.explorerView==="list"');
+ await click('button[aria-label="排序方式"]');
+ await until('document.querySelectorAll("[role=menu] [role=menuitem]").length===4');
+ await click('[role=menu] [role=menuitem]',0);
+ await delay(600);
  await evaluate(`(()=>document.querySelector('.folder-view-switch button[aria-label="列表视图"]')?.click())()`);
  await until('document.querySelector(".work-body")?.dataset.explorerView==="list"');
  await send("Emulation.clearDeviceMetricsOverride");

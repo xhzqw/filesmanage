@@ -8,11 +8,12 @@ import {RareButton} from "../../shared/ui/rare";
 import {request} from "../../shared/http";
 import {fileApi} from "./api";
 import {ExplorerCompactName} from "./ExplorerCompactName";
+import {compareFinderFolders,type FinderSortKey} from "./finderSort";
 
 // Ancestor columns share FileTable's existing action handlers instead of
 // introducing an independent operation or permission model.
 type Props={
- folder:Folder; activeChildId:string|null; activeFileId:string|null; reloadKey:number;
+ folder:Folder; activeChildId:string|null; activeFileId:string|null; reloadKey:number;sort:FinderSortKey;
  onOpenFolder:(folder:Folder)=>void; onSelectFile:(file:FileItem)=>void;
  onOpenFile:(file:FileItem)=>void;
  onFileMenu:(event:MouseEvent<HTMLElement>,file:FileItem)=>void;
@@ -35,13 +36,17 @@ function readFolderChildren(parentId:string,cursor=""){
 }
 
 export function FinderPathColumn(props:Props){
- const {folder,reloadKey}=props;
+ const {folder,reloadKey,sort}=props;
  const[data,setData]=useState<Page>(EMPTY);
  const[status,setStatus]=useState<"loading"|"ready"|"failed">("loading");
  const[moreBusy,setMoreBusy]=useState(false);
  const[moreFailed,setMoreFailed]=useState(false);
  const[dropTargetId,setDropTargetId]=useState<string|null>(null);
  const listRef=useRef<HTMLDivElement>(null);
+ // Sorting and directory navigation invalidate outstanding pagination
+ // responses. A slow old-order page must never append into a new order.
+ const generation=useRef(0);
+ const previousFolder=useRef(folder.id);
  function internalMove(event:DragEvent<HTMLElement>){
   const types=Array.from(event.dataTransfer.types);
   return !types.includes("Files")&&(types.includes("application/x-filesmanage-files")||types.includes("application/x-filesmanage-folder"));
@@ -58,29 +63,36 @@ export function FinderPathColumn(props:Props){
  useEffect(()=>{
   let live=true;
   const controller=new AbortController();
-  setStatus("loading");setData(EMPTY);setMoreFailed(false);
-  Promise.all([readFolderChildren(folder.id),fileApi.list(folder.id,"name_asc","",50,controller.signal)])
-   .then(([folders,files])=>{if(live){setData({
-    folders:folders.items.map(item=>({id:item.id,name:item.name,parentId:item.parentId})),
+  const version=++generation.current;
+  const folderChanged=previousFolder.current!==folder.id;
+  previousFolder.current=folder.id;
+  if(folderChanged){setStatus("loading");setData(EMPTY);}
+  setMoreBusy(false);setMoreFailed(false);
+  Promise.all([readFolderChildren(folder.id),fileApi.list(folder.id,sort,"",50,controller.signal)])
+   .then(([folders,files])=>{if(live&&version===generation.current){setData({
+    folders:folders.items.map(item=>({id:item.id,name:item.name,parentId:item.parentId,updatedAt:item.updatedAt})),
     files:files.items,folderCursor:folders.nextCursor,fileCursor:files.nextCursor
    });setStatus("ready");}})
-   .catch(()=>{if(live)setStatus("failed");});
+   .catch(()=>{if(live&&version===generation.current)setStatus("failed");});
   return()=>{live=false;controller.abort();};
- },[folder.id,reloadKey]);
+ },[folder.id,reloadKey,sort]);
  async function more(){
   if(moreBusy||(!data.folderCursor&&!data.fileCursor))return;
+  const version=generation.current;
   setMoreBusy(true);setMoreFailed(false);
   try{
    const [folders,files]=await Promise.all([
     data.folderCursor?readFolderChildren(folder.id,data.folderCursor):Promise.resolve(null),
-    data.fileCursor?fileApi.list(folder.id,"name_asc",data.fileCursor,50):Promise.resolve(null),
+    data.fileCursor?fileApi.list(folder.id,sort,data.fileCursor,50):Promise.resolve(null),
    ]);
+   if(version!==generation.current)return;
    setData(current=>({
-    folders:folders?[...current.folders,...folders.items.map(item=>({id:item.id,name:item.name,parentId:item.parentId}))]:current.folders,
+    folders:folders?[...current.folders,...folders.items.map(item=>({id:item.id,name:item.name,parentId:item.parentId,updatedAt:item.updatedAt}))]:current.folders,
     files:files?[...current.files,...files.items]:current.files,
     folderCursor:folders?.nextCursor??"",fileCursor:files?.nextCursor??"",
    }));
-  }catch{setMoreFailed(true);}finally{setMoreBusy(false);}
+  }catch{if(version===generation.current)setMoreFailed(true);}
+  finally{if(version===generation.current)setMoreBusy(false);}
  }
  function keyMove(event:KeyboardEvent<HTMLElement>,kind:"file"|"folder",id:string){
   if(event.target!==event.currentTarget)return;
@@ -102,14 +114,14 @@ export function FinderPathColumn(props:Props){
    event.preventDefault();props.onOpenFolder(folder);
   }
  }
- return <div className={"explorer-column-list finder-path-list"+(dropTargetId===folder.id?" drop-target":"")} role="grid" aria-label={folder.name+" 的内容"} ref={listRef} data-column-folder-id={folder.id}
+ return <div className={"explorer-column-list finder-path-list"+(dropTargetId===folder.id?" drop-target":"")} role="grid" aria-label={folder.name+" 的内容"} ref={listRef} data-column-folder-id={folder.id} data-sort={sort}
   onDragOver={event=>{if(!(event.target as HTMLElement).closest(".finder-column-row"))overTarget(event,folder);}}
   onDragLeave={event=>leaveTarget(event,folder.id)}
   onDrop={event=>{if(!internalMove(event))return;setDropTargetId(null);props.onDropFolder(event,folder);}}>
   {status==="loading"&&<div className="finder-column-status" role="status"><BrandLoadingLabel size="sm" decorative>加载中…</BrandLoadingLabel></div>}
   {status==="failed"&&<div className="finder-column-status" role="alert">目录读取失败</div>}
   {status==="ready"&&<>
-   {data.folders.map(item=><div key={"folder-"+item.id} role="row" tabIndex={0} data-row-key={"folder:"+item.id} data-folder-id={item.id} data-upload-folder-id={item.id}
+   {[...data.folders].sort((a,b)=>compareFinderFolders(a,b,sort)).map(item=><div key={"folder-"+item.id} role="row" tabIndex={0} data-row-key={"folder:"+item.id} data-folder-id={item.id} data-upload-folder-id={item.id}
     className={"finder-column-row finder-folder-row"+(props.activeChildId===item.id?" selected":"")+(dropTargetId===item.id?" drop-target":"")}
     aria-selected={props.activeChildId===item.id}
     draggable onDragStart={event=>props.onFolderDragStart(event,item)} onDragEnd={props.onFolderDragEnd}

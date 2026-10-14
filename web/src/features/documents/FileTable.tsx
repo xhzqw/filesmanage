@@ -34,17 +34,12 @@ import {FinderPathColumn} from "./FinderPathColumn";
 import"./fileTable.css";
 import type {ExplorerViewMode} from "./explorerView";
 import {ExplorerCompactName} from "./ExplorerCompactName";
+import {compareFinderFiles,compareFinderFolders,FINDER_SORT_KEYS,FINDER_SORT_LABELS,type FinderSortKey} from "./finderSort";
+import {readFinderAssignmentBatches} from "./finderAssignmentBatches";
 
-type SortKey="updated_desc"|"name_asc"|"name_desc"|"size_desc";
-
-const SORT_LABELS:Record<SortKey,string>={
- updated_desc:"最近修改",
- name_asc:"名称 A→Z",
- name_desc:"名称 Z→A",
- size_desc:"大小降序",
-};
-
-const SORT_KEYS:SortKey[]=["updated_desc","name_asc","name_desc","size_desc"];
+type SortKey=FinderSortKey;
+const SORT_LABELS=FINDER_SORT_LABELS;
+const SORT_KEYS=FINDER_SORT_KEYS;
 const CATEGORY_KEYS:{id:FileCategory;name:string}[]=[
  {id:"all",name:"全部类型"},{id:"cad",name:"CAD / 3D 图纸"},{id:"doc",name:"办公文档"},
  {id:"image",name:"图片文件"},{id:"media",name:"音视频"},{id:"archive",name:"压缩包"},
@@ -265,17 +260,18 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
  },[finderRevision]);
  useEffect(()=>{
   let live=true;setFinderReady(false);
-  const ids=items.slice(0,100).map(item=>item.id);
+  const ids=items.map(item=>item.id);
   if(!ids.length){setFinderAssignments({});setFinderReady(true);return;}
-  labelApi.assignments(ids).then(assigned=>{
+  readFinderAssignmentBatches(ids,batch=>labelApi.assignments(batch),()=>live).then(assigned=>{
    if(live){setFinderAssignments(assigned);setFinderReady(true);}
   }).catch(()=>{if(live){setFinderAssignments({});setFinderReady(false);}});
   return()=>{live=false;};
  },[items,finderRevision]);
  useEffect(()=>{
   let live=true;
-  const ids=childFolders.slice(0,100).map(folder=>folder.id);
-  labelApi.folderAssignments(ids).then(assignments=>{
+  const ids=childFolders.map(folder=>folder.id);
+  if(!ids.length){setFinderFolderAssignments({});return;}
+  readFinderAssignmentBatches(ids,batch=>labelApi.folderAssignments(batch),()=>live).then(assignments=>{
    if(live)setFinderFolderAssignments(assignments);
   }).catch(()=>{if(live)setFinderFolderAssignments({});});
   return()=>{live=false;};
@@ -605,7 +601,7 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
   const visibleItems=useMemo(()=>{
    let list=items;
    if(labelId){
-    list=[...list].sort((a,b)=>sort==="name_asc"?a.name.localeCompare(b.name,"zh"):sort==="name_desc"?b.name.localeCompare(a.name,"zh"):sort==="size_desc"?b.sizeBytes-a.sizeBytes:b.updatedAt.localeCompare(a.updatedAt));
+    list=[...list].sort((a,b)=>compareFinderFiles(a,b,sort));
    }
    if(nameFilter.trim()){
     const q=nameFilter.trim().toLowerCase();
@@ -629,7 +625,7 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
  },[items]);
 
  const visibleKeys=[...visibleFoldersIds(),...visibleItems.map(i=>"file:"+i.id)];
- function visibleFoldersIds(){return childFolders.filter(entry=>entry.name.toLocaleLowerCase().includes(nameFilter.trim().toLocaleLowerCase())).map(entry=>"folder:"+entry.id);}
+ function visibleFoldersIds(){return childFolders.filter(entry=>entry.name.toLocaleLowerCase().includes(nameFilter.trim().toLocaleLowerCase())).sort((a,b)=>compareFinderFolders(a,b,sort)).map(entry=>"folder:"+entry.id);}
  function selectKeys(keys:string[]){
   setSelectedIds(new Set(keys.filter(key=>key.startsWith("file:")).map(key=>key.slice(5))));
   setSelectedFolderIds(new Set(keys.filter(key=>key.startsWith("folder:")).map(key=>key.slice(7))));
@@ -1401,7 +1397,7 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
   ...(ancestorFolder&&selectedFolderIds.has(ancestorFolder.id)&&!childFolders.some(i=>i.id===ancestorFolder.id)?[ancestorFolder]:[])];
  const selectedTotal=selectedIds.size+selectedFolderIds.size;
  const hiddenSelectedCount=Math.max(0,selection.length-visibleItems.filter(i=>selectedIds.has(i.id)).length-(ancestorFile&&selectedIds.has(ancestorFile.id)?1:0));
- const visibleFolders=childFolders.filter(entry=>entry.name.toLocaleLowerCase().includes(nameFilter.trim().toLocaleLowerCase()));
+ const visibleFolders=childFolders.filter(entry=>entry.name.toLocaleLowerCase().includes(nameFilter.trim().toLocaleLowerCase())).sort((a,b)=>compareFinderFolders(a,b,sort));
  const activeFolder=visibleFolders.find(entry=>entry.id===focusedFolderId)
   ??(focusedId===null?visibleFolders[0]??null:null);
  const activePreview=visibleItems.find(item=>item.id===focusedId)
@@ -1699,7 +1695,7 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
    </div>}
    {viewMode==="columns"&&<div className="explorer-columns" ref={columnViewportRef} aria-label="逐级文件夹分栏">
     {folderPath.slice(0,showingAncestorPreview?ancestorPreviewIndex+1:-1).map((directory,index)=><FinderPathColumn key={directory.id} folder={directory}
-     activeChildId={folderPath[index+1]?.id??null} activeFileId={ancestorFile?.folderId===directory.id?ancestorFile.id:null} reloadKey={reloadKey}
+     activeChildId={folderPath[index+1]?.id??null} activeFileId={ancestorFile?.folderId===directory.id?ancestorFile.id:null} reloadKey={reloadKey} sort={sort}
      onOpenFolder={entry=>navigate("/doc?folder="+encodeURIComponent(entry.id))}
      onSelectFile={item=>{
       setAncestorFile(item);setAncestorFolder(null);

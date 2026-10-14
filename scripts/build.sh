@@ -36,6 +36,7 @@ node scripts/ux_session_identity_check.mjs
 node scripts/ux_file_revalidation_check.mjs
 node scripts/file_rename_extension_check.mjs
 node scripts/explorer_display_name_check.mjs
+node scripts/finder_second_round_check.mjs
 node scripts/toast_feedback_check.mjs
 node scripts/toast_surface_governance_check.mjs
 node scripts/rare_emil_interaction_check.mjs
