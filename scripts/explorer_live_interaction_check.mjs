@@ -222,6 +222,8 @@ try{
    }
   }
  }
+ await evaluate(`(()=>document.querySelector('.folder-view-switch button[aria-label="列表视图"]')?.click())()`);
+ await until('document.querySelector(".work-body")?.dataset.explorerView==="list"');
  await send("Emulation.clearDeviceMetricsOverride");
  // The command row is portalled into the folder toolbar. Verify its actual
  // geometry, not just the absence of a page-wide overflow scrollbar.
