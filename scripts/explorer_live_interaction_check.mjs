@@ -192,6 +192,25 @@ try{
    else assert(geometry.shapes.every((shape,i)=>Math.abs(shape.x-baseline[i].x)<=.5&&Math.abs(shape.y-baseline[i].y)<=.5),
     "Finder toolbar shifted at "+width+" "+mode+": "+JSON.stringify({baseline,current:geometry.shapes}));
    console.log("FINDER_FOUR_VIEW_TOOLBAR",width,mode,JSON.stringify(geometry));
+   if(mode==="icons"){
+    const gridArt=await evaluate(`(()=>{
+     const folders=[...document.querySelectorAll('.explorer-icon-grid .explorer-folder')];
+     const folder=folders[0],art=folder?.querySelector('.explorer-item-art');
+     const star=folder?.querySelector('.explorer-item-star');
+     const picture=folder?.querySelector('[data-slot="rare-folder-component"][data-folder-scale="large"]');
+     const artBox=art?.getBoundingClientRect(),starBox=star?.getBoundingClientRect();
+     const firstOther=folders.find(row=>row!==folder&&row.getBoundingClientRect().top===folder.getBoundingClientRect().top);
+     return {largeRareFolder:!!picture,papers:picture?.querySelectorAll('.rare-folder-card').length??0,
+      starAgainstArt:!!artBox&&!!starBox&&Math.abs(starBox.right-artBox.right)<=5&&Math.abs(starBox.top-artBox.top)<=5,
+      artworkRowAligned:!firstOther||Math.abs(artBox.top-firstOther.querySelector('.explorer-item-art').getBoundingClientRect().top)<=1,
+      fixedMeta:!!folder?.querySelector('.explorer-item-meta')&&
+       getComputedStyle(folder.querySelector('.explorer-item-meta')).height==='15px'};
+    })()`);
+    assert(gridArt.largeRareFolder&&gridArt.papers===3&&gridArt.starAgainstArt&&
+     gridArt.artworkRowAligned&&gridArt.fixedMeta,
+     "Rare Folder grid artwork/stars/metadata alignment at "+width+": "+JSON.stringify(gridArt));
+    console.log("FINDER_ICON_GRID_RARE_PASS",width,JSON.stringify(gridArt));
+   }
    if(mode==="columns"){
     const point=await evaluate(`(()=>{
      const row=document.querySelector('.explorer-current-column .explorer-folder');
