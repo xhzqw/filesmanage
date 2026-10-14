@@ -32,7 +32,7 @@ export function compactExplorerName(name:string):string{
  const extension=extensionMatch?.[2]??"";
  const extWithDot=extension?"."+extension:"";
  const stem=(extensionMatch?.[1]??normalized).trim();
- if(visualWidth(stem)<=22)return stem+extWithDot;
+ if(visualWidth(stem)<22)return stem+extWithDot;
  const timestamp=stem.match(/^(.*?)[-_.]?(\d{10,})$/u);
  if(timestamp){
   const head=visualSlice((timestamp[1]??"").replace(/[-_.\s]+$/u,""),13);
