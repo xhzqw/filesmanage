@@ -269,8 +269,10 @@ try{
      const title=rect(selected?.querySelector('.explorer-item-name')),tags=rect(selected?.querySelector('.explorer-item-meta'));
      const star=rect(cards.find(card=>card.classList.contains('file-entry'))?.querySelector('.explorer-item-star'));
      const art=rect(cards.find(card=>card.classList.contains('file-entry'))?.querySelector('.explorer-item-art'));
+     const tracks=css(grid).gridTemplateColumns.split(' ').filter(Boolean);
      return {mode:'icons',gridColumns:css(grid).gridTemplateColumns,firstRow:firstRow.length,
-      edgeDelta:Math.abs((a.left-g.left)-(g.right-b.right)),
+      tracks:tracks.length,paddedLeft:a.left-g.left,
+      edgeDelta:firstRow.length===tracks.length?Math.abs((a.left-g.left)-(g.right-b.right)):null,
       tagsGap:tags&&title?tags.top-title.bottom:null,
       starWidth:star?.width,starInner:star&&art?star.right<art.right:null,
       artWidth:art?.width,overflow:grid.scrollWidth>grid.clientWidth+2};
@@ -295,7 +297,8 @@ try{
     assert(dimensions.nameWidth>120);
    }
    if(mode==="icons"){
-    assert(dimensions.firstRow>=1&&dimensions.edgeDelta<=2&&!dimensions.overflow,
+    assert(dimensions.firstRow>=1&&dimensions.paddedLeft>=19&&
+     (dimensions.edgeDelta===null||dimensions.edgeDelta<=2)&&!dimensions.overflow,
      "Finder responsive grid edge imbalance "+width+": "+JSON.stringify(dimensions));
     if(dimensions.tagsGap!==null)assert(Math.abs(dimensions.tagsGap-4)<=1,
      "Finder one-line tags detached from name "+width+": "+JSON.stringify(dimensions));
