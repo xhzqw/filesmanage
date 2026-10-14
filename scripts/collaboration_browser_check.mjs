@@ -76,7 +76,7 @@ try{
   await cdp.navigate(BASE+"/doc?view=favorites");
   check(await cdp.waitFor("()=>!!document.querySelector('.collab-workspace .collab-results') && !!document.querySelector('.finder-sidebar') && document.querySelectorAll('.collab-results tbody .rare-badge').length>0"),vp.name+" favorites render");
   const layout=await cdp.evaluate(`(()=>{
-   const first=document.querySelector('.finder-nav-item[href="/doc?view=favorites"]');
+   const first=document.querySelector('.finder-nav-section-link[href="/doc?view=favorites"]');
    const left=document.querySelector('.finder-sidebar')?.getBoundingClientRect();
    const right=document.querySelector('.collab-workspace .collab-results')?.getBoundingClientRect();
    const bad=[...document.querySelectorAll('.collab-results tbody tr')].filter(row=>row.querySelector('.rare-badge[data-rare-badge-tone=danger]'));
@@ -88,7 +88,7 @@ try{
     count:badges.length,tones:badges.every(b=>['success','danger'].includes(b.dataset.rareBadgeTone)&&b.textContent.trim()),
     badCount:bad.length,allBadUnlinked};
   })()`);
-  check(layout.first==="我的关注"&&layout.selected==="page",vp.name+" 关注 in Finder sidebar");
+  check(layout.first==="个人收藏"&&layout.selected==="page",vp.name+" 关注 in Finder sidebar");
   // Verify actual API names reach the Finder labels, including folder
   // favorites. The DB query coalesces file and folder names independently;
   // checking for a rendered row alone misses empty folder labels.
