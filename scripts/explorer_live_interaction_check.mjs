@@ -8,7 +8,7 @@ import {readFileSync,rmSync} from "node:fs";
 const origin="http://127.0.0.1:18091";
 const profile="/tmp/fm-explorer-real-"+process.pid;
 const chrome=spawn("/usr/bin/google-chrome",[
- "--headless=new","--no-sandbox","--disable-gpu","--disable-dev-shm-usage",
+ "--headless=new","--no-sandbox",...(process.env.FINDER_GPU_CHECK==="1"?[]:["--disable-gpu"]),"--disable-dev-shm-usage",
  "--user-data-dir="+profile,"--remote-debugging-port=0","--window-size=1440,900","about:blank"
 ],{stdio:"ignore"});
 const delay=ms=>new Promise(done=>setTimeout(done,ms));
@@ -53,6 +53,33 @@ async function click(selector,index=0,modifiers=0){
  await send("Input.dispatchMouseEvent",{type:"mouseMoved",x:rect.x,y:rect.y,modifiers});
  await send("Input.dispatchMouseEvent",{type:"mousePressed",button:"left",clickCount:1,x:rect.x,y:rect.y,modifiers});
  await send("Input.dispatchMouseEvent",{type:"mouseReleased",button:"left",clickCount:1,x:rect.x,y:rect.y,modifiers});
+}
+// DOM hit-testing cannot detect GPU raster blanking. Examine captured pixels
+// in the brand and navigation rail, while the page is actually composited.
+async function sidebarRaster(){
+ const result=await send("Page.captureScreenshot",{format:"png",captureBeyondViewport:false});
+ const imageUrl="data:image/png;base64,"+result.data;
+ return evaluate(`(async()=>{
+  const picture=new Image();
+  picture.src=${JSON.stringify(imageUrl)};
+  await picture.decode();
+  const canvas=document.createElement('canvas');
+  canvas.width=picture.naturalWidth;canvas.height=picture.naturalHeight;
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+  ctx.drawImage(picture,0,0);
+  const width=Math.min(canvas.width,230),height=Math.min(canvas.height,350);
+  const pixels=ctx.getImageData(0,0,width,height).data;
+  let dark=0,samples=0;
+  for(let y=65;y<Math.min(height,310);y+=2){
+   for(let x=12;x<Math.min(width,205);x+=2){
+    const offset=(y*width+x)*4;
+    if(pixels[offset+3]<200)continue;
+    samples++;
+    if(pixels[offset]<155&&pixels[offset+1]<175&&pixels[offset+2]<190)dark++;
+   }
+  }
+  return {dark,samples,width,height};
+ })()`);
 }
 const selectedFiles=()=>evaluate('document.querySelectorAll("tr.file-entry[aria-selected=true]").length');
 const selectionText=()=>evaluate('document.querySelector(".file-selected-count")?.textContent||""');
@@ -126,6 +153,12 @@ try{
    console.log("EXPLORER_SIDEBAR_STABILITY",mode,pass,JSON.stringify(rail));
    assert(rail.visible&&rail.homeHeight===48,
     "Finder sidebar disappeared or is occluded in "+mode+" view: "+JSON.stringify(rail));
+   if(pass===0||pass===5||pass===11){
+    const raster=await sidebarRaster();
+    console.log("EXPLORER_SIDEBAR_RASTER",mode,pass,JSON.stringify(raster));
+    assert(raster.dark>35,
+     "Composited Finder navigation pixels disappeared despite live DOM: "+JSON.stringify(raster));
+   }
   }
  }
  // The command row is portalled into the folder toolbar. Verify its actual
