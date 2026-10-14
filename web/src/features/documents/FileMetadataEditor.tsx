@@ -4,11 +4,12 @@ import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {toast} from "../../shared/ui/feedback";
 import {errorCopy} from "../../shared/errors";
 import {fileApi} from "./api";
-import type {FileMetadata} from "../../entities/file/model";
+import type {FileMetadata,FileLineage} from "../../entities/file/model";
+import {FileLineageTree} from "./FileLineageTree";
 
 // File business metadata lives alongside document attributes, not in a
 // full-page create form. Server authorizes both read and write.
-export function FileMetadataEditor({fileId}:{fileId:string}){
+export function FileMetadataEditor({fileId,fileName,lineageParent,lineageChildren}:{fileId:string;fileName?:string;lineageParent?:FileLineage|null;lineageChildren?:FileLineage[]}){
  const[metadata,setMetadata]=useState<FileMetadata|null>(null);
  const[error,setError]=useState("");
  const[editing,setEditing]=useState(false);
@@ -34,6 +35,7 @@ export function FileMetadataEditor({fileId}:{fileId:string}){
   finally{setBusy(false);}
  }
  return <section className="file-metadata-section" aria-label="文档分类">
+  {fileName&&<FileLineageTree fileName={fileName} parent={lineageParent} children={lineageChildren}/>}
   <header className="file-metadata-bar"><strong>业务分类</strong>
    {metadata&&!editing&&<RareButton type="button" onClick={()=>setEditing(true)}>编辑</RareButton>}
   </header>

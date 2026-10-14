@@ -1,4 +1,4 @@
-import {useEffect,useMemo,useRef,useState} from "react";
+import {useEffect,useMemo,useRef,useState,type ReactNode} from "react";
 import {BrandLoadingLabel} from "./BrandLoader";
 import {request} from "../http";
 export type FileHistoryEvent={id:number;actorId:string;actorName?:string;requestId:string;eventType:string;targetKind:string;targetId:string;outcome:string;details:Record<string,unknown>;createdAt:string};
@@ -9,7 +9,7 @@ import {errorCopy} from "../errors";
 import "./fileHistory.css";
 
 const eventLabels:Record<string,string>={
- "file.upload":"文件上传","file.save":"内容修改","file.rollback":"版本回滚",
+ "file.upload":"文件上传","file.convert":"格式转换 / 衍生文件","file.save":"内容修改","file.rollback":"版本回滚",
  "file.replace":"替换文件内容","file.download_prepare":"请求下载文件",
  "file.download_zip_prepare":"加入批量下载",
  "seal.restore":"签章修订回退","approval.cancel":"撤销审批",
@@ -27,6 +27,7 @@ const eventLabels:Record<string,string>={
 const detailText=(value:unknown)=>typeof value==="string"?value:typeof value==="number"?String(value):"";
 function describe(item:FileHistoryEvent){
  const d=item.details;
+ if(item.eventType==="file.convert")return (detailText(d.derivedFileName)||"衍生文件")+" · 源版本 v"+detailText(d.sourceVersionSeq);
  if(item.eventType==="file.rename")return d.oldName?detailText(d.oldName)+" → "+(detailText(d.newName)||detailText(d.name)):"新名称："+(detailText(d.newName)||detailText(d.name))+" · 旧名称未留存";
  if(item.eventType==="folder.rename")return detailText(d.oldName)&&detailText(d.newName)?detailText(d.oldName)+" → "+detailText(d.newName):"文件所在路径受到影响";
  if(item.eventType==="folder.move"||item.eventType==="folder.delete")return "此操作影响了文件所在目录";
@@ -44,7 +45,7 @@ function describe(item:FileHistoryEvent){
 
 // Read-only timeline. The single "历史" workspace reuses the existing
 // content-version actions rather than creating a second rollback flow.
-export function FileHistoryPanel({fileId,revision}:{fileId:string;revision:number}){
+export function FileHistoryPanel({fileId,revision,lineage}:{fileId:string;revision:number;lineage?:ReactNode}){
  const[filter,setFilter]=useState<"all"|"content"|"location"|"workflow">("all");
  const[page,setPage]=useState<FileHistoryPage>({items:[],nextCursor:""});
  const[loading,setLoading]=useState(true);
@@ -110,6 +111,7 @@ export function FileHistoryPanel({fileId,revision}:{fileId:string;revision:numbe
   setActiveMonth(current=>current===id?current:id);
  }
  return <div className="file-history" aria-label="文件操作时间线">
+  {lineage}
   <div className="file-history-filters" role="group" aria-label="操作类型">
    {([["all","全部"],["content","内容"],["location","文件操作"],["workflow","审批签章"]] as const).map(([key,label])=>
     <RareButton key={key} type="button" aria-pressed={filter===key} onClick={()=>setFilter(key)}>{label}</RareButton>)}

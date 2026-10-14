@@ -106,7 +106,9 @@
 .cad-inspector-section h3 span{color:var(--text-tertiary);font-family:var(--font-mono);font-size:10px;font-weight:500}
 .cad-quick-actions{display:flex;gap:5px;flex-wrap:wrap}
 .cad-quick-actions button{min-height:25px;height:25px;flex:1;min-width:72px;font-size:11px}
-.cad-layer-list{display:flex;flex-direction:column;gap:2px;min-height:0;max-height:225px;overflow:auto;scrollbar-gutter:stable}
+.cad-layer-list{display:flex;flex-direction:column;gap:2px;min-height:0;max-height:225px;overflow:auto;scrollbar-gutter:stable;padding-bottom:12px;scrollbar-width:thin;scrollbar-color:#CBD5E1 transparent}
+.cad-layer-list::-webkit-scrollbar{width:6px}
+.cad-layer-list::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:var(--radius-finder)}
 .cad-layer{display:flex;align-items:center;gap:8px;min-height:27px;padding:2px 5px;border-radius:var(--radius-xs);cursor:pointer;font-size:12px;color:var(--text-primary)}
 .cad-layer:hover,.cad-part:hover{background:var(--surface-row-hover)}
 .cad-layer input,.cad-part input{flex:none;width:15px;height:15px;margin:0}
@@ -115,6 +117,11 @@
 .cad-part button{flex:1;min-width:0;max-width:100%;justify-content:flex-start;overflow:hidden;text-overflow:ellipsis}
 .cad-part button:last-child{flex:none;width:auto;font-size:11px;padding:0 5px}
 .cad-part button.on{color:var(--brand-blue);background:var(--surface-subtle);border-color:transparent}
+.cad-part .cad-part-name.rare-button{display:flex;align-items:center;justify-content:flex-start;flex:1 1 auto;min-width:0;min-height:24px;height:24px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 5px;border:0!important;box-shadow:none;background:transparent;color:#344054;font-weight:450;font-size:12px}
+.cad-part .cad-part-name.rare-button:hover{background:#F1F5F9}
+.cad-part .cad-part-name.on.rare-button{background:rgba(0,100,225,.08);color:#0058D0}
+.cad-part .cad-part-locate.rare-button{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;min-height:22px;height:22px;padding:0 7px;border:0!important;border-radius:var(--radius-finder);box-shadow:none;background:transparent;color:#64748B;font-size:11px}
+.cad-part .cad-part-locate.rare-button:hover{background:#F1F5F9;color:#0058D0}
 .cad-inspector-section>button{align-self:flex-start}
 .cad-properties{gap:6px}
 .cad-properties>div{display:grid;grid-template-columns:56px minmax(0,1fr);align-items:start;gap:8px;font-size:11px;line-height:19px}

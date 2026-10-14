@@ -3,6 +3,8 @@
 .file-pdf-toolbar strong{font-size:12px}
 .file-pdf-tools{display:flex;align-items:center;justify-content:flex-end;flex-wrap:nowrap;gap:6px;min-width:0;max-width:100%}
 .file-pdf-tools>span{font-size:12px;color:var(--text-secondary);font-variant-numeric:tabular-nums;white-space:nowrap}
+.file-pdf-tools .rare-select,.file-workbench-preview-surface .file-pdf-tools .rare-select{height:26px;min-height:26px;padding:0 8px;border:1px solid rgba(15,23,42,.08)!important;border-radius:var(--radius-finder);background:#F8FAFC;color:#475569;box-shadow:none;outline:none}
+.file-pdf-tools .preview-dock-divider{width:1px;height:16px;flex:0 0 1px;background:rgba(15,23,42,.08)}
 .file-pdf-paper{position:relative;display:flex;flex-direction:column;align-items:safe center;justify-content:safe center;min-height:240px;min-width:0;overflow:auto;padding:28px 24px 84px;box-sizing:border-box;background:#F8FAFC}
 .file-pdf-paper.is-pending{min-height:clamp(260px,56vh,620px)}
 .file-pdf-paper > img.file-pdf-image,.file-pdf-paper > img.file-pdf-retained{display:block;flex:0 0 auto;max-width:100%;max-height:78vh;height:auto;width:auto;border:1px solid rgba(15,23,42,.06);border-radius:var(--radius-sm);box-shadow:0 1px 3px rgba(15,23,42,.06),0 10px 30px rgba(15,23,42,.07);background:#fff}

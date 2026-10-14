@@ -14,4 +14,4 @@
 .structured-section{border:1px solid var(--border-hairline);border-radius:var(--radius-md);min-width:0;overflow:hidden}
 .structured-section h3{font-size:12px;font-weight:700;padding:11px 14px;background:var(--surface-header);margin:0;border-bottom:1px solid var(--border-hairline)}
 .structured-lines{padding:10px 14px;max-height:430px;overflow:auto}
-.structured-lines p{margin:0;padding:4px 0;overflow-wrap:anywhere;font-family:var(--font-mono);font-size:12px;border-bottom:1px solid var(--border-hairline)}
+.structured-lines p{margin:0;padding:4px 0;writing-mode:horizontal-tb;word-break:normal;overflow-wrap:break-word;white-space:pre-wrap;font-family:inherit;font-size:12px;border-bottom:1px solid var(--border-hairline)}

@@ -192,7 +192,7 @@ func parseDocument(out *StructuredPreview, files map[string]*zip.File) {
 		addOfficeNote(out, err)
 		return
 	}
-	texts, err := xmlTexts(raw, "t", maxOfficeTextLines)
+	texts, err := docxParagraphTexts(raw, maxOfficeTextLines)
 	if err != nil {
 		addOfficeNote(out, err)
 		return
@@ -205,6 +205,57 @@ func parseDocument(out *StructuredPreview, files map[string]*zip.File) {
 		out.Truncated = true
 	}
 }
+
+// DOCX rich-text runs frequently split single words into separate <w:t>
+// nodes. A preview line must represent the entire paragraph, not a run.
+func docxParagraphTexts(raw []byte, maxLines int) ([]string, error) {
+	dec := xml.NewDecoder(bytes.NewReader(raw))
+	var lines []string
+	var paragraph strings.Builder
+	pDepth, tDepth := 0, 0
+	for {
+		tok, err := dec.Token()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		switch v := tok.(type) {
+		case xml.StartElement:
+			if v.Name.Local == "p" {
+				if pDepth == 0 {
+					paragraph.Reset()
+				}
+				pDepth++
+			}
+			if pDepth > 0 && v.Name.Local == "t" {
+				tDepth++
+			}
+		case xml.EndElement:
+			if v.Name.Local == "t" && tDepth > 0 {
+				tDepth--
+			}
+			if v.Name.Local == "p" && pDepth > 0 {
+				pDepth--
+				if pDepth == 0 {
+					if line := strings.TrimSpace(paragraph.String()); line != "" {
+						lines = append(lines, line)
+					}
+					if len(lines) >= maxLines {
+						return lines, nil
+					}
+				}
+			}
+		case xml.CharData:
+			if pDepth > 0 && tDepth > 0 && paragraph.Len() < 16384 {
+				paragraph.Write(v)
+			}
+		}
+	}
+	return lines, nil
+}
+
 func parseSpreadsheet(out *StructuredPreview, files map[string]*zip.File) {
 	shared := []string{}
 	if f := files["xl/sharedStrings.xml"]; f != nil {

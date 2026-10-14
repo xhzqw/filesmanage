@@ -1,7 +1,7 @@
 import {request} from "../../shared/http";
 import {postMultipart} from "../../shared/uploadClient";
 import {publishResourceChange} from "../../shared/resourceSync";
-import type {FileItem, FileVersion, PreviewData, FileMetadata} from "../../entities/file/model";
+import type {FileItem, FileVersion, PreviewData, FileMetadata, LineageData} from "../../entities/file/model";
 
 export type SealRevision={id:string;fileId:string;versionSeq:number;revision:number;markCount:number;action:"original"|"legacy"|"sign"|"restore";actorId?:string;actorName?:string;restoredFrom?:number;createdAt?:string};
 export type SealHistory={current:number;revisions:SealRevision[]};
@@ -24,6 +24,8 @@ export type OfficeSessionData={
  editorUrl:string;
  config:{token:string};
 };
+export type NativeParagraph={text:string;kind:string;tableCell:boolean};
+export type NativeDocument={versionSeq:number;paragraphs:NativeParagraph[]};
 
 function changed<T>(promise:Promise<T>,fileId:string,addsTrash=false):Promise<T>{
  return promise.then(data=>{
@@ -41,7 +43,7 @@ export const fileApi={
   if(cursor)query.set("cursor",cursor);
   return request<FilePage>("/files?"+query.toString(),{signal});
  },
- meta:(id:string,signal?:AbortSignal)=>request<{file:FileItem;versions:FileVersion[]}>("/files/"+id,{signal}),
+ meta:(id:string,signal?:AbortSignal)=>request<{file:FileItem;versions:FileVersion[]}&LineageData>("/files/"+id,{signal}),
  history:(id:string,cursor="",signal?:AbortSignal)=>request<FileHistoryPage>("/files/"+encodeURIComponent(id)+"/history?"+new URLSearchParams({cursor,limit:"30"}),{signal}),
   replaceTarget:(folderId:string,name:string)=>request<ReplaceTarget>("/files/replace-target?"+new URLSearchParams({folderId,name})),
  lifecycle:(id:string)=>request<FileLifecycle>("/files/"+id+"/lifecycle"),
@@ -56,6 +58,9 @@ export const fileApi={
  sealHistory:(id:string,version:number)=>request<SealHistory>("/files/"+encodeURIComponent(id)+"/seals/revisions?version="+version),
  signedDownloadUrl:(id:string,version:number,revision:number|null=null)=>"/api/files/"+encodeURIComponent(id)+"/seals/export?"+new URLSearchParams({version:String(version),...(revision===null?{}:{revision:String(revision)})}),
  convertDOCXForSigning:(id:string,expectedSeq:number,expectedSha256:string,idempotencyKey:string)=>request<{fileId:string;versionSeq:number;sha256:string;name:string}>("/files/"+encodeURIComponent(id)+"/convert-for-signing",{method:"POST",body:JSON.stringify({expectedSeq,expectedSha256,idempotencyKey})}),
+ convertFormat:(id:string,targetFormat:"pdf"|"docx",expectedSeq:number,expectedSha256:string,idempotencyKey:string)=>
+  changed(request<{fileId:string;folderId:string;name:string;versionSeq:number;sha256:string}>(
+   "/files/"+encodeURIComponent(id)+"/convert",{method:"POST",body:JSON.stringify({targetFormat,expectedSeq,expectedSha256,idempotencyKey})}),id),
 
   preparePrint:(id:string,expectedSha256:string)=>request<{fileId:string;name:string;versionSeq:number;sha256:string}>(
    "/files/"+encodeURIComponent(id)+"/print/prepare",{method:"POST",body:JSON.stringify({expectedSha256})}),
@@ -106,6 +111,10 @@ export const fileApi={
     return data;
    }),
  openOfficeSession:(id:string)=>request<OfficeSessionData>("/files/"+id+"/office/session",{method:"POST",body:"{}"}),
+ nativeDOCXContent:(id:string)=>request<NativeDocument>("/files/"+encodeURIComponent(id)+"/native-docx"),
+ saveNativeDOCX:(id:string,baseSeq:number,lockToken:string,idempotencyKey:string,paragraphs:string[])=>
+  changed(request<{status:"committed"|"pending";versionSeq:number}>("/files/"+encodeURIComponent(id)+"/native-docx/save",{
+   method:"POST",body:JSON.stringify({baseSeq,lockToken,idempotencyKey,paragraphs})}),id),
  officeNativeSaveStatus:(id:string,sessionId:string)=>request<{versionSeq:number;savedCount:number;failedCount:number}>(
   "/files/"+encodeURIComponent(id)+"/office/session/"+encodeURIComponent(sessionId)+"/state"),
  requestOfficeSave:(id:string,sessionId:string)=>request<{status:"pending"|"unchanged";requestId?:string}>(

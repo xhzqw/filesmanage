@@ -93,5 +93,6 @@ func (s *Service) ConvertDOCXForSigning(ctx context.Context, u domain.User, id s
 		baseRunes = baseRunes[:len(baseRunes)-1]
 		pdfName = fmt.Sprintf("%s-签章-v%d-%s.pdf", string(baseRunes), expectedSeq, expectedSHA[:8])
 	}
-	return s.CommitUpload(ctx, u, folderID, pdfName, "application/pdf", idempotencyKey, bytes.NewReader(pdf))
+	return s.commitUploadWithLineage(ctx, u, folderID, pdfName, "application/pdf", idempotencyKey, bytes.NewReader(pdf),
+		&domain.FileLineage{SourceFileID: id, SourceFileName: name, SourceVersionSeq: expectedSeq, RelationType: "seal_copy"})
 }

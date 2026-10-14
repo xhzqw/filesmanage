@@ -1,5 +1,12 @@
 export type FileMetadata={fileId:string;category:string;description:string;tags:string[];updatedBy:string;updatedAt:string};
 
+export type FileLineage={
+ id:string;name:string;ext:string;versionSeq:number;createdAt:string;
+ sourceFileId:string;sourceFileName:string;sourceVersionSeq:number;
+ relationType:"docx_to_pdf"|"pdf_to_docx"|"seal_copy";
+};
+export type LineageData={lineageParent:FileLineage|null;lineageChildren:FileLineage[]};
+
 export type FileItem={
  id:string;
  folderId:string;
@@ -9,6 +16,10 @@ export type FileItem={
  sizeBytes:number;
  sha256:string;
  currentVersionSeq:number;
+ sourceFileId?:string;
+ sourceFileName?:string;
+ sourceVersionSeq?:number;
+ relationType?:FileLineage["relationType"];
  updatedAt:string;
  // Search projection only: a bounded plain-text window around the match
  // (SPEC §10.3); rendered as escaped text nodes plus <mark>.
@@ -30,6 +41,12 @@ export type FileVersion={
 
 export type PreviewData={
  fileId:string;
+ lineageParent?:FileLineage|null;
+ lineageChildren?:FileLineage[];
+ sourceFileId?:string;
+ sourceFileName?:string;
+ sourceVersionSeq?:number;
+ relationType?:FileLineage["relationType"];
  name:string;
  contentType:string;
  size:number;

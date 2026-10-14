@@ -28,6 +28,10 @@ type UploadResult struct {
 // CommitUpload finalizes a streamed upload: the caller has already written the
 // request body into stage.
 func (s *Service) CommitUpload(ctx context.Context, u domain.User, folderID, fileName, contentType, idempotencyKey string, content io.Reader) (UploadResult, error) {
+	return s.commitUploadWithLineage(ctx, u, folderID, fileName, contentType, idempotencyKey, content, nil)
+}
+
+func (s *Service) commitUploadWithLineage(ctx context.Context, u domain.User, folderID, fileName, contentType, idempotencyKey string, content io.Reader, lineage *domain.FileLineage) (UploadResult, error) {
 	fileName = strings.TrimSpace(fileName)
 	if folderID == "" || fileName == "" || len(fileName) > 200 {
 		return UploadResult{}, domain.ErrInvalidInput
@@ -85,6 +89,26 @@ func (s *Service) CommitUpload(ctx context.Context, u domain.User, folderID, fil
 	}
 	if err = tx.CreateFileWithFirstVersion(ctx, file, version); err != nil {
 		return UploadResult{}, mapError(err)
+	}
+	if lineage != nil {
+		store, ok := tx.(interface {
+			InsertFileLineage(context.Context, domain.FileLineage) error
+		})
+		if !ok {
+			return UploadResult{}, errors.New("file lineage storage unavailable")
+		}
+		child := *lineage
+		child.ID = file.ID
+		if err = store.InsertFileLineage(ctx, child); err != nil {
+			return UploadResult{}, err
+		}
+		// The source-side audit trail survives even if its derived child is
+		// subsequently moved, trashed or purged.
+		if err = auditRequired(ctx, tx, u, "file.convert", "file", child.SourceFileID, "success",
+			map[string]any{"derivedFileId": file.ID, "derivedFileName": file.Name,
+				"sourceVersionSeq": child.SourceVersionSeq, "relationType": child.RelationType}); err != nil {
+			return UploadResult{}, err
+		}
 	}
 	result := UploadResult{FileID: file.ID, VersionSeq: 1, Sha256: sha, Size: size, Name: fileName, FolderID: folder.ID, Dedup: dedup}
 	storeIdempotentResult(ctx, tx, u.ID, "file.upload", idempotencyKey, mustMarshal(result))

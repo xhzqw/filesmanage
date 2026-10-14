@@ -1,0 +1,9 @@
+.inline-file-editor{box-sizing:border-box;flex:1 1 auto;width:min(860px,calc(100% - 48px));height:calc(100% - 104px);min-height:0;margin:24px auto 80px;overflow-y:auto;border:1px solid rgba(15,23,42,.08);border-radius:var(--radius-sm);background:#fff;box-shadow:0 2px 12px rgba(15,23,42,.06)}
+.inline-file-editor>form{display:flex;flex-direction:column;gap:10px;padding:20px 24px 24px;min-height:100%}
+.inline-file-editor-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:5px;color:#344054;font-size:13px}
+.inline-file-editor-head>span{font-size:11px;color:#94A3B8}
+.file-editor-code-card{display:grid;grid-template-columns:44px minmax(0,1fr);min-height:250px;max-height:65vh;overflow:auto;border:1px solid rgba(15,23,42,.08);border-radius:var(--radius-sm);background:#fff}
+.file-editor-line-numbers{position:sticky;left:0;top:0;min-width:44px;margin:0;padding:10px 6px 12px;background:#F8FAFC;border-right:1px solid rgba(15,23,42,.05);color:#94A3B8;text-align:right;user-select:none;font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace}
+.file-editor-code-card textarea{display:block;resize:vertical;width:100%;min-width:0;min-height:250px;max-height:none;margin:0;padding:10px 12px;border:0!important;border-radius:0;background:transparent;box-shadow:none;outline:none;font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre;overflow-wrap:normal}
+.file-editor-code-card:focus-within{outline:1px solid rgba(0,88,208,.3)}
+.inline-file-editor .dialog-actions{margin-top:auto}

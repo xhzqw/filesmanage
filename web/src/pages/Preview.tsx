@@ -14,6 +14,7 @@ import {resolvePreviewAdapter} from "../features/documents/previewAdapters";
 import {previewCapabilities} from "../features/documents/previewCapabilities";
 import {FileEditor} from "../features/documents/FileEditor";
 import {FileMetadataEditor} from "../features/documents/FileMetadataEditor";
+import {FileLineageTree} from "../features/documents/FileLineageTree";
 import {VersionComparePanel} from "../features/documents/VersionComparePanel";
 import {FileHistoryPanel} from "../shared/ui/FileHistoryPanel";
 import {FileSealsPanel} from "../features/seals/FileSealsPanel";
@@ -31,6 +32,8 @@ import {Dialog} from "../shared/ui/Dialog";
 import {FileTypeIcon} from "../shared/ui/FileTypeIcon";
 import type {MenuItem} from "../shared/ui/Menu";
 import type {PreviewData,FileVersion,FileItem} from "../entities/file/model";
+import type {FileLineage} from "../entities/file/model";
+import {newIdempotencyKey} from "../shared/ids";
 import type {User} from "../entities/user/model";
 import {AppShell} from "../shared/ui/AppShell";
 import "./previewWorkbench.css";
@@ -69,6 +72,10 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const[preview,setPreview]=useState<PreviewData|null>(null);
  const[file,setFile]=useState<FileItem|null>(null);
  const[versions,setVersions]=useState<FileVersion[]>([]);
+ const[lineageParent,setLineageParent]=useState<FileLineage|null>(null);
+ const[lineageChildren,setLineageChildren]=useState<FileLineage[]>([]);
+ const[converted,setConverted]=useState<{fileId:string;name:string;target:"pdf"|"docx"}|null>(null);
+ const[converting,setConverting]=useState(false);
  const[status,setStatus]=useState<"loading"|"ready"|"failed">("loading");
  const[sidebarCollapsed,setSidebarCollapsed]=useState(false);
  const[historyView,setHistoryView]=useState<"activity"|"versions">("activity");
@@ -143,6 +150,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
   if(switchingFile||!preview){
    setStatus("loading");
    setPreview(null);setFile(null);setVersions([]);
+   setLineageParent(null);setLineageChildren([]);
   }
   setError("");
   // The metadata endpoint checks access and returns the complete version
@@ -163,11 +171,14 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
      return data;
     });
     setVersions(current=>JSON.stringify(current)===JSON.stringify(meta.versions)?current:meta.versions);
+    setLineageParent(meta.lineageParent??null);
+    setLineageChildren(meta.lineageChildren??[]);
     setFile(current=>current&&JSON.stringify(current)===JSON.stringify(meta.file)?current:meta.file);
     setStatus("ready");
    }).catch(err=>{if(valid){
     // Revoked access must never leave the last successful preview visible.
     setPreview(null);setFile(null);setVersions([]);
+    setLineageParent(null);setLineageChildren([]);
     setStatus("failed");setError(errorCopy(err,"无法读取文件，请检查访问权限。"));
    }});
   return()=>{valid=false;controller.abort();};
@@ -200,6 +211,19 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  },[id]);
 
  function refresh(){setReloadToken(value=>value+1);}
+ async function convert(target:"pdf"|"docx"){
+  if(!file||!preview||converting)return;
+  setConverting(true);
+  try{
+   const result=await toast.track(()=>fileApi.convertFormat(id,target,currentSeq,preview.sha256,newIdempotencyKey()),{
+    loading:target==="pdf"?"正在转换为 PDF…":"正在转换为 Word…",
+    success:"格式转换完成",error:e=>errorCopy(e,"格式转换失败")
+   });
+   setConverted({fileId:result.fileId,name:result.name,target});
+   refresh();
+  }catch{/* toast.track has already shown the actionable error */}
+  finally{setConverting(false);}
+ }
  function announce(message:string,isError=false){
   // Persistent inline feedback is reserved for actionable errors.
   setError(isError?message:"");
@@ -287,6 +311,9 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
         {file&&<div><dt>修改于</dt><dd>{versionTime(file.updatedAt)}</dd></div>}
         {file&&<div><dt>创建人</dt><dd>{file.uploadedBy}</dd></div>}
        </dl>
+       {(lineageParent||lineageChildren.length>0)&&<section className="file-sidebar-disclosure file-sidebar-lineage">
+        <FileLineageTree fileName={preview.name} parent={lineageParent} children={lineageChildren}/>
+       </section>}
        <details className="file-sidebar-disclosure">
         <summary>分类与标签</summary>
         <FileMetadataEditor fileId={id}/>
@@ -333,16 +360,32 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
          {lifecycle&&<RareBadge tone={archived?"warning":lifecycle.state==="released"?(lifecycle.publishedSeq===currentSeq?"success":"warning"):"neutral"} dot>{archived?"已归档":lifecycle.state==="released"?(lifecycle.publishedSeq===currentSeq?"已发布":"待发布更新"):"草稿"}</RareBadge>}
          {lifecycle?.dueStatus==="soon"&&<RareBadge tone="warning">即将到期</RareBadge>}
          {lifecycle?.dueStatus==="overdue"&&<RareBadge tone="danger">已到期</RareBadge>}</div>
+       {(lineageParent||lineageChildren.length>0)&&<div className="file-lineage-pills">
+        {lineageParent&&<Link className="file-lineage-pill" to={"/preview/"+encodeURIComponent(lineageParent.id)}
+         title={lineageParent.name}>↗ 源自 {lineageParent.ext.toUpperCase()} · v{lineageParent.sourceVersionSeq}</Link>}
+        {lineageChildren.length>0&&<details className="file-lineage-dropdown">
+         <summary className="file-lineage-pill">衍生文件 ({lineageChildren.length}) ▾</summary>
+         <div className="file-lineage-popover"><FileLineageTree fileName={preview.name} children={lineageChildren}/></div>
+        </details>}
+       </div>}
       </div>
      </header>
        <div className="file-preview-action-dock" ref={actionDockRef}>
         {moreOpen&&<div className="file-action-expansion" id="file-workbench-more-actions" role="group" aria-label="更多文件操作">
-         {isOfficeName(preview.name)&&!archived&&<Link className="rare-button file-action-item" to={"/office/"+id} onClick={()=>setMoreOpen(false)}>在线编辑</Link>}
          {moreActions.map(action=><RareButton key={action.id} type="button"
           className={"file-action-item"+(action.danger?" is-danger":"")} tone="ghost" disabled={action.disabled}
           onClick={()=>{setMoreOpen(false);action.onSelect?.();}}>{action.label}</RareButton>)}
         </div>}
         <div className="file-workbench-actions" role="group" aria-label="文件操作">
+         {isOfficeName(preview.name)&&!archived&&<Link className="file-core-action is-edit" to={"/office/"+encodeURIComponent(id)}>✎ 在线编辑</Link>}
+         {preview.renderer==="pdf"&&!archived&&<RareButton className="file-core-action is-edit" type="button"
+          onClick={()=>{setHasOpenedSeals(true);setSidebarCollapsed(false);setTab("seals")}}>✎ 编辑 / 签章</RareButton>}
+         {capabilities?.canEditText&&!archived&&<RareButton className="file-core-action is-edit" type="button"
+          disabled={requiresApproval===null} onClick={()=>setEditing(true)}>✎ 在线编辑</RareButton>}
+         {isOfficeName(preview.name)&&<RareButton type="button" className="file-core-action" disabled={converting}
+          onClick={()=>void convert("pdf")}>⇄ {converting?"转换中…":"转为 PDF"}</RareButton>}
+         {preview.renderer==="pdf"&&<RareButton type="button" className="file-core-action" disabled={converting}
+          onClick={()=>void convert("docx")}>⇄ {converting?"转换中…":"转为 Word"}</RareButton>}
          <RareButton type="button" tone="ghost" title="下载" aria-label="下载" onClick={download}><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M4 17v3h16v-3"/></svg><span className="file-side-action-label">下载</span></RareButton>
          {capabilities?.canPrint&&<RareButton type="button" tone="ghost" title="打印" aria-label="打印" onClick={()=>setPrinting(true)}><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M7 8V4h10v4M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1-2 2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M7 14h10v6H7z"/><path d="M17 11h1"/></svg><span className="file-side-action-label">打印</span></RareButton>}
          <RareButton type="button" tone="ghost" className="file-more-trigger"
@@ -369,9 +412,16 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
         <Suspense fallback={<div className="cad-preview-loading" role="status" aria-label="正在加载三维查看器"><BrandLoader size="lg" decorative/></div>}>
          <CadViewer key={preview.fileId+":"+preview.sha256} fileId={preview.fileId}/>
         </Suspense>:
+       preview.textual&&editing&&file&&requiresApproval!==null?
+        <div className="file-text-stage"><FileEditor inline file={file} requiresApproval={requiresApproval}
+         onClose={()=>{setEditing(false);refresh();}}
+         onSaved={()=>{announce("编辑已提交，版本状态正在刷新");refresh();}}/></div>:
        preview.textual?
         <div className="file-text-stage">
-         <pre className={"file-text-content"+(wrapText?" file-text-wrap":"")}>{preview.content||"（空文件）"}</pre>
+         <div className="file-text-paper" role="region" aria-label="文本内容（含行号）">
+          <pre className="file-text-numbers" aria-hidden="true">{Array.from({length:Math.min(5000,preview.content.split("\n").length)},(_,i)=>i+1).join("\n")}</pre>
+          <pre className={"file-text-content"+(wrapText?" file-text-wrap":"")}>{preview.content||"（空文件）"}</pre>
+         </div>
          <div className="file-text-tools preview-reader-dock" role="group" aria-label="文本阅读工具">
           {preview.truncated&&<span className="file-text-limit" title="仅显示前 256 KB；下载可查看完整内容">前 256 KB</span>}
           <RareButton type="button" aria-pressed={wrapText} onClick={()=>setWrapText(value=>!value)}>{wrapText?"取消换行":"自动换行"}</RareButton>
@@ -390,7 +440,9 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
         <RareButton type="button" aria-pressed={historyView==="activity"} onClick={()=>setHistoryView("activity")}>操作记录</RareButton>
         <RareButton type="button" aria-pressed={historyView==="versions"} onClick={()=>setHistoryView("versions")}>内容版本</RareButton>
        </div>
-       {historyView==="activity"?<FileHistoryPanel fileId={id} revision={reloadToken}/>:<div className="file-version-timeline file-history-version-list">
+       {historyView==="activity"?<FileHistoryPanel fileId={id} revision={reloadToken}
+        lineage={<FileLineageTree fileName={preview.name} parent={lineageParent} children={lineageChildren}/>}
+       />:<div className="file-version-timeline file-history-version-list">
         {versions.length===0?<p className="empty">暂无版本记录</p>:versions.slice().reverse().map(v=><article key={v.versionSeq} className="file-version-entry">
          <div className="file-version-entry-heading"><strong>v{v.versionSeq}</strong>{v.versionSeq===currentSeq&&<RareBadge tone="info">当前</RareBadge>}</div>
          <span>{ACTION_LABELS[v.action]??v.action}{v.rollbackTargetSeq?" · 来自 v"+v.rollbackTargetSeq:""}</span>
@@ -414,7 +466,17 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
     </div>}
    </main>
   </div>
-  {editing&&file&&requiresApproval!==null&&<FileEditor file={file} requiresApproval={requiresApproval} onClose={()=>{setEditing(false);refresh();}} onSaved={()=>{announce("编辑已提交，版本状态正在刷新");refresh();}}/>}
+  {converted&&<Dialog open title="转换完成" onClose={()=>setConverted(null)}>
+   <p>已生成「{converted.name}」，并记录源文件版本关系。</p>
+   {converted.target==="docx"&&<p className="hint">PDF 转换为可编辑 Word 后，复杂表格、字体与图片可能需要人工检查。</p>}
+   <div className="dialog-actions">
+    <RareButton type="button" onClick={()=>setConverted(null)}>留在当前文件</RareButton>
+    <RareButton type="button" className="primary" onClick={()=>{
+     const result=converted;setConverted(null);
+     navigate(result.target==="docx"?"/office/"+encodeURIComponent(result.fileId):"/preview/"+encodeURIComponent(result.fileId));
+    }}>{converted.target==="docx"?"立即在线编辑 Word":"立即打开生成的 PDF"}</RareButton>
+   </div>
+  </Dialog>}
   {moving&&file&&<MoveDialog file={file} presetTargetId="" onClose={()=>setMoving(false)}
    onMoved={()=>{setMoving(false);announce("文件已移动");refresh();}} onReload={refresh}/>}
    {sharing&&file&&<ShareDialog resource={{kind:"file",id:file.id,name:file.name}}

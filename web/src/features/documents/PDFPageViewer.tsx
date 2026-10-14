@@ -122,6 +122,7 @@ export function PDFPageViewer({fileId,sha,name,seq,revision,onRevisionChange,epo
       {item.revision===0?"原始未签章":("签章 r"+item.revision+" · "+item.markCount+" 枚")}
      </option>)}
     </RareSelect>}
+    <span className="preview-dock-divider" aria-hidden="true"/>
     <RareButton type="button" title="切换整页 / 页宽适配" aria-label={"PDF 适配方式："+(fitMode==="page"?"整页":"页宽")+"，点击切换"}
      onClick={()=>{anchorRef.current=null;setFitMode(mode=>mode==="page"?"width":"page");setZoom(1);
       if(viewportRef.current){viewportRef.current.scrollLeft=0;viewportRef.current.scrollTop=0;}}}>

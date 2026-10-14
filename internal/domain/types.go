@@ -35,6 +35,19 @@ type File struct {
 	SearchRank int
 }
 
+// FileLineage captures the version that was transformed, not a moving alias.
+type FileLineage struct {
+	ID               string    `json:"id"`
+	Name             string    `json:"name"`
+	Ext              string    `json:"ext"`
+	VersionSeq       int       `json:"versionSeq"`
+	CreatedAt        time.Time `json:"createdAt"`
+	SourceFileID     string    `json:"sourceFileId"`
+	SourceFileName   string    `json:"sourceFileName"`
+	SourceVersionSeq int       `json:"sourceVersionSeq"`
+	RelationType     string    `json:"relationType"`
+}
+
 type FileVersion struct {
 	ID, FileID               string
 	Seq                      int

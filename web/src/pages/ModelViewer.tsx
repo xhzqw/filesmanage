@@ -590,7 +590,7 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
           const child=mshRoot.current?.children[index];if(child)child.visible=event.target.checked;
           controls.current?.invalidate();
          }}/>
-         <RareButton type="button" className={selectedPart===index?"on":""} onClick={()=>{
+         <RareButton type="button" className={"cad-part-name"+(selectedPart===index?" on":"")} onClick={()=>{
           const next=selectedPart===index?-1:index;setSelectedPart(next);
           mshRoot.current?.children.forEach((child,i)=>{
            const mat=(child as import("three").Mesh).material as import("three").MeshPhongMaterial|undefined;
@@ -598,7 +598,7 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
           });
           controls.current?.invalidate();
          }}>{part.name}</RareButton>
-         <RareButton type="button" onClick={()=>{const child=mshRoot.current?.children[index];if(child)controls.current?.focusObject(child);}}>定位</RareButton>
+         <RareButton type="button" className="cad-part-locate" onClick={()=>{const child=mshRoot.current?.children[index];if(child)controls.current?.focusObject(child);}}>定位</RareButton>
         </div>)}
        </div>
        <RareButton type="button" onClick={()=>{

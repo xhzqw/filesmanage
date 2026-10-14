@@ -8,6 +8,7 @@ import {errorCode,errorCopy}from "../../shared/errors";
 import {newIdempotencyKey}from "../../shared/ids";
 import type{FileItem}from"../../entities/file/model";
 import {Dialog}from"../../shared/ui/Dialog";
+import "./fileEditor.css";
 
 // Lock-aware plain-text editor. The dialog acquires the server-side edit lock
 // before the user types, saves with the live token, and releases on close.
@@ -19,7 +20,7 @@ import {Dialog}from"../../shared/ui/Dialog";
 // non-UTF-8 and mixed-EOL files are blocked with an actionable reason instead
 // of risking a lossy save. A submitted transaction can never be cancelled
 // away: closing is blocked while busy and unsaved edits ask first.
-export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileItem;requiresApproval:boolean;onClose:()=>void;onSaved:()=>void}){
+export function FileEditor({file,requiresApproval,onClose,onSaved,inline=false}:{file:FileItem;requiresApproval:boolean;onClose:()=>void;onSaved:()=>void;inline?:boolean}){
  const[status,setStatus]=useState<"loading"|"ready"|"blocked"|"failed">("loading");
  const[assessment,setAssessment]=useState<EditAssessment|null>(null);
  const[content,setContent]=useState("");
@@ -122,8 +123,8 @@ export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileIte
   }finally{setBusy(false);}
  }
 
- return <Dialog open title={`编辑 ${file.name}`} onClose={requestClose} closeGuard={()=>!busy} className="dialog editor-dialog">
-  <form onSubmit={submit}>
+ const body=<form onSubmit={submit}>
+   {inline&&<header className="inline-file-editor-head"><strong>在线编辑 · {file.name}</strong><span>⌘ / Ctrl + S 保存</span></header>}
    <p className="hint">{requiresApproval?"该目录的修改需要审批：提交后由审批人通过才生成新版本。":"保存将创建新的不可变版本；当前为 v"+baseSeq+"。"}</p>
    {status==="loading"&&<p className="empty"><BrandLoadingLabel size="sm">正在加载内容…</BrandLoadingLabel></p>}
    {status==="failed"&&<p role="alert" className="notice error">{message||"无法读取文件内容。"}</p>}
@@ -134,7 +135,16 @@ export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileIte
    {editable&&<>
     <p className="hint">字节保真：UTF-8 · {editable.eol==="crlf"?"CRLF":"LF"} 换行 · {editable.hasBom?"含 BOM":"无 BOM"}，保存时按原始字节特征写回。</p>
     <label htmlFor="editor-content">内容</label>
-    <RareTextarea id="editor-content" value={content} rows={16} onChange={e=>setContent(e.target.value)}/>
+    <div className="file-editor-code-card">
+     <pre className="file-editor-line-numbers" aria-hidden="true">{Array.from({length:Math.min(5000,content.split("\n").length)},(_,i)=>i+1).join("\n")}</pre>
+     <RareTextarea id="editor-content" value={content} rows={16} onChange={e=>setContent(e.target.value)}
+      onKeyDown={event=>{
+       if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==="s"){
+        event.preventDefault();
+        if(!busy&&!lockPending)event.currentTarget.form?.requestSubmit();
+       }
+      }}/>
+    </div>
    </>}
    {message&&status!=="failed"&&<p role={messageTone==="warning"?"status":"alert"} className={"notice"+(messageTone==="danger"?" error":"")}>{message}</p>}
    {pending&&<p role="alert" className="notice error">有未保存的修改，放弃后将丢失本次编辑。</p>}
@@ -151,6 +161,7 @@ export function FileEditor({file,requiresApproval,onClose,onSaved}:{file:FileIte
      <RareButton type="button" className="secondary-action" onClick={()=>setPending(null)}>继续编辑</RareButton>
     </>}
    </div>
-  </form>
- </Dialog>;
+  </form>;
+ if(inline)return <section className="inline-file-editor" aria-label={"在线编辑 "+file.name}>{body}</section>;
+ return <Dialog open title={`编辑 ${file.name}`} onClose={requestClose} closeGuard={()=>!busy} className="dialog editor-dialog">{body}</Dialog>;
 }

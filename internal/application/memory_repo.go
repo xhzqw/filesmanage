@@ -38,6 +38,7 @@ type memoryRepo struct {
 	files                       map[string]domain.File
 	fileText                    map[string]memoryFileText
 	fileMetadata                map[string]domain.FileMetadata
+	fileLineages                map[string]domain.FileLineage
 	finderLabels                map[string]domain.FinderLabel
 	finderAssignments           map[string]map[string]bool
 	finderFolderAssignments     map[string]map[string]bool
@@ -84,6 +85,7 @@ func newMemoryRepo() *memoryRepo {
 		folders:                 map[string]domain.Folder{},
 		files:                   map[string]domain.File{},
 		fileMetadata:            map[string]domain.FileMetadata{},
+		fileLineages:            map[string]domain.FileLineage{},
 		finderLabels:            map[string]domain.FinderLabel{},
 		finderAssignments:       map[string]map[string]bool{},
 		finderFolderAssignments: map[string]map[string]bool{},

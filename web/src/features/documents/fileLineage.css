@@ -1,0 +1,11 @@
+.file-lineage-tree{min-width:0;padding:10px 0;color:#344054;font-size:12px}
+.file-lineage-tree>strong{display:block;margin-bottom:9px;font-size:12px;color:#344054}
+.file-lineage-tree ol{list-style:none;padding:0;margin:0;display:grid;gap:4px}
+.file-lineage-tree li{min-width:0;display:grid;gap:3px}
+.file-lineage-tree a,.file-lineage-tree .file-lineage-node{min-width:0;display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:var(--radius-sm);text-decoration:none;color:inherit;background:#fff}
+.file-lineage-tree a:hover{background:#f1f5f9}
+.file-lineage-tree a>span,.file-lineage-node>span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:1}
+.file-lineage-tree small{white-space:nowrap;color:#667085}
+.file-lineage-tree .is-current>.file-lineage-node{background:#edf4ff;color:#0058d0}
+.file-lineage-tree .file-lineage-connector{padding-left:13px;font-size:11px;color:#98a2b3}
+.file-lineage-tree time{font-size:10px;color:#98a2b3;padding-left:12px}

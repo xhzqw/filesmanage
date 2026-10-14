@@ -147,8 +147,20 @@ func (h *Handler) fileMeta(c *gin.Context) {
 	for _, v := range versions {
 		versionData = append(versionData, versionPayload(v))
 	}
+	parent, children, err := h.S.LineageForMetadata(c.Request.Context(), u, c.Param("id"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	fileData := filePayload(file)
+	if parent != nil {
+		fileData["sourceFileId"] = parent.SourceFileID
+		fileData["sourceFileName"] = parent.SourceFileName
+		fileData["sourceVersionSeq"] = parent.SourceVersionSeq
+		fileData["relationType"] = parent.RelationType
+	}
 	c.JSON(200, gin.H{"ok": true, "data": gin.H{
-		"file": filePayload(file), "versions": versionData,
+		"file": fileData, "versions": versionData, "lineageParent": parent, "lineageChildren": children,
 	}})
 }
 
@@ -213,6 +225,19 @@ func (h *Handler) previewFile(c *gin.Context) {
 	}
 	if preview.Textual {
 		data["rawBase64"] = preview.RawBase64
+	}
+	parent, children, err := h.S.Lineage(c.Request.Context(), u, c.Param("id"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	data["lineageParent"] = parent
+	data["lineageChildren"] = children
+	if parent != nil {
+		data["sourceFileId"] = parent.SourceFileID
+		data["sourceFileName"] = parent.SourceFileName
+		data["sourceVersionSeq"] = parent.SourceVersionSeq
+		data["relationType"] = parent.RelationType
 	}
 	c.JSON(200, gin.H{"ok": true, "data": data})
 }
