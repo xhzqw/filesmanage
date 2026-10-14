@@ -165,7 +165,10 @@ try{
  // only edge painter at the rounded sidebar/work seam.
  for(const width of [1920,1366,820]){
   await send("Emulation.setDeviceMetricsOverride",{width,height:900,deviceScaleFactor:1,mobile:false});
-  await delay(130);
+  // Chrome preserves the pointer position across viewport emulation. Reset
+  // the preceding iteration's hovered inactive nav item before idle sampling.
+  await send("Input.dispatchMouseEvent",{type:"mouseMoved",x:Math.max(10,width-24),y:110});
+  await delay(210);
   const result=await evaluate(`(()=>{
    const nav=document.querySelector('.header nav[data-slot="gooey-nav"][data-appearance="pill"]');
    const active=nav?.querySelector('[data-slot="gooey-nav-item"][data-active="true"]');
