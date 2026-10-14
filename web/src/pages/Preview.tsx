@@ -34,6 +34,7 @@ import type {MenuItem} from "../shared/ui/Menu";
 import type {PreviewData,FileVersion,FileItem} from "../entities/file/model";
 import type {FileLineage} from "../entities/file/model";
 import {newIdempotencyKey} from "../shared/ids";
+import {prewarmOfficeEditor} from "../features/documents/officeBootstrap";
 import type {User} from "../entities/user/model";
 import {AppShell} from "../shared/ui/AppShell";
 import "./previewWorkbench.css";
@@ -70,6 +71,9 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const{id=""}=useParams();
  const navigate=useNavigate();
  const[preview,setPreview]=useState<PreviewData|null>(null);
+ useEffect(()=>{
+  if(preview?.name&&isOfficeName(preview.name))prewarmOfficeEditor();
+ },[preview?.name]);
  const[file,setFile]=useState<FileItem|null>(null);
  const[versions,setVersions]=useState<FileVersion[]>([]);
  const[lineageParent,setLineageParent]=useState<FileLineage|null>(null);
@@ -377,7 +381,9 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
           onClick={()=>{setMoreOpen(false);action.onSelect?.();}}>{action.label}</RareButton>)}
         </div>}
         <div className="file-workbench-actions" role="group" aria-label="文件操作">
-         {isOfficeName(preview.name)&&!archived&&<Link className="file-core-action is-edit" to={"/office/"+encodeURIComponent(id)}>✎ 在线编辑</Link>}
+         {isOfficeName(preview.name)&&!archived&&<Link className="file-core-action is-edit"
+          onMouseEnter={prewarmOfficeEditor} onFocus={prewarmOfficeEditor}
+          to={"/office/"+encodeURIComponent(id)}>✎ 在线编辑</Link>}
          {preview.renderer==="pdf"&&!archived&&<RareButton className="file-core-action is-edit" type="button"
           onClick={()=>{setHasOpenedSeals(true);setSidebarCollapsed(false);setTab("seals")}}>✎ 编辑 / 签章</RareButton>}
          {capabilities?.canEditText&&!archived&&<RareButton className="file-core-action is-edit" type="button"

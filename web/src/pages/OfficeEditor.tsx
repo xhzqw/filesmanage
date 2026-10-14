@@ -11,15 +11,11 @@ import type {FileItem} from "../entities/file/model";
 import type {User} from "../entities/user/model";
 import {FileTypeIcon} from "../shared/ui/FileTypeIcon";
 import {newIdempotencyKey} from "../shared/ids";
+import {warmOfficeEditor} from "../features/documents/officeBootstrap";
 import "./officeEditor.css";
 
-declare global{
- interface Window{
-  DocsAPI?:{DocEditor?:new (id:string,config:Record<string,unknown>)=>{destroyEditor?:()=>void}};
- }
-}
-
 type EditorStatus="loading"|"ready"|"failed";
+type BootStage="session"|"script"|"document";
 type SaveState="clean"|"dirty"|"saved"|"failed";
 const OFFICE_SAVE_POLL_MS=800;
 const OFFICE_SAVE_CONFIRM_TIMEOUT_MS=20000;
@@ -30,6 +26,7 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
  const{id=""}=useParams();
  const navigate=useNavigate();
  const[status,setStatus]=useState<EditorStatus>("loading");
+ const[bootStage,setBootStage]=useState<BootStage>("session");
  const[message,setMessage]=useState("");
  const[file,setFile]=useState<FileItem|null>(null);
  const[sessionId,setSessionId]=useState("");
@@ -82,44 +79,71 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
  },[id]);
 
  useEffect(()=>{
-  if(!file)return;
   let valid=true;
   let ready=false;
   let failed=false;
   let openedSession="";
   let waitForDocument:number|undefined;
+  const started=performance.now();
+  let scriptAt:number|undefined;
+  let sessionAt:number|undefined;
+  let editorAt:number|undefined;
+  const logTiming=(result:"ready"|"failed")=>{
+   // Technical timing is for browser diagnostics only, not UI chrome.
+   // No file names, IDs, JWTs or document contents are logged.
+   console.info("[office-startup]",{
+    result,
+    totalMs:Math.round(performance.now()-started),
+    sessionMs:sessionAt===undefined?null:Math.round(sessionAt-started),
+    scriptMs:scriptAt===undefined?null:Math.round(scriptAt-started),
+    documentMs:editorAt===undefined?null:Math.round(performance.now()-editorAt),
+   });
+  };
   setStatus("loading");
+  setBootStage("session");
   setMessage("");
   setSaveMessage("● 正在连接 ONLYOFFICE");
+  // Start loading api.js immediately, concurrently with session creation;
+  // preview pages often already have it prewarmed.
+  const earlyScript=warmOfficeEditor();
+  // Avoid an unhandled rejection if the script fails before the session API.
+  void earlyScript?.catch(()=>undefined);
   const fail=(reason:string)=>{
    if(!valid||failed)return;
    failed=true;
+   logTiming("failed");
    window.clearTimeout(waitForDocument);
    editor.current?.destroyEditor?.();editor.current=null;
    const closing=openedSession;
    openedSession="";
-   if(closing)void fileApi.cancelOfficeSession(file.id,closing).catch(()=>undefined);
+   if(closing)void fileApi.cancelOfficeSession(id,closing).catch(()=>undefined);
    setSessionId("");
    setStatus("failed");
    setMessage(reason);
    setSaveState("failed");
    setSaveMessage("● ONLYOFFICE 连接失败");
   };
-  fileApi.openOfficeSession(file.id)
+  fileApi.openOfficeSession(id)
    .then(async session=>{
     const opened=session as OfficeSessionData;
+    sessionAt=performance.now();
     if(!valid){
-     void fileApi.cancelOfficeSession(file.id,opened.sessionId).catch(()=>undefined);
+     void fileApi.cancelOfficeSession(id,opened.sessionId).catch(()=>undefined);
      return;
     }
     openedSession=opened.sessionId;
     setSessionId(opened.sessionId);
-    // Capture the current server receipts before the user can edit.
-    const initial=await fileApi.officeNativeSaveStatus(file.id,opened.sessionId).catch(()=>null);
-    if(!valid)return;
-    nativeSavedCount.current=initial?.savedCount??0;
-    nativeFailedCount.current=initial?.failedCount??0;
-    await loadEditorScript(editorBrowserUrl(opened.editorUrl)+"/web-apps/apps/api/documents/api.js");
+    setBootStage("script");
+    // Both operations run concurrently; previously the network requests
+    // were serial and withheld the editor until receipt initialization ended.
+    const nativeReady=fileApi.officeNativeSaveStatus(id,opened.sessionId)
+     .then(initial=>{
+      nativeSavedCount.current=initial.savedCount;
+      nativeFailedCount.current=initial.failedCount;
+     }).catch(()=>undefined);
+    const scriptPromise=earlyScript??warmOfficeEditor(opened.editorUrl);
+    if(!scriptPromise)throw new Error("ONLYOFFICE editor address is unavailable");
+    await Promise.all([scriptPromise.then(()=>{scriptAt=performance.now()}),nativeReady]);
     if(!valid||failed||!holder.current)return;
     const DocEditor=window.DocsAPI?.DocEditor;
     if(!DocEditor)throw new Error("editor api unavailable");
@@ -128,6 +152,7 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
       if(!valid||failed)return;
       ready=true;
       window.clearTimeout(waitForDocument);
+      logTiming("ready");
       setStatus("ready");
       setSaveState("clean");
       setSaveMessage("● ONLYOFFICE 已连接");
@@ -158,7 +183,10 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
       }
      }
     };
+    editorAt=performance.now();
     editor.current=new DocEditor("docx-editor-target",{...opened.config,events});
+    setBootStage("document");
+    setSaveMessage("● 正在打开文档…");
     waitForDocument=window.setTimeout(()=>{
      if(!valid||failed||ready)return;
      fail("ONLYOFFICE 文档加载超时。请检查编辑服务与文档下载接口。");
@@ -168,8 +196,16 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
     if(!valid||failed)return;
     fail(errorCopy(error,"无法连接 ONLYOFFICE，请检查文档编辑服务后重试"));
    });
-  return()=>{valid=false;window.clearTimeout(waitForDocument);editor.current?.destroyEditor?.();editor.current=null;};
- },[file]);
+  return()=>{
+   valid=false;
+   window.clearTimeout(waitForDocument);
+   editor.current?.destroyEditor?.();
+   editor.current=null;
+   // Do not leave an exclusive edit session behind when the route unmounts.
+   // After a completed explicit close this is a harmless idempotent cleanup.
+   if(openedSession)void fileApi.cancelOfficeSession(id,openedSession).catch(()=>undefined);
+  };
+ },[id]);
 
  // The built-in Save button triggers status=6 (forcesavetype=1). Listen for
  // the committed change hint to remove the old 0–1200ms polling delay, but
@@ -339,58 +375,18 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
    </div>
   </header>
   <main className="office-workbench-content">
-   {file&&<div id="placeholder" ref={holder} className="office-holder">
+   <div id="placeholder" ref={holder} className="office-holder">
     <div id="docx-editor-target"/>
-    {status==="loading"&&<div className="office-loading-cover" role="status"><BrandLoadingLabel size="sm">正在检测 Office 编辑器…</BrandLoadingLabel></div>}
+    {status==="loading"&&bootStage!=="document"&&<div className="office-loading-cover" role="status">
+     <BrandLoadingLabel size="sm">{bootStage==="session"?"正在建立编辑会话…":"正在准备 ONLYOFFICE…"}</BrandLoadingLabel>
+    </div>}
+    {status==="loading"&&bootStage==="document"&&<div className="office-document-loading-hint" role="status">正在打开文档…</div>}
     {status==="failed"&&<div className="office-loading-cover office-loading-failed" role="alert">
      <strong>无法连接 ONLYOFFICE</strong>
      <span>{message||"文档编辑服务暂不可用，请稍后重试"}</span>
      <RareButton type="button" onClick={()=>window.location.reload()}>重新连接 ONLYOFFICE</RareButton>
     </div>}
-   </div>}
-   {status==="failed"&&!file&&<div className="office-native-state" role="alert">
-    {message||"文档信息暂不可用"}<RareButton type="button" onClick={()=>window.location.reload()}>重试</RareButton>
-   </div>}
+   </div>
   </main>
  </div>;
-}
-
-// Browser traffic from the new HTTPS frontend must never load HTTP editor
-// scripts or iframes. Backend callbacks/downloads continue using the pinned
-// internal editor URL, independent of this browser-only URL selection.
-function editorBrowserUrl(internalUrl:string):string{
- if(window.location.protocol==="https:"&&window.location.port==="18443"){
-  return "https://"+window.location.hostname+":18444";
- }
- if(window.location.protocol==="http:"&&window.location.port==="18091"){
-  return "http://"+window.location.hostname+":18080";
- }
- return internalUrl.replace(/\/$/,"");
-}
-
-let pendingOfficeScript:Promise<void>|null=null;
-let pendingOfficeScriptURL="";
-function loadEditorScript(src:string):Promise<void>{
- if(window.DocsAPI?.DocEditor)return Promise.resolve();
- if(pendingOfficeScript&&pendingOfficeScriptURL===src)return pendingOfficeScript;
- pendingOfficeScriptURL=src;
- pendingOfficeScript=new Promise<void>((resolve,reject)=>{
-  const existing=document.querySelector(`script[src="${src}"]`) as HTMLScriptElement|null;
-  const script=existing??document.createElement("script");
-  let settled=false;
-  const cleanup=()=>{window.clearTimeout(timeout);script.removeEventListener("load",loaded);script.removeEventListener("error",failed);};
-  const finish=(error?:Error)=>{
-   if(settled)return;
-   settled=true;
-   cleanup();
-   if(error){script.remove();reject(error);}else resolve();
-  };
-  const loaded=()=>finish(window.DocsAPI?.DocEditor?undefined:new Error("编辑器脚本未提供 DocsAPI"));
-  const failed=()=>finish(new Error("Office 编辑器脚本加载失败"));
-  const timeout=window.setTimeout(()=>finish(new Error("ONLYOFFICE 脚本加载超时，请检查编辑服务连接")),15000);
-  script.addEventListener("load",loaded);
-  script.addEventListener("error",failed);
-  if(!existing){script.src=src;document.head.appendChild(script);}
- }).catch(error=>{pendingOfficeScript=null;throw error;});
- return pendingOfficeScript;
 }
