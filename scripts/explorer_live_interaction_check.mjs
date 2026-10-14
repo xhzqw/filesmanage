@@ -237,6 +237,7 @@ try{
    const views=bounds('.folder-file-toolbar-host .folder-view-switch');
    const search=bounds('.folder-file-toolbar-host .filter-search-wrap');
    const table=bounds('.explorer-striped-list table.file-table'),list=bounds('.work-body>.explorer-striped-list');
+   const listScrollPort=document.querySelector('.work-body>.explorer-striped-list');
    const header=bounds('.shell>.header'),dock=bounds('.global-utility-dock'),nav=bounds('.header-gooey-nav');
    const sizeHead=document.querySelector('.file-table th.col-size'),sizeCell=document.querySelector('.file-table tbody td.col-size');
    const sizeButton=sizeHead?.querySelector('.file-column-sort'),range=document.createRange();
@@ -277,7 +278,8 @@ try{
     views:inBounds(views,host),search:inBounds(search,host),
     overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,
     sidebar:bounds('.finder-sidebar')?.height,header:bounds('.header')?.top,sidebarTop:bounds('.finder-sidebar')?.top,
-    tableFills:!!table&&!!list&&table.width>=list.width-20&&table.right>=list.right-19&&table.right<=list.right+1,
+    tableFills:!!table&&!!list&&!!listScrollPort&&table.width>=listScrollPort.clientWidth-20&&
+     table.right>=list.left+listScrollPort.clientWidth-10&&table.right<=list.right+1,
     sizeAligned:!sizeText||!sizeButton||Math.abs(sizeButton.getBoundingClientRect().right-sizeText.right)<2,
     headerDockRight:!!dock&&!!header&&Math.abs((header.right-dock.right)-16)<=2,
     navCentered:innerWidth<=1210||!!nav&&!!header&&nav.left>=header.left+10&&nav.left<=header.left+24,
