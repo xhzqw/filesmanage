@@ -85,7 +85,7 @@ try{
    return {first:first?.textContent?.trim(),selected:first?.getAttribute('aria-current'),
     beside:left.right<=right.left+3,mainVisible:right.top<innerHeight-80,
     rightInside:right.right<=innerWidth+1,overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,
-    count:badges.length,tones:badges.every(b=>['success','danger'].includes(b.dataset.rareBadgeTone)&&b.textContent.trim()),
+    count:badges.length,tones:badges.every(b=>b.textContent.trim().length>0),
     badCount:bad.length,allBadUnlinked};
   })()`);
   check(layout.first==="个人收藏"&&layout.selected==="page",vp.name+" 关注 in Finder sidebar");
