@@ -33,7 +33,7 @@ func TestOfficeManualSaveReceiptsAndRepeatedVersions(t *testing.T) {
 			_, _ = w.Write([]byte(`{"error":0}`))
 			return
 		}
-		if r.URL.Path == "/saved" {
+		if r.URL.Path == "/saved" || r.URL.Path == "/cache/files/saved" {
 			_, _ = w.Write(current)
 			return
 		}
@@ -68,8 +68,12 @@ func TestOfficeManualSaveReceiptsAndRepeatedVersions(t *testing.T) {
 		if err != nil || pre.Status != "pending" {
 			t.Fatalf("before callback #%d: %+v %v", i, pre, err)
 		}
+		callbackURL := docServer.URL + "/saved"
+		if i == 0 {
+			callbackURL = "http://filesmanage-office:80/cache/files/saved"
+		} // internal Docker hostname, pinned to trusted editor URL
 		if code, err := s.HandleEditorCallback(ctx, token, EditorCallbackPayload{
-			Key: view.DocumentKey, Status: domain.CallbackStatusForceSave, URL: docServer.URL + "/saved", UserData: rid,
+			Key: view.DocumentKey, Status: domain.CallbackStatusForceSave, URL: callbackURL, UserData: rid,
 		}); err != nil || code != 0 {
 			t.Fatalf("callback #%d: %d %v", i, code, err)
 		}
@@ -124,6 +128,45 @@ func TestOfficeManualSaveFailureReceipt(t *testing.T) {
 	receipt, err := s.OfficeSaveStatus(ctx, admin, uploaded.FileID, view.SessionID, requestID)
 	if err != nil || receipt.Status != "failed" || receipt.VersionSeq != 1 {
 		t.Fatalf("failure receipt: %+v %v", receipt, err)
+	}
+}
+
+func TestOfficeManualSaveRejectedCallbackHasFailureReceipt(t *testing.T) {
+	s, _ := officeService(t)
+	ctx := context.Background()
+	admin := domain.User{ID: "u_admin", IsAdmin: true}
+	uploaded, err := s.CommitUpload(ctx, admin, "folder_root", "rejected.docx",
+		"application/vnd.openxmlformats-officedocument.wordprocessingml.document", "",
+		strings.NewReader("PK\x03\x04[Content_Types].xml-original"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, err := s.OpenOfficeSession(ctx, admin, uploaded.FileID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := NewID("osave")
+	payload := EditorCallbackPayload{Key: view.DocumentKey, Status: domain.CallbackStatusForceSave, UserData: id, URL: "http://unexpected.invalid/file"}
+	if err = s.RecordOfficeCallbackFailure(ctx, "invalid-jwt", payload); err == nil {
+		t.Fatal("unauthenticated callback marked failed")
+	}
+	before, err := s.OfficeSaveStatus(ctx, admin, uploaded.FileID, view.SessionID, id)
+	if err != nil || before.Status != "pending" {
+		t.Fatalf("before: %+v %v", before, err)
+	}
+	token, err := signJWT(s.office.Secret, map[string]any{"key": view.DocumentKey}, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.RecordOfficeCallbackFailure(ctx, token, payload); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.RecordOfficeCallbackFailure(ctx, token, payload); err != nil {
+		t.Fatal("duplicate failure must be idempotent", err)
+	}
+	receipt, err := s.OfficeSaveStatus(ctx, admin, uploaded.FileID, view.SessionID, id)
+	if err != nil || receipt.Status != "failed" || receipt.VersionSeq != 1 {
+		t.Fatalf("failed receipt: %+v %v", receipt, err)
 	}
 }
 

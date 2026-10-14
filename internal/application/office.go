@@ -226,6 +226,47 @@ type OfficeSaveReceipt struct {
 	VersionSeq int    `json:"versionSeq"`
 }
 
+// RecordOfficeCallbackFailure records an authenticated, request-correlated
+// failure so the editor can stop waiting when ONLYOFFICE rejects a save.
+func (s *Service) RecordOfficeCallbackFailure(ctx context.Context, authorization string, payload EditorCallbackPayload) error {
+	if payload.Status != domain.CallbackStatusForceSave || !strings.HasPrefix(payload.UserData, "osave_") || len(payload.UserData) > 128 {
+		return nil
+	}
+	if _, err := verifyJWTWith(s.office.Secret, authorization, false); err != nil {
+		return domain.ErrUnauthorized
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if err = tx.LockOfficeSessionByKey(ctx, payload.Key); err != nil {
+		return err
+	}
+	session, err := tx.OfficeSessionByKey(ctx, payload.Key)
+	if err != nil {
+		return err
+	}
+	if session.ClosedAt != nil {
+		return nil
+	}
+	key := officeSaveReceiptHash(session.ID, payload.UserData)
+	outcome, err := tx.OfficeSaveEventOutcome(ctx, session.ID, key)
+	if err != nil {
+		return err
+	}
+	if strings.HasPrefix(outcome, "committed:") || outcome == "failed" {
+		return nil
+	}
+	if err = tx.RecordSaveEvent(ctx, domain.OfficeSaveEvent{
+		ID: NewID("oev"), SessionID: session.ID, Generation: session.LockGeneration,
+		CallbackStatus: payload.Status, EventHash: key, Outcome: "failed",
+	}); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 // OfficeSaveStatus reports a correlated callback receipt, never an
 // optimistic editor-side "all changes saved" notification.
 func (s *Service) OfficeSaveStatus(ctx context.Context, u domain.User, fileID, sessionID, requestID string) (OfficeSaveReceipt, error) {
@@ -578,9 +619,12 @@ func recordOfficeSaveReceipt(ctx context.Context, tx ports.Repository, session d
 	})
 }
 
-// downloadFromEditor fetches the saved document under strict SSRF controls:
-// the host must equal the configured editor host, redirects are refused, and
-// the connection dials the resolved IP once to defeat DNS rebinding.
+// downloadFromEditor fetches the saved document under strict SSRF controls.
+// ONLYOFFICE may emit an internal Docker hostname in callback URLs even when
+// the API reaches the same Document Server via a LAN proxy. Never dial that
+// supplied hostname: reuse only its generated path/query on the pinned,
+// configured Document Server origin. This prevents false callback failures
+// without permitting the Document Server to trigger arbitrary outbound URLs.
 func (s *Service) downloadFromEditor(ctx context.Context, raw string) ([]byte, error) {
 	target, err := url.Parse(raw)
 	if err != nil {
@@ -590,10 +634,26 @@ func (s *Service) downloadFromEditor(ctx context.Context, raw string) ([]byte, e
 	if err != nil {
 		return nil, domain.ErrInvalidInput
 	}
-	if !strings.EqualFold(target.Host, allowed.Host) {
+	if (target.Scheme != "http" && target.Scheme != "https") || target.Host == "" ||
+		target.User != nil || target.Fragment != "" ||
+		(allowed.Scheme != "http" && allowed.Scheme != "https") || allowed.Host == "" {
 		return nil, domain.ErrForbidden
 	}
-	host := target.Hostname()
+	// Do not accept arbitrary foreign hosts. The ONLYOFFICE Docker service
+	// publishes /cache/files/ under its internal name on port 80, which may
+	// differ from the operator's trusted reverse-proxy origin.
+	internalCacheOrigin := (target.Host == "filesmanage-office" || target.Host == "filesmanage-office:80") &&
+		strings.HasPrefix(target.EscapedPath(), "/cache/files/")
+	if !strings.EqualFold(target.Host, allowed.Host) && !internalCacheOrigin {
+		return nil, domain.ErrForbidden
+	}
+	// Path is part of the signed ONLYOFFICE callback but never a URL origin.
+	// Force all network traffic onto the server configured by the operator.
+	target.Scheme = allowed.Scheme
+	target.Host = allowed.Host
+	target.User = nil
+	callbackURL := target.String()
+	host := allowed.Hostname()
 	ips, err := net.LookupIP(host)
 	if err != nil || len(ips) == 0 {
 		return nil, domain.ErrInvalidInput
@@ -616,7 +676,7 @@ func (s *Service) downloadFromEditor(ctx context.Context, raw string) ([]byte, e
 			return errors.New("redirects are not followed for editor downloads")
 		},
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, raw, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, callbackURL, nil)
 	if err != nil {
 		return nil, err
 	}

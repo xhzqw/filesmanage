@@ -3,6 +3,7 @@ package httpx
 import (
 	"filesmanage/internal/application"
 	"github.com/gin-gonic/gin"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -141,6 +142,14 @@ func (h *Handler) officeCallback(c *gin.Context) {
 	}
 	code, err := h.S.HandleEditorCallback(c.Request.Context(), authorization, payload)
 	if err != nil {
+		// Never log callback URLs, JWTs or document content.
+		log.Printf("office callback failed status=%d forceType=%d manual=%t errorClass=%T",
+			payload.Status, payload.ForceSaveType, strings.HasPrefix(payload.UserData, "osave_"), err)
+		if strings.HasPrefix(payload.UserData, "osave_") {
+			if receiptErr := h.S.RecordOfficeCallbackFailure(c.Request.Context(), authorization, payload); receiptErr != nil {
+				log.Printf("office callback failure receipt could not be recorded: %T", receiptErr)
+			}
+		}
 		c.JSON(200, gin.H{"error": codeOr(code, err)})
 		return
 	}
