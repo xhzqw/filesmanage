@@ -280,6 +280,9 @@ try{
     sidebar:bounds('.finder-sidebar')?.height,header:bounds('.header')?.top,sidebarTop:bounds('.finder-sidebar')?.top,
     tableFills:!!table&&!!list&&!!listScrollPort&&table.width>=listScrollPort.clientWidth-20&&
      table.right>=list.left+listScrollPort.clientWidth-10&&table.right<=list.right+1,
+    tableMetrics:table&&list&&listScrollPort?{width:table.width,right:table.right,listWidth:list.width,
+     listRight:list.right,listLeft:list.left,clientWidth:listScrollPort.clientWidth,
+     computedGutter:getComputedStyle(listScrollPort).scrollbarGutter}:null,
     sizeAligned:!sizeText||!sizeButton||Math.abs(sizeButton.getBoundingClientRect().right-sizeText.right)<2,
     headerDockRight:!!dock&&!!header&&Math.abs((header.right-dock.right)-16)<=2,
     navCentered:innerWidth<=1210||!!nav&&!!header&&nav.left>=header.left+10&&nav.left<=header.left+24,
