@@ -101,16 +101,20 @@ try{
   const card=document.querySelector('.file-preview-identity');
   const back=card?.querySelector('.file-back')?.getBoundingClientRect();
   const svg=card?.querySelector('.file-back svg')?.getBoundingClientRect();
-  const heading=card?.querySelector('h1');
-  const title=heading?.getBoundingClientRect(),rect=card?.getBoundingClientRect();
-  if(!back||!svg||!rect||!title)return null;
+ const heading=card?.querySelector('h1');
+ const title=heading?.getBoundingClientRect(),rect=card?.getBoundingClientRect();
+  const toolbar=card?.closest('.file-workbench-toolbar')?.getBoundingClientRect();
+  if(!back||!svg||!rect||!title||!toolbar)return null;
   return {width:rect.width,height:rect.height,titleClipped:heading.scrollWidth>heading.clientWidth,
+   toolbarHeight:Math.round(toolbar.height),inFlow:getComputedStyle(card).position==='static',
+   withinToolbar:rect.top>=toolbar.top-1&&rect.bottom<=toolbar.bottom+1,
    arrowCentered:Math.abs(back.x+back.width/2-svg.x-svg.width/2)<1&&
     Math.abs(back.y+back.height/2-svg.y-svg.height/2)<1,
    titleWithinCard:title.right<=rect.right+1};
  })()`);
- assert("file identity is compact, title bounded and return arrow centered",
-  !!identityGeometry&&identityGeometry.width<540&&identityGeometry.height<70&&
+ assert("file identity occupies the 48px flow toolbar with bounded title and centered back arrow",
+  !!identityGeometry&&identityGeometry.toolbarHeight===48&&identityGeometry.height<=48&&
+  identityGeometry.inFlow&&identityGeometry.withinToolbar&&
   identityGeometry.arrowCentered&&identityGeometry.titleWithinCard,JSON.stringify(identityGeometry));
  await cdp.send("Input.dispatchMouseEvent",{type:"mouseMoved",x:720,y:2});
  const headerShown=await cdp.waitFor(`()=>{
@@ -180,7 +184,7 @@ try{
  })()`);
  assert("global utility dock groups search and account without duplicate logout",
   workspaceUI.global&&workspaceUI.noExit,JSON.stringify(workspaceUI));
- assert("file identity floats inside preview, not in a separate header",
+ assert("file identity shares the flow preview toolbar, not a separate page header",
   workspaceUI.identity,JSON.stringify(workspaceUI));
  assert("PDF reader tools float in a compact bottom dock",
   workspaceUI.dockBottom!==null&&workspaceUI.dockBottom>=0&&workspaceUI.dockBottom<55&&workspaceUI.dockWidth<workspaceUI.viewerWidth*.94,
@@ -193,7 +197,7 @@ try{
   return area&&actions?{count:buttons.length,top:actions.top-area.top,right:area.right-actions.right,
    emptySidebar:!old,buttonLabels:buttons.map(b=>b.getAttribute('aria-label'))}:null;
  })()`);
- assert("download print and more are in one top-right floating dock, not sidebar",
+ assert("download print and more share the top-right toolbar, not sidebar",
   !!topActions&&topActions.count===3&&topActions.top>=0&&topActions.top<40&&topActions.right>=0&&topActions.right<40&&topActions.emptySidebar,
   JSON.stringify(topActions));
 
