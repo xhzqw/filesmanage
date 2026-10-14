@@ -101,6 +101,31 @@ try{
  assert(folderDate.api&&folderDate.raw===folderDate.api&&/^(?:今天|昨天|(?:\d{4}年)?\d{1,2}月\d{1,2}日) \d{2}:\d{2}$/.test(folderDate.displayed),
   "Folder modified date must preserve the API time and show Finder-style local text: "+JSON.stringify(folderDate));
  console.log("EXPLORER_FOLDER_MTIME_PASS",JSON.stringify(folderDate));
+ // The command row is portalled into the folder toolbar. Verify its actual
+ // geometry, not just the absence of a page-wide overflow scrollbar.
+ for(const viewport of [{name:"wide",width:1920},{name:"laptop",width:1366},{name:"compact",width:820}]){
+  await send("Emulation.setDeviceMetricsOverride",{width:viewport.width,height:900,deviceScaleFactor:1,mobile:false});
+  await delay(140);
+  const layout=await evaluate(`(()=>{
+   const bounds=s=>document.querySelector(s)?.getBoundingClientRect();
+   const inBounds=(rect,clip)=>!!rect&&!!clip&&rect.width>10&&rect.height>10&&rect.left>=clip.left-2&&rect.right<=clip.right+2;
+   const bar=bounds('.folder-context-bar'),host=bounds('.folder-file-toolbar-host'),command=bounds('.folder-file-toolbar-host .file-toolbar');
+   const toolbar=document.querySelector('.folder-file-toolbar-host .file-toolbar');
+   const uploads=bounds('.folder-file-toolbar-host .upload-button'),folders=bounds('.folder-file-toolbar-host .new-folder-wrapper');
+   const views=bounds('.folder-file-toolbar-host .folder-view-switch');
+   const search=bounds('.folder-file-toolbar-host .filter-search-wrap');
+   return {barHeight:bar?.height,portalled:!!toolbar&&document.querySelector('.work-body>.file-toolbar')===null,
+    oneRow:inBounds(command,bar),uploads:inBounds(uploads,host),folders:inBounds(folders,host),
+    views:inBounds(views,host),search:inBounds(search,host),
+    overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,
+    sidebar:bounds('.finder-sidebar')?.height,header:bounds('.header')?.top,sidebarTop:bounds('.finder-sidebar')?.top};
+  })()`);
+  console.log('EXPLORER_UNIFIED_TOOLBAR_GEOMETRY',viewport.name,JSON.stringify(layout));
+  assert(layout.portalled&&layout.barHeight>=43&&layout.barHeight<=45&&layout.oneRow&&layout.uploads&&layout.folders&&layout.views&&layout.search&&layout.overflow<=1,
+   'One accessible, unclipped Finder toolbar at '+viewport.width+': '+JSON.stringify(layout));
+  assert(layout.sidebarTop<=layout.header+2,'Finder sidebar extends to header at '+viewport.width);
+ }
+ await send('Emulation.clearDeviceMetricsOverride');
  let count=await evaluate('document.querySelectorAll("tr.file-entry").length');
  if(count<4){
   const queue=await evaluate('[...document.querySelectorAll(".explorer-list-folder")].map(el=>el.dataset.uploadFolderId).filter(Boolean)');
