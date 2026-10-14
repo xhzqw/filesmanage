@@ -174,7 +174,7 @@ try{
     footer28:!!footer&&Math.abs(footer.getBoundingClientRect().height-28)<1&&
      !!footerPath&&!!footerCount&&Math.abs((footerCount.getBoundingClientRect().left+footerCount.getBoundingClientRect().right)/2-(footer.getBoundingClientRect().left+footer.getBoundingClientRect().right)/2)<1.5&&
      footer.querySelectorAll('.finder-bottom-node svg').length>0&&document.querySelectorAll('.work-body>.finder-bottom-path').length===0,
-    nameTokens:names.length===0||[...names].every(el=>el.querySelector('.finder-name-prefix')&&(!el.textContent.match(/\.[a-z0-9]+$/i)||el.querySelector('.finder-name-extension')),
+    nameTokens:names.length===0||[...names].every(el=>el.querySelector('.finder-name-prefix')&&(!el.textContent.match(/\.[a-z0-9]+$/i)||el.querySelector('.finder-name-extension'))),
     brandHeaderAligned:!!brand&&!!header&&!!brandLogo&&!!brandName&&
      Math.abs(brand.top-header.top)<=1&&Math.abs(brand.height-48)<=.5&&Math.abs(header.height-48)<=.5&&
      Math.abs(centre(brandLogo)-centre(header))<=1&&Math.abs(centre(brandName)-centre(header))<=1&&
