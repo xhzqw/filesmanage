@@ -163,7 +163,7 @@ try{
  }
  // Finder white slider needs dark hover text, and the work canvas must be the
  // only edge painter at the rounded sidebar/work seam.
- for(const width of [1920,1366,820]){
+ for(const width of [2560,1920,1366,1280,820]){
   await send("Emulation.setDeviceMetricsOverride",{width,height:900,deviceScaleFactor:1,mobile:false});
   // Chrome preserves the pointer position across viewport emulation. Reset
   // the preceding iteration's hovered inactive nav item before idle sampling.
@@ -188,6 +188,17 @@ try{
     panelBorders:borders(pane),sideBorders:borders(side),workBorders:borders(work),
     sideRadius:style(side)?.borderTopRightRadius,sideShadow:style(side)?.boxShadow,
     workRadius:style(work)?.borderTopLeftRadius,workOverflow:style(work)?.overflow,
+    cornerRadii:['TopLeft','TopRight','BottomRight','BottomLeft'].map(part=>style(work)?.['border'+part+'Radius']),
+    shellBackground:style(document.querySelector('.shell.shell-finder'))?.backgroundColor,
+    htmlBackground:style(document.documentElement)?.backgroundColor,
+    bodyBackground:style(document.body)?.backgroundColor,
+    rootBackground:style(document.querySelector('#root'))?.backgroundColor,
+    panelBackground:style(pane)?.backgroundColor,headerBackground:style(document.querySelector('.shell.shell-finder>.header'))?.backgroundColor,
+    railBackground:style(side)?.backgroundColor,
+    shellPadding:style(document.querySelector('.shell.shell-finder'))?.paddingRight,
+    panePaddingRight:style(pane)?.paddingRight,panePaddingBottom:style(pane)?.paddingBottom,
+    workRect:box(work)?{top:box(work).top,bottom:box(work).bottom,right:box(work).right}:null,
+    workShadow:style(work)?.boxShadow,
     handleTop:box(handle)?.top-box(work)?.top,handleBorders:borders(handle),
     handleBackground:style(handle)?.backgroundColor,
     toolbarTop:style(bar)?.borderTopWidth,toolbarLeft:style(bar)?.borderLeftWidth,
@@ -196,8 +207,16 @@ try{
   assert(result.active&&result.inactive&&result.activeColor===result.primary&&
    result.inactiveColor===result.secondary&&result.panelBorders.every(v=>v==="0px")&&
    result.sideBorders.every(v=>v==="0px")&&result.sideRadius==="0px"&&result.sideShadow==="none"&&
-   JSON.stringify(result.workBorders)===JSON.stringify(["1px","0px","0px","1px"])&&
-   result.workRadius==="10px"&&result.workOverflow==="hidden"&&
+   result.workBorders.every(v=>v==="1px")&&
+   result.cornerRadii.every(v=>v==="12px")&&result.workOverflow==="hidden"&&
+   [result.shellBackground,result.htmlBackground,result.bodyBackground,result.rootBackground,
+    result.panelBackground].every(v=>v==="rgb(242, 244, 247)")&&
+   result.headerBackground==="rgb(242, 244, 247)"&&
+   result.railBackground==="rgba(0, 0, 0, 0)"&&
+   result.shellPadding==="0px"&&result.panePaddingRight==="8px"&&result.panePaddingBottom==="8px"&&
+   Math.abs(result.workRect.right-(width-8))<.6&&
+   Math.abs(result.workRect.bottom-(900-8))<.6&&Math.abs(result.workRect.top-48)<.6&&
+   result.workShadow!=="none"&&
    Math.abs(result.handleTop-10)<1&&result.handleBorders.every(v=>v==="0px")&&
    result.toolbarTop==="0px"&&result.toolbarLeft==="0px"&&result.toolbarRadius==="0px",
    "Finder seam or idle navigation regression "+width+": "+JSON.stringify(result));
@@ -256,10 +275,10 @@ try{
    dock.accountFont==="12.5px"&&dock.commandWidth>30,
    "Finder global utility geometry at "+width+": "+JSON.stringify(dock));
   assert(Math.abs(dock.accountRight-dock.moreRight)<=.5&&
-   Math.abs(dock.workRight-dock.viewport)<=.5&&
+   Math.abs(dock.workRight-(dock.viewport-8))<=.5&&
    Math.abs(dock.panelsRight-dock.viewport)<=.5&&
    Math.abs(dock.headerRight-dock.viewport)<=.5&&
-   dock.shellPadding==="0px"&&dock.workBorder==="0px"&&dock.panelsBorder==="0px"&&
+   dock.shellPadding==="0px"&&dock.workBorder==="1px"&&dock.panelsBorder==="0px"&&
    !dock.scrollbarOverflow,
    "Finder header/footer right reference line or canvas seam at "+width+": "+JSON.stringify(dock));
   console.log("FINDER_GLOBAL_DOCK_PIXEL_PASS",width,JSON.stringify(dock));
@@ -620,7 +639,7 @@ try{
      listRight:list.right,listLeft:list.left,clientWidth:listScrollPort.clientWidth,
      computedGutter:getComputedStyle(listScrollPort).scrollbarGutter}:null,
     sizeAligned:!sizeText||!sizeButton||Math.abs(sizeButton.getBoundingClientRect().right-sizeText.right)<2,
-    headerDockRight:!!dock&&!!header&&Math.abs((header.right-dock.right)-16)<=2,
+    headerDockRight:!!dock&&!!header&&Math.abs((header.right-dock.right)-20)<=.6,
     navCentered:innerWidth<=1210||!!nav&&!!header&&nav.left>=header.left+10&&nav.left<=header.left+24,
     navRowHeight:navRow?.getBoundingClientRect().height,tagRowHeight:tagRow?.getBoundingClientRect().height,
     historyPair:history.length===2&&history.every(button=>button.getBoundingClientRect().width>=25&&getComputedStyle(button).visibility!=='hidden'),
@@ -642,13 +661,16 @@ try{
      Math.abs(brand.top-header.top)<=1&&Math.abs(brand.height-48)<=.5&&Math.abs(header.height-48)<=.5&&
      Math.abs(centre(brandLogo)-centre(header))<=1&&Math.abs(centre(brandName)-centre(header))<=1&&
      (!nav?.width||Math.abs(centre(nav)-centre(header))<=1),
-    greyChrome:headerStyle.backgroundColor==='rgb(244, 245, 247)'&&
-     railStyle.backgroundColor==='rgb(244, 245, 247)'&&paneStyle.backgroundColor==='rgb(244, 245, 247)',
-    insetCanvas:!!work&&workStyle.borderTopLeftRadius==='10px'&&workStyle.borderBottomLeftRadius==='0px'&&
-     workStyle.borderBottomRightRadius==='0px'&&workStyle.overflowX==='hidden'&&workStyle.backgroundColor==='rgb(255, 255, 255)',
+    greyChrome:headerStyle.backgroundColor==='rgb(242, 244, 247)'&&
+     railStyle.backgroundColor==='rgba(0, 0, 0, 0)'&&paneStyle.backgroundColor==='rgb(242, 244, 247)',
+    insetCanvas:!!work&&['borderTopLeftRadius','borderTopRightRadius','borderBottomLeftRadius','borderBottomRightRadius'].every(part=>workStyle[part]==='12px')&&
+     ['borderTopWidth','borderRightWidth','borderBottomWidth','borderLeftWidth'].every(part=>workStyle[part]==='1px')&&
+     workStyle.overflowX==='hidden'&&workStyle.backgroundColor==='rgb(255, 255, 255)'&&
+     Math.abs(work.right-innerWidth+8)<=.5,
     bottomFlush:!!work&&!!pane&&!!footer&&Math.abs(footer.getBoundingClientRect().bottom-work.bottom)<=1.5&&
      paneStyle.borderBottomLeftRadius==='0px'&&paneStyle.borderBottomRightRadius==='0px'&&
-     statusStyle.borderBottomLeftRadius==='0px'&&statusStyle.borderBottomRightRadius==='0px',
+     statusStyle.borderBottomLeftRadius==='0px'&&statusStyle.borderBottomRightRadius==='0px'&&
+     Math.abs(work.bottom-(900-8))<=.6,
     tagOverflowPill:tagPill};
   })()`);
   console.log('EXPLORER_UNIFIED_TOOLBAR_GEOMETRY',viewport.name,JSON.stringify(layout));
@@ -662,7 +684,7 @@ try{
    layout.sidebarLine&&layout.monochrome&&layout.footer28&&layout.nameTokens,
    'Sonoma/Sequoia pixel contract at '+viewport.width+': '+JSON.stringify(layout));
   assert(layout.brandHeaderAligned&&layout.greyChrome&&layout.insetCanvas&&layout.bottomFlush&&layout.tagOverflowPill,
-   '48px Finder shared baseline, 10px inset canvas, seamless footer, +N tag pill at '+viewport.width+': '+JSON.stringify(layout));
+   '48px Finder shared baseline, 12px floating canvas, clipped footer, +N tag pill at '+viewport.width+': '+JSON.stringify(layout));
  }
  await send('Emulation.clearDeviceMetricsOverride');
  await click('.folder-file-toolbar-host button[aria-label="更多操作"]');

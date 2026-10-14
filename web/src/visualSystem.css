@@ -9,9 +9,12 @@
 /* A wide, independently scrollable data grid must never enlarge Chrome's
    layout viewport. All full-height pages already own their scroll regions. */
 html{overflow-x:clip}
-/* Document Finder alone is welded to the viewport's right edge. All other
-   application workbenches retain their standard outer shell inset. */
-.shell.shell-finder{padding-right:0}
+/* Linear/Arc Finder: grey reaches every screen corner. The white work area is
+   inset inside it; other workbenches keep their own content spacing. */
+.shell.shell-finder{
+ position:relative;padding:0;gap:0;
+ background:var(--surface-shell);border:0;border-radius:0;box-shadow:none;
+}
 
 /* Shell surface geometry now lives in theme.css. */
 .header nav{gap:3px}
@@ -31,34 +34,32 @@ html{overflow-x:clip}
 .work{overflow:hidden;background:var(--surface-canvas)}
 .work.file-preview-page{overflow-y:auto;overflow-x:hidden}
 .sidebar-scroll{padding:5px 4px}
-/* File explorer: one continuous workspace, not two outlined cards plus a
-   permanent resize rail. The only internal stroke is the pane separator. */
+/* The outer document workspace is NOT a card. Its only card is .work. */
 .panels.document-explorer{
-  gap:0;
-  overflow:hidden;
-  border:1px solid var(--border-hairline);
-  border-radius:var(--radius-lg);
-  background:var(--surface-panel);
-  box-shadow:var(--shadow-panel);
+ gap:0;overflow:hidden;margin:0;padding:0 8px 8px 0;
+ border:0;border-radius:0;box-shadow:none;
+ background:var(--surface-shell);
 }
 .shell.shell-finder>.panels.document-explorer{
- border-right:0;margin-right:0;padding-right:0;
-}
-.shell.shell-finder .document-explorer>.work{
- margin-right:0;padding-right:0;border-right:0;
+ gap:0;margin:0;padding:0 8px 8px 0;
+ border:0;border-radius:0;box-shadow:none;
+ background:var(--surface-shell);
 }
 .document-explorer>.sidebar,.document-explorer>.work{
   border:0;
   border-radius:0;
   box-shadow:none;
 }
-/* The full-height Finder rail and navigation share their chrome. The white
-   workspace owns only the upper-left inset; its bottom stays welded to the
-   single path/status bar, not to a second rounded surface. */
-.shell.shell-finder .document-explorer>.work{
-  border-radius:0;
-  border-top-left-radius:var(--radius-finder-canvas);
-  overflow:hidden;
+/* One independent inset white canvas, including the bottom corners. The
+   full four-edge stroke replaces the old sidebar seam and top-left-only arc. */
+.shell.shell-finder>.panels.document-explorer>.work{
+ margin:var(--height-header) 0 0;
+ padding:0;min-width:0;
+ background:#FFFFFF;
+ border:1px solid rgba(15,23,42,.075);
+ border-radius:12px;
+ box-shadow:0 2px 8px rgba(15,23,42,.03),0 1px 2px rgba(15,23,42,.02);
+ overflow:hidden;
 }
 .shell.shell-finder .work-body>.finder-bottom-bar{
   border-radius:0;
@@ -74,6 +75,7 @@ html{overflow-x:clip}
 .document-explorer .sidebar-resizer[data-dragging="true"]::after{opacity:1}
 @media(max-width:700px){
   .document-explorer>.sidebar{border:0}
+  .shell.shell-finder>.panels.document-explorer>.work{margin-top:0}
 }
 .sidebar .tree-row{
   width:calc(100% - 8px);

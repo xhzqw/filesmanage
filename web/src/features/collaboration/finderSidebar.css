@@ -4,7 +4,7 @@
    intermittently blank/flicker on Chromium + animated folder glass layers.
    The neutral, opaque Finder material is identical without that GPU layer. */
 .document-explorer .finder-sidebar{
- background:#F4F5F7;border-color:rgba(15,23,42,.07);
+ background:transparent;border:0;
  backdrop-filter:none;-webkit-backdrop-filter:none;
 }
 .finder-navigation{display:flex;flex-direction:column;gap:14px;min-width:0;padding:12px 8px 16px}
@@ -95,39 +95,29 @@
 
 /* Finder uses one 48px header reference line across the full-height rail
    and the main navigation. The outer surface supplies the inset grey. */
-.shell.shell-finder{--height-header:48px;--finder-chrome-bg:#F4F5F7;--finder-shell-gap:var(--space-2)}
+.shell.shell-finder{--height-header:48px;--finder-chrome-bg:var(--surface-shell)}
 .shell.shell-finder .document-explorer .finder-sidebar{
- background:var(--finder-chrome-bg);
+ background:transparent;
  backdrop-filter:none;-webkit-backdrop-filter:none;
 }
 .shell.shell-finder>.header{
+ position:absolute;inset:0 0 auto auto;
  align-self:flex-end;width:calc(100% - var(--finder-sidebar-width));
  box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) auto;
  align-items:center;height:var(--height-header);min-height:var(--height-header);
- padding:0 14px 0 16px;background:var(--finder-chrome-bg);border-radius:0;
+ padding:0 20px 0 16px;background:var(--surface-shell);
+ border:0;border-radius:0;box-shadow:none;
 }
 .shell.shell-finder>.header>.shell-home-pill{display:none}
 .shell.shell-finder>.header nav[data-slot="gooey-nav"][data-appearance="pill"]{grid-column:1;grid-row:1;justify-self:start}
 .shell.shell-finder>.header .global-utility-dock{grid-column:2;grid-row:1;justify-self:end;margin-left:auto}
 .shell.shell-finder>.panels.document-explorer{
- margin-top:calc(-1 * var(--height-header) - var(--finder-shell-gap));gap:0;
- background:var(--finder-chrome-bg);
- /* The panel wrapper is not an outlined card: the work canvas is the only
-    painted seam. A leftover outer left border produced a second 1px stub. */
- border:0;border-radius:0;
- overflow:hidden;
+ margin:0;gap:0;background:var(--surface-shell);
+ border:0;border-radius:0;box-shadow:none;overflow:hidden;
 }
 .shell.shell-finder .document-explorer>.finder-sidebar{
  box-sizing:border-box;padding-top:var(--height-header);
- border:0;border-radius:0;box-shadow:none;
-}
-.shell.shell-finder .document-explorer>.work{
- margin-top:var(--height-header);border:0;
- border-top:1px solid var(--border-hairline);
- border-left:1px solid var(--border-hairline);
- border-radius:0;border-top-left-radius:var(--radius-finder-canvas);
- box-shadow:none;
- overflow:hidden;background:var(--surface-panel);
+ border:0;border-radius:0;box-shadow:none;background:transparent;
 }
 /* Keep the pointer handle, but not over the branded header or round shoulder. */
 .shell.shell-finder .document-explorer .finder-sidebar>.sidebar-resizer{
@@ -154,15 +144,15 @@
  .shell.shell-finder>.header .global-utility-dock{margin-left:0}
 }
 @media(max-width:820px){
- /* visualSystem.css reduces the shell flex gap from 8px to 5px here.
-    Match that exact gap in the full-height sidebar/header overlap. */
- .shell.shell-finder{--finder-shell-gap:5px}
+ .shell.shell-finder>.header{padding-right:20px}
 }
 @media(max-width:700px){
  .shell.shell-finder>.header{width:100%;align-self:stretch}
  .shell.shell-finder>.header>.shell-home-pill{display:inline-flex}
- .shell.shell-finder>.panels.document-explorer{margin-top:0;flex-direction:column;border-radius:var(--radius-md)}
- .shell.shell-finder .document-explorer>.finder-sidebar{padding-top:0;border-right:0;border-bottom:1px solid rgba(15,23,42,.07)}
- .shell.shell-finder .document-explorer>.work{margin-top:0}
+ .shell.shell-finder>.panels.document-explorer{margin-top:var(--height-header);flex-direction:column;border-radius:0}
+ .shell.shell-finder .document-explorer>.finder-sidebar{
+  padding-top:0;border:0;background:transparent;
+ }
  .document-explorer .finder-sidebar-home{display:none}
 }
+@media(max-width:600px){.shell.shell-finder{--height-header:52px}}
