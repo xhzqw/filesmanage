@@ -39,6 +39,14 @@
   linear-gradient(100deg,rgba(11,70,121,.18),rgba(98,182,251,.07) 35%,rgba(41,126,201,.19) 90%);
  backface-visibility:hidden;
 }
+/* Finder's icon grid can show dozens of independent 3D folders. Chromium
+   compositor surfaces for each live backdrop plus the full-height sidebar
+   occasionally leave the rail blank on GPU drivers. Use the same translucent
+   gradient without a real-time backdrop capture inside this workspace.
+   Hover/open paper and flap transitions remain intact. */
+.document-explorer .rare-folder-glass{
+ backdrop-filter:none;-webkit-backdrop-filter:none;
+}
 /* Micro glyphs retain the source shape, but are not independent buttons. */
 .rare-folder-component[data-folder-scale="compact"]{cursor:inherit}
 @media(prefers-reduced-motion:reduce){

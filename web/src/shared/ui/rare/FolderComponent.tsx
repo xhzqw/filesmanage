@@ -77,12 +77,13 @@ export function RareFolderComponent({open=false,hovered=false,size=16,className=
    <span className="rare-folder-papers">
     {paperStates.map((paper,index)=><motion.span
      key={index} className={"rare-folder-card rare-folder-card-"+(index+1)}
+     initial={false}
      animate={{x:paper.x,y:paper.y,rotate:paper.rotate}}
      transition={reducedMotion?{duration:0}:{...SPRING,delay:paper.delay}}>
      <PaperCard filterId={uid+"-card-"+index}/>
     </motion.span>)}
    </span>
-   <motion.span className="rare-folder-front"
+   <motion.span className="rare-folder-front" initial={false}
     animate={{rotateX:open?-55:hovered?-45:-15}}
     transition={reducedMotion?{duration:0}:{type:"spring",stiffness:120,damping:14}}>
     <span className="rare-folder-glass" style={{clipPath:`path('${FLAP}')`}}/>
