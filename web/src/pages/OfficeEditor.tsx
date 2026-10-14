@@ -10,7 +10,6 @@ import type {OfficeSessionData} from "../features/documents/api";
 import type {FileItem} from "../entities/file/model";
 import type {User} from "../entities/user/model";
 import {FileTypeIcon} from "../shared/ui/FileTypeIcon";
-import {NativeDOCXEditor,type NativeEditorHandle} from "../features/documents/NativeDOCXEditor";
 import {newIdempotencyKey} from "../shared/ids";
 import "./officeEditor.css";
 
@@ -20,7 +19,7 @@ declare global{
  }
 }
 
-type EditorStatus="loading"|"ready"|"native"|"failed";
+type EditorStatus="loading"|"ready"|"failed";
 type SaveState="clean"|"dirty"|"saved"|"failed";
 
 // Only the application's callback receipt, followed by a committed file
@@ -42,12 +41,11 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
  const nativeSavedCount=useRef(0);
  const nativeFailedCount=useRef(0);
  const receiptProbe=useRef<(()=>void)|null>(null);
- const nativeEditor=useRef<NativeEditorHandle>(null);
  const[exporting,setExporting]=useState(false);
 
  useEffect(()=>{
   const beforeUnload=(event:BeforeUnloadEvent)=>{
-   if(!dirty.current&&!nativeEditor.current?.isDirty())return;
+   if(!dirty.current)return;
    event.preventDefault();
    event.returnValue="";
   };
@@ -56,7 +54,7 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
   const beforeLink=(event:MouseEvent)=>{
    const target=event.target;
    if(!(target instanceof Element)||!target.closest("a[href]"))return;
-   if((dirty.current||nativeEditor.current?.isDirty())&&!window.confirm("修改尚未保存至文档库。确定放弃修改并离开吗？")){
+   if(dirty.current&&!window.confirm("修改尚未保存至文档库。确定放弃修改并离开吗？")){
     event.preventDefault();
     event.stopPropagation();
    }
@@ -77,47 +75,55 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
   if(!file)return;
   let valid=true;
   let ready=false;
-  let fallingBack=false;
+  let failed=false;
   let openedSession="";
   let waitForDocument:number|undefined;
   setStatus("loading");
-  const fallback=async()=>{
-   if(!valid||fallingBack)return;
-   fallingBack=true;
+  setMessage("");
+  setSaveMessage("● 正在连接 ONLYOFFICE");
+  const fail=(reason:string)=>{
+   if(!valid||failed)return;
+   failed=true;
    window.clearTimeout(waitForDocument);
    editor.current?.destroyEditor?.();editor.current=null;
-   if(openedSession){
-    try{await fileApi.cancelOfficeSession(file.id,openedSession);}catch{/* Native lock will report any remaining conflict. */}
-   }
-   if(!valid)return;
+   const closing=openedSession;
+   openedSession="";
+   if(closing)void fileApi.cancelOfficeSession(file.id,closing).catch(()=>undefined);
    setSessionId("");
-   setStatus("native");
-   setSaveMessage("● 正在准备内置编辑器");
+   setStatus("failed");
+   setMessage(reason);
+   setSaveState("failed");
+   setSaveMessage("● ONLYOFFICE 连接失败");
   };
   fileApi.openOfficeSession(file.id)
    .then(async session=>{
-    if(!valid)return;
     const opened=session as OfficeSessionData;
+    if(!valid){
+     void fileApi.cancelOfficeSession(file.id,opened.sessionId).catch(()=>undefined);
+     return;
+    }
     openedSession=opened.sessionId;
     setSessionId(opened.sessionId);
     // Capture the current server receipts before the user can edit.
-    const initial=await fileApi.officeNativeSaveStatus(file.id,opened.sessionId);
+    const initial=await fileApi.officeNativeSaveStatus(file.id,opened.sessionId).catch(()=>null);
     if(!valid)return;
-    nativeSavedCount.current=initial.savedCount;
-    nativeFailedCount.current=initial.failedCount;
+    nativeSavedCount.current=initial?.savedCount??0;
+    nativeFailedCount.current=initial?.failedCount??0;
     await loadEditorScript(editorBrowserUrl(opened.editorUrl)+"/web-apps/apps/api/documents/api.js");
-    if(!valid||!holder.current)return;
+    if(!valid||failed||!holder.current)return;
     const DocEditor=window.DocsAPI?.DocEditor;
     if(!DocEditor)throw new Error("editor api unavailable");
     const events={
      onDocumentReady:()=>{
-      if(!valid||fallingBack)return;
+      if(!valid||failed)return;
       ready=true;
       window.clearTimeout(waitForDocument);
       setStatus("ready");
+      setSaveState("clean");
+      setSaveMessage("● ONLYOFFICE 已连接");
      },
      onDocumentStateChange:(event:{data?:boolean})=>{
-      if(!valid)return;
+      if(!valid||failed)return;
       if(event.data===true){
        changeNumber.current++;
        dirty.current=true;
@@ -132,9 +138,9 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
       }
      },
      onError:(event:{data?:{errorDescription?:string}})=>{
-      if(!valid||fallingBack)return;
+      if(!valid||failed)return;
       if(!ready){
-       void fallback();
+       fail(event.data?.errorDescription||"ONLYOFFICE 无法读取此文档，请检查文档下载接口");
       }else{
        dirty.current=true;
        setSaveState("failed");
@@ -144,15 +150,13 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
     };
     editor.current=new DocEditor("docx-editor-target",{...opened.config,events});
     waitForDocument=window.setTimeout(()=>{
-     if(!valid||ready)return;
-     void fallback();
-    },8500);
+     if(!valid||failed||ready)return;
+     fail("ONLYOFFICE 文档加载超时。请检查编辑服务与文档下载接口。");
+    },45000);
    })
    .catch(error=>{
-    if(!valid)return;
-    window.clearTimeout(waitForDocument);
-    setMessage(errorCopy(error,"ONLYOFFICE 不可用，已切换内置编辑器"));
-    void fallback();
+    if(!valid||failed)return;
+    fail(errorCopy(error,"无法连接 ONLYOFFICE，请检查文档编辑服务后重试"));
    });
   return()=>{valid=false;window.clearTimeout(waitForDocument);editor.current?.destroyEditor?.();editor.current=null;};
  },[file]);
@@ -223,7 +227,7 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
  },[file,sessionId]);
 
  async function close(){
-  if((dirty.current||nativeEditor.current?.isDirty())&&!window.confirm("修改尚未确认保存。确定要放弃修改并退出吗？"))return;
+  if(dirty.current&&!window.confirm("修改尚未确认保存。确定要放弃修改并退出吗？"))return;
   try{
    if(sessionId)await fileApi.cancelOfficeSession(file?.id??"",sessionId);
   }catch{
@@ -236,7 +240,6 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
  }
 
  async function saveNewVersion(){
-  if(status==="native"){await nativeEditor.current?.save();return;}
   if(status!=="ready"||!sessionId||!file)return;
   setSaveMessage("● 正在保存...");
   try{
@@ -247,7 +250,7 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
  }
  async function convertPDF(){
   if(!file||exporting)return;
-  if(dirty.current||nativeEditor.current?.isDirty()){
+  if(dirty.current){
    toast.info("请先保存修改，再转换为 PDF");return;
   }
   setExporting(true);
@@ -270,26 +273,23 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
     <span className="office-workbench-version">v{confirmedSeq??file?.currentVersionSeq??"—"}</span>
     <span role="status" aria-live="polite" className={"office-save-state office-save-"+saveState}>{saveMessage}</span>
    </div>
-   {status==="native"&&<div className="office-native-format" role="group" aria-label="文档格式工具">
-    {([["h1","H1"],["h2","H2"],["body","正文"],["bold","B"],["italic","I"],["justifyLeft","左对齐"],["justifyCenter","居中"],["insertUnorderedList","列表"],["insert-table-row","表格行"],["undo","撤销"],["redo","重做"]] as const).map(([cmd,label])=>
-     <RareButton key={cmd} type="button" tone="ghost" onMouseDown={event=>event.preventDefault()}
-      title={label} onClick={()=>nativeEditor.current?.format(cmd)}>{label}</RareButton>)}
-   </div>}
    <div className="office-workbench-actions">
     <RareButton type="button" disabled={status==="loading"||exporting||!file} loading={exporting} onClick={()=>void convertPDF()}>⇄ 转为 PDF</RareButton>
-    <RareButton type="button" className="primary" disabled={status!=="ready"&&status!=="native"} onClick={()=>void saveNewVersion()}>保存新版本</RareButton>
+    <RareButton type="button" className="primary" disabled={status!=="ready"} onClick={()=>void saveNewVersion()}>保存新版本</RareButton>
     <RareButton type="button" tone="ghost" onClick={()=>void close()}>结束编辑</RareButton>
    </div>
   </header>
   <main className="office-workbench-content">
-   {status==="native"&&file&&<NativeDOCXEditor ref={nativeEditor} fileId={file.id}
-    onState={(state,description)=>{setSaveState(state);setSaveMessage(description);dirty.current=state==="dirty"||nativeEditor.current?.isDirty()===true;}}
-    onSaved={seq=>{setConfirmedSeq(seq);dirty.current=false;}}/>}
-   {(status==="ready"||status==="loading")&&<div id="placeholder" ref={holder} className="office-holder">
+   {file&&<div id="placeholder" ref={holder} className="office-holder">
     <div id="docx-editor-target"/>
     {status==="loading"&&<div className="office-loading-cover" role="status"><BrandLoadingLabel size="sm">正在检测 Office 编辑器…</BrandLoadingLabel></div>}
+    {status==="failed"&&<div className="office-loading-cover office-loading-failed" role="alert">
+     <strong>无法连接 ONLYOFFICE</strong>
+     <span>{message||"文档编辑服务暂不可用，请稍后重试"}</span>
+     <RareButton type="button" onClick={()=>window.location.reload()}>重新连接 ONLYOFFICE</RareButton>
+    </div>}
    </div>}
-   {status==="failed"&&<div className="office-native-state" role="alert">
+   {status==="failed"&&!file&&<div className="office-native-state" role="alert">
     {message||"文档信息暂不可用"}<RareButton type="button" onClick={()=>window.location.reload()}>重试</RareButton>
    </div>}
   </main>
@@ -301,10 +301,10 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
 // internal editor URL, independent of this browser-only URL selection.
 function editorBrowserUrl(internalUrl:string):string{
  if(window.location.protocol==="https:"&&window.location.port==="18443"){
-  const host=window.location.hostname;
-  if(host==="192.168.1.22"||host==="10.144.144.1"||host==="openclaw77"){
-   return "https://"+host+":18444";
-  }
+  return "https://"+window.location.hostname+":18444";
+ }
+ if(window.location.protocol==="http:"&&window.location.port==="18091"){
+  return "http://"+window.location.hostname+":18080";
  }
  return internalUrl.replace(/\/$/,"");
 }
@@ -328,7 +328,7 @@ function loadEditorScript(src:string):Promise<void>{
   };
   const loaded=()=>finish(window.DocsAPI?.DocEditor?undefined:new Error("编辑器脚本未提供 DocsAPI"));
   const failed=()=>finish(new Error("Office 编辑器脚本加载失败"));
-  const timeout=window.setTimeout(()=>finish(new Error("Office 编辑器脚本加载超时")),3000);
+  const timeout=window.setTimeout(()=>finish(new Error("ONLYOFFICE 脚本加载超时，请检查编辑服务连接")),15000);
   script.addEventListener("load",loaded);
   script.addEventListener("error",failed);
   if(!existing){script.src=src;document.head.appendChild(script);}
