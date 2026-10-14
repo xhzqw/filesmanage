@@ -1584,10 +1584,10 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
     className={"file-table file-table-ultra"+(status==="ready"&&visibleFolders.length>0&&visibleItems.length===0?" file-table-folders-only":"")}>
     <thead><tr>
      {showCheckboxes&&<th className="col-select" scope="col"><RareInput ref={selectAllRef} type="checkbox" checked={allLoadedSelected} onChange={toggleSelectAllLoaded} aria-label="选择当前显示的文件及文件夹"/></th>}
-     <th className="col-name" scope="col"><button type="button" className="file-column-sort" aria-label="按文件名排序" onClick={()=>setSort(current=>current==="name_asc"?"name_desc":"name_asc")}>文件名 <span aria-hidden="true">{sort==="name_asc"?"↑":sort==="name_desc"?"↓":""}</span></button></th>
-     <th className="col-size" scope="col"><button type="button" className="file-column-sort" aria-label="按文件大小降序排序" onClick={()=>setSort("size_desc")}>大小 <span aria-hidden="true">{sort==="size_desc"?"↓":""}</span></button></th>
+     <th className="col-name" scope="col"><RareButton type="button" tone="ghost" className="file-column-sort" aria-label="按文件名排序" onClick={()=>setSort(current=>current==="name_asc"?"name_desc":"name_asc")}>文件名 <span aria-hidden="true">{sort==="name_asc"?"↑":sort==="name_desc"?"↓":""}</span></RareButton></th>
+     <th className="col-size" scope="col"><RareButton type="button" tone="ghost" className="file-column-sort" aria-label="按文件大小降序排序" onClick={()=>setSort("size_desc")}>大小 <span aria-hidden="true">{sort==="size_desc"?"↓":""}</span></RareButton></th>
      <th className="col-version" scope="col">版本</th>
-     <th className="col-date" scope="col"><button type="button" className="file-column-sort" aria-label="按最近修改排序" onClick={()=>setSort("updated_desc")}>修改日期 <span aria-hidden="true">{sort==="updated_desc"?"↓":""}</span></button></th>
+     <th className="col-date" scope="col"><RareButton type="button" tone="ghost" className="file-column-sort" aria-label="按最近修改排序" onClick={()=>setSort("updated_desc")}>修改日期 <span aria-hidden="true">{sort==="updated_desc"?"↓":""}</span></RareButton></th>
      <th className="col-actions" scope="col"><span className="sr-only">操作</span></th>
     </tr></thead>
     <tbody onKeyDown={onGridKeyDown}>
