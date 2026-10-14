@@ -271,9 +271,47 @@ try{
  assert(highVolume&&highVolume.every(item=>item.tiles>=300&&!item.overlap&&item.scrollWidth<=item.clientWidth+2),
   "Large Finder icon-grid overflow/wrapping: "+JSON.stringify(highVolume));
  console.log("FINDER_GRID_300_ZOOM_PASS",JSON.stringify(highVolume));
+ // Repeatedly enter different large folder icons while the compositor is
+ // active. Hover animation must retain three paper cards and the rail must
+ // remain visibly painted; no special animation is required for test clones.
+ const iconPoints=await evaluate('(()=>[...document.querySelectorAll(".explorer-icon-grid .explorer-folder")].slice(0,12).map(el=>{const r=el.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}}))()');
+ for(let cycle=0;cycle<3;cycle++){
+  for(const point of iconPoints){
+   await send("Input.dispatchMouseEvent",{type:"mouseMoved",x:point.x,y:point.y});
+   await delay(20);
+  }
+ }
+ await delay(180);
+ const hoverRender=await evaluate('(()=>{const folders=[...document.querySelectorAll(".explorer-icon-grid .explorer-folder")];return {folders:folders.length,allPapers:folders.every(row=>row.querySelectorAll(".rare-folder-card").length===3),active:folders.filter(row=>row.querySelector("[data-folder-open=true]")).length,blank:document.querySelector(".finder-navigation")?.getBoundingClientRect().height<100}})()');
+ const rasterAfterHover=await sidebarRaster();
+ assert(hoverRender.allPapers&&!hoverRender.blank&&rasterAfterHover.dark>35,
+  "Rapid folder-hover composite regression: "+JSON.stringify({hoverRender,rasterAfterHover}));
+ console.log("FINDER_RARE_HOVER_STRESS_PASS",JSON.stringify({hoverRender,rasterAfterHover}));
+ // Navigate into an actual subdirectory without mutating server data.
+ // Ancestor columns must receive the same sort state and never append a page
+ // from the previous sort generation.
+ const depthFolder=await evaluate('document.querySelector(".explorer-icon-grid .explorer-folder")?.dataset.folderId');
+ if(depthFolder){
+  await evaluate('document.querySelector(".explorer-icon-grid .explorer-folder")?.dispatchEvent(new MouseEvent("dblclick",{bubbles:true}))');
+  await until('location.search.includes("folder=")');
+  await evaluate('document.querySelector(".folder-view-switch button[aria-label=分栏视图]")?.click()');
+  await until('document.querySelector(".work-body")?.dataset.explorerView==="columns"');
+  await until('document.querySelectorAll(".finder-path-list").length>0');
+  await click('button[aria-label="排序方式"]');
+  await until('document.querySelectorAll("[role=menu] [role=menuitem]").length===4');
+  await click('[role=menu] [role=menuitem]',1);
+  await until('document.querySelector(".finder-path-list")?.dataset.sort==="name_asc"');
+  await delay(400);
+  const ancestor=await evaluate('(()=>{const col=document.querySelector(".finder-path-list");return {sort:col?.dataset.sort,folderRows:col?.querySelectorAll(".finder-folder-row").length,fileRows:col?.querySelectorAll(".finder-file-row").length,scrollable:!!col&&getComputedStyle(col).overflowY==="auto",toolbar:document.querySelector("button[aria-label=排序方式]")?.title}})()');
+  assert(ancestor.sort==="name_asc"&&ancestor.scrollable&&ancestor.toolbar==="名称 A→Z",
+   "Ancestor Finder column must follow the active sort: "+JSON.stringify(ancestor));
+  console.log("FINDER_DEEP_COLUMN_SORT_PASS",JSON.stringify(ancestor));
+  await navigate("/doc",'!!document.querySelector(".folder-view-switch")');
+ }
  // Restore the initial sort for the remaining clipboard/selection tests.
  await evaluate('document.querySelector(".folder-view-switch button[aria-label=列表视图]")?.click()');
  await until('document.querySelector(".work-body")?.dataset.explorerView==="list"');
+ await until('document.querySelectorAll("tr.file-entry,.explorer-list-folder").length>0');
  await click('button[aria-label="排序方式"]');
  await until('document.querySelectorAll("[role=menu] [role=menuitem]").length===4');
  await click('[role=menu] [role=menuitem]',0);
