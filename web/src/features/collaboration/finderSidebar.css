@@ -88,7 +88,7 @@
 
 /* Finder uses one 48px header reference line across the full-height rail
    and the main navigation. The outer surface supplies the inset grey. */
-.shell.shell-finder{--height-header:48px;--finder-chrome-bg:#F4F5F7}
+.shell.shell-finder{--height-header:48px;--finder-chrome-bg:#F4F5F7;--finder-shell-gap:var(--space-2)}
 .shell.shell-finder .document-explorer .finder-sidebar{
  background:var(--finder-chrome-bg);
 }
@@ -102,7 +102,7 @@
 .shell.shell-finder>.header nav[data-slot="gooey-nav"][data-appearance="pill"]{grid-column:1;grid-row:1;justify-self:start}
 .shell.shell-finder>.header .global-utility-dock{grid-column:2;grid-row:1;justify-self:end;margin-left:auto}
 .shell.shell-finder>.panels.document-explorer{
- margin-top:calc(-1 * var(--height-header) - var(--space-2));gap:0;
+ margin-top:calc(-1 * var(--height-header) - var(--finder-shell-gap));gap:0;
  background:var(--finder-chrome-bg);
  border:1px solid rgba(15,23,42,.065);border-top:0;
  border-radius:var(--radius-md);border-bottom-left-radius:0;border-bottom-right-radius:0;
@@ -135,6 +135,11 @@
  .shell.shell-finder>.header{display:flex;justify-content:flex-end}
  .shell.shell-finder>.header .nav-toggle{margin-left:auto}
  .shell.shell-finder>.header .global-utility-dock{margin-left:0}
+}
+@media(max-width:820px){
+ /* visualSystem.css reduces the shell flex gap from 8px to 5px here.
+    Match that exact gap in the full-height sidebar/header overlap. */
+ .shell.shell-finder{--finder-shell-gap:5px}
 }
 @media(max-width:700px){
  .shell.shell-finder>.header{width:100%;align-self:stretch}
