@@ -114,16 +114,36 @@ try{
    const uploads=bounds('.folder-file-toolbar-host .upload-button'),folders=bounds('.folder-file-toolbar-host .new-folder-wrapper');
    const views=bounds('.folder-file-toolbar-host .folder-view-switch');
    const search=bounds('.folder-file-toolbar-host .filter-search-wrap');
+   const table=bounds('.explorer-striped-list table.file-table'),list=bounds('.work-body>.explorer-striped-list');
+   const header=bounds('.shell>.header'),dock=bounds('.global-utility-dock'),nav=bounds('.header-gooey-nav');
+   const sizeHead=document.querySelector('.file-table th.col-size'),sizeCell=document.querySelector('.file-table tbody td.col-size');
+   const sizeButton=sizeHead?.querySelector('.file-column-sort'),range=document.createRange();
+   if(sizeCell)range.selectNodeContents(sizeCell);
+   const sizeText=sizeCell?.getClientRects().length?range.getBoundingClientRect():null;
+   const history=[...document.querySelectorAll('.folder-history-controls button')];
+   const status=document.querySelector('.work-body>.status-bar'),statusStyle=status&&getComputedStyle(status);
+   const navRow=document.querySelector('.finder-nav-item'),tagRow=document.querySelector('.finder-tag-link');
    return {barHeight:bar?.height,portalled:!!toolbar&&document.querySelector('.work-body>.file-toolbar')===null,
     oneRow:inBounds(command,bar),uploads:inBounds(uploads,host),folders:inBounds(folders,host),
     views:inBounds(views,host),search:inBounds(search,host),
     overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,
-    sidebar:bounds('.finder-sidebar')?.height,header:bounds('.header')?.top,sidebarTop:bounds('.finder-sidebar')?.top};
+    sidebar:bounds('.finder-sidebar')?.height,header:bounds('.header')?.top,sidebarTop:bounds('.finder-sidebar')?.top,
+    tableFills:!!table&&!!list&&table.width>=list.width-20&&table.right>=list.right-19&&table.right<=list.right+1,
+    sizeAligned:!sizeText||!sizeButton||Math.abs(sizeButton.getBoundingClientRect().right-sizeText.right)<2,
+    headerDockRight:!!dock&&!!header&&Math.abs(dock.right-header.right)<=10,
+    navCentered:innerWidth<=1210||!!nav&&!!header&&Math.abs((nav.left+nav.right-header.left-header.right)/2)<=12,
+    navRowHeight:navRow?.getBoundingClientRect().height,tagRowHeight:tagRow?.getBoundingClientRect().height,
+    historyPair:history.length===2&&history.every(button=>button.getBoundingClientRect().width>=25&&getComputedStyle(button).visibility!=='hidden'),
+    statusSeam:!!statusStyle&&statusStyle.borderTopLeftRadius==='0px'&&statusStyle.borderBottomLeftRadius==='0px'&&statusStyle.borderBottomWidth==='0px'&&statusStyle.borderLeftWidth==='0px'&&statusStyle.borderTopWidth==='1px',
+    toolbarSeam:getComputedStyle(document.querySelector('.folder-context-bar')).borderTopLeftRadius==='0px'};
   })()`);
   console.log('EXPLORER_UNIFIED_TOOLBAR_GEOMETRY',viewport.name,JSON.stringify(layout));
   assert(layout.portalled&&layout.barHeight>=43&&layout.barHeight<=45&&layout.oneRow&&layout.uploads&&layout.folders&&layout.views&&layout.search&&layout.overflow<=1,
    'One accessible, unclipped Finder toolbar at '+viewport.width+': '+JSON.stringify(layout));
   assert(layout.sidebarTop<=layout.header+2,'Finder sidebar extends to header at '+viewport.width);
+  assert(layout.tableFills&&layout.sizeAligned&&layout.headerDockRight&&layout.navCentered&&
+   layout.navRowHeight<=29&&layout.tagRowHeight<=29&&layout.historyPair&&layout.statusSeam&&layout.toolbarSeam,
+   'Full-width columns, dock alignment and continuous Finder chrome at '+viewport.width+': '+JSON.stringify(layout));
  }
  await send('Emulation.clearDeviceMetricsOverride');
  let count=await evaluate('document.querySelectorAll("tr.file-entry").length');

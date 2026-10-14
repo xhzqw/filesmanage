@@ -56,11 +56,14 @@ html{overflow-x:clip}
   border-radius:var(--radius-sm);
 }
 .status-bar{
-  border:1px solid var(--border-hairline);
-  border-radius:var(--radius-md);
+  border:0;
+  border-top:1px solid var(--border-hairline);
+  border-radius:0;
   background:var(--surface-panel);
   padding-inline:var(--space-3);
 }
+/* A continuous inner toolbar is not another rounded card. */
+.document-explorer .work .folder-context-bar{border-radius:0}
 
 /* Floating controls are compact and softly rectangular, never bubbles. */
 button,input:not([type="checkbox"]):not([type="radio"]),select,textarea,

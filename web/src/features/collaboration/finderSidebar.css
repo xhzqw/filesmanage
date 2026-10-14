@@ -1,14 +1,14 @@
 /* Finder hierarchy, adapted to the system's existing blue/neutral RareUI tokens. */
 .document-explorer .finder-sidebar{background:var(--ui-bg-sidebar);border-color:rgba(15,23,42,.07);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
-.finder-navigation{display:flex;flex-direction:column;gap:17px;min-width:0;padding:15px 10px 20px}
-.finder-nav-section{display:flex;flex-direction:column;gap:3px;min-width:0}
-.finder-nav-label{padding:0 12px 5px;font-size:11px;font-weight:600;color:var(--text-tertiary);letter-spacing:.025em}
+.finder-navigation{display:flex;flex-direction:column;gap:14px;min-width:0;padding:12px 8px 16px}
+.finder-nav-section{display:flex;flex-direction:column;gap:1px;min-width:0}
+.finder-nav-label{padding:0 10px 4px;font-size:11px;font-weight:600;color:var(--text-tertiary);letter-spacing:.025em}
 .finder-nav-section-link{text-decoration:none;align-self:flex-start}
 .finder-nav-section-link:hover,.finder-nav-section-link[aria-current="page"]{color:var(--brand-blue);text-decoration:none}
 .finder-nav-item,.finder-favorite-item{
- box-sizing:border-box;display:flex;align-items:center;gap:11px;width:100%;min-width:0;min-height:36px;
- padding:6px 11px;border:0;border-radius:var(--radius-md);background:transparent;text-decoration:none;
- color:var(--text-primary);font-size:13px;font-weight:540;text-align:left;
+ box-sizing:border-box;display:flex;align-items:center;gap:8px;width:100%;min-width:0;min-height:28px;height:28px;
+ padding:0 10px;border:0;border-radius:var(--radius-sm);background:transparent;text-decoration:none;
+ color:var(--text-primary);font-size:13px;font-weight:400;text-align:left;
  transition:background-color .15s ease,color .15s ease;
 }
 .finder-nav-item svg{flex:none;color:var(--brand-blue)}
@@ -16,7 +16,7 @@
 .finder-favorite-name{flex:1}
 .finder-nav-item:hover,.finder-favorite-item:hover{background:var(--surface-row-hover);text-decoration:none}
 .finder-nav-item.is-current{background:var(--ui-state-selected-sidebar);color:#0058D0;font-weight:500}
-.finder-favorite-item{min-height:31px;padding-left:11px;padding-right:12px;gap:9px;font-size:12px;font-weight:450}
+.finder-favorite-item{padding-left:10px;padding-right:12px;font-size:12px;font-weight:450}
 .finder-favorite-item svg{flex:none}
 .finder-nav-empty,.finder-nav-more,.finder-nav-retry{display:block;padding:5px 12px 5px 29px;font-size:11px;color:var(--text-tertiary)}
 .finder-nav-more{color:var(--brand-blue);text-decoration:none}
@@ -26,12 +26,12 @@
 .finder-nav-heading:hover .finder-tag-add,.finder-nav-heading:focus-within .finder-tag-add{opacity:1;pointer-events:auto}
 .finder-nav-heading .finder-nav-label{padding-bottom:0}
 .finder-tag-add{border:0;background:transparent;color:var(--text-secondary);font-size:15px;font-weight:400;width:25px;height:25px;padding:0;border-radius:var(--radius-sm)}
-.finder-tag-line{display:flex;align-items:center;min-width:0;border-radius:var(--radius-md);transition:background .15s}
+.finder-tag-line{display:flex;align-items:center;min-width:0;min-height:28px;border-radius:var(--radius-sm);transition:background .15s}
 .finder-tag-line:hover{background:var(--ui-state-hover)}
 .finder-tag-line.is-current{background:var(--ui-state-selected-sidebar);color:#0058D0}
 .finder-tag-line.is-current .finder-tag-link{color:var(--text-primary);font-weight:600}
 .finder-tag-line.is-drop-target{background:var(--ui-state-selected-grid);outline:2px solid var(--ui-state-focus);outline-offset:-2px}
-.finder-tag-link{display:flex;align-items:center;gap:11px;flex:1;min-width:0;min-height:34px;padding:5px 10px;color:var(--text-primary);text-decoration:none;font-size:13px}
+.finder-tag-link{display:flex;align-items:center;gap:8px;flex:1;min-width:0;min-height:28px;height:28px;padding:0 10px;color:var(--text-primary);text-decoration:none;font-size:13px}
 .finder-tag-link:hover{text-decoration:none}
 .finder-tag-dot{width:8px;height:8px;flex:none;border-radius:50%;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.18)}
 .finder-tag-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -93,6 +93,8 @@
  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
 }
 .shell.shell-finder>.header>.shell-home-pill{display:none}
+.shell.shell-finder>.header nav[data-slot="gooey-nav"][data-appearance="pill"]{grid-column:2;grid-row:1}
+.shell.shell-finder>.header .global-utility-dock{grid-column:3;grid-row:1;justify-self:end;margin-left:auto}
 .shell.shell-finder>.panels.document-explorer{
  margin-top:calc(-1 * var(--height-header) - var(--space-2));gap:0;
  background:var(--surface-panel);border:1px solid rgba(15,23,42,.065);
@@ -117,6 +119,11 @@
 .document-explorer .finder-sidebar-logo{width:27px;height:27px;object-fit:contain;flex:none}
 @media(max-width:1000px){
  .shell.shell-finder>.header{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}
+}
+@media(max-width:1210px){
+ .shell.shell-finder>.header{justify-content:flex-end}
+ .shell.shell-finder>.header .nav-toggle{margin-left:auto}
+ .shell.shell-finder>.header .global-utility-dock{margin-left:0}
 }
 @media(max-width:700px){
  .shell.shell-finder>.header{width:100%;align-self:stretch}
