@@ -142,7 +142,7 @@ try{
     sidebar:bounds('.finder-sidebar')?.height,header:bounds('.header')?.top,sidebarTop:bounds('.finder-sidebar')?.top,
     tableFills:!!table&&!!list&&table.width>=list.width-20&&table.right>=list.right-19&&table.right<=list.right+1,
     sizeAligned:!sizeText||!sizeButton||Math.abs(sizeButton.getBoundingClientRect().right-sizeText.right)<2,
-    headerDockRight:!!dock&&!!header&&Math.abs(dock.right-header.right)<=10,
+    headerDockRight:!!dock&&!!header&&Math.abs((header.right-dock.right)-16)<=2,
     navCentered:innerWidth<=1210||!!nav&&!!header&&nav.left>=header.left+10&&nav.left<=header.left+24,
     navRowHeight:navRow?.getBoundingClientRect().height,tagRowHeight:tagRow?.getBoundingClientRect().height,
     historyPair:history.length===2&&history.every(button=>button.getBoundingClientRect().width>=25&&getComputedStyle(button).visibility!=='hidden'),
@@ -154,7 +154,7 @@ try{
     nav26:history.every(el=>Math.abs(el.getBoundingClientRect().height-26)<1),
     nameLine:!nameHead||!nameIcon||Math.abs(nameHead.left-nameIcon.left)<=1.5,
     dateLine:!dateHead||!dateText||Math.abs(dateHead.left-dateText.left)<=1.5,
-    sidebarLine:!heading||!sideIcon||Math.abs(heading.getBoundingClientRect().left-sideIcon.getBoundingClientRect().left)<1.5,
+    sidebarLine:!heading||!sideIcon||Math.abs(heading.getBoundingClientRect().left+parseFloat(getComputedStyle(heading).paddingLeft)-sideIcon.getBoundingClientRect().left)<1.5,
     monochrome:tinyIcons.every(el=>el.classList.contains('finder-line-icon')&&el.getBoundingClientRect().width===16&&getComputedStyle(el).strokeWidth==='1.75px'),
     footer28:!!footer&&Math.abs(footer.getBoundingClientRect().height-28)<1&&
      !!footerPath&&!!footerCount&&Math.abs((footerCount.getBoundingClientRect().left+footerCount.getBoundingClientRect().right)/2-(footer.getBoundingClientRect().left+footer.getBoundingClientRect().right)/2)<1.5&&
