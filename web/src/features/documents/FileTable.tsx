@@ -159,6 +159,12 @@ type FavoriteRow={kind:string;fileId?:string;folderId?:string};
 // current visible order, and the keyboard mirrors every mouse action. The
 // selection model keeps focus, anchor and membership separate so a stale
 // anchor can never resurrect after a re-sort.
+function ExplorerMoreDotsIcon(){
+ return <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+  <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+ </svg>;
+}
+
 export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdit,reloadKey,newFolderSlot,onFolderChanged,viewMode="list",labelId,taggedItems,onTagRefresh,toolbarHostId,viewControls,folderMenuItems=[]}:{
  folder:string;folderName:string;childFolders?:Folder[];folderPath?:Folder[];onEdit:(fileId:string)=>void;reloadKey:number;newFolderSlot?:ReactNode;onFolderChanged?:()=>void;viewMode?:ExplorerViewMode;
  labelId?:string;taggedItems?:FileItem[];onTagRefresh?:()=>Promise<void>;toolbarHostId?:string;viewControls?:ReactNode;folderMenuItems?:MenuItem[];
@@ -1447,7 +1453,7 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
     <svg width="15" height="15" viewBox="0 0 24 24" fill={favoriteIds.has(item.id)?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.8 1.2 6.9L12 17.8l-6.2 3.2L7 14.1 2 9.3l6.9-1z"/></svg>
    </RareButton>
    <RareButton type="button" tone="ghost" className="explorer-item-more" aria-label={"文件操作 "+item.name}
-    aria-haspopup="menu" onClick={event=>{event.stopPropagation();openRowMenu(item,event.currentTarget);}}>···</RareButton>
+    aria-haspopup="menu" onClick={event=>{event.stopPropagation();openRowMenu(item,event.currentTarget);}}><ExplorerMoreDotsIcon/></RareButton>
   </div>;
  }
  function renderFolderEntry(entry:Folder){
@@ -1492,7 +1498,7 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
     <svg width="15" height="15" viewBox="0 0 24 24" fill={favoriteFolderIds.has(entry.id)?"currentColor":"none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="m12 2 3.1 6.3 6.9 1-5 4.8 1.2 6.9L12 17.8l-6.2 3.2L7 14.1 2 9.3l6.9-1z"/></svg>
    </RareButton>
    <RareButton type="button" tone="ghost" className="explorer-item-more" aria-label={"文件夹操作 "+entry.name}
-    aria-haspopup="menu" onClick={event=>{event.stopPropagation();openFolderContext(entry,event.currentTarget);}}>···</RareButton>
+    aria-haspopup="menu" onClick={event=>{event.stopPropagation();openFolderContext(entry,event.currentTarget);}}><ExplorerMoreDotsIcon/></RareButton>
   </div>;
  }
  const previewArt=(item:FileItem)=><div className="explorer-preview-art">

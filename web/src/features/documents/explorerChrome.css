@@ -182,9 +182,15 @@
  width:13px;height:13px;
 }
 /* Keep muted labels on one metadata rail rather than a separate rainbow line. */
-.explorer-item-meta{display:flex;align-items:center;justify-content:center;gap:7px;min-width:0;max-width:100%;min-height:14px}
-.explorer-item-meta .file-finder-marks{gap:4px;max-width:74px;white-space:nowrap}
-.explorer-item-meta .file-finder-mark{width:6px;height:6px}
+.explorer-item-meta{display:flex;align-items:center;justify-content:center;gap:5px;min-width:0;max-width:100%;min-height:14px}
+.explorer-item-meta .file-finder-marks{
+ display:inline-flex;align-items:center;gap:4px;max-width:74px;min-width:0;
+ margin-left:0;white-space:nowrap;
+}
+.explorer-item-meta .file-finder-mark{
+ width:7px;height:7px;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15);
+}
+.explorer-item-meta .file-finder-mark+.file-finder-mark{margin-left:0}
 .explorer-item-sub{font-size:11px;font-weight:400;color:#94A3B8;white-space:nowrap}
 .explorer-item-check{
  position:absolute;top:7px;left:7px;opacity:0;cursor:pointer;
@@ -196,7 +202,23 @@
  width:22px;min-height:22px;height:22px;padding:0;display:grid;place-items:center;
  color:var(--text-secondary);opacity:0;pointer-events:none;z-index:2;
 }
-.explorer-item-more{top:auto;bottom:5px;right:5px;font-size:17px}
+.explorer-item-more{
+ box-sizing:border-box;
+ display:inline-flex;align-items:center;justify-content:center;
+ top:6px;right:6px;bottom:auto;
+ width:22px;height:22px;min-height:22px;padding:0;
+ border-radius:var(--radius-finder);
+ background:rgba(255,255,255,.9);
+ box-shadow:0 1px 3px rgba(15,23,42,.12);
+}
+.explorer-item-more>svg{display:block;flex:none;width:14px;height:14px}
+/* Grid names and Finder label dots live exclusively below the artwork.
+   The upper-right corner is reserved for this menu affordance. */
+.explorer-icon-grid .explorer-item-more{top:6px;right:6px;bottom:auto}
+/* Gallery tiles reuse the same action buttons but have a narrower artwork.
+   Put the star beside, not beneath, the upper-right menu. */
+.explorer-gallery-strip .explorer-item-star{top:6px;right:34px}
+.explorer-gallery-strip .explorer-item-more{top:6px;right:6px;bottom:auto}
 .explorer-item:hover :is(.explorer-item-star,.explorer-item-more),
 .explorer-item:focus-within :is(.explorer-item-star,.explorer-item-more),
 .explorer-item-star.favorited{opacity:1;pointer-events:auto}
@@ -355,6 +377,9 @@
 @container file-list (max-width:560px){
  .explorer-icon-grid{grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:12px;padding:12px}
  .explorer-item{min-height:112px}
+ /* Even at the 112px minimum tile, leave space between the artwork badge
+    and the upper-right menu without touching the metadata area. */
+ .explorer-icon-grid .explorer-folder>.explorer-item-star{right:calc(50% - 27px)}
  .explorer-columns{--finder-column-width:clamp(178px,50cqw,270px)}
  .explorer-column-detail{flex-basis:clamp(210px,52cqw,300px)}
  .explorer-column-detail{padding:12px 8px}

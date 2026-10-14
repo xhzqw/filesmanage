@@ -255,6 +255,74 @@ try{
      gridArt.artworkRowAligned&&gridArt.fixedMeta,
      "Rare Folder grid artwork/stars/metadata alignment at "+width+": "+JSON.stringify(gridArt));
     console.log("FINDER_ICON_GRID_RARE_PASS",width,JSON.stringify(gridArt));
+    // Inspect actual hovered/selected tile geometry: menus must occupy only
+    // the artwork band, never the filename, version text, or Finder tag dots.
+    for(const selector of [".explorer-icon-grid .explorer-folder",".explorer-icon-grid .file-entry"]){
+     const anchor=await evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});
+      const r=e?.getBoundingClientRect();return r?{x:r.left+r.width/2,y:r.top+20}:null})()`);
+     if(!anchor)continue;
+     await send("Input.dispatchMouseEvent",{type:"mouseMoved",x:anchor.x,y:anchor.y});
+     await delay(95);
+     const collision=await evaluate(`(()=>{
+      const e=document.querySelector(${JSON.stringify(selector)});
+      const rect=node=>node?.getBoundingClientRect();
+      const more=e?.querySelector('.explorer-item-more'),star=e?.querySelector('.explorer-item-star'),
+       svg=more?.querySelector('svg'),art=e?.querySelector('.explorer-item-art'),
+       name=e?.querySelector('.explorer-item-name'),meta=e?.querySelector('.explorer-item-meta');
+      const m=rect(more),s=rect(star),v=rect(svg),a=rect(art),n=rect(name),t=rect(meta),card=rect(e);
+      const isOverlap=(x,y)=>!!x&&!!y&&x.width>0&&y.width>0&&
+       x.left<y.right-.4&&y.left<x.right-.4&&x.top<y.bottom-.4&&y.top<x.bottom-.4;
+      const marks=[...e.querySelectorAll('.explorer-item-meta .file-finder-mark')];
+      const markDimensions=marks.map(node=>({height:rect(node).height,width:rect(node).width,
+       center:(rect(node).top+rect(node).bottom)/2}));
+      const baseline=rect(e.querySelector('.explorer-item-sub'));
+      const controls={menu:more&&getComputedStyle(more),star:star&&getComputedStyle(star)};
+      const oldSelected=e.classList.contains('selected');
+      e.classList.add('selected');
+      const selectedOverlap=isOverlap(rect(more),rect(meta))||isOverlap(rect(more),rect(name));
+      if(!oldSelected)e.classList.remove('selected');
+      return {exists:!!m&&!!s&&!!a,hovered:e.matches(':hover'),
+       menuPosition:controls.menu?.position,menuBottom:controls.menu?.bottom,
+       menuTop:m&&card?m.top-card.top:null,menuRight:m&&card?card.right-m.right:null,
+       menuWidth:m?.width,menuHeight:m?.height,svgWidth:v?.width,svgHeight:v?.height,
+       svgCenterDelta:v&&m?Math.max(Math.abs((v.left+v.right-m.left-m.right)/2),
+         Math.abs((v.top+v.bottom-m.top-m.bottom)/2)):null,
+       iconCentres:svg?[...svg.querySelectorAll('circle')].map(c=>c.getAttribute('cy')):[],
+       menuOpacity:controls.menu?.opacity,starOverlap:isOverlap(m,s),
+       metaOverlap:isOverlap(m,t),nameOverlap:isOverlap(m,n),
+       markOverlap:marks.some(mark=>isOverlap(m,rect(mark))),
+       selectedOverlap,metaGap:meta&&name?t.top-n.bottom:null,
+       markDimensions,textBaselineCenter:baseline?(baseline.top+baseline.bottom)/2:null,
+       metaAlign:meta?getComputedStyle(meta).alignItems:null,
+       metaGapStyle:meta?getComputedStyle(meta).columnGap:null};
+     })()`);
+     assert(collision.exists&&collision.hovered&&collision.menuPosition==="absolute"&&
+      Math.abs(collision.menuTop-6)<=1&&Math.abs(collision.menuRight-6)<=1&&
+      collision.menuWidth===22&&collision.menuHeight===22&&collision.svgWidth===14&&
+      collision.svgHeight===14&&collision.svgCenterDelta<=.5&&
+      collision.iconCentres.join(",")==="12,12,12"&&
+      !collision.starOverlap&&!collision.metaOverlap&&!collision.nameOverlap&&
+      !collision.markOverlap&&!collision.selectedOverlap&&collision.metaAlign==="center"&&
+      collision.metaGapStyle==="5px"&&
+      collision.markDimensions.every(mark=>mark.width===7&&mark.height===7&&
+       (!collision.textBaselineCenter||Math.abs(mark.center-collision.textBaselineCenter)<2)),
+      "Finder visual item hover collides with badges/text at "+width+" "+selector+": "+JSON.stringify(collision));
+     console.log("FINDER_ICON_HOVER_ACTIONS_PASS",width,selector,JSON.stringify(collision));
+    }
+   }
+   if(mode==="gallery"){
+    const gallery=await evaluate(`(()=>{
+     const item=document.querySelector('.explorer-gallery-strip .explorer-item');
+     if(!item)return null;
+     const more=item.querySelector('.explorer-item-more'),star=item.querySelector('.explorer-item-star');
+     const m=more?.getBoundingClientRect(),s=star?.getBoundingClientRect();
+     return {svg:!!more?.querySelector('svg circle'),moreTop:getComputedStyle(more).top,
+      starRight:getComputedStyle(star).right,
+      overlap:!!m&&!!s&&m.left<s.right-.5&&s.left<m.right-.5&&m.top<s.bottom-.5&&s.top<m.bottom-.5};
+    })()`);
+    assert(gallery&&!gallery.overlap&&gallery.svg&&gallery.moreTop==="6px",
+     "Gallery toolbar regression after moving Finder icon actions: "+JSON.stringify(gallery));
+    console.log("FINDER_GALLERY_MORE_ACTIONS_PASS",width,JSON.stringify(gallery));
    }
    if(mode==="columns"){
     const point=await evaluate(`(()=>{
