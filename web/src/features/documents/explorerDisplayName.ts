@@ -39,7 +39,7 @@ export function compactExplorerName(name:string):string{
   if(visualWidth(head)>=3)return head+"…"+(timestamp[2]??"").slice(-4)+extWithDot;
  }
  const duplicate=stem.match(/(\(\d+\)[-_]?副本(?:\d+)?)$/u);
- const suffix=duplicate?visualTail(duplicate[1],16):visualTail(stem,10);
+ const suffix=duplicate?visualTail(duplicate[1]??"",16):visualTail(stem,10);
  const prefix=visualSlice(stem.slice(0,stem.length-suffix.length).replace(/[-_.\s]+$/u,""),duplicate?18:14);
  return (prefix||visualSlice(stem,14))+"…"+suffix+extWithDot;
 }
