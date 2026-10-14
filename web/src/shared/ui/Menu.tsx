@@ -10,6 +10,7 @@ export type MenuItem={
  disabled?:boolean;
  danger?:boolean;
  hint?:string;
+ separator?:boolean;
 };
 export type MenuSwatch={id:string;label:string;color:string;checked:boolean;disabled?:boolean;onSelect:()=>void};
 
@@ -151,7 +152,7 @@ export function Menu({open,onClose,items,swatches,anchor,label,point}:{
   style={{left:position?position.left:0,top:position?position.top:0,opacity:position?1:0}}
   onKeyDown={onKeyDown}
   onContextMenu={event=>event.preventDefault()}>
-  {items.map(item=><RareButton key={item.id} type="button" role="menuitem"
+  {items.map(item=>item.separator?<div key={item.id} className="menu-divider" role="separator" aria-hidden="true"/>:<RareButton key={item.id} type="button" role="menuitem"
    className={"menu-item"+(item.danger?" danger":"")}
    disabled={item.disabled}
    aria-disabled={item.disabled?true:undefined}

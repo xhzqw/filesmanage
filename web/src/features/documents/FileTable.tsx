@@ -29,7 +29,7 @@ import {classifyFile,type FileCategory} from "../../shared/fileTypes";
 import {FileTypeIcon} from "../../shared/ui/FileTypeIcon";
 import {FINDER_COLORS,finderColor,labelApi,type FinderLabel} from "../../shared/finderLabels";
 import {LABEL_DRAG_MIME} from "../../shared/labelDrag";
-import {FolderResourceIcon} from "../../shared/ui/ResourceIcons";
+import {FinderLineIcon,FolderResourceIcon} from "../../shared/ui/ResourceIcons";
 import {FinderPathColumn} from "./FinderPathColumn";
 import"./fileTable.css";
 import type {ExplorerViewMode} from "./explorerView";
@@ -62,6 +62,16 @@ function finderModifiedTime(value?:string){
  if(sameDay(yesterday))return "昨天 "+time;
  const date=(when.getFullYear()===today.getFullYear()?"":when.getFullYear()+"年")+(when.getMonth()+1)+"月"+when.getDate()+"日";
  return date+" "+time;
+}
+function FinderListFileName({name}:{name:string}){
+ const normalized=name.replace(/\s+(?=\.[\p{L}\p{N}]{1,12}$)/u,"");
+ const parts=normalized.match(/^(.+?)(\.[\p{L}\p{N}]{1,12})$/u);
+ const stem=parts?.[1]??normalized,extension=parts?.[2]??"";
+ const chars=Array.from(stem),long=chars.length>26;
+ return <span className="file-name finder-list-filename" title={name} aria-label={name}>
+  {long?<><span className="finder-name-prefix">{chars.slice(0,-9).join("")}</span><span className="finder-name-tail">{chars.slice(-9).join("")}</span></>:<span className="finder-name-prefix">{stem}</span>}
+  {extension&&<span className="finder-name-extension">{extension}</span>}
+ </span>;
 }
 
 type CopiedResource={kind:"file"|"folder";id:string;name:string};
@@ -154,9 +164,9 @@ type FavoriteRow={kind:string;fileId?:string;folderId?:string};
 // current visible order, and the keyboard mirrors every mouse action. The
 // selection model keeps focus, anchor and membership separate so a stale
 // anchor can never resurrect after a re-sort.
-export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdit,reloadKey,newFolderSlot,onFolderChanged,viewMode="list",labelId,taggedItems,onTagRefresh,toolbarHostId,viewControls}:{
+export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdit,reloadKey,newFolderSlot,onFolderChanged,viewMode="list",labelId,taggedItems,onTagRefresh,toolbarHostId,viewControls,folderMenuItems=[]}:{
  folder:string;folderName:string;childFolders?:Folder[];folderPath?:Folder[];onEdit:(fileId:string)=>void;reloadKey:number;newFolderSlot?:ReactNode;onFolderChanged?:()=>void;viewMode?:ExplorerViewMode;
- labelId?:string;taggedItems?:FileItem[];onTagRefresh?:()=>Promise<void>;toolbarHostId?:string;viewControls?:ReactNode;
+ labelId?:string;taggedItems?:FileItem[];onTagRefresh?:()=>Promise<void>;toolbarHostId?:string;viewControls?:ReactNode;folderMenuItems?:MenuItem[];
 }){
  const[toolbarHost,setToolbarHost]=useState<HTMLElement|null>(null);
  useLayoutEffect(()=>{
@@ -1553,10 +1563,11 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
      <RareInput type="search" className="filter-search-input" placeholder="筛选当前目录" aria-label="筛选当前目录的文件名"
       value={nameFilter} onChange={e=>{setNameFilter(e.target.value);setFocusedId(null);setAnchorId(null);}}/>
     </div>
-    <RareButton ref={displayMenuAnchor} type="button" tone="ghost" className="explorer-tool-icon" aria-haspopup="menu" aria-expanded={displayMenuOpen} aria-label="更多显示选项" title="更多显示选项" onClick={()=>setDisplayMenuOpen(open=>!open)}>···</RareButton>
-    <Menu open={displayMenuOpen} label="显示选项" anchor={displayMenuAnchor.current} onClose={()=>setDisplayMenuOpen(false)} items={[
+    <RareButton ref={displayMenuAnchor} type="button" tone="ghost" className="explorer-tool-icon" aria-haspopup="menu" aria-expanded={displayMenuOpen} aria-label="更多操作" title="更多操作" onClick={()=>setDisplayMenuOpen(open=>!open)}>···</RareButton>
+    <Menu open={displayMenuOpen} label="更多操作" anchor={displayMenuAnchor.current} onClose={()=>setDisplayMenuOpen(false)} items={[
      {id:"checkboxes",label:showCheckboxes?"隐藏勾选框":"显示勾选框",onSelect:()=>setShowCheckboxes(value=>!value)},
-     {id:"clear",label:"清除筛选",disabled:categoryFilter==="all"&&!nameFilter.trim(),onSelect:()=>{setCategoryFilter("all");setNameFilter("");}}
+     {id:"clear",label:"清除筛选",disabled:categoryFilter==="all"&&!nameFilter.trim(),onSelect:()=>{setCategoryFilter("all");setNameFilter("");}},
+     ...(folderMenuItems.length?[{id:"folder-divider",label:"",separator:true,onSelect:()=>{}},...folderMenuItems]:[])
     ]}/>
    </div>
   </div>;
@@ -1618,7 +1629,7 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
       {showCheckboxes&&<td className="col-select"><RareInput type="checkbox" checked={selectedFolderIds.has(entry.id)} aria-label={"选择文件夹 "+entry.name}
        onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}}
        onChange={()=>{selectResource("folder",entry.id,true,checkboxShiftRef.current);checkboxShiftRef.current=false;setFocusedFolderId(entry.id);setFocusedId(null);}}/></td>}
-      <td className="col-name"><div className="file-cell-wrap"><FolderResourceIcon size={19}/><span className="file-name-group"><span className="file-name" title={entry.name}>{entry.name}</span>{finderFolderDots(entry)}</span>
+      <td className="col-name"><div className="file-cell-wrap"><FolderResourceIcon size={20}/><span className="file-name-group"><span className="file-name" title={entry.name}>{entry.name}</span>{finderFolderDots(entry)}</span>
        <RareButton type="button" tone="ghost" className="folder-inline-open" aria-label={"打开文件夹 "+entry.name}
         onClick={event=>{event.stopPropagation();navigate("/doc?folder="+encodeURIComponent(entry.id));}}>打开 ↗</RareButton>
       </div></td>
@@ -1647,7 +1658,7 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
       onDragEnd={onRowDragEnd}>
       {showCheckboxes&&<td className="col-select"><RareInput type="checkbox" checked={selectedIds.has(item.id)} aria-label={"选择 "+item.name} onClick={event=>{event.stopPropagation();checkboxShiftRef.current=event.shiftKey;}} onChange={event=>onCheckToggle(event,item)}/></td>}
       <td className="col-name"><div className="file-cell-wrap">
-       <FileTypeIcon name={item.name} size={19}/><span className="file-name-group"><span className="file-name" title={item.name}>{item.name}</span>{finderDots(item)}</span>
+       <FileTypeIcon name={item.name} size={20}/><span className="file-name-group"><FinderListFileName name={item.name}/>{finderDots(item)}</span>
        <small className="file-mobile-meta">v{item.currentVersionSeq} · {formatSize(item.sizeBytes)}</small>
        <RareButton type="button" className="file-mobile-actions" aria-label={"操作 "+item.name}
         title={"文件操作："+item.name} aria-haspopup="menu"
@@ -1821,15 +1832,18 @@ export function FileTable({folder,folderName,childFolders=[],folderPath=[],onEdi
      disabled:!label||!finderReady||finderBusy||rowMenu.targets.length>100,
      onSelect:()=>{if(label)void markFinderFiles(label,rowMenu.targets);}};
    })}/>}
-  {!labelId&&<nav className="finder-bottom-path" aria-label="当前位置完整路径">
-   <Link to="/doc">文档管理</Link>
-   {folderPath.map((segment,index)=><span className="finder-bottom-segment" key={segment.id}>
-    <span aria-hidden="true">›</span>
-    {index===folderPath.length-1?<strong title={segment.name} aria-current="page">{segment.name}</strong>:<Link title={segment.name} to={"/doc?folder="+encodeURIComponent(segment.id)}>{segment.name}</Link>}
-   </span>)}
-  </nav>}
-  <footer className="status-bar">
-   <span>{hasMore?"已加载":"共"} <span className="status-strong">{items.length+childFolders.length}</span> 项（{items.length} 个文件，{childFolders.length} 个文件夹）{selectedTotal>0&&<>，已选 {selectedTotal} 项{selectedIds.size>0&&<>（{formatSize(selectedBytes)}）</>}</>}{(categoryFilter!=="all"||nameFilter.trim())&&<> · 当前匹配 {visibleItems.length+visibleFolders.length} 项</>}</span>
+  <footer className="status-bar finder-bottom-bar" aria-label="目录路径及状态">
+   <nav className="finder-bottom-path" aria-label="当前位置完整路径">
+    {!labelId&&<><Link to="/doc" className="finder-bottom-node"><FinderLineIcon kind="folder" size={12}/>文档管理</Link>
+     {folderPath.map((segment,index)=><span className="finder-bottom-segment" key={segment.id}>
+      <span aria-hidden="true" className="finder-bottom-chevron">›</span>
+      <Link className="finder-bottom-node" title={segment.name} aria-current={index===folderPath.length-1?"page":undefined}
+       to={"/doc?folder="+encodeURIComponent(segment.id)}><FinderLineIcon kind="folder" size={12}/><span>{segment.name}</span></Link>
+     </span>)}</>}
+    {labelId&&<span className="finder-bottom-node"><FinderLineIcon kind="folder" size={12}/>标签视图</span>}
+   </nav>
+   <span className="finder-bottom-count">{hasMore?"已加载":"共"} <span className="status-strong">{items.length+childFolders.length}</span> 项（{items.length} 个文件，{childFolders.length} 个文件夹）{(categoryFilter!=="all"||nameFilter.trim())&&<> · 匹配 {visibleItems.length+visibleFolders.length} 项</>}</span>
+   <span className="finder-bottom-selection">{selectedTotal>0&&<>已选中 {selectedTotal} 项{selectedIds.size>0&&<>（文件 {formatSize(selectedBytes)}）</>}</>}</span>
   </footer>
  </div>;
 }

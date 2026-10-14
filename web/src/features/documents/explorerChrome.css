@@ -326,16 +326,21 @@
  .folder-history-controls .rare-button,.folder-view-switch .rare-button{transition:none}
 }
 
-/* Unified Finder toolbar. Its file-command content is portalled here from
-   FileTable, so selection and upload handlers remain single-source. */
+/* One Finder chrome grammar: a 44px rail containing 28px rectangular controls
+   and a 26px fixed navigation pair; no second overflow trigger. */
 .document-explorer .work{container:file-work / inline-size}
 .document-explorer .work .folder-context-bar{
- height:44px;min-height:44px;max-height:44px;padding:0 10px;gap:7px;
+ height:44px;min-height:44px;max-height:44px;padding:0 12px;gap:8px;
  border-bottom:1px solid rgba(15,23,42,.065);
+}
+.document-explorer .folder-context-bar .folder-history-controls{flex:0 0 auto;gap:2px;margin-right:0}
+.document-explorer .folder-context-bar .folder-history-controls .rare-button{
+ box-sizing:border-box;display:grid;place-items:center;width:26px;height:26px;min-width:26px;min-height:26px;
+ padding:0;border:0;border-radius:var(--radius-finder);
 }
 .document-explorer .folder-current-title{
  min-width:0;flex:0 1 150px;overflow:hidden;text-overflow:ellipsis;
- white-space:nowrap;font-size:15px;font-weight:600;line-height:1.2;color:var(--text-primary);
+ white-space:nowrap;font-size:15px;font-weight:600;line-height:1.2;color:#0F172A;
 }
 .document-explorer .folder-file-toolbar-host{
  flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:flex-end;
@@ -344,29 +349,31 @@
 .document-explorer .folder-file-toolbar-host .file-toolbar{
  box-sizing:border-box;display:flex;flex:1;align-items:center;justify-content:flex-end;
  gap:7px;min-width:0;max-width:100%;width:100%;height:44px;min-height:44px;
- margin:0;padding:0;border:0;border-radius:var(--radius-xs);background:transparent;flex-wrap:nowrap;
+ margin:0;padding:0;border:0;border-radius:0;background:transparent;flex-wrap:nowrap;
 }
 .folder-file-toolbar-host .file-toolbar .toolbar-actions{
  flex:1 1 auto;min-width:0;justify-content:flex-end;overflow:hidden;
 }
 .folder-file-toolbar-host .file-toolbar .toolbar-views{
- flex:none;min-width:0;gap:6px;margin-left:0;
+ flex:none;min-width:0;gap:5px;margin-left:0;
 }
 .folder-file-toolbar-host .file-toolbar .folder-view-switch{
- padding:2px;border:0;background:#EEF1F5;border-radius:var(--radius-sm);gap:1px;
+ box-sizing:border-box;height:28px;min-height:28px;padding:0;border:0;
+ background:#EEF1F5;border-radius:var(--radius-finder);gap:0;overflow:hidden;
 }
 .folder-file-toolbar-host .file-toolbar .folder-view-switch .rare-button{
- border-radius:var(--radius-sm);height:27px;min-height:27px;width:28px;
+ box-sizing:border-box;border-radius:var(--radius-finder);height:28px;min-height:28px;width:28px;padding:0;
 }
 .folder-file-toolbar-host .file-toolbar .folder-view-switch .rare-button[aria-pressed="true"]{
  background:#FFFFFF;color:var(--text-primary);box-shadow:0 1px 2px rgba(0,0,0,.08);
 }
-.document-explorer .folder-context-bar .folder-actions-slot{flex:none}
+.document-explorer .folder-context-bar .finder-dialog-host,
+.document-explorer .folder-context-bar .finder-dialog-host .folder-actions{display:contents}
 .document-explorer .folder-context-bar .folder-actions{border:0;padding:0;min-height:30px}
 .document-explorer .folder-context-bar .ghost-more-btn{width:30px;height:30px;min-height:30px;background:transparent}
 .folder-file-toolbar-host .file-toolbar .explorer-tool-icon{
- display:inline-grid;place-items:center;flex:none;width:30px;height:30px;min-height:30px;
- padding:0;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--text-secondary);
+ display:inline-grid;place-items:center;flex:none;width:28px;height:28px;min-height:28px;
+ padding:0;border:0;border-radius:var(--radius-finder);background:transparent;color:var(--text-secondary);
  font-size:19px;line-height:1;
 }
 .folder-file-toolbar-host .file-toolbar .explorer-tool-icon:hover,
@@ -381,28 +388,45 @@
  flex-basis:240px;width:240px;
 }
 .folder-file-toolbar-host .file-toolbar input.filter-search-input{
- width:100%;height:30px;min-height:30px;padding-left:32px;
- background:#F1F5F9;border:1px solid transparent;border-radius:var(--radius-pill);font-size:12px;
+ box-sizing:border-box;width:100%;height:28px;min-height:28px;max-height:28px;padding-left:32px;
+ background:#F1F5F9;border:1px solid transparent;border-radius:var(--radius-finder);font-size:12px;
 }
 .folder-file-toolbar-host .file-toolbar input.filter-search-input:focus{
  background:#fff;border-color:var(--ui-state-focus);box-shadow:0 0 0 2px rgba(0,100,225,.08);
 }
 .document-explorer .folder-file-toolbar-host .file-toolbar .file-toolbar-mode{gap:5px}
 .document-explorer .folder-file-toolbar-host .file-toolbar .upload-button.primary-btn,
-.document-explorer .folder-file-toolbar-host .file-toolbar .action-btn-secondary{height:30px;min-height:30px}
+.document-explorer .folder-file-toolbar-host .file-toolbar .action-btn-secondary{
+ box-sizing:border-box;height:28px;min-height:28px;max-height:28px;
+ padding:0 10px;border-radius:var(--radius-finder);
+ background:#FFF;color:#0058D0;border:1px solid rgba(0,100,225,.28);
+ font-size:12.5px;font-weight:500;box-shadow:0 1px 2px rgba(15,23,42,.04);
+}
+.document-explorer .folder-file-toolbar-host .file-toolbar .upload-button.primary-btn:hover,
+.document-explorer .folder-file-toolbar-host .file-toolbar .action-btn-secondary:hover{
+ color:var(--brand-blue);background:#F8FBFF;border-color:rgba(0,100,225,.44);
+}
+.document-explorer .folder-file-toolbar-host .file-toolbar .batch-actions-group .rare-button{
+ height:28px;min-height:28px;max-height:28px;border-radius:var(--radius-finder);
+}
+.document-explorer .folder-file-toolbar-host .file-toolbar .filter-search-wrap,
+.document-explorer .folder-file-toolbar-host .file-toolbar .new-folder-wrapper{align-items:center}
+.document-explorer .folder-file-toolbar-host .file-toolbar .file-selected-count{font-size:11px}
 @container file-work (max-width:1040px){
  .folder-file-toolbar-host .file-toolbar .batch-action-label{display:none}
  .folder-file-toolbar-host .file-toolbar .batch-actions-group .rare-button{width:30px;padding:0}
- .document-explorer .folder-current-title{flex-basis:115px;font-size:13px}
+ .document-explorer .folder-current-title{flex-basis:105px;font-size:13px}
  .folder-file-toolbar-host .file-toolbar .filter-search-wrap{flex-basis:130px;width:130px}
  .folder-file-toolbar-host .file-toolbar .filter-search-wrap:focus-within{flex-basis:170px;width:170px}
 }
 @container file-work (max-width:770px){
- .document-explorer .folder-current-title{flex-basis:88px}
+ .document-explorer .folder-current-title{flex-basis:75px}
  .folder-file-toolbar-host .file-toolbar .filter-search-wrap{min-width:85px;flex-basis:95px;width:95px}
  .folder-file-toolbar-host .file-toolbar .filter-search-wrap:focus-within{flex-basis:125px;width:125px}
  .folder-file-toolbar-host .file-toolbar .toolbar-views{gap:3px}
- .folder-file-toolbar-host .file-toolbar .folder-view-switch .rare-button{width:25px}
+ .folder-file-toolbar-host .file-toolbar .folder-view-switch .rare-button{width:26px}
+ .document-explorer .folder-file-toolbar-host .file-toolbar .upload-button.primary-btn,
+ .document-explorer .folder-file-toolbar-host .file-toolbar .action-btn-secondary{padding-inline:6px;font-size:11px}
 }
 @media(prefers-reduced-motion:reduce){
  .folder-file-toolbar-host .file-toolbar .filter-search-wrap{transition:none}

@@ -2,7 +2,7 @@ import {useEffect,useState} from "react";
 import {Link} from "react-router-dom";
 import {collaborationApi,type Favorite} from "./api";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
-import {FileResourceIcon,FolderResourceIcon} from "../../shared/ui/ResourceIcons";
+import {FinderLineIcon} from "../../shared/ui/ResourceIcons";
 import {RareButton} from "../../shared/ui/rare";
 import "./finderSidebar.css";
 import {FinderTags} from "./FinderTags";
@@ -10,7 +10,7 @@ import {FinderTags} from "./FinderTags";
 export type DocumentSection="files"|"favorites"|"received"|"sent"|"labels";
 
 function NavigationGlyph({kind}:{kind:"files"|"favorite"|"received"|"sent"}){
- const base={viewBox:"0 0 24 24",width:19,height:19,fill:"none",stroke:"currentColor",strokeWidth:1.8,strokeLinecap:"round" as const,strokeLinejoin:"round" as const,"aria-hidden":true as const};
+ const base={viewBox:"0 0 24 24",width:16,height:16,fill:"none",stroke:"currentColor",strokeWidth:1.75,strokeLinecap:"round" as const,strokeLinejoin:"round" as const,"aria-hidden":true as const};
  if(kind==="files")return <svg {...base}><path d="M3 8a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9H3z"/><path d="M3 10h18"/></svg>;
  if(kind==="favorite")return <svg {...base}><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z"/></svg>;
  if(kind==="received")return <svg {...base}><circle cx="9" cy="9" r="3"/><path d="M3 19v-1c0-2.6 2.5-4 6-4s6 1.4 6 4v1M16 7a3 3 0 0 1 0 6M17 15c2.5.2 4 1.6 4 4"/></svg>;
@@ -46,7 +46,7 @@ export function FinderSidebar({section,revision}:{section:DocumentSection;revisi
     if(!id)return null;
     const href=item.kind==="file"?"/preview/"+encodeURIComponent(id):"/doc?folder="+encodeURIComponent(id);
     return <Link key={item.id} className="finder-favorite-item" to={href} title={item.resourceName}>
-     {item.kind==="file"?<FileResourceIcon name={item.resourceName} size={17}/>:<FolderResourceIcon size={17}/>}
+     <FinderLineIcon kind={item.kind==="file"?"file":"folder"}/>
      <span className="finder-favorite-name">{item.resourceName}</span>
     </Link>;
    })}

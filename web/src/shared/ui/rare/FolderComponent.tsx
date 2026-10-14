@@ -43,6 +43,21 @@ function PaperCard({filterId}:{filterId:string}){
 export function RareFolderComponent({open=false,hovered=false,size=16,className=""}:Props){
  const reducedMotion=useReducedMotion();
  const uid=useId().replace(/:/g,"");
+ // Finder list rows use a dedicated 20px crisp silhouette. Large icon/column
+ // tiles keep the interactive Rare UI paper-and-glass stage unchanged.
+ if(size<32)return <span className={"resource-folder-icon finder-compact-folder"+(className?" "+className:"")}
+  style={{width:size,height:size}} data-folder-scale="compact" aria-hidden="true">
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" focusable="false">
+   <defs>
+    <linearGradient id={uid+"-folder-back"} x1="0" y1="0" x2=".7" y2="1"><stop stopColor="#5AC8FA"/><stop offset="1" stopColor="#38BDF8"/></linearGradient>
+    <linearGradient id={uid+"-folder-front"} x1="0" y1="0" x2="0" y2="1"><stop stopColor="#60A5FA"/><stop offset="1" stopColor="#3B82F6"/></linearGradient>
+   </defs>
+   <path d="M2 7.2c0-1.3 1-2.3 2.3-2.3h5.1l2.1 2h8.1c1.3 0 2.4 1.1 2.4 2.4v9.3c0 1.4-1.1 2.4-2.4 2.4H4.4C3.1 21 2 20 2 18.6Z" fill={"url(#"+uid+"-folder-back)"} />
+   <path d="M2.3 11.6c0-1.3 1-2.3 2.3-2.3h15.6c1.3 0 2.2 1 2.1 2.3l-1.2 7.2c-.2 1.1-1.1 1.9-2.3 1.9H5.1c-1.2 0-2.2-.8-2.4-2Z" fill={"url(#"+uid+"-folder-front)"} />
+   <path d="M4.1 11h15.8" stroke="#FFF" strokeOpacity=".5" strokeWidth=".7" strokeLinecap="round"/>
+   <path d="M4.4 19.6h14.8" stroke="#1D4ED8" strokeOpacity=".17" strokeWidth=".7" strokeLinecap="round"/>
+  </svg>
+ </span>;
  // Hover belongs to the entire parent folder tile, not this tiny icon.
  // Preserve Rare UI's three levels: idle, hovered and selected/open.
  const active=open||hovered;

@@ -16,7 +16,8 @@ const projectRoot=resolve(fileURLToPath(new URL("..",import.meta.url)));
 const cssRoot=join(projectRoot,"web","src");
 const errors=[];
 const scanned=[];
-const allowed=/^(?:var\(--radius-(?:xs|sm|md|lg|xl|pill|control|surface)\)|inherit|50%)$/;
+// Zero means a welded interior rail, not an arbitrary component radius.
+const allowed=/^(?:var\(--radius-(?:xs|sm|md|lg|xl|pill|control|surface|finder)\)|inherit|50%|0)$/;
 
 function walk(dir){
  for(const item of readdirSync(dir,{withFileTypes:true})){
@@ -47,7 +48,7 @@ function walkTheme(){
   const line=uncommented.slice(0,match.index).split("\n").length;
   errors.push(`theme.css:${line}: unsupported border-radius ${match[1].trim()}`);
  }
- const expected={xs:"4px",sm:"7px",md:"11px",lg:"15px",xl:"20px",pill:"999px"};
+ const expected={xs:"4px",finder:"6px",sm:"7px",md:"11px",lg:"15px",xl:"20px",pill:"999px"};
  for(const [name,value] of Object.entries(expected)){
   const occurrences=[...uncommented.matchAll(new RegExp(`--radius-${name}\\s*:\\s*([^;]+)`, "g"))];
   if(occurrences.length!==1||occurrences[0][1].trim()!==value){

@@ -114,6 +114,7 @@
 
   /* ================= 几何与紧凑度标尺 (Compact Metrics) ================= */
   --radius-xs:4px;                 /* 紧凑标签/复选框 */
+  --radius-finder:6px;             /* Finder 文档工作台 28px 精细控件与行条 */
   --radius-sm:7px;                 /* 按钮/输入框/行条 */
   --radius-md:11px;                /* 弹出菜单/轻量对话框 */
   --radius-lg:15px;                /* 工作区/卡片 */

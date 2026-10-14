@@ -7,7 +7,7 @@ import {errorCode,errorCopy} from "../../shared/errors";
 import {Dialog} from "../../shared/ui/Dialog";
 import {Menu,type MenuItem} from "../../shared/ui/Menu";
 
-export function FolderActions({folder,actionRequest,onActionHandled,onActionComplete,onChanged,onMove,isAdmin,onManageGrants}:{folder:Folder;actionRequest?:{folderId:string;action:"rename"|"delete";id:number}|null;onActionHandled?:()=>void;onActionComplete?:()=>void;onChanged:(action:"rename"|"delete",folder:Folder)=>void;onMove?:()=>void;isAdmin:boolean;onManageGrants:()=>void}){
+export function FolderActions({folder,actionRequest,onActionHandled,onActionComplete,onChanged,onMove,isAdmin,onManageGrants,hideTrigger=false}:{folder:Folder;actionRequest?:{folderId:string;action:"rename"|"delete";id:number}|null;onActionHandled?:()=>void;onActionComplete?:()=>void;onChanged:(action:"rename"|"delete",folder:Folder)=>void;onMove?:()=>void;isAdmin:boolean;onManageGrants:()=>void;hideTrigger?:boolean}){
  const[message,setMessage]=useState("");
  const[renaming,setRenaming]=useState(false);
  const[renameValue,setRenameValue]=useState(folder.name);
@@ -62,12 +62,12 @@ export function FolderActions({folder,actionRequest,onActionHandled,onActionComp
   {id:"delete",label:"删除目录",danger:true,onSelect:()=>setDeleting(true)}
  ];
  return <div className="folder-actions">
-  <div className="folder-more-wrapper">
+  {!hideTrigger&&<div className="folder-more-wrapper">
    <RareButton ref={moreRef} type="button" className="ghost-more-btn" aria-label="更多目录操作"
     aria-haspopup="menu" aria-expanded={moreOpen} onClick={()=>setMoreOpen(v=>!v)}>···</RareButton>
    <Menu open={moreOpen} label={"目录操作："+folder.name} items={menuItems}
     anchor={moreRef.current} onClose={()=>setMoreOpen(false)}/>
-  </div>
+  </div>}
   {message&&<span role="alert" className="notice error">{message}</span>}
   {deleting&&<Dialog open title="删除目录确认" className="dialog"
    onClose={()=>{if(!removeBusy)finishDelete();}} closeGuard={()=>!removeBusy}>

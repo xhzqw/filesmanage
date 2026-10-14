@@ -48,5 +48,6 @@ assert.match(trash,/aria-label="刷新回收站"/,"trash refresh must remain ava
 assert.match(read("web/src/pages/SessionDevices.tsx"),/<Link to="\/doc" className="sessions-back"/,"account page must retain its real return path");
 assert.match(read("web/src/pages/Documents.tsx"),/toolbarHostId="document-file-toolbar-host"/,"documents must reuse the unified file toolbar");
 assert.match(table,/className="finder-bottom-path" aria-label="当前位置完整路径"/,"full directory path must remain a navigable Finder path bar");
-assert.match(table,/<Link title=\{segment.name\} to=\{"\/doc\?folder="\+encodeURIComponent\(segment.id\)\}/,"ancestor path must retain working directory links");
+assert.match(table,/to=\{"\/doc\?folder="\+encodeURIComponent\(segment.id\)\}/,"ancestor path must retain working directory links");
+assert.match(table,/className="status-bar finder-bottom-bar"/,"Finder must have one combined path and status footer");
 console.log("RARE_EMIL_INTERACTION_PASS: drag, selection, toast lifecycle, preview actions, no redundant page title rows");

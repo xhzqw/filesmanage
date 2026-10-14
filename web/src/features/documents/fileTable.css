@@ -572,8 +572,28 @@ table.file-table-folders-only tbody td.col-name{padding-left:8px}
  --explorer-list-stripe:rgba(248,250,252,.65);
  --explorer-list-hover:rgba(15,23,42,.035);
 }
-.explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder) > td:first-child{
- padding-left:10px;
+.explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder) > td:first-child{padding-left:10px}
+.file-table thead th.col-name{padding-left:10px}
+.file-table thead th.col-size{padding-right:16px!important}
+.file-table thead th.col-date{padding-left:12px!important}
+.file-table thead .file-column-sort{justify-content:flex-start}
+.file-table th.col-size .file-column-sort{position:relative;justify-content:flex-end}
+.file-table th.col-size .file-column-sort>span{position:absolute;right:-11px;font-size:10px}
+.file-table .file-cell-wrap{gap:6px}
+.file-table .file-cell-wrap>.file-type-icon,
+.file-table .file-cell-wrap>.resource-folder-icon{width:20px!important;height:20px!important;flex:0 0 20px}
+.file-table .finder-list-filename{display:inline-flex;align-items:center;max-width:100%;min-width:0;white-space:nowrap}
+.file-table .finder-list-filename .finder-name-prefix{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-table .finder-list-filename .finder-name-tail,
+.file-table .finder-list-filename .finder-name-extension{flex:none;white-space:nowrap}
+.file-table .finder-list-filename .finder-name-extension{opacity:.55}
+.file-table tr.selected .finder-list-filename .finder-name-extension{opacity:.8}
+.explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder)>td{border-top:0;border-bottom:0}
+.explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder)>td:first-child{
+ border-top-left-radius:var(--radius-finder);border-bottom-left-radius:var(--radius-finder)
+}
+.explorer-striped-list table.file-table tbody tr:is(.file-entry,.explorer-list-folder)>td:last-child{
+ border-top-right-radius:var(--radius-finder);border-bottom-right-radius:var(--radius-finder)
 }
 .file-table :is(th,td).col-date{text-align:left!important;font-variant-numeric:tabular-nums}
 .file-table td.col-date{color:var(--text-secondary)}
@@ -600,6 +620,10 @@ table.file-table-folders-only tbody td.col-name{padding-left:8px}
 .file-table tbody tr .row-actions :is(.action-star-btn:not(.favorited),.folder-row-more){
  opacity:0;pointer-events:none;
 }
+.file-table .row-actions .actions-cell-wrap{position:relative;gap:0;justify-content:flex-end}
+.file-table .row-actions .folder-row-more{position:absolute;right:0;top:50%;transform:translateY(-50%)}
+.file-table .row-actions .action-star-btn{margin-left:auto;transform:translateX(0);transition:transform .14s ease,opacity .12s ease,color .12s ease}
+.file-table tbody tr:is(:hover,.selected,:focus-within) .row-actions .action-star-btn{transform:translateX(-25px)}
 .file-table tbody tr:is(:hover,.selected,:focus-within) .row-actions :is(.action-star-btn,.folder-row-more),
 .file-table tbody tr .row-actions :is(.action-star-btn,.folder-row-more):focus-visible{
  opacity:1;pointer-events:auto;
@@ -612,23 +636,38 @@ table.file-table-folders-only tbody td.col-name{padding-left:8px}
  .file-table .file-name-group .file-finder-marks{max-width:44px;margin-left:4px}
 }
 
-/* Lightweight Finder path bar and one centered status line; no nested card. */
-.work-body>.finder-bottom-path{
- flex:none;min-width:0;height:25px;display:flex;align-items:center;gap:7px;
- padding:0 12px;overflow-x:auto;white-space:nowrap;scrollbar-width:none;
- border-top:1px solid rgba(0,0,0,.055);background:var(--surface-panel);
- font-size:11px;color:var(--text-secondary);
+/* A single 28px Finder bottom bar, with the count anchored to the pane centre. */
+.work-body>.finder-bottom-bar{
+ box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+ align-items:center;gap:12px;flex:none;width:100%;height:28px;min-height:28px;max-height:28px;
+ margin:0;padding:0 12px;border:0;border-top:1px solid rgba(15,23,42,.07);
+ border-radius:0;background:#FAFAFC;font-size:11px;color:var(--text-secondary);
+}
+.finder-bottom-bar .finder-bottom-path{
+ min-width:0;display:flex;align-items:center;gap:7px;overflow-x:auto;white-space:nowrap;
+ scrollbar-width:none;font-size:11.5px;line-height:1.25;
 }
 .finder-bottom-path::-webkit-scrollbar{display:none}
 .finder-bottom-path a{color:var(--text-secondary);text-decoration:none}
 .finder-bottom-path a:hover{color:var(--brand-blue)}
-.finder-bottom-segment{display:inline-flex;align-items:center;gap:7px;min-width:0}
-.finder-bottom-segment>span{color:var(--text-tertiary)}
-.finder-bottom-segment strong{max-width:260px;overflow:hidden;text-overflow:ellipsis;font-weight:550;color:var(--text-primary)}
-.work-body>.status-bar{
- height:26px;min-height:26px;max-height:26px;justify-content:center;
- width:100%;margin:0;padding:0 12px;background:var(--surface-panel);
- border:0;border-top:1px solid var(--border-hairline);box-shadow:none;
- font-size:11px;text-align:center;
+.finder-bottom-node{display:inline-flex;align-items:center;gap:4px;flex:none;min-width:0;max-width:210px}
+.finder-bottom-node>span{display:block;overflow:hidden;text-overflow:ellipsis}
+.finder-bottom-node svg{flex:none;stroke-width:1.75;color:var(--ui-brand-primary)}
+.finder-bottom-node[aria-current="page"]{color:var(--text-primary);font-weight:550}
+.finder-bottom-segment{display:inline-flex;align-items:center;gap:7px;min-width:0;flex:none}
+.finder-bottom-chevron{color:var(--text-tertiary)}
+.finder-bottom-bar .finder-bottom-count{min-width:0;white-space:nowrap;justify-self:center;text-align:center}
+.finder-bottom-bar .finder-bottom-selection{min-width:0;white-space:nowrap;justify-self:end;text-align:right;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:760px){
+ .work-body>.finder-bottom-bar{gap:6px;padding-inline:8px}
+ .finder-bottom-bar .finder-bottom-node{max-width:115px}
+ .finder-bottom-bar .finder-bottom-path{font-size:10.5px}
+ .finder-bottom-bar .finder-bottom-count{font-size:10px}
+ .finder-bottom-bar .finder-bottom-selection{font-size:10px}
 }
-.work-body>.status-bar>span{overflow:hidden;text-overflow:ellipsis}
+@media(hover:none),(pointer:coarse){
+ .file-table .row-actions .action-star-btn{transform:translateX(-25px)}
+}
+@media(prefers-reduced-motion:reduce){
+ .file-table .row-actions .action-star-btn{transition:none}
+}

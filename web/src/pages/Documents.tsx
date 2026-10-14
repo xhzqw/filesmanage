@@ -65,6 +65,7 @@ export function Documents({user,onLogout,onUploadFolderChange}:{user:User;onLogo
  // preview finishing must never make the entire folder tree show "刷新中".
  const[treeReloadKey,setTreeReloadKey]=useState(0);
  const[grantsFolder,setGrantsFolder]=useState<Folder|null>(null);
+ const[folderTopAction,setFolderTopAction]=useState<{folderId:string;action:"rename"|"delete";id:number}|null>(null);
  const[collaborationRevision,setCollaborationRevision]=useState(0);
  const[requiresApproval,setRequiresApproval]=useState(false);
  const[editingId,setEditingId]=useState<string|null>(null);
@@ -304,8 +305,9 @@ export function Documents({user,onLogout,onUploadFolderChange}:{user:User;onLogo
      </div>
      <strong className="folder-current-title" title={selected.name}>{selected.name}</strong>
      <div id="document-file-toolbar-host" className="folder-file-toolbar-host"/>
-     <div className="folder-actions-slot">
-      <FolderActions folder={selected} isAdmin={user.isAdmin} onChanged={folderActionChanged}
+     <div className="folder-actions-slot finder-dialog-host">
+      <FolderActions folder={selected} isAdmin={user.isAdmin} hideTrigger actionRequest={folderTopAction}
+       onActionHandled={()=>setFolderTopAction(null)} onChanged={folderActionChanged}
        onMove={()=>openMove(selected)} onManageGrants={()=>setGrantsFolder(selected)}/>
      </div>
    </div>}
@@ -315,6 +317,12 @@ export function Documents({user,onLogout,onUploadFolderChange}:{user:User;onLogo
       folderPath={ancestorPath(knownFolders,selected.id)}
       onEdit={setEditingId} reloadKey={reloadKey} viewMode={viewMode} onFolderChanged={refreshTreeAndFiles}
       toolbarHostId="document-file-toolbar-host"
+      folderMenuItems={[
+       ...(user.isAdmin?[{id:"grants",label:"授权管理",onSelect:()=>setGrantsFolder(selected)}]:[]),
+       {id:"rename-folder",label:"重命名当前目录",onSelect:()=>setFolderTopAction({folderId:selected.id,action:"rename",id:Date.now()})},
+       {id:"move-folder",label:"移动当前目录",onSelect:()=>openMove(selected)},
+       {id:"delete-folder",label:"删除当前目录",danger:true,onSelect:()=>setFolderTopAction({folderId:selected.id,action:"delete",id:Date.now()})}
+      ]}
       viewControls={<div className="folder-view-switch" role="group" aria-label="文件显示方式">
        {EXPLORER_VIEWS.map(mode=><RareButton type="button" key={mode.id} tone="ghost"
         aria-label={mode.label} title={mode.label} aria-pressed={viewMode===mode.id}

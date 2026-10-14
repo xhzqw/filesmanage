@@ -123,6 +123,18 @@ try{
    const history=[...document.querySelectorAll('.folder-history-controls button')];
    const status=document.querySelector('.work-body>.status-bar'),statusStyle=status&&getComputedStyle(status);
    const navRow=document.querySelector('.finder-nav-item'),tagRow=document.querySelector('.finder-tag-link');
+   const chrome=document.querySelector('.folder-context-bar');
+   const controls=[...chrome.querySelectorAll('.folder-file-toolbar-host .upload-button,.folder-file-toolbar-host .action-btn-secondary,.folder-file-toolbar-host .explorer-tool-icon,.folder-file-toolbar-host .folder-view-switch,.folder-file-toolbar-host .folder-view-switch button,.folder-file-toolbar-host input.filter-search-input')];
+   const headerButtons=[...chrome.querySelectorAll('button[aria-label="更多操作"]')];
+   const tinyIcons=[...document.querySelectorAll('.finder-favorite-item svg')];
+   const group=document.querySelector('.finder-nav-section'),heading=group?.querySelector('.finder-nav-label'),sideIcon=group?.querySelector('.finder-nav-item svg');
+   const footer=document.querySelector('.finder-bottom-bar'),footerCount=footer?.querySelector('.finder-bottom-count'),footerPath=footer?.querySelector('.finder-bottom-path');
+   const names=document.querySelectorAll('.file-entry .finder-list-filename');
+   const getTextRect=element=>{const node=[...element?.childNodes||[]].find(x=>x.nodeType===3&&x.textContent.trim());if(!node)return null;const r=document.createRange();r.selectNodeContents(node);return r.getBoundingClientRect();};
+   const nameHead=getTextRect(document.querySelector('th.col-name .file-column-sort')),nameIcon=bounds('.explorer-list-folder .file-cell-wrap>.resource-folder-icon');
+   const dateHead=getTextRect(document.querySelector('th.col-date .file-column-sort')),dateCell=document.querySelector('tbody td.col-date'),dateRange=document.createRange();
+   if(dateCell)dateRange.selectNodeContents(dateCell);
+   const dateText=dateCell?.getClientRects().length?dateRange.getBoundingClientRect():null;
    return {barHeight:bar?.height,portalled:!!toolbar&&document.querySelector('.work-body>.file-toolbar')===null,
     oneRow:inBounds(command,bar),uploads:inBounds(uploads,host),folders:inBounds(folders,host),
     views:inBounds(views,host),search:inBounds(search,host),
@@ -131,11 +143,23 @@ try{
     tableFills:!!table&&!!list&&table.width>=list.width-20&&table.right>=list.right-19&&table.right<=list.right+1,
     sizeAligned:!sizeText||!sizeButton||Math.abs(sizeButton.getBoundingClientRect().right-sizeText.right)<2,
     headerDockRight:!!dock&&!!header&&Math.abs(dock.right-header.right)<=10,
-    navCentered:innerWidth<=1210||!!nav&&!!header&&Math.abs((nav.left+nav.right-header.left-header.right)/2)<=12,
+    navCentered:innerWidth<=1210||!!nav&&!!header&&nav.left>=header.left+10&&nav.left<=header.left+24,
     navRowHeight:navRow?.getBoundingClientRect().height,tagRowHeight:tagRow?.getBoundingClientRect().height,
     historyPair:history.length===2&&history.every(button=>button.getBoundingClientRect().width>=25&&getComputedStyle(button).visibility!=='hidden'),
     statusSeam:!!statusStyle&&statusStyle.borderTopLeftRadius==='0px'&&statusStyle.borderBottomLeftRadius==='0px'&&statusStyle.borderBottomWidth==='0px'&&statusStyle.borderLeftWidth==='0px'&&statusStyle.borderTopWidth==='1px',
-    toolbarSeam:getComputedStyle(document.querySelector('.folder-context-bar')).borderTopLeftRadius==='0px'};
+    toolbarSeam:getComputedStyle(document.querySelector('.folder-context-bar')).borderTopLeftRadius==='0px',
+    singleMore:headerButtons.length===1&&chrome.querySelectorAll('.folder-more-wrapper').length===0,
+    controls28:controls.length>=8&&controls.every(el=>Math.abs(el.getBoundingClientRect().height-28)<=1),
+    corners6:controls.every(el=>getComputedStyle(el).borderTopLeftRadius==='6px'),
+    nav26:history.every(el=>Math.abs(el.getBoundingClientRect().height-26)<1),
+    nameLine:!nameHead||!nameIcon||Math.abs(nameHead.left-nameIcon.left)<=1.5,
+    dateLine:!dateHead||!dateText||Math.abs(dateHead.left-dateText.left)<=1.5,
+    sidebarLine:!heading||!sideIcon||Math.abs(heading.getBoundingClientRect().left-sideIcon.getBoundingClientRect().left)<1.5,
+    monochrome:tinyIcons.every(el=>el.classList.contains('finder-line-icon')&&el.getBoundingClientRect().width===16&&getComputedStyle(el).strokeWidth==='1.75px'),
+    footer28:!!footer&&Math.abs(footer.getBoundingClientRect().height-28)<1&&
+     !!footerPath&&!!footerCount&&Math.abs((footerCount.getBoundingClientRect().left+footerCount.getBoundingClientRect().right)/2-(footer.getBoundingClientRect().left+footer.getBoundingClientRect().right)/2)<1.5&&
+     footer.querySelectorAll('.finder-bottom-node svg').length>0&&document.querySelectorAll('.work-body>.finder-bottom-path').length===0,
+    nameTokens:names.length===0||[...names].every(el=>el.querySelector('.finder-name-prefix')&&(!el.textContent.match(/\.[a-z0-9]+$/i)||el.querySelector('.finder-name-extension')))};
   })()`);
   console.log('EXPLORER_UNIFIED_TOOLBAR_GEOMETRY',viewport.name,JSON.stringify(layout));
   assert(layout.portalled&&layout.barHeight>=43&&layout.barHeight<=45&&layout.oneRow&&layout.uploads&&layout.folders&&layout.views&&layout.search&&layout.overflow<=1,
@@ -144,6 +168,9 @@ try{
   assert(layout.tableFills&&layout.sizeAligned&&layout.headerDockRight&&layout.navCentered&&
    layout.navRowHeight<=29&&layout.tagRowHeight<=29&&layout.historyPair&&layout.statusSeam&&layout.toolbarSeam,
    'Full-width columns, dock alignment and continuous Finder chrome at '+viewport.width+': '+JSON.stringify(layout));
+  assert(layout.singleMore&&layout.controls28&&layout.corners6&&layout.nav26&&layout.nameLine&&layout.dateLine&&
+   layout.sidebarLine&&layout.monochrome&&layout.footer28&&layout.nameTokens,
+   'Sonoma/Sequoia pixel contract at '+viewport.width+': '+JSON.stringify(layout));
  }
  await send('Emulation.clearDeviceMetricsOverride');
  let count=await evaluate('document.querySelectorAll("tr.file-entry").length');
@@ -190,9 +217,9 @@ try{
  assert.equal(await selectedFiles(),3,"Ctrl-click should add a third file");
  assert(await evaluate('!document.querySelector("tr.file-entry input[type=checkbox]")'),
   "checkboxes must not exist before enabling the option");
- await click('button[aria-label="更多显示选项"]');
- await until('!!document.querySelector(\'[role="menu"][aria-label="显示选项"]\')');
- await click('[role="menu"][aria-label="显示选项"] [role="menuitem"]',0);
+ await click('button[aria-label="更多操作"]');
+ await until('!!document.querySelector(\'[role="menu"][aria-label="更多操作"]\')');
+ await click('[role="menu"][aria-label="更多操作"] [role="menuitem"]',0);
  await until('!!document.querySelector("tr.file-entry input[type=checkbox]")');
  await click('tr.file-entry .col-select input[type="checkbox"]',3);
  await until('(document.querySelector(".file-selected-count")?.textContent||"").includes("已选 4")');
@@ -201,9 +228,9 @@ try{
  await until('(document.querySelector(".file-selected-count")?.textContent||"").includes("已选 3")');
  await click(".batch-clear-selection");
  await until('!document.querySelector(".batch-actions-group")');
- await click('button[aria-label="更多显示选项"]');
- await until('!!document.querySelector(\'[role="menu"][aria-label="显示选项"]\')');
- await click('[role="menu"][aria-label="显示选项"] [role="menuitem"]',0);
+ await click('button[aria-label="更多操作"]');
+ await until('!!document.querySelector(\'[role="menu"][aria-label="更多操作"]\')');
+ await click('[role="menu"][aria-label="更多操作"] [role="menuitem"]',0);
  await until('!document.querySelector("tr.file-entry input[type=checkbox]")');
  console.log("EXPLORER_LIVE_MULTI_SELECT_PASS",JSON.stringify({count:4,plainSingle:true,ctrlClick:true,checkbox:true,toggleOff:true}));
 
