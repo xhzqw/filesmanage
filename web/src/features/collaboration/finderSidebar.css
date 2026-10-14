@@ -94,7 +94,7 @@
 }
 .shell.shell-finder>.header>.shell-home-pill{display:none}
 .shell.shell-finder>.panels.document-explorer{
- margin-top:calc(-1 * var(--height-header));gap:0;
+ margin-top:calc(-1 * var(--height-header) - var(--space-2));gap:0;
  background:var(--surface-panel);border:1px solid rgba(15,23,42,.065);
  border-radius:var(--radius-md);overflow:hidden;
 }
