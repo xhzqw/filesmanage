@@ -1,6 +1,7 @@
 import {useEffect,useLayoutEffect,useRef,useState,type PointerEvent} from "react";
 import {RareButton,RareSelect} from "../../shared/ui/rare";
 import {BrandLoader} from "../../shared/ui/BrandLoader";
+import {ReaderPageChevron} from "../../shared/ui/ReaderPageChevron";
 import {errorCopy} from "../../shared/errors";
 import {fileApi,type SealHistory} from "./api";
 import "./pdfPageViewer.css";
@@ -113,6 +114,7 @@ export function PDFPageViewer({fileId,sha,name,seq,revision,onRevisionChange,epo
   <div className="file-pdf-toolbar">
    <strong>PDF 预览</strong>
    <div className="file-pdf-tools">
+    <div className="file-pdf-view-controls" role="group" aria-label="PDF 视图模式">
     {history&&history.current>0&&<RareSelect aria-label="预览签章版本" value={revision===null?"latest":String(revision)}
      onChange={event=>{const value=event.target.value;onRevisionChange(value==="latest"?null:Number(value));setPageError("");}}>
      <option value="latest">当前签章 · r{history.current}</option>
@@ -120,18 +122,24 @@ export function PDFPageViewer({fileId,sha,name,seq,revision,onRevisionChange,epo
       {item.revision===0?"原始未签章":("签章 r"+item.revision+" · "+item.markCount+" 枚")}
      </option>)}
     </RareSelect>}
-    <RareButton type="button" aria-label="缩小 PDF" disabled={zoom<=0.5} onClick={()=>setZoomAt(zoom/1.25)}>−</RareButton>
-    <span className="file-pdf-zoom-value">{Math.round(zoom*100)}%</span>
-    <RareButton type="button" aria-label="放大 PDF" disabled={zoom>=5} onClick={()=>setZoomAt(zoom*1.25)}>＋</RareButton>
     <RareButton type="button" title="切换整页 / 页宽适配" aria-label={"PDF 适配方式："+(fitMode==="page"?"整页":"页宽")+"，点击切换"}
      onClick={()=>{anchorRef.current=null;setFitMode(mode=>mode==="page"?"width":"page");setZoom(1);
       if(viewportRef.current){viewportRef.current.scrollLeft=0;viewportRef.current.scrollTop=0;}}}>
      {fitMode==="page"?"整页":"页宽"}</RareButton>
     <RareButton type="button" aria-pressed={panMode} onClick={()=>setPanMode(v=>!v)}>{panMode?"结束平移":"平移"}</RareButton>
-    <RareButton type="button" disabled={!pages||page===1} onClick={()=>changePage(page-1)}>上一页</RareButton>
-    <span aria-live="polite">{pages?"第 "+page+" / "+pages+" 页":"—"}</span>
-    <RareButton type="button" disabled={!pages||page>=pages} onClick={()=>changePage(page+1)}>下一页</RareButton>
-
+    </div>
+    <span className="preview-dock-divider" aria-hidden="true"/>
+    <div className="file-pdf-pagination" role="group" aria-label="PDF 分页">
+     <RareButton type="button" className="reader-chevron" aria-label="上一页" title="上一页" disabled={!pages||page===1} onClick={()=>changePage(page-1)}><ReaderPageChevron direction="previous"/></RareButton>
+     <span className="preview-dock-page-count" aria-live="polite">{pages?page+" / "+pages:"—"}</span>
+     <RareButton type="button" className="reader-chevron" aria-label="下一页" title="下一页" disabled={!pages||page>=pages} onClick={()=>changePage(page+1)}><ReaderPageChevron direction="next"/></RareButton>
+    </div>
+    <span className="preview-dock-divider" aria-hidden="true"/>
+    <div className="file-pdf-zoom-controls" role="group" aria-label="PDF 缩放">
+     <RareButton type="button" aria-label="缩小 PDF" disabled={zoom<=0.5} onClick={()=>setZoomAt(zoom/1.25)}>−</RareButton>
+     <span className="preview-dock-zoom-value">{Math.round(zoom*100)}%</span>
+     <RareButton type="button" aria-label="放大 PDF" disabled={zoom>=5} onClick={()=>setZoomAt(zoom*1.25)}>＋</RareButton>
+    </div>
    </div>
   </div>
   {loading&&<div className="file-pdf-paper is-pending" aria-busy="true">

@@ -1,6 +1,7 @@
 import {useEffect,useLayoutEffect,useRef,useState} from "react";
 import {RareButton} from "../../shared/ui/rare";
 import {BrandLoader} from "../../shared/ui/BrandLoader";
+import {ReaderPageChevron} from "../../shared/ui/ReaderPageChevron";
 import {fileApi} from "./api";
 import type {StructuredPreview} from "../../entities/file/model";
 import {StructuredFilePreview} from "./StructuredFilePreview";
@@ -77,12 +78,16 @@ export function OfficeLayoutPreview({fileId,sha,structured}:{
     <RareButton type="button" aria-pressed={mode==="content"} onClick={()=>setMode("content")}>内容摘要</RareButton>
    </div>
    {mode==="pages"&&status==="ready"&&<div className="office-layout-page-controls">
-    <RareButton type="button" disabled={page<=1} onClick={()=>changePage(page-1)}>上一页</RareButton>
-    <span aria-live="polite">{page} / {pages}</span>
-    <RareButton type="button" disabled={page>=pages} onClick={()=>changePage(page+1)}>下一页</RareButton>
-    <RareButton type="button" aria-label="缩小页面" disabled={zoom<=0.5} onClick={()=>setZoom(v=>Math.max(.5,Math.round(v/1.25*100)/100))}>−</RareButton>
-    <span>{Math.round(zoom*100)}%</span>
-    <RareButton type="button" aria-label="放大页面" disabled={zoom>=2.5} onClick={()=>setZoom(v=>Math.min(2.5,Math.round(v*1.25*100)/100))}>＋</RareButton>
+    <span className="preview-dock-divider" aria-hidden="true"/>
+    <RareButton type="button" className="reader-chevron" aria-label="上一页" title="上一页" disabled={page<=1} onClick={()=>changePage(page-1)}><ReaderPageChevron direction="previous"/></RareButton>
+    <span className="preview-dock-page-count" aria-live="polite">{page} / {pages}</span>
+    <RareButton type="button" className="reader-chevron" aria-label="下一页" title="下一页" disabled={page>=pages} onClick={()=>changePage(page+1)}><ReaderPageChevron direction="next"/></RareButton>
+    <span className="preview-dock-divider" aria-hidden="true"/>
+    <div className="office-layout-zoom-controls" role="group" aria-label="页面缩放">
+     <RareButton type="button" aria-label="缩小页面" disabled={zoom<=0.5} onClick={()=>setZoom(v=>Math.max(.5,Math.round(v/1.25*100)/100))}>−</RareButton>
+     <span className="preview-dock-zoom-value">{Math.round(zoom*100)}%</span>
+     <RareButton type="button" aria-label="放大页面" disabled={zoom>=2.5} onClick={()=>setZoom(v=>Math.min(2.5,Math.round(v*1.25*100)/100))}>＋</RareButton>
+    </div>
    </div>}
   </div>
   {mode==="content"?<div className="office-layout-outline" aria-label="只读内容摘要">
