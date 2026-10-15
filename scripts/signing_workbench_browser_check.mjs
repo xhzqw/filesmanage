@@ -333,28 +333,14 @@ try{
     const moved=await cdp.evaluate(`(()=>parseFloat(document.querySelector('.seal-position-mark').style.left))()`);
     assert("stamp moves using pointer drag",moved>before.left+1);
     const handle=await cdp.evaluate(`(()=>{
-     const node=document.querySelector('.seal-resize-handle.is-se');
-     const r=node.getBoundingClientRect();
-     const x=r.x+r.width/2,y=r.y+r.height/2;
-     const target=document.elementFromPoint(x,y);
-     return {x,y,target:target?.className,handlePointer:getComputedStyle(node).pointerEvents,markPointer:getComputedStyle(node.parentElement).pointerEvents};
-
+     const r=document.querySelector('.seal-resize-handle.is-se').getBoundingClientRect();
+     return {x:r.x+r.width/2,y:r.y+r.height/2};
     })()`);
     const beforeRatio=await cdp.evaluate(`(()=>{
      const el=document.querySelector('.seal-position-mark').getBoundingClientRect();
      return el.width/el.height;
     })()`);
-    console.log("STAMP_RESIZE_HIT_DIAGNOSTIC",JSON.stringify(handle));
-    await cdp.evaluate(`(()=>{
-     window.__stampEvents=[];
-     const mark=document.querySelector('.seal-position-mark');
-     for(const type of ['pointerdown','gotpointercapture','pointermove','pointerup','pointercancel','lostpointercapture','mousemove','mousedown','mouseup']){
-      document.addEventListener(type,e=>window.__stampEvents.push({type,target:e.target.className,x:e.clientX,y:e.clientY,
-       button:e.button,buttons:e.buttons,id:e.pointerId,capture:e.pointerId!==undefined?mark.hasPointerCapture(e.pointerId):null,width:mark.style.width}),true);
-     }
-    })()`);
     await cdp.drag(handle,{x:handle.x+25,y:handle.y+12});
-    console.log("STAMP_RESIZE_EVENTS",JSON.stringify(await cdp.evaluate('window.__stampEvents')));
     const resized=await cdp.evaluate(`(()=>{
      const el=document.querySelector('.seal-position-mark');
      const r=el.getBoundingClientRect();
