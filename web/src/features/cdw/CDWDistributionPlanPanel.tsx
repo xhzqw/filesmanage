@@ -7,6 +7,7 @@ import {errorCopy} from "../../shared/errors";
 import {newIdempotencyKey} from "../../shared/ids";
 import type {User} from "../../entities/user/model";
 import {cdwApi,type CDWControlledRelease,type CDWDistributionPlan} from "./api";
+import {CDWDistributionLedgerPanel} from "./CDWDistributionLedgerPanel";
 
 type Department={id:string;name:string};
 type Target={departmentId:string;receiverId:string};
@@ -192,6 +193,7 @@ export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments,isAd
    {plan?.digestSha256&&<div className="cdw-review-digest">
     <small>受控范围规范摘要 SHA-256</small><code title={plan.digestSha256}>{plan.digestSha256}</code>
    </div>}
+   {plan?.state==="dispatched"&&<CDWDistributionLedgerPanel planId={plan.id}/>}
   </div>}
  </section>;
 }

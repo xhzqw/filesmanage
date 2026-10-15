@@ -1151,6 +1151,27 @@ add("GET","/api/workbench/distribution-targets/{id}/reading-eligible",operation(
  "Receiver-scoped eligible readers, not unrestricted organization directory."),
  resp("403",ERR["403"])])))
 
+CDW_DISTRIBUTION_LEDGER_ROW = obj({
+ "targetId":string(),"departmentId":string(),"departmentName":string(),
+ "receiverId":string(),"receiverName":string(),"actualSignerId":string(),
+ "actualSignerName":string(),"signedAt":timestamp(),"receiptId":string(),
+ "receiptStatus":string(enum=["awaiting","received"]),
+ "readingAssigned":integer(minimum=0),"readingConfirmed":integer(minimum=0),
+ "readingStatus":string(enum=["unassigned","awaiting","partial","confirmed"]),
+ "dueAt":timestamp(),"overdue":boolean(),"exceptionReason":string()},
+ required=["targetId","departmentId","departmentName","receiverId","receiverName",
+ "receiptStatus","readingAssigned","readingConfirmed","readingStatus","overdue"])
+CDW_DISTRIBUTION_LEDGER = obj({"planId":string(),"batchId":string(),
+ "manifestSha256":string(),"rows":arr(CDW_DISTRIBUTION_LEDGER_ROW),
+ "receiptCompleted":integer(minimum=0),"readingAssigned":integer(minimum=0),
+ "readingConfirmed":integer(minimum=0)},
+ required=["planId","batchId","manifestSha256","rows","receiptCompleted","readingAssigned","readingConfirmed"])
+add("GET","/api/workbench/distribution-plans/{id}/ledger",operation(
+ "Read truthful department receipts and personal reading progress from primary evidence tables","CDW","cdwDistributionLedger",
+ security=SESSION,params=[id_param("id","Dispatched distribution plan ID")],
+ responses=dict([json_ok(CDW_DISTRIBUTION_LEDGER,"Document-controller-only controlled distribution audit ledger."),
+ resp("403",ERR["403"]),resp("404",ERR["404"])])))
+
 # --- Auth ---
 add("POST", "/api/login", operation("Authenticate and open a session", "Auth", "login", security=[],
     request={"application/json": {"schema": ref("LoginRequest")}},

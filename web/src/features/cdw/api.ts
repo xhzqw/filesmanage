@@ -12,6 +12,18 @@ export type CDWDistributionBatch={
  id:string;planId:string;releaseId:string;fileId:string;
  state:"dispatched";revision:number;digestSha256:string;departmentCount:number;
 };
+export type CDWDistributionLedgerRow={
+ targetId:string;departmentId:string;departmentName:string;
+ receiverId:string;receiverName:string;actualSignerId?:string;actualSignerName?:string;
+ signedAt?:string;receiptId?:string;receiptStatus:"awaiting"|"received";
+ readingAssigned:number;readingConfirmed:number;
+ readingStatus:"unassigned"|"awaiting"|"partial"|"confirmed";
+ dueAt?:string;overdue:boolean;exceptionReason?:string;
+};
+export type CDWDistributionLedger={
+ planId:string;batchId:string;manifestSha256:string;rows:CDWDistributionLedgerRow[];
+ receiptCompleted:number;readingAssigned:number;readingConfirmed:number;
+};
 export type CDWReceiptTarget={
  targetId:string;batchId:string;fileId:string;fileName:string;
  revisionLabel:string;departmentId:string;receiverId:string;
@@ -160,6 +172,8 @@ export const cdwApi={
   "/workbench/controlled/releases/"+segment(releaseId)+"/issue",mutate(key,{},revision)),
  distributionDispatch:(planId:string,revision:number,key:string)=>request<CDWDistributionBatch>(
   "/workbench/distribution-plans/"+segment(planId)+"/dispatch",mutate(key,{},revision)),
+ distributionLedger:(planId:string)=>request<CDWDistributionLedger>(
+  "/workbench/distribution-plans/"+segment(planId)+"/ledger",{cache:"no-store"}),
  distributionForRelease:(releaseId:string)=>request<CDWDistributionPlan>(
   "/workbench/controlled/releases/"+segment(releaseId)+"/distribution-plan",{cache:"no-store"}),
  distributionCreate:(releaseId:string,targets:Array<{departmentId:string;receiverId:string}>,key:string)=>

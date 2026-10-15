@@ -519,6 +519,29 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	if readingCount != 1 {
 		t.Fatalf("reading confirmation immutable evidence count=%d", readingCount)
 	}
+	if _, e = service.CDWDistributionLedger(ctx, alice, plan.ID); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("scope approver without document-control role saw confidential department ledger: %v", e)
+	}
+	ledger, e := service.CDWDistributionLedger(ctx, admin, plan.ID)
+	if e != nil || ledger.ManifestSHA256 != frozenPlan.DigestSHA256 ||
+		ledger.ReceiptCompleted != 2 || ledger.ReadingAssigned != 1 || ledger.ReadingConfirmed != 1 || len(ledger.Rows) != 2 {
+		t.Fatalf("real controlled distribution ledger %+v %v", ledger, e)
+	}
+	var foundBob, foundCharlie bool
+	for _, row := range ledger.Rows {
+		if row.DepartmentID == deptB {
+			foundBob = row.ReceiptStatus == "received" && row.ActualSignerID != nil &&
+				*row.ActualSignerID == bob.ID && row.SignedAt != nil && row.ReadingStatus == "confirmed" && row.ReadingConfirmed == 1
+		}
+		if row.DepartmentID == deptC {
+			foundCharlie = row.ReceiptStatus == "received" && row.ActualSignerID != nil &&
+				*row.ActualSignerID == charlie.ID && row.ReadingStatus == "unassigned" && row.ReadingAssigned == 0
+		}
+	}
+	if !foundBob || !foundCharlie {
+		t.Fatalf("ledger must reflect independent department evidence %+v", ledger.Rows)
+	}
+	t.Logf("CDW_G9_LEDGER_POSTGRES_PASS plan=%s departments=2 receipts=2 reading=1/1 roster_missing=1", plan.ID)
 	t.Logf("CDW_G9_READING_POSTGRES_PASS roster=%s assignment=%s single_confirmed_event=1", bobRoster.ID, bobAssignment.ID)
 	t.Logf("CDW_G9_SCOPE_APPROVED_POSTGRES_PASS plan=%s digest=%s batch=none", plan.ID, approvedPlan.DigestSHA256)
 	t.Logf("CDW_G9_SCOPE_FROZEN_POSTGRES_PASS plan=%s departments=2 digest=%s issued=none", plan.ID, frozenPlan.DigestSHA256)

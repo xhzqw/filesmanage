@@ -51,6 +51,33 @@ type CDWDistributionBatch struct {
 	DigestSHA256    string `json:"digestSha256"`
 	DepartmentCount int    `json:"departmentCount"`
 }
+type CDWDistributionLedgerRow struct {
+	TargetID         string  `json:"targetId"`
+	DepartmentID     string  `json:"departmentId"`
+	DepartmentName   string  `json:"departmentName"`
+	ReceiverID       string  `json:"receiverId"`
+	ReceiverName     string  `json:"receiverName"`
+	ActualSignerID   *string `json:"actualSignerId,omitempty"`
+	ActualSignerName *string `json:"actualSignerName,omitempty"`
+	SignedAt         *string `json:"signedAt,omitempty"`
+	ReceiptID        *string `json:"receiptId,omitempty"`
+	ReceiptStatus    string  `json:"receiptStatus"`
+	ReadingAssigned  int     `json:"readingAssigned"`
+	ReadingConfirmed int     `json:"readingConfirmed"`
+	ReadingStatus    string  `json:"readingStatus"`
+	DueAt            *string `json:"dueAt,omitempty"`
+	Overdue          bool    `json:"overdue"`
+	ExceptionReason  *string `json:"exceptionReason,omitempty"`
+}
+type CDWDistributionLedger struct {
+	PlanID           string                     `json:"planId"`
+	BatchID          string                     `json:"batchId"`
+	ManifestSHA256   string                     `json:"manifestSha256"`
+	Rows             []CDWDistributionLedgerRow `json:"rows"`
+	ReceiptCompleted int                        `json:"receiptCompleted"`
+	ReadingAssigned  int                        `json:"readingAssigned"`
+	ReadingConfirmed int                        `json:"readingConfirmed"`
+}
 type CDWDistributionStore interface {
 	CDWDistributionReleaseFile(context.Context, string) (string, error)
 	CDWDistributionPlanFile(context.Context, string) (string, error)
@@ -63,5 +90,6 @@ type CDWDistributionStore interface {
 	CDWDistributionScopeApprove(context.Context, string, string, string, int64, string) (CDWDistributionPlan, error)
 	CDWDistributionScopeInbox(context.Context, string, int) ([]CDWDistributionPlan, error)
 	CDWDistributionDispatch(context.Context, string, string, string, int64, string, []string, []string, []string, []string) (CDWDistributionBatch, error)
+	CDWDistributionLedger(context.Context, string) (CDWDistributionLedger, error)
 	CDWDistributionEvent(context.Context, string, string, string, string, any) error
 }

@@ -143,6 +143,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.GET("/workbench/controlled/releases/:id/distribution-plan", h.cdwDistributionForRelease)
 	api.POST("/workbench/distribution-plans", h.cdwDistributionCreate)
 	api.GET("/workbench/distribution-plans/:id", h.cdwDistributionRead)
+	api.GET("/workbench/distribution-plans/:id/ledger", h.cdwDistributionLedger)
 	api.POST("/workbench/distribution-plans/:id/freeze", h.cdwDistributionFreeze)
 	api.POST("/workbench/distribution-scope-roles", h.cdwDistributionScopeGrant)
 	api.GET("/workbench/distribution-scope/inbox", h.cdwDistributionScopeInbox)
