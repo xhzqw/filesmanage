@@ -112,13 +112,20 @@ func (r *Repository) CDWTaskScope(ctx context.Context, id string) (string, strin
 // disabled until the freeze/subset protocol is implemented.
 func (r *Repository) CDWCreateRoot(ctx context.Context, cmd ports.CDWTaskCommand, actor string) (ports.CDWTaskResult, error) {
 	if cmd.TemplateVersionID == "" {
-		const id = "cdw_template_single_file_v1"
+		id := "cdw_template_single_file_v1"
+		templateKey := "cdw-single-file-task"
+		rolePolicy := `{"delegation":"accepted_assignee","formalApproval":false,"allowOverrideReview":false}`
+		if cmd.AllowOverrideReview {
+			id = "cdw_template_single_file_g6_override_v1"
+			templateKey = "cdw-single-file-override-review"
+			rolePolicy = `{"delegation":"accepted_assignee","formalApproval":false,"allowOverrideReview":true}`
+		}
 		_, err := r.Q.Exec(ctx, `INSERT INTO cdw_workflow_template_versions
 		(id,template_key,version_no,lifecycle,graph,role_policy,published_at,created_by)
-		VALUES($1,'cdw-single-file-task',1,'published',
+		VALUES($1,$3,1,'published',
 		'{"type":"single_file","review":"direct_parent"}'::jsonb,
-		'{"delegation":"accepted_assignee","formalApproval":false}'::jsonb,now(),$2)
-		ON CONFLICT DO NOTHING`, id, actor)
+		$4::jsonb,now(),$2)
+		ON CONFLICT DO NOTHING`, id, actor, templateKey, rolePolicy)
 		if err != nil {
 			return ports.CDWTaskResult{}, err
 		}

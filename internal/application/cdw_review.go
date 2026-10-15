@@ -49,8 +49,8 @@ func (s *Service) CDWReviewContent(ctx context.Context, actor domain.User, id st
 	if err != nil {
 		return nil, "", 0, err
 	}
-	if gate.ReviewerID != actor.ID {
-		return nil, "", 0, domain.ErrForbidden
+	if _, err = store.CDWReviewAccess(ctx, id, actor.ID); err != nil {
+		return nil, "", 0, err
 	}
 	if _, err = s.visibleFile(ctx, tx, actor, gate.FileID, domain.ActionPreview); err != nil {
 		return nil, "", 0, err
@@ -76,17 +76,29 @@ func (s *Service) CDWReviewGate(ctx context.Context, actor domain.User, id strin
 	if err != nil {
 		return gate, err
 	}
-	if gate.ReviewerID != actor.ID {
-		return ports.CDWReviewGate{}, domain.ErrForbidden
+	grantID, err := store.CDWReviewAccess(ctx, id, actor.ID)
+	if err != nil {
+		return ports.CDWReviewGate{}, err
+	}
+	if actor.ID != gate.ReviewerID {
+		gate.OverrideGrantID = grantID
+		gate.ReviewMode = "delegated"
 	}
 	if _, err = s.visibleFile(ctx, tx, actor, gate.FileID, domain.ActionPreview); err != nil {
 		return ports.CDWReviewGate{}, err
 	}
 	return gate, nil
 }
-func (s *Service) CDWDecideReview(ctx context.Context, actor domain.User, gateID, decision, reason string, expected int64, key string) (ports.CDWReviewDecisionResult, error) {
+func (s *Service) CDWDecideReview(ctx context.Context, actor domain.User, gateID, decision, reason string, expected int64, key string, overrideGrantIDs ...string) (ports.CDWReviewDecisionResult, error) {
 	var result ports.CDWReviewDecisionResult
 	reason = strings.TrimSpace(reason)
+	if len(overrideGrantIDs) > 1 {
+		return result, domain.ErrInvalidInput
+	}
+	overrideGrantID := ""
+	if len(overrideGrantIDs) == 1 {
+		overrideGrantID = overrideGrantIDs[0]
+	}
 	if !validCDWOperationKey(key) || expected < 1 || (decision != "accept" && decision != "return") ||
 		(decision == "return" && reason == "") || !utf8.ValidString(reason) || utf8.RuneCountInString(reason) > 3000 {
 		return result, domain.ErrInvalidInput
@@ -104,7 +116,15 @@ func (s *Service) CDWDecideReview(ctx context.Context, actor domain.User, gateID
 	if err != nil {
 		return result, err
 	}
-	if gate.ReviewerID != actor.ID {
+	grantID, err := store.CDWReviewAccess(ctx, gateID, actor.ID)
+	if err != nil {
+		return result, err
+	}
+	if actor.ID == gate.ReviewerID {
+		if overrideGrantID != "" {
+			return result, domain.ErrInvalidInput
+		}
+	} else if grantID == "" || grantID != overrideGrantID {
 		return result, domain.ErrForbidden
 	}
 	if _, err = s.visibleFile(ctx, tx, actor, gate.FileID, domain.ActionPreview); err != nil {
@@ -116,10 +136,11 @@ func (s *Service) CDWDecideReview(ctx context.Context, actor domain.User, gateID
 	}
 	const operation = "review.decide"
 	hash := cdwCommandHash(operation, gateID, struct {
-		Decision string `json:"decision"`
-		Reason   string `json:"reason"`
-		Expected int64  `json:"expected"`
-	}{decision, reason, expected})
+		Decision        string `json:"decision"`
+		Reason          string `json:"reason"`
+		Expected        int64  `json:"expected"`
+		OverrideGrantID string `json:"overrideGrantId,omitempty"`
+	}{decision, reason, expected, overrideGrantID})
 	prior, replay, err := taskStore.CDWClaimOperation(ctx, actor.ID, operation, key, hash)
 	if err != nil {
 		return result, err
@@ -130,16 +151,16 @@ func (s *Service) CDWDecideReview(ctx context.Context, actor domain.User, gateID
 		}
 		return result, nil
 	}
-	result, err = store.CDWDecideReview(ctx, gateID, actor.ID, expected, decision, reason, NewID("cdwdecision"), NewID("cdwreturn"))
+	result, err = store.CDWDecideReview(ctx, gateID, actor.ID, expected, decision, reason, NewID("cdwdecision"), NewID("cdwreturn"), overrideGrantID)
 	if err != nil {
 		return result, err
 	}
 	if err = auditRequired(ctx, tx, actor, "cdw.review."+decision, "review_gate", gateID, "success",
-		map[string]any{"taskId": result.TaskID, "deliveryId": result.DeliveryID, "reviewer": actor.ID, "reason": reason, "round": result.Round}); err != nil {
+		map[string]any{"taskId": result.TaskID, "deliveryId": result.DeliveryID, "reviewer": actor.ID, "reason": reason, "round": result.Round, "actingForId": result.ActingForID, "overrideGrantId": result.OverrideGrantID}); err != nil {
 		return result, err
 	}
 	if err = store.CDWReviewEvent(ctx, actor.ID, "review."+decision, gateID, key, map[string]any{
-		"taskId": result.TaskID, "deliveryId": result.DeliveryID, "state": result.State, "round": result.Round,
+		"taskId": result.TaskID, "deliveryId": result.DeliveryID, "state": result.State, "round": result.Round, "actingForId": result.ActingForID, "overrideGrantId": result.OverrideGrantID,
 	}); err != nil {
 		return result, err
 	}

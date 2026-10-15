@@ -15,15 +15,16 @@ type CDWAssignmentTarget struct {
 }
 
 type CDWTaskCommand struct {
-	TaskID            string              `json:"taskId"`
-	RootID            string              `json:"rootId"`
-	ParentID          string              `json:"parentId,omitempty"`
-	AssignmentID      string              `json:"assignmentId"`
-	Title             string              `json:"title"`
-	FileID            string              `json:"fileId"`
-	TemplateVersionID string              `json:"templateVersionId"`
-	Target            CDWAssignmentTarget `json:"assignee"`
-	Revision          int64               `json:"revision"`
+	TaskID              string              `json:"taskId"`
+	RootID              string              `json:"rootId"`
+	ParentID            string              `json:"parentId,omitempty"`
+	AssignmentID        string              `json:"assignmentId"`
+	Title               string              `json:"title"`
+	FileID              string              `json:"fileId"`
+	TemplateVersionID   string              `json:"templateVersionId"`
+	AllowOverrideReview bool                `json:"allowOverrideReview,omitempty"`
+	Target              CDWAssignmentTarget `json:"assignee"`
+	Revision            int64               `json:"revision"`
 }
 
 type CDWTaskResult struct {

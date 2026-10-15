@@ -76,19 +76,82 @@ func (h *Handler) cdwReviewDecide(c *gin.Context) {
 		return
 	}
 	var input struct {
-		Decision string `json:"decision"`
-		Reason   string `json:"reason"`
+		Decision        string `json:"decision"`
+		Reason          string `json:"reason"`
+		OverrideGrantID string `json:"overrideGrantId,omitempty"`
 	}
 	if !cdwBind(c, &input) {
 		return
 	}
-	result, err := h.S.CDWDecideReview(c.Request.Context(), actor, c.Param("id"), input.Decision, input.Reason, revision, key)
+	result, err := h.S.CDWDecideReview(c.Request.Context(), actor, c.Param("id"), input.Decision, input.Reason, revision, key, input.OverrideGrantID)
 	if err != nil {
 		cdwError(c, err)
 		return
 	}
 	c.Header("ETag", "\"rev-"+strconv.FormatInt(result.Revision, 10)+"\"")
 	c.JSON(http.StatusOK, gin.H{"ok": true, "data": result})
+}
+func (h *Handler) cdwReviewGrant(c *gin.Context) {
+	user, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	key, ok := cdwKey(c)
+	if !ok {
+		return
+	}
+	revision, ok := cdwIfMatch(c)
+	if !ok {
+		return
+	}
+	var input struct {
+		ActorID string `json:"actorId"`
+		Reason  string `json:"reason"`
+	}
+	if !cdwBind(c, &input) {
+		return
+	}
+	grant, err := h.S.CDWGrantReview(c.Request.Context(), user, c.Param("id"), input.ActorID, input.Reason, revision, key)
+	if err != nil {
+		cdwError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusCreated, gin.H{"ok": true, "data": grant})
+}
+func (h *Handler) cdwReviewGrants(c *gin.Context) {
+	user, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	grants, err := h.S.CDWReviewGrants(c.Request.Context(), user, c.Param("id"))
+	if err != nil {
+		cdwError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, gin.H{"ok": true, "data": gin.H{"items": grants}})
+}
+func (h *Handler) cdwReviewRevoke(c *gin.Context) {
+	user, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	key, ok := cdwKey(c)
+	if !ok {
+		return
+	}
+	var input struct{}
+	if !cdwBind(c, &input) {
+		return
+	}
+	grant, err := h.S.CDWRevokeReviewGrant(c.Request.Context(), user, c.Param("id"), c.Param("grantId"), key)
+	if err != nil {
+		cdwError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, gin.H{"ok": true, "data": grant})
 }
 func (h *Handler) cdwResumeReturned(c *gin.Context) {
 	actor, ok := h.auth(c)

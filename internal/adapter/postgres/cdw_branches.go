@@ -486,7 +486,9 @@ func (r *Repository) CDWFreezeBranchDelivery(ctx context.Context, branchID, acto
 		return result, err
 	}
 	if _, err = r.Q.Exec(ctx, `INSERT INTO cdw_review_gates(id,delivery_id,node_key,round_no,responsible_user_id,substitutable,state)
- VALUES($1,$2,'direct_parent',$3,$4,false,'awaiting')`, gateID, deliveryID, round, reviewer); err != nil {
+ SELECT $1,$2,'direct_parent',$3,$4,COALESCE(tv.lifecycle='published' AND tv.role_policy->>'allowOverrideReview'='true',false),'awaiting'
+ FROM cdw_tasks t JOIN cdw_workflow_template_versions tv ON tv.id=t.template_version_id
+ WHERE t.id=$5`, gateID, deliveryID, round, reviewer, b.TaskID); err != nil {
 		return result, err
 	}
 	if _, err = r.Q.Exec(ctx, `UPDATE cdw_office_branch_sessions SET state='closed',ended_at=now() WHERE branch_id=$1 AND ended_at IS NULL`, branchID); err != nil {

@@ -15,10 +15,11 @@ import (
 // Multi-file manifests, Office deliveries and review decisions remain separate
 // and MUST NOT advance merely because a subtask was delegated or accepted.
 type CDWRootTaskInput struct {
-	Title             string                    `json:"title"`
-	FileID            string                    `json:"fileId"`
-	TemplateVersionID string                    `json:"templateVersionId"`
-	Assignee          ports.CDWAssignmentTarget `json:"assignee"`
+	Title               string                    `json:"title"`
+	FileID              string                    `json:"fileId"`
+	TemplateVersionID   string                    `json:"templateVersionId"`
+	AllowOverrideReview bool                      `json:"allowOverrideReview,omitempty"`
+	Assignee            ports.CDWAssignmentTarget `json:"assignee"`
 }
 type CDWChildTaskInput struct {
 	Title    string                    `json:"childTitle"`
@@ -123,6 +124,9 @@ func (s *Service) CDWCreateRootTask(ctx context.Context, actor domain.User, inpu
 	if !actor.IsAdmin {
 		return ports.CDWTaskResult{}, domain.ErrForbidden
 	}
+	if input.AllowOverrideReview && input.TemplateVersionID != "" {
+		return ports.CDWTaskResult{}, domain.ErrInvalidInput
+	}
 	return s.cdwMutate(ctx, actor, "task.create", key, cdwCommandHash("task.create", "", input), 201,
 		func(tx ports.Tx, store ports.CDWTaskStore) error {
 			if _, err := s.visibleFile(ctx, tx, actor, input.FileID, domain.ActionPreview); err != nil {
@@ -134,7 +138,7 @@ func (s *Service) CDWCreateRootTask(ctx context.Context, actor domain.User, inpu
 			id := NewID("cdwtask")
 			return store.CDWCreateRoot(ctx, ports.CDWTaskCommand{
 				TaskID: id, RootID: id, AssignmentID: NewID("cdwasn"),
-				Title: input.Title, FileID: input.FileID, TemplateVersionID: input.TemplateVersionID, Target: input.Assignee,
+				Title: input.Title, FileID: input.FileID, TemplateVersionID: input.TemplateVersionID, Target: input.Assignee, AllowOverrideReview: input.AllowOverrideReview,
 			}, actor.ID)
 		})
 }
