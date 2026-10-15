@@ -5,11 +5,10 @@ import {errorCopy} from "../../shared/errors";
 import {ApiError} from "../../shared/http";
 import {newIdempotencyKey} from "../../shared/ids";
 import type {User} from "../../entities/user/model";
-import {organizationApi} from "../organization/api";
 import {cdwApi,type CDWFormalReady} from "./api";
 
 // Three explicit steps deliberately avoid silently granting approval authority.
-export function CDWFormalInitiate({onCreated}:{onCreated:()=>void}){
+export function CDWFormalInitiate({onCreated,loadUsers}:{onCreated:()=>void;loadUsers:()=>Promise<User[]>}){
  const [ready,setReady]=useState<CDWFormalReady[]>([]);
  const [users,setUsers]=useState<User[]>([]);
  const [delivery,setDelivery]=useState("");
@@ -25,12 +24,12 @@ export function CDWFormalInitiate({onCreated}:{onCreated:()=>void}){
  const selected=ready.find(d=>d.deliveryId===delivery);
  useEffect(()=>{
   let live=true;setLoading(true);setError("");
-  Promise.all([cdwApi.formalReady(),organizationApi.users()])
+  Promise.all([cdwApi.formalReady(),loadUsers()])
    .then(([deliveries,people])=>{if(live){setReady(deliveries.items);setUsers(people.filter(u=>!u.disabled));}})
    .catch(e=>{if(live)setError(errorCopy(e,"无法读取可提交交付稿与审批人"));})
    .finally(()=>{if(live)setLoading(false);});
   return()=>{live=false};
- },[]);
+ },[loadUsers]);
  function resetSteps(){
   setAuthorized(false);setTemplateId("");
   keys.current.clear();

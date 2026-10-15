@@ -245,7 +245,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
       <footer className="cdw-inbox-footer">我的工作 · 按服务器实时权限读取</footer>
      </section>
      <article className="cdw-detail" aria-label="任务详情">
-      {formalDraft?<CDWFormalInitiate onCreated={()=>{setFormalDraft(false);refresh(n=>n+1);}}/>:activeForm?<section className="cdw-detail-inner">
+      {formalDraft?<CDWFormalInitiate loadUsers={organizationApi.users} onCreated={()=>{setFormalDraft(false);refresh(n=>n+1);}}/>:activeForm?<section className="cdw-detail-inner">
        <div className="cdw-detail-header"><div><small>任务工作台</small><h2>{activeForm==="create"?"派发单文件任务":"逐级派发子任务"}</h2></div>
         <RareButton tone="ghost" onClick={()=>setActiveForm(null)}>取消</RareButton></div>
        <div className="cdw-form">
