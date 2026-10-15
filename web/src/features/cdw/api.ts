@@ -7,7 +7,7 @@ export type CDWTask={
  actualAcceptorId?:string;remainingObligations?:string[];
 };
 export type CDWInboxItem={
- kind:"task"|"obligation";taskId:string;title:string;fileId:string;
+ kind:"task"|"obligation"|"review";review?:CDWReviewGate;taskId:string;title:string;fileId:string;
  state:string;revision:number;assignmentId?:string;obligationId?:string;obligationKind?:string;
 };
 export type CDWBranch={
@@ -24,6 +24,18 @@ export type CDWSave={
  requestId:string;branchId:string;sessionId:string;
  state:"requested"|"accepted"|"unknown"|"persisted"|"failed";
  persistedRevisionId?:string;sha256?:string;generation:number;editEpoch:number;
+};
+export type CDWReviewGate={
+ gateId:string;deliveryId:string;taskId:string;taskTitle:string;
+ fileId:string;submittedBy:string;reviewerId:string;
+ branchRevisionId:string;sha256:string;state:string;revision:number;round:number;
+};
+export type CDWReviewResult={
+ gateId:string;deliveryId:string;taskId:string;state:string;
+ taskState:string;revision:number;round:number;returnOrderId?:string;
+};
+export type CDWResumeResult={
+ taskId:string;branchId:string;revision:number;round:number;state:string;
 };
 export type CDWDelivery={
  deliveryId:string;branchId:string;taskId:string;branchRevisionId:string;
@@ -58,4 +70,10 @@ export const cdwApi={
  freeze:(branchId:string,revision:number,requestId:string,branchRevisionId:string,key:string)=>
   request<CDWDelivery>("/work-branches/"+segment(branchId)+"/freeze-delivery",
    mutate(key,{requestId,branchRevisionId},revision)),
+ reviewInbox:(limit=100)=>request<{items:CDWReviewGate[]}>("/workbench/review-gates/inbox?limit="+limit,{cache:"no-store"}),
+ reviewGate:(id:string)=>request<CDWReviewGate>("/workbench/review-gates/"+segment(id),{cache:"no-store"}),
+ reviewDecide:(id:string,revision:number,decision:"accept"|"return",reason:string,key:string)=>
+  request<CDWReviewResult>("/workbench/review-gates/"+segment(id)+"/decide",mutate(key,{decision,reason},revision)),
+ resume:(taskId:string,revision:number,key:string)=>
+  request<CDWResumeResult>("/workbench/tasks/"+segment(taskId)+"/resume",mutate(key,{},revision)),
 };

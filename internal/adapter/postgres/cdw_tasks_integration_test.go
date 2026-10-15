@@ -492,7 +492,7 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 	t.Logf("CDW_BRANCH_POSTGRES_PASS branches=%s,%s persisted=2 froze=%s normal_seq=1", aliceBranch.ID, bobBranch.ID, frozen.DeliveryID)
 	var n int
 	if err = pool.QueryRow(ctx, `SELECT count(*) FROM cdw_domain_events WHERE aggregate_id IN ($1,$2,$3,$4)`,
-		root.TaskID, child.TaskID, child2.TaskID, groupRoot.TaskID).Scan(&n); err != nil || n != 7 {
+		root.TaskID, child.TaskID, child2.TaskID, groupRoot.TaskID).Scan(&n); err != nil || n != 8 {
 		t.Fatalf("atomic CDW event count=%d err=%v", n, err)
 	}
 	t.Logf("CDW_TASK_POSTGRES_PASS root=%s child=%s grandchild=%s pending-obligations=6", root.TaskID, child.TaskID, child2.TaskID)

@@ -81,6 +81,15 @@
 .cdw-doc-canvas{height:100%;width:100%}
 .cdw-editor-confirm{display:flex;align-items:center;justify-content:center;gap:10px;padding:6px 12px;font-size:11px;background:#F3F9F6;color:#496B59}
 .cdw-editor-error{padding:0 12px}
+.cdw-review-digest{display:flex;flex-direction:column;gap:9px;padding:12px;border-radius:8px;background:#F8FAFC;border:1px solid #ECF0F6}
+.cdw-review-digest small{color:#8A96A6;font-size:11px}
+.cdw-review-digest code{font-family:var(--font-mono);font-size:10.5px;overflow-wrap:anywhere;line-height:1.65;color:#475467}
+.cdw-review-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:18px}
+.cdw-review-form{display:flex;flex-direction:column;gap:12px;margin:18px 0;border-top:1px solid #F0F3F7;padding-top:18px}
+.cdw-review-form label{display:flex;flex-direction:column;gap:9px;font-size:12px;font-weight:600;color:#475467}
+.cdw-review-form .rare-textarea{width:100%;min-height:100px;resize:vertical}
+.cdw-review-form .cdw-review-actions{margin-top:0}
+
 @media(max-width:1100px){.cdw-layout{grid-template-columns:145px minmax(260px,315px) minmax(0,1fr)}.cdw-rail{padding:16px 6px}.cdw-detail-inner{padding:22px 20px 30px}.cdw-detail-facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:820px){.cdw-layout{grid-template-columns:minmax(235px,42%) minmax(0,1fr);grid-template-rows:45px minmax(0,1fr)}.cdw-rail{grid-column:1/-1;grid-row:1;flex-direction:row;align-items:center;padding:5px 8px;border-right:0;border-bottom:1px solid #E8ECF1;overflow-x:auto}.cdw-rail-caption,.cdw-rail-footer{display:none}.cdw-rail .cdw-rail-item.rare-button{width:auto;min-height:29px;height:29px;padding:0 10px;gap:7px;white-space:nowrap}.cdw-inbox{grid-column:1;grid-row:2}.cdw-detail{grid-column:2;grid-row:2}.cdw-detail-header h2{font-size:17px}.cdw-detail-facts{grid-template-columns:1fr 1fr}.cdw-inbox-tools{padding:0 9px}.cdw-inbox-actions .rare-button{padding:0 7px}}
 @media(max-width:560px){.cdw-panels{padding:4px}.cdw-layout{grid-template-columns:1fr;grid-template-rows:44px minmax(170px,37%) minmax(0,1fr)}.cdw-inbox{grid-column:1;grid-row:2;border-right:0;border-bottom:1px solid #E9EDF2}.cdw-detail{grid-column:1;grid-row:3}.cdw-inbox-footer{display:none}.cdw-task-row.rare-button{min-height:55px}.cdw-detail-inner{padding:16px}.cdw-detail-facts{margin:17px 0}.cdw-editor-save-state{display:none}.cdw-editor .office-workbench-identity{max-width:52%}.cdw-editor-toolbar-right>.rare-button{font-size:11px;padding:0 7px}}

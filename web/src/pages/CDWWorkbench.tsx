@@ -4,6 +4,7 @@ import type {User} from "../entities/user/model";
 import type {FileItem} from "../entities/file/model";
 import {AppShell} from "../shared/ui/AppShell";
 import {RareBadge,RareButton,RareInput,RareNotice,RareSelect} from "../shared/ui/rare";
+import {CDWReviewPanel} from "../features/cdw/CDWReviewPanel";
 import {BrandLoadingLabel} from "../shared/ui/BrandLoader";
 import {toast} from "../shared/ui/feedback";
 import {errorCopy} from "../shared/errors";
@@ -12,18 +13,19 @@ import {newIdempotencyKey} from "../shared/ids";
 import {collaborationApi} from "../features/collaboration/api";
 import {organizationApi} from "../features/organization/api";
 import {fileApi} from "../features/documents/api";
-import {cdwApi,type CDWBranch,type CDWInboxItem,type CDWRecipient} from "../features/cdw/api";
+import {cdwApi,type CDWBranch,type CDWInboxItem,type CDWRecipient,type CDWReviewGate} from "../features/cdw/api";
 import "./cdwWorkbench.css";
 
-type View="tasks"|"obligations"|"all";
+type View="tasks"|"obligations"|"reviews"|"all";
 const labels:Record<string,string>={
  assigned:"待接收",accepted:"已接收",in_progress:"进行中",submitted:"待上级验收",
+ returned:"已退回",awaiting:"待我验收",accepted_delivery:"交付已验收",
  open:"工作中",frozen:"已冻结",pending:"待履行",
  manage:"管理责任",integrate:"整合责任",report:"上报责任",acknowledge_override:"越级知会",
  closed:"已关闭",cancelled:"已取消",
 };
 const stateLabel=(v:string)=>labels[v]??v;
-function taskKey(item:CDWInboxItem){return item.kind==="obligation"?item.obligationId??item.taskId:item.taskId;}
+function taskKey(item:CDWInboxItem){return item.kind==="review"?item.review?.gateId??item.taskId:item.kind==="obligation"?item.obligationId??item.taskId:item.taskId;}
 function statusTone(state:string):"neutral"|"info"|"warning"|"success"{
  if(state==="assigned"||state==="pending")return "warning";
  if(state==="submitted"||state==="frozen")return "success";
@@ -39,6 +41,7 @@ function RecipientPicker({value,onChange,users}:{value:string;onChange:(id:strin
 export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const[params,setParams]=useSearchParams();
  const[items,setItems]=useState<CDWInboxItem[]>([]);
+ const[reviewGates,setReviewGates]=useState<CDWReviewGate[]>([]);
  const[busy,setBusy]=useState(false);
  const[refreshToken,refresh]=useState(0);
  const[requestError,setRequestError]=useState("");
@@ -62,9 +65,14 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const requestKeys=useRef(new Map<string,string>());
  const navigate=useNavigate();
  const selectedKey=params.get("task");
- const visible=useMemo(()=>items.filter(x=>(filter==="all"||x.kind===(filter==="tasks"?"task":"obligation"))
-  &&(x.title.toLocaleLowerCase().includes(search.toLocaleLowerCase())||x.fileId.toLowerCase().includes(search.toLowerCase()))),[items,filter,search]);
- const selected=items.find(x=>taskKey(x)===selectedKey)??visible[0]??null;
+ const reviewItems=useMemo<CDWInboxItem[]>(()=>reviewGates.map(gate=>({
+  kind:"review",review:gate,taskId:gate.taskId,title:gate.taskTitle,fileId:gate.fileId,
+  state:gate.state,revision:gate.revision
+ })),[reviewGates]);
+ const allItems=useMemo(()=>[...items,...reviewItems],[items,reviewItems]);
+ const visible=useMemo(()=>allItems.filter(x=>(filter==="all"||x.kind===(filter==="tasks"?"task":filter==="reviews"?"review":"obligation"))
+  &&(x.title.toLocaleLowerCase().includes(search.toLocaleLowerCase())||x.fileId.toLowerCase().includes(search.toLowerCase()))),[allItems,filter,search]);
+ const selected=visible.find(x=>taskKey(x)===selectedKey)??visible[0]??null;
 
  useEffect(()=>{
   const controller=new AbortController();let active=true;
@@ -75,6 +83,13 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
    if(active&&!(error instanceof DOMException&&error.name==="AbortError"))setRequestError(errorCopy(error,"任务列表加载失败"));
   }).finally(()=>{if(active)setBusy(false);});
   return()=>{active=false;controller.abort();};
+ },[refreshToken,user.id]);
+
+ useEffect(()=>{
+  let active=true;
+  cdwApi.reviewInbox(100).then(data=>{if(active)setReviewGates(data.items??[]);})
+    .catch(error=>{if(active)setRequestError(errorCopy(error,"验收待办加载失败"));});
+  return()=>{active=false};
  },[refreshToken,user.id]);
 
  useEffect(()=>{
@@ -154,6 +169,11 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
    key=>cdwApi.delegate(item.taskId,item.revision,{childTitle:title.trim(),assignee:selectedRecipient},key),"子任务已派发，上级责任保留");
   if(result){setActiveForm(null);setParams({task:result.taskId});}
  }
+ async function resumeTask(item:CDWInboxItem){
+  const result=await safeWrite("resume:"+item.taskId+":"+item.revision,
+   key=>cdwApi.resume(item.taskId,item.revision,key),"新一轮修订分支已建立");
+  if(result)navigate("/workbench/branch/"+encodeURIComponent(result.branchId)+"/edit");
+ }
  async function createBranch(item:CDWInboxItem){
   const result=await safeWrite("branch:"+item.taskId,
    key=>cdwApi.createBranch(item.taskId,key),"工作分支已创建");
@@ -161,6 +181,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  }
  const totalTasks=items.filter(x=>x.kind==="task").length;
  const totalObligations=items.filter(x=>x.kind==="obligation").length;
+ const totalReviews=reviewGates.length;
  const canWork=selected?.kind==="task"&&(selected.state==="accepted"||selected.state==="in_progress");
  const editingBranch=branches.find(b=>b.state==="open");
  return <AppShell user={user} onLogout={onLogout}>
@@ -172,7 +193,8 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
       {([
        ["tasks","我的任务",totalTasks],
        ["obligations","责任待办",totalObligations],
-       ["all","全部事项",items.length],
+       ["reviews","待我验收",totalReviews],
+       ["all","全部事项",allItems.length],
       ] as [View,string,number][]).map(([key,label,count])=>
        <RareButton key={key} type="button" className={"cdw-rail-item"+(filter===key?" is-current":"")}
         aria-current={filter===key?"page":undefined} onClick={()=>{setFilter(key);setActiveForm(null);}}>
@@ -182,7 +204,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
      </aside>
      <section className="cdw-inbox" aria-label="任务列表">
       <header className="cdw-inbox-tools">
-       <div className="cdw-inbox-heading"><strong>{filter==="tasks"?"我的任务":filter==="obligations"?"责任待办":"全部事项"}</strong><span>{visible.length}</span></div>
+       <div className="cdw-inbox-heading"><strong>{filter==="tasks"?"我的任务":filter==="obligations"?"责任待办":filter==="reviews"?"待我验收":"全部事项"}</strong><span>{visible.length}</span></div>
        <div className="cdw-inbox-actions">
         <RareButton type="button" tone="ghost" aria-label="刷新任务列表" disabled={busy} onClick={()=>refresh(v=>v+1)}>↻</RareButton>
         {user.isAdmin&&<RareButton type="button" tone="primary" onClick={()=>beginForm("create")}>派发任务</RareButton>}
@@ -197,7 +219,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
          aria-current={selected===item&&!activeForm?"true":undefined} onClick={()=>select(item)}>
         <span className={"cdw-task-symbol"+(item.kind==="obligation"?" is-obligation":"")} aria-hidden="true">{item.kind==="task"?"▤":"↳"}</span>
         <span className="cdw-task-copy"><strong title={item.title}>{item.title}</strong>
-         <small>{item.kind==="obligation"?stateLabel(item.obligationKind??""):"任务"} · {stateLabel(item.state)}</small></span>
+         <small>{item.kind==="obligation"?stateLabel(item.obligationKind??""):item.kind==="review"?"冻结交付 · 直属验收":"任务"} · {stateLabel(item.state)}</small></span>
         {item.kind==="task"&&item.state==="assigned"&&<span className="cdw-task-unread" aria-label="待接收"/>}
        </RareButton>)}
       </div>
@@ -230,7 +252,9 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
           onClick={()=>void (activeForm==="create"?createRoot():selected&&delegate(selected))}>确认派发</RareButton>
         </div>
        </div>
-      </section>:selected?<section className="cdw-detail-inner" key={taskKey(selected)}>
+      </section>:selected?.kind==="review"&&selected.review?
+      <CDWReviewPanel key={selected.review.gateId} gate={selected.review} onDecided={()=>refresh(n=>n+1)}/>:
+      selected?<section className="cdw-detail-inner" key={taskKey(selected)}>
        <div className="cdw-detail-header"><div><small>{selected.kind==="task"?"任务详情":"责任待办"}</small>
         <h2>{selected.title}</h2></div><RareBadge tone={statusTone(selected.state)}>{stateLabel(selected.state)}</RareBadge></div>
        <div className="cdw-detail-facts">
@@ -268,7 +292,12 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
           <RareButton type="button" onClick={()=>beginForm("delegate")}>派发子任务 →</RareButton>
          </div>
         </>}
-        {selected.state==="submitted"&&<RareNotice tone="success">交付物已冻结并送交直属上级待验收。审核决定功能仍在下一阶段建设中。</RareNotice>}
+        {selected.state==="returned"&&<div className="cdw-primary-action">
+         <RareNotice tone="warning">上一轮交付已被退回，原冻结稿及验收记录保持只读。继续修订将建立新轮次，并以退回稿作为编辑初稿。</RareNotice>
+         <RareButton type="button" tone="primary" loading={processing} onClick={()=>void resumeTask(selected)}>从退回稿继续修订</RareButton>
+        </div>}
+        {selected.state==="submitted"&&<RareNotice tone="info">交付稿已冻结，正在等待直属上级验收；尚未正式批准或生效。</RareNotice>}
+        {selected.state==="accepted_delivery"&&<RareNotice tone="success">本轮任务交付已通过直属上级验收；文件正式审批和受控发行仍需独立处理。</RareNotice>}
        </>}
       </section>:<div className="cdw-detail-empty"><strong>选择一项任务</strong><p>查看工作分支、任务责任和后续交付。</p></div>}
      </article>
