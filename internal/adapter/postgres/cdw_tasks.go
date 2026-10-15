@@ -202,9 +202,6 @@ func (r *Repository) CDWAccept(ctx context.Context, taskID, actor string, expect
 	if _, e := r.CDWActiveRecipients(ctx, ports.CDWAssignmentTarget{Kind: "user", ID: actor}); e != nil {
 		return ports.CDWTaskResult{}, e
 	}
-	if !active {
-		return ports.CDWTaskResult{}, domain.ErrForbidden
-	}
 	if _, err = r.Q.Exec(ctx, `UPDATE cdw_task_assignments
  SET accepted_by=$2,accepted_at=now() WHERE id=$1`, assignmentID, actor); err != nil {
 		return ports.CDWTaskResult{}, err
@@ -263,9 +260,6 @@ func (r *Repository) CDWDelegate(ctx context.Context, parentID, actor string, ex
 			}
 		}
 		if !allowed {
-			return ports.CDWTaskResult{}, domain.ErrForbidden
-		}
-		if !valid {
 			return ports.CDWTaskResult{}, domain.ErrForbidden
 		}
 	}
