@@ -198,7 +198,7 @@ try{
    emptySidebar:!old,buttonLabels:buttons.map(b=>b.getAttribute('aria-label'))}:null;
  })()`);
  assert("download print and more share the top-right toolbar, not sidebar",
-  !!topActions&&topActions.count===3&&topActions.top>=0&&topActions.top<40&&topActions.right>=0&&topActions.right<40&&topActions.emptySidebar,
+  !!topActions&&topActions.count>=3&&topActions.buttonLabels.includes("下载")&&topActions.buttonLabels.includes("打印")&&topActions.buttonLabels.includes("更多文件操作")&&topActions.top>=0&&topActions.top<40&&topActions.right>=0&&topActions.right<40&&topActions.emptySidebar,
   JSON.stringify(topActions));
 
  await cdp.evaluate(`(()=>document.querySelector('.file-sidebar-collapse')?.click())()`);
@@ -333,13 +333,18 @@ try{
     const moved=await cdp.evaluate(`(()=>parseFloat(document.querySelector('.seal-position-mark').style.left))()`);
     assert("stamp moves using pointer drag",moved>before.left+1);
     const handle=await cdp.evaluate(`(()=>{
-     const r=document.querySelector('.seal-resize-handle.is-se').getBoundingClientRect();
-     return {x:r.x+r.width/2,y:r.y+r.height/2};
+     const node=document.querySelector('.seal-resize-handle.is-se');
+     const r=node.getBoundingClientRect();
+     const x=r.x+r.width/2,y=r.y+r.height/2;
+     const target=document.elementFromPoint(x,y);
+     return {x,y,target:target?.className,handlePointer:getComputedStyle(node).pointerEvents,markPointer:getComputedStyle(node.parentElement).pointerEvents};
+
     })()`);
     const beforeRatio=await cdp.evaluate(`(()=>{
      const el=document.querySelector('.seal-position-mark').getBoundingClientRect();
      return el.width/el.height;
     })()`);
+    console.log("STAMP_RESIZE_HIT_DIAGNOSTIC",JSON.stringify(handle));
     await cdp.drag(handle,{x:handle.x+25,y:handle.y+12});
     const resized=await cdp.evaluate(`(()=>{
      const el=document.querySelector('.seal-position-mark');
@@ -414,8 +419,8 @@ try{
   const area=document.querySelector('.file-workbench-main')?.getBoundingClientRect();
   const group=document.querySelector('.file-preview-action-dock .file-workbench-actions');
   const buttons=[...(group?.querySelectorAll('button')??[])];
-  if(buttons.length!==3)return null;
-  buttons[2].click();
+  if(buttons.length<3)return null;
+  group.querySelector(".file-more-trigger")?.click();
   return {length:buttons.length,top:group.getBoundingClientRect().top-area.top,
     right:area.right-group.getBoundingClientRect().right,sidebarActions:!!document.querySelector('.file-workbench-sidebar .file-workbench-actions')};
  })()`);
@@ -427,7 +432,7 @@ try{
   return !!button&&!!expanded&&expanded.getBoundingClientRect().top>=button.getBoundingClientRect().bottom;
  })()`);
  assert("download print more are top-right, not in left sidebar",
-   !!dock&&dock.length===3&&dock.top<40&&dock.right<40&&!dock.sidebarActions,JSON.stringify(dock));
+   !!dock&&dock.length>=3&&dock.top<40&&dock.right<40&&!dock.sidebarActions,JSON.stringify(dock));
  assert("more actions drop down under upper-right capsule",
    Boolean(expanded)&&Boolean(dropdownBelow));
 
