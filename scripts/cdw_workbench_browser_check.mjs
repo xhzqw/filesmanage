@@ -79,6 +79,13 @@ try{
  await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('责任待办')");
  await evalJS("(()=>{const create=[...document.querySelectorAll('.cdw-inbox-actions button')].find(b=>b.textContent.includes('派发任务'));create?.click();return true;})()");
  await until("!!document.querySelector('.cdw-form') && document.querySelector('.cdw-detail h2')?.textContent?.includes('派发单文件任务')");
+ const overrideControl="document.querySelector('.cdw-form-permission button[aria-pressed]')";
+ await until(overrideControl+"?.getAttribute('aria-pressed')==='false'");
+ await evalJS("(()=>{"+overrideControl+".click();return true})()");
+ await until(overrideControl+"?.getAttribute('aria-pressed')==='true'");
+ await evalJS("(()=>{"+overrideControl+".click();return true})()");
+ await until(overrideControl+"?.getAttribute('aria-pressed')==='false'");
+ console.log("CDW_G6_TEMPLATE_OPT_IN_BROWSER_PASS default=off toggles=on/off no-write");
  console.log("CDW_BROWSER_PASS auth=tasks+review-inbox, responsive=1440/1024/780, review-filter, create-form");
 }finally{
  try{ws?.close();}catch{}
