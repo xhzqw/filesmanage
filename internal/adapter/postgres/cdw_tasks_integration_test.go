@@ -55,7 +55,7 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err = tx.Exec(ctx, `INSERT INTO folders(id,name,owner_id) VALUES($1,'G2 isolated fixture',$2)`, folderID, adminID); err != nil {
+	if _, err = tx.Exec(ctx, `INSERT INTO folders(id,name,owner_id) VALUES($1,$1,$2)`, folderID, adminID); err != nil {
 		t.Fatal(err)
 	}
 	for _, id := range []string{aliceID, bobID, charlieID} {
