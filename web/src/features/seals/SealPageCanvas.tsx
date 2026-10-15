@@ -30,6 +30,9 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
  const surfaceRef=useRef<HTMLDivElement>(null);
  const dragRef=useRef<{x:number;y:number;left:number;top:number}|null>(null);
  const stampDragRef=useRef<StampDrag|null>(null);
+ const resizePointerRef=useRef<number|null>(null);
+ const resizePropsRef=useRef({selected,position,angle,pageRatio,panMode,setPosition});
+ resizePropsRef.current={selected,position,angle,pageRatio,panMode,setPosition};
  const pendingAnchor=useRef<{x:number;y:number;oldZoom:number;left:number;top:number}|null>(null);
  const zoomRef=useRef(1);
  const[zoom,setZoom]=useState(1);
@@ -96,6 +99,55 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
   viewport.addEventListener("wheel",wheel,{passive:false});
   return()=>viewport.removeEventListener("wheel",wheel);
  },[setZoomAt]);
+ // Corner gestures are handled at document-capture level. An ordinary
+ // pointer capture on the outer mark is not reliable when a child handle is
+ // the initial hit target: moves can retarget to the paper outside the box.
+ useEffect(()=>{
+  function down(e:globalThis.PointerEvent){
+   const node=e.target instanceof Element?e.target.closest<HTMLElement>(".seal-resize-handle"):null;
+   const {selected,panMode,position}=resizePropsRef.current;
+   if(!node||!surfaceRef.current?.contains(node)||!selected||panMode||e.button!==0)return;
+   const corner=node.dataset.corner;
+   if(corner!=="nw"&&corner!=="ne"&&corner!=="sw"&&corner!=="se")return;
+   const rect=surfaceRef.current.getBoundingClientRect();
+   if(!rect.width||!rect.height)return;
+   stampDragRef.current={kind:corner,x:e.clientX,y:e.clientY,initial:{...position},rect};
+   resizePointerRef.current=e.pointerId;
+   e.preventDefault();e.stopPropagation();
+  }
+  function move(e:globalThis.PointerEvent){
+   const drag=stampDragRef.current;
+   if(resizePointerRef.current!==e.pointerId||!drag||drag.kind==="move")return;
+   const {angle,pageRatio,setPosition}=resizePropsRef.current;
+   const dx=(e.clientX-drag.x)/drag.rect.width,dy=(e.clientY-drag.y)/drag.rect.height;
+   const start=drag.initial;
+   const dirX=drag.kind==="nw"||drag.kind==="sw"?-1:1;
+   const dirY=drag.kind==="nw"||drag.kind==="ne"?-1:1;
+   const growX=dirX*dx/start.width,growY=dirY*dy/start.height;
+   const scale=Math.max(.05/start.width,.05/start.height,1+(Math.abs(growX)>Math.abs(growY)?growX:growY));
+   const width=start.width*scale,height=start.height*scale;
+   const x=dirX<0?start.x+start.width-width:start.x;
+   const y=dirY<0?start.y+start.height-height:start.y;
+   setPosition(()=>fitStampToPage({x,y,width,height},angle,pageRatio));
+   e.preventDefault();e.stopPropagation();
+  }
+  function end(e:globalThis.PointerEvent){
+   if(resizePointerRef.current!==e.pointerId)return;
+   resizePointerRef.current=null;
+   stampDragRef.current=null;
+   e.stopPropagation();
+  }
+  document.addEventListener("pointerdown",down,true);
+  document.addEventListener("pointermove",move,true);
+  document.addEventListener("pointerup",end,true);
+  document.addEventListener("pointercancel",end,true);
+  return()=>{
+   document.removeEventListener("pointerdown",down,true);
+   document.removeEventListener("pointermove",move,true);
+   document.removeEventListener("pointerup",end,true);
+   document.removeEventListener("pointercancel",end,true);
+  };
+ },[]);
  function pointerDown(e:PointerEvent<HTMLDivElement>){
   if(!panMode||e.button!==0)return;
   const viewport=viewportRef.current;if(!viewport)return;
@@ -130,15 +182,6 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
   stampDragRef.current={
    kind:kind??"move",x:e.clientX,y:e.clientY,initial:{...position},rect
   };
-  e.currentTarget.setPointerCapture(e.pointerId);
-  e.preventDefault();e.stopPropagation();
- }
- function startResize(e:PointerEvent<HTMLSpanElement>){
-  if(!selected||panMode||e.button!==0)return;
-  const rect=surfaceRef.current?.getBoundingClientRect();
-  if(!rect||!rect.width||!rect.height)return;
-  stampDragRef.current={kind:e.currentTarget.dataset.corner as StampDrag["kind"],
-   x:e.clientX,y:e.clientY,initial:{...position},rect};
   e.currentTarget.setPointerCapture(e.pointerId);
   e.preventDefault();e.stopPropagation();
  }
@@ -242,7 +285,7 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
      </span>
      {(["nw","ne","sw","se"] as const).map(corner=>
       <span key={corner} className={"seal-resize-handle is-"+corner} data-corner={corner} aria-hidden="true"
-       onPointerDownCapture={startResize} onPointerMove={moveStamp} onPointerUp={endStamp} onPointerCancel={endStamp}/>)}
+       />)}
     </span>}
     {marks.filter(m=>m.pageNumber===page).map(m=>{
      const style={left:m.x*100+"%",top:m.y*100+"%",width:m.width*100+"%",height:m.height*100+"%",transform:"rotate("+(m.angleDegrees??0)+"deg)"};
