@@ -118,7 +118,7 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 	if err != nil {
 		t.Fatal("delegate:", err)
 	}
-	if child.ParentTaskID != root.TaskID || len(child.RemainingObligations) != 3 {
+	if child.ParentTaskID != root.TaskID || child.ParentRevision != 3 || len(child.RemainingObligations) != 3 {
 		t.Fatalf("parent accountability missing: %+v", child)
 	}
 	var pending int

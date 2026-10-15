@@ -288,7 +288,7 @@ func (r *Repository) CDWDelegate(ctx context.Context, parentID, actor string, ex
 	if _, err = r.Q.Exec(ctx, `UPDATE cdw_tasks SET revision=revision+1 WHERE id=$1`, parentID); err != nil {
 		return ports.CDWTaskResult{}, err
 	}
-	return ports.CDWTaskResult{TaskID: cmd.TaskID, ParentTaskID: parentID, State: "assigned", Revision: 1, AssignmentID: cmd.AssignmentID, RemainingObligations: obligationIDs[:]}, nil
+	return ports.CDWTaskResult{TaskID: cmd.TaskID, ParentTaskID: parentID, ParentRevision: rev + 1, State: "assigned", Revision: 1, AssignmentID: cmd.AssignmentID, RemainingObligations: obligationIDs[:]}, nil
 }
 
 // Inbox ownership is derived from the live assignment or obligation; nothing

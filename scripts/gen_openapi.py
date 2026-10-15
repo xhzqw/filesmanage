@@ -723,7 +723,7 @@ add("GET", "/health/ready", operation("Readiness probe (PostgreSQL reachable)", 
 # --- CDW task kernel (single-file pilot) ---
 CDW_ASSIGNEE = obj({"kind": string(enum=["user","workgroup"]), "id": string()},required=["kind","id"])
 CDW_TASK_RESULT = obj({
-    "taskId": string(), "parentTaskId": string(), "state": string(),
+    "taskId": string(), "parentTaskId": string(), "parentRevision": integer(minimum=1), "state": string(),
     "revision": integer(minimum=1), "assignmentId": string(),
     "actualAcceptorId": string(), "remainingObligations": arr(string()),
 }, required=["taskId","state","revision","assignmentId"])
@@ -731,7 +731,7 @@ CDW_SCOPE_INBOX = obj({"items": arr(obj({
     "kind": string(enum=["task","obligation"]), "taskId": string(), "title": string(),
     "fileId": string(), "state": string(), "revision": integer(minimum=1),
     "assignmentId": string(), "obligationId": string(), "obligationKind": string(),
-})), "asOf": string(), "nextCursor": string()},required=["items","asOf","nextCursor"])
+})), "asOf": timestamp(), "nextCursor": {"type":"string","nullable":True}},required=["items","asOf","nextCursor"])
 CDW_IDEMPOTENCY = {"name":"Idempotency-Key","in":"header","required":True,
  "description":"8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.",
  "schema":string(max_length=128)}

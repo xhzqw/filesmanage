@@ -123,6 +123,9 @@ paths:
                         type: string
                       parentTaskId:
                         type: string
+                      parentRevision:
+                        type: integer
+                        minimum: 1
                       state:
                         type: string
                       revision:
@@ -223,8 +226,10 @@ paths:
                               type: string
                       asOf:
                         type: string
+                        format: date-time
                       nextCursor:
                         type: string
+                        nullable: true
                     required:
                     - items
                     - asOf
@@ -298,6 +303,9 @@ paths:
                         type: string
                       parentTaskId:
                         type: string
+                      parentRevision:
+                        type: integer
+                        minimum: 1
                       state:
                         type: string
                       revision:
@@ -402,6 +410,9 @@ paths:
                         type: string
                       parentTaskId:
                         type: string
+                      parentRevision:
+                        type: integer
+                        minimum: 1
                       state:
                         type: string
                       revision:

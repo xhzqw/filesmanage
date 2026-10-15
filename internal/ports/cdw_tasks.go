@@ -29,6 +29,7 @@ type CDWTaskCommand struct {
 type CDWTaskResult struct {
 	TaskID               string   `json:"taskId"`
 	ParentTaskID         string   `json:"parentTaskId,omitempty"`
+	ParentRevision       int64    `json:"parentRevision,omitempty"`
 	State                string   `json:"state"`
 	Revision             int64    `json:"revision"`
 	AcceptedBy           string   `json:"actualAcceptorId,omitempty"`

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func cdwBind(c *gin.Context, target any) bool {
@@ -155,5 +156,5 @@ func (h *Handler) cdwInbox(c *gin.Context) {
 		return
 	}
 	c.Header("Cache-Control", "no-store")
-	c.JSON(200, gin.H{"ok": true, "data": gin.H{"items": items, "asOf": "request", "nextCursor": nil}})
+	c.JSON(200, gin.H{"ok": true, "data": gin.H{"items": items, "asOf": time.Now().UTC().Format(time.RFC3339Nano), "nextCursor": nil}})
 }
