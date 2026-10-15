@@ -177,6 +177,15 @@ func exerciseCDWG6Override(t *testing.T, ctx context.Context, pool *pgxpool.Pool
 	if ee != nil || replayDecision.OverrideGrantID != final.OverrideGrantID || replayDecision.Revision != final.Revision {
 		t.Fatalf("delegated decision idempotent replay failed: %+v %v", replayDecision, ee)
 	}
+	// Revoking the authorization AFTER the recorded final decision cannot
+	// retroactively erase its evidence or break same-key response replay.
+	if after, ee := service.CDWRevokeReviewGrant(ctx, bob, gate.ID, grant3.ID, prefix+"_g6revoke_after"); ee != nil || !after.Revoked {
+		t.Fatalf("post-decision revocation evidence: %+v %v", after, ee)
+	}
+	replayAfterRevoke, ee := service.CDWDecideReview(ctx, alice, gate.ID, "accept", "已核对冻结稿", 1, prefix+"_g6decide", grant3.ID)
+	if ee != nil || replayAfterRevoke.OverrideGrantID != grant3.ID {
+		t.Fatalf("same-key replay after grant revoked: %+v %v", replayAfterRevoke, ee)
+	}
 	if other, ee := service.CDWDecideReview(ctx, bob, gate.ID, "return", "第二次审核不允许", 2, prefix+"_g6double"); !errors.Is(ee, domain.ErrVersionConflict) {
 		t.Fatalf("direct reviewer overrode terminal gate: %+v %v", other, ee)
 	}
