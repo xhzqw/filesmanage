@@ -25,14 +25,20 @@ export type CDWSave={
  state:"requested"|"accepted"|"unknown"|"persisted"|"failed";
  persistedRevisionId?:string;sha256?:string;generation:number;editEpoch:number;
 };
+export type CDWOverrideGrant={
+ grantId:string;gateId:string;taskId:string;grantedBy:string;
+ actorId:string;expiresAt:string;revoked:boolean;
+};
 export type CDWReviewGate={
  gateId:string;deliveryId:string;taskId:string;taskTitle:string;
  fileId:string;submittedBy:string;reviewerId:string;
  branchRevisionId:string;sha256:string;state:string;revision:number;round:number;
+ substitutable:boolean;overrideGrantId?:string;reviewMode:"direct"|"delegated";
 };
 export type CDWReviewResult={
  gateId:string;deliveryId:string;taskId:string;state:string;
  taskState:string;revision:number;round:number;returnOrderId?:string;
+ overrideGrantId?:string;actingForId?:string;
 };
 export type CDWResumeResult={
  taskId:string;branchId:string;revision:number;round:number;state:string;
@@ -52,7 +58,7 @@ const mutate=(key:string,body:object,revision?:number)=>({
 export const cdwApi={
  inbox:(limit=100,signal?:AbortSignal)=>request<{items:CDWInboxItem[];nextCursor:null;asOf:string}>(
   "/workbench/inbox?limit="+limit,{signal,cache:"no-store"}),
- create:(input:{title:string;fileId:string;assignee:CDWRecipient},key:string)=>
+ create:(input:{title:string;fileId:string;assignee:CDWRecipient;allowOverrideReview?:boolean},key:string)=>
   request<CDWTask>("/workbench/tasks",mutate(key,input)),
  accept:(taskId:string,revision:number,key:string)=>
   request<CDWTask>("/workbench/tasks/"+segment(taskId)+"/accept",mutate(key,{},revision)),
@@ -75,8 +81,14 @@ export const cdwApi={
    mutate(key,{requestId,branchRevisionId},revision)),
  reviewInbox:(limit=100)=>request<{items:CDWReviewGate[]}>("/workbench/review-gates/inbox?limit="+limit,{cache:"no-store"}),
  reviewGate:(id:string)=>request<CDWReviewGate>("/workbench/review-gates/"+segment(id),{cache:"no-store"}),
- reviewDecide:(id:string,revision:number,decision:"accept"|"return",reason:string,key:string)=>
-  request<CDWReviewResult>("/workbench/review-gates/"+segment(id)+"/decide",mutate(key,{decision,reason},revision)),
+ reviewDecide:(id:string,revision:number,decision:"accept"|"return",reason:string,key:string,overrideGrantId?:string)=>
+  request<CDWReviewResult>("/workbench/review-gates/"+segment(id)+"/decide",mutate(key,{decision,reason,overrideGrantId},revision)),
+ reviewGrants:(id:string)=>request<{items:CDWOverrideGrant[]}>("/workbench/review-gates/"+segment(id)+"/grants",{cache:"no-store"}),
+ reviewCandidates:(id:string)=>request<{items:Array<{id:string;displayName:string}>}>("/workbench/review-gates/"+segment(id)+"/candidates",{cache:"no-store"}),
+ reviewGrant:(id:string,revision:number,actorId:string,reason:string,key:string)=>
+  request<CDWOverrideGrant>("/workbench/review-gates/"+segment(id)+"/grants",mutate(key,{actorId,reason},revision)),
+ reviewRevoke:(id:string,grantId:string,key:string)=>
+  request<CDWOverrideGrant>("/workbench/review-gates/"+segment(id)+"/grants/"+segment(grantId)+"/revoke",mutate(key,{})),
  resume:(taskId:string,revision:number,key:string)=>
   request<CDWResumeResult>("/workbench/tasks/"+segment(taskId)+"/resume",mutate(key,{},revision)),
 };

@@ -38,6 +38,10 @@ type CDWResumeResult struct {
 	Round    int    `json:"round"`
 	State    string `json:"state"`
 }
+type CDWReviewCandidate struct {
+	ID          string `json:"id"`
+	DisplayName string `json:"displayName"`
+}
 type CDWOverrideGrant struct {
 	ID        string `json:"grantId"`
 	GateID    string `json:"gateId"`
@@ -52,6 +56,7 @@ type CDWReviewStore interface {
 	CDWGrantReview(context.Context, string, string, string, int64, string, string) (CDWOverrideGrant, error)
 	CDWRevokeReviewGrant(context.Context, string, string, string) (CDWOverrideGrant, error)
 	CDWReviewGrants(context.Context, string) ([]CDWOverrideGrant, error)
+	CDWReviewCandidates(context.Context, string) ([]CDWReviewCandidate, error)
 	CDWReviewInbox(context.Context, string, int) ([]CDWReviewGate, error)
 	CDWReviewByID(context.Context, string) (CDWReviewGate, error)
 	CDWReviewBlobSource(context.Context, string) (CDWBranchSource, error)

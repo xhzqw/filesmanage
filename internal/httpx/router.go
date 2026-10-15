@@ -120,6 +120,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.POST("/workbench/review-gates/:id/decide", h.cdwReviewDecide)
 	api.POST("/workbench/review-gates/:id/grants", h.cdwReviewGrant)
 	api.GET("/workbench/review-gates/:id/grants", h.cdwReviewGrants)
+	api.GET("/workbench/review-gates/:id/candidates", h.cdwReviewCandidates)
 	api.POST("/workbench/review-gates/:id/grants/:grantId/revoke", h.cdwReviewRevoke)
 	api.POST("/workbench/tasks/:id/resume", h.cdwResumeReturned)
 	api.POST("/workbench/tasks/:id/accept", h.cdwAcceptTask)

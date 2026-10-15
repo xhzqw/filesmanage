@@ -102,6 +102,10 @@ paths:
                   required:
                   - kind
                   - id
+                allowOverrideReview:
+                  type: boolean
+                  description: Administrator opt-in creates published single-file template version allowing gate-specific
+                    override; defaults false.
               required:
               - title
               - fileId
@@ -1193,6 +1197,15 @@ paths:
                             round:
                               type: integer
                               minimum: 1
+                            substitutable:
+                              type: boolean
+                            overrideGrantId:
+                              type: string
+                            reviewMode:
+                              type: string
+                              enum:
+                              - direct
+                              - delegated
                           required:
                           - gateId
                           - deliveryId
@@ -1206,6 +1219,8 @@ paths:
                           - state
                           - revision
                           - round
+                          - substitutable
+                          - reviewMode
                     required:
                     - items
                 required:
@@ -1273,6 +1288,15 @@ paths:
                       round:
                         type: integer
                         minimum: 1
+                      substitutable:
+                        type: boolean
+                      overrideGrantId:
+                        type: string
+                      reviewMode:
+                        type: string
+                        enum:
+                        - direct
+                        - delegated
                     required:
                     - gateId
                     - deliveryId
@@ -1286,6 +1310,8 @@ paths:
                     - state
                     - revision
                     - round
+                    - substitutable
+                    - reviewMode
                 required:
                 - ok
                 - data
@@ -1338,6 +1364,9 @@ paths:
                 reason:
                   type: string
                   maxLength: 3000
+                overrideGrantId:
+                  type: string
+                  description: Required and exact when acting under delegated review authority.
               required:
               - decision
       responses:
@@ -1373,6 +1402,10 @@ paths:
                         minimum: 1
                       returnOrderId:
                         type: string
+                      actingForId:
+                        type: string
+                      overrideGrantId:
+                        type: string
                     required:
                     - gateId
                     - deliveryId
@@ -1392,6 +1425,305 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '409':
           description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/review-gates/{id}/candidates:
+    get:
+      summary: File-authorized upper task-chain reviewers eligible for a gate-specific grant
+      operationId: cdwReviewCandidates
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Review gate ID.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Only accepted active ancestors above direct parent, filtered by file ACL.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            displayName:
+                              type: string
+                          required:
+                          - id
+                          - displayName
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/review-gates/{id}/grants:
+    get:
+      summary: List grants for a gate (original direct reviewer only)
+      operationId: cdwReviewGrants
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Review gate ID.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: All gate-bound grants including revoked evidence.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            grantId:
+                              type: string
+                            gateId:
+                              type: string
+                            taskId:
+                              type: string
+                            grantedBy:
+                              type: string
+                            actorId:
+                              type: string
+                            expiresAt:
+                              type: string
+                              format: date-time
+                            revoked:
+                              type: boolean
+                          required:
+                          - grantId
+                          - gateId
+                          - taskId
+                          - grantedBy
+                          - actorId
+                          - expiresAt
+                          - revoked
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      summary: Issue one-day gate-specific substitute-review authorization from original reviewer to accepted ancestor
+      operationId: cdwReviewGrant
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Review gate ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      - name: If-Match
+        in: header
+        required: true
+        description: Strong ETag rev-N enclosed in double quotes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                actorId:
+                  type: string
+                reason:
+                  type: string
+                  maxLength: 1000
+              required:
+              - actorId
+              - reason
+      responses:
+        '200':
+          description: Granted with immutable actor/task/gate/expiry scope, not a formal approval.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      grantId:
+                        type: string
+                      gateId:
+                        type: string
+                      taskId:
+                        type: string
+                      grantedBy:
+                        type: string
+                      actorId:
+                        type: string
+                      expiresAt:
+                        type: string
+                        format: date-time
+                      revoked:
+                        type: boolean
+                    required:
+                    - grantId
+                    - gateId
+                    - taskId
+                    - grantedBy
+                    - actorId
+                    - expiresAt
+                    - revoked
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/review-gates/{id}/grants/{grantId}/revoke:
+    post:
+      summary: Revoke a substitute review grant by its original issuer
+      operationId: cdwReviewRevoke
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Review gate ID.
+        schema:
+          type: string
+      - name: grantId
+        in: path
+        required: true
+        description: Grant ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        '200':
+          description: Revoked atomically and preserved as history.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      grantId:
+                        type: string
+                      gateId:
+                        type: string
+                      taskId:
+                        type: string
+                      grantedBy:
+                        type: string
+                      actorId:
+                        type: string
+                      expiresAt:
+                        type: string
+                        format: date-time
+                      revoked:
+                        type: boolean
+                    required:
+                    - grantId
+                    - gateId
+                    - taskId
+                    - grantedBy
+                    - actorId
+                    - expiresAt
+                    - revoked
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
           content:
             application/json:
               schema:

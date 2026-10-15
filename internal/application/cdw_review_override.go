@@ -9,6 +9,41 @@ import (
 	"unicode/utf8"
 )
 
+func (s *Service) CDWReviewCandidates(ctx context.Context, reviewer domain.User, gateID string) ([]ports.CDWReviewCandidate, error) {
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	store, ok := tx.(ports.CDWReviewStore)
+	if !ok {
+		return nil, domain.ErrInvalidInput
+	}
+	gate, err := store.CDWReviewByID(ctx, gateID)
+	if err != nil {
+		return nil, err
+	}
+	if reviewer.ID != gate.ReviewerID || !gate.Substitutable {
+		return nil, domain.ErrForbidden
+	}
+	if _, err = s.visibleFile(ctx, tx, reviewer, gate.FileID, domain.ActionPreview); err != nil {
+		return nil, err
+	}
+	result, err := store.CDWReviewCandidates(ctx, gateID)
+	if err != nil {
+		return nil, err
+	}
+	authorized := []ports.CDWReviewCandidate{}
+	for _, candidate := range result {
+		person, e := tx.UserByID(ctx, candidate.ID)
+		if e == nil && person.DisabledAt == nil {
+			if _, e = s.visibleFile(ctx, tx, person, gate.FileID, domain.ActionPreview); e == nil {
+				authorized = append(authorized, candidate)
+			}
+		}
+	}
+	return authorized, nil
+}
 func (s *Service) CDWGrantReview(ctx context.Context, reviewer domain.User, gateID, target, reason string, expected int64, key string) (ports.CDWOverrideGrant, error) {
 	var result ports.CDWOverrideGrant
 	reason = strings.TrimSpace(reason)

@@ -737,7 +737,7 @@ CDW_IDEMPOTENCY = {"name":"Idempotency-Key","in":"header","required":True,
  "schema":string(max_length=128)}
 CDW_IF_MATCH = {"name":"If-Match","in":"header","required":True,
  "description":"Strong ETag rev-N enclosed in double quotes.","schema":string()}
-CDW_ROOT = obj({"title":string(max_length=255),"fileId":string(),"templateVersionId":string("Optional; built-in single-file task template when omitted."),"assignee":CDW_ASSIGNEE},
+CDW_ROOT = obj({"title":string(max_length=255),"fileId":string(),"templateVersionId":string("Optional; built-in single-file task template when omitted."),"assignee":CDW_ASSIGNEE,"allowOverrideReview":{"type":"boolean","description":"Administrator opt-in creates published single-file template version allowing gate-specific override; defaults false."}},
  required=["title","fileId","assignee"])
 CDW_CHILD = obj({"childTitle":string(max_length=255),"assignee":CDW_ASSIGNEE},
  required=["childTitle","assignee"])
@@ -830,12 +830,13 @@ CDW_REVIEW_GATE=obj({
  "gateId":string(),"deliveryId":string(),"taskId":string(),"taskTitle":string(),
  "fileId":string(),"submittedBy":string(),"reviewerId":string(),
  "branchRevisionId":string(),"sha256":string(),"state":string(),
- "revision":integer(minimum=1),"round":integer(minimum=1)
-},required=["gateId","deliveryId","taskId","taskTitle","fileId","submittedBy","reviewerId","branchRevisionId","sha256","state","revision","round"])
-CDW_REVIEW_DECISION=obj({"decision":string(enum=["accept","return"]),"reason":string(max_length=3000)},
+ "revision":integer(minimum=1),"round":integer(minimum=1),
+ "substitutable":{"type":"boolean"},"overrideGrantId":string(),"reviewMode":string(enum=["direct","delegated"])
+},required=["gateId","deliveryId","taskId","taskTitle","fileId","submittedBy","reviewerId","branchRevisionId","sha256","state","revision","round","substitutable","reviewMode"])
+CDW_REVIEW_DECISION=obj({"decision":string(enum=["accept","return"]),"reason":string(max_length=3000),"overrideGrantId":string("Required and exact when acting under delegated review authority.")},
  required=["decision"])
 CDW_REVIEW_RESULT=obj({"gateId":string(),"deliveryId":string(),"taskId":string(),"state":string(),
- "taskState":string(),"revision":integer(minimum=1),"round":integer(minimum=1),"returnOrderId":string()},
+ "taskState":string(),"revision":integer(minimum=1),"round":integer(minimum=1),"returnOrderId":string(),"actingForId":string(),"overrideGrantId":string()},
  required=["gateId","deliveryId","taskId","state","taskState","revision","round"])
 CDW_RESUME_RESULT=obj({"taskId":string(),"branchId":string(),"revision":integer(minimum=1),
  "round":integer(minimum=1),"state":string()},required=["taskId","branchId","revision","round","state"])
@@ -852,6 +853,24 @@ add("POST","/api/workbench/review-gates/{id}/decide",operation("Accept or return
  request={"application/json":{"schema":CDW_REVIEW_DECISION}},
  responses=dict([json_ok(CDW_REVIEW_RESULT,"Decision committed; obligations remain independent."),
  resp("403",ERR["403"]),resp("409",ERR["409"])])))
+CDW_OVERRIDE_GRANT=obj({
+ "grantId":string(),"gateId":string(),"taskId":string(),"grantedBy":string(),
+ "actorId":string(),"expiresAt":timestamp(),"revoked":{"type":"boolean"}
+},required=["grantId","gateId","taskId","grantedBy","actorId","expiresAt","revoked"])
+add("GET","/api/workbench/review-gates/{id}/candidates",operation("File-authorized upper task-chain reviewers eligible for a gate-specific grant","CDW","cdwReviewCandidates",
+ security=SESSION,params=[id_param("id","Review gate ID.")],
+ responses=dict([json_ok(obj({"items":arr(obj({"id":string(),"displayName":string()},required=["id","displayName"]))},required=["items"]),"Only accepted active ancestors above direct parent, filtered by file ACL."),resp("403",ERR["403"])])))
+add("GET","/api/workbench/review-gates/{id}/grants",operation("List grants for a gate (original direct reviewer only)","CDW","cdwReviewGrants",
+ security=SESSION,params=[id_param("id","Review gate ID.")],
+ responses=dict([json_ok(obj({"items":arr(CDW_OVERRIDE_GRANT)},required=["items"]),"All gate-bound grants including revoked evidence."),resp("403",ERR["403"])])))
+add("POST","/api/workbench/review-gates/{id}/grants",operation("Issue one-day gate-specific substitute-review authorization from original reviewer to accepted ancestor","CDW","cdwReviewGrant",
+ security=SESSION,params=[id_param("id","Review gate ID."),CDW_IDEMPOTENCY,CDW_IF_MATCH],
+ request={"application/json":{"schema":obj({"actorId":string(),"reason":string(max_length=1000)},required=["actorId","reason"])}},
+ responses=dict([json_ok(CDW_OVERRIDE_GRANT,"Granted with immutable actor/task/gate/expiry scope, not a formal approval."),resp("403",ERR["403"]),resp("409",ERR["409"])])))
+add("POST","/api/workbench/review-gates/{id}/grants/{grantId}/revoke",operation("Revoke a substitute review grant by its original issuer","CDW","cdwReviewRevoke",
+ security=SESSION,params=[id_param("id","Review gate ID."),id_param("grantId","Grant ID."),CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({})}},
+ responses=dict([json_ok(CDW_OVERRIDE_GRANT,"Revoked atomically and preserved as history."),resp("403",ERR["403"])])))
 add("POST","/api/workbench/tasks/{id}/resume",operation("Rework a returned task with cloned frozen content and next round","CDW","cdwResumeReturned",
  security=SESSION,params=[id_param("id","Task ID."),CDW_IDEMPOTENCY,CDW_IF_MATCH],
  request={"application/json":{"schema":obj({})}},

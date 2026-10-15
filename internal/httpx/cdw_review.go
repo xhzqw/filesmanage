@@ -91,6 +91,19 @@ func (h *Handler) cdwReviewDecide(c *gin.Context) {
 	c.Header("ETag", "\"rev-"+strconv.FormatInt(result.Revision, 10)+"\"")
 	c.JSON(http.StatusOK, gin.H{"ok": true, "data": result})
 }
+func (h *Handler) cdwReviewCandidates(c *gin.Context) {
+	user, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	candidates, err := h.S.CDWReviewCandidates(c.Request.Context(), user, c.Param("id"))
+	if err != nil {
+		cdwError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, gin.H{"ok": true, "data": gin.H{"items": candidates}})
+}
 func (h *Handler) cdwReviewGrant(c *gin.Context) {
 	user, ok := h.auth(c)
 	if !ok {

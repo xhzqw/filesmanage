@@ -52,6 +52,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const[detailsError,setDetailsError]=useState("");
  const[activeForm,setActiveForm]=useState<"create"|"delegate"|null>(null);
  const[title,setTitle]=useState("");
+ const[allowOverrideReview,setAllowOverrideReview]=useState(false);
  const[recipient,setRecipient]=useState("");
  const[users,setUsers]=useState<User[]>([]);
  const[usersBusy,setUsersBusy]=useState(false);
@@ -136,7 +137,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
   setActiveForm(null);
  }
  function beginForm(kind:"create"|"delegate"){
-  setActiveForm(kind);setTitle("");setRecipient("");setChosenFile(null);setFileQuery("");setSearchResults([]);
+  setActiveForm(kind);setTitle("");setRecipient("");setChosenFile(null);setFileQuery("");setSearchResults([]);setAllowOverrideReview(false);
  }
  async function safeWrite<T>(name:string,fn:(key:string)=>Promise<T>,success:string){
   if(processing)return undefined;
@@ -158,8 +159,8 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  }
  async function createRoot(){
   if(!chosenFile||!recipient||!title.trim())return;
-  const result=await safeWrite("create:"+chosenFile.id+":"+recipient+":"+title.trim(),
-   key=>cdwApi.create({title:title.trim(),fileId:chosenFile.id,assignee:{kind:"user",id:recipient}},key),"任务已派发");
+  const result=await safeWrite("create:"+chosenFile.id+":"+recipient+":"+title.trim()+":"+allowOverrideReview,
+   key=>cdwApi.create({title:title.trim(),fileId:chosenFile.id,assignee:{kind:"user",id:recipient},allowOverrideReview},key),"任务已派发");
   if(result){setActiveForm(null);setParams({task:result.taskId});}
  }
  async function delegate(item:CDWInboxItem){
@@ -219,7 +220,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
          aria-current={selected===item&&!activeForm?"true":undefined} onClick={()=>select(item)}>
         <span className={"cdw-task-symbol"+(item.kind==="obligation"?" is-obligation":"")} aria-hidden="true">{item.kind==="task"?"▤":"↳"}</span>
         <span className="cdw-task-copy"><strong title={item.title}>{item.title}</strong>
-         <small>{item.kind==="obligation"?stateLabel(item.obligationKind??""):item.kind==="review"?"冻结交付 · 直属验收":"任务"} · {stateLabel(item.state)}</small></span>
+         <small>{item.kind==="obligation"?stateLabel(item.obligationKind??""):item.kind==="review"?(item.review?.reviewMode==="delegated"?"冻结交付 · 授权代验收":"冻结交付 · 直属验收"):"任务"} · {stateLabel(item.state)}</small></span>
         {item.kind==="task"&&item.state==="assigned"&&<span className="cdw-task-unread" aria-label="待接收"/>}
        </RareButton>)}
       </div>
@@ -246,6 +247,13 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
          {usersBusy?<span className="cdw-help">读取人员列表…</span>:<RecipientPicker users={users} value={recipient} onChange={setRecipient}/>}
         </label>
         {usersError&&<RareNotice tone="warning">{usersError}</RareNotice>}
+        {activeForm==="create"&&<div className="cdw-form-permission">
+         <RareButton type="button" aria-pressed={allowOverrideReview} tone={allowOverrideReview?"primary":"neutral"}
+          onClick={()=>setAllowOverrideReview(v=>!v)}>
+          {allowOverrideReview?"✓ 已允许授权越级验收":"允许授权越级验收"}
+         </RareButton>
+         <p className="cdw-section-note">默认关闭。开启后，直属审核人可针对具体交付节点授权更上级替代验收；中间管理与整合责任仍保留。</p>
+        </div>}
         {activeForm==="delegate"&&<RareNotice tone="info">派发子任务后，你仍须履行管理、整合和上报责任。</RareNotice>}
         <div className="cdw-form-actions">
          <RareButton type="button" tone="primary" loading={processing} disabled={!title.trim()||!recipient||usersBusy||(activeForm==="create"&&!chosenFile)}

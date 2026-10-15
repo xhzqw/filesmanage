@@ -11,6 +11,32 @@ import (
 )
 
 // Authorizing an override never means assigning formal document approval.
+// Candidates are exclusively current accepted task-tree ancestors; never
+// company-wide directory results. The service filters by file ACL again.
+func (r *Repository) CDWReviewCandidates(ctx context.Context, gateID string) ([]ports.CDWReviewCandidate, error) {
+	rows, err := r.Q.Query(ctx, `WITH RECURSIVE ancestors AS (
+ SELECT t.parent_id AS parent_id,0 depth FROM cdw_review_gates g
+ JOIN cdw_deliveries d ON d.id=g.delivery_id JOIN cdw_tasks t ON t.id=d.task_id WHERE g.id=$1
+ UNION ALL SELECT t.parent_id,a.depth+1 FROM cdw_tasks t JOIN ancestors a ON t.id=a.parent_id WHERE a.parent_id IS NOT NULL
+ ) SELECT DISTINCT u.id,u.display_name FROM ancestors a
+ JOIN cdw_task_assignments ass ON ass.task_id=a.parent_id
+ JOIN users u ON u.id=ass.accepted_by
+ WHERE a.depth>=1 AND ass.kind='primary' AND ass.ended_at IS NULL
+ AND ass.accepted_at IS NOT NULL AND u.disabled_at IS NULL ORDER BY u.display_name,u.id`, gateID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []ports.CDWReviewCandidate{}
+	for rows.Next() {
+		var row ports.CDWReviewCandidate
+		if err = rows.Scan(&row.ID, &row.DisplayName); err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
 func (r *Repository) CDWReviewAccess(ctx context.Context, gateID, actor string) (string, error) {
 	var reviewer string
 	var substitutable bool
@@ -98,6 +124,13 @@ func (r *Repository) CDWGrantReview(ctx context.Context, gateID, reviewer, targe
 	}
 	if _, err = r.CDWActiveRecipients(ctx, ports.CDWAssignmentTarget{Kind: "user", ID: target}); err != nil {
 		return out, err
+	}
+	var existing bool
+	if err = r.Q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM cdw_override_grants WHERE gate_id=$1 AND actor_id=$2 AND revoked_at IS NULL)`, gateID, target).Scan(&existing); err != nil {
+		return out, err
+	}
+	if existing {
+		return out, domain.ErrConflict
 	}
 	var expiry time.Time
 	err = r.Q.QueryRow(ctx, `INSERT INTO cdw_override_grants
