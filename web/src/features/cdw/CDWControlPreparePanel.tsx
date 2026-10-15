@@ -28,6 +28,8 @@ export function CDWControlPreparePanel({candidate,user,onPrepared,loadUsers,load
  const [verifyBusy,setVerifyBusy]=useState(false);
  const verifyKey=useRef("");
  const [distributionID,setDistributionID]=useState("");
+ const [historyRevision,setHistoryRevision]=useState(0);
+ function refreshHistory(){setHistoryRevision(n=>n+1);onPrepared();}
 
  useEffect(()=>{
   let active=true;setLoading(true);setMessage("");setReleases([]);setLabel("");
@@ -36,7 +38,7 @@ export function CDWControlPreparePanel({candidate,user,onPrepared,loadUsers,load
    .catch(error=>{if(active)setMessage(errorCopy(error,"无法查看受控版本历史"));})
    .finally(()=>{if(active)setLoading(false);});
   return()=>{active=false};
- },[candidate.id,candidate.fileId]);
+ },[candidate.id,candidate.fileId,historyRevision]);
  async function grant(){
   if(busy||!user.isAdmin)return;
   setBusy(true);
@@ -58,7 +60,7 @@ export function CDWControlPreparePanel({candidate,user,onPrepared,loadUsers,load
     loading:"正在锁定正式发行来源…",success:"发行准备记录已创建；尚未发行或生效",
     error:e=>errorCopy(e,"创建发行准备失败")
    });
-   prepareKey.current="";setLabel("");onPrepared();
+   prepareKey.current="";setLabel("");refreshHistory();
   }catch(e){if(!(e instanceof ApiError&&e.httpStatus===0))prepareKey.current="";}
   finally{setBusy(false)}
  }
@@ -72,7 +74,7 @@ export function CDWControlPreparePanel({candidate,user,onPrepared,loadUsers,load
     error:e=>errorCopy(e,"正式发行物核验失败")
    });
    verifyKey.current="";setVerifyId("");setJustification("");setNoSeal(false);setNoConversion(false);
-   onPrepared();
+   refreshHistory();
   }catch(e){if(!(e instanceof ApiError&&e.httpStatus===0))verifyKey.current="";}
   finally{setVerifyBusy(false);}
  }
@@ -122,11 +124,13 @@ export function CDWControlPreparePanel({candidate,user,onPrepared,loadUsers,load
      </span>
      {item.state==="preparing"?<RareButton type="button" tone="neutral" disabled={busy||verifyBusy}
       onClick={()=>openVerify(item.id)}>核验分发稿</RareButton>:
-      item.state==="ready"?<RareButton type="button" tone="neutral" onClick={()=>setDistributionID(v=>v===item.id?"":item.id)}>
+      (item.state==="ready"||item.state==="issued_pending")?<RareButton type="button" tone="neutral" onClick={()=>setDistributionID(v=>v===item.id?"":item.id)}>
        {distributionID===item.id?"收起部门范围":"配置部门范围"}</RareButton>:
       <RareBadge tone={item.state==="effective"?"success":"neutral"}>{item.state==="effective"?"当前生效":item.state}</RareBadge>}
     </div>
-    {distributionID===item.id&&item.state==="ready"&&<CDWDistributionPlanPanel release={item} loadUsers={loadUsers} loadDepartments={loadDepartments} isAdmin={user.isAdmin} currentUserId={user.id}/>}
+    {distributionID===item.id&&(item.state==="ready"||item.state==="issued_pending")&&
+     <CDWDistributionPlanPanel release={item} loadUsers={loadUsers} loadDepartments={loadDepartments}
+      isAdmin={user.isAdmin} currentUserId={user.id} onChanged={refreshHistory}/>}
     {verifyId===item.id&&item.state==="preparing"&&<div className="cdw-review-form">
      <RareNotice tone="warning">仅适用于经制度核验后确定<strong>无需额外签章且无需格式转换</strong>的原批准 DOCX。需要盖章或转换的文件不能用此入口。</RareNotice>
      <div className="cdw-review-actions">

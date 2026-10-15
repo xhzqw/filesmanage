@@ -12,9 +12,9 @@ type Department={id:string;name:string};
 type Target={departmentId:string;receiverId:string};
 const emptyTarget=():Target=>({departmentId:"",receiverId:""});
 
-export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments,isAdmin,currentUserId}:{
+export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments,isAdmin,currentUserId,onChanged}:{
  release:CDWControlledRelease;loadUsers:()=>Promise<User[]>;
- loadDepartments:()=>Promise<Department[]>;isAdmin:boolean;currentUserId:string;
+ loadDepartments:()=>Promise<Department[]>;isAdmin:boolean;currentUserId:string;onChanged:()=>void;
 }){
  const [plan,setPlan]=useState<CDWDistributionPlan|null>(null);
  const [targets,setTargets]=useState<Target[]>([emptyTarget()]);
@@ -28,6 +28,8 @@ export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments,isAd
  const [approverId,setApproverId]=useState("");
  const [grantBusy,setGrantBusy]=useState(false);
  const grantKey=useRef("");
+ const issueKey=useRef("");
+ const dispatchKey=useRef("");
  useEffect(()=>{
   let active=true;setPlan(null);setTargets([emptyTarget()]);setLoading(true);setError("");
   Promise.all([
@@ -97,6 +99,33 @@ export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments,isAd
   }catch(e){if(!(e instanceof ApiError&&e.httpStatus===0))grantKey.current="";}
   finally{setGrantBusy(false);}
  }
+ async function issue(){
+  if(!plan||plan.state!=="approved"||release.state!=="ready"||busy)return;
+  if(!issueKey.current)issueKey.current=newIdempotencyKey();
+  setBusy(true);
+  try{
+   await toast.track(()=>cdwApi.controlIssue(release.id,release.revision,issueKey.current),{
+    loading:"正在正式签发批准版本…",success:"受控文件已签发，尚未分发或生效",
+    error:e=>errorCopy(e,"正式签发失败")
+   });
+   issueKey.current="";onChanged();
+  }catch(e){if(!(e instanceof ApiError&&e.httpStatus===0))issueKey.current="";}
+  finally{setBusy(false);}
+ }
+ async function dispatch(){
+  if(!plan||plan.state!=="approved"||release.state!=="issued_pending"||busy)return;
+  if(!dispatchKey.current)dispatchKey.current=newIdempotencyKey();
+  setBusy(true);
+  try{
+   await toast.track(()=>cdwApi.distributionDispatch(plan.id,plan.revision,dispatchKey.current),{
+    loading:"正在形成受控批次并分发到指定部门…",
+    success:"发行批次已创建，等待部门签收及人员阅读确认",
+    error:e=>errorCopy(e,"部门受控分发失败")
+   });
+   dispatchKey.current="";onChanged();
+  }catch(e){if(!(e instanceof ApiError&&e.httpStatus===0))dispatchKey.current="";}
+  finally{setBusy(false);}
+ }
  return <section className="cdw-section">
   <div className="cdw-section-head"><h3>部门分发范围</h3>
    {plan&&<RareBadge tone={plan.state==="frozen"?"success":"neutral"}>{plan.state==="draft"?"草案待冻结":plan.state==="frozen"?"清单已冻结":"待分发审批"}</RareBadge>}
@@ -148,6 +177,18 @@ export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments,isAd
     </div>
     <p className="cdw-section-note">这只是授予资格；被授权人员仍须在自己的“范围审批”待办中独立批准冻结摘要。</p>
    </div>}
+   {plan?.state==="approved"&&release.state==="ready"&&
+    <div className="cdw-review-actions">
+     <RareButton type="button" tone="primary" loading={busy} disabled={busy}
+      onClick={()=>void issue()}>正式签发已批准版本</RareButton>
+    </div>}
+   {plan?.state==="approved"&&release.state==="issued_pending"&&
+    <div className="cdw-review-actions">
+     <RareButton type="button" tone="primary" loading={busy} disabled={busy}
+      onClick={()=>void dispatch()}>分发至 {plan.departmentCount} 个部门</RareButton>
+    </div>}
+   {plan?.state==="dispatched"&&
+    <RareNotice tone="info">正式发行批次已生成。部门签收、人员阅读确认及文件生效分别独立办理，不会由分发自动完成。</RareNotice>}
    {plan?.digestSha256&&<div className="cdw-review-digest">
     <small>受控范围规范摘要 SHA-256</small><code title={plan.digestSha256}>{plan.digestSha256}</code>
    </div>}
