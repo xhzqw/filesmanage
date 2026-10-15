@@ -6,9 +6,12 @@ import {errorCopy} from "../../shared/errors";
 import {newIdempotencyKey} from "../../shared/ids";
 import {ApiError} from "../../shared/http";
 import {cdwApi,type CDWDistributionPlan} from "./api";
+import {organizationApi} from "../organization/api";
 
 export function CDWScopeApprovalPanel({plan,onApproved}:{plan:CDWDistributionPlan;onApproved:()=>void}){
  const [detail,setDetail]=useState<CDWDistributionPlan|null>(null);
+ const [departmentNames,setDepartmentNames]=useState<Record<string,string>>({});
+ const [personNames,setPersonNames]=useState<Record<string,string>>({});
  const [error,setError]=useState("");
  const [busy,setBusy]=useState(false);
  const key=useRef("");
@@ -16,6 +19,12 @@ export function CDWScopeApprovalPanel({plan,onApproved}:{plan:CDWDistributionPla
   let active=true;setDetail(null);setError("");
   cdwApi.distributionRead(plan.id).then(item=>{if(active)setDetail(item)})
    .catch(e=>{if(active)setError(errorCopy(e,"无法读取冻结范围"))});
+  organizationApi.departments().then(items=>{
+   if(active)setDepartmentNames(Object.fromEntries(items.map(d=>[d.id,d.name])));
+  }).catch(()=>undefined);
+  organizationApi.users().then(items=>{
+   if(active)setPersonNames(Object.fromEntries(items.map(u=>[u.id,u.displayName])));
+  }).catch(()=>undefined);
   return()=>{active=false};
  },[plan.id]);
  async function approve(){
@@ -43,9 +52,10 @@ export function CDWScopeApprovalPanel({plan,onApproved}:{plan:CDWDistributionPla
     <div><span>清单状态</span><strong>{detail.state==="frozen"?"待审核":detail.state}</strong></div>
    </div>
    <div className="cdw-control-recipients" role="table" aria-label="冻结接收清单">
-    <div className="cdw-control-recipient-head" role="row"><strong>接收部门 ID</strong><strong>指定接收人 ID</strong><span>渠道</span></div>
+    <div className="cdw-control-recipient-head" role="row"><strong>接收部门</strong><strong>指定接收人</strong><span>渠道</span></div>
     {detail.targets.map(t=><div className="cdw-control-recipient-row" role="row" key={t.departmentId}>
-     <span>{t.departmentId}</span><span>{t.receiverId}</span><small>电子</small>
+     <span>{departmentNames[t.departmentId]??t.departmentId}</span>
+     <span>{personNames[t.receiverId]??t.receiverId}</span><small>电子</small>
     </div>)}
    </div>
    <div className="cdw-review-digest"><small>冻结范围 SHA-256</small><code>{detail.digestSha256}</code></div>

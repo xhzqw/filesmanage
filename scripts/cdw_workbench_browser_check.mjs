@@ -121,6 +121,14 @@ try{
  const controlledLayout=await evalJS("({width:innerWidth,scrollWidth:document.documentElement.scrollWidth})");
  assert.ok(controlledLayout.scrollWidth<=controlledLayout.width+2,"G8 narrow canvas has no page overflow");
  console.log("CDW_G8_PREPARE_BROWSER_PASS candidate-registry+tab+live-source-sha=read-only");
+ const scope=await evalJS("(async()=>{const r=await fetch('/api/workbench/distribution-scope/inbox');return {status:r.status,data:(await r.json()).data}})()");
+ assert.equal(scope.status,200,"G9 scope approval inbox enforces live authenticated identity");
+ assert.ok(Array.isArray(scope.data?.items),"G9 independently appointed scope list is live");
+ await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('范围审批'));button?.click();return true;})()");
+ await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('范围审批')");
+ assert.equal(await evalJS("[...document.querySelectorAll('.cdw-inbox-actions button')].some(b=>b.textContent.includes('派发任务'))"),false,
+  "G9 scope approval cannot masquerade as task delegation");
+ console.log("CDW_G9_SCOPE_BROWSER_PASS authenticated-inbox+separate-review-workbench");
  await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('责任待办'));button?.click();return true;})()");
  await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('责任待办')");
  const obligations=await evalJS("(async()=>{const r=await fetch('/api/workbench/inbox?limit=100');return {status:r.status,data:(await r.json()).data}})()");
