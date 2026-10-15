@@ -10,6 +10,7 @@ import (
 	"filesmanage/internal/domain"
 	"filesmanage/internal/ports"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -300,6 +301,11 @@ func (s *Service) CDWRequestBranchSave(ctx context.Context, actor domain.User, b
 		} else if parseErr := json.NewDecoder(io.LimitReader(response.Body, 4096)).Decode(&outcome); parseErr != nil {
 			err = parseErr
 		} else if outcome.Error == nil || *outcome.Error != 0 {
+			if outcome.Error != nil {
+				// Numeric Document Server command errors are safe diagnostics.
+				// Never log tokens, document keys, or callback URLs.
+				log.Printf("CDW ONLYOFFICE force-save command rejected code=%d", *outcome.Error)
+			}
 			err = domain.ErrConflict
 		}
 	}
