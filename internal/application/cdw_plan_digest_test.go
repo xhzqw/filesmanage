@@ -56,15 +56,15 @@ func TestCDWCanonicalDigestBindsEveryApprovalRelevantField(t *testing.T) {
 		t.Fatal(err)
 	}
 	cases := map[string]func(*CDWDistributionPlanSnapshot){
-		"artifact hash": func(p *CDWDistributionPlanSnapshot) { p.Items[0].ArtifactSHA256 = strings.Repeat("c", 64) },
-		"artifact": func(p *CDWDistributionPlanSnapshot) { p.Items[0].ArtifactID = "other" },
-		"release": func(p *CDWDistributionPlanSnapshot) { p.Items[0].ReleaseID = "other" },
-		"receiver": func(p *CDWDistributionPlanSnapshot) { p.Targets[0].DesignatedReceiverID = "other" },
-		"department": func(p *CDWDistributionPlanSnapshot) { p.Targets[0].DepartmentID = "other" },
-		"channel": func(p *CDWDistributionPlanSnapshot) { p.Targets[0].Channel = "mixed" },
-		"quantity": func(p *CDWDistributionPlanSnapshot) { p.Targets[0].PaperQuantity = 3 },
-		"receipt gate": func(p *CDWDistributionPlanSnapshot) { p.Targets[0].ItemRequirements[0].ReceiptRequired = false },
-		"reading gate": func(p *CDWDistributionPlanSnapshot) { p.Targets[1].ItemRequirements[0].ReadingRequired = false },
+		"artifact hash":       func(p *CDWDistributionPlanSnapshot) { p.Items[0].ArtifactSHA256 = strings.Repeat("c", 64) },
+		"artifact":            func(p *CDWDistributionPlanSnapshot) { p.Items[0].ArtifactID = "other" },
+		"release":             func(p *CDWDistributionPlanSnapshot) { p.Items[0].ReleaseID = "other" },
+		"receiver":            func(p *CDWDistributionPlanSnapshot) { p.Targets[0].DesignatedReceiverID = "other" },
+		"department":          func(p *CDWDistributionPlanSnapshot) { p.Targets[0].DepartmentID = "other" },
+		"channel":             func(p *CDWDistributionPlanSnapshot) { p.Targets[0].Channel = "mixed" },
+		"quantity":            func(p *CDWDistributionPlanSnapshot) { p.Targets[0].PaperQuantity = 3 },
+		"receipt gate":        func(p *CDWDistributionPlanSnapshot) { p.Targets[0].ItemRequirements[0].ReceiptRequired = false },
+		"reading gate":        func(p *CDWDistributionPlanSnapshot) { p.Targets[1].ItemRequirements[0].ReadingRequired = false },
 		"implementation gate": func(p *CDWDistributionPlanSnapshot) { p.Targets[0].ItemRequirements[0].ImplementationRequired = true },
 		"per-department items": func(p *CDWDistributionPlanSnapshot) {
 			p.Targets[1].ItemRequirements = p.Targets[1].ItemRequirements[:1]
@@ -87,14 +87,14 @@ func TestCDWCanonicalDigestBindsEveryApprovalRelevantField(t *testing.T) {
 
 func TestCDWCanonicalPlanRejectsInvalidOrAmbiguousScope(t *testing.T) {
 	cases := map[string]func(*CDWDistributionPlanSnapshot){
-		"missing items": func(p *CDWDistributionPlanSnapshot) { p.Items = nil },
-		"missing target": func(p *CDWDistributionPlanSnapshot) { p.Targets = nil },
-		"duplicate item": func(p *CDWDistributionPlanSnapshot) { p.Items[0].Ordinal = 1 },
+		"missing items":        func(p *CDWDistributionPlanSnapshot) { p.Items = nil },
+		"missing target":       func(p *CDWDistributionPlanSnapshot) { p.Targets = nil },
+		"duplicate item":       func(p *CDWDistributionPlanSnapshot) { p.Items[0].Ordinal = 1 },
 		"duplicate department": func(p *CDWDistributionPlanSnapshot) { p.Targets[0].DepartmentID = "d1" },
-		"bad sha": func(p *CDWDistributionPlanSnapshot) { p.Items[0].ArtifactSHA256 = strings.Repeat("A", 64) },
-		"bad quantity": func(p *CDWDistributionPlanSnapshot) { p.Targets[0].PaperQuantity = 0 },
-		"missing requirement": func(p *CDWDistributionPlanSnapshot) { p.Targets[0].ItemRequirements = nil },
-		"unknown ordinal": func(p *CDWDistributionPlanSnapshot) { p.Targets[0].ItemRequirements[0].ItemOrdinal = 3 },
+		"bad sha":              func(p *CDWDistributionPlanSnapshot) { p.Items[0].ArtifactSHA256 = strings.Repeat("A", 64) },
+		"bad quantity":         func(p *CDWDistributionPlanSnapshot) { p.Targets[0].PaperQuantity = 0 },
+		"missing requirement":  func(p *CDWDistributionPlanSnapshot) { p.Targets[0].ItemRequirements = nil },
+		"unknown ordinal":      func(p *CDWDistributionPlanSnapshot) { p.Targets[0].ItemRequirements[0].ItemOrdinal = 3 },
 		"duplicate requirement": func(p *CDWDistributionPlanSnapshot) {
 			p.Targets[0].ItemRequirements = append(p.Targets[0].ItemRequirements, p.Targets[0].ItemRequirements[0])
 		},
