@@ -170,6 +170,13 @@ func exerciseCDWG6Override(t *testing.T, ctx context.Context, pool *pgxpool.Pool
 	if err != nil || final.State != "substituted" || final.TaskState != "accepted_delivery" || final.ActingForID != bob.ID || final.OverrideGrantID != grant3.ID {
 		t.Fatalf("delegated accept failed: %+v %v", final, err)
 	}
+	// Reusing the exact request key must return the committed delegated
+	// decision even though its gate is now terminal and no longer eligible
+	// for a NEW authorization check.
+	replayDecision, ee := service.CDWDecideReview(ctx, alice, gate.ID, "accept", "已核对冻结稿", 1, prefix+"_g6decide", grant3.ID)
+	if ee != nil || replayDecision.OverrideGrantID != final.OverrideGrantID || replayDecision.Revision != final.Revision {
+		t.Fatalf("delegated decision idempotent replay failed: %+v %v", replayDecision, ee)
+	}
 	if other, ee := service.CDWDecideReview(ctx, bob, gate.ID, "return", "第二次审核不允许", 2, prefix+"_g6double"); !errors.Is(ee, domain.ErrVersionConflict) {
 		t.Fatalf("direct reviewer overrode terminal gate: %+v %v", other, ee)
 	}

@@ -116,17 +116,6 @@ func (s *Service) CDWDecideReview(ctx context.Context, actor domain.User, gateID
 	if err != nil {
 		return result, err
 	}
-	grantID, err := store.CDWReviewAccess(ctx, gateID, actor.ID)
-	if err != nil {
-		return result, err
-	}
-	if actor.ID == gate.ReviewerID {
-		if overrideGrantID != "" {
-			return result, domain.ErrInvalidInput
-		}
-	} else if grantID == "" || grantID != overrideGrantID {
-		return result, domain.ErrForbidden
-	}
 	if _, err = s.visibleFile(ctx, tx, actor, gate.FileID, domain.ActionPreview); err != nil {
 		return result, err
 	}
@@ -150,6 +139,20 @@ func (s *Service) CDWDecideReview(ctx context.Context, actor domain.User, gateID
 			return result, err
 		}
 		return result, nil
+	}
+	// The same actor's committed idempotent response must replay even after
+	// the gate closes, grant expires or is revoked. For fresh commands the
+	// current gate and grant authority are revalidated below.
+	grantID, err := store.CDWReviewAccess(ctx, gateID, actor.ID)
+	if err != nil {
+		return result, err
+	}
+	if actor.ID == gate.ReviewerID {
+		if overrideGrantID != "" {
+			return result, domain.ErrInvalidInput
+		}
+	} else if grantID == "" || grantID != overrideGrantID {
+		return result, domain.ErrForbidden
 	}
 	result, err = store.CDWDecideReview(ctx, gateID, actor.ID, expected, decision, reason, NewID("cdwdecision"), NewID("cdwreturn"), overrideGrantID)
 	if err != nil {
