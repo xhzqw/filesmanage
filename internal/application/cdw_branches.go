@@ -3,6 +3,8 @@ package application
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"filesmanage/internal/domain"
@@ -12,6 +14,18 @@ import (
 	"strings"
 	"time"
 )
+
+func validCDWOperationKey(key string) bool {
+	if len(key) < 8 || len(key) > 128 {
+		return false
+	}
+	for _, ch := range key {
+		if !(ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch >= '0' && ch <= '9' || ch == '_' || ch == '-') {
+			return false
+		}
+	}
+	return true
+}
 
 type CDWBranchEditorView struct {
 	Branch    ports.CDWBranch        `json:"branch"`
@@ -34,8 +48,8 @@ func (s *Service) cdwBranchForActor(ctx context.Context, tx ports.Tx, actor doma
 	}
 	return branch, store, nil
 }
-func (s *Service) CDWCreateBranch(ctx context.Context, actor domain.User, taskID string) (ports.CDWBranch, error) {
-	if taskID == "" {
+func (s *Service) CDWCreateBranch(ctx context.Context, actor domain.User, taskID, key string) (ports.CDWBranch, error) {
+	if taskID == "" || !validCDWOperationKey(key) {
 		return ports.CDWBranch{}, domain.ErrInvalidInput
 	}
 	tx, err := s.uow.Begin(ctx)
@@ -58,11 +72,33 @@ func (s *Service) CDWCreateBranch(ctx context.Context, actor domain.User, taskID
 	if !ok {
 		return ports.CDWBranch{}, domain.ErrInvalidInput
 	}
+	const operation = "branch.create"
+	prior, replay, err := taskStore.CDWClaimOperation(ctx, actor.ID, operation, key, cdwCommandHash(operation, taskID, nil))
+	if err != nil {
+		return ports.CDWBranch{}, err
+	}
+	if replay {
+		var old ports.CDWBranch
+		if err = json.Unmarshal(prior, &old); err != nil {
+			return old, err
+		}
+		return old, nil
+	}
 	branch, err := branchStore.CDWCreateBranch(ctx, NewID("cdwbranch"), taskID, fileID, actor.ID)
 	if err != nil {
 		return branch, err
 	}
 	if err = auditRequired(ctx, tx, actor, "cdw.branch.created", "task", taskID, "success", map[string]any{"branchId": branch.ID, "fileId": fileID}); err != nil {
+		return branch, err
+	}
+	if err = branchStore.CDWBranchEvent(ctx, actor.ID, "created", branch.ID, NewID("cdwreq"), map[string]any{"taskId": taskID, "fileId": fileID}); err != nil {
+		return branch, err
+	}
+	raw, err := json.Marshal(branch)
+	if err != nil {
+		return branch, err
+	}
+	if err = branchStore.CDWCompleteOperationRaw(ctx, actor.ID, operation, key, 201, raw); err != nil {
 		return branch, err
 	}
 	return branch, tx.Commit(ctx)
@@ -144,6 +180,21 @@ func (s *Service) CDWBranchSource(ctx context.Context, token string) (io.ReadSee
 	if !ok {
 		return nil, "", 0, nil, domain.ErrInvalidInput
 	}
+	sess, err := store.CDWBranchSessionByKey(ctx, key)
+	if err != nil {
+		return nil, "", 0, nil, domain.ErrUnauthorized
+	}
+	owner, err := tx.UserByID(ctx, sess.OpenedBy)
+	if err != nil || owner.DisabledAt != nil {
+		return nil, "", 0, nil, domain.ErrForbidden
+	}
+	branch, err := store.CDWBranchForActor(ctx, sess.BranchID, owner.ID)
+	if err != nil {
+		return nil, "", 0, nil, err
+	}
+	if _, err = s.visibleFile(ctx, tx, owner, branch.FileID, domain.ActionPreview); err != nil {
+		return nil, "", 0, nil, err
+	}
 	source, err := store.CDWBranchSessionSource(ctx, key)
 	if err != nil {
 		return nil, "", 0, nil, err
@@ -158,8 +209,13 @@ func (s *Service) CDWBranchSource(ctx context.Context, token string) (io.ReadSee
 // A button labelled "Submit delivery" may request final save fencing. The
 // visible editor Save remains ONLYOFFICE's own control; command success is
 // merely 'requested', NOT proof that immutable bytes have been persisted.
-func (s *Service) CDWRequestBranchSave(ctx context.Context, actor domain.User, branchID, sessionID string) (ports.CDWBranchSave, error) {
+func (s *Service) CDWRequestBranchSave(ctx context.Context, actor domain.User, branchID, sessionID, key string) (ports.CDWBranchSave, error) {
 	var save ports.CDWBranchSave
+	if !validCDWOperationKey(key) {
+		return save, domain.ErrInvalidInput
+	}
+	identity := sha256.Sum256([]byte(actor.ID + "|" + branchID + "|" + sessionID + "|" + key))
+	requestID := "cdwsave_" + hex.EncodeToString(identity[:])
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
 		return save, err
@@ -169,7 +225,7 @@ func (s *Service) CDWRequestBranchSave(ctx context.Context, actor domain.User, b
 	if err != nil {
 		return save, err
 	}
-	save, err = store.CDWBeginBranchSave(ctx, branchID, sessionID, actor.ID, NewID("cdwsave"))
+	save, err = store.CDWBeginBranchSave(ctx, branchID, sessionID, actor.ID, requestID)
 	if err != nil {
 		return save, err
 	}
@@ -179,6 +235,9 @@ func (s *Service) CDWRequestBranchSave(ctx context.Context, actor domain.User, b
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return save, err
+	}
+	if save.State == "persisted" {
+		return save, nil
 	}
 	command := map[string]any{"c": "forcesave", "key": session.DocumentKey, "userdata": save.ID}
 	signed, err := signJWT(s.office.Secret, command, time.Minute)
@@ -239,7 +298,23 @@ func (s *Service) CDWBranchSaveStatus(ctx context.Context, actor domain.User, br
 	return store.CDWReadBranchSave(ctx, branchID, requestID, actor.ID)
 }
 func (s *Service) CDWHandleBranchCallback(ctx context.Context, authorization string, payload EditorCallbackPayload) (int, error) {
-	if _, err := verifyJWTWith(s.office.Secret, authorization, false); err != nil {
+	claims, err := verifyJWTWith(s.office.Secret, authorization, false)
+	if err != nil {
+		return 1, domain.ErrUnauthorized
+	}
+	boundKey, _ := claims["key"].(string)
+	if body, ok := claims["payload"].(map[string]any); ok {
+		if key, ok := body["key"].(string); ok {
+			boundKey = key
+		}
+		if status, ok := body["status"].(float64); ok && int(status) != payload.Status {
+			return 1, domain.ErrUnauthorized
+		}
+		if u, ok := body["url"].(string); ok && u != payload.URL {
+			return 1, domain.ErrUnauthorized
+		}
+	}
+	if boundKey == "" || boundKey != payload.Key {
 		return 1, domain.ErrUnauthorized
 	}
 	if payload.Key == "" {
@@ -298,13 +373,30 @@ func (s *Service) CDWHandleBranchCallback(ctx context.Context, authorization str
 	if !ok {
 		return 1, domain.ErrInvalidInput
 	}
+	owner, err := tx.UserByID(ctx, session.OpenedBy)
+	if err != nil || owner.DisabledAt != nil {
+		return 1, domain.ErrForbidden
+	}
+	branch, err := store.CDWBranchForActor(ctx, session.BranchID, owner.ID)
+	if err != nil {
+		return 1, err
+	}
+	if _, err = s.visibleFile(ctx, tx, owner, branch.FileID, domain.ActionPreview); err != nil {
+		return 1, err
+	}
 	blob, err := ensureBlob(ctx, tx, key, stage.Sha256(), stage.Size())
 	if err != nil {
 		return 1, err
 	}
 	eventHash := callbackEventHash(session.ID, payload.Key, payload.Status, payload.URL, payload.UserData)
-	_, err = store.CDWCommitBranchCallback(ctx, payload.Key, payload.Status, payload.UserData, eventHash, blob.ID, stage.Size(), stage.Sha256(), session.Epoch, NewID("cdwrev"))
+	applied, err := store.CDWCommitBranchCallback(ctx, payload.Key, payload.Status, payload.UserData, eventHash, blob.ID, stage.Size(), stage.Sha256(), session.Epoch, NewID("cdwrev"))
 	if err != nil {
+		return 1, err
+	}
+	if !applied {
+		return 0, nil
+	}
+	if err = store.CDWBranchEvent(ctx, session.OpenedBy, "revision.persisted", session.BranchID, NewID("cdwreq"), map[string]any{"sessionId": session.ID, "eventHash": eventHash, "sha256": stage.Sha256()}); err != nil {
 		return 1, err
 	}
 	if err = auditRequired(ctx, tx, domain.User{ID: session.OpenedBy}, "cdw.office.callback", "branch", session.BranchID, "success",
@@ -316,8 +408,8 @@ func (s *Service) CDWHandleBranchCallback(ctx context.Context, authorization str
 	}
 	return 0, nil
 }
-func (s *Service) CDWFreezeBranch(ctx context.Context, actor domain.User, branchID, requestID, revisionID string, expected int64) (ports.CDWBranchFreeze, error) {
-	if expected < 1 || requestID == "" || revisionID == "" {
+func (s *Service) CDWFreezeBranch(ctx context.Context, actor domain.User, branchID, requestID, revisionID string, expected int64, key string) (ports.CDWBranchFreeze, error) {
+	if expected < 1 || requestID == "" || revisionID == "" || !validCDWOperationKey(key) {
 		return ports.CDWBranchFreeze{}, domain.ErrInvalidInput
 	}
 	tx, err := s.uow.Begin(ctx)
@@ -329,11 +421,42 @@ func (s *Service) CDWFreezeBranch(ctx context.Context, actor domain.User, branch
 	if err != nil {
 		return ports.CDWBranchFreeze{}, err
 	}
-	result, err := store.CDWFreezeBranchDelivery(ctx, branchID, actor.ID, requestID, revisionID, NewID("cdwdelivery"), expected, NewID("cdwfreeze"), NewID("cdwgate"), NewID("cdwidem"))
+	operation := "branch.freeze"
+	requestHash := cdwCommandHash(operation, branchID, struct {
+		RequestID  string `json:"requestId"`
+		RevisionID string `json:"branchRevisionId"`
+		Expected   int64  `json:"expected"`
+	}{requestID, revisionID, expected})
+	taskStore, ok := tx.(ports.CDWTaskStore)
+	if !ok {
+		return ports.CDWBranchFreeze{}, domain.ErrInvalidInput
+	}
+	prior, replay, err := taskStore.CDWClaimOperation(ctx, actor.ID, operation, key, requestHash)
+	if err != nil {
+		return ports.CDWBranchFreeze{}, err
+	}
+	if replay {
+		var old ports.CDWBranchFreeze
+		if err = json.Unmarshal(prior, &old); err != nil {
+			return old, err
+		}
+		return old, nil
+	}
+	result, err := store.CDWFreezeBranchDelivery(ctx, branchID, actor.ID, requestID, revisionID, NewID("cdwdelivery"), expected, NewID("cdwfreeze"), NewID("cdwgate"), key)
 	if err != nil {
 		return result, err
 	}
 	if err = auditRequired(ctx, tx, actor, "cdw.delivery.frozen", "branch", branchID, "success", map[string]any{"deliveryId": result.DeliveryID, "sha256": result.SHA256}); err != nil {
+		return result, err
+	}
+	if err = store.CDWBranchEvent(ctx, actor.ID, "delivery.frozen", branchID, NewID("cdwreq"), map[string]any{"deliveryId": result.DeliveryID, "sha256": result.SHA256, "reviewGateId": result.ReviewGateID}); err != nil {
+		return result, err
+	}
+	raw, err := json.Marshal(result)
+	if err != nil {
+		return result, err
+	}
+	if err = store.CDWCompleteOperationRaw(ctx, actor.ID, operation, key, 201, raw); err != nil {
 		return result, err
 	}
 	return result, tx.Commit(ctx)

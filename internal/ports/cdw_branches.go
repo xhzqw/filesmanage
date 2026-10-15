@@ -2,6 +2,7 @@ package ports
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 )
 
@@ -64,6 +65,8 @@ type CDWBranchStore interface {
 	CDWBranchSessionSource(context.Context, string) (CDWBranchSource, error)                   // documentKey
 	CDWBeginBranchSave(context.Context, string, string, string, string) (CDWBranchSave, error) // branch/session/actor/requestID
 	CDWMarkBranchSaveUnknown(context.Context, string) error
+	CDWCompleteOperationRaw(context.Context, string, string, string, int, json.RawMessage) error
+	CDWBranchEvent(context.Context, string, string, string, string, map[string]any) error
 	CDWReadBranchSave(context.Context, string, string, string) (CDWBranchSave, error)                                                        // branch/request/actor
 	CDWCommitBranchCallback(context.Context, string, int, string, string, string, int64, string, int64, string) (bool, error)                // key/status,userdata,eventHash,blobID,size,sha,epoch,revisionID
 	CDWFreezeBranchDelivery(context.Context, string, string, string, string, string, int64, string, string, string) (CDWBranchFreeze, error) // branch/actor/request/revision/delivery/expected/freeze/gate/idempotency

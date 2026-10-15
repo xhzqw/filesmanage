@@ -6,6 +6,8 @@ import (
 	"filesmanage/internal/application"
 	"filesmanage/internal/domain"
 	"filesmanage/internal/ports"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"sync"
@@ -209,14 +211,29 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 	if _, err = service.CDWAcceptTask(ctx, charlie, groupRoot.TaskID, 1, prefix+"_group_revoked"); !errors.Is(err, domain.ErrForbidden) {
 		t.Fatalf("revoked leader must not accept: %v", err)
 	}
+	// Fake document-server /command proves force-save dispatch is only a request;
+	// no callback is implied by an HTTP 200 response.
+	commandServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/command" || r.Header.Get("Authorization") == "" {
+			http.Error(w, "invalid command", 400)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"error":0}`))
+	}))
+	defer commandServer.Close()
+	service.WithOffice(application.OfficeConfig{EditorURL: commandServer.URL, Secret: "cdw-isolated-fixture-secret"})
 	// Independent branches from the SAME base file cannot change file_versions.
-	aliceBranch, err := service.CDWCreateBranch(ctx, alice, root.TaskID)
+	aliceBranch, err := service.CDWCreateBranch(ctx, alice, root.TaskID, prefix+"_create_A")
 	if err != nil {
 		t.Fatalf("A branch: %v", err)
 	}
-	bobBranch, err := service.CDWCreateBranch(ctx, bob, child.TaskID)
+	bobBranch, err := service.CDWCreateBranch(ctx, bob, child.TaskID, prefix+"_create_B")
 	if err != nil {
 		t.Fatalf("B branch: %v", err)
+	}
+	if duplicate, e := service.CDWCreateBranch(ctx, alice, root.TaskID, prefix+"_create_A"); e != nil || duplicate.ID != aliceBranch.ID {
+		t.Fatalf("create branch idempotency failed: %+v %v", duplicate, e)
 	}
 	if aliceBranch.BaseVersionID != versionID || bobBranch.BaseVersionID != versionID || aliceBranch.ID == bobBranch.ID {
 		t.Fatalf("branch baseline mismatch: A=%+v B=%+v", aliceBranch, bobBranch)
@@ -232,7 +249,7 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 		{aliceBranch, alice, "b"}, {bobBranch, bob, "c"},
 	}
 	var aliceReceipt ports.CDWBranchSave
-	var aliceRevision string
+	var aliceRevision, aliceDocKey string
 	for idx, candidate := range branchCommits {
 		workTx, e := repo.Begin(ctx)
 		if e != nil {
@@ -245,19 +262,24 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 			_ = workTx.Rollback(ctx)
 			t.Fatal(e)
 		}
-		request, e := store.CDWBeginBranchSave(ctx, candidate.b.ID, session.ID, candidate.user.ID, application.NewID("cdwsave"))
-		if e != nil {
-			_ = workTx.Rollback(ctx)
-			t.Fatal(e)
-		}
 		if e = workTx.Commit(ctx); e != nil {
 			t.Fatal(e)
 		}
+		key := prefix + "_save_" + candidate.letter
+		request, e := service.CDWRequestBranchSave(ctx, candidate.user, candidate.b.ID, session.ID, key)
+		if e != nil || request.State != "requested" {
+			t.Fatalf("force-save request: %+v %v", request, e)
+		}
+		duplicate, e := service.CDWRequestBranchSave(ctx, candidate.user, candidate.b.ID, session.ID, key)
+		if e != nil || duplicate.ID != request.ID {
+			t.Fatalf("force-save replay: %+v %v", duplicate, e)
+		}
 		if idx == 0 {
 			aliceReceipt = request
+			aliceDocKey = session.DocumentKey
 		}
 		// A forcesave accepted by ONLYOFFICE is only requested (no revision yet).
-		if _, e = service.CDWFreezeBranch(ctx, candidate.user, candidate.b.ID, request.ID, "nonexistent", 1); !errors.Is(e, domain.ErrVersionConflict) {
+		if _, e = service.CDWFreezeBranch(ctx, candidate.user, candidate.b.ID, request.ID, "nonexistent", 1, prefix+"_premature_"+candidate.letter); !errors.Is(e, domain.ErrVersionConflict) {
 			t.Fatalf("premature freeze was not blocked: %v", e)
 		}
 		sha := strings.Repeat(candidate.letter, 64)
@@ -318,7 +340,7 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 		t.Fatalf("branch changes leaked to formal versions seq=%d count=%d", fileSeq, versionCount)
 	}
 	// Frozen delivery is tied to a matching persisted save receipt and branch HEAD.
-	frozen, e := service.CDWFreezeBranch(ctx, alice, aliceBranch.ID, aliceReceipt.ID, aliceRevision, 2)
+	frozen, e := service.CDWFreezeBranch(ctx, alice, aliceBranch.ID, aliceReceipt.ID, aliceRevision, 2, prefix+"_freeze_A")
 	if e != nil {
 		t.Fatalf("freeze persisted branch: %v", e)
 	}
@@ -340,14 +362,17 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	_, e = lateTx.(ports.CDWBranchStore).CDWCommitBranchCallback(ctx, application.NewID("badkey"), 6, "",
+	_, e = lateTx.(ports.CDWBranchStore).CDWCommitBranchCallback(ctx, aliceDocKey, 6, "",
 		strings.Repeat("e", 64), blobID, 29, strings.Repeat("a", 64), 1, application.NewID("cdwrev"))
 	_ = lateTx.Rollback(ctx)
-	if !errors.Is(e, domain.ErrForbidden) {
-		t.Fatalf("unrecognized doc key was accepted: %v", e)
+	if !errors.Is(e, domain.ErrVersionConflict) {
+		t.Fatalf("late callback on frozen branch was accepted: %v", e)
 	}
-	if _, e = service.CDWFreezeBranch(ctx, alice, aliceBranch.ID, aliceReceipt.ID, aliceRevision, 2); !errors.Is(e, domain.ErrVersionConflict) {
-		t.Fatalf("duplicate delivery freeze accepted: %v", e)
+	if again, e2 := service.CDWFreezeBranch(ctx, alice, aliceBranch.ID, aliceReceipt.ID, aliceRevision, 2, prefix+"_freeze_A"); e2 != nil || again.DeliveryID != frozen.DeliveryID {
+		t.Fatalf("identical freeze must replay original: %+v %v", again, e2)
+	}
+	if _, e = service.CDWFreezeBranch(ctx, alice, aliceBranch.ID, aliceReceipt.ID, aliceRevision, 2, prefix+"_freeze_B"); !errors.Is(e, domain.ErrVersionConflict) {
+		t.Fatalf("new freeze key must not create a second delivery: %v", e)
 	}
 	t.Logf("CDW_BRANCH_POSTGRES_PASS branches=%s,%s persisted=2 froze=%s normal_seq=1", aliceBranch.ID, bobBranch.ID, frozen.DeliveryID)
 	var n int

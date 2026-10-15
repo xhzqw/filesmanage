@@ -14,13 +14,17 @@ func (h *Handler) cdwCreateBranch(c *gin.Context) {
 	if !ok {
 		return
 	}
+	key, ok := cdwKey(c)
+	if !ok {
+		return
+	}
 	var req struct {
 		TaskID string `json:"taskId"`
 	}
 	if !cdwBind(c, &req) {
 		return
 	}
-	branch, err := h.S.CDWCreateBranch(c.Request.Context(), user, req.TaskID)
+	branch, err := h.S.CDWCreateBranch(c.Request.Context(), user, req.TaskID, key)
 	if err != nil {
 		cdwError(c, err)
 		return
@@ -49,13 +53,17 @@ func (h *Handler) cdwRequestBranchSave(c *gin.Context) {
 	if !ok {
 		return
 	}
+	key, ok := cdwKey(c)
+	if !ok {
+		return
+	}
 	var req struct {
 		SessionID string `json:"sessionId"`
 	}
 	if !cdwBind(c, &req) {
 		return
 	}
-	result, err := h.S.CDWRequestBranchSave(c.Request.Context(), user, c.Param("id"), req.SessionID)
+	result, err := h.S.CDWRequestBranchSave(c.Request.Context(), user, c.Param("id"), req.SessionID, key)
 	if err != nil {
 		cdwError(c, err)
 		return
@@ -80,6 +88,10 @@ func (h *Handler) cdwFreezeBranch(c *gin.Context) {
 	if !ok {
 		return
 	}
+	key, ok := cdwKey(c)
+	if !ok {
+		return
+	}
 	expected, ok := cdwIfMatch(c)
 	if !ok {
 		return
@@ -91,7 +103,7 @@ func (h *Handler) cdwFreezeBranch(c *gin.Context) {
 	if !cdwBind(c, &req) {
 		return
 	}
-	result, err := h.S.CDWFreezeBranch(c.Request.Context(), user, c.Param("id"), req.RequestID, req.BranchRevisionID, expected)
+	result, err := h.S.CDWFreezeBranch(c.Request.Context(), user, c.Param("id"), req.RequestID, req.BranchRevisionID, expected, key)
 	if err != nil {
 		cdwError(c, err)
 		return

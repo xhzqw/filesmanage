@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"filesmanage/internal/domain"
 	"filesmanage/internal/ports"
@@ -195,6 +196,16 @@ func (r *Repository) CDWBeginBranchSave(ctx context.Context, branchID, sessionID
 	if session.OpenedBy != actor || session.State != "open" || !session.ExpiresAt.After(time.Now()) || session.Epoch != epoch {
 		return ports.CDWBranchSave{}, domain.ErrConflict
 	}
+	// Replays of the same save key always return the same request, including
+	// 'unknown' (retryable), rather than generating a competing barrier.
+	if existing, e := r.CDWReadBranchSave(ctx, branchID, requestID, actor); e == nil {
+		if existing.SessionID != sessionID || existing.Generation != session.Generation || existing.Epoch != epoch {
+			return ports.CDWBranchSave{}, domain.ErrConflict
+		}
+		return existing, nil
+	} else if !errors.Is(e, domain.ErrNotFound) {
+		return ports.CDWBranchSave{}, e
+	}
 	var active bool
 	if err = r.Q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM cdw_office_save_requests
  WHERE branch_id=$1 AND state IN('requested','accepted','unknown'))`, branchID).Scan(&active); err != nil {
@@ -207,6 +218,35 @@ func (r *Repository) CDWBeginBranchSave(ctx context.Context, branchID, sessionID
 	_, err = r.Q.Exec(ctx, `INSERT INTO cdw_office_save_requests(id,session_id,branch_id,requested_by,requested_generation,requested_epoch,state)
  VALUES($1,$2,$3,$4,$5,$6,'requested')`, requestID, sessionID, branchID, actor, session.Generation, epoch)
 	return result, err
+}
+func (r *Repository) CDWCompleteOperationRaw(ctx context.Context, actor, operation, key string, status int, response json.RawMessage) error {
+	tag, err := r.Q.Exec(ctx, `UPDATE cdw_operation_results SET state='done',http_status=$4,response=$5
+ WHERE actor_id=$1 AND operation=$2 AND request_key=$3 AND state='running'`, actor, operation, key, status, string(response))
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return domain.ErrConflict
+	}
+	return nil
+}
+func (r *Repository) CDWBranchEvent(ctx context.Context, actor, kind, branchID, requestID string, details map[string]any) error {
+	if requestID == "" {
+		return domain.ErrInvalidInput
+	}
+	raw, err := json.Marshal(details)
+	if err != nil {
+		return err
+	}
+	_, err = r.Q.Exec(ctx, `INSERT INTO cdw_domain_events(aggregate_kind,aggregate_id,event_kind,actor_id,request_id,details)
+ VALUES('branch',$1,$2,$3,$4,$5)`, branchID, kind, actor, requestID, string(raw))
+	if err != nil {
+		return err
+	}
+	event := sha256.Sum256([]byte(actor + "|" + branchID + "|" + kind + "|" + requestID))
+	_, err = r.Q.Exec(ctx, `INSERT INTO outbox_jobs(id,kind,payload) VALUES($1,'cdw.branch.changed',$2)`,
+		"cdw_evt_"+hex.EncodeToString(event[:]), string(raw))
+	return err
 }
 func (r *Repository) CDWMarkBranchSaveUnknown(ctx context.Context, id string) error {
 	_, err := r.Q.Exec(ctx, `UPDATE cdw_office_save_requests SET state='unknown'

@@ -454,6 +454,14 @@ paths:
       - CDW
       security:
       - cookieSession: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
       requestBody:
         required: true
         content:
@@ -623,6 +631,13 @@ paths:
         description: Branch ID.
         schema:
           type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
       requestBody:
         required: true
         content:
@@ -778,6 +793,13 @@ paths:
         description: Branch ID.
         schema:
           type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
       - name: If-Match
         in: header
         required: true

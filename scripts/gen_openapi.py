@@ -783,7 +783,7 @@ CDW_FREEZE = obj({"deliveryId":string(),"branchId":string(),"taskId":string(),
  "revision":integer(minimum=1)},
  required=["deliveryId","branchId","taskId","branchRevisionId","sha256","reviewGateId","revision"])
 add("POST","/api/work-branches",operation("Create isolated task editing branch; no file_versions mutation","CDW","cdwCreateBranch",
- security=SESSION,request={"application/json":{"schema":CDW_BRANCH_CREATE}},
+ security=SESSION,params=[CDW_IDEMPOTENCY],request={"application/json":{"schema":CDW_BRANCH_CREATE}},
  responses=dict([json_ok(CDW_BRANCH,"New branch created."),resp("403",ERR["403"]),resp("409",ERR["409"])])))
 add("POST","/api/work-branches/{id}/office-sessions",operation("Open exclusive ONLYOFFICE document key for a task branch","CDW","cdwBranchOffice",
  security=SESSION,params=[id_param("id","Branch ID.")],
@@ -791,7 +791,7 @@ add("POST","/api/work-branches/{id}/office-sessions",operation("Open exclusive O
  responses=dict([json_ok(obj({"branch":CDW_BRANCH,"session":{"type":"object"},"editorUrl":string(),"config":{"type":"object"}}),
  "ONLYOFFICE editor config signed; callback/source use branch-only routes."),resp("409",ERR["409"])])))
 add("POST","/api/work-branches/{id}/save",operation("Request final ONLYOFFICE save; acknowledgement is NOT persistence","CDW","cdwBranchSave",
- security=SESSION,params=[id_param("id","Branch ID.")],request={"application/json":{"schema":CDW_SAVE_REQ}},
+ security=SESSION,params=[id_param("id","Branch ID."),CDW_IDEMPOTENCY],request={"application/json":{"schema":CDW_SAVE_REQ}},
  responses={"202":{"description":"Requested/unknown: poll matching callback receipt; cannot freeze yet",
  "content":{"application/json":{"schema":obj({"ok":{"type":"boolean"},"data":CDW_SAVE_STATUS},required=["ok","data"])}}},
  "409":{"description":"Invalid/duplicate active save request"}}))
@@ -799,7 +799,7 @@ add("GET","/api/work-branches/{id}/save-requests/{rid}",operation("Read authorit
  security=SESSION,params=[id_param("id","Branch ID."),id_param("rid","Save request ID.")],
  responses=dict([json_ok(CDW_SAVE_STATUS,"Persisted only after callback commits exact blob/revision."),resp("403",ERR["403"])])))
 add("POST","/api/work-branches/{id}/freeze-delivery",operation("Freeze exact committed branch revision into immutable delivery","CDW","cdwBranchFreeze",
- security=SESSION,params=[id_param("id","Branch ID."),CDW_IF_MATCH],
+ security=SESSION,params=[id_param("id","Branch ID."),CDW_IDEMPOTENCY,CDW_IF_MATCH],
  request={"application/json":{"schema":CDW_FREEZE_REQ}},
  responses={"201":{"description":"Committed immutable delivery, first direct-parent gate awaiting review",
  "content":{"application/json":{"schema":obj({"ok":{"type":"boolean"},"data":CDW_FREEZE},required=["ok","data"])}}},
