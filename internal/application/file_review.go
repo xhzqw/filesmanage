@@ -57,8 +57,12 @@ func (s *Service) ReviewComments(ctx context.Context, u domain.User, fileID stri
 	return page, nil
 }
 func (s *Service) AddReviewComment(ctx context.Context, u domain.User, fileID string, version int, line *int, body string) (domain.FileReviewComment, error) {
+	return s.AddReviewFlowComment(ctx, u, fileID, version, nil, line, body, "")
+}
+
+func (s *Service) AddReviewFlowComment(ctx context.Context, u domain.User, fileID string, version int, page, line *int, body, assignee string) (domain.FileReviewComment, error) {
 	body = strings.TrimSpace(body)
-	if version < 1 || body == "" || !utf8.ValidString(body) || utf8.RuneCountInString(body) > 2000 || (line != nil && (*line < 1 || *line > 1000000)) {
+	if version < 1 || body == "" || !utf8.ValidString(body) || utf8.RuneCountInString(body) > 2000 || (line != nil && (*line < 1 || *line > 1000000)) || (page != nil && (*page < 1 || *page > 100000)) {
 		return domain.FileReviewComment{}, domain.ErrInvalidInput
 	}
 	tx, err := s.uow.Begin(ctx)
@@ -72,8 +76,20 @@ func (s *Service) AddReviewComment(ctx context.Context, u domain.User, fileID st
 	if _, err = tx.VersionBySeq(ctx, fileID, version); err != nil {
 		return domain.FileReviewComment{}, domain.ErrNotFound
 	}
-	comment, err := tx.InsertReviewComment(ctx, domain.FileReviewComment{FileID: fileID, VersionSeq: version, LineNumber: line, Body: body, AuthorID: u.ID})
+	status := domain.ReviewOpen
+	if assignee != "" && assignee != u.ID {
+		if err = s.requireReviewAssignee(ctx, tx, fileID, assignee); err != nil {
+			return domain.FileReviewComment{}, err
+		}
+		status = domain.ReviewAssigned
+	} else {
+		assignee = ""
+	}
+	comment, err := tx.InsertReviewComment(ctx, domain.FileReviewComment{FileID: fileID, VersionSeq: version, PageNumber: page, LineNumber: line, Body: body, AuthorID: u.ID, Status: status, AssigneeID: assignee})
 	if err != nil {
+		return domain.FileReviewComment{}, err
+	}
+	if err = tx.RecordReviewTransition(ctx, comment.ID, u.ID, "created", "", assignee); err != nil {
 		return domain.FileReviewComment{}, err
 	}
 	if err = auditRequired(ctx, tx, u, "file.review_comment", "file", fileID, "success", map[string]any{"commentId": comment.ID, "versionSeq": version}); err != nil {
@@ -83,9 +99,17 @@ func (s *Service) AddReviewComment(ctx context.Context, u domain.User, fileID st
 		return domain.FileReviewComment{}, err
 	}
 	s.notifyWorkspaceChange("review")
+	if assignee != "" {
+		s.publishUserEvent(assignee, UserEvent{Type: "review.changed"})
+	}
 	return comment, nil
 }
 func (s *Service) ResolveReviewComment(ctx context.Context, u domain.User, fileID string, id int64) error {
+	return s.TransitionReviewComment(ctx, u, fileID, id, "resolve-self", "", nil, "")
+}
+
+// Legacy resolve uses the same authorization and transactional state machine.
+func (s *Service) legacyResolveReviewComment(ctx context.Context, u domain.User, fileID string, id int64) error {
 	if id < 1 {
 		return domain.ErrInvalidInput
 	}

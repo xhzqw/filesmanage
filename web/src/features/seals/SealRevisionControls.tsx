@@ -31,21 +31,26 @@ export function SealRevisionControls({fileId,seq,sha,isAdmin,refreshKey,onSelect
   finally{setPassword("");setBusy(false)}
  }
  return <section className="seal-revisions" aria-label="签章版本历史">
-  <div className="seal-library-heading">签章版本 {history?<span>r{history.current}</span>:null}</div>
+  <div className="seal-library-heading">历史签章版本 {history?<span>r{history.current}</span>:null}</div>
   {error&&<p className="notice error" role="alert">{error}</p>}
   {message&&<p className="notice" role="status">{message}</p>}
   {!history?<span className="seal-draft-empty"><BrandLoadingLabel>正在读取签章版本…</BrandLoadingLabel></span>:
    <div className="seal-revision-list">
-    {history.revisions.map(item=><div key={item.revision} className="seal-revision-row">
+    {history.revisions.map(item=><div key={item.revision}
+     className={"seal-revision-row"+(item.revision===history.current?" is-current":" is-viewable")}
+     role={item.revision===history.current?undefined:"button"} tabIndex={item.revision===history.current?undefined:0}
+     aria-label={item.revision===history.current?undefined:"查看签章版本 r"+item.revision}
+     onClick={()=>{if(item.revision!==history.current)onSelect(item.revision)}}
+     onKeyDown={e=>{if(item.revision!==history.current&&(e.key==="Enter"||e.key===" ")){e.preventDefault();onSelect(item.revision)}}}>
      <div className="seal-revision-meta">
-      <strong>{item.revision===0?"原始未签章":"签章 r"+item.revision}{item.revision===history.current?" · 当前":""}</strong>
+      <strong>{item.revision===0?"原始未签章":"签章 r"+item.revision}</strong>
       <small>{item.markCount} 枚 · {item.action==="restore"?"回退":item.action==="sign"?"签署":item.action==="legacy"?"历史导入":item.action==="revoke"?"删除签章":"原件"}</small>
-      {item.actorName&&<small>{item.actorName}{item.createdAt?" · "+new Date(item.createdAt).toLocaleString("zh-CN"):""}</small>}
      </div>
      <div className="seal-revision-actions">
-      <RareButton type="button" onClick={()=>onSelect(item.revision)}>查看</RareButton>
+      {item.revision===history.current&&<span className="seal-revision-current">当前</span>}
       {isAdmin&&item.revision!==history.current&&<RareButton type="button" disabled={busy}
-       aria-pressed={target===item.revision} onClick={()=>{setTarget(item.revision);setPassword("");setError("")}}>回退</RareButton>}
+       aria-pressed={target===item.revision} onKeyDown={e=>e.stopPropagation()}
+       onClick={e=>{e.stopPropagation();setTarget(item.revision);setPassword("");setError("")}}>↺ 回退到此版</RareButton>}
      </div>
     </div>)}
    </div>}

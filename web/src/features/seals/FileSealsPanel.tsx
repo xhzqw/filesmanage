@@ -273,27 +273,25 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
  const history = <details className="seal-sidebar-history">
   <summary>签署记录 <span>{marks.length}</span></summary>
   <aside className="seal-file-history">
+   <div className="seal-library-heading">当前印章 · {marks.length} 枚</div>
+   {marks.length===0&&<p className="empty">此版本尚无签章</p>}
+   {marks.map(m=><div key={m.id} className={"seal-history-row"+(deleteIds.includes(m.id)?" is-selected":"")}>
+    <div className="seal-history-row-top">
+     <strong>{m.assetKind==="personal"?"个人签名 · ":"公章 · "}{m.assetName}</strong>
+     <span className="seal-history-row-actions"><span className="seal-history-page">第 {m.pageNumber} 页</span>
+      {removable.some(mark=>mark.id===m.id)&&<RareButton type="button" tone="ghost" className="seal-history-delete"
+       aria-label={"删除"+m.assetName} title="删除此枚签章" disabled={deleteBusy}
+       onClick={()=>{setDeleteMode(false);setDeleteIds([m.id]);setDeletePassword("");setError("");setDeleteOpen(true)}}>
+       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v6m4-6v6"/></svg>
+      </RareButton>}
+     </span>
+    </div>
+    <small title={"v"+m.versionSeq+" · SHA "+m.fileSha256}>{m.signerName} · {new Date(m.createdAt).toLocaleString("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"})}</small>
+   </div>)}
    <SealRevisionControls fileId={fileId} seq={seq} sha={sha} isAdmin={isAdmin}
     refreshKey={revision} onSelect={onSelectRevision} onRestored={()=>{
      setStaged([]);setAssetId("");setDeleteMode(false);setDeleteIds([]);setRevision(n=>n+1);onChanged();
     }}/>
-
-   {removable.length>0&&<div className="seal-history-actions">
-    <RareButton type="button" tone="ghost" onClick={toggleDeleteMode}>{deleteMode?"取消选择":"选择删除签章"}</RareButton>
-    {deleteMode&&<RareButton type="button" tone="danger" disabled={!deleteIds.length||deleteBusy}
-     onClick={()=>{setError("");setDeletePassword("");setDeleteOpen(true)}}>删除选中 ({deleteIds.length})</RareButton>}
-   </div>}
-   {deleteMode&&<p className="seal-history-guidance">选择下方签章或点击纸张上的记录，再确认删除。</p>}
-   {marks.length===0&&<p className="empty">此版本尚无签章</p>}
-   {marks.map(m=><div key={m.id} className={"seal-history-row"+(deleteIds.includes(m.id)?" is-selected":"")}>
-    <div><strong>{m.assetName}</strong><RareBadge tone="neutral">第 {m.pageNumber} 页</RareBadge></div>
-    <small>{m.signerName} · {new Date(m.createdAt).toLocaleString("zh-CN")}</small>
-    <small>v{m.versionSeq} · {m.angleDegrees?m.angleDegrees+"° · ":""}SHA {m.fileSha256.slice(0,12)}…</small>
-    {deleteMode&&<RareButton type="button" tone="ghost" className="seal-history-pick"
-     disabled={!removable.some(mark=>mark.id===m.id)}
-     aria-pressed={deleteIds.includes(m.id)} onClick={()=>toggleDeleteMark(m.id)}>
-     {deleteIds.includes(m.id)?"✓ 已选中":"选择此签章"}</RareButton>}
-   </div>)}
   </aside>
  </details>;
  return <div className={"seal-file-workspace"+(controlsTargetId?" is-workbench":"")}>

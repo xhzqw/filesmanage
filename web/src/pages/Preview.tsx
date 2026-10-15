@@ -83,8 +83,11 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const[status,setStatus]=useState<"loading"|"ready"|"failed">("loading");
  const[sidebarCollapsed,setSidebarCollapsed]=useState(false);
  const[historyView,setHistoryView]=useState<"activity"|"versions">("activity");
- const[tab,setTab]=useState<Tab>(()=>new URLSearchParams(window.location.search).get("tab")==="seals"?"seals":"preview");
+ const[tab,setTab]=useState<Tab>(()=>{const requested=new URLSearchParams(window.location.search).get("tab");return requested==="seals"||requested==="review"?requested:"preview"});
  const[hasOpenedSeals,setHasOpenedSeals]=useState(()=>new URLSearchParams(window.location.search).get("tab")==="seals");
+ const[readerPage,setReaderPage]=useState(1);
+ const[reviewJumpPage,setReviewJumpPage]=useState(0);
+ useEffect(()=>{setReaderPage(1);setReviewJumpPage(0)},[id]);
  const[sealRevision,setSealRevision]=useState<number|null>(null);
  useEffect(()=>{setSealRevision(null)},[id,preview?.sha256,file?.currentVersionSeq]);
 
@@ -337,10 +340,6 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
        </details>
      </section>}
 
-            {tab==="review"&&<section id="file-panel-review" role="tabpanel" aria-labelledby="file-tab-review" className="file-sidebar-context">
-      <FileReviewPanel fileId={id} versions={versions}/>
-     </section>}
-
       {hasOpenedSeals&&!isOfficeName(preview.name)&&<div id="file-seals-sidebar" hidden={tab!=="seals"} className="file-sidebar-context file-seal-sidebar-host"/>}
 
       </aside>
@@ -392,6 +391,9 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
           onClick={()=>void convert("pdf")}>⇄ {converting?"转换中…":"转为 PDF"}</RareButton>}
          {preview.renderer==="pdf"&&<RareButton type="button" className="file-core-action" disabled={converting}
           onClick={()=>void convert("docx")}>⇄ {converting?"转换中…":"转为 Word"}</RareButton>}
+         {capabilities?.canReview&&<RareButton type="button" tone="ghost" title={tab==="review"?"关闭审查批注":"打开审查批注"}
+          aria-label="审查批注" aria-pressed={tab==="review"} onClick={()=>setTab(tab==="review"?"preview":"review")}>
+          <WorkbenchNavIcon type="review"/></RareButton>}
          <RareButton type="button" tone="ghost" title="下载" aria-label="下载" onClick={download}><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M4 17v3h16v-3"/></svg><span className="file-side-action-label">下载</span></RareButton>
          {capabilities?.canPrint&&<RareButton type="button" tone="ghost" title="打印" aria-label="打印" onClick={()=>setPrinting(true)}><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M7 8V4h10v4M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1-2 2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M7 14h10v6H7z"/><path d="M17 11h1"/></svg><span className="file-side-action-label">打印</span></RareButton>}
          <RareButton type="button" tone="ghost" className="file-more-trigger"
@@ -404,12 +406,15 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
        </div>
        </div>
        {error&&<p role="alert" className="notice error file-workbench-inline-notice">{error}</p>}
-            <section className="file-workbench-panel file-workbench-preview-surface" aria-label="文件预览" hidden={tab==="compare"||tab==="seals"||tab==="versions"}>
+       <div className={"file-workbench-reading-layout"+(tab==="review"?" has-review":"")}
+        hidden={tab==="compare"||tab==="seals"||tab==="versions"}>
+            <section className="file-workbench-panel file-workbench-preview-surface" aria-label="文件预览">
       {(preview.renderer==="image"||preview.renderer==="video"||preview.renderer==="audio")?
        <MediaPreview key={preview.fileId+preview.sha256} fileId={preview.fileId} sha256={preview.sha256}
         name={preview.name} kind={preview.renderer} mime={preview.mediaType??""}/>:
        preview.renderer==="pdf"?
-        <PDFPageViewer fileId={preview.fileId} sha={preview.sha256} name={preview.name} seq={currentSeq} revision={sealRevision} epoch={reloadToken} onRevisionChange={setSealRevision}/>:
+        <PDFPageViewer fileId={preview.fileId} sha={preview.sha256} name={preview.name} seq={currentSeq} revision={sealRevision} epoch={reloadToken}
+         onRevisionChange={setSealRevision} requestedPage={reviewJumpPage} onPageChange={setReaderPage}/>:
        preview.structured&&["spreadsheet","presentation","document"].includes(adapter)?
         <OfficeLayoutPreview fileId={preview.fileId} sha={preview.sha256} structured={preview.structured}/>:
        preview.structured&&adapter==="archive"?
@@ -440,6 +445,11 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
          <p>此文件无法直接在浏览器内预览，可下载后使用对应应用打开。</p>
         </div>}
      </section>
+     {tab==="review"&&<aside className="file-review-drawer" id="file-panel-review" role="tabpanel" aria-label="审查批注">
+      <FileReviewPanel fileId={id} versions={versions} currentUser={{id:user.id,isAdmin:user.isAdmin}}
+       currentPage={readerPage} onJumpToPage={setReviewJumpPage}/>
+     </aside>}
+     </div>
 
             {tab==="versions"&&<section id="file-panel-versions" role="tabpanel" aria-label="文件历史记录" className="file-workbench-mode-panel file-workbench-history">
        <div className="file-history-switch" role="group" aria-label="历史分类">

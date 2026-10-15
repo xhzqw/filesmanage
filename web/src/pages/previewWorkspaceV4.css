@@ -8,6 +8,12 @@
 .file-workbench-sidebar{display:flex;flex-direction:column;width:240px;min-width:0;min-height:0;padding:0;margin:0;border:0;border-radius:0;box-shadow:none;overflow:hidden;background:#F2F4F7}
 .file-workbench-layout.is-collapsed .file-workbench-sidebar{width:56px}
 .file-workbench-main{position:relative;isolation:isolate;display:flex;flex-direction:column;min-width:0;min-height:0;box-sizing:border-box;overflow:hidden;background:#F8FAFC;border:1px solid rgba(15,23,42,.075);border-radius:12px;box-shadow:0 2px 8px rgba(15,23,42,.03)}
+.file-workbench-reading-layout{display:flex;flex:1 1 auto;min-height:0;min-width:0;overflow:hidden}
+.file-workbench-reading-layout[hidden]{display:none!important}
+.file-workbench-reading-layout>.file-workbench-preview-surface{display:flex;flex-direction:column;flex:1 1 auto;min-width:0;min-height:0;overflow:hidden}
+.file-review-drawer{flex:0 0 350px;width:350px;min-width:0;min-height:0;display:flex;flex-direction:column;background:#FFFFFF;border-left:1px solid rgba(15,23,42,.07);box-sizing:border-box;overflow:hidden}
+@media(max-width:1050px){.file-review-drawer{flex-basis:310px;width:310px}}
+@media(max-width:620px){.file-workbench-reading-layout.has-review{flex-direction:column}.file-workbench-reading-layout.has-review>.file-workbench-preview-surface{flex:1 1 56%;min-height:130px}.file-review-drawer{flex:0 1 44%;width:100%;max-height:55%;border-left:0;border-top:1px solid rgba(15,23,42,.07)}}
 
 /* A single 48px flow toolbar replaces the two absolutely positioned islands. */
 .file-workbench-toolbar{position:relative;z-index:30;display:flex;align-items:center;justify-content:space-between;flex:0 0 48px;gap:12px;min-width:0;height:48px;padding:0 14px;box-sizing:border-box;container-type:inline-size;background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-bottom:1px solid rgba(15,23,42,.07)}
@@ -31,6 +37,7 @@
 .file-preview-action-dock .file-workbench-actions{display:flex;align-items:center;gap:3px;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;white-space:nowrap;flex-wrap:nowrap}
 .file-preview-action-dock .file-workbench-actions>.rare-button{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;gap:5px;width:auto;min-width:28px;height:28px;min-height:28px;padding:0 8px;border:0;border-radius:6px;background:transparent;box-shadow:none;color:#475569;font-size:12.5px;font-weight:500}
 .file-preview-action-dock .file-workbench-actions>.rare-button:hover,.file-preview-action-dock .file-workbench-actions>.rare-button[aria-expanded=true]{background:#F1F5F9;color:#0058D0}
+.file-preview-action-dock .file-workbench-actions>.rare-button[aria-pressed=true]{background:rgba(0,100,225,.08);color:#0058D0}
 .file-preview-action-dock .file-workbench-actions>.file-core-action{display:inline-flex;align-items:center;justify-content:center;flex:none;box-sizing:border-box;height:28px;min-height:28px;padding:0 9px;border:1px solid rgba(15,23,42,.09);border-radius:6px;background:#fff;color:#475569;font-size:12.5px;font-weight:500;text-decoration:none;white-space:nowrap;box-shadow:none}
 .file-preview-action-dock .file-workbench-actions>.file-core-action.is-edit{color:#0058D0;background:rgba(0,100,225,.08);border-color:rgba(0,100,225,.22)}
 .file-preview-action-dock .file-workbench-actions>.file-core-action:hover{background:#eef4ff;color:#0058D0}
@@ -65,6 +72,7 @@
 .file-workbench-nav .file-workbench-nav-item{display:flex;align-items:center;justify-content:flex-start;width:100%;height:28px;min-height:28px;gap:8px;padding:0 10px;border:0!important;border-radius:6px;background:transparent;color:#475569;font-size:13px;font-weight:400;box-shadow:none}
 .file-workbench-nav .file-workbench-nav-item:hover{background:#E9EDF3;color:#0F172A}
 .file-workbench-nav .file-workbench-nav-item.is-active{background:rgba(0,100,225,.10);color:#0058D0;font-weight:500}
+.file-workbench-nav .file-workbench-nav-item:focus,.file-workbench-nav .file-workbench-nav-item:focus-visible{outline:none!important;box-shadow:none!important;border-color:transparent!important}
 .file-workbench-nav-icon{flex:0 0 16px;width:16px;height:16px;opacity:1}
 .file-workbench-nav .file-workbench-nav-item>small{margin-left:auto;color:#94A3B8;font-size:11px;font-variant-numeric:tabular-nums;text-align:right}
 .file-workbench-layout.is-collapsed .file-sidebar-top{justify-content:center;padding:0}

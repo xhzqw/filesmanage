@@ -8,8 +8,9 @@ import "./pdfPageViewer.css";
 
 // PDF rasterization is server-side and checked against current preview ACL.
 // Do not embed the Chrome PDF extension in a sandboxed iframe.
-export function PDFPageViewer({fileId,sha,name,seq,revision,onRevisionChange,epoch}:{
+export function PDFPageViewer({fileId,sha,name,seq,revision,onRevisionChange,epoch,requestedPage,onPageChange}:{
  fileId:string;sha:string;name:string;seq:number;revision:number|null;epoch:number;onRevisionChange:(value:number|null)=>void;
+ requestedPage?:number;onPageChange?:(page:number)=>void;
 }){
  const[pages,setPages]=useState(0);
  const[history,setHistory]=useState<SealHistory|null>(null);
@@ -21,6 +22,10 @@ export function PDFPageViewer({fileId,sha,name,seq,revision,onRevisionChange,epo
  },[fileId,seq,epoch]);
 
  const[page,setPage]=useState(1);
+ useEffect(()=>{onPageChange?.(page)},[page,onPageChange]);
+ useEffect(()=>{
+  if(requestedPage&&requestedPage>=1&&requestedPage<=pages){setPage(requestedPage);setPageError("")}
+ },[requestedPage,pages]);
  const[loading,setLoading]=useState(true);
  const[error,setError]=useState("");
  const[retry,setRetry]=useState(0);

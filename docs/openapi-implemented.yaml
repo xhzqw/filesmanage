@@ -3334,6 +3334,508 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/{id}/reviews:
+    get:
+      summary: List version-scoped review workflows
+      operationId: listReviewFlow
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      - name: version
+        in: query
+        required: true
+        description: Version sequence
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Review workflow records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/ReviewCommentPage'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      summary: Create a self or assigned review
+      operationId: createReviewFlow
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReviewComment'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/ReviewComment'
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/{id}/reviews/assignees:
+    get:
+      summary: List permitted review assignees
+      operationId: reviewAssignees
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Active users with document preview access
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ReviewAssignee'
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/{id}/reviews/{cid}/{action}:
+    post:
+      summary: Transition a review through assignment, resolution, and acceptance
+      operationId: transitionReview
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        description: Review comment ID
+        schema:
+          type: string
+      - name: action
+        in: path
+        required: true
+        schema:
+          type: string
+          enum:
+          - assign
+          - resolve-self
+          - submit-resolution
+          - update-resolution
+          - approve
+          - reject
+          - reopen
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewTransition'
+      responses:
+        '200':
+          description: Transition applied atomically
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      updated:
+                        type: boolean
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/files/{id}/reviews:
+    get:
+      summary: List version-scoped review workflows
+      operationId: listReviewFlowV1
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      - name: version
+        in: query
+        required: true
+        description: Version sequence
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Review workflow records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/ReviewCommentPage'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      summary: Create a self or assigned review
+      operationId: createReviewFlowV1
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReviewComment'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/ReviewComment'
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/files/{id}/reviews/assignees:
+    get:
+      summary: List permitted review assignees
+      operationId: reviewAssigneesV1
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Active users with document preview access
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ReviewAssignee'
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/files/{id}/reviews/{cid}/{action}:
+    post:
+      summary: Transition a review through assignment, resolution, and acceptance
+      operationId: transitionReviewV1
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        description: Review comment ID
+        schema:
+          type: string
+      - name: action
+        in: path
+        required: true
+        schema:
+          type: string
+          enum:
+          - assign
+          - resolve-self
+          - submit-resolution
+          - update-resolution
+          - approve
+          - reject
+          - reopen
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewTransition'
+      responses:
+        '200':
+          description: Transition applied atomically
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      updated:
+                        type: boolean
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/review-notifications:
+    get:
+      summary: Current user's review notifications
+      operationId: reviewNotifications
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Recipient-scoped review notifications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/ReviewNotificationPage'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/review-notifications/{nid}/read:
+    post:
+      summary: Mark review notification read
+      operationId: readReviewNotification
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: nid
+        in: path
+        required: true
+        description: Review notification ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Marked read
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/files/{id}/bytes:
     get:
       summary: Download file content (Range supported)
@@ -9844,6 +10346,8 @@ components:
           type: string
         versionSeq:
           type: integer
+        pageNumber:
+          type: integer
         lineNumber:
           type: integer
         body:
@@ -9852,7 +10356,33 @@ components:
           type: string
         authorName:
           type: string
-        createdAt:
+        creatorId:
+          type: string
+        creatorName:
+          type: string
+        assigneeId:
+          type: string
+        assigneeName:
+          type: string
+        revision:
+          type: integer
+          minimum: 0
+        status:
+          type: string
+          enum:
+          - open
+          - assigned
+          - pending_approval
+          - approved
+          - completed_self
+          - rejected
+        resolutionNote:
+          type: string
+        resolvedVersionSeq:
+          type: integer
+        approvalNote:
+          type: string
+        approvedAt:
           type: string
           format: date-time
         resolvedAt:
@@ -9860,6 +10390,9 @@ components:
           format: date-time
         resolvedBy:
           type: string
+        createdAt:
+          type: string
+          format: date-time
       required:
       - id
       - fileId
@@ -9884,14 +10417,86 @@ components:
       properties:
         version:
           type: integer
+        versionSeq:
+          type: integer
+          minimum: 1
+        pageNumber:
+          type: integer
+          minimum: 1
         lineNumber:
           type: integer
+        assigneeId:
+          type: string
         body:
           type: string
           maxLength: 2000
       required:
-      - version
       - body
+    ReviewTransition:
+      type: object
+      properties:
+        assigneeId:
+          type: string
+        resolutionNote:
+          type: string
+          maxLength: 3000
+        resolvedVersionSeq:
+          type: integer
+          minimum: 1
+        approvalNote:
+          type: string
+          maxLength: 3000
+    ReviewAssignee:
+      type: object
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+        departmentId:
+          type: string
+      required:
+      - id
+      - displayName
+    ReviewNotification:
+      type: object
+      properties:
+        id:
+          type: integer
+        reviewId:
+          type: integer
+        fileId:
+          type: string
+        fileName:
+          type: string
+        kind:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        read:
+          type: boolean
+      required:
+      - id
+      - reviewId
+      - fileId
+      - fileName
+      - kind
+      - createdAt
+      - read
+    ReviewNotificationPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReviewNotification'
+        unreadCount:
+          type: integer
+          minimum: 0
+      required:
+      - items
+      - unreadCount
     ResumableStatus:
       type: object
       properties:

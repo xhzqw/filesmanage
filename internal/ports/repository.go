@@ -75,6 +75,10 @@ type Repository interface {
 	ReviewCommentByID(context.Context, int64) (domain.FileReviewComment, error)
 	InsertReviewComment(context.Context, domain.FileReviewComment) (domain.FileReviewComment, error)
 	ResolveReviewComment(context.Context, int64, string) (bool, error)
+	UpdateReviewComment(context.Context, domain.FileReviewComment, int) (bool, error)
+	RecordReviewTransition(context.Context, int64, string, string, string, string) error
+	ReviewNotifications(context.Context, string, int) ([]domain.ReviewNotification, int, error)
+	ReadReviewNotification(context.Context, string, int64) (bool, error)
 	BlobBySha(context.Context, string) (domain.Blob, error)
 	BlobByID(context.Context, string) (domain.Blob, error)
 	SetBlobState(context.Context, string, string) error

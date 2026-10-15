@@ -8,8 +8,13 @@ export type SealHistory={current:number;revisions:SealRevision[]};
 export type CompareDiffLine={kind:"equal"|"added"|"removed";left?:number;right?:number;text:string};
 export type OfficeSemanticChange={kind:"added"|"removed"|"changed";section:string;key:string;before:string;after:string};
 export type VersionComparison={left:{seq:number;sha256:string;sizeBytes:number};right:{seq:number;sha256:string;sizeBytes:number};mode:"identical"|"metadata"|"large"|"text";detail?:"office_parts"|"office_semantic";semanticChanges?:OfficeSemanticChange[];lines:CompareDiffLine[];added:number;removed:number};
-export type FileReviewComment={id:number;fileId:string;versionSeq:number;lineNumber?:number;body:string;authorId:string;authorName:string;createdAt:string;resolvedAt?:string;resolvedBy?:string};
+export type ReviewStatus="open"|"assigned"|"pending_approval"|"approved"|"completed_self"|"rejected";
+export type FileReviewComment={id:number;fileId:string;versionSeq:number;pageNumber?:number;lineNumber?:number;body:string;
+ authorId:string;authorName:string;creatorId:string;creatorName:string;assigneeId?:string;assigneeName?:string;status:ReviewStatus;revision:number;
+ resolutionNote?:string;resolvedVersionSeq?:number;resolvedAt?:string;resolvedBy?:string;approvalNote?:string;approvedAt?:string;createdAt:string};
 export type ReviewCommentPage={items:FileReviewComment[];nextCursor:string};
+export type ReviewAssignee={id:string;displayName:string;departmentId?:string};
+export type ReviewAction="assign"|"resolve-self"|"submit-resolution"|"update-resolution"|"approve"|"reject"|"reopen";
 export type FilePage={items:FileItem[];nextCursor:string};
 export type FileHistoryEvent={id:number;actorId:string;actorName?:string;requestId:string;eventType:string;targetKind:string;targetId:string;outcome:string;details:Record<string,unknown>;createdAt:string};
 export type FileHistoryPage={items:FileHistoryEvent[];nextCursor:string};
@@ -72,8 +77,12 @@ export const fileApi={
 	mediaUrl:(id:string,sha:string)=>"/api/files/"+encodeURIComponent(id)+"/preview/media?v="+encodeURIComponent(sha),
  versions:(id:string)=>request<FileVersion[]>("/files/"+id+"/versions"),
  compareVersions:(id:string,left:number,right:number)=>request<VersionComparison>("/files/"+id+"/versions/compare?"+new URLSearchParams({left:String(left),right:String(right)})),
- reviewComments:(id:string,version:number,cursor="")=>request<ReviewCommentPage>("/files/"+id+"/review-comments?"+new URLSearchParams({version:String(version),limit:"30",cursor})),
- addReviewComment:(id:string,body:{version:number;body:string;lineNumber?:number})=>request<FileReviewComment>("/files/"+id+"/review-comments",{method:"POST",body:JSON.stringify(body)}),
+	reviewComments:(id:string,version:number,cursor="")=>request<ReviewCommentPage>("/files/"+id+"/reviews?"+new URLSearchParams({version:String(version),limit:"30",cursor})),
+	addReviewComment:(id:string,body:{versionSeq:number;body:string;pageNumber?:number;lineNumber?:number;assigneeId?:string})=>
+   request<FileReviewComment>("/files/"+id+"/reviews",{method:"POST",body:JSON.stringify(body)}),
+	reviewAssignees:(id:string)=>request<ReviewAssignee[]>("/files/"+id+"/reviews/assignees"),
+	transitionReview:(id:string,commentId:number,action:ReviewAction,body:Record<string,unknown>={})=>
+   request<{id:number;updated:boolean}>("/files/"+id+"/reviews/"+commentId+"/"+action,{method:"POST",body:JSON.stringify(body)}),
  resolveReviewComment:(id:string,commentId:number)=>request<{resolved:number}>("/files/"+id+"/review-comments/"+commentId+"/resolve",{method:"POST"}),
  rename:(id:string,name:string)=>changed(request<FileItem>("/files/"+id,{method:"PATCH",body:JSON.stringify({name})}),id),
  remove:(id:string)=>changed(request<{id:string;oldName:string}>("/files/"+id,{method:"DELETE"}),id,true),

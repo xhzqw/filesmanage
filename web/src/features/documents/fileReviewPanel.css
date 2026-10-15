@@ -1,0 +1,56 @@
+.file-review{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;background:#fff;color:#0F172A;font-size:12px}
+.file-review-header{display:flex;flex:none;align-items:center;justify-content:space-between;gap:6px;min-height:44px;padding:7px 12px;border-bottom:1px solid rgba(15,23,42,.06)}
+.file-review-heading,.file-review-header-actions{display:flex;align-items:center;min-width:0;gap:6px}
+.file-review-heading>strong{white-space:nowrap;font-size:13px;font-weight:650}
+.file-review-heading .rare-select{width:66px;min-width:66px;height:26px;min-height:26px;padding:0 5px;border:1px solid rgba(15,23,42,.12);border-radius:6px;box-shadow:none;background:#fff;font-size:11px}
+.file-review-header-actions .rare-button{display:inline-flex;align-items:center;justify-content:center;flex:none;height:28px;min-height:28px;padding:0 6px;border:0;border-radius:6px;box-shadow:none}
+.file-review-header-actions .file-review-new.rare-button,.file-review-form .file-review-submit.rare-button{background:#0064E1;color:#fff;padding:0 9px;font-size:11px}
+.file-review-header-actions .rare-button:not(.primary){width:26px;padding:0;color:#64748B;background:transparent}
+.file-review-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;flex:none;min-width:0;margin:9px 12px 10px;padding:3px;background:#F1F5F9;border-radius:8px}
+.file-review-filters .rare-button{display:flex;align-items:center;justify-content:center;gap:3px;min-width:0;height:28px;min-height:28px;padding:0 2px;border:0;border-radius:6px;box-shadow:none;background:transparent;color:#64748B;font-size:10.5px;white-space:nowrap}
+.file-review-filters .rare-button[aria-pressed=true]{background:#fff;color:#0F172A;box-shadow:0 1px 3px rgba(15,23,42,.08);font-weight:600}
+.file-review-filters small{font-size:9.5px;color:#94A3B8}
+.file-review-form{display:flex;flex:none;flex-direction:column;gap:9px;max-height:min(540px,65vh);overflow:auto;margin:0 12px 10px;padding:12px;border:1px solid rgba(0,100,225,.15);border-radius:10px;background:#F8FAFC}
+.file-review textarea{box-sizing:border-box;width:100%;min-width:0;border:1px solid rgba(15,23,42,.10);border-radius:7px;background:#fff;box-shadow:none;font-size:12px;resize:vertical;line-height:1.5}
+.file-review input{min-width:0;box-sizing:border-box;box-shadow:none}
+.file-review-anchor{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.file-review-anchor>label,.file-review-inline-form>label{display:flex;flex-direction:column;min-width:0;gap:4px;color:#64748B;font-size:11px}
+.file-review-anchor input{width:100%;height:28px;min-height:28px;padding:0 8px;border:1px solid rgba(15,23,42,.10);border-radius:6px;background:#fff}
+.file-review-mode{display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:3px;background:#E9EDF3;border-radius:7px}
+.file-review-mode .rare-button{height:27px;min-height:27px;min-width:0;padding:0 3px;border:0;border-radius:5px;background:transparent;color:#64748B;font-size:10.5px;box-shadow:none}
+.file-review-mode .rare-button[aria-pressed=true]{background:#fff;color:#0058D0;font-weight:600;box-shadow:0 1px 2px rgba(15,23,42,.08)}
+.file-review-form .file-review-submit.rare-button{align-self:flex-end;min-height:29px;height:29px}
+.file-review-people{display:flex;flex-direction:column;gap:6px;min-width:0}
+.file-review-people>input{height:28px;min-height:28px;padding:0 8px;border:1px solid rgba(15,23,42,.1);border-radius:6px;background:#fff;font-size:11px}
+.file-review-people-list{display:flex;flex-direction:column;gap:2px;max-height:132px;overflow:auto;overscroll-behavior:contain}
+.file-review-people-list .file-review-person.rare-button{display:flex;align-items:center;gap:6px;justify-content:flex-start;min-height:30px;height:auto;padding:5px 8px;border:0;border-radius:6px;background:transparent;box-shadow:none;text-align:left}
+.file-review-person strong{font-size:11.5px;font-weight:600}.file-review-person small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:#94A3B8}
+.file-review-person>span{margin-left:auto;color:#0058D0}
+.file-review-people-list .file-review-person.is-selected.rare-button,.file-review-people-list .file-review-person.rare-button:hover{background:#EEF4FF}
+.file-review-list{display:flex;flex-direction:column;flex:1;min-height:0;gap:9px;padding:0 12px 18px;overflow-y:auto;overscroll-behavior:contain}
+.file-review-empty{margin:15px 0;color:#94A3B8;text-align:center;font-size:12px}
+.file-review-item{display:flex;flex:none;flex-direction:column;gap:9px;padding:12px 13px;min-width:0;border:1px solid rgba(15,23,42,.08);border-radius:10px;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.02)}
+.file-review-item-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px}
+.file-review-item-meta{display:flex;flex-wrap:wrap;align-items:center;gap:5px;min-width:0}
+.file-review-item-meta>strong{font-size:11.5px;font-weight:650}
+.file-review-item-meta>time{font-size:10px;color:#94A3B8;white-space:nowrap}
+.file-review-item-meta .file-review-page.rare-button{height:20px;min-height:20px;padding:0 6px;border:0;border-radius:999px;background:#F1F5F9;color:#64748B;box-shadow:none;font-size:10px}
+.file-review-status{display:inline-flex;align-items:center;max-width:100%;padding:4px 7px;border-radius:999px;background:#EFF6FF;color:#64748B;font-size:10px;font-weight:550;overflow-wrap:anywhere}
+.file-review-status.is-assigned{background:#FFFBEB;color:#B45309}.file-review-status.is-pending_approval{background:#EEF2FF;color:#4F46E5}
+.file-review-status.is-rejected{background:#FFF1F2;color:#BE123C}.file-review-status.is-approved{background:#ECFDF5;color:#047857}
+.file-review-status.is-completed_self{background:#F0FDF4;color:#15803D}
+.file-review-route{display:flex;gap:5px;align-items:center;flex-wrap:wrap;color:#64748B;font-size:10.5px}.file-review-route>span:nth-child(2){color:#0058D0}
+.file-review-body{margin:0;color:#0F172A;font-size:13px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.file-review-history{display:flex;flex-direction:column;gap:7px;margin:0;padding:8px 10px;border-radius:6px;border-left:2px solid #0064E1;background:#F8FAFC;font-size:11.5px;color:#64748B}
+.file-review-history strong{font-weight:650;color:#475569}.file-review-history p{margin:4px 0 0;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.file-review-history .file-review-opinion{padding-top:6px;border-top:1px solid #E2E8F0}
+.file-review-card-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:5px;padding-top:3px;border-top:1px solid rgba(15,23,42,.045)}
+.file-review-card-actions .rare-button,.file-review-inline-actions .rare-button{flex:0 1 auto;min-height:26px;height:26px;padding:0 8px;border:1px solid rgba(15,23,42,.10);border-radius:6px;background:#fff;color:#475569;box-shadow:none;font-size:10.5px}
+.file-review-card-actions .rare-button.primary,.file-review-inline-actions .rare-button.primary{border:0;background:#0064E1;color:#fff}
+.file-review-card-actions .file-review-approve.rare-button{background:#059669;color:#fff;border-color:#059669}
+.file-review-card-actions .file-review-reject.rare-button{color:#BE123C;border-color:#FECDD3}
+.file-review-await{flex:1 1 100%;font-size:10.5px;color:#64748B}
+.file-review-inline-form{display:flex;flex-direction:column;gap:8px;padding:10px;background:#F8FAFC;border-radius:8px}
+.file-review-inline-form>strong{font-size:11.5px}.file-review-inline-form select{height:28px;min-height:28px;border:1px solid rgba(15,23,42,.1);background:#fff;border-radius:6px}
+.file-review-inline-actions{display:flex;justify-content:flex-end;gap:6px}
+.file-review-error{margin:0 12px 8px;font-size:11px}
