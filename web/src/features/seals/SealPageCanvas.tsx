@@ -31,13 +31,13 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
  const dragRef=useRef<{x:number;y:number;left:number;top:number}|null>(null);
  const stampDragRef=useRef<StampDrag|null>(null);
  const resizePointerRef=useRef<number|null>(null);
- const resizePropsRef=useRef({selected,position,angle,pageRatio,panMode,setPosition});
- resizePropsRef.current={selected,position,angle,pageRatio,panMode,setPosition};
  const pendingAnchor=useRef<{x:number;y:number;oldZoom:number;left:number;top:number}|null>(null);
  const zoomRef=useRef(1);
  const[zoom,setZoom]=useState(1);
  const[fitMode,setFitMode]=useState<"page"|"width">("page");
  const[panMode,setPanMode]=useState(false);
+ const resizePropsRef=useRef({selected,position,angle,pageRatio,panMode,setPosition});
+ resizePropsRef.current={selected,position,angle,pageRatio,panMode,setPosition};
  const[viewportWidth,setViewportWidth]=useState(650);
  const[viewportHeight,setViewportHeight]=useState(590);
  useEffect(()=>{
