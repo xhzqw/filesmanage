@@ -337,6 +337,76 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	if scopeApprovals != 1 {
 		t.Fatalf("scope approval evidence rows=%d", scopeApprovals)
 	}
+	if _, e = service.CDWIssueControlledRelease(ctx, alice, ready.ID, 2, prefix+"_g9_wrong_issuer"); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("scope approver cannot issue without document-control role: %v", e)
+	}
+	issued, e := service.CDWIssueControlledRelease(ctx, admin, ready.ID, 2, prefix+"_g9_issue")
+	if e != nil || issued.State != "issued_pending" || issued.Revision != 3 {
+		t.Fatalf("formal issue %+v %v", issued, e)
+	}
+	issuedReplay, e := service.CDWIssueControlledRelease(ctx, admin, ready.ID, 2, prefix+"_g9_issue")
+	if e != nil || issuedReplay.ID != issued.ID {
+		t.Fatalf("issue idempotent replay %+v %v", issuedReplay, e)
+	}
+	if _, e = service.CDWIssueControlledRelease(ctx, admin, ready.ID, 2, prefix+"_g9_issue_stale"); !errors.Is(e, domain.ErrVersionConflict) {
+		t.Fatalf("issue CAS stale %v", e)
+	}
+	if _, e = service.CDWDispatchDistribution(ctx, alice, plan.ID, 3, prefix+"_g9_wrong_dispatcher"); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("scope approver cannot dispatch without document-control role: %v", e)
+	}
+	batch, e := service.CDWDispatchDistribution(ctx, admin, plan.ID, 3, prefix+"_g9_dispatch")
+	if e != nil || batch.State != "dispatched" || batch.DepartmentCount != 2 || batch.DigestSHA256 != approvedPlan.DigestSHA256 {
+		t.Fatalf("atomic controlled distribution batch %+v %v", batch, e)
+	}
+	replayedBatch, e := service.CDWDispatchDistribution(ctx, admin, plan.ID, 3, prefix+"_g9_dispatch")
+	if e != nil || replayedBatch.ID != batch.ID {
+		t.Fatalf("batch replay %+v %v", replayedBatch, e)
+	}
+	if _, e = service.CDWDispatchDistribution(ctx, admin, plan.ID, 3, prefix+"_g9_stale_dispatch"); !errors.Is(e, domain.ErrVersionConflict) {
+		t.Fatalf("dispatch CAS stale %v", e)
+	}
+	var batchItems, targets, requirements, accessGrants, heads, receiptCount, readingCount int
+	for i, q := range []string{
+		"SELECT COUNT(*) FROM cdw_distribution_batch_items WHERE batch_id=$1",
+		"SELECT COUNT(*) FROM cdw_distribution_targets WHERE batch_id=$1",
+		"SELECT COUNT(*) FROM cdw_target_item_requirements WHERE batch_id=$1",
+		"SELECT COUNT(*) FROM cdw_release_access_grants g JOIN cdw_distribution_batch_items i ON i.id=g.batch_item_id WHERE i.batch_id=$1",
+		"SELECT COUNT(*) FROM cdw_target_receipt_heads h JOIN cdw_distribution_targets t ON t.id=h.target_id WHERE t.batch_id=$1",
+		"SELECT COUNT(*) FROM cdw_department_receipts r JOIN cdw_distribution_targets t ON t.id=r.target_id WHERE t.batch_id=$1",
+		"SELECT COUNT(*) FROM cdw_reading_assignments r WHERE r.batch_id=$1",
+	} {
+		var n int
+		if e = pool.QueryRow(ctx, q, batch.ID).Scan(&n); e != nil {
+			t.Fatalf("evidence query %d: %v", i, e)
+		}
+		switch i {
+		case 0:
+			batchItems = n
+		case 1:
+			targets = n
+		case 2:
+			requirements = n
+		case 3:
+			accessGrants = n
+		case 4:
+			heads = n
+		case 5:
+			receiptCount = n
+		case 6:
+			readingCount = n
+		}
+	}
+	if batchItems != 1 || targets != 2 || requirements != 2 || accessGrants != 2 || heads != 2 || receiptCount != 0 || readingCount != 0 {
+		t.Fatalf("batch snapshot mismatch items=%d targets=%d requirements=%d grants=%d heads=%d receipts=%d readings=%d",
+			batchItems, targets, requirements, accessGrants, heads, receiptCount, readingCount)
+	}
+	if e = pool.QueryRow(ctx, "SELECT count(*) FROM cdw_effective_pointers WHERE file_id=$1", fileID).Scan(&pointerCount); e != nil {
+		t.Fatal(e)
+	}
+	if pointerCount != 0 {
+		t.Fatal("issue/dispatch cannot activate default effective pointer")
+	}
+	t.Logf("CDW_G9_DISPATCH_POSTGRES_PASS batch=%s departments=2 grants=2 receipts=0 reading=0 effective_pointer=none", batch.ID)
 	t.Logf("CDW_G9_SCOPE_APPROVED_POSTGRES_PASS plan=%s digest=%s batch=none", plan.ID, approvedPlan.DigestSHA256)
 	t.Logf("CDW_G9_SCOPE_FROZEN_POSTGRES_PASS plan=%s departments=2 digest=%s issued=none", plan.ID, frozenPlan.DigestSHA256)
 	t.Logf("CDW_G8_VERIFIED_ARTIFACT_PASS release=%s sha=%s still_not_effective", ready.ID, sha)

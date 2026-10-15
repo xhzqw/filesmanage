@@ -31,5 +31,6 @@ type CDWControlStore interface {
 	CDWControlGrantRole(context.Context, string, string, string, string) (string, error)
 	CDWControlPrepare(context.Context, string, string, string, string, string, string, *string) (CDWControlledRelease, error)
 	CDWControlVerify(context.Context, string, string, string, string, int64, string) (CDWControlledRelease, error)
+	CDWControlIssue(context.Context, string, string, int64, string, string) (CDWControlledRelease, error)
 	CDWControlEvent(context.Context, string, string, string, string, map[string]any) error
 }

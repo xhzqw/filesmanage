@@ -8,6 +8,10 @@ export type CDWDistributionPlan={
  revision:number;digestSha256?:string;departmentCount:number;
  targets:Array<{departmentId:string;receiverId:string}>;
 };
+export type CDWDistributionBatch={
+ id:string;planId:string;releaseId:string;fileId:string;
+ state:"dispatched";revision:number;digestSha256:string;departmentCount:number;
+};
 export type CDWFormalReady={deliveryId:string;taskId:string;fileId:string;fileName:string;sha256:string};
 export type CDWFormalApproval={
  id:string;subjectId:string;deliveryId:string;fileId:string;fileName?:string;
@@ -116,6 +120,10 @@ export const cdwApi={
   "/workbench/distribution-scope-roles",mutate(key,{fileId,userId})),
  scopeApprove:(id:string,revision:number,key:string)=>request<CDWDistributionPlan>(
   "/workbench/distribution-plans/"+segment(id)+"/approve-scope",mutate(key,{},revision)),
+ controlIssue:(releaseId:string,revision:number,key:string)=>request<CDWControlledRelease>(
+  "/workbench/controlled/releases/"+segment(releaseId)+"/issue",mutate(key,{},revision)),
+ distributionDispatch:(planId:string,revision:number,key:string)=>request<CDWDistributionBatch>(
+  "/workbench/distribution-plans/"+segment(planId)+"/dispatch",mutate(key,{},revision)),
  distributionForRelease:(releaseId:string)=>request<CDWDistributionPlan>(
   "/workbench/controlled/releases/"+segment(releaseId)+"/distribution-plan",{cache:"no-store"}),
  distributionCreate:(releaseId:string,targets:Array<{departmentId:string;receiverId:string}>,key:string)=>

@@ -1053,6 +1053,25 @@ add("POST", "/api/workbench/distribution-plans/{id}/approve-scope", operation(
  responses=dict([json_ok(CDW_DISTRIBUTION_PLAN, "Approved scope, not dispatched."),
                  resp("403", ERR["403"]), resp("409", ERR["409"])])))
 
+# --- G9 explicit release issue; never activates effective pointer ---
+add("POST", "/api/workbench/controlled/releases/{id}/issue", operation(
+ "Issue approved frozen release after independent scope approval and digest validation", "CDW", "cdwControlIssue",
+ security=SESSION, params=[id_param("id", "Controlled release ID"), CDW_IDEMPOTENCY, CDW_IF_MATCH],
+ request={"application/json": {"schema": obj({})}},
+ responses=dict([json_ok(CDW_CONTROL_RELEASE, "Issued pending; no effective pointer change."),
+                 resp("403", ERR["403"]), resp("409", ERR["409"])])))
+
+CDW_BATCH_RESULT = obj({"id": string(), "planId": string(), "releaseId": string(),
+ "fileId": string(), "state": string(enum=["dispatched"]), "revision": integer(minimum=2),
+ "digestSha256": string(), "departmentCount": integer(minimum=1)},
+ required=["id","planId","releaseId","fileId","state","revision","digestSha256","departmentCount"])
+add("POST", "/api/workbench/distribution-plans/{id}/dispatch", operation(
+ "Atomically distribute exact approved issue to immutable departmental batch and scoped grants", "CDW", "cdwDistributionDispatch",
+ security=SESSION, params=[id_param("id", "Approved plan ID"), CDW_IDEMPOTENCY, CDW_IF_MATCH],
+ request={"application/json": {"schema": obj({})}},
+ responses=dict([json_ok(CDW_BATCH_RESULT, "Batch dispatched; receipt and reading remain unconfirmed."),
+                 resp("403", ERR["403"]), resp("409", ERR["409"])])))
+
 # --- Auth ---
 add("POST", "/api/login", operation("Authenticate and open a session", "Auth", "login", security=[],
     request={"application/json": {"schema": ref("LoginRequest")}},

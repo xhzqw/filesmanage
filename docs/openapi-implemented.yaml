@@ -3626,6 +3626,202 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/controlled/releases/{id}/issue:
+    post:
+      summary: Issue approved frozen release after independent scope approval and digest validation
+      operationId: cdwControlIssue
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Controlled release ID
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      - name: If-Match
+        in: header
+        required: true
+        description: Strong ETag rev-N enclosed in double quotes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        '200':
+          description: Issued pending; no effective pointer change.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      fileId:
+                        type: string
+                      fileName:
+                        type: string
+                      candidateId:
+                        type: string
+                      revisionLabel:
+                        type: string
+                      sha256:
+                        type: string
+                      state:
+                        type: string
+                        enum:
+                        - preparing
+                        - ready
+                        - issued_pending
+                        - effective
+                        - superseded
+                        - withdrawn
+                        - cancelled
+                      revision:
+                        type: integer
+                        minimum: 1
+                      plannedEffectiveAt:
+                        type: string
+                        format: date-time
+                    required:
+                    - id
+                    - fileId
+                    - fileName
+                    - candidateId
+                    - revisionLabel
+                    - sha256
+                    - state
+                    - revision
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/distribution-plans/{id}/dispatch:
+    post:
+      summary: Atomically distribute exact approved issue to immutable departmental batch and scoped grants
+      operationId: cdwDistributionDispatch
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Approved plan ID
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      - name: If-Match
+        in: header
+        required: true
+        description: Strong ETag rev-N enclosed in double quotes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        '200':
+          description: Batch dispatched; receipt and reading remain unconfirmed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      planId:
+                        type: string
+                      releaseId:
+                        type: string
+                      fileId:
+                        type: string
+                      state:
+                        type: string
+                        enum:
+                        - dispatched
+                      revision:
+                        type: integer
+                        minimum: 2
+                      digestSha256:
+                        type: string
+                      departmentCount:
+                        type: integer
+                        minimum: 1
+                    required:
+                    - id
+                    - planId
+                    - releaseId
+                    - fileId
+                    - state
+                    - revision
+                    - digestSha256
+                    - departmentCount
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/login:
     post:
       summary: Authenticate and open a session

@@ -41,6 +41,16 @@ type CDWDistributionScopeSnapshot struct {
 	Items    []CDWDistributionItemSnapshot
 	Targets  []CDWDistributionTargetSnapshot
 }
+type CDWDistributionBatch struct {
+	ID              string `json:"id"`
+	PlanID          string `json:"planId"`
+	ReleaseID       string `json:"releaseId"`
+	FileID          string `json:"fileId"`
+	State           string `json:"state"`
+	Revision        int64  `json:"revision"`
+	DigestSHA256    string `json:"digestSha256"`
+	DepartmentCount int    `json:"departmentCount"`
+}
 type CDWDistributionStore interface {
 	CDWDistributionReleaseFile(context.Context, string) (string, error)
 	CDWDistributionPlanFile(context.Context, string) (string, error)
@@ -52,5 +62,6 @@ type CDWDistributionStore interface {
 	CDWDistributionGrantScopeRole(context.Context, string, string, string, string) (string, error)
 	CDWDistributionScopeApprove(context.Context, string, string, string, int64, string) (CDWDistributionPlan, error)
 	CDWDistributionScopeInbox(context.Context, string, int) ([]CDWDistributionPlan, error)
+	CDWDistributionDispatch(context.Context, string, string, string, int64, string, []string, []string, []string) (CDWDistributionBatch, error)
 	CDWDistributionEvent(context.Context, string, string, string, string, any) error
 }
