@@ -4,7 +4,7 @@ import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {errorCode,errorCopy} from "../../shared/errors";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {useEffect,useMemo,useRef,useState,type FormEvent} from "react";
-import {Link,useNavigate} from "react-router-dom";
+import {Link,useNavigate,useSearchParams} from "react-router-dom";
 import {collaborationApi,formatBytes} from "./api";
 import type {FileItem} from "../../entities/file/model";
 import type {Folder} from "../../entities/folder/model";
@@ -56,7 +56,9 @@ function csvField(value:string|number):string{
 // sort filters, authorized results with snippets and safe highlighting, and
 // cursor paging that appends strictly by the server's nextCursor (DI-16 §9).
 export function SearchPanel({userId}:{userId:string}){
- const[q,setQ]=useState("");
+ const[searchParams]=useSearchParams();
+ const initialKeyword=(searchParams.get("q")??"").slice(0,200);
+ const[q,setQ]=useState(initialKeyword);
  const[category,setCategory]=useState("");
  const[tag,setTag]=useState("");
  const[uploader,setUploader]=useState("");
@@ -165,7 +167,7 @@ export function SearchPanel({userId}:{userId:string}){
   setFrom("");setTo("");setSort("updated_desc");setPageSize(DEFAULT_PAGE_SIZE);setShowAdvanced(false);
   epochRef.current++;moreBusyRef.current=false;setQuery({q:"",category:"",tag:"",uploader:"",type:"",sort:"updated_desc",limit:DEFAULT_PAGE_SIZE,folder:"",scope:"",from:"",to:""});setItems([]);setNextCursor("");setTotal(0);setStatus("loading");setMessage("");
  }
- const[query,setQuery]=useState<Query|null>({q:"",category:"",tag:"",uploader:"",type:"",sort:"updated_desc",limit:DEFAULT_PAGE_SIZE,folder:"",scope:"",from:"",to:""});
+ const[query,setQuery]=useState<Query|null>({q:initialKeyword.trim(),category:"",tag:"",uploader:"",type:"",sort:"updated_desc",limit:DEFAULT_PAGE_SIZE,folder:"",scope:"",from:"",to:""});
  const[items,setItems]=useState<FileItem[]>([]);
  const[total,setTotal]=useState(0);
  const[nextCursor,setNextCursor]=useState("");

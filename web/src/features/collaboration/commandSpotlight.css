@@ -77,6 +77,16 @@
   background:var(--surface-panel);box-shadow:none;
 }
 .command-row[data-kind="folder"] .command-actions{margin-left:auto}
+.command-advanced{
+ display:flex;justify-content:flex-end;align-items:center;
+ padding:5px 12px;border-top:1px solid var(--border-hairline);
+}
+.command-native-dialog .command-advanced button{
+ min-height:27px;padding:3px 7px;border:0;background:transparent;
+ color:var(--text-tertiary);font-size:12px;font-weight:500;
+}
+.command-native-dialog .command-advanced button:hover{color:var(--text-primary);background:var(--surface-row-hover)}
+.command-native-dialog .command-advanced button:focus-visible{outline:2px solid var(--border-focus);outline-offset:1px}
 @media(max-width:600px){
   .command-panel.command-native-dialog{
     width:calc(100vw - 24px);max-width:calc(100vw - 24px);

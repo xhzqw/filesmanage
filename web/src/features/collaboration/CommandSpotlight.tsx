@@ -221,6 +221,12 @@ export function CommandSpotlight(){
     closePalette();
   }
 
+  function openAdvancedSearch(){
+    const keyword=query.trim();
+    navigate(keyword?"/search?q="+encodeURIComponent(keyword):"/search");
+    closePalette();
+  }
+
   function step(delta:number){
     if(visibleRows.length===0)return;
     // Wrap: with at most eleven rows a dead end is only friction.
@@ -297,6 +303,9 @@ export function CommandSpotlight(){
       </li>;
      })}
     </ul>:null}
+    {showResults?<div className="command-advanced">
+     <RareButton type="button" tone="ghost" onClick={openAdvancedSearch}>高级搜索与筛选 <span aria-hidden="true">→</span></RareButton>
+    </div>:null}
    </div>
   </Dialog>;
 }

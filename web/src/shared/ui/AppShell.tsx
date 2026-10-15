@@ -26,7 +26,6 @@ export function BrandLogo({size,className,transparent=false}:{size:number;classN
 
 const NAV=[
  {to:"/doc",label:"文档管理"},
- {to:"/search",label:"全局搜索"},
  {to:"/stats",label:"统计"},
  {to:"/approvals",label:"审批"},
  {to:"/lifecycle",label:"生命周期"},
@@ -133,7 +132,7 @@ export function AppShell({user,onLogout,actions,children,finderSidebarWidth}:{us
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
    </RareButton>
    <div className="header-right global-utility-dock" role="group" aria-label="系统快捷工具">
-    <RareButton type="button" className="command-trigger" aria-label="快速跳转" title="快速跳转（⌘K / Ctrl+K）" onClick={()=>window.dispatchEvent(new CustomEvent("filesmanage:command-spotlight"))}>
+    <RareButton type="button" className="command-trigger" aria-label="搜索文件与文件夹" title="搜索文件与文件夹（⌘K / Ctrl+K）" onClick={()=>window.dispatchEvent(new CustomEvent("filesmanage:command-spotlight"))}>
      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true" focusable="false"><circle cx="10.8" cy="10.8" r="6.7"/><path d="m16 16 4.4 4.4"/></svg>
      <span className="command-keys"><kbd>⌘K</kbd></span>
     </RareButton>
