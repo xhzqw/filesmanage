@@ -232,7 +232,8 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
        onClick={()=>onRemoveDraft(selected!.id)}>移除</RareButton>
      </span>
      {(["nw","ne","sw","se"] as const).map(corner=>
-      <span key={corner} className={"seal-resize-handle is-"+corner} data-corner={corner} aria-hidden="true"/>)}
+      <span key={corner} className={"seal-resize-handle is-"+corner} data-corner={corner} aria-hidden="true"
+       onPointerDown={startStamp} onPointerMove={moveStamp} onPointerUp={endStamp} onPointerCancel={endStamp}/>)}
     </span>}
     {marks.filter(m=>m.pageNumber===page).map(m=>{
      const style={left:m.x*100+"%",top:m.y*100+"%",width:m.width*100+"%",height:m.height*100+"%",transform:"rotate("+(m.angleDegrees??0)+"deg)"};
