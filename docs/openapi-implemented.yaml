@@ -2866,6 +2866,120 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/controlled/releases/{id}/verify:
+    post:
+      summary: Verify source-identical DOCX distribution artifact, recording explicit no-seal/no-conversion evidence
+      operationId: cdwControlVerify
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Prepared release ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      - name: If-Match
+        in: header
+        required: true
+        description: Strong ETag rev-N enclosed in double quotes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                justification:
+                  type: string
+                  minLength: 24
+                  maxLength: 3000
+                noAdditionalSealRequired:
+                  type: boolean
+                noConversionRequired:
+                  type: boolean
+              required:
+              - justification
+              - noAdditionalSealRequired
+              - noConversionRequired
+      responses:
+        '200':
+          description: State advances preparing to ready; DOES NOT issue, activate or notify departments.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      fileId:
+                        type: string
+                      fileName:
+                        type: string
+                      candidateId:
+                        type: string
+                      revisionLabel:
+                        type: string
+                      sha256:
+                        type: string
+                      state:
+                        type: string
+                        enum:
+                        - preparing
+                        - ready
+                        - issued_pending
+                        - effective
+                        - superseded
+                        - withdrawn
+                        - cancelled
+                      revision:
+                        type: integer
+                        minimum: 1
+                      plannedEffectiveAt:
+                        type: string
+                        format: date-time
+                    required:
+                    - id
+                    - fileId
+                    - fileName
+                    - candidateId
+                    - revisionLabel
+                    - sha256
+                    - state
+                    - revision
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/login:
     post:
       summary: Authenticate and open a session

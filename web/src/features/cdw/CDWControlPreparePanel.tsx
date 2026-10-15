@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from "react";
-import {RareBadge,RareButton,RareInput,RareNotice} from "../../shared/ui/rare";
+import {RareBadge,RareButton,RareInput,RareNotice,RareTextarea} from "../../shared/ui/rare";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {toast} from "../../shared/ui/feedback";
 import {errorCopy} from "../../shared/errors";
@@ -19,6 +19,13 @@ export function CDWControlPreparePanel({candidate,user,onPrepared}:{
  const [message,setMessage]=useState("");
  const grantKey=useRef("");
  const prepareKey=useRef("");
+ const [verifyId,setVerifyId]=useState("");
+ const [justification,setJustification]=useState("");
+ const [noSeal,setNoSeal]=useState(false);
+ const [noConversion,setNoConversion]=useState(false);
+ const [verifyBusy,setVerifyBusy]=useState(false);
+ const verifyKey=useRef("");
+
  useEffect(()=>{
   let active=true;setLoading(true);setMessage("");setReleases([]);setLabel("");
   void cdwApi.controlList(candidate.fileId)
@@ -51,6 +58,24 @@ export function CDWControlPreparePanel({candidate,user,onPrepared}:{
    prepareKey.current="";setLabel("");onPrepared();
   }catch(e){if(!(e instanceof ApiError&&e.httpStatus===0))prepareKey.current="";}
   finally{setBusy(false)}
+ }
+ async function verify(release:CDWControlledRelease){
+  if(!noSeal||!noConversion||justification.trim().length<24||verifyBusy)return;
+  if(!verifyKey.current)verifyKey.current=newIdempotencyKey();
+  setVerifyBusy(true);
+  try{
+   await toast.track(()=>cdwApi.controlVerify(release.id,release.revision,justification.trim(),verifyKey.current),{
+    loading:"正在核验正式发行物…",success:"发行物已核验冻结，尚未发行或生效",
+    error:e=>errorCopy(e,"正式发行物核验失败")
+   });
+   verifyKey.current="";setVerifyId("");setJustification("");setNoSeal(false);setNoConversion(false);
+   onPrepared();
+  }catch(e){if(!(e instanceof ApiError&&e.httpStatus===0))verifyKey.current="";}
+  finally{setVerifyBusy(false);}
+ }
+ function openVerify(id:string){
+  setVerifyId(previous=>previous===id?"":id);setJustification("");
+  setNoSeal(false);setNoConversion(false);verifyKey.current="";
  }
  return <div className="cdw-detail-inner">
   <div className="cdw-detail-header">
@@ -87,9 +112,39 @@ export function CDWControlPreparePanel({candidate,user,onPrepared}:{
    {loading&&<div className="cdw-message"><BrandLoadingLabel showContext>加载历史版本</BrandLoadingLabel></div>}
    {message&&<RareNotice tone="warning">{message}</RareNotice>}
    {!loading&&releases.length===0&&<p className="cdw-section-note">该文件尚无受控发行记录。</p>}
-   {releases.map(item=><div className="cdw-branch-row" key={item.id}>
-    <span className="cdw-branch-text"><strong>{item.revisionLabel}</strong><small>{item.state==="preparing"?"发行准备中":item.state} · 内容指纹 {item.sha256.slice(0,16)}…</small></span>
-    <RareBadge tone={item.state==="effective"?"success":"neutral"}>{item.state==="effective"?"当前生效":item.state==="preparing"?"待发行核验":item.state}</RareBadge>
+   {releases.map(item=><div className="cdw-control-release-item" key={item.id}>
+    <div className="cdw-branch-row">
+     <span className="cdw-branch-text"><strong>{item.revisionLabel}</strong>
+      <small>{item.state==="preparing"?"发行物待核验":item.state==="ready"?"发行物已冻结 · 待分发范围审批":item.state} · 内容指纹 {item.sha256.slice(0,16)}…</small>
+     </span>
+     {item.state==="preparing"?<RareButton type="button" tone="neutral" disabled={busy||verifyBusy}
+      onClick={()=>openVerify(item.id)}>核验分发稿</RareButton>:
+      <RareBadge tone={item.state==="effective"?"success":"neutral"}>{item.state==="effective"?"当前生效":item.state==="ready"?"待范围审批":item.state}</RareBadge>}
+    </div>
+    {verifyId===item.id&&item.state==="preparing"&&<div className="cdw-review-form">
+     <RareNotice tone="warning">仅适用于经制度核验后确定<strong>无需额外签章且无需格式转换</strong>的原批准 DOCX。需要盖章或转换的文件不能用此入口。</RareNotice>
+     <div className="cdw-review-actions">
+      <RareButton type="button" tone={noSeal?"primary":"neutral"} aria-pressed={noSeal}
+       disabled={verifyBusy} onClick={()=>{setNoSeal(v=>!v);verifyKey.current="";}}>
+       {noSeal?"✓ 已核验无需追加签章":"确认无需追加签章"}
+      </RareButton>
+      <RareButton type="button" tone={noConversion?"primary":"neutral"} aria-pressed={noConversion}
+       disabled={verifyBusy} onClick={()=>{setNoConversion(v=>!v);verifyKey.current="";}}>
+       {noConversion?"✓ 已核验无需转换":"确认无需格式转换"}
+      </RareButton>
+     </div>
+     <label>文控制度核验依据（至少 24 字）
+      <RareTextarea value={justification} maxLength={3000} rows={3} disabled={verifyBusy}
+       onChange={e=>{setJustification(e.target.value);verifyKey.current="";}}
+       placeholder="写明文件类别、制度依据、批准源版本和无需追加签章/转换的理由"/>
+     </label>
+     <div className="cdw-review-actions">
+      <RareButton type="button" tone="primary" loading={verifyBusy}
+       disabled={!noSeal||!noConversion||justification.trim().length<24||verifyBusy}
+       onClick={()=>void verify(item)}>核验并冻结发行物</RareButton>
+      <RareButton type="button" tone="ghost" disabled={verifyBusy} onClick={()=>openVerify("")}>取消</RareButton>
+     </div>
+    </div>}
    </div>)}
   </section>
  </div>;

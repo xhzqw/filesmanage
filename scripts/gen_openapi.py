@@ -987,6 +987,17 @@ add("POST","/api/workbench/obligations/{id}/fulfill",operation(
  responses=dict([json_ok(CDW_OBLIGATION_FULFILLMENT,"Real fulfillment receipt; subordinate acceptance remains a prerequisite only."),
  resp("403",ERR["403"]),resp("409",ERR["409"])])))
 
+# --- G8 document-control release distribution artifact verification ---
+add("POST","/api/workbench/controlled/releases/{id}/verify",operation(
+ "Verify source-identical DOCX distribution artifact, recording explicit no-seal/no-conversion evidence","CDW","cdwControlVerify",
+ security=SESSION,params=[id_param("id","Prepared release ID."),CDW_IDEMPOTENCY,CDW_IF_MATCH],
+ request={"application/json":{"schema":obj({
+ "justification":{"type":"string","minLength":24,"maxLength":3000},
+ "noAdditionalSealRequired":boolean(),"noConversionRequired":boolean()},
+ required=["justification","noAdditionalSealRequired","noConversionRequired"])}},
+ responses=dict([json_ok(CDW_CONTROL_RELEASE,"State advances preparing to ready; DOES NOT issue, activate or notify departments."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
+
 # --- Auth ---
 add("POST", "/api/login", operation("Authenticate and open a session", "Auth", "login", security=[],
     request={"application/json": {"schema": ref("LoginRequest")}},

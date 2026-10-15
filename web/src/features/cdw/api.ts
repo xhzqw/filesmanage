@@ -104,6 +104,9 @@ export const cdwApi={
   request<CDWOverrideGrant>("/workbench/review-gates/"+segment(id)+"/grants",mutate(key,{actorId,reason},revision)),
  reviewRevoke:(id:string,grantId:string,key:string)=>
   request<CDWOverrideGrant>("/workbench/review-gates/"+segment(id)+"/grants/"+segment(grantId)+"/revoke",mutate(key,{})),
+ controlVerify:(id:string,revision:number,justification:string,key:string)=>
+  request<CDWControlledRelease>("/workbench/controlled/releases/"+segment(id)+"/verify",
+   mutate(key,{justification,noAdditionalSealRequired:true,noConversionRequired:true},revision)),
  controlCandidates:()=>request<{items:CDWApprovedCandidate[]}>("/workbench/controlled/candidates",{cache:"no-store"}),
  controlList:(fileId:string)=>request<{items:CDWControlledRelease[]}>("/workbench/controlled/files/"+segment(fileId)+"/releases",{cache:"no-store"}),
  controlGrant:(fileId:string,userId:string,key:string)=>request<{id:string}>("/workbench/controlled/role",mutate(key,{fileId,userId})),

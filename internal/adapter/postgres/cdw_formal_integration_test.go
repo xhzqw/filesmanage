@@ -208,6 +208,44 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	if sourceArtifactCount != 1 || pointerCount != 0 {
 		t.Fatalf("preparation leaked into effective version: artifacts=%d pointer=%d", sourceArtifactCount, pointerCount)
 	}
+	verifyInput := application.CDWControlVerificationInput{
+		Justification:            "经文控核验，本次电子 DOCX 发行无需追加盖章或格式转换，原批准稿即为正式分发内容。",
+		NoAdditionalSealRequired: true, NoConversionRequired: true,
+	}
+	if _, e = service.CDWVerifyControlledRelease(ctx, admin, prepared.ID,
+		application.CDWControlVerificationInput{Justification: verifyInput.Justification,
+			NoAdditionalSealRequired: false, NoConversionRequired: true}, 1, prefix+"_g8_unsafe"); !errors.Is(e, domain.ErrInvalidInput) {
+		t.Fatalf("seal-needed release must fail closed: %v", e)
+	}
+	ready, e := service.CDWVerifyControlledRelease(ctx, admin, prepared.ID, verifyInput, 1, prefix+"_g8_verify")
+	if e != nil || ready.State != "ready" || ready.Revision != 2 {
+		t.Fatalf("verify distribution snapshot: %+v %v", ready, e)
+	}
+	replayedReady, e := service.CDWVerifyControlledRelease(ctx, admin, prepared.ID, verifyInput, 1, prefix+"_g8_verify")
+	if e != nil || replayedReady.ID != ready.ID {
+		t.Fatalf("verified idempotent replay: %+v %v", replayedReady, e)
+	}
+	if _, e = service.CDWVerifyControlledRelease(ctx, admin, prepared.ID, verifyInput, 1, prefix+"_g8_verify_stale"); !errors.Is(e, domain.ErrVersionConflict) {
+		t.Fatalf("verified release CAS stale: %v", e)
+	}
+	var frozenDistribution int
+	if e = pool.QueryRow(ctx, `SELECT COUNT(*) FROM cdw_release_artifacts a
+ JOIN cdw_release_artifact_verifications v ON v.verified_artifact_id=a.id
+ WHERE a.release_id=$1 AND a.purpose='distribution'
+ AND a.sha256=$2 AND v.requires_additional_seal=false AND v.requires_conversion=false`,
+		prepared.ID, sha).Scan(&frozenDistribution); e != nil {
+		t.Fatal(e)
+	}
+	if frozenDistribution != 1 {
+		t.Fatalf("missing separate verified distribution artifact=%d", frozenDistribution)
+	}
+	if e = pool.QueryRow(ctx, "SELECT count(*) FROM cdw_effective_pointers WHERE file_id=$1", fileID).Scan(&pointerCount); e != nil {
+		t.Fatal(e)
+	}
+	if pointerCount != 0 {
+		t.Fatal("ready artifact must never implicitly become effective")
+	}
+	t.Logf("CDW_G8_VERIFIED_ARTIFACT_PASS release=%s sha=%s still_not_effective", ready.ID, sha)
 	t.Logf("CDW_G8_PREPARE_POSTGRES_PASS release=%s sha=%s active_pointer=none", prepared.ID, sha)
 	t.Logf("CDW_G7_FORMAL_POSTGRES_PASS subject=%s candidate=%s sha=%s steps=2", started.SubjectID, final.CandidateID, sha)
 }

@@ -138,6 +138,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.GET("/workbench/controlled/files/:fileId/releases", h.cdwControlList)
 	api.POST("/workbench/controlled/role", h.cdwControlGrantRole)
 	api.POST("/workbench/controlled/releases", h.cdwControlPrepare)
+	api.POST("/workbench/controlled/releases/:id/verify", h.cdwControlVerify)
 	api.GET("/folders/tree", h.folders)
 	api.GET("/labels", h.finderLabels)
 	api.POST("/labels/assignments", h.finderAssignments)
