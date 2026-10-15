@@ -513,5 +513,6 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 		t.Fatalf("atomic CDW event count=%d err=%v", n, err)
 	}
 	exerciseCDWG6Override(t, ctx, pool, repo, service, prefix, admin, alice, bob, charlie, fileID, blobID)
+	exerciseCDWG7Formal(t, ctx, pool, repo, service, prefix, admin, alice, bob, charlie, fileID)
 	t.Logf("CDW_TASK_POSTGRES_PASS root=%s child=%s grandchild=%s pending-obligations=6", root.TaskID, child.TaskID, child2.TaskID)
 }

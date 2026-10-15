@@ -134,7 +134,7 @@ func (r *Repository) CDWCreateRoot(ctx context.Context, cmd ports.CDWTaskCommand
 	tag, err := r.Q.Exec(ctx, `INSERT INTO cdw_tasks(id,root_id,template_version_id,title,subject_kind,file_id,state,created_by)
  SELECT $1,$1,id,$3,'file',$4,'assigned',$5
  FROM cdw_workflow_template_versions
- WHERE id=$2 AND lifecycle='published'`, cmd.TaskID, cmd.TemplateVersionID, cmd.Title, cmd.FileID, actor)
+ WHERE id=$2 AND lifecycle='published' AND role_policy->>'formalApproval' IS DISTINCT FROM 'true'`, cmd.TaskID, cmd.TemplateVersionID, cmd.Title, cmd.FileID, actor)
 	if err != nil {
 		return ports.CDWTaskResult{}, err
 	}
