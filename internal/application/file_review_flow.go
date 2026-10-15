@@ -90,7 +90,8 @@ func (s *Service) TransitionReviewComment(ctx context.Context, u domain.User, fi
 		return err
 	}
 	defer tx.Rollback(ctx)
-	if _, err = s.visibleFile(ctx, tx, u, fileID, domain.ActionPreview); err != nil {
+	file, err := s.visibleFile(ctx, tx, u, fileID, domain.ActionPreview)
+	if err != nil {
 		return err
 	}
 	c, err := tx.ReviewCommentByID(ctx, id)
@@ -103,6 +104,7 @@ func (s *Service) TransitionReviewComment(ctx context.Context, u domain.User, fi
 	creator := u.ID == c.AuthorID || u.IsAdmin
 	handler := u.ID == c.AssigneeID && c.AssigneeID != "" || u.IsAdmin
 	expected := c.Revision
+	previousStatus := c.Status
 	recipient := ""
 	now := time.Now().UTC()
 	switch action {
@@ -121,20 +123,34 @@ func (s *Service) TransitionReviewComment(ctx context.Context, u domain.User, fi
 		}
 		c.AssigneeID = assignee
 		c.Status = domain.ReviewAssigned
+		c.ResolutionNote = ""
+		c.ResolvedVersionSeq = nil
+		c.ResolvedAt = nil
+		c.ResolvedBy = ""
+		c.ResolvedByName = ""
 		recipient = assignee
 		c.ApprovalNote = ""
 		c.ApprovedAt = nil
-	case "resolve-self":
+	case "resolve-self", "resolve-legacy":
 		if !creator {
-			return domain.ErrForbidden
+			if action != "resolve-legacy" {
+				return domain.ErrForbidden
+			}
+			if err = s.require(ctx, tx, u, file.FolderID, domain.ActionModify); err != nil {
+				return err
+			}
 		}
-		if c.Status != domain.ReviewOpen && c.Status != domain.ReviewAssigned && c.Status != domain.ReviewRejected {
+		if action == "resolve-legacy" && c.Status != domain.ReviewOpen {
+			return domain.ErrVersionConflict
+		}
+		if action == "resolve-self" && c.Status != domain.ReviewOpen && c.Status != domain.ReviewAssigned && c.Status != domain.ReviewRejected {
 			return domain.ErrVersionConflict
 		}
 		c.Status = domain.ReviewCompletedSelf
 		c.ResolutionNote = note
 		c.ResolvedAt = &now
 		c.ResolvedBy = u.ID
+		c.ResolvedByName = u.DisplayName
 		c.ResolvedVersionSeq = newVersion
 		c.ApprovalNote = ""
 		c.ApprovedAt = nil
@@ -162,6 +178,7 @@ func (s *Service) TransitionReviewComment(ctx context.Context, u domain.User, fi
 		c.ResolvedVersionSeq = newVersion
 		c.ResolvedAt = &now
 		c.ResolvedBy = u.ID
+		c.ResolvedByName = u.DisplayName
 		c.ApprovalNote = ""
 		c.ApprovedAt = nil
 		recipient = c.AuthorID
@@ -194,6 +211,7 @@ func (s *Service) TransitionReviewComment(ctx context.Context, u domain.User, fi
 		c.ResolvedVersionSeq = nil
 		c.ResolvedAt = nil
 		c.ResolvedBy = ""
+		c.ResolvedByName = ""
 		c.ApprovalNote = ""
 		c.ApprovedAt = nil
 	default:
@@ -206,7 +224,7 @@ func (s *Service) TransitionReviewComment(ctx context.Context, u domain.User, fi
 	if !won {
 		return domain.ErrVersionConflict
 	}
-	if err = tx.RecordReviewTransition(ctx, id, u.ID, action, note, recipient); err != nil {
+	if err = tx.RecordReviewTransition(ctx, c, previousStatus, u.ID, action, recipient); err != nil {
 		return err
 	}
 	if err = auditRequired(ctx, tx, u, "file.review_"+action, "file", fileID, "success", map[string]any{"commentId": id, "fromRevision": expected, "status": c.Status}); err != nil {
@@ -220,6 +238,28 @@ func (s *Service) TransitionReviewComment(ctx context.Context, u domain.User, fi
 		s.publishUserEvent(recipient, UserEvent{Type: "review.changed"})
 	}
 	return nil
+}
+
+func (s *Service) ReviewCommentEvents(ctx context.Context, u domain.User, fileID string, id int64) ([]domain.ReviewEvent, error) {
+	if id < 1 {
+		return nil, domain.ErrInvalidInput
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	if _, err = s.visibleFile(ctx, tx, u, fileID, domain.ActionPreview); err != nil {
+		return nil, err
+	}
+	c, err := tx.ReviewCommentByID(ctx, id)
+	if errors.Is(err, ports.ErrRowMissing) || err == nil && c.FileID != fileID {
+		return nil, domain.ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return tx.ReviewCommentEvents(ctx, id)
 }
 
 type ReviewNoticePage struct {
@@ -236,6 +276,13 @@ func (s *Service) ReviewNotices(ctx context.Context, u domain.User) (ReviewNotic
 	rows, count, err := tx.ReviewNotifications(ctx, u.ID, 50)
 	if err != nil {
 		return ReviewNoticePage{}, err
+	}
+	for i := range rows {
+		if _, err = s.visibleFile(ctx, tx, u, rows[i].FileID, domain.ActionPreview); err != nil {
+			rows[i].FileID = ""
+			rows[i].FileName = ""
+			rows[i].Kind = "access_revoked"
+		}
 	}
 	return ReviewNoticePage{Items: rows, UnreadCount: count}, nil
 }

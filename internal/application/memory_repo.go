@@ -47,6 +47,7 @@ type memoryRepo struct {
 	lifecycleDepartmentPolicies map[string]domain.LifecyclePolicy
 	lifecycleNotifications      []domain.LifecycleNotification
 	reviewComments              []domain.FileReviewComment
+	reviewEvents                map[int64][]domain.ReviewEvent
 	reviewNotifications         []domain.ReviewNotification
 	reviewNotificationOwners    []string
 	resumableUploads            map[string]domain.ResumableUpload

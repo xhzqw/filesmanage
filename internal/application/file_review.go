@@ -13,11 +13,15 @@ import (
 type ReviewCommentPage struct {
 	Items      []domain.FileReviewComment `json:"items"`
 	NextCursor string                     `json:"nextCursor"`
+	Counts     domain.ReviewCommentCounts `json:"counts"`
 }
 
 func (s *Service) ReviewComments(ctx context.Context, u domain.User, fileID string, version int, cursor string, limit int) (ReviewCommentPage, error) {
+	return s.ReviewWorkflowComments(ctx, u, fileID, version, cursor, limit, "all")
+}
+func (s *Service) ReviewWorkflowComments(ctx context.Context, u domain.User, fileID string, version int, cursor string, limit int, filter string) (ReviewCommentPage, error) {
 	page := ReviewCommentPage{Items: []domain.FileReviewComment{}}
-	if version < 1 {
+	if version < 1 || (filter != "all" && filter != "mine" && filter != "approval" && filter != "done") {
 		return page, domain.ErrInvalidInput
 	}
 	if limit == 0 {
@@ -45,7 +49,11 @@ func (s *Service) ReviewComments(ctx context.Context, u domain.User, fileID stri
 	if _, err = tx.VersionBySeq(ctx, fileID, version); err != nil {
 		return page, domain.ErrNotFound
 	}
-	rows, err := tx.ReviewComments(ctx, fileID, version, before, limit+1)
+	page.Counts, err = tx.ReviewCommentCounts(ctx, fileID, version, u.ID)
+	if err != nil {
+		return page, err
+	}
+	rows, err := tx.ReviewCommentsFiltered(ctx, fileID, version, before, limit+1, u.ID, filter)
 	if err != nil {
 		return page, err
 	}
@@ -89,7 +97,7 @@ func (s *Service) AddReviewFlowComment(ctx context.Context, u domain.User, fileI
 	if err != nil {
 		return domain.FileReviewComment{}, err
 	}
-	if err = tx.RecordReviewTransition(ctx, comment.ID, u.ID, "created", "", assignee); err != nil {
+	if err = tx.RecordReviewTransition(ctx, comment, domain.ReviewOpen, u.ID, "created", assignee); err != nil {
 		return domain.FileReviewComment{}, err
 	}
 	if err = auditRequired(ctx, tx, u, "file.review_comment", "file", fileID, "success", map[string]any{"commentId": comment.ID, "versionSeq": version}); err != nil {
@@ -105,7 +113,7 @@ func (s *Service) AddReviewFlowComment(ctx context.Context, u domain.User, fileI
 	return comment, nil
 }
 func (s *Service) ResolveReviewComment(ctx context.Context, u domain.User, fileID string, id int64) error {
-	return s.TransitionReviewComment(ctx, u, fileID, id, "resolve-self", "", nil, "")
+	return s.TransitionReviewComment(ctx, u, fileID, id, "resolve-legacy", "", nil, "")
 }
 
 // Legacy resolve uses the same authorization and transactional state machine.

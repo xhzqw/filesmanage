@@ -3356,6 +3356,17 @@ paths:
         schema:
           type: integer
           minimum: 1
+      - name: filter
+        in: query
+        required: false
+        description: Server-side status / assignee filter
+        schema:
+          type: string
+          enum:
+          - all
+          - mine
+          - approval
+          - done
       responses:
         '200':
           description: Review workflow records
@@ -3425,6 +3436,58 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '403':
           description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/files/{id}/reviews/{cid}/history:
+    get:
+      summary: Immutable review transition timeline
+      operationId: reviewHistory
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        description: Review comment ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Original review transition receipts and decisions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ReviewEvent'
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
           content:
             application/json:
               schema:
@@ -3571,6 +3634,17 @@ paths:
         schema:
           type: integer
           minimum: 1
+      - name: filter
+        in: query
+        required: false
+        description: Server-side status / assignee filter
+        schema:
+          type: string
+          enum:
+          - all
+          - mine
+          - approval
+          - done
       responses:
         '200':
           description: Review workflow records
@@ -3640,6 +3714,58 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '403':
           description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/files/{id}/reviews/{cid}/history:
+    get:
+      summary: Immutable review transition timeline
+      operationId: reviewHistoryV1
+      tags:
+      - Files
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: File ID
+        schema:
+          type: string
+      - name: cid
+        in: path
+        required: true
+        description: Review comment ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Original review transition receipts and decisions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ReviewEvent'
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
           content:
             application/json:
               schema:
@@ -10390,6 +10516,8 @@ components:
           format: date-time
         resolvedBy:
           type: string
+        resolvedByName:
+          type: string
         createdAt:
           type: string
           format: date-time
@@ -10400,6 +10528,22 @@ components:
       - body
       - authorId
       - createdAt
+    ReviewCounts:
+      type: object
+      properties:
+        all:
+          type: integer
+        mine:
+          type: integer
+        approval:
+          type: integer
+        done:
+          type: integer
+      required:
+      - all
+      - mine
+      - approval
+      - done
     ReviewCommentPage:
       type: object
       properties:
@@ -10409,9 +10553,52 @@ components:
             $ref: '#/components/schemas/ReviewComment'
         nextCursor:
           type: string
+        counts:
+          $ref: '#/components/schemas/ReviewCounts'
       required:
       - items
       - nextCursor
+      - counts
+    ReviewEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        actorId:
+          type: string
+        actorName:
+          type: string
+        kind:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        statusBefore:
+          type: string
+        statusAfter:
+          type: string
+        assigneeId:
+          type: string
+        assigneeName:
+          type: string
+        resolvedBy:
+          type: string
+        resolvedByName:
+          type: string
+        resolutionNote:
+          type: string
+        resolvedVersionSeq:
+          type: integer
+        approvalNote:
+          type: string
+      required:
+      - id
+      - actorId
+      - actorName
+      - kind
+      - createdAt
+      - statusBefore
+      - statusAfter
     CreateReviewComment:
       type: object
       properties:

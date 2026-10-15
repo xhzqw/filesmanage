@@ -228,9 +228,16 @@ schema("ReviewComment",obj({
  "assigneeId":string(),"assigneeName":string(),"revision":integer(minimum=0),
  "status":string(enum=["open","assigned","pending_approval","approved","completed_self","rejected"]),
  "resolutionNote":string(),"resolvedVersionSeq":integer(),"approvalNote":string(),"approvedAt":timestamp(),
- "resolvedAt":timestamp(),"resolvedBy":string(),"createdAt":timestamp(),
+ "resolvedAt":timestamp(),"resolvedBy":string(),"resolvedByName":string(),"createdAt":timestamp(),
 },required=["id","fileId","versionSeq","body","authorId","createdAt"]))
-schema("ReviewCommentPage",obj({"items":arr(ref("ReviewComment")),"nextCursor":string()},required=["items","nextCursor"]))
+schema("ReviewCounts",obj({"all":integer(),"mine":integer(),"approval":integer(),"done":integer()},required=["all","mine","approval","done"]))
+schema("ReviewCommentPage",obj({"items":arr(ref("ReviewComment")),"nextCursor":string(),"counts":ref("ReviewCounts")},required=["items","nextCursor","counts"]))
+schema("ReviewEvent",obj({
+ "id":integer(),"actorId":string(),"actorName":string(),"kind":string(),"createdAt":timestamp(),
+ "statusBefore":string(),"statusAfter":string(),"assigneeId":string(),"assigneeName":string(),
+ "resolvedBy":string(),"resolvedByName":string(),"resolutionNote":string(),"resolvedVersionSeq":integer(),
+ "approvalNote":string(),
+},required=["id","actorId","actorName","kind","createdAt","statusBefore","statusAfter"]))
 schema("CreateReviewComment",obj({
  "version":integer(),"versionSeq":integer(minimum=1),"pageNumber":integer(minimum=1),
  "lineNumber":integer(),"assigneeId":string(),"body":string(max_length=2000),
@@ -1019,8 +1026,11 @@ add("POST","/api/files/{id}/review-comments/{cid}/resolve",operation("Resolve a 
  responses=dict([json_ok(obj({"resolved":integer()},required=["resolved"]),"Resolved comment."),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
 for prefix,suffix in [("/api",""),("/api/v1","V1")]:
  add("GET",prefix+"/files/{id}/reviews",operation("List version-scoped review workflows","Files","listReviewFlow"+suffix,security=SESSION,
-  params=[id_param("id","File ID"),query("version","Version sequence",integer(minimum=1),required=True)],
+  params=[id_param("id","File ID"),query("version","Version sequence",integer(minimum=1),required=True),query("filter","Server-side status / assignee filter",string(enum=["all","mine","approval","done"]))],
   responses=dict([json_ok(ref("ReviewCommentPage"),"Review workflow records"),resp("400",ERR["400"]),resp("403",ERR["403"])])))
+ add("GET",prefix+"/files/{id}/reviews/{cid}/history",operation("Immutable review transition timeline","Files","reviewHistory"+suffix,security=SESSION,
+  params=[id_param("id","File ID"),id_param("cid","Review comment ID")],
+  responses=dict([json_ok(arr(ref("ReviewEvent")),"Original review transition receipts and decisions"),resp("403",ERR["403"]),resp("404",ERR["404"])])))
  add("POST",prefix+"/files/{id}/reviews",operation("Create a self or assigned review","Files","createReviewFlow"+suffix,security=SESSION,
   params=[id_param("id","File ID")],request={"application/json":{"schema":ref("CreateReviewComment")}},
   responses=dict([resp("201","Created",obj({"ok":boolean(),"data":ref("ReviewComment")})),resp("400",ERR["400"]),resp("403",ERR["403"])])))

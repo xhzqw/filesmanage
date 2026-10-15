@@ -12,6 +12,7 @@ type Props={
  pendingCount:number;onConfirm:()=>void;onClearDrafts:()=>void;canConfirm:boolean;onRotate:(degrees:number)=>void;
  deleteMode:boolean;deletableMarkIds:string[];deleteIds:string[];
  onToggleDeleteMark:(id:string)=>void;
+ onToggleDeleteMode:()=>void;onConfirmDelete:()=>void;
  fileId:string;page:number;pageCount:number;onPageChange:(page:number)=>void;onRetry:()=>void;
  imageUrl:string;selected?:SealAsset;marks:FileSealMark[];
  position:StampPosition;setPosition:(update:(value:StampPosition)=>StampPosition)=>void;
@@ -25,7 +26,7 @@ const limit=(value:number)=>Math.max(.6,Math.min(5,Math.round(value*100)/100));
 export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,imageUrl,selected,marks,
  position,setPosition,angle,pageRatio,setPageRatio,imageAvailable,setImageAvailable,drafts=[],
  onSelectDraft,onRemoveDraft,pendingCount,onConfirm,onClearDrafts,canConfirm,onRotate,
- deleteMode,deletableMarkIds,deleteIds,onToggleDeleteMark}:Props){
+ deleteMode,deletableMarkIds,deleteIds,onToggleDeleteMark,onToggleDeleteMode,onConfirmDelete}:Props){
  const viewportRef=useRef<HTMLDivElement>(null);
  const surfaceRef=useRef<HTMLDivElement>(null);
  const dragRef=useRef<{x:number;y:number;left:number;top:number}|null>(null);
@@ -243,7 +244,14 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
     <span className="seal-toolbar-divider" aria-hidden="true"/>
     <RareButton type="button" aria-pressed={panMode} className="seal-pan-button" onClick={()=>setPanMode(value=>!value)}>{panMode?"退出平移":"平移"}</RareButton>
    </div>
-   {!deleteMode&&pendingCount>0&&<div className="seal-toolbar-actions">
+    {deletableMarkIds.length>0&&<div className="seal-toolbar-actions">
+     <span className="seal-toolbar-divider" aria-hidden="true"/>
+     <RareButton type="button" tone="danger" className="seal-batch-delete-action"
+      aria-pressed={deleteMode} onClick={onToggleDeleteMode}>{deleteMode?"取消删除":"删除签章"}</RareButton>
+     {deleteMode&&<RareButton type="button" tone="danger" emphasis="solid" className="seal-confirm-delete-action"
+      disabled={deleteIds.length===0} onClick={onConfirmDelete}>删除选中 ({deleteIds.length})</RareButton>}
+    </div>}
+    {!deleteMode&&pendingCount>0&&<div className="seal-toolbar-actions">
     <span className="seal-toolbar-divider" aria-hidden="true"/>
     <RareButton type="button" tone="ghost" className="seal-clear-action" onClick={onClearDrafts}>清空待签</RareButton>
     <RareButton type="button" tone="primary" className="seal-confirm-action"

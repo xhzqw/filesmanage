@@ -87,7 +87,8 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const[hasOpenedSeals,setHasOpenedSeals]=useState(()=>new URLSearchParams(window.location.search).get("tab")==="seals");
  const[readerPage,setReaderPage]=useState(1);
  const[reviewJumpPage,setReviewJumpPage]=useState(0);
- useEffect(()=>{setReaderPage(1);setReviewJumpPage(0)},[id]);
+ const[reviewVersion,setReviewVersion]=useState<number|null>(null);
+ useEffect(()=>{setReaderPage(1);setReviewJumpPage(0);setReviewVersion(null)},[id]);
  const[sealRevision,setSealRevision]=useState<number|null>(null);
  useEffect(()=>{setSealRevision(null)},[id,preview?.sha256,file?.currentVersionSeq]);
 
@@ -123,6 +124,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const[lifecycle,setLifecycle]=useState<FileLifecycle|null>(null);
  const archived=lifecycle?.state==="archived";
  const currentSeq=Math.max(file?.currentVersionSeq??1,...versions.map(v=>v.versionSeq));
+ const reviewVersionMismatch=tab==="review"&&reviewVersion!==null&&reviewVersion!==currentSeq;
  const adapter=preview?resolvePreviewAdapter(preview):"unsupported";
  const capabilities=preview?previewCapabilities(preview,versions.length):null;
  const canManage=file!==null;
@@ -409,7 +411,12 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
        <div className={"file-workbench-reading-layout"+(tab==="review"?" has-review":"")}
         hidden={tab==="compare"||tab==="seals"||tab==="versions"}>
             <section className="file-workbench-panel file-workbench-preview-surface" aria-label="文件预览">
-      {(preview.renderer==="image"||preview.renderer==="video"||preview.renderer==="audio")?
+      {reviewVersionMismatch?<div className="file-review-version-placeholder" role="status">
+        <strong>历史批注 v{reviewVersion}</strong>
+        <p>当前正文为 v{currentSeq}，历史版本不能使用当前正文冒充。此处已暂停正文预览及处理操作；切回 v{currentSeq} 继续审查，或通过「版本对比」核对修改。</p>
+        {capabilities?.canCompare&&<RareButton type="button" onClick={()=>setTab("compare")}>查看版本对比</RareButton>}
+       </div>:
+       (preview.renderer==="image"||preview.renderer==="video"||preview.renderer==="audio")?
        <MediaPreview key={preview.fileId+preview.sha256} fileId={preview.fileId} sha256={preview.sha256}
         name={preview.name} kind={preview.renderer} mime={preview.mediaType??""}/>:
        preview.renderer==="pdf"?
@@ -447,6 +454,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
      </section>
      {tab==="review"&&<aside className="file-review-drawer" id="file-panel-review" role="tabpanel" aria-label="审查批注">
       <FileReviewPanel fileId={id} versions={versions} currentUser={{id:user.id,isAdmin:user.isAdmin}}
+       currentVersion={currentSeq} onVersionChange={setReviewVersion}
        currentPage={readerPage} onJumpToPage={setReviewJumpPage}/>
      </aside>}
      </div>

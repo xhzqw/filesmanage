@@ -301,8 +301,10 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
    pageCount={pageCount} onPageChange={changePage} onRetry={()=>setImageRetry(n=>n+1)}
    onSelectDraft={pickAsset} onRemoveDraft={removeDraft} pendingCount={staged.length}
    onConfirm={requestSign} onClearDrafts={clearDrafts} onRotate={delta=>changeAngle(((angle+delta+540)%360)-180)} canConfirm={!busy&&!!pageCount&&imageAvailable&&staged.length>0&&staged.every(item=>stampFitsPage(item,item.angleDegrees,pageRatio))}
-   deleteMode={deleteMode} deletableMarkIds={removable.map(mark=>mark.id)}
-   deleteIds={deleteIds} onToggleDeleteMark={toggleDeleteMark}
+    deleteMode={deleteMode} deletableMarkIds={removable.map(mark=>mark.id)}
+    deleteIds={deleteIds} onToggleDeleteMark={toggleDeleteMark}
+    onToggleDeleteMode={toggleDeleteMode}
+    onConfirmDelete={()=>{setDeletePassword("");setError("");setDeleteOpen(true)}}
    imageAvailable={imageAvailable} setImageAvailable={setImageAvailable}
    drafts={staged.map(item=>({...item,asset:assets.find(a=>a.id===item.assetId)}))}/>:
    <div className="seal-file-preview"><p className="empty">仅 PDF 支持页面定位</p></div>}

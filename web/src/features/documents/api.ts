@@ -11,8 +11,12 @@ export type VersionComparison={left:{seq:number;sha256:string;sizeBytes:number};
 export type ReviewStatus="open"|"assigned"|"pending_approval"|"approved"|"completed_self"|"rejected";
 export type FileReviewComment={id:number;fileId:string;versionSeq:number;pageNumber?:number;lineNumber?:number;body:string;
  authorId:string;authorName:string;creatorId:string;creatorName:string;assigneeId?:string;assigneeName?:string;status:ReviewStatus;revision:number;
- resolutionNote?:string;resolvedVersionSeq?:number;resolvedAt?:string;resolvedBy?:string;approvalNote?:string;approvedAt?:string;createdAt:string};
-export type ReviewCommentPage={items:FileReviewComment[];nextCursor:string};
+ resolutionNote?:string;resolvedVersionSeq?:number;resolvedAt?:string;resolvedBy?:string;resolvedByName?:string;approvalNote?:string;approvedAt?:string;createdAt:string};
+export type ReviewFilter="all"|"mine"|"approval"|"done";
+export type ReviewCounts=Record<ReviewFilter,number>;
+export type ReviewCommentPage={items:FileReviewComment[];nextCursor:string;counts:ReviewCounts};
+export type ReviewEvent={id:number;actorId:string;actorName:string;kind:string;statusBefore:ReviewStatus;statusAfter:ReviewStatus;
+ assigneeId?:string;assigneeName?:string;resolvedBy?:string;resolvedByName?:string;resolutionNote?:string;resolvedVersionSeq?:number;approvalNote?:string;createdAt:string};
 export type ReviewAssignee={id:string;displayName:string;departmentName?:string;role:string};
 export type ReviewAction="assign"|"resolve-self"|"submit-resolution"|"update-resolution"|"approve"|"reject"|"reopen";
 export type FilePage={items:FileItem[];nextCursor:string};
@@ -77,7 +81,8 @@ export const fileApi={
 	mediaUrl:(id:string,sha:string)=>"/api/files/"+encodeURIComponent(id)+"/preview/media?v="+encodeURIComponent(sha),
  versions:(id:string)=>request<FileVersion[]>("/files/"+id+"/versions"),
  compareVersions:(id:string,left:number,right:number)=>request<VersionComparison>("/files/"+id+"/versions/compare?"+new URLSearchParams({left:String(left),right:String(right)})),
-	reviewComments:(id:string,version:number,cursor="")=>request<ReviewCommentPage>("/files/"+id+"/reviews?"+new URLSearchParams({version:String(version),limit:"30",cursor})),
+	reviewComments:(id:string,version:number,cursor="",filter:ReviewFilter="all")=>request<ReviewCommentPage>("/files/"+id+"/reviews?"+new URLSearchParams({version:String(version),limit:"30",cursor,filter})),
+	reviewHistory:(id:string,reviewId:number)=>request<ReviewEvent[]>("/files/"+encodeURIComponent(id)+"/reviews/"+reviewId+"/history"),
 	addReviewComment:(id:string,body:{versionSeq:number;body:string;pageNumber?:number;lineNumber?:number;assigneeId?:string})=>
    request<FileReviewComment>("/files/"+id+"/reviews",{method:"POST",body:JSON.stringify(body)}),
 	reviewAssignees:(id:string)=>request<ReviewAssignee[]>("/files/"+id+"/reviews/assignees"),

@@ -25,7 +25,13 @@ func (h *Handler) listFileReviewComments(c *gin.Context) {
 			return
 		}
 	}
-	page, err := h.S.ReviewComments(c.Request.Context(), u, c.Param("id"), version, c.Query("cursor"), limit)
+	filter := "all"
+	if c.FullPath() == "/api/files/:id/reviews" || c.FullPath() == "/api/v1/files/:id/reviews" {
+		if value := c.Query("filter"); value != "" {
+			filter = value
+		}
+	}
+	page, err := h.S.ReviewWorkflowComments(c.Request.Context(), u, c.Param("id"), version, c.Query("cursor"), limit, filter)
 	if err != nil {
 		respondError(c, err)
 		return
@@ -93,6 +99,23 @@ func (h *Handler) reviewAssignees(c *gin.Context) {
 			"departmentName": candidate.DepartmentName, "role": candidate.Role})
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true, "data": out})
+}
+func (h *Handler) reviewHistory(c *gin.Context) {
+	u, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	id, err := strconv.ParseInt(c.Param("cid"), 10, 64)
+	if err != nil {
+		respondError(c, domain.ErrInvalidInput)
+		return
+	}
+	events, err := h.S.ReviewCommentEvents(c.Request.Context(), u, c.Param("id"), id)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true, "data": events})
 }
 func (h *Handler) transitionReviewComment(c *gin.Context) {
 	u, ok := h.auth(c)

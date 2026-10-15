@@ -114,3 +114,96 @@ func TestReviewFlowRejectsUnauthorizedAssignee(t *testing.T) {
 		t.Fatalf("should not assign without preview access: %v", err)
 	}
 }
+
+func TestReviewReassignmentPreservesReceiptAndNotificationACL(t *testing.T) {
+	ctx := context.Background()
+	s, repo := testService(t)
+	admin := domain.User{ID: "u_admin", IsAdmin: true}
+	first := domain.User{ID: "u_user"}
+	second := domain.User{ID: "u_other", DisplayName: "第二处理人", Login: "other"}
+	repo.seedUser(second, "")
+	file, err := s.CommitUpload(ctx, admin, "folder_root", "review-transfer.txt", "text/plain", "", strings.NewReader("content"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo.seedGrant(domain.ACL{ID: "review-first", FolderID: "folder_root", SubjectKind: "user", SubjectID: first.ID, Actions: []domain.Action{domain.ActionPreview}})
+	repo.seedGrant(domain.ACL{ID: "review-second", FolderID: "folder_root", SubjectKind: "user", SubjectID: second.ID, Actions: []domain.Action{domain.ActionPreview}})
+	comment, err := s.AddReviewFlowComment(ctx, admin, file.FileID, 1, nil, nil, "请核实", first.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = s.TransitionReviewComment(ctx, first, file.FileID, comment.ID, "submit-resolution", "第一人已修改", nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.TransitionReviewComment(ctx, admin, file.FileID, comment.ID, "reject", "还有问题", nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.TransitionReviewComment(ctx, admin, file.FileID, comment.ID, "assign", "", nil, second.ID); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := repo.ReviewCommentByID(ctx, comment.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Status != domain.ReviewAssigned || updated.AssigneeID != second.ID || updated.ResolutionNote != "" || updated.ResolvedBy != "" || updated.ResolvedAt != nil {
+		t.Fatalf("reassignment has stale receipt: %+v", updated)
+	}
+	events, err := s.ReviewCommentEvents(ctx, admin, file.FileID, comment.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 4 || events[1].ResolutionNote != "第一人已修改" || events[1].ResolvedBy != first.ID ||
+		events[2].ApprovalNote != "还有问题" || events[3].AssigneeID != second.ID {
+		t.Fatalf("immutable history lost or wrongly attributed: %+v", events)
+	}
+	notices, err := s.ReviewNotices(ctx, second)
+	if err != nil || len(notices.Items) == 0 || notices.Items[0].FileID == "" {
+		t.Fatalf("expected visible notice: %+v %v", notices, err)
+	}
+	repo.mu.Lock()
+	delete(repo.grants, "review-second")
+	repo.mu.Unlock()
+	notices, err = s.ReviewNotices(ctx, second)
+	if err != nil || len(notices.Items) == 0 || notices.Items[0].FileID != "" || notices.Items[0].Kind != "access_revoked" {
+		t.Fatalf("notice leaked a revoked resource: %+v %v", notices, err)
+	}
+}
+
+func TestReviewServerFilteredPaginationAndLegacyModify(t *testing.T) {
+	ctx := context.Background()
+	s, repo := testService(t)
+	admin := domain.User{ID: "u_admin", IsAdmin: true}
+	user := domain.User{ID: "u_user"}
+	file, err := s.CommitUpload(ctx, admin, "folder_root", "filter.txt", "text/plain", "", strings.NewReader("content"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo.seedGrant(domain.ACL{ID: "review-view-modify", FolderID: "folder_root", SubjectKind: "user", SubjectID: user.ID,
+		Actions: []domain.Action{domain.ActionPreview, domain.ActionModify}})
+	for i := 0; i < 35; i++ {
+		if _, err = s.AddReviewFlowComment(ctx, admin, file.FileID, 1, nil, nil, "打开项", ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	assigned, err := s.AddReviewFlowComment(ctx, admin, file.FileID, 1, nil, nil, "待我处理", user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := s.ReviewWorkflowComments(ctx, user, file.FileID, 1, "", 1, "mine")
+	if err != nil || page.Counts.All != 36 || page.Counts.Mine != 1 || len(page.Items) != 1 || page.Items[0].ID != assigned.ID {
+		t.Fatalf("filtered page missed work beyond thirty: %+v %v", page, err)
+	}
+	if err = s.TransitionReviewComment(ctx, user, file.FileID, assigned.ID, "submit-resolution", "已完成", nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	page, err = s.ReviewWorkflowComments(ctx, admin, file.FileID, 1, "", 1, "approval")
+	if err != nil || page.Counts.Approval != 1 || len(page.Items) != 1 || page.Items[0].ID != assigned.ID {
+		t.Fatalf("approval counts wrong: %+v %v", page, err)
+	}
+	if err = s.ResolveReviewComment(ctx, user, file.FileID, 1); err != nil {
+		t.Fatalf("legacy modify actor lost resolution rights: %v", err)
+	}
+	if _, err = s.ReviewWorkflowComments(ctx, user, file.FileID, 1, "", 10, "invalid"); !errors.Is(err, domain.ErrInvalidInput) {
+		t.Fatalf("invalid filter should fail: %v", err)
+	}
+}

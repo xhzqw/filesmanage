@@ -108,6 +108,7 @@ export function NotificationCenter(){
    }catch{setError("标记批注已读失败");toast.error("标记已读失败");setLoading(false);return}
   }
   setOpen(false);setLoading(false);
+  if(!note.fileId){toast.error("该文件已无法访问，通知已标为已读");return}
   navigate("/preview/"+encodeURIComponent(note.fileId)+"?tab=review");
  }
  const visible=showUnread?notes.filter(n=>!n.read):notes.slice(0,12);
@@ -123,7 +124,7 @@ export function NotificationCenter(){
    <div className="notification-scroll">
     {visible.length===0&&visibleLife.length===0&&visibleFavorites.length===0&&visibleReviews.length===0&&<p className="notification-empty">{showUnread?"暂无未读通知":"暂无通知"}</p>}
     {visibleReviews.map(n=><RareButton type="button" key={"review-"+n.id} disabled={loading} className={"notification-row"+(n.read?"":" is-unread")} onClick={()=>void viewReview(n)}>
-     <span className="notification-row-main"><span>{n.fileName||"文档"} · {n.kind==="created"||n.kind==="assign"?"批注待你处理":n.kind==="submit-resolution"||n.kind==="update-resolution"?"处理结果待验收":n.kind==="reject"?"批注已退回":n.kind==="approve"?"批注已验收":"批注状态更新"}</span>
+      <span className="notification-row-main"><span>{n.kind==="access_revoked"?"无权限查看的历史通知":(n.fileName||"文档")+" · "+(n.kind==="created"||n.kind==="assign"?"批注待你处理":n.kind==="submit-resolution"||n.kind==="update-resolution"?"处理结果待验收":n.kind==="reject"?"批注已退回":n.kind==="approve"?"批注已验收":"批注状态更新")}</span>
       <small>{new Date(n.createdAt).toLocaleString("zh-CN")}</small></span>
      {!n.read&&<span className="notification-dot" aria-label="未读"/>}
     </RareButton>)}

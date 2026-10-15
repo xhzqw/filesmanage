@@ -23,6 +23,57 @@ func (r *memoryRepo) ReviewComments(_ context.Context, fileID string, version in
 	}
 	return out, nil
 }
+func (r *memoryRepo) ReviewCommentsFiltered(ctx context.Context, fileID string, version int, before int64, limit int, actor, filter string) ([]domain.FileReviewComment, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]domain.FileReviewComment, 0)
+	for _, c := range r.reviewComments {
+		if c.FileID != fileID || c.VersionSeq != version || before != 0 && c.ID >= before {
+			continue
+		}
+		if filter == "mine" && (c.AssigneeID != actor || c.Status != domain.ReviewAssigned && c.Status != domain.ReviewRejected) {
+			continue
+		}
+		if filter == "approval" && (c.AuthorID != actor || c.Status != domain.ReviewPendingApproval) {
+			continue
+		}
+		if filter == "done" && c.Status != domain.ReviewApproved && c.Status != domain.ReviewCompletedSelf {
+			continue
+		}
+		out = append(out, c)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID > out[j].ID })
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}
+func (r *memoryRepo) ReviewCommentCounts(_ context.Context, fileID string, version int, actor string) (domain.ReviewCommentCounts, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var n domain.ReviewCommentCounts
+	for _, c := range r.reviewComments {
+		if c.FileID != fileID || c.VersionSeq != version {
+			continue
+		}
+		n.All++
+		if c.AssigneeID == actor && (c.Status == domain.ReviewAssigned || c.Status == domain.ReviewRejected) {
+			n.Mine++
+		}
+		if c.AuthorID == actor && c.Status == domain.ReviewPendingApproval {
+			n.Approval++
+		}
+		if c.Status == domain.ReviewApproved || c.Status == domain.ReviewCompletedSelf {
+			n.Done++
+		}
+	}
+	return n, nil
+}
+func (r *memoryRepo) ReviewCommentEvents(_ context.Context, id int64) ([]domain.ReviewEvent, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]domain.ReviewEvent{}, r.reviewEvents[id]...), nil
+}
 func (r *memoryRepo) ReviewCommentByID(_ context.Context, id int64) (domain.FileReviewComment, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -79,13 +130,21 @@ func (r *memoryRepo) UpdateReviewComment(_ context.Context, c domain.FileReviewC
 	}
 	return false, nil
 }
-func (r *memoryRepo) RecordReviewTransition(_ context.Context, id int64, actor, kind, note, recipient string) error {
+func (r *memoryRepo) RecordReviewTransition(_ context.Context, c domain.FileReviewComment, previous domain.ReviewStatus, actor, kind, recipient string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.reviewEvents == nil {
+		r.reviewEvents = make(map[int64][]domain.ReviewEvent)
+	}
+	entries := r.reviewEvents[c.ID]
+	r.reviewEvents[c.ID] = append(entries, domain.ReviewEvent{ID: int64(len(entries) + 1), ActorID: actor, Kind: kind,
+		StatusBefore: previous, StatusAfter: c.Status, AssigneeID: c.AssigneeID, AssigneeName: c.AssigneeName,
+		ResolvedBy: c.ResolvedBy, ResolvedByName: c.ResolvedByName, ResolutionNote: c.ResolutionNote,
+		ResolvedVersionSeq: c.ResolvedVersionSeq, ApprovalNote: c.ApprovalNote, CreatedAt: time.Now().UTC()})
 	if recipient != "" && recipient != actor {
-		for _, c := range r.reviewComments {
-			if c.ID == id {
-				r.reviewNotifications = append(r.reviewNotifications, domain.ReviewNotification{ID: int64(len(r.reviewNotifications) + 1), ReviewID: id, FileID: c.FileID, Kind: kind, CreatedAt: time.Now().UTC()})
+		for _, entry := range r.reviewComments {
+			if entry.ID == c.ID {
+				r.reviewNotifications = append(r.reviewNotifications, domain.ReviewNotification{ID: int64(len(r.reviewNotifications) + 1), ReviewID: c.ID, FileID: entry.FileID, Kind: kind, CreatedAt: time.Now().UTC()})
 				r.reviewNotificationOwners = append(r.reviewNotificationOwners, recipient)
 				break
 			}

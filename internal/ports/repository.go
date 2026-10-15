@@ -72,11 +72,14 @@ type Repository interface {
 	VersionsByFile(context.Context, string) ([]domain.FileVersion, error)
 	VersionBySeq(context.Context, string, int) (domain.FileVersion, error)
 	ReviewComments(context.Context, string, int, int64, int) ([]domain.FileReviewComment, error)
+	ReviewCommentsFiltered(context.Context, string, int, int64, int, string, string) ([]domain.FileReviewComment, error)
+	ReviewCommentCounts(context.Context, string, int, string) (domain.ReviewCommentCounts, error)
+	ReviewCommentEvents(context.Context, int64) ([]domain.ReviewEvent, error)
 	ReviewCommentByID(context.Context, int64) (domain.FileReviewComment, error)
 	InsertReviewComment(context.Context, domain.FileReviewComment) (domain.FileReviewComment, error)
 	ResolveReviewComment(context.Context, int64, string) (bool, error)
 	UpdateReviewComment(context.Context, domain.FileReviewComment, int) (bool, error)
-	RecordReviewTransition(context.Context, int64, string, string, string, string) error
+	RecordReviewTransition(context.Context, domain.FileReviewComment, domain.ReviewStatus, string, string, string) error
 	ReviewNotifications(context.Context, string, int) ([]domain.ReviewNotification, int, error)
 	ReadReviewNotification(context.Context, string, int64) (bool, error)
 	BlobBySha(context.Context, string) (domain.Blob, error)

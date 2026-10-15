@@ -12,6 +12,9 @@
 .file-workbench-reading-layout[hidden]{display:none!important}
 .file-workbench-reading-layout>.file-workbench-preview-surface{display:flex;flex-direction:column;flex:1 1 auto;min-width:0;min-height:0;overflow:hidden}
 .file-review-drawer{flex:0 0 350px;width:350px;min-width:0;min-height:0;display:flex;flex-direction:column;background:#FFFFFF;border-left:1px solid rgba(15,23,42,.07);box-sizing:border-box;overflow:hidden}
+.file-review-version-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;flex:1;min-height:0;padding:30px;text-align:center;color:#475569}
+.file-review-version-placeholder strong{font-size:15px;color:#0F172A}
+.file-review-version-placeholder p{max-width:430px;font-size:12px;line-height:1.7}
 @media(max-width:1050px){.file-review-drawer{flex-basis:310px;width:310px}}
 @media(max-width:620px){.file-workbench-reading-layout.has-review{flex-direction:column}.file-workbench-reading-layout.has-review>.file-workbench-preview-surface{flex:1 1 56%;min-height:130px}.file-review-drawer{flex:0 1 44%;width:100%;max-height:55%;border-left:0;border-top:1px solid rgba(15,23,42,.07)}}
 

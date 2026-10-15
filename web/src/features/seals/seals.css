@@ -216,6 +216,9 @@
 .seal-history-page{padding:3px 7px;border:1px solid #E2E8F0;border-radius:var(--radius-pill);background:#F1F5F9;color:#64748B;font-size:10px;white-space:nowrap}
 .seal-history-row .seal-history-delete.rare-button{display:grid;place-items:center;flex:0 0 22px;width:22px;min-width:22px;height:22px;min-height:22px;padding:0;border:0;border-radius:var(--radius-finder);background:transparent;box-shadow:none;color:#94A3B8}
 .seal-history-row .seal-history-delete.rare-button:hover{background:#FEE2E2;color:#DC2626}
+.seal-toolbar-actions .seal-batch-delete-action.rare-button{color:#BE123C;border:1px solid #FECDD3;border-radius:var(--radius-finder);background:#FFF1F2}
+.seal-toolbar-actions .seal-batch-delete-action.rare-button[aria-pressed=true]{background:#FEE2E2}
+.seal-toolbar-actions .seal-confirm-delete-action.rare-button{background:#DC2626;color:#fff;border:0;border-radius:var(--radius-finder)}
 .seal-history-row>small{color:var(--text-tertiary,#94A3B8);font-size:11px}
 .seal-file-history .seal-revisions{border-top:1px solid rgba(15,23,42,.07);margin-top:6px;padding-top:9px}
 .seal-revision-list{gap:2px}
