@@ -385,7 +385,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
           onMouseEnter={prewarmOfficeEditor} onFocus={prewarmOfficeEditor}
           to={"/office/"+encodeURIComponent(id)}>✎ 在线编辑</Link>}
          {preview.renderer==="pdf"&&!archived&&<RareButton className={"file-core-action is-edit"+(tab==="seals"?" is-active":"")} type="button"
-          aria-pressed={tab==="seals"} onClick={()=>{if(tab==="seals"){setTab("preview")}else{setHasOpenedSeals(true);setSidebarCollapsed(false);setTab("seals")}}}>{tab==="seals"?"◉ 返回预览":"✎ 编辑 / 签章"}</RareButton>
+          aria-pressed={tab==="seals"} onClick={()=>{if(tab==="seals"){setTab("preview")}else{setHasOpenedSeals(true);setSidebarCollapsed(false);setTab("seals")}}}>{tab==="seals"?"◉ 返回预览":"✎ 编辑 / 签章"}</RareButton>}
          {capabilities?.canEditText&&!archived&&<RareButton className="file-core-action is-edit" type="button"
           disabled={requiresApproval===null} onClick={()=>setEditing(true)}>✎ 在线编辑</RareButton>}
          {isOfficeName(preview.name)&&<RareButton type="button" className="file-core-action" disabled={converting}
