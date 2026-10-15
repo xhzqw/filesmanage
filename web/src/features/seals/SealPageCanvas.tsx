@@ -133,6 +133,15 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
   e.currentTarget.setPointerCapture(e.pointerId);
   e.preventDefault();e.stopPropagation();
  }
+ function startResize(e:PointerEvent<HTMLSpanElement>){
+  if(!selected||panMode||e.button!==0)return;
+  const rect=surfaceRef.current?.getBoundingClientRect();
+  if(!rect||!rect.width||!rect.height)return;
+  stampDragRef.current={kind:e.currentTarget.dataset.corner as StampDrag["kind"],
+   x:e.clientX,y:e.clientY,initial:{...position},rect};
+  e.currentTarget.setPointerCapture(e.pointerId);
+  e.preventDefault();e.stopPropagation();
+ }
  function moveStamp(e:PointerEvent<HTMLSpanElement>){
   const drag=stampDragRef.current;
   if(!drag)return;
@@ -233,7 +242,7 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
      </span>
      {(["nw","ne","sw","se"] as const).map(corner=>
       <span key={corner} className={"seal-resize-handle is-"+corner} data-corner={corner} aria-hidden="true"
-       onPointerDown={startStamp} onPointerMove={moveStamp} onPointerUp={endStamp} onPointerCancel={endStamp}/>)}
+       onPointerDownCapture={startResize} onPointerMove={moveStamp} onPointerUp={endStamp} onPointerCancel={endStamp}/>)}
     </span>}
     {marks.filter(m=>m.pageNumber===page).map(m=>{
      const style={left:m.x*100+"%",top:m.y*100+"%",width:m.width*100+"%",height:m.height*100+"%",transform:"rotate("+(m.angleDegrees??0)+"deg)"};
