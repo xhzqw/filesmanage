@@ -239,7 +239,7 @@ schema("ReviewTransition",obj({
  "assigneeId":string(),"resolutionNote":string(max_length=3000),
  "resolvedVersionSeq":integer(minimum=1),"approvalNote":string(max_length=3000),
 }))
-schema("ReviewAssignee",obj({"id":string(),"displayName":string(),"departmentId":string()},required=["id","displayName"]))
+schema("ReviewAssignee",obj({"id":string(),"displayName":string(),"departmentName":string(),"role":string()},required=["id","displayName","role"]))
 schema("ReviewNotification",obj({
  "id":integer(),"reviewId":integer(),"fileId":string(),"fileName":string(),
  "kind":string(),"createdAt":timestamp(),"read":boolean(),

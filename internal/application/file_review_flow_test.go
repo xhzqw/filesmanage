@@ -18,6 +18,22 @@ func TestReviewFlowSelfAndAssignedAcceptance(t *testing.T) {
 		t.Fatal(err)
 	}
 	repo.seedGrant(domain.ACL{ID: "acl_review_flow", FolderID: "folder_root", SubjectKind: "user", SubjectID: assignee.ID, Actions: []domain.Action{domain.ActionPreview}})
+	candidates, err := s.ReviewAssignees(ctx, creator, uploaded.FileID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, candidate := range candidates {
+		if candidate.ID == assignee.ID {
+			found = true
+			if candidate.Role != "成员" {
+				t.Fatalf("incorrect role label: %+v", candidate)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("permitted assignee missing from picker: %+v", candidates)
+	}
 	page := 1
 	self, err := s.AddReviewFlowComment(ctx, creator, uploaded.FileID, 1, &page, nil, "自行处理", "")
 	if err != nil || self.Status != domain.ReviewOpen {

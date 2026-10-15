@@ -123,7 +123,7 @@ export function FileReviewPanel({fileId,versions,currentUser,currentPage=1,onJum
  const approval=(c:FileReviewComment)=>c.creatorId===currentUser.id&&c.status==="pending_approval";
  const counts={all:items.length,mine:items.filter(mine).length,approval:items.filter(approval).length,done:items.filter(finished).length};
  const filtered=items.filter(c=>filter==="all"||filter==="mine"&&mine(c)||filter==="approval"&&approval(c)||filter==="done"&&finished(c));
- const people=assignees.filter(person=>person.displayName.toLowerCase().includes(peopleSearch.trim().toLowerCase())||person.departmentId?.toLowerCase().includes(peopleSearch.trim().toLowerCase()));
+ const people=assignees.filter(person=>person.displayName.toLowerCase().includes(peopleSearch.trim().toLowerCase())||person.departmentName?.toLowerCase().includes(peopleSearch.trim().toLowerCase())||person.role.toLowerCase().includes(peopleSearch.trim().toLowerCase()));
  function personPicker(){
   return <div className="file-review-people">
    <RareInput aria-label="搜索处理人" placeholder="搜索姓名或部门" value={peopleSearch} onChange={e=>setPeopleSearch(e.target.value)}/>
@@ -131,7 +131,7 @@ export function FileReviewPanel({fileId,versions,currentUser,currentPage=1,onJum
     {people.map(person=><RareButton key={person.id} type="button" tone="ghost"
      className={"file-review-person"+(assignee===person.id?" is-selected":"")}
      aria-pressed={assignee===person.id} onClick={()=>setAssignee(person.id)}>
-     <strong>{person.displayName}</strong><small>{person.departmentId||"成员"}</small>
+     <strong>{person.displayName}</strong><small>{[person.departmentName,person.role].filter(Boolean).join(" · ")}</small>
      {assignee===person.id&&<span aria-hidden="true">✓</span>}
     </RareButton>)}
     {people.length===0&&<p className="hint">没有可指派且拥有文档查看权限的成员</p>}

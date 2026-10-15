@@ -29,7 +29,17 @@ func (s *Service) requireReviewAssignee(ctx context.Context, tx ports.Repository
 	}
 	return nil
 }
-func (s *Service) ReviewAssignees(ctx context.Context, u domain.User, fileID string) ([]domain.User, error) {
+
+// ReviewAssignable exposes display-safe labels without leaking credentials or
+// the organization-wide directory to ordinary reviewers.
+type ReviewAssignable struct {
+	ID             string `json:"id"`
+	DisplayName    string `json:"displayName"`
+	DepartmentName string `json:"departmentName,omitempty"`
+	Role           string `json:"role"`
+}
+
+func (s *Service) ReviewAssignees(ctx context.Context, u domain.User, fileID string) ([]ReviewAssignable, error) {
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -42,13 +52,26 @@ func (s *Service) ReviewAssignees(ctx context.Context, u domain.User, fileID str
 	if err != nil {
 		return nil, err
 	}
-	out := make([]domain.User, 0)
+	departments, err := tx.ListDepartments(ctx)
+	if err != nil {
+		return nil, err
+	}
+	names := make(map[string]string, len(departments))
+	for _, department := range departments {
+		names[department.ID] = department.Name
+	}
+	out := make([]ReviewAssignable, 0)
 	for _, candidate := range users {
 		if candidate.ID == u.ID || candidate.DisabledAt != nil {
 			continue
 		}
 		if _, err = s.visibleFile(ctx, tx, candidate, fileID, domain.ActionPreview); err == nil {
-			out = append(out, candidate)
+			role := "成员"
+			if candidate.IsAdmin {
+				role = "管理员"
+			}
+			out = append(out, ReviewAssignable{ID: candidate.ID, DisplayName: candidate.DisplayName,
+				DepartmentName: names[candidate.DepartmentID], Role: role})
 		}
 	}
 	return out, nil

@@ -10453,11 +10453,14 @@ components:
           type: string
         displayName:
           type: string
-        departmentId:
+        departmentName:
+          type: string
+        role:
           type: string
       required:
       - id
       - displayName
+      - role
     ReviewNotification:
       type: object
       properties:

@@ -89,7 +89,8 @@ func (h *Handler) reviewAssignees(c *gin.Context) {
 	}
 	out := make([]gin.H, 0, len(users))
 	for _, candidate := range users {
-		out = append(out, gin.H{"id": candidate.ID, "displayName": candidate.DisplayName, "departmentId": candidate.DepartmentID})
+		out = append(out, gin.H{"id": candidate.ID, "displayName": candidate.DisplayName,
+			"departmentName": candidate.DepartmentName, "role": candidate.Role})
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true, "data": out})
 }

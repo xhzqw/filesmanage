@@ -13,7 +13,7 @@ export type FileReviewComment={id:number;fileId:string;versionSeq:number;pageNum
  authorId:string;authorName:string;creatorId:string;creatorName:string;assigneeId?:string;assigneeName?:string;status:ReviewStatus;revision:number;
  resolutionNote?:string;resolvedVersionSeq?:number;resolvedAt?:string;resolvedBy?:string;approvalNote?:string;approvedAt?:string;createdAt:string};
 export type ReviewCommentPage={items:FileReviewComment[];nextCursor:string};
-export type ReviewAssignee={id:string;displayName:string;departmentId?:string};
+export type ReviewAssignee={id:string;displayName:string;departmentName?:string;role:string};
 export type ReviewAction="assign"|"resolve-self"|"submit-resolution"|"update-resolution"|"approve"|"reject"|"reopen";
 export type FilePage={items:FileItem[];nextCursor:string};
 export type FileHistoryEvent={id:number;actorId:string;actorName?:string;requestId:string;eventType:string;targetKind:string;targetId:string;outcome:string;details:Record<string,unknown>;createdAt:string};
