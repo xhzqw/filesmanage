@@ -235,6 +235,21 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 	if duplicate, e := service.CDWCreateBranch(ctx, alice, root.TaskID, prefix+"_create_A"); e != nil || duplicate.ID != aliceBranch.ID {
 		t.Fatalf("create branch idempotency failed: %+v %v", duplicate, e)
 	}
+	aliceList, e := service.CDWTaskBranches(ctx, alice, root.TaskID)
+	if e != nil || len(aliceList) != 1 || aliceList[0].ID != aliceBranch.ID {
+		t.Fatalf("A branches authorization/list: %+v %v", aliceList, e)
+	}
+	bobDenied, e := service.CDWTaskBranches(ctx, bob, root.TaskID)
+	if e != nil || len(bobDenied) != 0 {
+		t.Fatalf("B must not see A branches: %+v %v", bobDenied, e)
+	}
+	readBranch, e := service.CDWReadBranch(ctx, alice, aliceBranch.ID)
+	if e != nil || readBranch.Revision != aliceBranch.Revision {
+		t.Fatalf("branch state read failed: %+v %v", readBranch, e)
+	}
+	if _, e = service.CDWReadBranch(ctx, bob, aliceBranch.ID); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("other task's branch exposed: %v", e)
+	}
 	if aliceBranch.BaseVersionID != versionID || bobBranch.BaseVersionID != versionID || aliceBranch.ID == bobBranch.ID {
 		t.Fatalf("branch baseline mismatch: A=%+v B=%+v", aliceBranch, bobBranch)
 	}
