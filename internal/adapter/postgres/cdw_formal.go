@@ -161,7 +161,7 @@ func (r *Repository) CDWStartFormalApproval(ctx context.Context, id, subjectID, 
 	}
 	_, err = r.Q.Exec(ctx, `INSERT INTO cdw_approval_subjects
  (id,file_id,source_kind,delivery_id,blob_id,sha256,size_bytes,lineage_snapshot,frozen_by)
- VALUES($1,$2,'delivery',$3,$4,$5,$6,jsonb_build_object('deliveryId',$3,'blobId',$4,'requestId',$8),$7)`,
+ VALUES($1,$2,'delivery',$3,$4,$5,$6,jsonb_build_object('deliveryId',$3::text,'blobId',$4::text,'requestId',$8::text),$7)`,
 		subjectID, fileID, deliveryID, blobID, hash, size, actor, requestID)
 	if err != nil {
 		return result, err
@@ -237,7 +237,7 @@ func (r *Repository) CDWDecideFormalApproval(ctx context.Context, id, actor, dec
 	_, err = r.Q.Exec(ctx, `INSERT INTO cdw_formal_approval_decisions
  (id,step_id,actor_id,decision,reason,subject_sha256,actor_authority_snapshot)
  VALUES($1,$2,$3,$4,$5,$6,jsonb_build_object('role','formal_approver',
- 'bindingId',$7,'actorId',$3,'approvedSubjectId',$8))`,
+ 'bindingId',$7::text,'actorId',$3::text,'approvedSubjectId',$8::text))`,
 		decisionID, stepID, actor, decision, reason, hash, binding, subjectID)
 	if err != nil {
 		return result, err
