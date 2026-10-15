@@ -700,15 +700,13 @@ func looksDocx(name, contentType string) bool {
 	return strings.EqualFold(extensionOf(name), ".docx")
 }
 
-// looksLikeOOXML performs the structural check required before a saved file is
-// published as a new version: a DOCX is a ZIP whose first entry is [Content_Types].xml.
+// looksLikeOOXML applies a lightweight OOXML marker check. ZIP entry ordering
+// is not guaranteed, and ONLYOFFICE can place other parts before content
+// types. Do not reject a valid edited document merely because the marker
+// appears after the first 4 KiB.
 func looksLikeOOXML(data []byte) bool {
 	if len(data) < 4 || data[0] != 'P' || data[1] != 'K' || data[2] != 0x03 || data[3] != 0x04 {
 		return false
 	}
-	const window = 4096
-	if len(data) < window {
-		return strings.Index(string(data), "[Content_Types].xml") >= 0
-	}
-	return strings.Index(string(data[:window]), "[Content_Types].xml") >= 0
+	return bytes.Contains(data, []byte("[Content_Types].xml"))
 }

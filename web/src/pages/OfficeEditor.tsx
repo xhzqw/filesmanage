@@ -17,8 +17,6 @@ import "./officeEditor.css";
 type EditorStatus="loading"|"ready"|"failed";
 type BootStage="session"|"script"|"document";
 type SaveState="clean"|"dirty"|"saved"|"failed";
-const OFFICE_SAVE_POLL_MS=800;
-const OFFICE_SAVE_CONFIRM_TIMEOUT_MS=20000;
 
 // Only the application's callback receipt, followed by a committed file
 // version, can make the UI say "saved". The editor's cache sync is not a save.
@@ -39,16 +37,9 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
  const changeNumber=useRef(0);
  const nativeSavedCount=useRef(0);
  const nativeFailedCount=useRef(0);
+ const nativeReceiptPrimed=useRef(false);
  const receiptProbe=useRef<(()=>void)|null>(null);
  const[exporting,setExporting]=useState(false);
- const[saving,setSaving]=useState(false);
- const manualSaving=useRef(false);
- const mounted=useRef(true);
-
- useEffect(()=>{
-  mounted.current=true;
-  return()=>{mounted.current=false;};
- },[]);
 
  useEffect(()=>{
   const beforeUnload=(event:BeforeUnloadEvent)=>{
@@ -103,6 +94,9 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
   setBootStage("session");
   setMessage("");
   setSaveMessage("● 正在连接 ONLYOFFICE");
+  nativeSavedCount.current=0;
+  nativeFailedCount.current=0;
+  nativeReceiptPrimed.current=false;
   // Start loading api.js immediately, concurrently with session creation;
   // preview pages often already have it prewarmed.
   const earlyScript=warmOfficeEditor();
@@ -140,6 +134,7 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
      .then(initial=>{
       nativeSavedCount.current=initial.savedCount;
       nativeFailedCount.current=initial.failedCount;
+      nativeReceiptPrimed.current=true;
      }).catch(()=>undefined);
     const scriptPromise=earlyScript??warmOfficeEditor(opened.editorUrl);
     if(!scriptPromise)throw new Error("ONLYOFFICE editor address is unavailable");
@@ -207,25 +202,30 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
   };
  },[id]);
 
- // The built-in Save button triggers status=6 (forcesavetype=1). Listen for
- // the committed change hint to remove the old 0–1200ms polling delay, but
- // ALWAYS verify the durable receipt before showing success. Polling remains
- // as a fallback if WebSocket messages are delayed or unavailable.
+ // The ONLYOFFICE built-in Save (and Ctrl/Cmd+S) is the ONLY way to save.
+ // It triggers status=6, forcesavetype=1. Observe durable server receipts,
+ // never the editor's local saved indicator.
  useEffect(()=>{
   if(!sessionId||!file)return;
   let active=true;
   let inFlight=false;
   let queued=false;
  const check=async()=>{
-   // Manual forcesave has its own requestId-correlated receipt endpoint.
-   // Native counters here are ONLY for the editor's built-in save button.
-   if(!dirty.current||!active||manualSaving.current)return;
+   if(!dirty.current||!active)return;
    if(inFlight){queued=true;return;}
    inFlight=true;
    const revision=changeNumber.current;
    try{
     const receipt=await fileApi.officeNativeSaveStatus(file.id,sessionId);
     if(!active)return;
+    if(!nativeReceiptPrimed.current){
+     // On a failed initial read, establish a baseline instead of treating
+     // historical callbacks as new success or failure notifications.
+     nativeSavedCount.current=receipt.savedCount;
+     nativeFailedCount.current=receipt.failedCount;
+     nativeReceiptPrimed.current=true;
+     return;
+    }
     const committed=receipt.savedCount>nativeSavedCount.current;
     const failed=receipt.failedCount>nativeFailedCount.current;
     nativeSavedCount.current=receipt.savedCount;
@@ -247,7 +247,10 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
      toast.error("保存失败，请重试编辑器左上角的保存");
     }
    }catch{
-    if(active){setSaveState("failed");setSaveMessage("无法确认服务器保存状态，请检查网络");}
+    if(active){
+     setSaveState("failed");
+     setSaveMessage("● 保存状态暂时无法确认");
+    }
    }finally{
     inFlight=false;
     if(queued&&active){queued=false;void check();}
@@ -275,7 +278,6 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
  },[file,sessionId]);
 
  async function close(){
-  if(manualSaving.current){toast.info("正在确认文档保存，请等待结果后再结束编辑");return;}
   if(dirty.current&&!window.confirm("修改尚未确认保存。确定要放弃修改并退出吗？"))return;
   try{
    if(sessionId)await fileApi.cancelOfficeSession(file?.id??"",sessionId);
@@ -288,63 +290,8 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
   navigate("/preview/"+encodeURIComponent(id));
  }
 
- async function saveNewVersion(){
-  if(status!=="ready"||!sessionId||!file||manualSaving.current)return;
-  manualSaving.current=true;
-  setSaving(true);
-  setSaveState("dirty");
-  setSaveMessage("● 正在请求 ONLYOFFICE 保存…");
-  const targetFile=file.id;
-  const targetSession=sessionId;
-  const revision=changeNumber.current;
-  try{
-   const result=await fileApi.requestOfficeSave(targetFile,targetSession);
-   if(!mounted.current)return;
-   if(result.status==="unchanged"){
-    // ONLYOFFICE explicitly states that there is nothing new to persist.
-    dirty.current=false;
-    setSaveMessage("● 尚未修改");
-    setSaveState("clean");
-    return;
-   }
-   if(!result.requestId)throw new Error("保存服务未返回可验证的请求编号");
-   setSaveMessage("● 正在确认新版本…");
-   const deadline=Date.now()+OFFICE_SAVE_CONFIRM_TIMEOUT_MS;
-   while(mounted.current&&Date.now()<deadline){
-    // Only a receipt for THIS forcesave request can confirm its success.
-    // Native save counts refer to a different callback, never substitute.
-    const receipt=await fileApi.officeSaveStatus(targetFile,targetSession,result.requestId);
-    if(!mounted.current)return;
-    if(receipt.status==="committed"){
-     setConfirmedSeq(receipt.versionSeq);
-     if(changeNumber.current===revision){
-      dirty.current=false;
-      setSaveState("saved");
-      setSaveMessage("● 已保存至文档库 · v"+receipt.versionSeq);
-     }else{
-      setSaveState("dirty");
-      setSaveMessage("● 已保存 v"+receipt.versionSeq+" · 仍有新修改");
-     }
-     toast.success("已保存为 v"+receipt.versionSeq);
-     return;
-    }
-    if(receipt.status==="failed")throw new Error("ONLYOFFICE 回调保存失败，未生成新版本");
-    await new Promise<void>(resolve=>window.setTimeout(resolve,OFFICE_SAVE_POLL_MS));
-   }
-   if(mounted.current)throw new Error("保存确认超时：尚未收到新版本回执，请检查编辑器连接后重试");
-  }catch(err){
-   if(mounted.current){
-    setSaveState("failed");
-    setSaveMessage("● "+errorCopy(err,"保存失败，请重试"));
-    toast.error(errorCopy(err,"保存失败，请重试"));
-   }
-  }finally{
-   manualSaving.current=false;
-   if(mounted.current)setSaving(false);
-  }
- }
  async function convertPDF(){
-  if(!file||exporting||manualSaving.current)return;
+  if(!file||exporting)return;
   if(dirty.current){
    toast.info("请先保存修改，再转换为 PDF");return;
   }
@@ -369,9 +316,8 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
     <span role="status" aria-live="polite" className={"office-save-state office-save-"+saveState}>{saveMessage}</span>
    </div>
    <div className="office-workbench-actions">
-    <RareButton type="button" disabled={status!=="ready"||exporting||saving||!file} loading={exporting} onClick={()=>void convertPDF()}>⇄ 转为 PDF</RareButton>
-    <RareButton type="button" className="primary" disabled={status!=="ready"||saving} loading={saving} onClick={()=>void saveNewVersion()}>{saving?"正在保存…":"保存新版本"}</RareButton>
-    <RareButton type="button" tone="ghost" disabled={saving} onClick={()=>void close()}>结束编辑</RareButton>
+    <RareButton type="button" disabled={status!=="ready"||exporting||!file} loading={exporting} onClick={()=>void convertPDF()}>⇄ 转为 PDF</RareButton>
+    <RareButton type="button" tone="ghost" onClick={()=>void close()}>结束编辑</RareButton>
    </div>
   </header>
   <main className="office-workbench-content">

@@ -235,8 +235,6 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.GET("/files/:id/native-docx", h.nativeDOCXContent)
 	api.POST("/files/:id/native-docx/save", h.saveNativeDOCX)
 	api.GET("/files/:id/office/session/:sid/state", h.nativeOfficeSaveStatus)
-	api.POST("/files/:id/office/session/:sid/save", h.saveOfficeSession)
-	api.GET("/files/:id/office/session/:sid/save/:rid", h.officeSaveStatus)
 	api.POST("/files/:id/office/session/:sid/cancel", h.cancelOfficeSession)
 	r.GET("/api/internal/office/source/:token", h.officeSource)
 	r.POST("/api/internal/office/callback", h.officeCallback)
