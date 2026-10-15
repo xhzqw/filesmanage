@@ -2980,6 +2980,402 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/distribution-plans:
+    post:
+      summary: Create real electronic department distribution draft for verified release, with required department receipt
+        and personal reading
+      operationId: cdwDistributionCreate
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                releaseId:
+                  type: string
+                targets:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      departmentId:
+                        type: string
+                      receiverId:
+                        type: string
+                    required:
+                    - departmentId
+                    - receiverId
+              required:
+              - releaseId
+              - targets
+      responses:
+        '200':
+          description: Draft plan, not issued or distributed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      releaseId:
+                        type: string
+                      fileId:
+                        type: string
+                      fileName:
+                        type: string
+                      state:
+                        type: string
+                        enum:
+                        - draft
+                        - frozen
+                        - approved
+                        - dispatched
+                        - cancelled
+                      revision:
+                        type: integer
+                        minimum: 1
+                      digestSha256:
+                        type: string
+                      departmentCount:
+                        type: integer
+                        minimum: 1
+                      targets:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            departmentId:
+                              type: string
+                            receiverId:
+                              type: string
+                          required:
+                          - departmentId
+                          - receiverId
+                    required:
+                    - id
+                    - releaseId
+                    - fileId
+                    - fileName
+                    - state
+                    - revision
+                    - departmentCount
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/controlled/releases/{id}/distribution-plan:
+    get:
+      summary: Look up retained distribution scope for exact controlled release
+      operationId: cdwDistributionForRelease
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Release ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Returns draft or immutable frozen plan with designated departments and receivers.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      releaseId:
+                        type: string
+                      fileId:
+                        type: string
+                      fileName:
+                        type: string
+                      state:
+                        type: string
+                        enum:
+                        - draft
+                        - frozen
+                        - approved
+                        - dispatched
+                        - cancelled
+                      revision:
+                        type: integer
+                        minimum: 1
+                      digestSha256:
+                        type: string
+                      departmentCount:
+                        type: integer
+                        minimum: 1
+                      targets:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            departmentId:
+                              type: string
+                            receiverId:
+                              type: string
+                          required:
+                          - departmentId
+                          - receiverId
+                    required:
+                    - id
+                    - releaseId
+                    - fileId
+                    - fileName
+                    - state
+                    - revision
+                    - departmentCount
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/distribution-plans/{id}:
+    get:
+      summary: Read controlled distribution scope and canonical digest
+      operationId: cdwDistributionRead
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Plan ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The current controlled distribution scope.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      releaseId:
+                        type: string
+                      fileId:
+                        type: string
+                      fileName:
+                        type: string
+                      state:
+                        type: string
+                        enum:
+                        - draft
+                        - frozen
+                        - approved
+                        - dispatched
+                        - cancelled
+                      revision:
+                        type: integer
+                        minimum: 1
+                      digestSha256:
+                        type: string
+                      departmentCount:
+                        type: integer
+                        minimum: 1
+                      targets:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            departmentId:
+                              type: string
+                            receiverId:
+                              type: string
+                          required:
+                          - departmentId
+                          - receiverId
+                    required:
+                    - id
+                    - releaseId
+                    - fileId
+                    - fileName
+                    - state
+                    - revision
+                    - departmentCount
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/distribution-plans/{id}/freeze:
+    post:
+      summary: Freeze exact database-derived plan digest and prohibit later target/item rewrites; scope approval remains independent
+      operationId: cdwDistributionFreeze
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Plan ID
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      - name: If-Match
+        in: header
+        required: true
+        description: Strong ETag rev-N enclosed in double quotes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        '200':
+          description: Frozen immutable manifest pending scope approval, NOT dispatched.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      releaseId:
+                        type: string
+                      fileId:
+                        type: string
+                      fileName:
+                        type: string
+                      state:
+                        type: string
+                        enum:
+                        - draft
+                        - frozen
+                        - approved
+                        - dispatched
+                        - cancelled
+                      revision:
+                        type: integer
+                        minimum: 1
+                      digestSha256:
+                        type: string
+                      departmentCount:
+                        type: integer
+                        minimum: 1
+                      targets:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            departmentId:
+                              type: string
+                            receiverId:
+                              type: string
+                          required:
+                          - departmentId
+                          - receiverId
+                    required:
+                    - id
+                    - releaseId
+                    - fileId
+                    - fileName
+                    - state
+                    - revision
+                    - departmentCount
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/login:
     post:
       summary: Authenticate and open a session

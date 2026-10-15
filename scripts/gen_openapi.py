@@ -998,6 +998,38 @@ add("POST","/api/workbench/controlled/releases/{id}/verify",operation(
  responses=dict([json_ok(CDW_CONTROL_RELEASE,"State advances preparing to ready; DOES NOT issue, activate or notify departments."),
  resp("403",ERR["403"]),resp("409",ERR["409"])])))
 
+# --- G9 server-reconstructed canonical department distribution scope ---
+CDW_DISTRIBUTION_TARGET=obj({"departmentId":string(),"receiverId":string()},
+ required=["departmentId","receiverId"])
+CDW_DISTRIBUTION_PLAN=obj({"id":string(),"releaseId":string(),"fileId":string(),
+ "fileName":string(),"state":string(enum=["draft","frozen","approved","dispatched","cancelled"]),
+ "revision":integer(minimum=1),"digestSha256":string(),
+ "departmentCount":integer(minimum=1),"targets":arr(CDW_DISTRIBUTION_TARGET)},
+ required=["id","releaseId","fileId","fileName","state","revision","departmentCount"])
+add("POST","/api/workbench/distribution-plans",operation(
+ "Create real electronic department distribution draft for verified release, with required department receipt and personal reading","CDW","cdwDistributionCreate",
+ security=SESSION,params=[CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({"releaseId":string(),
+ "targets":arr(CDW_DISTRIBUTION_TARGET)},required=["releaseId","targets"])}},
+ responses=dict([json_ok(CDW_DISTRIBUTION_PLAN,"Draft plan, not issued or distributed."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
+add("GET","/api/workbench/controlled/releases/{id}/distribution-plan",operation(
+ "Look up retained distribution scope for exact controlled release","CDW","cdwDistributionForRelease",
+ security=SESSION,params=[id_param("id","Release ID")],
+ responses=dict([json_ok(CDW_DISTRIBUTION_PLAN,"Returns draft or immutable frozen plan with designated departments and receivers."),
+ resp("403",ERR["403"]),resp("404",ERR["404"])])))
+add("GET","/api/workbench/distribution-plans/{id}",operation(
+ "Read controlled distribution scope and canonical digest","CDW","cdwDistributionRead",
+ security=SESSION,params=[id_param("id","Plan ID")],
+ responses=dict([json_ok(CDW_DISTRIBUTION_PLAN,"The current controlled distribution scope."),
+ resp("403",ERR["403"])])))
+add("POST","/api/workbench/distribution-plans/{id}/freeze",operation(
+ "Freeze exact database-derived plan digest and prohibit later target/item rewrites; scope approval remains independent","CDW","cdwDistributionFreeze",
+ security=SESSION,params=[id_param("id","Plan ID"),CDW_IDEMPOTENCY,CDW_IF_MATCH],
+ request={"application/json":{"schema":obj({})}},
+ responses=dict([json_ok(CDW_DISTRIBUTION_PLAN,"Frozen immutable manifest pending scope approval, NOT dispatched."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
+
 # --- Auth ---
 add("POST", "/api/login", operation("Authenticate and open a session", "Auth", "login", security=[],
     request={"application/json": {"schema": ref("LoginRequest")}},

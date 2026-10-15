@@ -2,6 +2,12 @@ import {request} from "../../shared/http";
 
 export type CDWApprovedCandidate={id:string;fileId:string;fileName:string;sha256:string;approvedAt:string};
 export type CDWControlledRelease={id:string;fileId:string;fileName:string;candidateId:string;revisionLabel:string;sha256:string;state:"preparing"|"ready"|"issued_pending"|"effective"|"superseded"|"withdrawn"|"cancelled";revision:number;plannedEffectiveAt?:string};
+export type CDWDistributionPlan={
+ id:string;releaseId:string;fileId:string;fileName:string;
+ state:"draft"|"frozen"|"approved"|"dispatched"|"cancelled";
+ revision:number;digestSha256?:string;departmentCount:number;
+ targets:Array<{departmentId:string;receiverId:string}>;
+};
 export type CDWFormalReady={deliveryId:string;taskId:string;fileId:string;fileName:string;sha256:string};
 export type CDWFormalApproval={
  id:string;subjectId:string;deliveryId:string;fileId:string;fileName?:string;
@@ -104,6 +110,13 @@ export const cdwApi={
   request<CDWOverrideGrant>("/workbench/review-gates/"+segment(id)+"/grants",mutate(key,{actorId,reason},revision)),
  reviewRevoke:(id:string,grantId:string,key:string)=>
   request<CDWOverrideGrant>("/workbench/review-gates/"+segment(id)+"/grants/"+segment(grantId)+"/revoke",mutate(key,{})),
+ distributionForRelease:(releaseId:string)=>request<CDWDistributionPlan>(
+  "/workbench/controlled/releases/"+segment(releaseId)+"/distribution-plan",{cache:"no-store"}),
+ distributionCreate:(releaseId:string,targets:Array<{departmentId:string;receiverId:string}>,key:string)=>
+  request<CDWDistributionPlan>("/workbench/distribution-plans",mutate(key,{releaseId,targets})),
+ distributionFreeze:(id:string,revision:number,key:string)=>
+  request<CDWDistributionPlan>("/workbench/distribution-plans/"+segment(id)+"/freeze",mutate(key,{},revision)),
+ distributionRead:(id:string)=>request<CDWDistributionPlan>("/workbench/distribution-plans/"+segment(id),{cache:"no-store"}),
  controlVerify:(id:string,revision:number,justification:string,key:string)=>
   request<CDWControlledRelease>("/workbench/controlled/releases/"+segment(id)+"/verify",
    mutate(key,{justification,noAdditionalSealRequired:true,noConversionRequired:true},revision)),

@@ -245,6 +245,58 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	if pointerCount != 0 {
 		t.Fatal("ready artifact must never implicitly become effective")
 	}
+	deptB := prefix + "_g9_dept_b"
+	deptC := prefix + "_g9_dept_c"
+	if _, e = pool.Exec(ctx, `INSERT INTO departments(id,name) VALUES($1,'G9质量部'),($2,'G9文控部')`, deptB, deptC); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = pool.Exec(ctx, `UPDATE users SET department_id=CASE WHEN id=$1 THEN $3 WHEN id=$2 THEN $4 ELSE department_id END
+ WHERE id IN($1,$2)`, bob.ID, charlie.ID, deptB, deptC); e != nil {
+		t.Fatal(e)
+	}
+	planInput := application.CDWDistributionCreateInput{ReleaseID: ready.ID,
+		Targets: []ports.CDWDistributionTargetInput{
+			{DepartmentID: deptB, ReceiverID: bob.ID}, {DepartmentID: deptC, ReceiverID: charlie.ID}}}
+	if _, e = service.CDWDistributionCreate(ctx, alice, planInput, prefix+"_g9_no_role"); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("not an authorized document-control officer: %v", e)
+	}
+	plan, e := service.CDWDistributionCreate(ctx, admin, planInput, prefix+"_g9_create")
+	if e != nil || plan.State != "draft" || plan.DepartmentCount != 2 {
+		t.Fatalf("real distribution draft %+v %v", plan, e)
+	}
+	againPlan, e := service.CDWDistributionCreate(ctx, admin, planInput, prefix+"_g9_create")
+	if e != nil || againPlan.ID != plan.ID {
+		t.Fatalf("plan idempotent replay %+v %v", againPlan, e)
+	}
+	if _, e = service.CDWDistributionCreate(ctx, admin, planInput, prefix+"_g9_duplicate"); !errors.Is(e, domain.ErrConflict) {
+		t.Fatalf("second plan from same frozen release should be blocked %v", e)
+	}
+	frozenPlan, e := service.CDWDistributionFreeze(ctx, admin, plan.ID, 1, prefix+"_g9_freeze")
+	if e != nil || frozenPlan.State != "frozen" || len(frozenPlan.DigestSHA256) != 64 {
+		t.Fatalf("frozen distribution scope %+v %v", frozenPlan, e)
+	}
+	if _, e = service.CDWDistributionFreeze(ctx, admin, plan.ID, 1, prefix+"_g9_frozen_stale"); !errors.Is(e, domain.ErrVersionConflict) {
+		t.Fatalf("stale frozen plan should fail CAS: %v", e)
+	}
+	readPlan, e := service.CDWDistributionRead(ctx, admin, plan.ID)
+	if e != nil || readPlan.DigestSHA256 != frozenPlan.DigestSHA256 {
+		t.Fatalf("frozen scope retrieval %+v %v", readPlan, e)
+	}
+	if _, e = pool.Exec(ctx, `UPDATE cdw_distribution_plan_targets SET designated_receiver_id=$2 WHERE plan_id=$1 AND department_id=$3`,
+		plan.ID, charlie.ID, deptB); e == nil {
+		t.Fatal("mutating frozen distribution scope accepted by DB")
+	}
+	var scopeApprovals, batches int
+	if e = pool.QueryRow(ctx, "SELECT count(*) FROM cdw_distribution_scope_approvals WHERE plan_id=$1", plan.ID).Scan(&scopeApprovals); e != nil {
+		t.Fatal(e)
+	}
+	if e = pool.QueryRow(ctx, "SELECT count(*) FROM cdw_distribution_batches WHERE plan_id=$1", plan.ID).Scan(&batches); e != nil {
+		t.Fatal(e)
+	}
+	if scopeApprovals != 0 || batches != 0 {
+		t.Fatalf("draft/freeze silently approved/dispatched scope %d/%d", scopeApprovals, batches)
+	}
+	t.Logf("CDW_G9_SCOPE_FROZEN_POSTGRES_PASS plan=%s departments=2 digest=%s issued=none", plan.ID, frozenPlan.DigestSHA256)
 	t.Logf("CDW_G8_VERIFIED_ARTIFACT_PASS release=%s sha=%s still_not_effective", ready.ID, sha)
 	t.Logf("CDW_G8_PREPARE_POSTGRES_PASS release=%s sha=%s active_pointer=none", prepared.ID, sha)
 	t.Logf("CDW_G7_FORMAL_POSTGRES_PASS subject=%s candidate=%s sha=%s steps=2", started.SubjectID, final.CandidateID, sha)

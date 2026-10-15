@@ -7,9 +7,11 @@ import {ApiError} from "../../shared/http";
 import {newIdempotencyKey} from "../../shared/ids";
 import {cdwApi,type CDWApprovedCandidate,type CDWControlledRelease} from "./api";
 import type {User} from "../../entities/user/model";
+import {CDWDistributionPlanPanel} from "./CDWDistributionPlanPanel";
 
-export function CDWControlPreparePanel({candidate,user,onPrepared}:{
- candidate:CDWApprovedCandidate;user:User;onPrepared:()=>void
+export function CDWControlPreparePanel({candidate,user,onPrepared,loadUsers,loadDepartments}:{
+ candidate:CDWApprovedCandidate;user:User;onPrepared:()=>void;
+ loadUsers:()=>Promise<User[]>;loadDepartments:()=>Promise<Array<{id:string;name:string}>>;
 }){
  const [label,setLabel]=useState("");
  const [releases,setReleases]=useState<CDWControlledRelease[]>([]);
@@ -25,6 +27,7 @@ export function CDWControlPreparePanel({candidate,user,onPrepared}:{
  const [noConversion,setNoConversion]=useState(false);
  const [verifyBusy,setVerifyBusy]=useState(false);
  const verifyKey=useRef("");
+ const [distributionID,setDistributionID]=useState("");
 
  useEffect(()=>{
   let active=true;setLoading(true);setMessage("");setReleases([]);setLabel("");
@@ -119,8 +122,11 @@ export function CDWControlPreparePanel({candidate,user,onPrepared}:{
      </span>
      {item.state==="preparing"?<RareButton type="button" tone="neutral" disabled={busy||verifyBusy}
       onClick={()=>openVerify(item.id)}>核验分发稿</RareButton>:
-      <RareBadge tone={item.state==="effective"?"success":"neutral"}>{item.state==="effective"?"当前生效":item.state==="ready"?"待范围审批":item.state}</RareBadge>}
+      item.state==="ready"?<RareButton type="button" tone="neutral" onClick={()=>setDistributionID(v=>v===item.id?"":item.id)}>
+       {distributionID===item.id?"收起部门范围":"配置部门范围"}</RareButton>:
+      <RareBadge tone={item.state==="effective"?"success":"neutral"}>{item.state==="effective"?"当前生效":item.state}</RareBadge>}
     </div>
+    {distributionID===item.id&&item.state==="ready"&&<CDWDistributionPlanPanel release={item} loadUsers={loadUsers} loadDepartments={loadDepartments}/>}
     {verifyId===item.id&&item.state==="preparing"&&<div className="cdw-review-form">
      <RareNotice tone="warning">仅适用于经制度核验后确定<strong>无需额外签章且无需格式转换</strong>的原批准 DOCX。需要盖章或转换的文件不能用此入口。</RareNotice>
      <div className="cdw-review-actions">
