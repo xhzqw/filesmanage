@@ -796,6 +796,11 @@ add("POST","/api/work-branches/{id}/office-sessions",operation("Open exclusive O
  request={"application/json":{"schema":obj({})}},
  responses=dict([json_ok(obj({"branch":CDW_BRANCH,"session":{"type":"object"},"editorUrl":string(),"config":{"type":"object"}}),
  "ONLYOFFICE editor config signed; callback/source use branch-only routes."),resp("409",ERR["409"])])))
+add("POST","/api/work-branches/{id}/office-sessions/{sessionId}/heartbeat",operation("Renew the live exclusively owned branch editor lease","CDW","cdwHeartbeatBranchOffice",
+ security=SESSION,params=[id_param("id","Branch ID."),id_param("sessionId","Owned active Office session ID.")],
+ request={"application/json":{"schema":obj({})}},
+ responses=dict([json_ok(obj({"sessionId":string(),"branchId":string(),"expiresAt":timestamp()},required=["sessionId","branchId","expiresAt"]),"Active lease extended, expired/fenced leases cannot revive."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
 add("POST","/api/work-branches/{id}/save",operation("Request final ONLYOFFICE save; acknowledgement is NOT persistence","CDW","cdwBranchSave",
  security=SESSION,params=[id_param("id","Branch ID."),CDW_IDEMPOTENCY],request={"application/json":{"schema":CDW_SAVE_REQ}},
  responses={"202":{"description":"Requested/unknown: poll matching callback receipt; cannot freeze yet",

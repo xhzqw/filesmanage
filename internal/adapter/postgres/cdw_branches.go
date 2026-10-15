@@ -205,6 +205,23 @@ func (r *Repository) CDWBranchSessionByID(ctx context.Context, id string) (ports
 	}
 	return session, err
 }
+
+// Extend a live exclusive editor lease only for its actual owner while both
+// branch state and edit epoch still agree. Expired/closed leases cannot revive.
+func (r *Repository) CDWTouchBranchSession(ctx context.Context, branchID, sessionID, actor string, expires time.Time) (ports.CDWBranchSession, error) {
+	session, err := scanCDWBranchSession(r.Q.QueryRow(ctx, `UPDATE cdw_office_branch_sessions s
+ SET expires_at=GREATEST(s.expires_at,$4)
+ FROM cdw_work_branches b
+ WHERE b.id=s.branch_id AND s.id=$2 AND s.branch_id=$1 AND s.opened_by=$3
+ AND s.state='open' AND s.ended_at IS NULL AND s.expires_at>now()
+ AND b.state='open' AND b.edit_epoch=s.edit_epoch
+ RETURNING s.id,s.branch_id,s.document_key,s.opened_by,s.generation,s.edit_epoch,s.state,s.expires_at`,
+		branchID, sessionID, actor, expires))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return session, domain.ErrVersionConflict
+	}
+	return session, err
+}
 func (r *Repository) CDWBranchSessionSource(ctx context.Context, key string) (ports.CDWBranchSource, error) {
 	var source ports.CDWBranchSource
 	err := r.Q.QueryRow(ctx, `SELECT bl.storage_key,f.name,bl.size_bytes

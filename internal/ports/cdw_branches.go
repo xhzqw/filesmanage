@@ -63,6 +63,7 @@ type CDWBranchStore interface {
 	CDWOpenBranchSession(context.Context, string, string, string, string, time.Time) (CDWBranchSession, error) // branch/actor/session/key/expiry
 	CDWBranchSessionByKey(context.Context, string) (CDWBranchSession, error)
 	CDWBranchSessionByID(context.Context, string) (CDWBranchSession, error)
+	CDWTouchBranchSession(context.Context, string, string, string, time.Time) (CDWBranchSession, error)
 	CDWBranchSessionSource(context.Context, string) (CDWBranchSource, error)                   // documentKey
 	CDWBeginBranchSave(context.Context, string, string, string, string) (CDWBranchSave, error) // branch/session/actor/requestID
 	CDWMarkBranchSaveUnknown(context.Context, string) error

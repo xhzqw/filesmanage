@@ -75,6 +75,23 @@ func (h *Handler) cdwOpenBranchOffice(c *gin.Context) {
 	}
 	c.JSON(http.StatusCreated, gin.H{"ok": true, "data": view})
 }
+func (h *Handler) cdwHeartbeatBranchOffice(c *gin.Context) {
+	user, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	var body struct{}
+	if !cdwBind(c, &body) {
+		return
+	}
+	session, err := h.S.CDWTouchBranchOffice(c.Request.Context(), user, c.Param("id"), c.Param("sessionId"))
+	if err != nil {
+		cdwError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(200, gin.H{"ok": true, "data": session})
+}
 func (h *Handler) cdwRequestBranchSave(c *gin.Context) {
 	user, ok := h.auth(c)
 	if !ok {

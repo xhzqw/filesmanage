@@ -267,7 +267,7 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 		{aliceBranch, alice, "b"}, {bobBranch, bob, "c"},
 	}
 	var aliceReceipt ports.CDWBranchSave
-	var aliceRevision, aliceDocKey string
+	var aliceRevision, aliceDocKey, aliceOfficeSession string
 	for idx, candidate := range branchCommits {
 		workTx, e := repo.Begin(ctx)
 		if e != nil {
@@ -283,6 +283,16 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 		if e = workTx.Commit(ctx); e != nil {
 			t.Fatal(e)
 		}
+		renewed, e := service.CDWTouchBranchOffice(ctx, candidate.user, candidate.b.ID, session.ID)
+		if e != nil || renewed.ID != session.ID || renewed.ExpiresAt.Before(session.ExpiresAt) {
+			t.Fatalf("valid branch Office heartbeat refused: %+v %v", renewed, e)
+		}
+		if _, e = service.CDWTouchBranchOffice(ctx, admin, candidate.b.ID, session.ID); !errors.Is(e, domain.ErrForbidden) {
+			t.Fatalf("unrelated user renewed another branch session: %v", e)
+		}
+		if _, e = service.CDWTouchBranchOffice(ctx, candidate.user, candidate.b.ID, "wrong-session-id"); !errors.Is(e, domain.ErrVersionConflict) {
+			t.Fatalf("invalid session ID renewed: %v", e)
+		}
 		key := prefix + "_save_" + candidate.letter
 		request, e := service.CDWRequestBranchSave(ctx, candidate.user, candidate.b.ID, session.ID, key)
 		if e != nil || request.State != "requested" {
@@ -295,6 +305,7 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 		if idx == 0 {
 			aliceReceipt = request
 			aliceDocKey = session.DocumentKey
+			aliceOfficeSession = session.ID
 		}
 		// A forcesave accepted by ONLYOFFICE is only requested (no revision yet).
 		if _, e = service.CDWFreezeBranch(ctx, candidate.user, candidate.b.ID, request.ID, "nonexistent", 1, prefix+"_premature_"+candidate.letter); !errors.Is(e, domain.ErrVersionConflict) {
@@ -361,6 +372,9 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 	frozen, e := service.CDWFreezeBranch(ctx, alice, aliceBranch.ID, aliceReceipt.ID, aliceRevision, 2, prefix+"_freeze_A")
 	if e != nil {
 		t.Fatalf("freeze persisted branch: %v", e)
+	}
+	if _, e := service.CDWTouchBranchOffice(ctx, alice, aliceBranch.ID, aliceOfficeSession); !errors.Is(e, domain.ErrVersionConflict) {
+		t.Fatalf("frozen branch editor lease was renewed: %v", e)
 	}
 	if frozen.SHA256 != strings.Repeat("b", 64) || frozen.ReviewGateID == "" {
 		t.Fatalf("invalid delivery: %+v", frozen)

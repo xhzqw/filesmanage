@@ -5,6 +5,7 @@ import {BrandLoadingLabel} from "../shared/ui/BrandLoader";
 import {toast} from "../shared/ui/feedback";
 import {errorCopy} from "../shared/errors";
 import {newIdempotencyKey} from "../shared/ids";
+import {ApiError} from "../shared/http";
 import {warmOfficeEditor} from "../features/documents/officeBootstrap";
 import {cdwApi,type CDWBranch,type CDWOfficeSession,type CDWSave} from "../features/cdw/api";
 import "./officeEditor.css";
@@ -28,6 +29,7 @@ export function CDWBranchEditor(){
  const[changed,setChanged]=useState(false);
  const[save,setSave]=useState<CDWSave|null>(null);
  const[finalizing,setFinalizing]=useState(false);
+ const[leaseExpired,setLeaseExpired]=useState(false);
  const[polling,setPolling]=useState(false);
  const[fileName,setFileName]=useState("工作分支文档");
  const returnPath="/workbench";
@@ -60,6 +62,26 @@ export function CDWBranchEditor(){
   }).catch(reason=>{if(live){setError(errorCopy(reason,"无法打开任务工作分支"));setLoadState("failed");}});
   return()=>{live=false;window.clearTimeout(timer);editor.current?.destroyEditor?.();editor.current=null;};
  },[id]);
+ // Extend the exclusive edit lease while this view is in use. A static
+ // 30-minute lease would lose all saves from a long-running editing session.
+ useEffect(()=>{
+  if(!office?.session.sessionId)return;
+  let live=true,working=false;
+  const renew=async()=>{
+   if(working||!live)return;
+   working=true;
+   try{await cdwApi.touchOffice(id,office.session.sessionId);}
+   catch(reason){
+    if(live){setError(errorCopy(reason,"编辑会话续约失败，请检查连接"));
+      if(reason instanceof ApiError && [401,403,409].includes(reason.httpStatus))setLeaseExpired(true);
+    }
+   }finally{working=false;}
+  };
+  const onVisibility=()=>{if(document.visibilityState==="visible")void renew();};
+  const timer=window.setInterval(()=>void renew(),60_000);
+  document.addEventListener("visibilitychange",onVisibility);
+  return()=>{live=false;window.clearInterval(timer);document.removeEventListener("visibilitychange",onVisibility);};
+ },[id,office?.session.sessionId]);
  useEffect(()=>{
   const unload=(event:BeforeUnloadEvent)=>{if(dirty.current||save&&save.state!=="persisted"){event.preventDefault();event.returnValue="";}};
   window.addEventListener("beforeunload",unload);return()=>window.removeEventListener("beforeunload",unload);
@@ -87,7 +109,7 @@ export function CDWBranchEditor(){
   const timer=window.setInterval(()=>void check(),1600);
   return()=>{live=false;window.clearInterval(timer);};
  },[id,save?.requestId,save?.state,office]);
- const canFinalize=loadState==="ready"&&!finalizing&&!polling&&office?.session?.sessionId;
+ const canFinalize=loadState==="ready"&&!leaseExpired&&!finalizing&&!polling&&office?.session?.sessionId;
  const requestFinalSave=useCallback(async()=>{
   if(!canFinalize||!office?.session.sessionId||submissionInFlight.current)return;
   submissionInFlight.current=true;setPolling(true);setError("");
@@ -101,7 +123,7 @@ export function CDWBranchEditor(){
   finally{submissionInFlight.current=false;setPolling(false);}
  },[canFinalize,id,office]);
  async function freeze(){
-  if(!save||save.state!=="persisted"||!save.persistedRevisionId||!branch||changed||finalizing)return;
+  if(!save||save.state!=="persisted"||!save.persistedRevisionId||!branch||changed||finalizing||leaseExpired)return;
   setFinalizing(true);setError("");
   if(!freezeKey.current)freezeKey.current=newIdempotencyKey();
   try{
@@ -129,7 +151,7 @@ export function CDWBranchEditor(){
    </div>
    <div className="cdw-editor-toolbar-right">
     <span role="status" className="cdw-editor-save-state">{subtitle}</span>
-    {readyReceipt?<RareButton type="button" tone="primary" loading={finalizing} disabled={!branch||finalizing}
+    {readyReceipt?<RareButton type="button" tone="primary" loading={finalizing} disabled={!branch||finalizing||leaseExpired}
       onClick={()=>void freeze()}>冻结并提交验收</RareButton>:
       <RareButton type="button" tone="primary" loading={polling}
        disabled={!canFinalize} onClick={()=>void requestFinalSave()}>{save?"重新核验交付":"提交交付校验"}</RareButton>}

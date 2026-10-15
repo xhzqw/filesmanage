@@ -63,6 +63,9 @@ export const cdwApi={
   request<CDWBranch>("/work-branches",mutate(key,{taskId})),
  branch:(id:string)=>request<CDWBranch>("/work-branches/"+segment(id),{cache:"no-store"}),
  openOffice:(id:string)=>request<CDWOfficeSession>("/work-branches/"+segment(id)+"/office-sessions",{method:"POST",body:"{}"}),
+ touchOffice:(id:string,sessionId:string)=>request<CDWOfficeSession["session"]>(
+  "/work-branches/"+segment(id)+"/office-sessions/"+segment(sessionId)+"/heartbeat",
+  {method:"POST",body:"{}"}),
  requestSave:(branchId:string,sessionId:string,key:string)=>request<CDWSave>(
   "/work-branches/"+segment(branchId)+"/save",mutate(key,{sessionId})),
  saveStatus:(branchId:string,requestId:string)=>request<CDWSave>(

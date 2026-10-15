@@ -164,6 +164,12 @@ func (s *Service) CDWOpenBranchOffice(ctx context.Context, actor domain.User, br
 	if err != nil {
 		return view, err
 	}
+	// Reopening the same editor extends an existing near-expiry lease. For
+	// active long-running sessions, the browser renews the lease periodically.
+	sess, err = store.CDWTouchBranchSession(ctx, branchID, sess.ID, actor.ID, s.now().Add(30*time.Minute))
+	if err != nil {
+		return view, err
+	}
 	sourceClaims, err := signJWT(s.office.Secret, map[string]any{"document": map[string]any{"key": sess.DocumentKey}, "purpose": "cdw-branch-source"}, 2*time.Hour)
 	if err != nil {
 		return view, err
@@ -193,6 +199,28 @@ func (s *Service) CDWOpenBranchOffice(ctx context.Context, actor domain.User, br
 	}
 	return CDWBranchEditorView{Branch: branch, Session: sess, EditorURL: s.office.EditorURL, Config: config}, nil
 }
+func (s *Service) CDWTouchBranchOffice(ctx context.Context, actor domain.User, branchID, sessionID string) (ports.CDWBranchSession, error) {
+	if branchID == "" || sessionID == "" {
+		return ports.CDWBranchSession{}, domain.ErrInvalidInput
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return ports.CDWBranchSession{}, err
+	}
+	defer tx.Rollback(ctx)
+	branch, store, err := s.cdwBranchForActor(ctx, tx, actor, branchID)
+	if err != nil {
+		return ports.CDWBranchSession{}, err
+	}
+	if branch.State != "open" {
+		return ports.CDWBranchSession{}, domain.ErrVersionConflict
+	}
+	sess, err := store.CDWTouchBranchSession(ctx, branchID, sessionID, actor.ID, s.now().Add(30*time.Minute))
+	if err != nil {
+		return ports.CDWBranchSession{}, err
+	}
+	return sess, tx.Commit(ctx)
+}
 func (s *Service) CDWBranchSource(ctx context.Context, token string) (io.ReadSeekCloser, string, int64, func(), error) {
 	claims, err := verifyJWT(s.office.Secret, token)
 	if err != nil {
@@ -216,6 +244,9 @@ func (s *Service) CDWBranchSource(ctx context.Context, token string) (io.ReadSee
 	sess, err := store.CDWBranchSessionByKey(ctx, key)
 	if err != nil {
 		return nil, "", 0, nil, domain.ErrUnauthorized
+	}
+	if sess.State != "open" || !sess.ExpiresAt.After(s.now()) {
+		return nil, "", 0, nil, domain.ErrVersionConflict
 	}
 	owner, err := tx.UserByID(ctx, sess.OpenedBy)
 	if err != nil || owner.DisabledAt != nil {

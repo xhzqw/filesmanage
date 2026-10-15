@@ -759,6 +759,75 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/work-branches/{id}/office-sessions/{sessionId}/heartbeat:
+    post:
+      summary: Renew the live exclusively owned branch editor lease
+      operationId: cdwHeartbeatBranchOffice
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Branch ID.
+        schema:
+          type: string
+      - name: sessionId
+        in: path
+        required: true
+        description: Owned active Office session ID.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        '200':
+          description: Active lease extended, expired/fenced leases cannot revive.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      sessionId:
+                        type: string
+                      branchId:
+                        type: string
+                      expiresAt:
+                        type: string
+                        format: date-time
+                    required:
+                    - sessionId
+                    - branchId
+                    - expiresAt
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/work-branches/{id}/save:
     post:
       summary: Request final ONLYOFFICE save; acknowledgement is NOT persistence
