@@ -58,6 +58,383 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/tasks:
+    post:
+      summary: Create single-file root work task (administrator only)
+      operationId: cdwCreateRoot
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  maxLength: 255
+                fileId:
+                  type: string
+                templateVersionId:
+                  type: string
+                  description: Optional; built-in single-file task template when omitted.
+                assignee:
+                  type: object
+                  properties:
+                    kind:
+                      type: string
+                      enum:
+                      - user
+                      - workgroup
+                    id:
+                      type: string
+                  required:
+                  - kind
+                  - id
+              required:
+              - title
+              - fileId
+              - assignee
+      responses:
+        '201':
+          description: Created with rev-1 ETag
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      taskId:
+                        type: string
+                      parentTaskId:
+                        type: string
+                      state:
+                        type: string
+                      revision:
+                        type: integer
+                        minimum: 1
+                      assignmentId:
+                        type: string
+                      actualAcceptorId:
+                        type: string
+                      remainingObligations:
+                        type: array
+                        items:
+                          type: string
+                    required:
+                    - taskId
+                    - state
+                    - revision
+                    - assignmentId
+                required:
+                - ok
+                - data
+        '400':
+          description: Invalid input or missing idempotency key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Insufficient access
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/inbox:
+    get:
+      summary: Authorized CDW task and accountability inbox
+      operationId: cdwInbox
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        description: Requested rows (1..100).
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+      responses:
+        '200':
+          description: Authorized current rows; nextCursor null until cursor paging is implemented.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            kind:
+                              type: string
+                              enum:
+                              - task
+                              - obligation
+                            taskId:
+                              type: string
+                            title:
+                              type: string
+                            fileId:
+                              type: string
+                            state:
+                              type: string
+                            revision:
+                              type: integer
+                              minimum: 1
+                            assignmentId:
+                              type: string
+                            obligationId:
+                              type: string
+                            obligationKind:
+                              type: string
+                      asOf:
+                        type: string
+                      nextCursor:
+                        type: string
+                    required:
+                    - items
+                    - asOf
+                    - nextCursor
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/tasks/{id}/accept:
+    post:
+      summary: Accept a task as its active assignee or current workgroup leader
+      operationId: cdwAccept
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Task ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      - name: If-Match
+        in: header
+        required: true
+        description: Strong ETag rev-N enclosed in double quotes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        '200':
+          description: Accepted with new strong ETag.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      taskId:
+                        type: string
+                      parentTaskId:
+                        type: string
+                      state:
+                        type: string
+                      revision:
+                        type: integer
+                        minimum: 1
+                      assignmentId:
+                        type: string
+                      actualAcceptorId:
+                        type: string
+                      remainingObligations:
+                        type: array
+                        items:
+                          type: string
+                    required:
+                    - taskId
+                    - state
+                    - revision
+                    - assignmentId
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/tasks/{id}/delegate:
+    post:
+      summary: Create child task retaining parent accountability
+      operationId: cdwDelegate
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Parent task ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      - name: If-Match
+        in: header
+        required: true
+        description: Strong ETag rev-N enclosed in double quotes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                childTitle:
+                  type: string
+                  maxLength: 255
+                assignee:
+                  type: object
+                  properties:
+                    kind:
+                      type: string
+                      enum:
+                      - user
+                      - workgroup
+                    id:
+                      type: string
+                  required:
+                  - kind
+                  - id
+              required:
+              - childTitle
+              - assignee
+      responses:
+        '201':
+          description: Child assigned; parent obligations stay pending
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      taskId:
+                        type: string
+                      parentTaskId:
+                        type: string
+                      state:
+                        type: string
+                      revision:
+                        type: integer
+                        minimum: 1
+                      assignmentId:
+                        type: string
+                      actualAcceptorId:
+                        type: string
+                      remainingObligations:
+                        type: array
+                        items:
+                          type: string
+                    required:
+                    - taskId
+                    - state
+                    - revision
+                    - assignmentId
+                required:
+                - ok
+                - data
+        '403':
+          description: Not the accepted active assignee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/login:
     post:
       summary: Authenticate and open a session

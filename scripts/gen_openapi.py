@@ -720,6 +720,48 @@ add("GET", "/health/ready", operation("Readiness probe (PostgreSQL reachable)", 
     responses={"200": {"description": "Database reachable", "content": {"application/json": {"schema": OK_SCHEMA}}},
                "503": {"description": ERR["503"]}}))
 
+# --- CDW task kernel (single-file pilot) ---
+CDW_ASSIGNEE = obj({"kind": string(enum=["user","workgroup"]), "id": string()},required=["kind","id"])
+CDW_TASK_RESULT = obj({
+    "taskId": string(), "parentTaskId": string(), "state": string(),
+    "revision": integer(minimum=1), "assignmentId": string(),
+    "actualAcceptorId": string(), "remainingObligations": arr(string()),
+}, required=["taskId","state","revision","assignmentId"])
+CDW_SCOPE_INBOX = obj({"items": arr(obj({
+    "kind": string(enum=["task","obligation"]), "taskId": string(), "title": string(),
+    "fileId": string(), "state": string(), "revision": integer(minimum=1),
+    "assignmentId": string(), "obligationId": string(), "obligationKind": string(),
+})), "asOf": string(), "nextCursor": string()},required=["items","asOf","nextCursor"])
+CDW_IDEMPOTENCY = {"name":"Idempotency-Key","in":"header","required":True,
+ "description":"8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.",
+ "schema":string(max_length=128)}
+CDW_IF_MATCH = {"name":"If-Match","in":"header","required":True,
+ "description":"Strong ETag rev-N enclosed in double quotes.","schema":string()}
+CDW_ROOT = obj({"title":string(max_length=255),"fileId":string(),"templateVersionId":string("Optional; built-in single-file task template when omitted."),"assignee":CDW_ASSIGNEE},
+ required=["title","fileId","assignee"])
+CDW_CHILD = obj({"childTitle":string(max_length=255),"assignee":CDW_ASSIGNEE},
+ required=["childTitle","assignee"])
+add("POST","/api/workbench/tasks",operation("Create single-file root work task (administrator only)","CDW","cdwCreateRoot",
+ security=SESSION,params=[CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":CDW_ROOT}},
+ responses={"201":{"description":"Created with rev-1 ETag","content":{"application/json":{"schema":obj({"ok":{"type":"boolean"},"data":CDW_TASK_RESULT},required=["ok","data"])}}},
+ "400":{"description":"Invalid input or missing idempotency key"},"403":{"description":"Insufficient access"},"409":{"description":"Conflict"}}))
+add("GET","/api/workbench/inbox",operation("Authorized CDW task and accountability inbox","CDW","cdwInbox",
+ security=SESSION,params=[query("limit","Requested rows (1..100).",{"type":"integer","minimum":1,"maximum":100})],
+ responses=dict([json_ok(CDW_SCOPE_INBOX,"Authorized current rows; nextCursor null until cursor paging is implemented."),
+ resp("400",ERR["400"]),resp("401",ERR["401"])])))
+add("POST","/api/workbench/tasks/{id}/accept",operation("Accept a task as its active assignee or current workgroup leader","CDW","cdwAccept",
+ security=SESSION,params=[id_param("id","Task ID."),CDW_IDEMPOTENCY,CDW_IF_MATCH],
+ request={"application/json":{"schema":obj({})}},
+ responses=dict([json_ok(CDW_TASK_RESULT,"Accepted with new strong ETag."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
+add("POST","/api/workbench/tasks/{id}/delegate",operation("Create child task retaining parent accountability","CDW","cdwDelegate",
+ security=SESSION,params=[id_param("id","Parent task ID."),CDW_IDEMPOTENCY,CDW_IF_MATCH],
+ request={"application/json":{"schema":CDW_CHILD}},
+ responses={"201":{"description":"Child assigned; parent obligations stay pending",
+ "content":{"application/json":{"schema":obj({"ok":{"type":"boolean"},"data":CDW_TASK_RESULT},required=["ok","data"])}}},
+ "403":{"description":"Not the accepted active assignee"},"409":{"description":"Conflict"}}))
+
 # --- Auth ---
 add("POST", "/api/login", operation("Authenticate and open a session", "Auth", "login", security=[],
     request={"application/json": {"schema": ref("LoginRequest")}},

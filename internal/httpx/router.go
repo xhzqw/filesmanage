@@ -101,6 +101,11 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.DELETE("/me/sessions/others", h.revokeOtherSessions)
 	api.DELETE("/me/sessions/:id", h.revokeOwnSession)
 	api.GET("/events/ws", h.websocketEvents)
+	// CDW task pilot: single-file task assignment, acceptance and accountability.
+	api.POST("/workbench/tasks", h.cdwCreateRoot)
+	api.GET("/workbench/inbox", h.cdwInbox)
+	api.POST("/workbench/tasks/:id/accept", h.cdwAcceptTask)
+	api.POST("/workbench/tasks/:id/delegate", h.cdwDelegateTask)
 	api.GET("/folders/tree", h.folders)
 	api.GET("/labels", h.finderLabels)
 	api.POST("/labels/assignments", h.finderAssignments)
