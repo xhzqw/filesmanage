@@ -125,6 +125,31 @@ func (r *Repository) CDWDecideReview(ctx context.Context, gateID, actor string, 
 	if err != nil || current != actor {
 		return result, domain.ErrForbidden
 	}
+	// A former workgroup leader cannot retain review authority after the
+	// assignment role binding has been revoked or expired.
+	var parentGroup *string
+	e := r.Q.QueryRow(ctx, `SELECT a.group_id FROM cdw_tasks t
+	 JOIN cdw_task_assignments a ON a.task_id=t.parent_id
+	 WHERE t.id=$1 AND a.kind='primary' AND a.ended_at IS NULL`, taskID).Scan(&parentGroup)
+	if e != nil && !errors.Is(e, pgx.ErrNoRows) {
+		return result, e
+	}
+	if parentGroup != nil {
+		eligible, e := r.CDWActiveRecipients(ctx, ports.CDWAssignmentTarget{Kind: "workgroup", ID: *parentGroup})
+		if e != nil {
+			return result, e
+		}
+		approved := false
+		for _, id := range eligible {
+			if id == actor {
+				approved = true
+				break
+			}
+		}
+		if !approved {
+			return result, domain.ErrForbidden
+		}
+	}
 	nextGate, nextTask := "accepted", "accepted_delivery"
 	if decision == "return" {
 		nextGate, nextTask = "returned", "returned"

@@ -40,6 +40,15 @@ func (r *Repository) CDWCreateBranch(ctx context.Context, id, taskID, fileID, ac
 	if err = r.cdwVerifyBranchActor(ctx, actor, group); err != nil {
 		return ports.CDWBranch{}, err
 	}
+	// Single-file pilot is single active branch per task/round. The locked
+	// task row serializes competing branch creations from separate requests.
+	var active bool
+	if err = r.Q.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM cdw_work_branches WHERE task_id=$1 AND state IN ('open','fencing'))`, taskID).Scan(&active); err != nil {
+		return ports.CDWBranch{}, err
+	}
+	if active {
+		return ports.CDWBranch{}, domain.ErrConflict
+	}
 	var b ports.CDWBranch
 	var head *string
 	err = r.Q.QueryRow(ctx, `INSERT INTO cdw_work_branches(id,task_id,file_id,base_version_id,base_sha256,created_by,state)

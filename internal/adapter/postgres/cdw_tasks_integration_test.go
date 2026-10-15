@@ -228,6 +228,9 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("A branch: %v", err)
 	}
+	if _, e := service.CDWCreateBranch(ctx, alice, root.TaskID, prefix+"_create_A_duplicate"); !errors.Is(e, domain.ErrConflict) {
+		t.Fatalf("duplicate active branch must be blocked: %v", e)
+	}
 	bobBranch, err := service.CDWCreateBranch(ctx, bob, child.TaskID, prefix+"_create_B")
 	if err != nil {
 		t.Fatalf("B branch: %v", err)

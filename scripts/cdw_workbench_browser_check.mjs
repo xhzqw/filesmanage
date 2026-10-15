@@ -54,6 +54,9 @@ try{
  const inbox=await evalJS("(async()=>{const r=await fetch('/api/workbench/inbox?limit=5');return {status:r.status,data:(await r.json()).data}})()");
  assert.equal(inbox.status,200,"authenticated CDW inbox responds 200");
  assert.ok(Array.isArray(inbox.data?.items),"CDW inbox contains items array");
+ const gates=await evalJS("(async()=>{const r=await fetch('/api/workbench/review-gates/inbox?limit=5');return {status:r.status,data:(await r.json()).data}})()");
+ assert.equal(gates.status,200,"review gate inbox must authorize current session");
+ assert.ok(Array.isArray(gates.data?.items),"review inbox must return items array");
  for(const width of [1440,1024,780]){
   await send("Emulation.setDeviceMetricsOverride",{width,height:850,deviceScaleFactor:1,mobile:false});
   await sleep(150);
@@ -70,11 +73,13 @@ try{
   assert.ok(layout.panes.every(p=>p.bottom<=851),"panes extend below viewport at "+width);
   console.log("CDW_LAYOUT_PASS",width,layout.panes.map(p=>p.selector+":"+Math.round(p.right-p.left)).join(" "));
  }
+ await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('待我验收'));button?.click();return true;})()");
+ await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('待我验收')");
  await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('责任待办'));button?.click();return true;})()");
  await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('责任待办')");
  await evalJS("(()=>{const create=[...document.querySelectorAll('.cdw-inbox-actions button')].find(b=>b.textContent.includes('派发任务'));create?.click();return true;})()");
  await until("!!document.querySelector('.cdw-form') && document.querySelector('.cdw-detail h2')?.textContent?.includes('派发单文件任务')");
- console.log("CDW_BROWSER_PASS auth=inbox, responsive=1440/1024/780, filter, create-form");
+ console.log("CDW_BROWSER_PASS auth=tasks+review-inbox, responsive=1440/1024/780, review-filter, create-form");
 }finally{
  try{ws?.close();}catch{}
  chrome.kill("SIGTERM");
