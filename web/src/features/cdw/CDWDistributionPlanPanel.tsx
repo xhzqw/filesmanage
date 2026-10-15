@@ -12,9 +12,9 @@ type Department={id:string;name:string};
 type Target={departmentId:string;receiverId:string};
 const emptyTarget=():Target=>({departmentId:"",receiverId:""});
 
-export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments}:{
+export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments,isAdmin,currentUserId}:{
  release:CDWControlledRelease;loadUsers:()=>Promise<User[]>;
- loadDepartments:()=>Promise<Department[]>;
+ loadDepartments:()=>Promise<Department[]>;isAdmin:boolean;currentUserId:string;
 }){
  const [plan,setPlan]=useState<CDWDistributionPlan|null>(null);
  const [targets,setTargets]=useState<Target[]>([emptyTarget()]);
@@ -25,6 +25,9 @@ export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments}:{
  const [busy,setBusy]=useState(false);
  const requestKey=useRef("");
  const freezeKey=useRef("");
+ const [approverId,setApproverId]=useState("");
+ const [grantBusy,setGrantBusy]=useState(false);
+ const grantKey=useRef("");
  useEffect(()=>{
   let active=true;setPlan(null);setTargets([emptyTarget()]);setLoading(true);setError("");
   Promise.all([
@@ -79,6 +82,21 @@ export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments}:{
   }catch(e){if(!(e instanceof ApiError&&e.httpStatus===0))freezeKey.current="";}
   finally{setBusy(false);}
  }
+ async function grantApprover(){
+  if(grantBusy||!approverId||!plan||!isAdmin||approverId===currentUserId)return;
+  if(!grantKey.current)grantKey.current=newIdempotencyKey();
+  setGrantBusy(true);
+  try{
+   await toast.track(()=>cdwApi.scopeGrant(plan.fileId,approverId,grantKey.current),{
+    loading:"正在登记独立范围批准人员…",
+    success:"审批授权已登记；需由该人员登录完成批准",
+    error:e=>errorCopy(e,"范围审批授权失败")
+   });
+   grantKey.current="";
+   setApproverId("");
+  }catch(e){if(!(e instanceof ApiError&&e.httpStatus===0))grantKey.current="";}
+  finally{setGrantBusy(false);}
+ }
  return <section className="cdw-section">
   <div className="cdw-section-head"><h3>部门分发范围</h3>
    {plan&&<RareBadge tone={plan.state==="frozen"?"success":"neutral"}>{plan.state==="draft"?"草案待冻结":plan.state==="frozen"?"清单已冻结":"待分发审批"}</RareBadge>}
@@ -114,6 +132,21 @@ export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments}:{
    {plan?.state==="draft"&&<div className="cdw-review-actions">
     <RareButton type="button" tone="primary" disabled={busy} loading={busy}
      onClick={()=>void freeze()}>核对并冻结部门清单</RareButton>
+   </div>}
+   {plan?.state==="frozen"&&isAdmin&&<div className="cdw-review-form">
+    <label>独立范围审批授权
+     <RareSelect searchable value={approverId} disabled={grantBusy}
+      onChange={e=>{setApproverId(e.target.value);grantKey.current="";}}>
+      <option value="">选择另一位审批人</option>
+      {users.filter(u=>u.id!==currentUserId).map(person=>
+       <option key={person.id} value={person.id}>{person.displayName}</option>)}
+     </RareSelect>
+    </label>
+    <div className="cdw-review-actions">
+     <RareButton type="button" tone="neutral" loading={grantBusy}
+      disabled={!approverId||grantBusy} onClick={()=>void grantApprover()}>授予范围批准权限</RareButton>
+    </div>
+    <p className="cdw-section-note">这只是授予资格；被授权人员仍须在自己的“范围审批”待办中独立批准冻结摘要。</p>
    </div>}
    {plan?.digestSha256&&<div className="cdw-review-digest">
     <small>受控范围规范摘要 SHA-256</small><code title={plan.digestSha256}>{plan.digestSha256}</code>

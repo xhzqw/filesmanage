@@ -3376,6 +3376,256 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/distribution-scope-roles:
+    post:
+      summary: Appoint file-level scope approver
+      operationId: cdwDistributionScopeGrant
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fileId:
+                  type: string
+                userId:
+                  type: string
+              required:
+              - fileId
+              - userId
+      responses:
+        '200':
+          description: Explicit reviewer appointment.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                    required:
+                    - id
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/distribution-scope/inbox:
+    get:
+      summary: Pending frozen scopes for independently appointed approvers
+      operationId: cdwDistributionScopeInbox
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Authorized frozen plans only.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            releaseId:
+                              type: string
+                            fileId:
+                              type: string
+                            fileName:
+                              type: string
+                            state:
+                              type: string
+                              enum:
+                              - draft
+                              - frozen
+                              - approved
+                              - dispatched
+                              - cancelled
+                            revision:
+                              type: integer
+                              minimum: 1
+                            digestSha256:
+                              type: string
+                            departmentCount:
+                              type: integer
+                              minimum: 1
+                            targets:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  departmentId:
+                                    type: string
+                                  receiverId:
+                                    type: string
+                                required:
+                                - departmentId
+                                - receiverId
+                          required:
+                          - id
+                          - releaseId
+                          - fileId
+                          - fileName
+                          - state
+                          - revision
+                          - departmentCount
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/distribution-plans/{id}/approve-scope:
+    post:
+      summary: Authorize exact frozen scope digest without issuing a batch
+      operationId: cdwDistributionScopeApprove
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Frozen plan ID
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      - name: If-Match
+        in: header
+        required: true
+        description: Strong ETag rev-N enclosed in double quotes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        '200':
+          description: Approved scope, not dispatched.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      releaseId:
+                        type: string
+                      fileId:
+                        type: string
+                      fileName:
+                        type: string
+                      state:
+                        type: string
+                        enum:
+                        - draft
+                        - frozen
+                        - approved
+                        - dispatched
+                        - cancelled
+                      revision:
+                        type: integer
+                        minimum: 1
+                      digestSha256:
+                        type: string
+                      departmentCount:
+                        type: integer
+                        minimum: 1
+                      targets:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            departmentId:
+                              type: string
+                            receiverId:
+                              type: string
+                          required:
+                          - departmentId
+                          - receiverId
+                    required:
+                    - id
+                    - releaseId
+                    - fileId
+                    - fileName
+                    - state
+                    - revision
+                    - departmentCount
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/login:
     post:
       summary: Authenticate and open a session

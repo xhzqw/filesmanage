@@ -141,28 +141,7 @@ func (s *Service) CDWDistributionFreeze(ctx context.Context, actor domain.User, 
 			if _, e = roles.CDWControlRole(ctx, actor.ID, "document_control", snapshot.FileID); e != nil {
 				return nil, e
 			}
-			plan := CDWDistributionPlanSnapshot{PlanID: id}
-			for _, item := range snapshot.Items {
-				plan.Items = append(plan.Items, CDWPlanItem{Ordinal: item.Ordinal, ReleaseID: item.ReleaseID,
-					ArtifactID: item.ArtifactID, ArtifactSHA256: item.SHA256, Required: item.Required})
-			}
-			for _, t := range snapshot.Targets {
-				if !t.ReceiptRequired || !t.ReadingRequired {
-					return nil, domain.ErrConflict
-				}
-				person, e := tx.UserByID(ctx, t.ReceiverID)
-				if e != nil || person.DisabledAt != nil || person.DepartmentID != t.DepartmentID {
-					return nil, domain.ErrForbidden
-				}
-				if _, e = s.visibleFile(ctx, tx, person, snapshot.FileID, domain.ActionPreview); e != nil {
-					return nil, domain.ErrForbidden
-				}
-				plan.Targets = append(plan.Targets, CDWPlanTarget{DepartmentID: t.DepartmentID,
-					DesignatedReceiverID: t.ReceiverID, Channel: t.Channel, PaperQuantity: t.PaperQuantity,
-					ItemRequirements: []CDWPlanTargetRequirement{{ItemOrdinal: 1, ReceiptRequired: t.ReceiptRequired,
-						ReadingRequired: t.ReadingRequired, ImplementationRequired: t.ImplementationRequired}}})
-			}
-			digest, e := CDWCanonicalPlanDigest(plan)
+			digest, e := s.cdwVerifiedDistributionDigest(ctx, tx, snapshot)
 			if e != nil {
 				return nil, domain.ErrInvalidInput
 			}

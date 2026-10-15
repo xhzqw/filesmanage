@@ -296,6 +296,48 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	if scopeApprovals != 0 || batches != 0 {
 		t.Fatalf("draft/freeze silently approved/dispatched scope %d/%d", scopeApprovals, batches)
 	}
+	if _, e = service.CDWApproveDistributionScope(ctx, admin, plan.ID, 2, prefix+"_g9_scope_author"); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("plan creator must not approve own scope: %v", e)
+	}
+	if _, e = service.CDWApproveDistributionScope(ctx, alice, plan.ID, 2, prefix+"_g9_scope_no_role"); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("unappointed scope approver accepted: %v", e)
+	}
+	scopeRole, e := service.CDWGrantDistributionScopeApprover(ctx, admin, application.CDWDistributionScopeRoleInput{
+		FileID: fileID, UserID: alice.ID}, prefix+"_g9_scope_grant")
+	if e != nil || scopeRole.ID == "" {
+		t.Fatalf("scope role grant %+v %v", scopeRole, e)
+	}
+	scopeInbox, e := service.CDWDistributionScopeInbox(ctx, alice, 100)
+	if e != nil {
+		t.Fatal(e)
+	}
+	sawPlan := false
+	for _, row := range scopeInbox {
+		if row.ID == plan.ID && row.DigestSHA256 == frozenPlan.DigestSHA256 {
+			sawPlan = true
+		}
+	}
+	if !sawPlan {
+		t.Fatalf("appointed principal must see frozen scope %+v", scopeInbox)
+	}
+	approvedPlan, e := service.CDWApproveDistributionScope(ctx, alice, plan.ID, 2, prefix+"_g9_scope_approve")
+	if e != nil || approvedPlan.State != "approved" || approvedPlan.DigestSHA256 != frozenPlan.DigestSHA256 {
+		t.Fatalf("immutable digest scope approval %+v %v", approvedPlan, e)
+	}
+	againApproved, e := service.CDWApproveDistributionScope(ctx, alice, plan.ID, 2, prefix+"_g9_scope_approve")
+	if e != nil || againApproved.ID != plan.ID {
+		t.Fatalf("scope replay %+v %v", againApproved, e)
+	}
+	if _, e = service.CDWApproveDistributionScope(ctx, alice, plan.ID, 2, prefix+"_g9_scope_stale"); !errors.Is(e, domain.ErrVersionConflict) {
+		t.Fatalf("scope CAS stale must fail: %v", e)
+	}
+	if e = pool.QueryRow(ctx, "SELECT count(*) FROM cdw_distribution_scope_approvals WHERE plan_id=$1 AND plan_digest_sha256=$2", plan.ID, frozenPlan.DigestSHA256).Scan(&scopeApprovals); e != nil {
+		t.Fatal(e)
+	}
+	if scopeApprovals != 1 {
+		t.Fatalf("scope approval evidence rows=%d", scopeApprovals)
+	}
+	t.Logf("CDW_G9_SCOPE_APPROVED_POSTGRES_PASS plan=%s digest=%s batch=none", plan.ID, approvedPlan.DigestSHA256)
 	t.Logf("CDW_G9_SCOPE_FROZEN_POSTGRES_PASS plan=%s departments=2 digest=%s issued=none", plan.ID, frozenPlan.DigestSHA256)
 	t.Logf("CDW_G8_VERIFIED_ARTIFACT_PASS release=%s sha=%s still_not_effective", ready.ID, sha)
 	t.Logf("CDW_G8_PREPARE_POSTGRES_PASS release=%s sha=%s active_pointer=none", prepared.ID, sha)

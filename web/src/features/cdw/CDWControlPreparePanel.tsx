@@ -126,7 +126,7 @@ export function CDWControlPreparePanel({candidate,user,onPrepared,loadUsers,load
        {distributionID===item.id?"收起部门范围":"配置部门范围"}</RareButton>:
       <RareBadge tone={item.state==="effective"?"success":"neutral"}>{item.state==="effective"?"当前生效":item.state}</RareBadge>}
     </div>
-    {distributionID===item.id&&item.state==="ready"&&<CDWDistributionPlanPanel release={item} loadUsers={loadUsers} loadDepartments={loadDepartments}/>}
+    {distributionID===item.id&&item.state==="ready"&&<CDWDistributionPlanPanel release={item} loadUsers={loadUsers} loadDepartments={loadDepartments} isAdmin={user.isAdmin} currentUserId={user.id}/>}
     {verifyId===item.id&&item.state==="preparing"&&<div className="cdw-review-form">
      <RareNotice tone="warning">仅适用于经制度核验后确定<strong>无需额外签章且无需格式转换</strong>的原批准 DOCX。需要盖章或转换的文件不能用此入口。</RareNotice>
      <div className="cdw-review-actions">

@@ -1030,6 +1030,29 @@ add("POST","/api/workbench/distribution-plans/{id}/freeze",operation(
  responses=dict([json_ok(CDW_DISTRIBUTION_PLAN,"Frozen immutable manifest pending scope approval, NOT dispatched."),
  resp("403",ERR["403"]),resp("409",ERR["409"])])))
 
+# --- G9 scope reviewer roles ---
+add("POST", "/api/workbench/distribution-scope-roles", operation(
+ "Appoint file-level scope approver", "CDW", "cdwDistributionScopeGrant",
+ security=SESSION, params=[CDW_IDEMPOTENCY],
+ request={"application/json": {"schema": obj({"fileId": string(), "userId": string()}, required=["fileId", "userId"])}},
+ responses=dict([json_ok(obj({"id": string()}, required=["id"]), "Explicit reviewer appointment."),
+                 resp("403", ERR["403"])])))
+
+# --- G9 frozen scope inbox ---
+add("GET", "/api/workbench/distribution-scope/inbox", operation(
+ "Pending frozen scopes for independently appointed approvers", "CDW", "cdwDistributionScopeInbox",
+ security=SESSION,
+ responses=dict([json_ok(obj({"items": arr(CDW_DISTRIBUTION_PLAN)}, required=["items"]),
+                         "Authorized frozen plans only."), resp("403", ERR["403"])])))
+
+# --- G9 independent frozen scope approval ---
+add("POST", "/api/workbench/distribution-plans/{id}/approve-scope", operation(
+ "Authorize exact frozen scope digest without issuing a batch", "CDW", "cdwDistributionScopeApprove",
+ security=SESSION, params=[id_param("id", "Frozen plan ID"), CDW_IDEMPOTENCY, CDW_IF_MATCH],
+ request={"application/json": {"schema": obj({})}},
+ responses=dict([json_ok(CDW_DISTRIBUTION_PLAN, "Approved scope, not dispatched."),
+                 resp("403", ERR["403"]), resp("409", ERR["409"])])))
+
 # --- Auth ---
 add("POST", "/api/login", operation("Authenticate and open a session", "Auth", "login", security=[],
     request={"application/json": {"schema": ref("LoginRequest")}},

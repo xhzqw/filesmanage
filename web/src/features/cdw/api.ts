@@ -28,7 +28,7 @@ export type CDWTask={
  actualAcceptorId?:string;remainingObligations?:string[];
 };
 export type CDWInboxItem={
- kind:"task"|"obligation"|"review"|"formal"|"control";review?:CDWReviewGate;formal?:CDWFormalApproval;candidate?:CDWApprovedCandidate;taskId:string;title:string;fileId:string;
+ kind:"task"|"obligation"|"review"|"formal"|"control"|"scope";scope?:CDWDistributionPlan;review?:CDWReviewGate;formal?:CDWFormalApproval;candidate?:CDWApprovedCandidate;taskId:string;title:string;fileId:string;
  state:string;revision:number;assignmentId?:string;obligationId?:string;obligationKind?:string;
 };
 export type CDWBranch={
@@ -110,6 +110,12 @@ export const cdwApi={
   request<CDWOverrideGrant>("/workbench/review-gates/"+segment(id)+"/grants",mutate(key,{actorId,reason},revision)),
  reviewRevoke:(id:string,grantId:string,key:string)=>
   request<CDWOverrideGrant>("/workbench/review-gates/"+segment(id)+"/grants/"+segment(grantId)+"/revoke",mutate(key,{})),
+ scopeInbox:()=>request<{items:CDWDistributionPlan[]}>(
+  "/workbench/distribution-scope/inbox",{cache:"no-store"}),
+ scopeGrant:(fileId:string,userId:string,key:string)=>request<{id:string}>(
+  "/workbench/distribution-scope-roles",mutate(key,{fileId,userId})),
+ scopeApprove:(id:string,revision:number,key:string)=>request<CDWDistributionPlan>(
+  "/workbench/distribution-plans/"+segment(id)+"/approve-scope",mutate(key,{},revision)),
  distributionForRelease:(releaseId:string)=>request<CDWDistributionPlan>(
   "/workbench/controlled/releases/"+segment(releaseId)+"/distribution-plan",{cache:"no-store"}),
  distributionCreate:(releaseId:string,targets:Array<{departmentId:string;receiverId:string}>,key:string)=>
