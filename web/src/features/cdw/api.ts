@@ -12,6 +12,15 @@ export type CDWDistributionBatch={
  id:string;planId:string;releaseId:string;fileId:string;
  state:"dispatched";revision:number;digestSha256:string;departmentCount:number;
 };
+export type CDWReceiptTarget={
+ targetId:string;batchId:string;fileId:string;fileName:string;
+ revisionLabel:string;departmentId:string;receiverId:string;
+ manifestSha256:string;artifactSha256:string;state:"awaiting"|"received";revision:number;
+};
+export type CDWDepartmentReceipt={
+ receiptId:string;targetId:string;batchId:string;fileId:string;actorId:string;
+ state:"received";revision:number;manifestSha256:string;evidenceSha256:string;signedAt:string;
+};
 export type CDWFormalReady={deliveryId:string;taskId:string;fileId:string;fileName:string;sha256:string};
 export type CDWFormalApproval={
  id:string;subjectId:string;deliveryId:string;fileId:string;fileName?:string;
@@ -32,7 +41,7 @@ export type CDWTask={
  actualAcceptorId?:string;remainingObligations?:string[];
 };
 export type CDWInboxItem={
- kind:"task"|"obligation"|"review"|"formal"|"control"|"scope";scope?:CDWDistributionPlan;review?:CDWReviewGate;formal?:CDWFormalApproval;candidate?:CDWApprovedCandidate;taskId:string;title:string;fileId:string;
+ kind:"task"|"obligation"|"review"|"formal"|"control"|"scope"|"receipt";receipt?:CDWReceiptTarget;scope?:CDWDistributionPlan;review?:CDWReviewGate;formal?:CDWFormalApproval;candidate?:CDWApprovedCandidate;taskId:string;title:string;fileId:string;
  state:string;revision:number;assignmentId?:string;obligationId?:string;obligationKind?:string;
 };
 export type CDWBranch={
@@ -120,6 +129,10 @@ export const cdwApi={
   "/workbench/distribution-scope-roles",mutate(key,{fileId,userId})),
  scopeApprove:(id:string,revision:number,key:string)=>request<CDWDistributionPlan>(
   "/workbench/distribution-plans/"+segment(id)+"/approve-scope",mutate(key,{},revision)),
+ receiptInbox:()=>request<{items:CDWReceiptTarget[]}>(
+  "/workbench/distribution-targets/inbox",{cache:"no-store"}),
+ receiptAcknowledge:(id:string,revision:number,statement:string,key:string)=>request<CDWDepartmentReceipt>(
+  "/workbench/distribution-targets/"+segment(id)+"/acknowledge",mutate(key,{statement},revision)),
  controlIssue:(releaseId:string,revision:number,key:string)=>request<CDWControlledRelease>(
   "/workbench/controlled/releases/"+segment(releaseId)+"/issue",mutate(key,{},revision)),
  distributionDispatch:(planId:string,revision:number,key:string)=>request<CDWDistributionBatch>(

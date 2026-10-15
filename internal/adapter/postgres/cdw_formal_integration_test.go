@@ -407,6 +407,67 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 		t.Fatal("issue/dispatch cannot activate default effective pointer")
 	}
 	t.Logf("CDW_G9_DISPATCH_POSTGRES_PASS batch=%s departments=2 grants=2 receipts=0 reading=0 effective_pointer=none", batch.ID)
+	bobTargets, e := service.CDWReceiptInbox(ctx, bob, 20)
+	if e != nil || len(bobTargets) != 1 || bobTargets[0].State != "awaiting" ||
+		bobTargets[0].ManifestSHA256 != approvedPlan.DigestSHA256 {
+		t.Fatalf("designated receiver inbox %+v %v", bobTargets, e)
+	}
+	charlieTargets, e := service.CDWReceiptInbox(ctx, charlie, 20)
+	if e != nil || len(charlieTargets) != 1 || charlieTargets[0].State != "awaiting" {
+		t.Fatalf("second department inbox %+v %v", charlieTargets, e)
+	}
+	if _, e = service.CDWAcknowledgeDepartment(ctx, alice, bobTargets[0].TargetID, 1,
+		application.CDWReceiptAcknowledgeInput{Statement: "我不是指定部门接收人，不得替代部门签收"}, prefix+"_g9_wrong_receipt"); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("nonreceiver signed another department: %v", e)
+	}
+	ack := application.CDWReceiptAcknowledgeInput{Statement: "已核验受控文件版本及 SHA256，并确认本部门已收到指定发行稿"}
+	bobReceipt, e := service.CDWAcknowledgeDepartment(ctx, bob, bobTargets[0].TargetID, 1, ack, prefix+"_g9_receipt_bob")
+	if e != nil || bobReceipt.State != "received" || bobReceipt.Revision != 2 || len(bobReceipt.EvidenceSHA256) != 64 {
+		t.Fatalf("first department receipt %+v %v", bobReceipt, e)
+	}
+	bobReplay, e := service.CDWAcknowledgeDepartment(ctx, bob, bobTargets[0].TargetID, 1, ack, prefix+"_g9_receipt_bob")
+	if e != nil || bobReplay.ReceiptID != bobReceipt.ReceiptID {
+		t.Fatalf("receipt replay %+v %v", bobReplay, e)
+	}
+	if _, e = service.CDWAcknowledgeDepartment(ctx, bob, bobTargets[0].TargetID, 1, ack, prefix+"_g9_receipt_bob_stale"); !errors.Is(e, domain.ErrVersionConflict) {
+		t.Fatalf("duplicate receipt did not enforce CAS: %v", e)
+	}
+	if e = pool.QueryRow(ctx, `SELECT COUNT(*) FROM cdw_department_receipts r JOIN cdw_distribution_targets t
+	 ON t.id=r.target_id WHERE t.batch_id=$1`, batch.ID).Scan(&receiptCount); e != nil {
+		t.Fatal(e)
+	}
+	if receiptCount != 1 {
+		t.Fatalf("partial receipt count=%d", receiptCount)
+	}
+	if _, e = pool.Exec(ctx, `UPDATE cdw_business_role_bindings SET revoked_at=now()
+	 WHERE user_id=$1 AND department_id=$2 AND role='department_receiver'`, charlie.ID, deptC); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = service.CDWAcknowledgeDepartment(ctx, charlie, charlieTargets[0].TargetID, 1, ack, prefix+"_g9_revoked_receiver"); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("revoked department receiver signed: %v", e)
+	}
+	if _, e = pool.Exec(ctx, `UPDATE cdw_business_role_bindings SET revoked_at=NULL
+	 WHERE user_id=$1 AND department_id=$2 AND role='department_receiver'`, charlie.ID, deptC); e != nil {
+		t.Fatal(e)
+	}
+	charlieReceipt, e := service.CDWAcknowledgeDepartment(ctx, charlie, charlieTargets[0].TargetID, 1, ack, prefix+"_g9_receipt_charlie")
+	if e != nil || charlieReceipt.ActorID != charlie.ID {
+		t.Fatalf("second department receipt %+v %v", charlieReceipt, e)
+	}
+	if e = pool.QueryRow(ctx, `SELECT COUNT(*) FROM cdw_department_receipts r JOIN cdw_distribution_targets t
+	 ON t.id=r.target_id WHERE t.batch_id=$1`, batch.ID).Scan(&receiptCount); e != nil {
+		t.Fatal(e)
+	}
+	if receiptCount != 2 {
+		t.Fatalf("department receipts should be independently signed: %d", receiptCount)
+	}
+	if e = pool.QueryRow(ctx, "SELECT count(*) FROM cdw_reading_assignments WHERE batch_id=$1", batch.ID).Scan(&readingCount); e != nil {
+		t.Fatal(e)
+	}
+	if readingCount != 0 {
+		t.Fatal("receipt cannot create or complete personal reading assignment")
+	}
+	t.Logf("CDW_G9_DEPARTMENT_RECEIPTS_POSTGRES_PASS batch=%s receipts=2 reading=0", batch.ID)
 	t.Logf("CDW_G9_SCOPE_APPROVED_POSTGRES_PASS plan=%s digest=%s batch=none", plan.ID, approvedPlan.DigestSHA256)
 	t.Logf("CDW_G9_SCOPE_FROZEN_POSTGRES_PASS plan=%s departments=2 digest=%s issued=none", plan.ID, frozenPlan.DigestSHA256)
 	t.Logf("CDW_G8_VERIFIED_ARTIFACT_PASS release=%s sha=%s still_not_effective", ready.ID, sha)

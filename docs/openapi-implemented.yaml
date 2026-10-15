@@ -3822,6 +3822,189 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/distribution-targets/inbox:
+    get:
+      summary: Read live department receipt assignments for the authenticated designated receiver
+      operationId: cdwReceiptInbox
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Real departmental receipt requirements and receipt-head revisions.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            targetId:
+                              type: string
+                            batchId:
+                              type: string
+                            fileId:
+                              type: string
+                            fileName:
+                              type: string
+                            revisionLabel:
+                              type: string
+                            departmentId:
+                              type: string
+                            receiverId:
+                              type: string
+                            manifestSha256:
+                              type: string
+                            artifactSha256:
+                              type: string
+                            state:
+                              type: string
+                              enum:
+                              - awaiting
+                              - received
+                            revision:
+                              type: integer
+                              minimum: 1
+                          required:
+                          - targetId
+                          - batchId
+                          - fileId
+                          - fileName
+                          - revisionLabel
+                          - departmentId
+                          - receiverId
+                          - manifestSha256
+                          - artifactSha256
+                          - state
+                          - revision
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/distribution-targets/{id}/acknowledge:
+    post:
+      summary: Sign immutable department receipt using live receiver authorization and frozen release digest
+      operationId: cdwReceiptAcknowledge
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Assigned department target
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      - name: If-Match
+        in: header
+        required: true
+        description: Strong ETag rev-N enclosed in double quotes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                statement:
+                  type: string
+                  minLength: 12
+                  maxLength: 2000
+              required:
+              - statement
+      responses:
+        '200':
+          description: Signed department receipt; does not complete personal reading or activation.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      receiptId:
+                        type: string
+                      targetId:
+                        type: string
+                      batchId:
+                        type: string
+                      fileId:
+                        type: string
+                      actorId:
+                        type: string
+                      state:
+                        type: string
+                        enum:
+                        - received
+                      revision:
+                        type: integer
+                        minimum: 2
+                      manifestSha256:
+                        type: string
+                      evidenceSha256:
+                        type: string
+                      signedAt:
+                        type: string
+                        format: date-time
+                    required:
+                    - receiptId
+                    - targetId
+                    - batchId
+                    - fileId
+                    - actorId
+                    - state
+                    - revision
+                    - manifestSha256
+                    - evidenceSha256
+                    - signedAt
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/login:
     post:
       summary: Authenticate and open a session

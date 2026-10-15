@@ -148,6 +148,8 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.GET("/workbench/distribution-scope/inbox", h.cdwDistributionScopeInbox)
 	api.POST("/workbench/distribution-plans/:id/approve-scope", h.cdwDistributionScopeApprove)
 	api.POST("/workbench/distribution-plans/:id/dispatch", h.cdwDistributionDispatch)
+	api.GET("/workbench/distribution-targets/inbox", h.cdwReceiptInbox)
+	api.POST("/workbench/distribution-targets/:id/acknowledge", h.cdwReceiptAcknowledge)
 	api.GET("/folders/tree", h.folders)
 	api.GET("/labels", h.finderLabels)
 	api.POST("/labels/assignments", h.finderAssignments)

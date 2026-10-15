@@ -1072,6 +1072,31 @@ add("POST", "/api/workbench/distribution-plans/{id}/dispatch", operation(
  responses=dict([json_ok(CDW_BATCH_RESULT, "Batch dispatched; receipt and reading remain unconfirmed."),
                  resp("403", ERR["403"]), resp("409", ERR["409"])])))
 
+CDW_RECEIPT_TARGET = obj({"targetId":string(),"batchId":string(),"fileId":string(),
+ "fileName":string(),"revisionLabel":string(),"departmentId":string(),"receiverId":string(),
+ "manifestSha256":string(),"artifactSha256":string(),"state":string(enum=["awaiting","received"]),
+ "revision":integer(minimum=1)},
+ required=["targetId","batchId","fileId","fileName","revisionLabel","departmentId",
+ "receiverId","manifestSha256","artifactSha256","state","revision"])
+add("GET","/api/workbench/distribution-targets/inbox",operation(
+ "Read live department receipt assignments for the authenticated designated receiver","CDW","cdwReceiptInbox",
+ security=SESSION,
+ responses=dict([json_ok(obj({"items":arr(CDW_RECEIPT_TARGET)},required=["items"]),
+ "Real departmental receipt requirements and receipt-head revisions."),resp("403",ERR["403"])])))
+
+CDW_RECEIPT_RESULT = obj({"receiptId":string(),"targetId":string(),"batchId":string(),
+ "fileId":string(),"actorId":string(),"state":string(enum=["received"]),
+ "revision":integer(minimum=2),"manifestSha256":string(),"evidenceSha256":string(),
+ "signedAt":timestamp()},
+ required=["receiptId","targetId","batchId","fileId","actorId","state",
+ "revision","manifestSha256","evidenceSha256","signedAt"])
+add("POST","/api/workbench/distribution-targets/{id}/acknowledge",operation(
+ "Sign immutable department receipt using live receiver authorization and frozen release digest","CDW","cdwReceiptAcknowledge",
+ security=SESSION,params=[id_param("id","Assigned department target"),CDW_IDEMPOTENCY,CDW_IF_MATCH],
+ request={"application/json":{"schema":obj({"statement":{"type":"string","minLength":12,"maxLength":2000}},required=["statement"])}},
+ responses=dict([json_ok(CDW_RECEIPT_RESULT,"Signed department receipt; does not complete personal reading or activation."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
+
 # --- Auth ---
 add("POST", "/api/login", operation("Authenticate and open a session", "Auth", "login", security=[],
     request={"application/json": {"schema": ref("LoginRequest")}},

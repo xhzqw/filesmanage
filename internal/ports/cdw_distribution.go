@@ -62,6 +62,6 @@ type CDWDistributionStore interface {
 	CDWDistributionGrantScopeRole(context.Context, string, string, string, string) (string, error)
 	CDWDistributionScopeApprove(context.Context, string, string, string, int64, string) (CDWDistributionPlan, error)
 	CDWDistributionScopeInbox(context.Context, string, int) ([]CDWDistributionPlan, error)
-	CDWDistributionDispatch(context.Context, string, string, string, int64, string, []string, []string, []string) (CDWDistributionBatch, error)
+	CDWDistributionDispatch(context.Context, string, string, string, int64, string, []string, []string, []string, []string) (CDWDistributionBatch, error)
 	CDWDistributionEvent(context.Context, string, string, string, string, any) error
 }

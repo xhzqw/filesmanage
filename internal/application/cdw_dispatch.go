@@ -60,8 +60,12 @@ func (s *Service) CDWDispatchDistribution(ctx context.Context, actor domain.User
 			for i := range grantIDs {
 				grantIDs[i] = NewID("cdwaccess")
 			}
+			receiverBindingIDs := make([]string, len(snapshot.Targets))
+			for i := range receiverBindingIDs {
+				receiverBindingIDs[i] = NewID("cdwreceiverrole")
+			}
 			return store.CDWDistributionDispatch(ctx, batchID, planID, actor.ID,
-				expected, digest, itemIDs, targetIDs, grantIDs)
+				expected, digest, itemIDs, targetIDs, grantIDs, receiverBindingIDs)
 		})
 	if err != nil {
 		return out, err

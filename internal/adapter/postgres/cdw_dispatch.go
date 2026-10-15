@@ -11,7 +11,7 @@ import (
 // Snapshot dispatch occurs atomically after independent scope approval and
 // release issue. Item/target keys are allocated once per idempotency request.
 func (r *Repository) CDWDistributionDispatch(ctx context.Context, batchID, planID, actor string,
-	expected int64, digest string, itemIDs, targetIDs, grantIDs []string) (ports.CDWDistributionBatch, error) {
+	expected int64, digest string, itemIDs, targetIDs, grantIDs, receiverBindingIDs []string) (ports.CDWDistributionBatch, error) {
 	var out ports.CDWDistributionBatch
 	var state, sourceDigest, releaseID, releaseState, fileID string
 	var rev int64
@@ -55,7 +55,7 @@ func (r *Repository) CDWDistributionDispatch(ctx context.Context, batchID, planI
 	if err != nil {
 		return out, err
 	}
-	if itemCount != len(itemIDs) || targetCount != len(targetIDs) || len(grantIDs) != targetCount*itemCount || targetCount == 0 || itemCount != 1 {
+	if itemCount != len(itemIDs) || targetCount != len(targetIDs) || len(grantIDs) != targetCount*itemCount || len(receiverBindingIDs) != targetCount || targetCount == 0 || itemCount != 1 {
 		return out, domain.ErrConflict
 	}
 	_, err = r.Q.Exec(ctx, `INSERT INTO cdw_distribution_batches
@@ -117,6 +117,25 @@ func (r *Repository) CDWDistributionDispatch(ctx context.Context, batchID, planI
 		return out, err
 	}
 	for i, target := range receivers {
+		if _, err = r.Q.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1))",
+			"cdw:receiver:"+target.receiver+":"+target.dept); err != nil {
+			return out, err
+		}
+		var receiverRole string
+		err = r.Q.QueryRow(ctx, `SELECT id FROM cdw_business_role_bindings
+		WHERE user_id=$1 AND department_id=$2 AND role='department_receiver'
+		AND file_id IS NULL AND revoked_at IS NULL AND valid_from<=now()
+		AND (expires_at IS NULL OR expires_at>now())
+		LIMIT 1 FOR UPDATE`, target.receiver, target.dept).Scan(&receiverRole)
+		if errors.Is(err, pgx.ErrNoRows) {
+			receiverRole = receiverBindingIDs[i]
+			_, err = r.Q.Exec(ctx, `INSERT INTO cdw_business_role_bindings
+		 (id,user_id,role,department_id,granted_by)
+		 VALUES($1,$2,'department_receiver',$3,$4)`, receiverRole, target.receiver, target.dept, actor)
+		}
+		if err != nil {
+			return out, err
+		}
 		_, err = r.Q.Exec(ctx, `INSERT INTO cdw_distribution_targets
  (id,batch_id,plan_id,department_id,designated_receiver_id)
  VALUES($1,$2,$3,$4,$5)`, targetIDs[i], batchID, planID, target.dept, target.receiver)
