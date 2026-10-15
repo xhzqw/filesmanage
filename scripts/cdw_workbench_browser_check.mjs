@@ -78,5 +78,6 @@ try{
 }finally{
  try{ws?.close();}catch{}
  chrome.kill("SIGTERM");
- rmSync(profile,{recursive:true,force:true});
+ await Promise.race([new Promise(resolve=>chrome.once("exit",resolve)),sleep(1800)]);
+ rmSync(profile,{recursive:true,force:true,maxRetries:6,retryDelay:130});
 }
