@@ -972,6 +972,21 @@ add("POST","/api/workbench/controlled/releases",operation(
  responses=dict([json_ok(CDW_CONTROL_RELEASE,"Created in preparing state with source-only artifact."),
  resp("403",ERR["403"]),resp("409",ERR["409"])])))
 
+# --- G11 explicit obligation completion, separate from delivery acceptance ---
+CDW_OBLIGATION_FULFILLMENT = obj({"obligationId":string(),"taskId":string(),
+ "fileId":string(),"kind":string(enum=["manage","integrate","report"]),
+ "state":string(enum=["fulfilled"]),"revision":integer(minimum=2),"fulfilledBy":string(),
+ "evidenceSha256":string(),"fulfilledAt":timestamp()},
+ required=["obligationId","taskId","fileId","kind","state","revision",
+ "fulfilledBy","evidenceSha256","fulfilledAt"])
+add("POST","/api/workbench/obligations/{id}/fulfill",operation(
+ "Record explicit accountable management/integration/reporting with frozen evidence, CAS and no automatic waiver","CDW","cdwCompleteObligation",
+ security=SESSION,params=[id_param("id","Pending obligation ID."),CDW_IDEMPOTENCY,CDW_IF_MATCH],
+ request={"application/json":{"schema":obj({"statement":{"type":"string","minLength":12,"maxLength":3000}},
+ required=["statement"])}},
+ responses=dict([json_ok(CDW_OBLIGATION_FULFILLMENT,"Real fulfillment receipt; subordinate acceptance remains a prerequisite only."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
+
 # --- Auth ---
 add("POST", "/api/login", operation("Authenticate and open a session", "Auth", "login", security=[],
     request={"application/json": {"schema": ref("LoginRequest")}},

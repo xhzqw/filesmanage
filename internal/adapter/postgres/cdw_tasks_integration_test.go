@@ -268,6 +268,8 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 	}
 	var aliceReceipt ports.CDWBranchSave
 	var aliceRevision, aliceDocKey, aliceOfficeSession string
+	var bobReceipt ports.CDWBranchSave
+	var bobRevision string
 	for idx, candidate := range branchCommits {
 		workTx, e := repo.Begin(ctx)
 		if e != nil {
@@ -307,6 +309,9 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 			aliceDocKey = session.DocumentKey
 			aliceOfficeSession = session.ID
 		}
+		if idx == 1 {
+			bobReceipt = request
+		}
 		// A forcesave accepted by ONLYOFFICE is only requested (no revision yet).
 		if _, e = service.CDWFreezeBranch(ctx, candidate.user, candidate.b.ID, request.ID, "nonexistent", 1, prefix+"_premature_"+candidate.letter); !errors.Is(e, domain.ErrVersionConflict) {
 			t.Fatalf("premature freeze was not blocked: %v", e)
@@ -344,6 +349,9 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 		}
 		if idx == 0 {
 			aliceRevision = revisionID
+		}
+		if idx == 1 {
+			bobRevision = revisionID
 		}
 		// A callback replay is idempotent; no second branch revision.
 		replayTx, e := repo.Begin(ctx)
@@ -512,6 +520,7 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 		root.TaskID, child.TaskID, child2.TaskID, groupRoot.TaskID).Scan(&n); err != nil || n != 8 {
 		t.Fatalf("atomic CDW event count=%d err=%v", n, err)
 	}
+	exerciseCDWG11Obligations(t, ctx, pool, repo, service, prefix, admin, alice, bob, charlie, root, child, child2, bobBranch, bobReceipt, bobRevision, fileID, blobID)
 	exerciseCDWG6Override(t, ctx, pool, repo, service, prefix, admin, alice, bob, charlie, fileID, blobID)
 	exerciseCDWG7Formal(t, ctx, pool, repo, service, prefix, admin, alice, bob, charlie, fileID)
 	t.Logf("CDW_TASK_POSTGRES_PASS root=%s child=%s grandchild=%s pending-obligations=6", root.TaskID, child.TaskID, child2.TaskID)

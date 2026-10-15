@@ -11,6 +11,10 @@ export type CDWFormalApproval={
 export type CDWFormalStep={id:string;nodeKey:string;sequence:number;approverId:string;state:string;revision:number};
 export type CDWFormalDetail={approval:CDWFormalApproval;steps:CDWFormalStep[];
  decisions:Array<{stepId:string;actorId:string;decision:string;reason:string;decidedAt:string}>};
+export type CDWObligationFulfillment={
+ obligationId:string;taskId:string;fileId:string;kind:string;state:"fulfilled";
+ revision:number;fulfilledBy:string;evidenceSha256:string;fulfilledAt:string;
+};
 export type CDWRecipient={kind:"user"|"workgroup";id:string};
 export type CDWTask={
  taskId:string;parentTaskId?:string;parentRevision?:number;
@@ -117,6 +121,8 @@ export const cdwApi={
   request<{id:string}>("/workbench/formal-roles",mutate(key,{fileId,userId})),
  formalStart:(deliveryId:string,templateVersionId:string,key:string)=>
   request<CDWFormalApproval>("/workbench/formal-approvals",mutate(key,{deliveryId,templateVersionId})),
+ fulfillObligation:(id:string,revision:number,statement:string,key:string)=>
+  request<CDWObligationFulfillment>("/workbench/obligations/"+segment(id)+"/fulfill",mutate(key,{statement},revision)),
  resume:(taskId:string,revision:number,key:string)=>
   request<CDWResumeResult>("/workbench/tasks/"+segment(taskId)+"/resume",mutate(key,{},revision)),
 };

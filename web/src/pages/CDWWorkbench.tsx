@@ -8,6 +8,7 @@ import {CDWReviewPanel} from "../features/cdw/CDWReviewPanel";
 import {CDWFormalPanel} from "../features/cdw/CDWFormalPanel";
 import {CDWFormalInitiate} from "../features/cdw/CDWFormalInitiate";
 import {CDWControlPreparePanel} from "../features/cdw/CDWControlPreparePanel";
+import {CDWObligationPanel} from "../features/cdw/CDWObligationPanel";
 import {BrandLoadingLabel} from "../shared/ui/BrandLoader";
 import {toast} from "../shared/ui/feedback";
 import {errorCopy} from "../shared/errors";
@@ -183,6 +184,13 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
    return undefined;
   }finally{setProcessing(false);}
  }
+ async function fulfillObligation(item:CDWInboxItem,statement:string):Promise<boolean>{
+  if(!item.obligationId)return false;
+  const operationKey=["fulfill",item.obligationId,item.revision,statement].join(":");
+  const result=await safeWrite(operationKey,
+   key=>cdwApi.fulfillObligation(item.obligationId!,item.revision,statement,key),"责任履行证据已保存");
+  return Boolean(result);
+ }
  async function acceptTask(item:CDWInboxItem){
   await safeWrite("accept:"+item.taskId,key=>cdwApi.accept(item.taskId,item.revision,key),"任务已接收");
  }
@@ -312,7 +320,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
         <p className="cdw-section-note">原文件维持独立正式版本；编辑任务产生单独工作修订，不直接覆盖原件。</p>
        </div>
        {selected.kind==="obligation"?<div className="cdw-section">
-        <h3>责任说明</h3><RareNotice tone="info">这项责任必须单独履行；下级完成工作不会自动将它标记为完成。责任核销将在验收事务上线后开放。</RareNotice>
+        <CDWObligationPanel item={selected} busy={processing} onFulfill={statement=>fulfillObligation(selected,statement)}/>
        </div>:<>
         {selected.state==="assigned"&&<div className="cdw-primary-action">
          <p>你收到一项工作任务。接收后可以建立独立编辑分支，也可以向下一级派发。</p>

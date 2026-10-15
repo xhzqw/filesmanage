@@ -2759,6 +2759,113 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/obligations/{id}/fulfill:
+    post:
+      summary: Record explicit accountable management/integration/reporting with frozen evidence, CAS and no automatic waiver
+      operationId: cdwCompleteObligation
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Pending obligation ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      - name: If-Match
+        in: header
+        required: true
+        description: Strong ETag rev-N enclosed in double quotes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                statement:
+                  type: string
+                  minLength: 12
+                  maxLength: 3000
+              required:
+              - statement
+      responses:
+        '200':
+          description: Real fulfillment receipt; subordinate acceptance remains a prerequisite only.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      obligationId:
+                        type: string
+                      taskId:
+                        type: string
+                      fileId:
+                        type: string
+                      kind:
+                        type: string
+                        enum:
+                        - manage
+                        - integrate
+                        - report
+                      state:
+                        type: string
+                        enum:
+                        - fulfilled
+                      revision:
+                        type: integer
+                        minimum: 2
+                      fulfilledBy:
+                        type: string
+                      evidenceSha256:
+                        type: string
+                      fulfilledAt:
+                        type: string
+                        format: date-time
+                    required:
+                    - obligationId
+                    - taskId
+                    - fileId
+                    - kind
+                    - state
+                    - revision
+                    - fulfilledBy
+                    - evidenceSha256
+                    - fulfilledAt
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/login:
     post:
       summary: Authenticate and open a session

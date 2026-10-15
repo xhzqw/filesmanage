@@ -125,6 +125,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.POST("/workbench/tasks/:id/resume", h.cdwResumeReturned)
 	api.POST("/workbench/tasks/:id/accept", h.cdwAcceptTask)
 	api.POST("/workbench/tasks/:id/delegate", h.cdwDelegateTask)
+	api.POST("/workbench/obligations/:id/fulfill", h.cdwCompleteObligation)
 	api.POST("/workbench/formal-templates", h.cdwFormalTemplatePublish)
 	api.POST("/workbench/formal-roles", h.cdwFormalRoleGrant)
 	api.POST("/workbench/formal-approvals", h.cdwFormalCreate)
