@@ -299,15 +299,47 @@ func (r *Repository) CDWDecideFormalApproval(ctx context.Context, id, actor, dec
 		State: state, Revision: rev + 1, CandidateID: candidate, RequestedBy: requester}, nil
 }
 
+func (r *Repository) CDWFormalReady(ctx context.Context, limit int) ([]ports.CDWFormalReadyDelivery, error) {
+	rows, err := r.Q.Query(ctx, `SELECT d.id,t.id,f.id,f.name,i.sha256 FROM cdw_deliveries d
+ JOIN cdw_tasks t ON t.id=d.task_id AND t.root_id=t.id
+ JOIN cdw_review_gates g ON g.delivery_id=d.id
+ JOIN cdw_delivery_items i ON i.delivery_id=d.id AND i.ordinal=1
+ JOIN files f ON f.id=i.file_id
+ JOIN blobs b ON b.id=i.blob_id
+ WHERE t.state='accepted_delivery' AND g.state IN('accepted','substituted')
+ AND f.deleted_at IS NULL AND b.state='ready' AND b.sha256=i.sha256
+ AND NOT EXISTS(SELECT 1 FROM cdw_tasks child WHERE child.root_id=t.id
+ AND child.id<>t.id AND child.state NOT IN('accepted_delivery','closed'))
+ AND NOT EXISTS(SELECT 1 FROM cdw_approval_subjects s
+ JOIN cdw_formal_approval_instances a ON a.subject_id=s.id
+ WHERE s.delivery_id=d.id AND (a.state='pending' OR EXISTS
+ (SELECT 1 FROM cdw_approved_candidates c WHERE c.approval_instance_id=a.id)))
+ ORDER BY d.submitted_at DESC,d.id DESC LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := []ports.CDWFormalReadyDelivery{}
+	for rows.Next() {
+		var d ports.CDWFormalReadyDelivery
+		if e := rows.Scan(&d.DeliveryID, &d.TaskID, &d.FileID, &d.FileName, &d.SHA256); e != nil {
+			return nil, e
+		}
+		result = append(result, d)
+	}
+	return result, rows.Err()
+}
+
 const cdwFormalApprovalSelect = `SELECT a.id,s.id,COALESCE(s.delivery_id,''),s.file_id,s.sha256,a.template_version_id,
- a.state,a.revision,COALESCE(c.id,''),a.requested_by
+ a.state,a.revision,COALESCE(c.id,''),a.requested_by,f.name
  FROM cdw_formal_approval_instances a JOIN cdw_approval_subjects s ON s.id=a.subject_id
+ JOIN files f ON f.id=s.file_id
  LEFT JOIN cdw_approved_candidates c ON c.approval_instance_id=a.id`
 
 func scanFormalApproval(row rowScanner) (ports.CDWFormalApproval, error) {
 	var a ports.CDWFormalApproval
 	err := row.Scan(&a.ID, &a.SubjectID, &a.DeliveryID, &a.FileID, &a.SHA256, &a.TemplateVersionID,
-		&a.State, &a.Revision, &a.CandidateID, &a.RequestedBy)
+		&a.State, &a.Revision, &a.CandidateID, &a.RequestedBy, &a.FileName)
 	return a, err
 }
 func (r *Repository) CDWFormalInbox(ctx context.Context, actor string, limit int) ([]ports.CDWFormalApproval, error) {
@@ -329,7 +361,7 @@ func (r *Repository) CDWFormalInbox(ctx context.Context, actor string, limit int
 	for rows.Next() {
 		var a ports.CDWFormalApproval
 		if err = rows.Scan(&a.ID, &a.SubjectID, &a.DeliveryID, &a.FileID, &a.SHA256, &a.TemplateVersionID,
-			&a.State, &a.Revision, &a.CandidateID, &a.RequestedBy); err != nil {
+			&a.State, &a.Revision, &a.CandidateID, &a.RequestedBy, &a.FileName); err != nil {
 			return nil, err
 		}
 		list = append(list, a)

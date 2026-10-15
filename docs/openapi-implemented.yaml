@@ -1833,6 +1833,634 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/formal-templates:
+    post:
+      summary: Publish immutable versioned formal approval template
+      operationId: cdwFormalTemplatePublish
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                templateKey:
+                  type: string
+                steps:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      nodeKey:
+                        type: string
+                      sequence:
+                        type: integer
+                        minimum: 1
+                      approverId:
+                        type: string
+                    required:
+                    - nodeKey
+                    - sequence
+                    - approverId
+              required:
+              - templateKey
+              - steps
+      responses:
+        '200':
+          description: Published version ID; administrator only.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                    required:
+                    - id
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/formal-roles:
+    post:
+      summary: Grant file-scoped formal approver role; does not issue or activate a document
+      operationId: cdwFormalRoleGrant
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                fileId:
+                  type: string
+              required:
+              - userId
+              - fileId
+      responses:
+        '200':
+          description: Role binding ID; administrator only.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                    required:
+                    - id
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/formal-approvals:
+    post:
+      summary: Freeze accepted root delivery as separate formal approval subject
+      operationId: cdwFormalCreate
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deliveryId:
+                  type: string
+                templateVersionId:
+                  type: string
+              required:
+              - deliveryId
+              - templateVersionId
+      responses:
+        '200':
+          description: New pending approval; NOT an effective version.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      subjectId:
+                        type: string
+                      deliveryId:
+                        type: string
+                      fileId:
+                        type: string
+                      fileName:
+                        type: string
+                      sha256:
+                        type: string
+                      templateVersionId:
+                        type: string
+                      state:
+                        type: string
+                        enum:
+                        - pending
+                        - approved
+                        - rejected
+                        - cancelled
+                        - conflicted
+                      revision:
+                        type: integer
+                        minimum: 1
+                      candidateId:
+                        type: string
+                      requestedBy:
+                        type: string
+                    required:
+                    - id
+                    - subjectId
+                    - fileId
+                    - sha256
+                    - templateVersionId
+                    - state
+                    - revision
+                    - requestedBy
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/formal-approvals/ready:
+    get:
+      summary: List verified, ACL-visible accepted root-task frozen deliveries eligible for formal submission
+      operationId: cdwFormalReady
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Admin-only ready deliveries.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            deliveryId:
+                              type: string
+                            taskId:
+                              type: string
+                            fileId:
+                              type: string
+                            fileName:
+                              type: string
+                            sha256:
+                              type: string
+                          required:
+                          - deliveryId
+                          - taskId
+                          - fileId
+                          - fileName
+                          - sha256
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/formal-approvals/inbox:
+    get:
+      summary: Formal review instances awaiting the principal's current live role
+      operationId: cdwFormalInbox
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        description: Number of approvals, 1..100
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Ready and authorized formal decisions.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            subjectId:
+                              type: string
+                            deliveryId:
+                              type: string
+                            fileId:
+                              type: string
+                            fileName:
+                              type: string
+                            sha256:
+                              type: string
+                            templateVersionId:
+                              type: string
+                            state:
+                              type: string
+                              enum:
+                              - pending
+                              - approved
+                              - rejected
+                              - cancelled
+                              - conflicted
+                            revision:
+                              type: integer
+                              minimum: 1
+                            candidateId:
+                              type: string
+                            requestedBy:
+                              type: string
+                          required:
+                          - id
+                          - subjectId
+                          - fileId
+                          - sha256
+                          - templateVersionId
+                          - state
+                          - revision
+                          - requestedBy
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/formal-approvals/{id}:
+    get:
+      summary: Approval detail with immutable frozen SHA, node timeline and decision evidence
+      operationId: cdwFormalDetail
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Approval instance ID.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Authorized timeline.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      approval:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          subjectId:
+                            type: string
+                          deliveryId:
+                            type: string
+                          fileId:
+                            type: string
+                          fileName:
+                            type: string
+                          sha256:
+                            type: string
+                          templateVersionId:
+                            type: string
+                          state:
+                            type: string
+                            enum:
+                            - pending
+                            - approved
+                            - rejected
+                            - cancelled
+                            - conflicted
+                          revision:
+                            type: integer
+                            minimum: 1
+                          candidateId:
+                            type: string
+                          requestedBy:
+                            type: string
+                        required:
+                        - id
+                        - subjectId
+                        - fileId
+                        - sha256
+                        - templateVersionId
+                        - state
+                        - revision
+                        - requestedBy
+                      steps:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            nodeKey:
+                              type: string
+                            sequence:
+                              type: integer
+                            approverId:
+                              type: string
+                            state:
+                              type: string
+                            revision:
+                              type: integer
+                      decisions:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            stepId:
+                              type: string
+                            actorId:
+                              type: string
+                            decision:
+                              type: string
+                            reason:
+                              type: string
+                            decidedAt:
+                              type: string
+                              format: date-time
+                    required:
+                    - approval
+                    - steps
+                    - decisions
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/formal-approvals/{id}/content:
+    get:
+      summary: Download exact immutable approval subject DOCX, not mutable latest file
+      operationId: cdwFormalContent
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Approval instance ID.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Immutable delivery DOCX with authorization recheck
+        '403':
+          description: Principal lacks live file and formal subject access
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/formal-approvals/{id}/decide:
+    post:
+      summary: Approve/reject one ready step with CAS, immutable decision evidence and outbox
+      operationId: cdwFormalDecide
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Approval instance ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      - name: If-Match
+        in: header
+        required: true
+        description: Strong ETag rev-N enclosed in double quotes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                decision:
+                  type: string
+                  enum:
+                  - approve
+                  - reject
+                reason:
+                  type: string
+                  maxLength: 3000
+              required:
+              - decision
+      responses:
+        '200':
+          description: Candidate produced only after all mandatory steps approve; never activates file.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      subjectId:
+                        type: string
+                      deliveryId:
+                        type: string
+                      fileId:
+                        type: string
+                      fileName:
+                        type: string
+                      sha256:
+                        type: string
+                      templateVersionId:
+                        type: string
+                      state:
+                        type: string
+                        enum:
+                        - pending
+                        - approved
+                        - rejected
+                        - cancelled
+                        - conflicted
+                      revision:
+                        type: integer
+                        minimum: 1
+                      candidateId:
+                        type: string
+                      requestedBy:
+                        type: string
+                    required:
+                    - id
+                    - subjectId
+                    - fileId
+                    - sha256
+                    - templateVersionId
+                    - state
+                    - revision
+                    - requestedBy
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/login:
     post:
       summary: Authenticate and open a session

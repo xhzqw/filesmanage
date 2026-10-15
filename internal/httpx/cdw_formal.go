@@ -119,6 +119,19 @@ func (h *Handler) cdwFormalInbox(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.JSON(200, gin.H{"ok": true, "data": gin.H{"items": items}})
 }
+func (h *Handler) cdwFormalReady(c *gin.Context) {
+	actor, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	items, err := h.S.CDWFormalReady(c.Request.Context(), actor, 100)
+	if err != nil {
+		cdwError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(200, gin.H{"ok": true, "data": gin.H{"items": items}})
+}
 func (h *Handler) cdwFormalDetail(c *gin.Context) {
 	actor, ok := h.auth(c)
 	if !ok {

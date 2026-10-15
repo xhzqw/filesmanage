@@ -1,5 +1,14 @@
 import {request} from "../../shared/http";
 
+export type CDWFormalReady={deliveryId:string;taskId:string;fileId:string;fileName:string;sha256:string};
+export type CDWFormalApproval={
+ id:string;subjectId:string;deliveryId:string;fileId:string;fileName?:string;
+ sha256:string;templateVersionId:string;state:"pending"|"approved"|"rejected"|"cancelled"|"conflicted";
+ revision:number;candidateId?:string;requestedBy:string;
+};
+export type CDWFormalStep={id:string;nodeKey:string;sequence:number;approverId:string;state:string;revision:number};
+export type CDWFormalDetail={approval:CDWFormalApproval;steps:CDWFormalStep[];
+ decisions:Array<{stepId:string;actorId:string;decision:string;reason:string;decidedAt:string}>};
 export type CDWRecipient={kind:"user"|"workgroup";id:string};
 export type CDWTask={
  taskId:string;parentTaskId?:string;parentRevision?:number;
@@ -7,7 +16,7 @@ export type CDWTask={
  actualAcceptorId?:string;remainingObligations?:string[];
 };
 export type CDWInboxItem={
- kind:"task"|"obligation"|"review";review?:CDWReviewGate;taskId:string;title:string;fileId:string;
+ kind:"task"|"obligation"|"review"|"formal";review?:CDWReviewGate;formal?:CDWFormalApproval;taskId:string;title:string;fileId:string;
  state:string;revision:number;assignmentId?:string;obligationId?:string;obligationKind?:string;
 };
 export type CDWBranch={
@@ -89,6 +98,18 @@ export const cdwApi={
   request<CDWOverrideGrant>("/workbench/review-gates/"+segment(id)+"/grants",mutate(key,{actorId,reason},revision)),
  reviewRevoke:(id:string,grantId:string,key:string)=>
   request<CDWOverrideGrant>("/workbench/review-gates/"+segment(id)+"/grants/"+segment(grantId)+"/revoke",mutate(key,{})),
+ formalReady:()=>request<{items:CDWFormalReady[]}>("/workbench/formal-approvals/ready",{cache:"no-store"}),
+ formalInbox:(limit=100)=>request<{items:CDWFormalApproval[]}>(
+  "/workbench/formal-approvals/inbox?limit="+limit,{cache:"no-store"}),
+ formalDetail:(id:string)=>request<CDWFormalDetail>("/workbench/formal-approvals/"+segment(id),{cache:"no-store"}),
+ formalDecide:(id:string,revision:number,decision:"approve"|"reject",reason:string,key:string)=>
+  request<CDWFormalApproval>("/workbench/formal-approvals/"+segment(id)+"/decide",mutate(key,{decision,reason},revision)),
+ formalPublish:(templateKey:string,steps:Array<{nodeKey:string;sequence:number;approverId:string}>,key:string)=>
+  request<{id:string}>("/workbench/formal-templates",mutate(key,{templateKey,steps})),
+ formalGrant:(fileId:string,userId:string,key:string)=>
+  request<{id:string}>("/workbench/formal-roles",mutate(key,{fileId,userId})),
+ formalStart:(deliveryId:string,templateVersionId:string,key:string)=>
+  request<CDWFormalApproval>("/workbench/formal-approvals",mutate(key,{deliveryId,templateVersionId})),
  resume:(taskId:string,revision:number,key:string)=>
   request<CDWResumeResult>("/workbench/tasks/"+segment(taskId)+"/resume",mutate(key,{},revision)),
 };

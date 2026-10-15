@@ -257,6 +257,34 @@ func (s *Service) CDWFormalInbox(ctx context.Context, actor domain.User, limit i
 	}
 	return filtered, nil
 }
+func (s *Service) CDWFormalReady(ctx context.Context, actor domain.User, limit int) ([]ports.CDWFormalReadyDelivery, error) {
+	if !actor.IsAdmin {
+		return nil, domain.ErrForbidden
+	}
+	if limit < 1 || limit > 100 {
+		return nil, domain.ErrInvalidInput
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	store, ok := tx.(ports.CDWFormalStore)
+	if !ok {
+		return nil, domain.ErrInvalidInput
+	}
+	records, err := store.CDWFormalReady(ctx, limit)
+	if err != nil {
+		return nil, err
+	}
+	result := []ports.CDWFormalReadyDelivery{}
+	for _, record := range records {
+		if _, e := s.visibleFile(ctx, tx, actor, record.FileID, domain.ActionPreview); e == nil {
+			result = append(result, record)
+		}
+	}
+	return result, nil
+}
 func (s *Service) cdwFormalRead(ctx context.Context, actor domain.User, id string) (ports.CDWFormalStore, ports.Tx, error) {
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {

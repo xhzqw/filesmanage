@@ -883,6 +883,65 @@ add("GET","/api/workbench/review-gates/{id}/content",operation("Download exact i
  responses={"200":{"description":"Frozen delivery DOCX, only for actual reviewer (not current formal version)"},
  "403":{"description":"Not the direct reviewer"}}))
 
+# --- G7 formal document approvals (not task gate acceptance or activation) ---
+CDW_FORMAL_STEP = obj({"nodeKey":string(),"sequence":integer(minimum=1),"approverId":string()},
+ required=["nodeKey","sequence","approverId"])
+CDW_FORMAL_APPROVAL = obj({
+ "id":string(),"subjectId":string(),"deliveryId":string(),"fileId":string(),"fileName":string(),
+ "sha256":string(),"templateVersionId":string(),
+ "state":string(enum=["pending","approved","rejected","cancelled","conflicted"]),
+ "revision":integer(minimum=1),"candidateId":string(),"requestedBy":string()},
+ required=["id","subjectId","fileId","sha256","templateVersionId","state","revision","requestedBy"])
+CDW_FORMAL_CREATED = obj({"id":string()},required=["id"])
+CDW_FORMAL_READY = obj({"deliveryId":string(),"taskId":string(),"fileId":string(),
+ "fileName":string(),"sha256":string()},required=["deliveryId","taskId","fileId","fileName","sha256"])
+add("POST","/api/workbench/formal-templates",operation(
+ "Publish immutable versioned formal approval template","CDW","cdwFormalTemplatePublish",
+ security=SESSION,params=[CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({"templateKey":string(),"steps":arr(CDW_FORMAL_STEP)},required=["templateKey","steps"])}},
+ responses=dict([json_ok(CDW_FORMAL_CREATED,"Published version ID; administrator only."),resp("403",ERR["403"]),resp("409",ERR["409"])])))
+add("POST","/api/workbench/formal-roles",operation(
+ "Grant file-scoped formal approver role; does not issue or activate a document","CDW","cdwFormalRoleGrant",
+ security=SESSION,params=[CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({"userId":string(),"fileId":string()},required=["userId","fileId"])}},
+ responses=dict([json_ok(CDW_FORMAL_CREATED,"Role binding ID; administrator only."),resp("403",ERR["403"])])))
+add("POST","/api/workbench/formal-approvals",operation(
+ "Freeze accepted root delivery as separate formal approval subject","CDW","cdwFormalCreate",
+ security=SESSION,params=[CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({"deliveryId":string(),"templateVersionId":string()},required=["deliveryId","templateVersionId"])}},
+ responses=dict([json_ok(CDW_FORMAL_APPROVAL,"New pending approval; NOT an effective version."),resp("403",ERR["403"]),resp("409",ERR["409"])])))
+add("GET","/api/workbench/formal-approvals/ready",operation(
+ "List verified, ACL-visible accepted root-task frozen deliveries eligible for formal submission","CDW","cdwFormalReady",
+ security=SESSION,
+ responses=dict([json_ok(obj({"items":arr(CDW_FORMAL_READY)},required=["items"]),"Admin-only ready deliveries."),
+ resp("403",ERR["403"])])))
+add("GET","/api/workbench/formal-approvals/inbox",operation(
+ "Formal review instances awaiting the principal's current live role","CDW","cdwFormalInbox",
+ security=SESSION,params=[query("limit","Number of approvals, 1..100",integer(minimum=1))],
+ responses=dict([json_ok(obj({"items":arr(CDW_FORMAL_APPROVAL)},required=["items"]),"Ready and authorized formal decisions."),
+ resp("403",ERR["403"])])))
+add("GET","/api/workbench/formal-approvals/{id}",operation(
+ "Approval detail with immutable frozen SHA, node timeline and decision evidence","CDW","cdwFormalDetail",
+ security=SESSION,params=[id_param("id","Approval instance ID.")],
+ responses=dict([json_ok(obj({"approval":CDW_FORMAL_APPROVAL,
+ "steps":arr(obj({"id":string(),"nodeKey":string(),"sequence":integer(),"approverId":string(),
+ "state":string(),"revision":integer()})),
+ "decisions":arr(obj({"stepId":string(),"actorId":string(),"decision":string(),
+ "reason":string(),"decidedAt":timestamp()}))},required=["approval","steps","decisions"]),"Authorized timeline."),
+ resp("403",ERR["403"])])))
+add("GET","/api/workbench/formal-approvals/{id}/content",operation(
+ "Download exact immutable approval subject DOCX, not mutable latest file","CDW","cdwFormalContent",
+ security=SESSION,params=[id_param("id","Approval instance ID.")],
+ responses={"200":{"description":"Immutable delivery DOCX with authorization recheck"},
+ "403":{"description":"Principal lacks live file and formal subject access"}}))
+add("POST","/api/workbench/formal-approvals/{id}/decide",operation(
+ "Approve/reject one ready step with CAS, immutable decision evidence and outbox","CDW","cdwFormalDecide",
+ security=SESSION,params=[id_param("id","Approval instance ID."),CDW_IDEMPOTENCY,CDW_IF_MATCH],
+ request={"application/json":{"schema":obj({"decision":string(enum=["approve","reject"]),
+ "reason":string(max_length=3000)},required=["decision"])}},
+ responses=dict([json_ok(CDW_FORMAL_APPROVAL,"Candidate produced only after all mandatory steps approve; never activates file."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
+
 # --- Auth ---
 add("POST", "/api/login", operation("Authenticate and open a session", "Auth", "login", security=[],
     request={"application/json": {"schema": ref("LoginRequest")}},

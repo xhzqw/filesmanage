@@ -129,6 +129,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.POST("/workbench/formal-roles", h.cdwFormalRoleGrant)
 	api.POST("/workbench/formal-approvals", h.cdwFormalCreate)
 	api.GET("/workbench/formal-approvals/inbox", h.cdwFormalInbox)
+	api.GET("/workbench/formal-approvals/ready", h.cdwFormalReady)
 	api.GET("/workbench/formal-approvals/:id", h.cdwFormalDetail)
 	api.GET("/workbench/formal-approvals/:id/content", h.cdwFormalContent)
 	api.POST("/workbench/formal-approvals/:id/decide", h.cdwFormalDecide)
