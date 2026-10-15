@@ -283,32 +283,8 @@ func (s *Service) CDWRequestBranchSave(ctx context.Context, actor domain.User, b
 		return save, err
 	}
 	endpoint := strings.TrimRight(s.office.EditorURL, "/") + "/command"
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(encoded))
-	if err != nil {
-		return save, err
-	}
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Authorization", "Bearer "+signed)
-	client := &http.Client{Timeout: 12 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("redirect disabled") }}
-	response, err := client.Do(request)
-	if err == nil {
-		defer response.Body.Close()
-		var outcome struct {
-			Error *int `json:"error"`
-		}
-		if response.StatusCode != 200 {
-			err = domain.ErrConflict
-		} else if parseErr := json.NewDecoder(io.LimitReader(response.Body, 4096)).Decode(&outcome); parseErr != nil {
-			err = parseErr
-		} else if outcome.Error == nil || *outcome.Error != 0 {
-			if outcome.Error != nil {
-				// Numeric Document Server command errors are safe diagnostics.
-				// Never log tokens, document keys, or callback URLs.
-				log.Printf("CDW ONLYOFFICE force-save command rejected code=%d", *outcome.Error)
-			}
-			err = domain.ErrConflict
-		}
-	}
+	err = cdwSendForceSaveCommand(ctx, endpoint, signed, encoded)
+
 	if err != nil {
 		// A lost command response is 'unknown' (not successful). Only the matching
 		// callback may establish durable completion.
@@ -323,6 +299,66 @@ func (s *Service) CDWRequestBranchSave(ctx context.Context, actor domain.User, b
 	}
 	return save, nil
 }
+
+// CDW force-save is occasionally requested before ONLYOFFICE finishes
+// transmitting the just-edited collaborative document. Error 4 from the
+// command service means "no changes yet": retry the SAME immutable request
+// and userdata for a bounded period. Other codes never retry blindly.
+// A command error 0 only confirms dispatch, never durable persistence.
+func cdwSendForceSaveCommand(ctx context.Context, endpoint, signed string, encoded []byte) error {
+	client := &http.Client{Timeout: 12 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error {
+		return errors.New("redirect disabled")
+	}}
+	// Cumulative backoff ~6s only when Document Server explicitly returns 4.
+	delays := []time.Duration{0, 400 * time.Millisecond, 700 * time.Millisecond, 1100 * time.Millisecond, 1600 * time.Millisecond, 2200 * time.Millisecond}
+	for n, delay := range delays {
+		if delay > 0 {
+			timer := time.NewTimer(delay)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return ctx.Err()
+			case <-timer.C:
+			}
+		}
+		request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(encoded))
+		if err != nil {
+			return err
+		}
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Authorization", "Bearer "+signed)
+		response, err := client.Do(request)
+		if err != nil {
+			return err
+		}
+		var outcome struct {
+			Error *int `json:"error"`
+		}
+		if response.StatusCode != http.StatusOK {
+			response.Body.Close()
+			return domain.ErrConflict
+		}
+		decodeErr := json.NewDecoder(io.LimitReader(response.Body, 4096)).Decode(&outcome)
+		response.Body.Close()
+		if decodeErr != nil {
+			return decodeErr
+		}
+		if outcome.Error == nil {
+			return domain.ErrConflict
+		}
+		if *outcome.Error == 0 {
+			return nil
+		}
+		if *outcome.Error == 4 && n < len(delays)-1 {
+			continue
+		}
+		// Numeric code only, without document keys, URLs or JWT.
+		log.Printf("CDW ONLYOFFICE force-save command rejected code=%d", *outcome.Error)
+		return domain.ErrConflict
+	}
+	return domain.ErrConflict
+}
+
 func (s *Service) CDWBranchSaveStatus(ctx context.Context, actor domain.User, branchID, requestID string) (ports.CDWBranchSave, error) {
 	tx, err := s.uow.Begin(ctx)
 	if err != nil {

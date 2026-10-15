@@ -247,10 +247,8 @@ try{
 		t.Fatalf("real editor did not emit edited state: %s", browserLog.String())
 	}
 	t.Log("CDW_G5_REAL_ONLYOFFICE_EDITOR_CHANGED")
-	// The client has acknowledged a local edit, but collaborative changes
-	// may still be in transit. This diagnostic delay differentiates code=4
-	// ("no changes in Document Server") from JWT/command errors.
-	time.Sleep(5 * time.Second)
+	// Intentionally request immediately after browser edit: the server must
+	// retry only the real Document Server's transient no-changes (code 4).
 	save, err := svc.CDWRequestBranchSave(ctx, admin, branch.ID, editor.Session.ID, prefix+"_save")
 	if err != nil {
 		t.Fatalf("forcesave command: %v browser=%s", err, browserLog.String())
