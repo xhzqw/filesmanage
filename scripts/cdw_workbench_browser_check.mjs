@@ -86,6 +86,41 @@ try{
  await evalJS("(()=>{"+overrideControl+".click();return true})()");
  await until(overrideControl+"?.getAttribute('aria-pressed')==='false'");
  console.log("CDW_G6_TEMPLATE_OPT_IN_BROWSER_PASS default=off toggles=on/off no-write");
+
+ const formal=await evalJS("(async()=>{const r=await fetch('/api/workbench/formal-approvals/inbox?limit=5');return {status:r.status,data:(await r.json()).data}})()");
+ assert.equal(formal.status,200,"G7 formal approval inbox authorizes admin session");
+ assert.ok(Array.isArray(formal.data?.items),"G7 formal approval inbox is live");
+ const ready=await evalJS("(async()=>{const r=await fetch('/api/workbench/formal-approvals/ready');return {status:r.status,data:(await r.json()).data}})()");
+ assert.equal(ready.status,200,"G7 eligible frozen deliveries query is real");
+ assert.ok(Array.isArray(ready.data?.items),"G7 frozen delivery candidates are an array");
+ const controlled=await evalJS("(async()=>{const r=await fetch('/api/workbench/controlled/candidates');return {status:r.status,data:(await r.json()).data}})()");
+ assert.equal(controlled.status,200,"G8 approved controlled candidates API authorizes admin session");
+ assert.ok(Array.isArray(controlled.data?.items),"G8 approved candidate registry is live");
+
+ await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('正式审批'));button?.click();return true;})()");
+ await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('正式审批')");
+ assert.equal(await evalJS("[...document.querySelectorAll('.cdw-inbox-actions button')].some(b=>b.textContent.includes('发起审批'))"),true,
+  "G7 formal approval initiation is an actionable navigation control");
+ await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-inbox-actions button')].find(b=>b.textContent.includes('发起审批'));button?.click();return true;})()");
+ await until("document.querySelector('.cdw-detail h2')?.textContent?.includes('从已验收交付稿发起')");
+ assert.equal(await evalJS("!!document.querySelector('.cdw-form select, .cdw-form .rare-select')"),true,
+  "G7 connects frozen delivery candidate selector");
+ console.log("CDW_G7_FORMAL_BROWSER_PASS inbox+eligible-deliveries+initiation=live-no-write");
+
+ await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('发行准备'));button?.click();return true;})()");
+ await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('发行准备')");
+ assert.equal(await evalJS("[...document.querySelectorAll('.cdw-inbox-actions button')].some(b=>b.textContent.includes('派发任务'))"),false,
+  "G8 release register must not display unrelated task-creation action");
+ if(controlled.data.items.length){
+  const found=await evalJS("(()=>{const node=document.querySelector('.cdw-task-row');node?.click();return !!node})()");
+  assert.equal(found,true,"G8 real approved candidate selectable");
+  await until("!!document.querySelector('.cdw-review-digest code')");
+  const digest=await evalJS("document.querySelector('.cdw-review-digest code')?.textContent.trim()");
+  assert.equal(digest.length,64,"G8 source SHA is rendered from approved immutable candidate");
+ }
+ const controlledLayout=await evalJS("({width:innerWidth,scrollWidth:document.documentElement.scrollWidth})");
+ assert.ok(controlledLayout.scrollWidth<=controlledLayout.width+2,"G8 narrow canvas has no page overflow");
+ console.log("CDW_G8_PREPARE_BROWSER_PASS candidate-registry+tab+live-source-sha=read-only");
  console.log("CDW_BROWSER_PASS auth=tasks+review-inbox, responsive=1440/1024/780, review-filter, create-form");
 }finally{
  try{ws?.close();}catch{}
