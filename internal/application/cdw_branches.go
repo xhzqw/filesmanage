@@ -48,6 +48,38 @@ func (s *Service) cdwBranchForActor(ctx context.Context, tx ports.Tx, actor doma
 	}
 	return branch, store, nil
 }
+func (s *Service) CDWReadBranch(ctx context.Context, actor domain.User, id string) (ports.CDWBranch, error) {
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return ports.CDWBranch{}, err
+	}
+	defer tx.Rollback(ctx)
+	branch, _, err := s.cdwBranchForActor(ctx, tx, actor, id)
+	return branch, err
+}
+func (s *Service) CDWTaskBranches(ctx context.Context, actor domain.User, taskID string) ([]ports.CDWBranch, error) {
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	taskStore, ok := tx.(ports.CDWTaskStore)
+	if !ok {
+		return nil, domain.ErrInvalidInput
+	}
+	fileID, _, _, err := taskStore.CDWTaskScope(ctx, taskID)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = s.visibleFile(ctx, tx, actor, fileID, domain.ActionPreview); err != nil {
+		return nil, err
+	}
+	branchStore, ok := tx.(ports.CDWBranchStore)
+	if !ok {
+		return nil, domain.ErrInvalidInput
+	}
+	return branchStore.CDWTaskBranches(ctx, taskID, actor.ID)
+}
 func (s *Service) CDWCreateBranch(ctx context.Context, actor domain.User, taskID, key string) (ports.CDWBranch, error) {
 	if taskID == "" || !validCDWOperationKey(key) {
 		return ports.CDWBranch{}, domain.ErrInvalidInput

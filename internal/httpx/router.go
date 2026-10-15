@@ -103,6 +103,8 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.GET("/events/ws", h.websocketEvents)
 	// CDW task pilot: single-file task assignment, acceptance and accountability.
 	api.POST("/work-branches", h.cdwCreateBranch)
+	api.GET("/work-branches/:id", h.cdwReadBranch)
+	api.GET("/workbench/tasks/:id/branches", h.cdwTaskBranches)
 	api.POST("/work-branches/:id/office-sessions", h.cdwOpenBranchOffice)
 	api.POST("/work-branches/:id/save", h.cdwRequestBranchSave)
 	api.GET("/work-branches/:id/save-requests/:rid", h.cdwReadBranchSave)

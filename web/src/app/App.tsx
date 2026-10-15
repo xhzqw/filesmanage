@@ -22,6 +22,8 @@ import{Preview}from "../pages/Preview";
 import{Trash}from "../pages/Trash";
 import{Org}from "../pages/Org";
 import{Approvals}from "../pages/Approvals";
+import{CDWWorkbench}from "../pages/CDWWorkbench";
+import{CDWBranchEditor}from "../pages/CDWBranchEditor";
 import{Lifecycle}from "../pages/Lifecycle";
 import{lifecycleWorkspaceEnabled}from "../shared/featureFlags";
 import{OfficeEditor}from "../pages/OfficeEditor";
@@ -61,6 +63,8 @@ export function App(){
  <Route path="/org" element={user?<Org user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/lifecycle" element={user&&lifecycleWorkspaceEnabled?<Lifecycle user={user} onLogout={logout}/>:<Navigate to={user?"/doc":"/login"} replace/>}/>
  <Route path="/approvals" element={user?<Approvals user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
+ <Route path="/workbench" element={user?<CDWWorkbench user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
+ <Route path="/workbench/branch/:id/edit" element={user?<CDWBranchEditor/>:<Navigate to="/login" replace/>}/>
  <Route path="/office/:id" element={user?<OfficeEditor user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/model/:id" element={user?<Suspense fallback={<main className="brand-loading-screen" aria-busy="true"><BrandLoader size="lg" label="正在加载 CAD 模型预览"/></main>}><ModelViewer user={user} onLogout={logout}/></Suspense>:<Navigate to="/login" replace/>}/>
  <Route path="/workspace" element={<Navigate to={user?"/doc?view=favorites":"/login"} replace/>}/>

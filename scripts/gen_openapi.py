@@ -785,6 +785,12 @@ CDW_FREEZE = obj({"deliveryId":string(),"branchId":string(),"taskId":string(),
 add("POST","/api/work-branches",operation("Create isolated task editing branch; no file_versions mutation","CDW","cdwCreateBranch",
  security=SESSION,params=[CDW_IDEMPOTENCY],request={"application/json":{"schema":CDW_BRANCH_CREATE}},
  responses=dict([json_ok(CDW_BRANCH,"New branch created."),resp("403",ERR["403"]),resp("409",ERR["409"])])))
+add("GET","/api/work-branches/{id}",operation("Current authorized work branch","CDW","cdwReadBranch",
+ security=SESSION,params=[id_param("id","Branch ID.")],
+ responses=dict([json_ok(CDW_BRANCH,"Live branch head and edit epoch."),resp("403",ERR["403"])])))
+add("GET","/api/workbench/tasks/{id}/branches",operation("Authorized task branches","CDW","cdwTaskBranches",
+ security=SESSION,params=[id_param("id","Task ID.")],
+ responses=dict([json_ok(obj({"items":arr(CDW_BRANCH)},required=["items"]),"Branches visible to accepted assignee."),resp("403",ERR["403"])])))
 add("POST","/api/work-branches/{id}/office-sessions",operation("Open exclusive ONLYOFFICE document key for a task branch","CDW","cdwBranchOffice",
  security=SESSION,params=[id_param("id","Branch ID.")],
  request={"application/json":{"schema":obj({})}},

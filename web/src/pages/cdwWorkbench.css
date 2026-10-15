@@ -1,0 +1,87 @@
+/* CDW workbench — inset Finder canvas, Rare UI semantic controls, tight
+   three-pane desktop composition. No additional card stacks or full-page scroll. */
+.cdw-panels{min-height:0;min-width:0;padding:8px;background:#F2F4F7;overflow:hidden}
+.cdw-work.work{background:#fff;border:1px solid rgba(15,23,42,.075);border-radius:12px;box-shadow:0 2px 8px rgba(15,23,42,.025);overflow:hidden;min-height:0}
+.cdw-layout{display:grid;grid-template-columns:168px minmax(280px,360px) minmax(0,1fr);width:100%;height:100%;min-height:0;min-width:0}
+.cdw-rail{display:flex;flex-direction:column;min-width:0;min-height:0;padding:20px 10px 12px;background:#F8F9FB;border-right:1px solid rgba(15,23,42,.065)}
+.cdw-rail-caption{padding:0 10px 10px;font-size:11px;font-weight:600;color:#98A2B3;letter-spacing:.03em}
+.cdw-rail .cdw-rail-item.rare-button{display:flex;justify-content:space-between;width:100%;height:35px;min-height:35px;margin-bottom:3px;padding:0 11px;border:0;border-radius:8px;background:transparent;text-align:left;color:#475467;font-weight:500}
+.cdw-rail .cdw-rail-item.is-current{background:#E7EDF6;color:#1455A6;font-weight:650}
+.cdw-rail .cdw-rail-item:hover:not(.is-current){background:#EFF2F6}
+.cdw-rail-item small{font-size:11px;font-weight:500;color:#8793A4}
+.cdw-rail-footer{margin-top:auto;padding:12px 9px 4px;color:#98A2B3;font-size:11px;line-height:1.5}
+.cdw-inbox{display:flex;flex-direction:column;min-height:0;min-width:0;background:#fff;border-right:1px solid rgba(15,23,42,.07)}
+.cdw-inbox-tools{display:flex;align-items:center;justify-content:space-between;flex:0 0 auto;min-height:60px;padding:0 15px;gap:10px;border-bottom:1px solid #F2F3F6}
+.cdw-inbox-heading{display:flex;align-items:center;gap:8px;min-width:0}
+.cdw-inbox-heading strong{font-size:14px;font-weight:650;color:#1D2939;white-space:nowrap}
+.cdw-inbox-heading span{font-size:11px;color:#8692A2;background:#F3F5F7;border-radius:7px;padding:2px 6px}
+.cdw-inbox-actions{display:flex;gap:5px}
+.cdw-inbox-actions .rare-button{font-size:11px}
+.cdw-inbox-actions .rare-button[data-rare-tone="ghost"]{font-size:20px;min-width:26px}
+.cdw-search{padding:9px 12px}
+.cdw-search .rare-input{width:100%;height:31px;min-height:31px;border-radius:7px;background:#F7F8FA}
+.cdw-inbox-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:1px 7px 16px}
+.cdw-inbox-footer{padding:10px 13px;border-top:1px solid #F2F4F7;font-size:10px;color:#98A2B3}
+.cdw-task-row.rare-button{display:flex;width:100%;height:auto;min-height:66px;padding:10px 11px;gap:11px;align-items:center;border:0;border-radius:9px;text-align:left;background:transparent;color:#344054;box-shadow:none}
+.cdw-task-row:hover{background:#F6F8FB}
+.cdw-task-row.is-selected{background:#DCE8F8;color:#173967}
+.cdw-task-row.is-selected:hover{background:#D7E5F7}
+.cdw-task-symbol{display:grid;place-items:center;flex:0 0 30px;width:30px;height:30px;border-radius:8px;background:#ECF1FA;color:#3275B9;font-size:17px}
+.cdw-task-symbol.is-obligation{background:#F3F4F6;color:#667085}
+.cdw-task-copy{min-width:0;flex:1;display:flex;flex-direction:column;gap:5px}
+.cdw-task-copy strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;font-size:12.5px}
+.cdw-task-copy small{color:#8692A2;font-size:11px}
+.cdw-task-unread{width:7px;height:7px;border-radius:50%;background:#2463C3}
+.cdw-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:235px;gap:6px;color:#8794A5;text-align:center;padding:20px}
+.cdw-empty>span{font-size:25px;opacity:.4}
+.cdw-empty strong{font-size:13px;font-weight:600;color:#667085}
+.cdw-empty p{margin:0;font-size:11px}
+.cdw-message{padding:25px 8px;text-align:center}
+.cdw-detail{min-width:0;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.cdw-detail-inner{width:100%;max-width:790px;margin:0 auto;padding:27px clamp(20px,3.1vw,47px) 36px;box-sizing:border-box}
+.cdw-detail-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding-bottom:20px;border-bottom:1px solid #EFF1F5}
+.cdw-detail-header small{display:block;color:#8491A3;font-size:11px;margin-bottom:7px}
+.cdw-detail-header h2{font-size:20px;color:#1D2939;line-height:1.35;font-weight:650;letter-spacing:-.02em;margin:0;overflow-wrap:anywhere}
+.cdw-detail-header>.rare-badge{flex:none}
+.cdw-detail-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:24px 0 25px}
+.cdw-detail-facts>div{display:flex;flex-direction:column;min-width:0;gap:6px}
+.cdw-detail-facts span{font-size:11px;color:#98A2B3}
+.cdw-detail-facts strong{font-size:12px;font-weight:550;color:#344054;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cdw-section{padding:19px 0 23px;border-top:1px solid #F1F3F6}
+.cdw-section h3{margin:0;color:#344054;font-weight:650;font-size:13px}
+.cdw-section-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.cdw-section-head small{color:#98A2B3}
+.cdw-text-link{text-decoration:none;color:#356DB3;font-size:12px;white-space:nowrap}
+.cdw-section-note{font-size:12px;color:#8793A5;line-height:1.7;margin:10px 0 15px}
+.cdw-primary-action{padding:22px 0;border-top:1px solid #F1F3F6}
+.cdw-primary-action p{color:#667085;font-size:12px;margin:0 0 13px;line-height:1.75}
+.cdw-branch-row{display:flex;align-items:center;gap:12px;min-height:62px;padding:12px 0;border-bottom:1px solid #F2F4F7}
+.cdw-branch-text{display:flex;flex:1;min-width:0;flex-direction:column;gap:5px}
+.cdw-branch-text strong{font-size:12px;font-weight:550;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.cdw-branch-text small{font-size:11px;color:#98A2B3}
+.cdw-detail-empty{height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:7px;color:#8794A5}
+.cdw-detail-empty strong{font-size:14px;color:#667085}.cdw-detail-empty p{font-size:12px}
+.cdw-form{display:flex;flex-direction:column;gap:21px;margin:27px 0}
+.cdw-form>label,.cdw-file-picker>label{display:flex;flex-direction:column;gap:10px;font-size:12px;font-weight:600;color:#475467}
+.cdw-form .rare-input{min-height:34px;width:100%;background:#fff}
+.cdw-form .rare-select-root{width:100%}
+.cdw-form .rare-select{width:100%}
+.cdw-form-actions{padding-top:4px}
+.cdw-help,.cdw-file-results>span{font-size:11px;color:#8692A2;font-weight:400}
+.cdw-file-picker{min-width:0}
+.cdw-file-results{margin-top:10px;display:flex;flex-direction:column;gap:2px;min-height:32px;max-height:200px;overflow:auto;background:#F8F9FC;border-radius:8px;padding:4px}
+.cdw-file-result.rare-button{display:flex;justify-content:space-between;align-items:center;gap:8px;min-width:0;padding:9px;text-align:left;border:0;box-shadow:none;background:transparent;border-radius:6px}
+.cdw-file-result>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cdw-file-result small{color:#98A2B3;white-space:nowrap}
+.cdw-file-result.is-picked,.cdw-file-result:hover{background:#E6EDF8}
+.cdw-picked{margin-top:8px;color:#1B5C9B;font-size:11px;overflow-wrap:anywhere}
+.cdw-editor-toolbar-right{display:flex;align-items:center;gap:10px;flex:none;min-width:0}
+.cdw-editor-toolbar-right>.rare-button{height:30px;min-height:30px;white-space:nowrap}
+.cdw-editor-save-state{font-size:11px;color:#667085;max-width:185px;text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
+.cdw-doc-canvas{height:100%;width:100%}
+.cdw-editor-confirm{display:flex;align-items:center;justify-content:center;gap:10px;padding:6px 12px;font-size:11px;background:#F3F9F6;color:#496B59}
+.cdw-editor-error{padding:0 12px}
+@media(max-width:1100px){.cdw-layout{grid-template-columns:145px minmax(260px,315px) minmax(0,1fr)}.cdw-rail{padding:16px 6px}.cdw-detail-inner{padding:22px 20px 30px}.cdw-detail-facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:820px){.cdw-layout{grid-template-columns:minmax(235px,42%) minmax(0,1fr);grid-template-rows:45px minmax(0,1fr)}.cdw-rail{grid-column:1/-1;grid-row:1;flex-direction:row;align-items:center;padding:5px 8px;border-right:0;border-bottom:1px solid #E8ECF1;overflow-x:auto}.cdw-rail-caption,.cdw-rail-footer{display:none}.cdw-rail .cdw-rail-item.rare-button{width:auto;min-height:29px;height:29px;padding:0 10px;gap:7px;white-space:nowrap}.cdw-inbox{grid-column:1;grid-row:2}.cdw-detail{grid-column:2;grid-row:2}.cdw-detail-header h2{font-size:17px}.cdw-detail-facts{grid-template-columns:1fr 1fr}.cdw-inbox-tools{padding:0 9px}.cdw-inbox-actions .rare-button{padding:0 7px}}
+@media(max-width:560px){.cdw-panels{padding:4px}.cdw-layout{grid-template-columns:1fr;grid-template-rows:44px minmax(170px,37%) minmax(0,1fr)}.cdw-inbox{grid-column:1;grid-row:2;border-right:0;border-bottom:1px solid #E9EDF2}.cdw-detail{grid-column:1;grid-row:3}.cdw-inbox-footer{display:none}.cdw-task-row.rare-button{min-height:55px}.cdw-detail-inner{padding:16px}.cdw-detail-facts{margin:17px 0}.cdw-editor-save-state{display:none}.cdw-editor .office-workbench-identity{max-width:52%}.cdw-editor-toolbar-right>.rare-button{font-size:11px;padding:0 7px}}
+@media(prefers-reduced-motion:reduce){.cdw-layout *{scroll-behavior:auto}}

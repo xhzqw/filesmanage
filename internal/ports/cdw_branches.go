@@ -57,8 +57,9 @@ type CDWBranchFreeze struct {
 }
 
 type CDWBranchStore interface {
-	CDWCreateBranch(context.Context, string, string, string, string) (CDWBranch, error)                        // branchID/taskID/fileID/actor
-	CDWBranchForActor(context.Context, string, string) (CDWBranch, error)                                      // branchID/actor
+	CDWCreateBranch(context.Context, string, string, string, string) (CDWBranch, error) // branchID/taskID/fileID/actor
+	CDWBranchForActor(context.Context, string, string) (CDWBranch, error)
+	CDWTaskBranches(context.Context, string, string) ([]CDWBranch, error)                                      // branchID/actor
 	CDWOpenBranchSession(context.Context, string, string, string, string, time.Time) (CDWBranchSession, error) // branch/actor/session/key/expiry
 	CDWBranchSessionByKey(context.Context, string) (CDWBranchSession, error)
 	CDWBranchSessionByID(context.Context, string) (CDWBranchSession, error)

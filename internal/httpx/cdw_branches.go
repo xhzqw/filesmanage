@@ -32,6 +32,33 @@ func (h *Handler) cdwCreateBranch(c *gin.Context) {
 	c.Header("ETag", "\"rev-"+strconv.FormatInt(branch.Revision, 10)+"\"")
 	c.JSON(http.StatusCreated, gin.H{"ok": true, "data": branch})
 }
+func (h *Handler) cdwReadBranch(c *gin.Context) {
+	user, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	branch, err := h.S.CDWReadBranch(c.Request.Context(), user, c.Param("id"))
+	if err != nil {
+		cdwError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.Header("ETag", "\"rev-"+strconv.FormatInt(branch.Revision, 10)+"\"")
+	c.JSON(200, gin.H{"ok": true, "data": branch})
+}
+func (h *Handler) cdwTaskBranches(c *gin.Context) {
+	user, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	items, err := h.S.CDWTaskBranches(c.Request.Context(), user, c.Param("id"))
+	if err != nil {
+		cdwError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(200, gin.H{"ok": true, "data": gin.H{"items": items}})
+}
 func (h *Handler) cdwOpenBranchOffice(c *gin.Context) {
 	user, ok := h.auth(c)
 	if !ok {

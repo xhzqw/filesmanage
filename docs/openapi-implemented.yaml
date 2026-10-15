@@ -532,6 +532,149 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/work-branches/{id}:
+    get:
+      summary: Current authorized work branch
+      operationId: cdwReadBranch
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Branch ID.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Live branch head and edit epoch.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      branchId:
+                        type: string
+                      taskId:
+                        type: string
+                      fileId:
+                        type: string
+                      baseVersionId:
+                        type: string
+                      baseSha256:
+                        type: string
+                      state:
+                        type: string
+                      revision:
+                        type: integer
+                        minimum: 1
+                      headRevisionId:
+                        type: string
+                      editEpoch:
+                        type: integer
+                        minimum: 1
+                    required:
+                    - branchId
+                    - taskId
+                    - fileId
+                    - baseVersionId
+                    - baseSha256
+                    - state
+                    - revision
+                    - editEpoch
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/tasks/{id}/branches:
+    get:
+      summary: Authorized task branches
+      operationId: cdwTaskBranches
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Task ID.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Branches visible to accepted assignee.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            branchId:
+                              type: string
+                            taskId:
+                              type: string
+                            fileId:
+                              type: string
+                            baseVersionId:
+                              type: string
+                            baseSha256:
+                              type: string
+                            state:
+                              type: string
+                            revision:
+                              type: integer
+                              minimum: 1
+                            headRevisionId:
+                              type: string
+                            editEpoch:
+                              type: integer
+                              minimum: 1
+                          required:
+                          - branchId
+                          - taskId
+                          - fileId
+                          - baseVersionId
+                          - baseSha256
+                          - state
+                          - revision
+                          - editEpoch
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/work-branches/{id}/office-sessions:
     post:
       summary: Open exclusive ONLYOFFICE document key for a task branch

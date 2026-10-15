@@ -100,6 +100,41 @@ func (r *Repository) CDWBranchForActor(ctx context.Context, id, actor string) (p
 	}
 	return b, nil
 }
+
+// Only an accepted active primary assignee can see its task branches.
+func (r *Repository) CDWTaskBranches(ctx context.Context, taskID, actor string) ([]ports.CDWBranch, error) {
+	rows, err := r.Q.Query(ctx, `SELECT b.id,b.task_id,b.file_id,b.base_version_id,b.base_sha256,b.state,b.revision,b.head_revision_id,b.edit_epoch
+ FROM cdw_work_branches b JOIN cdw_task_assignments a ON a.task_id=b.task_id
+ WHERE b.task_id=$1 AND a.kind='primary' AND a.ended_at IS NULL AND a.accepted_at IS NOT NULL
+ AND a.accepted_by=$2 ORDER BY b.created_at DESC,b.id DESC LIMIT 50`, taskID, actor)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := []ports.CDWBranch{}
+	for rows.Next() {
+		var b ports.CDWBranch
+		var head *string
+		if err = rows.Scan(&b.ID, &b.TaskID, &b.FileID, &b.BaseVersionID, &b.BaseSHA256, &b.State, &b.Revision, &head, &b.Epoch); err != nil {
+			return nil, err
+		}
+		if head != nil {
+			b.HeadRevisionID = *head
+		}
+		result = append(result, b)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	// Free the transaction connection before per-branch permission queries.
+	rows.Close()
+	for _, b := range result {
+		if _, err = r.CDWBranchForActor(ctx, b.ID, actor); err != nil {
+			return nil, err
+		}
+	}
+	return result, nil
+}
 func scanCDWBranchSession(row rowScanner) (ports.CDWBranchSession, error) {
 	var s ports.CDWBranchSession
 	err := row.Scan(&s.ID, &s.BranchID, &s.DocumentKey, &s.OpenedBy, &s.Generation, &s.Epoch, &s.State, &s.ExpiresAt)
