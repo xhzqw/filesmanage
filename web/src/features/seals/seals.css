@@ -209,22 +209,22 @@
 .seal-sidebar-history summary:focus,.seal-sidebar-history summary:focus-visible{outline:none!important;box-shadow:none!important;border-color:transparent!important}
 .seal-file-history{gap:7px;min-width:0}
 .seal-file-history>.seal-library-heading{font-weight:600;color:#334155;font-size:12px}
-.seal-file-history .seal-history-row{padding:8px 10px;border:1px solid rgba(15,23,42,.07);border-radius:8px;background:#fff;gap:5px}
+.seal-file-history .seal-history-row{padding:8px 10px;border:1px solid rgba(15,23,42,.07);border-radius:var(--radius-sm);background:#fff;gap:5px}
 .seal-history-row .seal-history-row-top{display:flex;align-items:center;justify-content:space-between;gap:5px;min-width:0}
 .seal-history-row-top>strong{min-width:0;font-size:12.5px;font-weight:600;color:#1E293B;overflow-wrap:anywhere}
 .seal-history-row-actions{display:flex;align-items:center;gap:4px;flex:none}
-.seal-history-page{padding:3px 7px;border:1px solid #E2E8F0;border-radius:999px;background:#F1F5F9;color:#64748B;font-size:10px;white-space:nowrap}
-.seal-history-row .seal-history-delete.rare-button{display:grid;place-items:center;flex:0 0 22px;width:22px;min-width:22px;height:22px;min-height:22px;padding:0;border:0;border-radius:6px;background:transparent;box-shadow:none;color:#94A3B8}
+.seal-history-page{padding:3px 7px;border:1px solid #E2E8F0;border-radius:var(--radius-pill);background:#F1F5F9;color:#64748B;font-size:10px;white-space:nowrap}
+.seal-history-row .seal-history-delete.rare-button{display:grid;place-items:center;flex:0 0 22px;width:22px;min-width:22px;height:22px;min-height:22px;padding:0;border:0;border-radius:var(--radius-finder);background:transparent;box-shadow:none;color:#94A3B8}
 .seal-history-row .seal-history-delete.rare-button:hover{background:#FEE2E2;color:#DC2626}
 .seal-history-row>small{color:var(--text-tertiary,#94A3B8);font-size:11px}
 .seal-file-history .seal-revisions{border-top:1px solid rgba(15,23,42,.07);margin-top:6px;padding-top:9px}
 .seal-revision-list{gap:2px}
-.seal-revision-row{padding:7px 4px;border-bottom:1px solid rgba(15,23,42,.07);border-radius:6px}
+.seal-revision-row{padding:7px 4px;border-bottom:1px solid rgba(15,23,42,.07);border-radius:var(--radius-finder)}
 .seal-revision-row.is-viewable{cursor:pointer}
 .seal-revision-row.is-viewable:hover,.seal-revision-row.is-viewable:focus-visible{background:#F1F5F9;outline:none}
 .seal-revision-meta strong{font-size:12px;font-weight:600}
-.seal-revision-current{padding:3px 7px;border-radius:999px;background:#EFF6FF;color:#0058D0;font-size:10.5px}
-.seal-revision-actions .rare-button{height:24px;min-height:24px;padding:0 7px;border:1px solid rgba(15,23,42,.12);border-radius:6px;background:#fff;box-shadow:none;color:#475569;font-size:10px}
+.seal-revision-current{padding:3px 7px;border-radius:var(--radius-pill);background:#EFF6FF;color:#0058D0;font-size:10.5px}
+.seal-revision-actions .rare-button{height:24px;min-height:24px;padding:0 7px;border:1px solid rgba(15,23,42,.12);border-radius:var(--radius-finder);background:#fff;box-shadow:none;color:#475569;font-size:10px}
 .seal-revision-actions .rare-button:hover{border-color:rgba(0,100,225,.24);background:#F8FAFC}
 .seal-page-viewport{display:flex;align-items:flex-start;justify-content:center;box-sizing:border-box;padding:28px 32px 88px;background:#F1F5F9}
 .seal-page-viewport .seal-page-surface{flex:0 0 auto;align-self:flex-start;margin:0 auto;overflow:visible;border:1px solid rgba(15,23,42,.06);border-radius:var(--radius-xs);box-shadow:0 2px 6px rgba(15,23,42,.05),0 12px 32px rgba(15,23,42,.08);background:#FFF}
