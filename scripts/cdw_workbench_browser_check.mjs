@@ -129,6 +129,14 @@ try{
  assert.equal(await evalJS("[...document.querySelectorAll('.cdw-inbox-actions button')].some(b=>b.textContent.includes('派发任务'))"),false,
   "G9 scope approval cannot masquerade as task delegation");
  console.log("CDW_G9_SCOPE_BROWSER_PASS authenticated-inbox+separate-review-workbench");
+ const g9Reads=await evalJS("(async()=>{const r=await fetch('/api/workbench/reading-assignments/inbox');return {status:r.status,data:(await r.json()).data}})()");
+ assert.equal(g9Reads.status,200,"G9 reading inbox must enforce actual authenticated reader identity");
+ assert.ok(Array.isArray(g9Reads.data?.items),"G9 reader assignments cannot be simulated");
+ await evalJS("(()=>{const b=[...document.querySelectorAll('.cdw-rail-item')].find(x=>x.textContent.includes('阅读确认'));b?.click();return true;})()");
+ await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('阅读确认')");
+ assert.equal(await evalJS("[...document.querySelectorAll('.cdw-inbox-actions button')].some(x=>x.textContent.includes('派发任务'))"),false,
+  "G9 reading view may not show unrelated task-creation control");
+ console.log("CDW_G9_READING_BROWSER_PASS authenticated-reading-inbox+separate-personal-confirmation-tab");
  await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('责任待办'));button?.click();return true;})()");
  await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('责任待办')");
  const obligations=await evalJS("(async()=>{const r=await fetch('/api/workbench/inbox?limit=100');return {status:r.status,data:(await r.json()).data}})()");

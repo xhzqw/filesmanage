@@ -468,6 +468,58 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 		t.Fatal("receipt cannot create or complete personal reading assignment")
 	}
 	t.Logf("CDW_G9_DEPARTMENT_RECEIPTS_POSTGRES_PASS batch=%s receipts=2 reading=0", batch.ID)
+	if _, e = service.CDWCreateReadingRoster(ctx, alice, bobTargets[0].TargetID,
+		application.CDWReadingRosterInput{UserIDs: []string{bob.ID}}, prefix+"_g9_roster_unauthorized"); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("not appointed department receiver cannot set reading roster: %v", e)
+	}
+	bobRosterInput := application.CDWReadingRosterInput{UserIDs: []string{bob.ID}}
+	bobRoster, e := service.CDWCreateReadingRoster(ctx, bob, bobTargets[0].TargetID, bobRosterInput, prefix+"_g9_roster_bob")
+	if e != nil || bobRoster.AssignedCount != 1 || len(bobRoster.DigestSHA256) != 64 {
+		t.Fatalf("recipient created bounded reading roster %+v %v", bobRoster, e)
+	}
+	bobRosterAgain, e := service.CDWCreateReadingRoster(ctx, bob, bobTargets[0].TargetID, bobRosterInput, prefix+"_g9_roster_bob")
+	if e != nil || bobRosterAgain.ID != bobRoster.ID {
+		t.Fatalf("reading roster replay %+v %v", bobRosterAgain, e)
+	}
+	if _, e = service.CDWCreateReadingRoster(ctx, bob, bobTargets[0].TargetID, bobRosterInput, prefix+"_g9_roster_duplicate"); !errors.Is(e, domain.ErrConflict) {
+		t.Fatalf("second reading roster permitted: %v", e)
+	}
+	inboxRead, e := service.CDWReadingInbox(ctx, bob, 25)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var bobAssignment ports.CDWReadingAssignment
+	for _, candidate := range inboxRead {
+		if candidate.TargetID == bobTargets[0].TargetID {
+			bobAssignment = candidate
+		}
+	}
+	if bobAssignment.ID == "" || bobAssignment.State != "assigned" || bobAssignment.ArtifactSHA256 != bobTargets[0].ArtifactSHA256 {
+		t.Fatalf("personal reading assignment not frozen to exact distribution artifact %+v", inboxRead)
+	}
+	if _, e = service.CDWConfirmReading(ctx, charlie, bobAssignment.ID,
+		application.CDWReadingConfirmationInput{Statement: "我已阅读上述文件版本并确认理解"}, prefix+"_g9_wrong_reader"); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("another reader confirmed Bob's assigned version: %v", e)
+	}
+	readingStatement := application.CDWReadingConfirmationInput{Statement: "本人已核对本次受控发行的文档内容和版次，确认已经阅读。"}
+	confirmed, e := service.CDWConfirmReading(ctx, bob, bobAssignment.ID, readingStatement, prefix+"_g9_read_bob")
+	if e != nil || confirmed.State != "confirmed" || confirmed.ArtifactSHA256 != bobAssignment.ArtifactSHA256 {
+		t.Fatalf("personal read confirmation %+v %v", confirmed, e)
+	}
+	confirmedAgain, e := service.CDWConfirmReading(ctx, bob, bobAssignment.ID, readingStatement, prefix+"_g9_read_bob")
+	if e != nil || confirmedAgain.EventID != confirmed.EventID {
+		t.Fatalf("reading idempotent replay %+v %v", confirmedAgain, e)
+	}
+	if _, e = service.CDWConfirmReading(ctx, bob, bobAssignment.ID, readingStatement, prefix+"_g9_read_again"); !errors.Is(e, domain.ErrConflict) {
+		t.Fatalf("duplicate reading confirmation not blocked: %v", e)
+	}
+	if e = pool.QueryRow(ctx, "SELECT count(*) FROM cdw_reading_events WHERE assignment_id=$1 AND kind='confirmed'", bobAssignment.ID).Scan(&readingCount); e != nil {
+		t.Fatal(e)
+	}
+	if readingCount != 1 {
+		t.Fatalf("reading confirmation immutable evidence count=%d", readingCount)
+	}
+	t.Logf("CDW_G9_READING_POSTGRES_PASS roster=%s assignment=%s single_confirmed_event=1", bobRoster.ID, bobAssignment.ID)
 	t.Logf("CDW_G9_SCOPE_APPROVED_POSTGRES_PASS plan=%s digest=%s batch=none", plan.ID, approvedPlan.DigestSHA256)
 	t.Logf("CDW_G9_SCOPE_FROZEN_POSTGRES_PASS plan=%s departments=2 digest=%s issued=none", plan.ID, frozenPlan.DigestSHA256)
 	t.Logf("CDW_G8_VERIFIED_ARTIFACT_PASS release=%s sha=%s still_not_effective", ready.ID, sha)

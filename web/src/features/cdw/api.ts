@@ -21,6 +21,19 @@ export type CDWDepartmentReceipt={
  receiptId:string;targetId:string;batchId:string;fileId:string;actorId:string;
  state:"received";revision:number;manifestSha256:string;evidenceSha256:string;signedAt:string;
 };
+export type CDWReadingRoster={
+ id:string;targetId:string;batchId:string;fileId:string;
+ departmentId:string;digestSha256:string;assignedCount:number;
+};
+export type CDWReadingAssignment={
+ id:string;rosterId:string;targetId:string;batchId:string;fileId:string;fileName:string;
+ revisionLabel:string;artifactSha256:string;userId:string;
+ state:"assigned"|"opened"|"confirmed"|"exception"|"cancelled";
+};
+export type CDWReadingConfirmation={
+ assignmentId:string;eventId:string;actorId:string;
+ artifactSha256:string;state:"confirmed";confirmedAt:string;
+};
 export type CDWFormalReady={deliveryId:string;taskId:string;fileId:string;fileName:string;sha256:string};
 export type CDWFormalApproval={
  id:string;subjectId:string;deliveryId:string;fileId:string;fileName?:string;
@@ -41,7 +54,7 @@ export type CDWTask={
  actualAcceptorId?:string;remainingObligations?:string[];
 };
 export type CDWInboxItem={
- kind:"task"|"obligation"|"review"|"formal"|"control"|"scope"|"receipt";receipt?:CDWReceiptTarget;scope?:CDWDistributionPlan;review?:CDWReviewGate;formal?:CDWFormalApproval;candidate?:CDWApprovedCandidate;taskId:string;title:string;fileId:string;
+ kind:"task"|"obligation"|"review"|"formal"|"control"|"scope"|"receipt"|"reading";reading?:CDWReadingAssignment;receipt?:CDWReceiptTarget;scope?:CDWDistributionPlan;review?:CDWReviewGate;formal?:CDWFormalApproval;candidate?:CDWApprovedCandidate;taskId:string;title:string;fileId:string;
  state:string;revision:number;assignmentId?:string;obligationId?:string;obligationKind?:string;
 };
 export type CDWBranch={
@@ -129,6 +142,16 @@ export const cdwApi={
   "/workbench/distribution-scope-roles",mutate(key,{fileId,userId})),
  scopeApprove:(id:string,revision:number,key:string)=>request<CDWDistributionPlan>(
   "/workbench/distribution-plans/"+segment(id)+"/approve-scope",mutate(key,{},revision)),
+ readingEligible:(targetId:string)=>request<{items:Array<{id:string;displayName:string}>}>(
+  "/workbench/distribution-targets/"+segment(targetId)+"/reading-eligible",{cache:"no-store"}),
+ readingRoster:(targetId:string,userIds:string[],key:string)=>request<CDWReadingRoster>(
+  "/workbench/distribution-targets/"+segment(targetId)+"/reading-roster",mutate(key,{userIds})),
+ readingRosterRead:(targetId:string)=>request<CDWReadingRoster>(
+  "/workbench/distribution-targets/"+segment(targetId)+"/reading-roster",{cache:"no-store"}),
+ readingInbox:()=>request<{items:CDWReadingAssignment[]}>(
+  "/workbench/reading-assignments/inbox",{cache:"no-store"}),
+ readingConfirm:(id:string,statement:string,key:string)=>request<CDWReadingConfirmation>(
+  "/workbench/reading-assignments/"+segment(id)+"/confirm",mutate(key,{statement})),
  receiptInbox:()=>request<{items:CDWReceiptTarget[]}>(
   "/workbench/distribution-targets/inbox",{cache:"no-store"}),
  receiptAcknowledge:(id:string,revision:number,statement:string,key:string)=>request<CDWDepartmentReceipt>(

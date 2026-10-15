@@ -1097,6 +1097,60 @@ add("POST","/api/workbench/distribution-targets/{id}/acknowledge",operation(
  responses=dict([json_ok(CDW_RECEIPT_RESULT,"Signed department receipt; does not complete personal reading or activation."),
  resp("403",ERR["403"]),resp("409",ERR["409"])])))
 
+# --- G9 separately frozen personal reading rosters ---
+CDW_READING_ROSTER = obj({"id":string(),"targetId":string(),"batchId":string(),
+ "fileId":string(),"departmentId":string(),"digestSha256":string(),
+ "assignedCount":integer(minimum=1)},
+ required=["id","targetId","batchId","fileId","departmentId","digestSha256","assignedCount"])
+add("POST","/api/workbench/distribution-targets/{id}/reading-roster",operation(
+ "Freeze one department-specific required reading roster after signed receipt","CDW","cdwReadingRosterCreate",
+ security=SESSION,params=[id_param("id","Department target ID"),CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({"userIds":arr(string())},required=["userIds"])}},
+ responses=dict([json_ok(CDW_READING_ROSTER,"Immutable identity-scoped reading roster, not confirmations."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
+add("GET","/api/workbench/distribution-targets/{id}/reading-roster",operation(
+ "Read the signed department's immutable reading roster","CDW","cdwReadingRosterDetail",
+ security=SESSION,params=[id_param("id","Department target ID")],
+ responses=dict([json_ok(CDW_READING_ROSTER,"Active roster summary."),
+ resp("403",ERR["403"]),resp("404",ERR["404"])])))
+
+CDW_READING_ASSIGNMENT = obj({"id":string(),"rosterId":string(),"targetId":string(),
+ "batchId":string(),"fileId":string(),"fileName":string(),"revisionLabel":string(),
+ "artifactSha256":string(),"userId":string(),"state":string()},
+ required=["id","rosterId","targetId","batchId","fileId","fileName",
+ "revisionLabel","artifactSha256","userId","state"])
+CDW_READING_CONFIRMATION = obj({"assignmentId":string(),"eventId":string(),
+ "actorId":string(),"artifactSha256":string(),"state":string(enum=["confirmed"]),
+ "confirmedAt":timestamp()},
+ required=["assignmentId","eventId","actorId","artifactSha256","state","confirmedAt"])
+add("GET","/api/workbench/reading-assignments/inbox",operation(
+ "List authentic personal reading obligations for the current authorized reader","CDW","cdwReadingInbox",
+ security=SESSION,
+ responses=dict([json_ok(obj({"items":arr(CDW_READING_ASSIGNMENT)},required=["items"]),
+ "Reader's own assigned, opened and confirmed items."),
+ resp("403",ERR["403"])])))
+add("POST","/api/workbench/reading-assignments/{id}/confirm",operation(
+ "Append exactly one reader-identified evidence event and mark assigned version confirmed","CDW","cdwReadingConfirm",
+ security=SESSION,params=[id_param("id","Personal assignment ID"),CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({"statement":{"type":"string","minLength":12,"maxLength":2000}},
+ required=["statement"])}},
+ responses=dict([json_ok(CDW_READING_CONFIRMATION,"Personal reading declaration, not training completion or activation."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
+add("GET","/api/workbench/reading-assignments/{id}/content",operation(
+ "Get exactly the immutable issued DOCX artifact for the assigned reader","CDW","cdwReadingContent",
+ security=SESSION,params=[id_param("id","Personal assignment ID")],
+ responses={"200":{"description":"Exact issued DOCX bytes, not latest working file.",
+ "content":{"application/vnd.openxmlformats-officedocument.wordprocessingml.document":{"schema":{"type":"string","format":"binary"}}}},
+ "403":{"description":ERR["403"]}}))
+
+add("GET","/api/workbench/distribution-targets/{id}/reading-eligible",operation(
+ "List department members with current access to the exact signed distribution","CDW","cdwReadingEligible",
+ security=SESSION,params=[id_param("id","Designated receiver's department target")],
+ responses=dict([json_ok(obj({"items":arr(obj({"id":string(),"displayName":string()},
+ required=["id","displayName"]))},required=["items"]),
+ "Receiver-scoped eligible readers, not unrestricted organization directory."),
+ resp("403",ERR["403"])])))
+
 # --- Auth ---
 add("POST", "/api/login", operation("Authenticate and open a session", "Auth", "login", security=[],
     request={"application/json": {"schema": ref("LoginRequest")}},

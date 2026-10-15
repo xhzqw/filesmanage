@@ -4005,6 +4005,400 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/distribution-targets/{id}/reading-roster:
+    post:
+      summary: Freeze one department-specific required reading roster after signed receipt
+      operationId: cdwReadingRosterCreate
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Department target ID
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userIds:
+                  type: array
+                  items:
+                    type: string
+              required:
+              - userIds
+      responses:
+        '200':
+          description: Immutable identity-scoped reading roster, not confirmations.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      targetId:
+                        type: string
+                      batchId:
+                        type: string
+                      fileId:
+                        type: string
+                      departmentId:
+                        type: string
+                      digestSha256:
+                        type: string
+                      assignedCount:
+                        type: integer
+                        minimum: 1
+                    required:
+                    - id
+                    - targetId
+                    - batchId
+                    - fileId
+                    - departmentId
+                    - digestSha256
+                    - assignedCount
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    get:
+      summary: Read the signed department's immutable reading roster
+      operationId: cdwReadingRosterDetail
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Department target ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Active roster summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      targetId:
+                        type: string
+                      batchId:
+                        type: string
+                      fileId:
+                        type: string
+                      departmentId:
+                        type: string
+                      digestSha256:
+                        type: string
+                      assignedCount:
+                        type: integer
+                        minimum: 1
+                    required:
+                    - id
+                    - targetId
+                    - batchId
+                    - fileId
+                    - departmentId
+                    - digestSha256
+                    - assignedCount
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/reading-assignments/inbox:
+    get:
+      summary: List authentic personal reading obligations for the current authorized reader
+      operationId: cdwReadingInbox
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Reader's own assigned, opened and confirmed items.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            rosterId:
+                              type: string
+                            targetId:
+                              type: string
+                            batchId:
+                              type: string
+                            fileId:
+                              type: string
+                            fileName:
+                              type: string
+                            revisionLabel:
+                              type: string
+                            artifactSha256:
+                              type: string
+                            userId:
+                              type: string
+                            state:
+                              type: string
+                          required:
+                          - id
+                          - rosterId
+                          - targetId
+                          - batchId
+                          - fileId
+                          - fileName
+                          - revisionLabel
+                          - artifactSha256
+                          - userId
+                          - state
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/reading-assignments/{id}/confirm:
+    post:
+      summary: Append exactly one reader-identified evidence event and mark assigned version confirmed
+      operationId: cdwReadingConfirm
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Personal assignment ID
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                statement:
+                  type: string
+                  minLength: 12
+                  maxLength: 2000
+              required:
+              - statement
+      responses:
+        '200':
+          description: Personal reading declaration, not training completion or activation.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      assignmentId:
+                        type: string
+                      eventId:
+                        type: string
+                      actorId:
+                        type: string
+                      artifactSha256:
+                        type: string
+                      state:
+                        type: string
+                        enum:
+                        - confirmed
+                      confirmedAt:
+                        type: string
+                        format: date-time
+                    required:
+                    - assignmentId
+                    - eventId
+                    - actorId
+                    - artifactSha256
+                    - state
+                    - confirmedAt
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/reading-assignments/{id}/content:
+    get:
+      summary: Get exactly the immutable issued DOCX artifact for the assigned reader
+      operationId: cdwReadingContent
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Personal assignment ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Exact issued DOCX bytes, not latest working file.
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/distribution-targets/{id}/reading-eligible:
+    get:
+      summary: List department members with current access to the exact signed distribution
+      operationId: cdwReadingEligible
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Designated receiver's department target
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Receiver-scoped eligible readers, not unrestricted organization directory.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            displayName:
+                              type: string
+                          required:
+                          - id
+                          - displayName
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/login:
     post:
       summary: Authenticate and open a session

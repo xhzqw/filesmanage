@@ -11,6 +11,7 @@ import {CDWControlPreparePanel} from "../features/cdw/CDWControlPreparePanel";
 import {CDWObligationPanel} from "../features/cdw/CDWObligationPanel";
 import {CDWScopeApprovalPanel} from "../features/cdw/CDWScopeApprovalPanel";
 import {CDWDepartmentReceiptPanel} from "../features/cdw/CDWDepartmentReceiptPanel";
+import {CDWReadingPanel} from "../features/cdw/CDWReadingPanel";
 import {BrandLoadingLabel} from "../shared/ui/BrandLoader";
 import {toast} from "../shared/ui/feedback";
 import {errorCopy} from "../shared/errors";
@@ -19,10 +20,10 @@ import {newIdempotencyKey} from "../shared/ids";
 import {collaborationApi} from "../features/collaboration/api";
 import {organizationApi} from "../features/organization/api";
 import {fileApi} from "../features/documents/api";
-import {cdwApi,type CDWBranch,type CDWInboxItem,type CDWRecipient,type CDWReviewGate,type CDWFormalApproval,type CDWApprovedCandidate,type CDWDistributionPlan,type CDWReceiptTarget} from "../features/cdw/api";
+import {cdwApi,type CDWBranch,type CDWInboxItem,type CDWRecipient,type CDWReviewGate,type CDWFormalApproval,type CDWApprovedCandidate,type CDWDistributionPlan,type CDWReceiptTarget,type CDWReadingAssignment} from "../features/cdw/api";
 import "./cdwWorkbench.css";
 
-type View="tasks"|"obligations"|"reviews"|"formal"|"control"|"scope"|"receipts"|"all";
+type View="tasks"|"obligations"|"reviews"|"formal"|"control"|"scope"|"receipts"|"reading"|"all";
 const labels:Record<string,string>={
  assigned:"待接收",accepted:"已接收",in_progress:"进行中",submitted:"待上级验收",
  returned:"已退回",awaiting:"待我验收",accepted_delivery:"交付已验收",
@@ -31,7 +32,7 @@ const labels:Record<string,string>={
  closed:"已关闭",cancelled:"已取消",
 };
 const stateLabel=(v:string)=>labels[v]??v;
-function taskKey(item:CDWInboxItem){return item.kind==="receipt"?item.receipt?.targetId??item.taskId:item.kind==="scope"?item.scope?.id??item.taskId:item.kind==="control"?item.candidate?.id??item.taskId:item.kind==="formal"?item.formal?.id??item.taskId:item.kind==="review"?item.review?.gateId??item.taskId:item.kind==="obligation"?item.obligationId??item.taskId:item.taskId;}
+function taskKey(item:CDWInboxItem){return item.kind==="reading"?item.reading?.id??item.taskId:item.kind==="receipt"?item.receipt?.targetId??item.taskId:item.kind==="scope"?item.scope?.id??item.taskId:item.kind==="control"?item.candidate?.id??item.taskId:item.kind==="formal"?item.formal?.id??item.taskId:item.kind==="review"?item.review?.gateId??item.taskId:item.kind==="obligation"?item.obligationId??item.taskId:item.taskId;}
 function statusTone(state:string):"neutral"|"info"|"warning"|"success"{
  if(state==="assigned"||state==="pending")return "warning";
  if(state==="submitted"||state==="frozen")return "success";
@@ -52,6 +53,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const[controlCandidates,setControlCandidates]=useState<CDWApprovedCandidate[]>([]);
  const[scopeApprovals,setScopeApprovals]=useState<CDWDistributionPlan[]>([]);
  const[receiptTargets,setReceiptTargets]=useState<CDWReceiptTarget[]>([]);
+ const[readingAssignments,setReadingAssignments]=useState<CDWReadingAssignment[]>([]);
  const[formalDraft,setFormalDraft]=useState(false);
  const[busy,setBusy]=useState(false);
  const[refreshToken,refresh]=useState(0);
@@ -97,8 +99,12 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
   kind:"receipt",receipt,taskId:receipt.targetId,title:receipt.fileName,fileId:receipt.fileId,
   state:receipt.state,revision:receipt.revision
  })),[receiptTargets]);
- const allItems=useMemo(()=>[...items,...reviewItems,...formalItems,...controlItems,...scopeItems,...receiptItems],[items,reviewItems,formalItems,controlItems,scopeItems,receiptItems]);
- const visible=useMemo(()=>allItems.filter(x=>(filter==="all"||x.kind===(filter==="tasks"?"task":filter==="reviews"?"review":filter==="formal"?"formal":filter==="control"?"control":filter==="scope"?"scope":filter==="receipts"?"receipt":"obligation"))
+ const readingItems=useMemo<CDWInboxItem[]>(()=>readingAssignments.map(reading=>({
+  kind:"reading",reading,taskId:reading.id,title:reading.fileName,fileId:reading.fileId,
+  state:reading.state,revision:1
+ })),[readingAssignments]);
+ const allItems=useMemo(()=>[...items,...reviewItems,...formalItems,...controlItems,...scopeItems,...receiptItems,...readingItems],[items,reviewItems,formalItems,controlItems,scopeItems,receiptItems,readingItems]);
+ const visible=useMemo(()=>allItems.filter(x=>(filter==="all"||x.kind===(filter==="tasks"?"task":filter==="reviews"?"review":filter==="formal"?"formal":filter==="control"?"control":filter==="scope"?"scope":filter==="receipts"?"receipt":filter==="reading"?"reading":"obligation"))
   &&(x.title.toLocaleLowerCase().includes(search.toLocaleLowerCase())||x.fileId.toLowerCase().includes(search.toLowerCase()))),[allItems,filter,search]);
  const selected=visible.find(x=>taskKey(x)===selectedKey)??visible[0]??null;
 
@@ -145,6 +151,13 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
   let active=true;
   cdwApi.receiptInbox().then(data=>{if(active)setReceiptTargets(data.items??[])})
    .catch(error=>{if(active)setRequestError(errorCopy(error,"部门签收清单加载失败"))});
+  return()=>{active=false};
+ },[refreshToken,user.id]);
+
+ useEffect(()=>{
+  let active=true;
+  cdwApi.readingInbox().then(data=>{if(active)setReadingAssignments(data.items??[])})
+   .catch(error=>{if(active)setRequestError(errorCopy(error,"个人阅读确认列表加载失败"))});
   return()=>{active=false};
  },[refreshToken,user.id]);
 
@@ -250,6 +263,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const totalControl=controlCandidates.length;
  const totalScope=scopeApprovals.length;
  const totalReceipts=receiptTargets.filter(item=>item.state==="awaiting").length;
+ const totalReading=readingAssignments.filter(item=>item.state==="assigned"||item.state==="opened").length;
  const canWork=selected?.kind==="task"&&(selected.state==="accepted"||selected.state==="in_progress");
  const editingBranch=branches.find(b=>b.state==="open");
  return <AppShell user={user} onLogout={onLogout}>
@@ -266,6 +280,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
        ["control","发行准备",totalControl],
        ["scope","范围审批",totalScope],
        ["receipts","部门签收",totalReceipts],
+       ["reading","阅读确认",totalReading],
        ["all","全部事项",allItems.length],
       ] as [View,string,number][]).map(([key,label,count])=>
        <RareButton key={key} type="button" className={"cdw-rail-item"+(filter===key?" is-current":"")}
@@ -276,10 +291,10 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
      </aside>
      <section className="cdw-inbox" aria-label="任务列表">
       <header className="cdw-inbox-tools">
-       <div className="cdw-inbox-heading"><strong>{filter==="tasks"?"我的任务":filter==="obligations"?"责任待办":filter==="reviews"?"待我验收":filter==="formal"?"正式审批":filter==="control"?"发行准备":filter==="scope"?"范围审批":filter==="receipts"?"部门签收":"全部事项"}</strong><span>{visible.length}</span></div>
+       <div className="cdw-inbox-heading"><strong>{filter==="tasks"?"我的任务":filter==="obligations"?"责任待办":filter==="reviews"?"待我验收":filter==="formal"?"正式审批":filter==="control"?"发行准备":filter==="scope"?"范围审批":filter==="receipts"?"部门签收":filter==="reading"?"阅读确认":"全部事项"}</strong><span>{visible.length}</span></div>
        <div className="cdw-inbox-actions">
         <RareButton type="button" tone="ghost" aria-label="刷新任务列表" disabled={busy} onClick={()=>refresh(v=>v+1)}>↻</RareButton>
-        {user.isAdmin&&(filter==="formal"?<RareButton type="button" tone="primary" onClick={()=>{setFormalDraft(true);setActiveForm(null);}}>发起审批</RareButton>:filter==="control"||filter==="scope"||filter==="receipts"?null:<RareButton type="button" tone="primary" onClick={()=>beginForm("create")}>派发任务</RareButton>)}
+        {user.isAdmin&&(filter==="formal"?<RareButton type="button" tone="primary" onClick={()=>{setFormalDraft(true);setActiveForm(null);}}>发起审批</RareButton>:filter==="control"||filter==="scope"||filter==="receipts"||filter==="reading"?null:<RareButton type="button" tone="primary" onClick={()=>beginForm("create")}>派发任务</RareButton>)}
        </div>
       </header>
       <div className="cdw-search"><RareInput type="search" aria-label="筛选任务" placeholder="筛选任务或文件…" value={search} onChange={e=>setSearch(e.target.value)}/></div>
@@ -291,7 +306,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
          aria-current={selected===item&&!activeForm?"true":undefined} onClick={()=>select(item)}>
         <span className={"cdw-task-symbol"+(item.kind==="obligation"?" is-obligation":"")} aria-hidden="true">{item.kind==="task"?"▤":"↳"}</span>
         <span className="cdw-task-copy"><strong title={item.title}>{item.title}</strong>
-         <small>{item.kind==="obligation"?stateLabel(item.obligationKind??""):item.kind==="formal"?"冻结候选稿 · 正式批准":item.kind==="control"?"正式批准 · 文控版次":item.kind==="scope"?"冻结清单 · 独立范围批准":item.kind==="receipt"?"部门受控发行 · 真实签收":item.kind==="review"?(item.review?.reviewMode==="delegated"?"冻结交付 · 授权代验收":"冻结交付 · 直属验收"):"任务"} · {stateLabel(item.state)}</small></span>
+         <small>{item.kind==="obligation"?stateLabel(item.obligationKind??""):item.kind==="formal"?"冻结候选稿 · 正式批准":item.kind==="control"?"正式批准 · 文控版次":item.kind==="scope"?"冻结清单 · 独立范围批准":item.kind==="receipt"?"部门受控发行 · 真实签收":item.kind==="reading"?"指定人员 · 独立阅读确认":item.kind==="review"?(item.review?.reviewMode==="delegated"?"冻结交付 · 授权代验收":"冻结交付 · 直属验收"):"任务"} · {stateLabel(item.state)}</small></span>
         {item.kind==="task"&&item.state==="assigned"&&<span className="cdw-task-unread" aria-label="待接收"/>}
        </RareButton>)}
       </div>
@@ -333,6 +348,8 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
        </div>
       </section>:selected?.kind==="control"&&selected.candidate?
       <CDWControlPreparePanel key={selected.candidate.id} candidate={selected.candidate} user={user} loadUsers={organizationApi.users} loadDepartments={organizationApi.departments} onPrepared={()=>refresh(n=>n+1)}/>:
+      selected?.kind==="reading"&&selected.reading?
+      <CDWReadingPanel key={selected.reading.id} assignment={selected.reading} onConfirmed={()=>refresh(n=>n+1)}/>:
       selected?.kind==="receipt"&&selected.receipt?
       <CDWDepartmentReceiptPanel key={selected.receipt.targetId} target={selected.receipt} onSigned={()=>refresh(n=>n+1)}/>:
       selected?.kind==="scope"&&selected.scope?

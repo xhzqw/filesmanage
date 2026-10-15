@@ -5,6 +5,7 @@ import {errorCopy} from "../../shared/errors";
 import {newIdempotencyKey} from "../../shared/ids";
 import {ApiError} from "../../shared/http";
 import {cdwApi,type CDWReceiptTarget} from "./api";
+import {CDWReadingRosterPanel} from "./CDWReadingRosterPanel";
 
 export function CDWDepartmentReceiptPanel({target,onSigned}:{
  target:CDWReceiptTarget;onSigned:()=>void;
@@ -58,5 +59,6 @@ export function CDWDepartmentReceiptPanel({target,onSigned}:{
    </div>
   </section>}
   {target.state==="received"&&<RareNotice tone="success">本部门签收已完成。指定人员阅读确认、正式生效和旧版回收仍属于独立业务环节。</RareNotice>}
+  {target.state==="received"&&<CDWReadingRosterPanel target={target} onCreated={onSigned}/>}
  </div>;
 }
