@@ -348,9 +348,9 @@ try{
     await cdp.evaluate(`(()=>{
      window.__stampEvents=[];
      const mark=document.querySelector('.seal-position-mark');
-     for(const type of ['pointerdown','gotpointercapture','pointermove','pointerup','lostpointercapture']){
-      mark.addEventListener(type,e=>window.__stampEvents.push({type,target:e.target.className,x:e.clientX,y:e.clientY,
-       capture:mark.hasPointerCapture(e.pointerId),width:mark.style.width}));
+     for(const type of ['pointerdown','gotpointercapture','pointermove','pointerup','pointercancel','lostpointercapture','mousemove','mousedown','mouseup']){
+      document.addEventListener(type,e=>window.__stampEvents.push({type,target:e.target.className,x:e.clientX,y:e.clientY,
+       button:e.button,buttons:e.buttons,id:e.pointerId,capture:e.pointerId!==undefined?mark.hasPointerCapture(e.pointerId):null,width:mark.style.width}),true);
      }
     })()`);
     await cdp.drag(handle,{x:handle.x+25,y:handle.y+12});
