@@ -92,11 +92,14 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
   if(!activeForm)return;
   let live=true;
   setUsersBusy(true);setUsersError("");
-  organizationApi.users().then(data=>{if(live)setUsers(data);})
+  (activeForm==="create"?organizationApi.users():selected?.fileId?
+   fileApi.reviewAssignees(selected.fileId).then(list=>list.map(person=>({
+    id:person.id,displayName:person.displayName,isAdmin:false,mustChangePassword:false
+   } as User))):Promise.resolve([] as User[])).then(data=>{if(live)setUsers(data);})
    .catch(error=>{if(live)setUsersError(errorCopy(error,"无法获取负责人名单（可能没有组织目录权限）"));})
    .finally(()=>{if(live)setUsersBusy(false);});
   return()=>{live=false;};
- },[activeForm]);
+ },[activeForm,selected?.fileId]);
 
  useEffect(()=>{
   if(activeForm!=="create"||fileQuery.trim().length<2){
