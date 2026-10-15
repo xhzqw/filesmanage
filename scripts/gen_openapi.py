@@ -942,6 +942,36 @@ add("POST","/api/workbench/formal-approvals/{id}/decide",operation(
  responses=dict([json_ok(CDW_FORMAL_APPROVAL,"Candidate produced only after all mandatory steps approve; never activates file."),
  resp("403",ERR["403"]),resp("409",ERR["409"])])))
 
+# --- G8 controlled release preparation (approval != preparation != issue != activation) ---
+CDW_CONTROL_CANDIDATE=obj({"id":string(),"fileId":string(),"fileName":string(),
+ "sha256":string(),"approvedAt":timestamp()},required=["id","fileId","fileName","sha256","approvedAt"])
+CDW_CONTROL_RELEASE=obj({"id":string(),"fileId":string(),"fileName":string(),"candidateId":string(),
+ "revisionLabel":string(),"sha256":string(),
+ "state":string(enum=["preparing","ready","issued_pending","effective","superseded","withdrawn","cancelled"]),
+ "revision":integer(minimum=1),"plannedEffectiveAt":timestamp()},
+ required=["id","fileId","fileName","candidateId","revisionLabel","sha256","state","revision"])
+add("GET","/api/workbench/controlled/candidates",operation(
+ "List formally approved immutable candidates available to document control","CDW","cdwControlCandidates",
+ security=SESSION,responses=dict([json_ok(obj({"items":arr(CDW_CONTROL_CANDIDATE)},required=["items"]),
+ "Only file-visible approved candidates, authorized officer or admin."),resp("403",ERR["403"])])))
+add("GET","/api/workbench/controlled/files/{fileId}/releases",operation(
+ "List file-controlled release lifecycle and revision; never read file_versions.latest as effective","CDW","cdwControlList",
+ security=SESSION,params=[id_param("fileId","File ID.")],
+ responses=dict([json_ok(obj({"items":arr(CDW_CONTROL_RELEASE)},required=["items"]),
+ "File ACL enforced on read."),resp("403",ERR["403"])])))
+add("POST","/api/workbench/controlled/role",operation(
+ "Explicit file-scoped document control officer authorization, admin only","CDW","cdwControlGrantRole",
+ security=SESSION,params=[CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({"userId":string(),"fileId":string()},required=["userId","fileId"])}},
+ responses=dict([json_ok(CDW_FORMAL_CREATED,"Role binding ID."),resp("403",ERR["403"])])))
+add("POST","/api/workbench/controlled/releases",operation(
+ "Prepare controlled release from approved immutable Blob, never issue or activate implicitly","CDW","cdwControlPrepare",
+ security=SESSION,params=[CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({"candidateId":string(),"revisionLabel":string(max_length=60),
+ "plannedEffectiveAt":timestamp()},required=["candidateId","revisionLabel"])}},
+ responses=dict([json_ok(CDW_CONTROL_RELEASE,"Created in preparing state with source-only artifact."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
+
 # --- Auth ---
 add("POST", "/api/login", operation("Authenticate and open a session", "Auth", "login", security=[],
     request={"application/json": {"schema": ref("LoginRequest")}},

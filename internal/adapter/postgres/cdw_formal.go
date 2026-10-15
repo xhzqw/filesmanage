@@ -374,7 +374,12 @@ func (r *Repository) CDWFormalCanRead(ctx context.Context, id, actor string) (bo
  SELECT 1 FROM cdw_formal_approval_instances a
  JOIN cdw_approval_subjects s ON s.id=a.subject_id
  WHERE a.id=$1 AND (a.requested_by=$2 OR EXISTS(
- SELECT 1 FROM cdw_formal_approval_steps st WHERE st.instance_id=a.id AND st.approver_user_id=$2)
+ SELECT 1 FROM cdw_formal_approval_steps st
+ JOIN cdw_business_role_bindings auth ON auth.user_id=st.approver_user_id
+ WHERE st.instance_id=a.id AND st.approver_user_id=$2
+ AND auth.role='formal_approver' AND (auth.file_id=s.file_id OR auth.file_id IS NULL)
+ AND auth.department_id IS NULL AND auth.revoked_at IS NULL
+ AND auth.valid_from<=now() AND (auth.expires_at IS NULL OR auth.expires_at>now()))
  OR EXISTS(SELECT 1 FROM cdw_business_role_bindings b WHERE b.user_id=$2 AND b.role='document_control'
  AND (b.file_id=s.file_id OR b.file_id IS NULL) AND b.revoked_at IS NULL
  AND b.valid_from<=now() AND (b.expires_at IS NULL OR b.expires_at>now()))))`, id, actor).Scan(&allowed)

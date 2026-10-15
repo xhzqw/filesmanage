@@ -2461,6 +2461,304 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/controlled/candidates:
+    get:
+      summary: List formally approved immutable candidates available to document control
+      operationId: cdwControlCandidates
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Only file-visible approved candidates, authorized officer or admin.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            fileId:
+                              type: string
+                            fileName:
+                              type: string
+                            sha256:
+                              type: string
+                            approvedAt:
+                              type: string
+                              format: date-time
+                          required:
+                          - id
+                          - fileId
+                          - fileName
+                          - sha256
+                          - approvedAt
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/controlled/files/{fileId}/releases:
+    get:
+      summary: List file-controlled release lifecycle and revision; never read file_versions.latest as effective
+      operationId: cdwControlList
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: fileId
+        in: path
+        required: true
+        description: File ID.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: File ACL enforced on read.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            fileId:
+                              type: string
+                            fileName:
+                              type: string
+                            candidateId:
+                              type: string
+                            revisionLabel:
+                              type: string
+                            sha256:
+                              type: string
+                            state:
+                              type: string
+                              enum:
+                              - preparing
+                              - ready
+                              - issued_pending
+                              - effective
+                              - superseded
+                              - withdrawn
+                              - cancelled
+                            revision:
+                              type: integer
+                              minimum: 1
+                            plannedEffectiveAt:
+                              type: string
+                              format: date-time
+                          required:
+                          - id
+                          - fileId
+                          - fileName
+                          - candidateId
+                          - revisionLabel
+                          - sha256
+                          - state
+                          - revision
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/controlled/role:
+    post:
+      summary: Explicit file-scoped document control officer authorization, admin only
+      operationId: cdwControlGrantRole
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                fileId:
+                  type: string
+              required:
+              - userId
+              - fileId
+      responses:
+        '200':
+          description: Role binding ID.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                    required:
+                    - id
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/controlled/releases:
+    post:
+      summary: Prepare controlled release from approved immutable Blob, never issue or activate implicitly
+      operationId: cdwControlPrepare
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                candidateId:
+                  type: string
+                revisionLabel:
+                  type: string
+                  maxLength: 60
+                plannedEffectiveAt:
+                  type: string
+                  format: date-time
+              required:
+              - candidateId
+              - revisionLabel
+      responses:
+        '200':
+          description: Created in preparing state with source-only artifact.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      fileId:
+                        type: string
+                      fileName:
+                        type: string
+                      candidateId:
+                        type: string
+                      revisionLabel:
+                        type: string
+                      sha256:
+                        type: string
+                      state:
+                        type: string
+                        enum:
+                        - preparing
+                        - ready
+                        - issued_pending
+                        - effective
+                        - superseded
+                        - withdrawn
+                        - cancelled
+                      revision:
+                        type: integer
+                        minimum: 1
+                      plannedEffectiveAt:
+                        type: string
+                        format: date-time
+                    required:
+                    - id
+                    - fileId
+                    - fileName
+                    - candidateId
+                    - revisionLabel
+                    - sha256
+                    - state
+                    - revision
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/login:
     post:
       summary: Authenticate and open a session

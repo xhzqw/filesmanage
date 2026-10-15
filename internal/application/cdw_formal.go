@@ -141,6 +141,9 @@ func (s *Service) CDWGrantFormalApprover(ctx context.Context, actor domain.User,
 			if _, e := s.visibleFile(ctx, tx, actor, input.FileID, domain.ActionPreview); e != nil {
 				return nil, e
 			}
+			person, e := tx.UserByID(ctx, input.UserID)
+			if e != nil || person.DisabledAt != nil { return nil, domain.ErrForbidden }
+			if _, e = s.visibleFile(ctx, tx, person, input.FileID, domain.ActionPreview); e != nil { return nil, domain.ErrForbidden }
 			actual, e := store.CDWGrantFormalApprover(ctx, id, input.UserID, input.FileID, actor.ID)
 			return CDWFormalCreated{ID: actual}, e
 		})

@@ -1,5 +1,7 @@
 import {request} from "../../shared/http";
 
+export type CDWApprovedCandidate={id:string;fileId:string;fileName:string;sha256:string;approvedAt:string};
+export type CDWControlledRelease={id:string;fileId:string;fileName:string;candidateId:string;revisionLabel:string;sha256:string;state:"preparing"|"ready"|"issued_pending"|"effective"|"superseded"|"withdrawn"|"cancelled";revision:number;plannedEffectiveAt?:string};
 export type CDWFormalReady={deliveryId:string;taskId:string;fileId:string;fileName:string;sha256:string};
 export type CDWFormalApproval={
  id:string;subjectId:string;deliveryId:string;fileId:string;fileName?:string;
@@ -16,7 +18,7 @@ export type CDWTask={
  actualAcceptorId?:string;remainingObligations?:string[];
 };
 export type CDWInboxItem={
- kind:"task"|"obligation"|"review"|"formal";review?:CDWReviewGate;formal?:CDWFormalApproval;taskId:string;title:string;fileId:string;
+ kind:"task"|"obligation"|"review"|"formal"|"control";review?:CDWReviewGate;formal?:CDWFormalApproval;candidate?:CDWApprovedCandidate;taskId:string;title:string;fileId:string;
  state:string;revision:number;assignmentId?:string;obligationId?:string;obligationKind?:string;
 };
 export type CDWBranch={
@@ -98,6 +100,11 @@ export const cdwApi={
   request<CDWOverrideGrant>("/workbench/review-gates/"+segment(id)+"/grants",mutate(key,{actorId,reason},revision)),
  reviewRevoke:(id:string,grantId:string,key:string)=>
   request<CDWOverrideGrant>("/workbench/review-gates/"+segment(id)+"/grants/"+segment(grantId)+"/revoke",mutate(key,{})),
+ controlCandidates:()=>request<{items:CDWApprovedCandidate[]}>("/workbench/controlled/candidates",{cache:"no-store"}),
+ controlList:(fileId:string)=>request<{items:CDWControlledRelease[]}>("/workbench/controlled/files/"+segment(fileId)+"/releases",{cache:"no-store"}),
+ controlGrant:(fileId:string,userId:string,key:string)=>request<{id:string}>("/workbench/controlled/role",mutate(key,{fileId,userId})),
+ controlPrepare:(candidateId:string,revisionLabel:string,plannedEffectiveAt:string|undefined,key:string)=>
+  request<CDWControlledRelease>("/workbench/controlled/releases",mutate(key,{candidateId,revisionLabel,...(plannedEffectiveAt?{plannedEffectiveAt}:{})})),
  formalReady:()=>request<{items:CDWFormalReady[]}>("/workbench/formal-approvals/ready",{cache:"no-store"}),
  formalInbox:(limit=100)=>request<{items:CDWFormalApproval[]}>(
   "/workbench/formal-approvals/inbox?limit="+limit,{cache:"no-store"}),

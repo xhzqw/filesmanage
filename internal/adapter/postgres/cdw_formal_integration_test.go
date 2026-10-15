@@ -157,5 +157,57 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	if approvedCount != 1 || versionSeq != 1 {
 		t.Fatalf("approved NOT issued/effective: count=%d legacy=%d", approvedCount, versionSeq)
 	}
+
+	// G8: neither acceptance nor formal approval permits an uncontrolled issue.
+	if _, e := service.CDWControlPrepare(ctx, admin, application.CDWControlPrepareInput{
+		CandidateID: final.CandidateID, RevisionLabel: "A/0"}, prefix+"_g8_without_role"); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("admin must not automatically become document-control officer: %v", e)
+	}
+	grants, e := service.CDWControlGrantRole(ctx, admin, application.CDWControlRoleInput{
+		UserID: admin.ID, FileID: fileID}, prefix+"_g8_role")
+	if e != nil || grants.ID == "" {
+		t.Fatalf("control-role grant: %+v %v", grants, e)
+	}
+	candidates, e := service.CDWControlCandidates(ctx, admin, 100)
+	if e != nil {
+		t.Fatalf("candidate listing: %v", e)
+	}
+	found := false
+	for _, row := range candidates {
+		if row.ID == final.CandidateID && row.SHA256 == sha {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("approved frozen candidate not available: %+v", candidates)
+	}
+	prepareInput := application.CDWControlPrepareInput{CandidateID: final.CandidateID, RevisionLabel: "A/0"}
+	prepared, e := service.CDWControlPrepare(ctx, admin, prepareInput, prefix+"_g8_prepare")
+	if e != nil || prepared.State != "preparing" || prepared.SHA256 != sha {
+		t.Fatalf("controlled release preparation: %+v %v", prepared, e)
+	}
+	again, e := service.CDWControlPrepare(ctx, admin, prepareInput, prefix+"_g8_prepare")
+	if e != nil || again.ID != prepared.ID {
+		t.Fatalf("release preparation idempotency: %+v %v", again, e)
+	}
+	if _, e = service.CDWControlPrepare(ctx, admin, prepareInput, prefix+"_g8_duplicate"); !errors.Is(e, domain.ErrConflict) {
+		t.Fatalf("duplicate candidate must be rejected: %v", e)
+	}
+	rows, e := service.CDWControlList(ctx, admin, fileID)
+	if e != nil || len(rows) != 1 || rows[0].ID != prepared.ID {
+		t.Fatalf("release listing: %+v %v", rows, e)
+	}
+	var sourceArtifactCount, pointerCount int
+	if e = pool.QueryRow(ctx, `SELECT count(*) FROM cdw_release_artifacts WHERE release_id=$1
+ AND purpose='source' AND sha256=$2`, prepared.ID, sha).Scan(&sourceArtifactCount); e != nil {
+		t.Fatal(e)
+	}
+	if e = pool.QueryRow(ctx, "SELECT count(*) FROM cdw_effective_pointers WHERE file_id=$1", fileID).Scan(&pointerCount); e != nil {
+		t.Fatal(e)
+	}
+	if sourceArtifactCount != 1 || pointerCount != 0 {
+		t.Fatalf("preparation leaked into effective version: artifacts=%d pointer=%d", sourceArtifactCount, pointerCount)
+	}
+	t.Logf("CDW_G8_PREPARE_POSTGRES_PASS release=%s sha=%s active_pointer=none", prepared.ID, sha)
 	t.Logf("CDW_G7_FORMAL_POSTGRES_PASS subject=%s candidate=%s sha=%s steps=2", started.SubjectID, final.CandidateID, sha)
 }
