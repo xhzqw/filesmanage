@@ -70,16 +70,10 @@ try{
   assert.ok(layout.panes.every(p=>p.bottom<=851),"panes extend below viewport at "+width);
   console.log("CDW_LAYOUT_PASS",width,layout.panes.map(p=>p.selector+":"+Math.round(p.right-p.left)).join(" "));
  }
- const controls=await evalJS(`(()=>{const buttons=[...document.querySelectorAll('.cdw-rail-item')];
- const obligation=buttons.find(b=>b.textContent.includes('责任待办'));obligation?.click();
- const active=document.querySelector('.cdw-rail-item.is-current')?.textContent;
- const create=[...document.querySelectorAll('.cdw-inbox-actions button')].find(b=>b.textContent.includes('派发任务'));
- create?.click();
- return {active,createVisible:!!document.querySelector('.cdw-form'),headline:document.querySelector('.cdw-detail h2')?.textContent};
- })()`);
- assert.match(controls.active||"",/责任待办/);
- assert.equal(controls.createVisible,true,"admin should be able to open task creation form");
- assert.match(controls.headline||"",/派发单文件任务/);
+ await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('责任待办'));button?.click();return true;})()");
+ await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('责任待办')");
+ await evalJS("(()=>{const create=[...document.querySelectorAll('.cdw-inbox-actions button')].find(b=>b.textContent.includes('派发任务'));create?.click();return true;})()");
+ await until("!!document.querySelector('.cdw-form') && document.querySelector('.cdw-detail h2')?.textContent?.includes('派发单文件任务')");
  console.log("CDW_BROWSER_PASS auth=inbox, responsive=1440/1024/780, filter, create-form");
 }finally{
  try{ws?.close();}catch{}
