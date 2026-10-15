@@ -85,6 +85,6 @@ func (s *Service) ConvertDOCXForSigning(ctx context.Context, u domain.User, id s
 	}
 	_ = check.Rollback(ctx)
 	base := name[:len(name)-5]
-	return s.commitFriendlyConversion(ctx,u,folderID,base,"pdf",expectedSeq,"application/pdf",idempotencyKey,pdf,
-		&domain.FileLineage{SourceFileID:id,SourceFileName:name,SourceVersionSeq:expectedSeq,RelationType:"seal_copy"})
+	return s.commitFriendlyConversion(ctx, u, folderID, base, "pdf", expectedSeq, "application/pdf", idempotencyKey, pdf,
+		&domain.FileLineage{SourceFileID: id, SourceFileName: name, SourceVersionSeq: expectedSeq, RelationType: "seal_copy"})
 }
