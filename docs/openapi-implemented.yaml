@@ -11305,9 +11305,10 @@ components:
           type: string
           enum:
           - native
-          - convert
+          - converted
           - licensed
-          - unsupported
+          - unverified
+          - invalid
         engine:
           type: string
         note:

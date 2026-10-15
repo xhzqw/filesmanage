@@ -37,16 +37,22 @@ func (h *Handler) derivativeStatus(c *gin.Context) {
 		return
 	}
 	if !found {
+		state := ""
+		errorCode := ""
+		if support.Class == "invalid" {
+			state = "invalid"
+			errorCode = "INVALID_DWG"
+		}
 		c.JSON(200, gin.H{"ok": true, "data": gin.H{
 			"found": false, "format": support.Format, "class": support.Class,
-			"engine": support.Engine, "note": support.Note,
+			"engine": support.Engine, "note": support.Note, "state": state, "errorCode": errorCode,
 		}})
 		return
 	}
 	c.JSON(200, gin.H{"ok": true, "data": gin.H{
 		"found": true, "state": derivative.State, "outputKind": derivative.OutputKind,
 		"sourceFormat": derivative.SourceFormat, "format": support.Format,
-		"converter": derivative.Converter,
+		"converter":    derivative.Converter,
 		"outputSha256": derivative.OutputSha256, "outputSize": derivative.OutputSize,
 		"errorCode": derivative.ErrorCode, "class": support.Class, "note": support.Note,
 	}})

@@ -38,6 +38,7 @@ assert.equal(cadDerivativeDisposition({found:false,class:"unverified"}),"unsuppo
 assert.equal(cadDerivativeDisposition({found:false,class:""}),"unsupported");
 assert.equal(cadDerivativeDisposition({found:false,class:"native"}),"request");
 assert.equal(cadDerivativeDisposition({found:false,class:"converted"}),"request");
+assert.equal(cadDerivativeDisposition({found:false,class:"invalid"}),"unsupported");
 assert.equal(cadDerivativeDisposition({found:true,class:"native"}),"existing");
 assert.equal(cadDerivativeDisposition({found:true,class:"licensed"}),"unsupported");
 assert.equal(cadDerivativeDisposition({found:true,class:"converted",state:"failed"}),"existing");

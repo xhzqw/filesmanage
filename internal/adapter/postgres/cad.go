@@ -25,7 +25,8 @@ func (r *Repository) EnsureDerivative(ctx context.Context, d domain.ModelDerivat
 		`INSERT INTO model_derivatives(id,file_id,version_seq,source_sha256,source_format,output_kind,converter,converter_version,settings_hash,state)
 		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'queued')
 		 ON CONFLICT (file_id,version_seq,output_kind,converter,converter_version,settings_hash)
-		 DO UPDATE SET state='queued'
+		 DO UPDATE SET state=CASE WHEN model_derivatives.state='failed' THEN 'queued' ELSE model_derivatives.state END,
+		 error_code=CASE WHEN model_derivatives.state='failed' THEN NULL ELSE model_derivatives.error_code END
 		 RETURNING id,file_id,version_seq,source_sha256,source_format,output_kind,coalesce(blob_id,''),coalesce(output_sha256,''),coalesce(output_size,0),converter,converter_version,settings_hash,state,coalesce(error_code,'')`,
 		d.ID, d.FileID, d.VersionSeq, d.SourceSha256, d.SourceFormat, d.OutputKind, d.Converter, d.ConverterVersion, d.SettingsHash)
 	out, err := scanDerivative(row)
@@ -37,7 +38,10 @@ func (r *Repository) EnsureDerivative(ctx context.Context, d domain.ModelDerivat
 
 func (r *Repository) EnqueueDerivativeJob(ctx context.Context, jobID, derivativeID string) error {
 	_, err := r.Q.Exec(ctx,
-		"INSERT INTO conversion_jobs(id,derivative_id,state) VALUES($1,$2,'queued') ON CONFLICT DO NOTHING", jobID, derivativeID)
+		`INSERT INTO conversion_jobs(id,derivative_id,state)
+		 SELECT $1,$2,'queued' WHERE NOT EXISTS (
+		  SELECT 1 FROM conversion_jobs WHERE derivative_id=$2 AND state IN ('queued','running')
+		 ) ON CONFLICT DO NOTHING`, jobID, derivativeID)
 	return err
 }
 

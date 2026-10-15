@@ -3,12 +3,40 @@ package application
 import (
 	"context"
 	"filesmanage/internal/domain"
+	"filesmanage/internal/ports"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 )
+
+// A DWG has an AC10xx six-byte signature followed by its binary header.
+// A short/truncated file (including the eight-byte fake.dwg fixture) can
+// never be converted, regardless of queue capacity or converter availability.
+const minimumDWGPreviewBytes = 64
+
+func (s *Service) hasValidDWGHeader(ctx context.Context, repo ports.Repository, version domain.FileVersion) (bool, error) {
+	if version.SizeBytes < minimumDWGPreviewBytes {
+		return false, nil
+	}
+	blob, err := repo.BlobByID(ctx, version.BlobID)
+	if err != nil {
+		return false, err
+	}
+	source, err := s.blobs.Open(blob.StorageKey)
+	if err != nil {
+		return false, err
+	}
+	defer source.Close()
+	var header [6]byte
+	if _, err = io.ReadFull(source, header[:]); err != nil {
+		return false, err
+	}
+	return string(header[:4]) == "AC10" &&
+		header[4] >= '0' && header[4] <= '9' && header[5] >= '0' && header[5] <= '9', nil
+}
 
 // CADSupport describes one source format's preview capability class.
 type CADSupport struct {
@@ -72,6 +100,15 @@ func (s *Service) RequestDerivative(ctx context.Context, u domain.User, fileID s
 	if err != nil {
 		return domain.ModelDerivative{}, domain.ErrNotFound
 	}
+	if format == "dwg" {
+		valid, checkErr := s.hasValidDWGHeader(ctx, tx, version)
+		if checkErr != nil {
+			return domain.ModelDerivative{}, checkErr
+		}
+		if !valid {
+			return domain.ModelDerivative{}, domain.ErrInvalidInput
+		}
+	}
 	// Converted formats emit MSH 2.2: it keeps shared node indices, which lets
 	// the viewer recover the assembly's connected components (parts) from the
 	// merged mesh. STL carries no such structure.
@@ -90,6 +127,11 @@ func (s *Service) RequestDerivative(ctx context.Context, u domain.User, fileID s
 	if err != nil {
 		return domain.ModelDerivative{}, err
 	}
+	// An open preview or a duplicate POST is not an instruction to redo an
+	// active/finished conversion. Only failed derivatives may be retried.
+	if derivative.State == "running" || derivative.State == "ready" {
+		return derivative, tx.Commit(ctx)
+	}
 	if support.Class == "native" {
 		if err = tx.MarkDerivativeNative(ctx, derivative.ID, version.Sha256); err != nil {
 			return domain.ModelDerivative{}, err
@@ -97,6 +139,8 @@ func (s *Service) RequestDerivative(ctx context.Context, u domain.User, fileID s
 		derivative.State = "ready"
 		return derivative, tx.Commit(ctx)
 	}
+	// The repository uses a derivative-row lock plus an outstanding-job guard,
+	// so repeated requests never flood the worker with duplicates.
 	if err = tx.EnqueueDerivativeJob(ctx, NewID("job"), derivative.ID); err != nil {
 		return domain.ModelDerivative{}, err
 	}
@@ -128,6 +172,21 @@ func (s *Service) DerivativeStatus(ctx context.Context, u domain.User, fileID st
 	support, ok := cadSupportFor(format)
 	if !ok {
 		return domain.ModelDerivative{}, CADSupport{}, false, nil
+	}
+	if format == "dwg" && support.Class == "converted" {
+		version, versionErr := tx.VersionBySeq(ctx, file.ID, currentSeq(file))
+		if versionErr != nil {
+			return domain.ModelDerivative{}, CADSupport{}, false, versionErr
+		}
+		valid, checkErr := s.hasValidDWGHeader(ctx, tx, version)
+		if checkErr != nil {
+			return domain.ModelDerivative{}, CADSupport{}, false, checkErr
+		}
+		if !valid {
+			support.Class = "invalid"
+			support.Note = "此文件不是完整有效的 DWG 图纸，或文件头已损坏。请重新导出原始 DWG 后上传。"
+			return domain.ModelDerivative{}, support, false, nil
+		}
 	}
 	derivative, found, err := tx.DerivativeForFile(ctx, file.ID, currentSeq(file))
 	if err != nil || !found {

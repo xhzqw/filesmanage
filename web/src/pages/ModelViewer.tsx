@@ -150,7 +150,7 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
     // Capability is returned by GET /derivative even without a derivative row.
     // Never POST to the conversion endpoint for unsupported DWG/unknown formats.
     if(cadDerivativeDisposition(derivative)==="unsupported"){
-     setInfo(derivative);setStatus("unsupported");return;
+     setInfo(derivative);setStatus(derivative.class==="invalid"?"invalid":"unsupported");return;
     }
     // Only an explicit retry queues failed conversions again.
     if(cadDerivativeDisposition(derivative,retryEpoch>0)==="request"){
@@ -180,7 +180,7 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
       }catch{if(valid)setFileMeta(null);}
     }
     if(cadDerivativeDisposition(derivative)==="unsupported"){
-     setStatus("unsupported");
+     setStatus(derivative.class==="invalid"?"invalid":"unsupported");
      return;
     }
     // The worker may not expose its new job on the first status read.
@@ -214,8 +214,11 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
     const next=await fileApi.derivativeStatus(id);
     if(!active)return;
     setInfo(next);
-    if(next.state==="failed"){
-     setMessage(next.errorCode?"模型转换失败："+next.errorCode:"模型转换失败");
+    if(next.class==="invalid"){
+     setStatus("invalid");
+    }else if(next.state==="failed"){
+     setMessage(next.format==="dwg"?"DWG 图纸解析失败，请检查原文件是否损坏；建议从 CAD 软件重新导出后上传":
+      next.errorCode?"模型转换失败："+next.errorCode:"模型转换失败");
      setStatus("failed");
     }else if(next.found&&["ready","completed","succeeded"].includes(next.state??"")){
      setStatus("loading-model");
@@ -399,7 +402,7 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
         <div className="cad-loading-body" aria-busy="true">
          <BrandLoader size="lg" decorative/>
          <strong>{status==="loading"?"正在准备模型":status==="converting"?
-          (info?.state==="queued"?"正在排队转换":info?.state==="running"?"正在转换模型":"正在准备转换"):
+          (info?.state==="queued"?"等待转换进程接手":info?.state==="running"?"正在转换模型":"正在准备转换"):
           loadPhase==="fetching"?"正在获取几何数据":loadPhase==="downloading"?"正在下载模型":
           loadPhase==="parsing"?"正在解析几何结构":loadPhase==="scene"?"正在建立三维场景":"正在载入模型"}</strong>
          <div className="cad-loading-progress" role="progressbar" aria-label={status==="loading-model"&&loadPhase==="downloading"&&downloadProgress!==null?"模型下载进度":"模型加载进度"}
@@ -411,11 +414,13 @@ function ModelViewerStage({id,user,onLogout,embedded=false}:{id:string;user?:Use
           <span className="cad-loading-caption">{downloadProgress}%</span>:
           status==="converting"&&conversionSeconds>=3?<span className="cad-loading-caption">已等待 {conversionSeconds} 秒</span>:null}
         </div>:
-        <><strong>{status==="unsupported"&&info?.format==="dwg"?"DWG 暂不支持在线预览":
+        <><strong>{status==="invalid"?(info?.note??"文件内容不是完整有效的 DWG 图纸，请重新导出后上传"):
+          status==="unsupported"&&info?.format==="dwg"?"DWG 暂不支持在线预览":
           status==="unsupported"?(info?.note??"该格式当前不支持在线预览"):
           status==="too-large"?"模型过大，已停止浏览器预览":
           status==="webgl-lost"?(message||"WebGL 上下文丢失"):(message||"预览失败")}</strong>
          {(status==="failed"||status==="webgl-lost")&&<RareButton type="button" onClick={()=>setRetryEpoch(value=>value+1)}>重试</RareButton>}
+         {status==="invalid"&&<span>原文件已保留，修复后请上传有效 DWG 文件；无需反复重试。</span>}
          {status==="unsupported"&&info?.format==="dwg"&&<span>请将 DWG 转存为 DXF 后预览</span>}
          {status==="too-large"&&<span>请下载后使用桌面 CAD 软件打开</span>}</>}
       </div>}

@@ -11,8 +11,13 @@ import (
 func (r *memoryRepo) EnsureDerivative(_ context.Context, d domain.ModelDerivative) (domain.ModelDerivative, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	for _, existing := range r.derivatives {
+	for i, existing := range r.derivatives {
 		if existing.FileID == d.FileID && existing.VersionSeq == d.VersionSeq && existing.OutputKind == d.OutputKind {
+			if existing.State == "failed" {
+				r.derivatives[i].State = "queued"
+				r.derivatives[i].ErrorCode = ""
+				return r.derivatives[i], nil
+			}
 			return existing, nil
 		}
 	}
@@ -24,6 +29,11 @@ func (r *memoryRepo) EnsureDerivative(_ context.Context, d domain.ModelDerivativ
 func (r *memoryRepo) EnqueueDerivativeJob(_ context.Context, jobID, derivativeID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	for _, job := range r.derivativeJobs {
+		if job.derivativeID == derivativeID {
+			return nil
+		}
+	}
 	r.derivativeJobs = append(r.derivativeJobs, memoryJob{id: jobID, derivativeID: derivativeID})
 	return nil
 }

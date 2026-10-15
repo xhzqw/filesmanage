@@ -500,7 +500,11 @@ def main():
             check("MC11 DWG derivative refused", status in (400, 422), f"HTTP {status}")
             continue
         if name.endswith(".dwg") and expected_class == "converted":
-            check("MC11 DWG converter queues malformed sample", status == 202 and data.get("state") == "queued", f"HTTP {status} {data.get('state')}")
+            code, state = admin.json("GET", f"/api/files/{file_id}/derivative")
+            info = (state or {}).get("data") or {}
+            check("MC11 malformed DWG refused before queue",status==400 and code==200 and
+                  info.get("class")=="invalid" and info.get("errorCode")=="INVALID_DWG" and not info.get("found"),
+                  f"POST {status} GET {code} {info}")
             continue
         if expected_class == "native":
             # The endpoint answers 202 (accepted) with the derivative already

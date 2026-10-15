@@ -426,7 +426,7 @@ schema("Derivative", obj({
 schema("DerivativeStatus", obj({
     "found": boolean(),
     "format": string(),
-    "class": string(enum=["native", "convert", "licensed", "unsupported"]),
+    "class": string(enum=["native", "converted", "licensed", "unverified", "invalid"]),
     "engine": string(),
     "note": string("Why the format class applies."),
     "state": string(),
