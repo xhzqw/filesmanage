@@ -10,6 +10,7 @@ import "./fileReviewPanel.css";
 
 type Filter=ReviewFilter;
 type ActionEditor={id:number;action:"assign"|"submit-resolution"|"update-resolution"|"reject"}|null;
+const finished=(c:FileReviewComment)=>c.status==="approved"||c.status==="completed_self";
 function shortDate(value:string){return new Date(value).toLocaleString("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});}
 function statusLabel(c:FileReviewComment){
  switch(c.status){
