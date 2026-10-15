@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // Authorizing an override never means assigning formal document approval.
@@ -138,6 +139,10 @@ func (r *Repository) CDWGrantReview(ctx context.Context, gateID, reviewer, targe
  VALUES($1,$2,$3,$4,$5,ARRAY['substitute_review_gate']::text[],$6,now()+interval '24 hours')
  RETURNING expires_at`, grantID, reviewer, target, taskID, gateID, reason).Scan(&expiry)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return out, domain.ErrConflict
+		}
 		return out, err
 	}
 	return ports.CDWOverrideGrant{ID: grantID, GateID: gateID, TaskID: taskID, GrantedBy: reviewer, ActorID: target, ExpiresAt: expiry.UTC().Format(time.RFC3339Nano)}, nil
