@@ -112,7 +112,7 @@ func TestCDWG5RealOnlyOfficeBrowserCallback(t *testing.T) {
 		_ = tx.Rollback(ctx)
 		t.Fatal(err)
 	}
-	if _, err = tx.Exec(ctx, `INSERT INTO folders(id,name,owner_id) VALUES($1,'CDW G5 only', $2)`, folderID, adminID); err != nil {
+	if _, err = tx.Exec(ctx, `INSERT INTO folders(id,name,owner_id) VALUES($1,$2,$3)`, folderID, "CDW G5 isolated "+prefix, adminID); err != nil {
 		_ = tx.Rollback(ctx)
 		t.Fatal(err)
 	}
