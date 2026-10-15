@@ -1,9 +1,7 @@
 package application
 
 import (
-	"bytes"
 	"context"
-	"fmt"
 	"strings"
 
 	"filesmanage/internal/domain"
@@ -86,13 +84,7 @@ func (s *Service) ConvertDOCXForSigning(ctx context.Context, u domain.User, id s
 		return UploadResult{}, err
 	}
 	_ = check.Rollback(ctx)
-	baseRunes := []rune(name[:len(name)-5])
-	pdfName := fmt.Sprintf("%s-签章-v%d-%s.pdf", string(baseRunes), expectedSeq, expectedSHA[:8])
-	// Trim on Unicode boundaries, never split Chinese UTF-8 names.
-	for len(pdfName) > 195 && len(baseRunes) > 0 {
-		baseRunes = baseRunes[:len(baseRunes)-1]
-		pdfName = fmt.Sprintf("%s-签章-v%d-%s.pdf", string(baseRunes), expectedSeq, expectedSHA[:8])
-	}
-	return s.commitUploadWithLineage(ctx, u, folderID, pdfName, "application/pdf", idempotencyKey, bytes.NewReader(pdf),
-		&domain.FileLineage{SourceFileID: id, SourceFileName: name, SourceVersionSeq: expectedSeq, RelationType: "seal_copy"})
+	base := name[:len(name)-5]
+	return s.commitFriendlyConversion(ctx,u,folderID,base,"pdf",expectedSeq,"application/pdf",idempotencyKey,pdf,
+		&domain.FileLineage{SourceFileID:id,SourceFileName:name,SourceVersionSeq:expectedSeq,RelationType:"seal_copy"})
 }

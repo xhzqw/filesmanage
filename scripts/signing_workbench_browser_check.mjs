@@ -256,203 +256,132 @@ try{
    return !!history&&!history.open&&!document.querySelector('#file-seals-sidebar .seal-submit-panel');
   })()`);
   assert("signing sidebar defaults to compact controls with history collapsed",compact);
-  const redDelete=await cdp.evaluate(`(()=>{
-    const button=document.querySelector('.seal-page-toolbar .seal-delete-action');
-    if(!button)return null;
-    return {tone:button.dataset.rareIntent,emphasis:button.dataset.rareEmphasis,
-      label:button.textContent.trim(),visible:button.getBoundingClientRect().height>26};
+
+  const clean=await cdp.evaluate(`(()=>{
+   const page=document.querySelector('.seal-page-surface')?.getBoundingClientRect();
+   const stage=document.querySelector('.seal-page-viewport');
+   const css=stage&&getComputedStyle(stage);
+   return !!page&&page.width<=764&&css?.backgroundColor==='rgb(241, 245, 249)'&&
+    !document.querySelector('.seal-page-toolbar .seal-delete-action')&&
+    !document.querySelector('.seal-page-toolbar .seal-confirm-action');
   })()`);
-  if(redDelete){
-   assert("bottom capsule offers a single global red delete-seal action",
-    redDelete.tone==='danger'&&redDelete.emphasis==='solid'&&redDelete.visible&&redDelete.label==='删除签章',JSON.stringify(redDelete));
-   await cdp.evaluate(`(()=>document.querySelector('.seal-delete-action')?.click())()`);
-   const availableKinds=await cdp.evaluate(`(()=>{
-    const marks=[...document.querySelectorAll('.seal-delete-target')];
-    return {personal:marks.some(x=>x.getAttribute('aria-label')?.startsWith('选择删除签名')),
-      company:marks.some(x=>x.getAttribute('aria-label')?.startsWith('选择删除公章'))};
+  assert("empty signing stage has grey A4 paper without permanent red action",clean);
+
+  const historyActions=await cdp.evaluate(`(()=>{
+   const history=document.querySelector('#file-seals-sidebar .seal-sidebar-history');
+   history.open=true;
+   const actions=history.querySelector('.seal-history-actions');
+   const yes=!!actions;
+   history.open=false;
+   return yes;
+  })()`);
+  if(historyActions){
+   await cdp.evaluate(`(()=>{
+    const history=document.querySelector('#file-seals-sidebar .seal-sidebar-history');
+    history.open=true;
+    [...history.querySelectorAll('.seal-history-actions button')].find(b=>b.textContent.includes('选择删除'))?.click();
    })()`);
-   for(const kind of ['company','personal']){
-    if(!availableKinds[kind]){console.log('SKIP existing '+kind+' mark: no eligible mark on current page');continue;}
-    const prefix=kind==='company'?'选择删除公章':'选择删除签名';
-    await cdp.evaluate(`(p=>[...document.querySelectorAll('.seal-delete-target')].find(t=>t.getAttribute('aria-label')?.startsWith(p))?.click())(${JSON.stringify(prefix)})`);
-    const marked=await cdp.evaluate(`(()=>{
-     const buttons=[...document.querySelectorAll('.seal-delete-target')];
-     return buttons.filter(b=>b.classList.contains('is-selected')&&b.getAttribute('aria-pressed')==='true').length===1;
-    })()`);
-    assert("individually selecting existing "+kind+" highlights only that mark",marked);
-    await cdp.evaluate(`(()=>document.querySelector('.seal-delete-action')?.click())()`);
-    const modal=await cdp.waitFor(`()=>!!document.querySelector('dialog.seal-confirm-dialog[open]')`,3500);
-    const check=await cdp.evaluate(`(()=>{
-      const dlg=document.querySelector('dialog.seal-confirm-dialog[open]');
-      const pw=dlg?.querySelector('input[type=password]');
-      const submit=[...(dlg?.querySelectorAll('button')??[])].find(b=>b.textContent?.includes('确认删除'));
-      return {hasPassword:!!pw,disabled:submit?.disabled,title:dlg?.querySelector('h2')?.textContent??''};
-    })()`);
-    assert(kind==="personal"?"deleting a personal signature requires a password":"deleting a company seal requires no password",
-      Boolean(modal)&&check.hasPassword===(kind==="personal")&&(kind==="personal"?check.disabled:!check.disabled),
-      JSON.stringify(check));
-    // Do not submit deletion against existing signed documents.
-    await cdp.evaluate(`(()=>[...document.querySelectorAll('dialog.seal-confirm-dialog[open] button')].find(b=>b.textContent?.includes('取消'))?.click())()`);
-    assert("canceling "+kind+" deletion preserves original evidence",
-     await cdp.waitFor(`()=>!document.querySelector('dialog.seal-confirm-dialog[open]')`,2500));
-    await cdp.evaluate(`(p=>[...document.querySelectorAll('.seal-delete-target')].find(t=>t.getAttribute('aria-label')?.startsWith(p))?.click())(${JSON.stringify(prefix)})`);
-   }
-   if(availableKinds.company&&availableKinds.personal){
-    await cdp.evaluate(`(()=>{
-     const marks=[...document.querySelectorAll('.seal-delete-target')];
-     marks.find(t=>t.getAttribute('aria-label')?.startsWith('选择删除公章'))?.click();
-     marks.find(t=>t.getAttribute('aria-label')?.startsWith('选择删除签名'))?.click();
-    })()`);
-    const two=await cdp.evaluate(`(()=>document.querySelectorAll('.seal-delete-target.is-selected').length===2)()`);
-    assert("company seal and personal signature can be selected in one deletion batch",two);
-    await cdp.evaluate(`(()=>document.querySelector('.seal-delete-action')?.click())()`);
-    const mixed=await cdp.waitFor(`()=>!!document.querySelector('dialog.seal-confirm-dialog[open] input[type=password]')`,3500);
-    assert("mixed deletion requires password because personal signature is included",Boolean(mixed));
-    await cdp.evaluate(`(()=>[...document.querySelectorAll('dialog.seal-confirm-dialog[open] button')].find(b=>b.textContent?.includes('取消'))?.click())()`);
-   }
-   await cdp.evaluate(`(()=>document.querySelector('.seal-cancel-delete')?.click())()`);
-  }else console.log("SKIP mark deletion button: no authorized signed marks exist");
+   const deletionFromHistory=await cdp.evaluate(`(()=>{
+    return !!document.querySelector('.seal-history-pick')&&
+     !document.querySelector('.seal-page-toolbar .seal-delete-action');
+   })()`);
+   assert("historical stamp removal starts from expanded signed records",deletionFromHistory);
+   await cdp.evaluate(`(()=>document.querySelector('.seal-history-actions button')?.click())()`);
+  }else console.log("SKIP historical removal: no deletable marks");
 
-  const enabled=await cdp.evaluate(`(()=>{
-   const list=document.querySelector('#file-seals-sidebar select');
-   return [...(list?.options??[])].filter(o=>o.value&&!o.disabled).length;
-  })()`);
+  const enabled=await cdp.evaluate(`(()=>[...document.querySelectorAll('#file-seals-sidebar .seal-stamp-card')].filter(b=>!b.disabled).length)()`);
   if(enabled){
-   await cdp.evaluate(`(()=>{document.querySelector('#file-seals-sidebar .rare-select')?.click()})()`);
-   const chose=await cdp.waitFor(`()=>[...document.querySelectorAll('[role="option"]')].some(o=>!o.disabled&&o.textContent.trim()!=='选择人员或公章')`,4500);
-   assert("signing asset selection opens RareUI listbox",Boolean(chose));
-   if(chose){
-    await cdp.evaluate(`(()=>{
-      const options=[...document.querySelectorAll('[role="option"]')].filter(o=>!o.disabled&&o.textContent.trim()!=='选择人员或公章');
-      // Prefer a personal signature for a password-modal test. Never submit a
-      // company-only stamp during the browser regression: that would be real.
-      (options.find(o=>!o.textContent.trim().startsWith('公章 ·'))||options[0])?.click();
+   const clickedAsset=await cdp.evaluate(`(()=>{
+    const cards=[...document.querySelectorAll('#file-seals-sidebar .seal-stamp-card')].filter(b=>!b.disabled);
+    const card=cards.find(b=>b.textContent.includes('个人签名'))||cards[0];
+    const kind=card.textContent.includes('个人签名')?'personal':'company';
+    card.click();
+    return kind;
+   })()`);
+   const mark=await cdp.waitFor(`()=>!!document.querySelector('.seal-position-mark.is-editable')`,4500);
+   assert("visual stamp card places a movable mark on the PDF page",Boolean(mark));
+   if(mark){
+    const frame=await cdp.evaluate(`(()=>{
+     const node=document.querySelector('.seal-position-mark');
+     const img=node.querySelector('img');
+     const toolbar=node.querySelector('.seal-stamp-mini-toolbar');
+     const paper=document.querySelector('.seal-page-surface').getBoundingClientRect();
+     const box=node.getBoundingClientRect();
+     const handles=[...node.querySelectorAll('.seal-resize-handle')];
+     return {corners:handles.length,toolbar:!!toolbar,ratio:box.width/box.height,
+      nativeRatio:img.naturalWidth/img.naturalHeight,
+      inside:box.left>=paper.left-4&&box.right<=paper.right+4,
+      overlap:handles.some(h=>{const r=h.getBoundingClientRect(),tb=toolbar?.getBoundingClientRect();return !!tb&&r.left<tb.right&&r.right>tb.left&&r.top<tb.bottom&&r.bottom>tb.top})};
     })()`);
-    const selectedType=await cdp.evaluate(`(()=>{
-      const native=document.querySelector('#file-seals-sidebar select');
-      return native?.selectedOptions?.[0]?.textContent.trim().startsWith('公章 ·')?'company':'personal';
-    })()`);
-    const mark=await cdp.waitFor(`()=>!!document.querySelector('.seal-position-mark.is-editable')`,4500);
-    assert("selected signing asset has movable page overlay",Boolean(mark));
+    assert("stamp preserves image proportions with four clean handles and floating mini toolbar",
+     frame.corners===4&&frame.toolbar&&frame.inside&&!frame.overlap&&
+     Math.abs(frame.ratio-frame.nativeRatio)/frame.nativeRatio<.12,JSON.stringify(frame));
     const advanced=await cdp.evaluate(`(()=>{
-     const section=document.querySelector('#file-seals-sidebar .seal-advanced-settings');
-     if(!section||section.open)return false;
-     section.querySelector('summary')?.click();
-     const visible=section.open&&!!section.querySelector('input[aria-label="旋转度数"]');
-     section.querySelector('summary')?.click();
-     return visible&&!section.open;
+     const details=document.querySelector('#file-seals-sidebar .seal-advanced-settings');
+     details?.querySelector('summary')?.click();
+     const okay=details?.open&&!!details.querySelector('input[aria-label="旋转度数"]');
+     details?.querySelector('summary')?.click();return !!okay;
     })()`);
-    assert("precision controls expand on demand without replacing stamp",advanced);
+    assert("precision inspector expands without another white container",advanced);
 
-    if(mark){
-     const before=await cdp.evaluate(`(()=>{
-      const p=document.querySelector('.seal-position-mark').getBoundingClientRect();
-      return {x:p.x+p.width*.45,y:p.y+p.height*.45,left:parseFloat(document.querySelector('.seal-position-mark').style.left),width:parseFloat(document.querySelector('.seal-position-mark').style.width)};
-     })()`);
-     await cdp.drag({x:before.x,y:before.y},{x:before.x+48,y:before.y-25});
-     const after=await cdp.evaluate(`(()=>parseFloat(document.querySelector('.seal-position-mark').style.left))()`);
-     assert("mark moves through real pointer drag",after>before.left+1,"left "+before.left+" → "+after);
-     const handle=await cdp.evaluate(`(()=>{
-      const h=document.querySelector('.seal-resize-handle.is-se').getBoundingClientRect();
-      return {x:h.x+h.width/2,y:h.y+h.height/2};
-     })()`);
-     await cdp.drag(handle,{x:handle.x+25,y:handle.y+12});
-     const width=await cdp.evaluate(`(()=>parseFloat(document.querySelector('.seal-position-mark').style.width))()`);
-     assert("mark resizes through pointer handle",width>before.width+1,"width "+before.width+" → "+width);
-     const autoDraft=await cdp.evaluate(`(()=>{
-      return !!document.querySelector('.seal-draft-row')&&
-       ![...document.querySelectorAll('#file-seals-sidebar button')].some(b=>b.textContent?.includes('加入待签清单'));
-     })()`);
-     assert("selecting an asset automatically places its draft without add-list action",autoDraft);
-     const frame=await cdp.evaluate(`(()=>{
-      const mark=document.querySelector('.seal-position-mark');
-      const paper=document.querySelector('.seal-page-surface');
-      const controls=mark?.querySelectorAll('.seal-resize-handle');
-      return {corners:controls?.length,remove:!!mark?.querySelector('.seal-remove-mark'),
-       inside:mark&&paper?mark.getBoundingClientRect().left>=paper.getBoundingClientRect().left-4&&
-       mark.getBoundingClientRect().right<=paper.getBoundingClientRect().right+4:null};
-     })()`);
-     assert("stamp has four resize corners and in-bounds upper-right remove control",
-      frame.corners===4&&frame.remove&&frame.inside,JSON.stringify(frame));
-     const bottomConfirm=await cdp.evaluate(`(()=>{
-      const button=document.querySelector('.seal-page-toolbar .seal-confirm-action');
-      return !!button&&!button.disabled&&button.textContent.includes('确认签署')&&
-       !document.querySelector('#file-seals-sidebar input[type=password]');
-     })()`);
-     assert("single blue signing action lives in the bottom capsule without sidebar password",bottomConfirm);
-     if(selectedType==='personal'){
-      await cdp.evaluate(`(()=>document.querySelector('.seal-confirm-action')?.click())()`);
-      const modal=await cdp.waitFor(`()=>!!document.querySelector('dialog.seal-confirm-dialog[open] input[type=password]')`,3200);
-      assert("personal signature prompts for password at bottom confirmation",Boolean(modal));
-      await cdp.evaluate(`(()=>{
-       [...document.querySelectorAll('dialog.seal-confirm-dialog button')].find(b=>b.textContent?.includes('取消'))?.click();
-      })()`);
-      const canceled=await cdp.waitFor(`()=>!document.querySelector('dialog.seal-confirm-dialog[open]')`,3000);
-      assert("cancelling personal signing modal preserves draft",
-       Boolean(canceled)&&await cdp.evaluate(`(()=>document.querySelectorAll('.seal-draft-row').length===1)()`));
-     }else{
-      // Never click "confirm" for a company stamp in tests. Company stamping
-      // is intentionally passwordless and would immediately persist a mark.
-      assert("company stamp offers direct confirmation with no password entry",
-       await cdp.evaluate(`(()=>!document.querySelector('#file-seals-sidebar input[type=password]')&&!document.querySelector('dialog.seal-confirm-dialog[open]'))()`));
-     }
-     await cdp.evaluate(`(()=>document.querySelector('.seal-remove-mark')?.click())()`);
-     const removed=await cdp.waitFor(`()=>document.querySelectorAll('.seal-draft-row').length===0&&!document.querySelector('.seal-position-mark')`,3500);
-     assert("upper-right X removes staged seal without signing",Boolean(removed));
-     await cdp.evaluate(`(()=>document.querySelector('#file-seals-sidebar .rare-select')?.click())()`);
-     await cdp.waitFor(`()=>[...document.querySelectorAll('[role="option"]')].some(o=>!o.disabled&&o.textContent.trim()!=='选择人员或公章')`,3200);
-     await cdp.evaluate(`(()=>[...document.querySelectorAll('[role="option"]')].find(o=>!o.disabled&&o.textContent.trim()!=='选择人员或公章')?.click())()`);
-     const repopulated=await cdp.waitFor(`()=>document.querySelectorAll('.seal-draft-row').length===1`,3500);
-     assert("asset can be selected again after X removal",Boolean(repopulated));
+    const before=await cdp.evaluate(`(()=>{
+     const mark=document.querySelector('.seal-position-mark');
+     const r=mark.getBoundingClientRect();
+     return {x:r.x+r.width*.45,y:r.y+r.height*.45,left:parseFloat(mark.style.left),width:parseFloat(mark.style.width)};
+    })()`);
+    await cdp.drag({x:before.x,y:before.y},{x:before.x+48,y:before.y-25});
+    const moved=await cdp.evaluate(`(()=>parseFloat(document.querySelector('.seal-position-mark').style.left))()`);
+    assert("stamp moves using pointer drag",moved>before.left+1);
+    const handle=await cdp.evaluate(`(()=>{
+     const r=document.querySelector('.seal-resize-handle.is-se').getBoundingClientRect();
+     return {x:r.x+r.width/2,y:r.y+r.height/2};
+    })()`);
+    const beforeRatio=await cdp.evaluate(`(()=>{
+     const el=document.querySelector('.seal-position-mark').getBoundingClientRect();
+     return el.width/el.height;
+    })()`);
+    await cdp.drag(handle,{x:handle.x+25,y:handle.y+12});
+    const resized=await cdp.evaluate(`(()=>{
+     const el=document.querySelector('.seal-position-mark');
+     const r=el.getBoundingClientRect();
+     return {width:parseFloat(el.style.width),ratio:r.width/r.height};
+    })()`);
+    assert("four-corner resizing preserves the original aspect ratio",
+      resized.width>before.width+1&&Math.abs(resized.ratio-beforeRatio)<.09,JSON.stringify(resized));
 
-     await cdp.send("Emulation.setDeviceMetricsOverride",{width:760,height:820,deviceScaleFactor:1,mobile:false});
-     await delay(380);
-     const narrow=await cdp.evaluate(`(()=>{
-      const panel=document.querySelector('.seal-file-preview')?.getBoundingClientRect();
-      const dock=document.querySelector('.seal-page-toolbar')?.getBoundingClientRect();
-      const confirm=document.querySelector('.seal-confirm-action')?.getBoundingClientRect();
-      return panel&&dock&&confirm?{
-       inside:confirm.left>=dock.left-1&&confirm.right<=dock.right+1&&
-        dock.left>=panel.left-1&&dock.right<=panel.right+1,
-       visible:confirm.width>70&&confirm.height>=28,
-       pageOverflow:document.documentElement.scrollWidth>window.innerWidth+2,
-       dockWidth:dock.width,confirmWidth:confirm.width
-      }:null;
-     })()`);
-     assert("narrow viewport keeps blue confirmation inside the bottom capsule",
-       !!narrow&&narrow.inside&&narrow.visible&&!narrow.pageOverflow,JSON.stringify(narrow));
-     await cdp.send("Emulation.clearDeviceMetricsOverride");
-     await delay(300);
+    await cdp.evaluate(`(()=>[...document.querySelectorAll('.seal-stamp-mini-toolbar button')].find(b=>b.getAttribute('aria-label')?.includes('顺时针'))?.click())()`);
+    const rotated=await cdp.evaluate(`(()=>document.querySelector('.seal-position-mark img')?.style.transform.includes('90deg'))()`);
+    assert("floating stamp toolbar rotates by 90 degrees",rotated);
+    assert("pending stamps show primary confirmation and secondary clear",
+      await cdp.evaluate(`(()=>!!document.querySelector('.seal-page-toolbar .seal-confirm-action')&&!!document.querySelector('.seal-page-toolbar .seal-clear-action'))()`));
+    if(clickedAsset==='personal'){
+     await cdp.evaluate(`(()=>document.querySelector('.seal-confirm-action')?.click())()`);
+     const passwordDialog=await cdp.waitFor(`()=>!!document.querySelector('dialog.seal-confirm-dialog[open] input[type=password]')`,3200);
+     assert("personal signature confirmation requires password",Boolean(passwordDialog));
+     await cdp.evaluate(`(()=>[...document.querySelectorAll('dialog.seal-confirm-dialog button')].find(b=>b.textContent?.includes('取消'))?.click())()`);
+    }else console.log("SKIP submit company-only stamp (would persist a mark)");
 
-
-     const availableSecond=await cdp.evaluate(`(()=>{
-      const select=document.querySelector('#file-seals-sidebar select');
-      if(!select)return null;
-      const option=[...select.options].find(o=>o.value&&!o.disabled&&o.value!==select.value);
-      return option?.textContent?.trim()??null;
-     })()`);
-     if(availableSecond){
-      await cdp.evaluate(`(()=>document.querySelector('#file-seals-sidebar .rare-select')?.click())()`);
-      await cdp.waitFor(`()=>[...document.querySelectorAll('[role="option"]')].some(o=>o.textContent.trim()===${JSON.stringify(availableSecond)})`,3000);
-      await cdp.evaluate(`(()=>{
-       const target=${JSON.stringify(availableSecond)};
-       [...document.querySelectorAll('[role="option"]')].find(o=>o.textContent.trim()===target)?.click();
-      })()`);
-      const two=await cdp.waitFor(`()=>document.querySelectorAll('.seal-draft-row').length===2`,3500);
-      assert("additional distinct signature/seal auto-joins same batch",Boolean(two));
-      if(two){
-       await cdp.evaluate(`(()=>document.querySelector('.seal-remove-mark')?.click())()`);
-       const one=await cdp.waitFor(`()=>document.querySelectorAll('.seal-draft-row').length===1`,3500);
-       assert("removing one signature preserves other batch members",Boolean(one));
-      }
-     }else console.log("SKIP multiple assets: no second unused authorized signature");
-
-
-
-
-    }
+    await cdp.evaluate(`(()=>document.querySelector('.seal-stamp-mini-toolbar .seal-mini-remove')?.click())()`);
+    const removed=await cdp.waitFor(`()=>document.querySelectorAll('.seal-draft-row').length===0&&!document.querySelector('.seal-position-mark')`,3500);
+    assert("floating toolbar removes only the pending mark",Boolean(removed));
+    await cdp.evaluate(`(()=>[...document.querySelectorAll('#file-seals-sidebar .seal-stamp-card')].find(b=>!b.disabled)?.click())()`);
+    const repopulated=await cdp.waitFor(`()=>document.querySelectorAll('.seal-draft-row').length===1`,3500);
+    assert("same stamp can be placed again after removal",Boolean(repopulated));
+    await cdp.send("Emulation.setDeviceMetricsOverride",{width:760,height:820,deviceScaleFactor:1,mobile:false});
+    await delay(500);
+    const narrow=await cdp.evaluate(`(()=>{
+     const panel=document.querySelector('.seal-file-preview')?.getBoundingClientRect();
+     const dock=document.querySelector('.seal-page-toolbar')?.getBoundingClientRect();
+     const confirm=document.querySelector('.seal-confirm-action')?.getBoundingClientRect();
+     return !!panel&&!!dock&&!!confirm&&confirm.left>=dock.left-1&&confirm.right<=dock.right+1&&
+      dock.left>=panel.left-1&&dock.right<=panel.right+1&&document.documentElement.scrollWidth<=window.innerWidth+2;
+    })()`);
+    assert("narrow signing HUD remains within preview canvas",narrow);
+    await cdp.send("Emulation.clearDeviceMetricsOverride");
+    await delay(250);
    }
-  }else console.log("SKIP asset editing: no unconsumed authorized signing assets");
+  }else console.log("SKIP draft editing: no authorized unused assets");
+
  }
  await cdp.evaluate(`(()=>{
   [...document.querySelectorAll('.file-workbench-nav-item')].find(b=>b.textContent.trim()==='预览')?.click();

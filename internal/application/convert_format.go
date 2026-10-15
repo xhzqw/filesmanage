@@ -84,22 +84,15 @@ func (s *Service) ConvertFormat(ctx context.Context, u domain.User, id, target s
 	if latest.FolderID != file.FolderID || currentSeq(latest) != expectedSeq || !strings.EqualFold(latest.Sha256, expectedSHA) {
 		return UploadResult{}, domain.ErrVersionConflict
 	}
-	base := []rune(strings.TrimSuffix(file.Name, filepath.Ext(file.Name)))
-	// Each conversion is a distinct descendant; converting an unchanged
-	// source twice must not collide with the first generated sibling.
-	suffix := fmt.Sprintf("-v%d-%s-%s.%s", expectedSeq, expectedSHA[:8], NewID("cv")[3:11], target)
-	for len(string(base))+len(suffix) > 195 && len(base) > 0 {
-		base = base[:len(base)-1]
-	}
-	name := string(base) + suffix
+	base := strings.TrimSuffix(file.Name,filepath.Ext(file.Name))
 	mime := "application/pdf"
 	relation := "docx_to_pdf"
 	if target == "docx" {
 		mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 		relation = "pdf_to_docx"
 	}
-	return s.commitUploadWithLineage(ctx, u, file.FolderID, name, mime, key, bytes.NewReader(out),
-		&domain.FileLineage{SourceFileID: id, SourceFileName: file.Name, SourceVersionSeq: expectedSeq, RelationType: relation})
+	return s.commitFriendlyConversion(ctx,u,file.FolderID,base,target,expectedSeq,mime,key,out,
+		&domain.FileLineage{SourceFileID:id,SourceFileName:file.Name,SourceVersionSeq:expectedSeq,RelationType:relation})
 }
 
 // The PDF importer extracts position-ordered text using Poppler. Its output is

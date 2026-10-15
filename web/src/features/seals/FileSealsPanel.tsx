@@ -1,7 +1,7 @@
-import {useEffect,useLayoutEffect,useState} from "react";
+import {useEffect,useLayoutEffect,useRef,useState,type SyntheticEvent} from "react";
 import {createPortal} from "react-dom";
 import {Link} from "react-router-dom";
-import {RareBadge,RareButton,RareInput,RareSelect} from "../../shared/ui/rare";
+import {RareBadge,RareButton,RareInput} from "../../shared/ui/rare";
 import {errorCopy} from "../../shared/errors";
 import {toast} from "../../shared/ui/feedback";
 import {Dialog} from "../../shared/ui/Dialog";
@@ -24,6 +24,9 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
  const[marks,setMarks]=useState<FileSealMark[]>([]);
  const[usedAssetIds,setUsedAssetIds]=useState<string[]>([]);
  const[assetId,setAssetId]=useState("");
+ const[assetQuery,setAssetQuery]=useState("");
+ const aspectRef=useRef<Record<string,number>>({});
+ const initialRef=useRef<Record<string,Position>>({});
  const[page,setPage]=useState(1);
  const[pageCount,setPageCount]=useState(0);
  const[imageRetry,setImageRetry]=useState(0);
@@ -50,21 +53,47 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
  const deleteKinds=deleteIds.map(id=>marks.find(mark=>mark.id===id)?.assetKind);
  const deleteLabel=deleteKinds.every(kind=>kind==="company")?"公章":deleteKinds.every(kind=>kind==="personal")?"签名":"签章";
  const selected=assets.find(a=>a.id===assetId);
- const maySign=!!selected&&(selected.kind!=="personal"||!!selected.ownerId)&&
+ const maySign=!!selected&&selected.active&&(selected.kind!=="personal"||!!selected.ownerId)&&
   (isAdmin||(selected.kind==="personal"?!!access?.canSign:!!access?.canStamp));
  const duplicate=!!selected&&(usedAssetIds.includes(selected.id)||staged.some(s=>s.assetId!==selected.id&&assets.some(a=>a.id===s.assetId&&a.sha256===selected.sha256)));
  const rotationFits=stampFitsPage(position,angle,pageRatio);
  const imageUrl="/api/files/"+encodeURIComponent(fileId)+"/seals/page?"+
   new URLSearchParams({version:String(seq),page:String(page),sha256:sha,retry:String(imageRetry)}).toString();
+ const availableAssets=assets.filter(a=>(a.name+" "+(a.ownerName||"")+" "+(a.kind==="personal"?"个人签名":"公章")).toLocaleLowerCase().includes(assetQuery.trim().toLocaleLowerCase()));
+ function assetDisabled(a:SealAsset){
+  return !a.active||(a.kind==="personal"&&!a.ownerId)||
+   (!isAdmin&&(a.kind==="personal"?!access?.canSign:!access?.canStamp))||
+   usedAssetIds.includes(a.id)||staged.some(s=>s.assetId!==a.id&&assets.some(b=>b.id===s.assetId&&b.sha256===a.sha256));
+ }
+ function stampHeight(asset:string,width:number,ratio=pageRatio){
+  const aspect=aspectRef.current[asset];
+  return aspect?Math.max(.025,Math.min(.65,width/(aspect*ratio))):.12;
+ }
+ // Thumbnails also load the real image ratio. Never overwrite a manually edited draft.
+ function artworkLoaded(asset:string,event:SyntheticEvent<HTMLImageElement>){
+  const img=event.currentTarget;
+  const aspect=img.naturalWidth/img.naturalHeight;
+  if(!Number.isFinite(aspect)||aspect<=0||aspectRef.current[asset]===aspect)return;
+  aspectRef.current[asset]=aspect;
+  const initial=initialRef.current[asset];
+  if(!initial)return;
+  const height=stampHeight(asset,initial.width);
+  const updated=fitStampToPage({...initial,y:initial.y+(initial.height-height)/2,height},0,pageRatio);
+  setStaged(items=>items.map(item=>item.assetId===asset&&
+   item.x===initial.x&&item.y===initial.y&&item.width===initial.width&&item.height===initial.height&&item.angleDegrees===0
+   ?{...item,...updated}:item));
+  if(assetId===asset)setPosition(current=>current.x===initial.x&&current.y===initial.y&&current.width===initial.width&&current.height===initial.height?updated:current);
+  delete initialRef.current[asset];
+ }
 
  useEffect(()=>{
   let live=true;
-  setStaged([]);setAssetId("");setPassword("");setConfirmOpen(false);setDeleteMode(false);setDeleteIds([]);setDeleteOpen(false);setDeletePassword("");
+  setStaged([]);setAssetId("");setAssetQuery("");aspectRef.current={};initialRef.current={};setPassword("");setConfirmOpen(false);setDeleteMode(false);setDeleteIds([]);setDeleteOpen(false);setDeletePassword("");
   Promise.all([sealsApi.list(),sealsApi.marks(fileId,seq),sealsApi.myPermission(),sealsApi.used(fileId)])
    .then(([available,entries,permission,used])=>{
     if(!live)return;
     setAccess(permission);
-    setAssets(available.filter(a=>a.active&&(isAdmin||a.kind==="company"||!!a.ownerId)));
+    setAssets(available.filter(a=>isAdmin||a.kind==="company"||!!a.ownerId));
     setMarks(entries);setUsedAssetIds(used);
    }).catch(err=>{if(live)setError(errorCopy(err,"签章资料读取失败"))});
   return()=>{live=false};
@@ -91,16 +120,19 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
 
  function updatePosition(updater:(value:Position)=>Position){
   const next=updater(position);
+  if(assetId)delete initialRef.current[assetId];
   setPosition(next);
   if(assetId)setStaged(list=>list.map(item=>item.assetId===assetId?{...item,...next,pageNumber:page}:item));
  }
  function changeAngle(value:number){
+  if(assetId)delete initialRef.current[assetId];
   const next=Math.max(-180,Math.min(180,Math.round(Number.isFinite(value)?value:0)));
   const moved=fitStampToPage(position,next,pageRatio);
   setAngle(next);setPosition(moved);
   setStaged(list=>list.map(item=>item.assetId===assetId?{...item,...moved,angleDegrees:next}:item));
  }
  function changeSize(update:Partial<Position>){
+  if(assetId)delete initialRef.current[assetId];
   const next=fitStampToPage({...position,...update},angle,pageRatio);
   setPosition(next);
   if(assetId)setStaged(list=>list.map(item=>item.assetId===assetId?{...item,...next}:item));
@@ -112,10 +144,11 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
   if(deleteMode)return;
   if(!id){setAssetId("");return;}
   const asset=assets.find(a=>a.id===id);
-  if(!asset||usedAssetIds.includes(id)||!isPDF||busy||!pageCount||!imageAvailable)return;
+  if(!asset||!isPDF||busy||!pageCount||!imageAvailable)return;
+  const existing=staged.find(item=>item.assetId===id);
+  if(!existing&&assetDisabled(asset))return;
   const permitted=isAdmin||(asset.kind==="personal"?!!access?.canSign:!!access?.canStamp);
   if(!permitted||(asset.kind==="personal"&&!asset.ownerId))return;
-  const existing=staged.find(item=>item.assetId===id);
   if(existing){
    setPage(existing.pageNumber);
    setPosition({x:existing.x,y:existing.y,width:existing.width,height:existing.height});
@@ -126,16 +159,19 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
   if(staged.some(item=>assets.find(a=>a.id===item.assetId)?.sha256===asset.sha256)){
    setError("同一文件不能重复使用相同签章");return;
   }
-  const offset=(staged.length%4)*.12;
-  const initial=fitStampToPage({x:.24+offset,y:.18+(staged.length%3)*.10,width:.22,height:.12},0,pageRatio);
+  const width=.22,height=stampHeight(id,width);
+  const initial=fitStampToPage({x:.5-width/2,y:.5-height/2,width,height},0,pageRatio);
+  if(!aspectRef.current[id])initialRef.current[id]=initial;
   setAssetId(id);setPosition(initial);setAngle(0);
   setStaged(list=>[...list,{assetId:id,pageNumber:page,...initial,angleDegrees:0}]);
   setError("");
  }
  function removeDraft(id:string){
+  delete initialRef.current[id];
   setStaged(list=>list.filter(item=>item.assetId!==id));
   if(assetId===id)setAssetId("");
  }
+ function clearDrafts(){initialRef.current={};setStaged([]);setAssetId("");setError("");}
  async function sign(pass=password){
   if((requiresPassword&&!pass)||!isPDF||busy||!pageCount||!staged.length||!imageAvailable)return;
   setBusy(true);setError("");
@@ -176,23 +212,26 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
  }
  const controls = <div className="seal-file-controls">
    {error&&!confirmOpen&&!deleteOpen&&<p role="alert" className="notice error">{error}</p>}
-   <label>签名 / 公章
-    <RareSelect value={assetId} disabled={deleteMode} onChange={e=>pickAsset(e.target.value)}>
-     <option value="">选择人员或公章</option>
-     {assets.map(a=><option key={a.id} value={a.id}
-      disabled={(a.kind==="personal"&&!a.ownerId)||(!isAdmin&&(a.kind==="personal"?!access?.canSign:!access?.canStamp))||usedAssetIds.includes(a.id)||
-       staged.some(s=>s.assetId!==a.id&&assets.some(b=>b.id===s.assetId&&b.sha256===a.sha256))}>
-      {a.kind==="personal"?(a.ownerName||"待绑定")+" · "+a.name:"公章 · "+a.name}
-     </option>)}
-    </RareSelect>
-   </label>
+   <div className="seal-stamp-library-heading"><strong>签名 / 公章</strong><span>{assets.length} 枚</span></div>
+   {assets.length>4&&<RareInput type="search" className="seal-stamp-search" aria-label="筛选签名或公章"
+    placeholder="搜索签名或公章" value={assetQuery} onChange={e=>setAssetQuery(e.target.value)}/>}
+   <div className="seal-stamp-grid" role="group" aria-label="选择要放置的签章">
+    {availableAssets.map(a=>{
+     const placed=staged.some(item=>item.assetId===a.id);
+     const disabled=(!placed&&assetDisabled(a))||deleteMode||busy||!isPDF||!pageCount||!imageAvailable;
+     return <RareButton key={a.id} type="button" tone="ghost" className={"seal-stamp-card"+(assetId===a.id?" is-selected":"")}
+      aria-pressed={assetId===a.id} disabled={disabled} title={disabled&&!a.active?"已停用":a.name}
+      onClick={()=>pickAsset(a.id)}>
+      <img src={sealsApi.imageUrl(a.id)} alt="" loading="lazy" onLoad={e=>artworkLoaded(a.id,e)}/>
+      <span className="seal-stamp-info"><strong>{a.kind==="personal"?(a.ownerName||a.name):a.name}</strong>
+       <small>{a.kind==="personal"?"个人签名":"公章"}{!a.active?" · 已停用":usedAssetIds.includes(a.id)?" · 已使用":placed?" · 已放置":""}</small></span>
+     </RareButton>;
+    })}
+    {assets.length>0&&availableAssets.length===0&&<p className="seal-stamp-no-match">没有匹配的签章</p>}
+   </div>
    {assets.length===0&&<p className="seal-asset-empty" role="status">尚无可用签章。<Link to="/approvals?tab=seals">去签章管理导入</Link></p>}
    {selected&&!maySign&&<p role="status" className="hint">当前账号没有此签名／印章使用权限，或尚未绑定归属人。</p>}
    {duplicate&&<p role="status" className="hint">当前文件或待签清单已使用同一枚签章。</p>}
-   {selected&&<div className="seal-selected-asset">
-    <img src={sealsApi.imageUrl(selected.id)} alt={selected.name}/>
-    <span>{selected.kind==="personal"?(selected.ownerName||"未绑定")+"的签名":"公司印章"} · {selected.name}</span>
-   </div>}
    {selected&&<details className="seal-advanced-settings">
     <summary>精确调整 <span>{Math.round(position.width*100)}% · {angle}°</span></summary>
    <div className="seal-size-controls">
@@ -224,7 +263,8 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
        <span className="seal-draft-index">{i+1}</span>
        <span className="seal-draft-label">{a?.ownerName||a?.name||"签章"}<small>第 {item.pageNumber} 页 · {item.angleDegrees}°</small></span>
       </RareButton>
-      <RareButton type="button" aria-label={"移除"+(a?.name||"签章")} disabled={busy} onClick={()=>removeDraft(item.assetId)}>×</RareButton>
+      <RareButton type="button" className="seal-draft-remove" aria-label={"移除"+(a?.name||"签章")} disabled={busy}
+       onClick={()=>removeDraft(item.assetId)}><svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M5 5l10 10M15 5 5 15"/></svg></RareButton>
      </div>;
     })}
    </div>}
@@ -238,11 +278,21 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
      setStaged([]);setAssetId("");setDeleteMode(false);setDeleteIds([]);setRevision(n=>n+1);onChanged();
     }}/>
 
+   {removable.length>0&&<div className="seal-history-actions">
+    <RareButton type="button" tone="ghost" onClick={toggleDeleteMode}>{deleteMode?"取消选择":"选择删除签章"}</RareButton>
+    {deleteMode&&<RareButton type="button" tone="danger" disabled={!deleteIds.length||deleteBusy}
+     onClick={()=>{setError("");setDeletePassword("");setDeleteOpen(true)}}>删除选中 ({deleteIds.length})</RareButton>}
+   </div>}
+   {deleteMode&&<p className="seal-history-guidance">选择下方签章或点击纸张上的记录，再确认删除。</p>}
    {marks.length===0&&<p className="empty">此版本尚无签章</p>}
-   {marks.map(m=><div key={m.id} className="seal-history-row">
+   {marks.map(m=><div key={m.id} className={"seal-history-row"+(deleteIds.includes(m.id)?" is-selected":"")}>
     <div><strong>{m.assetName}</strong><RareBadge tone="neutral">第 {m.pageNumber} 页</RareBadge></div>
     <small>{m.signerName} · {new Date(m.createdAt).toLocaleString("zh-CN")}</small>
     <small>v{m.versionSeq} · {m.angleDegrees?m.angleDegrees+"° · ":""}SHA {m.fileSha256.slice(0,12)}…</small>
+    {deleteMode&&<RareButton type="button" tone="ghost" className="seal-history-pick"
+     disabled={!removable.some(mark=>mark.id===m.id)}
+     aria-pressed={deleteIds.includes(m.id)} onClick={()=>toggleDeleteMark(m.id)}>
+     {deleteIds.includes(m.id)?"✓ 已选中":"选择此签章"}</RareButton>}
    </div>)}
   </aside>
  </details>;
@@ -252,11 +302,9 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
    position={position} setPosition={updatePosition} angle={angle} pageRatio={pageRatio} setPageRatio={setPageRatio}
    pageCount={pageCount} onPageChange={changePage} onRetry={()=>setImageRetry(n=>n+1)}
    onSelectDraft={pickAsset} onRemoveDraft={removeDraft} pendingCount={staged.length}
-   onConfirm={requestSign} canConfirm={!busy&&!!pageCount&&imageAvailable&&staged.length>0&&staged.every(item=>stampFitsPage(item,item.angleDegrees,pageRatio))}
+   onConfirm={requestSign} onClearDrafts={clearDrafts} onRotate={delta=>changeAngle(((angle+delta+540)%360)-180)} canConfirm={!busy&&!!pageCount&&imageAvailable&&staged.length>0&&staged.every(item=>stampFitsPage(item,item.angleDegrees,pageRatio))}
    deleteMode={deleteMode} deletableMarkIds={removable.map(mark=>mark.id)}
-   deleteIds={deleteIds} onToggleDeleteMode={toggleDeleteMode}
-   onToggleDeleteMark={toggleDeleteMark}
-   onRequestDelete={()=>{setError("");setDeletePassword("");setDeleteOpen(true)}}
+   deleteIds={deleteIds} onToggleDeleteMark={toggleDeleteMark}
    imageAvailable={imageAvailable} setImageAvailable={setImageAvailable}
    drafts={staged.map(item=>({...item,asset:assets.find(a=>a.id===item.assetId)}))}/>:
    <div className="seal-file-preview"><p className="empty">仅 PDF 支持页面定位</p></div>}

@@ -160,3 +160,14 @@
 }
 @media(max-width:600px){.file-pdf-tools .rare-select{max-width:90px}.file-workbench-preview-surface .file-pdf-tools{gap:3px}.file-workbench-preview-surface .preview-dock-page-count{min-width:40px}.file-workbench-preview-surface .file-pdf-tools .rare-button{padding:0 4px}}
 @media(prefers-reduced-motion:reduce){.file-preview-action-dock .file-action-expansion{animation:none}}
+
+/* Signing stage keeps the same inset-paper treatment as PDF preview. */
+.file-workbench-signing .seal-page-viewport{display:flex;justify-content:center;align-items:flex-start;padding:28px 32px 88px;background:#F1F5F9}
+.file-workbench-signing .seal-page-viewport .seal-page-surface{flex:0 0 auto;overflow:visible;margin:0 auto;box-sizing:border-box;border:1px solid rgba(15,23,42,.06);border-radius:4px;background:#FFF;box-shadow:0 2px 6px rgba(15,23,42,.05),0 12px 32px rgba(15,23,42,.08)}
+.file-workbench-signing .seal-page-toolbar{overflow:visible}
+.file-workbench-signing .seal-toolbar-reader{align-items:center}
+.file-workbench-signing .seal-page-toolbar .seal-toolbar-actions{display:flex;flex:0 0 auto;align-items:center;gap:5px}
+.file-workbench-signing .seal-page-toolbar .seal-confirm-action.rare-button{font-size:11px}
+.file-preview-action-dock .file-workbench-actions>.file-core-action.is-active{background:rgba(0,100,225,.09);color:#0058D0;border-color:rgba(0,100,225,.25)}
+.file-seal-sidebar-controls>.seal-file-controls,.file-seal-sidebar-controls>.seal-file-history{background:transparent}
+@media(max-width:820px){.file-workbench-signing .seal-page-viewport{padding:20px 16px 80px}}

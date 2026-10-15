@@ -9,9 +9,9 @@ type StagedCanvasMark={assetId:string;asset?:SealAsset;pageNumber:number;x:numbe
 type Props={
  drafts?:StagedCanvasMark[];
  onSelectDraft:(assetId:string)=>void;onRemoveDraft:(assetId:string)=>void;
- pendingCount:number;onConfirm:()=>void;canConfirm:boolean;
+ pendingCount:number;onConfirm:()=>void;onClearDrafts:()=>void;canConfirm:boolean;onRotate:(degrees:number)=>void;
  deleteMode:boolean;deletableMarkIds:string[];deleteIds:string[];
- onToggleDeleteMode:()=>void;onToggleDeleteMark:(id:string)=>void;onRequestDelete:()=>void;
+ onToggleDeleteMark:(id:string)=>void;
  fileId:string;page:number;pageCount:number;onPageChange:(page:number)=>void;onRetry:()=>void;
  imageUrl:string;selected?:SealAsset;marks:FileSealMark[];
  position:StampPosition;setPosition:(update:(value:StampPosition)=>StampPosition)=>void;
@@ -24,8 +24,8 @@ const limit=(value:number)=>Math.max(.6,Math.min(5,Math.round(value*100)/100));
 /** All mark coordinates remain normalized to the unscaled PDF page. */
 export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,imageUrl,selected,marks,
  position,setPosition,angle,pageRatio,setPageRatio,imageAvailable,setImageAvailable,drafts=[],
- onSelectDraft,onRemoveDraft,pendingCount,onConfirm,canConfirm,
- deleteMode,deletableMarkIds,deleteIds,onToggleDeleteMode,onToggleDeleteMark,onRequestDelete}:Props){
+ onSelectDraft,onRemoveDraft,pendingCount,onConfirm,onClearDrafts,canConfirm,onRotate,
+ deleteMode,deletableMarkIds,deleteIds,onToggleDeleteMark}:Props){
  const viewportRef=useRef<HTMLDivElement>(null);
  const surfaceRef=useRef<HTMLDivElement>(null);
  const dragRef=useRef<{x:number;y:number;left:number;top:number}|null>(null);
@@ -33,7 +33,7 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
  const pendingAnchor=useRef<{x:number;y:number;oldZoom:number;left:number;top:number}|null>(null);
  const zoomRef=useRef(1);
  const[zoom,setZoom]=useState(1);
- const[fitMode,setFitMode]=useState<"page"|"width">("width");
+ const[fitMode,setFitMode]=useState<"page"|"width">("page");
  const[panMode,setPanMode]=useState(false);
  const[viewportWidth,setViewportWidth]=useState(650);
  const[viewportHeight,setViewportHeight]=useState(590);
@@ -46,11 +46,11 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
  },[]);
  // Do not reset zoom or scroll merely because a page changed.
  useEffect(()=>{
-  zoomRef.current=1;setZoom(1);setFitMode("width");setPanMode(false);
+  zoomRef.current=1;setZoom(1);setFitMode("page");setPanMode(false);
   const viewport=viewportRef.current;if(viewport){viewport.scrollLeft=0;viewport.scrollTop=0}
  },[fileId]);
- const availableWidth=Math.max(120,viewportWidth-32);
- const baseWidth=fitMode==="width"?availableWidth:Math.min(availableWidth,Math.max(120,(viewportHeight-32)/pageRatio));
+ const availableWidth=Math.max(120,viewportWidth-64);
+ const baseWidth=fitMode==="width"?availableWidth:Math.min(760,availableWidth,Math.max(120,(viewportHeight-116)/pageRatio));
  const displayWidth=baseWidth*zoom;
  // Focus a newly selected asset in the viewport rather than leaving it below
  // the fold in width-fit mode. Do not refocus on every pointer move.
@@ -141,21 +141,15 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
    setPosition(()=>fitStampToPage({...drag.initial,x:drag.initial.x+dx,y:drag.initial.y+dy},angle,pageRatio));
   }else{
    const start=drag.initial;
-   const min=.05;
-   let x=start.x,y=start.y,width=start.width,height=start.height;
-   if(drag.kind==="nw"||drag.kind==="sw"){
-    const delta=Math.min(start.width-min,dx);
-    x+=delta;width-=delta;
-   }else width=Math.max(min,width+dx);
-   if(drag.kind==="nw"||drag.kind==="ne"){
-    const delta=Math.min(start.height-min,dy);
-    y+=delta;height-=delta;
-   }else height=Math.max(min,height+dy);
-   const resized=fitStampToPage({x,y,width,height},angle,pageRatio);
-   if(resized.width<=1&&resized.height<=1&&resized.x>=-1e-6&&resized.y>=-1e-6&&
-    resized.x+resized.width<=1+1e-6&&resized.y+resized.height<=1+1e-6){
-    setPosition(()=>resized);
-   }
+   // Keep the imported artwork aspect ratio during all corner drags.
+   const dirX=drag.kind==="nw"||drag.kind==="sw"?-1:1;
+   const dirY=drag.kind==="nw"||drag.kind==="ne"?-1:1;
+   const growX=dirX*dx/start.width,growY=dirY*dy/start.height;
+   const scale=Math.max(.05/start.width,.05/start.height,1+(Math.abs(growX)>Math.abs(growY)?growX:growY));
+   const width=start.width*scale,height=start.height*scale;
+   const x=dirX<0?start.x+start.width-width:start.x;
+   const y=dirY<0?start.y+start.height-height:start.y;
+   setPosition(()=>fitStampToPage({x,y,width,height},angle,pageRatio));
   }
   e.stopPropagation();
  }
@@ -182,30 +176,27 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
   <div className="seal-page-toolbar">
    <div className="seal-toolbar-reader" role="group" aria-label="签章页面工具">
     <div className="seal-page-tools" role="group" aria-label="PDF 页码">
-    <RareButton type="button" aria-label="上一页" disabled={page<=1||!pageCount} onClick={()=>onPageChange(page-1)}>‹</RareButton>
-    <span className="seal-page-count">第 {page} / {pageCount||"—"} 页</span>
-    <RareButton type="button" aria-label="下一页" disabled={!pageCount||page>=pageCount} onClick={()=>onPageChange(page+1)}>›</RareButton>
-   </div>
-   <div className="seal-page-tools" role="group" aria-label="PDF 视图工具">
-    <RareButton type="button" aria-label="缩小页面" disabled={zoom<=.6} onClick={()=>setZoomAt(zoomRef.current/1.25)}>−</RareButton>
-    <span aria-live="polite" className="seal-page-zoom">{Math.round(zoom*100)}%</span>
-    <RareButton type="button" aria-label="放大页面" disabled={zoom>=5} onClick={()=>setZoomAt(zoomRef.current*1.25)}>＋</RareButton>
-    <RareButton type="button" onClick={()=>{setFitMode(m=>m==="page"?"width":"page");fit();}}>{fitMode==="page"?"适应页面":"适应宽度"}</RareButton>
-    <RareButton type="button" aria-pressed={panMode} onClick={()=>setPanMode(value=>!value)}>{panMode?"退出平移":"平移"}</RareButton>
+     <RareButton type="button" aria-label="上一页" disabled={page<=1||!pageCount} onClick={()=>onPageChange(page-1)}>‹</RareButton>
+     <span className="seal-page-count">{page} / {pageCount||"—"}</span>
+     <RareButton type="button" aria-label="下一页" disabled={!pageCount||page>=pageCount} onClick={()=>onPageChange(page+1)}>›</RareButton>
     </div>
+    <span className="seal-toolbar-divider" aria-hidden="true"/>
+    <div className="seal-page-tools" role="group" aria-label="PDF 缩放">
+     <RareButton type="button" aria-label="缩小页面" disabled={zoom<=.6} onClick={()=>setZoomAt(zoomRef.current/1.25)}>−</RareButton>
+     <span aria-live="polite" className="seal-page-zoom">{Math.round(zoom*100)}%</span>
+     <RareButton type="button" aria-label="放大页面" disabled={zoom>=5} onClick={()=>setZoomAt(zoomRef.current*1.25)}>＋</RareButton>
+    </div>
+    <span className="seal-toolbar-divider" aria-hidden="true"/>
+    <RareButton type="button" className="seal-fit-button" onClick={()=>{setFitMode("page");fit();}}>适应页面</RareButton>
+    <span className="seal-toolbar-divider" aria-hidden="true"/>
+    <RareButton type="button" aria-pressed={panMode} className="seal-pan-button" onClick={()=>setPanMode(value=>!value)}>{panMode?"退出平移":"平移"}</RareButton>
    </div>
-   {!deleteMode&&pendingCount>0&&<RareButton type="button" tone="primary" className="seal-confirm-action"
-    aria-label={"确认签署 "+pendingCount+" 枚签章"} disabled={!canConfirm} onClick={onConfirm}>
-    确认签署 · {pendingCount}
-   </RareButton>}
-   {deletableMarkIds.length>0&&<>
-    {deleteMode&&<RareButton type="button" tone="ghost" className="seal-cancel-delete" onClick={onToggleDeleteMode}>取消</RareButton>}
-    <RareButton type="button" tone="danger" emphasis="solid" className="seal-delete-action"
-     aria-pressed={deleteMode} aria-label={deleteMode?(deleteIds.length?"删除选中的 "+deleteIds.length+" 处签章":"退出签章删除模式"):"选择删除已签章"}
-     onClick={()=>{if(!deleteMode||!deleteIds.length)onToggleDeleteMode();else onRequestDelete()}}>
-     {deleteMode?(deleteIds.length?"删除选中 · "+deleteIds.length:"退出删除"):"删除签章"}
-    </RareButton>
-   </>}
+   {!deleteMode&&pendingCount>0&&<div className="seal-toolbar-actions">
+    <span className="seal-toolbar-divider" aria-hidden="true"/>
+    <RareButton type="button" tone="ghost" className="seal-clear-action" onClick={onClearDrafts}>清空待签</RareButton>
+    <RareButton type="button" tone="primary" className="seal-confirm-action"
+     aria-label={"确认签署 "+pendingCount+" 枚签章"} disabled={!canConfirm} onClick={onConfirm}>✓ 确认签署 ({pendingCount})</RareButton>
+   </div>}
   </div>
   <div className="seal-page-viewport" ref={viewportRef} onPointerDown={pointerDown} onPointerMove={pointerMove}
    onPointerUp={pointerEnd} onPointerCancel={pointerEnd} aria-label="PDF 签章页面，可放大并拖动平移"
@@ -229,11 +220,17 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
      onClick={e=>e.stopPropagation()} onKeyDown={markKey}>
      <img alt="" draggable={false} src={sealsApi.imageUrl(selected!.id)}
       style={{transform:"rotate("+angle+"deg)"}}/>
-     <RareButton type="button" tone="ghost" className="seal-remove-mark"
-      aria-label={"移除 "+selected!.name} title="移除此签章"
-      disabled={false} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onRemoveDraft(selected!.id)}}>
-      <svg viewBox="0 0 20 20" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15"/></svg>
-     </RareButton>
+     <span className="seal-stamp-mini-toolbar" role="toolbar" aria-label={"操作 "+selected!.name}
+      onPointerDown={e=>e.stopPropagation()} onClick={e=>e.stopPropagation()}>
+      <RareButton type="button" tone="ghost" aria-label="逆时针旋转 90 度" title="向左旋转 90°"
+       onClick={()=>onRotate(-90)}>↺ <small>−90°</small></RareButton>
+      <RareButton type="button" tone="ghost" aria-label="顺时针旋转 90 度" title="向右旋转 90°"
+       onClick={()=>onRotate(90)}>↻ <small>+90°</small></RareButton>
+      <span className="seal-mini-divider" aria-hidden="true"/>
+      <RareButton type="button" tone="ghost" className="seal-mini-remove"
+       aria-label={"移除 "+selected!.name} title="移除此签章"
+       onClick={()=>onRemoveDraft(selected!.id)}>移除</RareButton>
+     </span>
      {(["nw","ne","sw","se"] as const).map(corner=>
       <span key={corner} className={"seal-resize-handle is-"+corner} data-corner={corner} aria-hidden="true"/>)}
     </span>}
@@ -255,6 +252,6 @@ export function SealPageCanvas({fileId,page,pageCount,onPageChange,onRetry,image
      <RareButton type="button" onClick={()=>{setImageAvailable(true);onRetry()}}>重试加载</RareButton>
     </div>}
   </div>
-  {selected&&<span className="seal-page-tip">{panMode?"拖动空白区域平移":stagedPage!==undefined&&stagedPage!==page?"点击当前页可将选中签章移至此页":"拖动签章调整位置 · 右下角调整大小 · Ctrl/⌘ + 滚轮缩放"}</span>}
+  {selected&&<span className="seal-page-tip">{panMode?"拖动空白区域平移":stagedPage!==undefined&&stagedPage!==page?"点击当前页可将选中签章移至此页":"拖动签章定位 · 四角等比缩放 · Ctrl/⌘ + 滚轮缩放"}</span>}
  </div>;
 }
