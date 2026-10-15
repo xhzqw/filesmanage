@@ -102,6 +102,13 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.DELETE("/me/sessions/:id", h.revokeOwnSession)
 	api.GET("/events/ws", h.websocketEvents)
 	// CDW task pilot: single-file task assignment, acceptance and accountability.
+	api.POST("/work-branches", h.cdwCreateBranch)
+	api.POST("/work-branches/:id/office-sessions", h.cdwOpenBranchOffice)
+	api.POST("/work-branches/:id/save", h.cdwRequestBranchSave)
+	api.GET("/work-branches/:id/save-requests/:rid", h.cdwReadBranchSave)
+	api.POST("/work-branches/:id/freeze-delivery", h.cdwFreezeBranch)
+	r.GET("/api/internal/office/branch-source/:token", h.cdwBranchSource)
+	r.POST("/api/internal/office/branch-callback", h.cdwBranchCallback)
 	api.POST("/workbench/tasks", h.cdwCreateRoot)
 	api.GET("/workbench/inbox", h.cdwInbox)
 	api.POST("/workbench/tasks/:id/accept", h.cdwAcceptTask)

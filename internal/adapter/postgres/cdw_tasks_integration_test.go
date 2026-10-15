@@ -209,6 +209,147 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 	if _, err = service.CDWAcceptTask(ctx, charlie, groupRoot.TaskID, 1, prefix+"_group_revoked"); !errors.Is(err, domain.ErrForbidden) {
 		t.Fatalf("revoked leader must not accept: %v", err)
 	}
+	// Independent branches from the SAME base file cannot change file_versions.
+	aliceBranch, err := service.CDWCreateBranch(ctx, alice, root.TaskID)
+	if err != nil {
+		t.Fatalf("A branch: %v", err)
+	}
+	bobBranch, err := service.CDWCreateBranch(ctx, bob, child.TaskID)
+	if err != nil {
+		t.Fatalf("B branch: %v", err)
+	}
+	if aliceBranch.BaseVersionID != versionID || bobBranch.BaseVersionID != versionID || aliceBranch.ID == bobBranch.ID {
+		t.Fatalf("branch baseline mismatch: A=%+v B=%+v", aliceBranch, bobBranch)
+	}
+	// Simulate a genuinely durable ONLYOFFICE callback through the transaction
+	// store; the upstream HTTP downloader uses the same store only AFTER OOXML
+	// and signed-callback verification.
+	branchCommits := []struct {
+		b      ports.CDWBranch
+		user   domain.User
+		letter string
+	}{
+		{aliceBranch, alice, "b"}, {bobBranch, bob, "c"},
+	}
+	var aliceReceipt ports.CDWBranchSave
+	var aliceRevision string
+	for idx, candidate := range branchCommits {
+		workTx, e := repo.Begin(ctx)
+		if e != nil {
+			t.Fatal(e)
+		}
+		store := workTx.(ports.CDWBranchStore)
+		session, e := store.CDWOpenBranchSession(ctx, candidate.b.ID, candidate.user.ID,
+			application.NewID("cdwos"), application.NewID("cdwkey"), time.Now().Add(30*time.Minute))
+		if e != nil {
+			_ = workTx.Rollback(ctx)
+			t.Fatal(e)
+		}
+		request, e := store.CDWBeginBranchSave(ctx, candidate.b.ID, session.ID, candidate.user.ID, application.NewID("cdwsave"))
+		if e != nil {
+			_ = workTx.Rollback(ctx)
+			t.Fatal(e)
+		}
+		if e = workTx.Commit(ctx); e != nil {
+			t.Fatal(e)
+		}
+		if idx == 0 {
+			aliceReceipt = request
+		}
+		// A forcesave accepted by ONLYOFFICE is only requested (no revision yet).
+		if _, e = service.CDWFreezeBranch(ctx, candidate.user, candidate.b.ID, request.ID, "nonexistent", 1); !errors.Is(e, domain.ErrVersionConflict) {
+			t.Fatalf("premature freeze was not blocked: %v", e)
+		}
+		sha := strings.Repeat(candidate.letter, 64)
+		blobID2 := application.NewID("cdwblob")
+		if _, e = pool.Exec(ctx, `INSERT INTO blobs(id,storage_key,sha256,size_bytes,state)
+		 VALUES($1,$2,$3,29,'ready')`, blobID2, prefix+"_branch_storage_"+candidate.letter, sha); e != nil {
+			t.Fatal(e)
+		}
+		saveTx, e := repo.Begin(ctx)
+		if e != nil {
+			t.Fatal(e)
+		}
+		store = saveTx.(ports.CDWBranchStore)
+		revisionID := application.NewID("cdwrev")
+		applied, e := store.CDWCommitBranchCallback(ctx, session.DocumentKey, 6, request.ID,
+			strings.Repeat(candidate.letter, 64), blobID2, 29, sha, candidate.b.Epoch, revisionID)
+		if e != nil || !applied {
+			_ = saveTx.Rollback(ctx)
+			t.Fatalf("callback persist: applied=%v err=%v", applied, e)
+		}
+		if e = saveTx.Commit(ctx); e != nil {
+			t.Fatal(e)
+		}
+		checkTx, e := repo.Begin(ctx)
+		if e != nil {
+			t.Fatal(e)
+		}
+		store = checkTx.(ports.CDWBranchStore)
+		receipt, e := store.CDWReadBranchSave(ctx, candidate.b.ID, request.ID, candidate.user.ID)
+		_ = checkTx.Rollback(ctx)
+		if e != nil || receipt.State != "persisted" || receipt.RevisionID != revisionID || receipt.SHA256 != sha {
+			t.Fatalf("saved receipt invalid: %+v %v", receipt, e)
+		}
+		if idx == 0 {
+			aliceRevision = revisionID
+		}
+		// A callback replay is idempotent; no second branch revision.
+		replayTx, e := repo.Begin(ctx)
+		if e != nil {
+			t.Fatal(e)
+		}
+		replayed, e := replayTx.(ports.CDWBranchStore).CDWCommitBranchCallback(ctx, session.DocumentKey, 6, request.ID,
+			strings.Repeat(candidate.letter, 64), blobID2, 29, sha, candidate.b.Epoch, application.NewID("cdwrev"))
+		_ = replayTx.Rollback(ctx)
+		if e != nil || replayed {
+			t.Fatalf("duplicate callback must not append: %v %v", replayed, e)
+		}
+	}
+	// File's ordinary version history remains pinned to the original upload.
+	var fileSeq, versionCount int
+	if e := pool.QueryRow(ctx, `SELECT current_version_seq FROM files WHERE id=$1`, fileID).Scan(&fileSeq); e != nil {
+		t.Fatal(e)
+	}
+	if e := pool.QueryRow(ctx, `SELECT count(*) FROM file_versions WHERE file_id=$1`, fileID).Scan(&versionCount); e != nil {
+		t.Fatal(e)
+	}
+	if fileSeq != 1 || versionCount != 1 {
+		t.Fatalf("branch changes leaked to formal versions seq=%d count=%d", fileSeq, versionCount)
+	}
+	// Frozen delivery is tied to a matching persisted save receipt and branch HEAD.
+	frozen, e := service.CDWFreezeBranch(ctx, alice, aliceBranch.ID, aliceReceipt.ID, aliceRevision, 2)
+	if e != nil {
+		t.Fatalf("freeze persisted branch: %v", e)
+	}
+	if frozen.SHA256 != strings.Repeat("b", 64) || frozen.ReviewGateID == "" {
+		t.Fatalf("invalid delivery: %+v", frozen)
+	}
+	var frozenSHA, reviewer, state string
+	if e = pool.QueryRow(ctx, `SELECT i.sha256,g.responsible_user_id,g.state
+	 FROM cdw_delivery_items i JOIN cdw_review_gates g ON g.delivery_id=i.delivery_id
+	 WHERE i.delivery_id=$1`, frozen.DeliveryID).Scan(&frozenSHA, &reviewer, &state); e != nil {
+		t.Fatal(e)
+	}
+	if frozenSHA != frozen.SHA256 || reviewer != adminID || state != "awaiting" {
+		t.Fatalf("review gate mismatch: sha=%s reviewer=%s state=%s", frozenSHA, reviewer, state)
+	}
+	// Late saving callback cannot change the frozen delivery even with signed
+	// document key and a different event hash.
+	lateTx, e := repo.Begin(ctx)
+	if e != nil {
+		t.Fatal(e)
+	}
+	_, e = lateTx.(ports.CDWBranchStore).CDWCommitBranchCallback(ctx, application.NewID("badkey"), 6, "",
+		strings.Repeat("e", 64), blobID, 29, strings.Repeat("a", 64), 1, application.NewID("cdwrev"))
+	_ = lateTx.Rollback(ctx)
+	if !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("unrecognized doc key was accepted: %v", e)
+	}
+	if _, e = service.CDWFreezeBranch(ctx, alice, aliceBranch.ID, aliceReceipt.ID, aliceRevision, 2); !errors.Is(e, domain.ErrVersionConflict) {
+		t.Fatalf("duplicate delivery freeze accepted: %v", e)
+	}
+	t.Logf("CDW_BRANCH_POSTGRES_PASS branches=%s,%s persisted=2 froze=%s normal_seq=1", aliceBranch.ID, bobBranch.ID, frozen.DeliveryID)
 	var n int
 	if err = pool.QueryRow(ctx, `SELECT count(*) FROM cdw_domain_events WHERE aggregate_id IN ($1,$2,$3,$4)`,
 		root.TaskID, child.TaskID, child2.TaskID, groupRoot.TaskID).Scan(&n); err != nil || n != 7 {

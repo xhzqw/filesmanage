@@ -762,6 +762,58 @@ add("POST","/api/workbench/tasks/{id}/delegate",operation("Create child task ret
  "content":{"application/json":{"schema":obj({"ok":{"type":"boolean"},"data":CDW_TASK_RESULT},required=["ok","data"])}}},
  "403":{"description":"Not the accepted active assignee"},"409":{"description":"Conflict"}}))
 
+# --- CDW branch/ONLYOFFICE delivery fence (single-file pilot) ---
+CDW_BRANCH_CREATE = obj({"taskId":string()},required=["taskId"])
+CDW_BRANCH = obj({
+ "branchId":string(),"taskId":string(),"fileId":string(),
+ "baseVersionId":string(),"baseSha256":string(),"state":string(),
+ "revision":integer(minimum=1),"headRevisionId":string(),"editEpoch":integer(minimum=1)
+},required=["branchId","taskId","fileId","baseVersionId","baseSha256","state","revision","editEpoch"])
+CDW_SAVE_REQ = obj({"sessionId":string()},required=["sessionId"])
+CDW_SAVE_STATUS = obj({
+ "requestId":string(),"branchId":string(),"sessionId":string(),
+ "state":string(enum=["requested","accepted","unknown","persisted","failed"]),
+ "persistedRevisionId":string(),"sha256":string(),
+ "generation":integer(minimum=1),"editEpoch":integer(minimum=1)
+},required=["requestId","branchId","sessionId","state","generation","editEpoch"])
+CDW_FREEZE_REQ = obj({"requestId":string(),"branchRevisionId":string()},
+ required=["requestId","branchRevisionId"])
+CDW_FREEZE = obj({"deliveryId":string(),"branchId":string(),"taskId":string(),
+ "branchRevisionId":string(),"sha256":string(),"reviewGateId":string(),
+ "revision":integer(minimum=1)},
+ required=["deliveryId","branchId","taskId","branchRevisionId","sha256","reviewGateId","revision"])
+add("POST","/api/work-branches",operation("Create isolated task editing branch; no file_versions mutation","CDW","cdwCreateBranch",
+ security=SESSION,request={"application/json":{"schema":CDW_BRANCH_CREATE}},
+ responses=dict([json_ok(CDW_BRANCH,"New branch created."),resp("403",ERR["403"]),resp("409",ERR["409"])])))
+add("POST","/api/work-branches/{id}/office-sessions",operation("Open exclusive ONLYOFFICE document key for a task branch","CDW","cdwBranchOffice",
+ security=SESSION,params=[id_param("id","Branch ID.")],
+ request={"application/json":{"schema":obj({})}},
+ responses=dict([json_ok(obj({"branch":CDW_BRANCH,"session":{"type":"object"},"editorUrl":string(),"config":{"type":"object"}}),
+ "ONLYOFFICE editor config signed; callback/source use branch-only routes."),resp("409",ERR["409"])])))
+add("POST","/api/work-branches/{id}/save",operation("Request final ONLYOFFICE save; acknowledgement is NOT persistence","CDW","cdwBranchSave",
+ security=SESSION,params=[id_param("id","Branch ID.")],request={"application/json":{"schema":CDW_SAVE_REQ}},
+ responses={"202":{"description":"Requested/unknown: poll matching callback receipt; cannot freeze yet",
+ "content":{"application/json":{"schema":obj({"ok":{"type":"boolean"},"data":CDW_SAVE_STATUS},required=["ok","data"])}}},
+ "409":{"description":"Invalid/duplicate active save request"}}))
+add("GET","/api/work-branches/{id}/save-requests/{rid}",operation("Read authoritative scoped branch-save receipt","CDW","cdwBranchSaveStatus",
+ security=SESSION,params=[id_param("id","Branch ID."),id_param("rid","Save request ID.")],
+ responses=dict([json_ok(CDW_SAVE_STATUS,"Persisted only after callback commits exact blob/revision."),resp("403",ERR["403"])])))
+add("POST","/api/work-branches/{id}/freeze-delivery",operation("Freeze exact committed branch revision into immutable delivery","CDW","cdwBranchFreeze",
+ security=SESSION,params=[id_param("id","Branch ID."),CDW_IF_MATCH],
+ request={"application/json":{"schema":CDW_FREEZE_REQ}},
+ responses={"201":{"description":"Committed immutable delivery, first direct-parent gate awaiting review",
+ "content":{"application/json":{"schema":obj({"ok":{"type":"boolean"},"data":CDW_FREEZE},required=["ok","data"])}}},
+ "409":{"description":"Save pending, stale ETag, or branch frozen"}}))
+add("GET","/api/internal/office/branch-source/{token}",operation("Signed branch-only ONLYOFFICE document snapshot","CDW","cdwOfficeBranchSource",
+ security=[],params=[id_param("token","Short-lived scoped editor JWT.")],
+ responses={"200":{"description":"OOXML bytes, only if session and branch remain live"},
+ "401":{"description":"Invalid source capability"}}))
+add("POST","/api/internal/office/branch-callback",operation("JWT-authenticated ONLYOFFICE branch-save callback","CDW","cdwOfficeBranchCallback",
+ security=[],request={"application/json":{"schema":obj({
+ "key":string(),"status":integer(),"url":string(),"userdata":string(),"forcesavetype":integer()
+ },required=["key","status"])}},
+ responses={"200":{"description":"ONLYOFFICE acknowledgement: error 0 or 1; never updates file_versions"}}))
+
 # --- Auth ---
 add("POST", "/api/login", operation("Authenticate and open a session", "Auth", "login", security=[],
     request={"application/json": {"schema": ref("LoginRequest")}},

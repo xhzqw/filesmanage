@@ -446,6 +446,456 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/work-branches:
+    post:
+      summary: Create isolated task editing branch; no file_versions mutation
+      operationId: cdwCreateBranch
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                taskId:
+                  type: string
+              required:
+              - taskId
+      responses:
+        '200':
+          description: New branch created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      branchId:
+                        type: string
+                      taskId:
+                        type: string
+                      fileId:
+                        type: string
+                      baseVersionId:
+                        type: string
+                      baseSha256:
+                        type: string
+                      state:
+                        type: string
+                      revision:
+                        type: integer
+                        minimum: 1
+                      headRevisionId:
+                        type: string
+                      editEpoch:
+                        type: integer
+                        minimum: 1
+                    required:
+                    - branchId
+                    - taskId
+                    - fileId
+                    - baseVersionId
+                    - baseSha256
+                    - state
+                    - revision
+                    - editEpoch
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/work-branches/{id}/office-sessions:
+    post:
+      summary: Open exclusive ONLYOFFICE document key for a task branch
+      operationId: cdwBranchOffice
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Branch ID.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        '200':
+          description: ONLYOFFICE editor config signed; callback/source use branch-only routes.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      branch:
+                        type: object
+                        properties:
+                          branchId:
+                            type: string
+                          taskId:
+                            type: string
+                          fileId:
+                            type: string
+                          baseVersionId:
+                            type: string
+                          baseSha256:
+                            type: string
+                          state:
+                            type: string
+                          revision:
+                            type: integer
+                            minimum: 1
+                          headRevisionId:
+                            type: string
+                          editEpoch:
+                            type: integer
+                            minimum: 1
+                        required:
+                        - branchId
+                        - taskId
+                        - fileId
+                        - baseVersionId
+                        - baseSha256
+                        - state
+                        - revision
+                        - editEpoch
+                      session:
+                        type: object
+                      editorUrl:
+                        type: string
+                      config:
+                        type: object
+                required:
+                - ok
+                - data
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/work-branches/{id}/save:
+    post:
+      summary: Request final ONLYOFFICE save; acknowledgement is NOT persistence
+      operationId: cdwBranchSave
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Branch ID.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sessionId:
+                  type: string
+              required:
+              - sessionId
+      responses:
+        '202':
+          description: 'Requested/unknown: poll matching callback receipt; cannot freeze yet'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      requestId:
+                        type: string
+                      branchId:
+                        type: string
+                      sessionId:
+                        type: string
+                      state:
+                        type: string
+                        enum:
+                        - requested
+                        - accepted
+                        - unknown
+                        - persisted
+                        - failed
+                      persistedRevisionId:
+                        type: string
+                      sha256:
+                        type: string
+                      generation:
+                        type: integer
+                        minimum: 1
+                      editEpoch:
+                        type: integer
+                        minimum: 1
+                    required:
+                    - requestId
+                    - branchId
+                    - sessionId
+                    - state
+                    - generation
+                    - editEpoch
+                required:
+                - ok
+                - data
+        '409':
+          description: Invalid/duplicate active save request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/work-branches/{id}/save-requests/{rid}:
+    get:
+      summary: Read authoritative scoped branch-save receipt
+      operationId: cdwBranchSaveStatus
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Branch ID.
+        schema:
+          type: string
+      - name: rid
+        in: path
+        required: true
+        description: Save request ID.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Persisted only after callback commits exact blob/revision.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      requestId:
+                        type: string
+                      branchId:
+                        type: string
+                      sessionId:
+                        type: string
+                      state:
+                        type: string
+                        enum:
+                        - requested
+                        - accepted
+                        - unknown
+                        - persisted
+                        - failed
+                      persistedRevisionId:
+                        type: string
+                      sha256:
+                        type: string
+                      generation:
+                        type: integer
+                        minimum: 1
+                      editEpoch:
+                        type: integer
+                        minimum: 1
+                    required:
+                    - requestId
+                    - branchId
+                    - sessionId
+                    - state
+                    - generation
+                    - editEpoch
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/work-branches/{id}/freeze-delivery:
+    post:
+      summary: Freeze exact committed branch revision into immutable delivery
+      operationId: cdwBranchFreeze
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Branch ID.
+        schema:
+          type: string
+      - name: If-Match
+        in: header
+        required: true
+        description: Strong ETag rev-N enclosed in double quotes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                requestId:
+                  type: string
+                branchRevisionId:
+                  type: string
+              required:
+              - requestId
+              - branchRevisionId
+      responses:
+        '201':
+          description: Committed immutable delivery, first direct-parent gate awaiting review
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      deliveryId:
+                        type: string
+                      branchId:
+                        type: string
+                      taskId:
+                        type: string
+                      branchRevisionId:
+                        type: string
+                      sha256:
+                        type: string
+                      reviewGateId:
+                        type: string
+                      revision:
+                        type: integer
+                        minimum: 1
+                    required:
+                    - deliveryId
+                    - branchId
+                    - taskId
+                    - branchRevisionId
+                    - sha256
+                    - reviewGateId
+                    - revision
+                required:
+                - ok
+                - data
+        '409':
+          description: Save pending, stale ETag, or branch frozen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/internal/office/branch-source/{token}:
+    get:
+      summary: Signed branch-only ONLYOFFICE document snapshot
+      operationId: cdwOfficeBranchSource
+      tags:
+      - CDW
+      security: []
+      parameters:
+      - name: token
+        in: path
+        required: true
+        description: Short-lived scoped editor JWT.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OOXML bytes, only if session and branch remain live
+        '401':
+          description: Invalid source capability
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/internal/office/branch-callback:
+    post:
+      summary: JWT-authenticated ONLYOFFICE branch-save callback
+      operationId: cdwOfficeBranchCallback
+      tags:
+      - CDW
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                key:
+                  type: string
+                status:
+                  type: integer
+                url:
+                  type: string
+                userdata:
+                  type: string
+                forcesavetype:
+                  type: integer
+              required:
+              - key
+              - status
+      responses:
+        '200':
+          description: 'ONLYOFFICE acknowledgement: error 0 or 1; never updates file_versions'
   /api/login:
     post:
       summary: Authenticate and open a session
