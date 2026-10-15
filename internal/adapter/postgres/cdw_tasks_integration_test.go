@@ -389,6 +389,106 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 	if _, e = service.CDWFreezeBranch(ctx, alice, aliceBranch.ID, aliceReceipt.ID, aliceRevision, 2, prefix+"_freeze_B"); !errors.Is(e, domain.ErrVersionConflict) {
 		t.Fatalf("new freeze key must not create a second delivery: %v", e)
 	}
+	// A direct parent can decide only its own immutable gate. Return never
+	// mutates the delivered revision nor waives the A/B/C responsibility chain.
+	gates, e := service.CDWReviewInbox(ctx, admin, 30)
+	if e != nil || len(gates) != 1 || gates[0].ID != frozen.ReviewGateID {
+		t.Fatalf("admin reviewer inbox mismatch: %+v %v", gates, e)
+	}
+	if other, e := service.CDWReviewInbox(ctx, bob, 30); e != nil || len(other) != 0 {
+		t.Fatalf("foreign review gate exposed to B: %+v %v", other, e)
+	}
+	if _, e = service.CDWDecideReview(ctx, bob, frozen.ReviewGateID, "accept", "", 1, prefix+"_foreign_review"); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("B unexpectedly reviewed A gate: %v", e)
+	}
+	if _, e = service.CDWDecideReview(ctx, admin, frozen.ReviewGateID, "return", "", 1, prefix+"_empty_return"); !errors.Is(e, domain.ErrInvalidInput) {
+		t.Fatalf("return without reason accepted: %v", e)
+	}
+	returned, e := service.CDWDecideReview(ctx, admin, frozen.ReviewGateID, "return", "请补充仪器验证记录", 1, prefix+"_return")
+	if e != nil || returned.TaskState != "returned" || returned.ReturnOrderID == "" {
+		t.Fatalf("return: %+v %v", returned, e)
+	}
+	if again, e2 := service.CDWDecideReview(ctx, admin, frozen.ReviewGateID, "return", "请补充仪器验证记录", 1, prefix+"_return"); e2 != nil || again.ReturnOrderID != returned.ReturnOrderID {
+		t.Fatalf("decision retry must replay return order: %+v %v", again, e2)
+	}
+	if _, e = service.CDWDecideReview(ctx, admin, frozen.ReviewGateID, "accept", "", 2, prefix+"_double_decide"); !errors.Is(e, domain.ErrVersionConflict) {
+		t.Fatalf("terminal gate changed by second decision: %v", e)
+	}
+	var returnedTaskRevision int64
+	if e = pool.QueryRow(ctx, `SELECT revision FROM cdw_tasks WHERE id=$1`, root.TaskID).Scan(&returnedTaskRevision); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = service.CDWResumeReturned(ctx, bob, root.TaskID, returnedTaskRevision, prefix+"_foreign_resume"); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("non-assignee resumed returned work: %v", e)
+	}
+	resumed, e := service.CDWResumeReturned(ctx, alice, root.TaskID, returnedTaskRevision, prefix+"_resume")
+	if e != nil || resumed.Round != 2 || resumed.BranchID == aliceBranch.ID || resumed.State != "accepted" {
+		t.Fatalf("return resumption: %+v %v", resumed, e)
+	}
+	if again, e2 := service.CDWResumeReturned(ctx, alice, root.TaskID, returnedTaskRevision, prefix+"_resume"); e2 != nil || again.BranchID != resumed.BranchID {
+		t.Fatalf("resume retry created competing branch: %+v %v", again, e2)
+	}
+	var recoveredSHA, returnedSHA, oldGateState string
+	if e = pool.QueryRow(ctx, `SELECT rev.sha256 FROM cdw_work_branches b JOIN cdw_work_branch_revisions rev ON rev.id=b.head_revision_id WHERE b.id=$1`, resumed.BranchID).Scan(&recoveredSHA); e != nil {
+		t.Fatal(e)
+	}
+	if e = pool.QueryRow(ctx, `SELECT i.sha256,g.state FROM cdw_delivery_items i JOIN cdw_review_gates g ON g.delivery_id=i.delivery_id WHERE i.delivery_id=$1`, frozen.DeliveryID).Scan(&returnedSHA, &oldGateState); e != nil {
+		t.Fatal(e)
+	}
+	if recoveredSHA != returnedSHA || recoveredSHA != strings.Repeat("b", 64) || oldGateState != "returned" {
+		t.Fatalf("returned branch must inherit exact immutable old revision: inherited=%s old=%s gate=%s", recoveredSHA, returnedSHA, oldGateState)
+	}
+	var stillPending int
+	if e = pool.QueryRow(ctx, `SELECT count(*) FROM cdw_accountability_obligations WHERE task_id IN ($1,$2) AND state='pending'`, child.TaskID, child2.TaskID).Scan(&stillPending); e != nil || stillPending != 6 {
+		t.Fatalf("return/resume silently waived middle accountability: %d %v", stillPending, e)
+	}
+	// Second round starts with a prefilled work branch, but that seed is
+	// never itself a valid final save receipt for the new delivery.
+	reworkTx, e := repo.Begin(ctx)
+	if e != nil {
+		t.Fatal(e)
+	}
+	reworkStore := reworkTx.(ports.CDWBranchStore)
+	reworkSession, e := reworkStore.CDWOpenBranchSession(ctx, resumed.BranchID, alice.ID,
+		application.NewID("cdwos"), application.NewID("cdwkey"), time.Now().Add(30*time.Minute))
+	if e != nil {
+		_ = reworkTx.Rollback(ctx)
+		t.Fatal(e)
+	}
+	reworkRequest, e := reworkStore.CDWBeginBranchSave(ctx, resumed.BranchID, reworkSession.ID, alice.ID, application.NewID("cdwsave"))
+	if e != nil {
+		_ = reworkTx.Rollback(ctx)
+		t.Fatal(e)
+	}
+	if e = reworkTx.Commit(ctx); e != nil {
+		t.Fatal(e)
+	}
+	newFrozenRevision := application.NewID("cdwrev")
+	persistTx, e := repo.Begin(ctx)
+	if e != nil {
+		t.Fatal(e)
+	}
+	okCommit, e := persistTx.(ports.CDWBranchStore).CDWCommitBranchCallback(ctx, reworkSession.DocumentKey, 6, reworkRequest.ID,
+		strings.Repeat("d", 64), blobID, 42, strings.Repeat("a", 64), 1, newFrozenRevision)
+	if e != nil || !okCommit {
+		_ = persistTx.Rollback(ctx)
+		t.Fatalf("round2 callback: %v %v", okCommit, e)
+	}
+	if e = persistTx.Commit(ctx); e != nil {
+		t.Fatal(e)
+	}
+	secondDelivery, e := service.CDWFreezeBranch(ctx, alice, resumed.BranchID, reworkRequest.ID, newFrozenRevision, 3, prefix+"_freeze_round2")
+	if e != nil || secondDelivery.DeliveryID == frozen.DeliveryID {
+		t.Fatalf("round2 freeze: %+v %v", secondDelivery, e)
+	}
+	gateAccepted, e := service.CDWDecideReview(ctx, admin, secondDelivery.ReviewGateID, "accept", "已核对", 1, prefix+"_accept_round2")
+	if e != nil || gateAccepted.TaskState != "accepted_delivery" || gateAccepted.Round != 2 {
+		t.Fatalf("second round accept: %+v %v", gateAccepted, e)
+	}
+	if e = pool.QueryRow(ctx, `SELECT count(*) FROM cdw_accountability_obligations WHERE task_id IN ($1,$2) AND state='pending'`, child.TaskID, child2.TaskID).Scan(&stillPending); e != nil || stillPending != 6 {
+		t.Fatalf("review accept incorrectly waived intermediate duties: %d %v", stillPending, e)
+	}
+	t.Logf("CDW_REVIEW_POSTGRES_PASS return=%s resumed=%s round2=%s middle_obligations=%d", returned.ReturnOrderID, resumed.BranchID, gateAccepted.GateID, stillPending)
 	t.Logf("CDW_BRANCH_POSTGRES_PASS branches=%s,%s persisted=2 froze=%s normal_seq=1", aliceBranch.ID, bobBranch.ID, frozen.DeliveryID)
 	var n int
 	if err = pool.QueryRow(ctx, `SELECT count(*) FROM cdw_domain_events WHERE aggregate_id IN ($1,$2,$3,$4)`,

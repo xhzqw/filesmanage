@@ -820,6 +820,45 @@ add("POST","/api/internal/office/branch-callback",operation("JWT-authenticated O
  },required=["key","status"])}},
  responses={"200":{"description":"ONLYOFFICE acknowledgement: error 0 or 1; never updates file_versions"}}))
 
+# --- CDW direct-parent review, return and content-continuity ---
+CDW_REVIEW_GATE=obj({
+ "gateId":string(),"deliveryId":string(),"taskId":string(),"taskTitle":string(),
+ "fileId":string(),"submittedBy":string(),"reviewerId":string(),
+ "branchRevisionId":string(),"sha256":string(),"state":string(),
+ "revision":integer(minimum=1),"round":integer(minimum=1)
+},required=["gateId","deliveryId","taskId","taskTitle","fileId","submittedBy","reviewerId","branchRevisionId","sha256","state","revision","round"])
+CDW_REVIEW_DECISION=obj({"decision":string(enum=["accept","return"]),"reason":string(max_length=3000)},
+ required=["decision"])
+CDW_REVIEW_RESULT=obj({"gateId":string(),"deliveryId":string(),"taskId":string(),"state":string(),
+ "taskState":string(),"revision":integer(minimum=1),"round":integer(minimum=1),"returnOrderId":string()},
+ required=["gateId","deliveryId","taskId","state","taskState","revision","round"])
+CDW_RESUME_RESULT=obj({"taskId":string(),"branchId":string(),"revision":integer(minimum=1),
+ "round":integer(minimum=1),"state":string()},required=["taskId","branchId","revision","round","state"])
+add("GET","/api/workbench/review-gates/inbox",operation("Review gates addressed to actual direct reviewer","CDW","cdwReviewInbox",
+ security=SESSION,params=[query("limit","1..100",{"type":"integer","minimum":1,"maximum":100})],
+ responses=dict([json_ok(obj({"items":arr(CDW_REVIEW_GATE)},required=["items"]),"Direct reviewer awaiting gates with live ACL."),
+ resp("401",ERR["401"])])))
+add("GET","/api/workbench/review-gates/{id}",operation("Read exact frozen delivery gate","CDW","cdwReviewDetail",
+ security=SESSION,params=[id_param("id","Review gate ID.")],
+ responses=dict([json_ok(CDW_REVIEW_GATE,"SHA bound delivery gate, reviewer only."),
+ resp("403",ERR["403"])])))
+add("POST","/api/workbench/review-gates/{id}/decide",operation("Accept or return immutable delivery; never formally approve file","CDW","cdwReviewDecide",
+ security=SESSION,params=[id_param("id","Review gate ID."),CDW_IDEMPOTENCY,CDW_IF_MATCH],
+ request={"application/json":{"schema":CDW_REVIEW_DECISION}},
+ responses=dict([json_ok(CDW_REVIEW_RESULT,"Decision committed; obligations remain independent."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
+add("POST","/api/workbench/tasks/{id}/resume",operation("Rework a returned task with cloned frozen content and next round","CDW","cdwResumeReturned",
+ security=SESSION,params=[id_param("id","Task ID."),CDW_IDEMPOTENCY,CDW_IF_MATCH],
+ request={"application/json":{"schema":obj({})}},
+ responses={"201":{"description":"New round and independent editable branch seeded from returned frozen revision.",
+ "content":{"application/json":{"schema":obj({"ok":{"type":"boolean"},"data":CDW_RESUME_RESULT},required=["ok","data"])}}},
+ "403":{"description":"Not current assignee"},"409":{"description":"Stale task revision or not returned"}}))
+
+add("GET","/api/workbench/review-gates/{id}/content",operation("Download exact immutable reviewed DOCX","CDW","cdwReviewContent",
+ security=SESSION,params=[id_param("id","Review gate ID.")],
+ responses={"200":{"description":"Frozen delivery DOCX, only for actual reviewer (not current formal version)"},
+ "403":{"description":"Not the direct reviewer"}}))
+
 # --- Auth ---
 add("POST", "/api/login", operation("Authenticate and open a session", "Auth", "login", security=[],
     request={"application/json": {"schema": ref("LoginRequest")}},

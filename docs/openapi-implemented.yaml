@@ -1061,6 +1061,377 @@ paths:
       responses:
         '200':
           description: 'ONLYOFFICE acknowledgement: error 0 or 1; never updates file_versions'
+  /api/workbench/review-gates/inbox:
+    get:
+      summary: Review gates addressed to actual direct reviewer
+      operationId: cdwReviewInbox
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        description: 1..100
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+      responses:
+        '200':
+          description: Direct reviewer awaiting gates with live ACL.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            gateId:
+                              type: string
+                            deliveryId:
+                              type: string
+                            taskId:
+                              type: string
+                            taskTitle:
+                              type: string
+                            fileId:
+                              type: string
+                            submittedBy:
+                              type: string
+                            reviewerId:
+                              type: string
+                            branchRevisionId:
+                              type: string
+                            sha256:
+                              type: string
+                            state:
+                              type: string
+                            revision:
+                              type: integer
+                              minimum: 1
+                            round:
+                              type: integer
+                              minimum: 1
+                          required:
+                          - gateId
+                          - deliveryId
+                          - taskId
+                          - taskTitle
+                          - fileId
+                          - submittedBy
+                          - reviewerId
+                          - branchRevisionId
+                          - sha256
+                          - state
+                          - revision
+                          - round
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/review-gates/{id}:
+    get:
+      summary: Read exact frozen delivery gate
+      operationId: cdwReviewDetail
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Review gate ID.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: SHA bound delivery gate, reviewer only.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      gateId:
+                        type: string
+                      deliveryId:
+                        type: string
+                      taskId:
+                        type: string
+                      taskTitle:
+                        type: string
+                      fileId:
+                        type: string
+                      submittedBy:
+                        type: string
+                      reviewerId:
+                        type: string
+                      branchRevisionId:
+                        type: string
+                      sha256:
+                        type: string
+                      state:
+                        type: string
+                      revision:
+                        type: integer
+                        minimum: 1
+                      round:
+                        type: integer
+                        minimum: 1
+                    required:
+                    - gateId
+                    - deliveryId
+                    - taskId
+                    - taskTitle
+                    - fileId
+                    - submittedBy
+                    - reviewerId
+                    - branchRevisionId
+                    - sha256
+                    - state
+                    - revision
+                    - round
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/review-gates/{id}/decide:
+    post:
+      summary: Accept or return immutable delivery; never formally approve file
+      operationId: cdwReviewDecide
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Review gate ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      - name: If-Match
+        in: header
+        required: true
+        description: Strong ETag rev-N enclosed in double quotes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                decision:
+                  type: string
+                  enum:
+                  - accept
+                  - return
+                reason:
+                  type: string
+                  maxLength: 3000
+              required:
+              - decision
+      responses:
+        '200':
+          description: Decision committed; obligations remain independent.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      gateId:
+                        type: string
+                      deliveryId:
+                        type: string
+                      taskId:
+                        type: string
+                      state:
+                        type: string
+                      taskState:
+                        type: string
+                      revision:
+                        type: integer
+                        minimum: 1
+                      round:
+                        type: integer
+                        minimum: 1
+                      returnOrderId:
+                        type: string
+                    required:
+                    - gateId
+                    - deliveryId
+                    - taskId
+                    - state
+                    - taskState
+                    - revision
+                    - round
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/tasks/{id}/resume:
+    post:
+      summary: Rework a returned task with cloned frozen content and next round
+      operationId: cdwResumeReturned
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Task ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      - name: If-Match
+        in: header
+        required: true
+        description: Strong ETag rev-N enclosed in double quotes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        '201':
+          description: New round and independent editable branch seeded from returned frozen revision.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      taskId:
+                        type: string
+                      branchId:
+                        type: string
+                      revision:
+                        type: integer
+                        minimum: 1
+                      round:
+                        type: integer
+                        minimum: 1
+                      state:
+                        type: string
+                    required:
+                    - taskId
+                    - branchId
+                    - revision
+                    - round
+                    - state
+                required:
+                - ok
+                - data
+        '403':
+          description: Not current assignee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Stale task revision or not returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/review-gates/{id}/content:
+    get:
+      summary: Download exact immutable reviewed DOCX
+      operationId: cdwReviewContent
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Review gate ID.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Frozen delivery DOCX, only for actual reviewer (not current formal version)
+        '403':
+          description: Not the direct reviewer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/login:
     post:
       summary: Authenticate and open a session
