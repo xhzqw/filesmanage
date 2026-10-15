@@ -319,7 +319,9 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
       </section>:selected?.kind==="control"&&selected.candidate?
       <CDWControlPreparePanel key={selected.candidate.id} candidate={selected.candidate} user={user} loadUsers={organizationApi.users} loadDepartments={organizationApi.departments} onPrepared={()=>refresh(n=>n+1)}/>:
       selected?.kind==="scope"&&selected.scope?
-      <CDWScopeApprovalPanel key={selected.scope.id} plan={selected.scope} onApproved={()=>refresh(n=>n+1)}/>:
+      <CDWScopeApprovalPanel key={selected.scope.id} plan={selected.scope}
+       loadUsers={organizationApi.users} loadDepartments={organizationApi.departments}
+       onApproved={()=>refresh(n=>n+1)}/>:
       selected?.kind==="formal"&&selected.formal?
       <CDWFormalPanel key={selected.formal.id} approval={selected.formal} onDecided={()=>refresh(n=>n+1)}/>:
       selected?.kind==="review"&&selected.review?

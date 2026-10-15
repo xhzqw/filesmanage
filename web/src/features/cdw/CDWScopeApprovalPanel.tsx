@@ -6,9 +6,13 @@ import {errorCopy} from "../../shared/errors";
 import {newIdempotencyKey} from "../../shared/ids";
 import {ApiError} from "../../shared/http";
 import {cdwApi,type CDWDistributionPlan} from "./api";
-import {organizationApi} from "../organization/api";
+import type {User} from "../../entities/user/model";
 
-export function CDWScopeApprovalPanel({plan,onApproved}:{plan:CDWDistributionPlan;onApproved:()=>void}){
+export function CDWScopeApprovalPanel({plan,onApproved,loadDepartments,loadUsers}:{
+ plan:CDWDistributionPlan;onApproved:()=>void;
+ loadDepartments:()=>Promise<Array<{id:string;name:string}>>;
+ loadUsers:()=>Promise<User[]>;
+}){
  const [detail,setDetail]=useState<CDWDistributionPlan|null>(null);
  const [departmentNames,setDepartmentNames]=useState<Record<string,string>>({});
  const [personNames,setPersonNames]=useState<Record<string,string>>({});
@@ -19,14 +23,14 @@ export function CDWScopeApprovalPanel({plan,onApproved}:{plan:CDWDistributionPla
   let active=true;setDetail(null);setError("");
   cdwApi.distributionRead(plan.id).then(item=>{if(active)setDetail(item)})
    .catch(e=>{if(active)setError(errorCopy(e,"无法读取冻结范围"))});
-  organizationApi.departments().then(items=>{
+  loadDepartments().then(items=>{
    if(active)setDepartmentNames(Object.fromEntries(items.map(d=>[d.id,d.name])));
   }).catch(()=>undefined);
-  organizationApi.users().then(items=>{
+  loadUsers().then(items=>{
    if(active)setPersonNames(Object.fromEntries(items.map(u=>[u.id,u.displayName])));
   }).catch(()=>undefined);
   return()=>{active=false};
- },[plan.id]);
+ },[plan.id,loadDepartments,loadUsers]);
  async function approve(){
   if(!detail||detail.state!=="frozen"||busy)return;
   if(!key.current)key.current=newIdempotencyKey();
