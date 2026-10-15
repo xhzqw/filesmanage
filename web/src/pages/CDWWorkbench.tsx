@@ -148,6 +148,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  },[fileQuery,activeForm]);
 
  function select(item:CDWInboxItem){
+  setFormalDraft(false);
   setParams(previous=>{const next=new URLSearchParams(previous);next.set("task",taskKey(item));return next;});
   setActiveForm(null);
  }
@@ -278,7 +279,8 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
         </div>
        </div>
       </section>:selected?.kind==="formal"&&selected.formal?
-      <CDWFormalPanel key={selected.formal.id} approval={selected.formal} onDecided={()=>refresh(n=>n+1)}/>:      </section>:selected?.kind==="review"&&selected.review?
+      <CDWFormalPanel key={selected.formal.id} approval={selected.formal} onDecided={()=>refresh(n=>n+1)}/>:
+      selected?.kind==="review"&&selected.review?
       <CDWReviewPanel key={selected.review.gateId} gate={selected.review} onDecided={()=>refresh(n=>n+1)}/>:
       selected?<section className="cdw-detail-inner" key={taskKey(selected)}>
        <div className="cdw-detail-header"><div><small>{selected.kind==="task"?"任务详情":"责任待办"}</small>
