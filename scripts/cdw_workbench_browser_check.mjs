@@ -121,6 +121,19 @@ try{
  const controlledLayout=await evalJS("({width:innerWidth,scrollWidth:document.documentElement.scrollWidth})");
  assert.ok(controlledLayout.scrollWidth<=controlledLayout.width+2,"G8 narrow canvas has no page overflow");
  console.log("CDW_G8_PREPARE_BROWSER_PASS candidate-registry+tab+live-source-sha=read-only");
+ await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('责任待办'));button?.click();return true;})()");
+ await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('责任待办')");
+ const obligations=await evalJS("(async()=>{const r=await fetch('/api/workbench/inbox?limit=100');return {status:r.status,data:(await r.json()).data}})()");
+ assert.equal(obligations.status,200,"G11 obligation inbox must use real authenticated data");
+ const obligationRows=obligations.data.items.filter(item=>item.kind==='obligation');
+ const eligibleIndex=obligationRows.findIndex(item=>['manage','integrate','report'].includes(item.obligationKind));
+ if(eligibleIndex>=0){
+  await evalJS("(()=>{const node=[...document.querySelectorAll('.cdw-task-row')]["+eligibleIndex+"];node?.click()})()");
+  await until("!!document.querySelector('.cdw-detail .cdw-review-form')");
+  assert.equal(await evalJS("!!document.querySelector('.cdw-detail textarea')"),true,
+   "G11 rendered live accountability statement input");
+ }
+ console.log("CDW_G11_ACCOUNTABILITY_BROWSER_PASS authenticated-inbox+real-obligation-form-when-present");
  console.log("CDW_BROWSER_PASS auth=tasks+review-inbox, responsive=1440/1024/780, review-filter, create-form");
 }finally{
  try{ws?.close();}catch{}

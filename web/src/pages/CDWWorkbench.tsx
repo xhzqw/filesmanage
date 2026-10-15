@@ -319,9 +319,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
         <Link className="cdw-text-link" to={"/preview/"+encodeURIComponent(selected.fileId)}>打开预览 ↗</Link></div>
         <p className="cdw-section-note">原文件维持独立正式版本；编辑任务产生单独工作修订，不直接覆盖原件。</p>
        </div>
-       {selected.kind==="obligation"?<div className="cdw-section">
-        <CDWObligationPanel item={selected} busy={processing} onFulfill={statement=>fulfillObligation(selected,statement)}/>
-       </div>:<>
+       {selected.kind==="obligation"?<CDWObligationPanel item={selected} busy={processing} onFulfill={statement=>fulfillObligation(selected,statement)}/>:<>
         {selected.state==="assigned"&&<div className="cdw-primary-action">
          <p>你收到一项工作任务。接收后可以建立独立编辑分支，也可以向下一级派发。</p>
          <RareButton type="button" tone="primary" loading={processing} onClick={()=>void acceptTask(selected)}>接收任务</RareButton>
