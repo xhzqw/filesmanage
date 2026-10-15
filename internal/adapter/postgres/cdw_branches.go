@@ -348,9 +348,10 @@ func (r *Repository) CDWCommitBranchCallback(ctx context.Context, key string, st
 			return false, err
 		}
 	}
+	callbackID := sha256.Sum256([]byte(sess.ID + "|" + eventHash))
 	if _, err = r.Q.Exec(ctx, `INSERT INTO cdw_office_callback_events
  (id,session_id,event_hash,request_id,callback_status,outcome)
- VALUES($1,$2,$3,$4,$5,'persisted')`, "cdwcb_"+eventHash[:40], sess.ID, eventHash, requestID, status); err != nil {
+ VALUES($1,$2,$3,$4,$5,'persisted')`, "cdwcb_"+hex.EncodeToString(callbackID[:]), sess.ID, eventHash, requestID, status); err != nil {
 		return false, err
 	}
 	if status == 2 {
