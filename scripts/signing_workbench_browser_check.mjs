@@ -345,7 +345,16 @@ try{
      return el.width/el.height;
     })()`);
     console.log("STAMP_RESIZE_HIT_DIAGNOSTIC",JSON.stringify(handle));
+    await cdp.evaluate(`(()=>{
+     window.__stampEvents=[];
+     const mark=document.querySelector('.seal-position-mark');
+     for(const type of ['pointerdown','gotpointercapture','pointermove','pointerup','lostpointercapture']){
+      mark.addEventListener(type,e=>window.__stampEvents.push({type,target:e.target.className,x:e.clientX,y:e.clientY,
+       capture:mark.hasPointerCapture(e.pointerId),width:mark.style.width}));
+     }
+    })()`);
     await cdp.drag(handle,{x:handle.x+25,y:handle.y+12});
+    console.log("STAMP_RESIZE_EVENTS",JSON.stringify(await cdp.evaluate('window.__stampEvents')));
     const resized=await cdp.evaluate(`(()=>{
      const el=document.querySelector('.seal-position-mark');
      const r=el.getBoundingClientRect();
