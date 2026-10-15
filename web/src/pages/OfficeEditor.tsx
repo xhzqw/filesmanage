@@ -313,7 +313,8 @@ export function OfficeEditor({}:{user:User;onLogout:()=>void}){
     <FileTypeIcon name={file?.name??"document.docx"} size={20}/>
     <strong title={file?.name}>{file?.name??"正在获取文档"}</strong>
     <span className="office-workbench-version">v{confirmedSeq??file?.currentVersionSeq??"—"}</span>
-    <span role="status" aria-live="polite" className={"office-save-state office-save-"+saveState}>{saveMessage}</span>
+    <span role="status" aria-live="polite" title="在 ONLYOFFICE 内使用保存按钮或 Ctrl/Cmd + S；版本以文档库保存回执为准"
+     className={"office-save-state office-save-"+saveState}>{saveMessage}</span>
    </div>
    <div className="office-workbench-actions">
     <RareButton type="button" disabled={status!=="ready"||exporting||!file} loading={exporting} onClick={()=>void convertPDF()}>⇄ 转为 PDF</RareButton>

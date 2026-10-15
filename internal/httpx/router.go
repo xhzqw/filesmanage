@@ -232,8 +232,6 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.DELETE("/folders/:id/approval-policy", h.clearApprovalPolicy)
 	api.POST("/files/:id/office/session", h.openOfficeSession)
 	api.POST("/files/:id/convert", h.convertFileFormat)
-	api.GET("/files/:id/native-docx", h.nativeDOCXContent)
-	api.POST("/files/:id/native-docx/save", h.saveNativeDOCX)
 	api.GET("/files/:id/office/session/:sid/state", h.nativeOfficeSaveStatus)
 	api.POST("/files/:id/office/session/:sid/cancel", h.cancelOfficeSession)
 	r.GET("/api/internal/office/source/:token", h.officeSource)
