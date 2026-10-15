@@ -13,7 +13,7 @@ const password=readFileSync(process.argv[3]||".secrets/admin.password","utf8").t
 const port=18000+process.pid%17000,profile=mkdtempSync(join(tmpdir(),"fm-cdw-browser-"));
 const chrome=spawn("/usr/bin/google-chrome",[
  "--headless=new","--no-sandbox","--disable-dev-shm-usage","--remote-debugging-port="+port,
- "--user-data-dir="+profile,"--window-size=1440,900","about:blank"],{stdio:"ignore"});
+ "--user-data-dir="+profile,"--window-size=1440,900","about:blank"],{stdio:"ignore",detached:true});
 let ws,sequence=0;
 const pending=new Map();
 function send(method,params={}){
@@ -89,7 +89,10 @@ try{
  console.log("CDW_BROWSER_PASS auth=tasks+review-inbox, responsive=1440/1024/780, review-filter, create-form");
 }finally{
  try{ws?.close();}catch{}
- chrome.kill("SIGTERM");
- await Promise.race([new Promise(resolve=>chrome.once("exit",resolve)),sleep(1800)]);
- rmSync(profile,{recursive:true,force:true,maxRetries:6,retryDelay:130});
+ try{process.kill(-chrome.pid,"SIGTERM")}catch{chrome.kill("SIGTERM")}
+ if(chrome.exitCode===null&&chrome.signalCode===null)await Promise.race([new Promise(resolve=>chrome.once("exit",resolve)),sleep(2400)]);
+ for(let attempt=0;attempt<15;attempt++){
+  try{rmSync(profile,{recursive:true,force:true,maxRetries:4,retryDelay:150});break;}
+  catch(error){if(attempt===14)throw error;await sleep(270);}
+ }
 }
