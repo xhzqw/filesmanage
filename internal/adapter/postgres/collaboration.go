@@ -324,15 +324,16 @@ func (r *Repository) SearchFiles(ctx context.Context, q ports.FileSearchQuery) (
 	if err != nil {
 		return nil, 0, err
 	}
-	// Placeholders must match the emitted SQL: the scope CTE binds $1 to the
-	// caller, the folder filter adds $2, and the admin all-folders branch binds
-	// nothing at all.
+	// Placeholders match the caller scope CTE and folder filter. Managed
+	// effective files cannot leak stale ordinary-latest search content; exclude
+	// them until indexed from the exact immutable issued artifact.
 	args := []any{}
 	if needsCTE {
 		args = append(args, q.UserID)
 	}
 	args = append(args, folderArgs...)
-	where := []string{"f.deleted_at IS NULL", folderSQL}
+	where := []string{"f.deleted_at IS NULL", folderSQL,
+		"NOT EXISTS(SELECT 1 FROM cdw_effective_pointers cp WHERE cp.file_id=f.id)"}
 	ph := newPlaceholder(len(args))
 	if q.Uploader != "" {
 		where = append(where, "f.uploaded_by="+ph.next())

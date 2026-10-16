@@ -173,11 +173,12 @@ func (r *Repository) CDWControlPrepare(ctx context.Context, id, artifactID, cand
 	}
 	_, err = r.Q.Exec(ctx, `INSERT INTO cdw_controlled_releases
  (id,file_id,approved_candidate_id,controlled_revision,display_name_snapshot,state,
- planned_effective_at,policy_snapshot,prepared_by)
+ planned_effective_at,policy_snapshot,prepared_by,supersedes_release_id)
  VALUES($1,$2,$3,$4,$5,'preparing',$6,
  jsonb_build_object('version','cdw-g8-v1','sourceSha256',$7::text,
  'preparedRoleBindingId',$8::text,'requiresScopeApproval',true,
- 'requiresDepartmentReceipt',true,'requiresReadingConfirmation',true),$9)`,
+ 'requiresDepartmentReceipt',true,'requiresReadingConfirmation',true),$9,
+ (SELECT release_id FROM cdw_effective_pointers WHERE file_id=$2 AND state='active'))`,
 		id, fileID, candidateID, label, name, when, sha, binding, actor)
 	if err != nil {
 		return result, err

@@ -950,6 +950,19 @@ CDW_CONTROL_RELEASE=obj({"id":string(),"fileId":string(),"fileName":string(),"ca
  "state":string(enum=["preparing","ready","issued_pending","effective","superseded","withdrawn","cancelled"]),
  "revision":integer(minimum=1),"plannedEffectiveAt":timestamp()},
  required=["id","fileId","fileName","candidateId","revisionLabel","sha256","state","revision"])
+CDW_ACTIVATION_DECISION=obj({
+ "releaseId":string(),"fileId":string(),"outcome":string(enum=["activated","blocked"]),
+ "revision":integer(minimum=1),"pointerRevision":integer(minimum=0),
+ "priorReleaseId":string(),"effectiveAt":timestamp(),"blockers":arr(string())},
+ required=["releaseId","fileId","outcome","revision","pointerRevision","blockers"])
+add("POST","/api/workbench/controlled/releases/{id}/activate",operation(
+ "CAS-controlled manual activation: validate scope, immutable artifact, all department receipts, required reading, paper issuance, planned time and predecessor withdrawal; append immutable activation attempt; atomically advance effective pointer and audit/outbox only on success",
+ "CDW","cdwActivation",security=SESSION,
+ params=[id_param("id","Issued controlled release ID"),CDW_IDEMPOTENCY,CDW_IF_MATCH],
+ request={"application/json":{"schema":obj({})}},
+ responses=dict([json_ok(CDW_ACTIVATION_DECISION,
+ "Blocked outcome is audited and never changes the effective pointer; activated outcome advances it atomically."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
 add("GET","/api/workbench/controlled/candidates",operation(
  "List formally approved immutable candidates available to document control","CDW","cdwControlCandidates",
  security=SESSION,responses=dict([json_ok(obj({"items":arr(CDW_CONTROL_CANDIDATE)},required=["items"]),

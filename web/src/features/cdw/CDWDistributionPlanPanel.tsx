@@ -6,7 +6,7 @@ import {toast} from "../../shared/ui/feedback";
 import {errorCopy} from "../../shared/errors";
 import {newIdempotencyKey} from "../../shared/ids";
 import type {User} from "../../entities/user/model";
-import {cdwApi,type CDWControlledRelease,type CDWDistributionPlan} from "./api";
+import {cdwApi,type CDWControlledRelease,type CDWDistributionPlan,type CDWActivationDecision} from "./api";
 import {CDWDistributionLedgerPanel} from "./CDWDistributionLedgerPanel";
 
 type Department={id:string;name:string};
@@ -34,6 +34,36 @@ export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments,isAd
  const [withdrawOpen,setWithdrawOpen]=useState(false);
  const [withdrawReason,setWithdrawReason]=useState("");
  const withdrawKey=useRef("");
+ const activateKey=useRef("");
+ const [activation,setActivation]=useState<CDWActivationDecision|null>(null);
+ const blockerText:Record<string,string>={
+  unsupported_activation_policy:"生效策略未获系统支持",
+  planned_effective_time_not_reached:"尚未到达计划生效时间",
+  verified_dispatched_manifest_missing:"缺少已核验的发行物或已批准发行清单",
+  distribution_not_dispatched:"发行批次未完成分发",
+  distribution_targets_invalid:"存在已撤销或异常分发目标",
+  department_receipts_incomplete:"相关部门尚未全部签收",
+  required_readings_incomplete:"相关人员尚未全部阅读确认或确认授权已失效",
+  paper_issue_not_frozen:"纸质发放数量尚未逐份编号并冻结",
+  supersession_lineage_mismatch:"候选版本不符合当前有效版的替代关系",
+  previous_paper_copies_outstanding:"旧版纸质副本尚有未回收或遗失项",
+  supersession_pointer_missing:"待替换的有效版本不存在"
+ };
+ async function activate(){
+  if(release.state!=="issued_pending"||plan?.state!=="dispatched"||busy)return;
+  if(!activateKey.current)activateKey.current=newIdempotencyKey();
+  setBusy(true);setActivation(null);
+  try{
+   const decision=await toast.track(()=>cdwApi.controlActivate(release.id,release.revision,activateKey.current),{
+    loading:"正在独立核验生效条件与版本指针…",
+    success:"生效条件校验已完成，请查看判定结果",
+    error:e=>errorCopy(e,"受控文件生效判定失败")
+   });
+   activateKey.current="";setActivation(decision);
+   if(decision.outcome==="activated")onChanged();
+  }catch(e){if(!(e instanceof ApiError&&e.httpStatus===0))activateKey.current="";}
+  finally{setBusy(false);}
+ }
  useEffect(()=>{
   let active=true;setPlan(null);setTargets([emptyTarget()]);setLoading(true);setError("");
   Promise.all([
@@ -223,6 +253,14 @@ export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments,isAd
     </div>}
    {plan?.state==="dispatched"&&
     <RareNotice tone="info">正式发行批次已生成。部门签收、人员阅读确认及文件生效分别独立办理，不会由分发自动完成。</RareNotice>}
+   {plan?.state==="dispatched"&&release.state==="issued_pending"&&<div className="cdw-review-form">
+    <div className="cdw-review-actions"><RareButton type="button" tone="primary" loading={busy} disabled={busy}
+     onClick={()=>void activate()}>核验条件并办理正式生效</RareButton></div>
+    {activation?.outcome==="blocked"&&<RareNotice tone="warning">
+     该版本尚未生效。须先完成以下条件：{activation.blockers.map(code=>blockerText[code]??code).join("；")}
+    </RareNotice>}
+    {activation?.outcome==="activated"&&<RareNotice tone="info">正式版本已生效，操作与有效版本指针已记录。</RareNotice>}
+   </div>}
    {plan?.state==="dispatched"&&release.state==="issued_pending"&&<div className="cdw-review-form">
     <RareButton type="button" tone="neutral" aria-pressed={withdrawOpen} disabled={busy}
      onClick={()=>setWithdrawOpen(v=>!v)}>{withdrawOpen?"收起撤销操作":"撤销本次未生效发行"}</RareButton>

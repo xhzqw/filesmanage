@@ -2461,6 +2461,104 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/controlled/releases/{id}/activate:
+    post:
+      summary: 'CAS-controlled manual activation: validate scope, immutable artifact, all department receipts, required reading,
+        paper issuance, planned time and predecessor withdrawal; append immutable activation attempt; atomically advance effective
+        pointer and audit/outbox only on success'
+      operationId: cdwActivation
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Issued controlled release ID
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      - name: If-Match
+        in: header
+        required: true
+        description: Strong ETag rev-N enclosed in double quotes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        '200':
+          description: Blocked outcome is audited and never changes the effective pointer; activated outcome advances it atomically.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      releaseId:
+                        type: string
+                      fileId:
+                        type: string
+                      outcome:
+                        type: string
+                        enum:
+                        - activated
+                        - blocked
+                      revision:
+                        type: integer
+                        minimum: 1
+                      pointerRevision:
+                        type: integer
+                        minimum: 0
+                      priorReleaseId:
+                        type: string
+                      effectiveAt:
+                        type: string
+                        format: date-time
+                      blockers:
+                        type: array
+                        items:
+                          type: string
+                    required:
+                    - releaseId
+                    - fileId
+                    - outcome
+                    - revision
+                    - pointerRevision
+                    - blockers
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/controlled/candidates:
     get:
       summary: List formally approved immutable candidates available to document control

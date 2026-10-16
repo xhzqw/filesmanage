@@ -408,6 +408,18 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 		t.Fatal("issue/dispatch cannot activate default effective pointer")
 	}
 	t.Logf("CDW_G9_DISPATCH_POSTGRES_PASS batch=%s departments=2 grants=2 receipts=0 reading=0 effective_pointer=none", batch.ID)
+	blockedActivation, e := service.CDWActivateRelease(ctx, admin, issued.ID, issued.Revision, prefix+"_g8_blocked_activation")
+	if e != nil || blockedActivation.Outcome != "blocked" || blockedActivation.Revision != issued.Revision ||
+		len(blockedActivation.Blockers) < 2 {
+		t.Fatalf("premature activation permitted or missing gate evidence: %+v %v", blockedActivation, e)
+	}
+	blockedReplay, e := service.CDWActivateRelease(ctx, admin, issued.ID, issued.Revision, prefix+"_g8_blocked_activation")
+	if e != nil || len(blockedReplay.Blockers) != len(blockedActivation.Blockers) {
+		t.Fatalf("activation blocker replay %+v %v", blockedReplay, e)
+	}
+	if _, e = service.CDWActivateRelease(ctx, alice, issued.ID, issued.Revision, prefix+"_g8_unauthorized_activation"); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("unprivileged effective activation: %v", e)
+	}
 	bobTargets, e := service.CDWReceiptInbox(ctx, bob, 20)
 	if e != nil || len(bobTargets) != 1 || bobTargets[0].State != "awaiting" ||
 		bobTargets[0].ManifestSHA256 != approvedPlan.DigestSHA256 {
@@ -615,24 +627,54 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 		t.Fatalf("paper statuses must not confuse lost with collected %+v %v", endLedger, e)
 	}
 	t.Logf("CDW_G10_PAPER_POSTGRES_PASS lot=%s copies=2 collected=1 lost=1; neither personal reading nor batch receipt counts as recovery", issuedPaper.LotID)
-	// Read-routing fixture only: this directly seeds an isolated test pointer.
-	// It DOES NOT exercise or claim a production activation transaction.
+	// Preserve the second department's real pending reading assignment after
+	// this rollback so subsequent G9 withdrawal can cancel it.
+	charlieRoster, e := service.CDWCreateReadingRoster(ctx, charlie, charlieTargets[0].TargetID,
+		application.CDWReadingRosterInput{UserIDs: []string{charlie.ID}}, prefix+"_g9_roster_charlie")
+	if e != nil || charlieRoster.AssignedCount != 1 {
+		t.Fatalf("pending reading before withdrawal %+v %v", charlieRoster, e)
+	}
+	charlieReadItems, e := service.CDWReadingInbox(ctx, charlie, 25)
+	if e != nil {
+		t.Fatal(e)
+	}
+	charlieReadID := ""
+	for _, item := range charlieReadItems {
+		if item.TargetID == charlieTargets[0].TargetID {
+			charlieReadID = item.ID
+		}
+	}
+	if charlieReadID == "" {
+		t.Fatal("second department missing designated pending reader")
+	}
+	// Exercise the real G8 activation transaction in a rolled-back isolated
+	// fixture. Its synthetic final confirmation is *not* a browser E2E proof.
 	readFixtureTx, e := pool.Begin(ctx)
 	if e != nil {
 		t.Fatal(e)
 	}
 	defer readFixtureTx.Rollback(ctx)
-	if _, e = readFixtureTx.Exec(ctx, `UPDATE cdw_controlled_releases
-	 SET state='effective',actual_effective_at=clock_timestamp()
-	 WHERE id=$1 AND state='issued_pending'`, issued.ID); e != nil {
+	if _, e = readFixtureTx.Exec(ctx, `UPDATE cdw_reading_assignments
+	 SET state='confirmed',confirmed_at=clock_timestamp() WHERE id=$1`, charlieReadID); e != nil {
 		t.Fatal(e)
 	}
-	if _, e = readFixtureTx.Exec(ctx, `INSERT INTO cdw_effective_pointers
-	 (file_id,release_id,state,activated_at) VALUES($1,$2,'active',clock_timestamp())`,
-		fileID, issued.ID); e != nil {
+	if _, e = readFixtureTx.Exec(ctx, `INSERT INTO cdw_reading_events
+	 (id,assignment_id,actor_id,kind,artifact_sha256,statement_snapshot)
+	 VALUES($1,$2,$3,'confirmed',$4,'transaction-gate-fixture')`,
+		prefix+"_fixture_charlie_confirm", charlieReadID, charlie.ID, charlieTargets[0].ArtifactSHA256); e != nil {
 		t.Fatal(e)
 	}
 	fixtureReader := &Repository{DB: pool, Q: readFixtureTx}
+	activatedFixture, e := fixtureReader.CDWActivateRelease(ctx, prefix+"_activation_real_transaction",
+		issued.ID, admin.ID, issued.Revision, prefix+"_g8_activate_fixture")
+	if e != nil || activatedFixture.Outcome != "activated" || activatedFixture.PointerRevision != 1 ||
+		activatedFixture.Revision != issued.Revision+1 || activatedFixture.EffectiveAt == nil {
+		t.Fatalf("actual effective transaction failed %+v %v", activatedFixture, e)
+	}
+	if _, e = fixtureReader.CDWActivateRelease(ctx, prefix+"_activation_replay", issued.ID,
+		admin.ID, issued.Revision, prefix+"_g8_activate_again"); !errors.Is(e, domain.ErrVersionConflict) {
+		t.Fatalf("duplicate activation bypassed CAS: %v", e)
+	}
 	controlledRead, managed, e := fixtureReader.CDWEffectiveRead(ctx, fileID, admin.ID, domain.ActionPreview)
 	if e != nil || !managed || controlledRead.BlobID != blobID ||
 		controlledRead.SHA256 != sha || controlledRead.FileName == "" {
@@ -660,27 +702,7 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	if e = readFixtureTx.Rollback(ctx); e != nil {
 		t.Fatal(e)
 	}
-	t.Log("CDW_G8_POINTER_READ_FIXTURE_PASS effective-artifact-snapshot, withdrawn-pointer-fail-closed; no activation workflow claimed")
-	// A second department still has an assigned but unconfirmed reader. A
-	// controlled withdrawal must cancel that task without deleting evidence.
-	charlieRoster, e := service.CDWCreateReadingRoster(ctx, charlie, charlieTargets[0].TargetID,
-		application.CDWReadingRosterInput{UserIDs: []string{charlie.ID}}, prefix+"_g9_roster_charlie")
-	if e != nil || charlieRoster.AssignedCount != 1 {
-		t.Fatalf("pending reading before withdrawal %+v %v", charlieRoster, e)
-	}
-	charlieReadItems, e := service.CDWReadingInbox(ctx, charlie, 25)
-	if e != nil {
-		t.Fatal(e)
-	}
-	charlieReadID := ""
-	for _, item := range charlieReadItems {
-		if item.TargetID == charlieTargets[0].TargetID {
-			charlieReadID = item.ID
-		}
-	}
-	if charlieReadID == "" {
-		t.Fatal("second department missing designated pending reader")
-	}
+	t.Log("CDW_G8_ACTIVATION_POSTGRES_PASS blockers, authorization, immutable effective transaction, duplicate CAS, rollback fixture and fail-closed reads")
 	withdrawInput := application.CDWDistributionWithdrawalInput{Reason: "该发行批次发现版本适用范围错误，需撤销此次未生效的部门分发并保留原签收记录。"}
 	if _, e = service.CDWWithdrawDistribution(ctx, alice, plan.ID, 4, withdrawInput, prefix+"_g9_withdraw_unprivileged"); !errors.Is(e, domain.ErrForbidden) {
 		t.Fatalf("scope reviewer withdrew release without document-control role: %v", e)

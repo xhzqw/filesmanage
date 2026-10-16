@@ -2,6 +2,10 @@ import {request} from "../../shared/http";
 
 export type CDWApprovedCandidate={id:string;fileId:string;fileName:string;sha256:string;approvedAt:string};
 export type CDWControlledRelease={id:string;fileId:string;fileName:string;candidateId:string;revisionLabel:string;sha256:string;state:"preparing"|"ready"|"issued_pending"|"effective"|"superseded"|"withdrawn"|"cancelled";revision:number;plannedEffectiveAt?:string};
+export type CDWActivationDecision={
+ releaseId:string;fileId:string;outcome:"activated"|"blocked";revision:number;
+ pointerRevision:number;priorReleaseId?:string;effectiveAt?:string;blockers:string[];
+};
 export type CDWDistributionPlan={
  id:string;releaseId:string;fileId:string;fileName:string;
  state:"draft"|"frozen"|"approved"|"dispatched"|"cancelled";
@@ -211,6 +215,8 @@ export const cdwApi={
    mutate(key,{justification,noAdditionalSealRequired:true,noConversionRequired:true},revision)),
  controlCandidates:()=>request<{items:CDWApprovedCandidate[]}>("/workbench/controlled/candidates",{cache:"no-store"}),
  controlList:(fileId:string)=>request<{items:CDWControlledRelease[]}>("/workbench/controlled/files/"+segment(fileId)+"/releases",{cache:"no-store"}),
+ controlActivate:(releaseId:string,revision:number,key:string)=>request<CDWActivationDecision>(
+  "/workbench/controlled/releases/"+segment(releaseId)+"/activate",mutate(key,{},revision)),
  controlGrant:(fileId:string,userId:string,key:string)=>request<{id:string}>("/workbench/controlled/role",mutate(key,{fileId,userId})),
  controlPrepare:(candidateId:string,revisionLabel:string,plannedEffectiveAt:string|undefined,key:string)=>
   request<CDWControlledRelease>("/workbench/controlled/releases",mutate(key,{candidateId,revisionLabel,...(plannedEffectiveAt?{plannedEffectiveAt}:{})})),
