@@ -5,7 +5,7 @@ import {errorCopy} from "../../shared/errors";
 import {ApiError} from "../../shared/http";
 import {newIdempotencyKey} from "../../shared/ids";
 import type {User} from "../../entities/user/model";
-import {cdwApi,type CDWFormalReady,type CDWEffectiveSearchHit,type CDWDocumentClassification} from "./api";
+import {cdwApi,type CDWFormalReady,type CDWEffectiveSearchHit,type CDWDocumentClassification,type CDWQMSFormalInterruption} from "./api";
 import {CDWQMSAppointmentEvidence} from "./CDWQMSAppointmentEvidence";
 import {CDWQMSSpecialAuthorityPanel} from "./CDWQMSSpecialAuthorityPanel";
 
@@ -24,6 +24,8 @@ const signerPositions=[
 // Three explicit steps deliberately avoid silently granting approval authority.
 export function CDWFormalInitiate({onCreated,loadUsers,actorId}:{onCreated:()=>void;loadUsers:()=>Promise<User[]>;actorId:string}){
  const [ready,setReady]=useState<CDWFormalReady[]>([]);
+ const [interrupted,setInterrupted]=useState<CDWQMSFormalInterruption[]>([]);
+ const [replaces,setReplaces]=useState("");
  const [users,setUsers]=useState<User[]>([]);
  const [delivery,setDelivery]=useState("");
  const [reviewer1,setReviewer1]=useState("");
@@ -62,8 +64,10 @@ export function CDWFormalInitiate({onCreated,loadUsers,actorId}:{onCreated:()=>v
  },[selected?.fileId]);
  useEffect(()=>{
   let live=true;setLoading(true);setError("");
-  Promise.all([cdwApi.formalReady(),loadUsers()])
-   .then(([deliveries,people])=>{if(live){setReady(deliveries.items);setUsers(people.filter(u=>!u.disabled));}})
+  Promise.all([cdwApi.formalReady(),loadUsers(),cdwApi.qmsFormalInterruptions()])
+   .then(([deliveries,people,history])=>{if(live){
+    setReady(deliveries.items);setUsers(people.filter(u=>!u.disabled));setInterrupted(history.items??[]);
+   }})
    .catch(e=>{if(live)setError(errorCopy(e,"无法读取可提交交付稿与审批人"));})
    .finally(()=>{if(live)setLoading(false);});
   return()=>{live=false};
@@ -132,7 +136,8 @@ export function CDWFormalInitiate({onCreated,loadUsers,actorId}:{onCreated:()=>v
  }
  async function submit(){
   if(!selected||!templateId)return;
-  const success=await step("start",key=>cdwApi.formalStart(selected.deliveryId,templateId,key),"正式审批已发起，冻结稿已锁定");
+  const success=await step("start",key=>cdwApi.formalStart(selected.deliveryId,templateId,key,replaces||undefined),
+   replaces?"重新发起成功，原审批血缘已保留":"正式审批已发起，冻结稿已锁定");
   if(success)onCreated();
  }
  return <section className="cdw-detail-inner">
@@ -144,12 +149,24 @@ export function CDWFormalInitiate({onCreated,loadUsers,actorId}:{onCreated:()=>v
   <div className="cdw-form">
    <label>选择已冻结、已验收的文件
     <RareSelect aria-label="选择已验收交付" value={delivery} disabled={busy||loading}
-     onChange={e=>{setDelivery(e.target.value);resetSteps();}}>
+     onChange={e=>{setDelivery(e.target.value);setReplaces("");resetSteps();}}>
      <option value="">选择正式审批候选稿</option>
      {ready.map(r=><option key={r.deliveryId} value={r.deliveryId}>{r.fileName}</option>)}
     </RareSelect>
    </label>
    {selected&&<div className="cdw-review-digest"><small>冻结交付 SHA-256</small><code>{selected.sha256}</code></div>}
+   {selected&&interrupted.some(a=>a.subjectFileId===selected.fileId)&&<label>
+    与终止审批建立正式血缘
+    <RareSelect aria-label="关联原终止正式审批" value={replaces} disabled={busy}
+     onChange={e=>setReplaces(e.target.value)}>
+     <option value="">此交付稿未指定替代审批</option>
+     {interrupted.filter(a=>a.subjectFileId===selected.fileId).map(a=>
+      <option key={a.approvalInstanceId} value={a.approvalInstanceId}>
+       原审批 {a.approvalInstanceId} · 已签 {a.completedDecisions} 节点
+      </option>)}
+    </RareSelect>
+    <small>新审批须经现行制度、任命与签批权限重新核验；旧签字不继承。</small>
+   </label>}
    {selected&&<section className="cdw-section">
     <p className="cdw-section-note">文控归类：{classLoading?"正在核验…":classification?.approvalClass==="qms"?"质量体系受控文件":classification?.approvalClass==="general"?"普通文件":"待核定，暂不可正式审批"}</p>
     {classification?.approvalClass==="pending"&&<>

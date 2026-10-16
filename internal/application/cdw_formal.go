@@ -21,8 +21,9 @@ type CDWFormalRoleInput struct {
 	AuthorityBasisReleaseID string `json:"authorityBasisReleaseId,omitempty"`
 }
 type CDWFormalStartInput struct {
-	DeliveryID        string `json:"deliveryId"`
-	TemplateVersionID string `json:"templateVersionId"`
+	DeliveryID         string `json:"deliveryId"`
+	TemplateVersionID  string `json:"templateVersionId"`
+	ReplacesApprovalID string `json:"replacesApprovalId,omitempty"`
 }
 type CDWFormalDecisionInput struct {
 	Decision string `json:"decision"`
@@ -192,7 +193,21 @@ func (s *Service) CDWStartFormalApproval(ctx context.Context, actor domain.User,
 			if _, e := s.visibleFile(ctx, tx, actor, fileID, domain.ActionPreview); e != nil {
 				return nil, e
 			}
-			return store.CDWStartFormalApproval(ctx, id, subjectID, input.DeliveryID, input.TemplateVersionID, actor.ID, key)
+			created, e := store.CDWStartFormalApproval(ctx, id, subjectID, input.DeliveryID, input.TemplateVersionID, actor.ID, key)
+			if e != nil {
+				return nil, e
+			}
+			if input.ReplacesApprovalID != "" {
+				g16, ok := tx.(ports.CDWQMSG16Store)
+				if !ok {
+					return nil, domain.ErrInvalidInput
+				}
+				if e = g16.CDWQMSRecordRestart(ctx, NewID("cdwqmsrestart"), input.ReplacesApprovalID, id, actor.ID); e != nil {
+					return nil, e
+				}
+				created.ReplacesApprovalID = input.ReplacesApprovalID
+			}
+			return created, nil
 		})
 	if err != nil {
 		return result, err

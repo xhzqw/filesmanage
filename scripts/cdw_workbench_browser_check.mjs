@@ -149,6 +149,10 @@ try{
  assert.equal(cutApprovals.status,200,"G15 interrupted approvals require authenticated file access");
  assert.ok(Array.isArray(cutApprovals.data?.items),"G15 interrupted instances live in server-side history");
  console.log("CDW_G15_MIDFLIGHT_BROWSER_PASS read-only frozen approvals after policy change");
+ const g16=await evalJS("(async()=>{const urls=['/api/workbench/qms-legacy-approval-anomalies','/api/workbench/qms-formal-interruption-notices'];return await Promise.all(urls.map(async u=>{const r=await fetch(u);return {status:r.status,items:(await r.json()).data?.items}}))})()");
+ assert.ok(g16.every(r=>r.status===200&&Array.isArray(r.items)),
+  "G16 historical anomalies and per-recipient notices are authenticated server backed");
+ console.log("CDW_G16_LEGACY_NOTICE_BROWSER_PASS scoped historical anomalies and individual notice inbox=read-only");
 
  await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('发行准备'));button?.click();return true;})()");
  await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('发行准备')");

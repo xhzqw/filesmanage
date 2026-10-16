@@ -248,6 +248,16 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 		interruptions[0].CompletedDecisions != 0 {
 		t.Fatalf("midflight evidence not permanently recorded: %+v %v", interruptions, interruptErr)
 	}
+	formalNotices, noticeErr := r.CDWQMSFormalNotices(ctx, bob.ID, 20)
+	if noticeErr != nil || len(formalNotices) != 1 || formalNotices[0].ApprovalInstanceID != formalInstance {
+		t.Fatalf("formal signer received no personal interruption notice: %+v %v", formalNotices, noticeErr)
+	}
+	if read, readErr := r.CDWQMSReadFormalNotice(ctx, formalNotices[0].ID, admin.ID); readErr != nil || read {
+		t.Fatalf("other recipient falsely confirmed signer interruption: %t %v", read, readErr)
+	}
+	if read, readErr := r.CDWQMSReadFormalNotice(ctx, formalNotices[0].ID, bob.ID); readErr != nil || !read {
+		t.Fatalf("signer did not confirm own interruption notice: %t %v", read, readErr)
+	}
 	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g15_reopen_bypass"); err != nil {
 		t.Fatal(err)
 	}
@@ -365,6 +375,65 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 		prefix+"_g15_revoked_first", prefix+"_g15_revoked_second", revokedInstance, bob.ID, alice.ID); err != nil {
 		t.Fatal(err)
 	}
+	// G16 lineage: a distinct new instance, same real file, approved source
+	// currently valid. Old signatures are not copied to the new instance.
+	if err = r.CDWQMSRecordRestart(ctx, prefix+"_g16_valid_restart", formalInstance, revokedInstance, admin.ID); err != nil {
+		t.Fatalf("new pending approval could not link its prior conflict: %v", err)
+	}
+	if err = r.CDWQMSRecordRestart(ctx, prefix+"_g16_invalid_restart", formalInstance, formalInstance, admin.ID); err == nil {
+		t.Fatal("restart linked an approval to itself")
+	}
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g16_lineage_mutation"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `UPDATE cdw_qms_formal_restarts SET previous_approval_id=$2 WHERE id=$1`,
+		prefix+"_g16_valid_restart", coalescedInstance); err == nil {
+		t.Fatal("SQL rewrote immutable restart lineage")
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_g16_lineage_mutation"); err != nil {
+		t.Fatal(err)
+	}
+	// A legacy pending approval can become invalid without a G15 policy
+	// pointer transition (for example the source document was deleted).
+	// Discovery must not alter the instance before independent intervention.
+	legacyInstance := prefix + "_g16_legacy_pending"
+	if _, err = tx.Exec(ctx, `INSERT INTO cdw_formal_approval_instances
+ (id,subject_id,template_version_id,state,requested_by)
+ VALUES($1,$2,$3,'pending',$4)`, legacyInstance, formalSubject, tpl, admin.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO cdw_formal_approval_steps
+ (id,instance_id,node_key,sequence_no,approver_user_id,state)
+ VALUES($1,$3,'management_representative',1,$4,'ready'),
+       ($2,$3,'general_manager',2,$5,'waiting')`,
+		prefix+"_g16_legacy_first", prefix+"_g16_legacy_second", legacyInstance, bob.ID, alice.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `UPDATE files SET deleted_at=clock_timestamp() WHERE id=$1`, policyFile); err != nil {
+		t.Fatal(err)
+	}
+	anomalies, anomalyErr := r.CDWQMSLegacyAnomalies(ctx, charlie.ID, 30)
+	if anomalyErr != nil || len(anomalies) < 1 {
+		t.Fatalf("historical pending qualification anomaly not found: %+v %v", anomalies, anomalyErr)
+	}
+	if err = tx.QueryRow(ctx, `SELECT state FROM cdw_formal_approval_instances WHERE id=$1`,
+		legacyInstance).Scan(&interruptedState); err != nil || interruptedState != "pending" {
+		t.Fatalf("read-only historical scan unexpectedly modified approval: %s %v", interruptedState, err)
+	}
+	if _, anomalyErr = r.CDWQMSHoldLegacy(ctx, prefix+"_g16_self_hold", legacyInstance, admin.ID, reason); !errors.Is(anomalyErr, domain.ErrForbidden) {
+		t.Fatalf("requester self-quarantined legacy approval: %v", anomalyErr)
+	}
+	held, anomalyErr := r.CDWQMSHoldLegacy(ctx, prefix+"_g16_hold", legacyInstance, charlie.ID, reason)
+	if anomalyErr != nil || held.State != "conflicted" {
+		t.Fatalf("independent legacy quarantine failed: %+v %v", held, anomalyErr)
+	}
+	if err = tx.QueryRow(ctx, `SELECT state FROM cdw_formal_approval_instances WHERE id=$1`,
+		legacyInstance).Scan(&interruptedState); err != nil || interruptedState != "conflicted" {
+		t.Fatalf("legacy quarantine didn't make terminal conflict: %s %v", interruptedState, err)
+	}
+	if _, err = tx.Exec(ctx, `UPDATE files SET deleted_at=NULL WHERE id=$1`, policyFile); err != nil {
+		t.Fatal(err)
+	}
 	record, err = r.CDWQMSSpecialReview(ctx, recordID, charlie.ID, reason, "revoke")
 	if err != nil || record.Status != "revoked" {
 		t.Fatalf("dedicated rule revocation failed: %+v %v", record, err)
@@ -438,6 +507,7 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_special_new_review"); err != nil {
 		t.Fatal(err)
 	}
+	t.Log("CDW_G16_LEGACY_LINEAGE_PASS per-recipient notices and ACK, independent legacy anomaly quarantine, immutable same-file restart lineage")
 	t.Log("CDW_G15_MIDFLIGHT_PASS pointer change+authority revoke terminal conflicts, immutable frozen decisions, no SQL resurrection/candidate")
 	t.Log("CDW_G14_POLICY_IMPACT_PASS automatic pointer review, independent assessment, irreversible history, exact-artifact fail-closed")
 	t.Log("CDW_QMS_SPECIAL_AUTHORITY_PASS node clauses, return/reject/resubmit, revoked alerts+recipient ACK, exact template, sticky kind, pointer rotation")

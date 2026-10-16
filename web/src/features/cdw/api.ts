@@ -112,7 +112,15 @@ export type CDWQMSFormalInterruption={
 export type CDWFormalApproval={
  id:string;subjectId:string;deliveryId:string;fileId:string;fileName?:string;
  sha256:string;templateVersionId:string;state:"pending"|"approved"|"rejected"|"cancelled"|"conflicted";
- revision:number;candidateId?:string;requestedBy:string;
+ revision:number;candidateId?:string;requestedBy:string;replacesApprovalId?:string;
+};
+export type CDWQMSLegacyAnomaly={
+ approvalInstanceId:string;fileId:string;fileName:string;templateVersionId:string;
+ requestedBy:string;completedDecisions:number;sha256:string;
+};
+export type CDWQMSFormalNotice={
+ id:string;approvalInstanceId:string;fileId:string;
+ eventKind:"policy_interrupted"|"legacy_quarantined";createdAt:string;readAt?:string;
 };
 export type CDWFormalStep={id:string;nodeKey:string;sequence:number;approverId:string;state:string;revision:number};
 export type CDWFormalDetail={approval:CDWFormalApproval;steps:CDWFormalStep[];
@@ -305,6 +313,14 @@ export const cdwApi={
   "/workbench/qms-special-policy-impacts",{cache:"no-store"}),
  qmsFormalInterruptions:()=>request<{items:CDWQMSFormalInterruption[]}>(
   "/workbench/qms-interrupted-approvals",{cache:"no-store"}),
+ qmsLegacyAnomalies:()=>request<{items:CDWQMSLegacyAnomaly[]}>(
+  "/workbench/qms-legacy-approval-anomalies",{cache:"no-store"}),
+ qmsLegacyHold:(id:string,reason:string,key:string)=>request<{id:string;approvalInstanceId:string;fileId:string;state:string}>(
+  "/workbench/qms-legacy-approval-anomalies/"+segment(id)+"/hold",mutate(key,{reason})),
+ qmsFormalNotices:()=>request<{items:CDWQMSFormalNotice[]}>(
+  "/workbench/qms-formal-interruption-notices",{cache:"no-store"}),
+ qmsFormalNoticeRead:(id:string,key:string)=>request<{id:string;read:boolean}>(
+  "/workbench/qms-formal-interruption-notices/"+segment(id)+"/read",mutate(key,{})),
  qmsSpecialAssessImpact:(id:string,disposition:"reapproval_required"|"no_effect_on_existing_records",assessment:string,key:string)=>
   request<CDWQMSSpecialPolicyImpact>("/workbench/qms-special-policy-impacts/"+segment(id)+"/assess",
    mutate(key,{disposition,assessment})),
@@ -317,8 +333,9 @@ export const cdwApi={
   request<{id:string}>("/workbench/formal-templates",mutate(key,{templateKey,steps,...(authorityBasisReleaseId?{authorityBasisReleaseId}:{})})),
  formalGrant:(fileId:string,userId:string,key:string,authorityBasisReleaseId?:string)=>
   request<{id:string}>("/workbench/formal-roles",mutate(key,{fileId,userId,...(authorityBasisReleaseId?{authorityBasisReleaseId}:{})})),
- formalStart:(deliveryId:string,templateVersionId:string,key:string)=>
-  request<CDWFormalApproval>("/workbench/formal-approvals",mutate(key,{deliveryId,templateVersionId})),
+ formalStart:(deliveryId:string,templateVersionId:string,key:string,replacesApprovalId?:string)=>
+  request<CDWFormalApproval>("/workbench/formal-approvals",
+   mutate(key,{deliveryId,templateVersionId,...(replacesApprovalId?{replacesApprovalId}:{})})),
  fulfillObligation:(id:string,revision:number,statement:string,key:string)=>
   request<CDWObligationFulfillment>("/workbench/obligations/"+segment(id)+"/fulfill",mutate(key,{statement},revision)),
  resume:(taskId:string,revision:number,key:string)=>

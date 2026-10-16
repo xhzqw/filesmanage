@@ -1084,6 +1084,41 @@ add("GET","/api/workbench/qms-interrupted-approvals",operation(
  responses=dict([json_ok(obj({"items":arr(CDW_QMS_INTERRUPTION)},required=["items"]),
  "Requester, participant or current controller must also pass both source and subject file ACLs."),
  resp("403",ERR["403"])])))
+CDW_QMS_LEGACY_ANOMALY=obj({
+ "approvalInstanceId":string(),"fileId":string(),"fileName":string(),
+ "templateVersionId":string(),"requestedBy":string(),"completedDecisions":integer(minimum=0),
+ "sha256":string()},required=["approvalInstanceId","fileId","fileName",
+ "templateVersionId","requestedBy","completedDecisions","sha256"])
+CDW_QMS_FORMAL_NOTICE=obj({
+ "id":string(),"approvalInstanceId":string(),"fileId":string(),
+ "eventKind":string(enum=["policy_interrupted","legacy_quarantined"]),
+ "createdAt":timestamp(),"readAt":timestamp()},
+ required=["id","approvalInstanceId","fileId","eventKind","createdAt"])
+add("GET","/api/workbench/qms-legacy-approval-anomalies",operation(
+ "Live ACL-filtered historical pending DHF/DMR approvals lacking current signatory authority",
+ "CDW","cdwQMSLegacyAnomalies",security=SESSION,
+ responses=dict([json_ok(obj({"items":arr(CDW_QMS_LEGACY_ANOMALY)},required=["items"]),
+ "Read-only anomaly discovery does not rewrite existing records."),resp("403",ERR["403"])])))
+add("POST","/api/workbench/qms-legacy-approval-anomalies/{id}/hold",operation(
+ "Independently quarantine one historical anomalous pending approval with immutable explanation",
+ "CDW","cdwQMSLegacyHold",security=SESSION,
+ params=[id_param("id","Historical approval instance."),CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({"reason":string()},required=["reason"])}},
+ responses=dict([json_ok(obj({"id":string(),"approvalInstanceId":string(),"fileId":string(),"state":string()},
+ required=["id","approvalInstanceId","fileId","state"]),"New terminal conflict, never modifies signed history."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
+add("GET","/api/workbench/qms-formal-interruption-notices",operation(
+ "Recipient-specific formal interruption and legacy quarantine inbox",
+ "CDW","cdwQMSFormalNotices",security=SESSION,
+ responses=dict([json_ok(obj({"items":arr(CDW_QMS_FORMAL_NOTICE)},required=["items"]),
+ "Preserves individual read timestamps."),resp("403",ERR["403"])])))
+add("POST","/api/workbench/qms-formal-interruption-notices/{id}/read",operation(
+ "Confirm only your own formal approval interruption notice",
+ "CDW","cdwQMSFormalNoticeRead",security=SESSION,
+ params=[id_param("id","Notice ID."),CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({})}},
+ responses=dict([json_ok(obj({"id":string(),"read":boolean()},required=["id","read"]),
+ "Recipient-only acknowledgement."),resp("404",ERR["404"])])))
 add("POST","/api/workbench/formal-templates",operation(
  "Publish immutable versioned formal approval template","CDW","cdwFormalTemplatePublish",
  security=SESSION,params=[CDW_IDEMPOTENCY],
@@ -1101,7 +1136,9 @@ add("POST","/api/workbench/formal-roles",operation(
 add("POST","/api/workbench/formal-approvals",operation(
  "Freeze accepted root delivery as separate formal approval subject","CDW","cdwFormalCreate",
  security=SESSION,params=[CDW_IDEMPOTENCY],
- request={"application/json":{"schema":obj({"deliveryId":string(),"templateVersionId":string()},required=["deliveryId","templateVersionId"])}},
+ request={"application/json":{"schema":obj({"deliveryId":string(),"templateVersionId":string(),
+ "replacesApprovalId":string("Optional immutable prior quarantined formal approval ID, subject to same-file and current-policy checks.")},
+ required=["deliveryId","templateVersionId"])}},
  responses=dict([json_ok(CDW_FORMAL_APPROVAL,"New pending approval; NOT an effective version."),resp("403",ERR["403"]),resp("409",ERR["409"])])))
 add("GET","/api/workbench/formal-approvals/ready",operation(
  "List verified, ACL-visible accepted root-task frozen deliveries eligible for formal submission","CDW","cdwFormalReady",

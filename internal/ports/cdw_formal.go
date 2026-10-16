@@ -13,17 +13,48 @@ type CDWFormalStepDefinition struct {
 	ApproverID string `json:"approverId"`
 }
 type CDWFormalApproval struct {
-	ID                string `json:"id"`
-	SubjectID         string `json:"subjectId"`
-	DeliveryID        string `json:"deliveryId"`
-	FileID            string `json:"fileId"`
-	FileName          string `json:"fileName,omitempty"`
-	SHA256            string `json:"sha256"`
-	TemplateVersionID string `json:"templateVersionId"`
-	State             string `json:"state"`
-	Revision          int64  `json:"revision"`
-	CandidateID       string `json:"candidateId,omitempty"`
-	RequestedBy       string `json:"requestedBy"`
+	ID                 string `json:"id"`
+	SubjectID          string `json:"subjectId"`
+	DeliveryID         string `json:"deliveryId"`
+	FileID             string `json:"fileId"`
+	FileName           string `json:"fileName,omitempty"`
+	SHA256             string `json:"sha256"`
+	TemplateVersionID  string `json:"templateVersionId"`
+	State              string `json:"state"`
+	Revision           int64  `json:"revision"`
+	CandidateID        string `json:"candidateId,omitempty"`
+	RequestedBy        string `json:"requestedBy"`
+	ReplacesApprovalID string `json:"replacesApprovalId,omitempty"`
+}
+type CDWQMSLegacyAnomaly struct {
+	ApprovalInstanceID string `json:"approvalInstanceId"`
+	FileID             string `json:"fileId"`
+	FileName           string `json:"fileName"`
+	TemplateVersionID  string `json:"templateVersionId"`
+	RequestedBy        string `json:"requestedBy"`
+	CompletedDecisions int    `json:"completedDecisions"`
+	SHA256             string `json:"sha256"`
+}
+type CDWQMSFormalNotice struct {
+	ID                 string  `json:"id"`
+	ApprovalInstanceID string  `json:"approvalInstanceId"`
+	FileID             string  `json:"fileId"`
+	EventKind          string  `json:"eventKind"`
+	CreatedAt          string  `json:"createdAt"`
+	ReadAt             *string `json:"readAt,omitempty"`
+}
+type CDWQMSLegacyHold struct {
+	ID                 string `json:"id"`
+	ApprovalInstanceID string `json:"approvalInstanceId"`
+	FileID             string `json:"fileId"`
+	State              string `json:"state"`
+}
+type CDWQMSG16Store interface {
+	CDWQMSLegacyAnomalies(context.Context, string, int) ([]CDWQMSLegacyAnomaly, error)
+	CDWQMSHoldLegacy(context.Context, string, string, string, string) (CDWQMSLegacyHold, error)
+	CDWQMSFormalNotices(context.Context, string, int) ([]CDWQMSFormalNotice, error)
+	CDWQMSReadFormalNotice(context.Context, string, string) (bool, error)
+	CDWQMSRecordRestart(context.Context, string, string, string, string) error
 }
 type CDWFormalStep struct {
 	ID         string `json:"id"`

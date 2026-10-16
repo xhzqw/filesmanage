@@ -3,7 +3,7 @@ import {RareButton,RareNotice,RareTextarea,RareInput,RareSelect} from "../../sha
 import {toast} from "../../shared/ui/feedback";
 import {errorCopy} from "../../shared/errors";
 import {newIdempotencyKey} from "../../shared/ids";
-import {cdwApi,type CDWQMSSpecialAuthority,type CDWQMSSpecialAlert,type CDWQMSSpecialPolicyImpact,type CDWQMSFormalInterruption} from "./api";
+import {cdwApi,type CDWQMSSpecialAuthority,type CDWQMSSpecialAlert,type CDWQMSSpecialPolicyImpact,type CDWQMSFormalInterruption,type CDWQMSLegacyAnomaly,type CDWQMSFormalNotice} from "./api";
 
 type Scope={fileId:string;kind:"dhf"|"dmr";templateVersionId:string;policyReleaseId:string;
  nodes:Array<{nodeKey:string;label:string}>};
@@ -24,6 +24,10 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
  const [alerts,setAlerts]=useState<CDWQMSSpecialAlert[]>([]);
  const [impacts,setImpacts]=useState<CDWQMSSpecialPolicyImpact[]>([]);
  const [interruptions,setInterruptions]=useState<CDWQMSFormalInterruption[]>([]);
+ const [legacy,setLegacy]=useState<CDWQMSLegacyAnomaly[]>([]);
+ const [notices,setNotices]=useState<CDWQMSFormalNotice[]>([]);
+ const [holdId,setHoldId]=useState("");
+ const [holdReason,setHoldReason]=useState("");
  const [impactReason,setImpactReason]=useState("");
  const [impactDisposition,setImpactDisposition]=useState<"reapproval_required"|"no_effect_on_existing_records">("reapproval_required");
  const [impactSelected,setImpactSelected]=useState("");
@@ -48,8 +52,15 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
  },[refresh,actorId]);
  useEffect(()=>{
   let live=true;
-  cdwApi.qmsFormalInterruptions().then(page=>{if(live)setInterruptions(page.items??[]);})
+ cdwApi.qmsFormalInterruptions().then(page=>{if(live)setInterruptions(page.items??[]);})
    .catch(e=>{if(live)setError(errorCopy(e,"中途失效的正式审批记录加载失败"));});
+  return()=>{live=false;};
+ },[refresh,actorId]);
+ useEffect(()=>{
+  let live=true;
+  Promise.all([cdwApi.qmsLegacyAnomalies(),cdwApi.qmsFormalNotices()])
+   .then(([pending,messages])=>{if(live){setLegacy(pending.items??[]);setNotices(messages.items??[]);}})
+   .catch(e=>{if(live)setError(errorCopy(e,"历史异常审批与中断通知加载失败"));});
   return()=>{live=false;};
  },[refresh,actorId]);
  const shown=useMemo(()=>scope?
@@ -98,6 +109,25 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
    setRefresh(v=>v+1);
   }catch(e){setError(errorCopy(e,"确认通知失败"));}
  }
+ async function readInterruption(id:string){
+  try{
+   await toast.track(()=>cdwApi.qmsFormalNoticeRead(id,newIdempotencyKey()),{
+    loading:"正在确认中断通知…",success:"已记录本人阅读确认",
+    error:e=>errorCopy(e,"中断通知确认失败")});
+   setRefresh(v=>v+1);
+  }catch(e){setError(errorCopy(e,"中断通知确认失败"));}
+ }
+ async function quarantine(id:string){
+  if(busy||Array.from(holdReason.trim()).length<16)return;
+  setBusy(true);setError("");
+  try{
+   await toast.track(()=>cdwApi.qmsLegacyHold(id,holdReason.trim(),newIdempotencyKey()),{
+    loading:"正在隔离异常审批…",success:"历史待审实例已隔离，原签署记录保留",
+    error:e=>errorCopy(e,"历史审批隔离失败")});
+   setHoldId("");setHoldReason("");setRefresh(v=>v+1);onChange?.();
+  }catch(e){setError(errorCopy(e,"历史审批隔离失败"));}
+  finally{setBusy(false);}
+ }
  async function assessImpact(id:string){
   if(busy||Array.from(impactReason.trim()).length<16)return;
   setBusy(true);setError("");
@@ -121,6 +151,35 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
    核对原始专属规定、适用文件、精确受控发行版本和模板节点后才能独立确认。提报人不能自审。
   </p>}
   {error&&<RareNotice tone="danger">{error}</RareNotice>}
+  {!scope&&notices.some(n=>!n.readAt)&&<div className="cdw-review-digest" aria-label="审批中断通知">
+   <small>需要本人确认的审批中断通知</small>
+   {notices.filter(n=>!n.readAt).map(n=><div key={n.id} className="cdw-review-digest">
+    <p className="cdw-section-note">原审批 {n.approvalInstanceId}：
+     {n.eventKind==="legacy_quarantined"?"历史签批资格异常，经文控核验后已隔离":"制度变更后进行中的审批已经终止"}。
+     历史签字保留，必须按现行制度重新审批。</p>
+    <RareButton type="button" tone="neutral" onClick={()=>void readInterruption(n.id)}>已知悉</RareButton>
+   </div>)}
+  </div>}
+  {!scope&&legacy.length>0&&<div className="cdw-review-digest" aria-label="历史待审资格异常">
+   <small>历史待审审批异常（仅核实后可隔离）</small>
+   {legacy.map(item=><div className="cdw-review-digest" key={item.approvalInstanceId}>
+    <strong>{item.fileName}</strong>
+    <p className="cdw-section-note">旧审批 {item.approvalInstanceId} · 已签署 {item.completedDecisions} 节点 · 当前专用审批资格不满足</p>
+    <RareButton type="button" tone="neutral" disabled={busy}
+     onClick={()=>{setHoldId(holdId===item.approvalInstanceId?"":item.approvalInstanceId);setHoldReason("");}}>
+     {holdId===item.approvalInstanceId?"取消":"文控核实并隔离"}
+    </RareButton>
+    {holdId===item.approvalInstanceId&&<>
+     <label>核实依据
+      <RareTextarea rows={3} aria-label="历史待审异常隔离依据"
+       value={holdReason} onChange={e=>setHoldReason(e.target.value)}
+       placeholder="核对适用制度及签批资格，说明不能继续的原因（至少16字）"/>
+     </label>
+     <RareButton type="button" loading={busy} disabled={busy||Array.from(holdReason.trim()).length<16}
+      onClick={()=>void quarantine(item.approvalInstanceId)}>确认受控隔离</RareButton>
+    </>}
+   </div>)}
+  </div>}
   {!scope&&interruptions.length>0&&<div className="cdw-review-digest" aria-label="制度变更中断的正式审批">
    <small>因制度变更或授权撤销而终止的审批</small>
    <RareNotice tone="warning">这些审批已正式转为冲突终态，既有签署历史保留，不能继续原审批；须依据新版有效制度和授权重新发起。</RareNotice>

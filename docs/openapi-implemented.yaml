@@ -3842,6 +3842,266 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-legacy-approval-anomalies:
+    get:
+      summary: Live ACL-filtered historical pending DHF/DMR approvals lacking current signatory authority
+      operationId: cdwQMSLegacyAnomalies
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Read-only anomaly discovery does not rewrite existing records.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            approvalInstanceId:
+                              type: string
+                            fileId:
+                              type: string
+                            fileName:
+                              type: string
+                            templateVersionId:
+                              type: string
+                            requestedBy:
+                              type: string
+                            completedDecisions:
+                              type: integer
+                              minimum: 0
+                            sha256:
+                              type: string
+                          required:
+                          - approvalInstanceId
+                          - fileId
+                          - fileName
+                          - templateVersionId
+                          - requestedBy
+                          - completedDecisions
+                          - sha256
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-legacy-approval-anomalies/{id}/hold:
+    post:
+      summary: Independently quarantine one historical anomalous pending approval with immutable explanation
+      operationId: cdwQMSLegacyHold
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Historical approval instance.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+              required:
+              - reason
+      responses:
+        '200':
+          description: New terminal conflict, never modifies signed history.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      approvalInstanceId:
+                        type: string
+                      fileId:
+                        type: string
+                      state:
+                        type: string
+                    required:
+                    - id
+                    - approvalInstanceId
+                    - fileId
+                    - state
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-formal-interruption-notices:
+    get:
+      summary: Recipient-specific formal interruption and legacy quarantine inbox
+      operationId: cdwQMSFormalNotices
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Preserves individual read timestamps.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            approvalInstanceId:
+                              type: string
+                            fileId:
+                              type: string
+                            eventKind:
+                              type: string
+                              enum:
+                              - policy_interrupted
+                              - legacy_quarantined
+                            createdAt:
+                              type: string
+                              format: date-time
+                            readAt:
+                              type: string
+                              format: date-time
+                          required:
+                          - id
+                          - approvalInstanceId
+                          - fileId
+                          - eventKind
+                          - createdAt
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-formal-interruption-notices/{id}/read:
+    post:
+      summary: Confirm only your own formal approval interruption notice
+      operationId: cdwQMSFormalNoticeRead
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Notice ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        '200':
+          description: Recipient-only acknowledgement.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      read:
+                        type: boolean
+                    required:
+                    - id
+                    - read
+                required:
+                - ok
+                - data
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/formal-templates:
     post:
       summary: Publish immutable versioned formal approval template
@@ -4011,6 +4271,10 @@ paths:
                   type: string
                 templateVersionId:
                   type: string
+                replacesApprovalId:
+                  type: string
+                  description: Optional immutable prior quarantined formal approval ID, subject to same-file and current-policy
+                    checks.
               required:
               - deliveryId
               - templateVersionId
