@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -17,7 +18,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const cdwTaskScratchName = "cdw_g2_tasks_iso_20261015"
+// A fresh, disposable scratch database is mandatory. The old fixed-name lab
+// accumulated runnable activation schedules and made the test nondeterministic.
+var cdwTaskScratchPattern = regexp.MustCompile(`^cdw_g2_tasks_iso_20261015_[a-f0-9]{16}$`)
 
 // Never run against a production or development database. This integration
 // suite is opt-in and checks current_database before creating any fixture.
@@ -37,8 +40,8 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 	if err = pool.QueryRow(ctx, "SELECT current_database()").Scan(&dbName); err != nil {
 		t.Fatal(err)
 	}
-	if dbName != cdwTaskScratchName {
-		t.Fatalf("refusing to mutate non-isolated database %q", dbName)
+	if !cdwTaskScratchPattern.MatchString(dbName) || os.Getenv("CDW_TASK_TEST_FRESH_LAB") != dbName {
+		t.Fatalf("refusing non-fresh or non-attested scratch database %q", dbName)
 	}
 	repo := New(pool)
 	service := application.New(repo, nil)
