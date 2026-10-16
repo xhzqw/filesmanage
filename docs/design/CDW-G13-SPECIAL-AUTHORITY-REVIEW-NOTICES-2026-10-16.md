@@ -13,3 +13,15 @@
 ## 本阶段验收原则
 
 使用 `scripts/cdw_fresh_pg_lab.sh` 每次新建隔离 PostgreSQL 库，应用全部迁移、完成 G2–G13 回归、自动销毁测试库；同时执行 Go 编译与静态检查、TS/Vite、OpenAPI 与架构检查、18091 开发部署和 Chrome 1440/1024/780 浏览器实测。**8091 未授权，不得使用演示数据在业务库生成公司任命、制度或真实审批。**
+
+## 2026-10-16 实际执行验收
+
+- 代码提交 `e763b79`：G13 逐节点条款和退回/驳回状态机、通知 API 与复用工作台；`bb1e714`：工作台未读数量、错误审批节点/直接 SQL 回写反绕过测试。远端 `main` 已同步。
+- **两次全新隔离库** `cdw_g2_tasks_iso_20261015_e64c4b0c63c41b95` 和 `cdw_g2_tasks_iso_20261015_a20b2b83a14472e9` 各自从空库完成 `MIGRATIONS_OK 65` 并通过全部 `TestCDWTaskPostgresTransactions`（包括 `CDW_QMS_SPECIAL_AUTHORITY_PASS`、G2–G11 既有关键流及任命撤销）；均输出 `CDW_FRESH_LAB_DROPPED`。
+- 新增反绕过检查实测：申请的节点条款数量不全被拒绝；试图用模板外节点顶替必需节点被拒绝；原提报人自审被拒绝；`returned/rejected` 终态不允许正常接口或**直接 SQL** 恢复。原批准后撤销不可恢复；撤销通知发至相应审批人员并只允许真正收件人确认已读。
+- 远端 TypeScript `tsc --noEmit`、Vite 生产构建（724 modules）、Go build/vet、HTTP 定向测试、OpenAPI 漂移检查（212 paths）、架构约束与验收矩阵检查通过。Vite 仍有原有 Three.js 动态/静态混用及大包 warning，此项尚未优化，不影响本次构建通过的事实。
+- 18091 **开发数据库** 已真正应用 `0063_cdw_qms_special_review_actions.sql`，启动程序报告 `MIGRATIONS_OK 65`，开发 server/worker 重启并两次 `health/ready OK`。
+- 实际 Chrome 登录的只读浏览器验证通过：`CDW_LAYOUT_PASS` 1440、1024、780 px；`CDW_QMS_SPECIAL_REVIEW_ALERT_BROWSER_PASS`；G6/G7/G8/G9/G11 等现有 CDW 入口回归。没有通过浏览器在真实开发库执行“正式审批通过”等改变企业质量事实的写入动作；写路径正反例由隔离 PostgreSQL 完成。
+- **边界：** 源专用制度中的条款与岗位对应关系由有权文控人员核验，本系统只自动核对编号、记录完整性及版本节点一致性，不声称机器已理解条款实质意义。8091 生产端口、原始 `docs/流程参考文档/` 和既有用户未提交修改未触及。
+
+后续可继续建设：在专项核验界面直接以 SHA 和发行 ID 展示专用制度的**原始发行物**，取代普通最新预览；为非标准命名的 DHF/DMR 制度增加正式的受控类别登记、及早期政策变更影响任务。此处不宣称这些后续功能已交付。
