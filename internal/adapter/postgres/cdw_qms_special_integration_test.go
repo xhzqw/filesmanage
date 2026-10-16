@@ -152,8 +152,8 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 		t.Fatal(err)
 	}
 	if _, err = tx.Exec(ctx, `INSERT INTO cdw_distribution_plans
- (id,state,digest_sha256,created_by,frozen_at)
- VALUES($1,'dispatched',$2,$3,clock_timestamp())`,
+	 (id,state,digest_sha256,created_by)
+	 VALUES($1,'draft',$2,$3)`,
 		planID, snapshotSHA, admin.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -162,16 +162,25 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
  VALUES($1,1,$2,$3,$4)`, planID, policyRelease, artifactID, sha); err != nil {
 		t.Fatal(err)
 	}
+	if _, err = tx.Exec(ctx, `UPDATE cdw_distribution_plans SET state='dispatched',
+ frozen_at=clock_timestamp() WHERE id=$1`, planID); err != nil {
+		t.Fatal(err)
+	}
 	if _, err = tx.Exec(ctx, `INSERT INTO cdw_distribution_batches
- (id,plan_id,plan_digest_sha256,state,dispatched_by,dispatched_at)
- VALUES($1,$2,$3,'dispatched',$4,clock_timestamp())`,
-		batchID, planID, snapshotSHA, admin.ID); err != nil {
+	 (id,plan_id,plan_digest_sha256,state)
+	 VALUES($1,$2,$3,'draft')`,
+		batchID, planID, snapshotSHA); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = tx.Exec(ctx, `INSERT INTO cdw_distribution_batch_items
  (id,batch_id,plan_id,ordinal,release_id,artifact_id,artifact_sha256)
  VALUES($1,$2,$3,1,$4,$5,$6)`,
 		prefix+"_special_batch_item", batchID, planID, policyRelease, artifactID, sha); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `UPDATE cdw_distribution_batches SET state='dispatched',
+ dispatched_by=$2,dispatched_at=clock_timestamp() WHERE id=$1`,
+		batchID, admin.ID); err != nil {
 		t.Fatal(err)
 	}
 	if source, sourceErr := r.CDWQMSSpecialEvidenceSource(ctx, recordID); sourceErr != nil || source.ReleaseID != policyRelease || source.SHA256 != sha || source.SizeBytes != 31 ||
