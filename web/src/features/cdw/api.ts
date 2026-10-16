@@ -248,10 +248,10 @@ export const cdwApi={
  formalDetail:(id:string)=>request<CDWFormalDetail>("/workbench/formal-approvals/"+segment(id),{cache:"no-store"}),
  formalDecide:(id:string,revision:number,decision:"approve"|"reject",reason:string,key:string)=>
   request<CDWFormalApproval>("/workbench/formal-approvals/"+segment(id)+"/decide",mutate(key,{decision,reason},revision)),
- formalPublish:(templateKey:string,steps:Array<{nodeKey:string;sequence:number;approverId:string}>,key:string)=>
-  request<{id:string}>("/workbench/formal-templates",mutate(key,{templateKey,steps})),
- formalGrant:(fileId:string,userId:string,key:string)=>
-  request<{id:string}>("/workbench/formal-roles",mutate(key,{fileId,userId})),
+ formalPublish:(templateKey:string,steps:Array<{nodeKey:string;sequence:number;approverId:string}>,key:string,authorityBasisReleaseId?:string)=>
+  request<{id:string}>("/workbench/formal-templates",mutate(key,{templateKey,steps,...(authorityBasisReleaseId?{authorityBasisReleaseId}:{})})),
+ formalGrant:(fileId:string,userId:string,key:string,authorityBasisReleaseId?:string)=>
+  request<{id:string}>("/workbench/formal-roles",mutate(key,{fileId,userId,...(authorityBasisReleaseId?{authorityBasisReleaseId}:{})})),
  formalStart:(deliveryId:string,templateVersionId:string,key:string)=>
   request<CDWFormalApproval>("/workbench/formal-approvals",mutate(key,{deliveryId,templateVersionId})),
  fulfillObligation:(id:string,revision:number,statement:string,key:string)=>

@@ -52,8 +52,8 @@ type CDWFormalReadyDelivery struct {
 
 // All mutations run inside the caller's UnitOfWork transaction.
 type CDWFormalStore interface {
-	CDWPublishFormalTemplate(context.Context, string, string, []CDWFormalStepDefinition, string) (string, error)
-	CDWGrantFormalApprover(context.Context, string, string, string, string) (string, error)
+	CDWPublishFormalTemplate(context.Context, string, string, []CDWFormalStepDefinition, string, string) (string, error)
+	CDWGrantFormalApprover(context.Context, string, string, string, string, string) (string, error)
 	CDWFormalDeliveryFile(context.Context, string) (string, error)
 	CDWFormalApprovalFile(context.Context, string) (string, error)
 	CDWStartFormalApproval(context.Context, string, string, string, string, string, string) (CDWFormalApproval, error)

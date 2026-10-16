@@ -9,26 +9,51 @@ import (
 	"filesmanage/internal/domain"
 	"filesmanage/internal/ports"
 	"github.com/jackc/pgx/v5"
+	"strings"
 	"time"
 )
 
+func cdwIsQMSFormalTemplate(key string) bool {
+	key = strings.ToLower(key)
+	return strings.HasPrefix(key, "qms_") || strings.HasPrefix(key, "cdw_qms_")
+}
+
+func (r *Repository) cdwQMSPolicyEffective(ctx context.Context, basisID string) (bool, error) {
+	if basisID == "" {
+		return false, nil
+	}
+	var active bool
+	err := r.Q.QueryRow(ctx, "SELECT cdw_qms_policy_release_effective($1)", basisID).Scan(&active)
+	return active, err
+}
+
 // The binding is checked again while deciding, not just when a step is assigned.
 // In particular, administrator status is never itself formal approval authority.
-func (r *Repository) cdwFormalAuthority(ctx context.Context, actor, fileID string) (string, error) {
+func (r *Repository) cdwFormalAuthority(ctx context.Context, actor, fileID, policyBasisID string) (string, error) {
 	var id string
 	err := r.Q.QueryRow(ctx, `SELECT b.id FROM cdw_business_role_bindings b
  JOIN users u ON u.id=b.user_id WHERE b.user_id=$1 AND b.role='formal_approver'
  AND (b.file_id=$2 OR b.file_id IS NULL) AND b.department_id IS NULL
  AND b.valid_from<=now() AND (b.expires_at IS NULL OR b.expires_at>now())
  AND b.revoked_at IS NULL AND u.disabled_at IS NULL
- ORDER BY (b.file_id IS NOT NULL) DESC,b.id LIMIT 1 FOR SHARE OF b,u`, actor, fileID).Scan(&id)
+ AND ($3='' OR b.authority_basis_release_id=$3)
+ ORDER BY (b.file_id IS NOT NULL) DESC,b.id LIMIT 1 FOR SHARE OF b,u`, actor, fileID, policyBasisID).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", domain.ErrForbidden
 	}
 	return id, err
 }
 
-func (r *Repository) CDWPublishFormalTemplate(ctx context.Context, id, key string, steps []ports.CDWFormalStepDefinition, actor string) (string, error) {
+func (r *Repository) CDWPublishFormalTemplate(ctx context.Context, id, key string, steps []ports.CDWFormalStepDefinition, actor, policyBasisID string) (string, error) {
+	if cdwIsQMSFormalTemplate(key) || policyBasisID != "" {
+		active, err := r.cdwQMSPolicyEffective(ctx, policyBasisID)
+		if err != nil {
+			return "", err
+		}
+		if !active {
+			return "", domain.ErrPolicyAuthorityPending
+		}
+	}
 	// A transaction-scoped advisory lock serializes version allocation for a key.
 	if _, err := r.Q.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1))", key); err != nil {
 		return "", err
@@ -42,16 +67,31 @@ func (r *Repository) CDWPublishFormalTemplate(ctx context.Context, id, key strin
 		return "", err
 	}
 	_, err = r.Q.Exec(ctx, `INSERT INTO cdw_workflow_template_versions
- (id,template_key,version_no,lifecycle,graph,role_policy,published_at,created_by)
- VALUES($1,$2,$3,'published',$4,'{"formalApproval":true}'::jsonb,now(),$5)`, id, key, version, graph, actor)
+ (id,template_key,version_no,lifecycle,graph,role_policy,published_at,created_by,authority_basis_release_id)
+ VALUES($1,$2,$3,'published',$4,'{"formalApproval":true}'::jsonb,now(),$5,NULLIF($6,''))`,
+		id, key, version, graph, actor, policyBasisID)
 	return id, err
 }
-func (r *Repository) CDWGrantFormalApprover(ctx context.Context, id, userID, fileID, actor string) (string, error) {
+func (r *Repository) CDWGrantFormalApprover(ctx context.Context, id, userID, fileID, actor, policyBasisID string) (string, error) {
+	if policyBasisID != "" {
+		active, err := r.cdwQMSPolicyEffective(ctx, policyBasisID)
+		if err != nil {
+			return "", err
+		}
+		if !active {
+			return "", domain.ErrPolicyAuthorityPending
+		}
+	}
+	if _, err := r.Q.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1))",
+		"cdw:formal_approver:"+userID+":"+fileID+":"+policyBasisID); err != nil {
+		return "", err
+	}
 	var existing string
 	err := r.Q.QueryRow(ctx, `SELECT id FROM cdw_business_role_bindings
  WHERE user_id=$1 AND role='formal_approver' AND file_id=$2
+ AND authority_basis_release_id IS NOT DISTINCT FROM NULLIF($3,'')
  AND revoked_at IS NULL AND valid_from<=now()
- AND (expires_at IS NULL OR expires_at>now()) LIMIT 1 FOR UPDATE`, userID, fileID).Scan(&existing)
+ AND (expires_at IS NULL OR expires_at>now()) LIMIT 1 FOR UPDATE`, userID, fileID, policyBasisID).Scan(&existing)
 	if err == nil {
 		return existing, nil
 	}
@@ -59,9 +99,10 @@ func (r *Repository) CDWGrantFormalApprover(ctx context.Context, id, userID, fil
 		return "", err
 	}
 	tag, err := r.Q.Exec(ctx, `INSERT INTO cdw_business_role_bindings
- (id,user_id,role,file_id,granted_by) SELECT $1,u.id,'formal_approver',f.id,$4
+ (id,user_id,role,file_id,granted_by,authority_basis_release_id)
+ SELECT $1,u.id,'formal_approver',f.id,$4,NULLIF($5,'')
  FROM users u CROSS JOIN files f WHERE u.id=$2 AND u.disabled_at IS NULL
- AND f.id=$3 AND f.deleted_at IS NULL`, id, userID, fileID, actor)
+ AND f.id=$3 AND f.deleted_at IS NULL`, id, userID, fileID, actor, policyBasisID)
 	if err != nil {
 		return "", err
 	}
@@ -131,14 +172,25 @@ func (r *Repository) CDWStartFormalApproval(ctx context.Context, id, subjectID, 
 		return result, domain.ErrConflict
 	}
 	var graph []byte
-	err = r.Q.QueryRow(ctx, `SELECT graph FROM cdw_workflow_template_versions
+	var templateKey, policyBasisID string
+	err = r.Q.QueryRow(ctx, `SELECT graph,template_key,COALESCE(authority_basis_release_id,'')
+ FROM cdw_workflow_template_versions
  WHERE id=$1 AND lifecycle='published' AND graph->>'type'='formal_document'
- AND role_policy->>'formalApproval'='true'`, templateID).Scan(&graph)
+ AND role_policy->>'formalApproval'='true'`, templateID).Scan(&graph, &templateKey, &policyBasisID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return result, domain.ErrInvalidInput
 	}
 	if err != nil {
 		return result, err
+	}
+	if cdwIsQMSFormalTemplate(templateKey) {
+		active, checkErr := r.cdwQMSPolicyEffective(ctx, policyBasisID)
+		if checkErr != nil {
+			return result, checkErr
+		}
+		if !active {
+			return result, domain.ErrPolicyAuthorityPending
+		}
 	}
 	var template struct {
 		Steps []ports.CDWFormalStepDefinition `json:"steps"`
@@ -155,7 +207,7 @@ func (r *Repository) CDWStartFormalApproval(ctx context.Context, id, subjectID, 
 		if step.Sequence < 1 || step.ApproverID == submittedBy {
 			return result, domain.ErrForbidden
 		}
-		if _, err = r.cdwFormalAuthority(ctx, step.ApproverID, fileID); err != nil {
+		if _, err = r.cdwFormalAuthority(ctx, step.ApproverID, fileID, policyBasisID); err != nil {
 			return result, err
 		}
 	}
@@ -203,11 +255,13 @@ func hashFormalID(a, b string) string {
 
 func (r *Repository) CDWDecideFormalApproval(ctx context.Context, id, actor, decisionID string, expected int64, decision, reason, candidateID string) (ports.CDWFormalApproval, error) {
 	var result ports.CDWFormalApproval
-	var state, subjectID, templateID, fileID, hash, requester string
+	var state, subjectID, templateID, fileID, hash, requester, templateKey, policyBasisID string
 	var rev int64
-	err := r.Q.QueryRow(ctx, `SELECT a.state,a.subject_id,a.template_version_id,s.file_id,s.sha256,a.requested_by,a.revision
+	err := r.Q.QueryRow(ctx, `SELECT a.state,a.subject_id,a.template_version_id,s.file_id,s.sha256,a.requested_by,a.revision,
+ tv.template_key,COALESCE(tv.authority_basis_release_id,'')
  FROM cdw_formal_approval_instances a JOIN cdw_approval_subjects s ON s.id=a.subject_id
- WHERE a.id=$1 FOR UPDATE OF a`, id).Scan(&state, &subjectID, &templateID, &fileID, &hash, &requester, &rev)
+ JOIN cdw_workflow_template_versions tv ON tv.id=a.template_version_id
+ WHERE a.id=$1 FOR UPDATE OF a`, id).Scan(&state, &subjectID, &templateID, &fileID, &hash, &requester, &rev, &templateKey, &policyBasisID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return result, domain.ErrNotFound
 	}
@@ -220,7 +274,16 @@ func (r *Repository) CDWDecideFormalApproval(ctx context.Context, id, actor, dec
 	if actor == requester {
 		return result, domain.ErrForbidden
 	}
-	binding, err := r.cdwFormalAuthority(ctx, actor, fileID)
+	if cdwIsQMSFormalTemplate(templateKey) {
+		active, checkErr := r.cdwQMSPolicyEffective(ctx, policyBasisID)
+		if checkErr != nil {
+			return result, checkErr
+		}
+		if !active {
+			return result, domain.ErrPolicyAuthorityPending
+		}
+	}
+	binding, err := r.cdwFormalAuthority(ctx, actor, fileID, policyBasisID)
 	if err != nil {
 		return result, err
 	}
@@ -237,8 +300,9 @@ func (r *Repository) CDWDecideFormalApproval(ctx context.Context, id, actor, dec
 	_, err = r.Q.Exec(ctx, `INSERT INTO cdw_formal_approval_decisions
  (id,step_id,actor_id,decision,reason,subject_sha256,actor_authority_snapshot)
  VALUES($1,$2,$3,$4,$5,$6,jsonb_build_object('role','formal_approver',
- 'bindingId',$7::text,'actorId',$3::text,'approvedSubjectId',$8::text))`,
-		decisionID, stepID, actor, decision, reason, hash, binding, subjectID)
+ 'bindingId',$7::text,'actorId',$3::text,'approvedSubjectId',$8::text,
+ 'policyBasisReleaseId',NULLIF($9::text,'')))`,
+		decisionID, stepID, actor, decision, reason, hash, binding, subjectID, policyBasisID)
 	if err != nil {
 		return result, err
 	}
@@ -346,12 +410,16 @@ func (r *Repository) CDWFormalInbox(ctx context.Context, actor string, limit int
 	rows, err := r.Q.Query(ctx, cdwFormalApprovalSelect+`
  WHERE a.state='pending' AND EXISTS (
  SELECT 1 FROM cdw_formal_approval_steps step
+ JOIN cdw_workflow_template_versions tv ON tv.id=a.template_version_id
  JOIN cdw_business_role_bindings b ON b.user_id=step.approver_user_id
  JOIN users u ON u.id=b.user_id
  WHERE step.instance_id=a.id AND step.state='ready' AND step.approver_user_id=$1
  AND b.role='formal_approver' AND (b.file_id=s.file_id OR b.file_id IS NULL)
  AND b.department_id IS NULL AND b.revoked_at IS NULL AND b.valid_from<=now()
- AND (b.expires_at IS NULL OR b.expires_at>now()) AND u.disabled_at IS NULL)
+ AND (b.expires_at IS NULL OR b.expires_at>now()) AND u.disabled_at IS NULL
+ AND (lower(tv.template_key) !~ '^(cdw_)?qms_' OR
+  (b.authority_basis_release_id=tv.authority_basis_release_id
+   AND cdw_qms_policy_release_effective(tv.authority_basis_release_id))))
  ORDER BY a.requested_at DESC,a.id DESC LIMIT $2`, actor, limit)
 	if err != nil {
 		return nil, err
@@ -373,13 +441,17 @@ func (r *Repository) CDWFormalCanRead(ctx context.Context, id, actor string) (bo
 	err := r.Q.QueryRow(ctx, `SELECT EXISTS(
  SELECT 1 FROM cdw_formal_approval_instances a
  JOIN cdw_approval_subjects s ON s.id=a.subject_id
+ JOIN cdw_workflow_template_versions tv ON tv.id=a.template_version_id
  WHERE a.id=$1 AND (a.requested_by=$2 OR EXISTS(
  SELECT 1 FROM cdw_formal_approval_steps st
  JOIN cdw_business_role_bindings auth ON auth.user_id=st.approver_user_id
  WHERE st.instance_id=a.id AND st.approver_user_id=$2
  AND auth.role='formal_approver' AND (auth.file_id=s.file_id OR auth.file_id IS NULL)
  AND auth.department_id IS NULL AND auth.revoked_at IS NULL
- AND auth.valid_from<=now() AND (auth.expires_at IS NULL OR auth.expires_at>now()))
+ AND auth.valid_from<=now() AND (auth.expires_at IS NULL OR auth.expires_at>now())
+ AND (lower(tv.template_key) !~ '^(cdw_)?qms_' OR
+  (auth.authority_basis_release_id=tv.authority_basis_release_id
+   AND cdw_qms_policy_release_effective(tv.authority_basis_release_id))))
  OR EXISTS(SELECT 1 FROM cdw_business_role_bindings b WHERE b.user_id=$2 AND b.role='document_control'
  AND (b.file_id=s.file_id OR b.file_id IS NULL) AND b.revoked_at IS NULL
  AND b.valid_from<=now() AND (b.expires_at IS NULL OR b.expires_at>now()))))`, id, actor).Scan(&allowed)

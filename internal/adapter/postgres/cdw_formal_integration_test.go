@@ -89,6 +89,33 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 			t.Fatalf("role %v %v", role, e)
 		}
 	}
+	// QMS rule 77A: the existing admin-granted role alone is insufficient to
+	// publish a new official QMS template, or to assert an imaginary policy.
+	qmsName := "qms_" + prefix + "_document_correction"
+	qmsSteps := []ports.CDWFormalStepDefinition{{NodeKey: "management_representative", Sequence: 1, ApproverID: bob.ID},
+		{NodeKey: "general_manager", Sequence: 2, ApproverID: charlie.ID}}
+	if _, e := service.CDWPublishFormalTemplate(ctx, admin, application.CDWFormalTemplateInput{
+		TemplateKey: qmsName, Steps: qmsSteps,
+	}, prefix+"_qms_no_basis"); !errors.Is(e, domain.ErrPolicyAuthorityPending) {
+		t.Fatalf("unverified QMS template was published: %v", e)
+	}
+	if _, e := service.CDWPublishFormalTemplate(ctx, admin, application.CDWFormalTemplateInput{
+		TemplateKey: qmsName, Steps: qmsSteps, AuthorityBasisReleaseID: "missing_policy_release",
+	}, prefix+"_qms_fake_basis"); !errors.Is(e, domain.ErrPolicyAuthorityPending) {
+		t.Fatalf("imaginary QMS policy was accepted: %v", e)
+	}
+	if _, e := service.CDWGrantFormalApprover(ctx, admin, application.CDWFormalRoleInput{
+		UserID: bob.ID, FileID: fileID, AuthorityBasisReleaseID: "missing_policy_release",
+	}, prefix+"_qms_fake_role"); !errors.Is(e, domain.ErrPolicyAuthorityPending) {
+		t.Fatalf("imaginary QMS approver appointment was accepted: %v", e)
+	}
+	if _, e := pool.Exec(ctx, `INSERT INTO cdw_workflow_template_versions
+	 (id,template_key,version_no,lifecycle,graph,role_policy,published_at,created_by)
+	 VALUES($1,$2,1,'published','{"type":"formal_document"}'::jsonb,
+	 '{"formalApproval":true}'::jsonb,now(),$3)`,
+		prefix+"_qms_direct_bypass", qmsName, admin.ID); e == nil {
+		t.Fatal("database permitted publishing a QMS template without policy evidence")
+	}
 	tpl, err := service.CDWPublishFormalTemplate(ctx, admin, application.CDWFormalTemplateInput{
 		TemplateKey: prefix + "_g7_formal_approval",
 		Steps: []ports.CDWFormalStepDefinition{

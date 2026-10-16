@@ -1,11 +1,11 @@
 import {useEffect,useRef,useState} from "react";
-import {RareButton,RareSelect,RareNotice} from "../../shared/ui/rare";
+import {RareButton,RareInput,RareSelect,RareNotice} from "../../shared/ui/rare";
 import {toast} from "../../shared/ui/feedback";
 import {errorCopy} from "../../shared/errors";
 import {ApiError} from "../../shared/http";
 import {newIdempotencyKey} from "../../shared/ids";
 import type {User} from "../../entities/user/model";
-import {cdwApi,type CDWFormalReady} from "./api";
+import {cdwApi,type CDWFormalReady,type CDWEffectiveSearchHit} from "./api";
 
 // Three explicit steps deliberately avoid silently granting approval authority.
 export function CDWFormalInitiate({onCreated,loadUsers}:{onCreated:()=>void;loadUsers:()=>Promise<User[]>}){
@@ -15,6 +15,11 @@ export function CDWFormalInitiate({onCreated,loadUsers}:{onCreated:()=>void;load
  const [reviewer1,setReviewer1]=useState("");
  const [reviewer2,setReviewer2]=useState("");
  const [parallel,setParallel]=useState(false);
+ const [qms,setQms]=useState(false);
+ const [basisSearch,setBasisSearch]=useState("");
+ const [basisResults,setBasisResults]=useState<CDWEffectiveSearchHit[]>([]);
+ const [basisReleaseId,setBasisReleaseId]=useState("");
+ const [basisBusy,setBasisBusy]=useState(false);
  const [authorized,setAuthorized]=useState(false);
  const [templateId,setTemplateId]=useState("");
  const [error,setError]=useState("");
@@ -34,7 +39,17 @@ export function CDWFormalInitiate({onCreated,loadUsers}:{onCreated:()=>void;load
   setAuthorized(false);setTemplateId("");
   keys.current.clear();
  }
- const prepared=Boolean(selected&&reviewer1&&reviewer2&&reviewer1!==reviewer2);
+ const prepared=Boolean(selected&&reviewer1&&reviewer2&&reviewer1!==reviewer2&&(!qms||basisReleaseId));
+ const policyBasis=qms?basisReleaseId:undefined;
+ async function searchPolicy(){
+  if(!basisSearch.trim()||basisBusy)return;
+  setBasisBusy(true);
+  try{
+   const page=await cdwApi.controlEffectiveSearch(basisSearch.trim(),"",30);
+   setBasisResults(page.items);setBasisReleaseId("");
+  }catch(e){setBasisResults([]);setBasisReleaseId("");setError(errorCopy(e,"受控制度依据检索失败"));}
+  finally{setBasisBusy(false);}
+ }
  async function step(name:string,work:(key:string)=>Promise<unknown>,success:string){
   if(busy)return false;
   let key=keys.current.get(name);
@@ -49,14 +64,14 @@ export function CDWFormalInitiate({onCreated,loadUsers}:{onCreated:()=>void;load
  async function authorize(){
   if(!selected||!prepared)return;
   // Individual grants are explicit, auditable role assignment commands.
-  const a=await step("grant:"+delivery+":"+reviewer1,key=>cdwApi.formalGrant(selected.fileId,reviewer1,key),"第一级正式审批权限已授予");
+  const a=await step("grant:"+delivery+":"+reviewer1,key=>cdwApi.formalGrant(selected.fileId,reviewer1,key,policyBasis),"第一级正式审批权限已授予");
   if(!a)return;
-  const b=await step("grant:"+delivery+":"+reviewer2,key=>cdwApi.formalGrant(selected.fileId,reviewer2,key),"第二级正式审批权限已授予");
+  const b=await step("grant:"+delivery+":"+reviewer2,key=>cdwApi.formalGrant(selected.fileId,reviewer2,key,policyBasis),"第二级正式审批权限已授予");
   if(b)setAuthorized(true);
  }
  async function publish(){
   if(!selected||!authorized||!prepared)return;
-  const name="cdw-formal-"+selected.deliveryId;
+  const name=(qms?"qms_":"cdw-formal-")+selected.deliveryId;
   const steps=[
    {nodeKey:"stage-one",sequence:1,approverId:reviewer1},
    {nodeKey:"stage-two",sequence:parallel?1:2,approverId:reviewer2},
@@ -66,7 +81,7 @@ export function CDWFormalInitiate({onCreated,loadUsers}:{onCreated:()=>void;load
   if(!key){key=newIdempotencyKey();keys.current.set("publish",key);}
   setBusy(true);
   try{
-   const result=await toast.track(()=>cdwApi.formalPublish(name,steps,key),{
+   const result=await toast.track(()=>cdwApi.formalPublish(name,steps,key,policyBasis),{
     loading:"正在发布只读审批模板…",success:"审批模板版本已发布",error:e=>errorCopy(e,"模板发布失败")
    });
    setTemplateId(result.id);keys.current.delete("publish");
@@ -93,6 +108,31 @@ export function CDWFormalInitiate({onCreated,loadUsers}:{onCreated:()=>void;load
     </RareSelect>
    </label>
    {selected&&<div className="cdw-review-digest"><small>冻结交付 SHA-256</small><code>{selected.sha256}</code></div>}
+   <label>审批用途
+    <RareSelect aria-label="审批用途" value={qms?"qms":"general"} disabled={busy}
+     onChange={e=>{setQms(e.target.value==="qms");resetSteps();}}>
+     <option value="general">普通文件正式审批</option>
+     <option value="qms">质量体系受控文件 / DHF / DMR</option>
+    </RareSelect>
+   </label>
+   {qms&&<>
+    <RareNotice tone="info">质量体系审批必须使用已生效的受控文件作为制度依据。此项只能证明文件来源可追溯，实际签批资格仍须文控按制度核实。</RareNotice>
+    <label>检索当前有效的制度依据
+     <RareInput type="search" aria-label="检索审批制度依据" value={basisSearch}
+      onChange={e=>{setBasisSearch(e.target.value);setBasisResults([]);setBasisReleaseId("");resetSteps();}}
+      placeholder="例如 文件控制程序" disabled={busy||basisBusy}/>
+    </label>
+    <RareButton type="button" loading={basisBusy} disabled={busy||basisBusy||!basisSearch.trim()}
+     onClick={()=>void searchPolicy()}>查找已生效受控文件</RareButton>
+    {basisResults.length>0&&<label>选取制度依据的受控发行版本
+     <RareSelect aria-label="选择生效依据" value={basisReleaseId} disabled={busy}
+      onChange={e=>{setBasisReleaseId(e.target.value);resetSteps();}}>
+      <option value="">选择当前有效的发行物</option>
+      {basisResults.map(r=><option key={r.releaseId} value={r.releaseId}>{r.fileName} · {r.releaseId}</option>)}
+     </RareSelect>
+    </label>}
+    {!basisReleaseId&&<p className="cdw-section-note">未核验依据前可继续准备文档任务，但正式审批角色授权及模板发布不会开放。</p>}
+   </>}
    <label>一级审批人
     <RareSelect aria-label="一级审批人" value={reviewer1} disabled={busy} onChange={e=>{setReviewer1(e.target.value);resetSteps();}}>
      <option value="">选择人员</option>{users.map(u=><option key={u.id} value={u.id}>{u.displayName}</option>)}

@@ -11,12 +11,14 @@ import (
 )
 
 type CDWFormalTemplateInput struct {
-	TemplateKey string                          `json:"templateKey"`
-	Steps       []ports.CDWFormalStepDefinition `json:"steps"`
+	TemplateKey             string                          `json:"templateKey"`
+	Steps                   []ports.CDWFormalStepDefinition `json:"steps"`
+	AuthorityBasisReleaseID string                          `json:"authorityBasisReleaseId,omitempty"`
 }
 type CDWFormalRoleInput struct {
-	UserID string `json:"userId"`
-	FileID string `json:"fileId"`
+	UserID                  string `json:"userId"`
+	FileID                  string `json:"fileId"`
+	AuthorityBasisReleaseID string `json:"authorityBasisReleaseId,omitempty"`
 }
 type CDWFormalStartInput struct {
 	DeliveryID        string `json:"deliveryId"`
@@ -107,7 +109,7 @@ func (s *Service) CDWPublishFormalTemplate(ctx context.Context, actor domain.Use
 	id := NewID("cdwformaltemplate")
 	raw, err := s.cdwFormalMutate(ctx, actor, "formal.template.publish", key, cdwCommandHash("formal.template.publish", "", input), id, 201,
 		func(tx ports.Tx, store ports.CDWFormalStore) (any, error) {
-			published, err := store.CDWPublishFormalTemplate(ctx, id, name, input.Steps, actor.ID)
+			published, err := store.CDWPublishFormalTemplate(ctx, id, name, input.Steps, actor.ID, input.AuthorityBasisReleaseID)
 			return CDWFormalCreated{ID: published}, err
 		})
 	if err != nil {
@@ -142,9 +144,13 @@ func (s *Service) CDWGrantFormalApprover(ctx context.Context, actor domain.User,
 				return nil, e
 			}
 			person, e := tx.UserByID(ctx, input.UserID)
-			if e != nil || person.DisabledAt != nil { return nil, domain.ErrForbidden }
-			if _, e = s.visibleFile(ctx, tx, person, input.FileID, domain.ActionPreview); e != nil { return nil, domain.ErrForbidden }
-			actual, e := store.CDWGrantFormalApprover(ctx, id, input.UserID, input.FileID, actor.ID)
+			if e != nil || person.DisabledAt != nil {
+				return nil, domain.ErrForbidden
+			}
+			if _, e = s.visibleFile(ctx, tx, person, input.FileID, domain.ActionPreview); e != nil {
+				return nil, domain.ErrForbidden
+			}
+			actual, e := store.CDWGrantFormalApprover(ctx, id, input.UserID, input.FileID, actor.ID, input.AuthorityBasisReleaseID)
 			return CDWFormalCreated{ID: actual}, e
 		})
 	if err != nil {
