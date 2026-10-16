@@ -1036,6 +1036,36 @@ add("POST","/api/workbench/qms-special-alerts/{id}/read",operation(
  request={"application/json":{"schema":obj({})}},
  responses=dict([json_ok(obj({"id":string(),"read":boolean()},required=["id","read"]),
  "Recipient-specific acknowledged timestamp."),resp("404",ERR["404"])])))
+add("GET","/api/workbench/qms-special-authorities/{id}/evidence",operation(
+ "Download exact current issued and dispatched source policy artifact, immutable release ID and SHA",
+ "CDW","cdwQMSSpecialEvidence",security=SESSION,
+ params=[id_param("id","Dedicated authority request ID.")],
+ responses={"200":{"description":"Exact controlled DOCX or PDF, never mutable latest, SHA+release response headers."},
+  "403":{"description":"Missing live document-control role or file ACL."},
+  "409":{"description":"Exact policy release not current or not dispatched as controlled artifact."}}))
+CDW_QMS_POLICY_IMPACT=obj({
+ "id":string(),"authorityId":string(),"subjectFileId":string(),"subjectName":string(),
+ "policyFileId":string(),"oldReleaseId":string(),"newReleaseId":string(),
+ "sourceKind":string(enum=["pointer","release_status"]),"state":string(enum=["open","assessed"]),
+ "detectedAt":timestamp(),"assessment":string(),
+ "disposition":string(enum=["reapproval_required","no_effect_on_existing_records"])},
+ required=["id","authorityId","subjectFileId","subjectName","policyFileId","oldReleaseId",
+ "sourceKind","state","detectedAt"])
+add("GET","/api/workbench/qms-special-policy-impacts",operation(
+ "Live document-control scoped automatic impact assessment tasks after dedicated policy changes",
+ "CDW","cdwQMSSpecialImpacts",security=SESSION,
+ responses=dict([json_ok(obj({"items":arr(CDW_QMS_POLICY_IMPACT)},required=["items"]),
+ "Open and assessed tasks scoped to controller and source/subject ACL."),
+ resp("403",ERR["403"])])))
+add("POST","/api/workbench/qms-special-policy-impacts/{id}/assess",operation(
+ "Independently record policy change impact without inventing new signatory authorization",
+ "CDW","cdwQMSSpecialAssessImpact",security=SESSION,
+ params=[id_param("id","Policy impact task ID."),CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({
+ "disposition":string(enum=["reapproval_required","no_effect_on_existing_records"]),
+ "assessment":string()},required=["disposition","assessment"])}},
+ responses=dict([json_ok(CDW_QMS_POLICY_IMPACT,"Immutable, separate impact conclusion."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
 add("POST","/api/workbench/formal-templates",operation(
  "Publish immutable versioned formal approval template","CDW","cdwFormalTemplatePublish",
  security=SESSION,params=[CDW_IDEMPOTENCY],

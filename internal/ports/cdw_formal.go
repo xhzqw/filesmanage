@@ -126,9 +126,33 @@ type CDWQMSSpecialAlert struct {
 	CreatedAt   string  `json:"createdAt"`
 	ReadAt      *string `json:"readAt,omitempty"`
 }
+type CDWQMSSpecialPolicyImpact struct {
+	ID            string `json:"id"`
+	AuthorityID   string `json:"authorityId"`
+	SubjectFileID string `json:"subjectFileId"`
+	SubjectName   string `json:"subjectName"`
+	PolicyFileID  string `json:"policyFileId"`
+	OldReleaseID  string `json:"oldReleaseId"`
+	NewReleaseID  string `json:"newReleaseId,omitempty"`
+	SourceKind    string `json:"sourceKind"`
+	State         string `json:"state"`
+	DetectedAt    string `json:"detectedAt"`
+	Assessment    string `json:"assessment,omitempty"`
+	Disposition   string `json:"disposition,omitempty"`
+}
+type CDWQMSSpecialEvidenceSource struct {
+	CDWBranchSource
+	SHA256    string
+	ReleaseID string
+	Format    string
+}
 
 // All mutations run inside the caller's UnitOfWork transaction.
 type CDWFormalStore interface {
+	CDWQMSSpecialEvidenceSource(context.Context, string) (CDWQMSSpecialEvidenceSource, error)
+	CDWQMSSpecialImpacts(context.Context, string, int) ([]CDWQMSSpecialPolicyImpact, error)
+	CDWQMSSpecialAssessImpact(context.Context, string, string, string, string) (CDWQMSSpecialPolicyImpact, error)
+	CDWQMSSpecialImpactFiles(context.Context, string) (string, string, error)
 	CDWQMSSpecialPropose(context.Context, string, string, string, string, string, string, string, []CDWQMSSpecialNodeClaim) (CDWQMSSpecialAuthority, error)
 	CDWQMSSpecialReview(context.Context, string, string, string, string) (CDWQMSSpecialAuthority, error)
 	CDWQMSSpecialFile(context.Context, string) (string, string, error)

@@ -132,6 +132,9 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	if err = r.cdwFormalValidateClass(ctx, subjectFileID, tpl, "qms_"+policyTemplate, policyRelease); err != nil {
 		t.Fatalf("dedicated policy did not technically unblock matching template: %v", err)
 	}
+	if source, sourceErr := r.CDWQMSSpecialEvidenceSource(ctx, recordID); !errors.Is(sourceErr, domain.ErrPolicyAuthorityPending) {
+		t.Fatalf("non-dispatched policy artifact was served instead of failing closed: %+v %v", source, sourceErr)
+	}
 	if err = r.cdwFormalValidateClass(ctx, subjectFileID, "bogus", "qms_"+policyTemplate, policyRelease); !errors.Is(err, domain.ErrPolicyAuthorityPending) {
 		t.Fatalf("other template inherited dedicated authority: %v", err)
 	}
@@ -148,6 +151,41 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	if _, err = tx.Exec(ctx, `UPDATE cdw_effective_pointers SET state='none',release_id=NULL
  WHERE file_id=$1`, policyFile); err != nil {
 		t.Fatal(err)
+	}
+	impactRows, impactErr := r.CDWQMSSpecialImpacts(ctx, charlie.ID, 30)
+	if impactErr != nil || len(impactRows) != 1 || impactRows[0].State != "open" ||
+		impactRows[0].OldReleaseID != policyRelease || impactRows[0].NewReleaseID != "" {
+		t.Fatalf("policy change did not create exactly one scoped review task: %+v %v", impactRows, impactErr)
+	}
+	impactID := impactRows[0].ID
+	if _, impactErr = r.CDWQMSSpecialAssessImpact(ctx, impactID, admin.ID,
+		"reapproval_required", reason); !errors.Is(impactErr, domain.ErrForbidden) {
+		t.Fatalf("policy proposer self-assessed impact: %v", impactErr)
+	}
+	if _, impactErr = r.CDWQMSSpecialAssessImpact(ctx, impactID, bob.ID,
+		"reapproval_required", reason); !errors.Is(impactErr, domain.ErrForbidden) {
+		t.Fatalf("unauthorized approver assessed impact: %v", impactErr)
+	}
+	result, impactErr := r.CDWQMSSpecialAssessImpact(ctx, impactID, charlie.ID,
+		"reapproval_required", reason)
+	if impactErr != nil || result.State != "assessed" || result.Disposition != "reapproval_required" {
+		t.Fatalf("independent policy impact assessment failed: %+v %v", result, impactErr)
+	}
+	if _, impactErr = r.CDWQMSSpecialAssessImpact(ctx, impactID, charlie.ID,
+		"no_effect_on_existing_records", reason); !errors.Is(impactErr, domain.ErrConflict) {
+		t.Fatalf("assessed obligation was mutated: %v", impactErr)
+	}
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_policy_impact_sql"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `UPDATE cdw_qms_special_policy_impacts SET state='open' WHERE id=$1`, impactID); err == nil {
+		t.Fatal("direct SQL restored assessed impact")
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_policy_impact_sql"); err != nil {
+		t.Fatal(err)
+	}
+	if source, sourceErr := r.CDWQMSSpecialEvidenceSource(ctx, recordID); !errors.Is(sourceErr, domain.ErrPolicyAuthorityPending) {
+		t.Fatalf("old evidence opened after controlled pointer withdrawal: %+v %v", source, sourceErr)
 	}
 	if err = r.cdwFormalValidateClass(ctx, subjectFileID, tpl, "qms_"+policyTemplate, policyRelease); !errors.Is(err, domain.ErrPolicyAuthorityPending) {
 		t.Fatalf("superseded dedicated rule still signed: %v", err)
@@ -220,5 +258,6 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_special_new_review"); err != nil {
 		t.Fatal(err)
 	}
+	t.Log("CDW_G14_POLICY_IMPACT_PASS automatic pointer review, independent assessment, irreversible history, exact-artifact fail-closed")
 	t.Log("CDW_QMS_SPECIAL_AUTHORITY_PASS node clauses, return/reject/resubmit, revoked alerts+recipient ACK, exact template, sticky kind, pointer rotation")
 }

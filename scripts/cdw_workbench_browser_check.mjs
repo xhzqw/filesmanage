@@ -141,6 +141,10 @@ try{
  assert.equal(alerts2.status,200,"DHF/DMR returned, rejected and revoked alerts are authenticated");
  assert.ok(Array.isArray(alerts2.data?.items),"QMS special status alerts persist in a server-side inbox");
  console.log("CDW_QMS_SPECIAL_REVIEW_ALERT_BROWSER_PASS recipient-only status alerts=read-only");
+ const policyImpacts=await evalJS("(async()=>{const r=await fetch('/api/workbench/qms-special-policy-impacts');return {status:r.status,data:(await r.json()).data}})()");
+ assert.equal(policyImpacts.status,200,"QMS policy impact tasks are scoped and authenticated");
+ assert.ok(Array.isArray(policyImpacts.data?.items),"G14 policy impact assessment tasks are server-backed");
+ console.log("CDW_G14_POLICY_IMPACT_BROWSER_PASS live scoped impact task inbox=read-only");
 
  await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('发行准备'));button?.click();return true;})()");
  await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('发行准备')");

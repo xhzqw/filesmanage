@@ -93,6 +93,13 @@ export type CDWQMSSpecialAuthority={
  nodeClaims:Array<{nodeKey:string;clauseRef:string;basisSummary:string}>;
 };
 export type CDWQMSSpecialAlert={id:string;authorityId:string;fileId:string;kind:"dhf"|"dmr";eventKind:"returned"|"rejected"|"revoked";createdAt:string;readAt?:string};
+export type CDWQMSSpecialPolicyImpact={
+ id:string;authorityId:string;subjectFileId:string;subjectName:string;
+ policyFileId:string;oldReleaseId:string;newReleaseId?:string;
+ sourceKind:"pointer"|"release_status";state:"open"|"assessed";
+ detectedAt:string;assessment?:string;
+ disposition?:"reapproval_required"|"no_effect_on_existing_records";
+};
 export type CDWFormalApproval={
  id:string;subjectId:string;deliveryId:string;fileId:string;fileName?:string;
  sha256:string;templateVersionId:string;state:"pending"|"approved"|"rejected"|"cancelled"|"conflicted";
@@ -284,6 +291,12 @@ export const cdwApi={
  qmsSpecialAlerts:()=>request<{items:CDWQMSSpecialAlert[]}>("/workbench/qms-special-alerts",{cache:"no-store"}),
  qmsSpecialAlertRead:(id:string,key:string)=>request<{id:string;read:boolean}>(
   "/workbench/qms-special-alerts/"+segment(id)+"/read",mutate(key,{})),
+ qmsSpecialEvidenceUrl:(id:string)=>"/api/workbench/qms-special-authorities/"+segment(id)+"/evidence",
+ qmsSpecialImpacts:()=>request<{items:CDWQMSSpecialPolicyImpact[]}>(
+  "/workbench/qms-special-policy-impacts",{cache:"no-store"}),
+ qmsSpecialAssessImpact:(id:string,disposition:"reapproval_required"|"no_effect_on_existing_records",assessment:string,key:string)=>
+  request<CDWQMSSpecialPolicyImpact>("/workbench/qms-special-policy-impacts/"+segment(id)+"/assess",
+   mutate(key,{disposition,assessment})),
  formalInbox:(limit=100)=>request<{items:CDWFormalApproval[]}>(
   "/workbench/formal-approvals/inbox?limit="+limit,{cache:"no-store"}),
  formalDetail:(id:string)=>request<CDWFormalDetail>("/workbench/formal-approvals/"+segment(id),{cache:"no-store"}),

@@ -3,7 +3,7 @@ import {RareButton,RareNotice,RareTextarea,RareInput,RareSelect} from "../../sha
 import {toast} from "../../shared/ui/feedback";
 import {errorCopy} from "../../shared/errors";
 import {newIdempotencyKey} from "../../shared/ids";
-import {cdwApi,type CDWQMSSpecialAuthority,type CDWQMSSpecialAlert} from "./api";
+import {cdwApi,type CDWQMSSpecialAuthority,type CDWQMSSpecialAlert,type CDWQMSSpecialPolicyImpact} from "./api";
 
 type Scope={fileId:string;kind:"dhf"|"dmr";templateVersionId:string;policyReleaseId:string;
  nodes:Array<{nodeKey:string;label:string}>};
@@ -22,6 +22,10 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
  const [action,setAction]=useState<"verify"|"return"|"reject">("verify");
  const [nodeRefs,setNodeRefs]=useState<Record<string,{clauseRef:string;basisSummary:string}>>({});
  const [alerts,setAlerts]=useState<CDWQMSSpecialAlert[]>([]);
+ const [impacts,setImpacts]=useState<CDWQMSSpecialPolicyImpact[]>([]);
+ const [impactReason,setImpactReason]=useState("");
+ const [impactDisposition,setImpactDisposition]=useState<"reapproval_required"|"no_effect_on_existing_records">("reapproval_required");
+ const [impactSelected,setImpactSelected]=useState("");
  const [refresh,setRefresh]=useState(0);
  useEffect(()=>{
   let live=true;
@@ -33,6 +37,12 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
   let live=true;
   cdwApi.qmsSpecialAlerts().then(page=>{if(live)setAlerts(page.items??[]);})
    .catch(e=>{if(live)setError(errorCopy(e,"专项审批通知加载失败"));});
+  return()=>{live=false;};
+ },[refresh,actorId]);
+ useEffect(()=>{
+  let live=true;
+  cdwApi.qmsSpecialImpacts().then(page=>{if(live)setImpacts(page.items??[]);})
+   .catch(e=>{if(live)setError(errorCopy(e,"制度变更影响评估加载失败"));});
   return()=>{live=false;};
  },[refresh,actorId]);
  const shown=useMemo(()=>scope?
@@ -81,6 +91,18 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
    setRefresh(v=>v+1);
   }catch(e){setError(errorCopy(e,"确认通知失败"));}
  }
+ async function assessImpact(id:string){
+  if(busy||Array.from(impactReason.trim()).length<16)return;
+  setBusy(true);setError("");
+  try{
+   await toast.track(()=>cdwApi.qmsSpecialAssessImpact(
+    id,impactDisposition,impactReason.trim(),newIdempotencyKey()),{
+    loading:"正在记录制度变更影响评估…",success:"影响评估已留痕；新制度签批资格仍须重新核验",
+    error:e=>errorCopy(e,"制度影响评估失败")});
+   setImpactSelected("");setImpactReason("");setRefresh(v=>v+1);onChange?.();
+  }catch(e){setError(errorCopy(e,"制度影响评估失败"));}
+  finally{setBusy(false);}
+ }
  return <section className="cdw-section" aria-label="DHF DMR 专项签批依据">
   <div className="cdw-section-head"><h3>{scope?"专用签批规定核验":"DHF / DMR 专项签批依据待办"}</h3>
    <RareButton type="button" tone="ghost" disabled={busy} onClick={()=>setRefresh(v=>v+1)}>刷新</RareButton>
@@ -92,6 +114,32 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
    核对原始专属规定、适用文件、精确受控发行版本和模板节点后才能独立确认。提报人不能自审。
   </p>}
   {error&&<RareNotice tone="danger">{error}</RareNotice>}
+  {!scope&&impacts.some(i=>i.state==="open")&&<div className="cdw-review-digest" aria-label="制度变更影响评估">
+   <small>待处理的制度变更影响评估</small>
+   {impacts.filter(i=>i.state==="open").map(impact=><div key={impact.id} className="cdw-review-digest">
+    <p className="cdw-section-note">{impact.subjectName} · 适用制度已换版或失效，原专项授权不再适用新审批。</p>
+    <RareButton type="button" tone="neutral" onClick={()=>{
+     setImpactSelected(impactSelected===impact.id?"":impact.id);setImpactReason("");
+    }}>{impactSelected===impact.id?"取消评估":"填写影响评估"}</RareButton>
+    {impactSelected===impact.id&&<>
+     <label>处理结论
+      <RareSelect aria-label="制度变更影响结论" value={impactDisposition}
+       onChange={e=>setImpactDisposition(e.target.value as typeof impactDisposition)}>
+       <option value="reapproval_required">需要基于新版制度重新批准</option>
+       <option value="no_effect_on_existing_records">仅确认已完成历史记录不受影响</option>
+      </RareSelect>
+     </label>
+     <label>影响范围与判断依据
+      <RareTextarea aria-label="制度变更影响评估说明" rows={3} value={impactReason}
+       onChange={e=>setImpactReason(e.target.value)}
+       placeholder="记录受影响节点、审批实例、已有文件和下一步要求（至少16字）"/>
+     </label>
+     <RareButton type="button" loading={busy}
+      disabled={busy||Array.from(impactReason.trim()).length<16}
+      onClick={()=>void assessImpact(impact.id)}>提交受控影响评估</RareButton>
+    </>}
+   </div>)}
+  </div>}
   {alerts.filter(a=>!a.readAt).length>0&&<div className="cdw-review-digest" aria-label="专项签批通知">
    <small>专项签批状态通知</small>
    {alerts.filter(a=>!a.readAt).map(a=><div className="cdw-review-digest" key={a.id}>
@@ -145,6 +193,10 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
   </RareButton>)}
   {active&&<div className="cdw-review-digest">
    <small>制度：{active.policyName}</small>
+   <a className="cdw-text-link" href={cdwApi.qmsSpecialEvidenceUrl(active.id)}>
+    下载并核对精确受控发行物 ↗
+   </a>
+   <RareNotice tone="info">该下载绑定专用制度真实发行 ID 与 SHA-256，不读取普通最新文件。已换版或失效的发行物不会自动回退到最新版本。</RareNotice>
    <p className="cdw-section-note">{active.reason}</p>
    <p className="cdw-section-note">版本绑定：{active.policyReleaseId} · 审批模板：{active.templateVersionId}</p>
    <div className="cdw-review-digest">

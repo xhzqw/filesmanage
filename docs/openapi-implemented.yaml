@@ -3518,6 +3518,232 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-special-authorities/{id}/evidence:
+    get:
+      summary: Download exact current issued and dispatched source policy artifact, immutable release ID and SHA
+      operationId: cdwQMSSpecialEvidence
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Dedicated authority request ID.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Exact controlled DOCX or PDF, never mutable latest, SHA+release response headers.
+        '403':
+          description: Missing live document-control role or file ACL.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Exact policy release not current or not dispatched as controlled artifact.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-special-policy-impacts:
+    get:
+      summary: Live document-control scoped automatic impact assessment tasks after dedicated policy changes
+      operationId: cdwQMSSpecialImpacts
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Open and assessed tasks scoped to controller and source/subject ACL.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            authorityId:
+                              type: string
+                            subjectFileId:
+                              type: string
+                            subjectName:
+                              type: string
+                            policyFileId:
+                              type: string
+                            oldReleaseId:
+                              type: string
+                            newReleaseId:
+                              type: string
+                            sourceKind:
+                              type: string
+                              enum:
+                              - pointer
+                              - release_status
+                            state:
+                              type: string
+                              enum:
+                              - open
+                              - assessed
+                            detectedAt:
+                              type: string
+                              format: date-time
+                            assessment:
+                              type: string
+                            disposition:
+                              type: string
+                              enum:
+                              - reapproval_required
+                              - no_effect_on_existing_records
+                          required:
+                          - id
+                          - authorityId
+                          - subjectFileId
+                          - subjectName
+                          - policyFileId
+                          - oldReleaseId
+                          - sourceKind
+                          - state
+                          - detectedAt
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-special-policy-impacts/{id}/assess:
+    post:
+      summary: Independently record policy change impact without inventing new signatory authorization
+      operationId: cdwQMSSpecialAssessImpact
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Policy impact task ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                disposition:
+                  type: string
+                  enum:
+                  - reapproval_required
+                  - no_effect_on_existing_records
+                assessment:
+                  type: string
+              required:
+              - disposition
+              - assessment
+      responses:
+        '200':
+          description: Immutable, separate impact conclusion.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      authorityId:
+                        type: string
+                      subjectFileId:
+                        type: string
+                      subjectName:
+                        type: string
+                      policyFileId:
+                        type: string
+                      oldReleaseId:
+                        type: string
+                      newReleaseId:
+                        type: string
+                      sourceKind:
+                        type: string
+                        enum:
+                        - pointer
+                        - release_status
+                      state:
+                        type: string
+                        enum:
+                        - open
+                        - assessed
+                      detectedAt:
+                        type: string
+                        format: date-time
+                      assessment:
+                        type: string
+                      disposition:
+                        type: string
+                        enum:
+                        - reapproval_required
+                        - no_effect_on_existing_records
+                    required:
+                    - id
+                    - authorityId
+                    - subjectFileId
+                    - subjectName
+                    - policyFileId
+                    - oldReleaseId
+                    - sourceKind
+                    - state
+                    - detectedAt
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/formal-templates:
     post:
       summary: Publish immutable versioned formal approval template
