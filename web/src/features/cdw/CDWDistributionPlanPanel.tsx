@@ -299,7 +299,7 @@ export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments,isAd
      </div>
      {schedule?.status==="enabled"&&<small>下次判定：{new Date(schedule.nextAttemptAt).toLocaleString("zh-CN")}。未满足条件时自动保留阻断记录并延后重试。</small>}
      {schedule?.status==="paused"&&<RareNotice tone="warning">文控授权或受控版本状态发生变化，自动办理已停止，需重新核对并授权。</RareNotice>}
-     {schedule?.lastBlockers?.length>0&&<small>上次阻断：{schedule.lastBlockers.map(code=>blockerText[code]??code).join("；")}</small>}
+     {schedule&&schedule.lastBlockers.length>0&&<small>上次阻断：{schedule.lastBlockers.map(code=>blockerText[code]??code).join("；")}</small>}
     </>}
    </div>}
    {plan?.state==="dispatched"&&release.state==="issued_pending"&&<div className="cdw-review-form">
