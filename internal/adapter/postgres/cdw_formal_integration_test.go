@@ -926,6 +926,7 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 		t.Fatal(checkErr)
 	}
 	qmsSubjectID := prefix + "_qms_direct_subject"
+	var checkErr error
 	if _, checkErr := readFixtureTx.Exec(ctx, `INSERT INTO cdw_approval_subjects
  (id,file_id,source_kind,blob_id,sha256,size_bytes,frozen_by)
  VALUES($1,$2,'existing_version',$3,$4,31,$5)`, qmsSubjectID, qmsFileID, blobID, sha, admin.ID); checkErr != nil {
