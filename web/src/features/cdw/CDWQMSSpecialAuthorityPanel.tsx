@@ -31,6 +31,7 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
  [items,scope,actorId]);
  const active=shown.find(a=>a.id===selectedId)??shown[0];
  const verified=shown.some(a=>a.status==="verified"&&a.policyReleaseId===scope?.policyReleaseId);
+ const canPropose=scope&&!shown.some(a=>a.status==="pending"||a.status==="verified");
  async function propose(){
   if(!scope||Array.from(reason.trim()).length<16||busy)return;
   setBusy(true);setError("");
@@ -69,14 +70,14 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
   {scope&&<div className="cdw-review-digest">
    <small>{verified?"已通过独立核验":"尚未满足专项解锁前置条件"}</small>
    <p className="cdw-section-note">仅核对已生效的专用制度（例如《产品设计历史文档管理规定》或《产品器械主文档管理规定》），并由不同人员签署核验。</p>
-   {shown.length===0&&<>
+   {canPropose&&<>
     <label>专项签批依据及适用范围
      <RareTextarea aria-label="专项签批依据说明" rows={3} value={reason} disabled={busy}
       onChange={e=>setReason(e.target.value)}
       placeholder="注明专属制度中的签批权限、适用对象和具体条款（至少 16 字）"/>
     </label>
     <RareButton type="button" loading={busy} disabled={busy||Array.from(reason.trim()).length<16}
-     onClick={()=>void propose()}>登记专项规定供文控复核</RareButton>
+     onClick={()=>void propose()}>{shown.length?"重新登记新版专用规定":"登记专项规定供文控复核"}</RareButton>
    </>}
   </div>}
   {shown.length===0&&!scope&&<p className="cdw-section-note">暂无您有权核验的专项签批依据。</p>}
