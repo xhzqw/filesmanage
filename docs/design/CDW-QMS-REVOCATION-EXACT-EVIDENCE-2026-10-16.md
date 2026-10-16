@@ -22,3 +22,13 @@
 ## 验收
 
 专用隔离数据库应用 `0061` 迁移并测试有权/无权撤销、反复撤销、签署阻断、收件人通知及已读、精确发行 DOCX 与 DHF/DMR 阻断；通过 G2–G11 回归、远端 Go/TS 构建、OpenAPI、架构检查、18091 启动和真实 Chrome 三尺寸浏览器验收后才可报告完成。
+
+## 2026-10-16 真实执行记录
+
+- 提交链：`050103e`（功能、API、SQL 与受控证据入口）；`2aaca9e`（修复新增隔离测试的 Go 变量作用域）；`b89ce9b`（非管理员独立文控撤销操作与精确证据读取请求审计）。所有代码已同步至远端 `main`。
+- `0061_cdw_qms_appointment_revocation.sql` 已在专用测试库 `cdw_g2_tasks_iso_20261015` 与 **18091 开发库**成功应用。开发迁移报告 `MIGRATIONS_OK 63`。
+- 集成回归 `TestCDWTaskPostgresTransactions` 最终通过：`CDW_QMS_REVOCATION_FIXTURE_PASS`（提报人/被任命人不得自行撤销、独立文控撤销、任命历史不可逆、撤销后签批门禁、收件人通知和阅读确认、固定 DOCX 发行 ID 与 SHA）；`CDW_QMS_APPOINTMENT_FIXTURE_PASS`；现有 G2–G11 业务链。
+- 上述集成测试过程中曾观察到“scheduler claimed before due date”间歇性失败，原因并非受控文件调度器跳过有效时间，而是**复用的测试库**遗留一条旧的已到期 `enabled` 计划，全局 `CDWClaimDueActivation` 误领其他历史测试任务。仅在该命名隔离库暂停特定历史测试调度项后重新运行，完整回归通过。此类测试库不应无限复用且保留旧的可调度记录；以后应使用干净的专用测试实例或严格独立的队列环境，不能靠单次通过掩盖污染风险。
+- 前端 `tsc --noEmit`、Vite 生产构建（723 modules）、Go `build`、`vet`、HTTP 定向测试、OpenAPI 生成器核对（205 paths）、架构检查通过。
+- 开发 server/worker 按新提交重新构建并重启，报告 `health/ready OK`；真实 Chrome 在 `1440/1024/780` 三种宽度验证 CDW 主入口和 `CDW_QMS_REVOCATION_ALERT_BROWSER_PASS`，无新导航溢出。浏览器仅完成真实登录和**无数据写入的**读页面验收；实际业务撤销的完整正反例已由隔离数据库完成，不宣称真实任命曾被撤销。
+- **8091 生产入口未改。** 没有创建真实公司岗位任命、受控发行、签章、放行或法规事实，也未修改 `docs/流程参考文档/`。
