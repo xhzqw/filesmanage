@@ -380,8 +380,14 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	if err = r.CDWQMSRecordRestart(ctx, prefix+"_g16_valid_restart", formalInstance, revokedInstance, admin.ID); err != nil {
 		t.Fatalf("new pending approval could not link its prior conflict: %v", err)
 	}
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g16_invalid_restart"); err != nil {
+		t.Fatal(err)
+	}
 	if err = r.CDWQMSRecordRestart(ctx, prefix+"_g16_invalid_restart", formalInstance, formalInstance, admin.ID); err == nil {
 		t.Fatal("restart linked an approval to itself")
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_g16_invalid_restart"); err != nil {
+		t.Fatal(err)
 	}
 	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g16_lineage_mutation"); err != nil {
 		t.Fatal(err)
