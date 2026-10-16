@@ -16,6 +16,14 @@ import (
 // immutable domain event, idempotency response and outbox).
 func (r *Repository) CDWActivateRelease(ctx context.Context, attemptID, releaseID, actor string,
 	expected int64, key string) (ports.CDWActivationDecision, error) {
+	return r.CDWActivateReleaseWithTrigger(ctx, attemptID, releaseID, actor, expected, key, "manual")
+}
+
+func (r *Repository) CDWActivateReleaseWithTrigger(ctx context.Context, attemptID, releaseID, actor string,
+	expected int64, key, trigger string) (ports.CDWActivationDecision, error) {
+	if trigger != "manual" && trigger != "scheduler" {
+		return ports.CDWActivationDecision{}, domain.ErrInvalidInput
+	}
 	out := ports.CDWActivationDecision{ReleaseID: releaseID, Outcome: "blocked", Blockers: []string{}}
 	var fileID string
 	err := r.Q.QueryRow(ctx, `SELECT file_id FROM cdw_controlled_releases WHERE id=$1`, releaseID).Scan(&fileID)
@@ -179,8 +187,8 @@ func (r *Repository) CDWActivateRelease(ctx context.Context, attemptID, releaseI
 		}
 		_, err = r.Q.Exec(ctx, `INSERT INTO cdw_activation_attempts
   (id,release_id,actor_id,outcome,trigger_kind,blockers,idempotency_key)
-  VALUES($1,$2,$3,'blocked','manual',$4::jsonb,$5)`,
-			attemptID, releaseID, actor, string(raw), key)
+  VALUES($1,$2,$3,'blocked',$4,$5::jsonb,$6)`,
+			attemptID, releaseID, actor, trigger, string(raw), key)
 		return out, err
 	}
 	// The immutable attempt, pointer, prior release retirement, and new
@@ -235,10 +243,21 @@ func (r *Repository) CDWActivateRelease(ctx context.Context, attemptID, releaseI
 	}
 	_, err = r.Q.Exec(ctx, `INSERT INTO cdw_activation_attempts
  (id,release_id,actor_id,outcome,trigger_kind,blockers,idempotency_key)
- VALUES($1,$2,$3,'activated','manual','[]'::jsonb,$4)`,
-		attemptID, releaseID, actor, key)
+ VALUES($1,$2,$3,'activated',$4,'[]'::jsonb,$5)`,
+		attemptID, releaseID, actor, trigger, key)
 	if err != nil {
 		return out, err
+	}
+	// A manual activation supersedes a previously opted-in timer. Do not
+	// clear a scheduler lease on the scheduler path: its claim must be
+	// finalized atomically by CDWScheduleFinish in the same transaction.
+	if trigger == "manual" {
+		_, err = r.Q.Exec(ctx, `UPDATE cdw_activation_schedules SET status='completed',
+		 lease_token=NULL,lease_until=NULL,revision=revision+1,
+		 changed_at=clock_timestamp() WHERE release_id=$1 AND status='enabled'`, releaseID)
+		if err != nil {
+			return out, err
+		}
 	}
 	at := effectiveAt.UTC().Format(time.RFC3339Nano)
 	out.EffectiveAt = &at

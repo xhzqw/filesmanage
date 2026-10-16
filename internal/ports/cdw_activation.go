@@ -16,6 +16,7 @@ type CDWActivationDecision struct {
 }
 type CDWActivationStore interface {
 	CDWActivateRelease(context.Context, string, string, string, int64, string) (CDWActivationDecision, error)
+	CDWActivateReleaseWithTrigger(context.Context, string, string, string, int64, string, string) (CDWActivationDecision, error)
 	CDWActivationHistory(context.Context, string, int) ([]CDWActivationAttempt, error)
 }
 type CDWActivationAttempt struct {

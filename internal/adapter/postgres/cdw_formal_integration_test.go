@@ -408,6 +408,71 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 		t.Fatal("issue/dispatch cannot activate default effective pointer")
 	}
 	t.Logf("CDW_G9_DISPATCH_POSTGRES_PASS batch=%s departments=2 grants=2 receipts=0 reading=0 effective_pointer=none", batch.ID)
+	// Explicit opt-in is independent of planned effective time.
+	if _, e = service.CDWScheduleSet(ctx, admin, issued.ID, issued.Revision, true, prefix+"_sched_no_date"); !errors.Is(e, domain.ErrConflict) {
+		t.Fatalf("automatic activation accepted without a planned date: %v", e)
+	}
+	if _, e = pool.Exec(ctx, `UPDATE cdw_controlled_releases
+	 SET planned_effective_at=clock_timestamp()+interval '2 hours' WHERE id=$1`, issued.ID); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = service.CDWScheduleSet(ctx, alice, issued.ID, issued.Revision, true, prefix+"_sched_wrong_role"); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("unprivileged schedule enable accepted: %v", e)
+	}
+	schedule, e := service.CDWScheduleSet(ctx, admin, issued.ID, issued.Revision, true, prefix+"_sched_enable")
+	if e != nil || schedule.Status != "enabled" || schedule.ReleaseRevision != issued.Revision+1 ||
+		schedule.SponsorID != admin.ID || schedule.Attempts != 0 {
+		t.Fatalf("explicit schedule opt-in %+v %v", schedule, e)
+	}
+	replaySchedule, e := service.CDWScheduleSet(ctx, admin, issued.ID, issued.Revision, true, prefix+"_sched_enable")
+	if e != nil || replaySchedule.Revision != schedule.Revision {
+		t.Fatalf("schedule idempotent replay %+v %v", replaySchedule, e)
+	}
+	if _, e = service.CDWScheduleSet(ctx, admin, issued.ID, issued.Revision, false, prefix+"_sched_stale"); !errors.Is(e, domain.ErrVersionConflict) {
+		t.Fatalf("stale schedule changed authorized release: %v", e)
+	}
+	issued.Revision = schedule.ReleaseRevision
+	if _, claimed, claimErr := repo.CDWClaimDueActivation(ctx); claimErr != nil || claimed {
+		t.Fatalf("scheduler claimed before due date: %t %v", claimed, claimErr)
+	}
+	// Queue clock advances only in this isolated fixture; the immutable G8
+	// planned-time gate remains in the future and must still block.
+	if _, e = pool.Exec(ctx, `UPDATE cdw_activation_schedules
+	 SET next_attempt_at=clock_timestamp()-interval '1 minute' WHERE release_id=$1`, issued.ID); e != nil {
+		t.Fatal(e)
+	}
+	claim, claimed, e := repo.CDWClaimDueActivation(ctx)
+	if e != nil || !claimed || claim.ReleaseID != issued.ID || claim.SponsorID != admin.ID || claim.ReleaseRevision != issued.Revision {
+		t.Fatalf("lease claim %+v claimed=%t err=%v", claim, claimed, e)
+	}
+	if _, claimed, e = repo.CDWClaimDueActivation(ctx); e != nil || claimed {
+		t.Fatalf("scheduler duplicated in-flight lease claimed=%t err=%v", claimed, e)
+	}
+	blockedScheduled, e := service.CDWRunScheduledActivation(ctx, claim)
+	if e != nil || blockedScheduled.Outcome != "blocked" || len(blockedScheduled.Blockers) < 2 {
+		t.Fatalf("scheduler skipped planned time or unsigned target gate: %+v %v", blockedScheduled, e)
+	}
+	queueState, e := service.CDWScheduleRead(ctx, admin, issued.ID)
+	if e != nil || queueState.Status != "enabled" || queueState.Attempts != 1 || len(queueState.LastBlockers) < 2 {
+		t.Fatalf("scheduler did not persist retry and reasons: %+v %v", queueState, e)
+	}
+	var schedulerAttempts int
+	if e = pool.QueryRow(ctx, `SELECT count(*) FROM cdw_activation_attempts
+	 WHERE release_id=$1 AND trigger_kind='scheduler' AND outcome='blocked'`, issued.ID).Scan(&schedulerAttempts); e != nil {
+		t.Fatal(e)
+	}
+	if schedulerAttempts != 1 {
+		t.Fatalf("scheduler generated %d immutable blocked attempts", schedulerAttempts)
+	}
+	if _, e = service.CDWScheduleSet(ctx, admin, issued.ID, issued.Revision, false, prefix+"_sched_cancel"); e != nil {
+		t.Fatalf("explicit cancellation: %v", e)
+	}
+	issued.Revision++
+	if _, e = service.CDWScheduleSet(ctx, admin, issued.ID, issued.Revision, true, prefix+"_sched_reenable"); e != nil {
+		t.Fatalf("authorized re-enable: %v", e)
+	}
+	issued.Revision++
+	t.Log("CDW_G8_SCHEDULE_POSTGRES_PASS opt-in, idempotency, CAS, lease exclusivity, time gate, blocker retry and cancellation")
 	blockedActivation, e := service.CDWActivateRelease(ctx, admin, issued.ID, issued.Revision, prefix+"_g8_blocked_activation")
 	if e != nil || blockedActivation.Outcome != "blocked" || blockedActivation.Revision != issued.Revision ||
 		len(blockedActivation.Blockers) < 2 {
@@ -418,9 +483,12 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 		t.Fatalf("activation blocker replay %+v %v", blockedReplay, e)
 	}
 	activationHistory, e := service.CDWActivationHistory(ctx, admin, issued.ID)
-	if e != nil || len(activationHistory) != 1 || activationHistory[0].Outcome != "blocked" ||
+	if e != nil || len(activationHistory) != 2 || activationHistory[0].Outcome != "blocked" ||
 		len(activationHistory[0].Blockers) < 2 || activationHistory[0].ActorID != admin.ID {
 		t.Fatalf("durable activation history must expose exact blockers once: %+v %v", activationHistory, e)
+	}
+	if activationHistory[0].TriggerKind != "manual" || activationHistory[1].TriggerKind != "scheduler" {
+		t.Fatalf("scheduled and manual evidence source confused %+v", activationHistory)
 	}
 	if _, e = service.CDWActivationHistory(ctx, alice, issued.ID); !errors.Is(e, domain.ErrForbidden) {
 		t.Fatalf("unprivileged user read activation evidence: %v", e)
@@ -666,6 +734,10 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	 SET state='confirmed',confirmed_at=clock_timestamp() WHERE id=$1`, charlieReadID); e != nil {
 		t.Fatal(e)
 	}
+	if _, e = readFixtureTx.Exec(ctx, `UPDATE cdw_controlled_releases
+	 SET planned_effective_at=clock_timestamp()-interval '1 minute' WHERE id=$1`, issued.ID); e != nil {
+		t.Fatal(e)
+	}
 	if _, e = readFixtureTx.Exec(ctx, `INSERT INTO cdw_reading_events
 	 (id,assignment_id,actor_id,kind,artifact_sha256,statement_snapshot)
 	 VALUES($1,$2,$3,'confirmed',$4,'transaction-gate-fixture')`,
@@ -678,6 +750,10 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	if e != nil || activatedFixture.Outcome != "activated" || activatedFixture.PointerRevision != 1 ||
 		activatedFixture.Revision != issued.Revision+1 || activatedFixture.EffectiveAt == nil {
 		t.Fatalf("actual effective transaction failed %+v %v", activatedFixture, e)
+	}
+	var scheduleStatusAfterManual string
+	if e = readFixtureTx.QueryRow(ctx, `SELECT status FROM cdw_activation_schedules WHERE release_id=$1`, issued.ID).Scan(&scheduleStatusAfterManual); e != nil || scheduleStatusAfterManual != "completed" {
+		t.Fatalf("manual activation failed to stop previously enabled timer: %q %v", scheduleStatusAfterManual, e)
 	}
 	if _, e = fixtureReader.CDWActivateRelease(ctx, prefix+"_activation_replay", issued.ID,
 		admin.ID, issued.Revision, prefix+"_g8_activate_again"); !errors.Is(e, domain.ErrVersionConflict) {

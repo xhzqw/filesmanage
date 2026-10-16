@@ -2461,6 +2461,201 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/controlled/releases/{id}/schedule:
+    get:
+      summary: Read explicit opt-in automatic effectivity configuration and last durable blocker; requires live document-control
+        authorization
+      operationId: cdwScheduleRead
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Controlled release ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: A planned date alone does not authorize automatic activation.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      releaseId:
+                        type: string
+                      sponsorId:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                        - not_configured
+                        - enabled
+                        - paused
+                        - completed
+                        - cancelled
+                      revision:
+                        type: integer
+                        minimum: 0
+                      releaseRevision:
+                        type: integer
+                        minimum: 1
+                      nextAttemptAt:
+                        type: string
+                        format: date-time
+                      attempts:
+                        type: integer
+                        minimum: 0
+                      lastBlockers:
+                        type: array
+                        items:
+                          type: string
+                      lastError:
+                        type: string
+                    required:
+                    - releaseId
+                    - sponsorId
+                    - status
+                    - revision
+                    - releaseRevision
+                    - nextAttemptAt
+                    - attempts
+                    - lastBlockers
+                    - lastError
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      summary: Enable or cancel explicit planned activation by currently authorized document controller with CAS and idempotent
+        audit/outbox; scheduler rechecks identity, receipt, reading, artifact, paper and supersession constraints
+      operationId: cdwScheduleSet
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Issued controlled release ID
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      - name: If-Match
+        in: header
+        required: true
+        description: Strong ETag rev-N enclosed in double quotes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+              required:
+              - enabled
+      responses:
+        '200':
+          description: Schedule and release CAS revisions advanced atomically; no automatic activation implied.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      releaseId:
+                        type: string
+                      sponsorId:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                        - not_configured
+                        - enabled
+                        - paused
+                        - completed
+                        - cancelled
+                      revision:
+                        type: integer
+                        minimum: 0
+                      releaseRevision:
+                        type: integer
+                        minimum: 1
+                      nextAttemptAt:
+                        type: string
+                        format: date-time
+                      attempts:
+                        type: integer
+                        minimum: 0
+                      lastBlockers:
+                        type: array
+                        items:
+                          type: string
+                      lastError:
+                        type: string
+                    required:
+                    - releaseId
+                    - sponsorId
+                    - status
+                    - revision
+                    - releaseRevision
+                    - nextAttemptAt
+                    - attempts
+                    - lastBlockers
+                    - lastError
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/controlled/releases/{id}/activation-history:
     get:
       summary: Read up to 100 immutable actual release activation attempts with original blockers and actors; requires current

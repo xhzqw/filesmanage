@@ -93,6 +93,14 @@ func (r *Repository) CDWDistributionWithdraw(ctx context.Context, evidenceID, pl
 	if tag.RowsAffected() != 1 {
 		return out, domain.ErrVersionConflict
 	}
+	// A withdrawn batch can never become effective through an earlier timer.
+	_, err = r.Q.Exec(ctx, `UPDATE cdw_activation_schedules
+	 SET status='cancelled',lease_token=NULL,lease_until=NULL,
+	 revision=revision+1,changed_at=clock_timestamp()
+	 WHERE release_id=$1 AND status='enabled'`, releaseID)
+	if err != nil {
+		return out, err
+	}
 	_, err = r.Q.Exec(ctx, `INSERT INTO cdw_distribution_withdrawal_events
  (id,batch_id,plan_id,release_id,actor_id,authority_binding_id,manifest_sha256,
  reason,revoked_grants,cancelled_pending_readers,invalidated_targets)

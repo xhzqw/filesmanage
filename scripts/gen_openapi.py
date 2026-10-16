@@ -961,6 +961,25 @@ CDW_ACTIVATION_ATTEMPT=obj({
  "triggerKind":string(enum=["manual","scheduler","recovery"]),
  "attemptedAt":timestamp(),"blockers":arr(string())},
  required=["id","releaseId","actorId","outcome","triggerKind","attemptedAt","blockers"])
+CDW_ACTIVATION_SCHEDULE=obj({
+ "releaseId":string(),"sponsorId":string(),
+ "status":string(enum=["not_configured","enabled","paused","completed","cancelled"]),
+ "revision":integer(minimum=0),"releaseRevision":integer(minimum=1),
+ "nextAttemptAt":timestamp(),"attempts":integer(minimum=0),
+ "lastBlockers":arr(string()),"lastError":string()},
+ required=["releaseId","sponsorId","status","revision","releaseRevision","nextAttemptAt","attempts","lastBlockers","lastError"])
+add("GET","/api/workbench/controlled/releases/{id}/schedule",operation(
+ "Read explicit opt-in automatic effectivity configuration and last durable blocker; requires live document-control authorization",
+ "CDW","cdwScheduleRead",security=SESSION,params=[id_param("id","Controlled release ID")],
+ responses=dict([json_ok(CDW_ACTIVATION_SCHEDULE,"A planned date alone does not authorize automatic activation."),
+ resp("403",ERR["403"]),resp("404",ERR["404"])])))
+add("POST","/api/workbench/controlled/releases/{id}/schedule",operation(
+ "Enable or cancel explicit planned activation by currently authorized document controller with CAS and idempotent audit/outbox; scheduler rechecks identity, receipt, reading, artifact, paper and supersession constraints",
+ "CDW","cdwScheduleSet",security=SESSION,
+ params=[id_param("id","Issued controlled release ID"),CDW_IDEMPOTENCY,CDW_IF_MATCH],
+ request={"application/json":{"schema":obj({"enabled":{"type":"boolean"}},required=["enabled"])}},
+ responses=dict([json_ok(CDW_ACTIVATION_SCHEDULE,"Schedule and release CAS revisions advanced atomically; no automatic activation implied."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
 add("GET","/api/workbench/controlled/releases/{id}/activation-history",operation(
  "Read up to 100 immutable actual release activation attempts with original blockers and actors; requires current document-control authorization",
  "CDW","cdwActivationHistory",security=SESSION,

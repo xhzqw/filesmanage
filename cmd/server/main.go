@@ -171,6 +171,12 @@ func main() {
 	startMaintenance(func() { postgres.WatchRealtimeNotifications(runCtx, dsn, realtimeWake) })
 	startMaintenance(func() { service.WatchDurableCacheWithWake(runCtx, realtimeWake) })
 	startMaintenance(func() { service.RunFileIndexJobs(runCtx) })
+	// A future effective_at value is not automatic authority. Only explicitly
+	// enabled CDW schedules run, with durable PostgreSQL leases and live user
+	// reauthorization. The operator can disable the scheduler independently.
+	if os.Getenv("FILESMANAGE_CDW_AUTO_ACTIVATE") != "false" {
+		startMaintenance(func() { runCDWScheduler(runCtx, postgres.New(pool), service) })
+	}
 	// Durable due-date reminders. At startup and hourly; duplicate instances
 	// are safe because PostgreSQL enforces one notification per due date/phase.
 	remindLifecycle := func() {

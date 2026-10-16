@@ -6,7 +6,7 @@ import {toast} from "../../shared/ui/feedback";
 import {errorCopy} from "../../shared/errors";
 import {newIdempotencyKey} from "../../shared/ids";
 import type {User} from "../../entities/user/model";
-import {cdwApi,type CDWControlledRelease,type CDWDistributionPlan,type CDWActivationDecision} from "./api";
+import {cdwApi,type CDWControlledRelease,type CDWDistributionPlan,type CDWActivationDecision,type CDWActivationSchedule} from "./api";
 import {CDWDistributionLedgerPanel} from "./CDWDistributionLedgerPanel";
 
 type Department={id:string;name:string};
@@ -36,6 +36,10 @@ export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments,isAd
  const withdrawKey=useRef("");
  const activateKey=useRef("");
  const [activation,setActivation]=useState<CDWActivationDecision|null>(null);
+ const [schedule,setSchedule]=useState<CDWActivationSchedule|null>(null);
+ const [scheduleBusy,setScheduleBusy]=useState(false);
+ const [scheduleError,setScheduleError]=useState("");
+ const scheduleKey=useRef("");
  const blockerText:Record<string,string>={
   unsupported_activation_policy:"生效策略未获系统支持",
   planned_effective_time_not_reached:"尚未到达计划生效时间",
@@ -63,6 +67,27 @@ export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments,isAd
    if(decision.outcome==="activated")onChanged();
   }catch(e){if(!(e instanceof ApiError&&e.httpStatus===0))activateKey.current="";}
   finally{setBusy(false);}
+ }
+ useEffect(()=>{
+  if(release.state!=="issued_pending"||!release.plannedEffectiveAt){setSchedule(null);return;}
+  let live=true;
+  cdwApi.controlScheduleRead(release.id).then(result=>{if(live){setSchedule(result);setScheduleError("");}})
+   .catch(e=>{if(live){setSchedule(null);setScheduleError(errorCopy(e,"读取自动生效安排失败"));}});
+  return()=>{live=false};
+ },[release.id,release.revision,release.state,release.plannedEffectiveAt]);
+ async function changeSchedule(enabled:boolean){
+  if(scheduleBusy||busy||release.state!=="issued_pending")return;
+  if(!scheduleKey.current)scheduleKey.current=newIdempotencyKey();
+  setScheduleBusy(true);setScheduleError("");
+  try{
+   const result=await toast.track(()=>cdwApi.controlScheduleSet(release.id,release.revision,enabled,scheduleKey.current),{
+    loading:enabled?"正在登记到时自动生效授权…":"正在取消自动生效授权…",
+    success:enabled?"已启用到时自动生效，仍须核验全部条件":"已取消自动生效安排",
+    error:e=>errorCopy(e,"更新自动生效安排失败")
+   });
+   setSchedule(result);scheduleKey.current="";onChanged();
+  }catch(e){if(!(e instanceof ApiError&&e.httpStatus===0))scheduleKey.current="";}
+  finally{setScheduleBusy(false);}
  }
  useEffect(()=>{
   let active=true;setPlan(null);setTargets([emptyTarget()]);setLoading(true);setError("");
@@ -260,6 +285,22 @@ export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments,isAd
      该版本尚未生效。须先完成以下条件：{activation.blockers.map(code=>blockerText[code]??code).join("；")}
     </RareNotice>}
     {activation?.outcome==="activated"&&<RareNotice tone="info">正式版本已生效，操作与有效版本指针已记录。</RareNotice>}
+    {release.plannedEffectiveAt&&<>
+     <p className="cdw-section-note">计划生效：{new Date(release.plannedEffectiveAt).toLocaleString("zh-CN")}。仅设置时间不会自动生效，须由授权文控人员明确启用。</p>
+     {scheduleError&&<RareNotice tone="danger">{scheduleError}</RareNotice>}
+     <div className="cdw-review-actions">
+      <RareBadge tone={schedule?.status==="enabled"?"success":schedule?.status==="paused"?"warning":"neutral"}>
+       {schedule?.status==="enabled"?"自动生效已启用":schedule?.status==="paused"?"自动执行已暂停":"自动生效未启用"}
+      </RareBadge>
+      <RareButton type="button" tone="neutral" loading={scheduleBusy}
+       disabled={busy||scheduleBusy||!schedule} onClick={()=>void changeSchedule(schedule?.status!=="enabled")}>
+       {schedule?.status==="enabled"?"取消自动生效":"启用到时自动生效"}
+      </RareButton>
+     </div>
+     {schedule?.status==="enabled"&&<small>下次判定：{new Date(schedule.nextAttemptAt).toLocaleString("zh-CN")}。未满足条件时自动保留阻断记录并延后重试。</small>}
+     {schedule?.status==="paused"&&<RareNotice tone="warning">文控授权或受控版本状态发生变化，自动办理已停止，需重新核对并授权。</RareNotice>}
+     {schedule?.lastBlockers?.length>0&&<small>上次阻断：{schedule.lastBlockers.map(code=>blockerText[code]??code).join("；")}</small>}
+    </>}
    </div>}
    {plan?.state==="dispatched"&&release.state==="issued_pending"&&<div className="cdw-review-form">
     <RareButton type="button" tone="neutral" aria-pressed={withdrawOpen} disabled={busy}
