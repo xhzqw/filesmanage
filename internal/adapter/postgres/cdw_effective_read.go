@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func (r *Repository) CDWEffectiveRead(ctx context.Context, fileID string) (ports.CDWEffectiveRead, bool, error) {
+func (r *Repository) CDWEffectiveRead(ctx context.Context, fileID, actorID string, action domain.Action) (ports.CDWEffectiveRead, bool, error) {
 	var out ports.CDWEffectiveRead
 	var state string
 	var releaseID *string
@@ -23,6 +23,31 @@ func (r *Repository) CDWEffectiveRead(ctx context.Context, fileID string) (ports
 	}
 	if state != "active" || releaseID == nil {
 		return out, true, domain.ErrConflict
+	}
+	// Generic file/folder ACL permits reaching the file, but cannot grant
+	// access to an effective controlled release. Recheck both individual and
+	// live workgroup grants on EACH preview/download (including byte ranges).
+	var granted bool
+	err = r.Q.QueryRow(ctx, `SELECT EXISTS(
+ SELECT 1 FROM cdw_release_access_grants g
+ JOIN users u ON u.id=$2 AND u.disabled_at IS NULL
+ LEFT JOIN cdw_distribution_targets t ON t.id=g.source_target_id
+ LEFT JOIN cdw_distribution_batches batch ON batch.id=t.batch_id
+ WHERE g.release_id=$1 AND g.revoked_at IS NULL
+ AND (g.expires_at IS NULL OR g.expires_at>now())
+ AND $3=ANY(g.actions)
+ AND (g.user_id=$2 OR EXISTS(SELECT 1 FROM workgroup_members wm
+ WHERE wm.group_id=g.group_id AND wm.user_id=$2))
+ AND (g.source_target_id IS NULL OR (t.validity_state='active'
+ AND t.department_id=u.department_id AND batch.state='dispatched'))
+ )`, *releaseID, actorID, string(action)).Scan(&granted)
+	if err != nil {
+		return out, true, err
+	}
+	if !granted {
+		if _, err = r.CDWControlRole(ctx, actorID, "document_control", fileID); err != nil {
+			return out, true, domain.ErrForbidden
+		}
 	}
 	// The first supported effective format is the exact DOCX issued in a
 	// dispatched batch. Never fall through to ordinary latest on broken linkage.

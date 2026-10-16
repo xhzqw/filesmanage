@@ -633,15 +633,28 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 		t.Fatal(e)
 	}
 	fixtureReader := &Repository{DB: pool, Q: readFixtureTx}
-	controlledRead, managed, e := fixtureReader.CDWEffectiveRead(ctx, fileID)
+	controlledRead, managed, e := fixtureReader.CDWEffectiveRead(ctx, fileID, admin.ID, domain.ActionPreview)
 	if e != nil || !managed || controlledRead.BlobID != blobID ||
 		controlledRead.SHA256 != sha || controlledRead.FileName == "" {
 		t.Fatalf("effective read did not resolve immutable distributed artifact: %+v managed=%t err=%v", controlledRead, managed, e)
 	}
+	if _, managed, e = fixtureReader.CDWEffectiveRead(ctx, fileID, alice.ID, domain.ActionPreview); !managed || !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("ordinary file access escalated into controlled release read: managed=%t err=%v", managed, e)
+	}
+	if _, managed, e = fixtureReader.CDWEffectiveRead(ctx, fileID, bob.ID, domain.ActionDownload); !managed || e != nil {
+		t.Fatalf("authorized batch recipient denied exact controlled file: managed=%t err=%v", managed, e)
+	}
+	if _, e = readFixtureTx.Exec(ctx, `UPDATE cdw_release_access_grants SET revoked_at=clock_timestamp()
+	 WHERE user_id=$1 AND release_id=$2`, bob.ID, issued.ID); e != nil {
+		t.Fatal(e)
+	}
+	if _, managed, e = fixtureReader.CDWEffectiveRead(ctx, fileID, bob.ID, domain.ActionDownload); !managed || !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("revoked release grant still accessed controlled file: managed=%t err=%v", managed, e)
+	}
 	if _, e = readFixtureTx.Exec(ctx, `UPDATE cdw_effective_pointers SET state='none',release_id=NULL WHERE file_id=$1`, fileID); e != nil {
 		t.Fatal(e)
 	}
-	if _, managed, e = fixtureReader.CDWEffectiveRead(ctx, fileID); !managed || !errors.Is(e, domain.ErrConflict) {
+	if _, managed, e = fixtureReader.CDWEffectiveRead(ctx, fileID, admin.ID, domain.ActionPreview); !managed || !errors.Is(e, domain.ErrConflict) {
 		t.Fatalf("explicit no-effective-version pointer leaked ordinary latest: managed=%t err=%v", managed, e)
 	}
 	if e = readFixtureTx.Rollback(ctx); e != nil {

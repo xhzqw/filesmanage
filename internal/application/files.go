@@ -261,7 +261,7 @@ func (s *Service) openFileBytes(ctx context.Context, u domain.User, fileID strin
 	if err != nil {
 		return Download{}, nil, err
 	}
-	file, blob, versionTime, err := s.resolveUserFacingVersion(ctx, tx, file)
+	file, blob, versionTime, err := s.resolveUserFacingVersion(ctx, tx, u, action, file)
 	if err != nil {
 		return Download{}, nil, err
 	}

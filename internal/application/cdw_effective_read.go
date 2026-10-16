@@ -12,9 +12,9 @@ import (
 // version. No fallback is allowed if a managed pointer is withdrawn, invalid
 // or refers to a missing or corrupted immutable blob.
 func (s *Service) resolveUserFacingVersion(ctx context.Context, tx ports.Tx,
-	file domain.File) (domain.File, domain.Blob, time.Time, error) {
+	actor domain.User, action domain.Action, file domain.File) (domain.File, domain.Blob, time.Time, error) {
 	if store, ok := tx.(ports.CDWEffectiveReadStore); ok {
-		controlled, managed, err := store.CDWEffectiveRead(ctx, file.ID)
+		controlled, managed, err := store.CDWEffectiveRead(ctx, file.ID, actor.ID, action)
 		if err != nil {
 			return file, domain.Blob{}, time.Time{}, err
 		}

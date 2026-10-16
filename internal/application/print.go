@@ -32,7 +32,7 @@ func (s *Service) printSource(ctx context.Context, tx ports.Repository, u domain
 	// file version sequence. Until CDW-specific print rendering is supported,
 	// refuse rather than accidentally printing an unrelated latest upload.
 	if controlled, ok := tx.(ports.CDWEffectiveReadStore); ok {
-		_, managed, e := controlled.CDWEffectiveRead(ctx, file.ID)
+		_, managed, e := controlled.CDWEffectiveRead(ctx, file.ID, u.ID, domain.ActionPrint)
 		if e != nil {
 			return domain.File{}, domain.Blob{}, 0, e
 		}

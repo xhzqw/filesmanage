@@ -11,15 +11,19 @@ import (
 
 type cdwEffectiveReadFake struct {
 	ports.Tx
-	managed       bool
-	projection    ports.CDWEffectiveRead
-	projectionErr error
-	current       domain.FileVersion
-	blob          domain.Blob
-	versionCalls  int
+	actorReceived  string
+	actionReceived domain.Action
+	managed        bool
+	projection     ports.CDWEffectiveRead
+	projectionErr  error
+	current        domain.FileVersion
+	blob           domain.Blob
+	versionCalls   int
 }
 
-func (f *cdwEffectiveReadFake) CDWEffectiveRead(_ context.Context, _ string) (ports.CDWEffectiveRead, bool, error) {
+func (f *cdwEffectiveReadFake) CDWEffectiveRead(_ context.Context, _ string, actor string, action domain.Action) (ports.CDWEffectiveRead, bool, error) {
+	f.actorReceived = actor
+	f.actionReceived = action
 	return f.projection, f.managed, f.projectionErr
 }
 func (f *cdwEffectiveReadFake) VersionBySeq(_ context.Context, _ string, _ int) (domain.FileVersion, error) {
@@ -45,25 +49,27 @@ func TestCDWEffectiveReadNeverFallsBackToLatestOnManagedFailure(t *testing.T) {
 		current: domain.FileVersion{BlobID: "ordinary-blob", CreatedAt: effectiveTime.Add(-time.Hour)},
 	}
 	service := &Service{}
-	chosen, blob, when, err := service.resolveUserFacingVersion(ctx, f, file)
+	actor := domain.User{ID: "reader-only"}
+	chosen, blob, when, err := service.resolveUserFacingVersion(ctx, f, actor, domain.ActionPreview, file)
 	if err != nil || blob.ID != "issued-blob" || chosen.Name != "受控正式稿.docx" ||
-		chosen.Sha256 != "approved-sha" || !when.Equal(effectiveTime) || f.versionCalls != 0 {
+		chosen.Sha256 != "approved-sha" || !when.Equal(effectiveTime) || f.versionCalls != 0 ||
+		f.actorReceived != actor.ID || f.actionReceived != domain.ActionPreview {
 		t.Fatalf("active pointer not authoritative: file=%+v blob=%+v when=%v err=%v versionReads=%d", chosen, blob, when, err, f.versionCalls)
 	}
 	f.projectionErr = domain.ErrConflict
-	_, _, _, err = service.resolveUserFacingVersion(ctx, f, file)
+	_, _, _, err = service.resolveUserFacingVersion(ctx, f, actor, domain.ActionDownload, file)
 	if !errors.Is(err, domain.ErrConflict) || f.versionCalls != 0 {
 		t.Fatalf("invalid/none pointer leaked latest ordinary upload: %v; latest reads=%d", err, f.versionCalls)
 	}
 	f.projectionErr = nil
 	f.blob.Sha256 = "corrupt-sha"
-	_, _, _, err = service.resolveUserFacingVersion(ctx, f, file)
+	_, _, _, err = service.resolveUserFacingVersion(ctx, f, actor, domain.ActionPreview, file)
 	if !errors.Is(err, domain.ErrConflict) || f.versionCalls != 0 {
 		t.Fatalf("corrupt controlled artifact leaked latest ordinary upload: %v; latest reads=%d", err, f.versionCalls)
 	}
 	f.managed = false
 	f.blob = domain.Blob{ID: "ordinary-blob", Sha256: "latest-sha", State: "ready", SizeBytes: 50}
-	unchanged, legacyBlob, _, err := service.resolveUserFacingVersion(ctx, f, file)
+	unchanged, legacyBlob, _, err := service.resolveUserFacingVersion(ctx, f, actor, domain.ActionDownload, file)
 	if err != nil || legacyBlob.ID != "ordinary-blob" || unchanged.Name != file.Name || f.versionCalls != 1 {
 		t.Fatalf("unmanaged legacy behavior changed: %+v %+v %v", unchanged, legacyBlob, err)
 	}

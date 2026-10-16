@@ -2,6 +2,7 @@ package ports
 
 import (
 	"context"
+	"filesmanage/internal/domain"
 	"time"
 )
 
@@ -18,5 +19,5 @@ type CDWEffectiveRead struct {
 type CDWEffectiveReadStore interface {
 	// present=false means the file has never entered CDW effective management.
 	// Once a pointer exists, invalid/none states must fail closed.
-	CDWEffectiveRead(context.Context, string) (CDWEffectiveRead, bool, error)
+	CDWEffectiveRead(context.Context, string, string, domain.Action) (CDWEffectiveRead, bool, error)
 }
