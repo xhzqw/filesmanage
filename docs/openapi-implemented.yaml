@@ -9419,7 +9419,8 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
   /api/files/{id}/print/prepare:
     post:
-      summary: Audit browser print intent (requires preview + print ACL, version digest)
+      summary: Audit browser print intent (requires preview + print ACL; CDW effective files print the exact controlled distribution
+        artifact, not ordinary latest)
       operationId: prepareBrowserPrint
       tags:
       - Files
@@ -9445,7 +9446,8 @@ paths:
               - expectedSha256
       responses:
         '200':
-          description: Browser print authorized; does not assert physical print completion.
+          description: Browser print authorized. For controlled issues versionSeq is 0 (not ordinary version 0); controlled=true
+            and sha256 pins the active issued artifact. Does not assert physical print completion.
           content:
             application/json:
               schema:
@@ -9466,11 +9468,14 @@ paths:
                         type: integer
                       sha256:
                         type: string
+                      controlled:
+                        type: boolean
                     required:
                     - fileId
                     - name
                     - versionSeq
                     - sha256
+                    - controlled
                 required:
                 - ok
                 - data

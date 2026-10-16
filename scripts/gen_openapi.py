@@ -1619,11 +1619,11 @@ add("GET", "/api/files/{id}/preview/office-pdf", operation("Isolated Office-to-P
                "404": {"description": ERR["404"]}, "415": {"description": "Unsupported or unsafe Office input."},
                "500": {"description": "Isolated conversion unavailable; client should use textual fallback."}}))
 
-add("POST", "/api/files/{id}/print/prepare", operation("Audit browser print intent (requires preview + print ACL, version digest)", "Files", "prepareBrowserPrint", security=SESSION,
+add("POST", "/api/files/{id}/print/prepare", operation("Audit browser print intent (requires preview + print ACL; CDW effective files print the exact controlled distribution artifact, not ordinary latest)", "Files", "prepareBrowserPrint", security=SESSION,
     params=[id_param("id", "File id.")],
     request={"application/json":{"schema":obj({"expectedSha256":string()},required=["expectedSha256"])}},
-    responses=dict([json_ok(obj({"fileId":string(),"name":string(),"versionSeq":integer(),"sha256":string()},
-                 required=["fileId","name","versionSeq","sha256"]), "Browser print authorized; does not assert physical print completion."),
+    responses=dict([json_ok(obj({"fileId":string(),"name":string(),"versionSeq":integer(),"sha256":string(),"controlled":boolean()},
+                 required=["fileId","name","versionSeq","sha256","controlled"]), "Browser print authorized. For controlled issues versionSeq is 0 (not ordinary version 0); controlled=true and sha256 pins the active issued artifact. Does not assert physical print completion."),
                  resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
 
 add("GET", "/api/files/{id}/print/media", operation("Stream checked PDF or still image for browser print (print + preview ACL)", "Files", "browserPrintMedia", security=SESSION,

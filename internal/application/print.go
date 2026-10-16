@@ -16,10 +16,13 @@ type BrowserPrintPreparation struct {
 	Name       string `json:"name"`
 	VersionSeq int    `json:"versionSeq"`
 	Sha256     string `json:"sha256"`
+	Controlled bool   `json:"controlled"`
 }
 
-// Both actions must be held for the current file version. The expected digest
-// fences subsequent render requests against concurrent version replacement.
+// Both actions must be held for the current user-facing version. Controlled
+// versions have no ordinary file_versions.seq: seq=0 is a print-only sentinel,
+// never a request to read version zero or to fall back to current_version_seq.
+// Every render request rechecks the effective pointer and the supplied digest.
 func (s *Service) printSource(ctx context.Context, tx ports.Repository, u domain.User, id, expectedSHA string) (domain.File, domain.Blob, int, error) {
 	file, err := s.visibleFile(ctx, tx, u, id, domain.ActionPrint)
 	if err != nil {
@@ -28,16 +31,37 @@ func (s *Service) printSource(ctx context.Context, tx ports.Repository, u domain
 	if _, err = s.visibleFile(ctx, tx, u, id, domain.ActionPreview); err != nil {
 		return domain.File{}, domain.Blob{}, 0, err
 	}
-	// A controlled effective pointer can select an artifact outside the normal
-	// file version sequence. Until CDW-specific print rendering is supported,
-	// refuse rather than accidentally printing an unrelated latest upload.
+	// An effective controlled print must be sourced from its immutable
+	// distribution artifact, with live *separate* print and preview grants.
+	// The exact existing DOCX->PDF renderer operates on this Blob, not a
+	// second editor or an ordinary latest upload.
 	if controlled, ok := tx.(ports.CDWEffectiveReadStore); ok {
-		_, managed, e := controlled.CDWEffectiveRead(ctx, file.ID, u.ID, domain.ActionPrint)
+		projection, managed, e := controlled.CDWEffectiveRead(ctx, file.ID, u.ID, domain.ActionPrint)
 		if e != nil {
 			return domain.File{}, domain.Blob{}, 0, e
 		}
 		if managed {
-			return domain.File{}, domain.Blob{}, 0, ErrPreviewUnsupported
+			preview, previewManaged, e := controlled.CDWEffectiveRead(ctx, file.ID, u.ID, domain.ActionPreview)
+			if e != nil {
+				return domain.File{}, domain.Blob{}, 0, e
+			}
+			if !previewManaged || preview.BlobID != projection.BlobID ||
+				preview.SHA256 != projection.SHA256 || projection.Format != "docx" {
+				return domain.File{}, domain.Blob{}, 0, domain.ErrConflict
+			}
+			blob, e := tx.BlobByID(ctx, projection.BlobID)
+			if e != nil || blob.State != "ready" || blob.Sha256 != projection.SHA256 {
+				return domain.File{}, domain.Blob{}, 0, domain.ErrConflict
+			}
+			if expectedSHA != "" && !strings.EqualFold(blob.Sha256, expectedSHA) {
+				return domain.File{}, domain.Blob{}, 0, domain.ErrConflict
+			}
+			file.Name = projection.FileName
+			file.ContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+			file.Sha256 = blob.Sha256
+			file.SizeBytes = blob.SizeBytes
+			file.UpdatedAt = projection.EffectiveAt
+			return file, blob, 0, nil
 		}
 	}
 	seq := currentSeq(file)
@@ -65,9 +89,9 @@ func (s *Service) PrepareBrowserPrint(ctx context.Context, u domain.User, id, ex
 	if err != nil {
 		return BrowserPrintPreparation{}, err
 	}
-	result := BrowserPrintPreparation{FileID: file.ID, Name: file.Name, VersionSeq: seq, Sha256: blob.Sha256}
+	result := BrowserPrintPreparation{FileID: file.ID, Name: file.Name, VersionSeq: seq, Sha256: blob.Sha256, Controlled: seq == 0}
 	if err = auditRequired(ctx, tx, u, "file.print.prepare", "file", file.ID, "success",
-		map[string]any{"versionSeq": seq, "sha256": blob.Sha256, "destination": "browser", "outcome": "dialog_requested"}); err != nil {
+		map[string]any{"versionSeq": seq, "controlled": seq == 0, "sha256": blob.Sha256, "destination": "browser", "outcome": "dialog_requested"}); err != nil {
 		return BrowserPrintPreparation{}, err
 	}
 	if err = tx.Commit(ctx); err != nil {
@@ -114,16 +138,20 @@ func (s *Service) openBrowserPrintSource(ctx context.Context, u domain.User, id,
 	if err != nil {
 		return Download{}, nil, err
 	}
-	version, err := tx.VersionBySeq(ctx, file.ID, seq)
-	if err != nil {
-		return Download{}, nil, domain.ErrNotFound
+	modTime := file.UpdatedAt
+	if seq != 0 {
+		version, versionErr := tx.VersionBySeq(ctx, file.ID, seq)
+		if versionErr != nil {
+			return Download{}, nil, domain.ErrNotFound
+		}
+		modTime = version.CreatedAt
 	}
 	reader, err := s.blobs.Open(blob.StorageKey)
 	if err != nil {
 		return Download{}, nil, err
 	}
 	if err = auditRequired(ctx, tx, u, "file.print.render", "file", file.ID, "success",
-		map[string]any{"versionSeq": seq, "sha256": blob.Sha256, "destination": "browser", "outcome": "content_requested"}); err != nil {
+		map[string]any{"versionSeq": seq, "controlled": seq == 0, "sha256": blob.Sha256, "destination": "browser", "outcome": "content_requested"}); err != nil {
 		_ = reader.Close()
 		return Download{}, nil, err
 	}
@@ -132,7 +160,7 @@ func (s *Service) openBrowserPrintSource(ctx context.Context, u domain.User, id,
 		return Download{}, nil, err
 	}
 	return Download{FileName: file.Name, ContentType: file.ContentType,
-			Sha256: blob.Sha256, Size: blob.SizeBytes, Reader: reader, ModTime: version.CreatedAt},
+			Sha256: blob.Sha256, Size: blob.SizeBytes, Reader: reader, ModTime: modTime},
 		func() { _ = reader.Close() }, nil
 }
 
