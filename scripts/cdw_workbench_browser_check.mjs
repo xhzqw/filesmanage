@@ -131,6 +131,12 @@ try{
  assert.equal(alerts.status,200,"appointment revocation notices belong to logged-in recipient");
  assert.ok(Array.isArray(alerts.data?.items),"revocation alerts must be durable server-backed rows");
  console.log("CDW_QMS_REVOCATION_ALERT_BROWSER_PASS current recipient alert inbox=live-no-write");
+ const special=await evalJS("(async()=>{const r=await fetch('/api/workbench/qms-special-authorities');return {status:r.status,data:(await r.json()).data}})()");
+ assert.equal(special.status,200,"DHF/DMR dedicated authority reviewer queue requires authentication");
+ assert.ok(Array.isArray(special.data?.items),"DHF/DMR dedicated authority queue is server-backed");
+ assert.equal(await evalJS("!!document.querySelector('[aria-label=\"DHF DMR 专项签批依据\"]')"),true,
+  "DHF and DMR independent document-control review shares the original workbench canvas");
+ console.log("CDW_QMS_SPECIAL_AUTHORITY_BROWSER_PASS authenticated review queue, compact canvas, no-write");
 
  await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('发行准备'));button?.click();return true;})()");
  await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('发行准备')");

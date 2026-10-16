@@ -4,10 +4,11 @@ import {toast} from "../../shared/ui/feedback";
 import {errorCopy} from "../../shared/errors";
 import {newIdempotencyKey} from "../../shared/ids";
 import {cdwApi,type CDWQMSPendingReview,type CDWQMSAppointmentAlert} from "./api";
+import {CDWQMSSpecialAuthorityPanel} from "./CDWQMSSpecialAuthorityPanel";
 
 // Only items already checked against live document-control role and file ACL
 // reach this list. Signing still revalidates both at transaction time.
-export function CDWQMSReviewInbox({items,alerts,onVerified,onRead}:{items:CDWQMSPendingReview[];alerts:CDWQMSAppointmentAlert[];onVerified:()=>void;onRead:(id:string)=>void}){
+export function CDWQMSReviewInbox({items,alerts,actorId,onVerified,onRead}:{items:CDWQMSPendingReview[];alerts:CDWQMSAppointmentAlert[];actorId:string;onVerified:()=>void;onRead:(id:string)=>void}){
  const [selectedId,setSelectedId]=useState("");
  const [statement,setStatement]=useState("");
  const [revokeReason,setRevokeReason]=useState("");
@@ -53,6 +54,7 @@ export function CDWQMSReviewInbox({items,alerts,onVerified,onRead}:{items:CDWQMS
   </section>
   <article className="cdw-detail" aria-label="岗位任命核验详情">
    <div className="cdw-detail-inner">
+    <CDWQMSSpecialAuthorityPanel actorId={actorId} onChange={onVerified}/>
     {alerts.some(a=>!a.readAt)&&<section className="cdw-section">
      <div className="cdw-section-head"><h3>任命撤销通知</h3></div>
      {alerts.filter(a=>!a.readAt).map(a=><div className="cdw-review-digest" key={a.id}>

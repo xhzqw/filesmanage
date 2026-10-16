@@ -85,6 +85,11 @@ export type CDWQMSAppointment={id:string;fileId:string;userId:string;nodeKey:str
 export type CDWQMSPendingReview=CDWQMSAppointment&{fileName:string;evidenceFileId:string;evidenceFileName:string};
 export type CDWQMSAppointmentInput={fileId:string;userId:string;nodeKey:string;policyReleaseId:string;evidenceReleaseId:string;expiresAt:string;reason:string};
 export type CDWQMSAppointmentAlert={id:string;appointmentId:string;fileId:string;nodeKey:string;createdAt:string;readAt?:string};
+export type CDWQMSSpecialAuthority={
+ id:string;fileId:string;fileName:string;kind:"dhf"|"dmr";templateVersionId:string;
+ policyReleaseId:string;policyFileId:string;policyName:string;status:"pending"|"verified"|"revoked";
+ reason:string;proposedBy:string;verifiedBy?:string;verificationStatement?:string;
+};
 export type CDWFormalApproval={
  id:string;subjectId:string;deliveryId:string;fileId:string;fileName?:string;
  sha256:string;templateVersionId:string;state:"pending"|"approved"|"rejected"|"cancelled"|"conflicted";
@@ -266,6 +271,13 @@ export const cdwApi={
  qmsAlerts:()=>request<{items:CDWQMSAppointmentAlert[]}>("/workbench/qms-appointment-alerts",{cache:"no-store"}),
  qmsAlertRead:(id:string,key:string)=>request<{id:string;read:boolean}>(
   "/workbench/qms-appointment-alerts/"+segment(id)+"/read",mutate(key,{})),
+ qmsSpecialList:()=>request<{items:CDWQMSSpecialAuthority[]}>(
+  "/workbench/qms-special-authorities",{cache:"no-store"}),
+ qmsSpecialPropose:(input:{fileId:string;kind:"dhf"|"dmr";templateVersionId:string;policyReleaseId:string;reason:string},key:string)=>
+  request<CDWQMSSpecialAuthority>("/workbench/qms-special-authorities",mutate(key,input)),
+ qmsSpecialReview:(id:string,action:"verify"|"revoke",statement:string,key:string)=>
+  request<CDWQMSSpecialAuthority>("/workbench/qms-special-authorities/"+segment(id)+"/"+action,
+   mutate(key,{statement})),
  formalInbox:(limit=100)=>request<{items:CDWFormalApproval[]}>(
   "/workbench/formal-approvals/inbox?limit="+limit,{cache:"no-store"}),
  formalDetail:(id:string)=>request<CDWFormalDetail>("/workbench/formal-approvals/"+segment(id),{cache:"no-store"}),

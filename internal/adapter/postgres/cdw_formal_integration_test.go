@@ -907,10 +907,10 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 		"依据原始质量控制程序编号、文控台账及受控制度适用性核定为质量体系文件。", charlie.ID); checkErr != nil || info.ApprovalClass != "qms" {
 		t.Fatalf("document-control QMS registration rejected: %+v %v", info, checkErr)
 	}
-	if checkErr := fixtureReader.cdwFormalValidateClass(ctx, qmsFileID, "cdw-formal-generic", ""); !errors.Is(checkErr, domain.ErrDocumentClassPending) {
+	if checkErr := fixtureReader.cdwFormalValidateClass(ctx, qmsFileID, "", "cdw-formal-generic", ""); !errors.Is(checkErr, domain.ErrDocumentClassPending) {
 		t.Fatalf("generic template accepted a formally classified QMS file: %v", checkErr)
 	}
-	if checkErr := fixtureReader.cdwFormalValidateClass(ctx, qmsFileID, "qms_verified", issued.ID); checkErr != nil {
+	if checkErr := fixtureReader.cdwFormalValidateClass(ctx, qmsFileID, "", "qms_verified", issued.ID); checkErr != nil {
 		t.Fatalf("valid QMS source and policy rejected: %v", checkErr)
 	}
 	// Database-level boundary: even privileged direct DML must not downgrade a
@@ -932,6 +932,8 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
  VALUES($1,$2,'existing_version',$3,$4,31,$5)`, qmsSubjectID, qmsFileID, blobID, sha, admin.ID); checkErr != nil {
 		t.Fatal(checkErr)
 	}
+	exerciseCDWQMSSpecialAuthority(t, ctx, readFixtureTx, fixtureReader, prefix,
+		admin, alice, bob, charlie, qmsFileID, fileID, blobID, sha, issued.ID)
 	if _, checkErr = readFixtureTx.Exec(ctx, "SAVEPOINT cdw_special_qms_77a"); checkErr != nil {
 		t.Fatal(checkErr)
 	}
@@ -943,7 +945,7 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 		if checkErr = readFixtureTx.QueryRow(ctx, "SELECT cdw_qms_special_authority_pending($1)", qmsFileID).Scan(&blocked); checkErr != nil || !blocked {
 			t.Fatalf("DHF/DMR not recognized as special controlled authority: %q %v", name, checkErr)
 		}
-		if checkErr = fixtureReader.cdwFormalValidateClass(ctx, qmsFileID, "qms_verified", issued.ID); !errors.Is(checkErr, domain.ErrPolicyAuthorityPending) {
+		if checkErr = fixtureReader.cdwFormalValidateClass(ctx, qmsFileID, "", "qms_verified", issued.ID); !errors.Is(checkErr, domain.ErrPolicyAuthorityPending) {
 			t.Fatalf("generic QMS authority wrongly unlocked DHF/DMR: %q %v", name, checkErr)
 		}
 	}

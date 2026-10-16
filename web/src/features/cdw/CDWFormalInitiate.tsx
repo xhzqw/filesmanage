@@ -7,6 +7,7 @@ import {newIdempotencyKey} from "../../shared/ids";
 import type {User} from "../../entities/user/model";
 import {cdwApi,type CDWFormalReady,type CDWEffectiveSearchHit,type CDWDocumentClassification} from "./api";
 import {CDWQMSAppointmentEvidence} from "./CDWQMSAppointmentEvidence";
+import {CDWQMSSpecialAuthorityPanel} from "./CDWQMSSpecialAuthorityPanel";
 
 const signerPositions=[
  {value:"management_representative",label:"管理者代表"},
@@ -21,7 +22,7 @@ const signerPositions=[
 ];
 
 // Three explicit steps deliberately avoid silently granting approval authority.
-export function CDWFormalInitiate({onCreated,loadUsers}:{onCreated:()=>void;loadUsers:()=>Promise<User[]>}){
+export function CDWFormalInitiate({onCreated,loadUsers,actorId}:{onCreated:()=>void;loadUsers:()=>Promise<User[]>;actorId:string}){
  const [ready,setReady]=useState<CDWFormalReady[]>([]);
  const [users,setUsers]=useState<User[]>([]);
  const [delivery,setDelivery]=useState("");
@@ -46,6 +47,9 @@ export function CDWFormalInitiate({onCreated,loadUsers}:{onCreated:()=>void;load
  const keys=useRef(new Map<string,string>());
  const selected=ready.find(d=>d.deliveryId===delivery);
  const qms=classification?.approvalClass==="qms";
+ const dedicatedSource=selected?.fileName.match(/产品设计历史文档管理规定|设计历史文档管理规定|产品器械主文档管理规定|器械主文档管理规定/);
+ const specialKind=dedicatedSource?null:selected?.fileName.match(/(?:^|[^a-z])DHF(?:[^a-z]|$)|设计历史文档|设计历史文件/i)?"dhf":
+  selected?.fileName.match(/(?:^|[^a-z])DMR(?:[^a-z]|$)|器械主文档/i)?"dmr":null;
  useEffect(()=>{
   let live=true;setClassification(null);setClassReason("");setBasisReleaseId("");
   if(!selected?.fileId)return;
@@ -229,6 +233,10 @@ export function CDWFormalInitiate({onCreated,loadUsers}:{onCreated:()=>void;load
   </section>
   <section className="cdw-section">
    <h3>3. 冻结并提交正式审批</h3>
+   {qms&&specialKind&&templateId&&basisReleaseId&&selected&&
+    <CDWQMSSpecialAuthorityPanel actorId={actorId}
+     scope={{fileId:selected.fileId,kind:specialKind,templateVersionId:templateId,policyReleaseId:basisReleaseId}}/>}
+   {qms&&specialKind&&<RareNotice tone="warning">DHF/DMR 正式审批会在服务器再次核对专用受控规定、独立文控核验和逐节点岗位任命。登记后若仍待复核，提交会被拒绝。</RareNotice>}
    <p className="cdw-section-note">仅生成正式审批实例，待全部必需节点同意后生成已批准候选版本；不会自动分发或生效。</p>
    <RareButton type="button" tone="primary" loading={busy} disabled={!templateId||busy} onClick={()=>void submit()}>确认提交正式审批</RareButton>
   </section>

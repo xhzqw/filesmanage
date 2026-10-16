@@ -981,6 +981,36 @@ add("POST","/api/workbench/qms-appointment-alerts/{id}/read",operation(
  request={"application/json":{"schema":obj({})}},
  responses=dict([json_ok(obj({"id":string(),"read":boolean()},required=["id","read"]),
  "Only the intended recipient may acknowledge"),resp("404",ERR["404"])])))
+CDW_QMS_SPECIAL=obj({
+ "id":string(),"fileId":string(),"fileName":string(),"kind":string(enum=["dhf","dmr"]),
+ "templateVersionId":string(),"policyReleaseId":string(),"policyFileId":string(),
+ "policyName":string(),"status":string(enum=["pending","verified","revoked"]),
+ "reason":string(),"proposedBy":string(),"verifiedBy":string(),"verificationStatement":string()},
+ required=["id","fileId","fileName","kind","templateVersionId","policyReleaseId",
+ "policyFileId","policyName","status","reason","proposedBy"])
+add("GET","/api/workbench/qms-special-authorities",operation(
+ "Live document-control scope and file-ACL intersected dedicated DHF/DMR authority requests",
+ "CDW","cdwQMSSpecialList",security=SESSION,
+ responses=dict([json_ok(obj({"items":arr(CDW_QMS_SPECIAL)},required=["items"]),
+ "Verified is valid only while the exact dedicated source remains effective."),
+ resp("403",ERR["403"])])))
+add("POST","/api/workbench/qms-special-authorities",operation(
+ "Propose an exact DHF or DMR file+template+dedicated controlled source binding",
+ "CDW","cdwQMSSpecialPropose",security=SESSION,params=[CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({
+ "fileId":string(),"kind":string(enum=["dhf","dmr"]),
+ "templateVersionId":string(),"policyReleaseId":string(),"reason":string()},
+ required=["fileId","kind","templateVersionId","policyReleaseId","reason"])}},
+ responses=dict([json_ok(CDW_QMS_SPECIAL,"Pending independent document-control review."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
+for action,label in [("verify","Independently validate the dedicated issued policy"),
+ ("revoke","Withdraw dedicated DHF/DMR policy approval scope")]:
+ add("POST",f"/api/workbench/qms-special-authorities/{{id}}/{action}",operation(
+  label,"CDW",f"cdwQMSSpecial{action.title()}",security=SESSION,
+  params=[id_param("id","Dedicated authority record ID."),CDW_IDEMPOTENCY],
+  request={"application/json":{"schema":obj({"statement":string()},required=["statement"])}},
+  responses=dict([json_ok(CDW_QMS_SPECIAL,"Independent, auditable state transition."),
+  resp("403",ERR["403"]),resp("409",ERR["409"])])))
 add("POST","/api/workbench/formal-templates",operation(
  "Publish immutable versioned formal approval template","CDW","cdwFormalTemplatePublish",
  security=SESSION,params=[CDW_IDEMPOTENCY],

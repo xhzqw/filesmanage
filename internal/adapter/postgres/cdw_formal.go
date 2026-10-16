@@ -30,19 +30,19 @@ func (r *Repository) cdwQMSPolicyEffective(ctx context.Context, basisID string) 
 // Approved candidates do not carry a permanent policy waiver: a QMS policy
 // that was effective during signing can be revoked before issue or activation.
 func (r *Repository) cdwQMSCandidatePolicyCurrent(ctx context.Context, candidateID string) (bool, error) {
-	var templateKey, policyBasisID, fileID string
-	err := r.Q.QueryRow(ctx, `SELECT tv.template_key,COALESCE(tv.authority_basis_release_id,''),c.file_id
+	var templateID, templateKey, policyBasisID, fileID string
+	err := r.Q.QueryRow(ctx, `SELECT tv.id,tv.template_key,COALESCE(tv.authority_basis_release_id,''),c.file_id
  FROM cdw_approved_candidates c
  JOIN cdw_formal_approval_instances fa ON fa.id=c.approval_instance_id
  JOIN cdw_workflow_template_versions tv ON tv.id=fa.template_version_id
- WHERE c.id=$1`, candidateID).Scan(&templateKey, &policyBasisID, &fileID)
+ WHERE c.id=$1`, candidateID).Scan(&templateID, &templateKey, &policyBasisID, &fileID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, domain.ErrNotFound
 	}
 	if err != nil {
 		return false, err
 	}
-	if err = r.cdwFormalValidateClass(ctx, fileID, templateKey, policyBasisID); err != nil {
+	if err = r.cdwFormalValidateClass(ctx, fileID, templateID, templateKey, policyBasisID); err != nil {
 		if errors.Is(err, domain.ErrDocumentClassPending) || errors.Is(err, domain.ErrPolicyAuthorityPending) {
 			return false, nil
 		}
@@ -228,7 +228,7 @@ func (r *Repository) CDWStartFormalApproval(ctx context.Context, id, subjectID, 
 	if err != nil {
 		return result, err
 	}
-	if err = r.cdwFormalValidateClass(ctx, fileID, templateKey, policyBasisID); err != nil {
+	if err = r.cdwFormalValidateClass(ctx, fileID, templateID, templateKey, policyBasisID); err != nil {
 		return result, err
 	}
 	var template struct {
@@ -318,7 +318,7 @@ func (r *Repository) CDWDecideFormalApproval(ctx context.Context, id, actor, dec
 	if actor == requester {
 		return result, domain.ErrForbidden
 	}
-	if err = r.cdwFormalValidateClass(ctx, fileID, templateKey, policyBasisID); err != nil {
+	if err = r.cdwFormalValidateClass(ctx, fileID, templateID, templateKey, policyBasisID); err != nil {
 		return result, err
 	}
 	binding, err := r.cdwFormalAuthority(ctx, actor, fileID, policyBasisID)

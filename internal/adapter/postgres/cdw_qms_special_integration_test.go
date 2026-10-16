@@ -1,0 +1,163 @@
+package postgres
+
+import (
+	"context"
+	"errors"
+	"filesmanage/internal/domain"
+	"filesmanage/internal/ports"
+	"testing"
+
+	"github.com/jackc/pgx/v5"
+)
+
+// Scratch-only synthetic policy fixture. Nothing is committed to the
+// development database or represented as a real signed company procedure.
+func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx, r *Repository,
+	prefix string, admin, alice, bob, charlie domain.User, subjectFileID, baseFileID, blobID, sha, basePolicy string) {
+	t.Helper()
+	if _, err := tx.Exec(ctx, "SAVEPOINT cdw_g12_special"); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if _, err := tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_g12_special"); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	const reason = "隔离测试：依据正式设计历史文档管理规定独立核对专属签批节点、范围与文件适用性。"
+	policyFile := prefix + "_dhf_policy_file"
+	policySubject := prefix + "_dhf_policy_subject"
+	policyApproval := prefix + "_dhf_policy_approval"
+	policyCandidate := prefix + "_dhf_policy_candidate"
+	policyRelease := prefix + "_dhf_policy_release"
+	policyTemplate := prefix + "_dhf_template"
+	if _, err := tx.Exec(ctx, `UPDATE files SET name='DHF-测试设计历史文档.docx' WHERE id=$1`, subjectFileID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO files(id,folder_id,name,uploaded_by)
+ SELECT $1,folder_id,'产品设计历史文档管理规定.docx',$2 FROM files WHERE id=$3`,
+		policyFile, admin.ID, baseFileID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO cdw_business_role_bindings
+ (id,user_id,role,file_id,granted_by) VALUES($1,$2,'document_control',$3,$4)`,
+		prefix+"_special_policy_controller", charlie.ID, policyFile, admin.ID); err != nil {
+		t.Fatal(err)
+	}
+	if classified, err := r.CDWFormalClassify(ctx, policyFile, "qms", reason, charlie.ID); err != nil || classified.ApprovalClass != "qms" {
+		t.Fatalf("synthetic dedicated policy not QMS-classified: %+v %v", classified, err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO cdw_approval_subjects
+ (id,file_id,source_kind,blob_id,sha256,size_bytes,frozen_by)
+ VALUES($1,$2,'existing_version',$3,$4,31,$5)`, policySubject, policyFile, blobID, sha, admin.ID); err != nil {
+		t.Fatal(err)
+	}
+	var sourceTemplateID string
+	if err := tx.QueryRow(ctx, `SELECT id FROM cdw_workflow_template_versions
+ WHERE authority_basis_release_id=$1 AND lifecycle='published'
+ AND lower(template_key)~'^(cdw_)?qms_' ORDER BY published_at DESC LIMIT 1`,
+		basePolicy).Scan(&sourceTemplateID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO cdw_formal_approval_instances
+ (id,subject_id,template_version_id,state,requested_by,completed_at)
+ VALUES($1,$2,$3,'approved',$4,clock_timestamp())`,
+		policyApproval, policySubject, sourceTemplateID, admin.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO cdw_approved_candidates
+ (id,subject_id,file_id,approval_instance_id,content_sha256)
+ VALUES($1,$2,$3,$4,$5)`, policyCandidate, policySubject, policyFile, policyApproval, sha); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO cdw_controlled_releases
+ (id,file_id,approved_candidate_id,controlled_revision,display_name_snapshot,state,
+ policy_snapshot,prepared_by,issued_by,issued_at,actual_effective_at)
+ VALUES($1,$2,$3,'A/0','产品设计历史文档管理规定.docx','effective','{}'::jsonb,
+ $4,$4,clock_timestamp(),clock_timestamp())`, policyRelease, policyFile, policyCandidate, admin.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO cdw_effective_pointers
+ (file_id,release_id,state,activated_at) VALUES($1,$2,'active',clock_timestamp())`,
+		policyFile, policyRelease); err != nil {
+		t.Fatal(err)
+	}
+	if qualified, err := r.cdwQMSPolicyEffective(ctx, policyRelease); err != nil || !qualified {
+		t.Fatalf("fixture dedicated policy release not effective: %t %v", qualified, err)
+	}
+	tpl, err := r.CDWPublishFormalTemplate(ctx, policyTemplate,
+		"qms_"+policyTemplate, []ports.CDWFormalStepDefinition{
+			{NodeKey: "management_representative", Sequence: 1, ApproverID: bob.ID},
+			{NodeKey: "general_manager", Sequence: 2, ApproverID: alice.ID}}, admin.ID, policyRelease)
+	if err != nil || tpl == "" {
+		t.Fatalf("dedicated QMS template not published: %q %v", tpl, err)
+	}
+	var active bool
+	if err = tx.QueryRow(ctx, "SELECT cdw_qms_special_authority_current($1,$2)",
+		subjectFileID, tpl).Scan(&active); err != nil || active {
+		t.Fatalf("unverified dedicated policy was active: %t %v", active, err)
+	}
+	if err = r.cdwFormalValidateClass(ctx, subjectFileID, tpl, "qms_"+policyTemplate, policyRelease); !errors.Is(err, domain.ErrPolicyAuthorityPending) {
+		t.Fatalf("DHF approval started without independent policy: %v", err)
+	}
+	recordID := prefix + "_dhf_dedicated_authority"
+	record, err := r.CDWQMSSpecialPropose(ctx, recordID, subjectFileID, "dhf", tpl,
+		policyRelease, admin.ID, reason)
+	if err != nil || record.Status != "pending" {
+		t.Fatalf("dedicated policy proposal: %+v %v", record, err)
+	}
+	if _, err = r.CDWQMSSpecialReview(ctx, recordID, admin.ID, reason, false); !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("self-verified dedicated approval: %v", err)
+	}
+	if _, err = r.CDWQMSSpecialReview(ctx, recordID, bob.ID, reason, false); !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("non document-controller verified dedicated approval: %v", err)
+	}
+	record, err = r.CDWQMSSpecialReview(ctx, recordID, charlie.ID, reason, false)
+	if err != nil || record.Status != "verified" || record.VerifiedBy != charlie.ID {
+		t.Fatalf("independently verified dedicated authority: %+v %v", record, err)
+	}
+	if err = r.cdwFormalValidateClass(ctx, subjectFileID, tpl, "qms_"+policyTemplate, policyRelease); err != nil {
+		t.Fatalf("dedicated policy did not technically unblock matching template: %v", err)
+	}
+	if err = r.cdwFormalValidateClass(ctx, subjectFileID, "bogus", "qms_"+policyTemplate, policyRelease); !errors.Is(err, domain.ErrPolicyAuthorityPending) {
+		t.Fatalf("other template inherited dedicated authority: %v", err)
+	}
+	if _, err = tx.Exec(ctx, `UPDATE files SET name='普通文件.docx' WHERE id=$1`, subjectFileID); err != nil {
+		t.Fatal(err)
+	}
+	var kind *string
+	if err = tx.QueryRow(ctx, "SELECT cdw_qms_special_kind($1)", subjectFileID).Scan(&kind); err != nil || kind == nil || *kind != "dhf" {
+		t.Fatalf("rename erased scoped DHF classification: %v %v", kind, err)
+	}
+	if _, err = tx.Exec(ctx, `UPDATE files SET name='DHF-测试设计历史文档.docx' WHERE id=$1`, subjectFileID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `UPDATE cdw_effective_pointers SET state='none',release_id=NULL
+ WHERE file_id=$1`, policyFile); err != nil {
+		t.Fatal(err)
+	}
+	if err = r.cdwFormalValidateClass(ctx, subjectFileID, tpl, "qms_"+policyTemplate, policyRelease); !errors.Is(err, domain.ErrPolicyAuthorityPending) {
+		t.Fatalf("superseded dedicated rule still signed: %v", err)
+	}
+	if _, err = tx.Exec(ctx, `UPDATE cdw_effective_pointers SET state='active',
+ release_id=$2,activated_at=clock_timestamp() WHERE file_id=$1`, policyFile, policyRelease); err != nil {
+		t.Fatal(err)
+	}
+	record, err = r.CDWQMSSpecialReview(ctx, recordID, charlie.ID, reason, true)
+	if err != nil || record.Status != "revoked" {
+		t.Fatalf("dedicated rule revocation failed: %+v %v", record, err)
+	}
+	if err = r.cdwFormalValidateClass(ctx, subjectFileID, tpl, "qms_"+policyTemplate, policyRelease); !errors.Is(err, domain.ErrPolicyAuthorityPending) {
+		t.Fatalf("revoked dedicated policy still signs: %v", err)
+	}
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_special_rewrite"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `UPDATE cdw_qms_special_authorities SET status='verified'
+ WHERE id=$1`, recordID); err == nil {
+		t.Fatal("database permitted restoring revoked dedicated authority")
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_special_rewrite"); err != nil {
+		t.Fatal(err)
+	}
+	t.Log("CDW_QMS_SPECIAL_AUTHORITY_PASS isolated policy source, no-self review, exact template, sticky kind, pointer rotation, irreversible revocation")
+}
