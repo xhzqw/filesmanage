@@ -957,6 +957,18 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 		"management_representative", issued.ID); !errors.Is(checkErr, domain.ErrQMSAppointmentPending) {
 		t.Fatalf("pending QMS appointment was treated as verified: %v", checkErr)
 	}
+	reviews, checkErr := fixtureReader.CDWQMSPendingReview(ctx, charlie.ID, 100)
+	if checkErr != nil || len(reviews) != 1 || reviews[0].ID != appointmentID {
+		t.Fatalf("independent document-control queue missing pending assignment: %+v %v", reviews, checkErr)
+	}
+	selfReviews, checkErr := fixtureReader.CDWQMSPendingReview(ctx, bob.ID, 100)
+	if checkErr != nil || len(selfReviews) != 0 {
+		t.Fatalf("appointment nominee observed restricted verifier inbox: %+v %v", selfReviews, checkErr)
+	}
+	selfReviews, checkErr = fixtureReader.CDWQMSPendingReview(ctx, admin.ID, 100)
+	if checkErr != nil || len(selfReviews) != 0 {
+		t.Fatalf("appointment proposer observed restricted verifier inbox: %+v %v", selfReviews, checkErr)
+	}
 	if _, checkErr = fixtureReader.CDWQMSVerifyAppointment(ctx, appointmentID, admin.ID,
 		"提出任命者不能独立验证自己的任命材料，该操作必须拒绝执行。"); !errors.Is(checkErr, domain.ErrForbidden) {
 		t.Fatalf("proposer self-verified QMS appointment: %v", checkErr)

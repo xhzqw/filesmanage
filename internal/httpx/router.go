@@ -130,6 +130,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.GET("/workbench/formal-documents/:fileId/classification", h.cdwFormalDocumentClass)
 	api.POST("/workbench/formal-documents/:fileId/classification", h.cdwFormalDocumentClassify)
 	api.GET("/workbench/qms-appointments/files/:fileId", h.cdwQMSListAppointments)
+	api.GET("/workbench/qms-appointments/pending", h.cdwQMSPendingReview)
 	api.POST("/workbench/qms-appointments", h.cdwQMSProposeAppointment)
 	api.POST("/workbench/qms-appointments/:id/verify", h.cdwQMSVerifyAppointment)
 	api.POST("/workbench/formal-roles", h.cdwFormalRoleGrant)

@@ -923,6 +923,19 @@ add("GET","/api/workbench/qms-appointments/files/{fileId}",operation(
  security=SESSION,params=[id_param("fileId","File ID.")],
  responses=dict([json_ok(obj({"items":arr(CDW_QMS_APPOINTMENT)},required=["items"]),
  "Appointment status, source and reviewer are read from the server."),resp("403",ERR["403"])])))
+add("GET","/api/workbench/qms-appointments/pending",operation(
+ "Independent document-control QMS appointment review queue","CDW","cdwQMSPendingReview",
+ security=SESSION,
+ responses=dict([json_ok(obj({"items":arr(obj({
+ "id":string(),"fileId":string(),"fileName":string(),"evidenceFileId":string(),
+ "evidenceFileName":string(),"evidenceReleaseId":string(),"userId":string(),
+ "nodeKey":string(),"policyReleaseId":string(),"expiresAt":timestamp(),"status":string(),
+ "proposedBy":string(),"reason":string(),
+ },required=["id","fileId","fileName","evidenceFileId","evidenceFileName",
+ "evidenceReleaseId","userId","nodeKey","policyReleaseId","expiresAt","status","proposedBy","reason"]))},
+ required=["items"]),
+ "Current reviewer roles and file visibility intersect; excludes proposer and nominee."),
+ resp("403",ERR["403"])])))
 add("POST","/api/workbench/qms-appointments",operation(
  "Record an unverified QMS signer appointment; does not itself grant signing rights",
  "CDW","cdwQMSProposeAppointment",security=SESSION,params=[CDW_IDEMPOTENCY],

@@ -75,13 +75,21 @@ type CDWQMSAppointment struct {
 	VerifiedBy        string `json:"verifiedBy,omitempty"`
 	Reason            string `json:"reason"`
 }
+type CDWQMSPendingReview struct {
+	CDWQMSAppointment
+	FileName         string `json:"fileName"`
+	EvidenceFileID   string `json:"evidenceFileId"`
+	EvidenceFileName string `json:"evidenceFileName"`
+}
 
 // All mutations run inside the caller's UnitOfWork transaction.
 type CDWFormalStore interface {
 	CDWQMSProposeAppointment(context.Context, string, string, string, string, string, string, string, time.Time, string) (CDWQMSAppointment, error)
 	CDWQMSVerifyAppointment(context.Context, string, string, string) (CDWQMSAppointment, error)
 	CDWQMSAppointmentFile(context.Context, string) (string, error)
+	CDWQMSAppointmentSourceFiles(context.Context, string) (string, string, error)
 	CDWQMSListAppointments(context.Context, string) ([]CDWQMSAppointment, error)
+	CDWQMSPendingReview(context.Context, string, int) ([]CDWQMSPendingReview, error)
 	CDWFormalClass(context.Context, string) (CDWDocumentClassification, error)
 	CDWFormalClassify(context.Context, string, string, string, string) (CDWDocumentClassification, error)
 	CDWPublishFormalTemplate(context.Context, string, string, []CDWFormalStepDefinition, string, string) (string, error)

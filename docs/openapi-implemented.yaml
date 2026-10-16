@@ -2064,6 +2064,86 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-appointments/pending:
+    get:
+      summary: Independent document-control QMS appointment review queue
+      operationId: cdwQMSPendingReview
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Current reviewer roles and file visibility intersect; excludes proposer and nominee.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            fileId:
+                              type: string
+                            fileName:
+                              type: string
+                            evidenceFileId:
+                              type: string
+                            evidenceFileName:
+                              type: string
+                            evidenceReleaseId:
+                              type: string
+                            userId:
+                              type: string
+                            nodeKey:
+                              type: string
+                            policyReleaseId:
+                              type: string
+                            expiresAt:
+                              type: string
+                              format: date-time
+                            status:
+                              type: string
+                            proposedBy:
+                              type: string
+                            reason:
+                              type: string
+                          required:
+                          - id
+                          - fileId
+                          - fileName
+                          - evidenceFileId
+                          - evidenceFileName
+                          - evidenceReleaseId
+                          - userId
+                          - nodeKey
+                          - policyReleaseId
+                          - expiresAt
+                          - status
+                          - proposedBy
+                          - reason
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/qms-appointments:
     post:
       summary: Record an unverified QMS signer appointment; does not itself grant signing rights

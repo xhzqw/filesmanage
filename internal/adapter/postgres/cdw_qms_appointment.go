@@ -81,6 +81,19 @@ func (r *Repository) CDWQMSAppointmentFile(ctx context.Context, id string) (stri
 	return fileID, err
 }
 
+func (r *Repository) CDWQMSAppointmentSourceFiles(ctx context.Context, id string) (string, string, error) {
+	var policyFileID, evidenceFileID string
+	err := r.Q.QueryRow(ctx, `SELECT policy.file_id,evidence.file_id
+ FROM cdw_qms_appointments a
+ JOIN cdw_controlled_releases policy ON policy.id=a.policy_release_id
+ JOIN cdw_controlled_releases evidence ON evidence.id=a.evidence_release_id
+ WHERE a.id=$1`, id).Scan(&policyFileID, &evidenceFileID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", "", domain.ErrNotFound
+	}
+	return policyFileID, evidenceFileID, err
+}
+
 func (r *Repository) CDWQMSVerifyAppointment(ctx context.Context, id, actor, statement string) (ports.CDWQMSAppointment, error) {
 	var fileID, userID, proposer, policyID, evidenceID, status string
 	var expiresAt time.Time
@@ -137,6 +150,44 @@ func (r *Repository) CDWQMSListAppointments(ctx context.Context, fileID string) 
 		if e != nil {
 			return nil, e
 		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// Scoped to live document-control bindings, excluding proposer and nominee.
+// Application intersects file visibility before returning any record.
+func (r *Repository) CDWQMSPendingReview(ctx context.Context, actor string, limit int) ([]ports.CDWQMSPendingReview, error) {
+	rows, err := r.Q.Query(ctx, `SELECT a.id,a.file_id,a.user_id,a.node_key,a.policy_release_id,
+ a.evidence_release_id,a.expires_at,a.status,a.proposed_by,COALESCE(a.verified_by,''),a.reason,
+ f.name,evidence.file_id,ef.name
+ FROM cdw_qms_appointments a JOIN files f ON f.id=a.file_id
+ JOIN cdw_controlled_releases evidence ON evidence.id=a.evidence_release_id
+ JOIN files ef ON ef.id=evidence.file_id
+ WHERE a.status='pending' AND a.proposed_by<>$1 AND a.user_id<>$1
+ AND f.deleted_at IS NULL AND EXISTS(
+  SELECT 1 FROM cdw_business_role_bindings b JOIN users u ON u.id=b.user_id
+  WHERE b.user_id=$1 AND b.role='document_control'
+   AND (b.file_id=a.file_id OR b.file_id IS NULL)
+   AND u.disabled_at IS NULL AND b.department_id IS NULL AND b.revoked_at IS NULL
+   AND b.valid_from<=clock_timestamp()
+   AND (b.expires_at IS NULL OR b.expires_at>clock_timestamp())
+ )
+ ORDER BY a.proposed_at DESC,a.id DESC LIMIT $2`, actor, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []ports.CDWQMSPendingReview{}
+	for rows.Next() {
+		var a ports.CDWQMSPendingReview
+		var expires time.Time
+		if e := rows.Scan(&a.ID, &a.FileID, &a.UserID, &a.NodeKey, &a.PolicyReleaseID,
+			&a.EvidenceReleaseID, &expires, &a.Status, &a.ProposedBy, &a.VerifiedBy, &a.Reason,
+			&a.FileName, &a.EvidenceFileID, &a.EvidenceFileName); e != nil {
+			return nil, e
+		}
+		a.ExpiresAt = expires.UTC().Format(time.RFC3339)
 		out = append(out, a)
 	}
 	return out, rows.Err()

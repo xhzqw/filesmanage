@@ -120,6 +120,14 @@ try{
  }
  console.log("CDW_QMS_CLASSIFICATION_BROWSER_PASS no requester-side route toggle; document-control classification enforced");
 
+ await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('任命核验'));button?.click();return Boolean(button);})()");
+ await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('任命核验')");
+ assert.equal(await evalJS("!!document.querySelector('[aria-label=\"岗位任命待核验列表\"]')"),true,
+  "independent document-control personnel have an actionable appointment review view");
+ assert.equal(await evalJS("!!document.querySelector('[aria-label=\"岗位任命核验详情\"]')"),true,
+  "appointment review details occupy the shared main canvas, without a second UI system");
+ console.log("CDW_QMS_APPOINTMENT_REVIEW_BROWSER_PASS independent document-control inbox=live-no-write");
+
  await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('发行准备'));button?.click();return true;})()");
  await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('发行准备')");
  assert.equal(await evalJS("[...document.querySelectorAll('.cdw-inbox-actions button')].some(b=>b.textContent.includes('派发任务'))"),false,

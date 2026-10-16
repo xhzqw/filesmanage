@@ -7,6 +7,7 @@ import {RareBadge,RareButton,RareInput,RareNotice,RareSelect} from "../shared/ui
 import {CDWReviewPanel} from "../features/cdw/CDWReviewPanel";
 import {CDWFormalPanel} from "../features/cdw/CDWFormalPanel";
 import {CDWFormalInitiate} from "../features/cdw/CDWFormalInitiate";
+import {CDWQMSReviewInbox} from "../features/cdw/CDWQMSReviewInbox";
 import {CDWControlPreparePanel} from "../features/cdw/CDWControlPreparePanel";
 import {CDWObligationPanel} from "../features/cdw/CDWObligationPanel";
 import {CDWScopeApprovalPanel} from "../features/cdw/CDWScopeApprovalPanel";
@@ -21,10 +22,10 @@ import {newIdempotencyKey} from "../shared/ids";
 import {collaborationApi} from "../features/collaboration/api";
 import {organizationApi} from "../features/organization/api";
 import {fileApi} from "../features/documents/api";
-import {cdwApi,type CDWBranch,type CDWInboxItem,type CDWRecipient,type CDWReviewGate,type CDWFormalApproval,type CDWApprovedCandidate,type CDWDistributionPlan,type CDWReceiptTarget,type CDWReadingAssignment} from "../features/cdw/api";
+import {cdwApi,type CDWBranch,type CDWInboxItem,type CDWRecipient,type CDWReviewGate,type CDWFormalApproval,type CDWApprovedCandidate,type CDWDistributionPlan,type CDWReceiptTarget,type CDWReadingAssignment,type CDWQMSPendingReview} from "../features/cdw/api";
 import "./cdwWorkbench.css";
 
-type View="tasks"|"obligations"|"reviews"|"formal"|"control"|"scope"|"receipts"|"reading"|"effective"|"all";
+type View="tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all";
 const labels:Record<string,string>={
  assigned:"待接收",accepted:"已接收",in_progress:"进行中",submitted:"待上级验收",
  returned:"已退回",awaiting:"待我验收",accepted_delivery:"交付已验收",
@@ -51,6 +52,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const[items,setItems]=useState<CDWInboxItem[]>([]);
  const[reviewGates,setReviewGates]=useState<CDWReviewGate[]>([]);
  const[formalApprovals,setFormalApprovals]=useState<CDWFormalApproval[]>([]);
+ const[pendingAppointments,setPendingAppointments]=useState<CDWQMSPendingReview[]>([]);
  const[controlCandidates,setControlCandidates]=useState<CDWApprovedCandidate[]>([]);
  const[scopeApprovals,setScopeApprovals]=useState<CDWDistributionPlan[]>([]);
  const[receiptTargets,setReceiptTargets]=useState<CDWReceiptTarget[]>([]);
@@ -131,6 +133,13 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
   let live=true;
   cdwApi.formalInbox(100).then(result=>{if(live)setFormalApprovals(result.items??[]);})
    .catch(error=>{if(live)setRequestError(errorCopy(error,"正式审批待办加载失败"));});
+  return()=>{live=false;};
+ },[refreshToken,user.id]);
+
+ useEffect(()=>{
+  let live=true;
+  cdwApi.qmsPendingReview().then(result=>{if(live)setPendingAppointments(result.items??[]);})
+   .catch(error=>{if(live)setRequestError(errorCopy(error,"岗位任命待核验列表加载失败"));});
   return()=>{live=false;};
  },[refreshToken,user.id]);
 
@@ -278,6 +287,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
        ["obligations","责任待办",totalObligations],
        ["reviews","待我验收",totalReviews],
        ["formal","正式审批",totalFormal],
+       ["appointments","任命核验",pendingAppointments.length],
        ["control","发行准备",totalControl],
        ["scope","范围审批",totalScope],
        ["receipts","部门签收",totalReceipts],
@@ -291,7 +301,8 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
        </RareButton>)}
       <div className="cdw-rail-footer">责任不会因下派而自动消失</div>
      </aside>
-     {filter==="effective"?<CDWEffectiveSearchPanel/>:<>
+     {filter==="effective"?<CDWEffectiveSearchPanel/>:filter==="appointments"?
+      <CDWQMSReviewInbox items={pendingAppointments} onVerified={()=>refresh(v=>v+1)}/>:<>
      <section className="cdw-inbox" aria-label="任务列表">
       <header className="cdw-inbox-tools">
        <div className="cdw-inbox-heading"><strong>{filter==="tasks"?"我的任务":filter==="obligations"?"责任待办":filter==="reviews"?"待我验收":filter==="formal"?"正式审批":filter==="control"?"发行准备":filter==="scope"?"范围审批":filter==="receipts"?"部门签收":filter==="reading"?"阅读确认":"全部事项"}</strong><span>{visible.length}</span></div>

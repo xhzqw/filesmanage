@@ -61,3 +61,16 @@ func (h *Handler) cdwQMSListAppointments(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, gin.H{"ok": true, "data": gin.H{"items": items}})
 }
+func (h *Handler) cdwQMSPendingReview(c *gin.Context) {
+	actor, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	items, err := h.S.CDWQMSPendingReview(c.Request.Context(), actor)
+	if err != nil {
+		cdwError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, gin.H{"ok": true, "data": gin.H{"items": items}})
+}

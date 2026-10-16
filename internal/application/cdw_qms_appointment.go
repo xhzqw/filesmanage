@@ -45,6 +45,19 @@ func (s *Service) CDWQMSProposeAppointment(ctx context.Context, actor domain.Use
 			if _, e := s.visibleFile(ctx, tx, actor, input.FileID, domain.ActionPreview); e != nil {
 				return nil, e
 			}
+			ctrl, ok := tx.(ports.CDWControlStore)
+			if !ok {
+				return nil, domain.ErrInvalidInput
+			}
+			for _, releaseID := range []string{input.PolicyReleaseID, input.EvidenceReleaseID} {
+				sourceFileID, e := ctrl.CDWControlFile(ctx, releaseID)
+				if e != nil {
+					return nil, domain.ErrPolicyAuthorityPending
+				}
+				if _, e = s.visibleFile(ctx, tx, actor, sourceFileID, domain.ActionPreview); e != nil {
+					return nil, domain.ErrForbidden
+				}
+			}
 			person, e := tx.UserByID(ctx, input.UserID)
 			if e != nil || person.DisabledAt != nil {
 				return nil, domain.ErrForbidden
@@ -74,6 +87,15 @@ func (s *Service) CDWQMSVerifyAppointment(ctx context.Context, actor domain.User
 			}
 			if _, e = s.visibleFile(ctx, tx, actor, fileID, domain.ActionPreview); e != nil {
 				return nil, e
+			}
+			policyFile, evidenceFile, e := store.CDWQMSAppointmentSourceFiles(ctx, id)
+			if e != nil {
+				return nil, e
+			}
+			for _, sourceFileID := range []string{policyFile, evidenceFile} {
+				if _, e = s.visibleFile(ctx, tx, actor, sourceFileID, domain.ActionPreview); e != nil {
+					return nil, domain.ErrForbidden
+				}
 			}
 			return store.CDWQMSVerifyAppointment(ctx, id, actor.ID, input.Statement)
 		})
@@ -107,4 +129,41 @@ func (s *Service) CDWQMSAppointments(ctx context.Context, actor domain.User, fil
 		return nil, domain.ErrInvalidInput
 	}
 	return store.CDWQMSListAppointments(ctx, fileID)
+}
+
+func (s *Service) CDWQMSPendingReview(ctx context.Context, actor domain.User) ([]ports.CDWQMSPendingReview, error) {
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	store, ok := tx.(ports.CDWFormalStore)
+	if !ok {
+		return nil, domain.ErrInvalidInput
+	}
+	items, err := store.CDWQMSPendingReview(ctx, actor.ID, 100)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ports.CDWQMSPendingReview, 0, len(items))
+	for _, item := range items {
+		visible := true
+		policyFileID, evidenceFileID, e := store.CDWQMSAppointmentSourceFiles(ctx, item.ID)
+		if e != nil {
+			continue
+		}
+		for _, fileID := range []string{item.FileID, policyFileID, evidenceFileID} {
+			if _, e = s.visibleFile(ctx, tx, actor, fileID, domain.ActionPreview); e != nil {
+				visible = false
+				if ctx.Err() != nil {
+					return nil, ctx.Err()
+				}
+				break
+			}
+		}
+		if visible {
+			out = append(out, item)
+		}
+	}
+	return out, nil
 }
