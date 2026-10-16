@@ -203,8 +203,59 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	if _, err = tx.Exec(ctx, `UPDATE files SET name='DHF-测试设计历史文档.docx' WHERE id=$1`, subjectFileID); err != nil {
 		t.Fatal(err)
 	}
+	// An already-started but unfinished DHF approval is quarantined atomically
+	// with the policy change. There is no safe in-place continuation of this
+	// instance after the old controlled policy becomes active again.
+	formalSubject := prefix + "_g15_formal_subject"
+	formalInstance := prefix + "_g15_formal_instance"
+	if _, err = tx.Exec(ctx, `INSERT INTO cdw_approval_subjects
+ (id,file_id,source_kind,blob_id,sha256,size_bytes,frozen_by)
+ VALUES($1,$2,'existing_version',$3,$4,31,$5)`,
+		formalSubject, subjectFileID, blobID, sha, admin.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO cdw_formal_approval_instances
+ (id,subject_id,template_version_id,state,requested_by)
+ VALUES($1,$2,$3,'pending',$4)`,
+		formalInstance, formalSubject, tpl, admin.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO cdw_formal_approval_steps
+ (id,instance_id,node_key,sequence_no,approver_user_id,state)
+ VALUES($1,$3,'management_representative',1,$4,'ready'),
+       ($2,$3,'general_manager',2,$5,'waiting')`,
+		prefix+"_g15_first_step", prefix+"_g15_second_step", formalInstance, bob.ID, alice.ID); err != nil {
+		t.Fatal(err)
+	}
 	if _, err = tx.Exec(ctx, `UPDATE cdw_effective_pointers SET state='none',release_id=NULL
  WHERE file_id=$1`, policyFile); err != nil {
+		t.Fatal(err)
+	}
+	var interruptedState string
+	var pendingSteps int
+	if err = tx.QueryRow(ctx, `SELECT state FROM cdw_formal_approval_instances WHERE id=$1`,
+		formalInstance).Scan(&interruptedState); err != nil || interruptedState != "conflicted" {
+		t.Fatalf("midflight approval not atomically conflicted: %s %v", interruptedState, err)
+	}
+	if err = tx.QueryRow(ctx, `SELECT COUNT(*) FROM cdw_formal_approval_steps
+ WHERE instance_id=$1 AND state IN('ready','waiting')`, formalInstance).Scan(&pendingSteps); err != nil || pendingSteps != 0 {
+		t.Fatalf("interrupted steps remained actionable: %d %v", pendingSteps, err)
+	}
+	interruptions, interruptErr := r.CDWQMSFormalInterruptions(ctx, charlie.ID, 20)
+	if interruptErr != nil || len(interruptions) != 1 ||
+		interruptions[0].ApprovalInstanceID != formalInstance ||
+		interruptions[0].SubjectSHA256 != sha ||
+		interruptions[0].CompletedDecisions != 0 {
+		t.Fatalf("midflight evidence not permanently recorded: %+v %v", interruptions, interruptErr)
+	}
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g15_reopen_bypass"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `UPDATE cdw_formal_approval_instances SET state='pending',completed_at=NULL
+ WHERE id=$1`, formalInstance); err == nil {
+		t.Fatal("SQL revived policy-interrupted approval")
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_g15_reopen_bypass"); err != nil {
 		t.Fatal(err)
 	}
 	impactRows, impactErr := r.CDWQMSSpecialImpacts(ctx, charlie.ID, 30)
@@ -249,12 +300,53 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
  release_id=$2,activated_at=clock_timestamp() WHERE file_id=$1`, policyFile, policyRelease); err != nil {
 		t.Fatal(err)
 	}
+	if err = tx.QueryRow(ctx, `SELECT state FROM cdw_formal_approval_instances WHERE id=$1`,
+		formalInstance).Scan(&interruptedState); err != nil || interruptedState != "conflicted" {
+		t.Fatalf("old approval resurrected merely by restoring policy pointer: %s %v", interruptedState, err)
+	}
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g15_forged_candidate"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO cdw_approved_candidates
+ (id,subject_id,file_id,approval_instance_id,content_sha256)
+ VALUES($1,$2,$3,$4,$5)`,
+		prefix+"_forged_midflight_candidate", formalSubject, subjectFileID, formalInstance, sha); err == nil {
+		t.Fatal("raw SQL created candidate from conflicted formal instance")
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_g15_forged_candidate"); err != nil {
+		t.Fatal(err)
+	}
+	// The reactivated policy is deliberately allowed to start a distinct
+	// approval, but a later explicit revocation must quarantine that new
+	// instance, even if no pointer switch happens.
+	revokedInstance := prefix + "_g15_revocation_instance"
+	if _, err = tx.Exec(ctx, `INSERT INTO cdw_formal_approval_instances
+ (id,subject_id,template_version_id,state,requested_by)
+ VALUES($1,$2,$3,'pending',$4)`, revokedInstance, formalSubject, tpl, admin.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO cdw_formal_approval_steps
+ (id,instance_id,node_key,sequence_no,approver_user_id,state)
+ VALUES($1,$3,'management_representative',1,$4,'ready'),
+       ($2,$3,'general_manager',2,$5,'waiting')`,
+		prefix+"_g15_revoked_first", prefix+"_g15_revoked_second", revokedInstance, bob.ID, alice.ID); err != nil {
+		t.Fatal(err)
+	}
 	record, err = r.CDWQMSSpecialReview(ctx, recordID, charlie.ID, reason, "revoke")
 	if err != nil || record.Status != "revoked" {
 		t.Fatalf("dedicated rule revocation failed: %+v %v", record, err)
 	}
 	if err = r.cdwFormalValidateClass(ctx, subjectFileID, tpl, "qms_"+policyTemplate, policyRelease); !errors.Is(err, domain.ErrPolicyAuthorityPending) {
 		t.Fatalf("revoked dedicated policy still signs: %v", err)
+	}
+	if err = tx.QueryRow(ctx, `SELECT state FROM cdw_formal_approval_instances WHERE id=$1`,
+		revokedInstance).Scan(&interruptedState); err != nil || interruptedState != "conflicted" {
+		t.Fatalf("revocation did not interrupt pending approval: %q %v", interruptedState, err)
+	}
+	var cutCount int
+	if err = tx.QueryRow(ctx, `SELECT count(*) FROM cdw_qms_formal_policy_interruptions
+ WHERE approval_instance_id IN($1,$2)`, formalInstance, revokedInstance).Scan(&cutCount); err != nil || cutCount != 2 {
+		t.Fatalf("pointer and revoke interruptions incomplete: %d %v", cutCount, err)
 	}
 	alerts, err := r.CDWQMSSpecialAlerts(ctx, bob.ID, 20)
 	if err != nil || len(alerts) != 1 || alerts[0].EventKind != "revoked" {
@@ -313,6 +405,7 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_special_new_review"); err != nil {
 		t.Fatal(err)
 	}
+	t.Log("CDW_G15_MIDFLIGHT_PASS pointer change+authority revoke terminal conflicts, immutable frozen decisions, no SQL resurrection/candidate")
 	t.Log("CDW_G14_POLICY_IMPACT_PASS automatic pointer review, independent assessment, irreversible history, exact-artifact fail-closed")
 	t.Log("CDW_QMS_SPECIAL_AUTHORITY_PASS node clauses, return/reject/resubmit, revoked alerts+recipient ACK, exact template, sticky kind, pointer rotation")
 }

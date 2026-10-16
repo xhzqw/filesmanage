@@ -145,6 +145,10 @@ try{
  assert.equal(policyImpacts.status,200,"QMS policy impact tasks are scoped and authenticated");
  assert.ok(Array.isArray(policyImpacts.data?.items),"G14 policy impact assessment tasks are server-backed");
  console.log("CDW_G14_POLICY_IMPACT_BROWSER_PASS live scoped impact task inbox=read-only");
+ const cutApprovals=await evalJS("(async()=>{const r=await fetch('/api/workbench/qms-interrupted-approvals');return {status:r.status,data:(await r.json()).data}})()");
+ assert.equal(cutApprovals.status,200,"G15 interrupted approvals require authenticated file access");
+ assert.ok(Array.isArray(cutApprovals.data?.items),"G15 interrupted instances live in server-side history");
+ console.log("CDW_G15_MIDFLIGHT_BROWSER_PASS read-only frozen approvals after policy change");
 
  await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('发行准备'));button?.click();return true;})()");
  await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('发行准备')");

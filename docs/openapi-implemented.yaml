@@ -3744,6 +3744,104 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-interrupted-approvals:
+    get:
+      summary: Irreversibly conflicted in-flight DHF/DMR approvals with preserved decision history
+      operationId: cdwQMSFormalInterruptions
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Requester, participant or current controller must also pass both source and subject file ACLs.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            approvalInstanceId:
+                              type: string
+                            authorityId:
+                              type: string
+                            subjectFileId:
+                              type: string
+                            subjectName:
+                              type: string
+                            policyFileId:
+                              type: string
+                            subjectSha256:
+                              type: string
+                            templateVersionId:
+                              type: string
+                            oldPolicyReleaseId:
+                              type: string
+                            replacementPolicyReleaseId:
+                              type: string
+                            cause:
+                              type: string
+                              enum:
+                              - pointer
+                              - release_status
+                              - authority_revoked
+                            completedDecisions:
+                              type: integer
+                              minimum: 0
+                            interruptedNodes:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  nodeKey:
+                                    type: string
+                                  approverId:
+                                    type: string
+                                  sequence:
+                                    type: integer
+                                  state:
+                                    type: string
+                            interruptedAt:
+                              type: string
+                              format: date-time
+                          required:
+                          - id
+                          - approvalInstanceId
+                          - authorityId
+                          - subjectFileId
+                          - subjectName
+                          - policyFileId
+                          - subjectSha256
+                          - templateVersionId
+                          - oldPolicyReleaseId
+                          - cause
+                          - completedDecisions
+                          - interruptedNodes
+                          - interruptedAt
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/formal-templates:
     post:
       summary: Publish immutable versioned formal approval template

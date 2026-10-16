@@ -1066,6 +1066,24 @@ add("POST","/api/workbench/qms-special-policy-impacts/{id}/assess",operation(
  "assessment":string()},required=["disposition","assessment"])}},
  responses=dict([json_ok(CDW_QMS_POLICY_IMPACT,"Immutable, separate impact conclusion."),
  resp("403",ERR["403"]),resp("409",ERR["409"])])))
+CDW_QMS_INTERRUPTION=obj({
+ "id":string(),"approvalInstanceId":string(),"authorityId":string(),
+ "subjectFileId":string(),"subjectName":string(),"policyFileId":string(),
+ "subjectSha256":string(),"templateVersionId":string(),
+ "oldPolicyReleaseId":string(),"replacementPolicyReleaseId":string(),
+ "cause":string(enum=["pointer","release_status","authority_revoked"]),
+ "completedDecisions":integer(minimum=0),"interruptedNodes":arr(obj({
+ "nodeKey":string(),"approverId":string(),"sequence":integer(),"state":string()})),
+ "interruptedAt":timestamp()},
+ required=["id","approvalInstanceId","authorityId","subjectFileId","subjectName",
+ "policyFileId","subjectSha256","templateVersionId","oldPolicyReleaseId",
+ "cause","completedDecisions","interruptedNodes","interruptedAt"])
+add("GET","/api/workbench/qms-interrupted-approvals",operation(
+ "Irreversibly conflicted in-flight DHF/DMR approvals with preserved decision history",
+ "CDW","cdwQMSFormalInterruptions",security=SESSION,
+ responses=dict([json_ok(obj({"items":arr(CDW_QMS_INTERRUPTION)},required=["items"]),
+ "Requester, participant or current controller must also pass both source and subject file ACLs."),
+ resp("403",ERR["403"])])))
 add("POST","/api/workbench/formal-templates",operation(
  "Publish immutable versioned formal approval template","CDW","cdwFormalTemplatePublish",
  security=SESSION,params=[CDW_IDEMPOTENCY],

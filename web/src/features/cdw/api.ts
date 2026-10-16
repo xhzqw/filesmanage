@@ -100,6 +100,15 @@ export type CDWQMSSpecialPolicyImpact={
  detectedAt:string;assessment?:string;
  disposition?:"reapproval_required"|"no_effect_on_existing_records";
 };
+export type CDWQMSFormalInterruption={
+ id:string;approvalInstanceId:string;authorityId:string;subjectFileId:string;
+ subjectName:string;policyFileId:string;subjectSha256:string;templateVersionId:string;
+ oldPolicyReleaseId:string;replacementPolicyReleaseId?:string;
+ cause:"pointer"|"release_status"|"authority_revoked";
+ completedDecisions:number;interruptedNodes:Array<{
+  nodeKey:string;approverId:string;sequence:number;state:"ready"|"waiting";
+ }>;interruptedAt:string;
+};
 export type CDWFormalApproval={
  id:string;subjectId:string;deliveryId:string;fileId:string;fileName?:string;
  sha256:string;templateVersionId:string;state:"pending"|"approved"|"rejected"|"cancelled"|"conflicted";
@@ -294,6 +303,8 @@ export const cdwApi={
  qmsSpecialEvidenceUrl:(id:string)=>"/api/workbench/qms-special-authorities/"+segment(id)+"/evidence",
  qmsSpecialImpacts:()=>request<{items:CDWQMSSpecialPolicyImpact[]}>(
   "/workbench/qms-special-policy-impacts",{cache:"no-store"}),
+ qmsFormalInterruptions:()=>request<{items:CDWQMSFormalInterruption[]}>(
+  "/workbench/qms-interrupted-approvals",{cache:"no-store"}),
  qmsSpecialAssessImpact:(id:string,disposition:"reapproval_required"|"no_effect_on_existing_records",assessment:string,key:string)=>
   request<CDWQMSSpecialPolicyImpact>("/workbench/qms-special-policy-impacts/"+segment(id)+"/assess",
    mutate(key,{disposition,assessment})),

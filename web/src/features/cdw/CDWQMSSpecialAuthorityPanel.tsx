@@ -3,7 +3,7 @@ import {RareButton,RareNotice,RareTextarea,RareInput,RareSelect} from "../../sha
 import {toast} from "../../shared/ui/feedback";
 import {errorCopy} from "../../shared/errors";
 import {newIdempotencyKey} from "../../shared/ids";
-import {cdwApi,type CDWQMSSpecialAuthority,type CDWQMSSpecialAlert,type CDWQMSSpecialPolicyImpact} from "./api";
+import {cdwApi,type CDWQMSSpecialAuthority,type CDWQMSSpecialAlert,type CDWQMSSpecialPolicyImpact,type CDWQMSFormalInterruption} from "./api";
 
 type Scope={fileId:string;kind:"dhf"|"dmr";templateVersionId:string;policyReleaseId:string;
  nodes:Array<{nodeKey:string;label:string}>};
@@ -23,6 +23,7 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
  const [nodeRefs,setNodeRefs]=useState<Record<string,{clauseRef:string;basisSummary:string}>>({});
  const [alerts,setAlerts]=useState<CDWQMSSpecialAlert[]>([]);
  const [impacts,setImpacts]=useState<CDWQMSSpecialPolicyImpact[]>([]);
+ const [interruptions,setInterruptions]=useState<CDWQMSFormalInterruption[]>([]);
  const [impactReason,setImpactReason]=useState("");
  const [impactDisposition,setImpactDisposition]=useState<"reapproval_required"|"no_effect_on_existing_records">("reapproval_required");
  const [impactSelected,setImpactSelected]=useState("");
@@ -43,6 +44,12 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
   let live=true;
   cdwApi.qmsSpecialImpacts().then(page=>{if(live)setImpacts(page.items??[]);})
    .catch(e=>{if(live)setError(errorCopy(e,"制度变更影响评估加载失败"));});
+  return()=>{live=false;};
+ },[refresh,actorId]);
+ useEffect(()=>{
+  let live=true;
+  cdwApi.qmsFormalInterruptions().then(page=>{if(live)setInterruptions(page.items??[]);})
+   .catch(e=>{if(live)setError(errorCopy(e,"中途失效的正式审批记录加载失败"));});
   return()=>{live=false;};
  },[refresh,actorId]);
  const shown=useMemo(()=>scope?
@@ -114,6 +121,18 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
    核对原始专属规定、适用文件、精确受控发行版本和模板节点后才能独立确认。提报人不能自审。
   </p>}
   {error&&<RareNotice tone="danger">{error}</RareNotice>}
+  {!scope&&interruptions.length>0&&<div className="cdw-review-digest" aria-label="制度变更中断的正式审批">
+   <small>因制度变更或授权撤销而终止的审批</small>
+   <RareNotice tone="warning">这些审批已正式转为冲突终态，既有签署历史保留，不能继续原审批；须依据新版有效制度和授权重新发起。</RareNotice>
+   {interruptions.map(item=><div className="cdw-review-digest" key={item.id}>
+    <strong>{item.subjectName}</strong>
+    <p className="cdw-section-note">原因：{item.cause==="authority_revoked"?"专项审批依据被撤销":
+     item.cause==="pointer"?"制度有效版本已变更":"制度发行状态已变更"}
+     {" · "}已签署 {item.completedDecisions} 节点；原待签 {item.interruptedNodes.length} 节点</p>
+    <p className="cdw-section-note">原制度版本：{item.oldPolicyReleaseId}</p>
+    <p className="cdw-section-note">原审批：{item.approvalInstanceId}</p>
+   </div>)}
+  </div>}
   {!scope&&impacts.some(i=>i.state==="open")&&<div className="cdw-review-digest" aria-label="制度变更影响评估">
    <small>待处理的制度变更影响评估</small>
    {impacts.filter(i=>i.state==="open").map(impact=><div key={impact.id} className="cdw-review-digest">

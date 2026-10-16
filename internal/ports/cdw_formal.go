@@ -2,6 +2,7 @@ package ports
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 )
 
@@ -146,9 +147,26 @@ type CDWQMSSpecialEvidenceSource struct {
 	ReleaseID string
 	Format    string
 }
+type CDWQMSFormalInterruption struct {
+	ID                         string          `json:"id"`
+	ApprovalInstanceID         string          `json:"approvalInstanceId"`
+	AuthorityID                string          `json:"authorityId"`
+	SubjectFileID              string          `json:"subjectFileId"`
+	SubjectName                string          `json:"subjectName"`
+	PolicyFileID               string          `json:"policyFileId"`
+	SubjectSHA256              string          `json:"subjectSha256"`
+	TemplateVersionID          string          `json:"templateVersionId"`
+	OldPolicyReleaseID         string          `json:"oldPolicyReleaseId"`
+	ReplacementPolicyReleaseID string          `json:"replacementPolicyReleaseId,omitempty"`
+	Cause                      string          `json:"cause"`
+	CompletedDecisions         int             `json:"completedDecisions"`
+	InterruptedNodes           json.RawMessage `json:"interruptedNodes"`
+	InterruptedAt              string          `json:"interruptedAt"`
+}
 
 // All mutations run inside the caller's UnitOfWork transaction.
 type CDWFormalStore interface {
+	CDWQMSFormalInterruptions(context.Context, string, int) ([]CDWQMSFormalInterruption, error)
 	CDWQMSSpecialEvidenceSource(context.Context, string) (CDWQMSSpecialEvidenceSource, error)
 	CDWQMSSpecialImpacts(context.Context, string, int) ([]CDWQMSSpecialPolicyImpact, error)
 	CDWQMSSpecialAssessImpact(context.Context, string, string, string, string) (CDWQMSSpecialPolicyImpact, error)

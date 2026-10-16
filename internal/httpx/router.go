@@ -137,6 +137,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.GET("/workbench/qms-special-authorities", h.cdwQMSSpecialList)
 	api.GET("/workbench/qms-special-authorities/:id/evidence", h.cdwQMSSpecialEvidence)
 	api.GET("/workbench/qms-special-policy-impacts", h.cdwQMSSpecialImpacts)
+	api.GET("/workbench/qms-interrupted-approvals", h.cdwQMSFormalInterruptions)
 	api.POST("/workbench/qms-special-policy-impacts/:id/assess", h.cdwQMSSpecialAssessImpact)
 	api.GET("/workbench/qms-special-alerts", h.cdwQMSSpecialAlerts)
 	api.POST("/workbench/qms-special-alerts/:id/read", h.cdwQMSSpecialReadAlert)
