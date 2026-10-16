@@ -8,12 +8,14 @@ import {newIdempotencyKey} from "../../shared/ids";
 import {cdwApi,type CDWApprovedCandidate,type CDWControlledRelease} from "./api";
 import type {User} from "../../entities/user/model";
 import {CDWDistributionPlanPanel} from "./CDWDistributionPlanPanel";
+import {CDWActivationHistoryPanel} from "./CDWActivationHistoryPanel";
 
 export function CDWControlPreparePanel({candidate,user,onPrepared,loadUsers,loadDepartments}:{
  candidate:CDWApprovedCandidate;user:User;onPrepared:()=>void;
  loadUsers:()=>Promise<User[]>;loadDepartments:()=>Promise<Array<{id:string;name:string}>>;
 }){
  const [label,setLabel]=useState("");
+ const [plannedLocal,setPlannedLocal]=useState("");
  const [releases,setReleases]=useState<CDWControlledRelease[]>([]);
  const [loading,setLoading]=useState(true);
  const [busy,setBusy]=useState(false);
@@ -28,6 +30,7 @@ export function CDWControlPreparePanel({candidate,user,onPrepared,loadUsers,load
  const [verifyBusy,setVerifyBusy]=useState(false);
  const verifyKey=useRef("");
  const [distributionID,setDistributionID]=useState("");
+ const [activationHistoryID,setActivationHistoryID]=useState("");
  const [historyRevision,setHistoryRevision]=useState(0);
  function refreshHistory(){setHistoryRevision(n=>n+1);onPrepared();}
 
@@ -53,14 +56,16 @@ export function CDWControlPreparePanel({candidate,user,onPrepared,loadUsers,load
  }
  async function prepare(){
   if(busy||!label.trim())return;
+  const plannedAt=plannedLocal?new Date(plannedLocal):null;
+  if(plannedAt&&Number.isNaN(plannedAt.getTime())){setMessage("计划生效时间格式错误");return;}
   setBusy(true);
   if(!prepareKey.current)prepareKey.current=newIdempotencyKey();
   try{
-   await toast.track(()=>cdwApi.controlPrepare(candidate.id,label.trim(),undefined,prepareKey.current),{
+   await toast.track(()=>cdwApi.controlPrepare(candidate.id,label.trim(),plannedAt?.toISOString(),prepareKey.current),{
     loading:"正在锁定正式发行来源…",success:"发行准备记录已创建；尚未发行或生效",
     error:e=>errorCopy(e,"创建发行准备失败")
    });
-   prepareKey.current="";setLabel("");refreshHistory();
+   prepareKey.current="";setLabel("");setPlannedLocal("");refreshHistory();
   }catch(e){if(!(e instanceof ApiError&&e.httpStatus===0))prepareKey.current="";}
   finally{setBusy(false)}
  }
@@ -109,6 +114,10 @@ export function CDWControlPreparePanel({candidate,user,onPrepared,loadUsers,load
     <label>正式版次标识
      <RareInput value={label} maxLength={60} placeholder="例如 A/0、A/1、B/0" onChange={e=>setLabel(e.target.value)}/>
     </label>
+    <label>计划生效时间（可选，未到时不可生效）
+     <RareInput type="datetime-local" value={plannedLocal} disabled={busy}
+      onChange={e=>{setPlannedLocal(e.target.value);prepareKey.current="";}}/>
+    </label>
     <RareButton type="button" tone={prepared?"neutral":"primary"} loading={busy} disabled={busy||prepared||!label.trim()} onClick={()=>void prepare()}>{prepared?"该批准稿已进入发行台账":"创建发行准备记录"}</RareButton>
    </div>
   </section>
@@ -120,8 +129,14 @@ export function CDWControlPreparePanel({candidate,user,onPrepared,loadUsers,load
    {releases.map(item=><div className="cdw-control-release-item" key={item.id}>
     <div className="cdw-branch-row">
      <span className="cdw-branch-text"><strong>{item.revisionLabel}</strong>
-      <small>{item.state==="preparing"?"发行物待核验":item.state==="ready"?"发行物已冻结 · 待分发范围审批":item.state} · 内容指纹 {item.sha256.slice(0,16)}…</small>
+     <small>{item.state==="preparing"?"发行物待核验":item.state==="ready"?"发行物已冻结 · 待分发范围审批":item.state} · 内容指纹 {item.sha256.slice(0,16)}…</small>
+     {item.plannedEffectiveAt&&<small>计划生效：{new Date(item.plannedEffectiveAt).toLocaleString("zh-CN")}</small>}
      </span>
+     {item.state!=="preparing"&&<RareButton type="button" tone="ghost"
+      aria-pressed={activationHistoryID===item.id}
+      onClick={()=>setActivationHistoryID(v=>v===item.id?"":item.id)}>
+      {activationHistoryID===item.id?"收起生效记录":"生效记录"}
+     </RareButton>}
      {item.state==="preparing"?<RareButton type="button" tone="neutral" disabled={busy||verifyBusy}
       onClick={()=>openVerify(item.id)}>核验分发稿</RareButton>:
       (item.state==="ready"||item.state==="issued_pending"||item.state==="withdrawn")?<RareButton type="button" tone="neutral" onClick={()=>setDistributionID(v=>v===item.id?"":item.id)}>
@@ -131,6 +146,7 @@ export function CDWControlPreparePanel({candidate,user,onPrepared,loadUsers,load
     {distributionID===item.id&&(item.state==="ready"||item.state==="issued_pending"||item.state==="withdrawn")&&
      <CDWDistributionPlanPanel release={item} loadUsers={loadUsers} loadDepartments={loadDepartments}
       isAdmin={user.isAdmin} currentUserId={user.id} onChanged={refreshHistory}/>}
+    {activationHistoryID===item.id&&<CDWActivationHistoryPanel key={item.id} releaseId={item.id}/>}
     {verifyId===item.id&&item.state==="preparing"&&<div className="cdw-review-form">
      <RareNotice tone="warning">仅适用于经制度核验后确定<strong>无需额外签章且无需格式转换</strong>的原批准 DOCX。需要盖章或转换的文件不能用此入口。</RareNotice>
      <div className="cdw-review-actions">

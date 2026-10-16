@@ -38,3 +38,32 @@ func (s *Service) CDWActivateRelease(ctx context.Context, actor domain.User,
 	err = json.Unmarshal(raw, &out)
 	return out, err
 }
+func (s *Service) CDWActivationHistory(ctx context.Context, actor domain.User, releaseID string) ([]ports.CDWActivationAttempt, error) {
+	if releaseID == "" {
+		return nil, domain.ErrInvalidInput
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	store, ok := tx.(ports.CDWActivationStore)
+	if !ok {
+		return nil, domain.ErrInvalidInput
+	}
+	ctrl, ok := tx.(ports.CDWControlStore)
+	if !ok {
+		return nil, domain.ErrInvalidInput
+	}
+	fileID, err := ctrl.CDWControlFile(ctx, releaseID)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = s.visibleFile(ctx, tx, actor, fileID, domain.ActionPreview); err != nil {
+		return nil, err
+	}
+	if _, err = ctrl.CDWControlRole(ctx, actor.ID, "document_control", fileID); err != nil {
+		return nil, err
+	}
+	return store.CDWActivationHistory(ctx, releaseID, 100)
+}

@@ -32,3 +32,16 @@ func (h *Handler) cdwActivation(c *gin.Context) {
 	c.Header("ETag", strconv.Quote("rev-"+strconv.FormatInt(out.Revision, 10)))
 	c.JSON(http.StatusOK, gin.H{"ok": true, "data": out})
 }
+func (h *Handler) cdwActivationHistory(c *gin.Context) {
+	actor, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	items, err := h.S.CDWActivationHistory(c.Request.Context(), actor, c.Param("id"))
+	if err != nil {
+		cdwError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, gin.H{"ok": true, "data": gin.H{"items": items}})
+}

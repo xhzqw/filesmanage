@@ -2461,6 +2461,92 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/controlled/releases/{id}/activation-history:
+    get:
+      summary: Read up to 100 immutable actual release activation attempts with original blockers and actors; requires current
+        document-control authorization
+      operationId: cdwActivationHistory
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Controlled release ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Only scoped document controllers can read the retained activation audit trail.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            releaseId:
+                              type: string
+                            actorId:
+                              type: string
+                            outcome:
+                              type: string
+                              enum:
+                              - activated
+                              - blocked
+                              - failed
+                            triggerKind:
+                              type: string
+                              enum:
+                              - manual
+                              - scheduler
+                              - recovery
+                            attemptedAt:
+                              type: string
+                              format: date-time
+                            blockers:
+                              type: array
+                              items:
+                                type: string
+                          required:
+                          - id
+                          - releaseId
+                          - actorId
+                          - outcome
+                          - triggerKind
+                          - attemptedAt
+                          - blockers
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/controlled/releases/{id}/activate:
     post:
       summary: 'CAS-controlled manual activation: validate scope, immutable artifact, all department receipts, required reading,

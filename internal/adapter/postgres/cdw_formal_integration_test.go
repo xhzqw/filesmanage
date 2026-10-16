@@ -417,6 +417,14 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	if e != nil || len(blockedReplay.Blockers) != len(blockedActivation.Blockers) {
 		t.Fatalf("activation blocker replay %+v %v", blockedReplay, e)
 	}
+	activationHistory, e := service.CDWActivationHistory(ctx, admin, issued.ID)
+	if e != nil || len(activationHistory) != 1 || activationHistory[0].Outcome != "blocked" ||
+		len(activationHistory[0].Blockers) < 2 || activationHistory[0].ActorID != admin.ID {
+		t.Fatalf("durable activation history must expose exact blockers once: %+v %v", activationHistory, e)
+	}
+	if _, e = service.CDWActivationHistory(ctx, alice, issued.ID); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("unprivileged user read activation evidence: %v", e)
+	}
 	if _, e = service.CDWActivateRelease(ctx, alice, issued.ID, issued.Revision, prefix+"_g8_unauthorized_activation"); !errors.Is(e, domain.ErrForbidden) {
 		t.Fatalf("unprivileged effective activation: %v", e)
 	}

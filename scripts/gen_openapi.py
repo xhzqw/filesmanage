@@ -955,6 +955,19 @@ CDW_ACTIVATION_DECISION=obj({
  "revision":integer(minimum=1),"pointerRevision":integer(minimum=0),
  "priorReleaseId":string(),"effectiveAt":timestamp(),"blockers":arr(string())},
  required=["releaseId","fileId","outcome","revision","pointerRevision","blockers"])
+CDW_ACTIVATION_ATTEMPT=obj({
+ "id":string(),"releaseId":string(),"actorId":string(),
+ "outcome":string(enum=["activated","blocked","failed"]),
+ "triggerKind":string(enum=["manual","scheduler","recovery"]),
+ "attemptedAt":timestamp(),"blockers":arr(string())},
+ required=["id","releaseId","actorId","outcome","triggerKind","attemptedAt","blockers"])
+add("GET","/api/workbench/controlled/releases/{id}/activation-history",operation(
+ "Read up to 100 immutable actual release activation attempts with original blockers and actors; requires current document-control authorization",
+ "CDW","cdwActivationHistory",security=SESSION,
+ params=[id_param("id","Controlled release ID")],
+ responses=dict([json_ok(obj({"items":arr(CDW_ACTIVATION_ATTEMPT)},required=["items"]),
+ "Only scoped document controllers can read the retained activation audit trail."),
+ resp("403",ERR["403"]),resp("404",ERR["404"])])))
 add("POST","/api/workbench/controlled/releases/{id}/activate",operation(
  "CAS-controlled manual activation: validate scope, immutable artifact, all department receipts, required reading, paper issuance, planned time and predecessor withdrawal; append immutable activation attempt; atomically advance effective pointer and audit/outbox only on success",
  "CDW","cdwActivation",security=SESSION,

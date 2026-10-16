@@ -141,6 +141,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.POST("/workbench/controlled/releases/:id/verify", h.cdwControlVerify)
 	api.POST("/workbench/controlled/releases/:id/issue", h.cdwControlIssue)
 	api.POST("/workbench/controlled/releases/:id/activate", h.cdwActivation)
+	api.GET("/workbench/controlled/releases/:id/activation-history", h.cdwActivationHistory)
 	api.GET("/workbench/controlled/releases/:id/distribution-plan", h.cdwDistributionForRelease)
 	api.POST("/workbench/distribution-plans", h.cdwDistributionCreate)
 	api.GET("/workbench/distribution-plans/:id", h.cdwDistributionRead)

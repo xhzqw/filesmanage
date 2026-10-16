@@ -16,4 +16,14 @@ type CDWActivationDecision struct {
 }
 type CDWActivationStore interface {
 	CDWActivateRelease(context.Context, string, string, string, int64, string) (CDWActivationDecision, error)
+	CDWActivationHistory(context.Context, string, int) ([]CDWActivationAttempt, error)
+}
+type CDWActivationAttempt struct {
+	ID          string   `json:"id"`
+	ReleaseID   string   `json:"releaseId"`
+	ActorID     string   `json:"actorId"`
+	Outcome     string   `json:"outcome"`
+	TriggerKind string   `json:"triggerKind"`
+	AttemptedAt string   `json:"attemptedAt"`
+	Blockers    []string `json:"blockers"`
 }
