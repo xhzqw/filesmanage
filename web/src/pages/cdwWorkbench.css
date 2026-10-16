@@ -22,6 +22,29 @@
 .cdw-search .rare-input{width:100%;height:31px;min-height:31px;border-radius:7px;background:#F7F8FA}
 .cdw-inbox-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:1px 7px 16px}
 .cdw-inbox-footer{padding:10px 13px;border-top:1px solid #F2F4F7;font-size:10px;color:#98A2B3}
+.cdw-effective-view{grid-column:2/-1;display:flex;flex-direction:column;min-width:0;min-height:0;background:#fff}
+.cdw-effective-tools{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:14px 22px;border-bottom:1px solid #F2F3F6}
+.cdw-effective-tools>div:first-child{display:flex;flex-direction:column;gap:5px}
+.cdw-effective-tools strong{font-size:14px;color:#1D2939}
+.cdw-effective-tools small{font-size:11px;color:#98A2B3}
+.cdw-effective-actions{display:flex;align-items:center;gap:8px;min-width:0}
+.cdw-effective-actions .rare-input{width:min(33vw,310px);min-width:160px;min-height:32px;background:#F8F9FB}
+.cdw-effective-scroll{min-height:0;flex:1;overflow:auto;padding:10px 18px 24px}
+.cdw-effective-table{width:100%;border-collapse:collapse;font-size:12px;text-align:left}
+.cdw-effective-table th{position:sticky;top:0;background:#fff;font-size:11px;font-weight:600;color:#98A2B3;z-index:1}
+.cdw-effective-table th,.cdw-effective-table td{padding:13px 10px;border-bottom:1px solid #F0F2F5;vertical-align:middle}
+.cdw-effective-table td{color:#475467}
+.cdw-effective-table td strong{display:block;color:#344054;font-size:12px;overflow-wrap:anywhere}
+.cdw-effective-table td small{display:block;color:#98A2B3;max-width:450px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:5px}
+.cdw-effective-table td code{font-size:10px;color:#8793A5}
+.cdw-effective-more{padding:18px 10px;text-align:center}
+@media(max-width:840px){
+ .cdw-effective-tools{flex-wrap:wrap;padding:12px 15px}
+ .cdw-effective-actions{width:100%}
+ .cdw-effective-actions .rare-input{flex:1;width:100%;min-width:100px}
+ .cdw-effective-scroll{padding:8px}
+ .cdw-effective-table th,.cdw-effective-table td{padding:10px 6px}
+}
 .cdw-task-row.rare-button{display:flex;width:100%;height:auto;min-height:66px;padding:10px 11px;gap:11px;align-items:center;border:0;border-radius:9px;text-align:left;background:transparent;color:#344054;box-shadow:none}
 .cdw-task-row:hover{background:#F6F8FB}
 .cdw-task-row.is-selected{background:#DCE8F8;color:#173967}

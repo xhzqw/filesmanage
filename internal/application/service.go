@@ -42,6 +42,7 @@ type Service struct {
 	officeCache   officePDFCache
 	officeFlights singleflight.Group
 	indexJobs     ports.FileIndexJobs
+	cdwIndexJobs  ports.CDWEffectiveIndexJobs
 	session       sessionCache
 	live          userEventHub
 	durable       DurableEventStore

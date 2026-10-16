@@ -135,6 +135,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.GET("/workbench/formal-approvals/:id/content", h.cdwFormalContent)
 	api.POST("/workbench/formal-approvals/:id/decide", h.cdwFormalDecide)
 	api.GET("/workbench/controlled/candidates", h.cdwControlCandidates)
+	api.GET("/workbench/controlled/effective-search", h.cdwSearchEffective)
 	api.GET("/workbench/controlled/files/:fileId/releases", h.cdwControlList)
 	api.POST("/workbench/controlled/role", h.cdwControlGrantRole)
 	api.POST("/workbench/controlled/releases", h.cdwControlPrepare)

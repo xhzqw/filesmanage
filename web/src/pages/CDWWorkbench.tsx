@@ -12,6 +12,7 @@ import {CDWObligationPanel} from "../features/cdw/CDWObligationPanel";
 import {CDWScopeApprovalPanel} from "../features/cdw/CDWScopeApprovalPanel";
 import {CDWDepartmentReceiptPanel} from "../features/cdw/CDWDepartmentReceiptPanel";
 import {CDWReadingPanel} from "../features/cdw/CDWReadingPanel";
+import {CDWEffectiveSearchPanel} from "../features/cdw/CDWEffectiveSearchPanel";
 import {BrandLoadingLabel} from "../shared/ui/BrandLoader";
 import {toast} from "../shared/ui/feedback";
 import {errorCopy} from "../shared/errors";
@@ -23,7 +24,7 @@ import {fileApi} from "../features/documents/api";
 import {cdwApi,type CDWBranch,type CDWInboxItem,type CDWRecipient,type CDWReviewGate,type CDWFormalApproval,type CDWApprovedCandidate,type CDWDistributionPlan,type CDWReceiptTarget,type CDWReadingAssignment} from "../features/cdw/api";
 import "./cdwWorkbench.css";
 
-type View="tasks"|"obligations"|"reviews"|"formal"|"control"|"scope"|"receipts"|"reading"|"all";
+type View="tasks"|"obligations"|"reviews"|"formal"|"control"|"scope"|"receipts"|"reading"|"effective"|"all";
 const labels:Record<string,string>={
  assigned:"待接收",accepted:"已接收",in_progress:"进行中",submitted:"待上级验收",
  returned:"已退回",awaiting:"待我验收",accepted_delivery:"交付已验收",
@@ -281,6 +282,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
        ["scope","范围审批",totalScope],
        ["receipts","部门签收",totalReceipts],
        ["reading","阅读确认",totalReading],
+       ["effective","生效文件",0],
        ["all","全部事项",allItems.length],
       ] as [View,string,number][]).map(([key,label,count])=>
        <RareButton key={key} type="button" className={"cdw-rail-item"+(filter===key?" is-current":"")}
@@ -289,6 +291,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
        </RareButton>)}
       <div className="cdw-rail-footer">责任不会因下派而自动消失</div>
      </aside>
+     {filter==="effective"?<CDWEffectiveSearchPanel/>:<>
      <section className="cdw-inbox" aria-label="任务列表">
       <header className="cdw-inbox-tools">
        <div className="cdw-inbox-heading"><strong>{filter==="tasks"?"我的任务":filter==="obligations"?"责任待办":filter==="reviews"?"待我验收":filter==="formal"?"正式审批":filter==="control"?"发行准备":filter==="scope"?"范围审批":filter==="receipts"?"部门签收":filter==="reading"?"阅读确认":"全部事项"}</strong><span>{visible.length}</span></div>
@@ -405,6 +408,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
        </>}
       </section>:<div className="cdw-detail-empty"><strong>选择一项任务</strong><p>查看工作分支、任务责任和后续交付。</p></div>}
      </article>
+     </>}
     </div>
    </main>
   </div>

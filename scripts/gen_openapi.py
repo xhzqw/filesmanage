@@ -968,6 +968,19 @@ CDW_ACTIVATION_SCHEDULE=obj({
  "nextAttemptAt":timestamp(),"attempts":integer(minimum=0),
  "lastBlockers":arr(string()),"lastError":string()},
  required=["releaseId","sponsorId","status","revision","releaseRevision","nextAttemptAt","attempts","lastBlockers","lastError"])
+CDW_EFFECTIVE_HIT=obj({
+ "fileId":string(),"releaseId":string(),"fileName":string(),"sha256":string(),
+ "effectiveAt":timestamp(),"snippet":string()},
+ required=["fileId","releaseId","fileName","sha256","effectiveAt","snippet"])
+add("GET","/api/workbench/controlled/effective-search",operation(
+ "Search ONLY current effective immutable DOCX distribution artifacts using SHA-bound independent fulltext projection. Verify folder/file visibility and live release preview grant for every result; exclude withdrawn/superseded/pending/unsafe index. No cache.",
+ "CDW","cdwSearchEffective",security=SESSION,params=[
+ {"name":"q","in":"query","schema":{"type":"string","maxLength":120},"description":"Optional approved filename or immutable issued-content search"},
+ {"name":"cursor","in":"query","schema":{"type":"string","maxLength":512},"description":"Keyset continuation for stable effective-at order"},
+ {"name":"limit","in":"query","schema":{"type":"integer","minimum":1,"maximum":50},"description":"Page size, default 30"}],
+ responses=dict([json_ok(obj({"items":arr(CDW_EFFECTIVE_HIT),"nextCursor":string()},
+  required=["items","nextCursor"]),"Each hit has a verified effective release SHA; ordinary latest file_text is never a fallback."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"])])))
 add("GET","/api/workbench/controlled/releases/{id}/schedule",operation(
  "Read explicit opt-in automatic effectivity configuration and last durable blocker; requires live document-control authorization",
  "CDW","cdwScheduleRead",security=SESSION,params=[id_param("id","Controlled release ID")],

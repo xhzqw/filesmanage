@@ -159,7 +159,7 @@ func main() {
 	if err := indexRepo.IndexJobsReady(ctx); err != nil {
 		log.Fatal("persistent file index queue unavailable; run migrations: ", err)
 	}
-	service := application.New(postgres.New(pool), store).WithDurableEvents(postgres.New(pool)).WithAsyncIndexJobs(indexRepo).WithOffice(application.OfficeConfig{
+	service := application.New(postgres.New(pool), store).WithDurableEvents(postgres.New(pool)).WithAsyncIndexJobs(indexRepo).WithCDWEffectiveIndexJobs(indexRepo).WithOffice(application.OfficeConfig{
 		EditorURL:     os.Getenv("FILESMANAGE_OFFICE_URL"),
 		Secret:        os.Getenv("FILESMANAGE_OFFICE_SECRET"),
 		SourceBaseURL: os.Getenv("FILESMANAGE_OFFICE_SOURCE_BASE"),
@@ -171,6 +171,7 @@ func main() {
 	startMaintenance(func() { postgres.WatchRealtimeNotifications(runCtx, dsn, realtimeWake) })
 	startMaintenance(func() { service.WatchDurableCacheWithWake(runCtx, realtimeWake) })
 	startMaintenance(func() { service.RunFileIndexJobs(runCtx) })
+	startMaintenance(func() { service.RunCDWEffectiveIndexJobs(runCtx) })
 	// A future effective_at value is not automatic authority. Only explicitly
 	// enabled CDW schedules run, with durable PostgreSQL leases and live user
 	// reauthorization. The operator can disable the scheduler independently.

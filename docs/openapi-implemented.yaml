@@ -2461,6 +2461,102 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/controlled/effective-search:
+    get:
+      summary: Search ONLY current effective immutable DOCX distribution artifacts using SHA-bound independent fulltext projection.
+        Verify folder/file visibility and live release preview grant for every result; exclude withdrawn/superseded/pending/unsafe
+        index. No cache.
+      operationId: cdwSearchEffective
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: q
+        in: query
+        schema:
+          type: string
+          maxLength: 120
+        description: Optional approved filename or immutable issued-content search
+      - name: cursor
+        in: query
+        schema:
+          type: string
+          maxLength: 512
+        description: Keyset continuation for stable effective-at order
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+        description: Page size, default 30
+      responses:
+        '200':
+          description: Each hit has a verified effective release SHA; ordinary latest file_text is never a fallback.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            fileId:
+                              type: string
+                            releaseId:
+                              type: string
+                            fileName:
+                              type: string
+                            sha256:
+                              type: string
+                            effectiveAt:
+                              type: string
+                              format: date-time
+                            snippet:
+                              type: string
+                          required:
+                          - fileId
+                          - releaseId
+                          - fileName
+                          - sha256
+                          - effectiveAt
+                          - snippet
+                      nextCursor:
+                        type: string
+                    required:
+                    - items
+                    - nextCursor
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/controlled/releases/{id}/schedule:
     get:
       summary: Read explicit opt-in automatic effectivity configuration and last durable blocker; requires live document-control

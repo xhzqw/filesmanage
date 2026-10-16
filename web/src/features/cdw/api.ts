@@ -15,6 +15,10 @@ export type CDWActivationSchedule={
  revision:number;releaseRevision:number;nextAttemptAt:string;attempts:number;
  lastBlockers:string[];lastError?:string;
 };
+export type CDWEffectiveSearchHit={
+ fileId:string;releaseId:string;fileName:string;sha256:string;effectiveAt:string;snippet:string;
+};
+export type CDWEffectiveSearchPage={items:CDWEffectiveSearchHit[];nextCursor:string};
 export type CDWDistributionPlan={
  id:string;releaseId:string;fileId:string;fileName:string;
  state:"draft"|"frozen"|"approved"|"dispatched"|"cancelled";
@@ -223,6 +227,9 @@ export const cdwApi={
   request<CDWControlledRelease>("/workbench/controlled/releases/"+segment(id)+"/verify",
    mutate(key,{justification,noAdditionalSealRequired:true,noConversionRequired:true},revision)),
  controlCandidates:()=>request<{items:CDWApprovedCandidate[]}>("/workbench/controlled/candidates",{cache:"no-store"}),
+ controlEffectiveSearch:(q:string,cursor:string,limit=30)=>request<CDWEffectiveSearchPage>(
+  "/workbench/controlled/effective-search?"+new URLSearchParams({q,cursor,limit:String(limit)}).toString(),
+  {cache:"no-store"}),
  controlList:(fileId:string)=>request<{items:CDWControlledRelease[]}>("/workbench/controlled/files/"+segment(fileId)+"/releases",{cache:"no-store"}),
  controlActivate:(releaseId:string,revision:number,key:string)=>request<CDWActivationDecision>(
   "/workbench/controlled/releases/"+segment(releaseId)+"/activate",mutate(key,{},revision)),

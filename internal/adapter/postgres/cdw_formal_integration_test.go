@@ -823,6 +823,59 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 		admin.ID, issued.Revision, prefix+"_g8_activate_again"); !errors.Is(e, domain.ErrVersionConflict) {
 		t.Fatalf("duplicate activation bypassed CAS: %v", e)
 	}
+	// Search is a separate, SHA-bound projection of the true issued artifact.
+	// All rows here are rolled back with readFixtureTx, not persisted as a fake
+	// searchable business document. No ordinary latest file_text is consulted.
+	if _, e = readFixtureTx.Exec(ctx, `INSERT INTO cdw_effective_search_index
+	 (release_id,artifact_id,blob_id,sha256,state,lease_token,lease_until)
+	 SELECT $1,a.id,a.blob_id,a.sha256,'pending',$2,clock_timestamp()+interval '1 minute'
+	 FROM cdw_release_artifacts a WHERE a.release_id=$1 AND a.purpose='distribution' AND a.format='docx'`,
+		issued.ID, prefix+"_index_lease"); e != nil {
+		t.Fatalf("index fixture setup: %v", e)
+	}
+	indexJob := ports.CDWEffectiveSearchJob{ReleaseID: issued.ID, BlobID: blobID, SHA256: sha,
+		LeaseToken: prefix + "_index_lease"}
+	if e = readFixtureTx.QueryRow(ctx, `SELECT artifact_id FROM cdw_effective_search_index
+	 WHERE release_id=$1`, issued.ID).Scan(&indexJob.ArtifactID); e != nil {
+		t.Fatal(e)
+	}
+	if e = fixtureReader.CDWFinishEffectiveIndexJob(ctx, indexJob, "current approved search witness", "current approved search witness"); e != nil {
+		t.Fatalf("indexed immutable distribution artifact rejected: %v", e)
+	}
+	indexQuery := ports.FileSearchQuery{UserID: admin.ID, Query: "search witness", TextQuery: "search witness", Limit: 10}
+	searchHits, e := fixtureReader.CDWSearchEffectiveCandidates(ctx, indexQuery)
+	if e != nil || len(searchHits) != 1 || searchHits[0].FileID != fileID ||
+		searchHits[0].ReleaseID != issued.ID || searchHits[0].SHA256 != sha ||
+		!strings.Contains(searchHits[0].Snippet, "search witness") {
+		t.Fatalf("effective search did not use exact issued digest: %+v %v", searchHits, e)
+	}
+	indexQuery.UserID = alice.ID
+	unauthorizedHits, e := fixtureReader.CDWSearchEffectiveCandidates(ctx, indexQuery)
+	if e != nil || len(unauthorizedHits) != 0 {
+		t.Fatalf("ungranted user observed controlled search hit: %+v %v", unauthorizedHits, e)
+	}
+	indexQuery.UserID = admin.ID
+	indexQuery.Query = "ordinary-latest"
+	indexQuery.TextQuery = "ordinary-latest"
+	ordinaryHits, e := fixtureReader.CDWSearchEffectiveCandidates(ctx, indexQuery)
+	if e != nil || len(ordinaryHits) != 0 {
+		t.Fatalf("ordinary latest content leaked into immutable search: %+v %v", ordinaryHits, e)
+	}
+	indexQuery.Query = "search witness"
+	indexQuery.TextQuery = "search witness"
+	if _, e = readFixtureTx.Exec(ctx, `UPDATE cdw_effective_search_index SET state='retry'
+	 WHERE release_id=$1`, issued.ID); e != nil {
+		t.Fatal(e)
+	}
+	unreadyHits, e := fixtureReader.CDWSearchEffectiveCandidates(ctx, indexQuery)
+	if e != nil || len(unreadyHits) != 0 {
+		t.Fatalf("unready index exposed: %+v %v", unreadyHits, e)
+	}
+	if _, e = readFixtureTx.Exec(ctx, `UPDATE cdw_effective_search_index SET state='ready'
+	 WHERE release_id=$1`, issued.ID); e != nil {
+		t.Fatal(e)
+	}
+	t.Log("CDW_G8_EFFECTIVE_SEARCH_POSTGRES_PASS immutable-sha-content, unauthorized-user, ordinary-latest exclusion, unready exclusion")
 	controlledRead, managed, e := fixtureReader.CDWEffectiveRead(ctx, fileID, admin.ID, domain.ActionPreview)
 	if e != nil || !managed || controlledRead.BlobID != blobID ||
 		controlledRead.SHA256 != sha || controlledRead.FileName == "" {
@@ -852,6 +905,10 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	}
 	if _, e = readFixtureTx.Exec(ctx, `UPDATE cdw_effective_pointers SET state='none',release_id=NULL WHERE file_id=$1`, fileID); e != nil {
 		t.Fatal(e)
+	}
+	withdrawnSearch, e := fixtureReader.CDWSearchEffectiveCandidates(ctx, indexQuery)
+	if e != nil || len(withdrawnSearch) != 0 {
+		t.Fatalf("nonactive effective pointer leaked historical index: %+v %v", withdrawnSearch, e)
 	}
 	if _, managed, e = fixtureReader.CDWEffectiveRead(ctx, fileID, admin.ID, domain.ActionPreview); !managed || !errors.Is(e, domain.ErrConflict) {
 		t.Fatalf("explicit no-effective-version pointer leaked ordinary latest: managed=%t err=%v", managed, e)
