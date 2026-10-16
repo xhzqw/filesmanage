@@ -3904,6 +3904,60 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-legacy-approval-holds:
+    get:
+      summary: Immutable quarantined historical approvals for traceability and new approval lineage
+      operationId: cdwQMSLegacyHoldHistory
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Only original requester, signers or live controller with current file preview ACL.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            approvalInstanceId:
+                              type: string
+                            fileId:
+                              type: string
+                            state:
+                              type: string
+                              enum:
+                              - conflicted
+                          required:
+                          - id
+                          - approvalInstanceId
+                          - fileId
+                          - state
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/qms-legacy-approval-anomalies/{id}/hold:
     post:
       summary: Independently quarantine one historical anomalous pending approval with immutable explanation

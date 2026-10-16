@@ -50,6 +50,8 @@ type CDWQMSLegacyHold struct {
 	State              string `json:"state"`
 }
 type CDWQMSG16Store interface {
+	CDWQMSRequiresRestart(context.Context, string) (bool, error)
+	CDWQMSLegacyHoldHistory(context.Context, string, int) ([]CDWQMSLegacyHold, error)
 	CDWQMSLegacyAnomalies(context.Context, string, int) ([]CDWQMSLegacyAnomaly, error)
 	CDWQMSHoldLegacy(context.Context, string, string, string, string) (CDWQMSLegacyHold, error)
 	CDWQMSFormalNotices(context.Context, string, int) ([]CDWQMSFormalNotice, error)

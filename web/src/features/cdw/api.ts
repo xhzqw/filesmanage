@@ -118,6 +118,7 @@ export type CDWQMSLegacyAnomaly={
  approvalInstanceId:string;fileId:string;fileName:string;templateVersionId:string;
  requestedBy:string;completedDecisions:number;sha256:string;
 };
+export type CDWQMSLegacyHold={id:string;approvalInstanceId:string;fileId:string;state:"conflicted"};
 export type CDWQMSFormalNotice={
  id:string;approvalInstanceId:string;fileId:string;
  eventKind:"policy_interrupted"|"legacy_quarantined";createdAt:string;readAt?:string;
@@ -315,6 +316,8 @@ export const cdwApi={
   "/workbench/qms-interrupted-approvals",{cache:"no-store"}),
  qmsLegacyAnomalies:()=>request<{items:CDWQMSLegacyAnomaly[]}>(
   "/workbench/qms-legacy-approval-anomalies",{cache:"no-store"}),
+ qmsLegacyHoldHistory:()=>request<{items:CDWQMSLegacyHold[]}>(
+  "/workbench/qms-legacy-approval-holds",{cache:"no-store"}),
  qmsLegacyHold:(id:string,reason:string,key:string)=>request<{id:string;approvalInstanceId:string;fileId:string;state:string}>(
   "/workbench/qms-legacy-approval-anomalies/"+segment(id)+"/hold",mutate(key,{reason})),
  qmsFormalNotices:()=>request<{items:CDWQMSFormalNotice[]}>(

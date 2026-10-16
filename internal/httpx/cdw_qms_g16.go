@@ -19,6 +19,19 @@ func (h *Handler) cdwQMSLegacyAnomalies(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, gin.H{"ok": true, "data": gin.H{"items": items}})
 }
+func (h *Handler) cdwQMSLegacyHoldHistory(c *gin.Context) {
+	actor, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	items, err := h.S.CDWQMSLegacyHoldHistory(c.Request.Context(), actor)
+	if err != nil {
+		cdwError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, gin.H{"ok": true, "data": gin.H{"items": items}})
+}
 func (h *Handler) cdwQMSLegacyHold(c *gin.Context) {
 	actor, ok := h.auth(c)
 	if !ok {

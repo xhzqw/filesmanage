@@ -101,6 +101,17 @@ func (r *Repository) CDWQMSReadFormalNotice(ctx context.Context, id, actor strin
 	}
 	return tag.RowsAffected() == 1, nil
 }
+func (r *Repository) CDWQMSRequiresRestart(ctx context.Context, deliveryID string) (bool, error) {
+	var required bool
+	err := r.Q.QueryRow(ctx, `SELECT EXISTS(
+ SELECT 1 FROM cdw_approval_subjects sub
+ JOIN cdw_formal_approval_instances a ON a.subject_id=sub.id
+ WHERE sub.delivery_id=$1 AND (
+  EXISTS(SELECT 1 FROM cdw_qms_formal_policy_interruptions h WHERE h.approval_instance_id=a.id)
+  OR EXISTS(SELECT 1 FROM cdw_qms_formal_legacy_holds h WHERE h.approval_instance_id=a.id))
+ )`, deliveryID).Scan(&required)
+	return required, err
+}
 func (r *Repository) CDWQMSRecordRestart(ctx context.Context, id, previousID, newID, actor string) error {
 	tag, err := r.Q.Exec(ctx, `INSERT INTO cdw_qms_formal_restarts
  (id,previous_approval_id,new_approval_id,file_id,previous_sha256,new_sha256,submitted_by)

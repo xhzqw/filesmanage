@@ -193,15 +193,22 @@ func (s *Service) CDWStartFormalApproval(ctx context.Context, actor domain.User,
 			if _, e := s.visibleFile(ctx, tx, actor, fileID, domain.ActionPreview); e != nil {
 				return nil, e
 			}
+			g16, ok := tx.(ports.CDWQMSG16Store)
+			if !ok {
+				return nil, domain.ErrInvalidInput
+			}
+			mustLink, e := g16.CDWQMSRequiresRestart(ctx, input.DeliveryID)
+			if e != nil {
+				return nil, e
+			}
+			if mustLink && input.ReplacesApprovalID == "" {
+				return nil, domain.ErrConflict
+			}
 			created, e := store.CDWStartFormalApproval(ctx, id, subjectID, input.DeliveryID, input.TemplateVersionID, actor.ID, key)
 			if e != nil {
 				return nil, e
 			}
 			if input.ReplacesApprovalID != "" {
-				g16, ok := tx.(ports.CDWQMSG16Store)
-				if !ok {
-					return nil, domain.ErrInvalidInput
-				}
 				if e = g16.CDWQMSRecordRestart(ctx, NewID("cdwqmsrestart"), input.ReplacesApprovalID, id, actor.ID); e != nil {
 					return nil, e
 				}

@@ -1099,6 +1099,15 @@ add("GET","/api/workbench/qms-legacy-approval-anomalies",operation(
  "CDW","cdwQMSLegacyAnomalies",security=SESSION,
  responses=dict([json_ok(obj({"items":arr(CDW_QMS_LEGACY_ANOMALY)},required=["items"]),
  "Read-only anomaly discovery does not rewrite existing records."),resp("403",ERR["403"])])))
+add("GET","/api/workbench/qms-legacy-approval-holds",operation(
+ "Immutable quarantined historical approvals for traceability and new approval lineage",
+ "CDW","cdwQMSLegacyHoldHistory",security=SESSION,
+ responses=dict([json_ok(obj({"items":arr(obj({
+ "id":string(),"approvalInstanceId":string(),"fileId":string(),
+ "state":string(enum=["conflicted"])},
+ required=["id","approvalInstanceId","fileId","state"]))},required=["items"]),
+ "Only original requester, signers or live controller with current file preview ACL."),
+ resp("403",ERR["403"])])))
 add("POST","/api/workbench/qms-legacy-approval-anomalies/{id}/hold",operation(
  "Independently quarantine one historical anomalous pending approval with immutable explanation",
  "CDW","cdwQMSLegacyHold",security=SESSION,

@@ -5,7 +5,7 @@ import {errorCopy} from "../../shared/errors";
 import {ApiError} from "../../shared/http";
 import {newIdempotencyKey} from "../../shared/ids";
 import type {User} from "../../entities/user/model";
-import {cdwApi,type CDWFormalReady,type CDWEffectiveSearchHit,type CDWDocumentClassification,type CDWQMSFormalInterruption} from "./api";
+import {cdwApi,type CDWFormalReady,type CDWEffectiveSearchHit,type CDWDocumentClassification,type CDWQMSFormalInterruption,type CDWQMSLegacyHold} from "./api";
 import {CDWQMSAppointmentEvidence} from "./CDWQMSAppointmentEvidence";
 import {CDWQMSSpecialAuthorityPanel} from "./CDWQMSSpecialAuthorityPanel";
 
@@ -25,6 +25,7 @@ const signerPositions=[
 export function CDWFormalInitiate({onCreated,loadUsers,actorId}:{onCreated:()=>void;loadUsers:()=>Promise<User[]>;actorId:string}){
  const [ready,setReady]=useState<CDWFormalReady[]>([]);
  const [interrupted,setInterrupted]=useState<CDWQMSFormalInterruption[]>([]);
+ const [legacyHolds,setLegacyHolds]=useState<CDWQMSLegacyHold[]>([]);
  const [replaces,setReplaces]=useState("");
  const [users,setUsers]=useState<User[]>([]);
  const [delivery,setDelivery]=useState("");
@@ -64,9 +65,10 @@ export function CDWFormalInitiate({onCreated,loadUsers,actorId}:{onCreated:()=>v
  },[selected?.fileId]);
  useEffect(()=>{
   let live=true;setLoading(true);setError("");
-  Promise.all([cdwApi.formalReady(),loadUsers(),cdwApi.qmsFormalInterruptions()])
-   .then(([deliveries,people,history])=>{if(live){
-    setReady(deliveries.items);setUsers(people.filter(u=>!u.disabled));setInterrupted(history.items??[]);
+  Promise.all([cdwApi.formalReady(),loadUsers(),cdwApi.qmsFormalInterruptions(),cdwApi.qmsLegacyHoldHistory()])
+   .then(([deliveries,people,history,legacy])=>{if(live){
+    setReady(deliveries.items);setUsers(people.filter(u=>!u.disabled));
+    setInterrupted(history.items??[]);setLegacyHolds(legacy.items??[]);
    }})
    .catch(e=>{if(live)setError(errorCopy(e,"无法读取可提交交付稿与审批人"));})
    .finally(()=>{if(live)setLoading(false);});
@@ -155,7 +157,8 @@ export function CDWFormalInitiate({onCreated,loadUsers,actorId}:{onCreated:()=>v
     </RareSelect>
    </label>
    {selected&&<div className="cdw-review-digest"><small>冻结交付 SHA-256</small><code>{selected.sha256}</code></div>}
-   {selected&&interrupted.some(a=>a.subjectFileId===selected.fileId)&&<label>
+   {selected&&(interrupted.some(a=>a.subjectFileId===selected.fileId)||
+     legacyHolds.some(a=>a.fileId===selected.fileId))&&<label>
     与终止审批建立正式血缘
     <RareSelect aria-label="关联原终止正式审批" value={replaces} disabled={busy}
      onChange={e=>setReplaces(e.target.value)}>
@@ -163,6 +166,10 @@ export function CDWFormalInitiate({onCreated,loadUsers,actorId}:{onCreated:()=>v
      {interrupted.filter(a=>a.subjectFileId===selected.fileId).map(a=>
       <option key={a.approvalInstanceId} value={a.approvalInstanceId}>
        原审批 {a.approvalInstanceId} · 已签 {a.completedDecisions} 节点
+      </option>)}
+     {legacyHolds.filter(a=>a.fileId===selected.fileId).map(a=>
+      <option key={a.approvalInstanceId} value={a.approvalInstanceId}>
+       历史异常隔离审批 {a.approvalInstanceId}
       </option>)}
     </RareSelect>
     <small>新审批须经现行制度、任命与签批权限重新核验；旧签字不继承。</small>

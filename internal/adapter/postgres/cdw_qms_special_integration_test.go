@@ -433,6 +433,10 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	if anomalyErr != nil || held.State != "conflicted" {
 		t.Fatalf("independent legacy quarantine failed: %+v %v", held, anomalyErr)
 	}
+	history, historyErr := r.CDWQMSLegacyHoldHistory(ctx, bob.ID, 20)
+	if historyErr != nil || len(history) != 1 || history[0].ApprovalInstanceID != legacyInstance {
+		t.Fatalf("historical quarantines not visible to original assigned signer: %+v %v", history, historyErr)
+	}
 	if err = tx.QueryRow(ctx, `SELECT state FROM cdw_formal_approval_instances WHERE id=$1`,
 		legacyInstance).Scan(&interruptedState); err != nil || interruptedState != "conflicted" {
 		t.Fatalf("legacy quarantine didn't make terminal conflict: %s %v", interruptedState, err)
