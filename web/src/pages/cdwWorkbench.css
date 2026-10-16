@@ -101,6 +101,8 @@
 .cdw-control-recipient-row .rare-select{max-width:100%;min-width:0;font-size:11px}
 .cdw-control-recipient-row .rare-button{padding:0 6px;font-size:11px}
 .cdw-control-recipients{max-width:100%;overflow-x:auto}
+.cdw-paper-recipients .cdw-control-recipient-head,.cdw-paper-recipients .cdw-control-recipient-row{grid-template-columns:minmax(100px,1fr) minmax(125px,1fr) 96px 78px 50px;min-width:565px}
+.cdw-paper-recipients .rare-input{min-width:0;width:100%}
 .cdw-control-release-item{padding:3px 0 12px;border-bottom:1px solid #F1F3F6;min-width:0}
 .cdw-control-release-item>.cdw-section{margin:8px 0;padding:12px;border-radius:9px;background:#FAFBFD}
 .cdw-ledger-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}

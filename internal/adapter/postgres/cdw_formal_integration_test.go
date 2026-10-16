@@ -256,7 +256,8 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	}
 	planInput := application.CDWDistributionCreateInput{ReleaseID: ready.ID,
 		Targets: []ports.CDWDistributionTargetInput{
-			{DepartmentID: deptB, ReceiverID: bob.ID}, {DepartmentID: deptC, ReceiverID: charlie.ID}}}
+			{DepartmentID: deptB, ReceiverID: bob.ID, Channel: "mixed", PaperQuantity: 2},
+			{DepartmentID: deptC, ReceiverID: charlie.ID, Channel: "electronic"}}}
 	if _, e = service.CDWDistributionCreate(ctx, alice, planInput, prefix+"_g9_no_role"); !errors.Is(e, domain.ErrForbidden) {
 		t.Fatalf("not an authorized document-control officer: %v", e)
 	}
@@ -564,6 +565,56 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	if !foundBob || !foundCharlie {
 		t.Fatalf("ledger must reflect independent department evidence %+v", ledger.Rows)
 	}
+	// G10 independently tracks actual physical copies, not online reads.
+	if _, e = service.CDWPaperIssue(ctx, admin, charlieTargets[0].TargetID, 1,
+		application.CDWPaperIssueInput{CopyNumbers: []string{"PHYSICAL-C1"}}, prefix+"_g10_electronic_issue"); !errors.Is(e, domain.ErrConflict) {
+		t.Fatalf("electronic-only department issued paper: %v", e)
+	}
+	if _, e = service.CDWPaperIssue(ctx, admin, bobTargets[0].TargetID, 1,
+		application.CDWPaperIssueInput{CopyNumbers: []string{"PHYSICAL-B1"}}, prefix+"_g10_wrong_quantity"); !errors.Is(e, domain.ErrConflict) {
+		t.Fatalf("partial physical lot bypassed frozen count: %v", e)
+	}
+	lotInput := application.CDWPaperIssueInput{CopyNumbers: []string{prefix + "-B01", prefix + "-B02"}}
+	if _, e = service.CDWPaperIssue(ctx, alice, bobTargets[0].TargetID, 1, lotInput, prefix+"_g10_unauthorized_issue"); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("non-controller issued physical copies: %v", e)
+	}
+	issuedPaper, e := service.CDWPaperIssue(ctx, admin, bobTargets[0].TargetID, 1, lotInput, prefix+"_g10_issue")
+	if e != nil || issuedPaper.Issued != 2 || issuedPaper.Outstanding != 2 || len(issuedPaper.Copies) != 2 {
+		t.Fatalf("physical issue count or frozen roster %+v %v", issuedPaper, e)
+	}
+	replayedPaper, e := service.CDWPaperIssue(ctx, admin, bobTargets[0].TargetID, 1, lotInput, prefix+"_g10_issue")
+	if e != nil || replayedPaper.LotID != issuedPaper.LotID {
+		t.Fatalf("paper issue replay %+v %v", replayedPaper, e)
+	}
+	if _, e = service.CDWPaperIssue(ctx, admin, bobTargets[0].TargetID, 1, lotInput, prefix+"_g10_duplicate"); !errors.Is(e, domain.ErrVersionConflict) {
+		t.Fatalf("physical issue repeated despite CAS: %v", e)
+	}
+	physicalReason := "已核实纸质编号、实际交接人员及原始受控文件实物，并登记交接凭证。"
+	physicalRecord := application.CDWPaperTransitionInput{Kind: "collected", Reason: physicalReason}
+	if _, e = service.CDWPaperRecord(ctx, alice, issuedPaper.Copies[0].ID, 1, physicalRecord, prefix+"_g10_unprivileged_collect"); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("unauthorized collection changed physical evidence: %v", e)
+	}
+	collected, e := service.CDWPaperRecord(ctx, admin, issuedPaper.Copies[0].ID, 1, physicalRecord, prefix+"_g10_collect")
+	if e != nil || collected.Revision != 2 || collected.State != "collected" {
+		t.Fatalf("physical collection %+v %v", collected, e)
+	}
+	if _, e = service.CDWPaperRecord(ctx, admin, issuedPaper.Copies[0].ID, 1, physicalRecord, prefix+"_g10_collect_stale"); !errors.Is(e, domain.ErrVersionConflict) {
+		t.Fatalf("concurrent stale physical collection accepted: %v", e)
+	}
+	last, e := service.CDWPaperLedger(ctx, admin, bobTargets[0].TargetID)
+	if e != nil || last.Collected != 1 || last.Outstanding != 1 || last.Issued != 2 {
+		t.Fatalf("partial paper return incorrectly completed: %+v %v", last, e)
+	}
+	lost, e := service.CDWPaperRecord(ctx, admin, issuedPaper.Copies[1].ID, 1,
+		application.CDWPaperTransitionInput{Kind: "lost", Reason: "实物保管人报告纸质受控副本遗失，已登记异常等待后续处置。"}, prefix+"_g10_lost")
+	if e != nil || lost.State != "lost" {
+		t.Fatalf("lost copy not separately evidenced: %+v %v", lost, e)
+	}
+	endLedger, e := service.CDWPaperLedger(ctx, admin, bobTargets[0].TargetID)
+	if e != nil || endLedger.Issued != 2 || endLedger.Collected != 1 || endLedger.Lost != 1 || endLedger.Outstanding != 1 {
+		t.Fatalf("paper statuses must not confuse lost with collected %+v %v", endLedger, e)
+	}
+	t.Logf("CDW_G10_PAPER_POSTGRES_PASS lot=%s copies=2 collected=1 lost=1; neither personal reading nor batch receipt counts as recovery", issuedPaper.LotID)
 	// Read-routing fixture only: this directly seeds an isolated test pointer.
 	// It DOES NOT exercise or claim a production activation transaction.
 	readFixtureTx, e := pool.Begin(ctx)

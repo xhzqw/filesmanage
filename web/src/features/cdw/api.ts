@@ -6,7 +6,7 @@ export type CDWDistributionPlan={
  id:string;releaseId:string;fileId:string;fileName:string;
  state:"draft"|"frozen"|"approved"|"dispatched"|"cancelled";
  revision:number;digestSha256?:string;departmentCount:number;
- targets:Array<{departmentId:string;receiverId:string}>;
+ targets:Array<{departmentId:string;receiverId:string;channel:string;paperQuantity:number}>;
 };
 export type CDWDistributionBatch={
  id:string;planId:string;releaseId:string;fileId:string;
@@ -20,6 +20,7 @@ export type CDWDistributionWithdrawal={
 };
 export type CDWDistributionLedgerRow={
  targetId:string;departmentId:string;departmentName:string;
+ channel:"electronic"|"paper"|"mixed";paperQuantity:number;paperIssued:number;paperOutstanding:number;
  receiverId:string;receiverName:string;actualSignerId?:string;actualSignerName?:string;
  signedAt?:string;receiptId?:string;receiptStatus:"awaiting"|"received";
  readingAssigned:number;readingConfirmed:number;
@@ -29,6 +30,15 @@ export type CDWDistributionLedgerRow={
 export type CDWDistributionLedger={
  planId:string;batchId:string;batchState:"dispatched"|"withdrawn";manifestSha256:string;rows:CDWDistributionLedgerRow[];
  receiptCompleted:number;readingAssigned:number;readingConfirmed:number;
+};
+export type CDWPaperCopy={
+ id:string;copyNo:string;holderId:string;state:"issued"|"collected"|"destroyed"|"lost"|"waived";
+ revision:number;lastEventId?:string;lastActorId?:string;lastReason?:string;
+};
+export type CDWPaperLedger={
+ targetId:string;targetRevision:number;fileId:string;batchId:string;channel:string;paperQuantity:number;
+ lotId?:string;issued:number;collected:number;destroyed:number;lost:number;waived:number;
+ outstanding:number;copies:CDWPaperCopy[];
 };
 export type CDWReceiptTarget={
  targetId:string;batchId:string;fileId:string;fileName:string;
@@ -182,9 +192,16 @@ export const cdwApi={
   "/workbench/distribution-plans/"+segment(planId)+"/withdraw",mutate(key,{reason},revision)),
  distributionLedger:(planId:string)=>request<CDWDistributionLedger>(
   "/workbench/distribution-plans/"+segment(planId)+"/ledger",{cache:"no-store"}),
+ paperLedger:(targetId:string)=>request<CDWPaperLedger>(
+  "/workbench/distribution-targets/"+segment(targetId)+"/paper-copies",{cache:"no-store"}),
+ paperIssue:(targetId:string,revision:number,copyNumbers:string[],key:string)=>request<CDWPaperLedger>(
+  "/workbench/distribution-targets/"+segment(targetId)+"/paper-issue",mutate(key,{copyNumbers},revision)),
+ paperEvent:(copyId:string,revision:number,kind:"collected"|"lost"|"destroyed",reason:string,key:string)=>request<{
+  copyId:string;eventId:string;kind:string;state:string;revision:number;actorId:string;reason:string
+ }>("/workbench/paper-copies/"+segment(copyId)+"/events",mutate(key,{kind,reason},revision)),
  distributionForRelease:(releaseId:string)=>request<CDWDistributionPlan>(
   "/workbench/controlled/releases/"+segment(releaseId)+"/distribution-plan",{cache:"no-store"}),
- distributionCreate:(releaseId:string,targets:Array<{departmentId:string;receiverId:string}>,key:string)=>
+ distributionCreate:(releaseId:string,targets:Array<{departmentId:string;receiverId:string;channel:string;paperQuantity:number}>,key:string)=>
   request<CDWDistributionPlan>("/workbench/distribution-plans",mutate(key,{releaseId,targets})),
  distributionFreeze:(id:string,revision:number,key:string)=>
   request<CDWDistributionPlan>("/workbench/distribution-plans/"+segment(id)+"/freeze",mutate(key,{},revision)),

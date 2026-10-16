@@ -999,7 +999,8 @@ add("POST","/api/workbench/controlled/releases/{id}/verify",operation(
  resp("403",ERR["403"]),resp("409",ERR["409"])])))
 
 # --- G9 server-reconstructed canonical department distribution scope ---
-CDW_DISTRIBUTION_TARGET=obj({"departmentId":string(),"receiverId":string()},
+CDW_DISTRIBUTION_TARGET=obj({"departmentId":string(),"receiverId":string(),
+ "channel":string(enum=["electronic","paper","mixed"]),"paperQuantity":integer(minimum=0)},
  required=["departmentId","receiverId"])
 CDW_DISTRIBUTION_PLAN=obj({"id":string(),"releaseId":string(),"fileId":string(),
  "fileName":string(),"state":string(enum=["draft","frozen","approved","dispatched","cancelled"]),
@@ -1007,7 +1008,7 @@ CDW_DISTRIBUTION_PLAN=obj({"id":string(),"releaseId":string(),"fileId":string(),
  "departmentCount":integer(minimum=1),"targets":arr(CDW_DISTRIBUTION_TARGET)},
  required=["id","releaseId","fileId","fileName","state","revision","departmentCount"])
 add("POST","/api/workbench/distribution-plans",operation(
- "Create real electronic department distribution draft for verified release, with required department receipt and personal reading","CDW","cdwDistributionCreate",
+ "Create electronic/paper/mixed department distribution draft for verified release; physically numbered copies are separately managed","CDW","cdwDistributionCreate",
  security=SESSION,params=[CDW_IDEMPOTENCY],
  request={"application/json":{"schema":obj({"releaseId":string(),
  "targets":arr(CDW_DISTRIBUTION_TARGET)},required=["releaseId","targets"])}},
@@ -1153,6 +1154,8 @@ add("GET","/api/workbench/distribution-targets/{id}/reading-eligible",operation(
 
 CDW_DISTRIBUTION_LEDGER_ROW = obj({
  "targetId":string(),"departmentId":string(),"departmentName":string(),
+ "channel":string(enum=["electronic","paper","mixed"]),"paperQuantity":integer(minimum=0),
+ "paperIssued":integer(minimum=0),"paperOutstanding":integer(minimum=0),
  "receiverId":string(),"receiverName":string(),"actualSignerId":string(),
  "actualSignerName":string(),"signedAt":timestamp(),"receiptId":string(),
  "receiptStatus":string(enum=["awaiting","received"]),
@@ -1160,7 +1163,8 @@ CDW_DISTRIBUTION_LEDGER_ROW = obj({
  "readingStatus":string(enum=["unassigned","awaiting","partial","confirmed"]),
  "dueAt":timestamp(),"overdue":boolean(),"exceptionReason":string()},
  required=["targetId","departmentId","departmentName","receiverId","receiverName",
- "receiptStatus","readingAssigned","readingConfirmed","readingStatus","overdue"])
+ "receiptStatus","readingAssigned","readingConfirmed","readingStatus","overdue",
+ "channel","paperQuantity","paperIssued","paperOutstanding"])
 CDW_DISTRIBUTION_LEDGER = obj({"planId":string(),"batchId":string(),
  "batchState":string(enum=["dispatched","withdrawn"]),
  "manifestSha256":string(),"rows":arr(CDW_DISTRIBUTION_LEDGER_ROW),
@@ -1188,6 +1192,45 @@ add("POST","/api/workbench/distribution-plans/{id}/withdraw",operation(
  "reason":{"type":"string","minLength":12,"maxLength":3000}},required=["reason"])}},
  responses=dict([json_ok(CDW_DISTRIBUTION_WITHDRAWAL,
  "Audited withdrawal receipt. An effective release cannot be withdrawn here."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
+
+CDW_PAPER_COPY=obj({"id":string(),"copyNo":string(),"holderId":string(),
+ "state":string(enum=["issued","collected","destroyed","lost","waived"]),
+ "revision":integer(minimum=1),"lastEventId":string(),"lastActorId":string(),"lastReason":string()},
+ required=["id","copyNo","holderId","state","revision"])
+CDW_PAPER_LEDGER=obj({"targetId":string(),"targetRevision":integer(minimum=1),
+ "fileId":string(),"batchId":string(),
+ "channel":string(enum=["electronic","paper","mixed"]),
+ "paperQuantity":integer(minimum=0),"lotId":string(),
+ "issued":integer(minimum=0),"collected":integer(minimum=0),"destroyed":integer(minimum=0),
+ "lost":integer(minimum=0),"waived":integer(minimum=0),"outstanding":integer(minimum=0),
+ "copies":arr(CDW_PAPER_COPY)},
+ required=["targetId","targetRevision","fileId","batchId","channel","paperQuantity",
+ "issued","collected","destroyed","lost","waived","outstanding","copies"])
+CDW_PAPER_TRANSITION=obj({"copyId":string(),"eventId":string(),
+ "kind":string(enum=["collected","lost","destroyed"]),
+ "state":string(enum=["collected","lost","destroyed"]),"revision":integer(minimum=2),
+ "actorId":string(),"reason":string()},
+ required=["copyId","eventId","kind","state","revision","actorId","reason"])
+add("GET","/api/workbench/distribution-targets/{id}/paper-copies",operation(
+ "Read numbered paper-copy issue/return ledger independently of electronic reading acknowledgements",
+ "CDW","cdwPaperLedger",security=SESSION,params=[id_param("id","Dispatched target ID")],
+ responses=dict([json_ok(CDW_PAPER_LEDGER,"Document-control role required; retained after distribution withdrawal."),
+ resp("403",ERR["403"])])))
+add("POST","/api/workbench/distribution-targets/{id}/paper-issue",operation(
+ "Freeze one paper copy lot with exact frozen approved quantity and individual unique copy numbers",
+ "CDW","cdwPaperIssue",security=SESSION,
+ params=[id_param("id","Dispatched target ID"),CDW_IDEMPOTENCY,CDW_IF_MATCH],
+ request={"application/json":{"schema":obj({"copyNumbers":arr(string())},required=["copyNumbers"])}},
+ responses=dict([json_ok(CDW_PAPER_LEDGER,"Frozen issue lot. Electronic delivery does not count as physical issue."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
+add("POST","/api/workbench/paper-copies/{id}/events",operation(
+ "Append per-copy physical collection, loss or destruction evidence with CAS; no implicit electronic reading credit",
+ "CDW","cdwPaperEvent",security=SESSION,
+ params=[id_param("id","Numbered physical copy ID"),CDW_IDEMPOTENCY,CDW_IF_MATCH],
+ request={"application/json":{"schema":obj({"kind":string(enum=["collected","lost","destroyed"]),
+ "reason":{"type":"string","minLength":12,"maxLength":2000}},required=["kind","reason"])}},
+ responses=dict([json_ok(CDW_PAPER_TRANSITION,"Immutable per-copy event and updated state pointer."),
  resp("403",ERR["403"]),resp("409",ERR["409"])])))
 
 # --- Auth ---

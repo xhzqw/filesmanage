@@ -75,7 +75,18 @@ func (s *Service) CDWDistributionCreate(ctx context.Context, actor domain.User,
 		if t.DepartmentID == "" || t.ReceiverID == "" || seen[t.DepartmentID] {
 			return out, domain.ErrInvalidInput
 		}
+		if (t.Channel != "" && t.Channel != "electronic" && t.Channel != "paper" && t.Channel != "mixed") ||
+			t.PaperQuantity < 0 || t.PaperQuantity > 100 ||
+			((t.Channel == "" || t.Channel == "electronic") && t.PaperQuantity != 0) ||
+			((t.Channel == "paper" || t.Channel == "mixed") && t.PaperQuantity == 0) {
+			return out, domain.ErrInvalidInput
+		}
 		seen[t.DepartmentID] = true
+	}
+	for i := range input.Targets {
+		if input.Targets[i].Channel == "" {
+			input.Targets[i].Channel = "electronic"
+		}
 	}
 	id := NewID("cdwplan")
 	raw, err := s.cdwDistributionMutate(ctx, actor, "distribution.create", key,

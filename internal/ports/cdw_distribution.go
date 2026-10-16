@@ -3,8 +3,10 @@ package ports
 import "context"
 
 type CDWDistributionTargetInput struct {
-	DepartmentID string `json:"departmentId"`
-	ReceiverID   string `json:"receiverId"`
+	DepartmentID  string `json:"departmentId"`
+	ReceiverID    string `json:"receiverId"`
+	Channel       string `json:"channel"`
+	PaperQuantity int    `json:"paperQuantity"`
 }
 type CDWDistributionPlan struct {
 	ID              string                       `json:"id"`
@@ -68,6 +70,10 @@ type CDWDistributionWithdrawal struct {
 }
 type CDWDistributionLedgerRow struct {
 	TargetID         string  `json:"targetId"`
+	Channel          string  `json:"channel"`
+	PaperQuantity    int     `json:"paperQuantity"`
+	PaperIssued      int     `json:"paperIssued"`
+	PaperOutstanding int     `json:"paperOutstanding"`
 	DepartmentID     string  `json:"departmentId"`
 	DepartmentName   string  `json:"departmentName"`
 	ReceiverID       string  `json:"receiverId"`

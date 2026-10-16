@@ -2982,8 +2982,8 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/distribution-plans:
     post:
-      summary: Create real electronic department distribution draft for verified release, with required department receipt
-        and personal reading
+      summary: Create electronic/paper/mixed department distribution draft for verified release; physically numbered copies
+        are separately managed
       operationId: cdwDistributionCreate
       tags:
       - CDW
@@ -3015,6 +3015,15 @@ paths:
                         type: string
                       receiverId:
                         type: string
+                      channel:
+                        type: string
+                        enum:
+                        - electronic
+                        - paper
+                        - mixed
+                      paperQuantity:
+                        type: integer
+                        minimum: 0
                     required:
                     - departmentId
                     - receiverId
@@ -3069,6 +3078,15 @@ paths:
                               type: string
                             receiverId:
                               type: string
+                            channel:
+                              type: string
+                              enum:
+                              - electronic
+                              - paper
+                              - mixed
+                            paperQuantity:
+                              type: integer
+                              minimum: 0
                           required:
                           - departmentId
                           - receiverId
@@ -3158,6 +3176,15 @@ paths:
                               type: string
                             receiverId:
                               type: string
+                            channel:
+                              type: string
+                              enum:
+                              - electronic
+                              - paper
+                              - mixed
+                            paperQuantity:
+                              type: integer
+                              minimum: 0
                           required:
                           - departmentId
                           - receiverId
@@ -3247,6 +3274,15 @@ paths:
                               type: string
                             receiverId:
                               type: string
+                            channel:
+                              type: string
+                              enum:
+                              - electronic
+                              - paper
+                              - mixed
+                            paperQuantity:
+                              type: integer
+                              minimum: 0
                           required:
                           - departmentId
                           - receiverId
@@ -3350,6 +3386,15 @@ paths:
                               type: string
                             receiverId:
                               type: string
+                            channel:
+                              type: string
+                              enum:
+                              - electronic
+                              - paper
+                              - mixed
+                            paperQuantity:
+                              type: integer
+                              minimum: 0
                           required:
                           - departmentId
                           - receiverId
@@ -3495,6 +3540,15 @@ paths:
                                     type: string
                                   receiverId:
                                     type: string
+                                  channel:
+                                    type: string
+                                    enum:
+                                    - electronic
+                                    - paper
+                                    - mixed
+                                  paperQuantity:
+                                    type: integer
+                                    minimum: 0
                                 required:
                                 - departmentId
                                 - receiverId
@@ -3600,6 +3654,15 @@ paths:
                               type: string
                             receiverId:
                               type: string
+                            channel:
+                              type: string
+                              enum:
+                              - electronic
+                              - paper
+                              - mixed
+                            paperQuantity:
+                              type: integer
+                              minimum: 0
                           required:
                           - departmentId
                           - receiverId
@@ -4451,6 +4514,21 @@ paths:
                               type: string
                             departmentName:
                               type: string
+                            channel:
+                              type: string
+                              enum:
+                              - electronic
+                              - paper
+                              - mixed
+                            paperQuantity:
+                              type: integer
+                              minimum: 0
+                            paperIssued:
+                              type: integer
+                              minimum: 0
+                            paperOutstanding:
+                              type: integer
+                              minimum: 0
                             receiverId:
                               type: string
                             receiverName:
@@ -4500,6 +4578,10 @@ paths:
                           - readingConfirmed
                           - readingStatus
                           - overdue
+                          - channel
+                          - paperQuantity
+                          - paperIssued
+                          - paperOutstanding
                       receiptCompleted:
                         type: integer
                         minimum: 0
@@ -4634,6 +4716,398 @@ paths:
                     - revokedGrants
                     - cancelledReaders
                     - invalidatedTargets
+                    - actorId
+                    - reason
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/distribution-targets/{id}/paper-copies:
+    get:
+      summary: Read numbered paper-copy issue/return ledger independently of electronic reading acknowledgements
+      operationId: cdwPaperLedger
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Dispatched target ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Document-control role required; retained after distribution withdrawal.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      targetId:
+                        type: string
+                      targetRevision:
+                        type: integer
+                        minimum: 1
+                      fileId:
+                        type: string
+                      batchId:
+                        type: string
+                      channel:
+                        type: string
+                        enum:
+                        - electronic
+                        - paper
+                        - mixed
+                      paperQuantity:
+                        type: integer
+                        minimum: 0
+                      lotId:
+                        type: string
+                      issued:
+                        type: integer
+                        minimum: 0
+                      collected:
+                        type: integer
+                        minimum: 0
+                      destroyed:
+                        type: integer
+                        minimum: 0
+                      lost:
+                        type: integer
+                        minimum: 0
+                      waived:
+                        type: integer
+                        minimum: 0
+                      outstanding:
+                        type: integer
+                        minimum: 0
+                      copies:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            copyNo:
+                              type: string
+                            holderId:
+                              type: string
+                            state:
+                              type: string
+                              enum:
+                              - issued
+                              - collected
+                              - destroyed
+                              - lost
+                              - waived
+                            revision:
+                              type: integer
+                              minimum: 1
+                            lastEventId:
+                              type: string
+                            lastActorId:
+                              type: string
+                            lastReason:
+                              type: string
+                          required:
+                          - id
+                          - copyNo
+                          - holderId
+                          - state
+                          - revision
+                    required:
+                    - targetId
+                    - targetRevision
+                    - fileId
+                    - batchId
+                    - channel
+                    - paperQuantity
+                    - issued
+                    - collected
+                    - destroyed
+                    - lost
+                    - waived
+                    - outstanding
+                    - copies
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/distribution-targets/{id}/paper-issue:
+    post:
+      summary: Freeze one paper copy lot with exact frozen approved quantity and individual unique copy numbers
+      operationId: cdwPaperIssue
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Dispatched target ID
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      - name: If-Match
+        in: header
+        required: true
+        description: Strong ETag rev-N enclosed in double quotes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                copyNumbers:
+                  type: array
+                  items:
+                    type: string
+              required:
+              - copyNumbers
+      responses:
+        '200':
+          description: Frozen issue lot. Electronic delivery does not count as physical issue.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      targetId:
+                        type: string
+                      targetRevision:
+                        type: integer
+                        minimum: 1
+                      fileId:
+                        type: string
+                      batchId:
+                        type: string
+                      channel:
+                        type: string
+                        enum:
+                        - electronic
+                        - paper
+                        - mixed
+                      paperQuantity:
+                        type: integer
+                        minimum: 0
+                      lotId:
+                        type: string
+                      issued:
+                        type: integer
+                        minimum: 0
+                      collected:
+                        type: integer
+                        minimum: 0
+                      destroyed:
+                        type: integer
+                        minimum: 0
+                      lost:
+                        type: integer
+                        minimum: 0
+                      waived:
+                        type: integer
+                        minimum: 0
+                      outstanding:
+                        type: integer
+                        minimum: 0
+                      copies:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            copyNo:
+                              type: string
+                            holderId:
+                              type: string
+                            state:
+                              type: string
+                              enum:
+                              - issued
+                              - collected
+                              - destroyed
+                              - lost
+                              - waived
+                            revision:
+                              type: integer
+                              minimum: 1
+                            lastEventId:
+                              type: string
+                            lastActorId:
+                              type: string
+                            lastReason:
+                              type: string
+                          required:
+                          - id
+                          - copyNo
+                          - holderId
+                          - state
+                          - revision
+                    required:
+                    - targetId
+                    - targetRevision
+                    - fileId
+                    - batchId
+                    - channel
+                    - paperQuantity
+                    - issued
+                    - collected
+                    - destroyed
+                    - lost
+                    - waived
+                    - outstanding
+                    - copies
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/paper-copies/{id}/events:
+    post:
+      summary: Append per-copy physical collection, loss or destruction evidence with CAS; no implicit electronic reading
+        credit
+      operationId: cdwPaperEvent
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Numbered physical copy ID
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      - name: If-Match
+        in: header
+        required: true
+        description: Strong ETag rev-N enclosed in double quotes.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kind:
+                  type: string
+                  enum:
+                  - collected
+                  - lost
+                  - destroyed
+                reason:
+                  type: string
+                  minLength: 12
+                  maxLength: 2000
+              required:
+              - kind
+              - reason
+      responses:
+        '200':
+          description: Immutable per-copy event and updated state pointer.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      copyId:
+                        type: string
+                      eventId:
+                        type: string
+                      kind:
+                        type: string
+                        enum:
+                        - collected
+                        - lost
+                        - destroyed
+                      state:
+                        type: string
+                        enum:
+                        - collected
+                        - lost
+                        - destroyed
+                      revision:
+                        type: integer
+                        minimum: 2
+                      actorId:
+                        type: string
+                      reason:
+                        type: string
+                    required:
+                    - copyId
+                    - eventId
+                    - kind
+                    - state
+                    - revision
                     - actorId
                     - reason
                 required:

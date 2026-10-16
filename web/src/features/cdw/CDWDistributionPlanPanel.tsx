@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from "react";
-import {RareBadge,RareButton,RareNotice,RareSelect,RareTextarea} from "../../shared/ui/rare";
+import {RareBadge,RareButton,RareNotice,RareSelect,RareTextarea,RareInput} from "../../shared/ui/rare";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {ApiError} from "../../shared/http";
 import {toast} from "../../shared/ui/feedback";
@@ -10,8 +10,8 @@ import {cdwApi,type CDWControlledRelease,type CDWDistributionPlan} from "./api";
 import {CDWDistributionLedgerPanel} from "./CDWDistributionLedgerPanel";
 
 type Department={id:string;name:string};
-type Target={departmentId:string;receiverId:string};
-const emptyTarget=():Target=>({departmentId:"",receiverId:""});
+type Target={departmentId:string;receiverId:string;channel:string;paperQuantity:number};
+const emptyTarget=():Target=>({departmentId:"",receiverId:"",channel:"electronic",paperQuantity:0});
 
 export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments,isAdmin,currentUserId,onChanged}:{
  release:CDWControlledRelease;loadUsers:()=>Promise<User[]>;
@@ -52,13 +52,17 @@ export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments,isAd
    .finally(()=>{if(active)setLoading(false)});
   return()=>{active=false};
  },[release.id,loadUsers,loadDepartments]);
- function update(index:number,field:"departmentId"|"receiverId",value:string){
-  setTargets(old=>old.map((item,i)=>i!==index?item:field==="departmentId"?
-   {departmentId:value,receiverId:""}:{...item,receiverId:value}));
+ function update(index:number,field:"departmentId"|"receiverId"|"channel"|"paperQuantity",value:string){
+  setTargets(old=>old.map((item,i)=>i!==index?item:
+   field==="departmentId"?{...item,departmentId:value,receiverId:""}:
+   field==="channel"?{...item,channel:value,paperQuantity:value==="electronic"?0:Math.max(1,item.paperQuantity)}:
+   field==="paperQuantity"?{...item,paperQuantity:Number(value)}:{...item,receiverId:value}));
   requestKey.current="";
  }
  const ready=targets.length>0&&targets.length<=30&&targets.every(t=>
-  t.departmentId&&t.receiverId&&users.some(u=>u.id===t.receiverId&&u.departmentId===t.departmentId))&&
+  t.departmentId&&t.receiverId&&users.some(u=>u.id===t.receiverId&&u.departmentId===t.departmentId)&&
+  (t.channel==="electronic"?t.paperQuantity===0:
+   (t.channel==="paper"||t.channel==="mixed")&&Number.isInteger(t.paperQuantity)&&t.paperQuantity>=1&&t.paperQuantity<=100))&&
   new Set(targets.map(t=>t.departmentId)).size===targets.length;
  async function create(){
   if(busy||!ready||plan)return;
@@ -153,12 +157,12 @@ export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments,isAd
     plan.state==="approved"?"待签发分发":plan.state==="dispatched"?"已分发":"发行已撤销"
    }</RareBadge>}
   </div>
-  <p className="cdw-section-note">仅建立电子分发范围。每部门必须由指定负责人签收，另须配置相关人员阅读确认；冻结之后无法覆盖部门、接收人及要求。范围批准、发行和生效是后续独立步骤。</p>
+  <p className="cdw-section-note">支持电子、纸质和混合发行。纸质数量在冻结清单中确定，后续须逐份登记唯一编号并单独跟踪回收，不能用电子阅读确认代替。</p>
   {loading&&<div className="cdw-message"><BrandLoadingLabel showContext>读取部门与可用分发计划</BrandLoadingLabel></div>}
   {error&&<RareNotice tone="danger">{error}</RareNotice>}
   {!loading&&!error&&<div className="cdw-form">
-   <div className="cdw-control-recipients" role="table" aria-label="分发部门和指定接收人">
-    <div className="cdw-control-recipient-head" role="row"><strong>部门</strong><strong>指定接收人</strong><span>操作</span></div>
+   <div className="cdw-control-recipients cdw-paper-recipients" role="table" aria-label="分发部门和指定接收人">
+    <div className="cdw-control-recipient-head" role="row"><strong>部门</strong><strong>指定接收人</strong><strong>渠道</strong><strong>纸质份数</strong><span>操作</span></div>
     {targets.map((t,i)=><div className="cdw-control-recipient-row" role="row" key={i}>
      <RareSelect aria-label={"部门 "+(i+1)} value={t.departmentId}
       disabled={Boolean(plan)||busy} onChange={e=>update(i,"departmentId",e.target.value)}>
@@ -168,9 +172,16 @@ export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments,isAd
      <RareSelect aria-label={"部门接收人 "+(i+1)} value={t.receiverId}
       disabled={Boolean(plan)||busy||!t.departmentId} onChange={e=>update(i,"receiverId",e.target.value)}>
       <option value="">选择接收人</option>
-      {users.filter(u=>u.departmentId===t.departmentId).map(u=>
+     {users.filter(u=>u.departmentId===t.departmentId).map(u=>
        <option key={u.id} value={u.id}>{u.displayName}</option>)}
      </RareSelect>
+     <RareSelect aria-label={"发行渠道 "+(i+1)} value={t.channel} disabled={Boolean(plan)||busy}
+      onChange={e=>update(i,"channel",e.target.value)}>
+      <option value="electronic">电子</option><option value="paper">纸质</option><option value="mixed">混合</option>
+     </RareSelect>
+     <RareInput aria-label={"纸质份数 "+(i+1)} type="number" min={0} max={100}
+      value={String(t.paperQuantity)} disabled={Boolean(plan)||busy||t.channel==="electronic"}
+      onChange={e=>update(i,"paperQuantity",e.target.value)}/>
      <RareButton type="button" tone="ghost" disabled={Boolean(plan)||busy||targets.length<2}
       onClick={()=>{setTargets(rows=>rows.filter((_,j)=>i!==j));requestKey.current="";}}>移除</RareButton>
     </div>)}

@@ -3,6 +3,7 @@ import {RareBadge,RareButton,RareInput,RareNotice,RareSelect} from "../../shared
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {errorCopy} from "../../shared/errors";
 import {cdwApi,type CDWDistributionLedger,type CDWDistributionLedgerRow} from "./api";
+import {CDWPaperCopiesPanel} from "./CDWPaperCopiesPanel";
 
 type Sort="department"|"signed"|"reading";
 function readingLabel(row:CDWDistributionLedgerRow){
@@ -18,6 +19,7 @@ export function CDWDistributionLedgerPanel({planId}:{planId:string}){
  const [query,setQuery]=useState("");
  const [sort,setSort]=useState<Sort>("department");
  const [onlyPending,setOnlyPending]=useState(false);
+ const [paperTarget,setPaperTarget]=useState("");
  useEffect(()=>{
   let live=true;
   setLoading(true);setError("");
@@ -67,7 +69,7 @@ export function CDWDistributionLedgerPanel({planId}:{planId:string}){
     <table className="cdw-ledger-table">
      <thead><tr>
       <th>接收部门</th><th>指定接收人</th><th>实际签收人</th><th>签收时间</th>
-      <th>阅读确认</th><th>状态与异常</th>
+      <th>阅读确认</th><th>纸质副本</th><th>状态与异常</th>
      </tr></thead>
      <tbody>
       {rows.map(row=><tr key={row.targetId}>
@@ -77,6 +79,10 @@ export function CDWDistributionLedgerPanel({planId}:{planId:string}){
        <td>{row.signedAt?new Date(row.signedAt).toLocaleString("zh-CN"):"未签收"}</td>
        <td><span>{row.readingConfirmed}/{row.readingAssigned}</span>
         <small>{readingLabel(row)}</small></td>
+       <td>{row.paperQuantity>0?<RareButton type="button" tone="neutral"
+        onClick={()=>setPaperTarget(old=>old===row.targetId?"":row.targetId)}>
+        {row.paperIssued}/{row.paperQuantity} 已发 · {row.paperOutstanding} 待回收
+       </RareButton>:"仅电子"}</td>
        <td>{row.exceptionReason?<RareBadge tone="warning">{row.exceptionReason}</RareBadge>:
         row.overdue?<RareBadge tone="warning">签收逾期</RareBadge>:
         row.receiptStatus==="received"&&row.readingStatus==="confirmed"?
@@ -85,9 +91,12 @@ export function CDWDistributionLedgerPanel({planId}:{planId:string}){
        </td>
       </tr>)}
      </tbody>
-    </table>
-    {rows.length===0&&<div className="cdw-message">暂无符合筛选条件的部门</div>}
-   </div>
+   </table>
+   {rows.length===0&&<div className="cdw-message">暂无符合筛选条件的部门</div>}
+  </div>
+  {paperTarget&&ledger.rows.some(row=>row.targetId===paperTarget)&&<CDWPaperCopiesPanel
+   key={paperTarget} targetId={paperTarget} editable={ledger.batchState==="dispatched"}
+   onChanged={()=>setReload(n=>n+1)}/>}
   </div>}
  </section>;
 }

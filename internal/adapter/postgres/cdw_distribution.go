@@ -81,7 +81,7 @@ func (r *Repository) CDWDistributionCreate(ctx context.Context, planID, releaseI
 		}
 		_, err = r.Q.Exec(ctx, `INSERT INTO cdw_distribution_plan_targets
  (plan_id,department_id,designated_receiver_id,channel,paper_quantity)
- VALUES($1,$2,$3,'electronic',0)`, planID, target.DepartmentID, found)
+ VALUES($1,$2,$3,$4,$5)`, planID, target.DepartmentID, found, target.Channel, target.PaperQuantity)
 		if err != nil {
 			return result, err
 		}
@@ -203,7 +203,7 @@ func (r *Repository) CDWDistributionRead(ctx context.Context, id string) (ports.
 	if digest != nil {
 		out.DigestSHA256 = *digest
 	}
-	rows, err := r.Q.Query(ctx, `SELECT department_id,designated_receiver_id
+	rows, err := r.Q.Query(ctx, `SELECT department_id,designated_receiver_id,channel,paper_quantity
  FROM cdw_distribution_plan_targets WHERE plan_id=$1 ORDER BY department_id`, id)
 	if err != nil {
 		return out, err
@@ -212,7 +212,7 @@ func (r *Repository) CDWDistributionRead(ctx context.Context, id string) (ports.
 	out.Targets = []ports.CDWDistributionTargetInput{}
 	for rows.Next() {
 		var target ports.CDWDistributionTargetInput
-		if err = rows.Scan(&target.DepartmentID, &target.ReceiverID); err != nil {
+		if err = rows.Scan(&target.DepartmentID, &target.ReceiverID, &target.Channel, &target.PaperQuantity); err != nil {
 			return out, err
 		}
 		out.Targets = append(out.Targets, target)

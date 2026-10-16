@@ -59,7 +59,8 @@ export function CDWScopeApprovalPanel({plan,onApproved,loadDepartments,loadUsers
     <div className="cdw-control-recipient-head" role="row"><strong>接收部门</strong><strong>指定接收人</strong><span>渠道</span></div>
     {detail.targets.map(t=><div className="cdw-control-recipient-row" role="row" key={t.departmentId}>
      <span>{departmentNames[t.departmentId]??t.departmentId}</span>
-     <span>{personNames[t.receiverId]??t.receiverId}</span><small>电子</small>
+     <span>{personNames[t.receiverId]??t.receiverId}</span>
+     <small>{t.channel==="paper"?"纸质":t.channel==="mixed"?"电子+纸质":"电子"}{t.paperQuantity>0?" · "+t.paperQuantity+"份":""}</small>
     </div>)}
    </div>
    <div className="cdw-review-digest"><small>冻结范围 SHA-256</small><code>{detail.digestSha256}</code></div>

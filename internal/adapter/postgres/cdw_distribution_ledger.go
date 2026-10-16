@@ -28,8 +28,10 @@ func (r *Repository) CDWDistributionLedger(ctx context.Context, planID string) (
 	out.BatchState = state
 	rows, err := r.Q.Query(ctx, `SELECT t.id,t.department_id,d.name,t.designated_receiver_id,u.display_name,
  rec.id,rec.actor_id,signer.display_name,rec.signed_at,t.due_at,t.validity_state,
- COALESCE(reads.assigned,0),COALESCE(reads.confirmed,0)
+ COALESCE(reads.assigned,0),COALESCE(reads.confirmed,0),
+ pt.channel,pt.paper_quantity,COALESCE(paper.issued,0),COALESCE(paper.outstanding,0)
  FROM cdw_distribution_targets t
+ JOIN cdw_distribution_plan_targets pt ON pt.plan_id=t.plan_id AND pt.department_id=t.department_id
  JOIN departments d ON d.id=t.department_id
  JOIN users u ON u.id=t.designated_receiver_id
  LEFT JOIN cdw_target_receipt_heads h ON h.target_id=t.id
@@ -40,6 +42,14 @@ func (r *Repository) CDWDistributionLedger(ctx context.Context, planID string) (
   COUNT(*) FILTER(WHERE a.required AND a.state='confirmed') AS confirmed
   FROM cdw_reading_assignments a WHERE a.target_id=t.id
  ) reads ON true
+ LEFT JOIN LATERAL (
+  SELECT COUNT(*) AS issued,
+   COUNT(*) FILTER(WHERE head.state IN ('issued','lost')) AS outstanding
+  FROM cdw_copy_issue_lots lot
+  JOIN cdw_controlled_copies copy ON copy.lot_id=lot.id
+  JOIN cdw_controlled_copy_heads head ON head.copy_id=copy.id
+  WHERE lot.target_id=t.id
+ ) paper ON true
  WHERE t.batch_id=$1 ORDER BY d.name,t.department_id`, out.BatchID)
 	if err != nil {
 		return out, err
@@ -52,7 +62,8 @@ func (r *Repository) CDWDistributionLedger(ctx context.Context, planID string) (
 		if err = rows.Scan(&row.TargetID, &row.DepartmentID, &row.DepartmentName,
 			&row.ReceiverID, &row.ReceiverName, &row.ReceiptID, &row.ActualSignerID,
 			&row.ActualSignerName, &signerAt, &dueAt, &validity, &row.ReadingAssigned,
-			&row.ReadingConfirmed); err != nil {
+			&row.ReadingConfirmed, &row.Channel, &row.PaperQuantity,
+			&row.PaperIssued, &row.PaperOutstanding); err != nil {
 			return out, err
 		}
 		row.ReceiptStatus = "awaiting"
