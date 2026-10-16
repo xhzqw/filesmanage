@@ -272,7 +272,14 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 		t.Fatalf("independent controller reminder failed: %+v %v", followup, followErr)
 	}
 	controllerLedger, ledgerErr := r.CDWQMSFormalNoticeLedger(ctx, charlie.ID, 30)
-	if ledgerErr != nil || len(controllerLedger) < 1 || controllerLedger[0].FollowupAt == nil {
+	reminderVisible := false
+	for _, item := range controllerLedger {
+		if item.ID == formalNotices[0].ID && item.RecipientID == bob.ID &&
+			item.FollowupAt != nil && item.FollowupBy == charlie.ID {
+			reminderVisible = true
+		}
+	}
+	if ledgerErr != nil || !reminderVisible {
 		t.Fatalf("controller cannot inspect durable reminder: %+v %v", controllerLedger, ledgerErr)
 	}
 	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g18_duplicate_followup"); err != nil {
