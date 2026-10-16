@@ -258,11 +258,62 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	if noticeErr != nil || len(formalNotices) != 1 || formalNotices[0].ApprovalInstanceID != formalInstance {
 		t.Fatalf("formal signer received no personal interruption notice: %+v %v", formalNotices, noticeErr)
 	}
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g18_self_followup"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = r.CDWQMSFormalFollowup(ctx, prefix+"_g18_self", formalNotices[0].ID, bob.ID, reason); err == nil {
+		t.Fatal("notice recipient could create their own document-control reminder")
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_g18_self_followup"); err != nil {
+		t.Fatal(err)
+	}
+	followup, followErr := r.CDWQMSFormalFollowup(ctx, prefix+"_g18_followup", formalNotices[0].ID, charlie.ID, reason)
+	if followErr != nil || followup.RecipientID != bob.ID || followup.ApprovalInstanceID != formalInstance {
+		t.Fatalf("independent controller reminder failed: %+v %v", followup, followErr)
+	}
+	controllerLedger, ledgerErr := r.CDWQMSFormalNoticeLedger(ctx, charlie.ID, 30)
+	if ledgerErr != nil || len(controllerLedger) < 1 || controllerLedger[0].FollowupAt == nil {
+		t.Fatalf("controller cannot inspect durable reminder: %+v %v", controllerLedger, ledgerErr)
+	}
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g18_duplicate_followup"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = r.CDWQMSFormalFollowup(ctx, prefix+"_g18_duplicate", formalNotices[0].ID, charlie.ID, reason); err == nil {
+		t.Fatal("second independent followup for same unread notice was accepted")
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_g18_duplicate_followup"); err != nil {
+		t.Fatal(err)
+	}
 	if read, readErr := r.CDWQMSReadFormalNotice(ctx, formalNotices[0].ID, admin.ID); readErr != nil || read {
 		t.Fatalf("other recipient falsely confirmed signer interruption: %t %v", read, readErr)
 	}
 	if read, readErr := r.CDWQMSReadFormalNotice(ctx, formalNotices[0].ID, bob.ID); readErr != nil || !read {
 		t.Fatalf("signer did not confirm own interruption notice: %t %v", read, readErr)
+	}
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g18_after_read"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = r.CDWQMSFormalFollowup(ctx, prefix+"_g18_read", formalNotices[0].ID, charlie.ID, reason); err == nil {
+		t.Fatal("read notice accepted another followup")
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_g18_after_read"); err != nil {
+		t.Fatal(err)
+	}
+	if can, canErr := r.CDWQMSAuditCanExport(ctx, charlie.ID, subjectFileID); canErr != nil || !can {
+		t.Fatalf("document controller missing G18 audit export right: %t %v", can, canErr)
+	}
+	auditFacts, auditErr := r.CDWQMSAuditFacts(ctx, []string{formalInstance})
+	if auditErr != nil || len(auditFacts.Notices) < 2 {
+		t.Fatalf("G18 evidence export missing per-recipient notification facts: %+v %v", auditFacts, auditErr)
+	}
+	foundReminder := false
+	for _, n := range auditFacts.Notices {
+		if n.RecipientID == bob.ID && n.FollowupBy == charlie.ID && n.FollowupAt != nil && n.ReadAt != nil {
+			foundReminder = true
+		}
+	}
+	if !foundReminder {
+		t.Fatal("G18 audit facts excluded controller reminder or original signer ACK")
 	}
 	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g15_reopen_bypass"); err != nil {
 		t.Fatal(err)
@@ -565,6 +616,7 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_special_new_review"); err != nil {
 		t.Fatal(err)
 	}
+	t.Log("CDW_G18_AUDIT_FOLLOWUP_PASS controller-only per-recipient reminders, one-time guard, ACK and audit fact snapshot")
 	t.Log("CDW_G17_APPROVAL_CHAIN_PASS source-file restart requirement, historical read-only access, ancestor/descendant evidence, unique successor")
 	t.Log("CDW_G16_LEGACY_LINEAGE_PASS per-recipient notices and ACK, independent legacy anomaly quarantine, immutable same-file restart lineage")
 	t.Log("CDW_G15_MIDFLIGHT_PASS pointer change+authority revoke terminal conflicts, immutable frozen decisions, no SQL resurrection/candidate")

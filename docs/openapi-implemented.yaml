@@ -3962,6 +3962,193 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-formal-lineage/{id}/audit:
+    get:
+      summary: Export bounded immutable approval lineage, decision authority snapshots and individual notice evidence
+      operationId: cdwQMSFormalAudit
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Formal approval ID.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: JSON attachment with X-Content-SHA256, current document-control and file ACL required.
+        '403':
+          description: Document-control role or file authorization missing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Full audit export blocked for truncated lineage.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-formal-notice-ledger:
+    get:
+      summary: Current document-control scoped per-recipient notice and human follow-up ledger
+      operationId: cdwQMSFormalNoticeLedger
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: File ACL-filtered read-only ledger; no assumed regulatory overdue threshold.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            approvalInstanceId:
+                              type: string
+                            fileId:
+                              type: string
+                            recipientId:
+                              type: string
+                            eventKind:
+                              type: string
+                              enum:
+                              - policy_interrupted
+                              - legacy_quarantined
+                            createdAt:
+                              type: string
+                              format: date-time
+                            readAt:
+                              type: string
+                              format: date-time
+                            followupAt:
+                              type: string
+                              format: date-time
+                            followupReason:
+                              type: string
+                            followupBy:
+                              type: string
+                          required:
+                          - id
+                          - approvalInstanceId
+                          - fileId
+                          - eventKind
+                          - createdAt
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-formal-interruption-notices/{id}/followup:
+    post:
+      summary: Record one human-initiated reminder for an unread named recipient notice
+      operationId: cdwQMSFormalFollowup
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Unread recipient notice ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+              required:
+              - reason
+      responses:
+        '200':
+          description: Immutable controller reminder, independent of legal SLA.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      noticeId:
+                        type: string
+                      approvalInstanceId:
+                        type: string
+                      recipientId:
+                        type: string
+                      requestedBy:
+                        type: string
+                      reason:
+                        type: string
+                      requestedAt:
+                        type: string
+                        format: date-time
+                    required:
+                    - id
+                    - noticeId
+                    - approvalInstanceId
+                    - recipientId
+                    - requestedBy
+                    - reason
+                    - requestedAt
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/qms-legacy-approval-anomalies:
     get:
       summary: Live ACL-filtered historical pending DHF/DMR approvals lacking current signatory authority
@@ -4188,6 +4375,8 @@ paths:
                               type: string
                             fileId:
                               type: string
+                            recipientId:
+                              type: string
                             eventKind:
                               type: string
                               enum:
@@ -4199,6 +4388,13 @@ paths:
                             readAt:
                               type: string
                               format: date-time
+                            followupAt:
+                              type: string
+                              format: date-time
+                            followupReason:
+                              type: string
+                            followupBy:
+                              type: string
                           required:
                           - id
                           - approvalInstanceId

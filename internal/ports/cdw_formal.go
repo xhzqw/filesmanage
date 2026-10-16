@@ -39,9 +39,64 @@ type CDWQMSFormalNotice struct {
 	ID                 string  `json:"id"`
 	ApprovalInstanceID string  `json:"approvalInstanceId"`
 	FileID             string  `json:"fileId"`
+	RecipientID        string  `json:"recipientId,omitempty"`
 	EventKind          string  `json:"eventKind"`
 	CreatedAt          string  `json:"createdAt"`
 	ReadAt             *string `json:"readAt,omitempty"`
+	FollowupAt         *string `json:"followupAt,omitempty"`
+	FollowupReason     string  `json:"followupReason,omitempty"`
+	FollowupBy         string  `json:"followupBy,omitempty"`
+}
+type CDWQMSFormalFollowup struct {
+	ID                 string `json:"id"`
+	NoticeID           string `json:"noticeId"`
+	ApprovalInstanceID string `json:"approvalInstanceId"`
+	RecipientID        string `json:"recipientId"`
+	RequestedBy        string `json:"requestedBy"`
+	Reason             string `json:"reason"`
+	RequestedAt        string `json:"requestedAt"`
+}
+type CDWQMSAuditDecision struct {
+	ApprovalID        string          `json:"approvalId"`
+	StepID            string          `json:"stepId"`
+	NodeKey           string          `json:"nodeKey"`
+	ActorID           string          `json:"actorId"`
+	Decision          string          `json:"decision"`
+	Reason            string          `json:"reason"`
+	SubjectSHA256     string          `json:"subjectSha256"`
+	AuthoritySnapshot json.RawMessage `json:"authoritySnapshot"`
+	DecidedAt         string          `json:"decidedAt"`
+}
+type CDWQMSAuditNotice struct {
+	ApprovalID     string  `json:"approvalId"`
+	NoticeID       string  `json:"noticeId"`
+	RecipientID    string  `json:"recipientId"`
+	EventKind      string  `json:"eventKind"`
+	CreatedAt      string  `json:"createdAt"`
+	ReadAt         *string `json:"readAt,omitempty"`
+	FollowupBy     string  `json:"followupBy,omitempty"`
+	FollowupReason string  `json:"followupReason,omitempty"`
+	FollowupAt     *string `json:"followupAt,omitempty"`
+}
+type CDWQMSAuditFacts struct {
+	Decisions []CDWQMSAuditDecision `json:"decisions"`
+	Notices   []CDWQMSAuditNotice   `json:"notices"`
+}
+type CDWQMSClosureStats struct {
+	Interrupted         int    `json:"interrupted"`
+	Restarted           int    `json:"restarted"`
+	UnconfirmedNotices  int    `json:"unconfirmedNotices"`
+	ApprovalsInProgress int    `json:"approvalsInProgress"`
+	ApprovalsApproved   int    `json:"approvalsApproved"`
+	ChainStatus         string `json:"chainStatus"`
+}
+type CDWQMSAuditPacket struct {
+	SchemaVersion string              `json:"schemaVersion"`
+	GeneratedAt   string              `json:"generatedAt"`
+	RequestedBy   string              `json:"requestedBy"`
+	Lineage       CDWQMSFormalLineage `json:"lineage"`
+	Closure       CDWQMSClosureStats  `json:"closure"`
+	Facts         CDWQMSAuditFacts    `json:"facts"`
 }
 type CDWQMSLegacyHold struct {
 	ID                 string `json:"id"`
@@ -76,6 +131,11 @@ type CDWQMSFormalLineage struct {
 	Truncated       bool                `json:"truncated"`
 }
 type CDWQMSG16Store interface {
+	CDWQMSAuditCanExport(context.Context, string, string) (bool, error)
+	CDWQMSAuditFacts(context.Context, []string) (CDWQMSAuditFacts, error)
+	CDWQMSFormalFollowup(context.Context, string, string, string, string) (CDWQMSFormalFollowup, error)
+	CDWQMSFormalNoticeFile(context.Context, string) (string, error)
+	CDWQMSFormalNoticeLedger(context.Context, string, int) ([]CDWQMSFormalNotice, error)
 	CDWQMSFormalLineage(context.Context, string) (CDWQMSFormalLineage, error)
 	CDWQMSFormalLineageCanRead(context.Context, string, string) (bool, error)
 	CDWQMSRequiresRestart(context.Context, string) (bool, error)

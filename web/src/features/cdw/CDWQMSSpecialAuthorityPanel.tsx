@@ -28,6 +28,9 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
  const [lineageID,setLineageID]=useState("");
  const [legacy,setLegacy]=useState<CDWQMSLegacyAnomaly[]>([]);
  const [notices,setNotices]=useState<CDWQMSFormalNotice[]>([]);
+ const [noticeLedger,setNoticeLedger]=useState<CDWQMSFormalNotice[]>([]);
+ const [followupID,setFollowupID]=useState("");
+ const [followupReason,setFollowupReason]=useState("");
  const [holdId,setHoldId]=useState("");
  const [holdReason,setHoldReason]=useState("");
  const [impactReason,setImpactReason]=useState("");
@@ -60,8 +63,10 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
  },[refresh,actorId]);
  useEffect(()=>{
   let live=true;
-  Promise.all([cdwApi.qmsLegacyAnomalies(),cdwApi.qmsFormalNotices()])
-   .then(([pending,messages])=>{if(live){setLegacy(pending.items??[]);setNotices(messages.items??[]);}})
+  Promise.all([cdwApi.qmsLegacyAnomalies(),cdwApi.qmsFormalNotices(),cdwApi.qmsFormalNoticeLedger()])
+   .then(([pending,messages,ledger])=>{if(live){
+    setLegacy(pending.items??[]);setNotices(messages.items??[]);setNoticeLedger(ledger.items??[]);
+   }})
    .catch(e=>{if(live)setError(errorCopy(e,"历史异常审批与中断通知加载失败"));});
   return()=>{live=false;};
  },[refresh,actorId]);
@@ -119,6 +124,17 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
    setRefresh(v=>v+1);
   }catch(e){setError(errorCopy(e,"中断通知确认失败"));}
  }
+ async function followup(id:string){
+  if(busy||Array.from(followupReason.trim()).length<16)return;
+  setBusy(true);setError("");
+  try{
+   await toast.track(()=>cdwApi.qmsFormalFollowup(id,followupReason.trim(),newIdempotencyKey()),{
+    loading:"正在登记人工督办…",success:"已登记人工督办，等待收件人确认",
+    error:e=>errorCopy(e,"人工督办登记失败")});
+   setFollowupID("");setFollowupReason("");setRefresh(v=>v+1);onChange?.();
+  }catch(e){setError(errorCopy(e,"人工督办登记失败"));}
+  finally{setBusy(false);}
+ }
  async function quarantine(id:string){
   if(busy||Array.from(holdReason.trim()).length<16)return;
   setBusy(true);setError("");
@@ -159,7 +175,29 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
     <p className="cdw-section-note">原审批 {n.approvalInstanceId}：
      {n.eventKind==="legacy_quarantined"?"历史签批资格异常，经文控核验后已隔离":"制度变更后进行中的审批已经终止"}。
      历史签字保留，必须按现行制度重新审批。</p>
+    {n.followupAt&&<p className="cdw-section-note">文控人工督办：{n.followupReason}（{new Date(n.followupAt).toLocaleString("zh-CN")}）</p>}
     <RareButton type="button" tone="neutral" onClick={()=>void readInterruption(n.id)}>已知悉</RareButton>
+   </div>)}
+  </div>}
+  {!scope&&noticeLedger.some(n=>!n.readAt)&&<div className="cdw-review-digest" aria-label="逐人通知督办">
+   <small>逐人通知闭环 · 文控核实</small>
+   <p className="cdw-section-note">仅显示当前权限范围内最多100条记录；未确认不自动代表逾期违规，每条未读通知只可人工督办一次。</p>
+   {noticeLedger.filter(n=>!n.readAt).map(n=><div className="cdw-review-digest" key={n.id}>
+    <p className="cdw-section-note">原审批 {n.approvalInstanceId} · 收件人 {n.recipientId}</p>
+    {n.followupAt?<p className="cdw-section-note">已督办：{n.followupReason} · {new Date(n.followupAt).toLocaleString("zh-CN")}</p>:
+     <RareButton type="button" tone="neutral" disabled={busy}
+      onClick={()=>{setFollowupID(followupID===n.id?"":n.id);setFollowupReason("");}}>
+      {followupID===n.id?"取消督办":"人工督办"}
+     </RareButton>}
+    {followupID===n.id&&!n.followupAt&&<>
+     <label>督办依据与处理要求
+      <RareTextarea rows={3} value={followupReason} onChange={e=>setFollowupReason(e.target.value)}
+       placeholder="请说明待确认事项和提醒依据（至少16字）"/>
+     </label>
+     <RareButton type="button" tone="primary" loading={busy}
+      disabled={busy||Array.from(followupReason.trim()).length<16}
+      onClick={()=>void followup(n.id)}>记录督办</RareButton>
+    </>}
    </div>)}
   </div>}
   {!scope&&legacy.length>0&&<div className="cdw-review-digest" aria-label="历史待审资格异常">

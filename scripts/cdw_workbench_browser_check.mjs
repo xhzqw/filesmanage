@@ -156,6 +156,11 @@ try{
  const g17=await evalJS("(async()=>{const r=await fetch('/api/workbench/qms-formal-lineage/__nonexistent_g17_approval__');return {status:r.status,data:(await r.json()).data}})()");
  assert.equal(g17.status,404,"G17 cannot manufacture a complete lineage for missing formal approval IDs");
  console.log("CDW_G17_LINEAGE_BROWSER_PASS authenticated lineage endpoint denies missing approvals");
+ const g18=await evalJS("(async()=>{const [ledger,audit]=await Promise.all([fetch('/api/workbench/qms-formal-notice-ledger'),fetch('/api/workbench/qms-formal-lineage/__nonexistent_g18_approval__/audit')]);return {ledgerStatus:ledger.status,items:(await ledger.json()).data?.items,auditStatus:audit.status}})()");
+ assert.equal(g18.ledgerStatus,200,"G18 document-control ledger must have a real authenticated response");
+ assert.ok(Array.isArray(g18.items),"G18 personal notice follow-up ledger is server-backed");
+ assert.equal(g18.auditStatus,404,"G18 cannot export fabricated approval audit evidence");
+ console.log("CDW_G18_AUDIT_FOLLOWUP_BROWSER_PASS live scoped ledger and missing-audit fail-closed");
 
  await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('发行准备'));button?.click();return true;})()");
  await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('发行准备')");

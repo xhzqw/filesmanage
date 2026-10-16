@@ -21,6 +21,7 @@ export function CDWFormalLineagePanel({approvalId,onClose}:{
  const [chain,setChain]=useState<CDWQMSFormalLineage|null>(null);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
+ const [exporting,setExporting]=useState(false);
  const [revision,setRevision]=useState(0);
  useEffect(()=>{
   let live=true;setLoading(true);setError("");setChain(null);
@@ -30,11 +31,33 @@ export function CDWFormalLineagePanel({approvalId,onClose}:{
    .finally(()=>{if(live)setLoading(false);});
   return()=>{live=false;};
  },[approvalId,revision]);
+ async function exportAudit(){
+  if(exporting)return;
+  setExporting(true);setError("");
+  try{
+   const res=await fetch("/api/workbench/qms-formal-lineage/"+encodeURIComponent(approvalId)+"/audit",{
+    method:"GET",credentials:"same-origin",cache:"no-store"});
+   if(!res.ok)throw new Error("审计导出被服务端拒绝（HTTP "+res.status+"）；请检查文控权限与完整血缘");
+   const blob=await res.blob();
+   const href=URL.createObjectURL(blob);
+   const a=document.createElement("a");a.href=href;a.download="CDW-QMS-formal-audit.json";
+   document.body.appendChild(a);a.click();a.remove();
+   window.setTimeout(()=>URL.revokeObjectURL(href),1000);
+  }catch(e){setError(errorCopy(e,"审计导出失败"));}
+  finally{setExporting(false);}
+ }
+ const nodes=chain?.nodes??[];
+ const interrupted=nodes.filter(n=>n.state==="conflicted").length;
+ const restarted=nodes.filter(n=>Boolean(n.previousApprovalId)).length;
+ const unread=nodes.reduce((sum,n)=>sum+n.noticeTotal-n.noticeRead,0);
+ const current=nodes[nodes.length-1];
  return <section className="cdw-section" aria-label="正式审批血缘与责任闭环">
   <div className="cdw-section-head">
    <h3>受控审批追溯</h3>
    <div className="cdw-review-actions">
     <RareButton type="button" tone="ghost" onClick={()=>setRevision(v=>v+1)}>刷新</RareButton>
+    {chain&&<RareButton type="button" tone="neutral" disabled={exporting||chain.truncated}
+     onClick={()=>void exportAudit()}>{exporting?"审计包生成中…":"导出文控审计包"}</RareButton>}
     {onClose&&<RareButton type="button" tone="ghost" onClick={onClose}>收起</RareButton>}
    </div>
   </div>
@@ -42,6 +65,13 @@ export function CDWFormalLineagePanel({approvalId,onClose}:{
   {error&&<RareNotice tone="danger">{error}</RareNotice>}
   {chain&&<>
    <p className="cdw-section-note">每笔审批独立冻结、独立签批；只有满足权限和受控制度的新版审批才能成为旧审批的继承节点。通知确认不等于文件批准。</p>
+   <div className="cdw-detail-facts" aria-label="审批技术闭环统计">
+    <div><span>已中断审批</span><strong>{interrupted}</strong></div>
+    <div><span>重新发起次数</span><strong>{restarted}</strong></div>
+    <div><span>仍未确认通知</span><strong>{unread}</strong></div>
+    <div><span>最新审批状态</span><strong>{current?stage[current.state]??current.state:"无"}</strong></div>
+   </div>
+   <p className="cdw-section-note">这是当前审批链的技术闭环统计，并非全公司合规率。导出仅对当前有权文控开放，包含每次签署授权快照与逐人通知事实。</p>
    <div className="cdw-formal-timeline">
     {chain.nodes.map((n,i)=><div className="cdw-formal-step" key={n.approvalId}>
      <span className="cdw-formal-step-number">{i+1}</span>
@@ -63,7 +93,7 @@ export function CDWFormalLineagePanel({approvalId,onClose}:{
      </RareBadge>
     </div>)}
    </div>
-   {chain.truncated&&<RareNotice tone="warning">审批继承链超过单次查看范围，请通过审计导出核查完整历史。</RareNotice>}
+   {chain.truncated&&<RareNotice tone="warning">审批继承链超过单次查看上限；完整导出被阻断，请由文控核查并完善分段证据。</RareNotice>}
    {chain.nodes[chain.nodes.length-1]?.state==="conflicted"&&
     <RareNotice tone="warning">当前审批链以冲突终止结束。须从新的受控交付稿重新发起，不允许继续原审批。</RareNotice>}
   </>}

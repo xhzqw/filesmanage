@@ -121,7 +121,12 @@ export type CDWQMSLegacyAnomaly={
 export type CDWQMSLegacyHold={id:string;approvalInstanceId:string;fileId:string;state:"conflicted"};
 export type CDWQMSFormalNotice={
  id:string;approvalInstanceId:string;fileId:string;
- eventKind:"policy_interrupted"|"legacy_quarantined";createdAt:string;readAt?:string;
+ recipientId?:string;eventKind:"policy_interrupted"|"legacy_quarantined";
+ createdAt:string;readAt?:string;followupAt?:string;followupReason?:string;followupBy?:string;
+};
+export type CDWQMSFormalFollowup={
+ id:string;noticeId:string;approvalInstanceId:string;recipientId:string;
+ requestedBy:string;reason:string;requestedAt:string;
 };
 export type CDWQMSLineageNode={
  approvalId:string;previousApprovalId?:string;fileId:string;fileName:string;
@@ -334,6 +339,10 @@ export const cdwApi={
   "/workbench/qms-legacy-approval-anomalies/"+segment(id)+"/hold",mutate(key,{reason})),
  qmsFormalNotices:()=>request<{items:CDWQMSFormalNotice[]}>(
   "/workbench/qms-formal-interruption-notices",{cache:"no-store"}),
+ qmsFormalNoticeLedger:()=>request<{items:CDWQMSFormalNotice[]}>(
+  "/workbench/qms-formal-notice-ledger",{cache:"no-store"}),
+ qmsFormalFollowup:(id:string,reason:string,key:string)=>request<CDWQMSFormalFollowup>(
+  "/workbench/qms-formal-interruption-notices/"+segment(id)+"/followup",mutate(key,{reason})),
  qmsFormalNoticeRead:(id:string,key:string)=>request<{id:string;read:boolean}>(
   "/workbench/qms-formal-interruption-notices/"+segment(id)+"/read",mutate(key,{})),
  qmsSpecialAssessImpact:(id:string,disposition:"reapproval_required"|"no_effect_on_existing_records",assessment:string,key:string)=>

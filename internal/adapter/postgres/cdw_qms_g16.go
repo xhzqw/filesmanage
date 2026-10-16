@@ -66,11 +66,12 @@ func (r *Repository) CDWQMSHoldLegacy(ctx context.Context, id, approvalID, actor
 	return ports.CDWQMSLegacyHold{ID: id, ApprovalInstanceID: approvalID, FileID: fileID, State: "conflicted"}, nil
 }
 func (r *Repository) CDWQMSFormalNotices(ctx context.Context, actor string, limit int) ([]ports.CDWQMSFormalNotice, error) {
-	rows, err := r.Q.Query(ctx, `SELECT n.id,n.approval_instance_id,sub.file_id,
- n.event_kind,n.created_at,n.read_at
+	rows, err := r.Q.Query(ctx, `SELECT n.id,n.approval_instance_id,sub.file_id,n.recipient_id,
+ n.event_kind,n.created_at,n.read_at,f.requested_at,COALESCE(f.reason,''),COALESCE(f.requested_by,'')
  FROM cdw_qms_formal_interruption_alerts n
  JOIN cdw_formal_approval_instances a ON a.id=n.approval_instance_id
  JOIN cdw_approval_subjects sub ON sub.id=a.subject_id
+ LEFT JOIN cdw_qms_formal_notice_followups f ON f.notice_id=n.id
  WHERE n.recipient_id=$1 ORDER BY n.created_at DESC,n.id DESC LIMIT $2`, actor, limit)
 	if err != nil {
 		return nil, err
@@ -81,13 +82,19 @@ func (r *Repository) CDWQMSFormalNotices(ctx context.Context, actor string, limi
 		var item ports.CDWQMSFormalNotice
 		var at time.Time
 		var read *time.Time
-		if err = rows.Scan(&item.ID, &item.ApprovalInstanceID, &item.FileID, &item.EventKind, &at, &read); err != nil {
+		var followup *time.Time
+		if err = rows.Scan(&item.ID, &item.ApprovalInstanceID, &item.FileID, &item.RecipientID, &item.EventKind, &at, &read,
+			&followup, &item.FollowupReason, &item.FollowupBy); err != nil {
 			return nil, err
 		}
 		item.CreatedAt = at.UTC().Format(time.RFC3339Nano)
 		if read != nil {
 			v := read.UTC().Format(time.RFC3339Nano)
 			item.ReadAt = &v
+		}
+		if followup != nil {
+			v := followup.UTC().Format(time.RFC3339Nano)
+			item.FollowupAt = &v
 		}
 		out = append(out, item)
 	}

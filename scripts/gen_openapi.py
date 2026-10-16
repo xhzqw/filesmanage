@@ -1105,16 +1105,41 @@ add("GET","/api/workbench/qms-formal-lineage/{id}",operation(
  required=["focusApprovalId","nodes","truncated"]),
  "Requester/current authorized participant/controller, actual source file ACL; read only."),
  resp("403",ERR["403"]),resp("404",ERR["404"])])))
+add("GET","/api/workbench/qms-formal-lineage/{id}/audit",operation(
+ "Export bounded immutable approval lineage, decision authority snapshots and individual notice evidence",
+ "CDW","cdwQMSFormalAudit",security=SESSION,
+ params=[id_param("id","Formal approval ID.")],
+ responses={"200":{"description":"JSON attachment with X-Content-SHA256, current document-control and file ACL required."},
+ "403":{"description":"Document-control role or file authorization missing."},
+ "409":{"description":"Full audit export blocked for truncated lineage."}}))
 CDW_QMS_LEGACY_ANOMALY=obj({
  "approvalInstanceId":string(),"fileId":string(),"fileName":string(),
  "templateVersionId":string(),"requestedBy":string(),"completedDecisions":integer(minimum=0),
  "sha256":string()},required=["approvalInstanceId","fileId","fileName",
  "templateVersionId","requestedBy","completedDecisions","sha256"])
 CDW_QMS_FORMAL_NOTICE=obj({
- "id":string(),"approvalInstanceId":string(),"fileId":string(),
+ "id":string(),"approvalInstanceId":string(),"fileId":string(),"recipientId":string(),
  "eventKind":string(enum=["policy_interrupted","legacy_quarantined"]),
- "createdAt":timestamp(),"readAt":timestamp()},
+ "createdAt":timestamp(),"readAt":timestamp(),"followupAt":timestamp(),
+ "followupReason":string(),"followupBy":string()},
  required=["id","approvalInstanceId","fileId","eventKind","createdAt"])
+CDW_QMS_FOLLOWUP=obj({
+ "id":string(),"noticeId":string(),"approvalInstanceId":string(),
+ "recipientId":string(),"requestedBy":string(),"reason":string(),"requestedAt":timestamp()},
+ required=["id","noticeId","approvalInstanceId","recipientId","requestedBy","reason","requestedAt"])
+add("GET","/api/workbench/qms-formal-notice-ledger",operation(
+ "Current document-control scoped per-recipient notice and human follow-up ledger",
+ "CDW","cdwQMSFormalNoticeLedger",security=SESSION,
+ responses=dict([json_ok(obj({"items":arr(CDW_QMS_FORMAL_NOTICE)},required=["items"]),
+ "File ACL-filtered read-only ledger; no assumed regulatory overdue threshold."),
+ resp("403",ERR["403"])])))
+add("POST","/api/workbench/qms-formal-interruption-notices/{id}/followup",operation(
+ "Record one human-initiated reminder for an unread named recipient notice",
+ "CDW","cdwQMSFormalFollowup",security=SESSION,
+ params=[id_param("id","Unread recipient notice ID."),CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({"reason":string()},required=["reason"])}},
+ responses=dict([json_ok(CDW_QMS_FOLLOWUP,"Immutable controller reminder, independent of legal SLA."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
 add("GET","/api/workbench/qms-legacy-approval-anomalies",operation(
  "Live ACL-filtered historical pending DHF/DMR approvals lacking current signatory authority",
  "CDW","cdwQMSLegacyAnomalies",security=SESSION,
