@@ -92,3 +92,44 @@ func (s *Service) CDWReadingContent(ctx context.Context, actor domain.User, id s
 	reader, err := s.blobs.Open(source.StorageKey)
 	return reader, source.Name, source.SizeBytes, err
 }
+
+// CDWReadingContentDelivered is invoked by the streaming handler ONLY when
+// its full exact blob was transmitted without a write/read error. Incomplete
+// connections never unlock reading confirmation.
+func (s *Service) CDWReadingContentDelivered(ctx context.Context, actor domain.User, id string) error {
+	if id == "" {
+		return domain.ErrInvalidInput
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	store, ok := tx.(ports.CDWReadingStore)
+	if !ok {
+		return domain.ErrInvalidInput
+	}
+	fileID, err := store.CDWReadingAssignmentFile(ctx, id)
+	if err != nil {
+		return err
+	}
+	if _, err = s.visibleFile(ctx, tx, actor, fileID, domain.ActionPreview); err != nil {
+		return err
+	}
+	eventID := NewID("cdwreadopened")
+	changed, err := store.CDWReadingMarkOpened(ctx, id, actor.ID, eventID)
+	if err != nil {
+		return err
+	}
+	if changed {
+		if err = auditRequired(ctx, tx, actor, "cdw.reading.opened", "reading_assignment", id,
+			"success", map[string]any{"evidenceEventId": eventID, "transfer": "complete"}); err != nil {
+			return err
+		}
+		if err = store.CDWReadingEvent(ctx, actor.ID, "reading.opened", id, eventID,
+			map[string]any{"assignmentId": id, "openEventId": eventID, "transfer": "complete"}); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
+}

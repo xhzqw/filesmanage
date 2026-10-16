@@ -502,6 +502,29 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 		t.Fatalf("another reader confirmed Bob's assigned version: %v", e)
 	}
 	readingStatement := application.CDWReadingConfirmationInput{Statement: "本人已核对本次受控发行的文档内容和版次，确认已经阅读。"}
+	if _, e = service.CDWConfirmReading(ctx, bob, bobAssignment.ID, readingStatement, prefix+"_g9_read_without_open"); !errors.Is(e, domain.ErrConflict) {
+		t.Fatalf("reading confirmed without full controlled-content delivery: %v", e)
+	}
+	if e = service.CDWReadingContentDelivered(ctx, charlie, bobAssignment.ID); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("different person manufactured open evidence: %v", e)
+	}
+	// The streaming layer invokes this hook only after an actual successful
+	// full-size copy. This integration test verifies its DB state and ACL.
+	if e = service.CDWReadingContentDelivered(ctx, bob, bobAssignment.ID); e != nil {
+		t.Fatalf("post-transfer opened evidence failed: %v", e)
+	}
+	if e = service.CDWReadingContentDelivered(ctx, bob, bobAssignment.ID); e != nil {
+		t.Fatalf("idempotent full-transfer evidence: %v", e)
+	}
+	var openEvents int
+	if e = pool.QueryRow(ctx, `SELECT COUNT(*) FROM cdw_reading_events
+	 WHERE assignment_id=$1 AND actor_id=$2 AND kind='opened' AND artifact_sha256=$3`,
+		bobAssignment.ID, bob.ID, bobAssignment.ArtifactSHA256).Scan(&openEvents); e != nil {
+		t.Fatal(e)
+	}
+	if openEvents != 1 {
+		t.Fatalf("duplicate or missing immutable delivery evidence: %d", openEvents)
+	}
 	confirmed, e := service.CDWConfirmReading(ctx, bob, bobAssignment.ID, readingStatement, prefix+"_g9_read_bob")
 	if e != nil || confirmed.State != "confirmed" || confirmed.ArtifactSHA256 != bobAssignment.ArtifactSHA256 {
 		t.Fatalf("personal read confirmation %+v %v", confirmed, e)

@@ -11,10 +11,9 @@ export function CDWReadingPanel({assignment,onConfirmed}:{
 }){
  const [statement,setStatement]=useState("");
  const [busy,setBusy]=useState(false);
- const [accessed,setAccessed]=useState(false);
  const key=useRef("");
  async function confirm(){
-  if(assignment.state==="confirmed"||!accessed||statement.trim().length<12||busy)return;
+  if(assignment.state==="confirmed"||statement.trim().length<12||busy)return;
   if(!key.current)key.current=newIdempotencyKey();
   setBusy(true);
   try{
@@ -40,9 +39,9 @@ export function CDWReadingPanel({assignment,onConfirmed}:{
   <section className="cdw-section">
    <div className="cdw-section-head"><h3>核对精确受控发行稿</h3>
     <a className="cdw-text-link" href={"/api/workbench/reading-assignments/"+encodeURIComponent(assignment.id)+"/content"}
-     download="CDW-controlled-distribution.docx" onClick={()=>setAccessed(true)}>获取本次发行 DOCX ↗</a>
+     download="CDW-controlled-distribution.docx">获取本次发行 DOCX ↗</a>
    </div>
-   <p className="cdw-section-note">请打开下载的受控文件并完整阅读。这里直接提供冻结的发行 Blob，不以普通上传文件的“最新版本”替代。</p>
+   <p className="cdw-section-note">先完整下载并打开受控文件，再签署阅读声明。服务器必须记录完整文件传送成功，未下载或传送中断均不能确认；下载记录不代表已经阅读。</p>
    <div className="cdw-review-digest"><small>精确文件 SHA-256</small><code>{assignment.artifactSha256}</code></div>
   </section>
   {(assignment.state==="assigned"||assignment.state==="opened")&&<section className="cdw-section">
@@ -54,7 +53,7 @@ export function CDWReadingPanel({assignment,onConfirmed}:{
       onChange={e=>{setStatement(e.target.value);key.current="";}}/>
     </label>
     <div className="cdw-review-actions">
-     <RareButton type="button" tone="primary" disabled={busy||!accessed||statement.trim().length<12}
+     <RareButton type="button" tone="primary" disabled={busy||statement.trim().length<12}
       loading={busy} onClick={()=>void confirm()}>本人签署阅读确认</RareButton>
     </div>
    </div>

@@ -43,6 +43,7 @@ type CDWReadingStore interface {
 	CDWReadingRosterInfo(context.Context, string) (CDWReadingRoster, error)
 	CDWReadingCreateRoster(context.Context, string, string, string, string, []string, []string, []string) (CDWReadingRoster, error)
 	CDWReadingInbox(context.Context, string, int) ([]CDWReadingAssignment, error)
+	CDWReadingMarkOpened(context.Context, string, string, string) (bool, error)
 	CDWReadingConfirm(context.Context, string, string, string, string) (CDWReadingConfirmation, error)
 	CDWReadingSource(context.Context, string, string) (CDWBranchSource, error)
 	CDWReadingEvent(context.Context, string, string, string, string, any) error

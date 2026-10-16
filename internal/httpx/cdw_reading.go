@@ -105,5 +105,16 @@ func (h *Handler) cdwReadingContent(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.Header("Content-Length", strconv.FormatInt(size, 10))
 	c.Status(http.StatusOK)
-	_, _ = copyReader(c.Writer, reader)
+	bytesSent, copyErr := copyReader(c.Writer, reader)
+	// Persist opened evidence only if the complete immutable artifact was
+	// successfully streamed to the authenticated user's connection.
+	if cdwFullTransferComplete(bytesSent, size, copyErr, c.Request.Context().Err()) {
+		if err := h.S.CDWReadingContentDelivered(c.Request.Context(), actor, c.Param("id")); err != nil {
+			_ = c.Error(err)
+		}
+	}
+}
+
+func cdwFullTransferComplete(sent, expected int64, copyErr, contextErr error) bool {
+	return expected > 0 && sent == expected && copyErr == nil && contextErr == nil
 }

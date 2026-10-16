@@ -29,7 +29,7 @@ func (r *Repository) CDWReadingConfirm(ctx context.Context, id, actor, eventID, 
 	if err != nil {
 		return out, err
 	}
-	if state != "assigned" && state != "opened" {
+	if state != "opened" {
 		return out, domain.ErrConflict
 	}
 	if batchState != "dispatched" || blobState != "active" || receiptID == nil {
@@ -42,7 +42,10 @@ func (r *Repository) CDWReadingConfirm(ctx context.Context, id, actor, eventID, 
  AND g.source_target_id=a.target_id AND g.batch_item_id=a.batch_item_id
  WHERE a.id=$1 AND a.user_id=$2 AND u.department_id=$3
  AND g.revoked_at IS NULL AND (g.expires_at IS NULL OR g.expires_at>now())
- AND 'read_confirm'=ANY(g.actions))`, id, actor, dept).Scan(&valid)
+ AND 'read_confirm'=ANY(g.actions)
+ AND EXISTS (SELECT 1 FROM cdw_reading_events opened
+ WHERE opened.assignment_id=a.id AND opened.actor_id=$2
+ AND opened.kind='opened' AND opened.artifact_sha256=a.artifact_sha256))`, id, actor, dept).Scan(&valid)
 	if err != nil {
 		return out, err
 	}
@@ -57,7 +60,7 @@ func (r *Repository) CDWReadingConfirm(ctx context.Context, id, actor, eventID, 
 	}
 	tag, err := r.Q.Exec(ctx, `UPDATE cdw_reading_assignments
  SET state='confirmed',confirmed_at=clock_timestamp()
- WHERE id=$1 AND user_id=$2 AND state IN('assigned','opened')`, id, actor)
+ WHERE id=$1 AND user_id=$2 AND state='opened'`, id, actor)
 	if err != nil {
 		return out, err
 	}
@@ -72,6 +75,47 @@ func (r *Repository) CDWReadingConfirm(ctx context.Context, id, actor, eventID, 
 	return ports.CDWReadingConfirmation{AssignmentID: id, EventID: eventID, ActorID: actor,
 		ArtifactSHA256: sha, State: "confirmed", ConfirmedAt: at.UTC().Format(time.RFC3339Nano)}, nil
 }
+
+// A completed full-document transfer is required before an independent
+// personal reading declaration. Re-validate the exact artifact and grant
+// while the assignment row is locked.
+func (r *Repository) CDWReadingMarkOpened(ctx context.Context, id, actor, eventID string) (bool, error) {
+	var state, sha string
+	err := r.Q.QueryRow(ctx, `SELECT a.state,a.artifact_sha256 FROM cdw_reading_assignments a
+ WHERE a.id=$1 AND a.user_id=$2 FOR UPDATE OF a`, id, actor).Scan(&state, &sha)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, domain.ErrForbidden
+	}
+	if err != nil {
+		return false, err
+	}
+	if state == "opened" || state == "confirmed" {
+		return false, nil
+	}
+	if state != "assigned" {
+		return false, domain.ErrConflict
+	}
+	if _, err = r.CDWReadingSource(ctx, id, actor); err != nil {
+		return false, err
+	}
+	_, err = r.Q.Exec(ctx, `INSERT INTO cdw_reading_events
+ (id,assignment_id,actor_id,kind,artifact_sha256,statement_snapshot)
+ VALUES($1,$2,$3,'opened',$4,$5)`,
+		eventID, id, actor, sha, "受控发行稿完整传送成功；不代表实际阅读或培训完成")
+	if err != nil {
+		return false, err
+	}
+	tag, err := r.Q.Exec(ctx, `UPDATE cdw_reading_assignments SET state='opened'
+ WHERE id=$1 AND user_id=$2 AND state='assigned'`, id, actor)
+	if err != nil {
+		return false, err
+	}
+	if tag.RowsAffected() != 1 {
+		return false, domain.ErrConflict
+	}
+	return true, nil
+}
+
 func (r *Repository) CDWReadingSource(ctx context.Context, id, actor string) (ports.CDWBranchSource, error) {
 	var out ports.CDWBranchSource
 	err := r.Q.QueryRow(ctx, `SELECT bl.storage_key,r.display_name_snapshot,bl.size_bytes
