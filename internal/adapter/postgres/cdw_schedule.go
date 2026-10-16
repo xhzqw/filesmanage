@@ -178,6 +178,9 @@ func (r *Repository) CDWScheduleFinish(ctx context.Context, releaseID, token, st
 	if status != "completed" && status != "retry" && status != "paused" {
 		return false, domain.ErrInvalidInput
 	}
+	if blockers == nil {
+		blockers = []string{}
+	}
 	raw, err := json.Marshal(blockers)
 	if err != nil {
 		return false, err
