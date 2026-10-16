@@ -197,7 +197,7 @@ func (s *Service) CDWStartFormalApproval(ctx context.Context, actor domain.User,
 			if !ok {
 				return nil, domain.ErrInvalidInput
 			}
-			mustLink, e := g16.CDWQMSRequiresRestart(ctx, input.DeliveryID)
+			mustLink, e := g16.CDWQMSRequiresRestart(ctx, fileID)
 			if e != nil {
 				return nil, e
 			}

@@ -101,18 +101,20 @@ func (r *Repository) CDWQMSReadFormalNotice(ctx context.Context, id, actor strin
 	}
 	return tag.RowsAffected() == 1, nil
 }
-func (r *Repository) CDWQMSRequiresRestart(ctx context.Context, deliveryID string) (bool, error) {
+
+// The formal starter already holds the file lock and has resolved the
+// accepted delivery's file ID. Checking file ID, never delivery ID, prevents
+// a new delivery from bypassing an older interrupted approval obligation.
+func (r *Repository) CDWQMSRequiresRestart(ctx context.Context, fileID string) (bool, error) {
 	var required bool
 	err := r.Q.QueryRow(ctx, `SELECT EXISTS(
- SELECT 1 FROM cdw_deliveries d
- JOIN cdw_delivery_items item ON item.delivery_id=d.id AND item.ordinal=1
- JOIN cdw_approval_subjects sub ON sub.file_id=item.file_id
+ SELECT 1 FROM cdw_approval_subjects sub
  JOIN cdw_formal_approval_instances a ON a.subject_id=sub.id
- WHERE d.id=$1 AND (
+ WHERE sub.file_id=$1 AND (
   EXISTS(SELECT 1 FROM cdw_qms_formal_policy_interruptions h WHERE h.approval_instance_id=a.id)
   OR EXISTS(SELECT 1 FROM cdw_qms_formal_legacy_holds h WHERE h.approval_instance_id=a.id))
   AND NOT EXISTS(SELECT 1 FROM cdw_qms_formal_restarts link WHERE link.previous_approval_id=a.id)
- )`, deliveryID).Scan(&required)
+ )`, fileID).Scan(&required)
 	return required, err
 }
 func (r *Repository) CDWQMSRecordRestart(ctx context.Context, id, previousID, newID, actor string) error {

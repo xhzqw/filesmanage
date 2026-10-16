@@ -241,6 +241,12 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
  WHERE instance_id=$1 AND state IN('ready','waiting')`, formalInstance).Scan(&pendingSteps); err != nil || pendingSteps != 0 {
 		t.Fatalf("interrupted steps remained actionable: %d %v", pendingSteps, err)
 	}
+	if needs, checkErr := r.CDWQMSRequiresRestart(ctx, subjectFileID); checkErr != nil || !needs {
+		t.Fatalf("new delivery can bypass same-file interrupted approval lineage: %v %v", needs, checkErr)
+	}
+	if needs, checkErr := r.CDWQMSRequiresRestart(ctx, policyFile); checkErr != nil || needs {
+		t.Fatalf("unrelated policy document inherited wrong approval obligation: %v %v", needs, checkErr)
+	}
 	interruptions, interruptErr := r.CDWQMSFormalInterruptions(ctx, charlie.ID, 20)
 	if interruptErr != nil || len(interruptions) != 1 ||
 		interruptions[0].ApprovalInstanceID != formalInstance ||
@@ -388,6 +394,12 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 		lineage.Nodes[0].SHA256 != sha || lineage.Nodes[1].SHA256 != sha ||
 		lineage.Nodes[0].NoticeTotal < 2 || lineage.Nodes[0].NoticeRead != 1 {
 		t.Fatalf("G17 restart timeline lacks real node and recipient evidence: %+v %v", lineage, lineageErr)
+	}
+	if allowed, accessErr := r.CDWQMSFormalLineageCanRead(ctx, formalInstance, bob.ID); accessErr != nil || !allowed {
+		t.Fatalf("assigned signer lost historical read-only access: %v %v", allowed, accessErr)
+	}
+	if allowed, accessErr := r.CDWQMSFormalLineageCanRead(ctx, formalInstance, prefix+"_unknown_actor"); accessErr != nil || allowed {
+		t.Fatalf("unrelated principal gained formal history access: %v %v", allowed, accessErr)
 	}
 	fromOld, oldErr := r.CDWQMSFormalLineage(ctx, formalInstance)
 	if oldErr != nil || len(fromOld.Nodes) != len(lineage.Nodes) {
@@ -553,6 +565,7 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_special_new_review"); err != nil {
 		t.Fatal(err)
 	}
+	t.Log("CDW_G17_APPROVAL_CHAIN_PASS source-file restart requirement, historical read-only access, ancestor/descendant evidence, unique successor")
 	t.Log("CDW_G16_LEGACY_LINEAGE_PASS per-recipient notices and ACK, independent legacy anomaly quarantine, immutable same-file restart lineage")
 	t.Log("CDW_G15_MIDFLIGHT_PASS pointer change+authority revoke terminal conflicts, immutable frozen decisions, no SQL resurrection/candidate")
 	t.Log("CDW_G14_POLICY_IMPACT_PASS automatic pointer review, independent assessment, irreversible history, exact-artifact fail-closed")

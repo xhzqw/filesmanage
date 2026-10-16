@@ -77,6 +77,7 @@ type CDWQMSFormalLineage struct {
 }
 type CDWQMSG16Store interface {
 	CDWQMSFormalLineage(context.Context, string) (CDWQMSFormalLineage, error)
+	CDWQMSFormalLineageCanRead(context.Context, string, string) (bool, error)
 	CDWQMSRequiresRestart(context.Context, string) (bool, error)
 	CDWQMSLegacyHoldHistory(context.Context, string, int) ([]CDWQMSLegacyHold, error)
 	CDWQMSLegacyAnomalies(context.Context, string, int) ([]CDWQMSLegacyAnomaly, error)

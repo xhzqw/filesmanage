@@ -12,6 +12,26 @@ import (
 
 // A read-only ordered chain, with every node anchored to its immutable
 // subject hash and actual decision/recipient evidence (never inferred ACKs).
+// Historical participants retain read-only access after signing authority
+// revocation, but never receive new signing permissions. File ACL stays live.
+func (r *Repository) CDWQMSFormalLineageCanRead(ctx context.Context, id, actor string) (bool, error) {
+	var allowed bool
+	err := r.Q.QueryRow(ctx, `SELECT EXISTS(SELECT 1
+ FROM cdw_formal_approval_instances a
+ JOIN cdw_approval_subjects sub ON sub.id=a.subject_id
+ WHERE a.id=$1 AND (a.requested_by=$2
+  OR EXISTS(SELECT 1 FROM cdw_formal_approval_steps step
+    WHERE step.instance_id=a.id AND step.approver_user_id=$2)
+  OR EXISTS(SELECT 1 FROM cdw_business_role_bindings b
+   JOIN users u ON u.id=b.user_id
+   WHERE b.user_id=$2 AND b.role='document_control'
+    AND (b.file_id=sub.file_id OR b.file_id IS NULL)
+    AND b.department_id IS NULL AND b.revoked_at IS NULL
+    AND b.valid_from<=clock_timestamp()
+    AND (b.expires_at IS NULL OR b.expires_at>clock_timestamp())
+    AND u.disabled_at IS NULL)))`, id, actor).Scan(&allowed)
+	return allowed, err
+}
 func (r *Repository) CDWQMSFormalLineage(ctx context.Context, focusID string) (ports.CDWQMSFormalLineage, error) {
 	out := ports.CDWQMSFormalLineage{FocusApprovalID: focusID, Nodes: []ports.CDWQMSLineageNode{}}
 	rows, err := r.Q.Query(ctx, `WITH RECURSIVE

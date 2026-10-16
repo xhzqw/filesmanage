@@ -11,7 +11,7 @@ func (s *Service) CDWQMSFormalLineage(ctx context.Context, actor domain.User, id
 	if id == "" {
 		return empty, domain.ErrInvalidInput
 	}
-	_, tx, err := s.cdwFormalRead(ctx, actor, id)
+	tx, err := s.uow.Begin(ctx)
 	if err != nil {
 		return empty, err
 	}
@@ -19,6 +19,24 @@ func (s *Service) CDWQMSFormalLineage(ctx context.Context, actor domain.User, id
 	g17, ok := tx.(ports.CDWQMSG16Store)
 	if !ok {
 		return empty, domain.ErrInvalidInput
+	}
+	formal, ok := tx.(ports.CDWFormalStore)
+	if !ok {
+		return empty, domain.ErrInvalidInput
+	}
+	fileID, err := formal.CDWFormalApprovalFile(ctx, id)
+	if err != nil {
+		return empty, err
+	}
+	allowed, err := g17.CDWQMSFormalLineageCanRead(ctx, id, actor.ID)
+	if err != nil {
+		return empty, err
+	}
+	if !allowed {
+		return empty, domain.ErrForbidden
+	}
+	if _, err = s.visibleFile(ctx, tx, actor, fileID, domain.ActionPreview); err != nil {
+		return empty, err
 	}
 	chain, err := g17.CDWQMSFormalLineage(ctx, id)
 	if err != nil {
