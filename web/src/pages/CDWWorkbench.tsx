@@ -22,7 +22,7 @@ import {newIdempotencyKey} from "../shared/ids";
 import {collaborationApi} from "../features/collaboration/api";
 import {organizationApi} from "../features/organization/api";
 import {fileApi} from "../features/documents/api";
-import {cdwApi,type CDWBranch,type CDWInboxItem,type CDWRecipient,type CDWReviewGate,type CDWFormalApproval,type CDWApprovedCandidate,type CDWDistributionPlan,type CDWReceiptTarget,type CDWReadingAssignment,type CDWQMSPendingReview,type CDWQMSAppointmentAlert} from "../features/cdw/api";
+import {cdwApi,type CDWBranch,type CDWInboxItem,type CDWRecipient,type CDWReviewGate,type CDWFormalApproval,type CDWApprovedCandidate,type CDWDistributionPlan,type CDWReceiptTarget,type CDWReadingAssignment,type CDWQMSPendingReview,type CDWQMSAppointmentAlert,type CDWQMSSpecialAlert,type CDWQMSSpecialAuthority} from "../features/cdw/api";
 import "./cdwWorkbench.css";
 
 type View="tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all";
@@ -54,6 +54,8 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const[formalApprovals,setFormalApprovals]=useState<CDWFormalApproval[]>([]);
  const[pendingAppointments,setPendingAppointments]=useState<CDWQMSPendingReview[]>([]);
  const[appointmentAlerts,setAppointmentAlerts]=useState<CDWQMSAppointmentAlert[]>([]);
+ const[specialAlerts,setSpecialAlerts]=useState<CDWQMSSpecialAlert[]>([]);
+ const[specialReviews,setSpecialReviews]=useState<CDWQMSSpecialAuthority[]>([]);
  const[controlCandidates,setControlCandidates]=useState<CDWApprovedCandidate[]>([]);
  const[scopeApprovals,setScopeApprovals]=useState<CDWDistributionPlan[]>([]);
  const[receiptTargets,setReceiptTargets]=useState<CDWReceiptTarget[]>([]);
@@ -147,6 +149,14 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
   let live=true;
   cdwApi.qmsAlerts().then(result=>{if(live)setAppointmentAlerts(result.items??[]);})
    .catch(error=>{if(live)setRequestError(errorCopy(error,"岗位任命通知加载失败"));});
+  return()=>{live=false;};
+ },[refreshToken,user.id]);
+ useEffect(()=>{
+  let live=true;
+  Promise.all([cdwApi.qmsSpecialAlerts(),cdwApi.qmsSpecialList()])
+   .then(([notices,reviews])=>{if(live){
+    setSpecialAlerts(notices.items??[]);setSpecialReviews(reviews.items??[]);
+   }}).catch(error=>{if(live)setRequestError(errorCopy(error,"专项签批核验事项加载失败"));});
   return()=>{live=false;};
  },[refreshToken,user.id]);
  async function readAppointmentAlert(id:string){
@@ -302,7 +312,11 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
        ["obligations","责任待办",totalObligations],
        ["reviews","待我验收",totalReviews],
        ["formal","正式审批",totalFormal],
-       ["appointments","任命核验",pendingAppointments.length+appointmentAlerts.filter(a=>!a.readAt).length],
+       ["appointments","任命核验",
+        pendingAppointments.filter(a=>a.status==="pending").length+
+        appointmentAlerts.filter(a=>!a.readAt).length+
+        specialAlerts.filter(a=>!a.readAt).length+
+        specialReviews.filter(a=>a.status==="pending"&&a.proposedBy!==user.id).length],
        ["control","发行准备",totalControl],
        ["scope","范围审批",totalScope],
        ["receipts","部门签收",totalReceipts],

@@ -108,6 +108,12 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 		policyRelease, admin.ID, reason, claims[:1]); !errors.Is(err, domain.ErrInvalidInput) {
 		t.Fatalf("incomplete node clause coverage accepted: %v", err)
 	}
+	wrongNode := []ports.CDWQMSSpecialNodeClaim{claims[0],
+		{NodeKey: "unrelated_qa_role", ClauseRef: "§4.4.1", BasisSummary: "没有发布的岗位不得冒用指定审批条款"}}
+	if _, err = r.CDWQMSSpecialPropose(ctx, prefix+"_wrong_node", subjectFileID, "dhf", tpl,
+		policyRelease, admin.ID, reason, wrongNode); !errors.Is(err, domain.ErrInvalidInput) {
+		t.Fatalf("unrelated node substituted for mandatory approver: %v", err)
+	}
 	record, err := r.CDWQMSSpecialPropose(ctx, recordID, subjectFileID, "dhf", tpl,
 		policyRelease, admin.ID, reason, claims)
 	if err != nil || record.Status != "pending" {
@@ -195,6 +201,16 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 		}
 		if _, err = r.CDWQMSSpecialReview(ctx, newID, charlie.ID, reason, "verify"); !errors.Is(err, domain.ErrConflict) {
 			t.Fatalf("terminal %s got verified: %v", action, err)
+		}
+		if _, err = tx.Exec(ctx, "SAVEPOINT cdw_special_terminal_sql"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = tx.Exec(ctx, `UPDATE cdw_qms_special_authorities SET status='pending'
+ WHERE id=$1`, newID); err == nil {
+			t.Fatalf("direct SQL revived %s evidence", action)
+		}
+		if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_special_terminal_sql"); err != nil {
+			t.Fatal(err)
 		}
 		messages, e := r.CDWQMSSpecialAlerts(ctx, admin.ID, 30)
 		if e != nil || len(messages) < 1 || messages[0].EventKind != res.Status {

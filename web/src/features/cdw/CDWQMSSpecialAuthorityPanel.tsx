@@ -136,7 +136,7 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
   {shown.length===0&&!scope&&<p className="cdw-section-note">暂无您有权核验的专项签批依据。</p>}
   {shown.map(item=><RareButton type="button" key={item.id}
    className={"cdw-task-row"+(active?.id===item.id?" is-selected":"")}
-   onClick={()=>{setSelectedId(item.id);setStatement("");}}>
+   onClick={()=>{setSelectedId(item.id);setStatement("");setAction("verify");}}>
    <span className="cdw-task-copy"><strong>{item.fileName}</strong>
     <small>{item.kind.toUpperCase()} · {item.status==="pending"?"待独立核验":
      item.status==="verified"?"已核验，可撤销":item.status==="returned"?"已退回":
