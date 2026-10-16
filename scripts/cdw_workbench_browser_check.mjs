@@ -106,18 +106,19 @@ try{
  assert.equal(await evalJS("!!document.querySelector('.cdw-form select, .cdw-form .rare-select')"),true,
   "G7 connects frozen delivery candidate selector");
  console.log("CDW_G7_FORMAL_BROWSER_PASS inbox+eligible-deliveries+initiation=live-no-write");
- // Quality-controlled approval is opt-in and requires a genuinely effective
- // controlled release; an admin's user choice alone cannot enable issuing it.
- assert.equal(await evalJS("!!document.querySelector('button.rare-select[aria-label=\"审批用途\"]')"),true,
-  "formal initiation exposes explicit quality/non-quality classification");
- await evalJS("(()=>{document.querySelector('button.rare-select[aria-label=\"审批用途\"]').click();return true})()");
- await until("!!document.querySelector('[role=listbox][aria-label=\"审批用途\"]')");
- const qmsChoice=await evalJS("(()=>{const menu=document.querySelector('[role=listbox][aria-label=\"审批用途\"]');const option=[...menu.querySelectorAll('[role=option]')].find(x=>x.textContent.includes('质量体系受控文件'));option?.click();return !!option})()");
- assert.equal(qmsChoice,true,"the quality-controlled mode must be selectable");
- await until("!!document.querySelector('input[aria-label=\"检索审批制度依据\"]')");
- const qmsGuard=await evalJS("(()=>({basisField:!!document.querySelector('input[aria-label=\"检索审批制度依据\"]'),roleDisabled:[...document.querySelectorAll('.cdw-section button')].find(x=>x.textContent.includes('授权两位审批人'))?.disabled===true}))()");
- assert.ok(qmsGuard.basisField&&qmsGuard.roleDisabled,"QMS form must block authority grant without an effective policy release");
- console.log("CDW_QMS_AUTHORITY_BROWSER_PASS source-required form; no authority granted without policy");
+ // A requester cannot self-select generic/QMS approval routing. The server's
+ // document-control classification is loaded only for the frozen source.
+ assert.equal(await evalJS("!!document.querySelector('button.rare-select[aria-label=\"审批用途\"]')"),false,
+  "requester-side QMS bypass selector must not exist");
+ if(ready.data.items.length){
+  await evalJS("(()=>{document.querySelector('button.rare-select[aria-label=\"选择已验收交付\"]').click();return true})()");
+  await until("!!document.querySelector('[role=listbox][aria-label=\"选择已验收交付\"]')");
+  await evalJS("(()=>{[...document.querySelector('[role=listbox][aria-label=\"选择已验收交付\"]').querySelectorAll('[role=option]')].find(x=>!x.disabled&&x.textContent!=='选择正式审批候选稿')?.click();return true;})()");
+  await until("document.querySelector('.cdw-section-note')?.textContent!==undefined");
+  const classified=await evalJS("(()=>({classVisible:document.body.innerText.includes('文控归类：'),grantDisabled:[...document.querySelectorAll('.cdw-section button')].find(x=>x.textContent.includes('授权两位审批人'))?.disabled===true}))()");
+  assert.ok(classified.classVisible&&classified.grantDisabled,"unreviewed file cannot authorize approvers");
+ }
+ console.log("CDW_QMS_CLASSIFICATION_BROWSER_PASS no requester-side route toggle; document-control classification enforced");
 
  await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('发行准备'));button?.click();return true;})()");
  await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('发行准备')");

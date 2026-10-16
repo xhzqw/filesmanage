@@ -1,11 +1,11 @@
 import {useEffect,useRef,useState} from "react";
-import {RareButton,RareInput,RareSelect,RareNotice} from "../../shared/ui/rare";
+import {RareButton,RareInput,RareSelect,RareNotice,RareTextarea} from "../../shared/ui/rare";
 import {toast} from "../../shared/ui/feedback";
 import {errorCopy} from "../../shared/errors";
 import {ApiError} from "../../shared/http";
 import {newIdempotencyKey} from "../../shared/ids";
 import type {User} from "../../entities/user/model";
-import {cdwApi,type CDWFormalReady,type CDWEffectiveSearchHit} from "./api";
+import {cdwApi,type CDWFormalReady,type CDWEffectiveSearchHit,type CDWDocumentClassification} from "./api";
 
 // Three explicit steps deliberately avoid silently granting approval authority.
 export function CDWFormalInitiate({onCreated,loadUsers}:{onCreated:()=>void;loadUsers:()=>Promise<User[]>}){
@@ -15,7 +15,10 @@ export function CDWFormalInitiate({onCreated,loadUsers}:{onCreated:()=>void;load
  const [reviewer1,setReviewer1]=useState("");
  const [reviewer2,setReviewer2]=useState("");
  const [parallel,setParallel]=useState(false);
- const [qms,setQms]=useState(false);
+ const [classification,setClassification]=useState<CDWDocumentClassification|null>(null);
+ const [classLoading,setClassLoading]=useState(false);
+ const [classChoice,setClassChoice]=useState<"general"|"qms">("general");
+ const [classReason,setClassReason]=useState("");
  const [basisSearch,setBasisSearch]=useState("");
  const [basisResults,setBasisResults]=useState<CDWEffectiveSearchHit[]>([]);
  const [basisReleaseId,setBasisReleaseId]=useState("");
@@ -27,6 +30,17 @@ export function CDWFormalInitiate({onCreated,loadUsers}:{onCreated:()=>void;load
  const [busy,setBusy]=useState(false);
  const keys=useRef(new Map<string,string>());
  const selected=ready.find(d=>d.deliveryId===delivery);
+ const qms=classification?.approvalClass==="qms";
+ useEffect(()=>{
+  let live=true;setClassification(null);setClassReason("");setBasisReleaseId("");
+  if(!selected?.fileId)return;
+  setClassLoading(true);
+  cdwApi.formalClass(selected.fileId).then(info=>{
+   if(live){setClassification(info);setClassChoice(info.requiresQms?"qms":"general");}
+  }).catch(e=>{if(live)setError(errorCopy(e,"无法核验文控文件类别"));})
+   .finally(()=>{if(live)setClassLoading(false);});
+  return()=>{live=false;};
+ },[selected?.fileId]);
  useEffect(()=>{
   let live=true;setLoading(true);setError("");
   Promise.all([cdwApi.formalReady(),loadUsers()])
@@ -39,8 +53,17 @@ export function CDWFormalInitiate({onCreated,loadUsers}:{onCreated:()=>void;load
   setAuthorized(false);setTemplateId("");
   keys.current.clear();
  }
- const prepared=Boolean(selected&&reviewer1&&reviewer2&&reviewer1!==reviewer2&&(!qms||basisReleaseId));
+ const prepared=Boolean(selected&&!classLoading&&classification&&classification.approvalClass!=="pending"&&reviewer1&&reviewer2&&reviewer1!==reviewer2&&(!qms||basisReleaseId));
  const policyBasis=qms?basisReleaseId:undefined;
+ async function classify(){
+  if(!selected||!classification||classification.approvalClass!=="pending"||Array.from(classReason.trim()).length<16)return;
+  const success=await step("classify:"+selected.fileId,key=>cdwApi.formalClassify(
+   selected.fileId,classChoice,classReason.trim(),key),"文件类别已登记，后续正式审批按文控分类校验");
+  if(success){
+   try{setClassification(await cdwApi.formalClass(selected.fileId));resetSteps();}
+   catch(e){setError(errorCopy(e,"无法重新核验文件类别"));}
+  }
+ }
  async function searchPolicy(){
   if(!basisSearch.trim()||basisBusy)return;
   setBasisBusy(true);
@@ -108,13 +131,26 @@ export function CDWFormalInitiate({onCreated,loadUsers}:{onCreated:()=>void;load
     </RareSelect>
    </label>
    {selected&&<div className="cdw-review-digest"><small>冻结交付 SHA-256</small><code>{selected.sha256}</code></div>}
-   <label>审批用途
-    <RareSelect aria-label="审批用途" value={qms?"qms":"general"} disabled={busy}
-     onChange={e=>{setQms(e.target.value==="qms");resetSteps();}}>
-     <option value="general">普通文件正式审批</option>
-     <option value="qms">质量体系受控文件 / DHF / DMR</option>
-    </RareSelect>
-   </label>
+   {selected&&<section className="cdw-section">
+    <p className="cdw-section-note">文控归类：{classLoading?"正在核验…":classification?.approvalClass==="qms"?"质量体系受控文件":classification?.approvalClass==="general"?"普通文件":"待核定，暂不可正式审批"}</p>
+    {classification?.approvalClass==="pending"&&<>
+     <RareNotice tone="info">先由有授权的文控人员登记文件类别。已确认类别不可随意更改；已识别的质量制度不允许归入普通文件。</RareNotice>
+     <label>文件类别
+      <RareSelect aria-label="文控文件类别" value={classification.requiresQms?"qms":classChoice}
+       disabled={classification.requiresQms||busy} onChange={e=>setClassChoice(e.target.value as "general"|"qms")}>
+       <option value="general">普通文件</option>
+       <option value="qms">质量体系受控文件（含 DHF / DMR）</option>
+      </RareSelect>
+     </label>
+     <label>分类核验依据
+      <RareTextarea aria-label="文控分类核验依据" value={classReason} rows={2} disabled={busy}
+       onChange={e=>setClassReason(e.target.value)}
+       placeholder="说明原始制度、文控台账、适用文件类别和核对事实（至少 16 字）"/>
+     </label>
+     <RareButton type="button" loading={busy} disabled={busy||Array.from(classReason.trim()).length<16}
+      onClick={()=>void classify()}>文控确认文件类别</RareButton>
+    </>}
+   </section>}
    {qms&&<>
     <RareNotice tone="info">质量体系审批必须使用已生效的受控文件作为制度依据。此项只能证明文件来源可追溯，实际签批资格仍须文控按制度核实。</RareNotice>
     <label>检索当前有效的制度依据

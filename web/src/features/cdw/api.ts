@@ -80,6 +80,7 @@ export type CDWReadingConfirmation={
  artifactSha256:string;state:"confirmed";confirmedAt:string;
 };
 export type CDWFormalReady={deliveryId:string;taskId:string;fileId:string;fileName:string;sha256:string};
+export type CDWDocumentClassification={fileId:string;approvalClass:"pending"|"general"|"qms";requiresQms:boolean;reason?:string;classifiedBy?:string;roleBindingId?:string};
 export type CDWFormalApproval={
  id:string;subjectId:string;deliveryId:string;fileId:string;fileName?:string;
  sha256:string;templateVersionId:string;state:"pending"|"approved"|"rejected"|"cancelled"|"conflicted";
@@ -243,6 +244,10 @@ export const cdwApi={
  controlPrepare:(candidateId:string,revisionLabel:string,plannedEffectiveAt:string|undefined,key:string)=>
   request<CDWControlledRelease>("/workbench/controlled/releases",mutate(key,{candidateId,revisionLabel,...(plannedEffectiveAt?{plannedEffectiveAt}:{})})),
  formalReady:()=>request<{items:CDWFormalReady[]}>("/workbench/formal-approvals/ready",{cache:"no-store"}),
+ formalClass:(fileId:string)=>request<CDWDocumentClassification>(
+  "/workbench/formal-documents/"+segment(fileId)+"/classification",{cache:"no-store"}),
+ formalClassify:(fileId:string,approvalClass:"general"|"qms",reason:string,key:string)=>request<CDWDocumentClassification>(
+  "/workbench/formal-documents/"+segment(fileId)+"/classification",mutate(key,{approvalClass,reason})),
  formalInbox:(limit=100)=>request<{items:CDWFormalApproval[]}>(
   "/workbench/formal-approvals/inbox?limit="+limit,{cache:"no-store"}),
  formalDetail:(id:string)=>request<CDWFormalDetail>("/workbench/formal-approvals/"+segment(id),{cache:"no-store"}),

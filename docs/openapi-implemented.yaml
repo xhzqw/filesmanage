@@ -1833,6 +1833,153 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/formal-documents/{fileId}/classification:
+    get:
+      summary: Read server-owned formal approval class for the selected file
+      operationId: cdwFormalDocumentClass
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: fileId
+        in: path
+        required: true
+        description: File ID.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Server-derived class, not a client-supplied toggle.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      fileId:
+                        type: string
+                      approvalClass:
+                        type: string
+                        enum:
+                        - pending
+                        - general
+                        - qms
+                      requiresQms:
+                        type: boolean
+                      reason:
+                        type: string
+                      classifiedBy:
+                        type: string
+                      roleBindingId:
+                        type: string
+                    required:
+                    - fileId
+                    - approvalClass
+                    - requiresQms
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      summary: Record immutable document-control classification before formal approval
+      operationId: cdwFormalDocumentClassify
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: fileId
+        in: path
+        required: true
+        description: File ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                approvalClass:
+                  type: string
+                  enum:
+                  - general
+                  - qms
+                reason:
+                  type: string
+              required:
+              - approvalClass
+              - reason
+      responses:
+        '200':
+          description: Document-control role required, auditable, cannot downgrade QMS.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      fileId:
+                        type: string
+                      approvalClass:
+                        type: string
+                        enum:
+                        - pending
+                        - general
+                        - qms
+                      requiresQms:
+                        type: boolean
+                      reason:
+                        type: string
+                      classifiedBy:
+                        type: string
+                      roleBindingId:
+                        type: string
+                    required:
+                    - fileId
+                    - approvalClass
+                    - requiresQms
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/formal-templates:
     post:
       summary: Publish immutable versioned formal approval template
@@ -1874,6 +2021,9 @@ paths:
                     - nodeKey
                     - sequence
                     - approverId
+                authorityBasisReleaseId:
+                  type: string
+                  description: Mandatory for a QMS template; must reference current effective CDW policy release.
               required:
               - templateKey
               - steps
@@ -1938,6 +2088,9 @@ paths:
                   type: string
                 fileId:
                   type: string
+                authorityBasisReleaseId:
+                  type: string
+                  description: QMS formal approver evidence must match the template policy release.
               required:
               - userId
               - fileId

@@ -16,4 +16,5 @@ var (
 	ErrMoveConflict           = errors.New("move target conflicts with the current location")
 	ErrConflict               = errors.New("conflicting state")
 	ErrPolicyAuthorityPending = errors.New("formal QMS policy authority basis is pending verification")
+	ErrDocumentClassPending   = errors.New("formal document classification must be verified by document control")
 )

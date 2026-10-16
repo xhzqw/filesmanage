@@ -30,22 +30,25 @@ func (r *Repository) cdwQMSPolicyEffective(ctx context.Context, basisID string) 
 // Approved candidates do not carry a permanent policy waiver: a QMS policy
 // that was effective during signing can be revoked before issue or activation.
 func (r *Repository) cdwQMSCandidatePolicyCurrent(ctx context.Context, candidateID string) (bool, error) {
-	var templateKey, policyBasisID string
-	err := r.Q.QueryRow(ctx, `SELECT tv.template_key,COALESCE(tv.authority_basis_release_id,'')
+	var templateKey, policyBasisID, fileID string
+	err := r.Q.QueryRow(ctx, `SELECT tv.template_key,COALESCE(tv.authority_basis_release_id,''),c.file_id
  FROM cdw_approved_candidates c
  JOIN cdw_formal_approval_instances fa ON fa.id=c.approval_instance_id
  JOIN cdw_workflow_template_versions tv ON tv.id=fa.template_version_id
- WHERE c.id=$1`, candidateID).Scan(&templateKey, &policyBasisID)
+ WHERE c.id=$1`, candidateID).Scan(&templateKey, &policyBasisID, &fileID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, domain.ErrNotFound
 	}
 	if err != nil {
 		return false, err
 	}
-	if !cdwIsQMSFormalTemplate(templateKey) {
-		return true, nil
+	if err = r.cdwFormalValidateClass(ctx, fileID, templateKey, policyBasisID); err != nil {
+		if errors.Is(err, domain.ErrDocumentClassPending) || errors.Is(err, domain.ErrPolicyAuthorityPending) {
+			return false, nil
+		}
+		return false, err
 	}
-	return r.cdwQMSPolicyEffective(ctx, policyBasisID)
+	return true, nil
 }
 
 // The binding is checked again while deciding, not just when a step is assigned.
@@ -94,6 +97,16 @@ func (r *Repository) CDWPublishFormalTemplate(ctx context.Context, id, key strin
 	return id, err
 }
 func (r *Repository) CDWGrantFormalApprover(ctx context.Context, id, userID, fileID, actor, policyBasisID string) (string, error) {
+	classification, err := r.CDWFormalClass(ctx, fileID)
+	if err != nil {
+		return "", err
+	}
+	if (classification.ApprovalClass == "qms" || classification.RequiresQMS) && policyBasisID == "" {
+		return "", domain.ErrPolicyAuthorityPending
+	}
+	if classification.ApprovalClass == "general" && policyBasisID != "" {
+		return "", domain.ErrDocumentClassPending
+	}
 	if policyBasisID != "" {
 		active, err := r.cdwQMSPolicyEffective(ctx, policyBasisID)
 		if err != nil {
@@ -108,7 +121,7 @@ func (r *Repository) CDWGrantFormalApprover(ctx context.Context, id, userID, fil
 		return "", err
 	}
 	var existing string
-	err := r.Q.QueryRow(ctx, `SELECT id FROM cdw_business_role_bindings
+	err = r.Q.QueryRow(ctx, `SELECT id FROM cdw_business_role_bindings
  WHERE user_id=$1 AND role='formal_approver' AND file_id=$2
  AND authority_basis_release_id IS NOT DISTINCT FROM NULLIF($3,'')
  AND revoked_at IS NULL AND valid_from<=now()
@@ -204,14 +217,8 @@ func (r *Repository) CDWStartFormalApproval(ctx context.Context, id, subjectID, 
 	if err != nil {
 		return result, err
 	}
-	if cdwIsQMSFormalTemplate(templateKey) {
-		active, checkErr := r.cdwQMSPolicyEffective(ctx, policyBasisID)
-		if checkErr != nil {
-			return result, checkErr
-		}
-		if !active {
-			return result, domain.ErrPolicyAuthorityPending
-		}
+	if err = r.cdwFormalValidateClass(ctx, fileID, templateKey, policyBasisID); err != nil {
+		return result, err
 	}
 	var template struct {
 		Steps []ports.CDWFormalStepDefinition `json:"steps"`
@@ -295,14 +302,8 @@ func (r *Repository) CDWDecideFormalApproval(ctx context.Context, id, actor, dec
 	if actor == requester {
 		return result, domain.ErrForbidden
 	}
-	if cdwIsQMSFormalTemplate(templateKey) {
-		active, checkErr := r.cdwQMSPolicyEffective(ctx, policyBasisID)
-		if checkErr != nil {
-			return result, checkErr
-		}
-		if !active {
-			return result, domain.ErrPolicyAuthorityPending
-		}
+	if err = r.cdwFormalValidateClass(ctx, fileID, templateKey, policyBasisID); err != nil {
+		return result, err
 	}
 	binding, err := r.cdwFormalAuthority(ctx, actor, fileID, policyBasisID)
 	if err != nil {

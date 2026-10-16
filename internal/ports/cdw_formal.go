@@ -50,8 +50,19 @@ type CDWFormalReadyDelivery struct {
 	SHA256     string `json:"sha256"`
 }
 
+type CDWDocumentClassification struct {
+	FileID        string `json:"fileId"`
+	ApprovalClass string `json:"approvalClass"`
+	RequiresQMS   bool   `json:"requiresQms"`
+	Reason        string `json:"reason,omitempty"`
+	ClassifiedBy  string `json:"classifiedBy,omitempty"`
+	RoleBindingID string `json:"roleBindingId,omitempty"`
+}
+
 // All mutations run inside the caller's UnitOfWork transaction.
 type CDWFormalStore interface {
+	CDWFormalClass(context.Context, string) (CDWDocumentClassification, error)
+	CDWFormalClassify(context.Context, string, string, string, string) (CDWDocumentClassification, error)
 	CDWPublishFormalTemplate(context.Context, string, string, []CDWFormalStepDefinition, string, string) (string, error)
 	CDWGrantFormalApprover(context.Context, string, string, string, string, string) (string, error)
 	CDWFormalDeliveryFile(context.Context, string) (string, error)

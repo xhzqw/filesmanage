@@ -895,15 +895,35 @@ CDW_FORMAL_APPROVAL = obj({
 CDW_FORMAL_CREATED = obj({"id":string()},required=["id"])
 CDW_FORMAL_READY = obj({"deliveryId":string(),"taskId":string(),"fileId":string(),
  "fileName":string(),"sha256":string()},required=["deliveryId","taskId","fileId","fileName","sha256"])
+CDW_DOCUMENT_CLASS = obj({
+ "fileId":string(),"approvalClass":string(enum=["pending","general","qms"]),
+ "requiresQms":boolean(),"reason":string(),"classifiedBy":string(),"roleBindingId":string(),
+},required=["fileId","approvalClass","requiresQms"])
+add("GET","/api/workbench/formal-documents/{fileId}/classification",operation(
+ "Read server-owned formal approval class for the selected file","CDW","cdwFormalDocumentClass",
+ security=SESSION,params=[id_param("fileId","File ID.")],
+ responses=dict([json_ok(CDW_DOCUMENT_CLASS,"Server-derived class, not a client-supplied toggle."),
+ resp("403",ERR["403"])])))
+add("POST","/api/workbench/formal-documents/{fileId}/classification",operation(
+ "Record immutable document-control classification before formal approval","CDW","cdwFormalDocumentClassify",
+ security=SESSION,params=[id_param("fileId","File ID."),CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({"approvalClass":string(enum=["general","qms"]),
+  "reason":string()},required=["approvalClass","reason"])}},
+ responses=dict([json_ok(CDW_DOCUMENT_CLASS,"Document-control role required, auditable, cannot downgrade QMS."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
 add("POST","/api/workbench/formal-templates",operation(
  "Publish immutable versioned formal approval template","CDW","cdwFormalTemplatePublish",
  security=SESSION,params=[CDW_IDEMPOTENCY],
- request={"application/json":{"schema":obj({"templateKey":string(),"steps":arr(CDW_FORMAL_STEP)},required=["templateKey","steps"])}},
+ request={"application/json":{"schema":obj({"templateKey":string(),"steps":arr(CDW_FORMAL_STEP),
+ "authorityBasisReleaseId":string("Mandatory for a QMS template; must reference current effective CDW policy release.")},
+ required=["templateKey","steps"])}},
  responses=dict([json_ok(CDW_FORMAL_CREATED,"Published version ID; administrator only."),resp("403",ERR["403"]),resp("409",ERR["409"])])))
 add("POST","/api/workbench/formal-roles",operation(
  "Grant file-scoped formal approver role; does not issue or activate a document","CDW","cdwFormalRoleGrant",
  security=SESSION,params=[CDW_IDEMPOTENCY],
- request={"application/json":{"schema":obj({"userId":string(),"fileId":string()},required=["userId","fileId"])}},
+ request={"application/json":{"schema":obj({"userId":string(),"fileId":string(),
+ "authorityBasisReleaseId":string("QMS formal approver evidence must match the template policy release.")},
+ required=["userId","fileId"])}},
  responses=dict([json_ok(CDW_FORMAL_CREATED,"Role binding ID; administrator only."),resp("403",ERR["403"])])))
 add("POST","/api/workbench/formal-approvals",operation(
  "Freeze accepted root delivery as separate formal approval subject","CDW","cdwFormalCreate",

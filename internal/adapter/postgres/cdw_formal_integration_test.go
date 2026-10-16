@@ -126,6 +126,33 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A valid generic template and an administrator's approver grants are NOT
+	// sufficient to approve a file with no documented classification.
+	classification, e := service.CDWDocumentClass(ctx, admin, fileID)
+	if e != nil || classification.ApprovalClass != "pending" {
+		t.Fatalf("unclassified file erroneously recognized %+v %v", classification, e)
+	}
+	if _, e = service.CDWStartFormalApproval(ctx, admin, application.CDWFormalStartInput{
+		DeliveryID: frozen.DeliveryID, TemplateVersionID: tpl.ID}, prefix+"_unclassified_start"); !errors.Is(e, domain.ErrDocumentClassPending) {
+		t.Fatalf("generic formal approval bypassed pending document class: %v", e)
+	}
+	if _, e = service.CDWClassifyDocument(ctx, bob, fileID, application.CDWDocumentClassInput{
+		ApprovalClass: "general", Reason: "非质量受控文件，依据项目任务范围核对登记为普通行政交付文档。"}, prefix+"_unauthorized_class"); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("non-document-controller classified formal file: %v", e)
+	}
+	if _, e = service.CDWControlGrantRole(ctx, admin, application.CDWControlRoleInput{
+		UserID: charlie.ID, FileID: fileID}, prefix+"_class_document_control"); e != nil {
+		t.Fatalf("designate fixture document control: %v", e)
+	}
+	classification, e = service.CDWClassifyDocument(ctx, charlie, fileID, application.CDWDocumentClassInput{
+		ApprovalClass: "general", Reason: "本例为演示用普通交付文件，并非质量体系受控原件，文控核对后归类。"}, prefix+"_class_general")
+	if e != nil || classification.ApprovalClass != "general" || classification.ClassifiedBy != charlie.ID {
+		t.Fatalf("document-controlled classification failed %+v %v", classification, e)
+	}
+	if _, e = service.CDWClassifyDocument(ctx, charlie, fileID, application.CDWDocumentClassInput{
+		ApprovalClass: "qms", Reason: "尝试事后无凭证修改已确认文件类别，不应允许更改历史正式分类。"}, prefix+"_class_escalate"); !errors.Is(e, domain.ErrConflict) {
+		t.Fatalf("existing formal document class was overwritten: %v", e)
+	}
 	submit := application.CDWFormalStartInput{DeliveryID: frozen.DeliveryID, TemplateVersionID: tpl.ID}
 	started, err := service.CDWStartFormalApproval(ctx, admin, submit, prefix+"_g7start")
 	if err != nil || started.SHA256 != sha || started.State != "pending" {
@@ -853,7 +880,69 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 		qmsSteps, admin.ID, issued.ID); checkErr != nil {
 		t.Fatalf("QMS template could not bind effective controlled source: %v", checkErr)
 	}
-	if _, checkErr := fixtureReader.CDWGrantFormalApprover(ctx, prefix+"_qms_role", bob.ID, fileID,
+	if _, checkErr := fixtureReader.CDWGrantFormalApprover(ctx, prefix+"_qms_wrong_general_role", bob.ID, fileID,
+		admin.ID, issued.ID); !errors.Is(checkErr, domain.ErrDocumentClassPending) {
+		t.Fatalf("general classified document incorrectly got a QMS approver: %v", checkErr)
+	}
+	qmsFileID := prefix + "_qms_controlled_subject"
+	if _, checkErr := readFixtureTx.Exec(ctx, `INSERT INTO files(id,folder_id,name,uploaded_by)
+ SELECT $1,folder_id,'ZS-QP-99 测试隔离质量控制程序.doc', $2 FROM files WHERE id=$3`,
+		qmsFileID, admin.ID, fileID); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	if _, checkErr := readFixtureTx.Exec(ctx, `INSERT INTO cdw_business_role_bindings
+ (id,user_id,role,file_id,granted_by) VALUES($1,$2,'document_control',$3,$4)`,
+		prefix+"_qms_class_officer", charlie.ID, qmsFileID, admin.ID); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	if info, checkErr := fixtureReader.CDWFormalClass(ctx, qmsFileID); checkErr != nil ||
+		info.ApprovalClass != "pending" || !info.RequiresQMS {
+		t.Fatalf("source document title must force quality route: %+v %v", info, checkErr)
+	}
+	if _, checkErr := fixtureReader.CDWFormalClassify(ctx, qmsFileID, "general",
+		"此文件为质量管理受控程序，任何错误归类普通文件的尝试均应被系统拒绝。", charlie.ID); !errors.Is(checkErr, domain.ErrDocumentClassPending) {
+		t.Fatalf("QMS controlled source was misclassified general: %v", checkErr)
+	}
+	if info, checkErr := fixtureReader.CDWFormalClassify(ctx, qmsFileID, "qms",
+		"依据原始质量控制程序编号、文控台账及受控制度适用性核定为质量体系文件。", charlie.ID); checkErr != nil || info.ApprovalClass != "qms" {
+		t.Fatalf("document-control QMS registration rejected: %+v %v", info, checkErr)
+	}
+	if checkErr := fixtureReader.cdwFormalValidateClass(ctx, qmsFileID, "cdw-formal-generic", ""); !errors.Is(checkErr, domain.ErrDocumentClassPending) {
+		t.Fatalf("generic template accepted a formally classified QMS file: %v", checkErr)
+	}
+	if checkErr := fixtureReader.cdwFormalValidateClass(ctx, qmsFileID, "qms_verified", issued.ID); checkErr != nil {
+		t.Fatalf("valid QMS source and policy rejected: %v", checkErr)
+	}
+	// Database-level boundary: even privileged direct DML must not downgrade a
+	// registered quality file or attach a generic approval without quality
+	// policy evidence.
+	if _, checkErr := readFixtureTx.Exec(ctx, "SAVEPOINT cdw_qms_class_immutable"); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	if _, checkErr := readFixtureTx.Exec(ctx, `UPDATE cdw_document_profiles SET approval_class='general' WHERE file_id=$1`, qmsFileID); checkErr == nil {
+		t.Fatal("database allowed downgrading a classified QMS document")
+	}
+	if _, checkErr := readFixtureTx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_qms_class_immutable"); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	qmsSubjectID := prefix + "_qms_direct_subject"
+	if _, checkErr := readFixtureTx.Exec(ctx, `INSERT INTO cdw_approval_subjects
+ (id,file_id,source_kind,blob_id,sha256,size_bytes,frozen_by)
+ VALUES($1,$2,'existing_version',$3,$4,31,$5)`, qmsSubjectID, qmsFileID, blobID, sha, admin.ID); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	if _, checkErr := readFixtureTx.Exec(ctx, "SAVEPOINT cdw_qms_generic_bypass"); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	if _, checkErr := readFixtureTx.Exec(ctx, `INSERT INTO cdw_formal_approval_instances
+ (id,subject_id,template_version_id,state,requested_by)
+ VALUES($1,$2,$3,'pending',$4)`, prefix+"_qms_bypass_attempt", qmsSubjectID, tpl.ID, admin.ID); checkErr == nil {
+		t.Fatal("database allowed bypassing QMS control by selecting generic template")
+	}
+	if _, checkErr := readFixtureTx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_qms_generic_bypass"); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	if _, checkErr := fixtureReader.CDWGrantFormalApprover(ctx, prefix+"_qms_role", bob.ID, qmsFileID,
 		admin.ID, issued.ID); checkErr != nil {
 		t.Fatalf("QMS role could not bind effective controlled source: %v", checkErr)
 	}
