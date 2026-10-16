@@ -23,3 +23,11 @@
 ## 验收目标
 
 `0059_cdw_formal_document_classification.sql` 需经过隔离 PG17 迁移；`TestCDWTaskPostgresTransactions` 验证未知类别阻断、普通文件文控归类、无权分类拒绝、QMS 文号不能普通归类、QMS 非法模板拒绝、数据库反绕过、制度依据失效阻断及 G2–G9 主线无回退。浏览器脚本验证无需用户手动切换审批类型及不同工作区宽度。
+
+## 2026-10-16 实际验证结果
+
+- Git：`20cba55`。在隔离库 `cdw_g2_tasks_iso_20261015` 成功应用 `0059`，PostgreSQL 事务测试 `TestCDWTaskPostgresTransactions` 通过，包括 QMS 正反例及 G2–G9 主线。
+- 远端 Go 定向测试、构建、静态分析通过，前端 `tsc --noEmit` 与 Vite 生产构建通过。OpenAPI 生成器核验 **197 paths / 232 operations**，接受矩阵与架构检查通过。
+- 18091 开发数据库校验此前 60 项迁移并正式应用 `0059`，显示 `MIGRATIONS_OK 61`；开发 server/worker 已重启并报告 `health/ready OK`。
+- 真实 Chrome 只读浏览器脚本通过 1440、1024、780 宽度和正式审批等业务入口，`CDW_QMS_CLASSIFICATION_BROWSER_PASS` 核验“发起者不能选择通用/QMS 路由”。
+- 所有隔离用文控归类、非法数据库操作和模拟生效版本均未写入真实业务库。此验证**不代表**岗位任命或法定资格已完成实质合规认可。
