@@ -155,7 +155,7 @@ func (s *Service) Preview(ctx context.Context, u domain.User, fileID string) (Pr
 	if err != nil {
 		return Preview{}, err
 	}
-	file, blob, _, err = s.resolveUserFacingVersion(ctx, tx, file)
+	file, blob, _, err := s.resolveUserFacingVersion(ctx, tx, file)
 	if err != nil {
 		return Preview{}, err
 	}
