@@ -32,7 +32,8 @@ func (h *Handler) cdwQMSSpecialReview(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if c.Param("action") != "verify" && c.Param("action") != "revoke" {
+	if c.Param("action") != "verify" && c.Param("action") != "revoke" &&
+		c.Param("action") != "return" && c.Param("action") != "reject" {
 		c.JSON(http.StatusNotFound, gin.H{"ok": false, "error": gin.H{"code": "E_NOT_FOUND"}})
 		return
 	}
@@ -45,7 +46,7 @@ func (h *Handler) cdwQMSSpecialReview(c *gin.Context) {
 		return
 	}
 	out, err := h.S.CDWQMSSpecialReview(c.Request.Context(), actor, c.Param("id"), input,
-		c.Param("action") == "revoke", key)
+		c.Param("action"), key)
 	if err != nil {
 		cdwError(c, err)
 		return
@@ -65,4 +66,34 @@ func (h *Handler) cdwQMSSpecialList(c *gin.Context) {
 	}
 	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, gin.H{"ok": true, "data": gin.H{"items": items}})
+}
+func (h *Handler) cdwQMSSpecialAlerts(c *gin.Context) {
+	actor, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	items, err := h.S.CDWQMSSpecialAlerts(c.Request.Context(), actor)
+	if err != nil {
+		cdwError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, gin.H{"ok": true, "data": gin.H{"items": items}})
+}
+func (h *Handler) cdwQMSSpecialReadAlert(c *gin.Context) {
+	actor, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	key, ok := cdwKey(c)
+	if !ok {
+		return
+	}
+	out, err := h.S.CDWQMSSpecialReadAlert(c.Request.Context(), actor, c.Param("id"), key)
+	if err != nil {
+		cdwError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, gin.H{"ok": true, "data": out})
 }

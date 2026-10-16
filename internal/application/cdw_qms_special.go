@@ -10,11 +10,12 @@ import (
 )
 
 type CDWQMSSpecialInput struct {
-	FileID            string `json:"fileId"`
-	Kind              string `json:"kind"`
-	TemplateVersionID string `json:"templateVersionId"`
-	PolicyReleaseID   string `json:"policyReleaseId"`
-	Reason            string `json:"reason"`
+	FileID            string                         `json:"fileId"`
+	Kind              string                         `json:"kind"`
+	TemplateVersionID string                         `json:"templateVersionId"`
+	PolicyReleaseID   string                         `json:"policyReleaseId"`
+	Reason            string                         `json:"reason"`
+	NodeClaims        []ports.CDWQMSSpecialNodeClaim `json:"nodeClaims"`
 }
 type CDWQMSSpecialReviewInput struct {
 	Statement string `json:"statement"`
@@ -29,8 +30,15 @@ func (s *Service) CDWQMSSpecialPropose(ctx context.Context, actor domain.User, i
 	if input.FileID == "" || (input.Kind != "dhf" && input.Kind != "dmr") ||
 		input.TemplateVersionID == "" || input.PolicyReleaseID == "" ||
 		!utf8.ValidString(input.Reason) || utf8.RuneCountInString(input.Reason) < 16 ||
-		utf8.RuneCountInString(input.Reason) > 2000 {
+		utf8.RuneCountInString(input.Reason) > 2000 || len(input.NodeClaims) < 1 || len(input.NodeClaims) > 30 {
 		return out, domain.ErrInvalidInput
+	}
+	for _, c := range input.NodeClaims {
+		if c.NodeKey == "" || strings.TrimSpace(c.NodeKey) != c.NodeKey ||
+			utf8.RuneCountInString(c.ClauseRef) < 2 || utf8.RuneCountInString(c.ClauseRef) > 200 ||
+			utf8.RuneCountInString(c.BasisSummary) < 8 || utf8.RuneCountInString(c.BasisSummary) > 1000 {
+			return out, domain.ErrInvalidInput
+		}
 	}
 	id := NewID("cdwqmsspecial")
 	raw, err := s.cdwFormalMutate(ctx, actor, "qms.special.propose", key,
@@ -50,7 +58,7 @@ func (s *Service) CDWQMSSpecialPropose(ctx context.Context, actor domain.User, i
 				}
 			}
 			return store.CDWQMSSpecialPropose(ctx, id, input.FileID, input.Kind, input.TemplateVersionID,
-				input.PolicyReleaseID, actor.ID, input.Reason)
+				input.PolicyReleaseID, actor.ID, input.Reason, input.NodeClaims)
 		})
 	if err != nil {
 		return out, err
@@ -59,17 +67,17 @@ func (s *Service) CDWQMSSpecialPropose(ctx context.Context, actor domain.User, i
 	return out, err
 }
 
-func (s *Service) CDWQMSSpecialReview(ctx context.Context, actor domain.User, id string, input CDWQMSSpecialReviewInput, revoke bool, key string) (ports.CDWQMSSpecialAuthority, error) {
+func (s *Service) CDWQMSSpecialReview(ctx context.Context, actor domain.User, id string, input CDWQMSSpecialReviewInput, action, key string) (ports.CDWQMSSpecialAuthority, error) {
 	var out ports.CDWQMSSpecialAuthority
 	input.Statement = strings.TrimSpace(input.Statement)
 	if id == "" || !utf8.ValidString(input.Statement) || utf8.RuneCountInString(input.Statement) < 16 ||
 		utf8.RuneCountInString(input.Statement) > 2000 {
 		return out, domain.ErrInvalidInput
 	}
-	op := "qms.special.verify"
-	if revoke {
-		op = "qms.special.revoke"
+	if action != "verify" && action != "revoke" && action != "return" && action != "reject" {
+		return out, domain.ErrInvalidInput
 	}
+	op := "qms.special." + action
 	raw, err := s.cdwFormalMutate(ctx, actor, op, key,
 		cdwCommandHash(op, id, input), id, 200,
 		func(tx ports.Tx, store ports.CDWFormalStore) (any, error) {
@@ -82,7 +90,56 @@ func (s *Service) CDWQMSSpecialReview(ctx context.Context, actor domain.User, id
 					return nil, e
 				}
 			}
-			return store.CDWQMSSpecialReview(ctx, id, actor.ID, input.Statement, revoke)
+			return store.CDWQMSSpecialReview(ctx, id, actor.ID, input.Statement, action)
+		})
+	if err != nil {
+		return out, err
+	}
+	err = json.Unmarshal(raw, &out)
+	return out, err
+}
+
+func (s *Service) CDWQMSSpecialAlerts(ctx context.Context, actor domain.User) ([]ports.CDWQMSSpecialAlert, error) {
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	store, ok := tx.(ports.CDWFormalStore)
+	if !ok {
+		return nil, domain.ErrInvalidInput
+	}
+	items, err := store.CDWQMSSpecialAlerts(ctx, actor.ID, 100)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ports.CDWQMSSpecialAlert, 0, len(items))
+	for _, item := range items {
+		if _, e := s.visibleFile(ctx, tx, actor, item.FileID, domain.ActionPreview); e == nil {
+			out = append(out, item)
+		}
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+	}
+	return out, nil
+}
+func (s *Service) CDWQMSSpecialReadAlert(ctx context.Context, actor domain.User, id, key string) (CDWQMSAlertReceipt, error) {
+	var out CDWQMSAlertReceipt
+	if id == "" {
+		return out, domain.ErrInvalidInput
+	}
+	raw, err := s.cdwFormalMutate(ctx, actor, "qms.special.alert.read", key,
+		cdwCommandHash("qms.special.alert.read", id, id), id, 200,
+		func(_ ports.Tx, store ports.CDWFormalStore) (any, error) {
+			ok, e := store.CDWQMSSpecialReadAlert(ctx, id, actor.ID)
+			if e != nil {
+				return nil, e
+			}
+			if !ok {
+				return nil, domain.ErrNotFound
+			}
+			return CDWQMSAlertReceipt{ID: id, Read: true}, nil
 		})
 	if err != nil {
 		return out, err

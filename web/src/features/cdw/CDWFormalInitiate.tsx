@@ -235,7 +235,9 @@ export function CDWFormalInitiate({onCreated,loadUsers,actorId}:{onCreated:()=>v
    <h3>3. 冻结并提交正式审批</h3>
    {qms&&specialKind&&templateId&&basisReleaseId&&selected&&
     <CDWQMSSpecialAuthorityPanel actorId={actorId}
-     scope={{fileId:selected.fileId,kind:specialKind,templateVersionId:templateId,policyReleaseId:basisReleaseId}}/>}
+     scope={{fileId:selected.fileId,kind:specialKind,templateVersionId:templateId,policyReleaseId:basisReleaseId,
+      nodes:[{nodeKey:position1,label:signerPositions.find(p=>p.value===position1)?.label||position1},
+       {nodeKey:position2,label:signerPositions.find(p=>p.value===position2)?.label||position2}]}}/>}
    {qms&&specialKind&&<RareNotice tone="warning">DHF/DMR 正式审批会在服务器再次核对专用受控规定、独立文控核验和逐节点岗位任命。登记后若仍待复核，提交会被拒绝。</RareNotice>}
    <p className="cdw-section-note">仅生成正式审批实例，待全部必需节点同意后生成已批准候选版本；不会自动分发或生效。</p>
    <RareButton type="button" tone="primary" loading={busy} disabled={!templateId||busy} onClick={()=>void submit()}>确认提交正式审批</RareButton>

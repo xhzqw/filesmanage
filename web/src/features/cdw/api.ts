@@ -87,9 +87,12 @@ export type CDWQMSAppointmentInput={fileId:string;userId:string;nodeKey:string;p
 export type CDWQMSAppointmentAlert={id:string;appointmentId:string;fileId:string;nodeKey:string;createdAt:string;readAt?:string};
 export type CDWQMSSpecialAuthority={
  id:string;fileId:string;fileName:string;kind:"dhf"|"dmr";templateVersionId:string;
- policyReleaseId:string;policyFileId:string;policyName:string;status:"pending"|"verified"|"revoked";
+ policyReleaseId:string;policyFileId:string;policyName:string;status:"pending"|"verified"|"revoked"|"returned"|"rejected";
  reason:string;proposedBy:string;verifiedBy?:string;verificationStatement?:string;
+ reviewedBy?:string;reviewReason?:string;
+ nodeClaims:Array<{nodeKey:string;clauseRef:string;basisSummary:string}>;
 };
+export type CDWQMSSpecialAlert={id:string;authorityId:string;fileId:string;kind:"dhf"|"dmr";eventKind:"returned"|"rejected"|"revoked";createdAt:string;readAt?:string};
 export type CDWFormalApproval={
  id:string;subjectId:string;deliveryId:string;fileId:string;fileName?:string;
  sha256:string;templateVersionId:string;state:"pending"|"approved"|"rejected"|"cancelled"|"conflicted";
@@ -273,11 +276,14 @@ export const cdwApi={
   "/workbench/qms-appointment-alerts/"+segment(id)+"/read",mutate(key,{})),
  qmsSpecialList:()=>request<{items:CDWQMSSpecialAuthority[]}>(
   "/workbench/qms-special-authorities",{cache:"no-store"}),
- qmsSpecialPropose:(input:{fileId:string;kind:"dhf"|"dmr";templateVersionId:string;policyReleaseId:string;reason:string},key:string)=>
+ qmsSpecialPropose:(input:{fileId:string;kind:"dhf"|"dmr";templateVersionId:string;policyReleaseId:string;reason:string;nodeClaims:CDWQMSSpecialAuthority["nodeClaims"]},key:string)=>
   request<CDWQMSSpecialAuthority>("/workbench/qms-special-authorities",mutate(key,input)),
- qmsSpecialReview:(id:string,action:"verify"|"revoke",statement:string,key:string)=>
+ qmsSpecialReview:(id:string,action:"verify"|"revoke"|"return"|"reject",statement:string,key:string)=>
   request<CDWQMSSpecialAuthority>("/workbench/qms-special-authorities/"+segment(id)+"/"+action,
    mutate(key,{statement})),
+ qmsSpecialAlerts:()=>request<{items:CDWQMSSpecialAlert[]}>("/workbench/qms-special-alerts",{cache:"no-store"}),
+ qmsSpecialAlertRead:(id:string,key:string)=>request<{id:string;read:boolean}>(
+  "/workbench/qms-special-alerts/"+segment(id)+"/read",mutate(key,{})),
  formalInbox:(limit=100)=>request<{items:CDWFormalApproval[]}>(
   "/workbench/formal-approvals/inbox?limit="+limit,{cache:"no-store"}),
  formalDetail:(id:string)=>request<CDWFormalDetail>("/workbench/formal-approvals/"+segment(id),{cache:"no-store"}),

@@ -2662,6 +2662,8 @@ paths:
                               - pending
                               - verified
                               - revoked
+                              - returned
+                              - rejected
                             reason:
                               type: string
                             proposedBy:
@@ -2670,6 +2672,25 @@ paths:
                               type: string
                             verificationStatement:
                               type: string
+                            reviewedBy:
+                              type: string
+                            reviewReason:
+                              type: string
+                            nodeClaims:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  nodeKey:
+                                    type: string
+                                  clauseRef:
+                                    type: string
+                                  basisSummary:
+                                    type: string
+                                required:
+                                - nodeKey
+                                - clauseRef
+                                - basisSummary
                           required:
                           - id
                           - fileId
@@ -2682,6 +2703,7 @@ paths:
                           - status
                           - reason
                           - proposedBy
+                          - nodeClaims
                     required:
                     - items
                 required:
@@ -2728,12 +2750,28 @@ paths:
                   type: string
                 reason:
                   type: string
+                nodeClaims:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      nodeKey:
+                        type: string
+                      clauseRef:
+                        type: string
+                      basisSummary:
+                        type: string
+                    required:
+                    - nodeKey
+                    - clauseRef
+                    - basisSummary
               required:
               - fileId
               - kind
               - templateVersionId
               - policyReleaseId
               - reason
+              - nodeClaims
       responses:
         '200':
           description: Pending independent document-control review.
@@ -2774,6 +2812,8 @@ paths:
                         - pending
                         - verified
                         - revoked
+                        - returned
+                        - rejected
                       reason:
                         type: string
                       proposedBy:
@@ -2782,6 +2822,25 @@ paths:
                         type: string
                       verificationStatement:
                         type: string
+                      reviewedBy:
+                        type: string
+                      reviewReason:
+                        type: string
+                      nodeClaims:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            nodeKey:
+                              type: string
+                            clauseRef:
+                              type: string
+                            basisSummary:
+                              type: string
+                          required:
+                          - nodeKey
+                          - clauseRef
+                          - basisSummary
                     required:
                     - id
                     - fileId
@@ -2794,6 +2853,7 @@ paths:
                     - status
                     - reason
                     - proposedBy
+                    - nodeClaims
                 required:
                 - ok
                 - data
@@ -2882,6 +2942,8 @@ paths:
                         - pending
                         - verified
                         - revoked
+                        - returned
+                        - rejected
                       reason:
                         type: string
                       proposedBy:
@@ -2890,6 +2952,25 @@ paths:
                         type: string
                       verificationStatement:
                         type: string
+                      reviewedBy:
+                        type: string
+                      reviewReason:
+                        type: string
+                      nodeClaims:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            nodeKey:
+                              type: string
+                            clauseRef:
+                              type: string
+                            basisSummary:
+                              type: string
+                          required:
+                          - nodeKey
+                          - clauseRef
+                          - basisSummary
                     required:
                     - id
                     - fileId
@@ -2902,6 +2983,267 @@ paths:
                     - status
                     - reason
                     - proposedBy
+                    - nodeClaims
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-special-authorities/{id}/return:
+    post:
+      summary: Return incomplete evidence for a fresh corrected proposal
+      operationId: cdwQMSSpecialReturn
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Dedicated authority record ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                statement:
+                  type: string
+              required:
+              - statement
+      responses:
+        '200':
+          description: Independent, auditable state transition.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      fileId:
+                        type: string
+                      fileName:
+                        type: string
+                      kind:
+                        type: string
+                        enum:
+                        - dhf
+                        - dmr
+                      templateVersionId:
+                        type: string
+                      policyReleaseId:
+                        type: string
+                      policyFileId:
+                        type: string
+                      policyName:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                        - pending
+                        - verified
+                        - revoked
+                        - returned
+                        - rejected
+                      reason:
+                        type: string
+                      proposedBy:
+                        type: string
+                      verifiedBy:
+                        type: string
+                      verificationStatement:
+                        type: string
+                      reviewedBy:
+                        type: string
+                      reviewReason:
+                        type: string
+                      nodeClaims:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            nodeKey:
+                              type: string
+                            clauseRef:
+                              type: string
+                            basisSummary:
+                              type: string
+                          required:
+                          - nodeKey
+                          - clauseRef
+                          - basisSummary
+                    required:
+                    - id
+                    - fileId
+                    - fileName
+                    - kind
+                    - templateVersionId
+                    - policyReleaseId
+                    - policyFileId
+                    - policyName
+                    - status
+                    - reason
+                    - proposedBy
+                    - nodeClaims
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-special-authorities/{id}/reject:
+    post:
+      summary: Reject unsupported dedicated authority claim with reasons
+      operationId: cdwQMSSpecialReject
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Dedicated authority record ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                statement:
+                  type: string
+              required:
+              - statement
+      responses:
+        '200':
+          description: Independent, auditable state transition.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      fileId:
+                        type: string
+                      fileName:
+                        type: string
+                      kind:
+                        type: string
+                        enum:
+                        - dhf
+                        - dmr
+                      templateVersionId:
+                        type: string
+                      policyReleaseId:
+                        type: string
+                      policyFileId:
+                        type: string
+                      policyName:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                        - pending
+                        - verified
+                        - revoked
+                        - returned
+                        - rejected
+                      reason:
+                        type: string
+                      proposedBy:
+                        type: string
+                      verifiedBy:
+                        type: string
+                      verificationStatement:
+                        type: string
+                      reviewedBy:
+                        type: string
+                      reviewReason:
+                        type: string
+                      nodeClaims:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            nodeKey:
+                              type: string
+                            clauseRef:
+                              type: string
+                            basisSummary:
+                              type: string
+                          required:
+                          - nodeKey
+                          - clauseRef
+                          - basisSummary
+                    required:
+                    - id
+                    - fileId
+                    - fileName
+                    - kind
+                    - templateVersionId
+                    - policyReleaseId
+                    - policyFileId
+                    - policyName
+                    - status
+                    - reason
+                    - proposedBy
+                    - nodeClaims
                 required:
                 - ok
                 - data
@@ -2990,6 +3332,8 @@ paths:
                         - pending
                         - verified
                         - revoked
+                        - returned
+                        - rejected
                       reason:
                         type: string
                       proposedBy:
@@ -2998,6 +3342,25 @@ paths:
                         type: string
                       verificationStatement:
                         type: string
+                      reviewedBy:
+                        type: string
+                      reviewReason:
+                        type: string
+                      nodeClaims:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            nodeKey:
+                              type: string
+                            clauseRef:
+                              type: string
+                            basisSummary:
+                              type: string
+                          required:
+                          - nodeKey
+                          - clauseRef
+                          - basisSummary
                     required:
                     - id
                     - fileId
@@ -3010,6 +3373,7 @@ paths:
                     - status
                     - reason
                     - proposedBy
+                    - nodeClaims
                 required:
                 - ok
                 - data
@@ -3021,6 +3385,135 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
         '409':
           description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-special-alerts:
+    get:
+      summary: Recipient-specific returned, rejected, or revoked DHF/DMR authority notifications
+      operationId: cdwQMSSpecialAlerts
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Durable recipient notices; not implicitly read or delivered externally.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            authorityId:
+                              type: string
+                            fileId:
+                              type: string
+                            kind:
+                              type: string
+                              enum:
+                              - dhf
+                              - dmr
+                            eventKind:
+                              type: string
+                              enum:
+                              - returned
+                              - rejected
+                              - revoked
+                            createdAt:
+                              type: string
+                              format: date-time
+                            readAt:
+                              type: string
+                              format: date-time
+                          required:
+                          - id
+                          - authorityId
+                          - fileId
+                          - kind
+                          - eventKind
+                          - createdAt
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-special-alerts/{id}/read:
+    post:
+      summary: Explicitly acknowledge own dedicated policy status notice
+      operationId: cdwQMSSpecialReadAlert
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Dedicated authority notice ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        '200':
+          description: Recipient-specific acknowledged timestamp.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      read:
+                        type: boolean
+                    required:
+                    - id
+                    - read
+                required:
+                - ok
+                - data
+        '404':
+          description: E_NOT_FOUND
           content:
             application/json:
               schema:

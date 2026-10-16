@@ -984,10 +984,13 @@ add("POST","/api/workbench/qms-appointment-alerts/{id}/read",operation(
 CDW_QMS_SPECIAL=obj({
  "id":string(),"fileId":string(),"fileName":string(),"kind":string(enum=["dhf","dmr"]),
  "templateVersionId":string(),"policyReleaseId":string(),"policyFileId":string(),
- "policyName":string(),"status":string(enum=["pending","verified","revoked"]),
- "reason":string(),"proposedBy":string(),"verifiedBy":string(),"verificationStatement":string()},
+ "policyName":string(),"status":string(enum=["pending","verified","revoked","returned","rejected"]),
+ "reason":string(),"proposedBy":string(),"verifiedBy":string(),"verificationStatement":string(),
+ "reviewedBy":string(),"reviewReason":string(),
+ "nodeClaims":arr(obj({"nodeKey":string(),"clauseRef":string(),"basisSummary":string()},
+ required=["nodeKey","clauseRef","basisSummary"]))},
  required=["id","fileId","fileName","kind","templateVersionId","policyReleaseId",
- "policyFileId","policyName","status","reason","proposedBy"])
+ "policyFileId","policyName","status","reason","proposedBy","nodeClaims"])
 add("GET","/api/workbench/qms-special-authorities",operation(
  "Live document-control scope and file-ACL intersected dedicated DHF/DMR authority requests",
  "CDW","cdwQMSSpecialList",security=SESSION,
@@ -999,11 +1002,15 @@ add("POST","/api/workbench/qms-special-authorities",operation(
  "CDW","cdwQMSSpecialPropose",security=SESSION,params=[CDW_IDEMPOTENCY],
  request={"application/json":{"schema":obj({
  "fileId":string(),"kind":string(enum=["dhf","dmr"]),
- "templateVersionId":string(),"policyReleaseId":string(),"reason":string()},
- required=["fileId","kind","templateVersionId","policyReleaseId","reason"])}},
+ "templateVersionId":string(),"policyReleaseId":string(),"reason":string(),
+ "nodeClaims":arr(obj({"nodeKey":string(),"clauseRef":string(),"basisSummary":string()},
+ required=["nodeKey","clauseRef","basisSummary"]))},
+ required=["fileId","kind","templateVersionId","policyReleaseId","reason","nodeClaims"])}},
  responses=dict([json_ok(CDW_QMS_SPECIAL,"Pending independent document-control review."),
  resp("403",ERR["403"]),resp("409",ERR["409"])])))
 for action,label in [("verify","Independently validate the dedicated issued policy"),
+ ("return","Return incomplete evidence for a fresh corrected proposal"),
+ ("reject","Reject unsupported dedicated authority claim with reasons"),
  ("revoke","Withdraw dedicated DHF/DMR policy approval scope")]:
  add("POST",f"/api/workbench/qms-special-authorities/{{id}}/{action}",operation(
   label,"CDW",f"cdwQMSSpecial{action.title()}",security=SESSION,
@@ -1011,6 +1018,24 @@ for action,label in [("verify","Independently validate the dedicated issued poli
   request={"application/json":{"schema":obj({"statement":string()},required=["statement"])}},
   responses=dict([json_ok(CDW_QMS_SPECIAL,"Independent, auditable state transition."),
   resp("403",ERR["403"]),resp("409",ERR["409"])])))
+CDW_QMS_SPECIAL_ALERT=obj({
+ "id":string(),"authorityId":string(),"fileId":string(),
+ "kind":string(enum=["dhf","dmr"]),"eventKind":string(enum=["returned","rejected","revoked"]),
+ "createdAt":timestamp(),"readAt":timestamp()},
+ required=["id","authorityId","fileId","kind","eventKind","createdAt"])
+add("GET","/api/workbench/qms-special-alerts",operation(
+ "Recipient-specific returned, rejected, or revoked DHF/DMR authority notifications",
+ "CDW","cdwQMSSpecialAlerts",security=SESSION,
+ responses=dict([json_ok(obj({"items":arr(CDW_QMS_SPECIAL_ALERT)},required=["items"]),
+ "Durable recipient notices; not implicitly read or delivered externally."),
+ resp("403",ERR["403"])])))
+add("POST","/api/workbench/qms-special-alerts/{id}/read",operation(
+ "Explicitly acknowledge own dedicated policy status notice","CDW",
+ "cdwQMSSpecialReadAlert",security=SESSION,
+ params=[id_param("id","Dedicated authority notice ID."),CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({})}},
+ responses=dict([json_ok(obj({"id":string(),"read":boolean()},required=["id","read"]),
+ "Recipient-specific acknowledged timestamp."),resp("404",ERR["404"])])))
 add("POST","/api/workbench/formal-templates",operation(
  "Publish immutable versioned formal approval template","CDW","cdwFormalTemplatePublish",
  security=SESSION,params=[CDW_IDEMPOTENCY],

@@ -95,27 +95,46 @@ type CDWQMSAppointmentEvidenceSource struct {
 	ReleaseID string
 }
 type CDWQMSSpecialAuthority struct {
-	ID                    string `json:"id"`
-	FileID                string `json:"fileId"`
-	FileName              string `json:"fileName"`
-	Kind                  string `json:"kind"`
-	TemplateVersionID     string `json:"templateVersionId"`
-	PolicyReleaseID       string `json:"policyReleaseId"`
-	PolicyFileID          string `json:"policyFileId"`
-	PolicyName            string `json:"policyName"`
-	Status                string `json:"status"`
-	Reason                string `json:"reason"`
-	ProposedBy            string `json:"proposedBy"`
-	VerifiedBy            string `json:"verifiedBy,omitempty"`
-	VerificationStatement string `json:"verificationStatement,omitempty"`
+	ID                    string                   `json:"id"`
+	FileID                string                   `json:"fileId"`
+	FileName              string                   `json:"fileName"`
+	Kind                  string                   `json:"kind"`
+	TemplateVersionID     string                   `json:"templateVersionId"`
+	PolicyReleaseID       string                   `json:"policyReleaseId"`
+	PolicyFileID          string                   `json:"policyFileId"`
+	PolicyName            string                   `json:"policyName"`
+	Status                string                   `json:"status"`
+	Reason                string                   `json:"reason"`
+	ProposedBy            string                   `json:"proposedBy"`
+	VerifiedBy            string                   `json:"verifiedBy,omitempty"`
+	VerificationStatement string                   `json:"verificationStatement,omitempty"`
+	NodeClaims            []CDWQMSSpecialNodeClaim `json:"nodeClaims"`
+	ReviewedBy            string                   `json:"reviewedBy,omitempty"`
+	ReviewReason          string                   `json:"reviewReason,omitempty"`
+}
+type CDWQMSSpecialNodeClaim struct {
+	NodeKey      string `json:"nodeKey"`
+	ClauseRef    string `json:"clauseRef"`
+	BasisSummary string `json:"basisSummary"`
+}
+type CDWQMSSpecialAlert struct {
+	ID          string  `json:"id"`
+	AuthorityID string  `json:"authorityId"`
+	FileID      string  `json:"fileId"`
+	Kind        string  `json:"kind"`
+	EventKind   string  `json:"eventKind"`
+	CreatedAt   string  `json:"createdAt"`
+	ReadAt      *string `json:"readAt,omitempty"`
 }
 
 // All mutations run inside the caller's UnitOfWork transaction.
 type CDWFormalStore interface {
-	CDWQMSSpecialPropose(context.Context, string, string, string, string, string, string, string) (CDWQMSSpecialAuthority, error)
-	CDWQMSSpecialReview(context.Context, string, string, string, bool) (CDWQMSSpecialAuthority, error)
+	CDWQMSSpecialPropose(context.Context, string, string, string, string, string, string, string, []CDWQMSSpecialNodeClaim) (CDWQMSSpecialAuthority, error)
+	CDWQMSSpecialReview(context.Context, string, string, string, string) (CDWQMSSpecialAuthority, error)
 	CDWQMSSpecialFile(context.Context, string) (string, string, error)
 	CDWQMSSpecialList(context.Context, string, int) ([]CDWQMSSpecialAuthority, error)
+	CDWQMSSpecialAlerts(context.Context, string, int) ([]CDWQMSSpecialAlert, error)
+	CDWQMSSpecialReadAlert(context.Context, string, string) (bool, error)
 	CDWQMSRevokeAppointment(context.Context, string, string, string) (CDWQMSAppointment, error)
 	CDWQMSAppointmentAlerts(context.Context, string, int) ([]CDWQMSAppointmentAlert, error)
 	CDWQMSReadAppointmentAlert(context.Context, string, string) (bool, error)

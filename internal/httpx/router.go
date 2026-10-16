@@ -135,6 +135,8 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.POST("/workbench/qms-appointments/:id/verify", h.cdwQMSVerifyAppointment)
 	api.POST("/workbench/qms-appointments/:id/revoke", h.cdwQMSRevokeAppointment)
 	api.GET("/workbench/qms-special-authorities", h.cdwQMSSpecialList)
+	api.GET("/workbench/qms-special-alerts", h.cdwQMSSpecialAlerts)
+	api.POST("/workbench/qms-special-alerts/:id/read", h.cdwQMSSpecialReadAlert)
 	api.POST("/workbench/qms-special-authorities", h.cdwQMSSpecialPropose)
 	api.POST("/workbench/qms-special-authorities/:id/:action", h.cdwQMSSpecialReview)
 	api.GET("/workbench/qms-appointments/:id/evidence", h.cdwQMSAppointmentEvidence)

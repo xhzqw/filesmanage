@@ -100,18 +100,26 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 		t.Fatalf("DHF approval started without independent policy: %v", err)
 	}
 	recordID := prefix + "_dhf_dedicated_authority"
+	claims := []ports.CDWQMSSpecialNodeClaim{
+		{NodeKey: "management_representative", ClauseRef: "§4.3.2", BasisSummary: "管理者代表核对设计历史文档过程完整性和阶段批准记录"},
+		{NodeKey: "general_manager", ClauseRef: "§4.4.1", BasisSummary: "总经理按公司规定签署设计主文件的最终批准"},
+	}
+	if _, err = r.CDWQMSSpecialPropose(ctx, prefix+"_incomplete_special", subjectFileID, "dhf", tpl,
+		policyRelease, admin.ID, reason, claims[:1]); !errors.Is(err, domain.ErrInvalidInput) {
+		t.Fatalf("incomplete node clause coverage accepted: %v", err)
+	}
 	record, err := r.CDWQMSSpecialPropose(ctx, recordID, subjectFileID, "dhf", tpl,
-		policyRelease, admin.ID, reason)
+		policyRelease, admin.ID, reason, claims)
 	if err != nil || record.Status != "pending" {
 		t.Fatalf("dedicated policy proposal: %+v %v", record, err)
 	}
-	if _, err = r.CDWQMSSpecialReview(ctx, recordID, admin.ID, reason, false); !errors.Is(err, domain.ErrForbidden) {
+	if _, err = r.CDWQMSSpecialReview(ctx, recordID, admin.ID, reason, "verify"); !errors.Is(err, domain.ErrForbidden) {
 		t.Fatalf("self-verified dedicated approval: %v", err)
 	}
-	if _, err = r.CDWQMSSpecialReview(ctx, recordID, bob.ID, reason, false); !errors.Is(err, domain.ErrForbidden) {
+	if _, err = r.CDWQMSSpecialReview(ctx, recordID, bob.ID, reason, "verify"); !errors.Is(err, domain.ErrForbidden) {
 		t.Fatalf("non document-controller verified dedicated approval: %v", err)
 	}
-	record, err = r.CDWQMSSpecialReview(ctx, recordID, charlie.ID, reason, false)
+	record, err = r.CDWQMSSpecialReview(ctx, recordID, charlie.ID, reason, "verify")
 	if err != nil || record.Status != "verified" || record.VerifiedBy != charlie.ID {
 		t.Fatalf("independently verified dedicated authority: %+v %v", record, err)
 	}
@@ -142,12 +150,22 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
  release_id=$2,activated_at=clock_timestamp() WHERE file_id=$1`, policyFile, policyRelease); err != nil {
 		t.Fatal(err)
 	}
-	record, err = r.CDWQMSSpecialReview(ctx, recordID, charlie.ID, reason, true)
+	record, err = r.CDWQMSSpecialReview(ctx, recordID, charlie.ID, reason, "revoke")
 	if err != nil || record.Status != "revoked" {
 		t.Fatalf("dedicated rule revocation failed: %+v %v", record, err)
 	}
 	if err = r.cdwFormalValidateClass(ctx, subjectFileID, tpl, "qms_"+policyTemplate, policyRelease); !errors.Is(err, domain.ErrPolicyAuthorityPending) {
 		t.Fatalf("revoked dedicated policy still signs: %v", err)
+	}
+	alerts, err := r.CDWQMSSpecialAlerts(ctx, bob.ID, 20)
+	if err != nil || len(alerts) != 1 || alerts[0].EventKind != "revoked" {
+		t.Fatalf("template approver did not receive revocation notice: %+v %v", alerts, err)
+	}
+	if seen, err := r.CDWQMSSpecialReadAlert(ctx, alerts[0].ID, charlie.ID); err != nil || seen {
+		t.Fatalf("another recipient acknowledged Bob alert: %t %v", seen, err)
+	}
+	if seen, err := r.CDWQMSSpecialReadAlert(ctx, alerts[0].ID, bob.ID); err != nil || !seen {
+		t.Fatalf("target recipient did not acknowledge: %t %v", seen, err)
 	}
 	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_special_rewrite"); err != nil {
 		t.Fatal(err)
@@ -159,5 +177,32 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_special_rewrite"); err != nil {
 		t.Fatal(err)
 	}
-	t.Log("CDW_QMS_SPECIAL_AUTHORITY_PASS isolated policy source, no-self review, exact template, sticky kind, pointer rotation, irreversible revocation")
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_special_new_review"); err != nil {
+		t.Fatal(err)
+	}
+	for _, action := range []string{"return", "reject"} {
+		newID := prefix + "_special_" + action
+		_, err = r.CDWQMSSpecialPropose(ctx, newID, subjectFileID, "dhf", tpl, policyRelease, admin.ID, reason, claims)
+		if err != nil {
+			t.Fatalf("resubmission after revoked: %v", err)
+		}
+		if _, err = r.CDWQMSSpecialReview(ctx, newID, admin.ID, reason, action); !errors.Is(err, domain.ErrForbidden) {
+			t.Fatalf("proposer self-%s: %v", action, err)
+		}
+		res, err := r.CDWQMSSpecialReview(ctx, newID, charlie.ID, reason, action)
+		if err != nil || res.Status != map[string]string{"return": "returned", "reject": "rejected"}[action] {
+			t.Fatalf("review %s invalid: %+v %v", action, res, err)
+		}
+		if _, err = r.CDWQMSSpecialReview(ctx, newID, charlie.ID, reason, "verify"); !errors.Is(err, domain.ErrConflict) {
+			t.Fatalf("terminal %s got verified: %v", action, err)
+		}
+		messages, e := r.CDWQMSSpecialAlerts(ctx, admin.ID, 30)
+		if e != nil || len(messages) < 1 || messages[0].EventKind != res.Status {
+			t.Fatalf("proposer did not get %s notice %+v %v", action, messages, e)
+		}
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_special_new_review"); err != nil {
+		t.Fatal(err)
+	}
+	t.Log("CDW_QMS_SPECIAL_AUTHORITY_PASS node clauses, return/reject/resubmit, revoked alerts+recipient ACK, exact template, sticky kind, pointer rotation")
 }
