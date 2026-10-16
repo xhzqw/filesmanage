@@ -49,7 +49,8 @@ export function CDWDistributionLedgerPanel({planId}:{planId:string}){
    <div className="cdw-detail-facts">
     <div><span>部门签收</span><strong>{ledger.receiptCompleted} / {ledger.rows.length}</strong></div>
     <div><span>已指定人员阅读</span><strong>{ledger.readingConfirmed} / {ledger.readingAssigned}</strong></div>
-    <div><span>部门阅读名册配置</span><strong>{ledger.rows.filter(row=>row.readingAssigned>0).length} / {ledger.rows.length}</strong></div>
+    <div><span>{ledger.batchState==="withdrawn"?"发行已撤销":"部门阅读名册配置"}</span>
+     <strong>{ledger.batchState==="withdrawn"?"历史留存":ledger.rows.filter(row=>row.readingAssigned>0).length+" / "+ledger.rows.length}</strong></div>
    </div>
    <div className="cdw-review-digest"><small>发行清单 SHA-256</small><code>{ledger.manifestSha256}</code></div>
    <div className="cdw-ledger-tools">

@@ -12,6 +12,12 @@ export type CDWDistributionBatch={
  id:string;planId:string;releaseId:string;fileId:string;
  state:"dispatched";revision:number;digestSha256:string;departmentCount:number;
 };
+export type CDWDistributionWithdrawal={
+ id:string;batchId:string;planId:string;releaseId:string;fileId:string;
+ state:"withdrawn";planRevision:number;manifestSha256:string;
+ revokedGrants:number;cancelledReaders:number;invalidatedTargets:number;
+ actorId:string;reason:string;
+};
 export type CDWDistributionLedgerRow={
  targetId:string;departmentId:string;departmentName:string;
  receiverId:string;receiverName:string;actualSignerId?:string;actualSignerName?:string;
@@ -21,7 +27,7 @@ export type CDWDistributionLedgerRow={
  dueAt?:string;overdue:boolean;exceptionReason?:string;
 };
 export type CDWDistributionLedger={
- planId:string;batchId:string;manifestSha256:string;rows:CDWDistributionLedgerRow[];
+ planId:string;batchId:string;batchState:"dispatched"|"withdrawn";manifestSha256:string;rows:CDWDistributionLedgerRow[];
  receiptCompleted:number;readingAssigned:number;readingConfirmed:number;
 };
 export type CDWReceiptTarget={
@@ -172,6 +178,8 @@ export const cdwApi={
   "/workbench/controlled/releases/"+segment(releaseId)+"/issue",mutate(key,{},revision)),
  distributionDispatch:(planId:string,revision:number,key:string)=>request<CDWDistributionBatch>(
   "/workbench/distribution-plans/"+segment(planId)+"/dispatch",mutate(key,{},revision)),
+ distributionWithdraw:(planId:string,revision:number,reason:string,key:string)=>request<CDWDistributionWithdrawal>(
+  "/workbench/distribution-plans/"+segment(planId)+"/withdraw",mutate(key,{reason},revision)),
  distributionLedger:(planId:string)=>request<CDWDistributionLedger>(
   "/workbench/distribution-plans/"+segment(planId)+"/ledger",{cache:"no-store"}),
  distributionForRelease:(releaseId:string)=>request<CDWDistributionPlan>(

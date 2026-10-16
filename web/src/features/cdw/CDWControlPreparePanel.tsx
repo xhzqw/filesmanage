@@ -124,11 +124,11 @@ export function CDWControlPreparePanel({candidate,user,onPrepared,loadUsers,load
      </span>
      {item.state==="preparing"?<RareButton type="button" tone="neutral" disabled={busy||verifyBusy}
       onClick={()=>openVerify(item.id)}>核验分发稿</RareButton>:
-      (item.state==="ready"||item.state==="issued_pending")?<RareButton type="button" tone="neutral" onClick={()=>setDistributionID(v=>v===item.id?"":item.id)}>
-       {distributionID===item.id?"收起部门范围":"配置部门范围"}</RareButton>:
+      (item.state==="ready"||item.state==="issued_pending"||item.state==="withdrawn")?<RareButton type="button" tone="neutral" onClick={()=>setDistributionID(v=>v===item.id?"":item.id)}>
+       {distributionID===item.id?"收起部门记录":item.state==="withdrawn"?"查看撤销台账":"配置部门范围"}</RareButton>:
       <RareBadge tone={item.state==="effective"?"success":"neutral"}>{item.state==="effective"?"当前生效":item.state}</RareBadge>}
     </div>
-    {distributionID===item.id&&(item.state==="ready"||item.state==="issued_pending")&&
+    {distributionID===item.id&&(item.state==="ready"||item.state==="issued_pending"||item.state==="withdrawn")&&
      <CDWDistributionPlanPanel release={item} loadUsers={loadUsers} loadDepartments={loadDepartments}
       isAdmin={user.isAdmin} currentUserId={user.id} onChanged={refreshHistory}/>}
     {verifyId===item.id&&item.state==="preparing"&&<div className="cdw-review-form">

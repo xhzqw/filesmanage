@@ -566,28 +566,104 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	}
 	// Read-routing fixture only: this directly seeds an isolated test pointer.
 	// It DOES NOT exercise or claim a production activation transaction.
-	if _, e = pool.Exec(ctx, `UPDATE cdw_controlled_releases
+	readFixtureTx, e := pool.Begin(ctx)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer readFixtureTx.Rollback(ctx)
+	if _, e = readFixtureTx.Exec(ctx, `UPDATE cdw_controlled_releases
 	 SET state='effective',actual_effective_at=clock_timestamp()
 	 WHERE id=$1 AND state='issued_pending'`, issued.ID); e != nil {
 		t.Fatal(e)
 	}
-	if _, e = pool.Exec(ctx, `INSERT INTO cdw_effective_pointers
+	if _, e = readFixtureTx.Exec(ctx, `INSERT INTO cdw_effective_pointers
 	 (file_id,release_id,state,activated_at) VALUES($1,$2,'active',clock_timestamp())`,
 		fileID, issued.ID); e != nil {
 		t.Fatal(e)
 	}
-	controlledRead, managed, e := repo.CDWEffectiveRead(ctx, fileID)
+	fixtureReader := &Repository{DB: pool, Q: readFixtureTx}
+	controlledRead, managed, e := fixtureReader.CDWEffectiveRead(ctx, fileID)
 	if e != nil || !managed || controlledRead.BlobID != blobID ||
 		controlledRead.SHA256 != sha || controlledRead.FileName == "" {
 		t.Fatalf("effective read did not resolve immutable distributed artifact: %+v managed=%t err=%v", controlledRead, managed, e)
 	}
-	if _, e = pool.Exec(ctx, `UPDATE cdw_effective_pointers SET state='none',release_id=NULL WHERE file_id=$1`, fileID); e != nil {
+	if _, e = readFixtureTx.Exec(ctx, `UPDATE cdw_effective_pointers SET state='none',release_id=NULL WHERE file_id=$1`, fileID); e != nil {
 		t.Fatal(e)
 	}
-	if _, managed, e = repo.CDWEffectiveRead(ctx, fileID); !managed || !errors.Is(e, domain.ErrConflict) {
+	if _, managed, e = fixtureReader.CDWEffectiveRead(ctx, fileID); !managed || !errors.Is(e, domain.ErrConflict) {
 		t.Fatalf("explicit no-effective-version pointer leaked ordinary latest: managed=%t err=%v", managed, e)
 	}
+	if e = readFixtureTx.Rollback(ctx); e != nil {
+		t.Fatal(e)
+	}
 	t.Log("CDW_G8_POINTER_READ_FIXTURE_PASS effective-artifact-snapshot, withdrawn-pointer-fail-closed; no activation workflow claimed")
+	// A second department still has an assigned but unconfirmed reader. A
+	// controlled withdrawal must cancel that task without deleting evidence.
+	charlieRoster, e := service.CDWCreateReadingRoster(ctx, charlie, charlieTargets[0].TargetID,
+		application.CDWReadingRosterInput{UserIDs: []string{charlie.ID}}, prefix+"_g9_roster_charlie")
+	if e != nil || charlieRoster.AssignedCount != 1 {
+		t.Fatalf("pending reading before withdrawal %+v %v", charlieRoster, e)
+	}
+	charlieReadItems, e := service.CDWReadingInbox(ctx, charlie, 25)
+	if e != nil {
+		t.Fatal(e)
+	}
+	charlieReadID := ""
+	for _, item := range charlieReadItems {
+		if item.TargetID == charlieTargets[0].TargetID {
+			charlieReadID = item.ID
+		}
+	}
+	if charlieReadID == "" {
+		t.Fatal("second department missing designated pending reader")
+	}
+	withdrawInput := application.CDWDistributionWithdrawalInput{Reason: "该发行批次发现版本适用范围错误，需撤销此次未生效的部门分发并保留原签收记录。"}
+	if _, e = service.CDWWithdrawDistribution(ctx, alice, plan.ID, 4, withdrawInput, prefix+"_g9_withdraw_unprivileged"); !errors.Is(e, domain.ErrForbidden) {
+		t.Fatalf("scope reviewer withdrew release without document-control role: %v", e)
+	}
+	if _, e = service.CDWWithdrawDistribution(ctx, admin, plan.ID, 3, withdrawInput, prefix+"_g9_withdraw_stale"); !errors.Is(e, domain.ErrVersionConflict) {
+		t.Fatalf("withdrawal did not enforce plan CAS: %v", e)
+	}
+	withdrawn, e := service.CDWWithdrawDistribution(ctx, admin, plan.ID, 4, withdrawInput, prefix+"_g9_withdraw")
+	if e != nil || withdrawn.State != "withdrawn" || withdrawn.RevokedGrants < 4 ||
+		withdrawn.CancelledReaders != 1 || withdrawn.InvalidatedTargets != 2 || withdrawn.ManifestSHA256 != frozenPlan.DigestSHA256 {
+		t.Fatalf("atomic batch withdrawal and rights revocation %+v %v", withdrawn, e)
+	}
+	replayedWithdrawal, e := service.CDWWithdrawDistribution(ctx, admin, plan.ID, 4, withdrawInput, prefix+"_g9_withdraw")
+	if e != nil || replayedWithdrawal.ID != withdrawn.ID {
+		t.Fatalf("withdrawal replay %+v %v", replayedWithdrawal, e)
+	}
+	if _, e = service.CDWWithdrawDistribution(ctx, admin, plan.ID, 4, withdrawInput, prefix+"_g9_withdraw_again"); !errors.Is(e, domain.ErrVersionConflict) {
+		t.Fatalf("withdrawal second finalization was permitted: %v", e)
+	}
+	var validAfter string
+	if e = pool.QueryRow(ctx, `SELECT state FROM cdw_controlled_releases WHERE id=$1`, issued.ID).Scan(&validAfter); e != nil {
+		t.Fatal(e)
+	}
+	if validAfter != "withdrawn" {
+		t.Fatalf("release state should be withdrawn, not %s", validAfter)
+	}
+	var savedConfirmations, preservedReceipts, unconfirmed int
+	if e = pool.QueryRow(ctx, `SELECT COUNT(*) FROM cdw_reading_events WHERE assignment_id=$1 AND kind='confirmed'`, bobAssignment.ID).Scan(&savedConfirmations); e != nil {
+		t.Fatal(e)
+	}
+	if e = pool.QueryRow(ctx, `SELECT COUNT(*) FROM cdw_department_receipts r JOIN cdw_distribution_targets t ON t.id=r.target_id WHERE t.batch_id=$1`, batch.ID).Scan(&preservedReceipts); e != nil {
+		t.Fatal(e)
+	}
+	if e = pool.QueryRow(ctx, `SELECT COUNT(*) FROM cdw_reading_assignments WHERE batch_id=$1 AND state='cancelled'`, batch.ID).Scan(&unconfirmed); e != nil {
+		t.Fatal(e)
+	}
+	if savedConfirmations != 1 || preservedReceipts != 2 || unconfirmed != 1 {
+		t.Fatalf("withdrawal lost old evidence: confirmed=%d receipts=%d cancelled=%d", savedConfirmations, preservedReceipts, unconfirmed)
+	}
+	postWithdrawLedger, e := service.CDWDistributionLedger(ctx, admin, plan.ID)
+	if e != nil || postWithdrawLedger.BatchState != "withdrawn" || len(postWithdrawLedger.Rows) != 2 {
+		t.Fatalf("withdrawn batch history unavailable: %+v %v", postWithdrawLedger, e)
+	}
+	if _, e = service.CDWConfirmReading(ctx, charlie, charlieReadID, readingStatement, prefix+"_g9_after_revoke"); !errors.Is(e, domain.ErrConflict) {
+		t.Fatalf("withdrawn batch allowed an unexpected confirmation: %v", e)
+	}
+	t.Logf("CDW_G9_WITHDRAW_POSTGRES_PASS batch=%s revoked=%d cancelled_readers=%d preserved_receipts=2", batch.ID, withdrawn.RevokedGrants, withdrawn.CancelledReaders)
 	t.Logf("CDW_G9_LEDGER_POSTGRES_PASS plan=%s departments=2 receipts=2 reading=1/1 roster_missing=1", plan.ID)
 	t.Logf("CDW_G9_READING_POSTGRES_PASS roster=%s assignment=%s single_confirmed_event=1", bobRoster.ID, bobAssignment.ID)
 	t.Logf("CDW_G9_SCOPE_APPROVED_POSTGRES_PASS plan=%s digest=%s batch=none", plan.ID, approvedPlan.DigestSHA256)

@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from "react";
-import {RareBadge,RareButton,RareNotice,RareSelect} from "../../shared/ui/rare";
+import {RareBadge,RareButton,RareNotice,RareSelect,RareTextarea} from "../../shared/ui/rare";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {ApiError} from "../../shared/http";
 import {toast} from "../../shared/ui/feedback";
@@ -31,6 +31,9 @@ export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments,isAd
  const grantKey=useRef("");
  const issueKey=useRef("");
  const dispatchKey=useRef("");
+ const [withdrawOpen,setWithdrawOpen]=useState(false);
+ const [withdrawReason,setWithdrawReason]=useState("");
+ const withdrawKey=useRef("");
  useEffect(()=>{
   let active=true;setPlan(null);setTargets([emptyTarget()]);setLoading(true);setError("");
   Promise.all([
@@ -38,7 +41,7 @@ export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments,isAd
     if(e instanceof ApiError&&e.httpStatus===404)return null;
     throw e;
    }),
-   loadUsers(),loadDepartments()
+   loadUsers().catch(()=>[]),loadDepartments().catch(()=>[])
   ]).then(([existing,people,depts])=>{
    if(!active)return;
    setPlan(existing);
@@ -127,9 +130,28 @@ export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments,isAd
   }catch(e){if(!(e instanceof ApiError&&e.httpStatus===0))dispatchKey.current="";}
   finally{setBusy(false);}
  }
+ async function withdraw(){
+  if(!plan||plan.state!=="dispatched"||release.state!=="issued_pending"||
+   busy||withdrawReason.trim().length<12)return;
+  if(!withdrawKey.current)withdrawKey.current=newIdempotencyKey();
+  setBusy(true);
+  try{
+   await toast.track(()=>cdwApi.distributionWithdraw(plan.id,plan.revision,withdrawReason.trim(),withdrawKey.current),{
+    loading:"正在撤销发行并实时终止相关人员的访问…",
+    success:"发行已撤销；历史签收及阅读凭证已保留",
+    error:e=>errorCopy(e,"撤销受控发行失败")
+   });
+   withdrawKey.current="";setWithdrawReason("");setWithdrawOpen(false);
+   onChanged();
+  }catch(e){if(!(e instanceof ApiError&&e.httpStatus===0))withdrawKey.current="";}
+  finally{setBusy(false);}
+ }
  return <section className="cdw-section">
   <div className="cdw-section-head"><h3>部门分发范围</h3>
-   {plan&&<RareBadge tone={plan.state==="frozen"?"success":"neutral"}>{plan.state==="draft"?"草案待冻结":plan.state==="frozen"?"清单已冻结":"待分发审批"}</RareBadge>}
+   {plan&&<RareBadge tone={plan.state==="frozen"?"success":plan.state==="cancelled"?"warning":"neutral"}>{
+    plan.state==="draft"?"草案待冻结":plan.state==="frozen"?"清单已冻结":
+    plan.state==="approved"?"待签发分发":plan.state==="dispatched"?"已分发":"发行已撤销"
+   }</RareBadge>}
   </div>
   <p className="cdw-section-note">仅建立电子分发范围。每部门必须由指定负责人签收，另须配置相关人员阅读确认；冻结之后无法覆盖部门、接收人及要求。范围批准、发行和生效是后续独立步骤。</p>
   {loading&&<div className="cdw-message"><BrandLoadingLabel showContext>读取部门与可用分发计划</BrandLoadingLabel></div>}
@@ -190,10 +212,29 @@ export function CDWDistributionPlanPanel({release,loadUsers,loadDepartments,isAd
     </div>}
    {plan?.state==="dispatched"&&
     <RareNotice tone="info">正式发行批次已生成。部门签收、人员阅读确认及文件生效分别独立办理，不会由分发自动完成。</RareNotice>}
+   {plan?.state==="dispatched"&&release.state==="issued_pending"&&<div className="cdw-review-form">
+    <RareButton type="button" tone="neutral" aria-pressed={withdrawOpen} disabled={busy}
+     onClick={()=>setWithdrawOpen(v=>!v)}>{withdrawOpen?"收起撤销操作":"撤销本次未生效发行"}</RareButton>
+    {withdrawOpen&&<>
+     <RareNotice tone="warning">撤销会立刻失效本批次受控访问授权，并取消未完成阅读任务。原批次、已签收及已确认的证据不会删除。当前有效文件不能从这里撤销。</RareNotice>
+     <label>撤销依据（至少 12 字）
+      <RareTextarea rows={3} maxLength={3000} value={withdrawReason} disabled={busy}
+       onChange={e=>{setWithdrawReason(e.target.value);withdrawKey.current="";}}
+       placeholder="记录范围错误、文件作废或其他受控制度依据"/>
+     </label>
+     <div className="cdw-review-actions">
+      <RareButton type="button" tone="primary" loading={busy}
+       disabled={busy||withdrawReason.trim().length<12} onClick={()=>void withdraw()}>确认撤销并撤回访问权限</RareButton>
+     </div>
+    </>}
+   </div>}
+   {plan?.state==="cancelled"&&<RareNotice tone="warning">
+    本次发行已撤销，后续访问授权失效。原始批次、部门签收和个人阅读凭证仅供授权审计查询。
+   </RareNotice>}
    {plan?.digestSha256&&<div className="cdw-review-digest">
     <small>受控范围规范摘要 SHA-256</small><code title={plan.digestSha256}>{plan.digestSha256}</code>
    </div>}
-   {plan?.state==="dispatched"&&<CDWDistributionLedgerPanel planId={plan.id}/>}
+   {(plan?.state==="dispatched"||plan?.state==="cancelled")&&<CDWDistributionLedgerPanel planId={plan.id}/>}
   </div>}
  </section>;
 }

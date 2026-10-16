@@ -21,10 +21,11 @@ func (r *Repository) CDWDistributionLedger(ctx context.Context, planID string) (
 	if err != nil {
 		return out, err
 	}
-	if state != "dispatched" {
+	if state != "dispatched" && state != "withdrawn" {
 		return out, domain.ErrConflict
 	}
 	out.PlanID = planID
+	out.BatchState = state
 	rows, err := r.Q.Query(ctx, `SELECT t.id,t.department_id,d.name,t.designated_receiver_id,u.display_name,
  rec.id,rec.actor_id,signer.display_name,rec.signed_at,t.due_at,t.validity_state,
  COALESCE(reads.assigned,0),COALESCE(reads.confirmed,0)

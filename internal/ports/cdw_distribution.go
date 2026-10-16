@@ -51,6 +51,21 @@ type CDWDistributionBatch struct {
 	DigestSHA256    string `json:"digestSha256"`
 	DepartmentCount int    `json:"departmentCount"`
 }
+type CDWDistributionWithdrawal struct {
+	ID                 string `json:"id"`
+	BatchID            string `json:"batchId"`
+	PlanID             string `json:"planId"`
+	ReleaseID          string `json:"releaseId"`
+	FileID             string `json:"fileId"`
+	State              string `json:"state"`
+	PlanRevision       int64  `json:"planRevision"`
+	ManifestSHA256     string `json:"manifestSha256"`
+	RevokedGrants      int64  `json:"revokedGrants"`
+	CancelledReaders   int64  `json:"cancelledReaders"`
+	InvalidatedTargets int64  `json:"invalidatedTargets"`
+	ActorID            string `json:"actorId"`
+	Reason             string `json:"reason"`
+}
 type CDWDistributionLedgerRow struct {
 	TargetID         string  `json:"targetId"`
 	DepartmentID     string  `json:"departmentId"`
@@ -72,6 +87,7 @@ type CDWDistributionLedgerRow struct {
 type CDWDistributionLedger struct {
 	PlanID           string                     `json:"planId"`
 	BatchID          string                     `json:"batchId"`
+	BatchState       string                     `json:"batchState"`
 	ManifestSHA256   string                     `json:"manifestSha256"`
 	Rows             []CDWDistributionLedgerRow `json:"rows"`
 	ReceiptCompleted int                        `json:"receiptCompleted"`
@@ -91,5 +107,6 @@ type CDWDistributionStore interface {
 	CDWDistributionScopeInbox(context.Context, string, int) ([]CDWDistributionPlan, error)
 	CDWDistributionDispatch(context.Context, string, string, string, int64, string, []string, []string, []string, []string) (CDWDistributionBatch, error)
 	CDWDistributionLedger(context.Context, string) (CDWDistributionLedger, error)
+	CDWDistributionWithdraw(context.Context, string, string, string, int64, string) (CDWDistributionWithdrawal, error)
 	CDWDistributionEvent(context.Context, string, string, string, string, any) error
 }

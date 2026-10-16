@@ -223,7 +223,7 @@ func (r *Repository) CDWDistributionForRelease(ctx context.Context, releaseID st
 	var id string
 	err := r.Q.QueryRow(ctx, `SELECT p.id FROM cdw_distribution_plan_items i
  JOIN cdw_distribution_plans p ON p.id=i.plan_id
- WHERE i.release_id=$1 AND p.state<>'cancelled'
+	 WHERE i.release_id=$1
  ORDER BY p.created_at DESC LIMIT 1`, releaseID).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ports.CDWDistributionPlan{}, domain.ErrNotFound

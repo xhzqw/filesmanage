@@ -1162,15 +1162,33 @@ CDW_DISTRIBUTION_LEDGER_ROW = obj({
  required=["targetId","departmentId","departmentName","receiverId","receiverName",
  "receiptStatus","readingAssigned","readingConfirmed","readingStatus","overdue"])
 CDW_DISTRIBUTION_LEDGER = obj({"planId":string(),"batchId":string(),
+ "batchState":string(enum=["dispatched","withdrawn"]),
  "manifestSha256":string(),"rows":arr(CDW_DISTRIBUTION_LEDGER_ROW),
  "receiptCompleted":integer(minimum=0),"readingAssigned":integer(minimum=0),
  "readingConfirmed":integer(minimum=0)},
- required=["planId","batchId","manifestSha256","rows","receiptCompleted","readingAssigned","readingConfirmed"])
+ required=["planId","batchId","batchState","manifestSha256","rows","receiptCompleted","readingAssigned","readingConfirmed"])
 add("GET","/api/workbench/distribution-plans/{id}/ledger",operation(
  "Read truthful department receipts and personal reading progress from primary evidence tables","CDW","cdwDistributionLedger",
  security=SESSION,params=[id_param("id","Dispatched distribution plan ID")],
  responses=dict([json_ok(CDW_DISTRIBUTION_LEDGER,"Document-controller-only controlled distribution audit ledger."),
  resp("403",ERR["403"]),resp("404",ERR["404"])])))
+
+CDW_DISTRIBUTION_WITHDRAWAL=obj({"id":string(),"batchId":string(),
+ "planId":string(),"releaseId":string(),"fileId":string(),
+ "state":string(enum=["withdrawn"]),"planRevision":integer(minimum=1),
+ "manifestSha256":string(),"revokedGrants":integer(minimum=0),
+ "cancelledReaders":integer(minimum=0),"invalidatedTargets":integer(minimum=0),
+ "actorId":string(),"reason":string()},
+ required=["id","batchId","planId","releaseId","fileId","state","planRevision",
+ "manifestSha256","revokedGrants","cancelledReaders","invalidatedTargets","actorId","reason"])
+add("POST","/api/workbench/distribution-plans/{id}/withdraw",operation(
+ "Withdraw issued but not effective batch; revoke scoped grants, cancel pending reads, preserve immutable receipt and reading evidence","CDW","cdwDistributionWithdraw",
+ security=SESSION,params=[id_param("id","Dispatched plan ID"),CDW_IDEMPOTENCY,CDW_IF_MATCH],
+ request={"application/json":{"schema":obj({
+ "reason":{"type":"string","minLength":12,"maxLength":3000}},required=["reason"])}},
+ responses=dict([json_ok(CDW_DISTRIBUTION_WITHDRAWAL,
+ "Audited withdrawal receipt. An effective release cannot be withdrawn here."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
 
 # --- Auth ---
 add("POST", "/api/login", operation("Authenticate and open a session", "Auth", "login", security=[],
