@@ -123,6 +123,16 @@ export type CDWQMSFormalNotice={
  id:string;approvalInstanceId:string;fileId:string;
  eventKind:"policy_interrupted"|"legacy_quarantined";createdAt:string;readAt?:string;
 };
+export type CDWQMSLineageNode={
+ approvalId:string;previousApprovalId?:string;fileId:string;fileName:string;
+ sha256:string;templateVersionId:string;policyReleaseId?:string;state:string;
+ requestedBy:string;requestedAt:string;completedAt?:string;
+ stepCount:number;approvedCount:number;rejectedCount:number;pendingCount:number;
+ noticeTotal:number;noticeRead:number;interruptionReason?:string;candidateId?:string;
+};
+export type CDWQMSFormalLineage={
+ focusApprovalId:string;nodes:CDWQMSLineageNode[];truncated:boolean;
+};
 export type CDWFormalStep={id:string;nodeKey:string;sequence:number;approverId:string;state:string;revision:number};
 export type CDWFormalDetail={approval:CDWFormalApproval;steps:CDWFormalStep[];
  decisions:Array<{stepId:string;actorId:string;decision:string;reason:string;decidedAt:string}>};
@@ -314,6 +324,8 @@ export const cdwApi={
   "/workbench/qms-special-policy-impacts",{cache:"no-store"}),
  qmsFormalInterruptions:()=>request<{items:CDWQMSFormalInterruption[]}>(
   "/workbench/qms-interrupted-approvals",{cache:"no-store"}),
+ qmsFormalLineage:(id:string)=>request<CDWQMSFormalLineage>(
+  "/workbench/qms-formal-lineage/"+segment(id),{cache:"no-store"}),
  qmsLegacyAnomalies:()=>request<{items:CDWQMSLegacyAnomaly[]}>(
   "/workbench/qms-legacy-approval-anomalies",{cache:"no-store"}),
  qmsLegacyHoldHistory:()=>request<{items:CDWQMSLegacyHold[]}>(

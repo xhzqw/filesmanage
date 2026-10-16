@@ -4,6 +4,7 @@ import {toast} from "../../shared/ui/feedback";
 import {errorCopy} from "../../shared/errors";
 import {newIdempotencyKey} from "../../shared/ids";
 import {cdwApi,type CDWQMSSpecialAuthority,type CDWQMSSpecialAlert,type CDWQMSSpecialPolicyImpact,type CDWQMSFormalInterruption,type CDWQMSLegacyAnomaly,type CDWQMSFormalNotice} from "./api";
+import {CDWFormalLineagePanel} from "./CDWFormalLineagePanel";
 
 type Scope={fileId:string;kind:"dhf"|"dmr";templateVersionId:string;policyReleaseId:string;
  nodes:Array<{nodeKey:string;label:string}>};
@@ -24,6 +25,7 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
  const [alerts,setAlerts]=useState<CDWQMSSpecialAlert[]>([]);
  const [impacts,setImpacts]=useState<CDWQMSSpecialPolicyImpact[]>([]);
  const [interruptions,setInterruptions]=useState<CDWQMSFormalInterruption[]>([]);
+ const [lineageID,setLineageID]=useState("");
  const [legacy,setLegacy]=useState<CDWQMSLegacyAnomaly[]>([]);
  const [notices,setNotices]=useState<CDWQMSFormalNotice[]>([]);
  const [holdId,setHoldId]=useState("");
@@ -190,8 +192,12 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
      {" · "}已签署 {item.completedDecisions} 节点；原待签 {item.interruptedNodes.length} 节点</p>
     <p className="cdw-section-note">原制度版本：{item.oldPolicyReleaseId}</p>
     <p className="cdw-section-note">原审批：{item.approvalInstanceId}</p>
+    <RareButton type="button" tone="neutral" onClick={()=>setLineageID(item.approvalInstanceId===lineageID?"":item.approvalInstanceId)}>
+     {lineageID===item.approvalInstanceId?"收起完整血缘":"查看审批责任链"}
+    </RareButton>
    </div>)}
   </div>}
+  {!scope&&lineageID&&<CDWFormalLineagePanel approvalId={lineageID} onClose={()=>setLineageID("")}/>}
   {!scope&&impacts.some(i=>i.state==="open")&&<div className="cdw-review-digest" aria-label="制度变更影响评估">
    <small>待处理的制度变更影响评估</small>
    {impacts.filter(i=>i.state==="open").map(impact=><div key={impact.id} className="cdw-review-digest">

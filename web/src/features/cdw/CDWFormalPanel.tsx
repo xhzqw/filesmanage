@@ -6,6 +6,7 @@ import {newIdempotencyKey} from "../../shared/ids";
 import {errorCopy} from "../../shared/errors";
 import {ApiError} from "../../shared/http";
 import {toast} from "../../shared/ui/feedback";
+import {CDWFormalLineagePanel} from "./CDWFormalLineagePanel";
 
 const stateCopy:Record<string,string>={waiting:"待前置审批",ready:"待决定",approved:"已批准",rejected:"已拒绝",skipped:"已终止"};
 export function CDWFormalPanel({approval,onDecided}:{approval:CDWFormalApproval;onDecided:()=>void}){
@@ -76,6 +77,7 @@ export function CDWFormalPanel({approval,onDecided}:{approval:CDWFormalApproval;
     })}
    </div>
   </section>}
+  {detail&&<CDWFormalLineagePanel approvalId={approval.id}/>}
   <section className="cdw-section">
    <h3>当前节点决定</h3>
    <p className="cdw-section-note">系统在服务端再次检查您的正式审批角色、节点状态及乐观锁。批准后仅生成已批准候选版本，不会直接发行或生效。</p>

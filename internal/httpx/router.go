@@ -138,6 +138,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.GET("/workbench/qms-special-authorities/:id/evidence", h.cdwQMSSpecialEvidence)
 	api.GET("/workbench/qms-special-policy-impacts", h.cdwQMSSpecialImpacts)
 	api.GET("/workbench/qms-interrupted-approvals", h.cdwQMSFormalInterruptions)
+	api.GET("/workbench/qms-formal-lineage/:id", h.cdwQMSFormalLineage)
 	api.GET("/workbench/qms-legacy-approval-anomalies", h.cdwQMSLegacyAnomalies)
 	api.GET("/workbench/qms-legacy-approval-holds", h.cdwQMSLegacyHoldHistory)
 	api.POST("/workbench/qms-legacy-approval-anomalies/:id/hold", h.cdwQMSLegacyHold)

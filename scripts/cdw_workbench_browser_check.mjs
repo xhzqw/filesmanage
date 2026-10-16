@@ -153,6 +153,9 @@ try{
  assert.ok(g16.every(r=>r.status===200&&Array.isArray(r.items)),
   "G16 historical anomalies and per-recipient notices are authenticated server backed");
  console.log("CDW_G16_LEGACY_NOTICE_BROWSER_PASS scoped historical anomalies and individual notice inbox=read-only");
+ const g17=await evalJS("(async()=>{const r=await fetch('/api/workbench/qms-formal-lineage/__nonexistent_g17_approval__');return {status:r.status,data:(await r.json()).data}})()");
+ assert.equal(g17.status,404,"G17 cannot manufacture a complete lineage for missing formal approval IDs");
+ console.log("CDW_G17_LINEAGE_BROWSER_PASS authenticated lineage endpoint denies missing approvals");
 
  await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('发行准备'));button?.click();return true;})()");
  await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('发行准备')");

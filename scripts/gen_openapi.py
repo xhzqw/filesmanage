@@ -1084,6 +1084,27 @@ add("GET","/api/workbench/qms-interrupted-approvals",operation(
  responses=dict([json_ok(obj({"items":arr(CDW_QMS_INTERRUPTION)},required=["items"]),
  "Requester, participant or current controller must also pass both source and subject file ACLs."),
  resp("403",ERR["403"])])))
+CDW_QMS_LINEAGE_NODE=obj({
+ "approvalId":string(),"previousApprovalId":string(),"fileId":string(),
+ "fileName":string(),"sha256":string(),"templateVersionId":string(),
+ "policyReleaseId":string(),"state":string(),"requestedBy":string(),
+ "requestedAt":timestamp(),"completedAt":timestamp(),
+ "stepCount":integer(minimum=0),"approvedCount":integer(minimum=0),
+ "rejectedCount":integer(minimum=0),"pendingCount":integer(minimum=0),
+ "noticeTotal":integer(minimum=0),"noticeRead":integer(minimum=0),
+ "interruptionReason":string(),"candidateId":string()},
+ required=["approvalId","fileId","fileName","sha256","templateVersionId",
+ "state","requestedBy","requestedAt","stepCount","approvedCount",
+ "rejectedCount","pendingCount","noticeTotal","noticeRead"])
+add("GET","/api/workbench/qms-formal-lineage/{id}",operation(
+ "Read immutable formal approval ancestor/successor chain including live signing and individual notification ACK counts",
+ "CDW","cdwQMSFormalLineage",security=SESSION,
+ params=[id_param("id","Any approval instance in the chain.")],
+ responses=dict([json_ok(obj({"focusApprovalId":string(),
+ "nodes":arr(CDW_QMS_LINEAGE_NODE),"truncated":boolean()},
+ required=["focusApprovalId","nodes","truncated"]),
+ "Requester/current authorized participant/controller, actual source file ACL; read only."),
+ resp("403",ERR["403"]),resp("404",ERR["404"])])))
 CDW_QMS_LEGACY_ANOMALY=obj({
  "approvalInstanceId":string(),"fileId":string(),"fileName":string(),
  "templateVersionId":string(),"requestedBy":string(),"completedDecisions":integer(minimum=0),

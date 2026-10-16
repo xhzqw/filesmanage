@@ -49,7 +49,34 @@ type CDWQMSLegacyHold struct {
 	FileID             string `json:"fileId"`
 	State              string `json:"state"`
 }
+type CDWQMSLineageNode struct {
+	ApprovalID         string  `json:"approvalId"`
+	PreviousApprovalID string  `json:"previousApprovalId,omitempty"`
+	FileID             string  `json:"fileId"`
+	FileName           string  `json:"fileName"`
+	SHA256             string  `json:"sha256"`
+	TemplateVersionID  string  `json:"templateVersionId"`
+	PolicyReleaseID    string  `json:"policyReleaseId,omitempty"`
+	State              string  `json:"state"`
+	RequestedBy        string  `json:"requestedBy"`
+	RequestedAt        string  `json:"requestedAt"`
+	CompletedAt        *string `json:"completedAt,omitempty"`
+	StepCount          int     `json:"stepCount"`
+	ApprovedCount      int     `json:"approvedCount"`
+	RejectedCount      int     `json:"rejectedCount"`
+	PendingCount       int     `json:"pendingCount"`
+	NoticeTotal        int     `json:"noticeTotal"`
+	NoticeRead         int     `json:"noticeRead"`
+	InterruptionReason string  `json:"interruptionReason,omitempty"`
+	CandidateID        string  `json:"candidateId,omitempty"`
+}
+type CDWQMSFormalLineage struct {
+	FocusApprovalID string              `json:"focusApprovalId"`
+	Nodes           []CDWQMSLineageNode `json:"nodes"`
+	Truncated       bool                `json:"truncated"`
+}
 type CDWQMSG16Store interface {
+	CDWQMSFormalLineage(context.Context, string) (CDWQMSFormalLineage, error)
 	CDWQMSRequiresRestart(context.Context, string) (bool, error)
 	CDWQMSLegacyHoldHistory(context.Context, string, int) ([]CDWQMSLegacyHold, error)
 	CDWQMSLegacyAnomalies(context.Context, string, int) ([]CDWQMSLegacyAnomaly, error)

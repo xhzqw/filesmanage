@@ -380,6 +380,42 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	if err = r.CDWQMSRecordRestart(ctx, prefix+"_g16_valid_restart", formalInstance, revokedInstance, admin.ID); err != nil {
 		t.Fatalf("new pending approval could not link its prior conflict: %v", err)
 	}
+	lineage, lineageErr := r.CDWQMSFormalLineage(ctx, revokedInstance)
+	if lineageErr != nil || lineage.Truncated || len(lineage.Nodes) != 2 ||
+		lineage.Nodes[0].ApprovalID != formalInstance || lineage.Nodes[1].ApprovalID != revokedInstance ||
+		lineage.Nodes[1].PreviousApprovalID != formalInstance ||
+		lineage.Nodes[0].State != "conflicted" || lineage.Nodes[1].State != "pending" ||
+		lineage.Nodes[0].SHA256 != sha || lineage.Nodes[1].SHA256 != sha ||
+		lineage.Nodes[0].NoticeTotal < 2 || lineage.Nodes[0].NoticeRead != 1 {
+		t.Fatalf("G17 restart timeline lacks real node and recipient evidence: %+v %v", lineage, lineageErr)
+	}
+	fromOld, oldErr := r.CDWQMSFormalLineage(ctx, formalInstance)
+	if oldErr != nil || len(fromOld.Nodes) != len(lineage.Nodes) {
+		t.Fatalf("G17 ancestor and descendant lineage differ: %+v %v", fromOld, oldErr)
+	}
+	// A second direct successor is not a normal retry. It must instead cite
+	// the latest interrupted successor after that successor is quarantined.
+	secondSuccessor := prefix + "_g17_forbidden_fork"
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g17_second_successor"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO cdw_formal_approval_instances
+ (id,subject_id,template_version_id,state,requested_by)
+ VALUES($1,$2,$3,'pending',$4)`, secondSuccessor, formalSubject, tpl, admin.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g17_duplicate_successor"); err != nil {
+		t.Fatal(err)
+	}
+	if err = r.CDWQMSRecordRestart(ctx, prefix+"_g17_duplicate", formalInstance, secondSuccessor, admin.ID); err == nil {
+		t.Fatal("G17 accepted two direct successors of one conflicted approval")
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_g17_duplicate_successor"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_g17_second_successor"); err != nil {
+		t.Fatal(err)
+	}
 	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g16_invalid_restart"); err != nil {
 		t.Fatal(err)
 	}
