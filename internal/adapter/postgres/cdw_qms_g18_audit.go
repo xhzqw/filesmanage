@@ -16,8 +16,28 @@ func (r *Repository) CDWQMSAuditCanExport(ctx context.Context, actor, fileID str
 	return allowed, err
 }
 func (r *Repository) CDWQMSAuditFacts(ctx context.Context, approvalIDs []string) (ports.CDWQMSAuditFacts, error) {
-	result := ports.CDWQMSAuditFacts{Decisions: []ports.CDWQMSAuditDecision{}, Notices: []ports.CDWQMSAuditNotice{}}
-	rows, err := r.Q.Query(ctx, `SELECT step.instance_id,step.id,step.node_key,d.actor_id,
+	result := ports.CDWQMSAuditFacts{Steps: []ports.CDWQMSAuditStep{}, Decisions: []ports.CDWQMSAuditDecision{}, Notices: []ports.CDWQMSAuditNotice{}}
+	rows, err := r.Q.Query(ctx, `SELECT instance_id,id,node_key,sequence_no,approver_user_id,state,mandatory,revision
+ FROM cdw_formal_approval_steps WHERE instance_id=ANY($1)
+ ORDER BY instance_id,sequence_no,node_key`, approvalIDs)
+	if err != nil {
+		return result, err
+	}
+	for rows.Next() {
+		var st ports.CDWQMSAuditStep
+		if err = rows.Scan(&st.ApprovalID, &st.StepID, &st.NodeKey, &st.Sequence,
+			&st.ApproverID, &st.State, &st.Mandatory, &st.Revision); err != nil {
+			rows.Close()
+			return result, err
+		}
+		result.Steps = append(result.Steps, st)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return result, err
+	}
+	rows, err = r.Q.Query(ctx, `SELECT step.instance_id,step.id,step.node_key,d.actor_id,
  d.decision,d.reason,d.subject_sha256,d.actor_authority_snapshot,d.decided_at
  FROM cdw_formal_approval_decisions d
  JOIN cdw_formal_approval_steps step ON step.id=d.step_id

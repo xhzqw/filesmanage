@@ -310,7 +310,9 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 		t.Fatalf("document controller missing G18 audit export right: %t %v", can, canErr)
 	}
 	auditFacts, auditErr := r.CDWQMSAuditFacts(ctx, []string{formalInstance})
-	if auditErr != nil || len(auditFacts.Notices) < 2 {
+	if auditErr != nil || len(auditFacts.Notices) < 2 || len(auditFacts.Steps) != 2 ||
+		auditFacts.Steps[0].NodeKey != "management_representative" ||
+		auditFacts.Steps[0].State != "skipped" {
 		t.Fatalf("G18 evidence export missing per-recipient notification facts: %+v %v", auditFacts, auditErr)
 	}
 	foundReminder := false

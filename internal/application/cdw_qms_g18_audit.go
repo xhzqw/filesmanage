@@ -108,7 +108,7 @@ func (s *Service) CDWQMSFormalAudit(ctx context.Context, actor domain.User, id s
 		return nil, err
 	}
 	if err = auditRequired(ctx, tx, actor, "cdw.qms.formal.audit.requested", "formal_approval", id, "success",
-		map[string]any{"nodeCount": len(ids), "decisionCount": len(facts.Decisions),
+		map[string]any{"nodeCount": len(ids), "stepCount": len(facts.Steps), "decisionCount": len(facts.Decisions),
 			"noticeCount": len(facts.Notices), "schemaVersion": packet.SchemaVersion}); err != nil {
 		return nil, err
 	}

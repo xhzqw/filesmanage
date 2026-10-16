@@ -111,6 +111,10 @@ func (r *Repository) CDWQMSFormalLineage(ctx context.Context, focusID string) (p
 	if len(out.Nodes) == 0 {
 		return out, domain.ErrNotFound
 	}
+	// The parent walk is also depth limited. A nonempty predecessor on the
+	// first returned node means it is not the true root. Never mark this
+	// suffix as a complete auditable history.
+	parentTruncated := out.Nodes[0].PreviousApprovalID != ""
 	// Distinguish a complete 31-node chain from a larger one without allowing
 	// unbounded recursion in normal authenticated list/detail requests.
 	if out.Truncated {
@@ -125,5 +129,6 @@ func (r *Repository) CDWQMSFormalLineage(ctx context.Context, focusID string) (p
 		}
 		out.Truncated = next
 	}
+	out.Truncated = out.Truncated || parentTruncated
 	return out, nil
 }

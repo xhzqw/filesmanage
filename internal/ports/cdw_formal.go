@@ -56,6 +56,16 @@ type CDWQMSFormalFollowup struct {
 	Reason             string `json:"reason"`
 	RequestedAt        string `json:"requestedAt"`
 }
+type CDWQMSAuditStep struct {
+	ApprovalID string `json:"approvalId"`
+	StepID     string `json:"stepId"`
+	NodeKey    string `json:"nodeKey"`
+	Sequence   int    `json:"sequence"`
+	ApproverID string `json:"approverId"`
+	State      string `json:"state"`
+	Mandatory  bool   `json:"mandatory"`
+	Revision   int64  `json:"revision"`
+}
 type CDWQMSAuditDecision struct {
 	ApprovalID        string          `json:"approvalId"`
 	StepID            string          `json:"stepId"`
@@ -79,6 +89,7 @@ type CDWQMSAuditNotice struct {
 	FollowupAt     *string `json:"followupAt,omitempty"`
 }
 type CDWQMSAuditFacts struct {
+	Steps     []CDWQMSAuditStep     `json:"steps"`
 	Decisions []CDWQMSAuditDecision `json:"decisions"`
 	Notices   []CDWQMSAuditNotice   `json:"notices"`
 }
