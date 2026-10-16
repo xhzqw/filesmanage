@@ -84,6 +84,7 @@ export type CDWDocumentClassification={fileId:string;approvalClass:"pending"|"ge
 export type CDWQMSAppointment={id:string;fileId:string;userId:string;nodeKey:string;policyReleaseId:string;evidenceReleaseId:string;expiresAt:string;status:"pending"|"verified"|"revoked";proposedBy:string;verifiedBy?:string;reason:string};
 export type CDWQMSPendingReview=CDWQMSAppointment&{fileName:string;evidenceFileId:string;evidenceFileName:string};
 export type CDWQMSAppointmentInput={fileId:string;userId:string;nodeKey:string;policyReleaseId:string;evidenceReleaseId:string;expiresAt:string;reason:string};
+export type CDWQMSAppointmentAlert={id:string;appointmentId:string;fileId:string;nodeKey:string;createdAt:string;readAt?:string};
 export type CDWFormalApproval={
  id:string;subjectId:string;deliveryId:string;fileId:string;fileName?:string;
  sha256:string;templateVersionId:string;state:"pending"|"approved"|"rejected"|"cancelled"|"conflicted";
@@ -259,6 +260,12 @@ export const cdwApi={
   "/workbench/qms-appointments",mutate(key,input)),
  qmsAppointmentVerify:(id:string,statement:string,key:string)=>request<CDWQMSAppointment>(
   "/workbench/qms-appointments/"+segment(id)+"/verify",mutate(key,{statement})),
+ qmsAppointmentRevoke:(id:string,reason:string,key:string)=>request<CDWQMSAppointment>(
+  "/workbench/qms-appointments/"+segment(id)+"/revoke",mutate(key,{reason})),
+ qmsAppointmentEvidenceUrl:(id:string)=>"/api/workbench/qms-appointments/"+segment(id)+"/evidence",
+ qmsAlerts:()=>request<{items:CDWQMSAppointmentAlert[]}>("/workbench/qms-appointment-alerts",{cache:"no-store"}),
+ qmsAlertRead:(id:string,key:string)=>request<{id:string;read:boolean}>(
+  "/workbench/qms-appointment-alerts/"+segment(id)+"/read",mutate(key,{})),
  formalInbox:(limit=100)=>request<{items:CDWFormalApproval[]}>(
   "/workbench/formal-approvals/inbox?limit="+limit,{cache:"no-store"}),
  formalDetail:(id:string)=>request<CDWFormalDetail>("/workbench/formal-approvals/"+segment(id),{cache:"no-store"}),

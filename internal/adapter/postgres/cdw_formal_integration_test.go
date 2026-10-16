@@ -931,6 +931,24 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
  VALUES($1,$2,'existing_version',$3,$4,31,$5)`, qmsSubjectID, qmsFileID, blobID, sha, admin.ID); checkErr != nil {
 		t.Fatal(checkErr)
 	}
+	if _, checkErr = readFixtureTx.Exec(ctx, "SAVEPOINT cdw_special_qms_77a"); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	for _, name := range []string{"DHF-测试项目设计历史文件.docx", "DMR-测试器械主文档.docx"} {
+		if _, checkErr = readFixtureTx.Exec(ctx, "UPDATE files SET name=$2 WHERE id=$1", qmsFileID, name); checkErr != nil {
+			t.Fatal(checkErr)
+		}
+		var blocked bool
+		if checkErr = readFixtureTx.QueryRow(ctx, "SELECT cdw_qms_special_authority_pending($1)", qmsFileID).Scan(&blocked); checkErr != nil || !blocked {
+			t.Fatalf("DHF/DMR not recognized as special controlled authority: %q %v", name, checkErr)
+		}
+		if checkErr = fixtureReader.cdwFormalValidateClass(ctx, qmsFileID, "qms_verified", issued.ID); !errors.Is(checkErr, domain.ErrPolicyAuthorityPending) {
+			t.Fatalf("generic QMS authority wrongly unlocked DHF/DMR: %q %v", name, checkErr)
+		}
+	}
+	if _, checkErr = readFixtureTx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_special_qms_77a"); checkErr != nil {
+		t.Fatal(checkErr)
+	}
 	if _, checkErr := readFixtureTx.Exec(ctx, "SAVEPOINT cdw_qms_generic_bypass"); checkErr != nil {
 		t.Fatal(checkErr)
 	}
@@ -1028,6 +1046,56 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	if _, checkErr = readFixtureTx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_qms_direct_decision"); checkErr != nil {
 		t.Fatal(checkErr)
 	}
+	if source, checkErr := fixtureReader.CDWQMSAppointmentEvidenceSource(ctx, appointmentID); checkErr != nil || source.SHA256 != sha || source.ReleaseID != issued.ID {
+		t.Fatalf("exact effective evidence is not SHA/release-bound: %+v %v", source, checkErr)
+	}
+	if _, checkErr = readFixtureTx.Exec(ctx, "SAVEPOINT cdw_qms_revocation_test"); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	if _, checkErr = fixtureReader.CDWQMSRevokeAppointment(ctx, appointmentID, admin.ID,
+		"隔离测试：提报人不具有自己撤销任命的独立文控资格，需要拒绝。"); !errors.Is(checkErr, domain.ErrForbidden) {
+		t.Fatalf("appointment proposer could revoke: %v", checkErr)
+	}
+	if _, checkErr = fixtureReader.CDWQMSRevokeAppointment(ctx, appointmentID, bob.ID,
+		"隔离测试：被任命人不可绕过岗位撤销职责自行执行撤销。"); !errors.Is(checkErr, domain.ErrForbidden) {
+		t.Fatalf("appointed person could revoke: %v", checkErr)
+	}
+	if revoked, checkErr := fixtureReader.CDWQMSRevokeAppointment(ctx, appointmentID, charlie.ID,
+		"隔离测试：任命依据经独立文控确认失效，立即撤销后续签批权限并保留历史。"); checkErr != nil || revoked.Status != "revoked" {
+		t.Fatalf("authorized QMS appointment revocation failed %+v %v", revoked, checkErr)
+	}
+	if _, checkErr = fixtureReader.cdwCurrentQMSAppointment(ctx, qmsFileID, bob.ID,
+		"management_representative", issued.ID); !errors.Is(checkErr, domain.ErrQMSAppointmentPending) {
+		t.Fatalf("revoked appointment still authorizes QMS signature: %v", checkErr)
+	}
+	alerts, checkErr := fixtureReader.CDWQMSAppointmentAlerts(ctx, bob.ID, 50)
+	if checkErr != nil || len(alerts) != 1 || alerts[0].AppointmentID != appointmentID || alerts[0].ReadAt != nil {
+		t.Fatalf("revocation recipient notice not persisted: %+v %v", alerts, checkErr)
+	}
+	if ok, checkErr := fixtureReader.CDWQMSReadAppointmentAlert(ctx, alerts[0].ID, charlie.ID); checkErr != nil || ok {
+		t.Fatalf("other recipient acknowledged someone else's alert: %t %v", ok, checkErr)
+	}
+	if ok, checkErr := fixtureReader.CDWQMSReadAppointmentAlert(ctx, alerts[0].ID, bob.ID); checkErr != nil || !ok {
+		t.Fatalf("recipient could not acknowledge own alert: %t %v", ok, checkErr)
+	}
+	if _, checkErr = readFixtureTx.Exec(ctx, "SAVEPOINT cdw_qms_direct_revocation"); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	if _, checkErr = readFixtureTx.Exec(ctx, `UPDATE cdw_qms_appointments SET status='verified'
+ WHERE id=$1`, appointmentID); checkErr == nil {
+		t.Fatal("database permitted restoring revoked appointment")
+	}
+	if _, checkErr = readFixtureTx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_qms_direct_revocation"); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	if _, checkErr = readFixtureTx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_qms_revocation_test"); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	if active, checkErr := fixtureReader.cdwCurrentQMSAppointment(ctx, qmsFileID, bob.ID,
+		"management_representative", issued.ID); checkErr != nil || active == "" {
+		t.Fatalf("isolated revocation rollback did not restore fixture: %q %v", active, checkErr)
+	}
+	t.Log("CDW_QMS_REVOCATION_FIXTURE_PASS independent-revoke, immutable-history, signer-blocked, recipient-notices+ack, exact-docx")
 	t.Log("CDW_QMS_APPOINTMENT_FIXTURE_PASS pending+no-self+independent-verification+exact-position+no-rewrite")
 	if _, checkErr := readFixtureTx.Exec(ctx, "SAVEPOINT cdw_qms_revocation_fixture"); checkErr != nil {
 		t.Fatal(checkErr)

@@ -31,6 +31,13 @@ func (r *Repository) CDWFormalClass(ctx context.Context, fileID string) (ports.C
 }
 
 func (r *Repository) cdwFormalValidateClass(ctx context.Context, fileID, templateKey, policyBasisID string) error {
+	var specialPending bool
+	if e := r.Q.QueryRow(ctx, "SELECT cdw_qms_special_authority_pending($1)", fileID).Scan(&specialPending); e != nil {
+		return e
+	}
+	if specialPending {
+		return domain.ErrPolicyAuthorityPending
+	}
 	classification, err := r.CDWFormalClass(ctx, fileID)
 	if err != nil {
 		return err

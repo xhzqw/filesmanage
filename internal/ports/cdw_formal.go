@@ -81,9 +81,26 @@ type CDWQMSPendingReview struct {
 	EvidenceFileID   string `json:"evidenceFileId"`
 	EvidenceFileName string `json:"evidenceFileName"`
 }
+type CDWQMSAppointmentAlert struct {
+	ID            string  `json:"id"`
+	AppointmentID string  `json:"appointmentId"`
+	FileID        string  `json:"fileId"`
+	NodeKey       string  `json:"nodeKey"`
+	CreatedAt     string  `json:"createdAt"`
+	ReadAt        *string `json:"readAt,omitempty"`
+}
+type CDWQMSAppointmentEvidenceSource struct {
+	CDWBranchSource
+	SHA256    string
+	ReleaseID string
+}
 
 // All mutations run inside the caller's UnitOfWork transaction.
 type CDWFormalStore interface {
+	CDWQMSRevokeAppointment(context.Context, string, string, string) (CDWQMSAppointment, error)
+	CDWQMSAppointmentAlerts(context.Context, string, int) ([]CDWQMSAppointmentAlert, error)
+	CDWQMSReadAppointmentAlert(context.Context, string, string) (bool, error)
+	CDWQMSAppointmentEvidenceSource(context.Context, string) (CDWQMSAppointmentEvidenceSource, error)
 	CDWQMSProposeAppointment(context.Context, string, string, string, string, string, string, string, time.Time, string) (CDWQMSAppointment, error)
 	CDWQMSVerifyAppointment(context.Context, string, string, string) (CDWQMSAppointment, error)
 	CDWQMSAppointmentFile(context.Context, string) (string, error)

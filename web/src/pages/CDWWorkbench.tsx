@@ -22,7 +22,7 @@ import {newIdempotencyKey} from "../shared/ids";
 import {collaborationApi} from "../features/collaboration/api";
 import {organizationApi} from "../features/organization/api";
 import {fileApi} from "../features/documents/api";
-import {cdwApi,type CDWBranch,type CDWInboxItem,type CDWRecipient,type CDWReviewGate,type CDWFormalApproval,type CDWApprovedCandidate,type CDWDistributionPlan,type CDWReceiptTarget,type CDWReadingAssignment,type CDWQMSPendingReview} from "../features/cdw/api";
+import {cdwApi,type CDWBranch,type CDWInboxItem,type CDWRecipient,type CDWReviewGate,type CDWFormalApproval,type CDWApprovedCandidate,type CDWDistributionPlan,type CDWReceiptTarget,type CDWReadingAssignment,type CDWQMSPendingReview,type CDWQMSAppointmentAlert} from "../features/cdw/api";
 import "./cdwWorkbench.css";
 
 type View="tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all";
@@ -53,6 +53,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const[reviewGates,setReviewGates]=useState<CDWReviewGate[]>([]);
  const[formalApprovals,setFormalApprovals]=useState<CDWFormalApproval[]>([]);
  const[pendingAppointments,setPendingAppointments]=useState<CDWQMSPendingReview[]>([]);
+ const[appointmentAlerts,setAppointmentAlerts]=useState<CDWQMSAppointmentAlert[]>([]);
  const[controlCandidates,setControlCandidates]=useState<CDWApprovedCandidate[]>([]);
  const[scopeApprovals,setScopeApprovals]=useState<CDWDistributionPlan[]>([]);
  const[receiptTargets,setReceiptTargets]=useState<CDWReceiptTarget[]>([]);
@@ -142,6 +143,20 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
    .catch(error=>{if(live)setRequestError(errorCopy(error,"岗位任命待核验列表加载失败"));});
   return()=>{live=false;};
  },[refreshToken,user.id]);
+ useEffect(()=>{
+  let live=true;
+  cdwApi.qmsAlerts().then(result=>{if(live)setAppointmentAlerts(result.items??[]);})
+   .catch(error=>{if(live)setRequestError(errorCopy(error,"岗位任命通知加载失败"));});
+  return()=>{live=false;};
+ },[refreshToken,user.id]);
+ async function readAppointmentAlert(id:string){
+  try{
+   await toast.track(()=>cdwApi.qmsAlertRead(id,newIdempotencyKey()),{
+    loading:"正在确认通知…",success:"已确认任命失效通知",
+    error:e=>errorCopy(e,"通知确认失败")});
+   refresh(v=>v+1);
+  }catch(error){setRequestError(errorCopy(error,"通知确认失败"));}
+ }
 
  useEffect(()=>{
   let active=true;
@@ -287,7 +302,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
        ["obligations","责任待办",totalObligations],
        ["reviews","待我验收",totalReviews],
        ["formal","正式审批",totalFormal],
-       ["appointments","任命核验",pendingAppointments.length],
+       ["appointments","任命核验",pendingAppointments.length+appointmentAlerts.filter(a=>!a.readAt).length],
        ["control","发行准备",totalControl],
        ["scope","范围审批",totalScope],
        ["receipts","部门签收",totalReceipts],
@@ -302,7 +317,8 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
       <div className="cdw-rail-footer">责任不会因下派而自动消失</div>
      </aside>
      {filter==="effective"?<CDWEffectiveSearchPanel/>:filter==="appointments"?
-      <CDWQMSReviewInbox items={pendingAppointments} onVerified={()=>refresh(v=>v+1)}/>:<>
+      <CDWQMSReviewInbox items={pendingAppointments} alerts={appointmentAlerts}
+       onRead={id=>void readAppointmentAlert(id)} onVerified={()=>refresh(v=>v+1)}/>:<>
      <section className="cdw-inbox" aria-label="任务列表">
       <header className="cdw-inbox-tools">
        <div className="cdw-inbox-heading"><strong>{filter==="tasks"?"我的任务":filter==="obligations"?"责任待办":filter==="reviews"?"待我验收":filter==="formal"?"正式审批":filter==="control"?"发行准备":filter==="scope"?"范围审批":filter==="receipts"?"部门签收":filter==="reading"?"阅读确认":"全部事项"}</strong><span>{visible.length}</span></div>

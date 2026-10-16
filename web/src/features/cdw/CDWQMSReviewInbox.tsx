@@ -1,14 +1,13 @@
 import {useState} from "react";
-import {Link} from "react-router-dom";
 import {RareButton,RareNotice,RareTextarea} from "../../shared/ui/rare";
 import {toast} from "../../shared/ui/feedback";
 import {errorCopy} from "../../shared/errors";
 import {newIdempotencyKey} from "../../shared/ids";
-import {cdwApi,type CDWQMSPendingReview} from "./api";
+import {cdwApi,type CDWQMSPendingReview,type CDWQMSAppointmentAlert} from "./api";
 
 // Only items already checked against live document-control role and file ACL
 // reach this list. Signing still revalidates both at transaction time.
-export function CDWQMSReviewInbox({items,onVerified}:{items:CDWQMSPendingReview[];onVerified:()=>void}){
+export function CDWQMSReviewInbox({items,alerts,onVerified,onRead}:{items:CDWQMSPendingReview[];alerts:CDWQMSAppointmentAlert[];onVerified:()=>void;onRead:(id:string)=>void}){
  const [selectedId,setSelectedId]=useState("");
  const [statement,setStatement]=useState("");
  const [busy,setBusy]=useState(false);
@@ -42,6 +41,13 @@ export function CDWQMSReviewInbox({items,onVerified}:{items:CDWQMSPendingReview[
   </section>
   <article className="cdw-detail" aria-label="岗位任命核验详情">
    <div className="cdw-detail-inner">
+    {alerts.some(a=>!a.readAt)&&<section className="cdw-section">
+     <div className="cdw-section-head"><h3>任命撤销通知</h3></div>
+     {alerts.filter(a=>!a.readAt).map(a=><div className="cdw-review-digest" key={a.id}>
+      <p className="cdw-section-note">受控签批岗位 {a.nodeKey.replaceAll("_"," ")} 的任命已撤销，原授权不可再用于签署。</p>
+      <RareButton type="button" tone="neutral" onClick={()=>onRead(a.id)}>已知悉此通知</RareButton>
+     </div>)}
+    </section>}
     {selected?<>
      <div className="cdw-detail-header"><div><small>QMS 任命证据核验</small><h2>{selected.fileName}</h2></div></div>
      <div className="cdw-review-digest">
@@ -52,11 +58,11 @@ export function CDWQMSReviewInbox({items,onVerified}:{items:CDWQMSPendingReview[
      <div className="cdw-review-digest">
       <small>任命凭据文件：{selected.evidenceFileName}</small>
       <p className="cdw-section-note">核定的发行版本：<code>{selected.evidenceReleaseId}</code></p>
-      <Link className="cdw-text-link" to={"/preview/"+encodeURIComponent(selected.evidenceFileId)}>
-       打开任命材料所在文件 ↗
-      </Link>
+      <a className="cdw-text-link" href={cdwApi.qmsAppointmentEvidenceUrl(selected.id)}>
+       下载精确受控发行版本 DOCX ↗
+      </a>
      </div>
-     <RareNotice tone="info">普通预览可能是较新版本，不能替代以上明确的受控发行版本。请比对版本和原始签字/任命条款，核实岗位、权限、有效期及适用范围。本人或提报人不可自审。</RareNotice>
+     <RareNotice tone="info">此下载由服务器核验发行版本与 SHA-256，不读取“最新文件”。请核对原始任命签字、岗位和期限；本人或提报人不可自审。</RareNotice>
      <label>独立核验结论
       <RareTextarea aria-label="独立文控核验结论" value={statement} rows={4} disabled={busy}
        onChange={event=>setStatement(event.target.value)}

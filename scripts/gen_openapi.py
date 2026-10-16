@@ -953,6 +953,34 @@ add("POST","/api/workbench/qms-appointments/{id}/verify",operation(
  request={"application/json":{"schema":obj({"statement":string()},required=["statement"])}},
  responses=dict([json_ok(CDW_QMS_APPOINTMENT,"Verified documentary evidence, not automated legal qualification."),
  resp("403",ERR["403"]),resp("409",ERR["409"])])))
+add("POST","/api/workbench/qms-appointments/{id}/revoke",operation(
+ "Irreversibly revoke verified QMS appointment with independently authorized document control",
+ "CDW","cdwQMSRevokeAppointment",security=SESSION,
+ params=[id_param("id","Appointment ID."),CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({"reason":string()},required=["reason"])}},
+ responses=dict([json_ok(CDW_QMS_APPOINTMENT,"Revoked qualification; recipient alerts written atomically."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
+add("GET","/api/workbench/qms-appointments/{id}/evidence",operation(
+ "Stream exact effective, immutable, sha-bound appointment evidence DOCX (not file latest)",
+ "CDW","cdwQMSAppointmentEvidence",security=SESSION,
+ params=[id_param("id","Appointment ID.")],
+ responses={"200":{"description":"Exact controlled distribution DOCX, with X-CDW-Artifact-SHA256"},
+ "403":{"description":"Document-control or source ACL missing"},
+ "409":{"description":"Controlled evidence no longer effective"}}))
+CDW_QMS_ALERT=obj({"id":string(),"appointmentId":string(),"fileId":string(),
+ "nodeKey":string(),"createdAt":timestamp(),"readAt":timestamp()},
+ required=["id","appointmentId","fileId","nodeKey","createdAt"])
+add("GET","/api/workbench/qms-appointment-alerts",operation(
+ "Current user's durable appointment-revocation notices","CDW","cdwQMSAlerts",
+ security=SESSION,responses=dict([json_ok(obj({"items":arr(CDW_QMS_ALERT)},required=["items"]),
+ "Recipient-only, file-ACL filtered durable alerts"),resp("403",ERR["403"])])))
+add("POST","/api/workbench/qms-appointment-alerts/{id}/read",operation(
+ "Record recipient acknowledgement of an appointment-revocation notice",
+ "CDW","cdwQMSReadAlert",security=SESSION,
+ params=[id_param("id","Alert ID."),CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({})}},
+ responses=dict([json_ok(obj({"id":string(),"read":boolean()},required=["id","read"]),
+ "Only the intended recipient may acknowledge"),resp("404",ERR["404"])])))
 add("POST","/api/workbench/formal-templates",operation(
  "Publish immutable versioned formal approval template","CDW","cdwFormalTemplatePublish",
  security=SESSION,params=[CDW_IDEMPOTENCY],

@@ -24,6 +24,8 @@ export function CDWQMSAppointmentEvidence({fileId,policyReleaseId,users,position
  const [until,setUntil]=useState("");
  const [reason,setReason]=useState("");
  const [statement,setStatement]=useState("");
+ const [revokeTarget,setRevokeTarget]=useState("");
+ const [revokeReason,setRevokeReason]=useState("");
  const refresh=useCallback(async()=>{
   const data=await cdwApi.qmsAppointments(fileId);
   setItems(data.items.filter(item=>item.policyReleaseId===policyReleaseId));
@@ -69,6 +71,17 @@ export function CDWQMSAppointmentEvidence({fileId,policyReleaseId,users,position
     error:e=>errorCopy(e,"任命核验失败")});
    setStatement("");await refresh();
   }catch(e){setError(errorCopy(e,"任命核验失败"));}
+  finally{setBusy(false);}
+ }
+ async function revoke(id:string){
+  if(Array.from(revokeReason.trim()).length<16||busy)return;
+  setBusy(true);
+  try{
+   await toast.track(()=>cdwApi.qmsAppointmentRevoke(id,revokeReason.trim(),newIdempotencyKey()),{
+    loading:"正在撤销岗位任命…",success:"任命已撤销，后续 QMS 签批即刻失效",
+    error:e=>errorCopy(e,"任命撤销失败")});
+   setRevokeTarget("");setRevokeReason("");await refresh();
+  }catch(e){setError(errorCopy(e,"任命撤销失败"));}
   finally{setBusy(false);}
  }
  return <section className="cdw-section">
@@ -121,6 +134,21 @@ export function CDWQMSAppointmentEvidence({fileId,policyReleaseId,users,position
     </label>
     <RareButton type="button" disabled={busy||Array.from(statement.trim()).length<16}
      onClick={()=>void verify(item.id)}>由有权文控人员核验此任命</RareButton>
+   </>}
+   {item.status==="verified"&&<>
+    <RareButton type="button" disabled={busy} tone="neutral"
+     onClick={()=>{setRevokeTarget(v=>v===item.id?"":item.id);setRevokeReason("");}}>
+     {revokeTarget===item.id?"取消撤销操作":"撤销任命资格"}
+    </RareButton>
+    {revokeTarget===item.id&&<>
+     <RareNotice tone="warning">撤销立即阻断该岗位后续正式签批，向相关人员生成持久通知；历史签署记录不会删除。</RareNotice>
+     <label>撤销事实与依据
+      <RareTextarea aria-label="岗位任命撤销依据" rows={2} value={revokeReason} disabled={busy}
+       onChange={e=>setRevokeReason(e.target.value)} placeholder="说明撤销依据、起效条件及影响范围（至少 16 字）"/>
+     </label>
+     <RareButton type="button" disabled={busy||Array.from(revokeReason.trim()).length<16}
+      onClick={()=>void revoke(item.id)}>确认撤销岗位任命</RareButton>
+    </>}
    </>}
   </div>)}
  </section>;

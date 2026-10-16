@@ -2359,6 +2359,256 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-appointments/{id}/revoke:
+    post:
+      summary: Irreversibly revoke verified QMS appointment with independently authorized document control
+      operationId: cdwQMSRevokeAppointment
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Appointment ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+              required:
+              - reason
+      responses:
+        '200':
+          description: Revoked qualification; recipient alerts written atomically.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      fileId:
+                        type: string
+                      userId:
+                        type: string
+                      nodeKey:
+                        type: string
+                      policyReleaseId:
+                        type: string
+                      evidenceReleaseId:
+                        type: string
+                      expiresAt:
+                        type: string
+                        format: date-time
+                      status:
+                        type: string
+                        enum:
+                        - pending
+                        - verified
+                        - revoked
+                      proposedBy:
+                        type: string
+                      verifiedBy:
+                        type: string
+                      reason:
+                        type: string
+                    required:
+                    - id
+                    - fileId
+                    - userId
+                    - nodeKey
+                    - policyReleaseId
+                    - evidenceReleaseId
+                    - expiresAt
+                    - status
+                    - proposedBy
+                    - reason
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-appointments/{id}/evidence:
+    get:
+      summary: Stream exact effective, immutable, sha-bound appointment evidence DOCX (not file latest)
+      operationId: cdwQMSAppointmentEvidence
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Appointment ID.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Exact controlled distribution DOCX, with X-CDW-Artifact-SHA256
+        '403':
+          description: Document-control or source ACL missing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Controlled evidence no longer effective
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-appointment-alerts:
+    get:
+      summary: Current user's durable appointment-revocation notices
+      operationId: cdwQMSAlerts
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Recipient-only, file-ACL filtered durable alerts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            appointmentId:
+                              type: string
+                            fileId:
+                              type: string
+                            nodeKey:
+                              type: string
+                            createdAt:
+                              type: string
+                              format: date-time
+                            readAt:
+                              type: string
+                              format: date-time
+                          required:
+                          - id
+                          - appointmentId
+                          - fileId
+                          - nodeKey
+                          - createdAt
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-appointment-alerts/{id}/read:
+    post:
+      summary: Record recipient acknowledgement of an appointment-revocation notice
+      operationId: cdwQMSReadAlert
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Alert ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {}
+      responses:
+        '200':
+          description: Only the intended recipient may acknowledge
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      read:
+                        type: boolean
+                    required:
+                    - id
+                    - read
+                required:
+                - ok
+                - data
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/formal-templates:
     post:
       summary: Publish immutable versioned formal approval template

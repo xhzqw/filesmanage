@@ -127,6 +127,10 @@ try{
  assert.equal(await evalJS("!!document.querySelector('[aria-label=\"岗位任命核验详情\"]')"),true,
   "appointment review details occupy the shared main canvas, without a second UI system");
  console.log("CDW_QMS_APPOINTMENT_REVIEW_BROWSER_PASS independent document-control inbox=live-no-write");
+ const alerts=await evalJS("(async()=>{const r=await fetch('/api/workbench/qms-appointment-alerts');return {status:r.status,data:(await r.json()).data}})()");
+ assert.equal(alerts.status,200,"appointment revocation notices belong to logged-in recipient");
+ assert.ok(Array.isArray(alerts.data?.items),"revocation alerts must be durable server-backed rows");
+ console.log("CDW_QMS_REVOCATION_ALERT_BROWSER_PASS current recipient alert inbox=live-no-write");
 
  await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('发行准备'));button?.click();return true;})()");
  await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('发行准备')");
