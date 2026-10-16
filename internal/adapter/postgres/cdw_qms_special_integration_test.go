@@ -264,6 +264,39 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 		t.Fatalf("policy change did not create exactly one scoped review task: %+v %v", impactRows, impactErr)
 	}
 	impactID := impactRows[0].ID
+	// G14 deliberately coalesces repeated changes to the same open impact.
+	// An approval begun during temporary policy reactivation must STILL be
+	// cut by the next pointer change even when there is no new impact row.
+	if _, err = tx.Exec(ctx, `UPDATE cdw_effective_pointers SET state='active',
+ release_id=$2,activated_at=clock_timestamp() WHERE file_id=$1`, policyFile, policyRelease); err != nil {
+		t.Fatal(err)
+	}
+	coalescedInstance := prefix + "_g15_coalesced_instance"
+	if _, err = tx.Exec(ctx, `INSERT INTO cdw_formal_approval_instances
+ (id,subject_id,template_version_id,state,requested_by)
+ VALUES($1,$2,$3,'pending',$4)`, coalescedInstance, formalSubject, tpl, admin.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO cdw_formal_approval_steps
+ (id,instance_id,node_key,sequence_no,approver_user_id,state)
+ VALUES($1,$3,'management_representative',1,$4,'ready'),
+       ($2,$3,'general_manager',2,$5,'waiting')`,
+		prefix+"_g15_coalesced_first", prefix+"_g15_coalesced_second", coalescedInstance, bob.ID, alice.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `UPDATE cdw_effective_pointers SET state='none',release_id=NULL
+ WHERE file_id=$1`, policyFile); err != nil {
+		t.Fatal(err)
+	}
+	if err = tx.QueryRow(ctx, `SELECT state FROM cdw_formal_approval_instances WHERE id=$1`,
+		coalescedInstance).Scan(&interruptedState); err != nil || interruptedState != "conflicted" {
+		t.Fatalf("coalesced impact missed newer pending approval: %s %v", interruptedState, err)
+	}
+	var impactCount int
+	if err = tx.QueryRow(ctx, `SELECT COUNT(*) FROM cdw_qms_special_policy_impacts
+ WHERE authority_id=$1 AND state='open'`, recordID).Scan(&impactCount); err != nil || impactCount != 1 {
+		t.Fatalf("G14 coalesced impact unexpectedly duplicated: %d %v", impactCount, err)
+	}
 	if _, impactErr = r.CDWQMSSpecialAssessImpact(ctx, impactID, admin.ID,
 		"reapproval_required", reason); !errors.Is(impactErr, domain.ErrForbidden) {
 		t.Fatalf("policy proposer self-assessed impact: %v", impactErr)
@@ -345,7 +378,7 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	}
 	var cutCount int
 	if err = tx.QueryRow(ctx, `SELECT count(*) FROM cdw_qms_formal_policy_interruptions
- WHERE approval_instance_id IN($1,$2)`, formalInstance, revokedInstance).Scan(&cutCount); err != nil || cutCount != 2 {
+ WHERE approval_instance_id IN($1,$2,$3)`, formalInstance, revokedInstance, coalescedInstance).Scan(&cutCount); err != nil || cutCount != 3 {
 		t.Fatalf("pointer and revoke interruptions incomplete: %d %v", cutCount, err)
 	}
 	alerts, err := r.CDWQMSSpecialAlerts(ctx, bob.ID, 20)
