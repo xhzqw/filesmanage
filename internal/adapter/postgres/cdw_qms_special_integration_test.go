@@ -135,6 +135,52 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	if source, sourceErr := r.CDWQMSSpecialEvidenceSource(ctx, recordID); !errors.Is(sourceErr, domain.ErrPolicyAuthorityPending) {
 		t.Fatalf("non-dispatched policy artifact was served instead of failing closed: %+v %v", source, sourceErr)
 	}
+	// Exact-source POSITIVE test: a synthetic, otherwise valid dispatched
+	// artifact. Roll it back before testing pointer invalidation. No fake
+	// organization authorization survives even in this disposable lab.
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_special_dispatched_artifact"); err != nil {
+		t.Fatal(err)
+	}
+	artifactID := prefix + "_special_distribution_artifact"
+	planID := prefix + "_special_distribution_plan"
+	batchID := prefix + "_special_distribution_batch"
+	const snapshotSHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	if _, err = tx.Exec(ctx, `INSERT INTO cdw_release_artifacts
+ (id,release_id,format,purpose,blob_id,sha256,size_bytes,created_by)
+ VALUES($1,$2,'docx','distribution',$3,$4,31,$5)`,
+		artifactID, policyRelease, blobID, sha, admin.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO cdw_distribution_plans
+ (id,state,digest_sha256,created_by,frozen_at)
+ VALUES($1,'dispatched',$2,$3,clock_timestamp())`,
+		planID, snapshotSHA, admin.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO cdw_distribution_plan_items
+ (plan_id,ordinal,release_id,artifact_id,artifact_sha256)
+ VALUES($1,1,$2,$3,$4)`, planID, policyRelease, artifactID, sha); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO cdw_distribution_batches
+ (id,plan_id,plan_digest_sha256,state,dispatched_by,dispatched_at)
+ VALUES($1,$2,$3,'dispatched',$4,clock_timestamp())`,
+		batchID, planID, snapshotSHA, admin.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO cdw_distribution_batch_items
+ (id,batch_id,plan_id,ordinal,release_id,artifact_id,artifact_sha256)
+ VALUES($1,$2,$3,1,$4,$5,$6)`,
+		prefix+"_special_batch_item", batchID, planID, policyRelease, artifactID, sha); err != nil {
+		t.Fatal(err)
+	}
+	if source, sourceErr := r.CDWQMSSpecialEvidenceSource(ctx, recordID); sourceErr != nil || source.ReleaseID != policyRelease || source.SHA256 != sha || source.SizeBytes != 31 ||
+		source.Format != "docx" || source.StorageKey == "" {
+		t.Fatalf("exact dispatched controlled source not retrievable: %+v %v", source, sourceErr)
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_special_dispatched_artifact"); err != nil {
+		t.Fatal(err)
+	}
 	if err = r.cdwFormalValidateClass(ctx, subjectFileID, "bogus", "qms_"+policyTemplate, policyRelease); !errors.Is(err, domain.ErrPolicyAuthorityPending) {
 		t.Fatalf("other template inherited dedicated authority: %v", err)
 	}
