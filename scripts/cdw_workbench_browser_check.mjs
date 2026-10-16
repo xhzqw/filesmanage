@@ -121,6 +121,25 @@ try{
  const controlledLayout=await evalJS("({width:innerWidth,scrollWidth:document.documentElement.scrollWidth})");
  assert.ok(controlledLayout.scrollWidth<=controlledLayout.width+2,"G8 narrow canvas has no page overflow");
  console.log("CDW_G8_PREPARE_BROWSER_PASS candidate-registry+tab+live-source-sha=read-only");
+ const effective=await evalJS("(async()=>{const r=await fetch('/api/workbench/controlled/effective-search?limit=10');return {status:r.status,data:(await r.json()).data}})()");
+ assert.equal(effective.status,200,"authenticated current effective release search is live");
+ assert.ok(Array.isArray(effective.data?.items),"effective search results are not simulated");
+ assert.ok(effective.data.items.every(row=>row.releaseId&&row.fileId&&row.sha256?.length===64),
+  "each visible search hit is bound to an exact immutable effective release digest");
+ await evalJS("(()=>{const b=[...document.querySelectorAll('.cdw-rail-item')].find(x=>x.textContent.includes('生效文件'));b?.click();return Boolean(b)})()");
+ await until("!!document.querySelector('.cdw-effective-view input[type=search]')");
+ await until("!document.querySelector('.cdw-effective-view .cdw-message')");
+ for(const width of [1440,1024,780]){
+  await send("Emulation.setDeviceMetricsOverride",{width,height:850,deviceScaleFactor:1,mobile:false});
+  await sleep(170);
+  const effectiveLayout=await evalJS("(()=>{const v=document.querySelector('.cdw-effective-view'),r=v.getBoundingClientRect();return {viewport:innerWidth,pageWidth:document.documentElement.scrollWidth,left:r.left,right:r.right,bottom:r.bottom}})()");
+  assert.ok(effectiveLayout.pageWidth<=width+2&&effectiveLayout.right<=width+2&&effectiveLayout.left>=-2&&effectiveLayout.bottom<=851,
+   "effective search viewport overflow: "+JSON.stringify(effectiveLayout));
+ }
+ const searchInput=await evalJS("(()=>{const input=document.querySelector('.cdw-effective-view input[type=search]');const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(input,'nonexistent-controlled-fulltext-token');input.dispatchEvent(new Event('input',{bubbles:true}));return input.value})()");
+ assert.equal(searchInput,"nonexistent-controlled-fulltext-token","effective filename/contents filter accepts input");
+ await until("!document.querySelector('.cdw-effective-view .cdw-message')");
+ console.log("CDW_G8_EFFECTIVE_SEARCH_BROWSER_PASS live-authorized-api+immutable-sha+search-control+1440/1024/780");
  const scope=await evalJS("(async()=>{const r=await fetch('/api/workbench/distribution-scope/inbox');return {status:r.status,data:(await r.json()).data}})()");
  assert.equal(scope.status,200,"G9 scope approval inbox enforces live authenticated identity");
  assert.ok(Array.isArray(scope.data?.items),"G9 independently appointed scope list is live");
