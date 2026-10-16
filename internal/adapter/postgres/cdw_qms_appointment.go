@@ -156,6 +156,7 @@ func (r *Repository) CDWQMSListAppointments(ctx context.Context, fileID string) 
 }
 
 // Scoped to live document-control bindings, excluding proposer and nominee.
+// Includes pending reviews AND verified appointments the controller can revoke.
 // Application intersects file visibility before returning any record.
 func (r *Repository) CDWQMSPendingReview(ctx context.Context, actor string, limit int) ([]ports.CDWQMSPendingReview, error) {
 	rows, err := r.Q.Query(ctx, `SELECT a.id,a.file_id,a.user_id,a.node_key,a.policy_release_id,
@@ -164,7 +165,7 @@ func (r *Repository) CDWQMSPendingReview(ctx context.Context, actor string, limi
  FROM cdw_qms_appointments a JOIN files f ON f.id=a.file_id
  JOIN cdw_controlled_releases evidence ON evidence.id=a.evidence_release_id
  JOIN files ef ON ef.id=evidence.file_id
- WHERE a.status='pending' AND a.proposed_by<>$1 AND a.user_id<>$1
+ WHERE a.status IN('pending','verified') AND a.proposed_by<>$1 AND a.user_id<>$1
  AND f.deleted_at IS NULL AND EXISTS(
   SELECT 1 FROM cdw_business_role_bindings b JOIN users u ON u.id=b.user_id
   WHERE b.user_id=$1 AND b.role='document_control'

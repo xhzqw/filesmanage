@@ -1001,6 +1001,10 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	if checkErr != nil || appointment.Status != "verified" || appointment.VerifiedBy != charlie.ID {
 		t.Fatalf("valid independent QMS appointment verification failed %+v %v", appointment, checkErr)
 	}
+	reviews, checkErr = fixtureReader.CDWQMSPendingReview(ctx, charlie.ID, 100)
+	if checkErr != nil || len(reviews) != 1 || reviews[0].Status != "verified" {
+		t.Fatalf("non-admin document controller cannot reopen verified appointment for later revocation: %+v %v", reviews, checkErr)
+	}
 	if _, checkErr = fixtureReader.cdwCurrentQMSAppointment(ctx, qmsFileID, bob.ID,
 		"general_manager", issued.ID); !errors.Is(checkErr, domain.ErrQMSAppointmentPending) {
 		t.Fatalf("QMS appointment role scope not checked: %v", checkErr)

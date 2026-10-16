@@ -133,5 +133,15 @@ func (s *Service) CDWQMSAppointmentEvidence(ctx context.Context, actor domain.Us
 	if e != nil {
 		return nil, "", 0, e
 	}
+	// Audit the content REQUEST, not an assumed successful full transfer.
+	if e = auditRequired(ctx, tx, actor, "cdw.qms.evidence.requested", "qms_appointment", id, "success",
+		map[string]any{"releaseId": source.ReleaseID, "sha256": source.SHA256, "sizeBytes": source.SizeBytes}); e != nil {
+		_ = reader.Close()
+		return nil, "", 0, e
+	}
+	if e = tx.Commit(ctx); e != nil {
+		_ = reader.Close()
+		return nil, "", 0, e
+	}
 	return reader, source.SHA256, source.SizeBytes, nil
 }
