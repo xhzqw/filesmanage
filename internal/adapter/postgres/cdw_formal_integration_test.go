@@ -842,6 +842,39 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 		activatedFixture.Revision != issued.Revision+1 || activatedFixture.EffectiveAt == nil {
 		t.Fatalf("actual effective transaction failed %+v %v", activatedFixture, e)
 	}
+	// A controlled release becomes a valid source of policy provenance only
+	// while its exact effective pointer is active. No legal appointment or
+	// business signature is fabricated by this isolated transaction.
+	if active, checkErr := fixtureReader.cdwQMSPolicyEffective(ctx, issued.ID); checkErr != nil || !active {
+		t.Fatalf("effective QMS policy source not recognized: %t %v", active, checkErr)
+	}
+	qmsPolicyTemplate := prefix + "_qms_policy_test"
+	if _, checkErr := fixtureReader.CDWPublishFormalTemplate(ctx, prefix+"_qms_tpl", "qms_"+qmsPolicyTemplate,
+		qmsSteps, admin.ID, issued.ID); checkErr != nil {
+		t.Fatalf("QMS template could not bind effective controlled source: %v", checkErr)
+	}
+	if _, checkErr := fixtureReader.CDWGrantFormalApprover(ctx, prefix+"_qms_role", bob.ID, fileID,
+		admin.ID, issued.ID); checkErr != nil {
+		t.Fatalf("QMS role could not bind effective controlled source: %v", checkErr)
+	}
+	if _, checkErr := readFixtureTx.Exec(ctx, "SAVEPOINT cdw_qms_revocation_fixture"); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	if _, checkErr := readFixtureTx.Exec(ctx, `UPDATE cdw_effective_pointers
+ SET state='none',release_id=NULL WHERE file_id=$1`, fileID); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	if active, checkErr := fixtureReader.cdwQMSPolicyEffective(ctx, issued.ID); checkErr != nil || active {
+		t.Fatalf("superseded policy pointer still authorizes QMS: %t %v", active, checkErr)
+	}
+	if _, checkErr := fixtureReader.CDWPublishFormalTemplate(ctx, prefix+"_qms_tpl_revoked",
+		"qms_"+qmsPolicyTemplate+"_revoked", qmsSteps, admin.ID, issued.ID); !errors.Is(checkErr, domain.ErrPolicyAuthorityPending) {
+		t.Fatalf("QMS publish was not blocked after policy pointer withdrawal: %v", checkErr)
+	}
+	if _, checkErr := readFixtureTx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_qms_revocation_fixture"); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	t.Log("CDW_QMS_POLICY_EFFECTIVE_FIXTURE_PASS valid pointer grants, revoked pointer blocks, isolated rollback")
 	var scheduleStatusAfterManual string
 	if e = readFixtureTx.QueryRow(ctx, `SELECT status FROM cdw_activation_schedules WHERE release_id=$1`, issued.ID).Scan(&scheduleStatusAfterManual); e != nil || scheduleStatusAfterManual != "completed" {
 		t.Fatalf("manual activation failed to stop previously enabled timer: %q %v", scheduleStatusAfterManual, e)

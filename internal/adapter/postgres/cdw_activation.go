@@ -60,6 +60,18 @@ func (r *Repository) CDWActivateReleaseWithTrigger(ctx context.Context, attemptI
 	if _, err = r.CDWControlRole(ctx, actor, "document_control", fileID); err != nil {
 		return out, err
 	}
+	var approvalCandidateID string
+	err = r.Q.QueryRow(ctx, `SELECT approved_candidate_id FROM cdw_controlled_releases WHERE id=$1`, releaseID).Scan(&approvalCandidateID)
+	if err != nil {
+		return out, err
+	}
+	current, err := r.cdwQMSCandidatePolicyCurrent(ctx, approvalCandidateID)
+	if err != nil {
+		return out, err
+	}
+	if !current {
+		out.Blockers = append(out.Blockers, "qms_policy_authority_not_current")
+	}
 	var policyFlags struct {
 		Version                     string `json:"version"`
 		RequiresScopeApproval       bool   `json:"requiresScopeApproval"`

@@ -149,6 +149,13 @@ func (r *Repository) CDWControlPrepare(ctx context.Context, id, artifactID, cand
 	if approvalState != "approved" {
 		return result, domain.ErrConflict
 	}
+	current, err := r.cdwQMSCandidatePolicyCurrent(ctx, candidateID)
+	if err != nil {
+		return result, err
+	}
+	if !current {
+		return result, domain.ErrPolicyAuthorityPending
+	}
 	// Serialize the file's release allocation to prevent concurrent duplicate
 	// labels or duplicate use of an approved immutable candidate.
 	var locked string

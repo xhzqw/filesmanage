@@ -33,6 +33,13 @@ func (r *Repository) CDWControlIssue(ctx context.Context, id, actor string, expe
 	if state != "ready" || rev != expected {
 		return out, domain.ErrVersionConflict
 	}
+	current, err := r.cdwQMSCandidatePolicyCurrent(ctx, candidateID)
+	if err != nil {
+		return out, err
+	}
+	if !current {
+		return out, domain.ErrPolicyAuthorityPending
+	}
 	if _, err = r.CDWControlRole(ctx, actor, "document_control", fileID); err != nil {
 		return out, err
 	}

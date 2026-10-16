@@ -27,6 +27,27 @@ func (r *Repository) cdwQMSPolicyEffective(ctx context.Context, basisID string) 
 	return active, err
 }
 
+// Approved candidates do not carry a permanent policy waiver: a QMS policy
+// that was effective during signing can be revoked before issue or activation.
+func (r *Repository) cdwQMSCandidatePolicyCurrent(ctx context.Context, candidateID string) (bool, error) {
+	var templateKey, policyBasisID string
+	err := r.Q.QueryRow(ctx, `SELECT tv.template_key,COALESCE(tv.authority_basis_release_id,'')
+ FROM cdw_approved_candidates c
+ JOIN cdw_formal_approval_instances fa ON fa.id=c.approval_instance_id
+ JOIN cdw_workflow_template_versions tv ON tv.id=fa.template_version_id
+ WHERE c.id=$1`, candidateID).Scan(&templateKey, &policyBasisID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, domain.ErrNotFound
+	}
+	if err != nil {
+		return false, err
+	}
+	if !cdwIsQMSFormalTemplate(templateKey) {
+		return true, nil
+	}
+	return r.cdwQMSPolicyEffective(ctx, policyBasisID)
+}
+
 // The binding is checked again while deciding, not just when a step is assigned.
 // In particular, administrator status is never itself formal approval authority.
 func (r *Repository) cdwFormalAuthority(ctx context.Context, actor, fileID, policyBasisID string) (string, error) {
