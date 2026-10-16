@@ -17,4 +17,5 @@ var (
 	ErrConflict               = errors.New("conflicting state")
 	ErrPolicyAuthorityPending = errors.New("formal QMS policy authority basis is pending verification")
 	ErrDocumentClassPending   = errors.New("formal document classification must be verified by document control")
+	ErrQMSAppointmentPending  = errors.New("formal QMS signer has no independently verified current appointment")
 )

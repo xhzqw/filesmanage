@@ -1,6 +1,9 @@
 package ports
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // Equal sequence numbers are a parallel, unanimous approval group.
 type CDWFormalStepDefinition struct {
@@ -59,8 +62,26 @@ type CDWDocumentClassification struct {
 	RoleBindingID string `json:"roleBindingId,omitempty"`
 }
 
+type CDWQMSAppointment struct {
+	ID                string `json:"id"`
+	FileID            string `json:"fileId"`
+	UserID            string `json:"userId"`
+	NodeKey           string `json:"nodeKey"`
+	PolicyReleaseID   string `json:"policyReleaseId"`
+	EvidenceReleaseID string `json:"evidenceReleaseId"`
+	ExpiresAt         string `json:"expiresAt"`
+	Status            string `json:"status"`
+	ProposedBy        string `json:"proposedBy"`
+	VerifiedBy        string `json:"verifiedBy,omitempty"`
+	Reason            string `json:"reason"`
+}
+
 // All mutations run inside the caller's UnitOfWork transaction.
 type CDWFormalStore interface {
+	CDWQMSProposeAppointment(context.Context, string, string, string, string, string, string, string, time.Time, string) (CDWQMSAppointment, error)
+	CDWQMSVerifyAppointment(context.Context, string, string, string) (CDWQMSAppointment, error)
+	CDWQMSAppointmentFile(context.Context, string) (string, error)
+	CDWQMSListAppointments(context.Context, string) ([]CDWQMSAppointment, error)
 	CDWFormalClass(context.Context, string) (CDWDocumentClassification, error)
 	CDWFormalClassify(context.Context, string, string, string, string) (CDWDocumentClassification, error)
 	CDWPublishFormalTemplate(context.Context, string, string, []CDWFormalStepDefinition, string, string) (string, error)

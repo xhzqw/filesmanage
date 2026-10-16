@@ -115,6 +115,17 @@ func (r *Repository) CDWGrantFormalApprover(ctx context.Context, id, userID, fil
 		if !active {
 			return "", domain.ErrPolicyAuthorityPending
 		}
+		var appointed bool
+		if err = r.Q.QueryRow(ctx, `SELECT EXISTS(
+ SELECT 1 FROM cdw_qms_appointments a
+ WHERE a.file_id=$1 AND a.user_id=$2 AND a.policy_release_id=$3
+ AND cdw_qms_appointment_current(a.file_id,a.user_id,a.node_key,a.policy_release_id)
+ )`, fileID, userID, policyBasisID).Scan(&appointed); err != nil {
+			return "", err
+		}
+		if !appointed {
+			return "", domain.ErrQMSAppointmentPending
+		}
 	}
 	if _, err := r.Q.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1))",
 		"cdw:formal_approver:"+userID+":"+fileID+":"+policyBasisID); err != nil {
@@ -238,6 +249,11 @@ func (r *Repository) CDWStartFormalApproval(ctx context.Context, id, subjectID, 
 		if _, err = r.cdwFormalAuthority(ctx, step.ApproverID, fileID, policyBasisID); err != nil {
 			return result, err
 		}
+		if cdwIsQMSFormalTemplate(templateKey) {
+			if _, err = r.cdwCurrentQMSAppointment(ctx, fileID, step.ApproverID, step.NodeKey, policyBasisID); err != nil {
+				return result, err
+			}
+		}
 	}
 	_, err = r.Q.Exec(ctx, `INSERT INTO cdw_approval_subjects
  (id,file_id,source_kind,delivery_id,blob_id,sha256,size_bytes,lineage_snapshot,frozen_by)
@@ -309,22 +325,30 @@ func (r *Repository) CDWDecideFormalApproval(ctx context.Context, id, actor, dec
 	if err != nil {
 		return result, err
 	}
-	var stepID string
-	err = r.Q.QueryRow(ctx, `SELECT id FROM cdw_formal_approval_steps
+	var stepID, nodeKey string
+	err = r.Q.QueryRow(ctx, `SELECT id,node_key FROM cdw_formal_approval_steps
  WHERE instance_id=$1 AND approver_user_id=$2 AND state='ready'
- ORDER BY sequence_no,node_key LIMIT 1 FOR UPDATE`, id, actor).Scan(&stepID)
+ ORDER BY sequence_no,node_key LIMIT 1 FOR UPDATE`, id, actor).Scan(&stepID, &nodeKey)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return result, domain.ErrForbidden
 	}
 	if err != nil {
 		return result, err
 	}
+	appointmentID := ""
+	if cdwIsQMSFormalTemplate(templateKey) {
+		appointmentID, err = r.cdwCurrentQMSAppointment(ctx, fileID, actor, nodeKey, policyBasisID)
+		if err != nil {
+			return result, err
+		}
+	}
 	_, err = r.Q.Exec(ctx, `INSERT INTO cdw_formal_approval_decisions
  (id,step_id,actor_id,decision,reason,subject_sha256,actor_authority_snapshot)
  VALUES($1,$2,$3,$4,$5,$6,jsonb_build_object('role','formal_approver',
  'bindingId',$7::text,'actorId',$3::text,'approvedSubjectId',$8::text,
- 'policyBasisReleaseId',NULLIF($9::text,'')))`,
-		decisionID, stepID, actor, decision, reason, hash, binding, subjectID, policyBasisID)
+ 'policyBasisReleaseId',NULLIF($9::text,''),
+ 'appointmentId',NULLIF($10::text,'')))`,
+		decisionID, stepID, actor, decision, reason, hash, binding, subjectID, policyBasisID, appointmentID)
 	if err != nil {
 		return result, err
 	}
@@ -441,7 +465,8 @@ func (r *Repository) CDWFormalInbox(ctx context.Context, actor string, limit int
  AND (b.expires_at IS NULL OR b.expires_at>now()) AND u.disabled_at IS NULL
  AND (lower(tv.template_key) !~ '^(cdw_)?qms_' OR
   (b.authority_basis_release_id=tv.authority_basis_release_id
-   AND cdw_qms_policy_release_effective(tv.authority_basis_release_id))))
+   AND cdw_qms_policy_release_effective(tv.authority_basis_release_id)
+   AND cdw_qms_appointment_current(s.file_id,step.approver_user_id,step.node_key,tv.authority_basis_release_id))))
  ORDER BY a.requested_at DESC,a.id DESC LIMIT $2`, actor, limit)
 	if err != nil {
 		return nil, err
@@ -473,7 +498,8 @@ func (r *Repository) CDWFormalCanRead(ctx context.Context, id, actor string) (bo
  AND auth.valid_from<=now() AND (auth.expires_at IS NULL OR auth.expires_at>now())
  AND (lower(tv.template_key) !~ '^(cdw_)?qms_' OR
   (auth.authority_basis_release_id=tv.authority_basis_release_id
-   AND cdw_qms_policy_release_effective(tv.authority_basis_release_id))))
+   AND cdw_qms_policy_release_effective(tv.authority_basis_release_id)
+   AND cdw_qms_appointment_current(s.file_id,st.approver_user_id,st.node_key,tv.authority_basis_release_id))))
  OR EXISTS(SELECT 1 FROM cdw_business_role_bindings b WHERE b.user_id=$2 AND b.role='document_control'
  AND (b.file_id=s.file_id OR b.file_id IS NULL) AND b.revoked_at IS NULL
  AND b.valid_from<=now() AND (b.expires_at IS NULL OR b.expires_at>now()))))`, id, actor).Scan(&allowed)

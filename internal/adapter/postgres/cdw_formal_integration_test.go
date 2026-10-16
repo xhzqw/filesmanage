@@ -942,10 +942,81 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	if _, checkErr := readFixtureTx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_qms_generic_bypass"); checkErr != nil {
 		t.Fatal(checkErr)
 	}
-	if _, checkErr := fixtureReader.CDWGrantFormalApprover(ctx, prefix+"_qms_role", bob.ID, qmsFileID,
-		admin.ID, issued.ID); checkErr != nil {
-		t.Fatalf("QMS role could not bind effective controlled source: %v", checkErr)
+	if _, checkErr := fixtureReader.CDWGrantFormalApprover(ctx, prefix+"_qms_without_appointment", bob.ID, qmsFileID,
+		admin.ID, issued.ID); !errors.Is(checkErr, domain.ErrQMSAppointmentPending) {
+		t.Fatalf("technical role unexpectedly substituted for a verified QMS appointment: %v", checkErr)
 	}
+	appointmentID := prefix + "_qms_appointment_01"
+	appointment, checkErr := fixtureReader.CDWQMSProposeAppointment(ctx, appointmentID, qmsFileID, bob.ID,
+		"management_representative", issued.ID, issued.ID, admin.ID, time.Now().Add(24*time.Hour),
+		"隔离测试岗位材料登记，此条不证明现实中的正式企业任命和法规资格。")
+	if checkErr != nil || appointment.Status != "pending" {
+		t.Fatalf("QMS appointment staging failed %+v %v", appointment, checkErr)
+	}
+	if _, checkErr = fixtureReader.cdwCurrentQMSAppointment(ctx, qmsFileID, bob.ID,
+		"management_representative", issued.ID); !errors.Is(checkErr, domain.ErrQMSAppointmentPending) {
+		t.Fatalf("pending QMS appointment was treated as verified: %v", checkErr)
+	}
+	if _, checkErr = fixtureReader.CDWQMSVerifyAppointment(ctx, appointmentID, admin.ID,
+		"提出任命者不能独立验证自己的任命材料，该操作必须拒绝执行。"); !errors.Is(checkErr, domain.ErrForbidden) {
+		t.Fatalf("proposer self-verified QMS appointment: %v", checkErr)
+	}
+	if _, checkErr = fixtureReader.CDWQMSVerifyAppointment(ctx, appointmentID, bob.ID,
+		"被任命人不能自行验证其岗位任命材料，需要另外的有权文控人员。"); !errors.Is(checkErr, domain.ErrForbidden) {
+		t.Fatalf("appointed signer self-verified QMS appointment: %v", checkErr)
+	}
+	appointment, checkErr = fixtureReader.CDWQMSVerifyAppointment(ctx, appointmentID, charlie.ID,
+		"隔离场景由独立文控角色核验签批岗位、适用文件、期限及受控原件。")
+	if checkErr != nil || appointment.Status != "verified" || appointment.VerifiedBy != charlie.ID {
+		t.Fatalf("valid independent QMS appointment verification failed %+v %v", appointment, checkErr)
+	}
+	if _, checkErr = fixtureReader.cdwCurrentQMSAppointment(ctx, qmsFileID, bob.ID,
+		"general_manager", issued.ID); !errors.Is(checkErr, domain.ErrQMSAppointmentPending) {
+		t.Fatalf("QMS appointment role scope not checked: %v", checkErr)
+	}
+	if _, checkErr = fixtureReader.cdwCurrentQMSAppointment(ctx, qmsFileID, bob.ID,
+		"management_representative", issued.ID); checkErr != nil {
+		t.Fatalf("verified current QMS appointment was not usable: %v", checkErr)
+	}
+	if _, checkErr = fixtureReader.CDWGrantFormalApprover(ctx, prefix+"_qms_role", bob.ID, qmsFileID,
+		admin.ID, issued.ID); checkErr != nil {
+		t.Fatalf("QMS role did not honor independent appointment: %v", checkErr)
+	}
+	if _, checkErr = readFixtureTx.Exec(ctx, "SAVEPOINT cdw_qms_appointment_immutable"); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	if _, checkErr = readFixtureTx.Exec(ctx, `UPDATE cdw_qms_appointments
+ SET verified_by=$2 WHERE id=$1`, appointmentID, admin.ID); checkErr == nil {
+		t.Fatal("database rewrote an independently verified QMS appointment")
+	}
+	if _, checkErr = readFixtureTx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_qms_appointment_immutable"); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	if _, checkErr = readFixtureTx.Exec(ctx, "SAVEPOINT cdw_qms_direct_decision"); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	qmsAttemptID := prefix + "_qms_direct_approval"
+	qmsStepID := prefix + "_qms_direct_step"
+	if _, checkErr = readFixtureTx.Exec(ctx, `INSERT INTO cdw_formal_approval_instances
+ (id,subject_id,template_version_id,state,requested_by)
+ VALUES($1,$2,$3,'pending',$4)`, qmsAttemptID, qmsSubjectID, prefix+"_qms_tpl", admin.ID); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	if _, checkErr = readFixtureTx.Exec(ctx, `INSERT INTO cdw_formal_approval_steps
+ (id,instance_id,node_key,sequence_no,approver_user_id,state)
+ VALUES($1,$2,'general_manager',1,$3,'ready')`, qmsStepID, qmsAttemptID, charlie.ID); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	if _, checkErr = readFixtureTx.Exec(ctx, `INSERT INTO cdw_formal_approval_decisions
+ (id,step_id,actor_id,decision,reason,subject_sha256,actor_authority_snapshot)
+ VALUES($1,$2,$3,'approve','illegal direct approval',$4,'{}'::jsonb)`,
+		prefix+"_qms_direct_signature", qmsStepID, charlie.ID, sha); checkErr == nil {
+		t.Fatal("direct SQL allowed QMS signature without an exact verified appointment")
+	}
+	if _, checkErr = readFixtureTx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_qms_direct_decision"); checkErr != nil {
+		t.Fatal(checkErr)
+	}
+	t.Log("CDW_QMS_APPOINTMENT_FIXTURE_PASS pending+no-self+independent-verification+exact-position+no-rewrite")
 	if _, checkErr := readFixtureTx.Exec(ctx, "SAVEPOINT cdw_qms_revocation_fixture"); checkErr != nil {
 		t.Fatal(checkErr)
 	}
@@ -955,6 +1026,10 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	}
 	if active, checkErr := fixtureReader.cdwQMSPolicyEffective(ctx, issued.ID); checkErr != nil || active {
 		t.Fatalf("superseded policy pointer still authorizes QMS: %t %v", active, checkErr)
+	}
+	if _, checkErr = fixtureReader.cdwCurrentQMSAppointment(ctx, qmsFileID, bob.ID,
+		"management_representative", issued.ID); !errors.Is(checkErr, domain.ErrQMSAppointmentPending) {
+		t.Fatalf("withdrawn controlled evidence did not invalidate appointment: %v", checkErr)
 	}
 	if _, checkErr := fixtureReader.CDWPublishFormalTemplate(ctx, prefix+"_qms_tpl_revoked",
 		"qms_"+qmsPolicyTemplate+"_revoked", qmsSteps, admin.ID, issued.ID); !errors.Is(checkErr, domain.ErrPolicyAuthorityPending) {

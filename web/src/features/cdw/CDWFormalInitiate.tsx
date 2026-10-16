@@ -6,6 +6,19 @@ import {ApiError} from "../../shared/http";
 import {newIdempotencyKey} from "../../shared/ids";
 import type {User} from "../../entities/user/model";
 import {cdwApi,type CDWFormalReady,type CDWEffectiveSearchHit,type CDWDocumentClassification} from "./api";
+import {CDWQMSAppointmentEvidence} from "./CDWQMSAppointmentEvidence";
+
+const signerPositions=[
+ {value:"management_representative",label:"管理者代表"},
+ {value:"general_manager",label:"总经理"},
+ {value:"department_head",label:"部门负责人"},
+ {value:"independent_reviewer",label:"独立审查人"},
+ {value:"design_reviewer",label:"设计审查人"},
+ {value:"qa_reviewer",label:"质量审查人"},
+ {value:"regulatory_officer",label:"法规负责人"},
+ {value:"release_authority",label:"授权放行人"},
+ {value:"clinical_authority",label:"临床评价授权人"},
+];
 
 // Three explicit steps deliberately avoid silently granting approval authority.
 export function CDWFormalInitiate({onCreated,loadUsers}:{onCreated:()=>void;loadUsers:()=>Promise<User[]>}){
@@ -15,6 +28,8 @@ export function CDWFormalInitiate({onCreated,loadUsers}:{onCreated:()=>void;load
  const [reviewer1,setReviewer1]=useState("");
  const [reviewer2,setReviewer2]=useState("");
  const [parallel,setParallel]=useState(false);
+ const [position1,setPosition1]=useState("management_representative");
+ const [position2,setPosition2]=useState("general_manager");
  const [classification,setClassification]=useState<CDWDocumentClassification|null>(null);
  const [classLoading,setClassLoading]=useState(false);
  const [classChoice,setClassChoice]=useState<"general"|"qms">("general");
@@ -96,8 +111,8 @@ export function CDWFormalInitiate({onCreated,loadUsers}:{onCreated:()=>void;load
   if(!selected||!authorized||!prepared)return;
   const name=(qms?"qms_":"cdw-formal-")+selected.deliveryId;
   const steps=[
-   {nodeKey:"stage-one",sequence:1,approverId:reviewer1},
-   {nodeKey:"stage-two",sequence:parallel?1:2,approverId:reviewer2},
+   {nodeKey:qms?position1:"stage-one",sequence:1,approverId:reviewer1},
+   {nodeKey:qms?position2:"stage-two",sequence:parallel?1:2,approverId:reviewer2},
   ];
   if(busy)return;
   let key=keys.current.get("publish");
@@ -168,17 +183,31 @@ export function CDWFormalInitiate({onCreated,loadUsers}:{onCreated:()=>void;load
      </RareSelect>
     </label>}
     {!basisReleaseId&&<p className="cdw-section-note">未核验依据前可继续准备文档任务，但正式审批角色授权及模板发布不会开放。</p>}
+    {selected&&basisReleaseId&&<CDWQMSAppointmentEvidence fileId={selected.fileId}
+     policyReleaseId={basisReleaseId} users={users} positions={signerPositions}/>}
    </>}
    <label>一级审批人
     <RareSelect aria-label="一级审批人" value={reviewer1} disabled={busy} onChange={e=>{setReviewer1(e.target.value);resetSteps();}}>
      <option value="">选择人员</option>{users.map(u=><option key={u.id} value={u.id}>{u.displayName}</option>)}
     </RareSelect>
    </label>
+   {qms&&<label>一级岗位资格
+    <RareSelect aria-label="一级审批岗位" value={position1} disabled={busy}
+     onChange={e=>{setPosition1(e.target.value);resetSteps();}}>
+     {signerPositions.map(p=><option key={p.value} value={p.value}>{p.label}</option>)}
+    </RareSelect>
+   </label>}
    <label>二级审批人 / 并行会签人
     <RareSelect aria-label="二级审批人" value={reviewer2} disabled={busy} onChange={e=>{setReviewer2(e.target.value);resetSteps();}}>
      <option value="">选择人员</option>{users.filter(u=>u.id!==reviewer1).map(u=><option key={u.id} value={u.id}>{u.displayName}</option>)}
     </RareSelect>
    </label>
+   {qms&&<label>二级岗位资格
+    <RareSelect aria-label="二级审批岗位" value={position2} disabled={busy}
+     onChange={e=>{setPosition2(e.target.value);resetSteps();}}>
+     {signerPositions.map(p=><option key={p.value} value={p.value}>{p.label}</option>)}
+    </RareSelect>
+   </label>}
    <label>审批执行方式
     <RareSelect aria-label="审批执行方式" value={parallel?"parallel":"serial"} disabled={busy} onChange={e=>{setParallel(e.target.value==="parallel");resetSteps();}}>
      <option value="serial">逐级审批 · 一级通过后流转二级</option>

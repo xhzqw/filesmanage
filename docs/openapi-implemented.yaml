@@ -1980,6 +1980,305 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-appointments/files/{fileId}:
+    get:
+      summary: List QMS appointment evidence scoped to a visible file
+      operationId: cdwQMSListAppointments
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: fileId
+        in: path
+        required: true
+        description: File ID.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Appointment status, source and reviewer are read from the server.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            fileId:
+                              type: string
+                            userId:
+                              type: string
+                            nodeKey:
+                              type: string
+                            policyReleaseId:
+                              type: string
+                            evidenceReleaseId:
+                              type: string
+                            expiresAt:
+                              type: string
+                              format: date-time
+                            status:
+                              type: string
+                              enum:
+                              - pending
+                              - verified
+                              - revoked
+                            proposedBy:
+                              type: string
+                            verifiedBy:
+                              type: string
+                            reason:
+                              type: string
+                          required:
+                          - id
+                          - fileId
+                          - userId
+                          - nodeKey
+                          - policyReleaseId
+                          - evidenceReleaseId
+                          - expiresAt
+                          - status
+                          - proposedBy
+                          - reason
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-appointments:
+    post:
+      summary: Record an unverified QMS signer appointment; does not itself grant signing rights
+      operationId: cdwQMSProposeAppointment
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fileId:
+                  type: string
+                userId:
+                  type: string
+                nodeKey:
+                  type: string
+                policyReleaseId:
+                  type: string
+                evidenceReleaseId:
+                  type: string
+                expiresAt:
+                  type: string
+                  format: date-time
+                reason:
+                  type: string
+              required:
+              - fileId
+              - userId
+              - nodeKey
+              - policyReleaseId
+              - evidenceReleaseId
+              - expiresAt
+              - reason
+      responses:
+        '200':
+          description: Pending independent document-control verification.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      fileId:
+                        type: string
+                      userId:
+                        type: string
+                      nodeKey:
+                        type: string
+                      policyReleaseId:
+                        type: string
+                      evidenceReleaseId:
+                        type: string
+                      expiresAt:
+                        type: string
+                        format: date-time
+                      status:
+                        type: string
+                        enum:
+                        - pending
+                        - verified
+                        - revoked
+                      proposedBy:
+                        type: string
+                      verifiedBy:
+                        type: string
+                      reason:
+                        type: string
+                    required:
+                    - id
+                    - fileId
+                    - userId
+                    - nodeKey
+                    - policyReleaseId
+                    - evidenceReleaseId
+                    - expiresAt
+                    - status
+                    - proposedBy
+                    - reason
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-appointments/{id}/verify:
+    post:
+      summary: Independently confirm documentary signer appointment; proposer and nominee excluded
+      operationId: cdwQMSVerifyAppointment
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Appointment ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                statement:
+                  type: string
+              required:
+              - statement
+      responses:
+        '200':
+          description: Verified documentary evidence, not automated legal qualification.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      fileId:
+                        type: string
+                      userId:
+                        type: string
+                      nodeKey:
+                        type: string
+                      policyReleaseId:
+                        type: string
+                      evidenceReleaseId:
+                        type: string
+                      expiresAt:
+                        type: string
+                        format: date-time
+                      status:
+                        type: string
+                        enum:
+                        - pending
+                        - verified
+                        - revoked
+                      proposedBy:
+                        type: string
+                      verifiedBy:
+                        type: string
+                      reason:
+                        type: string
+                    required:
+                    - id
+                    - fileId
+                    - userId
+                    - nodeKey
+                    - policyReleaseId
+                    - evidenceReleaseId
+                    - expiresAt
+                    - status
+                    - proposedBy
+                    - reason
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/formal-templates:
     post:
       summary: Publish immutable versioned formal approval template

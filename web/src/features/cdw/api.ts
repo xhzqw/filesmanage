@@ -81,6 +81,8 @@ export type CDWReadingConfirmation={
 };
 export type CDWFormalReady={deliveryId:string;taskId:string;fileId:string;fileName:string;sha256:string};
 export type CDWDocumentClassification={fileId:string;approvalClass:"pending"|"general"|"qms";requiresQms:boolean;reason?:string;classifiedBy?:string;roleBindingId?:string};
+export type CDWQMSAppointment={id:string;fileId:string;userId:string;nodeKey:string;policyReleaseId:string;evidenceReleaseId:string;expiresAt:string;status:"pending"|"verified"|"revoked";proposedBy:string;verifiedBy?:string;reason:string};
+export type CDWQMSAppointmentInput={fileId:string;userId:string;nodeKey:string;policyReleaseId:string;evidenceReleaseId:string;expiresAt:string;reason:string};
 export type CDWFormalApproval={
  id:string;subjectId:string;deliveryId:string;fileId:string;fileName?:string;
  sha256:string;templateVersionId:string;state:"pending"|"approved"|"rejected"|"cancelled"|"conflicted";
@@ -248,6 +250,12 @@ export const cdwApi={
   "/workbench/formal-documents/"+segment(fileId)+"/classification",{cache:"no-store"}),
  formalClassify:(fileId:string,approvalClass:"general"|"qms",reason:string,key:string)=>request<CDWDocumentClassification>(
   "/workbench/formal-documents/"+segment(fileId)+"/classification",mutate(key,{approvalClass,reason})),
+ qmsAppointments:(fileId:string)=>request<{items:CDWQMSAppointment[]}>(
+  "/workbench/qms-appointments/files/"+segment(fileId),{cache:"no-store"}),
+ qmsAppointmentPropose:(input:CDWQMSAppointmentInput,key:string)=>request<CDWQMSAppointment>(
+  "/workbench/qms-appointments",mutate(key,input)),
+ qmsAppointmentVerify:(id:string,statement:string,key:string)=>request<CDWQMSAppointment>(
+  "/workbench/qms-appointments/"+segment(id)+"/verify",mutate(key,{statement})),
  formalInbox:(limit=100)=>request<{items:CDWFormalApproval[]}>(
   "/workbench/formal-approvals/inbox?limit="+limit,{cache:"no-store"}),
  formalDetail:(id:string)=>request<CDWFormalDetail>("/workbench/formal-approvals/"+segment(id),{cache:"no-store"}),

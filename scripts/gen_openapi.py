@@ -911,6 +911,35 @@ add("POST","/api/workbench/formal-documents/{fileId}/classification",operation(
   "reason":string()},required=["approvalClass","reason"])}},
  responses=dict([json_ok(CDW_DOCUMENT_CLASS,"Document-control role required, auditable, cannot downgrade QMS."),
  resp("403",ERR["403"]),resp("409",ERR["409"])])))
+CDW_QMS_APPOINTMENT=obj({
+ "id":string(),"fileId":string(),"userId":string(),"nodeKey":string(),
+ "policyReleaseId":string(),"evidenceReleaseId":string(),"expiresAt":timestamp(),
+ "status":string(enum=["pending","verified","revoked"]),"proposedBy":string(),
+ "verifiedBy":string(),"reason":string(),
+},required=["id","fileId","userId","nodeKey","policyReleaseId",
+ "evidenceReleaseId","expiresAt","status","proposedBy","reason"])
+add("GET","/api/workbench/qms-appointments/files/{fileId}",operation(
+ "List QMS appointment evidence scoped to a visible file","CDW","cdwQMSListAppointments",
+ security=SESSION,params=[id_param("fileId","File ID.")],
+ responses=dict([json_ok(obj({"items":arr(CDW_QMS_APPOINTMENT)},required=["items"]),
+ "Appointment status, source and reviewer are read from the server."),resp("403",ERR["403"])])))
+add("POST","/api/workbench/qms-appointments",operation(
+ "Record an unverified QMS signer appointment; does not itself grant signing rights",
+ "CDW","cdwQMSProposeAppointment",security=SESSION,params=[CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({
+ "fileId":string(),"userId":string(),"nodeKey":string(),
+ "policyReleaseId":string(),"evidenceReleaseId":string(),"expiresAt":timestamp(),
+ "reason":string()},required=["fileId","userId","nodeKey","policyReleaseId",
+ "evidenceReleaseId","expiresAt","reason"])}},
+ responses=dict([json_ok(CDW_QMS_APPOINTMENT,"Pending independent document-control verification."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
+add("POST","/api/workbench/qms-appointments/{id}/verify",operation(
+ "Independently confirm documentary signer appointment; proposer and nominee excluded",
+ "CDW","cdwQMSVerifyAppointment",security=SESSION,
+ params=[id_param("id","Appointment ID."),CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({"statement":string()},required=["statement"])}},
+ responses=dict([json_ok(CDW_QMS_APPOINTMENT,"Verified documentary evidence, not automated legal qualification."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
 add("POST","/api/workbench/formal-templates",operation(
  "Publish immutable versioned formal approval template","CDW","cdwFormalTemplatePublish",
  security=SESSION,params=[CDW_IDEMPOTENCY],
