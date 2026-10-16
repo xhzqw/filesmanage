@@ -42,5 +42,5 @@ type CDWPaperStore interface {
 	CDWPaperCopyFile(context.Context, string) (string, error)
 	CDWPaperLedger(context.Context, string) (CDWPaperLedger, error)
 	CDWPaperIssue(context.Context, string, string, string, int64, []string, []string) (CDWPaperLedger, error)
-	CDWPaperTransition(context.Context, string, string, string, int64, string) (CDWPaperTransition, error)
+	CDWPaperTransition(context.Context, string, string, string, int64, string, string) (CDWPaperTransition, error)
 }
