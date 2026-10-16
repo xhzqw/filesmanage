@@ -28,6 +28,18 @@ func (s *Service) printSource(ctx context.Context, tx ports.Repository, u domain
 	if _, err = s.visibleFile(ctx, tx, u, id, domain.ActionPreview); err != nil {
 		return domain.File{}, domain.Blob{}, 0, err
 	}
+	// A controlled effective pointer can select an artifact outside the normal
+	// file version sequence. Until CDW-specific print rendering is supported,
+	// refuse rather than accidentally printing an unrelated latest upload.
+	if controlled, ok := tx.(ports.CDWEffectiveReadStore); ok {
+		_, managed, e := controlled.CDWEffectiveRead(ctx, file.ID)
+		if e != nil {
+			return domain.File{}, domain.Blob{}, 0, e
+		}
+		if managed {
+			return domain.File{}, domain.Blob{}, 0, ErrPreviewUnsupported
+		}
+	}
 	seq := currentSeq(file)
 	version, err := tx.VersionBySeq(ctx, file.ID, seq)
 	if err != nil {

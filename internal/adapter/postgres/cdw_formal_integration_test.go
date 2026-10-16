@@ -564,6 +564,30 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	if !foundBob || !foundCharlie {
 		t.Fatalf("ledger must reflect independent department evidence %+v", ledger.Rows)
 	}
+	// Read-routing fixture only: this directly seeds an isolated test pointer.
+	// It DOES NOT exercise or claim a production activation transaction.
+	if _, e = pool.Exec(ctx, `UPDATE cdw_controlled_releases
+	 SET state='effective',actual_effective_at=clock_timestamp()
+	 WHERE id=$1 AND state='issued_pending'`, issued.ID); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = pool.Exec(ctx, `INSERT INTO cdw_effective_pointers
+	 (file_id,release_id,state,activated_at) VALUES($1,$2,'active',clock_timestamp())`,
+		fileID, issued.ID); e != nil {
+		t.Fatal(e)
+	}
+	controlledRead, managed, e := repo.CDWEffectiveRead(ctx, fileID)
+	if e != nil || !managed || controlledRead.BlobID != blobID ||
+		controlledRead.SHA256 != sha || controlledRead.FileName == "" {
+		t.Fatalf("effective read did not resolve immutable distributed artifact: %+v managed=%t err=%v", controlledRead, managed, e)
+	}
+	if _, e = pool.Exec(ctx, `UPDATE cdw_effective_pointers SET state='none',release_id=NULL WHERE file_id=$1`, fileID); e != nil {
+		t.Fatal(e)
+	}
+	if _, managed, e = repo.CDWEffectiveRead(ctx, fileID); !managed || !errors.Is(e, domain.ErrConflict) {
+		t.Fatalf("explicit no-effective-version pointer leaked ordinary latest: managed=%t err=%v", managed, e)
+	}
+	t.Log("CDW_G8_POINTER_READ_FIXTURE_PASS effective-artifact-snapshot, withdrawn-pointer-fail-closed; no activation workflow claimed")
 	t.Logf("CDW_G9_LEDGER_POSTGRES_PASS plan=%s departments=2 receipts=2 reading=1/1 roster_missing=1", plan.ID)
 	t.Logf("CDW_G9_READING_POSTGRES_PASS roster=%s assignment=%s single_confirmed_event=1", bobRoster.ID, bobAssignment.ID)
 	t.Logf("CDW_G9_SCOPE_APPROVED_POSTGRES_PASS plan=%s digest=%s batch=none", plan.ID, approvedPlan.DigestSHA256)

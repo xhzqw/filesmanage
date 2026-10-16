@@ -155,13 +155,9 @@ func (s *Service) Preview(ctx context.Context, u domain.User, fileID string) (Pr
 	if err != nil {
 		return Preview{}, err
 	}
-	version, err := tx.VersionBySeq(ctx, file.ID, currentSeq(file))
+	file, blob, _, err = s.resolveUserFacingVersion(ctx, tx, file)
 	if err != nil {
-		return Preview{}, domain.ErrNotFound
-	}
-	blob, err := tx.BlobByID(ctx, version.BlobID)
-	if err != nil {
-		return Preview{}, domain.ErrNotFound
+		return Preview{}, err
 	}
 	return s.previewBlob(file, blob)
 }

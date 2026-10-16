@@ -261,13 +261,9 @@ func (s *Service) openFileBytes(ctx context.Context, u domain.User, fileID strin
 	if err != nil {
 		return Download{}, nil, err
 	}
-	version, err := tx.VersionBySeq(ctx, file.ID, currentSeq(file))
+	file, blob, versionTime, err := s.resolveUserFacingVersion(ctx, tx, file)
 	if err != nil {
-		return Download{}, nil, domain.ErrNotFound
-	}
-	blob, err := tx.BlobByID(ctx, version.BlobID)
-	if err != nil {
-		return Download{}, nil, domain.ErrNotFound
+		return Download{}, nil, err
 	}
 	reader, err := s.blobs.Open(blob.StorageKey)
 	if err != nil {
@@ -278,7 +274,7 @@ func (s *Service) openFileBytes(ctx context.Context, u domain.User, fileID strin
 		ContentType: file.ContentType, Reader: reader,
 		// The version's commit time anchors ServeContent's ETag/Last-Modified,
 		// so Range revalidation follows the signed version (IO-PERF-02).
-		ModTime: version.CreatedAt,
+		ModTime: versionTime,
 	}, func() { _ = reader.Close() }, nil
 }
 
