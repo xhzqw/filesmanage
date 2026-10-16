@@ -23,3 +23,14 @@ QMS 受控文件的审批人必须同时具备文件级技术审批角色、当�
 ## 验收要点
 
 隔离 PostgreSQL 上核对：未经核验禁止授予 QMS 技术签批角色；提报人和被任命人不能自审；由独立文控人员确认后仅对应节点有效；变更核验人、强制 SQL 签署、任命凭据失效必须阻断；同时原 G2–G9 审批/发行/签收主链须保持通过。Go/前端构建、接口契约及 18091 开发界面另行验证。
+
+## 2026-10-16 实际验收记录
+
+- 代码提交：`7a7f146`（岗位任命与独立验证约束）、`38c2da9`（真实文控人员的独立审核工作台与资料可见性约束）；均已推送远端开发仓库。
+- 独立数据库 `cdw_g2_tasks_iso_20261015` 已应用 `0060_cdw_qms_appointment_evidence.sql`，完整 `TestCDWTaskPostgresTransactions` 通过，包含 `CDW_QMS_APPOINTMENT_FIXTURE_PASS` 和 G2–G9、G10/G11 已有流程回归；测试凭据没有进入真实业务库。
+- 远端前端 TypeScript、Vite 生产构建（723 modules）、Go 编译及 vet、OpenAPI 契约检查（201 paths）、架构和验收矩阵检查通过。
+- 18091 **开发环境**完成 `0060` 迁移，`MIGRATIONS_OK 62`，开发 server 和 worker 重启，`health/ready OK`。
+- 真实登录 Chrome 只读验收通过：1440/1024/780 px 工作区与全部原有 CDW 关键入口，新增 `CDW_QMS_APPOINTMENT_REVIEW_BROWSER_PASS`（独立文控核验列表、详情和入口已实际渲染）。未在开发环境伪造岗位任命、正式签批或监管报告。
+- 工作区保留原有 `internal/application/indexing_test.go` 的未提交更改、`docs/流程参考文档/` 原始参考资料及未追踪的系统缓存文件，均未包含在本次代码提交中。
+
+**下一阶段仍需处理：** 正式任命撤销及通知机制、逐签署节点的法规或企业授权矩阵的实体核验、任命凭据的精确发行物查看入口、DHF/DMR 正式批准所需的原始子制度。不得用本文档替代公司的签批授权或法定合规审查。
