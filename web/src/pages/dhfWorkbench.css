@@ -14,3 +14,6 @@
 @media(prefers-reduced-motion:reduce){.dhf-meter>div{transition:none}}
 
 .dhf-status.not_applicable_pending{background:#fff2df;color:#9b620c}
+
+.dhf-table tr.dhf-group{cursor:default;background:#f5f7fa}.dhf-table tr.dhf-group:hover{background:#f5f7fa}.dhf-table tr.dhf-group td{padding:8px 12px;color:#667791;font-size:10px;font-weight:650;line-height:1.35}
+.dhf-audit-tool{display:flex;flex-wrap:wrap;align-items:center;gap:7px;padding:9px 0}.dhf-audit-tool small{color:#658277;font-size:10px}.dhf-audit-tool a{font-size:11px}

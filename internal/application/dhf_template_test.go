@@ -30,7 +30,7 @@ func TestDHFOutlineSourcePreservesStagesAndDuplicates(t *testing.T) {
 	if stageCount != 9 {
 		t.Fatalf("expected nine stages, got %d", stageCount)
 	}
-	if counts[1] != 2 || counts[2] != 4 || counts[3] != 7 || counts[4] != 9 || counts[5] < 70 || counts[6] < 9 || counts[7] < 25 || counts[8] != 4 || counts[9] != 6 {
+	if counts[1] != 2 || counts[2] != 4 || counts[3] != 7 || counts[4] != 9 || counts[5] != 77 || counts[6] != 10 || counts[7] != 26 || counts[8] != 4 || counts[9] != 6 {
 		t.Fatalf("unexpected item breakdown: %+v", counts)
 	}
 	for _, n := range seen {
