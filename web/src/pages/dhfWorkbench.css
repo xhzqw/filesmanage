@@ -12,3 +12,5 @@
 @media(max-width:1120px){.dhf-grid{grid-template-columns:190px minmax(280px,1fr) 270px}.dhf-content{padding:14px}.dhf-totals{gap:9px}}
 @media(max-width:820px){.dhf-work{overflow:auto}.dhf-grid{display:flex;flex-direction:column;overflow:visible}.dhf-sidebar,.dhf-content,.dhf-detail{min-height:260px;max-height:none;overflow:visible!important}.dhf-table-wrap{max-height:55vh}.dhf-detail-scroll{max-height:500px}}
 @media(prefers-reduced-motion:reduce){.dhf-meter>div{transition:none}}
+
+.dhf-status.not_applicable_pending{background:#fff2df;color:#9b620c}

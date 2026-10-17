@@ -46,5 +46,5 @@ trap cleanup EXIT HUP INT TERM
 echo "DHF_FRESH_LAB_CREATED $lab"
 env DATABASE_URL="$test_dsn" go run ./cmd/migrate -dir migrations |
  grep -E '^(APPLIED|MIGRATIONS_OK)' | tail -n 4
-env CDW_TASK_TEST_DSN="$test_dsn" CDW_TASK_TEST_FRESH_LAB="$lab" go test ./internal/adapter/postgres -run '^TestDHFPostgresGates$' -count=1 -timeout=110s -v
+env CDW_TASK_TEST_DSN="$test_dsn" CDW_TASK_TEST_FRESH_LAB="$lab" go test ./internal/adapter/postgres -run '^TestDHF(PostgresGates|ServiceWorkflow)$' -count=1 -timeout=110s -v
 echo "DHF_FRESH_LAB_PASS $lab"

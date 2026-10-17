@@ -215,16 +215,33 @@ func (s *Service) DHFActItem(ctx context.Context, actor domain.User, id string, 
 		if utf8.RuneCountInString(in.Reason) < 8 {
 			return out, domain.ErrInvalidInput
 		}
-		after.State = "not_applicable"
+		after.State = "not_applicable_pending"
 		after.ApplicabilityReason = in.Reason
+		after.SubmittedBy = actor.ID
+		after.SubmittedAt = ""
 		after.FileID = ""
 		after.FileVersionID = ""
 		after.FileSHA256 = ""
-		after.SubmittedBy = ""
-		after.SubmittedAt = ""
 		after.ReviewedBy = ""
 		after.ReviewedAt = ""
 		after.ReviewReason = ""
+	case "confirm_not_applicable", "reject_not_applicable":
+		if actor.ID != p.ReviewerID || before.State != "not_applicable_pending" || actor.ID == before.SubmittedBy {
+			return out, domain.ErrForbidden
+		}
+		if utf8.RuneCountInString(in.Reason) < 8 {
+			return out, domain.ErrInvalidInput
+		}
+		after.ReviewedBy = actor.ID
+		after.ReviewReason = in.Reason
+		if in.Action == "confirm_not_applicable" {
+			after.State = "not_applicable"
+		} else {
+			after.State = "missing"
+			after.ApplicabilityReason = ""
+			after.SubmittedBy = ""
+			after.SubmittedAt = ""
+		}
 	case "submit":
 		if actor.ID != p.OwnerID || (before.State != "missing" && before.State != "returned") || in.FileID == "" || in.FileVersionID == "" {
 			return out, domain.ErrInvalidInput
@@ -260,7 +277,7 @@ func (s *Service) DHFActItem(ctx context.Context, actor domain.User, id string, 
 		if sha != before.FileSHA256 {
 			return out, domain.ErrConflict
 		}
-		if in.Action == "return" && utf8.RuneCountInString(in.Reason) < 8 {
+		if utf8.RuneCountInString(in.Reason) < 8 {
 			return out, domain.ErrInvalidInput
 		}
 		after.State = "accepted"
@@ -275,7 +292,7 @@ func (s *Service) DHFActItem(ctx context.Context, actor domain.User, id string, 
 	if err = store.DHFUpdateItem(ctx, id, after, expected); err != nil {
 		return out, err
 	}
-	payload := map[string]any{"from": before.State, "to": after.State, "line": line, "reason": in.Reason, "fileId": after.FileID, "versionId": after.FileVersionID, "sha256": after.FileSHA256, "priorVersionId": before.FileVersionID}
+	payload := map[string]any{"from": before.State, "to": after.State, "line": line, "reason": in.Reason, "applicabilityReason": after.ApplicabilityReason, "fileId": after.FileID, "versionId": after.FileVersionID, "sha256": after.FileSHA256, "priorVersionId": before.FileVersionID, "priorSHA256": before.FileSHA256}
 	if err = store.DHFAppendEvent(ctx, id, before.StageNo, line, "item."+in.Action, actor.ID, payload); err != nil {
 		return out, err
 	}
@@ -341,6 +358,12 @@ func (s *Service) DHFAcceptStage(ctx context.Context, actor domain.User, id stri
 		if i.State != "accepted" && i.State != "not_applicable" {
 			return out, domain.ErrConflict
 		}
+		if i.ReviewedBy != p.ReviewerID || i.ReviewedAt == "" || i.ReviewReason == "" {
+			return out, domain.ErrConflict
+		}
+		if i.State == "not_applicable" && (i.SubmittedBy == "" || i.SubmittedBy == i.ReviewedBy) {
+			return out, domain.ErrConflict
+		}
 		if i.State == "accepted" {
 			if _, err = s.visibleFile(ctx, tx, actor, i.FileID, domain.ActionPreview); err != nil {
 				return out, err
@@ -353,13 +376,20 @@ func (s *Service) DHFAcceptStage(ctx context.Context, actor domain.User, id stri
 				return out, domain.ErrConflict
 			}
 		}
-		rows = append(rows, strings.Join([]string{strconv.Itoa(i.SourceLine), i.State, i.FileVersionID, i.FileSHA256, i.ApplicabilityReason}, "|"))
+		itemBytes, encodeErr := json.Marshal(struct {
+			Line                                                                                                                      int `json:"line"`
+			State, FileID, FileVersionID, SHA256, ApplicabilityReason, SubmittedBy, SubmittedAt, ReviewedBy, ReviewedAt, ReviewReason string
+		}{i.SourceLine, i.State, i.FileID, i.FileVersionID, i.FileSHA256, i.ApplicabilityReason, i.SubmittedBy, i.SubmittedAt, i.ReviewedBy, i.ReviewedAt, i.ReviewReason})
+		if encodeErr != nil {
+			return out, encodeErr
+		}
+		rows = append(rows, string(itemBytes))
 	}
 	if len(rows) == 0 {
 		return out, domain.ErrConflict
 	}
 	sort.Strings(rows)
-	digest := sha256.Sum256([]byte(strings.Join(rows, "\n")))
+	digest := sha256.Sum256([]byte(strings.Join([]string{"dhf-stage-baseline-v2", p.ID, p.TemplateSHA256, strconv.Itoa(stage), strings.Join(rows, "\n")}, "\n")))
 	baseline := hex.EncodeToString(digest[:])
 	if err = store.DHFAcceptStage(ctx, id, stage, actor.ID, baseline); err != nil {
 		return out, err

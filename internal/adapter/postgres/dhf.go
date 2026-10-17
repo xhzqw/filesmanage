@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"filesmanage/internal/domain"
 	"filesmanage/internal/ports"
@@ -180,7 +181,7 @@ func (r *Repository) DHFUpdateItem(ctx context.Context, id string, i ports.DHFIt
 	}
 	// Clock is always from server. Submitted/reviewed timestamps are set only on transitions.
 	tag, err := r.Q.Exec(ctx, `UPDATE dhf_items SET state=$3,applicability_reason=$4,file_id=$5,file_version_id=$6,file_sha256=$7,
- submitted_by=$8,submitted_at=CASE WHEN $8::text IS NULL THEN NULL WHEN state<>'submitted' OR submitted_by IS DISTINCT FROM $8::text THEN clock_timestamp() ELSE submitted_at END,
+ submitted_by=$8,submitted_at=CASE WHEN $8::text IS NULL THEN NULL WHEN $3::text='not_applicable' AND state='not_applicable_pending' THEN submitted_at WHEN state<>'submitted' OR submitted_by IS DISTINCT FROM $8::text THEN clock_timestamp() ELSE submitted_at END,
  reviewed_by=$9,reviewed_at=CASE WHEN $9::text IS NULL THEN NULL ELSE clock_timestamp() END,review_reason=$10,revision=revision+1
  WHERE project_id=$1 AND source_line=$2 AND revision=$11`, id, i.SourceLine, i.State, i.ApplicabilityReason, file, version, sha, submitter, reviewer, i.ReviewReason, expected)
 	if err != nil {
@@ -265,9 +266,16 @@ func (r *Repository) DHFAppendEvent(ctx context.Context, id string, stage, line 
 	if err != nil {
 		return err
 	}
-	digest := sha256.Sum256([]byte(prev + "\n" + string(raw)))
+	digest := sha256.Sum256([]byte(strings.Join([]string{"dhf-event-v2", id, prev, string(raw)}, "\n")))
+	var stageValue, lineValue any
+	if stage > 0 {
+		stageValue = stage
+	}
+	if line > 0 {
+		lineValue = line
+	}
 	_, err = r.Q.Exec(ctx, `INSERT INTO dhf_events(project_id,stage_no,source_line,action,actor_id,payload_text,previous_sha256,event_sha256)
- VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, id, stage, line, action, actor, string(raw), prev, hex.EncodeToString(digest[:]))
+ VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, id, stageValue, lineValue, action, actor, string(raw), prev, hex.EncodeToString(digest[:]))
 	return err
 }
 func (r *Repository) DHFFileVersions(ctx context.Context, file string) ([]ports.DHFFileVersion, error) {
