@@ -1126,6 +1126,68 @@ CDW_QMS_PORTFOLIO_ITEM=obj({
  "unconfirmedNotices":integer(minimum=0),"lastActivityAt":timestamp()},
  required=["fileId","fileName","approvals","interrupted","restarts","pending",
  "approved","unconfirmedNotices","lastActivityAt"])
+CDW_QMS_ESCALATION_POLICY=obj({
+ "id":string(),"targetFileId":string(),"policyReleaseId":string(),
+ "clauseRef":string(),"delayMinutes":integer(minimum=60),"ownerId":string(),
+ "reason":string(),"proposedBy":string(),"status":string(enum=["pending","verified","revoked"]),
+ "verifiedBy":string(),"proposedAt":timestamp(),"verifiedAt":timestamp()},
+ required=["id","targetFileId","policyReleaseId","clauseRef","delayMinutes",
+ "ownerId","reason","proposedBy","status","proposedAt"])
+CDW_QMS_ESCALATION_CASE=obj({
+ "id":string(),"noticeId":string(),"policyId":string(),"targetFileId":string(),
+ "ownerId":string(),"escalatedBy":string(),"reason":string(),"escalatedAt":timestamp(),
+ "resolution":string(),"resolvedBy":string(),"resolvedAt":timestamp()},
+ required=["id","noticeId","policyId","targetFileId","ownerId","escalatedBy","reason","escalatedAt"])
+CDW_QMS_ESCALATION_RESOLUTION=obj({
+ "id":string(),"caseId":string(),"resolvedBy":string(),"resolution":string(),"resolvedAt":timestamp()},
+ required=["id","caseId","resolvedBy","resolution","resolvedAt"])
+add("GET","/api/workbench/qms-escalation-policies",operation(
+ "List file ACL scoped, independently verifiable in-app escalation policy records",
+ "CDW","cdwQMSEscalationPolicies",security=SESSION,
+ responses=dict([json_ok(obj({"items":arr(CDW_QMS_ESCALATION_POLICY)},required=["items"]),
+ "Current role+file access enforced; no default SLA."),resp("403",ERR["403"])])))
+add("POST","/api/workbench/qms-escalation-policies",operation(
+ "Propose an explicit controlled in-app escalation policy with effective released source",
+ "CDW","cdwQMSEscalationPropose",security=SESSION,params=[CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({
+ "targetFileId":string(),"policyReleaseId":string(),"clauseRef":string(),
+ "delayMinutes":integer(minimum=60),"ownerId":string(),"reason":string()},
+ required=["targetFileId","policyReleaseId","clauseRef","delayMinutes","ownerId","reason"])}},
+ responses=dict([json_ok(CDW_QMS_ESCALATION_POLICY,"Pending only until independent controller verification."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
+add("POST","/api/workbench/qms-escalation-policies/{id}/verify",operation(
+ "Independently verify exact current effective policy, explicit SLA and appointed owner",
+ "CDW","cdwQMSEscalationVerify",security=SESSION,
+ params=[id_param("id","Pending escalation policy ID."),CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({"reason":string()},required=["reason"])}},
+ responses=dict([json_ok(CDW_QMS_ESCALATION_POLICY,"Immutable verified parameters; proposer cannot self-verify."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
+add("POST","/api/workbench/qms-escalation-policies/{id}/revoke",operation(
+ "Independently revoke a policy without deleting historical escalation evidence",
+ "CDW","cdwQMSEscalationRevoke",security=SESSION,
+ params=[id_param("id","Verified policy ID."),CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({"reason":string()},required=["reason"])}},
+ responses=dict([json_ok(CDW_QMS_ESCALATION_POLICY,"Terminal revoked state; current owner/source authorization revalidated."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
+add("GET","/api/workbench/qms-escalation-cases",operation(
+ "Scoped and assigned in-app escalation cases, with independent resolution evidence",
+ "CDW","cdwQMSEscalationCases",security=SESSION,
+ responses=dict([json_ok(obj({"items":arr(CDW_QMS_ESCALATION_CASE)},required=["items"]),
+ "Current file ACL and document-control/assigned owner scope required."),resp("403",ERR["403"])])))
+add("POST","/api/workbench/qms-formal-interruption-notices/{id}/escalate",operation(
+ "Manually escalate one previously followed-up unread notice only after verified-policy delay",
+ "CDW","cdwQMSEscalationOpen",security=SESSION,
+ params=[id_param("id","Individual unread notice ID."),CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({"policyId":string(),"reason":string()},required=["policyId","reason"])}},
+ responses=dict([json_ok(CDW_QMS_ESCALATION_CASE,"In-app case only; no external dispatch or automatic regulator claim."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
+add("POST","/api/workbench/qms-escalation-cases/{id}/resolve",operation(
+ "Independent document-control resolution of an escalation, retaining separate read evidence",
+ "CDW","cdwQMSEscalationResolve",security=SESSION,
+ params=[id_param("id","Open in-app escalation case ID."),CDW_IDEMPOTENCY],
+ request={"application/json":{"schema":obj({"reason":string()},required=["reason"])}},
+ responses=dict([json_ok(CDW_QMS_ESCALATION_RESOLUTION,"Immutable documentary closeout distinct from notice receipt."),
+ resp("403",ERR["403"]),resp("409",ERR["409"])])))
 add("GET","/api/workbench/qms-formal-portfolio",operation(
  "Scoped latest 100 controller-authorized files with cross-approval restart and unconfirmed-notice metrics",
  "CDW","cdwQMSFormalPortfolio",security=SESSION,

@@ -291,6 +291,108 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_g18_duplicate_followup"); err != nil {
 		t.Fatal(err)
 	}
+	// G20: entirely synthetic, transaction-scoped quality-procedure
+	// approval, explicit SLA and independent in-app escalation. No actual
+	// enterprise deadline or appointment may escape this savepoint.
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g20_authorized_escalation"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `UPDATE cdw_effective_pointers SET state='active',
+ release_id=$2,activated_at=clock_timestamp() WHERE file_id=$1`, policyFile, policyRelease); err != nil {
+		t.Fatal(err)
+	}
+	for _, binding := range []struct{ suffix, user string }{
+		{"owner", alice.ID}, {"verifier", bob.ID}, {"revoker", admin.ID},
+	} {
+		if _, err = tx.Exec(ctx, `INSERT INTO cdw_business_role_bindings
+ (id,user_id,role,file_id,granted_by) VALUES($1,$2,'document_control',$3,$4)`,
+			prefix+"_g20_"+binding.suffix, binding.user, subjectFileID, admin.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	g20Policy := prefix + "_g20_policy"
+	g20, policyErr := r.CDWQMSEscalationPropose(ctx, g20Policy, ports.CDWQMSEscalationPolicy{
+		TargetFileID: subjectFileID, PolicyReleaseID: policyRelease, ClauseRef: "§4.3.2",
+		DelayMinutes: 60, OwnerID: alice.ID, Reason: reason, ProposedBy: charlie.ID})
+	if policyErr != nil || g20.Status != "pending" {
+		t.Fatalf("G20 authorized proposal failed: %+v %v", g20, policyErr)
+	}
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g20_self_verify"); err != nil {
+		t.Fatal(err)
+	}
+	if _, policyErr = r.CDWQMSEscalationVerify(ctx, g20Policy, charlie.ID, reason); policyErr == nil {
+		t.Fatal("G20 escalation proposer self-verified")
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_g20_self_verify"); err != nil {
+		t.Fatal(err)
+	}
+	g20, policyErr = r.CDWQMSEscalationVerify(ctx, g20Policy, bob.ID, reason)
+	if policyErr != nil || g20.Status != "verified" {
+		t.Fatalf("G20 independent verification failed: %+v %v", g20, policyErr)
+	}
+	g20notice := prefix + "_g20_old_notice"
+	if _, err = tx.Exec(ctx, `INSERT INTO cdw_qms_formal_interruption_alerts
+ (id,approval_instance_id,recipient_id,event_kind,created_at)
+ VALUES($1,$2,$3,'legacy_quarantined',clock_timestamp()-interval '2 days')`,
+		g20notice, formalInstance, bob.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g20_unfollowed"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = r.CDWQMSEscalationOpen(ctx, prefix+"_g20_no_followup", g20notice, g20Policy, charlie.ID, reason); err == nil {
+		t.Fatal("G20 upgraded a notice without a human follow-up")
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_g20_unfollowed"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = r.CDWQMSFormalFollowup(ctx, prefix+"_g20_followup", g20notice, charlie.ID, reason); err != nil {
+		t.Fatal(err)
+	}
+	g20case, caseErr := r.CDWQMSEscalationOpen(ctx, prefix+"_g20_case", g20notice, g20Policy, charlie.ID, reason)
+	if caseErr != nil || g20case.OwnerID != alice.ID {
+		t.Fatalf("G20 accepted case missing: %+v %v", g20case, caseErr)
+	}
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g20_duplicate"); err != nil {
+		t.Fatal(err)
+	}
+	if _, caseErr = r.CDWQMSEscalationOpen(ctx, prefix+"_g20_duplicate", g20notice, g20Policy, charlie.ID, reason); caseErr == nil {
+		t.Fatal("G20 duplicate case for one notice")
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_g20_duplicate"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g20_self_resolve"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = r.CDWQMSEscalationResolve(ctx, prefix+"_g20_self_resolution", g20case.ID, charlie.ID, reason); err == nil {
+		t.Fatal("G20 escalation initiator self-closed their own case")
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_g20_self_resolve"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = r.CDWQMSEscalationResolve(ctx, prefix+"_g20_resolution", g20case.ID, bob.ID, reason); err != nil {
+		t.Fatal(err)
+	}
+	g20cases, caseErr := r.CDWQMSEscalationCases(ctx, alice.ID, 30)
+	if caseErr != nil || len(g20cases) != 1 || g20cases[0].ResolvedAt == nil {
+		t.Fatalf("G20 owner's case inbox cannot see independent closure: %+v %v", g20cases, caseErr)
+	}
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g20_self_revoke"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = r.CDWQMSEscalationRevoke(ctx, g20Policy, charlie.ID, reason); err == nil {
+		t.Fatal("G20 proposer self-revoked their verified policy")
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_g20_self_revoke"); err != nil {
+		t.Fatal(err)
+	}
+	if revoked, revokeErr := r.CDWQMSEscalationRevoke(ctx, g20Policy, admin.ID, reason); revokeErr != nil || revoked.Status != "revoked" {
+		t.Fatalf("G20 independently authorized revocation failed: %+v %v", revoked, revokeErr)
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_g20_authorized_escalation"); err != nil {
+		t.Fatal(err)
+	}
 	if read, readErr := r.CDWQMSReadFormalNotice(ctx, formalNotices[0].ID, admin.ID); readErr != nil || read {
 		t.Fatalf("other recipient falsely confirmed signer interruption: %t %v", read, readErr)
 	}
@@ -647,6 +749,7 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_special_new_review"); err != nil {
 		t.Fatal(err)
 	}
+	t.Log("CDW_G20_AUTHORIZED_ESCALATION_PASS exact effective policy, independent verification/revocation, followup+elapsed gate, unique case, independent closure")
 	t.Log("CDW_G19_SEGMENT_PORTFOLIO_PASS bounded two-way chain, chronological evidence and scoped cross-file metrics")
 	t.Log("CDW_G18_AUDIT_FOLLOWUP_PASS controller-only per-recipient reminders, one-time guard, ACK and audit fact snapshot")
 	t.Log("CDW_G17_APPROVAL_CHAIN_PASS source-file restart requirement, historical read-only access, ancestor/descendant evidence, unique successor")

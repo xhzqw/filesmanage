@@ -145,6 +145,19 @@ export type CDWQMSPortfolioItem={
 export type CDWQMSPortfolio={
  items:CDWQMSPortfolioItem[];limit:number;hasMore:boolean;
 };
+export type CDWQMSEscalationPolicy={
+ id:string;targetFileId:string;policyReleaseId:string;clauseRef:string;
+ delayMinutes:number;ownerId:string;reason:string;proposedBy:string;
+ status:"pending"|"verified"|"revoked";verifiedBy?:string;proposedAt:string;verifiedAt?:string;
+};
+export type CDWQMSEscalationCase={
+ id:string;noticeId:string;policyId:string;targetFileId:string;ownerId:string;
+ escalatedBy:string;reason:string;escalatedAt:string;
+ resolution?:string;resolvedBy?:string;resolvedAt?:string;
+};
+export type CDWQMSEscalationResolution={
+ id:string;caseId:string;resolvedBy:string;resolution:string;resolvedAt:string;
+};
 export type CDWFormalStep={id:string;nodeKey:string;sequence:number;approverId:string;state:string;revision:number};
 export type CDWFormalDetail={approval:CDWFormalApproval;steps:CDWFormalStep[];
  decisions:Array<{stepId:string;actorId:string;decision:string;reason:string;decidedAt:string}>};
@@ -340,6 +353,24 @@ export const cdwApi={
   "/workbench/qms-formal-lineage/"+segment(id),{cache:"no-store"}),
  qmsFormalPortfolio:()=>request<CDWQMSPortfolio>(
   "/workbench/qms-formal-portfolio",{cache:"no-store"}),
+ qmsEscalationPolicies:()=>request<{items:CDWQMSEscalationPolicy[]}>(
+  "/workbench/qms-escalation-policies",{cache:"no-store"}),
+ qmsEscalationPropose:(input:{
+  targetFileId:string;policyReleaseId:string;clauseRef:string;
+  delayMinutes:number;ownerId:string;reason:string},key:string)=>
+  request<CDWQMSEscalationPolicy>("/workbench/qms-escalation-policies",mutate(key,input)),
+ qmsEscalationVerify:(id:string,reason:string,key:string)=>
+  request<CDWQMSEscalationPolicy>("/workbench/qms-escalation-policies/"+segment(id)+"/verify",mutate(key,{reason})),
+ qmsEscalationRevoke:(id:string,reason:string,key:string)=>
+  request<CDWQMSEscalationPolicy>("/workbench/qms-escalation-policies/"+segment(id)+"/revoke",mutate(key,{reason})),
+ qmsEscalationCases:()=>request<{items:CDWQMSEscalationCase[]}>(
+  "/workbench/qms-escalation-cases",{cache:"no-store"}),
+ qmsEscalationOpen:(noticeId:string,policyId:string,reason:string,key:string)=>
+  request<CDWQMSEscalationCase>("/workbench/qms-formal-interruption-notices/"+
+   segment(noticeId)+"/escalate",mutate(key,{policyId,reason})),
+ qmsEscalationResolve:(id:string,reason:string,key:string)=>
+  request<CDWQMSEscalationResolution>("/workbench/qms-escalation-cases/"+
+   segment(id)+"/resolve",mutate(key,{reason})),
  qmsLegacyAnomalies:()=>request<{items:CDWQMSLegacyAnomaly[]}>(
   "/workbench/qms-legacy-approval-anomalies",{cache:"no-store"}),
  qmsLegacyHoldHistory:()=>request<{items:CDWQMSLegacyHold[]}>(

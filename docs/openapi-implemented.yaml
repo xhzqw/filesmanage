@@ -4024,6 +4024,662 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-escalation-policies:
+    get:
+      summary: List file ACL scoped, independently verifiable in-app escalation policy records
+      operationId: cdwQMSEscalationPolicies
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Current role+file access enforced; no default SLA.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            targetFileId:
+                              type: string
+                            policyReleaseId:
+                              type: string
+                            clauseRef:
+                              type: string
+                            delayMinutes:
+                              type: integer
+                              minimum: 60
+                            ownerId:
+                              type: string
+                            reason:
+                              type: string
+                            proposedBy:
+                              type: string
+                            status:
+                              type: string
+                              enum:
+                              - pending
+                              - verified
+                              - revoked
+                            verifiedBy:
+                              type: string
+                            proposedAt:
+                              type: string
+                              format: date-time
+                            verifiedAt:
+                              type: string
+                              format: date-time
+                          required:
+                          - id
+                          - targetFileId
+                          - policyReleaseId
+                          - clauseRef
+                          - delayMinutes
+                          - ownerId
+                          - reason
+                          - proposedBy
+                          - status
+                          - proposedAt
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      summary: Propose an explicit controlled in-app escalation policy with effective released source
+      operationId: cdwQMSEscalationPropose
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                targetFileId:
+                  type: string
+                policyReleaseId:
+                  type: string
+                clauseRef:
+                  type: string
+                delayMinutes:
+                  type: integer
+                  minimum: 60
+                ownerId:
+                  type: string
+                reason:
+                  type: string
+              required:
+              - targetFileId
+              - policyReleaseId
+              - clauseRef
+              - delayMinutes
+              - ownerId
+              - reason
+      responses:
+        '200':
+          description: Pending only until independent controller verification.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      targetFileId:
+                        type: string
+                      policyReleaseId:
+                        type: string
+                      clauseRef:
+                        type: string
+                      delayMinutes:
+                        type: integer
+                        minimum: 60
+                      ownerId:
+                        type: string
+                      reason:
+                        type: string
+                      proposedBy:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                        - pending
+                        - verified
+                        - revoked
+                      verifiedBy:
+                        type: string
+                      proposedAt:
+                        type: string
+                        format: date-time
+                      verifiedAt:
+                        type: string
+                        format: date-time
+                    required:
+                    - id
+                    - targetFileId
+                    - policyReleaseId
+                    - clauseRef
+                    - delayMinutes
+                    - ownerId
+                    - reason
+                    - proposedBy
+                    - status
+                    - proposedAt
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-escalation-policies/{id}/verify:
+    post:
+      summary: Independently verify exact current effective policy, explicit SLA and appointed owner
+      operationId: cdwQMSEscalationVerify
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Pending escalation policy ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+              required:
+              - reason
+      responses:
+        '200':
+          description: Immutable verified parameters; proposer cannot self-verify.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      targetFileId:
+                        type: string
+                      policyReleaseId:
+                        type: string
+                      clauseRef:
+                        type: string
+                      delayMinutes:
+                        type: integer
+                        minimum: 60
+                      ownerId:
+                        type: string
+                      reason:
+                        type: string
+                      proposedBy:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                        - pending
+                        - verified
+                        - revoked
+                      verifiedBy:
+                        type: string
+                      proposedAt:
+                        type: string
+                        format: date-time
+                      verifiedAt:
+                        type: string
+                        format: date-time
+                    required:
+                    - id
+                    - targetFileId
+                    - policyReleaseId
+                    - clauseRef
+                    - delayMinutes
+                    - ownerId
+                    - reason
+                    - proposedBy
+                    - status
+                    - proposedAt
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-escalation-policies/{id}/revoke:
+    post:
+      summary: Independently revoke a policy without deleting historical escalation evidence
+      operationId: cdwQMSEscalationRevoke
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Verified policy ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+              required:
+              - reason
+      responses:
+        '200':
+          description: Terminal revoked state; current owner/source authorization revalidated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      targetFileId:
+                        type: string
+                      policyReleaseId:
+                        type: string
+                      clauseRef:
+                        type: string
+                      delayMinutes:
+                        type: integer
+                        minimum: 60
+                      ownerId:
+                        type: string
+                      reason:
+                        type: string
+                      proposedBy:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                        - pending
+                        - verified
+                        - revoked
+                      verifiedBy:
+                        type: string
+                      proposedAt:
+                        type: string
+                        format: date-time
+                      verifiedAt:
+                        type: string
+                        format: date-time
+                    required:
+                    - id
+                    - targetFileId
+                    - policyReleaseId
+                    - clauseRef
+                    - delayMinutes
+                    - ownerId
+                    - reason
+                    - proposedBy
+                    - status
+                    - proposedAt
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-escalation-cases:
+    get:
+      summary: Scoped and assigned in-app escalation cases, with independent resolution evidence
+      operationId: cdwQMSEscalationCases
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Current file ACL and document-control/assigned owner scope required.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            noticeId:
+                              type: string
+                            policyId:
+                              type: string
+                            targetFileId:
+                              type: string
+                            ownerId:
+                              type: string
+                            escalatedBy:
+                              type: string
+                            reason:
+                              type: string
+                            escalatedAt:
+                              type: string
+                              format: date-time
+                            resolution:
+                              type: string
+                            resolvedBy:
+                              type: string
+                            resolvedAt:
+                              type: string
+                              format: date-time
+                          required:
+                          - id
+                          - noticeId
+                          - policyId
+                          - targetFileId
+                          - ownerId
+                          - escalatedBy
+                          - reason
+                          - escalatedAt
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-formal-interruption-notices/{id}/escalate:
+    post:
+      summary: Manually escalate one previously followed-up unread notice only after verified-policy delay
+      operationId: cdwQMSEscalationOpen
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Individual unread notice ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                policyId:
+                  type: string
+                reason:
+                  type: string
+              required:
+              - policyId
+              - reason
+      responses:
+        '200':
+          description: In-app case only; no external dispatch or automatic regulator claim.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      noticeId:
+                        type: string
+                      policyId:
+                        type: string
+                      targetFileId:
+                        type: string
+                      ownerId:
+                        type: string
+                      escalatedBy:
+                        type: string
+                      reason:
+                        type: string
+                      escalatedAt:
+                        type: string
+                        format: date-time
+                      resolution:
+                        type: string
+                      resolvedBy:
+                        type: string
+                      resolvedAt:
+                        type: string
+                        format: date-time
+                    required:
+                    - id
+                    - noticeId
+                    - policyId
+                    - targetFileId
+                    - ownerId
+                    - escalatedBy
+                    - reason
+                    - escalatedAt
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-escalation-cases/{id}/resolve:
+    post:
+      summary: Independent document-control resolution of an escalation, retaining separate read evidence
+      operationId: cdwQMSEscalationResolve
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Open in-app escalation case ID.
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: 8-128 ASCII letters, digits, hyphens or underscores; same key+body exactly replays the committed result.
+        schema:
+          type: string
+          maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+              required:
+              - reason
+      responses:
+        '200':
+          description: Immutable documentary closeout distinct from notice receipt.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      caseId:
+                        type: string
+                      resolvedBy:
+                        type: string
+                      resolution:
+                        type: string
+                      resolvedAt:
+                        type: string
+                        format: date-time
+                    required:
+                    - id
+                    - caseId
+                    - resolvedBy
+                    - resolution
+                    - resolvedAt
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/qms-formal-portfolio:
     get:
       summary: Scoped latest 100 controller-authorized files with cross-approval restart and unconfirmed-notice metrics

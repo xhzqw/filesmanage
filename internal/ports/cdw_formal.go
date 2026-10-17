@@ -153,6 +153,40 @@ type CDWQMSPortfolio struct {
 	Limit   int                   `json:"limit"`
 	HasMore bool                  `json:"hasMore"`
 }
+type CDWQMSEscalationPolicy struct {
+	ID              string  `json:"id"`
+	TargetFileID    string  `json:"targetFileId"`
+	PolicyReleaseID string  `json:"policyReleaseId"`
+	ClauseRef       string  `json:"clauseRef"`
+	DelayMinutes    int     `json:"delayMinutes"`
+	OwnerID         string  `json:"ownerId"`
+	Reason          string  `json:"reason"`
+	ProposedBy      string  `json:"proposedBy"`
+	Status          string  `json:"status"`
+	VerifiedBy      string  `json:"verifiedBy,omitempty"`
+	ProposedAt      string  `json:"proposedAt"`
+	VerifiedAt      *string `json:"verifiedAt,omitempty"`
+}
+type CDWQMSEscalationCase struct {
+	ID           string  `json:"id"`
+	NoticeID     string  `json:"noticeId"`
+	PolicyID     string  `json:"policyId"`
+	TargetFileID string  `json:"targetFileId"`
+	OwnerID      string  `json:"ownerId"`
+	EscalatedBy  string  `json:"escalatedBy"`
+	Reason       string  `json:"reason"`
+	EscalatedAt  string  `json:"escalatedAt"`
+	Resolution   string  `json:"resolution,omitempty"`
+	ResolvedBy   string  `json:"resolvedBy,omitempty"`
+	ResolvedAt   *string `json:"resolvedAt,omitempty"`
+}
+type CDWQMSEscalationResolution struct {
+	ID         string `json:"id"`
+	CaseID     string `json:"caseId"`
+	ResolvedBy string `json:"resolvedBy"`
+	Resolution string `json:"resolution"`
+	ResolvedAt string `json:"resolvedAt"`
+}
 type CDWQMSLegacyHold struct {
 	ID                 string `json:"id"`
 	ApprovalInstanceID string `json:"approvalInstanceId"`
@@ -186,6 +220,16 @@ type CDWQMSFormalLineage struct {
 	Truncated       bool                `json:"truncated"`
 }
 type CDWQMSG16Store interface {
+	CDWQMSEscalationSourceFile(context.Context, string) (string, error)
+	CDWQMSEscalationPolicySourceFile(context.Context, string) (string, error)
+	CDWQMSEscalationContextFile(context.Context, string, string) (string, error)
+	CDWQMSEscalationPropose(context.Context, string, CDWQMSEscalationPolicy) (CDWQMSEscalationPolicy, error)
+	CDWQMSEscalationVerify(context.Context, string, string, string) (CDWQMSEscalationPolicy, error)
+	CDWQMSEscalationRevoke(context.Context, string, string, string) (CDWQMSEscalationPolicy, error)
+	CDWQMSEscalationPolicies(context.Context, string, int) ([]CDWQMSEscalationPolicy, error)
+	CDWQMSEscalationOpen(context.Context, string, string, string, string, string) (CDWQMSEscalationCase, error)
+	CDWQMSEscalationResolve(context.Context, string, string, string, string) (CDWQMSEscalationResolution, error)
+	CDWQMSEscalationCases(context.Context, string, int) ([]CDWQMSEscalationCase, error)
 	CDWQMSAuditBeginSnapshot(context.Context) error
 	CDWQMSAuditChainIDs(context.Context, string, int) ([]string, bool, error)
 	CDWQMSAuditNodes(context.Context, []string) ([]CDWQMSLineageNode, error)

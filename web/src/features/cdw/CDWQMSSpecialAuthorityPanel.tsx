@@ -6,6 +6,7 @@ import {newIdempotencyKey} from "../../shared/ids";
 import {cdwApi,type CDWQMSSpecialAuthority,type CDWQMSSpecialAlert,type CDWQMSSpecialPolicyImpact,type CDWQMSFormalInterruption,type CDWQMSLegacyAnomaly,type CDWQMSFormalNotice} from "./api";
 import {CDWFormalLineagePanel} from "./CDWFormalLineagePanel";
 import {CDWQMSPortfolioPanel} from "./CDWQMSPortfolioPanel";
+import {CDWQMSEscalationPanel} from "./CDWQMSEscalationPanel";
 
 type Scope={fileId:string;kind:"dhf"|"dmr";templateVersionId:string;policyReleaseId:string;
  nodes:Array<{nodeKey:string;label:string}>};
@@ -171,6 +172,7 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
   </p>}
   {error&&<RareNotice tone="danger">{error}</RareNotice>}
   {!scope&&<CDWQMSPortfolioPanel/>}
+  {!scope&&<CDWQMSEscalationPanel actorId={actorId} notices={noticeLedger} onChange={()=>setRefresh(v=>v+1)}/>}
   {!scope&&notices.some(n=>!n.readAt)&&<div className="cdw-review-digest" aria-label="审批中断通知">
    <small>需要本人确认的审批中断通知</small>
    {notices.filter(n=>!n.readAt).map(n=><div key={n.id} className="cdw-review-digest">

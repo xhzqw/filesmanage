@@ -170,6 +170,12 @@ try{
  assert.equal(await evalJS("!!document.querySelector('[aria-label=\"跨文件审批链统计\"]')"),true,
   "G19 compact portfolio shares existing QMS workbench, not a separate page");
  console.log("CDW_G19_SEGMENT_PORTFOLIO_BROWSER_PASS bounded live metrics and segmented audit fail-closed");
+ const g20=await evalJS("(async()=>{const endpoints=['/api/workbench/qms-escalation-policies','/api/workbench/qms-escalation-cases'];return Promise.all(endpoints.map(async url=>{const r=await fetch(url);return {status:r.status,items:(await r.json()).data?.items}}))})()");
+ assert.ok(g20.every(r=>r.status===200&&Array.isArray(r.items)),
+  "G20 escalation policy and case inboxes are live authenticated scoped server data");
+ assert.equal(await evalJS("!!document.querySelector('[aria-label=\"受控通知升级及异常闭环\"]')"),true,
+  "G20 escalation shares the existing document-control workbench");
+ console.log("CDW_G20_ESCALATION_BROWSER_PASS live policy/case lists, no generated company approvals or escalation");
 
  await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('发行准备'));button?.click();return true;})()");
  await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('发行准备')");
