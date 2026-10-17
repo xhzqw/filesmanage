@@ -135,10 +135,10 @@ try{
  const before=await evaluate("document.querySelector('.xmind-zoom').textContent");
  await evaluate("document.querySelector('.xmind-tools button[aria-label=\"放大\"]')?.click()");
  await until("document.querySelector('.xmind-zoom')?.textContent!=="+JSON.stringify(before),"zoom button");
- await evaluate("Array.from(document.querySelectorAll('.xmind-tools button')).find(b=>b.textContent==='收起')?.click()");
- await until("document.querySelectorAll('.xmind-node').length<20","fold deep");
  await evaluate("document.querySelector('.xmind-details .xmind-detail-relations button')?.click()");
  await until("document.querySelector('.xmind-details')?.textContent?.includes('阶段 2')","relationship jump");
+ await evaluate("Array.from(document.querySelectorAll('.xmind-tools button')).find(b=>b.textContent==='收起')?.click()");
+ await until("document.querySelectorAll('.xmind-node').length<20","fold deep");
  console.log("XMIND_CHROME_SEMANTICS_PASS links/image/boundary/summary/relationship navigation");
  console.log("XMIND_CHROME_INTERACTION_PASS sheets/search/reveal/notes/zoom/fold");
 }finally{
