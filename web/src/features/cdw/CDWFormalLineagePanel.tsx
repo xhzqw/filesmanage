@@ -31,16 +31,18 @@ export function CDWFormalLineagePanel({approvalId,onClose}:{
    .finally(()=>{if(live)setLoading(false);});
   return()=>{live=false;};
  },[approvalId,revision]);
- async function exportAudit(){
+ async function exportAudit(segmented=false){
   if(exporting)return;
   setExporting(true);setError("");
   try{
-   const res=await fetch("/api/workbench/qms-formal-lineage/"+encodeURIComponent(approvalId)+"/audit",{
+   const res=await fetch("/api/workbench/qms-formal-lineage/"+encodeURIComponent(approvalId)+
+    (segmented?"/audit-segmented":"/audit"),{
     method:"GET",credentials:"same-origin",cache:"no-store"});
    if(!res.ok)throw new Error("审计导出被服务端拒绝（HTTP "+res.status+"）；请检查文控权限与完整血缘");
    const blob=await res.blob();
    const href=URL.createObjectURL(blob);
-   const a=document.createElement("a");a.href=href;a.download="CDW-QMS-formal-audit.json";
+   const a=document.createElement("a");a.href=href;
+   a.download=segmented?"CDW-QMS-segmented-audit.json":"CDW-QMS-formal-audit.json";
    document.body.appendChild(a);a.click();a.remove();
    window.setTimeout(()=>URL.revokeObjectURL(href),1000);
   }catch(e){setError(errorCopy(e,"审计导出失败"));}
@@ -57,7 +59,9 @@ export function CDWFormalLineagePanel({approvalId,onClose}:{
    <div className="cdw-review-actions">
     <RareButton type="button" tone="ghost" onClick={()=>setRevision(v=>v+1)}>刷新</RareButton>
     {chain&&<RareButton type="button" tone="neutral" disabled={exporting||chain.truncated}
-     onClick={()=>void exportAudit()}>{exporting?"审计包生成中…":"导出文控审计包"}</RareButton>}
+     onClick={()=>void exportAudit()}>{exporting?"审计包生成中…":"审计导出"}</RareButton>}
+    {chain&&<RareButton type="button" tone="neutral" disabled={exporting}
+     onClick={()=>void exportAudit(true)}>{exporting?"生成中…":"分段完整导出"}</RareButton>}
     {onClose&&<RareButton type="button" tone="ghost" onClick={onClose}>收起</RareButton>}
    </div>
   </div>
@@ -93,7 +97,7 @@ export function CDWFormalLineagePanel({approvalId,onClose}:{
      </RareBadge>
     </div>)}
    </div>
-   {chain.truncated&&<RareNotice tone="warning">审批继承链超过单次查看上限；完整导出被阻断，请由文控核查并完善分段证据。</RareNotice>}
+   {chain.truncated&&<RareNotice tone="warning">当前仅展示有限节点。可申请最多512节点的分段完整审计包；若链路更长，服务端仍将拒绝并提示需要扩展审计工具。</RareNotice>}
    {chain.nodes[chain.nodes.length-1]?.state==="conflicted"&&
     <RareNotice tone="warning">当前审批链以冲突终止结束。须从新的受控交付稿重新发起，不允许继续原审批。</RareNotice>}
   </>}

@@ -161,6 +161,15 @@ try{
  assert.ok(Array.isArray(g18.items),"G18 personal notice follow-up ledger is server-backed");
  assert.equal(g18.auditStatus,404,"G18 cannot export fabricated approval audit evidence");
  console.log("CDW_G18_AUDIT_FOLLOWUP_BROWSER_PASS live scoped ledger and missing-audit fail-closed");
+ const g19=await evalJS("(async()=>{const [summary,audit]=await Promise.all([fetch('/api/workbench/qms-formal-portfolio'),fetch('/api/workbench/qms-formal-lineage/__nonexistent_g19_approval__/audit-segmented')]);return {status:summary.status,portfolio:(await summary.json()).data,auditStatus:audit.status}})()");
+ assert.equal(g19.status,200,"G19 controller-only cross-document portfolio requires live authorization");
+ assert.ok(Array.isArray(g19.portfolio?.items),"G19 portfolio must be a server-backed, bounded collection");
+ assert.ok(g19.portfolio?.limit===100&&typeof g19.portfolio.hasMore==="boolean",
+  "G19 portfolio discloses its cap and incomplete coverage");
+ assert.equal(g19.auditStatus,404,"G19 segmented audit cannot fabricate non-existent signed records");
+ assert.equal(await evalJS("!!document.querySelector('[aria-label=\"跨文件审批链统计\"]')"),true,
+  "G19 compact portfolio shares existing QMS workbench, not a separate page");
+ console.log("CDW_G19_SEGMENT_PORTFOLIO_BROWSER_PASS bounded live metrics and segmented audit fail-closed");
 
  await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('发行准备'));button?.click();return true;})()");
  await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('发行准备')");

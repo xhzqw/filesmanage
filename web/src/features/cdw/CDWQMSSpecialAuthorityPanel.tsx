@@ -5,6 +5,7 @@ import {errorCopy} from "../../shared/errors";
 import {newIdempotencyKey} from "../../shared/ids";
 import {cdwApi,type CDWQMSSpecialAuthority,type CDWQMSSpecialAlert,type CDWQMSSpecialPolicyImpact,type CDWQMSFormalInterruption,type CDWQMSLegacyAnomaly,type CDWQMSFormalNotice} from "./api";
 import {CDWFormalLineagePanel} from "./CDWFormalLineagePanel";
+import {CDWQMSPortfolioPanel} from "./CDWQMSPortfolioPanel";
 
 type Scope={fileId:string;kind:"dhf"|"dmr";templateVersionId:string;policyReleaseId:string;
  nodes:Array<{nodeKey:string;label:string}>};
@@ -169,6 +170,7 @@ export function CDWQMSSpecialAuthorityPanel({actorId,scope,onChange}:{
    核对原始专属规定、适用文件、精确受控发行版本和模板节点后才能独立确认。提报人不能自审。
   </p>}
   {error&&<RareNotice tone="danger">{error}</RareNotice>}
+  {!scope&&<CDWQMSPortfolioPanel/>}
   {!scope&&notices.some(n=>!n.readAt)&&<div className="cdw-review-digest" aria-label="审批中断通知">
    <small>需要本人确认的审批中断通知</small>
    {notices.filter(n=>!n.readAt).map(n=><div key={n.id} className="cdw-review-digest">

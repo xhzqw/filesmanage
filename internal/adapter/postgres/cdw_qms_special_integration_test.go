@@ -446,6 +446,28 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	if err = r.CDWQMSRecordRestart(ctx, prefix+"_g16_valid_restart", formalInstance, revokedInstance, admin.ID); err != nil {
 		t.Fatalf("new pending approval could not link its prior conflict: %v", err)
 	}
+	g19IDs, g19Truncated, g19Err := r.CDWQMSAuditChainIDs(ctx, revokedInstance, 512)
+	if g19Err != nil || g19Truncated || len(g19IDs) != 2 || g19IDs[0] != formalInstance || g19IDs[1] != revokedInstance {
+		t.Fatalf("G19 segmented chain ID walk lost chronological lineage: %+v %t %v", g19IDs, g19Truncated, g19Err)
+	}
+	g19Nodes, g19Err := r.CDWQMSAuditNodes(ctx, g19IDs)
+	if g19Err != nil || len(g19Nodes) != 2 || g19Nodes[1].PreviousApprovalID != formalInstance ||
+		g19Nodes[0].State != "conflicted" || g19Nodes[1].State != "pending" {
+		t.Fatalf("G19 segmented nodes and signed facts mismatch: %+v %v", g19Nodes, g19Err)
+	}
+	g19Files, g19Err := r.CDWQMSPortfolio(ctx, charlie.ID, 100)
+	if g19Err != nil {
+		t.Fatalf("G19 portfolio read: %v", g19Err)
+	}
+	g19Found := false
+	for _, item := range g19Files.Items {
+		if item.FileID == subjectFileID && item.Interrupted >= 1 && item.Restarts >= 1 && item.Approvals >= 2 {
+			g19Found = true
+		}
+	}
+	if !g19Found {
+		t.Fatalf("G19 portfolio omitted scoped formal interruptions: %+v", g19Files)
+	}
 	lineage, lineageErr := r.CDWQMSFormalLineage(ctx, revokedInstance)
 	if lineageErr != nil || lineage.Truncated || len(lineage.Nodes) != 2 ||
 		lineage.Nodes[0].ApprovalID != formalInstance || lineage.Nodes[1].ApprovalID != revokedInstance ||
@@ -625,6 +647,7 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_special_new_review"); err != nil {
 		t.Fatal(err)
 	}
+	t.Log("CDW_G19_SEGMENT_PORTFOLIO_PASS bounded two-way chain, chronological evidence and scoped cross-file metrics")
 	t.Log("CDW_G18_AUDIT_FOLLOWUP_PASS controller-only per-recipient reminders, one-time guard, ACK and audit fact snapshot")
 	t.Log("CDW_G17_APPROVAL_CHAIN_PASS source-file restart requirement, historical read-only access, ancestor/descendant evidence, unique successor")
 	t.Log("CDW_G16_LEGACY_LINEAGE_PASS per-recipient notices and ACK, independent legacy anomaly quarantine, immutable same-file restart lineage")

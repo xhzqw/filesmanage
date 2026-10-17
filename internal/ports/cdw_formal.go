@@ -109,6 +109,50 @@ type CDWQMSAuditPacket struct {
 	Closure       CDWQMSClosureStats  `json:"closure"`
 	Facts         CDWQMSAuditFacts    `json:"facts"`
 }
+
+// Each segment's digest is over its content bytes, while the digest chain
+// authenticates segment ordering and detects missing chunks.
+type CDWQMSAuditSegment struct {
+	Index                 int    `json:"index"`
+	FirstApprovalID       string `json:"firstApprovalId"`
+	LastApprovalID        string `json:"lastApprovalId"`
+	PreviousSegmentSHA256 string `json:"previousSegmentSha256,omitempty"`
+	ContentSHA256         string `json:"contentSha256"`
+	PayloadBase64         string `json:"payloadBase64"`
+}
+type CDWQMSAuditSegmentContent struct {
+	Nodes []CDWQMSLineageNode `json:"nodes"`
+	Facts CDWQMSAuditFacts    `json:"facts"`
+}
+type CDWQMSAuditSegmentedPacket struct {
+	SchemaVersion     string               `json:"schemaVersion"`
+	GeneratedAt       string               `json:"generatedAt"`
+	RequestedBy       string               `json:"requestedBy"`
+	FocusApprovalID   string               `json:"focusApprovalId"`
+	RootApprovalID    string               `json:"rootApprovalId"`
+	TotalNodes        int                  `json:"totalNodes"`
+	TotalSegments     int                  `json:"totalSegments"`
+	LastSegmentSHA256 string               `json:"lastSegmentSha256"`
+	Complete          bool                 `json:"complete"`
+	Closure           CDWQMSClosureStats   `json:"closure"`
+	Segments          []CDWQMSAuditSegment `json:"segments"`
+}
+type CDWQMSPortfolioItem struct {
+	FileID             string `json:"fileId"`
+	FileName           string `json:"fileName"`
+	Approvals          int    `json:"approvals"`
+	Interrupted        int    `json:"interrupted"`
+	Restarts           int    `json:"restarts"`
+	Pending            int    `json:"pending"`
+	Approved           int    `json:"approved"`
+	UnconfirmedNotices int    `json:"unconfirmedNotices"`
+	LastActivityAt     string `json:"lastActivityAt"`
+}
+type CDWQMSPortfolio struct {
+	Items   []CDWQMSPortfolioItem `json:"items"`
+	Limit   int                   `json:"limit"`
+	HasMore bool                  `json:"hasMore"`
+}
 type CDWQMSLegacyHold struct {
 	ID                 string `json:"id"`
 	ApprovalInstanceID string `json:"approvalInstanceId"`
@@ -142,6 +186,10 @@ type CDWQMSFormalLineage struct {
 	Truncated       bool                `json:"truncated"`
 }
 type CDWQMSG16Store interface {
+	CDWQMSAuditBeginSnapshot(context.Context) error
+	CDWQMSAuditChainIDs(context.Context, string, int) ([]string, bool, error)
+	CDWQMSAuditNodes(context.Context, []string) ([]CDWQMSLineageNode, error)
+	CDWQMSPortfolio(context.Context, string, int) (CDWQMSPortfolio, error)
 	CDWQMSAuditCanExport(context.Context, string, string) (bool, error)
 	CDWQMSAuditFacts(context.Context, []string) (CDWQMSAuditFacts, error)
 	CDWQMSFormalFollowup(context.Context, string, string, string, string) (CDWQMSFormalFollowup, error)

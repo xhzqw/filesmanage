@@ -64,6 +64,9 @@ func (s *Service) CDWQMSFormalAudit(ctx context.Context, actor domain.User, id s
 	if !ok {
 		return nil, domain.ErrInvalidInput
 	}
+	if err = g18.CDWQMSAuditBeginSnapshot(ctx); err != nil {
+		return nil, err
+	}
 	fileID, err := formal.CDWFormalApprovalFile(ctx, id)
 	if err != nil {
 		return nil, err

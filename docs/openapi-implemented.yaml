@@ -3992,6 +3992,119 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-formal-lineage/{id}/audit-segmented:
+    get:
+      summary: Export a consistent 512-node bounded audit with sixteen-node segments, base64 payloads and chained SHA-256
+        proofs
+      operationId: cdwQMSFormalAuditSegmented
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Any approval node in the same immutable chain.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Complete JSON attachment with hashed, indexed segments and X-Content-SHA256; current controller and
+            full file ACL required.
+        '403':
+          description: Document-control or file preview authorization absent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: 'Chain exceeds 512 nodes or continuity fails: no incomplete export returned.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/qms-formal-portfolio:
+    get:
+      summary: Scoped latest 100 controller-authorized files with cross-approval restart and unconfirmed-notice metrics
+      operationId: cdwQMSFormalPortfolio
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Scoped recent controller portfolio only; does not claim organization-wide completion.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            fileId:
+                              type: string
+                            fileName:
+                              type: string
+                            approvals:
+                              type: integer
+                              minimum: 0
+                            interrupted:
+                              type: integer
+                              minimum: 0
+                            restarts:
+                              type: integer
+                              minimum: 0
+                            pending:
+                              type: integer
+                              minimum: 0
+                            approved:
+                              type: integer
+                              minimum: 0
+                            unconfirmedNotices:
+                              type: integer
+                              minimum: 0
+                            lastActivityAt:
+                              type: string
+                              format: date-time
+                          required:
+                          - fileId
+                          - fileName
+                          - approvals
+                          - interrupted
+                          - restarts
+                          - pending
+                          - approved
+                          - unconfirmedNotices
+                          - lastActivityAt
+                      limit:
+                        type: integer
+                        minimum: 1
+                      hasMore:
+                        type: boolean
+                    required:
+                    - items
+                    - limit
+                    - hasMore
+                required:
+                - ok
+                - data
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/qms-formal-notice-ledger:
     get:
       summary: Current document-control scoped per-recipient notice and human follow-up ledger

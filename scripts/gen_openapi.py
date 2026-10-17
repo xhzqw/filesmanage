@@ -1112,6 +1112,28 @@ add("GET","/api/workbench/qms-formal-lineage/{id}/audit",operation(
  responses={"200":{"description":"JSON attachment with X-Content-SHA256, current document-control and file ACL required."},
  "403":{"description":"Document-control role or file authorization missing."},
  "409":{"description":"Full audit export blocked for truncated lineage."}}))
+add("GET","/api/workbench/qms-formal-lineage/{id}/audit-segmented",operation(
+ "Export a consistent 512-node bounded audit with sixteen-node segments, base64 payloads and chained SHA-256 proofs",
+ "CDW","cdwQMSFormalAuditSegmented",security=SESSION,
+ params=[id_param("id","Any approval node in the same immutable chain.")],
+ responses={"200":{"description":"Complete JSON attachment with hashed, indexed segments and X-Content-SHA256; current controller and full file ACL required."},
+ "403":{"description":"Document-control or file preview authorization absent."},
+ "409":{"description":"Chain exceeds 512 nodes or continuity fails: no incomplete export returned."}}))
+CDW_QMS_PORTFOLIO_ITEM=obj({
+ "fileId":string(),"fileName":string(),"approvals":integer(minimum=0),
+ "interrupted":integer(minimum=0),"restarts":integer(minimum=0),
+ "pending":integer(minimum=0),"approved":integer(minimum=0),
+ "unconfirmedNotices":integer(minimum=0),"lastActivityAt":timestamp()},
+ required=["fileId","fileName","approvals","interrupted","restarts","pending",
+ "approved","unconfirmedNotices","lastActivityAt"])
+add("GET","/api/workbench/qms-formal-portfolio",operation(
+ "Scoped latest 100 controller-authorized files with cross-approval restart and unconfirmed-notice metrics",
+ "CDW","cdwQMSFormalPortfolio",security=SESSION,
+ responses=dict([json_ok(obj({"items":arr(CDW_QMS_PORTFOLIO_ITEM),
+ "limit":integer(minimum=1),"hasMore":boolean()},
+ required=["items","limit","hasMore"]),
+ "Scoped recent controller portfolio only; does not claim organization-wide completion."),
+ resp("403",ERR["403"])])))
 CDW_QMS_LEGACY_ANOMALY=obj({
  "approvalInstanceId":string(),"fileId":string(),"fileName":string(),
  "templateVersionId":string(),"requestedBy":string(),"completedDecisions":integer(minimum=0),
