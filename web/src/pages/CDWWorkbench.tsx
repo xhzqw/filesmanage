@@ -26,6 +26,24 @@ import {cdwApi,type CDWBranch,type CDWInboxItem,type CDWRecipient,type CDWReview
 import "./cdwWorkbench.css";
 
 type View="tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all";
+const viewGroups:{name:string;views:{key:View;label:string;symbol:string}[]}[]=[
+ {name:"个人事务",views:[{key:"tasks",label:"工作事项",symbol:"▤"},{key:"obligations",label:"责任待办",symbol:"◇"},{key:"all",label:"全部事项",symbol:"▦"}]},
+ {name:"审查与批准",views:[{key:"reviews",label:"交付验收",symbol:"✓"},{key:"formal",label:"正式审批",symbol:"✎"},{key:"appointments",label:"任命核验",symbol:"♙"},{key:"scope",label:"范围审批",symbol:"◎"}]},
+ {name:"受控发行",views:[{key:"control",label:"发行准备",symbol:"▣"},{key:"receipts",label:"部门签收",symbol:"⌁"},{key:"reading",label:"阅读确认",symbol:"▧"},{key:"effective",label:"生效文件",symbol:"◈"}]},
+];
+const kindName:Record<CDWInboxItem["kind"],string>={
+ task:"工作交付",obligation:"责任履行",review:"交付验收",formal:"正式审批",
+ control:"发行准备",scope:"范围审批",receipt:"部门签收",reading:"阅读确认",
+};
+function isActionable(item:CDWInboxItem){
+ if(item.kind==="control")return true;
+ if(item.kind==="task")return ["assigned","accepted","in_progress","returned"].includes(item.state);
+ if(item.kind==="obligation")return ["pending","open"].includes(item.state);
+ if(item.kind==="receipt")return item.state==="awaiting";
+ if(item.kind==="reading")return ["assigned","opened"].includes(item.state);
+ return ["pending","awaiting","open","submitted","assigned"].includes(item.state);
+}
+
 const labels:Record<string,string>={
  assigned:"待接收",accepted:"已接收",in_progress:"进行中",submitted:"待上级验收",
  returned:"已退回",awaiting:"待我验收",accepted_delivery:"交付已验收",
@@ -69,6 +87,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const[requestError,setRequestError]=useState("");
  const[filter,setFilter]=useState<View>("tasks");
  const[search,setSearch]=useState("");
+ const[priorityFirst,setPriorityFirst]=useState(true);
  const[branches,setBranches]=useState<CDWBranch[]>([]);
  const[branchesBusy,setBranchesBusy]=useState(false);
  const[detailsError,setDetailsError]=useState("");
@@ -113,8 +132,12 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
   state:reading.state,revision:1
  })),[readingAssignments]);
  const allItems=useMemo(()=>[...items,...reviewItems,...formalItems,...controlItems,...scopeItems,...receiptItems,...readingItems],[items,reviewItems,formalItems,controlItems,scopeItems,receiptItems,readingItems]);
- const visible=useMemo(()=>allItems.filter(x=>(filter==="all"||x.kind===(filter==="tasks"?"task":filter==="reviews"?"review":filter==="formal"?"formal":filter==="control"?"control":filter==="scope"?"scope":filter==="receipts"?"receipt":filter==="reading"?"reading":"obligation"))
-  &&(x.title.toLocaleLowerCase().includes(search.toLocaleLowerCase())||x.fileId.toLowerCase().includes(search.toLowerCase()))),[allItems,filter,search]);
+ const visible=useMemo(()=>{
+  const query=search.trim().toLocaleLowerCase();
+  const matched=allItems.filter(x=>(filter==="all"||x.kind===(filter==="tasks"?"task":filter==="reviews"?"review":filter==="formal"?"formal":filter==="control"?"control":filter==="scope"?"scope":filter==="receipts"?"receipt":filter==="reading"?"reading":"obligation"))
+   &&(!query||x.title.toLocaleLowerCase().includes(query)||x.fileId.toLocaleLowerCase().includes(query)));
+  return priorityFirst?[...matched].sort((a,b)=>Number(isActionable(b))-Number(isActionable(a))):matched;
+ },[allItems,filter,search,priorityFirst]);
  const selected=visible.find(x=>taskKey(x)===selectedKey)??visible[0]??null;
 
  useEffect(()=>{
@@ -271,19 +294,19 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
   return Boolean(result);
  }
  async function acceptTask(item:CDWInboxItem){
-  await safeWrite("accept:"+item.taskId,key=>cdwApi.accept(item.taskId,item.revision,key),"任务已接收");
+  await safeWrite("accept:"+item.taskId,key=>cdwApi.accept(item.taskId,item.revision,key),"工作已接收");
  }
  async function createRoot(){
   if(!chosenFile||!recipient||!title.trim())return;
   const result=await safeWrite("create:"+chosenFile.id+":"+recipient+":"+title.trim()+":"+allowOverrideReview,
-   key=>cdwApi.create({title:title.trim(),fileId:chosenFile.id,assignee:{kind:"user",id:recipient},allowOverrideReview},key),"任务已派发");
+   key=>cdwApi.create({title:title.trim(),fileId:chosenFile.id,assignee:{kind:"user",id:recipient},allowOverrideReview},key),"工作已派发");
   if(result){setActiveForm(null);setParams({task:result.taskId});}
  }
  async function delegate(item:CDWInboxItem){
   if(!recipient||!title.trim())return;
   const selectedRecipient:CDWRecipient={kind:"user",id:recipient};
   const result=await safeWrite("delegate:"+item.taskId+":"+item.revision+":"+recipient+":"+title.trim(),
-   key=>cdwApi.delegate(item.taskId,item.revision,{childTitle:title.trim(),assignee:selectedRecipient},key),"子任务已派发，上级责任保留");
+   key=>cdwApi.delegate(item.taskId,item.revision,{childTitle:title.trim(),assignee:selectedRecipient},key),"下级工作已派发，上级责任保留");
   if(result){setActiveForm(null);setParams({task:result.taskId});}
  }
  async function resumeTask(item:CDWInboxItem){
@@ -304,6 +327,18 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const totalScope=scopeApprovals.length;
  const totalReceipts=receiptTargets.filter(item=>item.state==="awaiting").length;
  const totalReading=readingAssignments.filter(item=>item.state==="assigned"||item.state==="opened").length;
+ const appointmentCount=pendingAppointments.filter(a=>a.status==="pending").length+
+  appointmentAlerts.filter(a=>!a.readAt).length+specialAlerts.filter(a=>!a.readAt).length+
+  specialReviews.filter(a=>a.status==="pending"&&a.proposedBy!==user.id).length+
+  specialImpacts.filter(a=>a.state==="open").length+legacyAnomalies.filter(a=>a.requestedBy!==user.id).length+
+  formalNotices.filter(a=>!a.readAt).length;
+ const counts:Record<View,number>={
+  tasks:totalTasks,obligations:totalObligations,reviews:totalReviews,formal:totalFormal,
+  appointments:appointmentCount,control:totalControl,scope:totalScope,receipts:totalReceipts,
+  reading:totalReading,effective:0,all:allItems.length,
+ };
+ const selectedView=viewGroups.flatMap(group=>group.views).find(view=>view.key===filter)?.label??"工作事项";
+ const actionableVisible=visible.filter(isActionable).length;
  const canWork=selected?.kind==="task"&&(selected.state==="accepted"||selected.state==="in_progress");
  const editingBranch=branches.find(b=>b.state==="open");
  return <AppShell user={user} onLogout={onLogout}>
@@ -311,66 +346,53 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
    <main className="work cdw-work">
     <div className="cdw-layout">
      <aside className="cdw-rail" aria-label="工作视图分类">
-      <div className="cdw-rail-caption">工作视图</div>
-      {([
-       ["tasks","我的任务",totalTasks],
-       ["obligations","责任待办",totalObligations],
-       ["reviews","待我验收",totalReviews],
-       ["formal","正式审批",totalFormal],
-       ["appointments","任命核验",
-        pendingAppointments.filter(a=>a.status==="pending").length+
-        appointmentAlerts.filter(a=>!a.readAt).length+
-        specialAlerts.filter(a=>!a.readAt).length+
-        specialReviews.filter(a=>a.status==="pending"&&a.proposedBy!==user.id).length+
-        specialImpacts.filter(a=>a.state==="open").length+
-        legacyAnomalies.filter(a=>a.requestedBy!==user.id).length+
-        formalNotices.filter(a=>!a.readAt).length],
-       ["control","发行准备",totalControl],
-       ["scope","范围审批",totalScope],
-       ["receipts","部门签收",totalReceipts],
-       ["reading","阅读确认",totalReading],
-       ["effective","生效文件",0],
-       ["all","全部事项",allItems.length],
-      ] as [View,string,number][]).map(([key,label,count])=>
-       <RareButton key={key} type="button" className={"cdw-rail-item"+(filter===key?" is-current":"")}
-        aria-current={filter===key?"page":undefined} onClick={()=>{setFilter(key);setActiveForm(null);setFormalDraft(false);}}>
-        <span>{label}</span><small>{count}</small>
-       </RareButton>)}
-      <Link className="cdw-rail-item" to="/workbench/dhf" style={{textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px"}}><span>DHF 阶段验收</span><small>1–9</small></Link>
-      <div className="cdw-rail-footer">责任不会因下派而自动消失</div>
+      <div className="cdw-rail-overview"><span className="cdw-rail-mark" aria-hidden="true">◫</span><span><strong>工作队列</strong><small>{allItems.filter(isActionable).length+appointmentCount} 项待处理</small></span></div>
+      <nav className="cdw-rail-nav" aria-label="工作分类">
+       {viewGroups.map(group=><div className="cdw-rail-group" key={group.name}>
+        <div className="cdw-rail-caption">{group.name}</div>
+        {group.views.map(({key,label,symbol})=>
+         <RareButton key={key} type="button" className={"cdw-rail-item"+(filter===key?" is-current":"")}
+          aria-current={filter===key?"page":undefined} onClick={()=>{setFilter(key);setActiveForm(null);setFormalDraft(false);}}>
+          <span className="cdw-rail-icon" aria-hidden="true">{symbol}</span><span className="cdw-rail-label">{label}</span>
+          {key!=="effective"&&<small className={counts[key]>0?"has-count":""}>{counts[key]}</small>}
+         </RareButton>)}
+       </div>)}
+      </nav>
+      <Link className="cdw-rail-dhf" to="/workbench/dhf"><span className="cdw-rail-icon" aria-hidden="true">▣</span><span>DHF 九阶段验收</span><span aria-hidden="true">↗</span></Link>
      </aside>
      {filter==="effective"?<CDWEffectiveSearchPanel/>:filter==="appointments"?
       <CDWQMSReviewInbox items={pendingAppointments} alerts={appointmentAlerts} actorId={user.id}
        onRead={id=>void readAppointmentAlert(id)} onVerified={()=>refresh(v=>v+1)}/>:<>
      <section className="cdw-inbox" aria-label="工作事项列表">
       <header className="cdw-inbox-tools">
-       <div className="cdw-inbox-heading"><strong>{filter==="tasks"?"我的任务":filter==="obligations"?"责任待办":filter==="reviews"?"待我验收":filter==="formal"?"正式审批":filter==="control"?"发行准备":filter==="scope"?"范围审批":filter==="receipts"?"部门签收":filter==="reading"?"阅读确认":"全部事项"}</strong><span>{visible.length}</span></div>
+       <div className="cdw-inbox-heading"><strong>{selectedView}</strong><span>{visible.length}</span></div>
        <div className="cdw-inbox-actions">
-        <RareButton type="button" tone="ghost" aria-label="刷新工作事项" disabled={busy} onClick={()=>refresh(v=>v+1)}>↻</RareButton>
-        {user.isAdmin&&(filter==="formal"?<RareButton type="button" tone="primary" onClick={()=>{setFormalDraft(true);setActiveForm(null);}}>发起审批</RareButton>:filter==="control"||filter==="scope"||filter==="receipts"||filter==="reading"?null:<RareButton type="button" tone="primary" onClick={()=>beginForm("create")}>派发任务</RareButton>)}
+        <RareButton type="button" tone="ghost" className="cdw-refresh" aria-label="刷新工作事项" title="刷新工作事项" disabled={busy} onClick={()=>refresh(v=>v+1)}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2 6M20 4v7h-7"/></svg></RareButton>
+        {user.isAdmin&&(filter==="formal"?<RareButton type="button" tone="primary" onClick={()=>{setFormalDraft(true);setActiveForm(null);}}>发起审批</RareButton>:(filter==="tasks"||filter==="all")?<RareButton type="button" tone="primary" onClick={()=>beginForm("create")}>新建工作</RareButton>:null)}
        </div>
       </header>
-      <div className="cdw-search"><RareInput type="search" aria-label="筛选任务" placeholder="筛选任务或文件…" value={search} onChange={e=>setSearch(e.target.value)}/></div>
+      <div className="cdw-search"><div className="cdw-search-field"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><RareInput type="search" aria-label="筛选工作或文件" placeholder="搜索工作或文件…" value={search} onChange={e=>setSearch(e.target.value)}/></div></div>
+      <div className="cdw-list-meta"><span>{actionableVisible>0?<><i className="cdw-meta-dot"/> {actionableVisible} 项待处理</>:"当前分类的全部事项"}</span><RareButton type="button" className={"cdw-sort-button"+(priorityFirst?" is-active":"")} aria-pressed={priorityFirst} tone="ghost" onClick={()=>setPriorityFirst(v=>!v)}>待处理优先 <span aria-hidden="true">{priorityFirst?"↓":"↕"}</span></RareButton></div>
       <div className="cdw-inbox-scroll">
-       {busy&&items.length===0&&<div className="cdw-message"><BrandLoadingLabel showContext>加载任务</BrandLoadingLabel></div>}
+       {busy&&items.length===0&&<div className="cdw-message"><BrandLoadingLabel showContext>加载工作事项</BrandLoadingLabel></div>}
        {requestError&&<RareNotice tone="danger">{requestError} <RareButton type="button" onClick={()=>refresh(n=>n+1)}>重试</RareButton></RareNotice>}
-       {!busy&&!requestError&&visible.length===0&&<div className="cdw-empty"><span aria-hidden="true">☷</span><strong>暂无相关事项</strong><p>{filter==="obligations"?"目前没有待履行责任":"任务派发后将在这里显示"}</p></div>}
+       {!busy&&visible.length===0&&<div className="cdw-empty"><span className="cdw-empty-icon" aria-hidden="true">▤</span><strong>{search.trim()?"没有匹配的工作":"当前没有需要展示的事项"}</strong><p>{search.trim()?"可以更换关键词继续查找":filter==="obligations"?"目前没有待履行责任":"新事项到达后会出现在这里"}</p>{search.trim()&&<RareButton type="button" tone="ghost" onClick={()=>setSearch("")}>清除搜索</RareButton>}</div>}
        {visible.map(item=><RareButton type="button" className={"cdw-task-row"+(selected===item&&!activeForm?" is-selected":"")} key={taskKey(item)}
          aria-current={selected===item&&!activeForm?"true":undefined} onClick={()=>select(item)}>
-        <span className={"cdw-task-symbol"+(item.kind==="obligation"?" is-obligation":"")} aria-hidden="true">{item.kind==="task"?"▤":"↳"}</span>
-        <span className="cdw-task-copy"><strong title={item.title}>{item.title}</strong>
-         <small>{item.kind==="obligation"?stateLabel(item.obligationKind??""):item.kind==="formal"?"冻结候选稿 · 正式批准":item.kind==="control"?"正式批准 · 文控版次":item.kind==="scope"?"冻结清单 · 独立范围批准":item.kind==="receipt"?"部门受控发行 · 真实签收":item.kind==="reading"?"指定人员 · 独立阅读确认":item.kind==="review"?(item.review?.reviewMode==="delegated"?"冻结交付 · 授权代验收":"冻结交付 · 直属验收"):"任务"} · {stateLabel(item.state)}</small></span>
-        {item.kind==="task"&&item.state==="assigned"&&<span className="cdw-task-unread" aria-label="待接收"/>}
+        <span className={"cdw-task-symbol cdw-kind-"+item.kind} aria-hidden="true">{item.kind==="task"?"▤":item.kind==="obligation"?"◇":item.kind==="review"?"✓":item.kind==="formal"?"✎":item.kind==="receipt"?"⌁":"▣"}</span>
+        <span className="cdw-task-copy"><span className="cdw-task-kicker">{kindName[item.kind]}{item.kind==="review"&&item.review?.reviewMode==="delegated"?" · 授权代验收":""}</span><strong title={item.title}>{item.title}</strong>
+         <span className="cdw-task-bottom"><small>{item.kind==="obligation"?stateLabel(item.obligationKind??"") +" · ":""}{stateLabel(item.state)}</small>{isActionable(item)&&<i className="cdw-task-unread" aria-label="待处理"/>}</span></span>
+        <span className="cdw-task-chevron" aria-hidden="true">›</span>
        </RareButton>)}
       </div>
-      <footer className="cdw-inbox-footer">我的工作 · 按服务器实时权限读取</footer>
+      <footer className="cdw-inbox-footer">共 {visible.length} 项工作 · 选择条目查看详情</footer>
      </section>
-     <article className="cdw-detail" aria-label="任务详情">
+     <article className="cdw-detail" aria-label="工作详情">
       {formalDraft?<CDWFormalInitiate actorId={user.id} loadUsers={organizationApi.users} onCreated={()=>{setFormalDraft(false);refresh(n=>n+1);}}/>:activeForm?<section className="cdw-detail-inner">
-       <div className="cdw-detail-header"><div><small>工作台</small><h2>{activeForm==="create"?"派发单文件任务":"逐级派发子任务"}</h2></div>
+       <div className="cdw-detail-header"><div><small>工作台</small><h2>{activeForm==="create"?"新建受控文件工作":"派发下级工作"}</h2></div>
         <RareButton tone="ghost" onClick={()=>setActiveForm(null)}>取消</RareButton></div>
        <div className="cdw-form">
-        <label>任务名称<RareInput value={title} maxLength={255} placeholder="简要描述具体交付工作" onChange={e=>setTitle(e.target.value)}/></label>
+        <label>工作名称<RareInput value={title} maxLength={255} placeholder="简要描述具体交付工作" onChange={e=>setTitle(e.target.value)}/></label>
         {activeForm==="create"&&<div className="cdw-file-picker">
          <label>选择受控工作文件（DOCX）<RareInput type="search" value={fileQuery} placeholder="按文件名搜索，至少两个字" onChange={e=>{setFileQuery(e.target.value);setChosenFile(null);}}/></label>
          {chosenFile&&<div className="cdw-picked">已选：{chosenFile.name}</div>}
@@ -382,7 +404,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
            onClick={()=>setChosenFile(file)}><span>{file.name}</span><small>{file.currentVersionSeq} 版</small></RareButton>)}
          </div>
         </div>}
-        <label>任务负责人
+        <label>工作负责人
          {usersBusy?<span className="cdw-help">读取人员列表…</span>:<RecipientPicker users={users} value={recipient} onChange={setRecipient}/>}
         </label>
         {usersError&&<RareNotice tone="warning">{usersError}</RareNotice>}
@@ -393,7 +415,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
          </RareButton>
          <p className="cdw-section-note">默认关闭。开启后，直属审核人可针对具体交付节点授权更上级替代验收；中间管理与整合责任仍保留。</p>
         </div>}
-        {activeForm==="delegate"&&<RareNotice tone="info">派发子任务后，你仍须履行管理、整合和上报责任。</RareNotice>}
+        {activeForm==="delegate"&&<RareNotice tone="info">派发下级工作后，你仍须履行管理、整合和上报责任。</RareNotice>}
         <div className="cdw-form-actions">
          <RareButton type="button" tone="primary" loading={processing} disabled={!title.trim()||!recipient||usersBusy||(activeForm==="create"&&!chosenFile)}
           onClick={()=>void (activeForm==="create"?createRoot():selected&&delegate(selected))}>确认派发</RareButton>
@@ -414,27 +436,27 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
       selected?.kind==="review"&&selected.review?
       <CDWReviewPanel key={selected.review.gateId} gate={selected.review} onDecided={()=>refresh(n=>n+1)}/>:
       selected?<section className="cdw-detail-inner" key={taskKey(selected)}>
-       <div className="cdw-detail-header"><div><small>{selected.kind==="task"?"任务详情":"责任待办"}</small>
+       <div className="cdw-detail-header"><div><small>{selected.kind==="task"?"工作详情":"责任待办"}</small>
         <h2>{selected.title}</h2></div><RareBadge tone={statusTone(selected.state)}>{stateLabel(selected.state)}</RareBadge></div>
        <div className="cdw-detail-facts">
-        <div><span>事项</span><strong>{selected.kind==="task"?"任务交付":stateLabel(selected.obligationKind??"manage")}</strong></div>
+        <div><span>事项</span><strong>{selected.kind==="task"?"工作交付":stateLabel(selected.obligationKind??"manage")}</strong></div>
         <div><span>状态</span><strong>{stateLabel(selected.state)}</strong></div>
         <div><span>关联文件</span><strong title={fileInfo?.name??selected.fileId}>{fileInfo?.name??"文件"}</strong></div>
        </div>
        <div className="cdw-section"><div className="cdw-section-head"><h3>工作文件</h3>
         <Link className="cdw-text-link" to={"/preview/"+encodeURIComponent(selected.fileId)}>打开预览 ↗</Link></div>
-        <p className="cdw-section-note">原文件维持独立正式版本；编辑任务产生单独工作修订，不直接覆盖原件。</p>
+        <p className="cdw-section-note">原文件维持独立正式版本；在线编辑产生独立工作修订，不直接覆盖原件。</p>
        </div>
        {selected.kind==="obligation"?<CDWObligationPanel item={selected} busy={processing} onFulfill={statement=>fulfillObligation(selected,statement)}/>:<>
         {selected.state==="assigned"&&<div className="cdw-primary-action">
-         <p>你收到一项工作任务。接收后可以建立独立编辑分支，也可以向下一级派发。</p>
-         <RareButton type="button" tone="primary" loading={processing} onClick={()=>void acceptTask(selected)}>接收任务</RareButton>
+         <p>你收到一项工作。接收后可以建立独立编辑分支，也可以向下一级派发。</p>
+         <RareButton type="button" tone="primary" loading={processing} onClick={()=>void acceptTask(selected)}>接收工作</RareButton>
         </div>}
         {canWork&&<>
          <div className="cdw-section">
           <div className="cdw-section-head"><h3>工作分支</h3>{branchesBusy&&<small>正在更新</small>}</div>
           {detailsError&&<RareNotice tone="warning">{detailsError}</RareNotice>}
-          {!branchesBusy&&branches.length===0&&<p className="cdw-section-note">当前任务还没有工作分支。创建后由 ONLYOFFICE 原生保存，交付时验证最终回执。</p>}
+          {!branchesBusy&&branches.length===0&&<p className="cdw-section-note">当前工作还没有编辑分支。创建后由 ONLYOFFICE 原生保存，交付时验证最终回执。</p>}
           {branches.map(b=><div className="cdw-branch-row" key={b.branchId}>
            <span className="cdw-branch-text"><strong>工作修订 {b.headRevisionId?"· 已有保存":"· 待编辑"}</strong>
             <small>{stateLabel(b.state)} · 工作版本 {b.revision}</small></span>
@@ -445,8 +467,8 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
            onClick={()=>void createBranch(selected)}>创建工作分支</RareButton>}
          </div>
          <div className="cdw-section cdw-delegation">
-          <h3>逐级派发</h3><p className="cdw-section-note">需要其他人员协助时，建立独立子任务，上级管理责任仍保留。</p>
-          <RareButton type="button" onClick={()=>beginForm("delegate")}>派发子任务 →</RareButton>
+          <h3>逐级派发</h3><p className="cdw-section-note">需要其他人员协助时，建立独立下级工作，上级管理责任仍保留。</p>
+          <RareButton type="button" onClick={()=>beginForm("delegate")}>派发下级工作 →</RareButton>
          </div>
         </>}
         {selected.state==="returned"&&<div className="cdw-primary-action">
@@ -454,9 +476,9 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
          <RareButton type="button" tone="primary" loading={processing} onClick={()=>void resumeTask(selected)}>从退回稿继续修订</RareButton>
         </div>}
         {selected.state==="submitted"&&<RareNotice tone="info">交付稿已冻结，正在等待直属上级验收；尚未正式批准或生效。</RareNotice>}
-        {selected.state==="accepted_delivery"&&<RareNotice tone="success">本轮任务交付已通过直属上级验收；文件正式审批和受控发行仍需独立处理。</RareNotice>}
+        {selected.state==="accepted_delivery"&&<RareNotice tone="success">本轮工作交付已通过直属上级验收；文件正式审批和受控发行仍需独立处理。</RareNotice>}
        </>}
-      </section>:<div className="cdw-detail-empty"><strong>选择一项任务</strong><p>查看工作分支、任务责任和后续交付。</p></div>}
+      </section>:<div className="cdw-detail-empty"><strong>选择一项工作</strong><p>查看工作分支、责任和后续交付。</p></div>}
      </article>
      </>}
     </div>
