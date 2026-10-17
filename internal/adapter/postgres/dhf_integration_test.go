@@ -145,6 +145,9 @@ func TestDHFPostgresGates(t *testing.T) {
 	second := items[1]
 	second.State = "not_applicable"
 	second.ApplicabilityReason = "具体评估后判定无需本项"
+	second.SubmittedBy = owner
+	second.ReviewedBy = reviewer
+	second.ReviewReason = "独立核验后同意不适用"
 	if err = store.DHFUpdateItem(ctx, project.ID, second, second.Revision); err != nil {
 		t.Fatal(err)
 	}

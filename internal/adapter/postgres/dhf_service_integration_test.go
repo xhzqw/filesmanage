@@ -114,8 +114,9 @@ func TestDHFServiceWorkflow(t *testing.T) {
 	sha := hex.EncodeToString(sum[:])
 	exec(`INSERT INTO folders(id,name,owner_id) VALUES('dhf_svc_folder','Fixture',$1)`, owner.ID)
 	exec(`INSERT INTO blobs(id,storage_key,sha256,size_bytes,state) VALUES('dhf_svc_blob','dhf_svc_immutable_evidence',$1,26,'ready')`, sha)
-	exec(`INSERT INTO files(id,folder_id,name,uploaded_by,current_version_seq) VALUES('dhf_svc_file','dhf_svc_folder','evidence.txt',$1,1)`, owner.ID)
+	exec(`INSERT INTO files(id,folder_id,name,uploaded_by,current_version_seq) VALUES('dhf_svc_file','dhf_svc_folder','evidence.txt',$1,NULL)`, owner.ID)
 	exec(`INSERT INTO file_versions(id,file_id,seq,blob_id,size_bytes,sha256,action,created_by) VALUES('dhf_svc_file_v1','dhf_svc_file',1,'dhf_svc_blob',26,$1,'upload',$2)`, sha, owner.ID)
+	exec(`UPDATE files SET current_version_seq=1 WHERE id='dhf_svc_file'`)
 	line = stageOne[1]
 	rev, _ = getItem(line)
 	if _, err = service.DHFActItem(ctx, owner, first.Project.ID, line, rev, application.DHFItemAction{Action: "required"}, "dhf_svc_required"); err != nil {
