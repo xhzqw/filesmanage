@@ -1,95 +1,135 @@
 import {useEffect,useMemo,useRef,useState,type PointerEvent,type WheelEvent} from "react";
-import {RareButton} from "../../shared/ui/rare";
+import {RareButton,RareInput} from "../../shared/ui/rare";
 import type {XMindPreview,XMindTopic} from "../../entities/file/model";
+import {indexMindMap,layoutMindMap,MIND_NODE_WIDTH,MIND_NODE_HEIGHT,type MindMapDirection} from "./mindMapLayout";
 import "./mindMapPreview.css";
 
-type MapNode={path:string;topic:XMindTopic;depth:number;x:number;y:number;children:number};
-type MapEdge={fromX:number;fromY:number;toX:number;toY:number;kind?:string};
-const NODE_WIDTH=200;
-const NODE_HEIGHT=48;
-const COLUMN_SPACING=76;
-const ROW_SPACING=17;
-const PADDING=42;
-const clamp=(value:number,min:number,max:number)=>Math.min(max,Math.max(min,value));
-
-function arrange(root:XMindTopic,folded:Set<string>){
- const heights=new Map<string,number>();
- let maxDepth=0;
- function measure(topic:XMindTopic,path:string,depth:number):number {
-  maxDepth=Math.max(maxDepth,depth);
-  const children=folded.has(path)?[]:topic.children??[];
-  const total=children.reduce((sum,child,i)=>sum+measure(child,path+"."+i,depth+1)+(i>0?ROW_SPACING:0),0);
-  const height=Math.max(NODE_HEIGHT,total);
-  heights.set(path,height);
-  return height;
+const clamp=(n:number,low:number,high:number)=>Math.min(high,Math.max(low,n));
+type Viewport={width:number;height:number};
+function initialFolds(root?:XMindTopic,large=false):Set<string>{
+ const folds=new Set<string>();
+ if(!root||!large)return folds;
+ function walk(topic:XMindTopic,path:string,depth:number){
+  if(depth>=2&&topic.children?.length){folds.add(path);return;}
+  topic.children?.forEach((child,i)=>walk(child,path+"."+i,depth+1));
  }
- const height=measure(root,"0",0);
- const nodes:MapNode[]=[];
- const edges:MapEdge[]=[];
- function place(topic:XMindTopic,path:string,depth:number,top:number){
-  const y=top+((heights.get(path)??NODE_HEIGHT)-NODE_HEIGHT)/2;
-  const x=PADDING+depth*(NODE_WIDTH+COLUMN_SPACING);
-  const children=folded.has(path)?[]:topic.children??[];
-  nodes.push({path,topic,depth,x,y,children:(topic.children??[]).length});
-  let cursor=top;
-  children.forEach((child,i)=>{
-   const childPath=path+"."+i;
-   const childHeight=heights.get(childPath)??NODE_HEIGHT;
-   const childY=cursor+(childHeight-NODE_HEIGHT)/2;
-   edges.push({fromX:x+NODE_WIDTH,fromY:y+NODE_HEIGHT/2,
-    toX:x+NODE_WIDTH+COLUMN_SPACING,toY:childY+NODE_HEIGHT/2,kind:child.kind});
-   place(child,childPath,depth+1,cursor);
-   cursor+=childHeight+ROW_SPACING;
-  });
- }
- place(root,"0",0,PADDING);
- return {nodes,edges,width:PADDING*2+(maxDepth+1)*NODE_WIDTH+maxDepth*COLUMN_SPACING,height:height+PADDING*2};
+ walk(root,"0",0);
+ return folds;
+}
+function ancestorPaths(path:string){
+ const ancestors:string[]=[];
+ let cursor=path.lastIndexOf(".");
+ while(cursor>0){ancestors.push(path.slice(0,cursor));cursor=path.lastIndexOf(".",cursor-1);}
+ return ancestors;
 }
 
-export function MindMapPreview({value,note=""}:{value:XMindPreview;note?:string}){
+export function MindMapPreview({value,note=""}:{value?:XMindPreview;note?:string}){
  const [sheetIndex,setSheetIndex]=useState(0);
- const [folded,setFolded]=useState<Set<string>>(()=>new Set());
+ const sheet=value?.sheets[sheetIndex]??value?.sheets[0];
+ const big=(value?.topicCount??0)>350;
+ const [folded,setFolded]=useState<Set<string>>(()=>initialFolds(value?.sheets[0]?.root,big));
+ const [direction,setDirection]=useState<MindMapDirection>("balanced");
  const [selectedPath,setSelectedPath]=useState<string|null>(null);
+ const [outlineOpen,setOutlineOpen]=useState(false);
+ const [search,setSearch]=useState("");
  const [zoom,setZoom]=useState(1);
- const [pan,setPan]=useState({x:40,y:40});
+ const [pan,setPan]=useState({x:0,y:0});
+ const [viewport,setViewport]=useState<Viewport>({width:0,height:0});
+ const [fitNonce,setFitNonce]=useState(0);
+ const [focusPath,setFocusPath]=useState<string|null>(null);
  const surface=useRef<HTMLDivElement>(null);
+ const searchRef=useRef<HTMLInputElement>(null);
  const drag=useRef<{id:number;startX:number;startY:number;x:number;y:number}|null>(null);
- const sheet=value.sheets[sheetIndex]??value.sheets[0];
- const layout=useMemo(()=>sheet?arrange(sheet.root,folded):null,[sheet,folded]);
- const selected=layout?.nodes.find(n=>n.path===selectedPath);
- function fit(){
-  if(!layout||!surface.current)return;
-  const {clientWidth,clientHeight}=surface.current;
-  if(!clientWidth||!clientHeight)return;
-  const scale=clamp(Math.min((clientWidth-65)/layout.width,(clientHeight-65)/layout.height),.25,1.4);
+ const fitted=useRef("");
+ const indexed=useMemo(()=>sheet?indexMindMap(sheet.root):[],[sheet]);
+ const layout=useMemo(()=>sheet?layoutMindMap(sheet.root,folded,direction):null,[sheet,folded,direction]);
+ const selected=layout?.nodes.find(item=>item.path===selectedPath);
+ const matches=useMemo(()=>{
+  const term=search.trim().toLocaleLowerCase();
+  return term?indexed.filter(item=>item.topic.title.toLocaleLowerCase().includes(term)||
+    item.topic.notes?.toLocaleLowerCase().includes(term)):indexed;
+ },[search,indexed]);
+ const listed=matches.slice(0,180);
+ useEffect(()=>{
+  const el=surface.current;
+  if(!el)return;
+  const observer=new ResizeObserver(()=>{
+   setViewport(v=>{
+    const width=el.clientWidth,height=el.clientHeight;
+    return v.width===width&&v.height===height?v:{width,height};
+   });
+  });
+  observer.observe(el);
+  return()=>observer.disconnect();
+ },[!!sheet]);
+ function fitCanvas(){
+  if(!layout||viewport.width<=0||viewport.height<=0)return;
+  const availableWidth=Math.max(70,viewport.width-64);
+  const availableHeight=Math.max(70,viewport.height-64);
+  const ideal=Math.min(availableWidth/layout.width,availableHeight/layout.height);
+  const scale=clamp(ideal,.12,1.25);
+  const root=layout.nodes[0];
+  // When the whole map is too large to fit at the readable minimum scale,
+  // prioritize the root instead of centering on miles of invisible canvas.
+  if(ideal<.12&&root){
+   setPan({x:viewport.width/2-(root.x+MIND_NODE_WIDTH/2)*scale,
+    y:viewport.height/2-(root.y+MIND_NODE_HEIGHT/2)*scale});
+  }else{
+   setPan({x:(viewport.width-layout.width*scale)/2,y:(viewport.height-layout.height*scale)/2});
+  }
   setZoom(scale);
-  setPan({x:(clientWidth-layout.width*scale)/2,y:(clientHeight-layout.height*scale)/2});
  }
- useEffect(()=>{fit();},[sheetIndex,layout?.width,layout?.height]);
- useEffect(()=>{setFolded(new Set());setSelectedPath(null);},[sheetIndex]);
- function updateZoom(next:number,anchorX?:number,anchorY?:number){
-  const value=clamp(next,.25,2.5);
-  const x=anchorX??(surface.current?.clientWidth??0)/2;
-  const y=anchorY??(surface.current?.clientHeight??0)/2;
-  setPan(previous=>({x:x-(x-previous.x)*value/zoom,y:y-(y-previous.y)*value/zoom}));
-  setZoom(value);
+ const fitKey=sheetIndex+":"+direction+":"+viewport.width+":"+viewport.height+":"+fitNonce;
+ useEffect(()=>{
+  if(!layout||viewport.width===0||viewport.height===0||fitted.current===fitKey)return;
+  fitted.current=fitKey;
+  fitCanvas();
+ },[layout,fitKey]);
+ useEffect(()=>{
+  if(!focusPath||!layout||!viewport.width)return;
+  const node=layout.nodes.find(item=>item.path===focusPath);
+  if(!node)return;
+  setPan({x:viewport.width/2-(node.x+MIND_NODE_WIDTH/2)*zoom,
+   y:viewport.height/2-(node.y+MIND_NODE_HEIGHT/2)*zoom});
+  setFocusPath(null);
+ },[focusPath,layout,zoom,viewport.width,viewport.height]);
+ function switchSheet(i:number){
+  const root=value?.sheets[i]?.root;
+  setSheetIndex(i);setFolded(initialFolds(root,big));setSelectedPath(null);
+  setSearch("");setFocusPath(null);
+ }
+ function jump(path:string){
+  setFolded(old=>{
+   const updated=new Set(old);
+   ancestorPaths(path).forEach(item=>updated.delete(item));
+   return updated;
+  });
+  setSelectedPath(path);setFocusPath(path);
+  setOutlineOpen(false);
+ }
+ function changeZoom(next:number,x=viewport.width/2,y=viewport.height/2){
+  const target=clamp(next,.12,3);
+  setPan(previous=>({x:x-(x-previous.x)*target/zoom,y:y-(y-previous.y)*target/zoom}));
+  setZoom(target);
  }
  function wheel(event:WheelEvent<HTMLDivElement>){
-  if(!event.ctrlKey&&!event.metaKey)return;
   event.preventDefault();
-  const bounds=surface.current?.getBoundingClientRect();
-  if(!bounds)return;
-  updateZoom(zoom*(event.deltaY>0?.92:1.08),event.clientX-bounds.left,event.clientY-bounds.top);
+  if(event.ctrlKey||event.metaKey){
+   const rect=surface.current?.getBoundingClientRect();
+   if(rect)changeZoom(zoom*Math.exp(-event.deltaY*.004),event.clientX-rect.left,event.clientY-rect.top);
+  }else{
+   setPan(previous=>({x:previous.x-event.deltaX,y:previous.y-event.deltaY}));
+  }
  }
  function pointerDown(event:PointerEvent<HTMLDivElement>){
-  if(event.button!==0||(event.target as HTMLElement).closest("button"))return;
+  if(event.button!==0||(event.target as HTMLElement).closest("button,input"))return;
   drag.current={id:event.pointerId,startX:event.clientX,startY:event.clientY,x:pan.x,y:pan.y};
   event.currentTarget.setPointerCapture(event.pointerId);
  }
  function pointerMove(event:PointerEvent<HTMLDivElement>){
-  if(!drag.current||drag.current.id!==event.pointerId)return;
-  const origin=drag.current;
-  setPan({x:origin.x+event.clientX-origin.startX,y:origin.y+event.clientY-origin.startY});
+  const initial=drag.current;
+  if(!initial||initial.id!==event.pointerId)return;
+  setPan({x:initial.x+event.clientX-initial.startX,y:initial.y+event.clientY-initial.startY});
  }
  function stopPan(event:PointerEvent<HTMLDivElement>){
   if(drag.current?.id!==event.pointerId)return;
@@ -97,72 +137,142 @@ export function MindMapPreview({value,note=""}:{value:XMindPreview;note?:string}
   if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);
  }
  function toggle(path:string){
-  setFolded(before=>{
-   const next=new Set(before);
-   if(next.has(path))next.delete(path);else next.add(path);
-   return next;
+  setFolded(old=>{
+   const updated=new Set(old);
+   if(updated.has(path))updated.delete(path);else updated.add(path);
+   return updated;
   });
  }
- if(!sheet||!layout)return <div className="xmind-empty" role="status">没有可预览的思维导图画布。</div>;
+ function foldDeep(){
+  if(!sheet)return;
+  const next=new Set<string>();
+  indexed.forEach(item=>{
+   if(item.depth>=1&&item.topic.children?.length)next.add(item.path);
+  });
+  setFolded(next);setSelectedPath(null);
+ }
+ const visibleNodes=layout?.nodes.filter(node=>{
+  if(!viewport.width)return node.depth<=2;
+  const left=pan.x+node.x*zoom,top=pan.y+node.y*zoom;
+  return left<viewport.width+170&&left+MIND_NODE_WIDTH*zoom> -170&&
+   top<viewport.height+170&&top+MIND_NODE_HEIGHT*zoom> -170;
+ })??[];
+ const visiblePaths=new Set(visibleNodes.map(item=>item.path));
+ const edges=layout?.edges.filter(edge=>{
+  if(visiblePaths.has(edge.key))return true;
+  if(!viewport.width)return false;
+  const minX=pan.x+Math.min(edge.fromX,edge.toX)*zoom;
+  const maxX=pan.x+Math.max(edge.fromX,edge.toX)*zoom;
+  const minY=pan.y+Math.min(edge.fromY,edge.toY)*zoom;
+  const maxY=pan.y+Math.max(edge.fromY,edge.toY)*zoom;
+  return maxX>=-150&&minX<=viewport.width+150&&maxY>=-150&&minY<=viewport.height+150;
+ })??[];
+
  return <div className="xmind-viewer" aria-label="XMind 思维导图只读预览">
-  <div className="xmind-bar">
-   <div className="xmind-sheets" role="tablist" aria-label="思维导图画布">
-    {value.sheets.map((item,i)=><RareButton key={i} type="button" tone="ghost" role="tab" aria-selected={i===sheetIndex}
-      className={"xmind-sheet"+(i===sheetIndex?" is-active":"")} onClick={()=>setSheetIndex(i)}
-      title={item.title}>{item.title}</RareButton>)}
+  {!sheet||!layout?<div className="xmind-invalid" role="status">
+   <strong>无法展示此思维导图</strong><p>{note||"未找到可解析的画布或主题。请检查文件完整性及 XMind 格式。"}</p>
+  </div>:<>
+   <div className="xmind-bar">
+    <div className="xmind-sheets" role="tablist" aria-label="XMind 工作表">
+     {value?.sheets.map((item,i)=><RareButton key={i} type="button" tone="ghost" role="tab"
+      aria-selected={i===sheetIndex} className={"xmind-sheet"+(i===sheetIndex?" is-active":"")}
+      title={item.title} onClick={()=>switchSheet(i)}>{item.title}</RareButton>)}
+    </div>
+    <div className="xmind-tools" role="group" aria-label="思维导图阅读工具">
+     <RareButton type="button" tone="ghost" className="xmind-outline-toggle" aria-pressed={outlineOpen}
+      onClick={()=>setOutlineOpen(v=>!v)}>{outlineOpen?"关闭目录":"目录 / 搜索"}</RareButton>
+     <span className="xmind-divider"/>
+     <RareButton type="button" tone="ghost" aria-pressed={direction==="balanced"}
+      onClick={()=>setDirection("balanced")} title="左右均衡展开">左右</RareButton>
+     <RareButton type="button" tone="ghost" aria-pressed={direction==="right"}
+      onClick={()=>setDirection("right")} title="仅向右展开">向右</RareButton>
+     <span className="xmind-divider"/>
+     <RareButton type="button" tone="ghost" title="展开全部主题" onClick={()=>setFolded(new Set())}>展开</RareButton>
+     <RareButton type="button" tone="ghost" title="收起第 2 级以下主题" onClick={foldDeep}>收起</RareButton>
+     <span className="xmind-divider"/>
+     <RareButton type="button" tone="ghost" title="缩小" aria-label="缩小" onClick={()=>changeZoom(zoom/1.25)}>−</RareButton>
+     <span className="xmind-zoom">{Math.round(zoom*100)}%</span>
+     <RareButton type="button" tone="ghost" title="放大" aria-label="放大" onClick={()=>changeZoom(zoom*1.25)}>＋</RareButton>
+     <RareButton type="button" tone="ghost" onClick={()=>setFitNonce(v=>v+1)}>适应画布</RareButton>
+     <RareButton type="button" tone="ghost" title="居中根主题" onClick={()=>jump("0")}>根主题</RareButton>
+    </div>
    </div>
-   <div className="xmind-tools" role="group" aria-label="画布工具">
-    <RareButton type="button" tone="ghost" title="全部展开" onClick={()=>setFolded(new Set())}>展开</RareButton>
-    <RareButton type="button" tone="ghost" title="折叠到第一级" onClick={()=>{
-     const next=new Set<string>();
-     const walk=(topic:XMindTopic,path:string,depth:number)=>{
-      if(depth>0&&(topic.children?.length??0)>0)next.add(path);
-      topic.children?.forEach((child,i)=>walk(child,path+"."+i,depth+1));
-     };
-     walk(sheet.root,"0",0);setFolded(next);setSelectedPath(null);
-    }}>收起</RareButton>
-    <span className="xmind-divider" aria-hidden="true"/>
-    <RareButton type="button" tone="ghost" aria-label="缩小" onClick={()=>updateZoom(zoom/1.2)}>−</RareButton>
-    <span className="xmind-zoom">{Math.round(zoom*100)}%</span>
-    <RareButton type="button" tone="ghost" aria-label="放大" onClick={()=>updateZoom(zoom*1.2)}>＋</RareButton>
-    <RareButton type="button" tone="ghost" onClick={fit}>适应画布</RareButton>
+   <div className="xmind-main">
+    {outlineOpen&&<aside className="xmind-outline" aria-label="主题目录与搜索">
+     <div className="xmind-outline-search">
+      <RareInput ref={searchRef} value={search} type="search" placeholder="搜索主题、备注"
+       aria-label="搜索思维导图主题或备注" onChange={e=>setSearch(e.target.value)}
+       onKeyDown={e=>{if(e.key==="Enter"&&matches[0])jump(matches[0].path);if(e.key==="Escape")setOutlineOpen(false);}}/>
+      <small>{search.trim()?matches.length+" 个结果":indexed.length+" 个主题"}</small>
+     </div>
+     <div className="xmind-outline-scroll" role="list">
+      {listed.map(item=><RareButton key={item.path} type="button" tone="ghost" role="listitem"
+       className={"xmind-outline-row"+(item.path===selectedPath?" is-current":"")}
+       style={{paddingLeft:11+Math.min(item.depth,6)*12}}
+       title={item.topic.title} onClick={()=>jump(item.path)}>
+       <span className="xmind-outline-depth" aria-hidden="true">{item.topic.children?.length?"◇":"·"}</span>
+       <span className="xmind-outline-text">{item.topic.title}</span>
+      </RareButton>)}
+      {matches.length>listed.length&&<p className="xmind-outline-hint">只列出前 {listed.length} 项，可搜索缩小范围</p>}
+      {matches.length===0&&<p className="xmind-outline-hint">未找到匹配的主题</p>}
+     </div>
+    </aside>}
+    <div className="xmind-surface" ref={surface} role="region" tabIndex={0}
+     aria-label="思维导图画布，拖动平移、滚轮移动，按 Ctrl 或 Command 并滚轮缩放"
+     onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={stopPan}
+     onPointerCancel={stopPan} onWheel={wheel}
+     onKeyDown={event=>{
+      if(event.target!==event.currentTarget)return;
+      if(event.key==="Escape"){setSelectedPath(null);setOutlineOpen(false);}
+      if(event.key==="+"||event.key==="="){event.preventDefault();changeZoom(zoom*1.25);}
+      if(event.key==="-"){event.preventDefault();changeZoom(zoom/1.25);}
+      if(event.key==="0"){event.preventDefault();setFitNonce(n=>n+1);}
+      if(event.key==="/"){event.preventDefault();setOutlineOpen(true);requestAnimationFrame(()=>searchRef.current?.focus());}
+     }}>
+     <div className="xmind-stage" style={{width:layout.width,height:layout.height,
+      transform:"translate("+pan.x+"px,"+pan.y+"px) scale("+zoom+")"}}>
+      <svg width={layout.width} height={layout.height} viewBox={"0 0 "+layout.width+" "+layout.height}
+       className="xmind-edges" aria-hidden="true">
+       {edges.map(edge=>{
+        const side=edge.fromX<=edge.toX?1:-1;
+        return <path key={edge.key} d={"M "+edge.fromX+" "+edge.fromY+" C "+
+         (edge.fromX+side*38)+" "+edge.fromY+", "+(edge.toX-side*38)+" "+edge.toY+", "+edge.toX+" "+edge.toY}
+         className={edge.kind==="floating"?"is-floating":""}/>;
+       })}
+      </svg>
+      {visibleNodes.map(node=><div key={node.path} style={{left:node.x,top:node.y,width:MIND_NODE_WIDTH,height:MIND_NODE_HEIGHT}}
+       className={"xmind-node"+(node.depth===0?" is-root":"")+(selectedPath===node.path?" is-selected":"")+
+       (node.topic.kind?" is-"+node.topic.kind:"")}>
+       <RareButton type="button" tone="ghost" className="xmind-node-title" title={node.topic.title}
+        aria-label={"主题："+node.topic.title} aria-pressed={selectedPath===node.path}
+        onClick={()=>setSelectedPath(path=>path===node.path?null:node.path)}>
+        {node.topic.title}
+       </RareButton>
+       {(node.topic.notes||node.topic.labels?.length||node.topic.markers?.length)&&
+        <span className="xmind-node-meta" aria-hidden="true" title="有备注、标签或标记">•</span>}
+       {node.children>0&&<RareButton type="button" tone="ghost" className="xmind-fold"
+        aria-label={folded.has(node.path)?"展开子主题":"收起子主题"}
+        aria-expanded={!folded.has(node.path)} title={folded.has(node.path)?"展开子主题":"收起子主题"}
+        onClick={()=>toggle(node.path)}>{folded.has(node.path)?"+" :"−"}</RareButton>}
+      </div>)}
+     </div>
+     {selected&&<aside className="xmind-details" aria-label="主题详情">
+      <div className="xmind-details-heading"><strong>{selected.topic.title}</strong>
+       <RareButton type="button" tone="ghost" aria-label="关闭主题详情" onClick={()=>setSelectedPath(null)}>×</RareButton></div>
+      {selected.topic.kind&&<small>{selected.topic.kind==="floating"?"自由主题":selected.topic.kind==="summary"?"概要":"标注主题"}</small>}
+      {selected.topic.labels?.length?<div className="xmind-labels">{selected.topic.labels.map((label,i)=><span key={i}>{label}</span>)}</div>:null}
+      {selected.topic.markers?.length?<p className="xmind-markers">标记：{selected.topic.markers.join(" · ")}</p>:null}
+      {selected.topic.notes?<p className="xmind-notes">{selected.topic.notes}</p>:<p className="xmind-no-notes">无备注</p>}
+     </aside>}
+     <div className="xmind-canvas-hint">拖动平移 · 滚轮移动 · Ctrl / ⌘ + 滚轮缩放</div>
+    </div>
    </div>
-  </div>
-  <div className={"xmind-surface"+(drag.current?" is-dragging":"")} ref={surface}
-   onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={stopPan}
-   onPointerCancel={stopPan} onWheel={wheel} aria-label="思维导图画布，可以拖动；按 Ctrl 或 Command 并滚轮缩放">
-   <div className="xmind-stage" style={{width:layout.width,height:layout.height,transform:`translate(${pan.x}px,${pan.y}px) scale(${zoom})`}}>
-    <svg width={layout.width} height={layout.height} viewBox={`0 0 ${layout.width} ${layout.height}`}
-     className="xmind-edges" aria-hidden="true">
-     {layout.edges.map((edge,i)=><path key={i}
-      d={`M ${edge.fromX} ${edge.fromY} C ${edge.fromX+35} ${edge.fromY}, ${edge.toX-35} ${edge.toY}, ${edge.toX} ${edge.toY}`}
-      className={edge.kind==="floating"?"is-floating":""}/>)}
-    </svg>
-    {layout.nodes.map(node=><div key={node.path}
-      className={"xmind-node"+(node.depth===0?" is-root":"")+(selectedPath===node.path?" is-selected":"")+
-       (node.topic.kind==="floating"?" is-floating":"")}
-      style={{left:node.x,top:node.y,width:NODE_WIDTH,height:NODE_HEIGHT}}>
-      <RareButton type="button" tone="ghost" className="xmind-node-title" title={node.topic.title}
-       aria-label={"主题："+node.topic.title} aria-pressed={selectedPath===node.path}
-       onClick={()=>setSelectedPath(path=>path===node.path?null:node.path)}>{node.topic.title}</RareButton>
-      {node.children>0&&<RareButton type="button" tone="ghost" className="xmind-fold" title={folded.has(node.path)?"展开子主题":"收起子主题"}
-       aria-label={folded.has(node.path)?"展开子主题":"收起子主题"} aria-expanded={!folded.has(node.path)}
-       onClick={()=>toggle(node.path)}>{folded.has(node.path)?"+" :"−"}</RareButton>}
-     </div>)}
+   <div className="xmind-status">
+    <span>{sheet.title} · {layout.nodes.length} 个可见主题 · 全文件已解析 {value?.topicCount??0} 个 · 只读</span>
+    <span title="原始文件未修改。自由布局、关系线、复杂样式和附件不保证与 XMind 原生完全一致">
+     {note||(value?.truncated?"超过安全预览上限，部分主题已省略":"结构预览 · 非原生排版")}
+    </span>
    </div>
-   {selected&&<aside className="xmind-details" aria-label="主题详情">
-    <div className="xmind-details-heading"><strong title={selected.topic.title}>{selected.topic.title}</strong>
-     <RareButton type="button" tone="ghost" aria-label="关闭主题详情" onClick={()=>setSelectedPath(null)}>×</RareButton></div>
-    {selected.topic.kind&&<small>{selected.topic.kind==="floating"?"自由主题":selected.topic.kind==="summary"?"概要":"标注"}</small>}
-    {!!selected.topic.labels?.length&&<div className="xmind-labels">{selected.topic.labels.map((label,i)=><span key={i}>{label}</span>)}</div>}
-    {!!selected.topic.markers?.length&&<p className="xmind-markers">标记：{selected.topic.markers.join(" · ")}</p>}
-    {selected.topic.notes?<p className="xmind-notes">{selected.topic.notes}</p>:<p className="xmind-no-notes">无备注</p>}
-   </aside>}
-   <div className="xmind-canvas-hint">拖动画布 · Ctrl / ⌘ + 滚轮缩放 · 点击主题查看备注</div>
-  </div>
-  <div className="xmind-status">
-   <span>{sheet.title} · 共 {value.topicCount.toLocaleString()} 个主题 · 只读</span>
-   {(value.truncated||note)&&<span role="status">{note||"仅显示安全预览范围内的主题"}</span>}
-  </div>
+  </>}
  </div>;
 }

@@ -469,7 +469,15 @@ func inspectZIP(reader io.ReadSeeker, size int64, name string) (*StructuredPrevi
 	if err != nil {
 		return nil, err
 	}
-	return summarizeZIP(zr)
+	result, err := summarizeZIP(zr)
+	if err != nil {
+		return nil, err
+	}
+	if extensionOf(name) == ".xmind" && result.Kind == "archive" {
+		// Do not misrepresent a damaged/non-XMind workbook as a ZIP directory.
+		return &StructuredPreview{Kind: "mindmap", Note: "无法识别思维导图结构，或文件内容超过安全预览上限；请在 XMind 中检查原文件"}, nil
+	}
+	return result, nil
 }
 func containerKindHint(name string) string {
 	switch extensionOf(name) {
@@ -479,6 +487,8 @@ func containerKindHint(name string) string {
 		return "presentation"
 	case ".docx":
 		return "document"
+	case ".xmind":
+		return "mindmap"
 	default:
 		return "archive"
 	}

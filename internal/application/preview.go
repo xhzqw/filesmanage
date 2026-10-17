@@ -190,9 +190,24 @@ func (s *Service) previewBlob(file domain.File, blob domain.Blob) (Preview, erro
 		preview.ByteMeta = AnalyzeBytes(nil, blob.SizeBytes, blob.Sha256)
 		preview.Structured, err = inspectZIP(reader, blob.SizeBytes, file.Name)
 		if err != nil {
-			preview.Structured = &StructuredPreview{Kind: "archive", Note: "压缩包结构损坏或无法读取；请下载后使用可信工具检查"}
+			kind := containerKindHint(file.Name)
+			note := "压缩包结构损坏或无法读取；请下载后使用可信工具检查"
+			if kind == "mindmap" {
+				note = "思维导图文件损坏或格式不受支持；请在 XMind 中检查原文件"
+			}
+			preview.Structured = &StructuredPreview{Kind: kind, Note: note}
 		}
 		preview.Renderer = preview.Structured.Kind
+		return preview, nil
+	}
+	// A non-ZIP .xmind must explain the corrupt/unsupported workbook rather
+	// than displaying raw text, silently offering the wrong preview, or leaking
+	// the contents of the container index.
+	if extensionOf(file.Name) == ".xmind" {
+		preview.Renderer = "mindmap"
+		preview.Textual = false
+		preview.Structured = &StructuredPreview{Kind: "mindmap", Note: "不是可识别的 XMind 文件，请检查文件格式或重新导出"}
+		preview.ByteMeta = AnalyzeBytes(nil, blob.SizeBytes, blob.Sha256)
 		return preview, nil
 	}
 	if !preview.Textual {

@@ -425,7 +425,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
          onRevisionChange={setSealRevision} requestedPage={reviewJumpPage} onPageChange={setReaderPage}/>:
        preview.structured&&["spreadsheet","presentation","document"].includes(adapter)?
         <OfficeLayoutPreview fileId={preview.fileId} sha={preview.sha256} structured={preview.structured}/>:
-       preview.structured?.mindMap&&adapter==="mindmap"?
+       adapter==="mindmap"&&preview.structured?
         <MindMapPreview key={preview.fileId+":"+preview.sha256} value={preview.structured.mindMap} note={preview.structured.note}/>:
        preview.structured&&adapter==="archive"?
         <StructuredFilePreview value={preview.structured}/>:

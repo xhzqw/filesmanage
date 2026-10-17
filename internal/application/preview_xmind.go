@@ -13,7 +13,7 @@ import (
 // XMind previews are pure read-only projections of a verified ZIP package.
 // Never unpack attachments, interpret HTML notes, or follow embedded links.
 const (
-	maxXMindContentBytes = 2 << 20
+	maxXMindContentBytes = 8 << 20
 	maxXMindSheets       = 24
 	maxXMindTopics       = 1400
 	maxXMindDepth        = 60
@@ -181,6 +181,10 @@ func xmindJSONNode(topic *xmindJSONTopic, kind string, depth int, out *XMindPrev
 	}
 	for _, group := range groups {
 		for _, child := range group.nodes {
+			if out.TopicCount >= maxXMindTopics {
+				out.Truncated = true
+				break
+			}
 			if next := xmindJSONNode(child, group.kind, depth+1, out); next != nil {
 				node.Children = append(node.Children, *next)
 			}
@@ -212,8 +216,13 @@ func xmindXMLNode(topic *xmindXMLTopic, kind string, depth int, out *XMindPrevie
 	}
 	for _, group := range topic.Groups {
 		branch := ""
-		if group.Type == "detached" {
+		switch group.Type {
+		case "detached":
 			branch = "floating"
+		case "summary":
+			branch = "summary"
+		case "callout":
+			branch = "callout"
 		}
 		for i := range group.Topics {
 			if child := xmindXMLNode(&group.Topics[i], branch, depth+1, out); child != nil {
@@ -226,88 +235,96 @@ func xmindXMLNode(topic *xmindXMLTopic, kind string, depth int, out *XMindPrevie
 
 // parseXMindZIP checks actual content structure, not the filename or MIME type.
 // Modern content.json takes precedence over the legacy content.xml marker.
+// parseXMindZIP prefers the modern content.json, but tolerates a corrupt JSON
+// member when a valid classic XMind content.xml is also present.
 func parseXMindZIP(files map[string]*zip.File) (*XMindPreview, error) {
 	if f := files["content.json"]; f != nil {
-		raw, err := boundedXMindMember(f)
-		if err != nil {
-			return nil, err
-		}
-		var sheets []xmindJSONSheet
-		if err = json.Unmarshal(raw, &sheets); err != nil {
-			var object struct {
-				Sheets []xmindJSONSheet `json:"sheets"`
-				Root   *xmindJSONTopic  `json:"rootTopic"`
-				Title  string           `json:"title"`
-			}
-			if json.Unmarshal(raw, &object) != nil {
-				return nil, err
-			}
-			sheets = object.Sheets
-			if object.Root != nil {
-				sheets = []xmindJSONSheet{{Title: object.Title, Root: object.Root}}
+		if raw, err := boundedXMindMember(f); err == nil {
+			if out, parseErr := parseXMindJSON(raw); parseErr == nil {
+				return out, nil
 			}
 		}
-		if len(sheets) == 0 {
-			return nil, errors.New("XMind sheets missing")
-		}
-		out := &XMindPreview{Sheets: make([]XMindSheet, 0, min(len(sheets), maxXMindSheets))}
-		if len(sheets) > maxXMindSheets {
-			out.Truncated = true
-		}
-		for _, sheet := range sheets[:min(len(sheets), maxXMindSheets)] {
-			if sheet.Root == nil {
-				continue
-			}
-			root := xmindJSONNode(sheet.Root, "", 0, out)
-			if root == nil {
-				break
-			}
-			title := xmindText(sheet.Title, 120)
-			if title == "" {
-				title = "画布"
-			}
-			out.Sheets = append(out.Sheets, XMindSheet{Title: title, Root: *root})
-		}
-		if len(out.Sheets) == 0 {
-			return nil, errors.New("XMind has no root topics")
-		}
-		return out, nil
 	}
 	if f := files["content.xml"]; f != nil {
 		raw, err := boundedXMindMember(f)
 		if err != nil {
 			return nil, err
 		}
-		var content xmindXMLContent
-		if err = xml.NewDecoder(bytes.NewReader(raw)).Decode(&content); err != nil {
+		return parseXMindXML(raw)
+	}
+	return nil, errors.New("no valid XMind content")
+}
+func parseXMindJSON(raw []byte) (*XMindPreview, error) {
+	var sheets []xmindJSONSheet
+	if err := json.Unmarshal(raw, &sheets); err != nil {
+		var object struct {
+			Sheets []xmindJSONSheet `json:"sheets"`
+			Root   *xmindJSONTopic  `json:"rootTopic"`
+			Title  string           `json:"title"`
+		}
+		if err = json.Unmarshal(raw, &object); err != nil {
 			return nil, err
 		}
-		if content.XMLName.Local != "xmap-content" || len(content.Sheets) == 0 {
-			return nil, errors.New("not XMind content XML")
+		sheets = object.Sheets
+		if object.Root != nil {
+			sheets = []xmindJSONSheet{{Title: object.Title, Root: object.Root}}
 		}
-		out := &XMindPreview{Sheets: make([]XMindSheet, 0, min(len(content.Sheets), maxXMindSheets))}
-		if len(content.Sheets) > maxXMindSheets {
-			out.Truncated = true
-		}
-		for i := range content.Sheets[:min(len(content.Sheets), maxXMindSheets)] {
-			sheet := &content.Sheets[i]
-			if sheet.Root == nil {
-				continue
-			}
-			root := xmindXMLNode(sheet.Root, "", 0, out)
-			if root == nil {
-				break
-			}
-			title := xmindText(sheet.Title, 120)
-			if title == "" {
-				title = "画布"
-			}
-			out.Sheets = append(out.Sheets, XMindSheet{Title: title, Root: *root})
-		}
-		if len(out.Sheets) == 0 {
-			return nil, errors.New("XMind has no root topics")
-		}
-		return out, nil
 	}
-	return nil, errors.New("no XMind content")
+	if len(sheets) == 0 {
+		return nil, errors.New("XMind sheets missing")
+	}
+	out := &XMindPreview{Sheets: make([]XMindSheet, 0, min(len(sheets), maxXMindSheets))}
+	if len(sheets) > maxXMindSheets {
+		out.Truncated = true
+	}
+	for _, sheet := range sheets[:min(len(sheets), maxXMindSheets)] {
+		if sheet.Root == nil {
+			continue
+		}
+		root := xmindJSONNode(sheet.Root, "", 0, out)
+		if root == nil {
+			break
+		}
+		title := xmindText(sheet.Title, 120)
+		if title == "" {
+			title = "画布"
+		}
+		out.Sheets = append(out.Sheets, XMindSheet{Title: title, Root: *root})
+	}
+	if len(out.Sheets) == 0 {
+		return nil, errors.New("XMind has no root topics")
+	}
+	return out, nil
+}
+func parseXMindXML(raw []byte) (*XMindPreview, error) {
+	var content xmindXMLContent
+	if err := xml.NewDecoder(bytes.NewReader(raw)).Decode(&content); err != nil {
+		return nil, err
+	}
+	if content.XMLName.Local != "xmap-content" || len(content.Sheets) == 0 {
+		return nil, errors.New("not XMind content XML")
+	}
+	out := &XMindPreview{Sheets: make([]XMindSheet, 0, min(len(content.Sheets), maxXMindSheets))}
+	if len(content.Sheets) > maxXMindSheets {
+		out.Truncated = true
+	}
+	for i := range content.Sheets[:min(len(content.Sheets), maxXMindSheets)] {
+		sheet := &content.Sheets[i]
+		if sheet.Root == nil {
+			continue
+		}
+		root := xmindXMLNode(sheet.Root, "", 0, out)
+		if root == nil {
+			break
+		}
+		title := xmindText(sheet.Title, 120)
+		if title == "" {
+			title = "画布"
+		}
+		out.Sheets = append(out.Sheets, XMindSheet{Title: title, Root: *root})
+	}
+	if len(out.Sheets) == 0 {
+		return nil, errors.New("XMind has no root topics")
+	}
+	return out, nil
 }

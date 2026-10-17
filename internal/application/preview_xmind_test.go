@@ -92,6 +92,41 @@ func TestXMindPreviewResistsSpoofAndOversize(t *testing.T) {
 	}
 }
 
+func TestXMindFallbackAndMalformedWorkbook(t *testing.T) {
+	old := makePreviewZIP(t, map[string]string{
+		"content.json": "{damaged",
+		"content.xml":  `<xmap-content xmlns="urn:xmind:xmap:xmlns:content:2.0"><sheet><title>经典画布</title><topic><title>安全根节点</title></topic></sheet></xmap-content>`,
+	})
+	result, err := inspectZIP(bytes.NewReader(old), int64(len(old)), "legacy.xmind")
+	if err != nil || result.MindMap == nil || result.MindMap.Sheets[0].Root.Title != "安全根节点" {
+		t.Fatalf("failed to recover classic XML: %+v %v", result, err)
+	}
+	fake := makePreviewZIP(t, map[string]string{"content.json": "{garbled", "internal/secret.txt": "private"})
+	result, err = inspectZIP(bytes.NewReader(fake), int64(len(fake)), "corrupted.xmind")
+	if err != nil || result.Kind != "mindmap" || result.MindMap != nil || len(result.Entries) != 0 || result.Note == "" {
+		t.Fatalf("damaged XMind leaked ZIP index: %+v %v", result, err)
+	}
+	// Ordinary ZIPs with unrelated content.json keep archive behavior.
+	ordinary, err := inspectZIP(bytes.NewReader(fake), int64(len(fake)), "ordinary.zip")
+	if err != nil || ordinary.Kind != "archive" || len(ordinary.Entries) == 0 {
+		t.Fatalf("ordinary ZIP regression: %+v %v", ordinary, err)
+	}
+}
+
+func TestXMindInvalidNonZIPNeverFallsBackToText(t *testing.T) {
+	svc, _ := testService(t)
+	admin := domain.User{ID: "u_admin", Login: "admin", IsAdmin: true}
+	payload := []byte("untrusted XMind filename with text/plain MIME")
+	uploaded, err := svc.CommitUpload(context.Background(), admin, "folder_market", "invalid.xmind", "text/plain", "", bytes.NewReader(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	preview, err := svc.Preview(context.Background(), admin, uploaded.FileID)
+	if err != nil || preview.Renderer != "mindmap" || preview.Structured == nil || preview.Structured.MindMap != nil || preview.Textual || preview.Content != "" {
+		t.Fatalf("XMind masquerading as text: %+v %v", preview, err)
+	}
+}
+
 func TestXMindPreviewOnlyACLAndVersion(t *testing.T) {
 	svc, _ := testService(t)
 	ctx := context.Background()
