@@ -336,6 +336,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
         aria-current={filter===key?"page":undefined} onClick={()=>{setFilter(key);setActiveForm(null);setFormalDraft(false);}}>
         <span>{label}</span><small>{count}</small>
        </RareButton>)}
+      <Link className="cdw-rail-item" to="/workbench/dhf" style={{textDecoration:"none",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px"}}><span>DHF 阶段验收</span><small>1–9</small></Link>
       <div className="cdw-rail-footer">责任不会因下派而自动消失</div>
      </aside>
      {filter==="effective"?<CDWEffectiveSearchPanel/>:filter==="appointments"?

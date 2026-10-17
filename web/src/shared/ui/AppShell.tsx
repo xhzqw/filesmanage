@@ -75,7 +75,7 @@ export function AppShell({user,onLogout,actions,children,finderSidebarWidth}:{us
  },[previewRoute,pathname]);
  // Keep the main navigation tied to actual routes, including browser
  // back/forward; preview and account subpages have no misleading active tile.
- const activeNav=NAV.findIndex(item=>item.to===pathname);
+ const activeNav=NAV.findIndex(item=>item.to===pathname||(item.to==="/workbench"&&pathname.startsWith("/workbench/")));
  const notificationSlot=useContext(ShellAccessories);
  // Once the collapsed navigation opens, keyboard focus must enter the links,
  // otherwise Escape remains on the toggle and cannot close the menu.

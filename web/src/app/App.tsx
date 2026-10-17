@@ -23,6 +23,7 @@ import{Trash}from "../pages/Trash";
 import{Org}from "../pages/Org";
 import{Approvals}from "../pages/Approvals";
 import{CDWWorkbench}from "../pages/CDWWorkbench";
+import {DHFWorkbench} from "../pages/DHFWorkbench";
 import{CDWBranchEditor}from "../pages/CDWBranchEditor";
 import{Lifecycle}from "../pages/Lifecycle";
 import{lifecycleWorkspaceEnabled}from "../shared/featureFlags";
@@ -63,6 +64,7 @@ export function App(){
  <Route path="/org" element={user?<Org user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/lifecycle" element={user&&lifecycleWorkspaceEnabled?<Lifecycle user={user} onLogout={logout}/>:<Navigate to={user?"/doc":"/login"} replace/>}/>
  <Route path="/approvals" element={user?<Approvals user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
+ <Route path="/workbench/dhf" element={user?<DHFWorkbench user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/workbench" element={user?<CDWWorkbench user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/workbench/branch/:id/edit" element={user?<CDWBranchEditor/>:<Navigate to="/login" replace/>}/>
  <Route path="/office/:id" element={user?<OfficeEditor user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
