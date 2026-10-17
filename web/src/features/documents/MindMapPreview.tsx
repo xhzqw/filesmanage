@@ -42,7 +42,7 @@ function arrange(root:XMindTopic,folded:Set<string>){
    cursor+=childHeight+ROW_SPACING;
   });
  }
- place(root,"0",0);
+ place(root,"0",0,PADDING);
  return {nodes,edges,width:PADDING*2+(maxDepth+1)*NODE_WIDTH+maxDepth*COLUMN_SPACING,height:height+PADDING*2};
 }
 
