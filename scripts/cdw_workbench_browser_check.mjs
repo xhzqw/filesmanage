@@ -80,7 +80,7 @@ try{
  const gates=await evalJS("(async()=>{const r=await fetch('/api/workbench/review-gates/inbox?limit=5');return {status:r.status,data:(await r.json()).data}})()");
  assert.equal(gates.status,200,"review gate inbox must authorize current session");
  assert.ok(Array.isArray(gates.data?.items),"review inbox must return items array");
- for(const width of [1440,1024,780]){
+ for(const width of [1440,1024,780,540]){
   await send("Emulation.setDeviceMetricsOverride",{width,height:850,deviceScaleFactor:1,mobile:false});
   await sleep(150);
   const layout=await evalJS(`(()=>{const body=document.documentElement;
