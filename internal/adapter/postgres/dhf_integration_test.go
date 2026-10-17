@@ -49,6 +49,10 @@ func TestDHFPostgresGates(t *testing.T) {
 	if err = store.DHFCreate(ctx, project, outline.Nodes); err != nil {
 		t.Fatal(err)
 	}
+	p, err := store.DHFProjectByID(ctx, project.ID, owner, true)
+	if err != nil || p.ID != project.ID {
+		t.Fatalf("project lock/read failed: %+v %v", p, err)
+	}
 	d, err := store.DHFDetail(ctx, project.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -97,6 +101,41 @@ func TestDHFPostgresGates(t *testing.T) {
 	}
 	if first.SubmittedAt == "" {
 		t.Fatal("missing server submission timestamp")
+	}
+	first.State = "accepted"
+	first.ReviewedBy = reviewer
+	if err = store.DHFUpdateItem(ctx, project.ID, first, first.Revision); err != nil {
+		t.Fatal(err)
+	}
+	// A returned document enters a new submission round even for the same owner.
+	first, err = store.DHFItemByLine(ctx, project.ID, first.SourceLine)
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalSubmittedAt := first.SubmittedAt
+	first.State = "returned"
+	first.ReviewedBy = reviewer
+	first.ReviewReason = "需要补充证据后复核"
+	if err = store.DHFUpdateItem(ctx, project.ID, first, first.Revision); err != nil {
+		t.Fatal(err)
+	}
+	first, err = store.DHFItemByLine(ctx, project.ID, first.SourceLine)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first.State = "submitted"
+	first.ReviewedBy = ""
+	first.ReviewedAt = ""
+	first.ReviewReason = ""
+	if err = store.DHFUpdateItem(ctx, project.ID, first, first.Revision); err != nil {
+		t.Fatal(err)
+	}
+	first, err = store.DHFItemByLine(ctx, project.ID, first.SourceLine)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.SubmittedAt == originalSubmittedAt {
+		t.Fatal("resubmission reused previous delivery timestamp")
 	}
 	first.State = "accepted"
 	first.ReviewedBy = reviewer

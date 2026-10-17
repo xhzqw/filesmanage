@@ -180,7 +180,7 @@ func (r *Repository) DHFUpdateItem(ctx context.Context, id string, i ports.DHFIt
 	}
 	// Clock is always from server. Submitted/reviewed timestamps are set only on transitions.
 	tag, err := r.Q.Exec(ctx, `UPDATE dhf_items SET state=$3,applicability_reason=$4,file_id=$5,file_version_id=$6,file_sha256=$7,
- submitted_by=$8,submitted_at=CASE WHEN $8::text IS NULL THEN NULL WHEN state NOT IN('submitted','accepted','returned') OR submitted_by IS DISTINCT FROM $8::text THEN clock_timestamp() ELSE submitted_at END,
+ submitted_by=$8,submitted_at=CASE WHEN $8::text IS NULL THEN NULL WHEN state<>'submitted' OR submitted_by IS DISTINCT FROM $8::text THEN clock_timestamp() ELSE submitted_at END,
  reviewed_by=$9,reviewed_at=CASE WHEN $9::text IS NULL THEN NULL ELSE clock_timestamp() END,review_reason=$10,revision=revision+1
  WHERE project_id=$1 AND source_line=$2 AND revision=$11`, id, i.SourceLine, i.State, i.ApplicabilityReason, file, version, sha, submitter, reviewer, i.ReviewReason, expected)
 	if err != nil {
