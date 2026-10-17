@@ -7,6 +7,7 @@ G19 复用 G18 文控审计请求及正式审批权限，**不另建审批系统
 - `GET /api/workbench/qms-formal-lineage/{id}/audit-segmented`：具现行 `document_control` 资格和全部文件实时预览权限的文控可从任一审批 ID 导出。服务端在 PostgreSQL **REPEATABLE READ 事务**中获取完整有界链，审计读取限 **512 节点**；每 **16 节点**拆成一个独立负载，包含对应节点、所有流程步骤（含未签/跳过）、签字事实/授权快照、逐人通知及督办事实。全包一次性返回，所以各段是同一数据库快照的证据。
 - 分段负载以 `payloadBase64` 存储 JSON 的原始 UTF-8 字节。段摘要计算为 `SHA256("cdw-qms-segment-v1\\n" + index + "\\n" + firstApprovalId + "\\n" + lastApprovalId + "\\n" + previousSegmentSha256 + "\\n" + decodedPayloadBytes)`，防止重新编码 JSON 后摘要不一致；每段附本段首尾审批 ID 和前一段 SHA，整包包括 `totalNodes`、`totalSegments`、`rootApprovalId`、`lastSegmentSha256` 和 `complete`。服务端在提交审计事实前验证缺段、错序、签署血缘不连续、摘要篡改、焦点审批缺失及统计总数。
 - 常规 G18 审计仍保留 31 节点上限以兼容旧客户端；G19 分段导出超过 512 节点时**失败关闭**，不返回伪称完整的截断文件。响应附 `X-Content-SHA256`（整个响应文件字节），留痕为导出**请求**而非客户端实际收到文件；摘要证明自此服务端导出的证据字节一致，不具有法规电子签名法律效力。
+- **离线校验**：审计人员在可信环境中运行 `python3 scripts/verify_cdw_segmented_audit.py CDW-QMS-segmented-audit.json`，无需访问数据库即可复核分段摘要、前后继连续性、节点总量和事实范围，校验失败返回非零退出码。开发合同测试 `python3 scripts/check_cdw_audit_verifier.py` 使用 33 节点/3 段模拟及四类篡改负例。校验只能证明同一导出包内的数学一致性，不能证明签名本人身份或没有经过特权后台篡改。
 
 ## 跨文件统计的边界
 
