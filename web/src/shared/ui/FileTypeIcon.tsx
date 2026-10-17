@@ -73,6 +73,13 @@ export function FileTypeIcon({name="",size=18,className=""}:Props){
    <rect x="3" y="3" width="18" height="18" rx="4.5" fill="#E6E6FF" stroke="#7975D1" strokeWidth="1"/>
    <path d="M6 13v-2m3 5V8m3 11V5m3 11V8m3 5v-2" stroke="#6A64CC" strokeWidth="1.9" strokeLinecap="round"/>
   </>}
+  {visual==="mindmap"&&<>
+   <rect x="2.5" y="2.5" width="19" height="19" rx="4" fill="#EAF3FF" stroke="#89B6ED" strokeWidth=".9"/>
+   <path d="M8 12h4m0 0 4-5m-4 5 4 5" stroke="#2773B8" strokeWidth="1.4" strokeLinecap="round"/>
+   <circle cx="7" cy="12" r="2.4" fill="#186CD2"/>
+   <rect x="14" y="4.3" width="6" height="5.3" rx="1.6" fill="#70ACE8"/>
+   <rect x="14" y="14.4" width="6" height="5.3" rx="1.6" fill="#83C4B6"/>
+  </>}
   {visual==="archive"&&<>
    <path d="M4.2 3h15.6v17.1c0 1-.8 1.9-1.8 1.9H6c-1 0-1.8-.9-1.8-1.9Z" fill="#F9DFAC" stroke="#C38C30" strokeWidth=".8"/>
    <path d="M4.2 3h15.6v4.7H4.2Z" fill="#E1A343"/>

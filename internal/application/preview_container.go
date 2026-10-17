@@ -37,6 +37,7 @@ type StructuredPreview struct {
 	Sections  []PreviewSection `json:"sections"`
 	Truncated bool             `json:"truncated"`
 	Note      string           `json:"note"`
+	MindMap   *XMindPreview    `json:"mindMap,omitempty"`
 }
 
 func isZIPHeader(header []byte) bool {
@@ -86,6 +87,17 @@ func summarizeZIP(zr *zip.Reader) (*StructuredPreview, error) {
 		out.Kind = "document"
 		out.Entries = nil
 		parseDocument(out, lookup)
+	}
+	if out.Kind == "archive" && (lookup["content.json"] != nil || lookup["content.xml"] != nil) {
+		if mapData, err := parseXMindZIP(lookup); err == nil {
+			out.Kind = "mindmap"
+			out.MindMap = mapData
+			out.Entries = nil
+			out.Truncated = mapData.Truncated
+			if mapData.Truncated {
+				out.Note = "节点或画布数量超过安全预览范围，仅显示前面部分；原始文件未修改"
+			}
+		}
 	}
 	return out, nil
 }

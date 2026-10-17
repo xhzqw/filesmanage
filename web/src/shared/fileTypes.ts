@@ -1,7 +1,7 @@
 // Single source of truth for file identity, search filters and UI artwork.
 export type FileCategory = "all" | "cad" | "doc" | "image" | "media" | "archive" | "code" | "other";
 export type FileKind = "cad" | "word" | "sheet" | "slide" | "pdf" | "image" | "media" | "archive" | "code" | "text" | "file";
-export type FileVisual = "word" | "sheet" | "slide" | "pdf" | "image" | "video" | "audio" | "archive" | "code" | "text" | "drawing" | "solid" | "mesh" | "toolpath" | "font" | "file";
+export type FileVisual = "word" | "sheet" | "slide" | "pdf" | "image" | "video" | "audio" | "archive" | "mindmap" | "code" | "text" | "drawing" | "solid" | "mesh" | "toolpath" | "font" | "file";
 type Identity = Readonly<{kind:FileKind;category:FileCategory;visual:FileVisual}>;
 const info=(kind:FileKind,category:FileCategory,visual:FileVisual):Identity=>({kind,category,visual});
 const unknown=info("file","other","file");
@@ -17,6 +17,7 @@ register("pdf","pdf","doc","pdf");
 register("png jpg jpeg jfif gif webp bmp svg svgz tif tiff heic heif avif ico icns apng psd ai eps raw cr2 nef arw dng","image","image","image");
 register("mp4 m4v mov mkv avi webm wmv flv mpg mpeg 3gp mts m2ts vob ogv","media","media","video");
 register("mp3 wav flac aac m4a ogg oga opus wma aiff aif mid midi ape","media","media","audio");
+register("xmind","file","doc","mindmap");
 register("zip rar 7z tar gz tgz bz2 tbz2 xz txz zst tzst cab iso dmg jar war apk deb rpm","archive","archive","archive");
 register("dwg dxf dwt dws dgn dgnlib idw ipn slddrw drw sch pcb kicad_pcb kicad_sch","cad","cad","drawing");
 register("step stp stpz iges igs x_t x_b sat sab sldprt sldasm prt asm ipt iam f3d f3z 3dxml catpart catproduct jt par psm ifc ifczip rvt rfa skp 3dm","cad","cad","solid");

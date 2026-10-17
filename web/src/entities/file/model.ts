@@ -52,7 +52,7 @@ export type PreviewData={
  size:number;
  sha256:string;
  textual:boolean;
- renderer?:"text"|"image"|"video"|"audio"|"pdf"|"archive"|"spreadsheet"|"presentation"|"document"|"unsupported";
+ renderer?:"text"|"image"|"video"|"audio"|"pdf"|"archive"|"spreadsheet"|"presentation"|"document"|"mindmap"|"unsupported";
  structured?:StructuredPreview;
  mediaType?:string;
  truncated:boolean;
@@ -72,8 +72,11 @@ export type PreviewData={
  };
 };
 
+export type XMindTopic={title:string;kind?:string;notes?:string;labels?:string[];markers?:string[];children?:XMindTopic[]};
+export type XMindPreview={sheets:{title:string;root:XMindTopic}[];topicCount:number;truncated:boolean};
 export type StructuredPreview={
- kind:"archive"|"spreadsheet"|"presentation"|"document";
+ kind:"archive"|"spreadsheet"|"presentation"|"document"|"mindmap";
+ mindMap?:XMindPreview;
  entries:{name:string;size:number;directory:boolean}[];
  sections:{title:string;lines:string[]}[];
  truncated:boolean;

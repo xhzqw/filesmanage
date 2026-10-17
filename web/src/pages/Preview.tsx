@@ -7,6 +7,7 @@ import {fileApi,formatSize,type FileLifecycle} from "../features/documents/api";
 import {reuseVerifiedPreview} from "../features/documents/revalidate";
 import {MediaPreview} from "../features/documents/MediaPreview";
 import {StructuredFilePreview} from "../features/documents/StructuredFilePreview";
+import {MindMapPreview} from "../features/documents/MindMapPreview";
 import {OfficeLayoutPreview} from "../features/documents/OfficeLayoutPreview";
 import {PDFPageViewer} from "../features/documents/PDFPageViewer";
 import {DocxSealConversion} from "../features/documents/DocxSealConversion";
@@ -424,6 +425,8 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
          onRevisionChange={setSealRevision} requestedPage={reviewJumpPage} onPageChange={setReaderPage}/>:
        preview.structured&&["spreadsheet","presentation","document"].includes(adapter)?
         <OfficeLayoutPreview fileId={preview.fileId} sha={preview.sha256} structured={preview.structured}/>:
+       preview.structured?.mindMap&&adapter==="mindmap"?
+        <MindMapPreview key={preview.fileId+":"+preview.sha256} value={preview.structured.mindMap} note={preview.structured.note}/>:
        preview.structured&&adapter==="archive"?
         <StructuredFilePreview value={preview.structured}/>:
        adapter==="cad"?
