@@ -144,7 +144,7 @@ export function CDWBranchEditor(){
  return <div className="office-workbench cdw-editor">
   <header className="office-workbench-toolbar">
    <div className="office-workbench-identity">
-    <RareButton type="button" tone="ghost" onClick={back}>← 任务列表</RareButton>
+    <RareButton type="button" tone="ghost" onClick={back}>← 工作台</RareButton>
     <span className="office-workbench-divider" aria-hidden="true"/>
     <strong title={fileName}>{fileName}</strong>
     <span className="office-workbench-version">独立工作分支</span>

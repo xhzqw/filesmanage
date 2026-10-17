@@ -50,6 +50,7 @@ try{
  assert.equal(login.ok,true,"admin credentials work");
  await send("Page.navigate",{url:base+"/workbench/dhf"});
  await until("location.pathname==='/workbench/dhf'&&!!document.querySelector('.dhf-grid')");
+ assert.equal(await evalJS("document.querySelector('.dhf-toolbar a[href=\"/workbench\"]')?.textContent?.trim()"),"← 工作台","DHF return link uses workbench label");
  const dhf=await evalJS("(async()=>{const [t,p,n]=await Promise.all([fetch('/api/workbench/dhf/template'),fetch('/api/workbench/dhf/projects'),fetch('/api/workbench/dhf/projects/unknown-id')]);return {templateStatus:t.status,template:(await t.json()).data,projectsStatus:p.status,projects:(await p.json()).data,missingStatus:n.status}})()");
  assert.equal(dhf.templateStatus,200);
  assert.equal(dhf.projectsStatus,200);
@@ -69,6 +70,9 @@ try{
  console.log("DHF_TEMPLATE_BROWSER_PASS nine-source-stage catalogue and ACL guarded project list");
  await send("Page.navigate",{url:base+"/workbench"});
  await until("location.pathname==='/workbench'&&!!document.querySelector('.cdw-layout')");
+ assert.equal(await evalJS("document.querySelector('#shell-main-navigation a[href=\"/workbench\"]')?.textContent?.trim()"),"工作台","primary navigation uses workbench instead of task");
+ assert.equal(await evalJS("document.querySelector('.cdw-rail')?.getAttribute('aria-label')"),"工作视图分类","workbench categories accessible label");
+ console.log("CDW_NAMING_PASS primary navigation / DHF return / category semantics");
  await until("!document.querySelector('.cdw-message') && !!document.querySelector('.cdw-inbox-heading')");
  const inbox=await evalJS("(async()=>{const r=await fetch('/api/workbench/inbox?limit=5');return {status:r.status,data:(await r.json()).data}})()");
  assert.equal(inbox.status,200,"authenticated CDW inbox responds 200");

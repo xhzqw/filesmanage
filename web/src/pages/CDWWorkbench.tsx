@@ -123,7 +123,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
   cdwApi.inbox(100,controller.signal).then(page=>{
    if(active)setItems(page.items??[]);
   }).catch(error=>{
-   if(active&&!(error instanceof DOMException&&error.name==="AbortError"))setRequestError(errorCopy(error,"任务列表加载失败"));
+   if(active&&!(error instanceof DOMException&&error.name==="AbortError"))setRequestError(errorCopy(error,"工作台事项加载失败"));
   }).finally(()=>{if(active)setBusy(false);});
   return()=>{active=false;controller.abort();};
  },[refreshToken,user.id]);
@@ -310,7 +310,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
   <div className="panels cdw-panels">
    <main className="work cdw-work">
     <div className="cdw-layout">
-     <aside className="cdw-rail" aria-label="任务分类">
+     <aside className="cdw-rail" aria-label="工作视图分类">
       <div className="cdw-rail-caption">工作视图</div>
       {([
        ["tasks","我的任务",totalTasks],
@@ -342,11 +342,11 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
      {filter==="effective"?<CDWEffectiveSearchPanel/>:filter==="appointments"?
       <CDWQMSReviewInbox items={pendingAppointments} alerts={appointmentAlerts} actorId={user.id}
        onRead={id=>void readAppointmentAlert(id)} onVerified={()=>refresh(v=>v+1)}/>:<>
-     <section className="cdw-inbox" aria-label="任务列表">
+     <section className="cdw-inbox" aria-label="工作事项列表">
       <header className="cdw-inbox-tools">
        <div className="cdw-inbox-heading"><strong>{filter==="tasks"?"我的任务":filter==="obligations"?"责任待办":filter==="reviews"?"待我验收":filter==="formal"?"正式审批":filter==="control"?"发行准备":filter==="scope"?"范围审批":filter==="receipts"?"部门签收":filter==="reading"?"阅读确认":"全部事项"}</strong><span>{visible.length}</span></div>
        <div className="cdw-inbox-actions">
-        <RareButton type="button" tone="ghost" aria-label="刷新任务列表" disabled={busy} onClick={()=>refresh(v=>v+1)}>↻</RareButton>
+        <RareButton type="button" tone="ghost" aria-label="刷新工作事项" disabled={busy} onClick={()=>refresh(v=>v+1)}>↻</RareButton>
         {user.isAdmin&&(filter==="formal"?<RareButton type="button" tone="primary" onClick={()=>{setFormalDraft(true);setActiveForm(null);}}>发起审批</RareButton>:filter==="control"||filter==="scope"||filter==="receipts"||filter==="reading"?null:<RareButton type="button" tone="primary" onClick={()=>beginForm("create")}>派发任务</RareButton>)}
        </div>
       </header>
@@ -367,7 +367,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
      </section>
      <article className="cdw-detail" aria-label="任务详情">
       {formalDraft?<CDWFormalInitiate actorId={user.id} loadUsers={organizationApi.users} onCreated={()=>{setFormalDraft(false);refresh(n=>n+1);}}/>:activeForm?<section className="cdw-detail-inner">
-       <div className="cdw-detail-header"><div><small>任务工作台</small><h2>{activeForm==="create"?"派发单文件任务":"逐级派发子任务"}</h2></div>
+       <div className="cdw-detail-header"><div><small>工作台</small><h2>{activeForm==="create"?"派发单文件任务":"逐级派发子任务"}</h2></div>
         <RareButton tone="ghost" onClick={()=>setActiveForm(null)}>取消</RareButton></div>
        <div className="cdw-form">
         <label>任务名称<RareInput value={title} maxLength={255} placeholder="简要描述具体交付工作" onChange={e=>setTitle(e.target.value)}/></label>
