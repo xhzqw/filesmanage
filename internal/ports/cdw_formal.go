@@ -88,10 +88,28 @@ type CDWQMSAuditNotice struct {
 	FollowupReason string  `json:"followupReason,omitempty"`
 	FollowupAt     *string `json:"followupAt,omitempty"`
 }
+type CDWQMSAuditEscalation struct {
+	ApprovalID           string  `json:"approvalId"`
+	CaseID               string  `json:"caseId"`
+	NoticeID             string  `json:"noticeId"`
+	PolicyID             string  `json:"policyId"`
+	PolicyReleaseID      string  `json:"policyReleaseId"`
+	ClauseRef            string  `json:"clauseRef"`
+	DelayMinutes         int     `json:"delayMinutes"`
+	PolicyStatusAtExport string  `json:"policyStatusAtExport"`
+	OwnerID              string  `json:"ownerId"`
+	EscalatedBy          string  `json:"escalatedBy"`
+	Reason               string  `json:"reason"`
+	EscalatedAt          string  `json:"escalatedAt"`
+	ResolvedBy           string  `json:"resolvedBy,omitempty"`
+	Resolution           string  `json:"resolution,omitempty"`
+	ResolvedAt           *string `json:"resolvedAt,omitempty"`
+}
 type CDWQMSAuditFacts struct {
-	Steps     []CDWQMSAuditStep     `json:"steps"`
-	Decisions []CDWQMSAuditDecision `json:"decisions"`
-	Notices   []CDWQMSAuditNotice   `json:"notices"`
+	Steps       []CDWQMSAuditStep       `json:"steps"`
+	Decisions   []CDWQMSAuditDecision   `json:"decisions"`
+	Notices     []CDWQMSAuditNotice     `json:"notices"`
+	Escalations []CDWQMSAuditEscalation `json:"escalations"`
 }
 type CDWQMSClosureStats struct {
 	Interrupted         int    `json:"interrupted"`

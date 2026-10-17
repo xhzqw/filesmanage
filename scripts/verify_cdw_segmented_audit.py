@@ -60,6 +60,8 @@ def verify(packet: dict) -> tuple[int, int]:
             isinstance(facts.get(key), list) for key in ("steps", "decisions", "notices")
         ):
             raise InvalidAudit(f"segment {idx} facts malformed")
+        if "escalations" in facts and not isinstance(facts["escalations"], list):
+            raise InvalidAudit(f"segment {idx} escalations malformed")
         if nodes[0].get("approvalId") != first or nodes[-1].get("approvalId") != last:
             raise InvalidAudit(f"segment {idx} endpoints do not match bytes")
         prefix = f"cdw-qms-segment-v1\n{idx}\n{first}\n{last}\n{previous_hash}\n".encode()
@@ -79,8 +81,9 @@ def verify(packet: dict) -> tuple[int, int]:
             if previous_id == focus:
                 focus_seen = True
             total += 1
-        for key in ("steps", "decisions", "notices"):
-            if any(not isinstance(row, dict) or row.get("approvalId") not in ids for row in facts[key]):
+        for key in ("steps", "decisions", "notices", "escalations"):
+            if any(not isinstance(row, dict) or row.get("approvalId") not in ids
+                   for row in facts.get(key, [])):
                 raise InvalidAudit(f"segment {idx} {key} references another segment")
         if idx == 0 and nodes[0]["approvalId"] != first_root:
             raise InvalidAudit("root ID mismatch")

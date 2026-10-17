@@ -127,6 +127,13 @@ func (s *Service) CDWQMSEscalationOpen(ctx context.Context, actor domain.User, n
 			if _, e = s.visibleFile(ctx, tx, actor, fileID, domain.ActionPreview); e != nil {
 				return nil, e
 			}
+			source, e := repo.CDWQMSEscalationPolicySourceFile(ctx, input.PolicyID)
+			if e != nil {
+				return nil, e
+			}
+			if _, e = s.visibleFile(ctx, tx, actor, source, domain.ActionPreview); e != nil {
+				return nil, e
+			}
 			return repo.CDWQMSEscalationOpen(ctx, caseID, noticeID, input.PolicyID, actor.ID, input.Reason)
 		})
 	if err != nil {
@@ -180,7 +187,14 @@ func (s *Service) CDWQMSEscalationPolicies(ctx context.Context, actor domain.Use
 	}
 	out := []ports.CDWQMSEscalationPolicy{}
 	for _, p := range all {
-		if _, e := s.visibleFile(ctx, tx, actor, p.TargetFileID, domain.ActionPreview); e == nil {
+		if _, e := s.visibleFile(ctx, tx, actor, p.TargetFileID, domain.ActionPreview); e != nil {
+			continue
+		}
+		source, e := repo.CDWQMSEscalationSourceFile(ctx, p.PolicyReleaseID)
+		if e != nil {
+			continue
+		}
+		if _, e = s.visibleFile(ctx, tx, actor, source, domain.ActionPreview); e == nil {
 			out = append(out, p)
 		}
 		if ctx.Err() != nil {

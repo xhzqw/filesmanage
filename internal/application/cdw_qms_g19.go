@@ -151,7 +151,7 @@ func (s *Service) CDWQMSFormalAuditSegmented(ctx context.Context, actor domain.U
 		Closure: cdwQMSClosureStats(ports.CDWQMSFormalLineage{Nodes: nodes}),
 	}
 	prevHash := ""
-	stepCount, decisionCount, noticeCount := 0, 0, 0
+	stepCount, decisionCount, noticeCount, escalationCount := 0, 0, 0, 0
 	for start := 0; start < len(nodes); start += cdwG19SegmentNodes {
 		end := start + cdwG19SegmentNodes
 		if end > len(nodes) {
@@ -164,6 +164,7 @@ func (s *Service) CDWQMSFormalAuditSegmented(ctx context.Context, actor domain.U
 		stepCount += len(facts.Steps)
 		decisionCount += len(facts.Decisions)
 		noticeCount += len(facts.Notices)
+		escalationCount += len(facts.Escalations)
 		part := ports.CDWQMSAuditSegmentContent{Nodes: nodes[start:end], Facts: facts}
 		payload, e := json.Marshal(part)
 		if e != nil {
@@ -190,7 +191,7 @@ func (s *Service) CDWQMSFormalAuditSegmented(ctx context.Context, actor domain.U
 	if err = auditRequired(ctx, tx, actor, "cdw.qms.formal.audit.segmented.requested",
 		"formal_approval", focus, "success", map[string]any{
 			"segmentCount": packet.TotalSegments, "nodeCount": packet.TotalNodes,
-			"stepCount": stepCount, "decisionCount": decisionCount, "noticeCount": noticeCount,
+			"stepCount": stepCount, "decisionCount": decisionCount, "noticeCount": noticeCount, "escalationCount": escalationCount,
 			"lastSegmentSHA256": packet.LastSegmentSHA256}); err != nil {
 		return nil, err
 	}

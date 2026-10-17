@@ -16,7 +16,7 @@ func (r *Repository) CDWQMSAuditCanExport(ctx context.Context, actor, fileID str
 	return allowed, err
 }
 func (r *Repository) CDWQMSAuditFacts(ctx context.Context, approvalIDs []string) (ports.CDWQMSAuditFacts, error) {
-	result := ports.CDWQMSAuditFacts{Steps: []ports.CDWQMSAuditStep{}, Decisions: []ports.CDWQMSAuditDecision{}, Notices: []ports.CDWQMSAuditNotice{}}
+	result := ports.CDWQMSAuditFacts{Steps: []ports.CDWQMSAuditStep{}, Decisions: []ports.CDWQMSAuditDecision{}, Notices: []ports.CDWQMSAuditNotice{}, Escalations: []ports.CDWQMSAuditEscalation{}}
 	rows, err := r.Q.Query(ctx, `SELECT instance_id,id,node_key,sequence_no,approver_user_id,state,mandatory,revision
  FROM cdw_formal_approval_steps WHERE instance_id=ANY($1)
  ORDER BY instance_id,sequence_no,node_key`, approvalIDs)
@@ -89,6 +89,41 @@ func (r *Repository) CDWQMSAuditFacts(ctx context.Context, approvalIDs []string)
 			n.FollowupAt = &v
 		}
 		result.Notices = append(result.Notices, n)
+	}
+	err = rows.Err()
+	if err != nil {
+		return result, err
+	}
+	rows.Close()
+	rows, err = r.Q.Query(ctx, `SELECT n.approval_instance_id,c.id,c.notice_id,c.policy_id,
+ p.policy_release_id,p.clause_ref,p.delay_minutes,p.status,
+ c.escalated_to,c.escalated_by,c.reason,c.escalated_at,
+ COALESCE(res.resolved_by,''),COALESCE(res.resolution,''),res.resolved_at
+ FROM cdw_qms_escalation_cases c
+ JOIN cdw_qms_formal_interruption_alerts n ON n.id=c.notice_id
+ JOIN cdw_qms_escalation_policies p ON p.id=c.policy_id
+ LEFT JOIN cdw_qms_escalation_resolutions res ON res.case_id=c.id
+ WHERE n.approval_instance_id=ANY($1)
+ ORDER BY n.approval_instance_id,c.escalated_at,c.id`, approvalIDs)
+	if err != nil {
+		return result, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var e ports.CDWQMSAuditEscalation
+		var at time.Time
+		var resolved *time.Time
+		if err = rows.Scan(&e.ApprovalID, &e.CaseID, &e.NoticeID, &e.PolicyID,
+			&e.PolicyReleaseID, &e.ClauseRef, &e.DelayMinutes, &e.PolicyStatusAtExport,
+			&e.OwnerID, &e.EscalatedBy, &e.Reason, &at, &e.ResolvedBy, &e.Resolution, &resolved); err != nil {
+			return result, err
+		}
+		e.EscalatedAt = at.UTC().Format(time.RFC3339Nano)
+		if resolved != nil {
+			v := resolved.UTC().Format(time.RFC3339Nano)
+			e.ResolvedAt = &v
+		}
+		result.Escalations = append(result.Escalations, e)
 	}
 	return result, rows.Err()
 }

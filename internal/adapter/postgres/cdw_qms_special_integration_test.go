@@ -330,6 +330,15 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	if policyErr != nil || g20.Status != "verified" {
 		t.Fatalf("G20 independent verification failed: %+v %v", g20, policyErr)
 	}
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g20_too_early"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = r.CDWQMSEscalationOpen(ctx, prefix+"_g20_too_early", formalNotices[0].ID, g20Policy, charlie.ID, reason); err == nil {
+		t.Fatal("G20 manually escalated before the verified delay elapsed")
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_g20_too_early"); err != nil {
+		t.Fatal(err)
+	}
 	g20notice := prefix + "_g20_old_notice"
 	if _, err = tx.Exec(ctx, `INSERT INTO cdw_qms_formal_interruption_alerts
  (id,approval_instance_id,recipient_id,event_kind,created_at)
@@ -374,6 +383,21 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	if _, err = r.CDWQMSEscalationResolve(ctx, prefix+"_g20_resolution", g20case.ID, bob.ID, reason); err != nil {
 		t.Fatal(err)
 	}
+	g20Audit, g20AuditErr := r.CDWQMSAuditFacts(ctx, []string{formalInstance})
+	if g20AuditErr != nil || len(g20Audit.Escalations) != 1 ||
+		g20Audit.Escalations[0].NoticeID != g20notice ||
+		g20Audit.Escalations[0].ResolvedAt == nil {
+		t.Fatalf("G20 immutable escalation and resolution absent from audit evidence: %+v %v", g20Audit.Escalations, g20AuditErr)
+	}
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g20_mutate_case"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, "UPDATE cdw_qms_escalation_cases SET reason=$2 WHERE id=$1", g20case.ID, reason+"禁止事后重写"); err == nil {
+		t.Fatal("G20 persisted escalation event was silently edited")
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_g20_mutate_case"); err != nil {
+		t.Fatal(err)
+	}
 	g20cases, caseErr := r.CDWQMSEscalationCases(ctx, alice.ID, 30)
 	if caseErr != nil || len(g20cases) != 1 || g20cases[0].ResolvedAt == nil {
 		t.Fatalf("G20 owner's case inbox cannot see independent closure: %+v %v", g20cases, caseErr)
@@ -389,6 +413,25 @@ func exerciseCDWQMSSpecialAuthority(t *testing.T, ctx context.Context, tx pgx.Tx
 	}
 	if revoked, revokeErr := r.CDWQMSEscalationRevoke(ctx, g20Policy, admin.ID, reason); revokeErr != nil || revoked.Status != "revoked" {
 		t.Fatalf("G20 independently authorized revocation failed: %+v %v", revoked, revokeErr)
+	}
+	secondNotice := prefix + "_g20_revoked_notice"
+	if _, err = tx.Exec(ctx, `INSERT INTO cdw_qms_formal_interruption_alerts
+ (id,approval_instance_id,recipient_id,event_kind,created_at)
+ VALUES($1,$2,$3,'legacy_quarantined',clock_timestamp()-interval '2 days')`,
+		secondNotice, formalInstance, alice.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = r.CDWQMSFormalFollowup(ctx, prefix+"_g20_revoked_followup", secondNotice, charlie.ID, reason); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, "SAVEPOINT cdw_g20_revoked_case"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = r.CDWQMSEscalationOpen(ctx, prefix+"_g20_revoked_case", secondNotice, g20Policy, charlie.ID, reason); err == nil {
+		t.Fatal("G20 revoked policy could escalate a new notice")
+	}
+	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_g20_revoked_case"); err != nil {
+		t.Fatal(err)
 	}
 	if _, err = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT cdw_g20_authorized_escalation"); err != nil {
 		t.Fatal(err)
