@@ -95,7 +95,7 @@ CREATE TABLE cdw_qms_escalation_cases (
  CHECK(escalated_to<>escalated_by)
 );
 CREATE FUNCTION cdw_qms_escalation_case_guard() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE n record; p record;
+DECLARE notice_row record; p record;
 BEGIN
  IF TG_OP<>'INSERT' THEN RAISE EXCEPTION 'Escalation case history cannot change' USING ERRCODE='23514'; END IF;
  SELECT e.*,r.state AS release_state,ptr.release_id AS current_release
@@ -103,19 +103,19 @@ BEGIN
  JOIN cdw_controlled_releases r ON r.id=e.policy_release_id
  LEFT JOIN cdw_effective_pointers ptr ON ptr.file_id=r.file_id AND ptr.state='active'
  WHERE e.id=NEW.policy_id FOR UPDATE OF e;
- SELECT n.read_at,n.created_at,s.file_id,f.notice_id AS followed
- INTO n FROM cdw_qms_formal_interruption_alerts n
- JOIN cdw_formal_approval_instances a ON a.id=n.approval_instance_id
+ SELECT alert.read_at,alert.created_at,s.file_id,f.notice_id AS followed
+ INTO notice_row FROM cdw_qms_formal_interruption_alerts alert
+ JOIN cdw_formal_approval_instances a ON a.id=alert.approval_instance_id
  JOIN cdw_approval_subjects s ON s.id=a.subject_id
- LEFT JOIN cdw_qms_formal_notice_followups f ON f.notice_id=n.id
- WHERE n.id=NEW.notice_id FOR UPDATE OF n;
- IF p.id IS NULL OR n.file_id IS NULL OR n.read_at IS NOT NULL OR n.followed IS NULL
+ LEFT JOIN cdw_qms_formal_notice_followups f ON f.notice_id=alert.id
+ WHERE alert.id=NEW.notice_id FOR UPDATE OF alert;
+ IF p.id IS NULL OR notice_row.file_id IS NULL OR notice_row.read_at IS NOT NULL OR notice_row.followed IS NULL
   OR p.status<>'verified' OR p.release_state<>'effective'
   OR p.current_release IS DISTINCT FROM p.policy_release_id
-  OR NEW.target_file_id IS DISTINCT FROM n.file_id
+  OR NEW.target_file_id IS DISTINCT FROM notice_row.file_id
   OR NEW.target_file_id IS DISTINCT FROM p.target_file_id
   OR NEW.escalated_to IS DISTINCT FROM p.escalation_owner_id
-  OR clock_timestamp()<n.created_at+(p.delay_minutes * interval '1 minute')
+  OR clock_timestamp()<notice_row.created_at+(p.delay_minutes * interval '1 minute')
  THEN RAISE EXCEPTION 'Unread followed-up notice and verified effective elapsed policy required' USING ERRCODE='23514'; END IF;
  IF NOT EXISTS(SELECT 1 FROM cdw_business_role_bindings b JOIN users u ON u.id=b.user_id
   WHERE b.user_id=NEW.escalated_by AND b.role='document_control'
