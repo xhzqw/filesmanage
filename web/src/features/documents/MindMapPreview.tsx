@@ -107,9 +107,9 @@ export function MindMapPreview({value,note=""}:{value:XMindPreview;note?:string}
  return <div className="xmind-viewer" aria-label="XMind 思维导图只读预览">
   <div className="xmind-bar">
    <div className="xmind-sheets" role="tablist" aria-label="思维导图画布">
-    {value.sheets.map((item,i)=><button key={i} type="button" role="tab" aria-selected={i===sheetIndex}
+    {value.sheets.map((item,i)=><RareButton key={i} type="button" tone="ghost" role="tab" aria-selected={i===sheetIndex}
       className={"xmind-sheet"+(i===sheetIndex?" is-active":"")} onClick={()=>setSheetIndex(i)}
-      title={item.title}>{item.title}</button>)}
+      title={item.title}>{item.title}</RareButton>)}
    </div>
    <div className="xmind-tools" role="group" aria-label="画布工具">
     <RareButton type="button" tone="ghost" title="全部展开" onClick={()=>setFolded(new Set())}>展开</RareButton>
@@ -142,17 +142,17 @@ export function MindMapPreview({value,note=""}:{value:XMindPreview;note?:string}
       className={"xmind-node"+(node.depth===0?" is-root":"")+(selectedPath===node.path?" is-selected":"")+
        (node.topic.kind==="floating"?" is-floating":"")}
       style={{left:node.x,top:node.y,width:NODE_WIDTH,height:NODE_HEIGHT}}>
-      <button type="button" className="xmind-node-title" title={node.topic.title}
+      <RareButton type="button" tone="ghost" className="xmind-node-title" title={node.topic.title}
        aria-label={"主题："+node.topic.title} aria-pressed={selectedPath===node.path}
-       onClick={()=>setSelectedPath(path=>path===node.path?null:node.path)}>{node.topic.title}</button>
-      {node.children>0&&<button type="button" className="xmind-fold" title={folded.has(node.path)?"展开子主题":"收起子主题"}
+       onClick={()=>setSelectedPath(path=>path===node.path?null:node.path)}>{node.topic.title}</RareButton>
+      {node.children>0&&<RareButton type="button" tone="ghost" className="xmind-fold" title={folded.has(node.path)?"展开子主题":"收起子主题"}
        aria-label={folded.has(node.path)?"展开子主题":"收起子主题"} aria-expanded={!folded.has(node.path)}
-       onClick={()=>toggle(node.path)}>{folded.has(node.path)?"+" :"−"}</button>}
+       onClick={()=>toggle(node.path)}>{folded.has(node.path)?"+" :"−"}</RareButton>}
      </div>)}
    </div>
    {selected&&<aside className="xmind-details" aria-label="主题详情">
     <div className="xmind-details-heading"><strong title={selected.topic.title}>{selected.topic.title}</strong>
-     <button type="button" aria-label="关闭主题详情" onClick={()=>setSelectedPath(null)}>×</button></div>
+     <RareButton type="button" tone="ghost" aria-label="关闭主题详情" onClick={()=>setSelectedPath(null)}>×</RareButton></div>
     {selected.topic.kind&&<small>{selected.topic.kind==="floating"?"自由主题":selected.topic.kind==="summary"?"概要":"标注"}</small>}
     {!!selected.topic.labels?.length&&<div className="xmind-labels">{selected.topic.labels.map((label,i)=><span key={i}>{label}</span>)}</div>}
     {!!selected.topic.markers?.length&&<p className="xmind-markers">标记：{selected.topic.markers.join(" · ")}</p>}
