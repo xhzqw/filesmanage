@@ -75,7 +75,7 @@ export function layoutMindMap(root:XMindTopic,folded:ReadonlySet<string>,directi
  for(const [group,side] of [[right,1],[left,-1]] as const){
   let cursor=PADDING+(visibleHeight-stackHeight(group))/2;
   for(const item of group){
-   place(item.topic,item.path,1,side,cursor,nodes[0]);
+   place(item.topic,item.path,1,side,cursor,nodes[0]!);
    cursor+=item.height+ROW_GAP;
   }
  }
