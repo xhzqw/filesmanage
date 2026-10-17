@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-const dhfTime = `to_char(%s AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS"Z"')`
+const dhfTime = `to_char(%s AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
 
 func (r *Repository) DHFCreate(ctx context.Context, p ports.DHFProject, nodes []ports.DHFNode) error {
 	_, err := r.Q.Exec(ctx, `INSERT INTO dhf_projects(id,title,template_sha256,owner_id,reviewer_id) VALUES($1,$2,$3,$4,$5)`, p.ID, p.Title, p.TemplateSHA256, p.OwnerID, p.ReviewerID)
