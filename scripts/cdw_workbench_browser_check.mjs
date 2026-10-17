@@ -96,12 +96,18 @@ try{
   assert.ok(layout.panes.every(p=>p.bottom<=851),"panes extend below viewport at "+width);
   console.log("CDW_LAYOUT_PASS",width,layout.panes.map(p=>p.selector+":"+Math.round(p.right-p.left)).join(" "));
  }
- await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('待我验收'));button?.click();return true;})()");
- await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('待我验收')");
+ await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('交付验收'));button?.click();return true;})()");
+ await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('交付验收')");
  await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('责任待办'));button?.click();return true;})()");
  await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('责任待办')");
- await evalJS("(()=>{const create=[...document.querySelectorAll('.cdw-inbox-actions button')].find(b=>b.textContent.includes('派发任务'));create?.click();return true;})()");
- await until("!!document.querySelector('.cdw-form') && document.querySelector('.cdw-detail h2')?.textContent?.includes('派发单文件任务')");
+ assert.equal(await evalJS("[...document.querySelectorAll('.cdw-inbox-actions button')].some(b=>b.textContent.includes('新建工作'))"),false,
+  "responsibility view must not offer unrelated work creation");
+ await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('工作事项'));button?.click();return true;})()");
+ await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('工作事项')");
+ assert.equal(await evalJS("!!document.querySelector('.cdw-sort-button[aria-pressed=true]')"),true,
+  "actionable items are sorted first by default");
+ await evalJS("(()=>{const create=[...document.querySelectorAll('.cdw-inbox-actions button')].find(b=>b.textContent.includes('新建工作'));create?.click();return true;})()");
+ await until("!!document.querySelector('.cdw-form') && document.querySelector('.cdw-detail h2')?.textContent?.includes('新建受控文件工作')");
  const overrideControl="document.querySelector('.cdw-form-permission button[aria-pressed]')";
  await until(overrideControl+"?.getAttribute('aria-pressed')==='false'");
  await evalJS("(()=>{"+overrideControl+".click();return true})()");
@@ -202,7 +208,7 @@ try{
 
  await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('发行准备'));button?.click();return true;})()");
  await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('发行准备')");
- assert.equal(await evalJS("[...document.querySelectorAll('.cdw-inbox-actions button')].some(b=>b.textContent.includes('派发任务'))"),false,
+ assert.equal(await evalJS("[...document.querySelectorAll('.cdw-inbox-actions button')].some(b=>b.textContent.includes('新建工作'))"),false,
   "G8 release register must not display unrelated task-creation action");
  if(controlled.data.items.length){
   const found=await evalJS("(()=>{const node=document.querySelector('.cdw-task-row');node?.click();return !!node})()");
@@ -238,7 +244,7 @@ try{
  assert.ok(Array.isArray(scope.data?.items),"G9 independently appointed scope list is live");
  await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('范围审批'));button?.click();return true;})()");
  await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('范围审批')");
- assert.equal(await evalJS("[...document.querySelectorAll('.cdw-inbox-actions button')].some(b=>b.textContent.includes('派发任务'))"),false,
+ assert.equal(await evalJS("[...document.querySelectorAll('.cdw-inbox-actions button')].some(b=>b.textContent.includes('新建工作'))"),false,
   "G9 scope approval cannot masquerade as task delegation");
  console.log("CDW_G9_SCOPE_BROWSER_PASS authenticated-inbox+separate-review-workbench");
  const g9Reads=await evalJS("(async()=>{const r=await fetch('/api/workbench/reading-assignments/inbox');return {status:r.status,data:(await r.json()).data}})()");
@@ -246,7 +252,7 @@ try{
  assert.ok(Array.isArray(g9Reads.data?.items),"G9 reader assignments cannot be simulated");
  await evalJS("(()=>{const b=[...document.querySelectorAll('.cdw-rail-item')].find(x=>x.textContent.includes('阅读确认'));b?.click();return true;})()");
  await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('阅读确认')");
- assert.equal(await evalJS("[...document.querySelectorAll('.cdw-inbox-actions button')].some(x=>x.textContent.includes('派发任务'))"),false,
+ assert.equal(await evalJS("[...document.querySelectorAll('.cdw-inbox-actions button')].some(x=>x.textContent.includes('新建工作'))"),false,
   "G9 reading view may not show unrelated task-creation control");
  console.log("CDW_G9_READING_BROWSER_PASS authenticated-reading-inbox+separate-personal-confirmation-tab");
  await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('责任待办'));button?.click();return true;})()");
