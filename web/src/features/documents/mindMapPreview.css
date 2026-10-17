@@ -32,12 +32,15 @@
 .xmind-edges{position:absolute;inset:0;overflow:visible;pointer-events:none}
 .xmind-edges path{fill:none;stroke:#8EB5DC;stroke-width:2}
 .xmind-edges path.is-floating{stroke-dasharray:5 5}
+.xmind-relationship path{stroke:#8C65C5;stroke-width:2;stroke-dasharray:7 4;opacity:.88}
+.xmind-relationship text{fill:#7657AB;font-size:10px;paint-order:stroke;stroke:#F8FAFC;stroke-width:4px;stroke-linejoin:round;pointer-events:none}
 .xmind-node{position:absolute;box-sizing:border-box;display:flex;align-items:center;gap:2px;padding:4px 7px 4px 10px;border:1px solid rgba(23,102,187,.18);border-radius:var(--radius-sm);background:#fff;box-shadow:0 2px 8px rgba(15,23,42,.06)}
 .xmind-node.is-root{background:#176DCE;border-color:#176DCE;box-shadow:0 4px 15px rgba(23,109,206,.19)}
 .xmind-node.is-selected{outline:2px solid #70ADE6;outline-offset:2px}
 .xmind-node.is-floating{border-style:dashed}
 .xmind-node.is-summary{background:#EEF6FC;border-color:#B2D0E6}
 .xmind-node.is-callout{background:#FFF7E9;border-color:#E5CBA6}
+.xmind-node-image{flex:none;width:29px;height:34px;object-fit:contain;pointer-events:none;border-radius:var(--radius-xs)}
 .xmind-node .rare-button.xmind-node-title{flex:1;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;min-width:0;max-width:100%;height:auto;min-height:0;max-height:42px;margin:0;padding:0;border:0;border-radius:0;box-shadow:none;background:transparent;color:#24364C;text-align:left;white-space:normal;overflow:hidden;overflow-wrap:anywhere;font-size:12px;font-weight:500;line-height:1.36}
 .xmind-node.is-root .rare-button.xmind-node-title{color:#fff;font-size:13px;font-weight:600}
 .xmind-node .rare-button.xmind-node-title:hover{background:transparent}
@@ -55,10 +58,22 @@
 .xmind-labels{display:flex;gap:5px;flex-wrap:wrap}
 .xmind-labels span{padding:3px 6px;border-radius:var(--radius-xs);background:#EAF2FF;color:#286CA7;font-size:11px}
 .xmind-markers{margin:0;color:#64748B;font-size:11px;overflow-wrap:anywhere}
+.xmind-preview-image{width:100%;max-height:190px;object-fit:contain;border:1px solid rgba(15,23,42,.07);border-radius:var(--radius-sm);background:#F8FAFC}
+.xmind-link{display:block;font-size:11.5px;max-width:100%;overflow-wrap:anywhere;color:#0058D0;text-decoration:none}
+.xmind-link:hover{text-decoration:underline}
+.xmind-detail-relations,.xmind-annotation{display:flex;flex-direction:column;gap:5px;padding-top:9px;border-top:1px solid #E7ECF3;min-width:0}
+.xmind-detail-relations strong,.xmind-annotation strong{font-size:11.5px;color:#334155}
+.xmind-annotation p,.xmind-unsupported-link{margin:0;color:#64748B;font-size:11px;line-height:1.6;overflow-wrap:anywhere}
+.xmind-details .rare-button.xmind-detail-jump{display:block;height:auto;min-height:26px;padding:5px 8px;border:0;border-radius:var(--radius-finder);background:#F1F5F9;color:#2F6CA9;font-size:11px;font-weight:500;text-align:left;white-space:normal;overflow-wrap:anywhere;box-shadow:none}
+.xmind-details .rare-button.xmind-detail-jump:hover{background:#EAF2FF;color:#0058D0}
+.xmind-minimap{position:absolute;z-index:4;right:14px;bottom:13px;width:196px;height:112px;box-sizing:border-box;border:1px solid rgba(15,23,42,.10);border-radius:var(--radius-sm);background:rgba(255,255,255,.95);box-shadow:0 4px 14px rgba(15,23,42,.10);cursor:crosshair}
+.xmind-minimap:hover{border-color:#80B0E1}
+.xmind-minimap:focus-visible{outline:2px solid #176DCE;outline-offset:2px}
 .xmind-canvas-hint{position:absolute;left:14px;bottom:13px;pointer-events:none;color:#8997A9;font-size:10.5px}
 .xmind-status{display:flex;flex:none;align-items:center;justify-content:space-between;gap:8px;min-height:30px;box-sizing:border-box;padding:5px 12px;border-top:1px solid rgba(15,23,42,.06);background:#fff;color:#64748B;font-size:10.8px}
 .xmind-status span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .xmind-status span:last-child{max-width:46%}
 @media(max-width:1120px){.xmind-bar{align-items:flex-start;flex-wrap:wrap}.xmind-sheets{flex:1 1 100%}.xmind-tools{width:100%;justify-content:flex-end;overflow-x:auto;scrollbar-width:thin}}
 @media(max-width:720px){.xmind-outline{flex-basis:185px;width:185px;max-width:47%}.xmind-tools{justify-content:flex-start}.xmind-canvas-hint{max-width:72%}.xmind-status span:last-child{display:none}}
+@media(max-width:740px){.xmind-minimap{right:9px;bottom:10px;width:140px;height:80px}.xmind-canvas-hint{bottom:10px;max-width:calc(100% - 160px)}}
 @media(prefers-reduced-motion:reduce){.xmind-stage{will-change:auto}}

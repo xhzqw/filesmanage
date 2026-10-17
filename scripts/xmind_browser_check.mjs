@@ -21,8 +21,19 @@ const root={title:"DHF 阶段 1–9 流程",notes:"来源于受控文件工作�
     notes:"记录审查人、时间和追溯标识",labels:["受控"]}]
   }))
  }))};
+root.id="root-1";
+root.structure="org.xmind.ui.org-chart.down";
+root.children.forEach((topic,i)=>{topic.id="stage-"+(i+1);});
+const finalTopic=root.children[8].children[2].children[0];
+finalTopic.id="final-step";
+finalTopic.link="https://example.org/controlled";
+finalTopic.image="resources/fixture.png";
+finalTopic.color={fill:"#EAF3FF",text:"#223344"};
+finalTopic.boundaries=[{title:"最终归档边界",range:"(0,1)"}];
+finalTopic.summaries=[{title:"归档概要",range:"(0,1)"}];
+const embeddedPNG="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2q8AAAAASUVORK5CYII=";
 function count(topic){return 1+(topic.children??[]).reduce((sum,child)=>sum+count(child),0);}
-const mapData={sheets:[{title:"DHF 验收",root},{title:"变更流程",root:{title:"变更申请",children:[{title:"批准"},{title:"关闭"}]}}],topicCount:count(root)+3,truncated:false};
+const mapData={sheets:[{title:"DHF 验收",structure:root.structure,root,relationships:[{fromId:"root-1",toId:"stage-1",title:"质量关联"},{fromId:"stage-2",toId:"final-step",title:"审批依赖"}]},{title:"变更流程",root:{title:"变更申请",children:[{title:"批准"},{title:"关闭"}]}}],topicCount:count(root)+3,truncated:false,images:{"resources/fixture.png":embeddedPNG}};
 const file={id:fixture,folderId:"folder_root",name:"DHF-preview-fixture.xmind",uploadedBy:"admin",
  contentType:"application/vnd.xmind.workbook",sizeBytes:12345,sha256:"a".repeat(64),
  currentVersionSeq:1,updatedAt:stamp};
@@ -98,6 +109,13 @@ try{
   assert.equal(dimensions.pageOverflow,false,name+" caused document horizontal scroll");
   console.log("XMIND_CHROME_VIEWPORT_PASS",name,dimensions.width,dimensions.height);
  }
+ assert.equal(await evaluate("document.querySelector('.xmind-minimap')?.width"),196,"navigator missing");
+ const prior=await evaluate("document.querySelector('.xmind-stage')?.style.transform");
+ await evaluate("(()=>{const c=document.querySelector('.xmind-minimap'),r=c.getBoundingClientRect();c.dispatchEvent(new MouseEvent('click',{clientX:r.left+12,clientY:r.top+13,bubbles:true}));})()");
+ await until("document.querySelector('.xmind-stage')?.style.transform!=="+JSON.stringify(prior),"minimap pan");
+ await evaluate("Array.from(document.querySelectorAll('.xmind-tools button')).find(b=>b.textContent==='根主题')?.click()");
+ await until("!!document.querySelector('.xmind-node.is-root')","root after minimap jump");
+ console.log("XMIND_CHROME_MINIMAP_PASS click-to-pan and root recovery");
  await evaluate("document.querySelector('.xmind-sheet:nth-child(2)')?.click()");
  await until("document.querySelector('.xmind-node.is-root')?.textContent?.includes('变更申请')","second sheet");
  await evaluate("document.querySelector('.xmind-sheet:first-child')?.click()");
@@ -109,11 +127,19 @@ try{
  await evaluate("document.querySelector('.xmind-outline-row')?.click()");
  await until("document.querySelector('.xmind-details')?.textContent?.includes('归档验收-最终确认')","search jump");
  assert.ok(await evaluate("document.querySelector('.xmind-details')?.textContent?.includes('审查人')"),"notes missing");
+ assert.ok(await evaluate("document.querySelector('.xmind-details')?.textContent?.includes('最终归档边界')"),"boundary metadata lost");
+ assert.ok(await evaluate("document.querySelector('.xmind-details')?.textContent?.includes('归档概要')"),"summary metadata lost");
+ assert.ok(await evaluate("document.querySelector('.xmind-details .xmind-preview-image')?.getAttribute('src')?.startsWith('data:image/png;base64,')"),"embedded image missing");
+ assert.equal(await evaluate("document.querySelector('.xmind-details .xmind-link')?.getAttribute('rel')"),"noopener noreferrer","external link not isolated");
+ assert.ok(await evaluate("document.querySelectorAll('.xmind-detail-relations button').length")>0,"relationships not navigable");
  const before=await evaluate("document.querySelector('.xmind-zoom').textContent");
  await evaluate("document.querySelector('.xmind-tools button[aria-label=\"放大\"]')?.click()");
  await until("document.querySelector('.xmind-zoom')?.textContent!=="+JSON.stringify(before),"zoom button");
  await evaluate("Array.from(document.querySelectorAll('.xmind-tools button')).find(b=>b.textContent==='收起')?.click()");
  await until("document.querySelectorAll('.xmind-node').length<20","fold deep");
+ await evaluate("document.querySelector('.xmind-details .xmind-detail-relations button')?.click()");
+ await until("document.querySelector('.xmind-details')?.textContent?.includes('阶段 2')","relationship jump");
+ console.log("XMIND_CHROME_SEMANTICS_PASS links/image/boundary/summary/relationship navigation");
  console.log("XMIND_CHROME_INTERACTION_PASS sheets/search/reveal/notes/zoom/fold");
 }finally{
  try{ws?.close();}catch{}

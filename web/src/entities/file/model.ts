@@ -72,8 +72,19 @@ export type PreviewData={
  };
 };
 
-export type XMindTopic={title:string;kind?:string;notes?:string;labels?:string[];markers?:string[];children?:XMindTopic[]};
-export type XMindPreview={sheets:{title:string;root:XMindTopic}[];topicCount:number;truncated:boolean};
+export type XMindAnnotation={title?:string;range?:string};
+export type XMindRelationship={fromId:string;toId:string;title?:string};
+export type XMindTopic={
+ id?:string;title:string;kind?:string;structure?:string;collapsed?:boolean;
+ link?:string;image?:string;color?:{fill?:string;text?:string};
+ notes?:string;labels?:string[];markers?:string[];
+ boundaries?:XMindAnnotation[];summaries?:XMindAnnotation[];
+ children?:XMindTopic[];
+};
+export type XMindSheet={title:string;structure?:string;root:XMindTopic;relationships?:XMindRelationship[]};
+export type XMindPreview={
+ sheets:XMindSheet[];topicCount:number;truncated:boolean;images?:Record<string,string>;
+};
 export type StructuredPreview={
  kind:"archive"|"spreadsheet"|"presentation"|"document"|"mindmap";
  mindMap?:XMindPreview;

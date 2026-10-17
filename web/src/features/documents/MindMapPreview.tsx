@@ -1,4 +1,4 @@
-import {useEffect,useMemo,useRef,useState,type PointerEvent,type WheelEvent} from "react";
+import {useEffect,useMemo,useRef,useState,type PointerEvent,type MouseEvent,type WheelEvent} from "react";
 import {RareButton,RareInput} from "../../shared/ui/rare";
 import type {XMindPreview,XMindTopic} from "../../entities/file/model";
 import {indexMindMap,layoutMindMap,MIND_NODE_WIDTH,MIND_NODE_HEIGHT,type MindMapDirection} from "./mindMapLayout";
@@ -6,11 +6,36 @@ import "./mindMapPreview.css";
 
 const clamp=(n:number,low:number,high:number)=>Math.min(high,Math.max(low,n));
 type Viewport={width:number;height:number};
+const structureName=(structure?:string)=>{
+ if(!structure)return "思维导图";
+ if(structure.includes("org-chart"))return "组织结构图";
+ if(structure.includes("logic"))return "逻辑图";
+ if(structure.includes("tree"))return "树状图";
+ if(structure.includes("fishbone"))return "鱼骨图";
+ if(structure.includes("timeline"))return "时间线";
+ if(structure.includes("matrix"))return "矩阵";
+ return "思维导图";
+};
+const safeImage=(source?:string)=>source&&/^data:image\/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+$/.test(source)?source:undefined;
+const safeWebLink=(source?:string)=>{
+ if(!source||!/^https?:\/\//i.test(source))return undefined;
+ try{
+  const link=new URL(source);
+  return (link.protocol==="https:"||link.protocol==="http:")&&link.username===""&&link.password===""?link.href:undefined;
+ }catch{return undefined;}
+};
+function textContrast(fill?:string){
+ if(!fill)return undefined;
+ let hex=fill.slice(1);
+ if(hex.length===3)hex=hex.split("").map(c=>c+c).join("");
+ const red=parseInt(hex.slice(0,2),16),green=parseInt(hex.slice(2,4),16),blue=parseInt(hex.slice(4,6),16);
+ return red*.299+green*.587+blue*.114>155?"#25354A":"#FFFFFF";
+}
 function initialFolds(root?:XMindTopic,large=false):Set<string>{
  const folds=new Set<string>();
- if(!root||!large)return folds;
+ if(!root)return folds;
  function walk(topic:XMindTopic,path:string,depth:number){
-  if(depth>=2&&topic.children?.length){folds.add(path);return;}
+  if(topic.children?.length&&(topic.collapsed||(large&&depth>=2)))folds.add(path);
   topic.children?.forEach((child,i)=>walk(child,path+"."+i,depth+1));
  }
  walk(root,"0",0);
@@ -39,15 +64,56 @@ export function MindMapPreview({value,note=""}:{value?:XMindPreview;note?:string
  const [focusPath,setFocusPath]=useState<string|null>(null);
  const surface=useRef<HTMLDivElement>(null);
  const searchRef=useRef<HTMLInputElement>(null);
+ const mapRef=useRef<HTMLCanvasElement>(null);
  const drag=useRef<{id:number;startX:number;startY:number;x:number;y:number}|null>(null);
  const fitted=useRef("");
  const indexed=useMemo(()=>sheet?indexMindMap(sheet.root):[],[sheet]);
  const layout=useMemo(()=>sheet?layoutMindMap(sheet.root,folded,direction):null,[sheet,folded,direction]);
  const selected=layout?.nodes.find(item=>item.path===selectedPath);
+ const topicIds=useMemo(()=>{
+  const once=new Map<string,string>(),duplicate=new Set<string>();
+  for(const item of indexed){
+   const id=item.topic.id;
+   if(!id)continue;
+   if(once.has(id)){duplicate.add(id);continue;}
+   once.set(id,item.path);
+  }
+  duplicate.forEach(id=>once.delete(id));
+  return once;
+ },[indexed]);
+ const relationships=useMemo(()=>sheet?.relationships?.filter(link=>
+  topicIds.has(link.fromId)&&topicIds.has(link.toId))??[],[sheet,topicIds]);
+ const nodeById=useMemo(()=>{
+  const lookup=new Map<string,NonNullable<typeof layout>["nodes"][number]>();
+  layout?.nodes.forEach(node=>{
+   if(node.topic.id&&topicIds.has(node.topic.id))lookup.set(node.topic.id,node);
+  });
+  return lookup;
+ },[layout,topicIds]);
+ const related=selected?.topic.id?relationships.filter(link=>
+  link.fromId===selected.topic.id||link.toId===selected.topic.id):[];
+ const relationshipPaths=relationships.flatMap((link,i)=>{
+  const from=nodeById.get(link.fromId),to=nodeById.get(link.toId);
+  if(!from||!to)return [];
+  const fromX=from.x+MIND_NODE_WIDTH/2,fromY=from.y+MIND_NODE_HEIGHT/2;
+  const toX=to.x+MIND_NODE_WIDTH/2,toY=to.y+MIND_NODE_HEIGHT/2;
+  const top=Math.min(fromY,toY)-Math.max(45,Math.min(160,Math.abs(toX-fromX)/3));
+  return [{link,key:"relation-"+i,fromX,fromY,toX,toY,top}];
+ }).filter(line=>{
+  if(!viewport.width)return false;
+  const show=(x:number,y:number)=>{
+   const px=pan.x+x*zoom,py=pan.y+y*zoom;
+   return px>-200&&px<viewport.width+200&&py>-200&&py<viewport.height+200;
+  };
+  return show(line.fromX,line.fromY)&&show(line.toX,line.toY);
+ });
+ const selectedImage=selected?.topic.image?safeImage(value?.images?.[selected.topic.image]):undefined;
+ const selectedWebLink=safeWebLink(selected?.topic.link);
  const matches=useMemo(()=>{
   const term=search.trim().toLocaleLowerCase();
   return term?indexed.filter(item=>item.topic.title.toLocaleLowerCase().includes(term)||
-    item.topic.notes?.toLocaleLowerCase().includes(term)):indexed;
+    item.topic.notes?.toLocaleLowerCase().includes(term)||item.topic.labels?.some(label=>label.toLocaleLowerCase().includes(term))||
+    item.topic.markers?.some(marker=>marker.toLocaleLowerCase().includes(term))):indexed;
  },[search,indexed]);
  const listed=matches.slice(0,180);
  useEffect(()=>{
@@ -62,6 +128,31 @@ export function MindMapPreview({value,note=""}:{value?:XMindPreview;note?:string
   observer.observe(el);
   return()=>observer.disconnect();
  },[!!sheet]);
+ const mapScale=layout?Math.min(180/layout.width,96/layout.height):0;
+ const mapOffsetX=layout?(196-layout.width*mapScale)/2:0;
+ const mapOffsetY=layout?(112-layout.height*mapScale)/2:0;
+ useEffect(()=>{
+  const canvas=mapRef.current;
+  const ctx=canvas?.getContext("2d");
+  if(!canvas||!ctx||!layout||!mapScale)return;
+  ctx.clearRect(0,0,196,112);
+  ctx.fillStyle="#E9F0F8";
+  for(const node of layout.nodes){
+   ctx.fillStyle=node.path===selectedPath?"#176DCE":node.depth===0?"#397EC2":"#9EB9D7";
+   ctx.fillRect(mapOffsetX+node.x*mapScale,mapOffsetY+node.y*mapScale,
+    Math.max(2,MIND_NODE_WIDTH*mapScale),Math.max(2,MIND_NODE_HEIGHT*mapScale));
+  }
+  const x=mapOffsetX-pan.x/zoom*mapScale,y=mapOffsetY-pan.y/zoom*mapScale;
+  ctx.strokeStyle="#0058D0";ctx.lineWidth=1.5;ctx.strokeRect(x,y,
+   viewport.width/zoom*mapScale,viewport.height/zoom*mapScale);
+ },[layout,mapScale,mapOffsetX,mapOffsetY,pan,zoom,viewport,selectedPath]);
+ function mapJump(event:MouseEvent<HTMLCanvasElement>){
+  if(!layout||!mapScale)return;
+  const b=event.currentTarget.getBoundingClientRect();
+  const x=((event.clientX-b.left)*196/b.width-mapOffsetX)/mapScale;
+  const y=((event.clientY-b.top)*112/b.height-mapOffsetY)/mapScale;
+  setPan({x:viewport.width/2-x*zoom,y:viewport.height/2-y*zoom});
+ }
  function fitCanvas(){
   if(!layout||viewport.width<=0||viewport.height<=0)return;
   const availableWidth=Math.max(70,viewport.width-64);
@@ -239,16 +330,26 @@ export function MindMapPreview({value,note=""}:{value?:XMindPreview;note?:string
          (edge.fromX+side*38)+" "+edge.fromY+", "+(edge.toX-side*38)+" "+edge.toY+", "+edge.toX+" "+edge.toY}
          className={edge.kind==="floating"?"is-floating":""}/>;
        })}
+       {relationshipPaths.map(line=><g key={line.key} className="xmind-relationship">
+        <title>{line.link.title||"关联关系"}</title>
+        <path d={"M "+line.fromX+" "+line.fromY+" Q "+
+         ((line.fromX+line.toX)/2)+" "+line.top+" "+line.toX+" "+line.toY}/>
+        {line.link.title&&<text x={(line.fromX+line.toX)/2}
+         y={(line.fromY+line.toY+line.top*2)/4-5}
+         textAnchor="middle">{line.link.title}</text>}
+       </g>)}
       </svg>
-      {visibleNodes.map(node=><div key={node.path} style={{left:node.x,top:node.y,width:MIND_NODE_WIDTH,height:MIND_NODE_HEIGHT}}
+      {visibleNodes.map(node=><div key={node.path} style={{left:node.x,top:node.y,width:MIND_NODE_WIDTH,height:MIND_NODE_HEIGHT,...(node.topic.color?.fill?{backgroundColor:node.topic.color.fill}:{})}}
        className={"xmind-node"+(node.depth===0?" is-root":"")+(selectedPath===node.path?" is-selected":"")+
        (node.topic.kind?" is-"+node.topic.kind:"")}>
+       {node.topic.image&&safeImage(value?.images?.[node.topic.image])&&<img className="xmind-node-image" alt="" src={safeImage(value?.images?.[node.topic.image])}/>}
        <RareButton type="button" tone="ghost" className="xmind-node-title" title={node.topic.title}
         aria-label={"主题："+node.topic.title} aria-pressed={selectedPath===node.path}
+        style={node.topic.color?.text?{color:node.topic.color.text}:node.topic.color?.fill?{color:textContrast(node.topic.color.fill)}:undefined}
         onClick={()=>setSelectedPath(path=>path===node.path?null:node.path)}>
         {node.topic.title}
        </RareButton>
-       {(node.topic.notes||node.topic.labels?.length||node.topic.markers?.length)&&
+       {(node.topic.notes||node.topic.labels?.length||node.topic.markers?.length||node.topic.link||node.topic.boundaries?.length||node.topic.summaries?.length)&&
         <span className="xmind-node-meta" aria-hidden="true" title="有备注、标签或标记">•</span>}
        {node.children>0&&<RareButton type="button" tone="ghost" className="xmind-fold"
         aria-label={folded.has(node.path)?"展开子主题":"收起子主题"}
@@ -262,15 +363,48 @@ export function MindMapPreview({value,note=""}:{value?:XMindPreview;note?:string
       {selected.topic.kind&&<small>{selected.topic.kind==="floating"?"自由主题":selected.topic.kind==="summary"?"概要":"标注主题"}</small>}
       {selected.topic.labels?.length?<div className="xmind-labels">{selected.topic.labels.map((label,i)=><span key={i}>{label}</span>)}</div>:null}
       {selected.topic.markers?.length?<p className="xmind-markers">标记：{selected.topic.markers.join(" · ")}</p>:null}
+      {selectedImage&&<img className="xmind-preview-image" alt={"主题图片："+selected.topic.title} src={selectedImage}/>}
+      {selected.topic.link&&(selectedWebLink?
+       <a className="xmind-link" href={selectedWebLink} target="_blank" rel="noopener noreferrer">打开外部链接 ↗</a>:
+       selected.topic.link.startsWith("xmind:#")&&topicIds.has(selected.topic.link.slice(7))?
+       <RareButton type="button" tone="ghost" className="xmind-detail-jump"
+        onClick={()=>jump(topicIds.get(selected.topic.link!.slice(7))!)}>跳转关联主题 ↗</RareButton>:
+       <p className="xmind-unsupported-link">包含本地附件或其他引用，无法在浏览器中安全打开</p>)}
+      {selected.topic.boundaries?.length?<section className="xmind-annotation" aria-label="边界">
+       <strong>边界分组</strong>
+       {selected.topic.boundaries.map((entry,i)=><p key={i}>{entry.title||"未命名边界"}{entry.range?" · "+entry.range:""}</p>)}
+      </section>:null}
+      {selected.topic.summaries?.length?<section className="xmind-annotation" aria-label="概要">
+       <strong>概要范围</strong>
+       {selected.topic.summaries.map((entry,i)=><p key={i}>{entry.title||"概要"}{entry.range?" · "+entry.range:""}</p>)}
+      </section>:null}
+      {related.length>0&&<section className="xmind-detail-relations" aria-label="关联关系">
+       <strong>关联关系（{related.length}）</strong>
+       {related.map((rel,i)=>{
+        const id=rel.fromId===selected.topic.id?rel.toId:rel.fromId;
+        const destination=topicIds.get(id);
+        const target=indexed.find(item=>item.path===destination);
+        return destination&&target?<RareButton key={i} type="button" tone="ghost"
+         className="xmind-detail-jump" onClick={()=>jump(destination)}>
+         {rel.title?rel.title+" · ":""}{target.topic.title} ↗
+        </RareButton>:null;
+       })}
+      </section>}
       {selected.topic.notes?<p className="xmind-notes">{selected.topic.notes}</p>:<p className="xmind-no-notes">无备注</p>}
      </aside>}
+     <canvas className="xmind-minimap" ref={mapRef} width={196} height={112}
+      role="button" tabIndex={0} title="导航小地图，点击可跳转到对应位置"
+      aria-label="导航小地图，点击移动画布，按回车键返回根主题"
+      onPointerDown={event=>event.stopPropagation()}
+      onClick={mapJump}
+      onKeyDown={event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();jump("0");}}}/>
      <div className="xmind-canvas-hint">拖动平移 · 滚轮移动 · Ctrl / ⌘ + 滚轮缩放</div>
     </div>
    </div>
    <div className="xmind-status">
-    <span>{sheet.title} · {layout.nodes.length} 个可见主题 · 全文件已解析 {value?.topicCount??0} 个 · 只读</span>
-    <span title="原始文件未修改。自由布局、关系线、复杂样式和附件不保证与 XMind 原生完全一致">
-     {note||(value?.truncated?"超过安全预览上限，部分主题已省略":"结构预览 · 非原生排版")}
+    <span>{sheet.title} · {structureName(sheet.structure)} · {layout.nodes.length} 个画布主题 · {relationships.length} 条关系 · 全文件 {value?.topicCount??0} 个 · 只读</span>
+    <span title="保留关系、主题注释和受限图片预览；复杂布局、边界的原始几何位置仍为结构化近似">
+     {note||(value?.truncated?"超过安全预览上限，部分主题已省略":"增强结构阅读 · 布局可能有差异")}
     </span>
    </div>
   </>}

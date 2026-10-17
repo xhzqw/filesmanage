@@ -20,25 +20,67 @@ const (
 )
 
 type XMindPreview struct {
-	Sheets     []XMindSheet `json:"sheets"`
-	TopicCount int          `json:"topicCount"`
-	Truncated  bool         `json:"truncated"`
+	Sheets     []XMindSheet      `json:"sheets"`
+	TopicCount int               `json:"topicCount"`
+	Truncated  bool              `json:"truncated"`
+	Images     map[string]string `json:"images,omitempty"`
 }
 type XMindSheet struct {
-	Title string     `json:"title"`
-	Root  XMindTopic `json:"root"`
+	Title         string              `json:"title"`
+	Structure     string              `json:"structure,omitempty"`
+	Root          XMindTopic          `json:"root"`
+	Relationships []XMindRelationship `json:"relationships,omitempty"`
+}
+type XMindRelationship struct {
+	FromID string `json:"fromId"`
+	ToID   string `json:"toId"`
+	Title  string `json:"title,omitempty"`
+}
+type XMindAnnotation struct {
+	Title string `json:"title,omitempty"`
+	Range string `json:"range,omitempty"`
+}
+type XMindColor struct {
+	Fill string `json:"fill,omitempty"`
+	Text string `json:"text,omitempty"`
 }
 type XMindTopic struct {
-	Title    string       `json:"title"`
-	Kind     string       `json:"kind,omitempty"`
-	Notes    string       `json:"notes,omitempty"`
-	Labels   []string     `json:"labels,omitempty"`
-	Markers  []string     `json:"markers,omitempty"`
-	Children []XMindTopic `json:"children,omitempty"`
+	ID         string            `json:"id,omitempty"`
+	Title      string            `json:"title"`
+	Kind       string            `json:"kind,omitempty"`
+	Structure  string            `json:"structure,omitempty"`
+	Collapsed  bool              `json:"collapsed,omitempty"`
+	Link       string            `json:"link,omitempty"`
+	Image      string            `json:"image,omitempty"`
+	Color      *XMindColor       `json:"color,omitempty"`
+	Notes      string            `json:"notes,omitempty"`
+	Labels     []string          `json:"labels,omitempty"`
+	Markers    []string          `json:"markers,omitempty"`
+	Boundaries []XMindAnnotation `json:"boundaries,omitempty"`
+	Summaries  []XMindAnnotation `json:"summaries,omitempty"`
+	Children   []XMindTopic      `json:"children,omitempty"`
 }
 
 type xmindJSONTopic struct {
-	Title   string          `json:"title"`
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	Structure string `json:"structureClass"`
+	Branch    string `json:"branch"`
+	Href      string `json:"href"`
+	Image     struct {
+		Src string `json:"src"`
+	} `json:"image"`
+	Style struct {
+		Properties map[string]json.RawMessage `json:"properties"`
+	} `json:"style"`
+	Boundaries []struct {
+		Title string `json:"title"`
+		Range string `json:"range"`
+	} `json:"boundaries"`
+	Summaries []struct {
+		Title string `json:"title"`
+		Range string `json:"range"`
+	} `json:"summaries"`
 	Notes   json.RawMessage `json:"notes"`
 	Labels  json.RawMessage `json:"labels"`
 	Markers []struct {
@@ -52,12 +94,20 @@ type xmindJSONTopic struct {
 	} `json:"children"`
 }
 type xmindJSONSheet struct {
-	Title string          `json:"title"`
-	Root  *xmindJSONTopic `json:"rootTopic"`
+	Title         string          `json:"title"`
+	Root          *xmindJSONTopic `json:"rootTopic"`
+	Relationships []struct {
+		End1ID string `json:"end1Id"`
+		End2ID string `json:"end2Id"`
+		Title  string `json:"title"`
+	} `json:"relationships"`
 }
 type xmindXMLTopic struct {
-	Title string `xml:"title"`
-	Notes struct {
+	ID        string `xml:"id,attr"`
+	Structure string `xml:"structure-class,attr"`
+	Branch    string `xml:"branch,attr"`
+	Title     string `xml:"title"`
+	Notes     struct {
 		Plain string `xml:"plain"`
 	} `xml:"notes"`
 	Labels  []string `xml:"labels>label"`
@@ -114,6 +164,12 @@ func xmindLabels(raw json.RawMessage) []string {
 			items = wrapper.Labels
 		}
 	}
+	if len(items) == 0 {
+		var plain string
+		if json.Unmarshal(raw, &plain) == nil {
+			items = strings.Split(plain, ",")
+		}
+	}
 	return xmindLimitStrings(items)
 }
 func xmindLimitStrings(items []string) []string {
@@ -159,8 +215,17 @@ func xmindJSONNode(topic *xmindJSONTopic, kind string, depth int, out *XMindPrev
 		return nil
 	}
 	out.TopicCount++
-	node := &XMindTopic{Title: xmindText(topic.Title, 240), Kind: kind, Notes: xmindNote(topic.Notes),
-		Labels: xmindLabels(topic.Labels)}
+	node := &XMindTopic{
+		ID: xmindText(topic.ID, 128), Title: xmindText(topic.Title, 240), Kind: kind,
+		Structure: xmindText(topic.Structure, 128), Collapsed: topic.Branch == "folded",
+		Link: xmindSafeHref(topic.Href), Image: xmindResourcePath(topic.Image.Src),
+		Notes: xmindNote(topic.Notes), Labels: xmindLabels(topic.Labels),
+		Boundaries: xmindJSONAnnotations(topic.Boundaries),
+		Summaries:  xmindJSONAnnotations(topic.Summaries),
+	}
+	if fill, text := xmindSafeColor(topic.Style.Properties["svg:fill"]), xmindSafeColor(topic.Style.Properties["fo:color"]); fill != "" || text != "" {
+		node.Color = &XMindColor{Fill: fill, Text: text}
+	}
 	if node.Title == "" {
 		node.Title = "未命名主题"
 	}
@@ -201,8 +266,11 @@ func xmindXMLNode(topic *xmindXMLTopic, kind string, depth int, out *XMindPrevie
 		return nil
 	}
 	out.TopicCount++
-	node := &XMindTopic{Title: xmindText(topic.Title, 240), Kind: kind, Notes: xmindText(topic.Notes.Plain, 1800),
-		Labels: xmindLimitStrings(topic.Labels)}
+	node := &XMindTopic{
+		ID: xmindText(topic.ID, 128), Title: xmindText(topic.Title, 240), Kind: kind,
+		Structure: xmindText(topic.Structure, 128), Collapsed: topic.Branch == "folded",
+		Notes: xmindText(topic.Notes.Plain, 1800), Labels: xmindLimitStrings(topic.Labels),
+	}
 	if node.Title == "" {
 		node.Title = "未命名主题"
 	}
@@ -241,6 +309,7 @@ func parseXMindZIP(files map[string]*zip.File) (*XMindPreview, error) {
 	if f := files["content.json"]; f != nil {
 		if raw, err := boundedXMindMember(f); err == nil {
 			if out, parseErr := parseXMindJSON(raw); parseErr == nil {
+				xmindLoadImages(out, files)
 				return out, nil
 			}
 		}
@@ -250,7 +319,11 @@ func parseXMindZIP(files map[string]*zip.File) (*XMindPreview, error) {
 		if err != nil {
 			return nil, err
 		}
-		return parseXMindXML(raw)
+		out, parseErr := parseXMindXML(raw)
+		if parseErr == nil {
+			xmindLoadImages(out, files)
+		}
+		return out, parseErr
 	}
 	return nil, errors.New("no valid XMind content")
 }
@@ -289,7 +362,7 @@ func parseXMindJSON(raw []byte) (*XMindPreview, error) {
 		if title == "" {
 			title = "画布"
 		}
-		out.Sheets = append(out.Sheets, XMindSheet{Title: title, Root: *root})
+		out.Sheets = append(out.Sheets, XMindSheet{Title: title, Structure: root.Structure, Root: *root, Relationships: xmindJSONRelationships(sheet.Relationships, *root)})
 	}
 	if len(out.Sheets) == 0 {
 		return nil, errors.New("XMind has no root topics")
@@ -321,7 +394,7 @@ func parseXMindXML(raw []byte) (*XMindPreview, error) {
 		if title == "" {
 			title = "画布"
 		}
-		out.Sheets = append(out.Sheets, XMindSheet{Title: title, Root: *root})
+		out.Sheets = append(out.Sheets, XMindSheet{Title: title, Structure: root.Structure, Root: *root})
 	}
 	if len(out.Sheets) == 0 {
 		return nil, errors.New("XMind has no root topics")
