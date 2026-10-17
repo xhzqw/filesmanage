@@ -296,3 +296,37 @@ func (r *Repository) DHFFileVersions(ctx context.Context, file string) ([]ports.
 }
 
 var _ ports.DHFStore = (*Repository)(nil)
+
+func (r *Repository) DHFProofPage(ctx context.Context, projectID string, after int64, limit int) (string, []ports.DHFProofEvent, bool, error) {
+	anchor := "0000000000000000000000000000000000000000000000000000000000000000"
+	if after > 0 {
+		err := r.Q.QueryRow(ctx, `SELECT event_sha256 FROM dhf_events WHERE project_id=$1 AND id<=$2 ORDER BY id DESC LIMIT 1`, projectID, after).Scan(&anchor)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", nil, false, domain.ErrInvalidInput
+		}
+		if err != nil {
+			return "", nil, false, err
+		}
+	}
+	rows, err := r.Q.Query(ctx, `SELECT id,COALESCE(stage_no,0),COALESCE(source_line,0),action,actor_id,payload_text,previous_sha256,event_sha256,`+fmt.Sprintf(dhfTime, "occurred_at")+` FROM dhf_events WHERE project_id=$1 AND id>$2 ORDER BY id ASC LIMIT $3`, projectID, after, limit+1)
+	if err != nil {
+		return "", nil, false, err
+	}
+	defer rows.Close()
+	events := []ports.DHFProofEvent{}
+	for rows.Next() {
+		var e ports.DHFProofEvent
+		if err = rows.Scan(&e.ID, &e.StageNo, &e.SourceLine, &e.Action, &e.ActorID, &e.PayloadText, &e.PreviousSHA256, &e.EventSHA256, &e.OccurredAt); err != nil {
+			return "", nil, false, err
+		}
+		events = append(events, e)
+	}
+	if err = rows.Err(); err != nil {
+		return "", nil, false, err
+	}
+	hasMore := len(events) > limit
+	if hasMore {
+		events = events[:limit]
+	}
+	return anchor, events, hasMore, nil
+}

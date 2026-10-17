@@ -167,3 +167,36 @@ func (h *Handler) dhfPinnedEvidence(c *gin.Context) {
 	}
 	http.ServeContent(c.Writer, c.Request, out.FileName, out.ModTime, out.Reader)
 }
+
+func (h *Handler) dhfAuditProof(c *gin.Context) {
+	actor, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	after := int64(0)
+	if c.Query("after") != "" {
+		v, err := strconv.ParseInt(c.Query("after"), 10, 64)
+		if err != nil {
+			respondError(c, domain.ErrInvalidInput)
+			return
+		}
+		after = v
+	}
+	limit := 100
+	if c.Query("limit") != "" {
+		v, err := strconv.Atoi(c.Query("limit"))
+		if err != nil {
+			respondError(c, domain.ErrInvalidInput)
+			return
+		}
+		limit = v
+	}
+	proof, err := h.S.DHFProof(c.Request.Context(), actor, c.Param("id"), after, limit)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "private, no-store")
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.JSON(200, gin.H{"ok": true, "data": proof})
+}

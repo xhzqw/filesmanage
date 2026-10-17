@@ -57,6 +57,17 @@ type DHFFileVersion struct {
 	Seq    int    `json:"seq"`
 	SHA256 string `json:"sha256"`
 }
+type DHFProofEvent struct {
+	ID             int64  `json:"id"`
+	StageNo        int    `json:"stageNo"`
+	SourceLine     int    `json:"sourceLine"`
+	Action         string `json:"action"`
+	ActorID        string `json:"actorId"`
+	PayloadText    string `json:"payloadText"`
+	PreviousSHA256 string `json:"previousSha256"`
+	EventSHA256    string `json:"eventSha256"`
+	OccurredAt     string `json:"occurredAt"`
+}
 type DHFEvent struct {
 	ID             int64  `json:"id"`
 	StageNo        int    `json:"stageNo"`

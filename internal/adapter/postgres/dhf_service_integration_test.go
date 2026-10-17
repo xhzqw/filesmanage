@@ -180,6 +180,16 @@ func TestDHFServiceWorkflow(t *testing.T) {
 			t.Fatalf("broken event chain at %d", i)
 		}
 	}
+	proof, err := service.DHFProof(ctx, reviewer, first.Project.ID, 0, 200)
+	if err != nil || !proof.SegmentVerified || !proof.StartsAtGenesis || proof.HasMore || len(proof.Events) != len(stage.Events) || proof.Events[0].PreviousSHA256 != strings.Repeat("0", 64) {
+		t.Fatalf("full verifiable audit segment: %v %+v", err, proof)
+	}
+	if _, err = service.DHFProof(ctx, domain.User{ID: "unknown"}, first.Project.ID, 0, 50); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("outsider exported audit: %v", err)
+	}
+	if _, err = service.DHFProof(ctx, owner, first.Project.ID, 0, 201); !errors.Is(err, domain.ErrInvalidInput) {
+		t.Fatalf("unbounded audit slice: %v", err)
+	}
 	if strings.EqualFold(first.Events[0].EventSHA256, second.Events[0].EventSHA256) {
 		t.Fatal("duplicate project hash")
 	}

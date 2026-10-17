@@ -113,6 +113,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	r.GET("/api/internal/office/branch-source/:token", h.cdwBranchSource)
 	r.POST("/api/internal/office/branch-callback", h.cdwBranchCallback)
 	api.GET("/workbench/dhf/files/:fileId/versions", h.dhfFileVersions)
+	api.GET("/workbench/dhf/projects/:id/audit", h.dhfAuditProof)
 	api.GET("/workbench/dhf/projects/:id/items/:line/evidence", h.dhfPinnedEvidence)
 	api.GET("/workbench/dhf/template", h.dhfTemplate)
 	api.GET("/workbench/dhf/projects", h.dhfProjects)
