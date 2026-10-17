@@ -48,6 +48,25 @@ try{
  body:JSON.stringify({login:'admin',password:${JSON.stringify(password)}})});return {status:res.status,ok:(await res.json()).ok}})()`);
  assert.equal(login.status,200,"isolated Chrome read-only admin login");
  assert.equal(login.ok,true,"admin credentials work");
+ await send("Page.navigate",{url:base+"/workbench/dhf"});
+ await until("location.pathname==='/workbench/dhf'&&!!document.querySelector('.dhf-grid')");
+ const dhf=await evalJS("(async()=>{const [t,p,n]=await Promise.all([fetch('/api/workbench/dhf/template'),fetch('/api/workbench/dhf/projects'),fetch('/api/workbench/dhf/projects/unknown-id')]);return {templateStatus:t.status,template:(await t.json()).data,projectsStatus:p.status,projects:(await p.json()).data,missingStatus:n.status}})()");
+ assert.equal(dhf.templateStatus,200);
+ assert.equal(dhf.projectsStatus,200);
+ assert.equal(dhf.missingStatus,404);
+ assert.ok(Array.isArray(dhf.projects));
+ assert.equal(dhf.template.nodes.filter(n=>n.depth===1).length,9);
+ assert.ok(dhf.template.nodes.filter(n=>n.depth>1&&!n.isGroup).length>=140);
+ for(const width of [1440,1024,780]){
+  await send("Emulation.setDeviceMetricsOverride",{width,height:850,deviceScaleFactor:1,mobile:false});
+  await sleep(180);
+  const l=await evalJS("(()=>({width:document.documentElement.scrollWidth,panes:[...document.querySelector('.dhf-grid').children].map(e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right}})}))()");
+  assert.ok(l.width<=width+2,"DHF horizontal overflow at "+width+": "+JSON.stringify(l));
+  assert.ok(l.panes.every(p=>p.left>=-2&&p.right<=width+2),"DHF panel overflow "+width+": "+JSON.stringify(l));
+  console.log("DHF_LAYOUT_PASS",width);
+ }
+ await send("Emulation.clearDeviceMetricsOverride");
+ console.log("DHF_TEMPLATE_BROWSER_PASS nine-source-stage catalogue and ACL guarded project list");
  await send("Page.navigate",{url:base+"/workbench"});
  await until("location.pathname==='/workbench'&&!!document.querySelector('.cdw-layout')");
  await until("!document.querySelector('.cdw-message') && !!document.querySelector('.cdw-inbox-heading')");
