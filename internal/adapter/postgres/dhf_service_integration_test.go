@@ -1,10 +1,13 @@
 package postgres
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"filesmanage/internal/ports"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -13,6 +16,20 @@ import (
 	"filesmanage/internal/domain"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+type dhfLabBytes struct{ *bytes.Reader }
+
+func (d dhfLabBytes) Close() error { return nil }
+
+type dhfLabBlobs struct{}
+
+func (dhfLabBlobs) Stage() (ports.BlobStage, error) { return nil, errors.New("read-only lab blob") }
+func (dhfLabBlobs) Open(key string) (io.ReadSeekCloser, error) {
+	if key != "dhf_svc_immutable_evidence" {
+		return nil, errors.New("unknown immutable evidence")
+	}
+	return dhfLabBytes{bytes.NewReader([]byte("immutable DHF lab evidence"))}, nil
+}
 
 // Real Service and PostgreSQL transactions; test database is created/dropped by dhf_fresh_pg_lab.sh.
 func TestDHFServiceWorkflow(t *testing.T) {
@@ -34,7 +51,7 @@ func TestDHFServiceWorkflow(t *testing.T) {
 	owner := domain.User{ID: "dhf_service_owner", Login: "dhf_service_owner", DisplayName: "项目负责人", IsAdmin: true}
 	reviewer := domain.User{ID: "dhf_service_reviewer", Login: "dhf_service_reviewer", DisplayName: "独立验收人", IsAdmin: true}
 	exec(`INSERT INTO users(id,login,display_name,password_hash,is_admin) VALUES($1,$1,'项目负责人','fixture',true),($2,$2,'独立验收人','fixture',true)`, owner.ID, reviewer.ID)
-	service := application.New(New(pool), nil)
+	service := application.New(New(pool), dhfLabBlobs{})
 	createInput := application.DHFCreateInput{Title: "DHF真实事务测试项目", ReviewerID: reviewer.ID}
 	first, err := service.DHFCreate(ctx, owner, createInput, "dhf_svc_create_01")
 	if err != nil {
@@ -132,6 +149,24 @@ func TestDHFServiceWorkflow(t *testing.T) {
 	}
 	if _, err = service.DHFActItem(ctx, reviewer, first.Project.ID, line, rev, application.DHFItemAction{Action: "accept", Reason: "确认证据版本符合本项要求"}, "dhf_svc_accept"); err != nil {
 		t.Fatalf("review pinned file: %v", err)
+	}
+	// Updating the source file's latest sequence cannot substitute for the pinned DHF version.
+	updated := sha256.Sum256([]byte("later source revision"))
+	laterSHA := hex.EncodeToString(updated[:])
+	exec(`INSERT INTO blobs(id,storage_key,sha256,size_bytes,state) VALUES('dhf_svc_blob_v2','dhf_svc_later_revision',$1,21,'ready')`, laterSHA)
+	exec(`INSERT INTO file_versions(id,file_id,seq,blob_id,size_bytes,sha256,action,created_by) VALUES('dhf_svc_file_v2','dhf_svc_file',2,'dhf_svc_blob_v2',21,$1,'edit',$2)`, laterSHA, owner.ID)
+	exec(`UPDATE files SET current_version_seq=2 WHERE id='dhf_svc_file'`)
+	evidence, closeEvidence, err := service.DHFOpenEvidence(ctx, reviewer, first.Project.ID, line)
+	if err != nil {
+		t.Fatalf("reviewer open pinned evidence: %v", err)
+	}
+	evidenceBytes, readErr := io.ReadAll(evidence.Reader)
+	closeEvidence()
+	if readErr != nil || string(evidenceBytes) != "immutable DHF lab evidence" || evidence.Sha256 != sha {
+		t.Fatalf("evidence followed newest version or wrong hash: %v %s", readErr, evidenceBytes)
+	}
+	if _, _, err = service.DHFOpenEvidence(ctx, domain.User{ID: "unknown"}, first.Project.ID, line); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("cross-project evidence leaked: %v", err)
 	}
 	stage, err := service.DHFAcceptStage(ctx, reviewer, first.Project.ID, 1, application.DHFStageAction{Reason: "本阶段文件和例外均已独立验收"}, "dhf_svc_gate_accept")
 	if err != nil {

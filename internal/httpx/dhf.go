@@ -2,9 +2,11 @@ package httpx
 
 import (
 	"filesmanage/internal/application"
+	"filesmanage/internal/domain"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 func (h *Handler) dhfTemplate(c *gin.Context) {
@@ -129,4 +131,39 @@ func (h *Handler) dhfFileVersions(c *gin.Context) {
 	}
 	c.Header("Cache-Control", "no-store")
 	c.JSON(200, gin.H{"ok": true, "data": out})
+}
+
+// dhfPinnedEvidence streams the exact accepted/submitted bytes, never latest.
+func (h *Handler) dhfPinnedEvidence(c *gin.Context) {
+	actor, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	line, err := strconv.Atoi(c.Param("line"))
+	if err != nil || line < 1 {
+		respondError(c, domain.ErrInvalidInput)
+		return
+	}
+	out, closeFn, err := h.S.DHFOpenEvidence(c.Request.Context(), actor, c.Param("id"), line)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	defer closeFn()
+	mime := contentTypeOr(out.ContentType)
+	c.Header("Content-Type", mime)
+	c.Header("X-Content-Sha256", out.Sha256)
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Header("Cross-Origin-Resource-Policy", "same-origin")
+	c.Header("Referrer-Policy", "no-referrer")
+	c.Header("Cache-Control", "private, no-store")
+	// Passive browser-safe content is shown inline. Office documents and any
+	// active HTML/SVG/script formats stay attachments to avoid same-origin XSS.
+	safe := mime == "application/pdf" || mime == "text/plain" || strings.HasPrefix(mime, "image/png") || strings.HasPrefix(mime, "image/jpeg") || strings.HasPrefix(mime, "image/gif") || strings.HasPrefix(mime, "image/webp")
+	if safe {
+		c.Header("Content-Disposition", "inline")
+	} else {
+		c.Header("Content-Disposition", contentDisposition(out.FileName))
+	}
+	http.ServeContent(c.Writer, c.Request, out.FileName, out.ModTime, out.Reader)
 }
