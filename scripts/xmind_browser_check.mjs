@@ -118,5 +118,6 @@ try{
 }finally{
  try{ws?.close();}catch{}
  chrome.kill("SIGTERM");
- rmSync(profile,{recursive:true,force:true});
+ await sleep(250);
+ rmSync(profile,{recursive:true,force:true,maxRetries:12,retryDelay:100});
 }
