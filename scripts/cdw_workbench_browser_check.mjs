@@ -318,6 +318,47 @@ try{
    "G11 rendered live accountability statement input");
  }
  console.log("CDW_G11_ACCOUNTABILITY_BROWSER_PASS authenticated-inbox+real-obligation-form-when-present");
+ // Browser-only fixture: verify the nonempty, deeply linked flow without
+ // ever creating a task or approval in the developer database.
+ const sample={initiated:{items:[{taskId:"visual_root_1",rootId:"visual_root_1",
+  title:"仪器质量文件修订 · 专项交付",fileId:"visual_file_1",state:"submitted",revision:3,
+  createdAt:"2026-10-19T04:00:00Z",assigneeName:"负责人甲"}]},
+  flow:{taskId:"visual_root_1",rootId:"visual_root_1",truncated:false,
+   works:[{id:"visual_root_1",title:"仪器质量文件修订 · 专项交付",state:"submitted",round:2,createdByName:"负责人乙",responsibleName:"负责人甲"},
+    {id:"visual_child_1",parentId:"visual_root_1",title:"关键试验验证及交付",state:"accepted",round:1,createdByName:"负责人甲",responsibleName:"负责人丙"}],
+   milestones:[{kind:"delivery",reference:"proof_delivery_1",state:"submitted",round:2,actorName:"负责人甲",recordedAt:"2026-10-19T08:00:00Z",detail:"冻结交付稿"},
+    {kind:"review",reference:"proof_review_1",state:"awaiting",round:2,actorName:"质量验收人",recordedAt:"2026-10-19T09:00:00Z",detail:"逐级交付验收"}]},
+  events:{items:[{id:1,kind:"task",evidenceRef:"visual_root_1",event:"task.create",actorName:"负责人乙",occurredAt:"2026-10-19T04:00:00Z"}]}};
+ await evalJS("(()=>{[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('我发起的'))?.click()})()");
+ await until("!!document.querySelector('.cdw-initiated-head')");
+ await evalJS(`(()=>{const mock=${JSON.stringify(sample)};const real=window.fetch.bind(window);
+  window.__cdwNativeFetch=real;
+  window.fetch=(resource,options)=>{const url=new URL(typeof resource==='string'?resource:resource.url,location.origin);
+   let result=null;
+   if(url.pathname==='/api/workbench/initiated')result=mock.initiated;
+   else if(url.pathname==='/api/workbench/initiated/visual_root_1/flow')result=mock.flow;
+   else if(url.pathname==='/api/workbench/initiated/visual_root_1/events')result=mock.events;
+   return result?Promise.resolve(new Response(JSON.stringify({ok:true,data:result}),{status:200,headers:{'Content-Type':'application/json'}})):real(resource,options);
+  };return true})()`);
+ await evalJS("(()=>{document.querySelector('.cdw-initiated-head button')?.click()})()");
+ await until("document.querySelector('.cdw-flow-work-copy strong')?.textContent?.includes('仪器质量文件修订')");
+ assert.equal(await evalJS("document.querySelectorAll('.cdw-flow-work').length"),2,"delegation hierarchy draws two related tasks");
+ assert.equal(await evalJS("document.querySelectorAll('.cdw-flow-step').length"),9,"nine independent evidence stage categories render");
+ assert.equal(await evalJS("document.querySelectorAll('.cdw-flow-step.has-evidence').length"),2,"only evidenced delivery/review marked observed");
+ assert.equal(await evalJS("document.querySelectorAll('.cdw-flow-step.is-unstarted').length"),7,"unobserved approvals/distribution/effectiveness stay unstarted");
+ for(const width of [1440,1024,780,540]){
+  await send("Emulation.setDeviceMetricsOverride",{width,height:850,deviceScaleFactor:1,mobile:false});
+  await sleep(130);
+  const size=await evalJS("(()=>({body:document.documentElement.scrollWidth,canvas:(()=>{const a=document.querySelector('.cdw-flow').getBoundingClientRect();return {left:a.left,right:a.right}})()}))()");
+  assert.ok(size.body<=width+2&&size.canvas.left>=-2&&size.canvas.right<=width+2,
+   "populated flow canvas must fit "+width+": "+JSON.stringify(size));
+  console.log("CDW_FLOW_FIXTURE_LAYOUT_PASS",width);
+ }
+ await send("Emulation.clearDeviceMetricsOverride");
+ await evalJS("(()=>{document.querySelectorAll('.cdw-initiated-tabbar button')[1]?.click()})()");
+ await until("!!document.querySelector('.cdw-timeline-item')");
+ await evalJS("(()=>{window.fetch=window.__cdwNativeFetch;delete window.__cdwNativeFetch;return true})()");
+ console.log("CDW_FLOW_FIXTURE_PASS exact lineage, delegated work, absent nodes and event switch; browser-only no-write fixture");
  console.log("CDW_BROWSER_PASS auth=tasks+review-inbox, responsive=1440/1024/780, review-filter, create-form");
 }finally{
  try{ws?.close();}catch{}
