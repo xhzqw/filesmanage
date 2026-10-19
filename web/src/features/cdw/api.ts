@@ -179,7 +179,7 @@ export type CDWInitiatedPage={items:CDWInitiatedItem[];nextCursor?:string};
 export type CDWTraceEvent={id:number;kind:string;evidenceRef:string;event:string;actorName:string;occurredAt:string};
 export type CDWTracePage={items:CDWTraceEvent[];nextBefore?:number};
 export type CDWFlowWork={id:string;parentId?:string;title:string;state:string;round:number;responsibleName?:string;createdByName:string};
-export type CDWFlowMilestone={kind:string;reference:string;state:string;round?:number;actorName?:string;recordedAt:string;detail?:string};
+export type CDWFlowMilestone={taskId:string;kind:string;reference:string;state:string;round?:number;actorName?:string;recordedAt:string;detail?:string};
 export type CDWFlowSnapshot={taskId:string;rootId:string;works:CDWFlowWork[];truncated:boolean;milestones:CDWFlowMilestone[]};
 
 

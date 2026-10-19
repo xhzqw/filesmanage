@@ -326,8 +326,8 @@ try{
   flow:{taskId:"visual_root_1",rootId:"visual_root_1",truncated:false,
    works:[{id:"visual_root_1",title:"仪器质量文件修订 · 专项交付",state:"submitted",round:2,createdByName:"负责人乙",responsibleName:"负责人甲"},
     {id:"visual_child_1",parentId:"visual_root_1",title:"关键试验验证及交付",state:"accepted",round:1,createdByName:"负责人甲",responsibleName:"负责人丙"}],
-   milestones:[{kind:"delivery",reference:"proof_delivery_1",state:"submitted",round:2,actorName:"负责人甲",recordedAt:"2026-10-19T08:00:00Z",detail:"冻结交付稿"},
-    {kind:"review",reference:"proof_review_1",state:"awaiting",round:2,actorName:"质量验收人",recordedAt:"2026-10-19T09:00:00Z",detail:"逐级交付验收"}]},
+   milestones:[{taskId:"visual_child_1",kind:"delivery",reference:"proof_delivery_1",state:"submitted",round:2,actorName:"负责人甲",recordedAt:"2026-10-19T08:00:00Z",detail:"冻结交付稿"},
+    {taskId:"visual_child_1",kind:"review",reference:"proof_review_1",state:"awaiting",round:2,actorName:"质量验收人",recordedAt:"2026-10-19T09:00:00Z",detail:"逐级交付验收"}]},
   events:{items:[{id:1,kind:"task",evidenceRef:"visual_root_1",event:"task.create",actorName:"负责人乙",occurredAt:"2026-10-19T04:00:00Z"}]}};
  await evalJS("(()=>{[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('我发起的'))?.click()})()");
  await until("!!document.querySelector('.cdw-initiated-head')");
@@ -345,6 +345,7 @@ try{
  assert.equal(await evalJS("document.querySelectorAll('.cdw-flow-work').length"),2,"delegation hierarchy draws two related tasks");
  assert.equal(await evalJS("document.querySelectorAll('.cdw-flow-step').length"),9,"nine independent evidence stage categories render");
  assert.equal(await evalJS("document.querySelectorAll('.cdw-flow-step.has-evidence').length"),2,"only evidenced delivery/review marked observed");
+ assert.equal(await evalJS("[...document.querySelectorAll('.cdw-flow-evidence-detail>small')].some(s=>s.textContent.includes('来源工作：关键试验验证及交付'))"),true,"child evidence is attributed to the leaf task");
  assert.equal(await evalJS("document.querySelectorAll('.cdw-flow-step.is-unstarted').length"),7,"unobserved approvals/distribution/effectiveness stay unstarted");
  for(const width of [1440,1024,780,540]){
   await send("Emulation.setDeviceMetricsOverride",{width,height:850,deviceScaleFactor:1,mobile:false});

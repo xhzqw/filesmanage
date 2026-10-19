@@ -511,6 +511,8 @@ paths:
                         items:
                           type: object
                           properties:
+                            taskId:
+                              type: string
                             kind:
                               type: string
                             reference:
@@ -528,6 +530,7 @@ paths:
                             detail:
                               type: string
                           required:
+                          - taskId
                           - kind
                           - reference
                           - state

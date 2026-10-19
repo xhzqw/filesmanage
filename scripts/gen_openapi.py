@@ -776,9 +776,9 @@ CDW_WORK_FLOW = obj({
  "works":arr(obj({"id":string(),"parentId":string(),"title":string(),"state":string(),
   "round":integer(minimum=1),"responsibleName":string(),"createdByName":string()},
   required=["id","title","state","round","createdByName"])),
- "milestones":arr(obj({"kind":string(),"reference":string(),"state":string(),
+ "milestones":arr(obj({"taskId":string(),"kind":string(),"reference":string(),"state":string(),
   "round":integer(minimum=1),"actorName":string(),"recordedAt":timestamp(),"detail":string()},
-  required=["kind","reference","state","recordedAt"])),
+  required=["taskId","kind","reference","state","recordedAt"])),
 },required=["taskId","rootId","truncated","works","milestones"])
 add("GET","/api/workbench/initiated/{id}/flow",operation(
  "Creator-scoped delegation subtree and exact-delivery controlled-document milestone evidence",

@@ -96,6 +96,7 @@ type CDWFlowWork struct {
 	CreatedByName   string `json:"createdByName"`
 }
 type CDWFlowMilestone struct {
+	TaskID     string    `json:"taskId"`
 	Kind       string    `json:"kind"`
 	Reference  string    `json:"reference"`
 	State      string    `json:"state"`

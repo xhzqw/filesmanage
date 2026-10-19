@@ -96,6 +96,26 @@ func exerciseCDWG6Override(t *testing.T, ctx context.Context, pool *pgxpool.Pool
 	if err != nil {
 		t.Fatal("G6 freeze:", err)
 	}
+	parentFlow, flowErr := service.CDWInitiatedFlowSnapshot(ctx, admin, root.TaskID)
+	if flowErr != nil || len(parentFlow.Works) != 3 {
+		t.Fatalf("root author's delegated work subtree: %+v %v", parentFlow, flowErr)
+	}
+	seenLeafDelivery, seenLeafReview := false, false
+	for _, stage := range parentFlow.Milestones {
+		if stage.TaskID == leaf.TaskID && stage.Kind == "delivery" && stage.Reference == freeze.DeliveryID {
+			seenLeafDelivery = true
+		}
+		if stage.TaskID == leaf.TaskID && stage.Kind == "review" && stage.Reference == freeze.ReviewGateID {
+			seenLeafReview = true
+		}
+		if stage.TaskID != leaf.TaskID {
+			t.Fatalf("ancestor inherited leaf's delivery or review: %+v", stage)
+		}
+	}
+	if !seenLeafDelivery || !seenLeafReview {
+		t.Fatalf("root view lacks leaf-delivery evidence: %+v", parentFlow.Milestones)
+	}
+	t.Log("CDW_FLOW_SUBTREE_POSTGRES_PASS ancestor views leaf delivery with exact source task; no parent promotion")
 	gate, err := service.CDWReviewGate(ctx, bob, freeze.ReviewGateID)
 	if err != nil || !gate.Substitutable || gate.ReviewerID != bob.ID {
 		t.Fatalf("opt-in gate: %+v %v", gate, err)

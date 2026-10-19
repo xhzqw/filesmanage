@@ -79,7 +79,7 @@ export function CDWInitiatedFlowPanel({taskId}:{taskId:string}){
     {data.truncated&&<p className="cdw-flow-caution">关联工作超过 100 项，仅展示前 100 项，请到专项工作记录中继续查证。</p>}
    </div>
    <div className="cdw-flow-stages">
-    <div className="cdw-flow-section-title"><strong>本项工作的受控流程证据</strong><small>按具体冻结交付稿及后续发行物关联</small></div>
+    <div className="cdw-flow-section-title"><strong>本工作及下级工作的流程证据</strong><small>按具体冻结交付稿及后续发行物关联</small></div>
     <div className="cdw-flow-step-list">
      {steps.map((step,index)=>{
       const records=data.milestones.filter(m=>m.kind===step.kind);
@@ -87,10 +87,11 @@ export function CDWInitiatedFlowPanel({taskId}:{taskId:string}){
        <div className="cdw-flow-step-num">{index+1}</div>
        <div className="cdw-flow-step-body">
         <div className="cdw-flow-step-heading"><strong>{step.title}</strong><small>{records.length?records.length+" 条记录":"尚无关联记录"}</small></div>
-        {records.length?records.map((m:CDWFlowMilestone,i)=><div className="cdw-flow-evidence" key={m.reference+":"+m.state+":"+i}>
+        {records.length?records.map((m:CDWFlowMilestone,i)=><div className="cdw-flow-evidence" key={m.taskId+":"+m.reference+":"+m.state+":"+i}>
          <span className={"cdw-flow-evidence-state"+(isProblem(m.state)?" is-risk":isCompleted(m.kind,m.state)?" is-complete":"")}>{states[m.state]??"状态待核验"}</span>
          <div className="cdw-flow-evidence-detail"><span>{m.detail||step.hint}{m.round?" · 第"+m.round+"轮":""}</span>
-          <small>{m.actorName||"责任人依对应记录核验"} · {localTime(m.recordedAt)}</small>
+          <small>来源工作：{data.works.find(w=>w.id===m.taskId)?.title||"关联工作"} · {m.actorName||"责任人依对应记录核验"}</small>
+          <small>{localTime(m.recordedAt)} · 时间取自相应业务记录</small>
           <details><summary>查看溯源编号</summary><code>{m.reference}</code></details>
          </div>
         </div>):<p className="cdw-flow-stage-empty">{step.hint} · 尚无该节点的证据，不能推定已执行</p>}
@@ -99,7 +100,7 @@ export function CDWInitiatedFlowPanel({taskId}:{taskId:string}){
      })}
     </div>
    </div>
-   <div className="cdw-flow-scope">本页只显示当前所选工作的交付及与其精确关联的后续记录；不会把同文件其他工作或其他发行版的审批、签收及生效算入本流程。</div>
+   <div className="cdw-flow-scope">本页展示当前工作及其下级工作实际形成的交付与后续记录，每项证据标注来源；不会把同文件其他工作或其他发行版的审批、签收及生效算入本流程。</div>
   </>}
  </section>;
 }
