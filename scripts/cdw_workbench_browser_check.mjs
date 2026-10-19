@@ -73,7 +73,20 @@ try{
  assert.equal(await evalJS("document.querySelector('#shell-main-navigation a[href=\"/workbench\"]')?.textContent?.trim()"),"工作台","primary navigation uses workbench instead of task");
  assert.equal(await evalJS("document.querySelector('.cdw-rail')?.getAttribute('aria-label')"),"工作视图分类","workbench categories accessible label");
  console.log("CDW_NAMING_PASS primary navigation / DHF return / category semantics");
- await until("!document.querySelector('.cdw-message') && !!document.querySelector('.cdw-inbox-heading')");
+ await until("!!document.querySelector('.cdw-home-heading')");
+ assert.equal(await evalJS("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('工作首页')"),true,
+  "default route opens the guided work home");
+ for(const width of [1440,1024,780,540]){
+  await send("Emulation.setDeviceMetricsOverride",{width,height:850,deviceScaleFactor:1,mobile:false});
+  await sleep(130);
+  const l=await evalJS("(()=>({bodyWidth:document.documentElement.scrollWidth,panes:['.cdw-rail','.cdw-home'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return {left:r.left,right:r.right,bottom:r.bottom}})}))()");
+  assert.ok(l.bodyWidth<=width+2,"home horizontal overflow at "+width+": "+JSON.stringify(l));
+  assert.ok(l.panes.every(p=>p.left>=-2&&p.right<=width+2&&p.bottom<=851),"home pane overflow at "+width+": "+JSON.stringify(l));
+  console.log("CDW_HOME_LAYOUT_PASS",width);
+ }
+ await send("Emulation.clearDeviceMetricsOverride");
+ await evalJS("(()=>{[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('待我处理'))?.click()})()");
+ await until("!!document.querySelector('.cdw-inbox-heading')");
  const inbox=await evalJS("(async()=>{const r=await fetch('/api/workbench/inbox?limit=5');return {status:r.status,data:(await r.json()).data}})()");
  assert.equal(inbox.status,200,"authenticated CDW inbox responds 200");
  assert.ok(Array.isArray(inbox.data?.items),"CDW inbox contains items array");
@@ -102,8 +115,8 @@ try{
  await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('责任待办')");
  assert.equal(await evalJS("[...document.querySelectorAll('.cdw-inbox-actions button')].some(b=>b.textContent.includes('新建工作'))"),false,
   "responsibility view must not offer unrelated work creation");
- await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('工作事项'));button?.click();return true;})()");
- await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('工作事项')");
+ await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('文件工作'));button?.click();return true;})()");
+ await until("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('文件工作')");
  assert.equal(await evalJS("!!document.querySelector('.cdw-sort-button[aria-pressed=true]')"),true,
   "actionable items are sorted first by default");
  await evalJS("(()=>{const create=[...document.querySelectorAll('.cdw-inbox-actions button')].find(b=>b.textContent.includes('新建工作'));create?.click();return true;})()");

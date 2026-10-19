@@ -24,10 +24,12 @@ import {organizationApi} from "../features/organization/api";
 import {fileApi} from "../features/documents/api";
 import {cdwApi,type CDWBranch,type CDWInboxItem,type CDWRecipient,type CDWReviewGate,type CDWFormalApproval,type CDWApprovedCandidate,type CDWDistributionPlan,type CDWReceiptTarget,type CDWReadingAssignment,type CDWQMSPendingReview,type CDWQMSAppointmentAlert,type CDWQMSSpecialAlert,type CDWQMSSpecialAuthority,type CDWQMSSpecialPolicyImpact,type CDWQMSLegacyAnomaly,type CDWQMSFormalNotice} from "../features/cdw/api";
 import "./cdwWorkbench.css";
+import {CDWWorkbenchHome,workNeedsAction} from "./CDWWorkbenchHome";
 
-type View="tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all";
+type View="home"|"todo"|"following"|"tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all";
 const viewGroups:{name:string;views:{key:View;label:string;symbol:string}[]}[]=[
- {name:"个人事务",views:[{key:"tasks",label:"工作事项",symbol:"▤"},{key:"obligations",label:"责任待办",symbol:"◇"},{key:"all",label:"全部事项",symbol:"▦"}]},
+ {name:"开始工作",views:[{key:"home",label:"工作首页",symbol:"⌂"},{key:"todo",label:"待我处理",symbol:"▤"},{key:"following",label:"跟进中的",symbol:"↗"},{key:"all",label:"全部事项",symbol:"▦"}]},
+ {name:"按业务查看",views:[{key:"tasks",label:"文件工作",symbol:"▤"},{key:"obligations",label:"责任待办",symbol:"◇"}]},
  {name:"审查与批准",views:[{key:"reviews",label:"交付验收",symbol:"✓"},{key:"formal",label:"正式审批",symbol:"✎"},{key:"appointments",label:"任命核验",symbol:"♙"},{key:"scope",label:"范围审批",symbol:"◎"}]},
  {name:"受控发行",views:[{key:"control",label:"发行准备",symbol:"▣"},{key:"receipts",label:"部门签收",symbol:"⌁"},{key:"reading",label:"阅读确认",symbol:"▧"},{key:"effective",label:"生效文件",symbol:"◈"}]},
 ];
@@ -35,14 +37,7 @@ const kindName:Record<CDWInboxItem["kind"],string>={
  task:"工作交付",obligation:"责任履行",review:"交付验收",formal:"正式审批",
  control:"发行准备",scope:"范围审批",receipt:"部门签收",reading:"阅读确认",
 };
-function isActionable(item:CDWInboxItem){
- if(item.kind==="control")return true;
- if(item.kind==="task")return ["assigned","accepted","in_progress","returned"].includes(item.state);
- if(item.kind==="obligation")return ["pending","open"].includes(item.state);
- if(item.kind==="receipt")return item.state==="awaiting";
- if(item.kind==="reading")return ["assigned","opened"].includes(item.state);
- return ["pending","awaiting","open","submitted","assigned"].includes(item.state);
-}
+const isActionable=workNeedsAction;
 
 const labels:Record<string,string>={
  assigned:"待接收",accepted:"已接收",in_progress:"进行中",submitted:"待上级验收",
@@ -85,7 +80,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const[busy,setBusy]=useState(false);
  const[refreshToken,refresh]=useState(0);
  const[requestError,setRequestError]=useState("");
- const[filter,setFilter]=useState<View>("tasks");
+ const[filter,setFilter]=useState<View>(()=>params.get("task")?"all":"home");
  const[search,setSearch]=useState("");
  const[priorityFirst,setPriorityFirst]=useState(true);
  const[branches,setBranches]=useState<CDWBranch[]>([]);
@@ -134,7 +129,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const allItems=useMemo(()=>[...items,...reviewItems,...formalItems,...controlItems,...scopeItems,...receiptItems,...readingItems],[items,reviewItems,formalItems,controlItems,scopeItems,receiptItems,readingItems]);
  const visible=useMemo(()=>{
   const query=search.trim().toLocaleLowerCase();
-  const matched=allItems.filter(x=>(filter==="all"||x.kind===(filter==="tasks"?"task":filter==="reviews"?"review":filter==="formal"?"formal":filter==="control"?"control":filter==="scope"?"scope":filter==="receipts"?"receipt":filter==="reading"?"reading":"obligation"))
+  const matched=allItems.filter(x=>(filter==="all"||filter==="home"||filter==="todo"&&isActionable(x)||filter==="following"&&!isActionable(x)||x.kind===(filter==="tasks"?"task":filter==="reviews"?"review":filter==="formal"?"formal":filter==="control"?"control":filter==="scope"?"scope":filter==="receipts"?"receipt":filter==="reading"?"reading":"obligation"))
    &&(!query||x.title.toLocaleLowerCase().includes(query)||x.fileId.toLocaleLowerCase().includes(query)));
   return priorityFirst?[...matched].sort((a,b)=>Number(isActionable(b))-Number(isActionable(a))):matched;
  },[allItems,filter,search,priorityFirst]);
@@ -333,6 +328,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
   specialImpacts.filter(a=>a.state==="open").length+legacyAnomalies.filter(a=>a.requestedBy!==user.id).length+
   formalNotices.filter(a=>!a.readAt).length;
  const counts:Record<View,number>={
+  home:allItems.filter(isActionable).length+appointmentCount,todo:allItems.filter(isActionable).length+appointmentCount,following:allItems.filter(x=>!isActionable(x)).length,
   tasks:totalTasks,obligations:totalObligations,reviews:totalReviews,formal:totalFormal,
   appointments:appointmentCount,control:totalControl,scope:totalScope,receipts:totalReceipts,
   reading:totalReading,effective:0,all:allItems.length,
@@ -354,13 +350,15 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
          <RareButton key={key} type="button" className={"cdw-rail-item"+(filter===key?" is-current":"")}
           aria-current={filter===key?"page":undefined} onClick={()=>{setFilter(key);setActiveForm(null);setFormalDraft(false);}}>
           <span className="cdw-rail-icon" aria-hidden="true">{symbol}</span><span className="cdw-rail-label">{label}</span>
-          {key!=="effective"&&<small className={counts[key]>0?"has-count":""}>{counts[key]}</small>}
+          {key!=="effective"&&key!=="home"&&<small className={counts[key]>0?"has-count":""}>{counts[key]}</small>}
          </RareButton>)}
        </div>)}
       </nav>
       <Link className="cdw-rail-dhf" to="/workbench/dhf"><span className="cdw-rail-icon" aria-hidden="true">▣</span><span>DHF 九阶段验收</span><span aria-hidden="true">↗</span></Link>
      </aside>
-     {filter==="effective"?<CDWEffectiveSearchPanel/>:filter==="appointments"?
+     {filter==="home"?<CDWWorkbenchHome items={allItems} appointmentCount={appointmentCount} busy={busy} error={requestError}
+      canCreate={user.isAdmin} onRefresh={()=>refresh(v=>v+1)} onCreate={()=>{setFilter("tasks");beginForm("create");}}
+      onOpen={item=>{setFilter("all");select(item);}} onView={view=>{setFilter(view);setActiveForm(null);setFormalDraft(false);}}/>:filter==="effective"?<CDWEffectiveSearchPanel/>:filter==="appointments"?
       <CDWQMSReviewInbox items={pendingAppointments} alerts={appointmentAlerts} actorId={user.id}
        onRead={id=>void readAppointmentAlert(id)} onVerified={()=>refresh(v=>v+1)}/>:<>
      <section className="cdw-inbox" aria-label="工作事项列表">
@@ -374,9 +372,12 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
       <div className="cdw-search"><div className="cdw-search-field"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><RareInput type="search" aria-label="筛选工作或文件" placeholder="搜索工作或文件…" value={search} onChange={e=>setSearch(e.target.value)}/></div></div>
       <div className="cdw-list-meta"><span>{actionableVisible>0?<><i className="cdw-meta-dot"/> {actionableVisible} 项待处理</>:"当前分类的全部事项"}</span><RareButton type="button" className={"cdw-sort-button"+(priorityFirst?" is-active":"")} aria-pressed={priorityFirst} tone="ghost" onClick={()=>setPriorityFirst(v=>!v)}>待处理优先 <span aria-hidden="true">{priorityFirst?"↓":"↕"}</span></RareButton></div>
       <div className="cdw-inbox-scroll">
+       {filter==="todo"&&appointmentCount>0&&<RareButton type="button" className="cdw-appointment-shortcut" onClick={()=>setFilter("appointments")}>
+        <strong>专项核验及通知</strong><small>{appointmentCount} 项需关注或处理</small><span aria-hidden="true">→</span>
+       </RareButton>}
        {busy&&items.length===0&&<div className="cdw-message"><BrandLoadingLabel showContext>加载工作事项</BrandLoadingLabel></div>}
        {requestError&&<RareNotice tone="danger">{requestError} <RareButton type="button" onClick={()=>refresh(n=>n+1)}>重试</RareButton></RareNotice>}
-       {!busy&&visible.length===0&&<div className="cdw-empty"><span className="cdw-empty-icon" aria-hidden="true">▤</span><strong>{search.trim()?"没有匹配的工作":"当前没有需要展示的事项"}</strong><p>{search.trim()?"可以更换关键词继续查找":filter==="obligations"?"目前没有待履行责任":"新事项到达后会出现在这里"}</p>{search.trim()&&<RareButton type="button" tone="ghost" onClick={()=>setSearch("")}>清除搜索</RareButton>}</div>}
+       {!busy&&visible.length===0&&(filter!=="todo"||appointmentCount===0)&&<div className="cdw-empty"><span className="cdw-empty-icon" aria-hidden="true">▤</span><strong>{search.trim()?"没有匹配的工作":"当前没有需要展示的事项"}</strong><p>{search.trim()?"可以更换关键词继续查找":filter==="obligations"?"目前没有待履行责任":"新事项到达后会出现在这里"}</p>{search.trim()&&<RareButton type="button" tone="ghost" onClick={()=>setSearch("")}>清除搜索</RareButton>}</div>}
        {visible.map(item=><RareButton type="button" className={"cdw-task-row"+(selected===item&&!activeForm?" is-selected":"")} key={taskKey(item)}
          aria-current={selected===item&&!activeForm?"true":undefined} onClick={()=>select(item)}>
         <span className={"cdw-task-symbol cdw-kind-"+item.kind} aria-hidden="true">{item.kind==="task"?"▤":item.kind==="obligation"?"◇":item.kind==="review"?"✓":item.kind==="formal"?"✎":item.kind==="receipt"?"⌁":"▣"}</span>
