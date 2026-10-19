@@ -89,6 +89,8 @@ try{
  assert.equal(initiated.status,200,"current user can access creator-scoped records");
  assert.ok(Array.isArray(initiated.page.items),"authored work must return real server rows");
  assert.equal(initiated.badStatus,400,"creator-scope page limit validated");
+ const auditGuard=await evalJS("(async()=>{const [a,b]=await Promise.all([fetch('/api/workbench/initiated/unknown/events'),fetch('/api/workbench/initiated/unknown/events?before=bad')]);return [a.status,b.status]})()");
+ assert.deepEqual(auditGuard,[404,400],"audit queries require own task and valid cursor");
  assert.ok(initiated.page.items.every(item=>typeof item.taskId==="string"&&typeof item.createdAt==="string"&&typeof item.state==="string"),
   "creator rows include immutable identity, timestamps and current state");
  await evalJS("(()=>{[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('我发起的'))?.click()})()");

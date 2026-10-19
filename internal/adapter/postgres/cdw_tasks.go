@@ -371,6 +371,43 @@ func (r *Repository) CDWInitiated(ctx context.Context, actor string, limit int, 
 	return items, rows.Err()
 }
 
+// Creator-scoped immutable journal across the exact task's delivery evidence.
+func (r *Repository) CDWInitiatedAudit(ctx context.Context, actor, taskID string, limit int, before int64) (string, []ports.CDWTraceEvent, error) {
+	var fileID string
+	err := r.Q.QueryRow(ctx, `SELECT file_id FROM cdw_tasks WHERE id=$1 AND created_by=$2`, taskID, actor).Scan(&fileID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil, domain.ErrNotFound
+	}
+	if err != nil {
+		return "", nil, err
+	}
+	rows, err := r.Q.Query(ctx, `SELECT e.id,e.aggregate_kind,e.aggregate_id,e.event_kind,COALESCE(u.display_name,''),e.occurred_at
+ FROM cdw_domain_events e LEFT JOIN users u ON u.id=e.actor_id
+ WHERE ($3::bigint=0 OR e.id<$3) AND (
+ (e.aggregate_kind='task' AND e.aggregate_id=$1)
+ OR (e.aggregate_kind='review_gate' AND e.aggregate_id=$1)
+ OR (e.aggregate_kind='branch' AND EXISTS (SELECT 1 FROM cdw_work_branches b WHERE b.id=e.aggregate_id AND b.task_id=$1))
+ OR (e.aggregate_kind='review_gate' AND EXISTS (SELECT 1 FROM cdw_review_gates g JOIN cdw_deliveries d ON d.id=g.delivery_id WHERE g.id=e.aggregate_id AND d.task_id=$1))
+ OR (e.aggregate_kind='obligation' AND EXISTS (SELECT 1 FROM cdw_accountability_obligations o WHERE o.id=e.aggregate_id AND o.task_id=$1))
+ ) ORDER BY e.id DESC LIMIT $2`, taskID, limit, before)
+	if err != nil {
+		return "", nil, err
+	}
+	defer rows.Close()
+	items := []ports.CDWTraceEvent{}
+	for rows.Next() {
+		var v ports.CDWTraceEvent
+		if err = rows.Scan(&v.ID, &v.Kind, &v.EvidenceRef, &v.Event, &v.ActorName, &v.OccurredAt); err != nil {
+			return "", nil, err
+		}
+		items = append(items, v)
+	}
+	if err = rows.Err(); err != nil {
+		return "", nil, err
+	}
+	return fileID, items, nil
+}
+
 func (r *Repository) CDWEvent(ctx context.Context, actor, eventType, taskID, requestID string, result ports.CDWTaskResult) error {
 	if len(requestID) == 0 {
 		return domain.ErrInvalidInput

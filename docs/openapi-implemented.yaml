@@ -346,6 +346,103 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/initiated/{id}/events:
+    get:
+      summary: Immutable task, branch, review and responsibility facts for the current creator
+      operationId: cdwInitiatedEvents
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Author-owned work ID.
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        description: Requested event rows (1..100). Defaults to 30.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+      - name: before
+        in: query
+        required: false
+        description: Earlier event ID cursor, positive integer.
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Immutable audit identifiers, event kind, actor name and exact time without exposing raw event payloads.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              minimum: 1
+                            kind:
+                              type: string
+                            evidenceRef:
+                              type: string
+                            event:
+                              type: string
+                            actorName:
+                              type: string
+                            occurredAt:
+                              type: string
+                              format: date-time
+                          required:
+                          - id
+                          - kind
+                          - evidenceRef
+                          - event
+                          - actorName
+                          - occurredAt
+                      nextBefore:
+                        type: integer
+                        minimum: 1
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/tasks/{id}/accept:
     post:
       summary: Accept a task as its active assignee or current workgroup leader

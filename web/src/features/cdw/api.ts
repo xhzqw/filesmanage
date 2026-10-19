@@ -176,6 +176,8 @@ export type CDWInitiatedItem={
  state:string;revision:number;createdAt:string;assigneeName?:string;
 };
 export type CDWInitiatedPage={items:CDWInitiatedItem[];nextCursor?:string};
+export type CDWTraceEvent={id:number;kind:string;evidenceRef:string;event:string;actorName:string;occurredAt:string};
+export type CDWTracePage={items:CDWTraceEvent[];nextBefore?:number};
 
 export type CDWInboxItem={
  kind:"task"|"obligation"|"review"|"formal"|"control"|"scope"|"receipt"|"reading";reading?:CDWReadingAssignment;receipt?:CDWReceiptTarget;scope?:CDWDistributionPlan;review?:CDWReviewGate;formal?:CDWFormalApproval;candidate?:CDWApprovedCandidate;taskId:string;title:string;fileId:string;
@@ -231,6 +233,8 @@ export const cdwApi={
   "/workbench/inbox?limit="+limit,{signal,cache:"no-store"}),
  initiated:(cursor="",limit=30,signal?:AbortSignal)=>request<CDWInitiatedPage>(
   "/workbench/initiated?limit="+limit+(cursor?"&cursor="+encodeURIComponent(cursor):""),{signal,cache:"no-store"}),
+ initiatedEvents:(taskId:string,before=0,limit=30,signal?:AbortSignal)=>request<CDWTracePage>(
+  "/workbench/initiated/"+segment(taskId)+"/events?limit="+limit+(before?"&before="+before:""),{signal,cache:"no-store"}),
  create:(input:{title:string;fileId:string;assignee:CDWRecipient;allowOverrideReview?:boolean},key:string)=>
   request<CDWTask>("/workbench/tasks",mutate(key,input)),
  accept:(taskId:string,revision:number,key:string)=>

@@ -2,6 +2,7 @@ import {useMemo,useState} from "react";
 import {Link} from "react-router-dom";
 import {RareButton,RareInput,RareNotice,RareBadge} from "../shared/ui/rare";
 import type {CDWInitiatedItem} from "../features/cdw/api";
+import {CDWInitiatedEventTimeline} from "./CDWInitiatedEventTimeline";
 
 const status:Record<string,string>={draft:"待派发",assigned:"待接收",accepted:"已接收",in_progress:"正在修订",submitted:"等待验收",accepted_delivery:"交付已验收",returned:"已退回",declined:"已拒绝",closed:"已关闭",cancelled:"已取消"};
 const explanation:Record<string,string>={assigned:"等待负责人接收工作并确认交付范围。",accepted:"负责人已接收，正在准备工作分支。",in_progress:"负责人正在修订文件，尚未提交正式交付。",submitted:"冻结交付稿正在等待上级验收，并不代表正式批准。",accepted_delivery:"本轮交付已验收；正式审批、发行与生效是独立流程。",returned:"交付未通过验收，需要负责人根据退回意见修订。",cancelled:"本项工作已经取消。",closed:"本项工作已经关闭。"};
@@ -35,8 +36,7 @@ export function CDWInitiatedWorkspace({items,busy,error,nextCursor,onMore,onRefr
      <div><span>工作层级</span><strong>{selected.parentId?"下级派发":"主工作"}</strong></div>
      <div><span>发起时间</span><strong>{localTime(selected.createdAt)}</strong></div>
      <div><span>工作状态</span><strong>{status[selected.state]??"待核验"}</strong></div></div>
-    <section className="cdw-initiated-timeline"><h3>工作流转范围</h3><p>工作接收 → 文件修订 → 交付验收</p>
-     <small>正式审批、文控发行、部门签收、文件生效均有独立状态，不能仅凭本工作状态推断。</small></section>
+    <CDWInitiatedEventTimeline key={selected.taskId} taskId={selected.taskId}/>
     <div className="cdw-initiated-links"><Link to={"/preview/"+encodeURIComponent(selected.fileId)}>查看关联文件 →</Link>
      <span>查看发起进度不等于拥有编辑、验收或代签权限。</span></div>
    </div>:<div className="cdw-detail-empty"><strong>选择工作记录</strong><p>查看负责人和当前处理进度。</p></div>}</div>

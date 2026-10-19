@@ -195,6 +195,47 @@ func (s *Service) CDWDelegateTask(ctx context.Context, actor domain.User, parent
 		})
 }
 
+// Every timeline read checks authorship and current preview rights. The
+// immutable event journal does not grant the initiating user operation rights.
+func (s *Service) CDWInitiatedTimeline(ctx context.Context, actor domain.User, taskID string, limit int, before int64) (ports.CDWTracePage, error) {
+	if taskID == "" || len(taskID) > 256 || before < 0 {
+		return ports.CDWTracePage{}, domain.ErrInvalidInput
+	}
+	if limit <= 0 {
+		limit = 30
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return ports.CDWTracePage{}, err
+	}
+	defer tx.Rollback(ctx)
+	store, ok := tx.(ports.CDWTaskStore)
+	if !ok {
+		return ports.CDWTracePage{}, errors.New("CDW transaction store unavailable")
+	}
+	fileID, raw, err := store.CDWInitiatedAudit(ctx, actor.ID, taskID, limit+1, before)
+	if err != nil {
+		return ports.CDWTracePage{}, err
+	}
+	if _, err = s.visibleFile(ctx, tx, actor, fileID, domain.ActionPreview); err != nil {
+		return ports.CDWTracePage{}, err
+	}
+	page := ports.CDWTracePage{Items: []ports.CDWTraceEvent{}}
+	for i, item := range raw {
+		if i >= limit {
+			break
+		}
+		page.Items = append(page.Items, item)
+	}
+	if len(raw) > limit {
+		page.NextBefore = raw[limit-1].ID
+	}
+	return page, nil
+}
+
 // CDWInitiatedTasks returns the current user's authored work, not an inferred
 // subset of the assignee inbox. The raw page advances even over ACL-hidden
 // records, so pagination does not leak names or stall on revoked access.

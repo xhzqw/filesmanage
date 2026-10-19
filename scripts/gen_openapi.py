@@ -760,6 +760,17 @@ add("GET","/api/workbench/initiated",operation("Track work actually started by t
  query("cursor","Opaque task ID from previous page; scoped to the current creator.",string(max_length=256))],
  responses=dict([json_ok(CDW_INITIATED_PAGE,"Author-scoped keyset page, further filtered by current file preview ACL; the number of visible items may be lower than the raw page size."),
  resp("400",ERR["400"]),resp("401",ERR["401"])])))
+CDW_TRACE_PAGE=obj({"items":arr(obj({
+ "id":integer(minimum=1),"kind":string(),"evidenceRef":string(),"event":string(),
+ "actorName":string(),"occurredAt":timestamp(),
+},required=["id","kind","evidenceRef","event","actorName","occurredAt"])),
+ "nextBefore":integer(minimum=1)},required=["items"])
+add("GET","/api/workbench/initiated/{id}/events",operation("Immutable task, branch, review and responsibility facts for the current creator","CDW","cdwInitiatedEvents",
+ security=SESSION,params=[id_param("id","Author-owned work ID."),
+ query("limit","Requested event rows (1..100). Defaults to 30.",{"type":"integer","minimum":1,"maximum":100}),
+ query("before","Earlier event ID cursor, positive integer.",{"type":"integer","minimum":1})],
+ responses=dict([json_ok(CDW_TRACE_PAGE,"Immutable audit identifiers, event kind, actor name and exact time without exposing raw event payloads."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("404",ERR["404"])])))
 add("POST","/api/workbench/tasks/{id}/accept",operation("Accept a task as its active assignee or current workgroup leader","CDW","cdwAccept",
  security=SESSION,params=[id_param("id","Task ID."),CDW_IDEMPOTENCY,CDW_IF_MATCH],
  request={"application/json":{"schema":obj({})}},

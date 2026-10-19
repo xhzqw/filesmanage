@@ -71,6 +71,19 @@ type CDWInitiatedPage struct {
 	NextCursor string             `json:"nextCursor,omitempty"`
 }
 
+type CDWTraceEvent struct {
+	ID          int64     `json:"id"`
+	Kind        string    `json:"kind"`
+	EvidenceRef string    `json:"evidenceRef"`
+	Event       string    `json:"event"`
+	ActorName   string    `json:"actorName"`
+	OccurredAt  time.Time `json:"occurredAt"`
+}
+type CDWTracePage struct {
+	Items      []CDWTraceEvent `json:"items"`
+	NextBefore int64           `json:"nextBefore,omitempty"`
+}
+
 // CDWTaskStore only operates on an existing transaction. Implementations must
 // lock task/root rows, validate role bindings in that transaction, and retain
 // the original response for exact idempotency replay.
@@ -84,5 +97,6 @@ type CDWTaskStore interface {
 	CDWDelegate(context.Context, string, string, int64, CDWTaskCommand, [3]string) (CDWTaskResult, error)
 	CDWInbox(context.Context, string, int) ([]CDWInboxItem, error)
 	CDWInitiated(context.Context, string, int, string) ([]CDWInitiatedItem, error)
+	CDWInitiatedAudit(context.Context, string, string, int, int64) (string, []CDWTraceEvent, error)
 	CDWEvent(context.Context, string, string, string, string, CDWTaskResult) error
 }

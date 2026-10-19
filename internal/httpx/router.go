@@ -124,6 +124,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.POST("/workbench/tasks", h.cdwCreateRoot)
 	api.GET("/workbench/inbox", h.cdwInbox)
 	api.GET("/workbench/initiated", h.cdwInitiated)
+	api.GET("/workbench/initiated/:id/events", h.cdwInitiatedEvents)
 	api.GET("/workbench/review-gates/inbox", h.cdwReviewInbox)
 	api.GET("/workbench/review-gates/:id", h.cdwReviewDetail)
 	api.GET("/workbench/review-gates/:id/content", h.cdwReviewContent)

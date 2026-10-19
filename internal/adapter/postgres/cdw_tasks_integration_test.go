@@ -110,6 +110,14 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 	if err != nil || len(otherAuthor.Items) != 0 || otherAuthor.NextCursor != "" {
 		t.Fatalf("assignee must not inherit creator records: %+v %v", otherAuthor, err)
 	}
+	trace, e := service.CDWInitiatedTimeline(ctx, admin, root.TaskID, 30, 0)
+	if e != nil || len(trace.Items) == 0 || trace.Items[0].Event != "task.create" ||
+		trace.Items[0].ActorName != adminID {
+		t.Fatalf("root creator immutable timeline: %+v %v", trace, e)
+	}
+	if _, e := service.CDWInitiatedTimeline(ctx, alice, root.TaskID, 30, 0); !errors.Is(e, domain.ErrNotFound) {
+		t.Fatalf("foreign creator timeline must not exist: %v", e)
+	}
 	replay, err := service.CDWCreateRootTask(ctx, admin, rootInput, prefix+"_create_root")
 	if err != nil || replay.TaskID != root.TaskID {
 		t.Fatalf("same key replay: %+v %v", replay, err)
@@ -566,6 +574,10 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 	if e != nil || len(revokedPage.Items) != 0 {
 		t.Fatalf("revoked file ACL leaked authored tasks: %+v %v", revokedPage, e)
 	}
+	if timeline, e := service.CDWInitiatedTimeline(ctx, alice, child.TaskID, 20, 0); e == nil || len(timeline.Items) != 0 {
+		t.Fatalf("revoked ACL must block event timeline: %+v %v", timeline, e)
+	}
+	t.Log("CDW_INITIATED_AUDIT_POSTGRES_PASS immutable actor evidence, creator isolation and revoked-ACL fail closed")
 	t.Log("CDW_INITIATED_POSTGRES_PASS author isolation + keyset + revoked ACL")
 	t.Logf("CDW_TASK_POSTGRES_PASS root=%s child=%s grandchild=%s accountability-explicitly-fulfilled", root.TaskID, child.TaskID, child2.TaskID)
 }
