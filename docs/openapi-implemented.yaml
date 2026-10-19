@@ -443,6 +443,116 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/initiated/{id}/flow:
+    get:
+      summary: Creator-scoped delegation subtree and exact-delivery controlled-document milestone evidence
+      operationId: cdwInitiatedFlow
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Task authored by the signed-in user.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Live readonly facts. Missing milestones never imply completion. Release and receipt evidence is linked
+            through exact frozen delivery and artifact.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      taskId:
+                        type: string
+                      rootId:
+                        type: string
+                      truncated:
+                        type: boolean
+                      works:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            parentId:
+                              type: string
+                            title:
+                              type: string
+                            state:
+                              type: string
+                            round:
+                              type: integer
+                              minimum: 1
+                            responsibleName:
+                              type: string
+                            createdByName:
+                              type: string
+                          required:
+                          - id
+                          - title
+                          - state
+                          - round
+                          - createdByName
+                      milestones:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            kind:
+                              type: string
+                            reference:
+                              type: string
+                            state:
+                              type: string
+                            round:
+                              type: integer
+                              minimum: 1
+                            actorName:
+                              type: string
+                            recordedAt:
+                              type: string
+                              format: date-time
+                            detail:
+                              type: string
+                          required:
+                          - kind
+                          - reference
+                          - state
+                          - recordedAt
+                    required:
+                    - taskId
+                    - rootId
+                    - truncated
+                    - works
+                    - milestones
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/tasks/{id}/accept:
     post:
       summary: Accept a task as its active assignee or current workgroup leader

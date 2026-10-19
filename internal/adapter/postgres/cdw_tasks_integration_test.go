@@ -118,6 +118,14 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 	if _, e := service.CDWInitiatedTimeline(ctx, alice, root.TaskID, 30, 0); !errors.Is(e, domain.ErrNotFound) {
 		t.Fatalf("foreign creator timeline must not exist: %v", e)
 	}
+	initialFlow, flowErr := service.CDWInitiatedFlowSnapshot(ctx, admin, root.TaskID)
+	if flowErr != nil || len(initialFlow.Works) != 1 || initialFlow.Works[0].ID != root.TaskID ||
+		len(initialFlow.Milestones) != 0 {
+		t.Fatalf("newly assigned work has no invented flow evidence: %+v %v", initialFlow, flowErr)
+	}
+	if _, flowErr = service.CDWInitiatedFlowSnapshot(ctx, alice, root.TaskID); !errors.Is(flowErr, domain.ErrNotFound) {
+		t.Fatalf("assignee cannot read other creator's flow: %v", flowErr)
+	}
 	replay, err := service.CDWCreateRootTask(ctx, admin, rootInput, prefix+"_create_root")
 	if err != nil || replay.TaskID != root.TaskID {
 		t.Fatalf("same key replay: %+v %v", replay, err)
@@ -147,6 +155,11 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 		initiatedByAlice.Items[0].TaskID != child.TaskID ||
 		initiatedByAlice.Items[0].ParentID != root.TaskID {
 		t.Fatalf("delegated child must appear only in its author's view: %+v %v", initiatedByAlice, e)
+	}
+	delegationFlow, flowErr := service.CDWInitiatedFlowSnapshot(ctx, admin, root.TaskID)
+	if flowErr != nil || len(delegationFlow.Works) != 2 ||
+		delegationFlow.Works[1].ID != child.TaskID || delegationFlow.Works[1].ParentID != root.TaskID {
+		t.Fatalf("real delegated work tree must contain a child: %+v %v", delegationFlow, flowErr)
 	}
 	if child.ParentTaskID != root.TaskID || child.ParentRevision != 3 || len(child.RemainingObligations) != 3 {
 		t.Fatalf("parent accountability missing: %+v", child)
@@ -450,6 +463,28 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 	if !errors.Is(e, domain.ErrVersionConflict) {
 		t.Fatalf("late callback on frozen branch was accepted: %v", e)
 	}
+	frozenFlow, flowErr := service.CDWInitiatedFlowSnapshot(ctx, admin, root.TaskID)
+	if flowErr != nil {
+		t.Fatalf("frozen delivery flow read: %v", flowErr)
+	}
+	seenDelivery, seenReview, inventedFormal := false, false, false
+	for _, stage := range frozenFlow.Milestones {
+		switch stage.Kind {
+		case "delivery":
+			if stage.Reference == frozen.DeliveryID && stage.State == "submitted" {
+				seenDelivery = true
+			}
+		case "review":
+			if stage.Reference == frozen.ReviewGateID && stage.State == "awaiting" {
+				seenReview = true
+			}
+		case "formal":
+			inventedFormal = true
+		}
+	}
+	if !seenDelivery || !seenReview || inventedFormal {
+		t.Fatalf("delivery and independent review must not imply formal approval: %+v", frozenFlow.Milestones)
+	}
 	if again, e2 := service.CDWFreezeBranch(ctx, alice, aliceBranch.ID, aliceReceipt.ID, aliceRevision, 2, prefix+"_freeze_A"); e2 != nil || again.DeliveryID != frozen.DeliveryID {
 		t.Fatalf("identical freeze must replay original: %+v %v", again, e2)
 	}
@@ -573,6 +608,9 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 	revokedPage, e := service.CDWInitiatedTasks(ctx, alice, 20, "")
 	if e != nil || len(revokedPage.Items) != 0 {
 		t.Fatalf("revoked file ACL leaked authored tasks: %+v %v", revokedPage, e)
+	}
+	if flow, e := service.CDWInitiatedFlowSnapshot(ctx, alice, child.TaskID); e == nil || len(flow.Works) != 0 {
+		t.Fatalf("revoked file ACL must deny flow subtree too: %+v %v", flow, e)
 	}
 	if timeline, e := service.CDWInitiatedTimeline(ctx, alice, child.TaskID, 20, 0); e == nil || len(timeline.Items) != 0 {
 		t.Fatalf("revoked ACL must block event timeline: %+v %v", timeline, e)

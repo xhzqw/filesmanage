@@ -195,6 +195,31 @@ func (s *Service) CDWDelegateTask(ctx context.Context, actor domain.User, parent
 		})
 }
 
+// CDWInitiatedFlowSnapshot requires the selected task's original creator and
+// present file-preview rights. It grants no participant or workflow actions.
+func (s *Service) CDWInitiatedFlowSnapshot(ctx context.Context, actor domain.User, taskID string) (ports.CDWFlowSnapshot, error) {
+	if taskID == "" || len(taskID) > 256 {
+		return ports.CDWFlowSnapshot{}, domain.ErrInvalidInput
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return ports.CDWFlowSnapshot{}, err
+	}
+	defer tx.Rollback(ctx)
+	store, ok := tx.(ports.CDWTaskStore)
+	if !ok {
+		return ports.CDWFlowSnapshot{}, errors.New("CDW transaction store unavailable")
+	}
+	fileID, view, err := store.CDWInitiatedFlow(ctx, actor.ID, taskID)
+	if err != nil {
+		return ports.CDWFlowSnapshot{}, err
+	}
+	if _, err = s.visibleFile(ctx, tx, actor, fileID, domain.ActionPreview); err != nil {
+		return ports.CDWFlowSnapshot{}, err
+	}
+	return view, nil
+}
+
 // Every timeline read checks authorship and current preview rights. The
 // immutable event journal does not grant the initiating user operation rights.
 func (s *Service) CDWInitiatedTimeline(ctx context.Context, actor domain.User, taskID string, limit int, before int64) (ports.CDWTracePage, error) {

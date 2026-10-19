@@ -89,12 +89,28 @@ try{
  assert.equal(initiated.status,200,"current user can access creator-scoped records");
  assert.ok(Array.isArray(initiated.page.items),"authored work must return real server rows");
  assert.equal(initiated.badStatus,400,"creator-scope page limit validated");
+ const flowGuard=await evalJS("(async()=>{const r=await fetch('/api/workbench/initiated/no-such-work/flow');return r.status})()");
+ assert.equal(flowGuard,404,"unowned work flow must be indistinguishable from missing records");
  const auditGuard=await evalJS("(async()=>{const [a,b]=await Promise.all([fetch('/api/workbench/initiated/unknown/events'),fetch('/api/workbench/initiated/unknown/events?before=bad')]);return [a.status,b.status]})()");
  assert.deepEqual(auditGuard,[404,400],"audit queries require own task and valid cursor");
  assert.ok(initiated.page.items.every(item=>typeof item.taskId==="string"&&typeof item.createdAt==="string"&&typeof item.state==="string"),
   "creator rows include immutable identity, timestamps and current state");
  await evalJS("(()=>{[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('我发起的'))?.click()})()");
  await until("!!document.querySelector('.cdw-initiated-list') && !!document.querySelector('.cdw-initiated-detail')");
+ if(initiated.page.items.length){
+  const first=initiated.page.items[0];
+  const snapshot=await evalJS("(async()=>{const r=await fetch('/api/workbench/initiated/"+encodeURIComponent(first.taskId)+"/flow');return {status:r.status,data:(await r.json()).data}})()");
+  assert.equal(snapshot.status,200,"authenticated creator can inspect real work flow");
+  assert.ok(Array.isArray(snapshot.data.works)&&snapshot.data.works.some(w=>w.id===first.taskId),"flow includes authored work");
+  assert.ok(Array.isArray(snapshot.data.milestones)&&snapshot.data.milestones.every(x=>typeof x.reference==='string'&&typeof x.state==='string'),"flow renders exact evidenced milestones only");
+  await until("!!document.querySelector('.cdw-flow-step-list')");
+  assert.equal(await evalJS("[...document.querySelectorAll('.cdw-flow-step')].length"),9,"all business phases visible, missing evidence explicit");
+  await evalJS("(()=>{document.querySelectorAll('.cdw-initiated-tabbar button')[1]?.click()})()");
+  await until("!!document.querySelector('.cdw-timeline-head')");
+  await evalJS("(()=>{document.querySelectorAll('.cdw-initiated-tabbar button')[0]?.click()})()");
+  await until("!!document.querySelector('.cdw-flow-step-list')");
+  console.log("CDW_FLOW_BROWSER_PASS authored ACL, exact evidence, 9-stage map and trace switch");
+ }
  assert.equal(await evalJS("document.querySelector('.cdw-initiated-head')?.textContent.includes('我发起的工作')"),true,"creator view supports progress tracking");
  for(const width of [1440,1024,780,540]){
   await send("Emulation.setDeviceMetricsOverride",{width,height:850,deviceScaleFactor:1,mobile:false});

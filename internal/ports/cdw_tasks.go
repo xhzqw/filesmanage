@@ -84,6 +84,34 @@ type CDWTracePage struct {
 	NextBefore int64           `json:"nextBefore,omitempty"`
 }
 
+// CDWFlowSnapshot is a read-only, evidence-linked view of a creator's task.
+// Milestones are real records only: absence is not treated as a passed gate.
+type CDWFlowWork struct {
+	ID              string `json:"id"`
+	ParentID        string `json:"parentId,omitempty"`
+	Title           string `json:"title"`
+	State           string `json:"state"`
+	Round           int    `json:"round"`
+	ResponsibleName string `json:"responsibleName,omitempty"`
+	CreatedByName   string `json:"createdByName"`
+}
+type CDWFlowMilestone struct {
+	Kind       string    `json:"kind"`
+	Reference  string    `json:"reference"`
+	State      string    `json:"state"`
+	Round      int       `json:"round,omitempty"`
+	ActorName  string    `json:"actorName,omitempty"`
+	RecordedAt time.Time `json:"recordedAt"`
+	Detail     string    `json:"detail,omitempty"`
+}
+type CDWFlowSnapshot struct {
+	TaskID     string             `json:"taskId"`
+	RootID     string             `json:"rootId"`
+	Works      []CDWFlowWork      `json:"works"`
+	Truncated  bool               `json:"truncated"`
+	Milestones []CDWFlowMilestone `json:"milestones"`
+}
+
 // CDWTaskStore only operates on an existing transaction. Implementations must
 // lock task/root rows, validate role bindings in that transaction, and retain
 // the original response for exact idempotency replay.
@@ -98,5 +126,6 @@ type CDWTaskStore interface {
 	CDWInbox(context.Context, string, int) ([]CDWInboxItem, error)
 	CDWInitiated(context.Context, string, int, string) ([]CDWInitiatedItem, error)
 	CDWInitiatedAudit(context.Context, string, string, int, int64) (string, []CDWTraceEvent, error)
+	CDWInitiatedFlow(context.Context, string, string) (string, CDWFlowSnapshot, error)
 	CDWEvent(context.Context, string, string, string, string, CDWTaskResult) error
 }

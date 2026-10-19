@@ -136,6 +136,19 @@ func (h *Handler) cdwDelegateTask(c *gin.Context) {
 	}
 	cdwSuccess(c, http.StatusCreated, result)
 }
+func (h *Handler) cdwInitiatedFlow(c *gin.Context) {
+	actor, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	result, err := h.S.CDWInitiatedFlowSnapshot(c.Request.Context(), actor, c.Param("id"))
+	if err != nil {
+		cdwError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, gin.H{"ok": true, "data": result})
+}
 func (h *Handler) cdwInitiatedEvents(c *gin.Context) {
 	actor, ok := h.auth(c)
 	if !ok {

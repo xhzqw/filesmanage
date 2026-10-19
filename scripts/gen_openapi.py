@@ -771,6 +771,20 @@ add("GET","/api/workbench/initiated/{id}/events",operation("Immutable task, bran
  query("before","Earlier event ID cursor, positive integer.",{"type":"integer","minimum":1})],
  responses=dict([json_ok(CDW_TRACE_PAGE,"Immutable audit identifiers, event kind, actor name and exact time without exposing raw event payloads."),
  resp("400",ERR["400"]),resp("401",ERR["401"]),resp("404",ERR["404"])])))
+CDW_WORK_FLOW = obj({
+ "taskId":string(),"rootId":string(),"truncated":{"type":"boolean"},
+ "works":arr(obj({"id":string(),"parentId":string(),"title":string(),"state":string(),
+  "round":integer(minimum=1),"responsibleName":string(),"createdByName":string()},
+  required=["id","title","state","round","createdByName"])),
+ "milestones":arr(obj({"kind":string(),"reference":string(),"state":string(),
+  "round":integer(minimum=1),"actorName":string(),"recordedAt":timestamp(),"detail":string()},
+  required=["kind","reference","state","recordedAt"])),
+},required=["taskId","rootId","truncated","works","milestones"])
+add("GET","/api/workbench/initiated/{id}/flow",operation(
+ "Creator-scoped delegation subtree and exact-delivery controlled-document milestone evidence",
+ "CDW","cdwInitiatedFlow",security=SESSION,params=[id_param("id","Task authored by the signed-in user.")],
+ responses=dict([json_ok(CDW_WORK_FLOW,"Live readonly facts. Missing milestones never imply completion. Release and receipt evidence is linked through exact frozen delivery and artifact."),
+ resp("401",ERR["401"]),resp("404",ERR["404"])])))
 add("POST","/api/workbench/tasks/{id}/accept",operation("Accept a task as its active assignee or current workgroup leader","CDW","cdwAccept",
  security=SESSION,params=[id_param("id","Task ID."),CDW_IDEMPOTENCY,CDW_IF_MATCH],
  request={"application/json":{"schema":obj({})}},
