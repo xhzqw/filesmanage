@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 )
 
 var ErrCDWIdempotencyReuse = errors.New("CDW idempotency key used for a different request")
@@ -50,6 +51,26 @@ type CDWInboxItem struct {
 	ObligationKind string `json:"obligationKind,omitempty"`
 }
 
+// CDWInitiatedItem describes an actual task created by the caller. Creator
+// visibility is independently rechecked against current file ACL; the creator
+// never inherits assignee, review or approval permissions.
+type CDWInitiatedItem struct {
+	TaskID       string    `json:"taskId"`
+	RootID       string    `json:"rootId"`
+	ParentID     string    `json:"parentId,omitempty"`
+	Title        string    `json:"title"`
+	FileID       string    `json:"fileId"`
+	State        string    `json:"state"`
+	Revision     int64     `json:"revision"`
+	CreatedAt    time.Time `json:"createdAt"`
+	AssigneeName string    `json:"assigneeName,omitempty"`
+}
+
+type CDWInitiatedPage struct {
+	Items      []CDWInitiatedItem `json:"items"`
+	NextCursor string             `json:"nextCursor,omitempty"`
+}
+
 // CDWTaskStore only operates on an existing transaction. Implementations must
 // lock task/root rows, validate role bindings in that transaction, and retain
 // the original response for exact idempotency replay.
@@ -62,5 +83,6 @@ type CDWTaskStore interface {
 	CDWAccept(context.Context, string, string, int64) (CDWTaskResult, error)
 	CDWDelegate(context.Context, string, string, int64, CDWTaskCommand, [3]string) (CDWTaskResult, error)
 	CDWInbox(context.Context, string, int) ([]CDWInboxItem, error)
+	CDWInitiated(context.Context, string, int, string) ([]CDWInitiatedItem, error)
 	CDWEvent(context.Context, string, string, string, string, CDWTaskResult) error
 }

@@ -99,6 +99,17 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 	if root.Revision != 1 || root.State != "assigned" {
 		t.Fatalf("root: %+v", root)
 	}
+	// A creator can track an assigned task independently of the live assignee
+	// inbox; a colleague with file preview cannot read another creator's list.
+	initiated, err := service.CDWInitiatedTasks(ctx, admin, 1, "")
+	if err != nil || len(initiated.Items) != 1 || initiated.Items[0].TaskID != root.TaskID ||
+		initiated.Items[0].AssigneeName != aliceID || initiated.Items[0].State != "assigned" {
+		t.Fatalf("author's started-work query: %+v %v", initiated, err)
+	}
+	otherAuthor, err := service.CDWInitiatedTasks(ctx, alice, 5, "")
+	if err != nil || len(otherAuthor.Items) != 0 || otherAuthor.NextCursor != "" {
+		t.Fatalf("assignee must not inherit creator records: %+v %v", otherAuthor, err)
+	}
 	replay, err := service.CDWCreateRootTask(ctx, admin, rootInput, prefix+"_create_root")
 	if err != nil || replay.TaskID != root.TaskID {
 		t.Fatalf("same key replay: %+v %v", replay, err)
@@ -122,6 +133,12 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 	child, err := service.CDWDelegateTask(ctx, alice, root.TaskID, childInput, 2, prefix+"_alice_delegate")
 	if err != nil {
 		t.Fatal("delegate:", err)
+	}
+	initiatedByAlice, e := service.CDWInitiatedTasks(ctx, alice, 5, "")
+	if e != nil || len(initiatedByAlice.Items) != 1 ||
+		initiatedByAlice.Items[0].TaskID != child.TaskID ||
+		initiatedByAlice.Items[0].ParentID != root.TaskID {
+		t.Fatalf("delegated child must appear only in its author's view: %+v %v", initiatedByAlice, e)
 	}
 	if child.ParentTaskID != root.TaskID || child.ParentRevision != 3 || len(child.RemainingObligations) != 3 {
 		t.Fatalf("parent accountability missing: %+v", child)
@@ -204,6 +221,20 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 	}, prefix+"_group_create")
 	if err != nil {
 		t.Fatal("group task:", err)
+	}
+	// Keyset pages do not skip the second authored root, and foreign
+	// cursors cannot enumerate another employee's author records.
+	pageOne, e := service.CDWInitiatedTasks(ctx, admin, 1, "")
+	if e != nil || len(pageOne.Items) != 1 || pageOne.NextCursor == "" {
+		t.Fatalf("first authored page should have continuation: %+v %v", pageOne, e)
+	}
+	pageTwo, e := service.CDWInitiatedTasks(ctx, admin, 1, pageOne.NextCursor)
+	if e != nil || len(pageTwo.Items) != 1 || pageTwo.Items[0].TaskID == pageOne.Items[0].TaskID {
+		t.Fatalf("authored cursor did not advance: %+v %v", pageTwo, e)
+	}
+	foreignCursor, e := service.CDWInitiatedTasks(ctx, alice, 5, pageOne.NextCursor)
+	if e != nil || len(foreignCursor.Items) != 0 {
+		t.Fatalf("creator-scoped cursor crossed user boundary: %+v %v", foreignCursor, e)
 	}
 	if _, err = service.CDWAcceptTask(ctx, bob, groupRoot.TaskID, 1, prefix+"_group_notleader"); !errors.Is(err, domain.ErrForbidden) {
 		t.Fatalf("ordinary group member or outsider must not accept: %v", err)
@@ -526,5 +557,15 @@ func TestCDWTaskPostgresTransactions(t *testing.T) {
 	exerciseCDWG11Obligations(t, ctx, pool, repo, service, prefix, admin, alice, bob, charlie, root, child, child2, bobBranch, bobReceipt, bobRevision, fileID, blobID)
 	exerciseCDWG6Override(t, ctx, pool, repo, service, prefix, admin, alice, bob, charlie, fileID, blobID)
 	exerciseCDWG7Formal(t, ctx, pool, repo, service, prefix, admin, alice, bob, charlie, fileID)
+	// Revoked file-preview ACL removes even the author's formerly valid
+	// tracking row. This must fail closed without exposing filenames/status.
+	if _, e := pool.Exec(ctx, `DELETE FROM acls WHERE folder_id=$1 AND subject_id=$2 AND subject_kind='user'`, folderID, aliceID); e != nil {
+		t.Fatal(e)
+	}
+	revokedPage, e := service.CDWInitiatedTasks(ctx, alice, 20, "")
+	if e != nil || len(revokedPage.Items) != 0 {
+		t.Fatalf("revoked file ACL leaked authored tasks: %+v %v", revokedPage, e)
+	}
+	t.Log("CDW_INITIATED_POSTGRES_PASS author isolation + keyset + revoked ACL")
 	t.Logf("CDW_TASK_POSTGRES_PASS root=%s child=%s grandchild=%s accountability-explicitly-fulfilled", root.TaskID, child.TaskID, child2.TaskID)
 }

@@ -85,6 +85,25 @@ try{
   console.log("CDW_HOME_LAYOUT_PASS",width);
  }
  await send("Emulation.clearDeviceMetricsOverride");
+ const initiated=await evalJS("(async()=>{const [ok,bad]=await Promise.all([fetch('/api/workbench/initiated?limit=20'),fetch('/api/workbench/initiated?limit=102')]);return {status:ok.status,page:(await ok.json()).data,badStatus:bad.status}})()");
+ assert.equal(initiated.status,200,"current user can access creator-scoped records");
+ assert.ok(Array.isArray(initiated.page.items),"authored work must return real server rows");
+ assert.equal(initiated.badStatus,400,"creator-scope page limit validated");
+ assert.ok(initiated.page.items.every(item=>typeof item.taskId==="string"&&typeof item.createdAt==="string"&&typeof item.state==="string"),
+  "creator rows include immutable identity, timestamps and current state");
+ await evalJS("(()=>{[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('我发起的'))?.click()})()");
+ await until("!!document.querySelector('.cdw-initiated-list') && !!document.querySelector('.cdw-initiated-detail')");
+ assert.equal(await evalJS("document.querySelector('.cdw-initiated-head')?.textContent.includes('我发起的工作')"),true,"creator view supports progress tracking");
+ for(const width of [1440,1024,780,540]){
+  await send("Emulation.setDeviceMetricsOverride",{width,height:850,deviceScaleFactor:1,mobile:false});
+  await sleep(150);
+  const layout=await evalJS("(()=>({width:document.documentElement.scrollWidth,panes:['.cdw-rail','.cdw-initiated','.cdw-initiated-list','.cdw-initiated-detail'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return {left:r.left,right:r.right,bottom:r.bottom}})}))()");
+  assert.ok(layout.width<=width+2,"creator view horizontal overflow "+width+": "+JSON.stringify(layout));
+  assert.ok(layout.panes.every(p=>p.left>=-2&&p.right<=width+2&&p.bottom<=851),"creator tracking pane overflow "+width+": "+JSON.stringify(layout));
+  console.log("CDW_INITIATED_LAYOUT_PASS",width);
+ }
+ await send("Emulation.clearDeviceMetricsOverride");
+ console.log("CDW_INITIATED_BROWSER_PASS live author-scoped list + invalid limit + responsive read-only tracking");
  await evalJS("(()=>{[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('待我处理'))?.click()})()");
  await until("!!document.querySelector('.cdw-inbox-heading')");
  const inbox=await evalJS("(async()=>{const r=await fetch('/api/workbench/inbox?limit=5');return {status:r.status,data:(await r.json()).data}})()");

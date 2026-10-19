@@ -171,6 +171,12 @@ export type CDWTask={
  state:string;revision:number;assignmentId:string;
  actualAcceptorId?:string;remainingObligations?:string[];
 };
+export type CDWInitiatedItem={
+ taskId:string;rootId:string;parentId?:string;title:string;fileId:string;
+ state:string;revision:number;createdAt:string;assigneeName?:string;
+};
+export type CDWInitiatedPage={items:CDWInitiatedItem[];nextCursor?:string};
+
 export type CDWInboxItem={
  kind:"task"|"obligation"|"review"|"formal"|"control"|"scope"|"receipt"|"reading";reading?:CDWReadingAssignment;receipt?:CDWReceiptTarget;scope?:CDWDistributionPlan;review?:CDWReviewGate;formal?:CDWFormalApproval;candidate?:CDWApprovedCandidate;taskId:string;title:string;fileId:string;
  state:string;revision:number;assignmentId?:string;obligationId?:string;obligationKind?:string;
@@ -223,6 +229,8 @@ const mutate=(key:string,body:object,revision?:number)=>({
 export const cdwApi={
  inbox:(limit=100,signal?:AbortSignal)=>request<{items:CDWInboxItem[];nextCursor:null;asOf:string}>(
   "/workbench/inbox?limit="+limit,{signal,cache:"no-store"}),
+ initiated:(cursor="",limit=30,signal?:AbortSignal)=>request<CDWInitiatedPage>(
+  "/workbench/initiated?limit="+limit+(cursor?"&cursor="+encodeURIComponent(cursor):""),{signal,cache:"no-store"}),
  create:(input:{title:string;fileId:string;assignee:CDWRecipient;allowOverrideReview?:boolean},key:string)=>
   request<CDWTask>("/workbench/tasks",mutate(key,input)),
  accept:(taskId:string,revision:number,key:string)=>

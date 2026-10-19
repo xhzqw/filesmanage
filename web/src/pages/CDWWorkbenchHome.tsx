@@ -4,8 +4,8 @@ import {RareButton,RareNotice} from "../shared/ui/rare";
 import {BrandLoadingLabel} from "../shared/ui/BrandLoader";
 import type {CDWInboxItem} from "../features/cdw/api";
 
-export type HomeView="todo"|"following"|"all"|"appointments"|"reviews"|"receipts"|"tasks";
-type Props={items:CDWInboxItem[];appointmentCount:number;busy:boolean;error:string;canCreate:boolean;
+export type HomeView="todo"|"initiated"|"following"|"all"|"appointments"|"reviews"|"receipts"|"tasks";
+type Props={items:CDWInboxItem[];appointmentCount:number;initiatedCount:number;initiatedHasMore:boolean;initiatedError:string;initiatedBusy:boolean;busy:boolean;error:string;canCreate:boolean;
  onCreate:()=>void;onRefresh:()=>void;onOpen:(item:CDWInboxItem)=>void;onView:(view:HomeView)=>void};
 export function workNeedsAction(item:CDWInboxItem):boolean{
  switch(item.kind){
@@ -42,7 +42,7 @@ export function workNextStep(item:CDWInboxItem):string{
 function itemKey(item:CDWInboxItem){
  return item.kind+":"+(item.obligationId??item.review?.gateId??item.formal?.id??item.candidate?.id??item.scope?.id??item.receipt?.targetId??item.reading?.id??item.taskId);
 }
-export function CDWWorkbenchHome({items,appointmentCount,busy,error,canCreate,onCreate,onRefresh,onOpen,onView}:Props){
+export function CDWWorkbenchHome({items,appointmentCount,initiatedCount,initiatedHasMore,initiatedError,initiatedBusy,busy,error,canCreate,onCreate,onRefresh,onOpen,onView}:Props){
  const[expanded,setExpanded]=useState(false);
  const todo=items.filter(workNeedsAction);
  const following=items.filter(item=>!workNeedsAction(item));
@@ -63,11 +63,11 @@ export function CDWWorkbenchHome({items,appointmentCount,busy,error,canCreate,on
   <div className="cdw-home-scroll">
    <div className="cdw-home-stats" aria-label="工作概况">
     <RareButton type="button" className="cdw-home-stat" onClick={()=>onView("todo")}><small>待我处理</small><strong>{todo.length+appointmentCount}</strong><span>进入待办 →</span></RareButton>
-    <RareButton type="button" className="cdw-home-stat" onClick={()=>onView("following")}><small>跟进中的事项</small><strong>{following.length}</strong><span>查看进度 →</span></RareButton>
-    <RareButton type="button" className="cdw-home-stat" onClick={()=>onView("all")}><small>可见工作事项</small><strong>{items.length}</strong><span>查看全部 →</span></RareButton>
+    <RareButton type="button" className="cdw-home-stat" onClick={()=>onView("initiated")}><small>我发起的工作</small><strong>{initiatedError?"—":initiatedBusy&&initiatedCount===0?"…":initiatedCount}{!initiatedError&&initiatedHasMore?"+":""}</strong><span>跟踪我发起的 →</span></RareButton>
+    <RareButton type="button" className="cdw-home-stat" onClick={()=>onView("following")}><small>无需立即处理</small><strong>{following.length}</strong><span>查看当前队列 →</span></RareButton>
     <RareButton type="button" className="cdw-home-stat" onClick={()=>onView("todo")}><small>退回需修订</small><strong>{returned.length}</strong><span>查看待办 →</span></RareButton>
    </div>
-   {error&&<RareNotice tone="warning">部分工作数据暂时无法读取，数字可能不完整。{error} <RareButton type="button" onClick={onRefresh}>重试</RareButton></RareNotice>}
+   {(error||initiatedError)&&<RareNotice tone="warning">部分工作数据暂时无法读取，数字可能不完整。{error||initiatedError} <RareButton type="button" onClick={onRefresh}>重试</RareButton></RareNotice>}
    <div className="cdw-home-content">
     <div className="cdw-home-primary">
      <div className="cdw-home-heading"><div><h2>现在需要你处理</h2><p>选择一项工作，直接进入当前环节。</p></div>
@@ -76,7 +76,7 @@ export function CDWWorkbenchHome({items,appointmentCount,busy,error,canCreate,on
      todo.length===0&&appointmentCount===0?<div className="cdw-home-empty">
       <span className="cdw-home-empty-icon" aria-hidden="true">✓</span><strong>当前没有需要你处理的工作</strong>
       <p>收到工作指派或审批、发行、签收事项后会出现在这里。</p>
-      <RareButton type="button" tone="neutral" onClick={()=>onView("following")}>查看跟进中的事项</RareButton>
+      <RareButton type="button" tone="neutral" onClick={()=>onView("initiated")}>查看我发起的工作</RareButton>
      </div>:<div className="cdw-home-work-list">
       {display.map(item=><RareButton type="button" key={itemKey(item)} className="cdw-home-work-row" onClick={()=>onOpen(item)}>
        <span className="cdw-home-work-mark" aria-hidden="true"/>
@@ -98,6 +98,7 @@ export function CDWWorkbenchHome({items,appointmentCount,busy,error,canCreate,on
       <div><span>03</span><p><strong>跟进后续流转</strong><small>提交、批准、发行、生效是不同环节。</small></p></div>
      </div>
      <div className="cdw-home-quick"><strong>常用入口</strong>
+      <RareButton type="button" tone="ghost" onClick={()=>onView("initiated")}>我发起的工作 <span>↗</span></RareButton>
       <RareButton type="button" tone="ghost" onClick={()=>onView("tasks")}>文件修订工作 <span>↗</span></RareButton>
       <RareButton type="button" tone="ghost" onClick={()=>onView("reviews")}>交付验收 <span>↗</span></RareButton>
       <RareButton type="button" tone="ghost" onClick={()=>onView("receipts")}>部门签收 <span>↗</span></RareButton>
@@ -105,7 +106,7 @@ export function CDWWorkbenchHome({items,appointmentCount,busy,error,canCreate,on
      </div>
     </aside>
    </div>
-   <footer className="cdw-home-disclaimer">以上数字基于当前已加载的授权工作队列，不代表全公司工作总量或完整历史。</footer>
+   <footer className="cdw-home-disclaimer">待处理及等待数量来自已加载的授权工作队列；发起记录可继续翻页，均不代表全公司总量。</footer>
   </div>
  </section>;
 }

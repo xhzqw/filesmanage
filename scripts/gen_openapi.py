@@ -750,6 +750,16 @@ add("GET","/api/workbench/inbox",operation("Authorized CDW task and accountabili
  security=SESSION,params=[query("limit","Requested rows (1..100).",{"type":"integer","minimum":1,"maximum":100})],
  responses=dict([json_ok(CDW_SCOPE_INBOX,"Authorized current rows; nextCursor null until cursor paging is implemented."),
  resp("400",ERR["400"]),resp("401",ERR["401"])])))
+CDW_INITIATED_PAGE = obj({"items":arr(obj({
+ "taskId":string(),"rootId":string(),"parentId":string(),"title":string(),"fileId":string(),
+ "state":string(),"revision":integer(minimum=1),"createdAt":timestamp(),"assigneeName":string(),
+},required=["taskId","rootId","title","fileId","state","revision","createdAt"])),
+ "nextCursor":string("Opaque creator-scoped task cursor; absent on the last page.")},required=["items"])
+add("GET","/api/workbench/initiated",operation("Track work actually started by this user, including delegated and ended tasks","CDW","cdwInitiated",
+ security=SESSION,params=[query("limit","Requested raw rows (1..100). Defaults to 30.",{"type":"integer","minimum":1,"maximum":100}),
+ query("cursor","Opaque task ID from previous page; scoped to the current creator.",string(max_length=256))],
+ responses=dict([json_ok(CDW_INITIATED_PAGE,"Author-scoped keyset page, further filtered by current file preview ACL; the number of visible items may be lower than the raw page size."),
+ resp("400",ERR["400"]),resp("401",ERR["401"])])))
 add("POST","/api/workbench/tasks/{id}/accept",operation("Accept a task as its active assignee or current workgroup leader","CDW","cdwAccept",
  security=SESSION,params=[id_param("id","Task ID."),CDW_IDEMPOTENCY,CDW_IF_MATCH],
  request={"application/json":{"schema":obj({})}},

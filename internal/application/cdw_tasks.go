@@ -195,6 +195,44 @@ func (s *Service) CDWDelegateTask(ctx context.Context, actor domain.User, parent
 		})
 }
 
+// CDWInitiatedTasks returns the current user's authored work, not an inferred
+// subset of the assignee inbox. The raw page advances even over ACL-hidden
+// records, so pagination does not leak names or stall on revoked access.
+func (s *Service) CDWInitiatedTasks(ctx context.Context, actor domain.User, limit int, cursor string) (ports.CDWInitiatedPage, error) {
+	if limit <= 0 {
+		limit = 30
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return ports.CDWInitiatedPage{}, err
+	}
+	defer tx.Rollback(ctx)
+	store, ok := tx.(ports.CDWTaskStore)
+	if !ok {
+		return ports.CDWInitiatedPage{}, errors.New("CDW transaction store unavailable")
+	}
+	raw, err := store.CDWInitiated(ctx, actor.ID, limit+1, cursor)
+	if err != nil {
+		return ports.CDWInitiatedPage{}, err
+	}
+	page := ports.CDWInitiatedPage{Items: []ports.CDWInitiatedItem{}}
+	for i, item := range raw {
+		if i >= limit {
+			break
+		}
+		if _, err = s.visibleFile(ctx, tx, actor, item.FileID, domain.ActionPreview); err == nil {
+			page.Items = append(page.Items, item)
+		}
+	}
+	if len(raw) > limit {
+		page.NextCursor = raw[limit-1].TaskID
+	}
+	return page, nil
+}
+
 func (s *Service) CDWTaskInbox(ctx context.Context, actor domain.User, limit int) ([]ports.CDWInboxItem, error) {
 	if limit <= 0 {
 		limit = 50

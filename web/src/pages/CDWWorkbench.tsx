@@ -22,13 +22,14 @@ import {newIdempotencyKey} from "../shared/ids";
 import {collaborationApi} from "../features/collaboration/api";
 import {organizationApi} from "../features/organization/api";
 import {fileApi} from "../features/documents/api";
-import {cdwApi,type CDWBranch,type CDWInboxItem,type CDWRecipient,type CDWReviewGate,type CDWFormalApproval,type CDWApprovedCandidate,type CDWDistributionPlan,type CDWReceiptTarget,type CDWReadingAssignment,type CDWQMSPendingReview,type CDWQMSAppointmentAlert,type CDWQMSSpecialAlert,type CDWQMSSpecialAuthority,type CDWQMSSpecialPolicyImpact,type CDWQMSLegacyAnomaly,type CDWQMSFormalNotice} from "../features/cdw/api";
+import {cdwApi,type CDWBranch,type CDWInboxItem,type CDWInitiatedItem,type CDWRecipient,type CDWReviewGate,type CDWFormalApproval,type CDWApprovedCandidate,type CDWDistributionPlan,type CDWReceiptTarget,type CDWReadingAssignment,type CDWQMSPendingReview,type CDWQMSAppointmentAlert,type CDWQMSSpecialAlert,type CDWQMSSpecialAuthority,type CDWQMSSpecialPolicyImpact,type CDWQMSLegacyAnomaly,type CDWQMSFormalNotice} from "../features/cdw/api";
 import "./cdwWorkbench.css";
 import {CDWWorkbenchHome,workNeedsAction} from "./CDWWorkbenchHome";
+import {CDWInitiatedWorkspace} from "./CDWInitiatedWorkspace";
 
-type View="home"|"todo"|"following"|"tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all";
+type View="home"|"todo"|"initiated"|"following"|"tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all";
 const viewGroups:{name:string;views:{key:View;label:string;symbol:string}[]}[]=[
- {name:"开始工作",views:[{key:"home",label:"工作首页",symbol:"⌂"},{key:"todo",label:"待我处理",symbol:"▤"},{key:"following",label:"跟进中的",symbol:"↗"},{key:"all",label:"全部事项",symbol:"▦"}]},
+ {name:"开始工作",views:[{key:"home",label:"工作首页",symbol:"⌂"},{key:"todo",label:"待我处理",symbol:"▤"},{key:"initiated",label:"我发起的",symbol:"↗"},{key:"following",label:"其他事项",symbol:"◇"},{key:"all",label:"全部事项",symbol:"▦"}]},
  {name:"按业务查看",views:[{key:"tasks",label:"文件工作",symbol:"▤"},{key:"obligations",label:"责任待办",symbol:"◇"}]},
  {name:"审查与批准",views:[{key:"reviews",label:"交付验收",symbol:"✓"},{key:"formal",label:"正式审批",symbol:"✎"},{key:"appointments",label:"任命核验",symbol:"♙"},{key:"scope",label:"范围审批",symbol:"◎"}]},
  {name:"受控发行",views:[{key:"control",label:"发行准备",symbol:"▣"},{key:"receipts",label:"部门签收",symbol:"⌁"},{key:"reading",label:"阅读确认",symbol:"▧"},{key:"effective",label:"生效文件",symbol:"◈"}]},
@@ -63,6 +64,11 @@ function RecipientPicker({value,onChange,users}:{value:string;onChange:(id:strin
 export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const[params,setParams]=useSearchParams();
  const[items,setItems]=useState<CDWInboxItem[]>([]);
+ const[initiatedItems,setInitiatedItems]=useState<CDWInitiatedItem[]>([]);
+ const[initiatedCursor,setInitiatedCursor]=useState("");
+ const[initiatedBusy,setInitiatedBusy]=useState(false);
+ const[initiatedError,setInitiatedError]=useState("");
+ const initiatedLoadSeq=useRef(0);
  const[reviewGates,setReviewGates]=useState<CDWReviewGate[]>([]);
  const[formalApprovals,setFormalApprovals]=useState<CDWFormalApproval[]>([]);
  const[pendingAppointments,setPendingAppointments]=useState<CDWQMSPendingReview[]>([]);
@@ -129,7 +135,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const allItems=useMemo(()=>[...items,...reviewItems,...formalItems,...controlItems,...scopeItems,...receiptItems,...readingItems],[items,reviewItems,formalItems,controlItems,scopeItems,receiptItems,readingItems]);
  const visible=useMemo(()=>{
   const query=search.trim().toLocaleLowerCase();
-  const matched=allItems.filter(x=>(filter==="all"||filter==="home"||filter==="todo"&&isActionable(x)||filter==="following"&&!isActionable(x)||x.kind===(filter==="tasks"?"task":filter==="reviews"?"review":filter==="formal"?"formal":filter==="control"?"control":filter==="scope"?"scope":filter==="receipts"?"receipt":filter==="reading"?"reading":"obligation"))
+  const matched=allItems.filter(x=>(filter==="all"||filter==="home"||filter==="todo"&&isActionable(x)||filter==="following"&&!isActionable(x)||filter!=="initiated"&&x.kind===(filter==="tasks"?"task":filter==="reviews"?"review":filter==="formal"?"formal":filter==="control"?"control":filter==="scope"?"scope":filter==="receipts"?"receipt":filter==="reading"?"reading":"obligation"))
    &&(!query||x.title.toLocaleLowerCase().includes(query)||x.fileId.toLocaleLowerCase().includes(query)));
   return priorityFirst?[...matched].sort((a,b)=>Number(isActionable(b))-Number(isActionable(a))):matched;
  },[allItems,filter,search,priorityFirst]);
@@ -146,6 +152,32 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
   return()=>{active=false;controller.abort();};
  },[refreshToken,user.id]);
 
+ useEffect(()=>{
+  const controller=new AbortController();
+  const sequence=++initiatedLoadSeq.current;
+  setInitiatedBusy(true);setInitiatedError("");setInitiatedCursor("");
+  cdwApi.initiated("",30,controller.signal).then(page=>{
+   if(sequence!==initiatedLoadSeq.current)return;
+   setInitiatedItems(page.items??[]);setInitiatedCursor(page.nextCursor??"");
+  }).catch(error=>{
+   if(sequence===initiatedLoadSeq.current&&!(error instanceof DOMException&&error.name==="AbortError"))
+    setInitiatedError(errorCopy(error,"我发起的工作加载失败"));
+  }).finally(()=>{if(sequence===initiatedLoadSeq.current)setInitiatedBusy(false)});
+  return()=>{controller.abort();};
+ },[refreshToken,user.id]);
+ async function loadMoreInitiated(){
+  if(!initiatedCursor||initiatedBusy)return;
+  const sequence=initiatedLoadSeq.current;
+  setInitiatedBusy(true);setInitiatedError("");
+  try{
+   const page=await cdwApi.initiated(initiatedCursor,30);
+   if(sequence!==initiatedLoadSeq.current)return;
+   setInitiatedItems(old=>[...old,...(page.items??[]).filter(item=>!old.some(existing=>existing.taskId===item.taskId))]);
+   setInitiatedCursor(page.nextCursor??"");
+  }catch(error){
+   if(sequence===initiatedLoadSeq.current)setInitiatedError(errorCopy(error,"读取更早的工作失败"));
+  }finally{if(sequence===initiatedLoadSeq.current)setInitiatedBusy(false);}
+ }
  useEffect(()=>{
   let active=true;
   cdwApi.reviewInbox(100).then(data=>{if(active)setReviewGates(data.items??[]);})
@@ -328,7 +360,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
   specialImpacts.filter(a=>a.state==="open").length+legacyAnomalies.filter(a=>a.requestedBy!==user.id).length+
   formalNotices.filter(a=>!a.readAt).length;
  const counts:Record<View,number>={
-  home:allItems.filter(isActionable).length+appointmentCount,todo:allItems.filter(isActionable).length+appointmentCount,following:allItems.filter(x=>!isActionable(x)).length,
+  home:allItems.filter(isActionable).length+appointmentCount,todo:allItems.filter(isActionable).length+appointmentCount,initiated:initiatedItems.length,following:allItems.filter(x=>!isActionable(x)).length,
   tasks:totalTasks,obligations:totalObligations,reviews:totalReviews,formal:totalFormal,
   appointments:appointmentCount,control:totalControl,scope:totalScope,receipts:totalReceipts,
   reading:totalReading,effective:0,all:allItems.length,
@@ -350,15 +382,17 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
          <RareButton key={key} type="button" className={"cdw-rail-item"+(filter===key?" is-current":"")}
           aria-current={filter===key?"page":undefined} onClick={()=>{setFilter(key);setActiveForm(null);setFormalDraft(false);}}>
           <span className="cdw-rail-icon" aria-hidden="true">{symbol}</span><span className="cdw-rail-label">{label}</span>
-          {key!=="effective"&&key!=="home"&&<small className={counts[key]>0?"has-count":""}>{counts[key]}</small>}
+          {key!=="effective"&&key!=="home"&&key!=="initiated"&&<small className={counts[key]>0?"has-count":""}>{counts[key]}</small>}
          </RareButton>)}
        </div>)}
       </nav>
       <Link className="cdw-rail-dhf" to="/workbench/dhf"><span className="cdw-rail-icon" aria-hidden="true">▣</span><span>DHF 九阶段验收</span><span aria-hidden="true">↗</span></Link>
      </aside>
-     {filter==="home"?<CDWWorkbenchHome items={allItems} appointmentCount={appointmentCount} busy={busy} error={requestError}
+     {filter==="home"?<CDWWorkbenchHome initiatedCount={initiatedItems.length} initiatedHasMore={Boolean(initiatedCursor)} initiatedError={initiatedError} initiatedBusy={initiatedBusy} items={allItems} appointmentCount={appointmentCount} busy={busy} error={requestError}
       canCreate={user.isAdmin} onRefresh={()=>refresh(v=>v+1)} onCreate={()=>{setFilter("tasks");beginForm("create");}}
-      onOpen={item=>{setFilter("all");select(item);}} onView={view=>{setFilter(view);setActiveForm(null);setFormalDraft(false);}}/>:filter==="effective"?<CDWEffectiveSearchPanel/>:filter==="appointments"?
+      onOpen={item=>{setFilter("all");select(item);}} onView={view=>{setFilter(view);setActiveForm(null);setFormalDraft(false);}}/>:filter==="initiated"?
+      <CDWInitiatedWorkspace items={initiatedItems} busy={initiatedBusy} error={initiatedError} nextCursor={initiatedCursor}
+       onMore={()=>void loadMoreInitiated()} onRefresh={()=>refresh(v=>v+1)}/>:filter==="effective"?<CDWEffectiveSearchPanel/>:filter==="appointments"?
       <CDWQMSReviewInbox items={pendingAppointments} alerts={appointmentAlerts} actorId={user.id}
        onRead={id=>void readAppointmentAlert(id)} onVerified={()=>refresh(v=>v+1)}/>:<>
      <section className="cdw-inbox" aria-label="工作事项列表">

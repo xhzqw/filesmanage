@@ -253,6 +253,99 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/initiated:
+    get:
+      summary: Track work actually started by this user, including delegated and ended tasks
+      operationId: cdwInitiated
+      tags:
+      - CDW
+      security:
+      - cookieSession: []
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        description: Requested raw rows (1..100). Defaults to 30.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+      - name: cursor
+        in: query
+        required: false
+        description: Opaque task ID from previous page; scoped to the current creator.
+        schema:
+          type: string
+          maxLength: 256
+      responses:
+        '200':
+          description: Author-scoped keyset page, further filtered by current file preview ACL; the number of visible items
+            may be lower than the raw page size.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            taskId:
+                              type: string
+                            rootId:
+                              type: string
+                            parentId:
+                              type: string
+                            title:
+                              type: string
+                            fileId:
+                              type: string
+                            state:
+                              type: string
+                            revision:
+                              type: integer
+                              minimum: 1
+                            createdAt:
+                              type: string
+                              format: date-time
+                            assigneeName:
+                              type: string
+                          required:
+                          - taskId
+                          - rootId
+                          - title
+                          - fileId
+                          - state
+                          - revision
+                          - createdAt
+                      nextCursor:
+                        type: string
+                        description: Opaque creator-scoped task cursor; absent on the last page.
+                    required:
+                    - items
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/tasks/{id}/accept:
     post:
       summary: Accept a task as its active assignee or current workgroup leader

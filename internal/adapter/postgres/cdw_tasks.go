@@ -342,6 +342,35 @@ func (r *Repository) CDWInbox(ctx context.Context, actor string, limit int) ([]p
 	return items, rows.Err()
 }
 
+// An author-scoped, stable keyset of actual CDW tasks, including completed,
+// cancelled and delegated tasks. Never join in another author's assignments.
+func (r *Repository) CDWInitiated(ctx context.Context, actor string, limit int, cursor string) ([]ports.CDWInitiatedItem, error) {
+	rows, err := r.Q.Query(ctx, `SELECT t.id,t.root_id,COALESCE(t.parent_id,''),t.title,t.file_id,t.state,
+ t.revision,t.created_at,COALESCE(u.display_name,w.name,'')
+ FROM cdw_tasks t
+ LEFT JOIN cdw_tasks anchor ON anchor.id=$3 AND anchor.created_by=$1
+ LEFT JOIN cdw_task_assignments a ON a.task_id=t.id AND a.kind='primary' AND a.ended_at IS NULL
+ LEFT JOIN users u ON u.id=a.user_id
+ LEFT JOIN workgroups w ON w.id=a.group_id
+ WHERE t.created_by=$1 AND ($3='' OR (anchor.id IS NOT NULL AND
+ (t.created_at,t.id)<(anchor.created_at,anchor.id)))
+ ORDER BY t.created_at DESC,t.id DESC LIMIT $2`, actor, limit, cursor)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ports.CDWInitiatedItem{}
+	for rows.Next() {
+		var item ports.CDWInitiatedItem
+		if err = rows.Scan(&item.TaskID, &item.RootID, &item.ParentID, &item.Title, &item.FileID,
+			&item.State, &item.Revision, &item.CreatedAt, &item.AssigneeName); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
 func (r *Repository) CDWEvent(ctx context.Context, actor, eventType, taskID, requestID string, result ports.CDWTaskResult) error {
 	if len(requestID) == 0 {
 		return domain.ErrInvalidInput

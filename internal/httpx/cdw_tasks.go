@@ -136,6 +136,34 @@ func (h *Handler) cdwDelegateTask(c *gin.Context) {
 	}
 	cdwSuccess(c, http.StatusCreated, result)
 }
+func (h *Handler) cdwInitiated(c *gin.Context) {
+	actor, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	limit := 30
+	if raw := c.Query("limit"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 || n > 100 {
+			c.JSON(http.StatusBadRequest, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+			return
+		}
+		limit = n
+	}
+	cursor := strings.TrimSpace(c.Query("cursor"))
+	if len(cursor) > 256 {
+		c.JSON(http.StatusBadRequest, gin.H{"ok": false, "error": gin.H{"code": "E_BAD"}})
+		return
+	}
+	page, err := h.S.CDWInitiatedTasks(c.Request.Context(), actor, limit, cursor)
+	if err != nil {
+		cdwError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, gin.H{"ok": true, "data": page})
+}
+
 func (h *Handler) cdwInbox(c *gin.Context) {
 	actor, ok := h.auth(c)
 	if !ok {
