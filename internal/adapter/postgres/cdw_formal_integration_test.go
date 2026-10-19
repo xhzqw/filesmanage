@@ -461,6 +461,29 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	if pointerCount != 0 {
 		t.Fatal("issue/dispatch cannot activate default effective pointer")
 	}
+	linkedFlow, flowErr := service.CDWInitiatedFlowSnapshot(ctx, admin, root.TaskID)
+	if flowErr != nil {
+		t.Fatalf("linked G7-G9 work view: %v", flowErr)
+	}
+	observed := map[string]string{}
+	for _, stage := range linkedFlow.Milestones {
+		observed[stage.Kind+":"+stage.Reference] = stage.State
+	}
+	if observed["delivery:"+frozen.DeliveryID] != "submitted" ||
+		observed["review:"+frozen.ReviewGateID] != "accepted" ||
+		observed["formal:"+started.ID] != "approved" ||
+		observed["release:"+issued.ID] != "issued_pending" ||
+		observed["plan:"+plan.ID] != "dispatched" ||
+		observed["dispatch:"+batch.ID] != "dispatched" ||
+		observed["receipt:"+batch.ID] != "partial" {
+		t.Fatalf("exact delivery→approval→release→batch→unreceived targets chain: %+v", linkedFlow.Milestones)
+	}
+	for _, stage := range linkedFlow.Milestones {
+		if stage.Kind == "effective" || stage.Kind == "reading" {
+			t.Fatalf("dispatch invented effectiveness or reader confirmation: %+v", stage)
+		}
+	}
+	t.Log("CDW_FLOW_LINEAGE_POSTGRES_PASS frozen-delivery→independent-approval→exact-release→batch; no phantom effectiveness")
 	t.Logf("CDW_G9_DISPATCH_POSTGRES_PASS batch=%s departments=2 grants=2 receipts=0 reading=0 effective_pointer=none", batch.ID)
 	// Explicit opt-in is independent of planned effective time.
 	if _, e = service.CDWScheduleSet(ctx, admin, issued.ID, issued.Revision, true, prefix+"_sched_no_date"); !errors.Is(e, domain.ErrConflict) {
@@ -639,6 +662,20 @@ func exerciseCDWG7Formal(t *testing.T, ctx context.Context, pool *pgxpool.Pool, 
 	}
 	if readingCount != 0 {
 		t.Fatal("receipt cannot create or complete personal reading assignment")
+	}
+	receiptFlow, flowErr := service.CDWInitiatedFlowSnapshot(ctx, admin, root.TaskID)
+	if flowErr != nil {
+		t.Fatalf("receipt evidence projection: %v", flowErr)
+	}
+	seenCurrentReceipt := false
+	for _, stage := range receiptFlow.Milestones {
+		if stage.Kind == "receipt" && stage.Reference == batch.ID && stage.State == "complete" &&
+			stage.Detail == "部门签收 2/2" {
+			seenCurrentReceipt = true
+		}
+	}
+	if !seenCurrentReceipt {
+		t.Fatalf("two real department receipts must match precise distributed item: %+v", receiptFlow.Milestones)
 	}
 	t.Logf("CDW_G9_DEPARTMENT_RECEIPTS_POSTGRES_PASS batch=%s receipts=2 reading=0", batch.ID)
 	if _, e = service.CDWCreateReadingRoster(ctx, alice, bobTargets[0].TargetID,
