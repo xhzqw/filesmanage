@@ -46,40 +46,82 @@ function itemKey(item:CDWInboxItem){
 export function CDWWorkbenchHome({items,appointmentCount,initiatedCount,initiatedHasMore,initiatedError,initiatedBusy,busy,error,canCreate,onCreate,onRefresh,onOpen,onView}:Props){
  const[expanded,setExpanded]=useState(false);
  const[chooseKind,setChooseKind]=useState(false);
+ const[activeCategory,setActiveCategory]=useState<"all"|"tasks"|"reviews"|"receipts">("all");
  const todo=items.filter(workNeedsAction);
  const following=items.filter(item=>!workNeedsAction(item));
  const returned=todo.filter(item=>item.state==="returned");
- const display=expanded?todo:todo.slice(0,8);
+ const reviewTasks=todo.filter(item=>item.kind==="review"||item.kind==="formal"||item.kind==="scope");
+ const workTasks=todo.filter(item=>item.kind==="task"||item.kind==="obligation");
+ const receiptTasks=todo.filter(item=>item.kind==="receipt"||item.kind==="reading");
+ const filteredTodo=activeCategory==="tasks"?workTasks:activeCategory==="reviews"?reviewTasks:activeCategory==="receipts"?receiptTasks:todo;
+ const display=expanded?filteredTodo:filteredTodo.slice(0,8);
+
  return <section className="cdw-home" aria-label="工作首页">
   <header className="cdw-home-toolbar">
    <div className="cdw-home-identity">
-    <div className="cdw-home-heading"><h2>工作概览</h2></div>
+    <div className="cdw-home-heading">
+     <h2>工作台</h2>
+     <span className="cdw-home-badge">中晟生物 · 协同中心</span>
+    </div>
    </div>
    <div className="cdw-home-actions">
     <RareButton type="button" tone="ghost" disabled={busy} onClick={onRefresh}>刷新</RareButton>
-    {canCreate&&<RareButton type="button" tone="primary" aria-expanded={chooseKind} onClick={()=>setChooseKind(v=>!v)}>发起工作</RareButton>}
+    {canCreate&&<RareButton type="button" tone="primary" aria-expanded={chooseKind} onClick={()=>setChooseKind(v=>!v)}>+ 发起工作</RareButton>}
    </div>
   </header>
   {chooseKind&&canCreate&&<div className="cdw-home-chooser" role="region" aria-label="发起工作类型">
-   <div className="cdw-home-chooser-intro"><strong>发起工作</strong></div>
+   <div className="cdw-home-chooser-intro">
+    <strong>选择要发起的工作事项</strong>
+    <small>依据质量管理体系程序文件（QP-01 / QP-09）开展业务</small>
+   </div>
    <div className="cdw-home-chooser-options">
-    <RareButton type="button" tone="neutral" onClick={()=>{setChooseKind(false);onCreate();}}><strong>受控文件修订工作</strong></RareButton>
-    <Link to="/workbench/dhf?create=1" onClick={()=>setChooseKind(false)}><strong>DHF 九阶段文件验收</strong></Link>
+    <RareButton type="button" tone="neutral" onClick={()=>{setChooseKind(false);onCreate();}}>
+     <strong>受控文件修订工作</strong>
+     <small>选择 DOCX 文件建立工作分支，按受控流程管理</small>
+    </RareButton>
+    <Link to="/workbench/dhf?create=1" onClick={()=>setChooseKind(false)}>
+     <strong>DHF 九阶段文件验收</strong>
+     <small>按既定阶段大纲创建研发项目，指定独立验收人</small>
+    </Link>
+    <Link to="/workbench/customer-registrations" onClick={()=>setChooseKind(false)}>
+     <strong>客户建档与登记审批</strong>
+     <small>提交客户档案审核与资质登记</small>
+    </Link>
    </div>
   </div>}
   <div className="cdw-home-scroll">
    <div className="cdw-home-stats" aria-label="工作概况">
-    <RareButton type="button" className="cdw-home-stat" onClick={()=>onView("todo")}>
-     <small>待我处理</small><strong>{todo.length+appointmentCount}</strong>
+    <RareButton type="button" className="cdw-home-stat is-todo" onClick={()=>onView("todo")}>
+     <div className="cdw-stat-top">
+      <span className="cdw-stat-dot dot-amber"/>
+      <small>待我处理</small>
+     </div>
+     <strong>{todo.length+appointmentCount}</strong>
+     <span className="cdw-stat-hint">待审批 / 验收 / 签收</span>
     </RareButton>
-    <RareButton type="button" className="cdw-home-stat" onClick={()=>onView("initiated")}>
-     <small>我发起的</small><strong>{initiatedError?"—":initiatedBusy&&initiatedCount===0?"…":initiatedCount}{!initiatedError&&initiatedHasMore?"+":""}</strong>
+    <RareButton type="button" className="cdw-home-stat is-initiated" onClick={()=>onView("initiated")}>
+     <div className="cdw-stat-top">
+      <span className="cdw-stat-dot dot-blue"/>
+      <small>我发起的</small>
+     </div>
+     <strong>{initiatedError?"—":initiatedBusy&&initiatedCount===0?"…":initiatedCount}{!initiatedError&&initiatedHasMore?"+":""}</strong>
+     <span className="cdw-stat-hint">进行中的工作与流转</span>
     </RareButton>
-    <RareButton type="button" className="cdw-home-stat" onClick={()=>onView("following")}>
-     <small>无需立即处理</small><strong>{following.length}</strong>
+    <RareButton type="button" className="cdw-home-stat is-following" onClick={()=>onView("following")}>
+     <div className="cdw-stat-top">
+      <span className="cdw-stat-dot dot-purple"/>
+      <small>无需立即处理</small>
+     </div>
+     <strong>{following.length}</strong>
+     <span className="cdw-stat-hint">已提交或观察中事项</span>
     </RareButton>
-    <RareButton type="button" className="cdw-home-stat" onClick={()=>onView("todo")}>
-     <small>退回需修订</small><strong>{returned.length}</strong>
+    <RareButton type="button" className="cdw-home-stat is-returned" onClick={()=>onView("todo")}>
+     <div className="cdw-stat-top">
+      <span className="cdw-stat-dot dot-rose"/>
+      <small>退回需修订</small>
+     </div>
+     <strong>{returned.length}</strong>
+     <span className="cdw-stat-hint">需重新修改提交</span>
     </RareButton>
    </div>
    {(error||initiatedError)&&<RareNotice tone="warning">部分工作数据暂时无法读取。{error||initiatedError} <RareButton type="button" onClick={onRefresh}>重试</RareButton></RareNotice>}
@@ -87,44 +129,74 @@ export function CDWWorkbenchHome({items,appointmentCount,initiatedCount,initiate
    <div className="cdw-home-content">
     <div className="cdw-home-primary">
      <div className="cdw-home-section-head">
-      <strong>待处理事项</strong>
-      <RareButton type="button" tone="ghost" onClick={()=>onView("todo")}>查看全部 →</RareButton>
+      <div className="cdw-home-filter-tabs">
+       <RareButton type="button" tone="ghost" className={activeCategory==="all"?"active":""} onClick={()=>setActiveCategory("all")}>
+        全部待办 ({todo.length+appointmentCount})
+       </RareButton>
+       <RareButton type="button" tone="ghost" className={activeCategory==="reviews"?"active":""} onClick={()=>setActiveCategory("reviews")}>
+        审查与审批 ({reviewTasks.length+appointmentCount})
+       </RareButton>
+       <RareButton type="button" tone="ghost" className={activeCategory==="tasks"?"active":""} onClick={()=>setActiveCategory("tasks")}>
+        文件工作 ({workTasks.length})
+       </RareButton>
+       <RareButton type="button" tone="ghost" className={activeCategory==="receipts"?"active":""} onClick={()=>setActiveCategory("receipts")}>
+        签收与阅读 ({receiptTasks.length})
+       </RareButton>
+      </div>
+      <RareButton type="button" tone="ghost" onClick={()=>onView("todo")}>进入队列视图 →</RareButton>
      </div>
      {busy&&items.length===0?<div className="cdw-home-loading"><BrandLoadingLabel showContext>读取工作中</BrandLoadingLabel></div>:
-     todo.length===0&&appointmentCount===0?<div className="cdw-home-empty">
-      <span className="cdw-home-empty-icon" aria-hidden="true">✓</span>
-      <strong>当前没有需要处理的工作</strong>
+     todo.length===0&&appointmentCount===0?<div className="cdw-home-empty-card">
+      <div className="cdw-home-empty-icon" aria-hidden="true">✓</div>
+      <div className="cdw-home-empty-text">
+       <strong>当前待办事项均已处理完成</strong>
+       <p>没有需要立即处理的审批或流转任务，可以从下方快捷发起业务事项</p>
+      </div>
+      <div className="cdw-home-quick-actions">
+       {canCreate&&<RareButton type="button" tone="primary" onClick={onCreate}>发起文件修订工作</RareButton>}
+       <Link to="/workbench/dhf?create=1" className="cdw-quick-link">创建 DHF 项目</Link>
+       <RareButton type="button" tone="ghost" onClick={()=>onView("initiated")}>查看我发起的工作 ↗</RareButton>
+      </div>
      </div>:<div className="cdw-home-work-list">
       {display.map(item=><RareButton type="button" key={itemKey(item)} className="cdw-home-work-row" onClick={()=>onOpen(item)}>
-       <span className="cdw-home-work-mark" aria-hidden="true"/>
+       <span className={"cdw-task-symbol cdw-kind-"+item.kind} aria-hidden="true"/>
        <span className="cdw-home-work-copy">
-        <small>{kinds[item.kind]} · {item.state==="returned"?"已退回":item.state==="assigned"?"待接收":item.state==="awaiting"?"待验收":"待处理"}</small>
-        <strong title={item.title}>{item.title}</strong>
-        <span>{workNextStep(item)}</span>
+        <div className="cdw-home-work-title-row">
+         <strong title={item.title}>{item.title}</strong>
+         <span className="cdw-kind-badge">{kinds[item.kind]}</span>
+         <span className={"cdw-status-badge state-"+item.state}>
+          {item.state==="returned"?"已退回":item.state==="assigned"?"待接收":item.state==="awaiting"?"待验收":"待处理"}
+         </span>
+        </div>
+        <span className="cdw-home-work-sub">{workNextStep(item)}</span>
        </span>
-       <span className="cdw-home-work-go">处理 →</span>
+       <span className="cdw-home-work-go">办理 →</span>
       </RareButton>)}
       {appointmentCount>0&&<RareButton type="button" className="cdw-home-work-row" onClick={()=>onView("appointments")}>
-       <span className="cdw-home-work-mark" aria-hidden="true"/>
+       <span className="cdw-task-symbol cdw-kind-formal" aria-hidden="true"/>
        <span className="cdw-home-work-copy">
-        <small>专项核验</small>
-        <strong>岗位任命、授权与通知</strong>
-        <span>{appointmentCount} 项待核验</span>
+        <div className="cdw-home-work-title-row">
+         <strong>岗位任命、授权与通知</strong>
+         <span className="cdw-kind-badge">专项核验</span>
+         <span className="cdw-status-badge state-awaiting">待核验</span>
+        </div>
+        <span className="cdw-home-work-sub">{appointmentCount} 项需核验资格或知悉通知</span>
        </span>
-       <span className="cdw-home-work-go">处理 →</span>
+       <span className="cdw-home-work-go">办理 →</span>
       </RareButton>}
-      {!expanded&&todo.length>display.length&&<RareButton type="button" tone="ghost" className="cdw-home-more" onClick={()=>setExpanded(true)}>展开其余 {todo.length-display.length} 项</RareButton>}
+      {!expanded&&filteredTodo.length>display.length&&<RareButton type="button" tone="ghost" className="cdw-home-more" onClick={()=>setExpanded(true)}>展开其余 {filteredTodo.length-display.length} 项</RareButton>}
      </div>}
     </div>
     <aside className="cdw-home-guide" aria-label="快捷入口">
      <div className="cdw-home-quick">
-      <strong>快捷入口</strong>
+      <strong>常用业务入口</strong>
       <RareButton type="button" tone="ghost" onClick={()=>onView("initiated")}>我发起的 <span>↗</span></RareButton>
       <RareButton type="button" tone="ghost" onClick={()=>onView("tasks")}>文件工作 <span>↗</span></RareButton>
       <RareButton type="button" tone="ghost" onClick={()=>onView("reviews")}>交付验收 <span>↗</span></RareButton>
       <RareButton type="button" tone="ghost" onClick={()=>onView("receipts")}>部门签收 <span>↗</span></RareButton>
-      <Link to="/workbench/dhf">DHF 验收 <span>↗</span></Link>
-      <Link to="/workbench/customer-registrations">客户审核 <span>↗</span></Link>
+      <RareButton type="button" tone="ghost" onClick={()=>onView("seals")}>电子签章中心 <span>↗</span></RareButton>
+      <Link to="/workbench/dhf">DHF 九阶段验收 <span>↗</span></Link>
+      <Link to="/workbench/customer-registrations">客户登记审批 <span>↗</span></Link>
      </div>
     </aside>
    </div>

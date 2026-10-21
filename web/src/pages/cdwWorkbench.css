@@ -2,7 +2,7 @@
    three-pane desktop composition. No additional card stacks or full-page scroll. */
 .cdw-panels{min-height:0;min-width:0;padding:0 8px 8px 0;background:#F2F4F7;overflow:hidden}
 .cdw-work.work{min-height:0;min-width:0;margin:var(--height-header) 0 0;background:#fff;border:1px solid rgba(28,48,79,.07);border-radius:12px;box-shadow:0 3px 16px rgba(19,37,60,.035);overflow:hidden}
-.cdw-layout{display:grid;grid-template-columns:minmax(300px,352px) minmax(0,1fr);width:100%;height:100%;min-height:0;min-width:0}
+.cdw-layout{display:grid;grid-template-columns:240px minmax(0,1fr);width:100%;height:100%;min-height:0;min-width:0;background:#F8FAFC}
 .cdw-rail{display:flex;flex-direction:column;min-width:0;min-height:0;padding:12px 8px 10px;background:transparent;border:0}
 .cdw-rail-overview{display:flex;align-items:center;gap:10px;padding:8px 8px 16px;min-width:0}
 .cdw-rail-mark{display:grid;place-items:center;width:32px;height:32px;flex:none;border-radius:8px;background:#EFF6FF;color:#2563EB}
@@ -218,42 +218,61 @@
 
 /* P1 work landing: a genuine first screen, not another permanent detail pane. */
 .cdw-home{grid-column:2/-1;min-width:0;min-height:0;display:flex;flex-direction:column;background:#fff}
-.cdw-home-toolbar{display:flex;flex:none;align-items:center;justify-content:space-between;gap:18px;padding:20px 28px 16px;border-bottom:1px solid #EDF0F4}
+.cdw-home-toolbar{display:flex;flex:none;align-items:center;justify-content:space-between;gap:18px;padding:18px 28px;border-bottom:1px solid #E2E8F0;background:#fff}
 .cdw-home-identity{display:flex;align-items:center;gap:10px;min-width:0}
-.cdw-home-heading h2{font-size:17px;letter-spacing:-.02em;color:#0F172A;line-height:1.2;font-weight:650;margin:0}
+.cdw-home-heading{display:flex;align-items:center;gap:10px}
+.cdw-home-heading h2{font-size:18px;letter-spacing:-.025em;color:#0F172A;line-height:1.2;font-weight:700;margin:0}
+.cdw-home-badge{font-size:11px;font-weight:600;color:#2563EB;background:#EFF6FF;border-radius:6px;padding:2px 8px}
 .cdw-home-actions{flex:none;display:flex;gap:7px;align-items:center}
 .cdw-home-actions>.rare-button{white-space:nowrap;font-size:12px}
-.cdw-home-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:22px 28px 20px}
-.cdw-home-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:24px}
-.cdw-home-stat.rare-button{height:auto;min-height:92px;min-width:0;display:flex;align-items:flex-start;justify-content:space-between;flex-direction:column;gap:6px;text-align:left;padding:14px 16px;border:1px solid #E2E8F0;border-radius:10px;background:#FFFFFF;box-shadow:0 1px 2px rgba(0,0,0,0.02);color:#334155;transition:border-color .15s ease,box-shadow .15s ease}
-.cdw-home-stat.rare-button:hover{background:#F8FAFC;border-color:#93C5FD;box-shadow:0 2px 6px rgba(37,99,235,0.06)}
+.cdw-home-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:22px 28px 24px}
+.cdw-home-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}
+.cdw-home-stat.rare-button{height:auto;min-height:82px;min-width:0;display:flex;align-items:flex-start;justify-content:space-between;flex-direction:column;gap:5px;text-align:left;padding:12px 16px;border:1px solid #E2E8F0;border-radius:10px;background:#FFFFFF;box-shadow:0 1px 2px rgba(15,23,42,0.03);color:#334155;transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease}
+.cdw-home-stat.rare-button:hover{background:#F8FAFC;border-color:#93C5FD;box-shadow:0 3px 8px rgba(37,99,235,0.06);transform:translateY(-1px)}
 .cdw-home-stat.rare-button:focus-visible{outline:2px solid #2563EB;outline-offset:1px}
-.cdw-home-stat small{font-size:12px;font-weight:500;color:#64748B}
+.cdw-stat-top{display:flex;align-items:center;gap:7px;min-width:0}
+.cdw-stat-dot{width:7px;height:7px;border-radius:50%;flex:none}
+.dot-amber{background:#F59E0B}
+.dot-blue{background:#3B82F6}
+.dot-purple{background:#8B5CF6}
+.dot-rose{background:#F43F5E}
+.cdw-home-stat small{font-size:11.5px;font-weight:550;color:#64748B}
 .cdw-home-stat strong{font-size:24px;line-height:1;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.03em;color:#0F172A}
-.cdw-home-content{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,260px);gap:24px;align-items:start}
-.cdw-home-primary{min-width:0}
-.cdw-home-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
-.cdw-home-section-head strong{font-size:13px;font-weight:650;color:#1E293B}
+.cdw-stat-hint{font-size:10.5px;color:#94A3B8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cdw-home-content{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:20px;align-items:start}
+.cdw-home-primary{min-width:0;background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:16px 18px;box-shadow:0 1px 2px rgba(15,23,42,0.02)}
+.cdw-home-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #F1F5F9}
+.cdw-home-filter-tabs{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.cdw-home-filter-tabs .rare-button{height:28px;min-height:28px;padding:0 10px;font-size:11.5px;border-radius:6px;color:#64748B}
+.cdw-home-filter-tabs .rare-button.active{background:#EFF6FF;color:#1D4ED8;font-weight:600}
 .cdw-home-section-head>.rare-button{font-size:11px;color:#2563EB}
-.cdw-home-work-list{border-top:1px solid #E9EDF2}
-.cdw-home-work-row.rare-button{display:flex;align-items:center;gap:12px;min-width:0;width:100%;min-height:68px;height:auto;margin:0;padding:10px 8px;border:0;border-bottom:1px solid #EEF1F4;border-radius:0;background:#fff;box-shadow:none;text-align:left;transition:background .15s ease}
-.cdw-home-work-row.rare-button:hover{background:#F8FAFC}
+.cdw-home-work-list{display:flex;flex-direction:column;gap:4px}
+.cdw-home-work-row.rare-button{display:flex;align-items:center;gap:12px;min-width:0;width:100%;min-height:58px;height:auto;margin:0;padding:9px 10px;border:1px solid #F1F5F9;border-radius:8px;background:#fff;box-shadow:none;text-align:left;transition:background .15s ease,border-color .15s ease}
+.cdw-home-work-row.rare-button:hover{background:#F8FAFC;border-color:#E2E8F0}
 .cdw-home-work-row.rare-button:focus-visible{outline:2px solid #2563EB;outline-offset:-2px}
-.cdw-home-work-mark{flex:0 0 6px;width:6px;height:6px;border-radius:50%;background:#2563EB}
-.cdw-home-work-copy{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
-.cdw-home-work-copy>small{font-size:10.5px;color:#64748B;font-weight:600}
-.cdw-home-work-copy>strong{font-size:13px;color:#1E293B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
-.cdw-home-work-copy>span{font-size:11.5px;color:#64748B;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cdw-home-work-go{font-size:11px;color:#2563EB;white-space:nowrap;flex:none}
-.cdw-home-more.rare-button{margin-top:12px;font-size:11px}
+.cdw-home-work-copy{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.cdw-home-work-title-row{display:flex;align-items:center;gap:8px;min-width:0}
+.cdw-home-work-title-row strong{font-size:13px;font-weight:600;color:#1E293B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cdw-kind-badge{font-size:10px;font-weight:600;padding:1px 6px;border-radius:4px;background:#F1F5F9;color:#475569;flex:none}
+.cdw-status-badge{font-size:10px;font-weight:600;padding:1px 6px;border-radius:4px;flex:none}
+.state-assigned{background:#FEF3C7;color:#B45309}
+.state-awaiting{background:#EFF6FF;color:#1D4ED8}
+.state-returned{background:#FEE2E2;color:#B91C1C}
+.cdw-home-work-sub{font-size:11.5px;color:#64748B;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cdw-home-work-go{font-size:11px;color:#2563EB;white-space:nowrap;flex:none;font-weight:550}
+.cdw-home-more.rare-button{margin-top:10px;font-size:11px}
 .cdw-home-loading{min-height:140px;display:grid;place-items:center}
-.cdw-home-empty{display:flex;min-height:180px;align-items:center;justify-content:center;flex-direction:column;gap:8px;text-align:center;padding:24px}
-.cdw-home-empty-icon{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#EFF6FF;color:#2563EB;font-size:16px}
-.cdw-home-empty strong{color:#334155;font-size:13px}
-.cdw-home-guide{padding:16px 18px;border:1px solid #E2E8F0;border-radius:10px;background:#F8FAFC;min-width:0}
+.cdw-home-empty-card{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:32px 20px;text-align:center;background:#F8FAFC;border:1px dashed #CBD5E1;border-radius:10px}
+.cdw-home-empty-card .cdw-home-empty-icon{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:#ECFDF5;color:#059669;font-size:18px;font-weight:700}
+.cdw-home-empty-text strong{font-size:13.5px;font-weight:650;color:#1E293B;display:block;margin-bottom:3px}
+.cdw-home-empty-text p{font-size:11.5px;color:#64748B;margin:0}
+.cdw-home-quick-actions{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap;justify-content:center}
+.cdw-quick-link{display:inline-flex;align-items:center;height:30px;padding:0 12px;border-radius:6px;background:#fff;border:1px solid #CBD5E1;color:#1E293B;font-size:11.5px;font-weight:550;text-decoration:none;transition:border-color .15s ease}
+.cdw-quick-link:hover{border-color:#2563EB;color:#2563EB}
+.cdw-home-guide{padding:14px 16px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;min-width:0;box-shadow:0 1px 2px rgba(15,23,42,0.02)}
 .cdw-home-quick{display:flex;flex-direction:column;gap:2px}
-.cdw-home-quick>strong{font-size:11.5px;font-weight:600;color:#64748B;margin-bottom:6px}
-.cdw-home-quick>.rare-button,.cdw-home-quick>a{display:flex;justify-content:space-between;align-items:center;width:100%;min-width:0;height:32px;min-height:32px;padding:0 8px;border:0;border-radius:6px;background:transparent;text-decoration:none;color:#334155;font-size:12px;box-shadow:none;font-weight:500;transition:background .15s ease,color .15s ease}
+.cdw-home-quick>strong{font-size:11.5px;font-weight:650;color:#334155;margin-bottom:6px;padding:0 4px}
+.cdw-home-quick>.rare-button,.cdw-home-quick>a{display:flex;justify-content:space-between;align-items:center;width:100%;min-width:0;height:30px;min-height:30px;padding:0 8px;border:0;border-radius:6px;background:transparent;text-decoration:none;color:#475569;font-size:12px;box-shadow:none;font-weight:500;transition:background .15s ease,color .15s ease}
 .cdw-home-quick>.rare-button:hover,.cdw-home-quick>a:hover{background:#EFF6FF;color:#1D4ED8}
 .cdw-seals-view{grid-column:2/-1;display:flex;flex-direction:column;min-width:0;min-height:0;background:#fff;overflow-y:auto;overscroll-behavior:contain;padding:16px 20px}
 @media(max-width:1100px){
@@ -427,6 +446,10 @@
 .cdw-home-dhf-copy{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
 .cdw-home-dhf-copy strong{font-size:11px;color:#37495E;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:620}
 .cdw-home-dhf-copy small{font-size:10px;color:#8A9AAB;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cdw-home-dhf-main{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.cdw-dhf-stages-bar{display:flex;align-items:center;gap:3px;flex:none}
+.cdw-dhf-stage-dot{width:7px;height:12px;border-radius:2px;background:#E2E8F0}
+.cdw-dhf-stage-dot.is-accepted{background:#2563EB}
 .cdw-home-dhf-progress{color:#527FA8;font-size:10px;flex:none}
 .cdw-home-dhf-empty{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0 0;font-size:10.5px;color:#8D9AAB}
 .cdw-home-dhf-empty>a{white-space:nowrap;color:#447AAE;text-decoration:none}

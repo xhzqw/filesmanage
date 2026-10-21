@@ -25,10 +25,18 @@ export function DHFHomeProjects({canCreate}:{canCreate:boolean}){
     {canCreate&&<Link to="/workbench/dhf?create=1">创建 DHF 项目 →</Link>}
    </div>:<div className="cdw-home-dhf-list">
     {(more?projects:projects.slice(0,3)).map(project=><Link key={project.id} to={"/workbench/dhf?project="+encodeURIComponent(project.id)}
-     className="cdw-home-dhf-row"><span className="cdw-home-dhf-no">DHF</span>
-     <span className="cdw-home-dhf-copy"><strong title={project.title}>{project.title}</strong>
-      <small>项目参与者 · 已验收 {project.acceptedStages}/9 阶段</small></span>
-     <span className="cdw-home-dhf-progress">{project.acceptedStages}/9</span></Link>)}
+     className="cdw-home-dhf-row">
+     <div className="cdw-home-dhf-main">
+      <span className="cdw-home-dhf-no">DHF</span>
+      <span className="cdw-home-dhf-copy">
+       <strong title={project.title}>{project.title}</strong>
+       <small>已验收 {project.acceptedStages}/9 阶段</small>
+      </span>
+     </div>
+     <div className="cdw-dhf-stages-bar" aria-label={`进度 ${project.acceptedStages} / 9`}>
+      {Array.from({length:9},(_,i)=><span key={i} className={"cdw-dhf-stage-dot"+(i<project.acceptedStages?" is-accepted":"")}/>)}
+     </div>
+    </Link>)}
     {!more&&projects.length>3&&<RareButton type="button" tone="ghost" onClick={()=>setMore(true)}>查看其余 {projects.length-3} 个项目</RareButton>}
    </div>}
  </section>;
