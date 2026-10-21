@@ -383,22 +383,29 @@ export function ProjectDatabase({user,initialScope="all"}:{
        </span>
       </div>
 
-      {error&&<RareNotice tone="danger">{error}<RareButton type="button" onClick={()=>refresh(v=>v+1)}>重试</RareButton></RareNotice>}
-      {busy&&!projects.length&&<div className="pj-loading">加载项目…</div>}
+      {/* 错误与加载态沿用工作台既有写法：RareNotice + .cdw-message，
+          不要在这里另造一套提示样式。 */}
+      {error&&<><RareNotice tone="danger">{error} <RareButton type="button" onClick={()=>refresh(v=>v+1)}>重试</RareButton></RareNotice>
+       <div className="pj-error-hold" aria-hidden="true"/></>}
+      {busy&&!projects.length&&<div className="cdw-message">加载项目…</div>}
 
-      {/* 三种「空」必须分开说：没有数据 / 搜索无命中 / 筛选无结果，否则用户会误判成系统丢了数据 */}
-      {!busy&&emptyKind==="none"&&(
-       <div className="pj-empty"><span className="pj-empty-ic">▤</span><strong>还没有任何项目</strong>
+      {/* 三种「空」必须分开说：没有数据 / 搜索无命中 / 筛选无结果，否则用户会误判成系统丢了数据。
+          结构对齐工作台 .cdw-empty：图标块 + strong + p + 按钮。 */}
+      {!busy&&!error&&emptyKind==="none"&&(
+       <div className="cdw-empty"><span className="cdw-empty-icon" aria-hidden="true">▤</span>
+        <strong>还没有任何项目</strong>
         <p>点击「＋ 新建项目」登记第一个项目</p>
         <RareButton type="button" tone="primary" onClick={()=>openDrawer("new")}>新建项目</RareButton></div>)}
-      {!busy&&emptyKind==="search"&&(
-       <div className="pj-empty"><span className="pj-empty-ic">⌕</span><strong>没有匹配「{search.trim()}」的项目</strong>
-        <p>换个关键词，或清空搜索回到全部项目</p>
-        <RareButton type="button" onClick={()=>setSearch("")}>清空搜索</RareButton></div>)}
-      {!busy&&emptyKind==="filter"&&(
-       <div className="pj-empty"><span className="pj-empty-ic">◔</span><strong>当前筛选条件下没有项目</strong>
+      {!busy&&!error&&emptyKind==="search"&&(
+       <div className="cdw-empty"><span className="cdw-empty-icon" aria-hidden="true">⌕</span>
+        <strong>没有匹配「{search.trim()}」的项目</strong>
+        <p>可以更换关键词继续查找，或清空搜索回到全部项目</p>
+        <RareButton type="button" tone="ghost" onClick={()=>setSearch("")}>清除搜索</RareButton></div>)}
+      {!busy&&!error&&emptyKind==="filter"&&(
+       <div className="cdw-empty"><span className="cdw-empty-icon" aria-hidden="true">◔</span>
+        <strong>当前筛选条件下没有项目</strong>
         <p>已隐藏 {ST_KEYS.filter(s=>!filterStatus[s]).map(s=>STATUS[s].label).join("、")} 的项目</p>
-        <RareButton type="button" onClick={()=>setFilterStatus({notstarted:true,progress:true,done:true})}>显示全部状态</RareButton></div>)}
+        <RareButton type="button" tone="ghost" onClick={()=>setFilterStatus({notstarted:true,progress:true,done:true})}>显示全部状态</RareButton></div>)}
 
       {!busy&&visible.length>0&&(view==="board"?renderBoard():view==="table"?renderTable():
        <ProjectGantt key={ganttScale} projects={visible} scale={ganttScale} onScale={setGanttScale}
@@ -492,7 +499,7 @@ export function ProjectDatabase({user,initialScope="all"}:{
     if(colVis.progress)cells.push(<td key="pg"><div className="pj-progress-cell"><div className="pj-progress-bar"><i style={{width:p.progress+"%"}}/></div><b>{p.progress}%</b></div></td>);
     cells.push(<td key="x"><button type="button" className="pj-del" title="删除" onClick={e=>{e.stopPropagation();onDelete(p);}}>🗑</button></td>);
     return<tr key={p.id} onClick={()=>openDrawer("edit",p)}>{cells}</tr>;})}
-   {visible.length===0&&<tr><td colSpan={heads.length} className="pj-empty-td">当前筛选下没有项目</td></tr>}
+   {visible.length===0&&<tr><td colSpan={heads.length} className="empty">当前筛选下没有项目</td></tr>}
   </tbody></table>;
  }
 

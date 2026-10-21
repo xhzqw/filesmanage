@@ -83,12 +83,6 @@
 .pj-progress-cell b{font-size:11px;color:var(--text-tertiary,#6B7C93);font-weight:600;min-width:28px}
 .pj-del{background:transparent;border:none;color:var(--text-tertiary,#B4C0D2);cursor:pointer;font-size:14px;border-radius:6px;width:26px;height:26px}
 .pj-del:hover{background:var(--surface-row-hover,#EFF4FB);color:#C0392B}
-.pj-empty-td{text-align:center;color:var(--text-tertiary,#6B7C93);padding:30px;font-size:13px}
-
-/* ---- 空 / 载入 ---- */
-.pj-loading{color:var(--text-tertiary,#6B7C93);font-size:13px;padding:40px;text-align:center}
-.pj-empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:60px 20px;color:var(--text-primary,#1D2A3D)}
-.pj-empty-ic{font-size:34px;color:var(--brand-blue,#0064E1)}
 
 /* ---- 属性可见性面板 ---- */
 .pj-colvis{position:absolute;top:150px;right:40px;width:240px;background:var(--surface-panel,#FFF);border:1px solid var(--border-hairline,#E3EAF3);border-radius:var(--radius-md,11px);box-shadow:var(--shadow-overlay,0 12px 32px rgba(15,39,92,.18));padding:12px;z-index:30}
@@ -179,10 +173,6 @@ body.pj-gdragging .pj-gbar{box-shadow:0 0 0 2px rgba(0,100,225,.35)}
 /* ---- 筛选条：总数回显 ---- */
 .pj-meta-total{color:var(--text-tertiary,#6B7C93);font-size:11.5px}
 
-/* ---- 空态变体：搜索 / 筛选 / 无数据三种出口 ---- */
-.pj-empty strong{font-size:14px}
-.pj-empty p{font-size:12.5px;color:var(--text-tertiary,#6B7C93);margin:0 0 8px;text-align:center;max-width:340px;line-height:1.6}
-
 /* ---- 抽屉：新建态提示、未保存标记、关联文档入口 ---- */
 .pj-sec-hint{font-size:12px;color:var(--text-tertiary,#6B7C93);margin:0}
 .pj-dirty{font-size:11.5px;color:var(--status-warning,#B45309);background:color-mix(in oklch,var(--status-warning,#B45309) 12%,var(--surface-panel,#FFF));padding:2px 8px;border-radius:var(--radius-pill,999px);align-self:center}
@@ -228,3 +218,23 @@ body.pj-gdragging .pj-gbar{box-shadow:0 0 0 2px rgba(0,100,225,.35)}
  .cdw-projects-view{grid-column:1 / -1;grid-row:1;
  min-width:0;min-height:0;height:100%;overflow:auto;padding:18px 22px 32px}
 @media (max-width:760px){.cdw-projects-view{padding:14px 14px 28px}}
+
+/* ---- 空 / 错误 / 载入：对齐工作台 .cdw-empty 的结构，
+ * 但项目视图是全宽内容区，窄栏那套 min-height:265px 与 11-12.5px 字号在这里偏小，
+ * 只在本视图内做尺寸适配，不改工作台原样式。 ---- */
+.pj-shell .cdw-empty{min-height:340px;gap:10px}
+.pj-shell .cdw-empty-icon{width:54px;height:54px;border-radius:var(--radius-lg,15px);font-size:26px}
+.pj-shell .cdw-empty strong{font-size:14px}
+.pj-shell .cdw-empty p{font-size:12.5px;max-width:460px;text-wrap:pretty}
+.pj-shell .cdw-empty .rare-button{font-size:12.5px;min-height:32px;padding:0 14px}
+.pj-shell .cdw-message{padding:40px 8px;color:var(--text-tertiary,#6B7C93);font-size:13px}
+/* 加载失败时不让内容区塌成一条提示：保留一块稳定的占位高度，
+   避免整页看起来像没加载完。 */
+.pj-shell > .rare-notice{margin:0}
+.pj-shell > .rare-notice + *{min-height:0}
+.pj-error-hold{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+ min-height:300px;color:var(--text-tertiary,#6B7C93);font-size:12.5px;text-align:center;padding:20px}
+.pj-error-hold::before{content:"◍";display:grid;place-items:center;width:54px;height:54px;
+ border-radius:var(--radius-lg,15px);background:var(--surface-subtle,#F6F9FD);
+ color:var(--text-tertiary,#6B7C93);font-size:26px}
+.pj-error-hold::after{content:"数据暂时不可用，重试后此处会显示项目列表";max-width:460px;line-height:1.6}
