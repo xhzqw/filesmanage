@@ -125,6 +125,43 @@ export function CDWWorkbenchHome({items,appointmentCount,initiatedCount,initiate
     </RareButton>
    </div>
    {(error||initiatedError)&&<RareNotice tone="warning">部分工作数据暂时无法读取。{error||initiatedError} <RareButton type="button" onClick={onRefresh}>重试</RareButton></RareNotice>}
+   <div className="cdw-home-pipeline" aria-label="体系文件与研发流程流转图">
+    <div className="cdw-pipeline-top">
+     <strong>体系文件与研发全流程流转图</strong>
+     <small>依 ZS-QP-01《文件控制程序》与 ZS-QP-09《设计和开发控制程序》标准执行</small>
+    </div>
+    <div className="cdw-pipeline-steps">
+     <RareButton type="button" className="cdw-pipeline-step" onClick={()=>onView("tasks")}>
+      <span className="cdw-step-badge">01 · 编制</span>
+      <strong>文件修订与编制</strong>
+      <small>DOCX 独立编辑分支</small>
+      <span className="cdw-step-arrow" aria-hidden="true">→</span>
+     </RareButton>
+     <RareButton type="button" className="cdw-pipeline-step" onClick={()=>onView("reviews")}>
+      <span className="cdw-step-badge">02 · 验收</span>
+      <strong>交付节点验收</strong>
+      <small>直属上级独立核验</small>
+      <span className="cdw-step-arrow" aria-hidden="true">→</span>
+     </RareButton>
+     <RareButton type="button" className="cdw-pipeline-step" onClick={()=>onView("formal")}>
+      <span className="cdw-step-badge">03 · 审批</span>
+      <strong>受控正式审批</strong>
+      <small>管代/总经理层级签批</small>
+      <span className="cdw-step-arrow" aria-hidden="true">→</span>
+     </RareButton>
+     <RareButton type="button" className="cdw-pipeline-step" onClick={()=>onView("scope")}>
+      <span className="cdw-step-badge">04 · 范围</span>
+      <strong>分发范围审批</strong>
+      <small>受控版次与范围核定</small>
+      <span className="cdw-step-arrow" aria-hidden="true">→</span>
+     </RareButton>
+     <RareButton type="button" className="cdw-pipeline-step" onClick={()=>onView("receipts")}>
+      <span className="cdw-step-badge">05 · 生效</span>
+      <strong>部门签收与生效</strong>
+      <small>纸质/电子受控台账闭环</small>
+     </RareButton>
+    </div>
+   </div>
    <DHFHomeProjects canCreate={canCreate}/>
    <div className="cdw-home-content">
     <div className="cdw-home-primary">
@@ -147,15 +184,38 @@ export function CDWWorkbenchHome({items,appointmentCount,initiatedCount,initiate
      </div>
      {busy&&items.length===0?<div className="cdw-home-loading"><BrandLoadingLabel showContext>读取工作中</BrandLoadingLabel></div>:
      todo.length===0&&appointmentCount===0?<div className="cdw-home-empty-card">
-      <div className="cdw-home-empty-icon" aria-hidden="true">✓</div>
-      <div className="cdw-home-empty-text">
-       <strong>当前待办事项均已处理完成</strong>
-       <p>没有需要立即处理的审批或流转任务，可以从下方快捷发起业务事项</p>
+      <div className="cdw-home-empty-top">
+       <div className="cdw-home-empty-icon" aria-hidden="true">✓</div>
+       <div className="cdw-home-empty-text">
+        <strong>当前待办事项均已处理完成</strong>
+        <p>系统运行正常，没有需要立即处理的审批或流转任务，可从下方快捷发起业务事项</p>
+       </div>
       </div>
-      <div className="cdw-home-quick-actions">
-       {canCreate&&<RareButton type="button" tone="primary" onClick={onCreate}>发起文件修订工作</RareButton>}
-       <Link to="/workbench/dhf?create=1" className="cdw-quick-link">创建 DHF 项目</Link>
-       <RareButton type="button" tone="ghost" onClick={()=>onView("initiated")}>查看我发起的工作 ↗</RareButton>
+      <div className="cdw-home-op-matrix">
+       <div className="cdw-op-card">
+        <div className="cdw-op-badge">程序文件 · ZS-QP-01</div>
+        <strong>受控文件编制与改版</strong>
+        <p>创建 DOCX 独立编辑分支，启动质量管理体系文件编制或升版修订。</p>
+        {canCreate&&<RareButton type="button" tone="primary" onClick={onCreate}>发起文件修订 →</RareButton>}
+       </div>
+       <div className="cdw-op-card">
+        <div className="cdw-op-badge">研发控制 · ZS-QP-09</div>
+        <strong>DHF 九阶段设计开发</strong>
+        <p>医疗器械研发阶段交付物管理，按 D1～D9 标准推进独立验收。</p>
+        <Link to="/workbench/dhf?create=1" className="cdw-quick-link">创建 DHF 项目 →</Link>
+       </div>
+       <div className="cdw-op-card">
+        <div className="cdw-op-badge">受控分发 · QP-01-JL02</div>
+        <strong>部门签收与借阅台账</strong>
+        <p>受控版本分发闭环、使用部门签收确认与纸质/电子副本管理。</p>
+        <RareButton type="button" tone="ghost" onClick={()=>onView("receipts")}>查看签收台账 →</RareButton>
+       </div>
+       <div className="cdw-op-card">
+        <div className="cdw-op-badge">行政合规 · XZ-13</div>
+        <strong>电子印章与签章中心</strong>
+        <p>公章登记、个人电子签名绑定、签署授权管理与数字防伪。</p>
+        <RareButton type="button" tone="ghost" onClick={()=>onView("seals")}>进入签章中心 →</RareButton>
+       </div>
       </div>
      </div>:<div className="cdw-home-work-list">
       {display.map(item=><RareButton type="button" key={itemKey(item)} className="cdw-home-work-row" onClick={()=>onOpen(item)}>

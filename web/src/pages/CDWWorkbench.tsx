@@ -73,10 +73,9 @@ export function WorkbenchIcon({name,className=""}:{name:string;className?:string
 
 type View="home"|"todo"|"initiated"|"following"|"tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all"|"seals";
 const viewGroups:{name:string;views:{key:View;label:string;icon:string}[]}[]=[
- {name:"工作中心",views:[{key:"home",label:"工作首页",icon:"home"},{key:"todo",label:"待我处理",icon:"todo"},{key:"initiated",label:"我发起的",icon:"initiated"},{key:"following",label:"其他事项",icon:"following"},{key:"all",label:"全部事项",icon:"all"}]},
- {name:"业务任务",views:[{key:"tasks",label:"文件工作",icon:"tasks"},{key:"obligations",label:"责任待办",icon:"obligations"}]},
- {name:"审查与批准",views:[{key:"formal",label:"正式审批",icon:"formal"},{key:"reviews",label:"交付验收",icon:"reviews"},{key:"appointments",label:"任命核验",icon:"appointments"},{key:"scope",label:"范围审批",icon:"scope"}]},
- {name:"受控发行",views:[{key:"control",label:"发行准备",icon:"control"},{key:"receipts",label:"部门签收",icon:"receipts"},{key:"reading",label:"阅读确认",icon:"reading"},{key:"effective",label:"生效文件",icon:"effective"}]},
+ {name:"主工作区",views:[{key:"home",label:"工作首页",icon:"home"},{key:"todo",label:"待我处理",icon:"todo"},{key:"initiated",label:"我发起的",icon:"initiated"},{key:"following",label:"其他事项",icon:"following"},{key:"all",label:"全部事项",icon:"all"}]},
+ {name:"审查与批准",views:[{key:"formal",label:"正式审批",icon:"formal"},{key:"reviews",label:"交付验收",icon:"reviews"},{key:"scope",label:"范围审批",icon:"scope"},{key:"appointments",label:"任命核验",icon:"appointments"}]},
+ {name:"受控执行与台账",views:[{key:"tasks",label:"文件工作",icon:"tasks"},{key:"obligations",label:"责任待办",icon:"obligations"},{key:"control",label:"发行准备",icon:"control"},{key:"receipts",label:"部门签收",icon:"receipts"},{key:"reading",label:"阅读确认",icon:"reading"},{key:"effective",label:"生效文件",icon:"effective"}]},
  {name:"系统服务",views:[{key:"seals",label:"电子签章",icon:"seals"}]},
 ];
 const kindName:Record<CDWInboxItem["kind"],string>={
@@ -423,7 +422,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
     <div className="sidebar-scroll">
      <div className="cdw-rail-overview">
       <span className="cdw-rail-mark" aria-hidden="true"><WorkbenchIcon name="todo"/></span>
-      <span><strong>工作台</strong><small>{allItems.filter(isActionable).length+appointmentCount} 项待处理</small></span>
+      <span><strong>工作台</strong><small>{allItems.filter(isActionable).length+appointmentCount > 0 ? `${allItems.filter(isActionable).length+appointmentCount} 项待处理` : "待办已清空"}</small></span>
      </div>
      <nav className="cdw-rail-nav" aria-label="工作分类">
       {viewGroups.map(group=><div className="cdw-rail-group" key={group.name}>
@@ -432,7 +431,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
         <RareButton key={key} type="button" className={"cdw-rail-item"+(filter===key?" is-current":"")}
          aria-current={filter===key?"page":undefined} onClick={()=>{setFilter(key);setActiveForm(null);setFormalDraft(false);}}>
          <span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name={icon}/></span><span className="cdw-rail-label">{label}</span>
-         {key!=="effective"&&key!=="home"&&key!=="initiated"&&key!=="seals"&&<small className={counts[key]>0?"has-count":""}>{counts[key]}</small>}
+         {counts[key]>0&&<small className="has-count">{counts[key]}</small>}
         </RareButton>)}
       </div>)}
      </nav>
