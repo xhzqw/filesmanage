@@ -1,6 +1,6 @@
 .continuous-page-viewport{scrollbar-gutter:stable;overscroll-behavior:contain;scroll-behavior:auto}
 .continuous-page-stack{display:flex;flex-direction:column;align-items:center;min-width:100%;box-sizing:border-box}
-.continuous-page{position:relative;flex:none;box-sizing:border-box;margin-bottom:20px;background:#fff;border:1px solid rgba(15,23,42,.06);border-radius:4px;box-shadow:0 1px 3px rgba(15,23,42,.06),0 10px 30px rgba(15,23,42,.07);overflow:hidden}
+.continuous-page{position:relative;flex:none;box-sizing:border-box;margin-bottom:20px;background:#fff;border:1px solid rgba(15,23,42,.06);border-radius:var(--radius-sm);box-shadow:0 1px 3px rgba(15,23,42,.06),0 10px 30px rgba(15,23,42,.07);overflow:hidden}
 .continuous-page img{display:block;max-width:none;max-height:none;object-fit:fill}
 .continuous-page-placeholder{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:#fff;color:#94A3B8;font-size:12px}
 .continuous-page-viewport.is-panning{cursor:grab}

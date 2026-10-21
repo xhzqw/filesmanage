@@ -94,7 +94,7 @@ try{
  await send("Page.enable");await send("Runtime.enable");await send("Network.enable");
  await send("Network.setCookie",{name:"fm_session",value:cookie.slice("fm_session=".length),url:base});
  await send("Page.navigate",{url:base+"/preview/"+encodeURIComponent(item.id)});
- assert(await waitFor('Boolean(document.querySelector(".office-layout-pdf img[aria-hidden=false]"))',35000),
+ assert(await waitFor('Boolean([...document.querySelectorAll(".office-layout-pdf img")].some(img=>img.complete&&img.naturalWidth>0&&getComputedStyle(img).visibility==="visible"))',35000),
   "DOCX must open as a rendered image page, without downloading");
  for(const [width,height] of [[1440,900],[1024,768],[740,740]]){
   await send("Emulation.setDeviceMetricsOverride",{width,height,deviceScaleFactor:1,mobile:false});
@@ -125,6 +125,20 @@ try{
    "DOCX paged layout geometry "+width+": "+JSON.stringify(state));
   console.log("PASS DOCX page layout "+width+" native="+state.ratio.toFixed(3)+" displayed="+state.displayedRatio.toFixed(3));
  }
+ const count=await evalJS('Number(document.querySelector(".office-layout-page-controls .preview-dock-page-count")?.textContent?.split("/")[1])||0');
+ const firstMounted=await evalJS('document.querySelectorAll(".office-layout-pdf img").length');
+ assert(firstMounted<=8,"Document must not mount every offscreen image");
+ if(count>1){
+  await evalJS('document.querySelector(".office-layout-pdf").scrollTop=document.querySelector(".office-layout-pdf").scrollHeight');
+  assert(await waitFor('Number(document.querySelector(".office-layout-page-controls .preview-dock-page-count")?.textContent?.split("/")[0])>1'),
+   "Scrolling must update the active page across document boundaries");
+  const afterScroll=await evalJS('document.querySelectorAll(".office-layout-pdf img").length');
+  assert(afterScroll<=8,"Continuous scrolling must keep the mounted page-image window bounded");
+  await evalJS('document.querySelector(".office-layout-pdf").scrollTop=0');
+  assert(await waitFor('document.querySelector(".office-layout-page-controls .preview-dock-page-count")?.textContent?.trim().startsWith("1 /")'),
+   "Scrolling back must restore the first page position");
+  console.log("PASS DOCX continuous scrolling, active page tracking and bounded images");
+ }
  const beforeZoom=await evalJS('document.querySelector(".office-layout-pdf img")?.getBoundingClientRect().height');
  await evalJS('document.querySelector("button[aria-label=放大页面]")?.click()');
  await delay(200);
@@ -148,7 +162,7 @@ try{
  await evalJS(`(()=>{
   [...document.querySelectorAll(".office-layout-switch button")].find(b=>b.textContent?.includes("页面布局"))?.click();
  })()`);
- assert(await waitFor('Boolean(document.querySelector(".office-layout-pdf img[aria-hidden=false]"))'),
+ assert(await waitFor('Boolean([...document.querySelectorAll(".office-layout-pdf img")].some(img=>img.complete&&img.naturalWidth>0&&getComputedStyle(img).visibility==="visible"))'),
   "DOCX switch back to pages must retain rendered page");
  assert.deepEqual(unexpectedDownloads,[],"DOCX preview must not trigger a browser download");
  assert.deepEqual(unexpectedBytesRequests,[],"DOCX preview must not fetch the original file");
