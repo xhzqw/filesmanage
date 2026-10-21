@@ -98,9 +98,10 @@ try{
  for(const width of [1440,1024,780,540]){
   await send("Emulation.setDeviceMetricsOverride",{width,height:850,deviceScaleFactor:1,mobile:false});
   await sleep(130);
-  const l=await evalJS("(()=>({bodyWidth:document.documentElement.scrollWidth,panes:['.cdw-rail','.cdw-home'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return {left:r.left,right:r.right,bottom:r.bottom}})}))()");
+  const l=await evalJS("(()=>({bodyWidth:document.documentElement.scrollWidth,panes:['.cdw-rail','.cdw-home'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return {left:r.left,right:r.right,bottom:r.bottom}}),layout:document.querySelector('.cdw-layout').getBoundingClientRect(),homeDoc:(()=>{const r=document.querySelector('.cdw-home-toolbar').getBoundingClientRect();return {left:r.left,right:r.right}})()}))()");
   assert.ok(l.bodyWidth<=width+2,"home horizontal overflow at "+width+": "+JSON.stringify(l));
   assert.ok(l.panes.every(p=>p.left>=-2&&p.right<=width+2&&p.bottom<=851),"home pane overflow at "+width+": "+JSON.stringify(l));
+  assert.ok(Math.abs(l.homeDoc.left-l.layout.left)<=1,"work home must start at the canvas edge, no empty grid track at "+width+": "+JSON.stringify(l));
   console.log("CDW_HOME_LAYOUT_PASS",width);
  }
  await send("Emulation.clearDeviceMetricsOverride");
@@ -158,11 +159,13 @@ try{
     const el=document.querySelector(selector),rect=el.getBoundingClientRect();
     return {selector,left:rect.left,right:rect.right,top:rect.top,bottom:rect.bottom,scrollHeight:el.scrollHeight,clientHeight:el.clientHeight};
    });
-   return {viewport:innerWidth,bodyWidth:body.scrollWidth,layoutRight:outer.right,panes}
+   return {viewport:innerWidth,bodyWidth:body.scrollWidth,layoutLeft:outer.left,layoutRight:outer.right,panes}
   })()`);
   assert.ok(layout.bodyWidth<=width+2,"horizontal page overflow at "+width+": "+JSON.stringify(layout));
   assert.ok(layout.panes.every(p=>p.right<=width+2&&p.left>=-2),"panes overflow at "+width+": "+JSON.stringify(layout));
   assert.ok(layout.panes.every(p=>p.bottom<=851),"panes extend below viewport at "+width);
+  assert.ok(Math.abs(layout.panes.find(p=>p.selector===".cdw-inbox").left-layout.layoutLeft)<=1,
+   "inbox must start at the canvas edge, no empty grid track at "+width+": "+JSON.stringify(layout));
   console.log("CDW_LAYOUT_PASS",width,layout.panes.map(p=>p.selector+":"+Math.round(p.right-p.left)).join(" "));
  }
  await evalJS("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')].find(b=>b.textContent.includes('交付验收'));button?.click();return true;})()");
