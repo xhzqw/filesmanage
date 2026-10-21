@@ -16,13 +16,15 @@ export function DHFHomeProjects({canCreate}:{canCreate:boolean}){
   return()=>{alive=false};
  },[]);
  return <section className="cdw-home-dhf" aria-label="DHF阶段项目">
-  <div className="cdw-home-dhf-head"><div><strong>DHF 九阶段项目</strong>
-   <span>独立文件验收，按项目及阶段办理</span></div><Link to="/workbench/dhf">进入 DHF 工作台 →</Link></div>
-  {error?<p className="cdw-home-dhf-empty">{error}。请从 DHF 工作台重新加载。</p>:
-   busy?<p className="cdw-home-dhf-empty">正在读取我的项目…</p>:
+  <div className="cdw-home-dhf-head">
+   <strong>DHF 研发项目</strong>
+   <Link to="/workbench/dhf">进入 DHF 工作台 →</Link>
+  </div>
+  {error?<p className="cdw-home-dhf-empty">{error}</p>:
+   busy?<p className="cdw-home-dhf-empty">正在加载…</p>:
    projects.length===0?<div className="cdw-home-dhf-empty">
-    <span>暂无关联的 DHF 项目</span>
-    {canCreate&&<Link to="/workbench/dhf?create=1">创建 DHF 项目 →</Link>}
+    <span>暂无进行中的研发项目</span>
+    {canCreate&&<Link to="/workbench/dhf?create=1">+ 创建项目</Link>}
    </div>:<div className="cdw-home-dhf-list">
     {(more?projects:projects.slice(0,3)).map(project=><Link key={project.id} to={"/workbench/dhf?project="+encodeURIComponent(project.id)}
      className="cdw-home-dhf-row">
