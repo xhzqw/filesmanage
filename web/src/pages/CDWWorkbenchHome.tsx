@@ -5,7 +5,7 @@ import {BrandLoadingLabel} from "../shared/ui/BrandLoader";
 import type {CDWInboxItem} from "../features/cdw/api";
 import {DHFHomeProjects} from "./DHFHomeProjects";
 
-export type HomeView="todo"|"initiated"|"following"|"all"|"appointments"|"reviews"|"receipts"|"tasks";
+export type HomeView="todo"|"initiated"|"following"|"all"|"appointments"|"reviews"|"receipts"|"tasks"|"seals";
 type Props={items:CDWInboxItem[];appointmentCount:number;initiatedCount:number;initiatedHasMore:boolean;initiatedError:string;initiatedBusy:boolean;busy:boolean;error:string;canCreate:boolean;
  onCreate:()=>void;onRefresh:()=>void;onOpen:(item:CDWInboxItem)=>void;onView:(view:HomeView)=>void};
 export function workNeedsAction(item:CDWInboxItem):boolean{
