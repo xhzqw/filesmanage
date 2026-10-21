@@ -1,3 +1,5 @@
+import {Link} from "react-router-dom";
+import {BrandLogo} from "../../shared/ui/AppShell";
 import {useEffect,useMemo,useState} from "react";
 import {observeWorkspaceChange} from "../../shared/resourceSync";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
@@ -106,28 +108,66 @@ export function StatsPanel(){
  const types=stats?.byType||[];
  const byUploader=stats?.byUploader||[];
 
- return <div className="work-body stats-workbench">
-  <div className="stats-toolbar">
-   <div className="stats-heading"><strong>文件资产概览</strong></div>
-   <div className="stats-filters">
-    <label className="stats-field"><span>目录</span><RareSelect aria-label="目录范围" value={scope} onChange={e=>changeScope(e.target.value as Scope)}>
-     <option value="all">全部可见</option><option value="current">仅当前目录</option><option value="descendants">包含子目录</option>
-    </RareSelect></label>
-    <RareButton type="button" tone="neutral" onClick={()=>openPicker()} title={folderLabel} className="stats-folder-trigger">{folderLabel==="全部可见目录"?"选择目录":folderLabel}</RareButton>
-    <label className="stats-field"><span>时间</span><RareSelect aria-label="修改时间" value={range} onChange={e=>setRange(e.target.value)}>
-     {rangeOptions.map(item=><option key={item.value} value={item.value}>{item.label}</option>)}
-    </RareSelect></label>
-    <label className="stats-field"><span>类型</span><RareSelect aria-label="文件 MIME 类型" value={type} onChange={e=>setType(e.target.value)}>
-     <option value="">全部格式</option><option value="image/">图片</option><option value="video/">视频</option>
-     <option value="audio/">音频</option><option value="application/pdf">PDF</option>
-     <option value="text/">文本</option><option value="application/">其他应用文件</option>
-    </RareSelect></label>
-    <MetricSwitch value={metric} onChange={setMetric}/>
-    {uploader&&<RareButton tone="ghost" type="button" onClick={()=>setUploader("")}>清除上传人</RareButton>}
-    {activeFilters&&<RareButton tone="ghost" type="button" onClick={resetFilters}>重置</RareButton>}
-    <a className="stats-export" href={collaborationApi.exportUrl(filters)} aria-label="导出当前统计筛选的文件 CSV">导出 CSV</a>
+ return <>
+  <aside className="sidebar finder-sidebar" style={{width:"240px"}}>
+   <Link to="/doc" className="finder-sidebar-home" aria-label="中晟生物 · 返回文档首页">
+    <BrandLogo size={27} className="finder-sidebar-logo" transparent/><span>中晟生物</span>
+   </Link>
+   <div className="sidebar-scroll">
+    <div className="finder-navigation stats-sidebar-nav" role="navigation" aria-label="统计筛选分类">
+     <div className="finder-nav-section stats-sidebar-section">
+      <div className="finder-nav-label">目录范围</div>
+      <label className="stats-field">
+       <RareSelect aria-label="目录范围" value={scope} onChange={e=>changeScope(e.target.value as Scope)}>
+        <option value="all">全部可见</option><option value="current">仅当前目录</option><option value="descendants">包含子目录</option>
+       </RareSelect>
+      </label>
+      <RareButton type="button" tone="neutral" onClick={()=>openPicker()} title={folderLabel} className="stats-folder-trigger">
+       {folderLabel==="全部可见目录"?"选择目录":folderLabel}
+      </RareButton>
+     </div>
+     <div className="finder-nav-section stats-sidebar-section">
+      <div className="finder-nav-label">时间范围</div>
+      <label className="stats-field">
+       <RareSelect aria-label="修改时间" value={range} onChange={e=>setRange(e.target.value)}>
+        {rangeOptions.map(item=><option key={item.value} value={item.value}>{item.label}</option>)}
+       </RareSelect>
+      </label>
+     </div>
+     <div className="finder-nav-section stats-sidebar-section">
+      <div className="finder-nav-label">文件类型</div>
+      <label className="stats-field">
+       <RareSelect aria-label="文件 MIME 类型" value={type} onChange={e=>setType(e.target.value)}>
+        <option value="">全部格式</option><option value="image/">图片</option><option value="video/">视频</option>
+        <option value="audio/">音频</option><option value="application/pdf">PDF</option>
+        <option value="text/">文本</option><option value="application/">其他应用文件</option>
+       </RareSelect>
+      </label>
+     </div>
+     <div className="finder-nav-section stats-sidebar-section">
+      <div className="finder-nav-label">统计度量</div>
+      <MetricSwitch value={metric} onChange={setMetric}/>
+     </div>
+     <div className="finder-nav-section stats-sidebar-section">
+      <div className="finder-nav-label">数据操作</div>
+      {uploader&&<RareButton tone="ghost" type="button" className="finder-nav-item" onClick={()=>setUploader("")}>清除上传人</RareButton>}
+      {activeFilters&&<RareButton tone="ghost" type="button" className="finder-nav-item" onClick={resetFilters}>重置筛选</RareButton>}
+      <a className="stats-export finder-nav-item" href={collaborationApi.exportUrl(filters)} aria-label="导出当前统计筛选的文件 CSV">
+       导出 CSV 数据 ↗
+      </a>
+     </div>
+    </div>
    </div>
-  </div>
+   <div className="sidebar-resizer" role="separator" aria-orientation="vertical" tabIndex={-1}/>
+  </aside>
+  <main className="work stats-work">
+   <div className="folder-context-bar stats-context-bar">
+    <strong className="folder-current-title">文件资产概览{scope!=="all"?` · ${folderLabel}`:""}</strong>
+    <div className="stats-context-actions">
+     <RareButton type="button" tone="ghost" className="stats-refresh-btn" aria-label="刷新统计" title="刷新统计" onClick={()=>setReload(n=>n+1)}>↻ 刷新</RareButton>
+    </div>
+   </div>
+   <div className="work-body stats-workbench">
   {scope!=="all"&&<div className="stats-scope-note">当前目录：{folderLabel} <RareButton tone="ghost" type="button" onClick={()=>openPicker(scope)}>更改</RareButton></div>}
   {status==="loading"&&<div className="stats-state" role="status"><BrandLoadingLabel size="sm">正在加载统计数据…</BrandLoadingLabel></div>}
   {status==="failed"&&<div className="stats-state" role="alert">统计加载失败 <RareButton type="button" tone="neutral" onClick={()=>setReload(n=>n+1)}>重试</RareButton></div>}
@@ -177,7 +217,14 @@ export function StatsPanel(){
      <RareButton type="button" tone="primary" disabled={!candidate} onClick={applyFolder}>应用</RareButton>
     </div>}/>}
   </Dialog>}
- </div>;
+   </div>
+   <div className="status-bar finder-bottom-bar">
+    <span className="finder-bottom-node">目录：{folderLabel}</span>
+    <span className="finder-bottom-count">共 {stats?.totalFiles??0} 个文件 · {formatBytes(stats?.totalBytes??0)}</span>
+    <span className="finder-bottom-path">{rangeOptions.find(r=>r.value===range)?.label} · {metric==="count"?"文件数":"容量"}</span>
+   </div>
+  </main>
+ </>;
 }
 function MetricSwitch({value,onChange}:{value:Metric;onChange:(value:Metric)=>void}){
  return <GooeyNav className="stats-metric" aria-label="统计单位" size="xs" items={["数量","容量"]}

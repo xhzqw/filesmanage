@@ -14,6 +14,8 @@ import {CDWScopeApprovalPanel} from "../features/cdw/CDWScopeApprovalPanel";
 import {CDWDepartmentReceiptPanel} from "../features/cdw/CDWDepartmentReceiptPanel";
 import {CDWReadingPanel} from "../features/cdw/CDWReadingPanel";
 import {CDWEffectiveSearchPanel} from "../features/cdw/CDWEffectiveSearchPanel";
+import {customerApi} from "../features/customers/api";
+import {CustomerRegistrationWorkspace} from "../features/customers/CustomerRegistrationWorkspace";
 import {BrandLoadingLabel} from "../shared/ui/BrandLoader";
 import {toast} from "../shared/ui/feedback";
 import {errorCopy} from "../shared/errors";
@@ -27,11 +29,11 @@ import "./cdwWorkbench.css";
 import {CDWWorkbenchHome,workNeedsAction} from "./CDWWorkbenchHome";
 import {CDWInitiatedWorkspace} from "./CDWInitiatedWorkspace";
 
-type View="home"|"todo"|"initiated"|"following"|"tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all";
+type View="home"|"todo"|"initiated"|"following"|"tasks"|"obligations"|"reviews"|"formal"|"customers"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all";
 const viewGroups:{name:string;views:{key:View;label:string;symbol:string}[]}[]=[
  {name:"开始工作",views:[{key:"home",label:"工作首页",symbol:"⌂"},{key:"todo",label:"待我处理",symbol:"▤"},{key:"initiated",label:"我发起的",symbol:"↗"},{key:"following",label:"其他事项",symbol:"◇"},{key:"all",label:"全部事项",symbol:"▦"}]},
  {name:"按业务查看",views:[{key:"tasks",label:"文件工作",symbol:"▤"},{key:"obligations",label:"责任待办",symbol:"◇"}]},
- {name:"审查与批准",views:[{key:"reviews",label:"交付验收",symbol:"✓"},{key:"formal",label:"正式审批",symbol:"✎"},{key:"appointments",label:"任命核验",symbol:"♙"},{key:"scope",label:"范围审批",symbol:"◎"}]},
+ {name:"审查与批准",views:[{key:"reviews",label:"交付验收",symbol:"✓"},{key:"formal",label:"正式审批",symbol:"✎"},{key:"customers",label:"客户登记",symbol:"▤"},{key:"appointments",label:"任命核验",symbol:"♙"},{key:"scope",label:"范围审批",symbol:"◎"}]},
  {name:"受控发行",views:[{key:"control",label:"发行准备",symbol:"▣"},{key:"receipts",label:"部门签收",symbol:"⌁"},{key:"reading",label:"阅读确认",symbol:"▧"},{key:"effective",label:"生效文件",symbol:"◈"}]},
 ];
 const kindName:Record<CDWInboxItem["kind"],string>={
@@ -85,8 +87,10 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const[formalDraft,setFormalDraft]=useState(false);
  const[busy,setBusy]=useState(false);
  const[refreshToken,refresh]=useState(0);
+ const[customerPending,setCustomerPending]=useState(0);
+ useEffect(()=>{let live=true;customerApi.registrations("inbox").then(page=>{if(live)setCustomerPending((page.items??[]).filter(x=>x.state==="pending").length)}).catch(()=>{if(live)setCustomerPending(0)});return()=>{live=false}},[refreshToken,user.id]);
  const[requestError,setRequestError]=useState("");
- const[filter,setFilter]=useState<View>(()=>params.get("view")==="initiated"?"initiated":params.get("task")?"all":"home");
+ const[filter,setFilter]=useState<View>(()=>params.get("view")==="customers"?"customers":params.get("view")==="initiated"?"initiated":params.get("task")?"all":"home");
  const[search,setSearch]=useState("");
  const[priorityFirst,setPriorityFirst]=useState(true);
  const[branches,setBranches]=useState<CDWBranch[]>([]);
@@ -360,21 +364,21 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
   specialImpacts.filter(a=>a.state==="open").length+legacyAnomalies.filter(a=>a.requestedBy!==user.id).length+
   formalNotices.filter(a=>!a.readAt).length;
  const counts:Record<View,number>={
-  home:allItems.filter(isActionable).length+appointmentCount,todo:allItems.filter(isActionable).length+appointmentCount,initiated:initiatedItems.length,following:allItems.filter(x=>!isActionable(x)).length,
+  home:allItems.filter(isActionable).length+appointmentCount+customerPending,todo:allItems.filter(isActionable).length+appointmentCount+customerPending,initiated:initiatedItems.length,following:allItems.filter(x=>!isActionable(x)).length,
   tasks:totalTasks,obligations:totalObligations,reviews:totalReviews,formal:totalFormal,
-  appointments:appointmentCount,control:totalControl,scope:totalScope,receipts:totalReceipts,
+  appointments:appointmentCount,customers:customerPending,control:totalControl,scope:totalScope,receipts:totalReceipts,
   reading:totalReading,effective:0,all:allItems.length,
  };
  const selectedView=viewGroups.flatMap(group=>group.views).find(view=>view.key===filter)?.label??"工作事项";
  const actionableVisible=visible.filter(isActionable).length;
  const canWork=selected?.kind==="task"&&(selected.state==="accepted"||selected.state==="in_progress");
  const editingBranch=branches.find(b=>b.state==="open");
- return <AppShell user={user} onLogout={onLogout}>
-  <div className="panels cdw-panels">
+ return <AppShell user={user} onLogout={onLogout} finderSidebarWidth={240}>
+  <div className="panels document-explorer cdw-panels">
    <main className="work cdw-work">
     <div className="cdw-layout">
      <aside className="cdw-rail" aria-label="工作视图分类">
-      <div className="cdw-rail-overview"><span className="cdw-rail-mark" aria-hidden="true">◫</span><span><strong>工作队列</strong><small>{allItems.filter(isActionable).length+appointmentCount} 项待处理</small></span></div>
+      <div className="cdw-rail-overview"><span className="cdw-rail-mark" aria-hidden="true">◫</span><span><strong>工作队列</strong><small>{allItems.filter(isActionable).length+appointmentCount+customerPending} 项待处理</small></span></div>
       <nav className="cdw-rail-nav" aria-label="工作分类">
        {viewGroups.map(group=><div className="cdw-rail-group" key={group.name}>
         <div className="cdw-rail-caption">{group.name}</div>
@@ -388,13 +392,13 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
       </nav>
       <Link className="cdw-rail-dhf" to="/workbench/dhf"><span className="cdw-rail-icon" aria-hidden="true">▣</span><span>DHF 九阶段验收</span><span aria-hidden="true">↗</span></Link>
      </aside>
-     {filter==="home"?<CDWWorkbenchHome initiatedCount={initiatedItems.length} initiatedHasMore={Boolean(initiatedCursor)} initiatedError={initiatedError} initiatedBusy={initiatedBusy} items={allItems} appointmentCount={appointmentCount} busy={busy} error={requestError}
+     {filter==="home"?<CDWWorkbenchHome initiatedCount={initiatedItems.length} initiatedHasMore={Boolean(initiatedCursor)} initiatedError={initiatedError} initiatedBusy={initiatedBusy} items={allItems} appointmentCount={appointmentCount} customerPending={customerPending} busy={busy} error={requestError}
       canCreate={user.isAdmin} onRefresh={()=>refresh(v=>v+1)} onCreate={()=>{setFilter("tasks");beginForm("create");}}
       onOpen={item=>{setFilter("all");select(item);}} onView={view=>{setFilter(view);setActiveForm(null);setFormalDraft(false);}}/>:filter==="initiated"?
       <CDWInitiatedWorkspace initialTaskId={params.get("initiated")??""} items={initiatedItems} busy={initiatedBusy} error={initiatedError} nextCursor={initiatedCursor}
        onMore={()=>void loadMoreInitiated()} onRefresh={()=>refresh(v=>v+1)}/>:filter==="effective"?<CDWEffectiveSearchPanel/>:filter==="appointments"?
       <CDWQMSReviewInbox items={pendingAppointments} alerts={appointmentAlerts} actorId={user.id}
-       onRead={id=>void readAppointmentAlert(id)} onVerified={()=>refresh(v=>v+1)}/>:<>
+       onRead={id=>void readAppointmentAlert(id)} onVerified={()=>refresh(v=>v+1)}/>:filter==="customers"?<CustomerRegistrationWorkspace actorId={user.id} refreshToken={refreshToken} initialScope={params.get("scope")==="mine"?"mine":"inbox"} onDecided={()=>refresh(v=>v+1)}/>:<>
      <section className="cdw-inbox" aria-label="工作事项列表">
       <header className="cdw-inbox-tools">
        <div className="cdw-inbox-heading"><strong>{selectedView}</strong><span>{visible.length}</span></div>
@@ -406,12 +410,13 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
       <div className="cdw-search"><div className="cdw-search-field"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><RareInput type="search" aria-label="筛选工作或文件" placeholder="搜索工作或文件…" value={search} onChange={e=>setSearch(e.target.value)}/></div></div>
       <div className="cdw-list-meta"><span>{actionableVisible>0?<><i className="cdw-meta-dot"/> {actionableVisible} 项待处理</>:"当前分类的全部事项"}</span><RareButton type="button" className={"cdw-sort-button"+(priorityFirst?" is-active":"")} aria-pressed={priorityFirst} tone="ghost" onClick={()=>setPriorityFirst(v=>!v)}>待处理优先 <span aria-hidden="true">{priorityFirst?"↓":"↕"}</span></RareButton></div>
       <div className="cdw-inbox-scroll">
+       {(filter==="todo"||filter==="all")&&customerPending>0&&<RareButton type="button" className="cdw-appointment-shortcut" onClick={()=>setFilter("customers")}><strong>客户登记审批</strong><small>{customerPending} 项待我审核</small><span aria-hidden="true">→</span></RareButton>}
        {filter==="todo"&&appointmentCount>0&&<RareButton type="button" className="cdw-appointment-shortcut" onClick={()=>setFilter("appointments")}>
         <strong>专项核验及通知</strong><small>{appointmentCount} 项需关注或处理</small><span aria-hidden="true">→</span>
        </RareButton>}
        {busy&&items.length===0&&<div className="cdw-message"><BrandLoadingLabel showContext>加载工作事项</BrandLoadingLabel></div>}
        {requestError&&<RareNotice tone="danger">{requestError} <RareButton type="button" onClick={()=>refresh(n=>n+1)}>重试</RareButton></RareNotice>}
-       {!busy&&visible.length===0&&(filter!=="todo"||appointmentCount===0)&&<div className="cdw-empty"><span className="cdw-empty-icon" aria-hidden="true">▤</span><strong>{search.trim()?"没有匹配的工作":"当前没有需要展示的事项"}</strong><p>{search.trim()?"可以更换关键词继续查找":filter==="obligations"?"目前没有待履行责任":"新事项到达后会出现在这里"}</p>{search.trim()&&<RareButton type="button" tone="ghost" onClick={()=>setSearch("")}>清除搜索</RareButton>}</div>}
+       {!busy&&visible.length===0&&(filter!=="todo"||(appointmentCount===0&&customerPending===0))&&<div className="cdw-empty"><span className="cdw-empty-icon" aria-hidden="true">▤</span><strong>{search.trim()?"没有匹配的工作":"当前没有需要展示的事项"}</strong><p>{search.trim()?"可以更换关键词继续查找":filter==="obligations"?"目前没有待履行责任":"新事项到达后会出现在这里"}</p>{search.trim()&&<RareButton type="button" tone="ghost" onClick={()=>setSearch("")}>清除搜索</RareButton>}</div>}
        {visible.map(item=><RareButton type="button" className={"cdw-task-row"+(selected===item&&!activeForm?" is-selected":"")} key={taskKey(item)}
          aria-current={selected===item&&!activeForm?"true":undefined} onClick={()=>select(item)}>
         <span className={"cdw-task-symbol cdw-kind-"+item.kind} aria-hidden="true">{item.kind==="task"?"▤":item.kind==="obligation"?"◇":item.kind==="review"?"✓":item.kind==="formal"?"✎":item.kind==="receipt"?"⌁":"▣"}</span>

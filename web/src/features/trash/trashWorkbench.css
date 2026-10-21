@@ -1,3 +1,12 @@
+.trash-work{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;overflow:hidden}
+.trash-context-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 14px}
+.trash-context-icon{display:grid;place-items:center;font-size:14px;width:24px;height:24px}
+.trash-sidebar-nav{display:flex;flex-direction:column;gap:14px;padding:6px 10px 16px}
+.trash-context-tools{display:flex;align-items:center;gap:6px;margin-left:auto}
+.trash-refresh-btn{height:26px;min-height:26px;padding:0 8px;font-size:12px}
+.trash-extra-toggle{height:26px;min-height:26px;padding:0 8px;font-size:12px}
+.finder-bottom-actions{display:flex;align-items:center;gap:4px;margin-left:auto}
+.finder-bottom-actions .rare-button{height:22px;min-height:22px;padding:0 6px;font-size:11px}
 .trash-workbench{display:flex;flex-direction:column;min-width:0;min-height:0;flex:1;padding:10px 12px 12px;gap:9px;background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-lg)}
 .trash-heading-spacer{flex:1;min-width:4px}
 .trash-workbench .rare-button{min-height:29px;padding:3px 10px;border-radius:var(--radius-sm);white-space:nowrap}

@@ -64,7 +64,7 @@ html{overflow-x:clip}
  box-shadow:0 2px 8px rgba(15,23,42,.03),0 1px 2px rgba(15,23,42,.02);
  overflow:hidden;
 }
-.shell.shell-finder>.panels.document-explorer>.work{
+.shell.shell-finder>.panels>.work{
  margin:var(--height-header) 0 0;
 }
 .shell.shell-finder .work-body>.finder-bottom-bar{

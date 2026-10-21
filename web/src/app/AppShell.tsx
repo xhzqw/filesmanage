@@ -8,11 +8,9 @@ import {SearchPanel} from "../features/collaboration/SearchPanel";
 // page layer can reuse it (VIS-09). Main navigation already names the active
 // module: do not insert another full-width, label-only breadcrumb beneath it.
 export function WorkspacePage({user,onLogout}:{user:User;onLogout:()=>void}){
- return <AppShell user={user} onLogout={onLogout}>
-  <div className="panels">
-   <main className="work">
-    <StatsPanel/>
-   </main>
+ return <AppShell user={user} onLogout={onLogout} finderSidebarWidth={240}>
+  <div className="panels document-explorer stats-explorer">
+   <StatsPanel/>
   </div>
  </AppShell>;
 }

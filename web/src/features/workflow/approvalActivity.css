@@ -1,6 +1,6 @@
 /* Finder-like, task-first approval workspace. No nested card or page headings. */
-.approval-work{min-width:0;min-height:0;overflow:hidden}
-.approval-shell{display:grid;grid-template-columns:188px minmax(0,1fr);flex:1;min-height:0;min-width:0;overflow:hidden}
+.approval-work{min-width:0;min-height:0;flex:1;display:flex;flex-direction:column;overflow:hidden}
+.approval-stage{min-width:0;min-height:0;flex:1;display:flex;flex-direction:column;overflow:hidden;background:#FFFFFF}
 .approval-nav{display:flex;flex-direction:column;align-items:stretch;gap:3px;min-width:0;padding:19px 10px;background:var(--surface-header);border-right:1px solid var(--border-hairline)}
 .approval-nav-heading{padding:0 12px 13px;font-size:14px;font-weight:700;letter-spacing:.01em}
 .approval-nav .approval-nav-item{display:flex;justify-content:space-between;align-items:center;text-align:left;height:37px;min-height:37px;width:100%;padding:0 12px;border:0;border-radius:var(--radius-md);background:transparent;color:var(--text-secondary);font-size:12px;font-weight:550;box-shadow:none;transition:background-color .16s ease,color .16s ease}
@@ -10,7 +10,7 @@
 .approval-stage{min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden;background:var(--surface-panel)}
 .approval-stage>.seal-library-container{min-height:0;flex:1;overflow:auto}
 .approval-page{min-height:0;min-width:0;flex:1;display:flex;flex-direction:column;overflow:hidden}
-.approval-toolbar{flex:none;display:flex;justify-content:space-between;align-items:center;gap:14px;min-height:62px;padding:11px 19px;border-bottom:1px solid var(--border-hairline)}
+.approval-toolbar{flex:none;display:flex;justify-content:space-between;align-items:center;gap:12px;height:40px;min-height:40px;padding:0 14px;border-bottom:1px solid var(--border-hairline)}
 .approval-heading{display:flex;align-items:center;gap:10px;white-space:nowrap}
 .approval-heading strong{font-size:15px;font-weight:700}
 .approval-heading span{font-size:12px;color:var(--text-secondary);font-variant-numeric:tabular-nums}

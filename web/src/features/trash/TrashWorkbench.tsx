@@ -1,3 +1,5 @@
+import {Link} from "react-router-dom";
+import {BrandLogo} from "../../shared/ui/AppShell";
 import {useEffect,useMemo,useState} from "react";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {toast} from "../../shared/ui/feedback";
@@ -178,32 +180,85 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
    uncertain||ok>0&&errors.length>0?"warning":errors.length>0?"danger":"success");
  }
 
- return <section className="trash-workbench" aria-label="回收站">
-  <div className="trash-filters">
-   <RareInput type="search" aria-label="搜索删除记录" placeholder="搜索文件或目录名称" value={search} maxLength={120} onChange={e=>setSearch(e.target.value)}/>
-   <RareSelect aria-label="资源类型" value={kind} onChange={e=>updateKind(e.target.value)}>
-    <option value="all">全部类型</option><option value="folder">文件夹</option><option value="file">文件</option>
-   </RareSelect>
-   <RareSelect aria-label="删除时间" value={period} onChange={e=>updatePeriod(e.target.value)}>
-    <option value="all">全部时间</option><option value="today">今天</option><option value="week">最近 7 天</option><option value="month">最近 30 天</option>
-   </RareSelect>
-   <RareSelect aria-label="排序方式" value={sort} onChange={e=>updateSort(e.target.value)}>
-    <option value="recent">最近删除</option><option value="oldest">最早删除</option><option value="name">名称升序</option>
-   </RareSelect>
-   <RareButton type="button" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)} className={expanded?"on":""}>筛选 <span aria-hidden="true">⌄</span></RareButton>
-   <RareButton type="button" className="trash-refresh" disabled={busy} onClick={refresh} aria-label="刷新回收站" title="刷新回收站">↻ 刷新</RareButton>
-  </div>
-  {expanded&&<div className="trash-extra"><label htmlFor="trash-delete-user">删除人</label><RareInput id="trash-delete-user" placeholder="按删除人筛选" maxLength={80} value={deletedBy} onChange={e=>setDeletedBy(e.target.value)}/>
-   <RareButton type="button" onClick={()=>{setDeletedBy("");setSearch("");updateKind("all");updatePeriod("all");updateSort("recent");}}>重置筛选</RareButton>
-  </div>}
-  {notice&&<div role={notice.announced?undefined:notice.error?"alert":"status"} className={"trash-notice"+(notice.error?" error":notice.warning?" warning":"")}>{notice.text}<RareButton type="button" aria-label="关闭提示" onClick={()=>setNotice(null)}>×</RareButton></div>}
-  {selected.size>0&&<div className="trash-selection">
-   <span>已选 {selectedRows.length} 项</span>
-   <RareButton type="button" disabled={locked} onClick={batchRestore}>批量恢复</RareButton>
-   {isAdmin&&<RareButton type="button" disabled={locked} className="danger" onClick={()=>askPurge(selectedRows)}>永久删除</RareButton>}
-   <RareButton type="button" disabled={locked} onClick={()=>setSelected(new Set())}>取消选择</RareButton>
-  </div>}
-  <div className="trash-table-scroll">
+ return <>
+  <aside className="sidebar finder-sidebar" style={{width:"240px"}}>
+   <Link to="/doc" className="finder-sidebar-home" aria-label="中晟生物 · 返回文档首页">
+    <BrandLogo size={27} className="finder-sidebar-logo" transparent/><span>中晟生物</span>
+   </Link>
+   <div className="sidebar-scroll">
+    <div className="finder-navigation trash-sidebar-nav" role="navigation" aria-label="回收站分类导航">
+     <div className="finder-nav-section">
+      <div className="finder-nav-label">资源类型</div>
+      <RareButton type="button" className={"finder-nav-item"+(kind==="all"?" is-current":"")} onClick={()=>updateKind("all")}>
+       <span className="finder-nav-bullet" aria-hidden="true">▤</span><span>全部类型</span>
+      </RareButton>
+      <RareButton type="button" className={"finder-nav-item"+(kind==="folder"?" is-current":"")} onClick={()=>updateKind("folder")}>
+       <span className="finder-nav-bullet" aria-hidden="true">📁</span><span>仅文件夹</span>
+      </RareButton>
+      <RareButton type="button" className={"finder-nav-item"+(kind==="file"?" is-current":"")} onClick={()=>updateKind("file")}>
+       <span className="finder-nav-bullet" aria-hidden="true">📄</span><span>仅文件</span>
+      </RareButton>
+     </div>
+     <div className="finder-nav-section">
+      <div className="finder-nav-label">删除时间</div>
+      <RareButton type="button" className={"finder-nav-item"+(period==="all"?" is-current":"")} onClick={()=>updatePeriod("all")}>
+       <span>全部时间</span>
+      </RareButton>
+      <RareButton type="button" className={"finder-nav-item"+(period==="today"?" is-current":"")} onClick={()=>updatePeriod("today")}>
+       <span>今天</span>
+      </RareButton>
+      <RareButton type="button" className={"finder-nav-item"+(period==="week"?" is-current":"")} onClick={()=>updatePeriod("week")}>
+       <span>最近 7 天</span>
+      </RareButton>
+      <RareButton type="button" className={"finder-nav-item"+(period==="month"?" is-current":"")} onClick={()=>updatePeriod("month")}>
+       <span>最近 30 天</span>
+      </RareButton>
+     </div>
+     <div className="finder-nav-section">
+      <div className="finder-nav-label">排序方式</div>
+      <RareButton type="button" className={"finder-nav-item"+(sort==="recent"?" is-current":"")} onClick={()=>updateSort("recent")}>
+       <span>最近删除</span>
+      </RareButton>
+      <RareButton type="button" className={"finder-nav-item"+(sort==="oldest"?" is-current":"")} onClick={()=>updateSort("oldest")}>
+       <span>最早删除</span>
+      </RareButton>
+      <RareButton type="button" className={"finder-nav-item"+(sort==="name"?" is-current":"")} onClick={()=>updateSort("name")}>
+       <span>名称排序</span>
+      </RareButton>
+     </div>
+     <div className="finder-nav-section">
+      <div className="finder-nav-label">快捷操作</div>
+      <RareButton type="button" className="finder-nav-item trash-refresh" disabled={busy} onClick={refresh} aria-label="刷新回收站">
+       <span>↻ 刷新回收站</span>
+      </RareButton>
+     </div>
+    </div>
+   </div>
+   <div className="sidebar-resizer" role="separator" aria-orientation="vertical" tabIndex={-1}/>
+  </aside>
+  <main className="work trash-work">
+   <div className="folder-context-bar trash-context-bar">
+    <div className="folder-history-controls"><span className="trash-context-icon" aria-hidden="true">🗑</span></div>
+    <strong className="folder-current-title">回收站</strong>
+    <div className="trash-filters">
+     <RareInput type="search" aria-label="搜索删除记录" placeholder="搜索已删除文件或目录名称…" value={search} maxLength={120} onChange={e=>setSearch(e.target.value)}/>
+    </div>
+    {selected.size>0&&<div className="trash-selection">
+     <span>已选 {selectedRows.length} 项</span>
+     <RareButton type="button" disabled={locked} tone="primary" onClick={batchRestore}>批量恢复</RareButton>
+     {isAdmin&&<RareButton type="button" disabled={locked} className="danger" onClick={()=>askPurge(selectedRows)}>永久删除</RareButton>}
+     <RareButton type="button" disabled={locked} tone="ghost" onClick={()=>setSelected(new Set())}>取消选择</RareButton>
+    </div>}
+    <div className="trash-context-tools">
+     <RareButton type="button" aria-expanded={expanded} onClick={()=>setExpanded(v=>!v)} className={"trash-extra-toggle"+(expanded?" on":"")} tone="ghost">高级筛选 ▾</RareButton>
+     <RareButton type="button" className="trash-refresh-btn" disabled={busy} onClick={refresh} aria-label="刷新回收站" title="刷新回收站" tone="ghost">↻ 刷新</RareButton>
+    </div>
+   </div>
+   {expanded&&<div className="trash-extra"><label htmlFor="trash-delete-user">删除人</label><RareInput id="trash-delete-user" placeholder="按删除人筛选" maxLength={80} value={deletedBy} onChange={e=>setDeletedBy(e.target.value)}/>
+    <RareButton type="button" onClick={()=>{setDeletedBy("");setSearch("");updateKind("all");updatePeriod("all");updateSort("recent");}}>重置筛选</RareButton>
+   </div>}
+   {notice&&<div role={notice.announced?undefined:notice.error?"alert":"status"} className={"trash-notice"+(notice.error?" error":notice.warning?" warning":"")}>{notice.text}<RareButton type="button" aria-label="关闭提示" onClick={()=>setNotice(null)}>×</RareButton></div>}
+   <div className="work-body trash-table-scroll">
    <RareDataTable className="trash-table">
     <thead><tr>
      <th scope="col"><RareInput type="checkbox" aria-label="全选当前页" checked={allSelected} disabled={locked||entries.length===0} onChange={e=>setSelected(new Set(e.target.checked?entries.map(item=>item.id):[]))}/></th>
@@ -228,10 +283,15 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
     </tbody>
    </RareDataTable>
   </div>
-  <div className="trash-footer"><span>每页 {PAGE_SIZE} 项 · 第 {Math.floor(offset/PAGE_SIZE)+1} 页</span><span className="trash-heading-spacer"/>
-   <RareButton type="button" disabled={locked||status!=="ready"||offset===0} onClick={()=>setOffset(v=>Math.max(0,v-PAGE_SIZE))}>上一页</RareButton>
-   <RareButton type="button" disabled={locked||status!=="ready"||!hasMore} onClick={()=>setOffset(v=>v+PAGE_SIZE)}>下一页</RareButton>
-  </div>
+   <div className="status-bar finder-bottom-bar">
+    <span className="finder-bottom-node">类型：{kind==="all"?"全部类型":kind==="folder"?"文件夹":"文件"}</span>
+    <span className="finder-bottom-count">每页 {PAGE_SIZE} 项 · 第 {Math.floor(offset/PAGE_SIZE)+1} 页 · 共 {entries.length} 项</span>
+    <div className="finder-bottom-actions">
+     <RareButton type="button" tone="ghost" disabled={locked||status!=="ready"||offset===0} onClick={()=>setOffset(v=>Math.max(0,v-PAGE_SIZE))}>上一页</RareButton>
+     <RareButton type="button" tone="ghost" disabled={locked||status!=="ready"||!hasMore} onClick={()=>setOffset(v=>v+PAGE_SIZE)}>下一页</RareButton>
+    </div>
+   </div>
+  </main>
   <Menu open={menu!==null} onClose={()=>setMenu(null)} label="回收站操作" anchor={menu?.anchor} items={menu?[{id:"purge",label:"永久删除",danger:true,onSelect:()=>askPurge([menu.entry])}]:[]}/>
   {historyEntry?.fileId&&<Dialog open title={historyEntry.oldName+" · 历史"} onClose={()=>setHistoryEntry(null)} className="trash-history-dialog">
    <FileHistoryPanel fileId={historyEntry.fileId} revision={reload}/>
@@ -250,5 +310,5 @@ export function TrashWorkbench({onRestored}:{onRestored:()=>void}){
        <MicroHoldToDelete label="确认永久删除" tone="danger" disabled={busy} onConfirm={confirmPurge}/></>}
    </div>
   </Dialog>}
- </section>;
+ </>;
 }
