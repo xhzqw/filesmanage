@@ -88,9 +88,9 @@ try{
  console.log("CDW_NAMING_PASS primary navigation / DHF return / category semantics");
  await until("!!document.querySelector('.cdw-home-heading')");
  await until("!!document.querySelector('.cdw-home-dhf')");
- assert.ok(await evalJS("!!document.querySelector('.cdw-home-dhf a[href='/workbench/dhf']')"),"work homepage includes DHF project entry");
+ assert.ok(await evalJS("document.querySelector('.cdw-home-dhf a')?.getAttribute('href')==='/workbench/dhf'"),"work homepage includes DHF project entry");
  await evalJS("(()=>{[...document.querySelectorAll('.cdw-home-actions button')].find(b=>b.textContent.includes('发起工作'))?.click()})()");
- assert.ok(await evalJS("!!document.querySelector('.cdw-home-chooser a[href='/workbench/dhf?create=1']')"),"guided chooser distinguishes DHF from CDW initiation");
+ assert.ok(await evalJS("document.querySelector('.cdw-home-chooser a')?.getAttribute('href')==='/workbench/dhf?create=1'"),"guided chooser distinguishes DHF from CDW initiation");
  console.log("DHF_CDW_GUIDED_ENTRY_PASS landing projects and separate workflow initiation");
 
  assert.equal(await evalJS("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('工作首页')"),true,
