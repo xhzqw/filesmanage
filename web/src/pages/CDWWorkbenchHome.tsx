@@ -3,7 +3,6 @@ import {Link} from "react-router-dom";
 import {RareButton,RareNotice} from "../shared/ui/rare";
 import {BrandLoadingLabel} from "../shared/ui/BrandLoader";
 import type {CDWInboxItem} from "../features/cdw/api";
-import {DHFHomeProjects} from "./DHFHomeProjects";
 
 export type HomeView="todo"|"initiated"|"following"|"all"|"appointments"|"reviews"|"receipts"|"tasks";
 type Props={items:CDWInboxItem[];appointmentCount:number;initiatedCount:number;initiatedHasMore:boolean;initiatedError:string;initiatedBusy:boolean;busy:boolean;error:string;canCreate:boolean;
@@ -45,7 +44,6 @@ function itemKey(item:CDWInboxItem){
 }
 export function CDWWorkbenchHome({items,appointmentCount,initiatedCount,initiatedHasMore,initiatedError,initiatedBusy,busy,error,canCreate,onCreate,onRefresh,onOpen,onView}:Props){
  const[expanded,setExpanded]=useState(false);
- const[chooseKind,setChooseKind]=useState(false);
  const todo=items.filter(workNeedsAction);
  const following=items.filter(item=>!workNeedsAction(item));
  const returned=todo.filter(item=>item.state==="returned");
@@ -59,16 +57,9 @@ export function CDWWorkbenchHome({items,appointmentCount,initiatedCount,initiate
    </div>
    <div className="cdw-home-actions">
     <RareButton type="button" tone="ghost" disabled={busy} onClick={onRefresh}>刷新</RareButton>
-    {canCreate&&<RareButton type="button" tone="primary" aria-expanded={chooseKind} onClick={()=>setChooseKind(v=>!v)}>{chooseKind?"收起发起选项":"发起工作"}</RareButton>}
+    {canCreate&&<RareButton type="button" tone="primary" onClick={onCreate}>发起文件工作</RareButton>}
    </div>
   </header>
-  {chooseKind&&canCreate&&<div className="cdw-home-chooser" role="region" aria-label="发起工作类型">
-   <div className="cdw-home-chooser-intro"><strong>选择要发起的工作</strong><small>两类工作采用不同的负责人及验收流程。</small></div>
-   <div className="cdw-home-chooser-options">
-    <RareButton type="button" tone="neutral" onClick={onCreate}><strong>受控文件修订工作 →</strong><small>选择 DOCX 文件、设置负责人，后续按受控交付验收。</small></RareButton>
-    <Link to="/workbench/dhf?create=1"><strong>DHF 九阶段文件验收 →</strong><small>按既定 XMind 阶段大纲创建项目，指定独立验收人。</small></Link>
-   </div>
-  </div>}
   <div className="cdw-home-scroll">
    <div className="cdw-home-stats" aria-label="工作概况">
     <RareButton type="button" className="cdw-home-stat" onClick={()=>onView("todo")}><small>待我处理</small><strong>{todo.length+appointmentCount}</strong><span>进入待办 →</span></RareButton>
@@ -77,7 +68,6 @@ export function CDWWorkbenchHome({items,appointmentCount,initiatedCount,initiate
     <RareButton type="button" className="cdw-home-stat" onClick={()=>onView("todo")}><small>退回需修订</small><strong>{returned.length}</strong><span>查看待办 →</span></RareButton>
    </div>
    {(error||initiatedError)&&<RareNotice tone="warning">部分工作数据暂时无法读取，数字可能不完整。{error||initiatedError} <RareButton type="button" onClick={onRefresh}>重试</RareButton></RareNotice>}
-   <DHFHomeProjects canCreate={canCreate}/>
    <div className="cdw-home-content">
     <div className="cdw-home-primary">
      <div className="cdw-home-heading"><div><h2>现在需要你处理</h2><p>选择一项工作，直接进入当前环节。</p></div>

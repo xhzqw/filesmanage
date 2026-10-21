@@ -2,7 +2,7 @@ import {useEffect,useMemo,useRef,useState} from "react";
 import {Link,useNavigate,useSearchParams} from "react-router-dom";
 import type {User} from "../entities/user/model";
 import type {FileItem} from "../entities/file/model";
-import {AppShell} from "../shared/ui/AppShell";
+import {AppShell,BrandLogo} from "../shared/ui/AppShell";
 import {RareBadge,RareButton,RareInput,RareNotice,RareSelect} from "../shared/ui/rare";
 import {CDWReviewPanel} from "../features/cdw/CDWReviewPanel";
 import {CDWFormalPanel} from "../features/cdw/CDWFormalPanel";
@@ -369,29 +369,35 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const actionableVisible=visible.filter(isActionable).length;
  const canWork=selected?.kind==="task"&&(selected.state==="accepted"||selected.state==="in_progress");
  const editingBranch=branches.find(b=>b.state==="open");
- return <AppShell user={user} onLogout={onLogout}>
-  <div className="panels cdw-panels">
+ return <AppShell user={user} onLogout={onLogout} finderSidebarWidth={240}>
+  <div className="panels document-explorer cdw-panels">
+   <aside className="sidebar finder-sidebar cdw-rail" aria-label="工作视图分类" style={{width:"240px"}}>
+    <Link to="/doc" className="finder-sidebar-home" aria-label="中晟生物 · 返回文档首页">
+     <BrandLogo size={27} className="finder-sidebar-logo" transparent/><span>中晟生物</span>
+    </Link>
+    <div className="sidebar-scroll">
+     <div className="cdw-rail-overview"><span className="cdw-rail-mark" aria-hidden="true">◫</span><span><strong>工作队列</strong><small>{allItems.filter(isActionable).length+appointmentCount} 项待处理</small></span></div>
+     <nav className="cdw-rail-nav" aria-label="工作分类">
+      {viewGroups.map(group=><div className="cdw-rail-group" key={group.name}>
+       <div className="cdw-rail-caption">{group.name}</div>
+       {group.views.map(({key,label,symbol})=>
+        <RareButton key={key} type="button" className={"cdw-rail-item"+(filter===key?" is-current":"")}
+         aria-current={filter===key?"page":undefined} onClick={()=>{setFilter(key);setActiveForm(null);setFormalDraft(false);}}>
+         <span className="cdw-rail-icon" aria-hidden="true">{symbol}</span><span className="cdw-rail-label">{label}</span>
+         {key!=="effective"&&key!=="home"&&key!=="initiated"&&<small className={counts[key]>0?"has-count":""}>{counts[key]}</small>}
+        </RareButton>)}
+      </div>)}
+     </nav>
+     <Link className="cdw-rail-dhf" to="/workbench/dhf"><span className="cdw-rail-icon" aria-hidden="true">▣</span><span>DHF 九阶段验收</span><span aria-hidden="true">↗</span></Link>
+    </div>
+    <div className="sidebar-resizer" role="separator" aria-orientation="vertical" tabIndex={-1}/>
+   </aside>
    <main className="work cdw-work">
     <div className="cdw-layout">
-     <aside className="cdw-rail" aria-label="工作视图分类">
-      <div className="cdw-rail-overview"><span className="cdw-rail-mark" aria-hidden="true">◫</span><span><strong>工作队列</strong><small>{allItems.filter(isActionable).length+appointmentCount} 项待处理</small></span></div>
-      <nav className="cdw-rail-nav" aria-label="工作分类">
-       {viewGroups.map(group=><div className="cdw-rail-group" key={group.name}>
-        <div className="cdw-rail-caption">{group.name}</div>
-        {group.views.map(({key,label,symbol})=>
-         <RareButton key={key} type="button" className={"cdw-rail-item"+(filter===key?" is-current":"")}
-          aria-current={filter===key?"page":undefined} onClick={()=>{setFilter(key);setActiveForm(null);setFormalDraft(false);}}>
-          <span className="cdw-rail-icon" aria-hidden="true">{symbol}</span><span className="cdw-rail-label">{label}</span>
-          {key!=="effective"&&key!=="home"&&key!=="initiated"&&<small className={counts[key]>0?"has-count":""}>{counts[key]}</small>}
-         </RareButton>)}
-       </div>)}
-      </nav>
-      <Link className="cdw-rail-dhf" to="/workbench/dhf"><span className="cdw-rail-icon" aria-hidden="true">▣</span><span>DHF 九阶段验收</span><span aria-hidden="true">↗</span></Link>
-     </aside>
      {filter==="home"?<CDWWorkbenchHome initiatedCount={initiatedItems.length} initiatedHasMore={Boolean(initiatedCursor)} initiatedError={initiatedError} initiatedBusy={initiatedBusy} items={allItems} appointmentCount={appointmentCount} busy={busy} error={requestError}
       canCreate={user.isAdmin} onRefresh={()=>refresh(v=>v+1)} onCreate={()=>{setFilter("tasks");beginForm("create");}}
       onOpen={item=>{setFilter("all");select(item);}} onView={view=>{setFilter(view);setActiveForm(null);setFormalDraft(false);}}/>:filter==="initiated"?
-      <CDWInitiatedWorkspace initialTaskId={params.get("initiated")??""} items={initiatedItems} busy={initiatedBusy} error={initiatedError} nextCursor={initiatedCursor}
+      <CDWInitiatedWorkspace items={initiatedItems} busy={initiatedBusy} error={initiatedError} nextCursor={initiatedCursor}
        onMore={()=>void loadMoreInitiated()} onRefresh={()=>refresh(v=>v+1)}/>:filter==="effective"?<CDWEffectiveSearchPanel/>:filter==="appointments"?
       <CDWQMSReviewInbox items={pendingAppointments} alerts={appointmentAlerts} actorId={user.id}
        onRead={id=>void readAppointmentAlert(id)} onVerified={()=>refresh(v=>v+1)}/>:<>

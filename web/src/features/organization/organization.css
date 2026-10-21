@@ -30,8 +30,11 @@
 }
 
 .org-stage-card{
-  min-width:0;
+  min-width:0;border:0;box-shadow:none;border-radius:0;background:transparent;flex:1;min-height:0;
 }
+.org-work{display:flex;flex-direction:column;min-width:0;min-height:0;flex:1;overflow:hidden}
+.org-context-bar{height:40px;min-height:40px;padding:0 12px;border-bottom:1px solid var(--border-hairline);background:#FFFFFF}
+.org-top-tools{margin:0;padding:0;border:0;background:transparent;min-height:auto}
 
 /* 卡片头部 */
 .org-card-header{

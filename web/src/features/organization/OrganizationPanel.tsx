@@ -172,29 +172,28 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
    ?"用户列表读取失败，请先用上方的重试按钮。"
    :memberEmpty;
 
- return <div className="work-body">
-  {/* 顶部工具栏：指标摘要与全局快捷创建 */}
-  <div className="toolbar">
-   <span className="toolbar-hint">{`账号 ${users.length} · 部门 ${departments.length} · 工作组 ${groups.length}`}</span>
-   <RareButton type="button" onClick={()=>{setNotice(null);setCreateDepartmentOpen(true);}}>
-    <IconPlus/>新建部门
-   </RareButton>
-   <RareButton type="button" className="primary" tone="primary" onClick={()=>{setNotice(null);setCreateGroupOpen(true);}}>
-    <IconPlus/>创建工作组
-   </RareButton>
-  </div>
+ return <>
+  <DepartmentNavigator departments={departments} departmentsState={departmentsState}
+   deptIndex={deptIndex} deptById={deptById} deptCounts={deptCounts}
+   selectedDepartment={selectedDepartment} onSelect={setSelectedDepartment}
+   usersCount={users.length} unassignedCount={unassignedCount}
+   onRetry={()=>setDepartmentsToken(token=>token+1)}/>
 
-  {notice?.tone==="error"&&<RareNotice tone="danger">{notice.text}</RareNotice>}
+  <main className="work org-work">
+   <div className="folder-context-bar org-context-bar">
+    <div className="toolbar org-top-tools">
+     <span className="toolbar-hint">{`账号 ${users.length} · 部门 ${departments.length} · 工作组 ${groups.length}`}</span>
+     <RareButton type="button" onClick={()=>{setNotice(null);setCreateDepartmentOpen(true);}}>
+      <IconPlus/>新建部门
+     </RareButton>
+     <RareButton type="button" className="primary" tone="primary" onClick={()=>{setNotice(null);setCreateGroupOpen(true);}}>
+      <IconPlus/>创建工作组
+     </RareButton>
+    </div>
+   </div>
 
-  {/* 双栏主工作台：左侧组织架构树 + 右侧主工作区卡片 */}
-  <div className="org-workbench">
-   <DepartmentNavigator departments={departments} departmentsState={departmentsState}
-    deptIndex={deptIndex} deptById={deptById} deptCounts={deptCounts}
-    selectedDepartment={selectedDepartment} onSelect={setSelectedDepartment}
-    usersCount={users.length} unassignedCount={unassignedCount}
-    onRetry={()=>setDepartmentsToken(token=>token+1)}/>
+   {notice?.tone==="error"&&<RareNotice tone="danger">{notice.text}</RareNotice>}
 
-   {/* 右侧：组织工作区 */}
    <section className="org-card org-stage-card" aria-label="组织管理主工作区">
     <div className="org-tabs-bar">
      <RareTabs className="org-tabs-nav" label="组织管理视图">
@@ -477,7 +476,12 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
      </div>
     </div>}
    </section>
-  </div>
+   <div className="status-bar finder-bottom-bar">
+    <span className="finder-bottom-node">范围：{scopeLabel}</span>
+    <span className="finder-bottom-count">账号 {users.length} · 部门 {departments.length} · 工作组 {groups.length}</span>
+    <span className="finder-bottom-path">{activeTab==="members"?"部门成员":activeTab==="groups"?"工作组":activeTab==="permissions"?"权限":activeTab==="approvals"?"审批":"管理角色"}</span>
+   </div>
+  </main>
 
   <Dialog open={discardDialogOpen} title="未保存的修改" className="org-dialog"
    onClose={()=>{pendingNavigation.current=null;setDiscardDialogOpen(false);}}>
@@ -513,5 +517,5 @@ export function OrganizationPanel({isAdmin,currentUserId}:{isAdmin:boolean;curre
   {createGroupOpen&&<CreateGroupDialog options={departmentOptions} defaultDepartmentId={deptFilter}
    listAvailable={departmentsReady}
    onClose={()=>setCreateGroupOpen(false)} onSubmit={createGroup}/>}
- </div>;
+ </>;
 }

@@ -1,3 +1,5 @@
+import {Link} from "react-router-dom";
+import {BrandLogo} from "../../shared/ui/AppShell";
 import {useEffect,useLayoutEffect,useMemo,useRef,useState,type KeyboardEvent,type ReactNode} from "react";
 import {RareBadge,RareButton,RareInput,RareNotice} from "../../shared/ui/rare";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
@@ -137,7 +139,11 @@ export function DepartmentNavigator({departments,departmentsState,deptIndex,dept
  const allSelected=selectedDepartment==="",unassignedSelected=selectedDepartment===UNASSIGNED_ID;
  // Keep cached nodes mounted during realtime refetches so focus and scroll survive.
  const showTree=departmentsState==="ready"||departments.length>0;
- return <section className="org-card org-dept-card" aria-label="组织架构树">
+ return <aside className="sidebar finder-sidebar org-dept-card" aria-label="组织架构树" style={{width:"240px"}}>
+  <Link to="/doc" className="finder-sidebar-home" aria-label="中晟生物 · 返回文档首页">
+   <BrandLogo size={27} className="finder-sidebar-logo" transparent/><span>中晟生物</span>
+  </Link>
+  <div className="sidebar-scroll">
   <div className="org-card-header"><h3 className="org-card-title">
    <IconOrganization/><span>组织架构</span>
    <RareBadge tone="neutral" className="org-count-pill">{departments.length} 部门</RareBadge>
@@ -191,5 +197,7 @@ export function DepartmentNavigator({departments,departmentsState,deptIndex,dept
     </li>}
    </ul></div>
   </>}
- </section>;
+  </div>
+  <div className="sidebar-resizer" role="separator" aria-orientation="vertical" tabIndex={-1}/>
+ </aside>;
 }
