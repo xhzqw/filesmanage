@@ -21,7 +21,7 @@ export function DHFHomeProjects({canCreate}:{canCreate:boolean}){
   {error?<p className="cdw-home-dhf-empty">{error}。请从 DHF 工作台重新加载。</p>:
    busy?<p className="cdw-home-dhf-empty">正在读取我的项目…</p>:
    projects.length===0?<div className="cdw-home-dhf-empty">
-    <span>当前没有属于你的项目。受控文件工作与 DHF 验收为两条独立流程。</span>
+    <span>暂无关联的 DHF 项目</span>
     {canCreate&&<Link to="/workbench/dhf?create=1">创建 DHF 项目 →</Link>}
    </div>:<div className="cdw-home-dhf-list">
     {(more?projects:projects.slice(0,3)).map(project=><Link key={project.id} to={"/workbench/dhf?project="+encodeURIComponent(project.id)}

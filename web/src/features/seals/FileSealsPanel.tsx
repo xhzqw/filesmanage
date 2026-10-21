@@ -229,7 +229,7 @@ export function FileSealsPanel({fileId,seq,sha,name,isAdmin,onSelectRevision,onC
     })}
     {assets.length>0&&availableAssets.length===0&&<p className="seal-stamp-no-match">没有匹配的签章</p>}
    </div>
-   {assets.length===0&&<p className="seal-asset-empty" role="status">尚无可用签章。<Link to="/approvals?tab=seals">去签章管理导入</Link></p>}
+   {assets.length===0&&<p className="seal-asset-empty" role="status">尚无可用签章。<Link to="/workbench?view=seals">去电子签章导入</Link></p>}
    {selected&&!maySign&&<p role="status" className="hint">当前账号没有此签名／印章使用权限，或尚未绑定归属人。</p>}
    {duplicate&&<p role="status" className="hint">当前文件或待签清单已使用同一枚签章。</p>}
    {selected&&<details className="seal-advanced-settings">

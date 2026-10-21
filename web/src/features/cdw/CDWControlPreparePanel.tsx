@@ -104,12 +104,10 @@ export function CDWControlPreparePanel({candidate,user,onPrepared,loadUsers,load
   </section>
   {user.isAdmin&&<section className="cdw-section">
    <div className="cdw-section-head"><h3>文控授权</h3></div>
-   <p className="cdw-section-note">必须明确授予文件级文控角色才能执行发行准备。管理员身份本身不具有自动发行权。</p>
-   <RareButton type="button" tone="neutral" loading={busy} disabled={busy} onClick={()=>void grant()}>为当前账号登记文件级文控权限</RareButton>
+   <RareButton type="button" tone="neutral" loading={busy} disabled={busy} onClick={()=>void grant()}>登记文件级文控权限</RareButton>
   </section>}
   <section className="cdw-section">
    <h3>受控发行准备</h3>
-   <p className="cdw-section-note">准备仅建立待核验发行对象和来源副本。正式发行须另行完成发行物校验、分发范围审批和签收条件；此操作绝不更改当前有效版。</p>
    <div className="cdw-form">
     <label>正式版次标识
      <RareInput value={label} maxLength={60} placeholder="例如 A/0、A/1、B/0" onChange={e=>setLabel(e.target.value)}/>

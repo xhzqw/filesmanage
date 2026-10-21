@@ -42,8 +42,8 @@ export function CDWFormalPanel({approval,onDecided}:{approval:CDWFormalApproval;
  }
  return <div className="cdw-detail-inner cdw-formal-pane">
   <div className="cdw-detail-header">
-   <div><small>正式文件审批 · 独立于任务交付验收</small><h2>{approval.fileName??"冻结审批候选文件"}</h2></div>
-   <RareBadge tone="warning">待正式批准</RareBadge>
+   <div><small>正式审批</small><h2>{approval.fileName??"冻结审批候选文件"}</h2></div>
+   <RareBadge tone="warning">待批准</RareBadge>
   </div>
   <div className="cdw-detail-facts">
    <div><span>当前状态</span><strong>审批中（尚未生效）</strong></div>
@@ -55,7 +55,6 @@ export function CDWFormalPanel({approval,onDecided}:{approval:CDWFormalApproval;
     <a className="cdw-text-link" href={"/api/workbench/formal-approvals/"+encodeURIComponent(approval.id)+"/content"}
       download="CDW-formal-candidate.docx">核对冻结稿 ↗</a>
    </div>
-   <p className="cdw-section-note">请对照本次正式提交的冻结 DOCX 内容作决定；普通文件预览中的“最新版本”不作为正式审批依据。</p>
    <div className="cdw-review-digest"><small>候选内容 SHA-256</small><code title={approval.sha256}>{approval.sha256}</code></div>
   </section>
   {loading&&<div className="cdw-message"><BrandLoadingLabel showContext>读取审批时间线</BrandLoadingLabel></div>}
@@ -80,7 +79,6 @@ export function CDWFormalPanel({approval,onDecided}:{approval:CDWFormalApproval;
   {detail&&<CDWFormalLineagePanel approvalId={approval.id}/>}
   <section className="cdw-section">
    <h3>当前节点决定</h3>
-   <p className="cdw-section-note">系统在服务端再次检查您的正式审批角色、节点状态及乐观锁。批准后仅生成已批准候选版本，不会直接发行或生效。</p>
    <div className="cdw-review-actions">
     <RareButton type="button" tone={mode==="approve"?"primary":"neutral"} disabled={busy} onClick={()=>{setMode("approve");setReason("");}}>批准候选稿</RareButton>
     <RareButton type="button" tone={mode==="reject"?"primary":"neutral"} disabled={busy} onClick={()=>setMode("reject")}>拒绝审批</RareButton>

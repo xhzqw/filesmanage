@@ -28,7 +28,6 @@ const NAV=[
  {to:"/doc",label:"文档管理"},
  {to:"/customers",label:"客户资料"},
  {to:"/stats",label:"统计"},
- {to:"/approvals",label:"审批"},
  {to:"/workbench",label:"工作台"},
  {to:"/lifecycle",label:"生命周期"},
  {to:"/trash",label:"回收站"},

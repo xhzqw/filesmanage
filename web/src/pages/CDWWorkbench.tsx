@@ -26,13 +26,58 @@ import {cdwApi,type CDWBranch,type CDWInboxItem,type CDWInitiatedItem,type CDWRe
 import "./cdwWorkbench.css";
 import {CDWWorkbenchHome,workNeedsAction} from "./CDWWorkbenchHome";
 import {CDWInitiatedWorkspace} from "./CDWInitiatedWorkspace";
+import {SealLibrary} from "../features/seals/SealLibrary";
 
-type View="home"|"todo"|"initiated"|"following"|"tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all";
-const viewGroups:{name:string;views:{key:View;label:string;symbol:string}[]}[]=[
- {name:"开始工作",views:[{key:"home",label:"工作首页",symbol:"⌂"},{key:"todo",label:"待我处理",symbol:"▤"},{key:"initiated",label:"我发起的",symbol:"↗"},{key:"following",label:"其他事项",symbol:"◇"},{key:"all",label:"全部事项",symbol:"▦"}]},
- {name:"按业务查看",views:[{key:"tasks",label:"文件工作",symbol:"▤"},{key:"obligations",label:"责任待办",symbol:"◇"}]},
- {name:"审查与批准",views:[{key:"reviews",label:"交付验收",symbol:"✓"},{key:"formal",label:"正式审批",symbol:"✎"},{key:"appointments",label:"任命核验",symbol:"♙"},{key:"scope",label:"范围审批",symbol:"◎"}]},
- {name:"受控发行",views:[{key:"control",label:"发行准备",symbol:"▣"},{key:"receipts",label:"部门签收",symbol:"⌁"},{key:"reading",label:"阅读确认",symbol:"▧"},{key:"effective",label:"生效文件",symbol:"◈"}]},
+export function WorkbenchIcon({name,className=""}:{name:string;className?:string}){
+ switch(name){
+  case "home":
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H4a1 1 0 0 1-1-1z"/></svg>;
+  case "todo":
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/></svg>;
+  case "initiated":
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9z"/></svg>;
+  case "all":
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect width="7" height="7" x="3" y="3" rx="1.5"/><rect width="7" height="7" x="14" y="3" rx="1.5"/><rect width="7" height="7" x="14" y="14" rx="1.5"/><rect width="7" height="7" x="3" y="14" rx="1.5"/></svg>;
+  case "following":
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>;
+  case "tasks":
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>;
+  case "obligations":
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
+  case "reviews":
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>;
+  case "formal":
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m18 2 4 4-10 10H8v-4z"/><path d="m14 6 4 4"/><path d="M4 22h16"/></svg>;
+  case "appointments":
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m19 8 2 2 4-4"/></svg>;
+  case "scope":
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v3a3 3 0 0 0 3 3h6"/></svg>;
+  case "control":
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>;
+  case "receipts":
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>;
+  case "reading":
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>;
+  case "effective":
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
+  case "seals":
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><circle cx="12" cy="12" r="3"/></svg>;
+  case "dhf":
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>;
+  case "customers":
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
+  default:
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg>;
+ }
+}
+
+type View="home"|"todo"|"initiated"|"following"|"tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all"|"seals";
+const viewGroups:{name:string;views:{key:View;label:string;icon:string}[]}[]=[
+ {name:"工作中心",views:[{key:"home",label:"工作首页",icon:"home"},{key:"todo",label:"待我处理",icon:"todo"},{key:"initiated",label:"我发起的",icon:"initiated"},{key:"following",label:"其他事项",icon:"following"},{key:"all",label:"全部事项",icon:"all"}]},
+ {name:"业务任务",views:[{key:"tasks",label:"文件工作",icon:"tasks"},{key:"obligations",label:"责任待办",icon:"obligations"}]},
+ {name:"审查与批准",views:[{key:"formal",label:"正式审批",icon:"formal"},{key:"reviews",label:"交付验收",icon:"reviews"},{key:"appointments",label:"任命核验",icon:"appointments"},{key:"scope",label:"范围审批",icon:"scope"}]},
+ {name:"受控发行",views:[{key:"control",label:"发行准备",icon:"control"},{key:"receipts",label:"部门签收",icon:"receipts"},{key:"reading",label:"阅读确认",icon:"reading"},{key:"effective",label:"生效文件",icon:"effective"}]},
+ {name:"系统服务",views:[{key:"seals",label:"电子签章",icon:"seals"}]},
 ];
 const kindName:Record<CDWInboxItem["kind"],string>={
  task:"工作交付",obligation:"责任履行",review:"交付验收",formal:"正式审批",
@@ -363,7 +408,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
   home:allItems.filter(isActionable).length+appointmentCount,todo:allItems.filter(isActionable).length+appointmentCount,initiated:initiatedItems.length,following:allItems.filter(x=>!isActionable(x)).length,
   tasks:totalTasks,obligations:totalObligations,reviews:totalReviews,formal:totalFormal,
   appointments:appointmentCount,control:totalControl,scope:totalScope,receipts:totalReceipts,
-  reading:totalReading,effective:0,all:allItems.length,
+  reading:totalReading,effective:0,all:allItems.length,seals:0,
  };
  const selectedView=viewGroups.flatMap(group=>group.views).find(view=>view.key===filter)?.label??"工作事项";
  const actionableVisible=visible.filter(isActionable).length;
@@ -376,20 +421,23 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
      <BrandLogo size={27} className="finder-sidebar-logo" transparent/><span>中晟生物</span>
     </Link>
     <div className="sidebar-scroll">
-     <div className="cdw-rail-overview"><span className="cdw-rail-mark" aria-hidden="true">◫</span><span><strong>工作队列</strong><small>{allItems.filter(isActionable).length+appointmentCount} 项待处理</small></span></div>
+     <div className="cdw-rail-overview">
+      <span className="cdw-rail-mark" aria-hidden="true"><WorkbenchIcon name="todo"/></span>
+      <span><strong>工作台</strong><small>{allItems.filter(isActionable).length+appointmentCount} 项待处理</small></span>
+     </div>
      <nav className="cdw-rail-nav" aria-label="工作分类">
       {viewGroups.map(group=><div className="cdw-rail-group" key={group.name}>
        <div className="cdw-rail-caption">{group.name}</div>
-       {group.views.map(({key,label,symbol})=>
+       {group.views.map(({key,label,icon})=>
         <RareButton key={key} type="button" className={"cdw-rail-item"+(filter===key?" is-current":"")}
          aria-current={filter===key?"page":undefined} onClick={()=>{setFilter(key);setActiveForm(null);setFormalDraft(false);}}>
-         <span className="cdw-rail-icon" aria-hidden="true">{symbol}</span><span className="cdw-rail-label">{label}</span>
-         {key!=="effective"&&key!=="home"&&key!=="initiated"&&<small className={counts[key]>0?"has-count":""}>{counts[key]}</small>}
+         <span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name={icon}/></span><span className="cdw-rail-label">{label}</span>
+         {key!=="effective"&&key!=="home"&&key!=="initiated"&&key!=="seals"&&<small className={counts[key]>0?"has-count":""}>{counts[key]}</small>}
         </RareButton>)}
       </div>)}
      </nav>
-     <Link className="cdw-rail-dhf" to="/workbench/dhf"><span className="cdw-rail-icon" aria-hidden="true">▣</span><span>DHF 九阶段验收</span><span aria-hidden="true">↗</span></Link>
-     <Link className="cdw-rail-dhf" to="/workbench/customer-registrations"><span className="cdw-rail-icon" aria-hidden="true">▤</span><span>客户登记审批</span><span aria-hidden="true">↗</span></Link>
+     <Link className="cdw-rail-dhf" to="/workbench/dhf"><span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name="dhf"/></span><span>DHF 九阶段验收</span><span aria-hidden="true">↗</span></Link>
+     <Link className="cdw-rail-dhf" to="/workbench/customer-registrations"><span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name="customers"/></span><span>客户登记审批</span><span aria-hidden="true">↗</span></Link>
     </div>
     <div className="sidebar-resizer" role="separator" aria-orientation="vertical" tabIndex={-1}/>
    </aside>
@@ -401,7 +449,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
       <CDWInitiatedWorkspace items={initiatedItems} busy={initiatedBusy} error={initiatedError} nextCursor={initiatedCursor}
        onMore={()=>void loadMoreInitiated()} onRefresh={()=>refresh(v=>v+1)}/>:filter==="effective"?<CDWEffectiveSearchPanel/>:filter==="appointments"?
       <CDWQMSReviewInbox items={pendingAppointments} alerts={appointmentAlerts} actorId={user.id}
-       onRead={id=>void readAppointmentAlert(id)} onVerified={()=>refresh(v=>v+1)}/>:<>
+       onRead={id=>void readAppointmentAlert(id)} onVerified={()=>refresh(v=>v+1)}/>:filter==="seals"?<div className="cdw-seals-view"><SealLibrary isAdmin={user.isAdmin}/></div>:<>
      <section className="cdw-inbox" aria-label="工作事项列表">
       <header className="cdw-inbox-tools">
        <div className="cdw-inbox-heading"><strong>{selectedView}</strong><span>{visible.length}</span></div>
@@ -421,13 +469,12 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
        {!busy&&visible.length===0&&(filter!=="todo"||appointmentCount===0)&&<div className="cdw-empty"><span className="cdw-empty-icon" aria-hidden="true">▤</span><strong>{search.trim()?"没有匹配的工作":"当前没有需要展示的事项"}</strong><p>{search.trim()?"可以更换关键词继续查找":filter==="obligations"?"目前没有待履行责任":"新事项到达后会出现在这里"}</p>{search.trim()&&<RareButton type="button" tone="ghost" onClick={()=>setSearch("")}>清除搜索</RareButton>}</div>}
        {visible.map(item=><RareButton type="button" className={"cdw-task-row"+(selected===item&&!activeForm?" is-selected":"")} key={taskKey(item)}
          aria-current={selected===item&&!activeForm?"true":undefined} onClick={()=>select(item)}>
-        <span className={"cdw-task-symbol cdw-kind-"+item.kind} aria-hidden="true">{item.kind==="task"?"▤":item.kind==="obligation"?"◇":item.kind==="review"?"✓":item.kind==="formal"?"✎":item.kind==="receipt"?"⌁":"▣"}</span>
+        <span className={"cdw-task-symbol cdw-kind-"+item.kind} aria-hidden="true"><WorkbenchIcon name={item.kind==="task"?"tasks":item.kind==="obligation"?"obligations":item.kind==="review"?"reviews":item.kind==="formal"?"formal":item.kind==="receipt"?"receipts":item.kind==="scope"?"scope":item.kind==="reading"?"reading":"control"}/></span>
         <span className="cdw-task-copy"><span className="cdw-task-kicker">{kindName[item.kind]}{item.kind==="review"&&item.review?.reviewMode==="delegated"?" · 授权代验收":""}</span><strong title={item.title}>{item.title}</strong>
          <span className="cdw-task-bottom"><small>{item.kind==="obligation"?stateLabel(item.obligationKind??"") +" · ":""}{stateLabel(item.state)}</small>{isActionable(item)&&<i className="cdw-task-unread" aria-label="待处理"/>}</span></span>
         <span className="cdw-task-chevron" aria-hidden="true">›</span>
        </RareButton>)}
       </div>
-      <footer className="cdw-inbox-footer">共 {visible.length} 项工作 · 选择条目查看详情</footer>
      </section>
      <article className="cdw-detail" aria-label="工作详情">
       {formalDraft?<CDWFormalInitiate actorId={user.id} loadUsers={organizationApi.users} onCreated={()=>{setFormalDraft(false);refresh(n=>n+1);}}/>:activeForm?<section className="cdw-detail-inner">
@@ -455,9 +502,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
           onClick={()=>setAllowOverrideReview(v=>!v)}>
           {allowOverrideReview?"✓ 已允许授权越级验收":"允许授权越级验收"}
          </RareButton>
-         <p className="cdw-section-note">默认关闭。开启后，直属审核人可针对具体交付节点授权更上级替代验收；中间管理与整合责任仍保留。</p>
         </div>}
-        {activeForm==="delegate"&&<RareNotice tone="info">派发下级工作后，你仍须履行管理、整合和上报责任。</RareNotice>}
         <div className="cdw-form-actions">
          <RareButton type="button" tone="primary" loading={processing} disabled={!title.trim()||!recipient||usersBusy||(activeForm==="create"&&!chosenFile)}
           onClick={()=>void (activeForm==="create"?createRoot():selected&&delegate(selected))}>确认派发</RareButton>
@@ -487,18 +532,15 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
        </div>
        <div className="cdw-section"><div className="cdw-section-head"><h3>工作文件</h3>
         <Link className="cdw-text-link" to={"/preview/"+encodeURIComponent(selected.fileId)}>打开预览 ↗</Link></div>
-        <p className="cdw-section-note">原文件维持独立正式版本；在线编辑产生独立工作修订，不直接覆盖原件。</p>
        </div>
        {selected.kind==="obligation"?<CDWObligationPanel item={selected} busy={processing} onFulfill={statement=>fulfillObligation(selected,statement)}/>:<>
         {selected.state==="assigned"&&<div className="cdw-primary-action">
-         <p>你收到一项工作。接收后可以建立独立编辑分支，也可以向下一级派发。</p>
          <RareButton type="button" tone="primary" loading={processing} onClick={()=>void acceptTask(selected)}>接收工作</RareButton>
         </div>}
         {canWork&&<>
          <div className="cdw-section">
           <div className="cdw-section-head"><h3>工作分支</h3>{branchesBusy&&<small>正在更新</small>}</div>
           {detailsError&&<RareNotice tone="warning">{detailsError}</RareNotice>}
-          {!branchesBusy&&branches.length===0&&<p className="cdw-section-note">当前工作还没有编辑分支。创建后由 ONLYOFFICE 原生保存，交付时验证最终回执。</p>}
           {branches.map(b=><div className="cdw-branch-row" key={b.branchId}>
            <span className="cdw-branch-text"><strong>工作修订 {b.headRevisionId?"· 已有保存":"· 待编辑"}</strong>
             <small>{stateLabel(b.state)} · 工作版本 {b.revision}</small></span>
@@ -509,18 +551,18 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
            onClick={()=>void createBranch(selected)}>创建工作分支</RareButton>}
          </div>
          <div className="cdw-section cdw-delegation">
-          <h3>逐级派发</h3><p className="cdw-section-note">需要其他人员协助时，建立独立下级工作，上级管理责任仍保留。</p>
+          <h3>逐级派发</h3>
           <RareButton type="button" onClick={()=>beginForm("delegate")}>派发下级工作 →</RareButton>
          </div>
         </>}
         {selected.state==="returned"&&<div className="cdw-primary-action">
-         <RareNotice tone="warning">上一轮交付已被退回，原冻结稿及验收记录保持只读。继续修订将建立新轮次，并以退回稿作为编辑初稿。</RareNotice>
+         <RareNotice tone="warning">上一轮交付已退回，继续修订将以退回稿作为新轮次编辑初稿。</RareNotice>
          <RareButton type="button" tone="primary" loading={processing} onClick={()=>void resumeTask(selected)}>从退回稿继续修订</RareButton>
         </div>}
-        {selected.state==="submitted"&&<RareNotice tone="info">交付稿已冻结，正在等待直属上级验收；尚未正式批准或生效。</RareNotice>}
-        {selected.state==="accepted_delivery"&&<RareNotice tone="success">本轮工作交付已通过直属上级验收；文件正式审批和受控发行仍需独立处理。</RareNotice>}
+        {selected.state==="submitted"&&<RareNotice tone="info">交付稿已冻结，等待上级验收。</RareNotice>}
+        {selected.state==="accepted_delivery"&&<RareNotice tone="success">本轮工作交付已通过验收。</RareNotice>}
        </>}
-      </section>:<div className="cdw-detail-empty"><strong>选择一项工作</strong><p>查看工作分支、责任和后续交付。</p></div>}
+      </section>:<div className="cdw-detail-empty"><span className="cdw-detail-empty-icon" aria-hidden="true"><WorkbenchIcon name="tasks"/></span><strong>未选择事项</strong></div>}
      </article>
      </>}
     </div>

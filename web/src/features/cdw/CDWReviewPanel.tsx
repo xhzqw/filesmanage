@@ -88,15 +88,12 @@ export function CDWReviewPanel({gate,onDecided}:{gate:CDWReviewGate;onDecided:()
    <div className="cdw-section-head"><h3>本轮冻结交付稿</h3>
     <a className="cdw-text-link" href={contentURL} download="CDW-delivery.docx">下载冻结稿 ↗</a>
    </div>
-   <p className="cdw-section-note">请审阅这份已冻结的修订稿，不要仅凭原文件预览进行验收。验收结论仅作用于此交付及其 SHA。</p>
    <div className="cdw-review-digest"><small>内容 SHA-256</small><code title={gate.sha256}>{gate.sha256}</code></div>
   </section>
-  {gate.reviewMode==="delegated"&&<RareNotice tone="info">本次以授权身份替代直属审核节点。系统记录实际审核人、被替代者和授权编号，原负责人不自动免责。</RareNotice>}
   {gate.reviewMode==="direct"&&gate.substitutable&&<section className="cdw-section">
    <div className="cdw-section-head"><h3>授权上级代验收</h3>
     <RareButton type="button" tone="ghost" disabled={grantBusy} onClick={()=>setGrantMode(v=>!v)}>{grantMode?"收起":"签发授权"}</RareButton>
    </div>
-   <p className="cdw-section-note">仅可授予本任务链已接收任务的更上一级负责人，有效期 24 小时，只针对本轮冻结稿审核节点。</p>
    {grantError&&<RareNotice tone="warning">{grantError}</RareNotice>}
    {grants.filter(gr=>!gr.revoked).map(gr=><div key={gr.grantId} className="cdw-branch-row">
     <span className="cdw-branch-text"><strong>{candidates.find(person=>person.id===gr.actorId)?.displayName??gr.actorId}</strong>
@@ -120,7 +117,6 @@ export function CDWReviewPanel({gate,onDecided}:{gate:CDWReviewGate;onDecided:()
   </section>}
   <section className="cdw-section">
    <h3>验收决定</h3>
-   <p className="cdw-section-note">通过表示认可当前任务交付，不等于正式文件批准或受控发行。退回会保留原稿和审核痕迹，执行人从冻结稿继续修订并重新提交。</p>
    <div className="cdw-review-actions">
     <RareButton type="button" tone={mode==="accept"?"primary":"neutral"}
      disabled={busy} onClick={()=>{setMode("accept");setReason("");}}>验收通过</RareButton>
@@ -132,7 +128,6 @@ export function CDWReviewPanel({gate,onDecided}:{gate:CDWReviewGate;onDecided:()
      <RareTextarea value={reason} onChange={event=>setReason(event.target.value)}
       rows={4} maxLength={3000} placeholder={mode==="return"?"请指出问题、需要修改的内容及验收标准":"补充本轮验收说明"}/>
     </label>
-    <RareNotice tone={mode==="return"?"warning":"info"}>{mode==="return"?"退回不删除原交付和中间管理责任。":"该操作不能替代独立的正式受控文件审批。"}</RareNotice>
     <div className="cdw-review-actions">
      <RareButton type="button" tone="primary" disabled={busy||(mode==="return"&&!reason.trim())}
       loading={busy} onClick={()=>void submit()}>{mode==="accept"?"确认验收通过":"确认退回"}</RareButton>

@@ -50,7 +50,6 @@ export function CDWScopeApprovalPanel({plan,onApproved,loadDepartments,loadUsers
   {error&&<RareNotice tone="danger">{error}</RareNotice>}
   {!detail&&!error&&<BrandLoadingLabel showContext>核验分发清单</BrandLoadingLabel>}
   {detail&&<section className="cdw-section">
-   <p className="cdw-section-note">批准人须独立于编制人。服务器重新核对冻结 SHA-256 摘要、部门接收人及权限。批准不等于发行或生效。</p>
    <div className="cdw-detail-facts">
     <div><span>涉及部门</span><strong>{detail.departmentCount}</strong></div>
     <div><span>清单状态</span><strong>{detail.state==="frozen"?"待审核":detail.state}</strong></div>
