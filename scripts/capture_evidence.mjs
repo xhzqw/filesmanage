@@ -161,7 +161,7 @@ async function main() {
 
     // 6-9. business surfaces
     for (const [name, route] of [["05-search", "/search"], ["06-stats", "/stats"],
-                                 ["07-org", "/org"], ["08-approvals", "/approvals"]]) {
+                                 ["07-org", "/org"], ["08-workbench", "/workbench"]]) {
       await cdp.navigate(`${BASE}${route}`);
       await delay(2000);
       shots.push([name, await cdp.shot(name)]);
