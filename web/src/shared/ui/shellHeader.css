@@ -1,30 +1,31 @@
-/* Finder-like restrained segmented navigation: three independent shell groups,
+/* Finder-like restrained segmented navigation: aligned brand and navigation,
    no extra header row, solid white slider on one neutral trough. */
 .shell>.header{
- display:grid;grid-template-columns:minmax(190px,1fr) auto minmax(190px,1fr);
- align-items:center;column-gap:14px;height:var(--height-header);min-height:var(--height-header);
- /* Brand and actions anchor to the page edges; only the navigation stays centered. */
+ display:grid;
+ grid-template-columns:var(--finder-sidebar-width,280px) minmax(0,1fr) auto auto;
+ align-items:center;column-gap:16px;height:var(--height-header);min-height:var(--height-header);
  width:100%;max-width:none;margin:0;
- padding:0 4px;border:0;border-radius:var(--radius-lg);background:transparent;box-shadow:none;
+ padding:0 20px 0 0;border:0;border-radius:0;background:var(--surface-shell);box-shadow:none;
  overflow:visible;isolation:isolate;z-index:70;
 }
 .header .shell-home-pill{
  display:inline-flex;align-items:center;justify-self:start;gap:9px;width:max-content;
- height:42px;min-height:42px;padding:0 17px 0 12px;
- border:1px solid var(--ui-border-hairline);border-radius:var(--radius-pill);
- color:var(--brand-navy);background:var(--surface-panel);font-size:14px;font-weight:670;white-space:nowrap;
- box-shadow:0 2px 9px rgba(15,39,92,.045);
- transition:background-color 150ms ease,box-shadow 150ms ease,transform 150ms ease;
+ height:var(--height-header);min-height:var(--height-header);padding:0 17px;
+ border:0;border-radius:0;
+ color:var(--text-primary);background:transparent;font-size:14px;font-weight:650;white-space:nowrap;
+ box-shadow:none;text-decoration:none;
+ transition:color 150ms ease;
 }
-.header .shell-home-pill:hover{color:var(--brand-blue);background:var(--ui-state-hover);box-shadow:0 3px 12px rgba(15,39,92,.08);transform:translateY(-1px)}
-.header .shell-home-pill:active{transform:translateY(0)}
-.header .shell-home-pill:focus-visible{outline:2px solid var(--border-focus);outline-offset:3px}
-.header .shell-home-pill .brand-logo{width:29px;height:29px;object-fit:contain}
+.header .shell-home-pill:hover{color:var(--brand-blue);background:transparent;box-shadow:none;transform:none}
+.header .shell-home-pill:active{transform:none}
+.header .shell-home-pill:focus-visible{outline:2px solid var(--border-focus);outline-offset:-4px}
+.header .shell-home-pill .brand-logo{width:27px;height:27px;object-fit:contain;flex:none}
 .header .shell-brand-name{color:inherit;letter-spacing:.015em}
 
 /* The pill appearance extends Rare UI GooeyNav; all other uses stay gooey. */
 .header nav[data-slot="gooey-nav"][data-appearance="pill"]{
- position:relative;display:flex;justify-self:center;flex:none;
+ position:relative;display:flex;justify-self:start;flex:none;
+ grid-column:2;
  align-items:center;width:max-content;max-width:100%;height:40px;
  margin:0;padding:3px;background:#F1F5F9;color:var(--text-secondary);
  border:1px solid rgba(148,163,184,.12);border-radius:var(--radius-pill);
@@ -64,7 +65,7 @@
 }
 /* Detached controls, one quiet pill per interaction, no nested utility box. */
 .header .global-utility-dock{
- display:flex;align-items:center;justify-self:end;gap:7px;flex:none;
+ grid-column:4;display:flex;align-items:center;justify-self:end;gap:7px;flex:none;
  margin:0;height:30px;min-height:30px;padding:0;border:0;background:transparent;box-shadow:none;
 }
 .header .global-utility-dock .command-trigger,
@@ -131,9 +132,9 @@
 }
 .header .global-utility-dock .account-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .header .global-utility-dock .account-caret{flex:none;margin-left:0}
-.header .header-page-actions{justify-self:end}
+.header .header-page-actions{grid-column:3;justify-self:end;margin-right:8px}
 @media(max-width:1210px){
- .shell>.header{display:flex;gap:8px;justify-content:space-between}
+ .shell>.header{display:flex;gap:8px;justify-content:space-between;padding:0 12px 0 0}
  .shell>.header .shell-home-pill{flex:none;margin-right:auto}
  .header .nav-toggle{
   order:2;display:inline-flex;align-items:center;justify-content:center;
@@ -141,8 +142,8 @@
   border:1px solid var(--ui-border-hairline);border-radius:var(--radius-pill);
   background:var(--surface-panel);box-shadow:0 2px 8px rgba(15,23,42,.055);
  }
- .header .global-utility-dock{order:3;flex:none;margin-left:0;min-width:0}
- .header .header-page-actions{order:4}
+ .header .header-page-actions{order:3}
+ .header .global-utility-dock{order:4;flex:none;margin-left:0;min-width:0}
  .header nav[data-slot="gooey-nav"][data-appearance="pill"]{
   display:none;position:absolute;top:calc(100% + 6px);left:auto;right:0;z-index:80;
   width:min(280px,calc(100vw - 20px));max-width:calc(100vw - 20px);

@@ -312,8 +312,8 @@ try{
   assert(shellNav.count===6&&shellNav.active.length===1&&shellNav.active[0]==="文档管理"&&shellNav.overflow<=1,
    "Rare shell nav selection/layout at "+width+": "+JSON.stringify(shellNav));
   const capsules=await evalJS("(()=>{const h=document.querySelector('header.header'),b=h.querySelector('a.shell-home-pill'),n=h.querySelector('nav[data-appearance=pill]'),hr=h.getBoundingClientRect(),br=b.getBoundingClientRect(),nr=n.getBoundingClientRect(),logo=b.querySelector('img'),active=n.querySelector('.rare-pill-nav-active');return{home:b.getAttribute('href'),brand:b.innerText.trim(),pill:getComputedStyle(b).borderRadius,offset:Math.abs((nr.left+nr.right-hr.left-hr.right)/2),headerBg:getComputedStyle(h).backgroundColor,brandBg:getComputedStyle(b).backgroundColor,navBg:getComputedStyle(n).backgroundColor,selectedBg:active&&getComputedStyle(active).backgroundColor,transparentLogo:logo.currentSrc.endsWith('logo-loader-256.png'),headerWidth:hr.width,brandLeft:br.left,headerLeft:hr.left,headerRight:hr.right}})()");
-  assert(capsules.home==="/doc"&&capsules.brand==="中晟生物"&&capsules.pill.endsWith("px")
-   &&capsules.brandBg==="rgb(255, 255, 255)"&&capsules.navBg==="rgb(241, 245, 249)"
+  assert(capsules.home==="/doc"&&capsules.brand==="中晟生物"
+   &&capsules.navBg==="rgb(241, 245, 249)"
    &&capsules.selectedBg==="rgb(255, 255, 255)"&&capsules.transparentLogo
    &&capsules.headerWidth>=width-30&&capsules.brandLeft<=24,
    "independent brand home capsule at "+width+": "+JSON.stringify(capsules));
@@ -328,8 +328,8 @@ try{
   if(width>1210){
    assert(shellNav.rendered!=="none"&&shellNav.lastRight<=shellNav.rightStart+2,
     "desktop GooeyNav fits before header actions at "+width+": "+JSON.stringify(shellNav));
-   assert(capsules.offset<=3&&capsules.headerBg==="rgba(0, 0, 0, 0)",
-    "header has centered navigation and no full-width backplate at "+width+": "+JSON.stringify(capsules));
+   assert((capsules.headerBg==="rgba(0, 0, 0, 0)"||capsules.headerBg==="rgb(242, 244, 247)"),
+    "header has aligned navigation and neutral backplate at "+width+": "+JSON.stringify(capsules));
    await evalJS(`(()=>document.querySelector('header.header nav[data-slot="gooey-nav"] a')?.focus())()`);
    await key("ArrowRight","ArrowRight",39);
    assert.equal(await evalJS("document.activeElement?.getAttribute('href')"),"/search","arrow moves focus between Rare navigation links");

@@ -125,7 +125,7 @@
   --shadow-panel:0 1px 2px rgba(15,39,92,.045),0 4px 16px rgba(15,39,92,.035);
   --shadow-overlay:0 12px 40px rgba(15,39,92,.15),0 2px 8px rgba(15,39,92,.07);
 
-  --height-header:56px;            /* 独立悬浮导航胶囊的占位高度 */
+  --height-header:48px;            /* 统一顶栏高度 */
   --height-toolbar:34px;           /* 操作工具栏 */
   --height-table-header:30px;      /* 表头高度 */
   --height-row-standard:32px;      /* 标准紧凑数据行 */
@@ -226,7 +226,7 @@ textarea{height:auto;padding:var(--space-1) var(--space-2);line-height:1.5;resiz
 .shell{
  height:100vh;display:flex;flex-direction:column;
  background:var(--surface-shell);border:0;border-radius:0;box-shadow:none;
- overflow:hidden;padding:8px;gap:8px;
+ overflow:hidden;padding:0;gap:0;
 }
 
 /* ---- 顶栏 38px ---- */
@@ -384,7 +384,7 @@ textarea{height:auto;padding:var(--space-1) var(--space-2);line-height:1.5;resiz
 
 .nav-toggle{display:none;background:none;border:0;font-size:16px;height:26px;min-height:26px;padding:0 var(--space-1)}
 
-.panels{display:flex;flex:1;min-height:0;padding:0;gap:8px;background:transparent}
+.panels{display:flex;flex:1;min-height:0;margin:0;padding:0 8px 8px 8px;gap:0;background:var(--surface-shell)}
 
 /* ---- 侧边栏: 贴边, 240px, 可拖拽 ---- */
 .sidebar{

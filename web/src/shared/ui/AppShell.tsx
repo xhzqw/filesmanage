@@ -112,7 +112,7 @@ export function AppShell({user,onLogout,actions,children,finderSidebarWidth}:{us
     event.preventDefault();cancelHeaderHide();setPreviewHeaderOpen(false);document.querySelector<HTMLButtonElement>(".file-sidebar-collapse")?.focus();
    }}}>
    <Link to="/doc" className="brand shell-home-pill" aria-label="中晟生物 · 返回文档首页" onClick={()=>setOpen(false)}>
-    <BrandLogo size={29} className="brand-logo" transparent/><span className="shell-brand-name">中晟生物</span>
+    <BrandLogo size={27} className="brand-logo" transparent/><span className="shell-brand-name">中晟生物</span>
    </Link>
    <GooeyNav id="shell-main-navigation" aria-label="主导航" className={"header-gooey-nav"+(open?" open":"")}
     appearance="pill" items={GOOEY_MAIN_ITEMS} value={activeNav} size="xs"
