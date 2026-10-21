@@ -88,6 +88,8 @@ try{
  console.log("CDW_NAMING_PASS primary navigation / DHF return / category semantics");
  await until("!!document.querySelector('.cdw-home-heading')");
  await until("!!document.querySelector('.cdw-home-dhf')");
+ const shot=await send("Page.captureScreenshot",{format:"png"});
+ (await import("node:fs")).writeFileSync("docs/evidence/real_workbench.png",Buffer.from(shot.data,"base64"));
  assert.ok(await evalJS("document.querySelector('.cdw-home-dhf a')?.getAttribute('href')==='/workbench/dhf'"),"work homepage includes DHF project entry");
  await evalJS("(()=>{[...document.querySelectorAll('.cdw-home-actions button')].find(b=>b.textContent.includes('发起工作'))?.click()})()");
  assert.ok(await evalJS("document.querySelector('.cdw-home-chooser a')?.getAttribute('href')==='/workbench/dhf?create=1'"),"guided chooser distinguishes DHF from CDW initiation");
