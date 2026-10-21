@@ -14,7 +14,7 @@ type Props={pages:number;className:string;label:string;pageUrl:(page:number,retr
 // window, even if the document contains thousands of pages.
 function pageAt(offsets:number[],position:number){
  let lo=0,hi=offsets.length-2;
- while(lo<hi){const mid=(lo+hi+1)>>1;if(offsets[mid]<=position)lo=mid;else hi=mid-1;}
+ while(lo<hi){const mid=(lo+hi+1)>>1;if((offsets[mid]??0)<=position)lo=mid;else hi=mid-1;}
  return Math.max(0,lo);
 }
 export const ContinuousPageStack=forwardRef<ContinuousPageHandle,Props>(function ContinuousPageStack({
@@ -36,7 +36,7 @@ export const ContinuousPageStack=forwardRef<ContinuousPageHandle,Props>(function
  const width=Math.max(1,Math.round((fitMode==="width"?usableWidth:Math.min(usableWidth,usableHeight/ratio))*zoom));
  const offsets=useMemo(()=>{
   const values=[0];
-  for(let page=1;page<=pages;page++)values.push(values[page-1]+Math.max(1,Math.round(width*(ratios[page]??ratio)))+GAP);
+  for(let page=1;page<=pages;page++)values.push((values[page-1]??0)+Math.max(1,Math.round(width*(ratios[page]??ratio)))+GAP);
   return values;
  },[pages,width,ratios,ratio]);
  useLayoutEffect(()=>{
@@ -67,8 +67,8 @@ export const ContinuousPageStack=forwardRef<ContinuousPageHandle,Props>(function
   if(old&&old.width>1&&viewport.height){
    const anchor=Math.max(0,node.scrollTop-viewport.top+viewport.height*.3);
    const index=Math.min(pages-1,pageAt(old.offsets,anchor));
-   const progress=Math.max(0,Math.min(1,(anchor-old.offsets[index])/Math.max(1,old.offsets[index+1]-old.offsets[index])));
-   node.scrollTop=Math.max(0,viewport.top+offsets[index]+progress*(offsets[index+1]-offsets[index])-viewport.height*.3);
+   const progress=Math.max(0,Math.min(1,(anchor-(old.offsets[index]??0))/Math.max(1,(old.offsets[index+1]??0)-(old.offsets[index]??0))));
+   node.scrollTop=Math.max(0,viewport.top+(offsets[index]??0)+progress*((offsets[index+1]??0)-(offsets[index]??0))-viewport.height*.3);
   }
   previous.current={offsets,width};sync();
  },[offsets,width,viewport.height,viewport.top,pages]);
@@ -81,7 +81,7 @@ export const ContinuousPageStack=forwardRef<ContinuousPageHandle,Props>(function
  function goToPage(page:number){
   const node=stage.current;if(!node||!pages)return;
   const target=Math.max(1,Math.min(pages,Math.round(page)));
-  node.scrollTop=viewport.top+offsets[target-1];
+  node.scrollTop=viewport.top+(offsets[target-1]??0);
   setActive(target);setWindow({first:Math.max(0,target-2),last:Math.min(pages-1,target+1)});
  }
  useImperativeHandle(ref,()=>({goToPage}));
@@ -102,7 +102,7 @@ export const ContinuousPageStack=forwardRef<ContinuousPageHandle,Props>(function
  for(let i=first;i<=last;i++){
   const number=i+1,status=loaded[number];
   items.push(<div key={number} className="continuous-page" data-page={number}
-   style={{width:width+"px",height:Math.max(1,offsets[i+1]-offsets[i]-GAP)+"px"}}>
+   style={{width:width+"px",height:Math.max(1,(offsets[i+1]??0)-(offsets[i]??0)-GAP)+"px"}}>
    {status!=="ready"&&<div className="continuous-page-placeholder" role="status">
     {status==="failed"?<><span>第 {number} 页加载失败</span><RareButton type="button" onClick={()=>{
      setRetry(old=>({...old,[number]:(old[number]??0)+1}));
@@ -126,9 +126,9 @@ export const ContinuousPageStack=forwardRef<ContinuousPageHandle,Props>(function
   onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd}
   style={{touchAction:panMode?"none":"auto"}}>
   <div className="continuous-page-stack">
-   <div aria-hidden="true" style={{height:offsets[first]}}/>
+   <div aria-hidden="true" style={{height:offsets[first]??0}}/>
    {items}
-   <div aria-hidden="true" style={{height:Math.max(0,offsets[pages]-offsets[last+1])}}/>
+   <div aria-hidden="true" style={{height:Math.max(0,(offsets[pages]??0)-(offsets[last+1]??0))}}/>
   </div>
  </div>;
 });
