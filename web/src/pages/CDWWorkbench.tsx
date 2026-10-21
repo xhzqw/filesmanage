@@ -86,7 +86,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const[busy,setBusy]=useState(false);
  const[refreshToken,refresh]=useState(0);
  const[requestError,setRequestError]=useState("");
- const[filter,setFilter]=useState<View>(()=>params.get("task")?"all":"home");
+ const[filter,setFilter]=useState<View>(()=>params.get("view")==="initiated"?"initiated":params.get("task")?"all":"home");
  const[search,setSearch]=useState("");
  const[priorityFirst,setPriorityFirst]=useState(true);
  const[branches,setBranches]=useState<CDWBranch[]>([]);
@@ -391,7 +391,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
      {filter==="home"?<CDWWorkbenchHome initiatedCount={initiatedItems.length} initiatedHasMore={Boolean(initiatedCursor)} initiatedError={initiatedError} initiatedBusy={initiatedBusy} items={allItems} appointmentCount={appointmentCount} busy={busy} error={requestError}
       canCreate={user.isAdmin} onRefresh={()=>refresh(v=>v+1)} onCreate={()=>{setFilter("tasks");beginForm("create");}}
       onOpen={item=>{setFilter("all");select(item);}} onView={view=>{setFilter(view);setActiveForm(null);setFormalDraft(false);}}/>:filter==="initiated"?
-      <CDWInitiatedWorkspace items={initiatedItems} busy={initiatedBusy} error={initiatedError} nextCursor={initiatedCursor}
+      <CDWInitiatedWorkspace initialTaskId={params.get("initiated")??""} items={initiatedItems} busy={initiatedBusy} error={initiatedError} nextCursor={initiatedCursor}
        onMore={()=>void loadMoreInitiated()} onRefresh={()=>refresh(v=>v+1)}/>:filter==="effective"?<CDWEffectiveSearchPanel/>:filter==="appointments"?
       <CDWQMSReviewInbox items={pendingAppointments} alerts={appointmentAlerts} actorId={user.id}
        onRead={id=>void readAppointmentAlert(id)} onVerified={()=>refresh(v=>v+1)}/>:<>

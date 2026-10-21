@@ -119,6 +119,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.GET("/workbench/dhf/projects", h.dhfProjects)
 	api.POST("/workbench/dhf/projects", h.dhfCreate)
 	api.GET("/workbench/dhf/projects/:id", h.dhfDetail)
+	api.GET("/workbench/dhf/projects/:id/work-links", h.dhfRelatedWorks)
 	api.POST("/workbench/dhf/projects/:id/items/:line/action", h.dhfItemAction)
 	api.POST("/workbench/dhf/projects/:id/stages/:stage/accept", h.dhfAcceptStage)
 	api.POST("/workbench/tasks", h.cdwCreateRoot)

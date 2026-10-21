@@ -55,6 +55,15 @@ try{
  assert.equal(dhf.templateStatus,200);
  assert.equal(dhf.projectsStatus,200);
  assert.equal(dhf.missingStatus,404);
+ const dhfMissingLink=await evalJS("(async()=>{const r=await fetch('/api/workbench/dhf/projects/unknown-id/work-links');return r.status})()");
+ assert.equal(dhfMissingLink,404,"unknown DHF project must not expose related CDW work");
+ if(dhf.projects.length){
+  const first=dhf.projects[0];
+  const related=await evalJS("(async()=>{const r=await fetch('/api/workbench/dhf/projects/"+encodeURIComponent(first.id)+"/work-links');return {status:r.status,data:(await r.json()).data}})()");
+  assert.equal(related.status,200,"DHF authorized project has related-work projection");
+  assert.ok(Array.isArray(related.data.items),"related work is a real bounded server list");
+  assert.ok(related.data.items.every(x=>typeof x.exactDeliveryMatch==="boolean"&&x.stageNo>=1&&x.stageNo<=9),"DHF relation has independent exact-delivery evidence flag");
+ }
  assert.ok(Array.isArray(dhf.projects));
  assert.equal(dhf.template.nodes.filter(n=>n.depth===1).length,9);
  assert.ok(dhf.template.nodes.filter(n=>n.depth>1&&!n.isGroup).length>=140);
@@ -67,6 +76,10 @@ try{
   console.log("DHF_LAYOUT_PASS",width);
  }
  await send("Emulation.clearDeviceMetricsOverride");
+ await send("Page.navigate",{url:base+"/workbench/dhf?create=1"});
+ await until("!!document.querySelector('.dhf-form')");
+ assert.ok(await evalJS("!!document.querySelector('.dhf-form input')"),"DHF deep-link creation opens guided project form");
+ console.log("DHF_CREATE_LINK_BROWSER_PASS admin project form via guided link");
  console.log("DHF_TEMPLATE_BROWSER_PASS nine-source-stage catalogue and ACL guarded project list");
  await send("Page.navigate",{url:base+"/workbench"});
  await until("location.pathname==='/workbench'&&!!document.querySelector('.cdw-layout')");
@@ -74,6 +87,12 @@ try{
  assert.equal(await evalJS("document.querySelector('.cdw-rail')?.getAttribute('aria-label')"),"工作视图分类","workbench categories accessible label");
  console.log("CDW_NAMING_PASS primary navigation / DHF return / category semantics");
  await until("!!document.querySelector('.cdw-home-heading')");
+ await until("!!document.querySelector('.cdw-home-dhf')");
+ assert.ok(await evalJS("!!document.querySelector('.cdw-home-dhf a[href='/workbench/dhf']')"),"work homepage includes DHF project entry");
+ await evalJS("(()=>{[...document.querySelectorAll('.cdw-home-actions button')].find(b=>b.textContent.includes('发起工作'))?.click()})()");
+ assert.ok(await evalJS("!!document.querySelector('.cdw-home-chooser a[href='/workbench/dhf?create=1']')"),"guided chooser distinguishes DHF from CDW initiation");
+ console.log("DHF_CDW_GUIDED_ENTRY_PASS landing projects and separate workflow initiation");
+
  assert.equal(await evalJS("document.querySelector('.cdw-rail-item.is-current')?.textContent?.includes('工作首页')"),true,
   "default route opens the guided work home");
  for(const width of [1440,1024,780,540]){

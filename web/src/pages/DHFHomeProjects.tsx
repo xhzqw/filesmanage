@@ -1,0 +1,35 @@
+import {useEffect,useState} from "react";
+import {Link} from "react-router-dom";
+import {dhfApi,type DHFProject} from "../features/dhf/api";
+import {RareButton} from "../shared/ui/rare";
+
+export function DHFHomeProjects({canCreate}:{canCreate:boolean}){
+ const [projects,setProjects]=useState<DHFProject[]>([]);
+ const [busy,setBusy]=useState(true);
+ const [error,setError]=useState("");
+ const [more,setMore]=useState(false);
+ useEffect(()=>{
+  let alive=true;
+  dhfApi.projects().then(items=>{if(alive)setProjects(items)})
+   .catch(e=>{if(alive)setError(e instanceof Error?e.message:"无法载入DHF项目")})
+   .finally(()=>{if(alive)setBusy(false)});
+  return()=>{alive=false};
+ },[]);
+ return <section className="cdw-home-dhf" aria-label="DHF阶段项目">
+  <div className="cdw-home-dhf-head"><div><strong>DHF 九阶段项目</strong>
+   <span>独立文件验收，按项目及阶段办理</span></div><Link to="/workbench/dhf">进入 DHF 工作台 →</Link></div>
+  {error?<p className="cdw-home-dhf-empty">{error}。请从 DHF 工作台重新加载。</p>:
+   busy?<p className="cdw-home-dhf-empty">正在读取我的项目…</p>:
+   projects.length===0?<div className="cdw-home-dhf-empty">
+    <span>当前没有属于你的项目。受控文件工作与 DHF 验收为两条独立流程。</span>
+    {canCreate&&<Link to="/workbench/dhf?create=1">创建 DHF 项目 →</Link>}
+   </div>:<div className="cdw-home-dhf-list">
+    {(more?projects:projects.slice(0,3)).map(project=><Link key={project.id} to={"/workbench/dhf?project="+encodeURIComponent(project.id)}
+     className="cdw-home-dhf-row"><span className="cdw-home-dhf-no">DHF</span>
+     <span className="cdw-home-dhf-copy"><strong title={project.title}>{project.title}</strong>
+      <small>项目参与者 · 已验收 {project.acceptedStages}/9 阶段</small></span>
+     <span className="cdw-home-dhf-progress">{project.acceptedStages}/9</span></Link>)}
+    {!more&&projects.length>3&&<RareButton type="button" tone="ghost" onClick={()=>setMore(true)}>查看其余 {projects.length-3} 个项目</RareButton>}
+   </div>}
+ </section>;
+}

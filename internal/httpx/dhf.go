@@ -49,6 +49,19 @@ func (h *Handler) dhfCreate(c *gin.Context) {
 	}
 	c.JSON(http.StatusCreated, gin.H{"ok": true, "data": out})
 }
+func (h *Handler) dhfRelatedWorks(c *gin.Context) {
+	actor, ok := h.auth(c)
+	if !ok {
+		return
+	}
+	result, err := h.S.DHFRelatedWorks(c.Request.Context(), actor, c.Param("id"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, gin.H{"ok": true, "data": result})
+}
 func (h *Handler) dhfDetail(c *gin.Context) {
 	actor, ok := h.auth(c)
 	if !ok {

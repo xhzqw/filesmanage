@@ -193,5 +193,25 @@ func TestDHFServiceWorkflow(t *testing.T) {
 	if strings.EqualFold(first.Events[0].EventSHA256, second.Events[0].EventSHA256) {
 		t.Fatal("duplicate project hash")
 	}
+	// Related CDW records are discoverable only under the current author's scope
+	// and are NEVER treated as a frozen DHF evidence match on file identity alone.
+	exec(`INSERT INTO cdw_workflow_template_versions (id,template_key,version_no,lifecycle,graph,role_policy,published_at,created_by)
+ VALUES ('dhf_svc_template','dhf_svc',1,'published','{}'::jsonb,'{}'::jsonb,now(),$1)`, owner.ID)
+	exec(`INSERT INTO cdw_tasks (id,root_id,template_version_id,title,subject_kind,file_id,state,created_by)
+ VALUES ('dhf_svc_task_owner','dhf_svc_task_owner','dhf_svc_template','由项目负责人发起','file','dhf_svc_file','assigned',$1),
+ ('dhf_svc_task_reviewer','dhf_svc_task_reviewer','dhf_svc_template','由独立验收人发起','file','dhf_svc_file','assigned',$2)`, owner.ID, reviewer.ID)
+	ownerLinked, linkedErr := service.DHFRelatedWorks(ctx, owner, first.Project.ID)
+	if linkedErr != nil || len(ownerLinked.Items) != 1 || ownerLinked.Items[0].TaskID != "dhf_svc_task_owner" ||
+		ownerLinked.Items[0].SourceLine != line || ownerLinked.Items[0].ExactDeliveryMatch {
+		t.Fatalf("DHF creator-owned file work must not simulate frozen delivery: %+v %v", ownerLinked, linkedErr)
+	}
+	reviewerLinked, linkedErr := service.DHFRelatedWorks(ctx, reviewer, first.Project.ID)
+	if linkedErr != nil || len(reviewerLinked.Items) != 1 || reviewerLinked.Items[0].TaskID != "dhf_svc_task_reviewer" {
+		t.Fatalf("DHF reviewer only sees their own initiated CDW work: %+v %v", reviewerLinked, linkedErr)
+	}
+	if _, linkedErr = service.DHFRelatedWorks(ctx, domain.User{ID: "dhf_unauthorized"}, first.Project.ID); !errors.Is(linkedErr, domain.ErrNotFound) {
+		t.Fatalf("DHF unrelated viewer must not discover author links: %v", linkedErr)
+	}
+	t.Log("DHF_CDW_RELATED_POSTGRES_PASS author isolation + pinned-file match never inferred")
 	t.Log("DHF_SERVICE_FULL_TRANSACTION_PASS create/replay/ACL/independent NA/pinned file/accept/stage baseline")
 }

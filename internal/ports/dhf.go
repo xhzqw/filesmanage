@@ -52,6 +52,24 @@ type DHFItem struct {
 	ReviewReason        string   `json:"reviewReason"`
 	Revision            int64    `json:"revision"`
 }
+
+// DHFRelatedWork is discovery by shared file identity, not an acceptance
+// decision. ExactDeliveryMatch is true only for the pinned SHA-256 of an actual
+// frozen CDW delivery item on the same work; no effect on DHF stage status.
+type DHFRelatedWork struct {
+	SourceLine         int    `json:"sourceLine"`
+	StageNo            int    `json:"stageNo"`
+	TaskID             string `json:"taskId"`
+	Title              string `json:"title"`
+	State              string `json:"state"`
+	AssigneeName       string `json:"assigneeName"`
+	ExactDeliveryMatch bool   `json:"exactDeliveryMatch"`
+}
+type DHFRelatedPage struct {
+	Items     []DHFRelatedWork `json:"items"`
+	Truncated bool             `json:"truncated"`
+}
+
 type DHFFileVersion struct {
 	ID     string `json:"id"`
 	Seq    int    `json:"seq"`
@@ -87,6 +105,7 @@ type DHFDetail struct {
 type DHFStore interface {
 	DHFCreate(context.Context, DHFProject, []DHFNode) error
 	DHFProjects(context.Context, string) ([]DHFProject, error)
+	DHFRelatedWork(context.Context, string, string, int) ([]DHFRelatedWork, error)
 	DHFProjectByID(context.Context, string, string, bool) (DHFProject, error)
 	DHFDetail(context.Context, string) (DHFDetail, error)
 	DHFUserActive(context.Context, string) (bool, error)

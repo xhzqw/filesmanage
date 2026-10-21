@@ -7,6 +7,9 @@ export type DHFStage={stageNo:number;name:string;state:"locked"|"open"|"accepted
 export type DHFItem={sourceLine:number;stageNo:number;parentPath:string[];title:string;state:"unclassified"|"missing"|"submitted"|"accepted"|"returned"|"not_applicable_pending"|"not_applicable";applicabilityReason:string;fileId?:string;fileVersionId?:string;fileSha256?:string;submittedBy?:string;submittedAt?:string;reviewedBy?:string;reviewedAt?:string;reviewReason:string;revision:number};
 export type DHFEvent={id:number;stageNo:number;sourceLine:number;action:string;actorId:string;eventSha256:string;previousSha256:string;occurredAt:string};
 export type DHFDetail={project:DHFProject;stages:DHFStage[];items:DHFItem[];events:DHFEvent[]};
+export type DHFRelatedWork={sourceLine:number;stageNo:number;taskId:string;title:string;state:string;assigneeName:string;exactDeliveryMatch:boolean};
+export type DHFRelatedPage={items:DHFRelatedWork[];truncated:boolean};
+
 export type DHFFileVersion={id:string;seq:number;sha256:string};
 export type DHFProofEvent={id:number;stageNo:number;sourceLine:number;action:string;actorId:string;payloadText:string;previousSha256:string;eventSha256:string;occurredAt:string};
 export type DHFProofPage={projectId:string;templateSha256:string;chainVersion:string;anchorSha256:string;segmentVerified:boolean;startsAtGenesis:boolean;hasMore:boolean;nextAfter:number;events:DHFProofEvent[]};
@@ -15,6 +18,7 @@ export const dhfApi={
  template:()=>request<DHFTemplate>(base+"/template"),
  projects:()=>request<DHFProject[]>(base+"/projects"),
  detail:(id:string)=>request<DHFDetail>(base+"/projects/"+encodeURIComponent(id)),
+ related:(id:string)=>request<DHFRelatedPage>(base+"/projects/"+encodeURIComponent(id)+"/work-links",{cache:"no-store"}),
  audit:(id:string,after=0)=>request<DHFProofPage>(base+"/projects/"+encodeURIComponent(id)+"/audit?after="+after+"&limit=100"),
  versions:(id:string)=>request<DHFFileVersion[]>(base+"/files/"+encodeURIComponent(id)+"/versions"),
  create:(title:string,reviewerId:string)=>request<DHFDetail>(base+"/projects",{method:"POST",headers:{"Idempotency-Key":newIdempotencyKey()},body:JSON.stringify({title,reviewerId})}),

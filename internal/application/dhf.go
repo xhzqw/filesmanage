@@ -39,6 +39,48 @@ func (s *Service) DHFProjects(ctx context.Context, actor domain.User) ([]ports.D
 	}
 	return store.DHFProjects(ctx, actor.ID)
 }
+
+// DHFRelatedWorks exposes only work initiated by the current person and
+// references from DHF pinned items for which that person still has file ACL.
+func (s *Service) DHFRelatedWorks(ctx context.Context, actor domain.User, id string) (ports.DHFRelatedPage, error) {
+	result := ports.DHFRelatedPage{Items: []ports.DHFRelatedWork{}}
+	tx, err := s.uow.Begin(ctx)
+	if err != nil {
+		return result, err
+	}
+	defer tx.Rollback(ctx)
+	store, ok := tx.(ports.DHFStore)
+	if !ok {
+		return result, domain.ErrInvalidInput
+	}
+	detail, err := s.dhfDetail(ctx, tx, store, actor, id)
+	if err != nil {
+		return result, err
+	}
+	allowed := map[int]bool{}
+	for _, item := range detail.Items {
+		if item.FileID != "" {
+			allowed[item.SourceLine] = true
+		}
+	}
+	rows, err := store.DHFRelatedWork(ctx, id, actor.ID, 201)
+	if err != nil {
+		return result, err
+	}
+	result.Truncated = len(rows) > 200
+	for _, row := range rows {
+		if !allowed[row.SourceLine] {
+			continue
+		}
+		if len(result.Items) >= 200 {
+			result.Truncated = true
+			break
+		}
+		result.Items = append(result.Items, row)
+	}
+	return result, nil
+}
+
 func (s *Service) DHFDetail(ctx context.Context, actor domain.User, id string) (ports.DHFDetail, error) {
 	var out ports.DHFDetail
 	tx, err := s.uow.Begin(ctx)

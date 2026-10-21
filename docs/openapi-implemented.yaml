@@ -443,6 +443,72 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/projects/{id}/work-links:
+    get:
+      summary: Creator-scoped related CDW work for DHF pinned files
+      operationId: dhfRelatedWorks
+      tags:
+      - DHF
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Authorized DHF project ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Read-only file identity and exact delivery SHA-256 matching
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            taskId:
+                              type: string
+                            sourceLine:
+                              type: integer
+                            stageNo:
+                              type: integer
+                            title:
+                              type: string
+                            state:
+                              type: string
+                            assigneeName:
+                              type: string
+                            exactDeliveryMatch:
+                              type: boolean
+                      truncated:
+                        type: boolean
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/initiated/{id}/flow:
     get:
       summary: Creator-scoped delegation subtree and exact-delivery controlled-document milestone evidence

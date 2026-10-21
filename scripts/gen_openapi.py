@@ -780,6 +780,7 @@ CDW_WORK_FLOW = obj({
   "round":integer(minimum=1),"actorName":string(),"recordedAt":timestamp(),"detail":string()},
   required=["taskId","kind","reference","state","recordedAt"])),
 },required=["taskId","rootId","truncated","works","milestones"])
+add("GET","/api/workbench/dhf/projects/{id}/work-links",operation("Creator-scoped related CDW work for DHF pinned files","DHF","dhfRelatedWorks",security=SESSION,params=[id_param("id","Authorized DHF project ID")],responses=dict([json_ok(obj({"items":arr(obj({"taskId":string(),"sourceLine":integer(),"stageNo":integer(),"title":string(),"state":string(),"assigneeName":string(),"exactDeliveryMatch":{"type":"boolean"}})),"truncated":{"type":"boolean"}}),"Read-only file identity and exact delivery SHA-256 matching"),resp("401",ERR["401"]),resp("404",ERR["404"])])))
 add("GET","/api/workbench/initiated/{id}/flow",operation(
  "Creator-scoped delegation subtree and exact-delivery controlled-document milestone evidence",
  "CDW","cdwInitiatedFlow",security=SESSION,params=[id_param("id","Task authored by the signed-in user.")],

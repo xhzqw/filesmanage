@@ -8,12 +8,12 @@ import {CDWInitiatedFlowPanel} from "./CDWInitiatedFlowPanel";
 const status:Record<string,string>={draft:"待派发",assigned:"待接收",accepted:"已接收",in_progress:"正在修订",submitted:"等待验收",accepted_delivery:"交付已验收",returned:"已退回",declined:"已拒绝",closed:"已关闭",cancelled:"已取消"};
 const explanation:Record<string,string>={assigned:"等待负责人接收工作并确认交付范围。",accepted:"负责人已接收，正在准备工作分支。",in_progress:"负责人正在修订文件，尚未提交正式交付。",submitted:"冻结交付稿正在等待上级验收，并不代表正式批准。",accepted_delivery:"本轮交付已验收；正式审批、发行与生效是独立流程。",returned:"交付未通过验收，需要负责人根据退回意见修订。",cancelled:"本项工作已经取消。",closed:"本项工作已经关闭。"};
 const localTime=(s:string)=>{const d=new Date(s);return Number.isNaN(d.getTime())?"时间待核验":d.toLocaleString("zh-CN",{timeZone:"Asia/Shanghai",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false})+"（北京时间）"};
-export function CDWInitiatedWorkspace({items,busy,error,nextCursor,onMore,onRefresh}:{items:CDWInitiatedItem[];busy:boolean;error:string;nextCursor:string;onMore:()=>void;onRefresh:()=>void}){
+export function CDWInitiatedWorkspace({items,busy,error,nextCursor,onMore,onRefresh,initialTaskId=""}:{items:CDWInitiatedItem[];busy:boolean;error:string;nextCursor:string;initialTaskId?:string;onMore:()=>void;onRefresh:()=>void}){
  const[query,setQuery]=useState("");
- const[chosen,setChosen]=useState("");
+ const[chosen,setChosen]=useState(initialTaskId);
  const[detailTab,setDetailTab]=useState<"flow"|"events">("flow");
  const visible=useMemo(()=>items.filter(x=>[x.title,x.assigneeName,x.state].join(" ").toLowerCase().includes(query.trim().toLowerCase())),[items,query]);
- const selected=visible.find(x=>x.taskId===chosen)??visible[0];
+ const selected=visible.find(x=>x.taskId===chosen)??(chosen?undefined:visible[0]);
  return <section className="cdw-initiated" aria-label="我发起的工作">
   <div className="cdw-initiated-list">
    <header className="cdw-initiated-head"><span><strong>我发起的工作</strong><small>按发起时间排序，包含已结束的工作</small></span>
@@ -45,6 +45,6 @@ export function CDWInitiatedWorkspace({items,busy,error,nextCursor,onMore,onRefr
     {detailTab==="flow"?<CDWInitiatedFlowPanel key={selected.taskId} taskId={selected.taskId}/>:<CDWInitiatedEventTimeline key={selected.taskId} taskId={selected.taskId}/>}
     <div className="cdw-initiated-links"><Link to={"/preview/"+encodeURIComponent(selected.fileId)}>查看关联文件 →</Link>
      <span>查看发起进度不等于拥有编辑、验收或代签权限。</span></div>
-   </div>:<div className="cdw-detail-empty"><strong>选择工作记录</strong><p>查看负责人和当前处理进度。</p></div>}</div>
+   </div>:<div className="cdw-detail-empty"><strong>选择工作记录</strong><p>查看负责人和当前处理进度。{chosen&&!selected&&" 当前链接指向的工作尚未加载，请加载更早的记录。"} </p></div>}</div>
  </section>;
 }

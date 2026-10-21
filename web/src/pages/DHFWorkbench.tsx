@@ -1,5 +1,5 @@
 import {Fragment,useEffect,useState} from "react";
-import {Link} from "react-router-dom";
+import {Link,useSearchParams} from "react-router-dom";
 import type {User} from "../entities/user/model";
 import type {FileItem} from "../entities/file/model";
 import {AppShell} from "../shared/ui/AppShell";
@@ -7,6 +7,8 @@ import {RareButton,RareInput,RareSelect,RareTextarea,RareNotice} from "../shared
 import {organizationApi} from "../features/organization/api";
 import {collaborationApi} from "../features/collaboration/api";
 import {dhfApi,type DHFDetail,type DHFProject,type DHFItem,type DHFFileVersion,type DHFProofPage} from "../features/dhf/api";
+import {DHFRelatedWorkPanel} from "./DHFRelatedWorkPanel";
+import type {DHFRelatedWork} from "../features/dhf/api";
 import "./dhfWorkbench.css";
 
 const labels:Record<DHFItem["state"],string>={unclassified:"待判定",missing:"待提交",submitted:"待验收",accepted:"已验收",returned:"退回整改",not_applicable_pending:"不适用待核验",not_applicable:"不适用"};
@@ -14,19 +16,30 @@ const stageLabels={locked:"未开放",open:"进行中",accepted:"已通过"};
 const date=(s?:string)=>s?new Date(s).toLocaleString("zh-CN",{hour12:false}):"—";
 const errText=(e:unknown)=>e instanceof Error?e.message:"请求失败";
 export function DHFWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
+ const[searchParams]=useSearchParams();
+ const linkedProject=searchParams.get("project")??"";
  const[projects,setProjects]=useState<DHFProject[]>([]),[detail,setDetail]=useState<DHFDetail|null>(null);
  const[stage,setStage]=useState(1),[line,setLine]=useState(0),[filter,setFilter]=useState("all"),[query,setQuery]=useState("");
  const[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState("");
- const[creating,setCreating]=useState(false),[title,setTitle]=useState(""),[reviewer,setReviewer]=useState(""),[users,setUsers]=useState<User[]>([]);
+ const[creating,setCreating]=useState(()=>searchParams.get("create")==="1"&&user.isAdmin),[title,setTitle]=useState(""),[reviewer,setReviewer]=useState(""),[users,setUsers]=useState<User[]>([]);
  const[reason,setReason]=useState(""),[fileQuery,setFileQuery]=useState(""),[files,setFiles]=useState<FileItem[]>([]);
  const[picked,setPicked]=useState<FileItem|null>(null),[versions,setVersions]=useState<DHFFileVersion[]>([]),[version,setVersion]=useState("");
+ const[related,setRelated]=useState<DHFRelatedWork[]>([]);
+ const[relatedBusy,setRelatedBusy]=useState(false),[relatedError,setRelatedError]=useState("");
+ const[relatedTruncated,setRelatedTruncated]=useState(false),[relatedReload,setRelatedReload]=useState(0);
  const[history,setHistory]=useState(false);const[proof,setProof]=useState<DHFProofPage|null>(null);const[proofAfter,setProofAfter]=useState(0);const[proofBusy,setProofBusy]=useState(false);
  useEffect(()=>{let live=true;dhfApi.projects().then(v=>{if(live)setProjects(v)}).catch(e=>{if(live)setError(errText(e))}).finally(()=>{if(live)setLoading(false)});return()=>{live=false}},[]);
+ useEffect(()=>{if(!linkedProject)return;let live=true;setLoading(true);
+  dhfApi.detail(linkedProject).then(d=>{if(live){setDetail(d);setStage(d.stages.find(x=>x.state==="open")?.stageNo??9);setLine(0)}})
+   .catch(e=>{if(live)setError(errText(e))}).finally(()=>{if(live)setLoading(false)});
+  return()=>{live=false};
+ },[linkedProject]);
+ useEffect(()=>{const id=detail?.project.id;if(!id){setRelated([]);return}let live=true;setRelatedBusy(true);setRelatedError("");setRelated([]);dhfApi.related(id).then(result=>{if(live){setRelated(result.items??[]);setRelatedTruncated(result.truncated)}}).catch(e=>{if(live)setRelatedError(errText(e))}).finally(()=>{if(live)setRelatedBusy(false)});return()=>{live=false}},[detail?.project.id,relatedReload]);
  useEffect(()=>{if(!creating)return;let live=true;organizationApi.users().then(v=>{if(live)setUsers(v)}).catch(e=>{if(live)setError(errText(e))});return()=>{live=false}},[creating]);
  useEffect(()=>{const q=fileQuery.trim();if(q.length<2){setFiles([]);return}let live=true;const timer=window.setTimeout(()=>{collaborationApi.search({q,sort:"updated_desc",limit:25}).then(v=>{if(live)setFiles(v.items)}).catch(()=>{if(live)setFiles([])})},220);return()=>{live=false;window.clearTimeout(timer)}},[fileQuery]);
  async function open(id:string){setLoading(true);setError("");try{const d=await dhfApi.detail(id);setDetail(d);setStage(d.stages.find(s=>s.state==="open")?.stageNo??9);setProof(null);setLine(0)}catch(e){setError(errText(e))}finally{setLoading(false)}}
  async function create(){setBusy(true);setError("");try{const d=await dhfApi.create(title.trim(),reviewer);setProjects(p=>[d.project,...p]);setDetail(d);setStage(1);setProof(null);setLine(0);setCreating(false);setTitle("");setReviewer("")}catch(e){setError(errText(e))}finally{setBusy(false)}}
- async function act(action:string){if(!detail||!item)return;setBusy(true);setError("");try{const d=await dhfApi.item(detail.project.id,item.sourceLine,item.revision,{action,reason,...(action==="submit"&&picked?{fileId:picked.id,fileVersionId:version}:{})});setDetail(d);setReason("");setFileQuery("");setPicked(null);setVersions([]);setVersion("")}catch(e){setError(errText(e))}finally{setBusy(false)}}
+ async function act(action:string){if(!detail||!item)return;setBusy(true);setError("");try{const d=await dhfApi.item(detail.project.id,item.sourceLine,item.revision,{action,reason,...(action==="submit"&&picked?{fileId:picked.id,fileVersionId:version}:{})});setDetail(d);setRelatedReload(v=>v+1);setReason("");setFileQuery("");setPicked(null);setVersions([]);setVersion("")}catch(e){setError(errText(e))}finally{setBusy(false)}}
  async function acceptStage(){if(!detail)return;setBusy(true);setError("");try{const d=await dhfApi.stage(detail.project.id,stage,reason);setDetail(d);setProjects(p=>p.map(x=>x.id===d.project.id?d.project:x));setStage(Math.min(stage+1,9));setLine(0);setReason("")}catch(e){setError(errText(e))}finally{setBusy(false)}}
  async function loadAudit(after=0){if(!detail)return;setProofBusy(true);setError("");try{setProof(await dhfApi.audit(detail.project.id,after));setProofAfter(after)}catch(e){setError(errText(e))}finally{setProofBusy(false)}}
  async function pickFile(f:FileItem){setPicked(f);setVersion("");setVersions([]);try{setVersions(await dhfApi.versions(f.id))}catch(e){setError(errText(e))}}
@@ -55,6 +68,7 @@ export function DHFWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  <aside className="dhf-detail"><div className="dhf-section-title"><strong>验收详情</strong>{item&&<span className={"dhf-status "+item.state}>{labels[item.state]}</span>}</div>
  {item?<div className="dhf-detail-scroll"><h3>{item.title}</h3><p className="dhf-hierarchy">{item.parentPath.join(" / ")}</p>
  <dl className="dhf-facts"><div><dt>原始行号</dt><dd>{item.sourceLine}</dd></div><div><dt>记录修订</dt><dd>R{item.revision}</dd></div><div><dt>交付人</dt><dd>{item.submittedBy||"—"}</dd></div><div><dt>交付时间</dt><dd>{date(item.submittedAt)}</dd></div><div><dt>验收人</dt><dd>{item.reviewedBy||"—"}</dd></div><div><dt>验收时间</dt><dd>{date(item.reviewedAt)}</dd></div></dl>
+ <DHFRelatedWorkPanel items={related} stageNo={item.stageNo} sourceLine={item.sourceLine} loading={relatedBusy} error={relatedError} truncated={relatedTruncated}/>
  {item.fileId&&<div className="dhf-evidence"><strong>冻结的文件版本</strong><a href={"/api/workbench/dhf/projects/"+encodeURIComponent(detail!.project.id)+"/items/"+item.sourceLine+"/evidence"} target="_blank" rel="noopener noreferrer">打开 / 下载固定验收版本 ↗</a><code>{item.fileVersionId}</code><small>内容 SHA-256</small><code>{item.fileSha256}</code><small>此入口严格读取验收绑定的原始版本；Office 文件提供原始文件下载，不会跳到最新版。</small></div>}
  {(item.reviewReason||item.applicabilityReason)&&<div className="dhf-note"><strong>审查记录</strong><p>{item.reviewReason||item.applicabilityReason}</p></div>}
  {owner&&(item.state==="unclassified"||item.state==="missing"||item.state==="returned")&&<div className="dhf-form"><strong>文件处理</strong>{item.state==="unclassified"&&<RareButton type="button" tone="neutral" disabled={busy} onClick={()=>void act("required")}>列为应交付文件</RareButton>}<RareTextarea rows={3} value={reason} onChange={e=>setReason(e.target.value)} placeholder="若不适用，必须说明具体依据（至少8字）"/><RareButton type="button" tone="neutral" disabled={busy||reason.trim().length<8} onClick={()=>void act("not_applicable")}>申请不适用复核</RareButton>
@@ -62,7 +76,7 @@ export function DHFWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  </div>}
  {checker&&item.state==="not_applicable_pending"&&<div className="dhf-form"><strong>独立适用性核验</strong><p className="dhf-hierarchy">申请依据：{item.applicabilityReason}</p><RareTextarea rows={3} value={reason} onChange={e=>setReason(e.target.value)} placeholder="独立核验结论（至少8字）"/><div className="dhf-actions"><RareButton type="button" tone="neutral" disabled={busy||reason.trim().length<8} onClick={()=>void act("reject_not_applicable")}>驳回不适用</RareButton><RareButton type="button" tone="primary" disabled={busy||reason.trim().length<8} onClick={()=>void act("confirm_not_applicable")}>核准不适用</RareButton></div></div>}
  {checker&&item.state==="submitted"&&<div className="dhf-form"><strong>独立验收</strong><RareTextarea rows={3} value={reason} onChange={e=>setReason(e.target.value)} placeholder="审核意见 / 退回依据"/><div className="dhf-actions"><RareButton type="button" tone="neutral" disabled={busy||reason.trim().length<8} onClick={()=>void act("return")}>退回修改</RareButton><RareButton type="button" tone="primary" disabled={busy||reason.trim().length<8} onClick={()=>void act("accept")}>验收通过</RareButton></div></div>}
- </div>:<p className="dhf-empty">选中一份交付文件查看详情</p>}
+ </div>:<DHFRelatedWorkPanel items={related} loading={relatedBusy} error={relatedError} truncated={relatedTruncated}/>}
  {detail&&<div className="dhf-history"><RareButton type="button" onClick={()=>setHistory(v=>!v)}>{history?"收起":"展开"}审计时间线 · {logs.length}条</RareButton>{history&&<div className="dhf-audit-tool"><RareButton type="button" tone="neutral" disabled={proofBusy} onClick={()=>void loadAudit(0)}>{proofBusy?"验算中…":"验算项目审计链"}</RareButton>{proof?.projectId===detail.project.id&&<><small>{proof.segmentVerified?"本段校验通过":"校验未完成"} · {proof.events.length} 条 · {proof.startsAtGenesis?"自创立事件":"续接前段"}</small>{proof.hasMore&&<RareButton type="button" tone="ghost" disabled={proofBusy} onClick={()=>void loadAudit(proof.nextAfter)}>下一段</RareButton>}<a href={"/api/workbench/dhf/projects/"+encodeURIComponent(detail.project.id)+"/audit?after="+proofAfter+"&limit=100"} target="_blank" rel="noopener noreferrer">查看取证 JSON</a></>}</div>}{history&&<div className="dhf-history-body">{logs.map(e=><div key={e.id}><strong>{e.action}</strong><small>{date(e.occurredAt)} · {e.actorId}</small><code>{e.eventSha256.slice(0,24)}…</code></div>)}</div>}</div>}</aside>
  </div></main></div></AppShell>;
 }
