@@ -18,3 +18,4 @@
  gap:10px;min-height:240px;padding:24px;text-align:center;color:var(--status-danger);font-size:12px}
 .file-pdf-message{padding:16px;text-align:center;font-size:12px;color:var(--text-secondary)}
 @media(max-width:650px){.file-pdf-toolbar{flex-wrap:wrap}.file-pdf-toolbar strong{display:none}.file-pdf-tools{width:100%;justify-content:space-between}.file-pdf-paper{padding:6px}.file-pdf-placeholder{inset:6px}}
+.file-pdf-paper.continuous-page-viewport{align-items:stretch;justify-content:flex-start}
