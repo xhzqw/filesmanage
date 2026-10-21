@@ -2,7 +2,7 @@
    no extra header row, solid white slider on one neutral trough. */
 .shell>.header{
  display:grid;
- grid-template-columns:var(--finder-sidebar-width,280px) minmax(0,1fr) auto auto;
+ grid-template-columns:var(--finder-sidebar-width,240px) minmax(0,1fr) auto auto;
  align-items:center;column-gap:16px;height:var(--height-header);min-height:var(--height-header);
  width:100%;max-width:none;margin:0;
  padding:0 20px 0 0;border:0;border-radius:0;background:var(--surface-shell);box-shadow:none;
