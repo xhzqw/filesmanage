@@ -14,6 +14,7 @@ import {CDWScopeApprovalPanel} from "../features/cdw/CDWScopeApprovalPanel";
 import {CDWDepartmentReceiptPanel} from "../features/cdw/CDWDepartmentReceiptPanel";
 import {CDWReadingPanel} from "../features/cdw/CDWReadingPanel";
 import {CDWEffectiveSearchPanel} from "../features/cdw/CDWEffectiveSearchPanel";
+import {ProjectDatabase} from "./ProjectDatabase";
 import {BrandLoadingLabel} from "../shared/ui/BrandLoader";
 import {toast} from "../shared/ui/feedback";
 import {errorCopy} from "../shared/errors";
@@ -66,17 +67,15 @@ export function WorkbenchIcon({name,className=""}:{name:string;className?:string
    return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>;
   case "customers":
    return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
-  case "projects":
-   // 多层「看板列」造型：区别于文件/文件夹图标，暗示这是同一批数据的多视图
-   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1.2"/><rect x="10" y="4" width="5" height="10" rx="1.2"/><rect x="17" y="4" width="4" height="13" rx="1.2"/></svg>;
   default:
    return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg>;
  }
 }
 
-type View="home"|"todo"|"initiated"|"following"|"tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all"|"seals";
+type View="home"|"todo"|"initiated"|"following"|"tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all"|"seals"|"projects"|"my-projects";
 const viewGroups:{name:string;views:{key:View;label:string;icon:string}[]}[]=[
  {name:"工作区",views:[{key:"home",label:"工作首页",icon:"home"},{key:"todo",label:"待我处理",icon:"todo"},{key:"initiated",label:"我发起的",icon:"initiated"},{key:"all",label:"全部事项",icon:"all"}]},
+ {name:"项目与任务",views:[{key:"projects",label:"项目",icon:"projects"},{key:"my-projects",label:"我的项目",icon:"projects"}]},
  {name:"审批与验收",views:[{key:"formal",label:"正式审批",icon:"formal"},{key:"reviews",label:"交付验收",icon:"reviews"},{key:"scope",label:"范围审批",icon:"scope"},{key:"appointments",label:"任命核验",icon:"appointments"}]},
  {name:"受控与流转",views:[{key:"tasks",label:"文件工作",icon:"tasks"},{key:"obligations",label:"责任待办",icon:"obligations"},{key:"control",label:"发行准备",icon:"control"},{key:"receipts",label:"部门签收",icon:"receipts"},{key:"reading",label:"阅读确认",icon:"reading"},{key:"effective",label:"生效文件",icon:"effective"},{key:"seals",label:"电子签章",icon:"seals"}]},
 ];
@@ -409,7 +408,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
   home:allItems.filter(isActionable).length+appointmentCount,todo:allItems.filter(isActionable).length+appointmentCount,initiated:initiatedItems.length,following:allItems.filter(x=>!isActionable(x)).length,
   tasks:totalTasks,obligations:totalObligations,reviews:totalReviews,formal:totalFormal,
   appointments:appointmentCount,control:totalControl,scope:totalScope,receipts:totalReceipts,
-  reading:totalReading,effective:0,all:allItems.length,seals:0,
+  reading:totalReading,effective:0,all:allItems.length,seals:0,projects:0,"my-projects":0,
  };
  const selectedView=viewGroups.flatMap(group=>group.views).find(view=>view.key===filter)?.label??"工作事项";
  const actionableVisible=visible.filter(isActionable).length;
@@ -435,13 +434,12 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
      </nav>
      <Link className="cdw-rail-dhf" to="/workbench/dhf"><span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name="dhf"/></span><span>DHF 九阶段验收</span><span aria-hidden="true">↗</span></Link>
      <Link className="cdw-rail-dhf" to="/workbench/customer-registrations"><span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name="customers"/></span><span>客户登记审批</span><span aria-hidden="true">↗</span></Link>
-     <Link className="cdw-rail-dhf" to="/workbench/projects"><span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name="projects"/></span><span>项目</span><span aria-hidden="true">↗</span></Link>
     </div>
     <div className="sidebar-resizer" role="separator" aria-orientation="vertical" tabIndex={-1}/>
    </aside>
    <main className="work cdw-work">
     <div className="cdw-layout">
-     {filter==="home"?<CDWWorkbenchHome initiatedCount={initiatedItems.length} initiatedHasMore={Boolean(initiatedCursor)} initiatedError={initiatedError} initiatedBusy={initiatedBusy} items={allItems} appointmentCount={appointmentCount} busy={busy} error={requestError}
+     {(filter==="projects"||filter==="my-projects")?<div className="cdw-projects-view"><ProjectDatabase user={user} initialScope={filter==="my-projects"?"mine":"all"}/></div>:filter==="home"?<CDWWorkbenchHome initiatedCount={initiatedItems.length} initiatedHasMore={Boolean(initiatedCursor)} initiatedError={initiatedError} initiatedBusy={initiatedBusy} items={allItems} appointmentCount={appointmentCount} busy={busy} error={requestError}
       canCreate={user.isAdmin} onRefresh={()=>refresh(v=>v+1)} onCreate={()=>{setFilter("tasks");beginForm("create");}}
       onOpen={item=>{setFilter("all");select(item);}} onView={view=>{setFilter(view);setActiveForm(null);setFormalDraft(false);}}/>:filter==="initiated"?
       <CDWInitiatedWorkspace items={initiatedItems} busy={initiatedBusy} error={initiatedError} nextCursor={initiatedCursor}

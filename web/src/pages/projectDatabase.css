@@ -2,9 +2,7 @@
  * 「项目」模块样式 —— 复用 theme.css 的 Polar Blue 设计 token，不引入新色板。
  * 结构沿用原型 project-db.html：看板/表格/甘特三视图 + 侧边抽屉 + 属性可见性面板。 */
 
-.pj-rail{background:var(--surface-shell,hsl(214 29% 98%));border-right:1px solid var(--border-hairline,#E3EAF3)}
-
-.pj-shell{display:flex;flex-direction:column;gap:14px;padding:18px 22px 32px;max-width:1280px;margin:0 auto;width:100%}
+.pj-shell{display:flex;flex-direction:column;gap:14px;width:100%;min-width:0}
 
 /* ---- 页头 ---- */
 .pj-header{display:flex;align-items:center}
@@ -212,11 +210,9 @@ body.pj-gdragging .pj-gbar{box-shadow:0 0 0 2px rgba(0,100,225,.35)}
 .pj-doc-chip:hover .pj-doc-open::after{opacity:.75;transform:none}
 @media (hover:none){.pj-doc-open::after{opacity:.55;transform:none}}
 
-/* ---- 单内容区容器 ----
- * .cdw-layout 是工作台的两列 grid，项目页只有一个主区，沿用会把内容
- * 压进 300px 左列。这里用独立容器接管滚动与内边距。 */
-.pj-work{overflow:hidden}
-.pj-canvas{height:100%;min-height:0;min-width:0;overflow:auto;background:var(--surface-shell,#F2F5FA)}
+/* ---- 作为工作台视图时的容器 ----
+ * 项目不再是独立页面：外壳（顶栏/侧栏/滚动）由 CDWWorkbench 提供，
+ * 这里只负责自己的工作区排布，不再重复设置背景与 overflow。 */
 .pj-shell{max-width:1280px;margin:0 auto;width:100%}
 
 /* 看板列宽：给标题留足宽度，避免中文逐字换行 */
@@ -225,3 +221,10 @@ body.pj-gdragging .pj-gbar{box-shadow:0 0 0 2px rgba(0,100,225,.35)}
 
 @media (max-width:1100px){.pj-board{grid-template-columns:repeat(2,minmax(200px,1fr))}}
 @media (max-width:760px){.pj-board{grid-template-columns:minmax(0,1fr)}}
+
+/* ---- 工作台内的项目视图容器 ----
+ * .cdw-layout 的两列 grid 里，项目视图占据内容列并自行滚动，
+ * 不再像独立页面那样另起一套背景与内边距。 */
+ .cdw-projects-view{grid-column:1 / -1;grid-row:1;
+ min-width:0;min-height:0;height:100%;overflow:auto;padding:18px 22px 32px}
+@media (max-width:760px){.cdw-projects-view{padding:14px 14px 28px}}

@@ -7,9 +7,8 @@
 // 后端对接规范见 BACKEND-API.md。
 
 import{useEffect,useMemo,useRef,useState}from "react";
-import{Link,useNavigate,useSearchParams}from "react-router-dom";
+import{Link,useSearchParams}from "react-router-dom";
 import type{User}from "../entities/user/model";
-import{AppShell,BrandLogo}from "../shared/ui/AppShell";
 import{RareButton,RareInput,RareSelect,RareTextarea,RareNotice}from "../shared/ui/rare";
 import{toast}from "../shared/ui/feedback";
 import{errorCopy}from "../shared/errors";
@@ -18,8 +17,6 @@ import{organizationApi}from "../features/organization/api";
 import{observeWindowReturn}from "../shared/resourceSync";
 import{DocumentPicker,type PickedDocument}from "../shared/ui/DocumentPicker";
 import{FileTypeIcon}from "../shared/ui/FileTypeIcon";
-import{WorkbenchIcon}from "./CDWWorkbench";
-import{ProjectsIcon}from "./projectIcons";
 import{projectApi,type Project,type ProjectStatus,type ProjectPriority,type ProjectTeam,type ProjectWriteInput}from "../features/projects/api";
 import"./projectDatabase.css";
 
@@ -69,10 +66,9 @@ function inputOf(d:Draft):ProjectWriteInput{
   team:d.team,priority:d.priority,startDate:d.startDate||null,endDate:d.endDate||null,progress:d.progress};
 }
 
-export function ProjectDatabase({user,onLogout,initialScope="all"}:{
- user:User;onLogout:()=>void;initialScope?:"all"|"mine";
+export function ProjectDatabase({user,initialScope="all"}:{
+ user:User;initialScope?:"all"|"mine";
 }){
- const navigate=useNavigate();
  const[params,setParams]=useSearchParams();
  const[projects,setProjects]=useState<Project[]>([]);
  const[busy,setBusy]=useState(true);
@@ -352,37 +348,9 @@ export function ProjectDatabase({user,onLogout,initialScope="all"}:{
  function toggleStatus(k:ProjectStatus){setFilterStatus(s=>({...s,[k]:!s[k]}));}
 
  /* ============================ 渲染 ============================ */
- return<AppShell user={user} onLogout={onLogout} finderSidebarWidth={240}>
-  <div className="panels document-explorer pj-panels">
-   <aside className="sidebar finder-sidebar cdw-rail pj-rail" aria-label="工作视图分类" style={{width:"240px"}}>
-    <Link to="/doc" className="finder-sidebar-home" aria-label="中晟生物 · 返回文档首页">
-     <BrandLogo size={27} className="finder-sidebar-logo" transparent/><span>中晟生物</span>
-    </Link>
-    <div className="sidebar-scroll">
-     <nav className="cdw-rail-nav" aria-label="工作分类">
-      <div className="cdw-rail-group"><div className="cdw-rail-caption">工作区</div>
-       <RareButton type="button" className="cdw-rail-item" onClick={()=>navigate("/workbench")}>
-        <span className="cdw-rail-icon"><WorkbenchIcon name="home"/></span><span className="cdw-rail-label">返回工作台</span>
-       </RareButton>
-      </div>
-      <div className="cdw-rail-group"><div className="cdw-rail-caption">项目与任务</div>
-       <RareButton type="button" className={"cdw-rail-item"+(scope==="all"?" is-current":"")} onClick={()=>setScope("all")}>
-        <span className="cdw-rail-icon"><ProjectsIcon/></span><span className="cdw-rail-label">项目</span>
-        <small className="has-count">{scopeCount.all}</small>
-       </RareButton>
-       <RareButton type="button" className={"cdw-rail-item"+(scope==="mine"?" is-current":"")} onClick={()=>setScope("mine")}>
-        <span className="cdw-rail-icon"><ProjectsIcon dash/></span><span className="cdw-rail-label">我的项目</span>
-        <small className="has-count">{scopeCount.mine}</small>
-       </RareButton>
-      </div>
-     </nav>
-    </div>
-   </aside>
-
-   <main className="work cdw-work pj-work">
-    {/* 项目页是单内容区：不能沿用工作台的 .cdw-layout（那是两列 grid，
-        只放一个子元素会被塞进 300px 左列，内容被挤成窄条）。 */}
-    <div className="pj-canvas">
+ // 纯内容组件：不套 AppShell、不带自己的侧栏。
+ // 它作为工作台的一个视图渲染，侧栏由 CDWWorkbench 提供，避免出现「两套壳」。
+ return<>
      <div className="pj-shell">
       <header className="pj-header"><div className="pj-crumb">赖·威威的工作空间 总部 <span>/</span> <b>项目</b></div></header>
       <div className="pj-title-row">
@@ -455,10 +423,7 @@ export function ProjectDatabase({user,onLogout,initialScope="all"}:{
       excludeIds={detail?.docs.map(d=>d.docId)??[]}
       onPick={docs=>{if(docPickerFor!=null)void attachDocs(docPickerFor,docs);}}
       onClose={()=>setDocPickerFor(null)}/>
-    </div>
-   </main>
-  </div>
- </AppShell>;
+ </>;
 
  function renderBoard(){
   return<div className="pj-board">{[...ST_KEYS].reverse().map(st=>
