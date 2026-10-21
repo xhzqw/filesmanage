@@ -307,7 +307,7 @@ try{
    paths:links.map(x=>new URL(x.href).pathname),count:segments.length,active:active.map(x=>x.textContent.trim()),
    rendered:getComputedStyle(nav).display,navWidth:rect.width,navScroll:nav.scrollWidth,
    lastRight:last?.right,rightStart:right?.left,overflow:document.documentElement.scrollWidth-innerWidth};})()`);
-  assert.deepEqual(shellNav.labels,["文档管理","全局搜索","统计","审批","回收站","组织与权限"],
+  assert.deepEqual(shellNav.labels,["文档管理","客户资料","统计","工作台","回收站","组织与权限"],
    "all six enabled global Rare UI navigation links");
   assert(shellNav.count===6&&shellNav.active.length===1&&shellNav.active[0]==="文档管理"&&shellNav.overflow<=1,
    "Rare shell nav selection/layout at "+width+": "+JSON.stringify(shellNav));
@@ -332,13 +332,13 @@ try{
     "header has aligned navigation and neutral backplate at "+width+": "+JSON.stringify(capsules));
    await evalJS(`(()=>document.querySelector('header.header nav[data-slot="gooey-nav"] a')?.focus())()`);
    await key("ArrowRight","ArrowRight",39);
-   assert.equal(await evalJS("document.activeElement?.getAttribute('href')"),"/search","arrow moves focus between Rare navigation links");
-   const navHit=await evalJS("(()=>{const a=document.querySelector('header.header nav a[href$=search]'),r=a.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2,e=document.elementFromPoint(x,y);return{rect:{x,y,width:r.width,height:r.height},hit:e?.outerHTML?.slice(0,260),linkHit:a.contains(e),pointerEvents:getComputedStyle(a).pointerEvents,navZ:getComputedStyle(a.closest('nav')).zIndex}})()");
+   assert.equal(await evalJS("document.activeElement?.getAttribute('href')"),"/customers","arrow moves focus between Rare navigation links");
+   const navHit=await evalJS("(()=>{const a=document.querySelector('header.header nav a[href$=customers]'),r=a.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2,e=document.elementFromPoint(x,y);return{rect:{x,y,width:r.width,height:r.height},hit:e?.outerHTML?.slice(0,260),linkHit:a.contains(e),pointerEvents:getComputedStyle(a).pointerEvents,navZ:getComputedStyle(a.closest('nav')).zIndex}})()");
    assert(navHit.linkHit,"top nav target must receive real pointer clicks: "+JSON.stringify(navHit));
    console.log("NAV_TRACE",width,"desktop",JSON.stringify(navHit));
-   await click('header.header nav[data-slot="gooey-nav"] a[href="/search"]');
+   await click('header.header nav[data-slot="gooey-nav"] a[href="/customers"]');
    console.log("NAV_AFTER_CLICK",width,await evalJS("location.pathname"));
-   await waitFor('location.pathname==="/search"');
+   await waitFor('location.pathname==="/customers"');
    await click("a.shell-home-pill");
    await waitFor('location.pathname==="/doc"');
   }else{
@@ -354,11 +354,11 @@ try{
    assert.equal(await evalJS('document.activeElement?.classList.contains("nav-toggle")'),true,"escape returns focus to nav toggle");
    await click(".nav-toggle");
    await waitFor(`getComputedStyle(document.querySelector('header.header nav[data-slot="gooey-nav"]')).display!=="none"`);
-   const mobileHit=await evalJS("(()=>{const a=document.querySelector('header.header nav a[href$=search]'),r=a.getBoundingClientRect(),e=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return{linkHit:a.contains(e),hit:e?.outerHTML?.slice(0,220),left:r.left,top:r.top}})()");
+   const mobileHit=await evalJS("(()=>{const a=document.querySelector('header.header nav a[href$=customers]'),r=a.getBoundingClientRect(),e=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return{linkHit:a.contains(e),hit:e?.outerHTML?.slice(0,220),left:r.left,top:r.top}})()");
    assert(mobileHit.linkHit,"collapsed navigation must be clickable above workbench at "+width+": "+JSON.stringify(mobileHit));
-   await click('header.header nav[data-slot="gooey-nav"] a[href="/search"]');
+   await click('header.header nav[data-slot="gooey-nav"] a[href="/customers"]');
    console.log("NAV_AFTER_CLICK",width,await evalJS("location.pathname"));
-   await waitFor('location.pathname==="/search"');
+   await waitFor('location.pathname==="/customers"');
    assert.equal(await evalJS('document.querySelector("#shell-main-navigation")?.classList.contains("open")'),false,
     "narrow nav closes on real client-side route change");
   }

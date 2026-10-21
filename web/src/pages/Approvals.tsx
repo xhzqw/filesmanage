@@ -40,10 +40,10 @@ export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
     </Link>
     <div className="sidebar-scroll">
      <nav className="finder-navigation" aria-label="审批分类导航">
-      <div className="finder-nav-section">
+      <div className="approval-nav finder-nav-section">
        <div className="finder-nav-label">审批与经办</div>
        {navigation.map(item=><RareButton type="button" key={item.id}
-        className={"finder-nav-item"+(section===item.id?" is-current":"")}
+        className={"approval-nav-item finder-nav-item"+(section===item.id?" is-current":"")}
         aria-current={section===item.id?"page":undefined}
         onClick={()=>changeSection(item.id)}>
         <span>{item.label}</span>
