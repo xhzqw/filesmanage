@@ -98,10 +98,10 @@ try{
  for(const width of [1440,1024,780,540]){
   await send("Emulation.setDeviceMetricsOverride",{width,height:850,deviceScaleFactor:1,mobile:false});
   await sleep(130);
-  const l=await evalJS("(()=>({bodyWidth:document.documentElement.scrollWidth,panes:['.cdw-rail','.cdw-home'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return {left:r.left,right:r.right,bottom:r.bottom}}),layout:document.querySelector('.cdw-layout').getBoundingClientRect(),homeDoc:(()=>{const r=document.querySelector('.cdw-home-toolbar').getBoundingClientRect();return {left:r.left,right:r.right}})()}))()");
+  const l=await evalJS("(()=>({bodyWidth:document.documentElement.scrollWidth,panes:['.cdw-rail','.cdw-home'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return {left:r.left,right:r.right,bottom:r.bottom}}),layoutLeft:document.querySelector('.cdw-layout').getBoundingClientRect().left,homeDoc:(()=>{const r=document.querySelector('.cdw-home-toolbar').getBoundingClientRect();return {left:r.left,right:r.right}})()}))()");
   assert.ok(l.bodyWidth<=width+2,"home horizontal overflow at "+width+": "+JSON.stringify(l));
   assert.ok(l.panes.every(p=>p.left>=-2&&p.right<=width+2&&p.bottom<=851),"home pane overflow at "+width+": "+JSON.stringify(l));
-  assert.ok(Math.abs(l.homeDoc.left-l.layout.left)<=1,"work home must start at the canvas edge, no empty grid track at "+width+": "+JSON.stringify(l));
+  assert.ok(Math.abs(l.homeDoc.left-l.layoutLeft)<=1,"work home must start at the canvas edge, no empty grid track at "+width+": "+JSON.stringify(l));
   console.log("CDW_HOME_LAYOUT_PASS",width);
  }
  await send("Emulation.clearDeviceMetricsOverride");
