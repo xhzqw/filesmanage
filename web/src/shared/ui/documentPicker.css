@@ -1,0 +1,102 @@
+/* documentPicker.css
+ * 「关联文档」选择器面板。渲染在 shared/ui/Dialog 的 modal 里，
+ * 因此这里没有遮罩、没有第二套焦点陷阱，只负责面板自身的排布。
+ * 所有颜色/间距/圆角取自 theme.css 语义 token，不写裸色值。 */
+
+.dialog.doc-picker-dialog{width:min(640px,calc(100vw - 28px));min-width:0;padding:var(--space-3)}
+
+.doc-picker{display:grid;gap:var(--space-2);min-width:0;width:100%;
+ background:var(--color-panel);color:var(--color-text)}
+
+/* 顶部：筛选 + 全选 */
+.doc-picker-bar{display:flex;align-items:center;gap:var(--space-2);min-width:0}
+.doc-picker .doc-picker-search{flex:1 1 auto;min-width:0;min-height:var(--height-control);
+ padding:var(--space-1) var(--space-2);border:1px solid var(--color-border-strong);
+ border-radius:var(--radius-control);background:var(--color-panel);color:var(--color-text)}
+.doc-picker .doc-picker-search:focus-visible{outline:3px solid var(--color-focus);outline-offset:-1px}
+
+/* 列表：28-32px 行高，与 FolderPicker 的树行保持一致 */
+.doc-picker-list{display:flex;flex-direction:column;gap:2px;min-width:0;
+ max-height:min(46vh,340px);overflow:auto;padding:var(--space-1);
+ border:1px solid var(--color-border);border-radius:var(--radius-control);background:var(--color-panel)}
+.doc-picker-list[aria-busy="true"]{opacity:.65}
+
+.doc-picker-row{display:flex;align-items:center;gap:var(--space-2);width:100%;min-width:0;
+ min-height:32px;padding:var(--space-1) var(--space-2);border:1px solid transparent;
+ border-radius:var(--radius-control);background:transparent;color:var(--color-text);
+ text-align:left;cursor:pointer;font:inherit}
+.doc-picker-row:hover{background:var(--color-row-hover)}
+/* 选中态：底色 + 边框双通道，不只靠颜色区分（对比度与色觉障碍都更稳） */
+.doc-picker-row.picked,.doc-picker-row.picked:hover{border-color:var(--color-row-selected-border);
+ background:var(--surface-subtle);color:var(--color-action)}
+.doc-picker-row:focus-visible{outline:3px solid var(--color-focus);outline-offset:-2px}
+
+.doc-picker-check{display:grid;place-items:center;flex:none;width:16px;height:16px;
+ border:1px solid var(--color-border-strong);border-radius:4px;
+ font-size:11px;line-height:1;color:var(--color-text-secondary);background:var(--color-panel)}
+/* 选中态沿用 FolderPicker 的既有语言：浅底 + 品牌色前景，不用实心色块 */
+.doc-picker-row.picked .doc-picker-check{border-color:var(--color-action);background:var(--surface-subtle);color:var(--color-action);
+ font-weight:700}
+
+.doc-picker-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.doc-picker-meta{flex:none;font-size:11px;color:var(--color-text-secondary);
+ font-variant-numeric:tabular-nums;white-space:nowrap}
+.doc-picker-time{min-width:74px;text-align:right}
+
+/* 空态 / 错误 / 分页 / 底栏 */
+.doc-picker-empty{margin:0;padding:var(--space-3);text-align:center;
+ font-size:12px;color:var(--color-text-secondary)}
+.doc-picker-error{display:flex;align-items:center;gap:var(--space-2);margin:0;
+ padding:var(--space-2) var(--space-3);border:1px solid var(--color-border);
+ border-left:3px solid var(--color-danger);border-radius:var(--radius-control);
+ background:var(--color-panel-subtle);color:var(--color-danger);font-size:12px}
+.doc-picker-more{display:flex;justify-content:center}
+.doc-picker-foot{display:flex;align-items:center;gap:var(--space-2);
+ padding-top:var(--space-2);border-top:1px solid var(--color-border)}
+.doc-picker-count{font-size:12px;color:var(--color-text-secondary);font-variant-numeric:tabular-nums}
+.doc-picker-spacer{flex:1}
+
+/* 小屏：行内时间列让位给文件名 */
+@media (max-width:520px){
+ .doc-picker-time{display:none}
+ .doc-picker-row{gap:var(--space-1)}
+}
+/* ---- 面包屑：逐级浏览的当前位置与回退 ---- */
+.doc-picker-crumbs{display:flex;align-items:center;flex-wrap:wrap;gap:2px;min-width:0;
+ min-height:26px;font-size:12px;color:var(--color-text-secondary)}
+.doc-crumb{display:inline-flex;align-items:center;gap:2px;min-width:0}
+.doc-crumb-sep{color:var(--color-border-strong);padding:0 2px}
+.doc-crumb-btn{background:transparent;border:0;padding:2px 5px;border-radius:var(--radius-control);
+ color:var(--color-action);font:inherit;cursor:pointer;max-width:160px;
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.doc-crumb-btn:hover{background:var(--color-row-hover);text-decoration:underline}
+.doc-crumb-btn:focus-visible{outline:3px solid var(--color-focus);outline-offset:-1px}
+.doc-crumb-now{font-weight:600;color:var(--color-text);padding:2px 5px;
+ max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.doc-crumb-up{flex:none;width:22px;height:22px;margin-right:2px;display:grid;place-items:center;
+ border:1px solid var(--color-border-strong);border-radius:var(--radius-control);
+ background:var(--color-panel);color:var(--color-text);font-size:11px;line-height:1;cursor:pointer}
+.doc-crumb-up:hover{background:var(--color-row-hover);border-color:var(--color-action);color:var(--color-action)}
+.doc-crumb-up:focus-visible{outline:3px solid var(--color-focus);outline-offset:1px}
+
+/* ---- 文件夹行：与文件行区分（无勾选框位、右侧箭头） ---- */
+.doc-picker-folder{color:var(--color-text)}
+.doc-picker-folder:hover{color:var(--color-action)}
+.doc-picker-check-empty{visibility:hidden}
+.doc-picker-chev{flex:none;color:var(--color-text-secondary);font-size:14px;line-height:1}
+.doc-picker-folder:hover .doc-picker-chev{color:var(--color-action)}
+
+/* ---- 已选清单：跨目录挑选后仍能一眼确认 ---- */
+.doc-picker-chosen{display:flex;flex-wrap:wrap;gap:4px;max-height:76px;overflow:auto;
+ padding:var(--space-1);border:1px solid var(--color-border);
+ border-radius:var(--radius-control);background:var(--color-panel-subtle)}
+.doc-chosen-chip{display:inline-flex;align-items:center;gap:4px;max-width:100%;
+ padding:2px 6px;border:1px solid var(--color-border-strong);border-radius:999px;
+ background:var(--color-panel);color:var(--color-text);font-size:11.5px}
+.doc-chosen-name{min-width:0;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.doc-chosen-chip button{flex:none;background:transparent;border:0;padding:0 1px;cursor:pointer;
+ color:var(--color-text-secondary);font-size:10px;line-height:1}
+.doc-chosen-chip button:hover{color:var(--color-danger)}
+.doc-chosen-chip button:focus-visible{outline:2px solid var(--color-focus);outline-offset:1px;border-radius:3px}
+
+@media (max-width:520px){.doc-crumb-now,.doc-crumb-btn{max-width:110px}}

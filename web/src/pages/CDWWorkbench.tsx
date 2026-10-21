@@ -66,6 +66,9 @@ export function WorkbenchIcon({name,className=""}:{name:string;className?:string
    return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>;
   case "customers":
    return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
+  case "projects":
+   // 多层「看板列」造型：区别于文件/文件夹图标，暗示这是同一批数据的多视图
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1.2"/><rect x="10" y="4" width="5" height="10" rx="1.2"/><rect x="17" y="4" width="4" height="13" rx="1.2"/></svg>;
   default:
    return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg>;
  }
@@ -432,6 +435,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
      </nav>
      <Link className="cdw-rail-dhf" to="/workbench/dhf"><span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name="dhf"/></span><span>DHF 九阶段验收</span><span aria-hidden="true">↗</span></Link>
      <Link className="cdw-rail-dhf" to="/workbench/customer-registrations"><span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name="customers"/></span><span>客户登记审批</span><span aria-hidden="true">↗</span></Link>
+     <Link className="cdw-rail-dhf" to="/workbench/projects"><span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name="projects"/></span><span>项目</span><span aria-hidden="true">↗</span></Link>
     </div>
     <div className="sidebar-resizer" role="separator" aria-orientation="vertical" tabIndex={-1}/>
    </aside>

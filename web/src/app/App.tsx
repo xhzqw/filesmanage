@@ -23,6 +23,7 @@ import{Trash}from "../pages/Trash";
 import{Org}from "../pages/Org";
 import{Approvals}from "../pages/Approvals";
 import{CDWWorkbench}from "../pages/CDWWorkbench";
+import{ProjectDatabase}from "../pages/ProjectDatabase";
 import{CustomerData}from "../pages/CustomerData";
 import{CustomerRegistrationPage}from "../pages/CustomerRegistrationPage";
 import {DHFWorkbench} from "../pages/DHFWorkbench";
@@ -70,6 +71,7 @@ export function App(){
  <Route path="/approvals" element={user?<Approvals user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/workbench/dhf" element={user?<DHFWorkbench user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/workbench" element={user?<CDWWorkbench user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
+  <Route path="/workbench/projects" element={user?<ProjectDatabase user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/workbench/branch/:id/edit" element={user?<CDWBranchEditor/>:<Navigate to="/login" replace/>}/>
  <Route path="/office/:id" element={user?<OfficeEditor user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/model/:id" element={user?<Suspense fallback={<main className="brand-loading-screen" aria-busy="true"><BrandLoader size="lg" label="正在加载 CAD 模型预览"/></main>}><ModelViewer user={user} onLogout={logout}/></Suspense>:<Navigate to="/login" replace/>}/>
