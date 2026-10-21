@@ -389,6 +389,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
       </div>)}
      </nav>
      <Link className="cdw-rail-dhf" to="/workbench/dhf"><span className="cdw-rail-icon" aria-hidden="true">▣</span><span>DHF 九阶段验收</span><span aria-hidden="true">↗</span></Link>
+     <Link className="cdw-rail-dhf" to="/workbench/customer-registrations"><span className="cdw-rail-icon" aria-hidden="true">▤</span><span>客户登记审批</span><span aria-hidden="true">↗</span></Link>
     </div>
     <div className="sidebar-resizer" role="separator" aria-orientation="vertical" tabIndex={-1}/>
    </aside>

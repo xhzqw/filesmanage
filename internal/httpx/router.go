@@ -101,6 +101,16 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.DELETE("/me/sessions/others", h.revokeOtherSessions)
 	api.DELETE("/me/sessions/:id", h.revokeOwnSession)
 	api.GET("/events/ws", h.websocketEvents)
+	// Customer master data; registration reviews are handled in the existing workbench.
+	api.GET("/customers", h.customerList)
+	api.POST("/customers", h.customerCreate)
+	api.GET("/customers/:id", h.customerGet)
+	api.PATCH("/customers/:id", h.customerUpdate)
+	api.GET("/customers/:id/events", h.customerEvents)
+	api.POST("/customers/:id/registrations", h.customerSubmitRegistration)
+	api.GET("/workbench/customer-registrations", h.customerRegistrations)
+	api.GET("/workbench/customer-registrations/:id", h.customerRegistrationGet)
+	api.POST("/workbench/customer-registrations/:id/decide", h.customerRegistrationDecide)
 	// CDW task pilot: single-file task assignment, acceptance and accountability.
 	api.POST("/work-branches", h.cdwCreateBranch)
 	api.GET("/work-branches/:id", h.cdwReadBranch)

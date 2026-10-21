@@ -720,6 +720,76 @@ add("GET", "/health/ready", operation("Readiness probe (PostgreSQL reachable)", 
     responses={"200": {"description": "Database reachable", "content": {"application/json": {"schema": OK_SCHEMA}}},
                "503": {"description": ERR["503"]}}))
 
+# --- Customer master data: registration decisions take place under Workbench routes ---
+CUSTOMER_CERT = obj({
+    "id": string(), "kind": string(), "number": string(), "issuedOn": string(fmt="date"),
+    "expiresOn": string(fmt="date"), "fileId": string(), "note": string(),
+})
+CUSTOMER_PROFILE = obj({
+    **{key:string() for key in ["contact","phone","address","legalRepresentative","businessScope",
+         "businessMethod","bankName","bankAccount","taxNumber","email","notes"]},
+    "certificates":arr(CUSTOMER_CERT),
+})
+CUSTOMER_WRITE = obj({
+    "name":string(max_length=200), "category":string(enum=["wholesale","retail","mixed","medical","other"]),
+    "creditCode":string(max_length=32), "status":string(enum=["active","disabled"]),
+    "profile":CUSTOMER_PROFILE, "expectedRevision":integer(minimum=0),
+},required=["name","category","status","profile"])
+CUSTOMER_ITEM = obj({
+    "id":string(),"code":string(),"name":string(),"category":string(),"creditCode":string(),
+    "status":string(enum=["active","disabled"]),"profile":CUSTOMER_PROFILE,
+    "revision":integer(minimum=1),"createdBy":string(),"updatedBy":string(),
+    "createdAt":timestamp(),"updatedAt":timestamp(),
+},required=["id","code","name","category","status","profile","revision","createdBy","updatedBy","createdAt","updatedAt"])
+CUSTOMER_REGISTRATION = obj({
+    "id":string(),"customerId":string(),"customerName":string(),"customerCode":string(),
+    "snapshotRevision":integer(minimum=1),"snapshot":CUSTOMER_ITEM,
+    "requesterId":string(),"reviewerId":string(),
+    "state":string(enum=["pending","approved","rejected"]),"revision":integer(minimum=1),
+    "reason":string(),"decidedBy":string(),"createdAt":timestamp(),"decidedAt":timestamp(),
+},required=["id","customerId","customerName","customerCode","snapshotRevision","snapshot",
+            "requesterId","reviewerId","state","revision","createdAt"])
+CUSTOMER_EVENT = obj({
+    "id":string(),"revision":integer(minimum=1),"action":string(),"actorId":string(),
+    "before":{"type":"object","nullable":True},"after":{"type":"object","nullable":True},
+    "reason":string(),"createdAt":timestamp(),
+},required=["id","revision","action","actorId","createdAt"])
+CUSTOMER_ERRORS = errors("400","401","403","404","409")
+add("GET","/api/customers",operation("List authorized customers with category, status and keyset filters","Customers","customerList",
+ security=SESSION,params=[query("q","Name, customer code or unified social credit code."),
+ query("category","wholesale, retail, mixed, medical or other."),query("status","active or disabled."),
+ query("cursor","Last returned customer ID."),query("limit","Rows (1..100).",integer(minimum=1))],
+ responses=dict([json_ok(obj({"items":arr(CUSTOMER_ITEM),"nextCursor":string()},required=["items","nextCursor"]),
+    "Customer master data; creation is separate from registration approval.")] + list(CUSTOMER_ERRORS.items()))))
+add("POST","/api/customers",operation("Create an editable customer master record","Customers","customerCreate",
+ security=SESSION,request={"application/json":{"schema":CUSTOMER_WRITE}},
+ responses={"201":{"description":"Customer record created","content":{"application/json":{"schema":obj({"ok":boolean(),"data":CUSTOMER_ITEM})}}},**CUSTOMER_ERRORS}))
+add("GET","/api/customers/{id}",operation("Read one customer master record","Customers","customerGet",
+ security=SESSION,params=[id_param("id","Customer ID.")],
+ responses=dict([json_ok(CUSTOMER_ITEM,"Customer record, including certificate file references.")] + list(CUSTOMER_ERRORS.items()))))
+add("PATCH","/api/customers/{id}",operation("Edit customer with optimistic revision check","Customers","customerUpdate",
+ security=SESSION,params=[id_param("id","Customer ID.")],
+ request={"application/json":{"schema":CUSTOMER_WRITE}},
+ responses=dict([json_ok(CUSTOMER_ITEM,"Updated customer with incremented revision.")] + list(CUSTOMER_ERRORS.items()))))
+add("GET","/api/customers/{id}/events",operation("Read audited customer changes and registration actions","Customers","customerEvents",
+ security=SESSION,params=[id_param("id","Customer ID.")],
+ responses=dict([json_ok(obj({"items":arr(CUSTOMER_EVENT)}),"Most recent 100 immutable events.")] + list(CUSTOMER_ERRORS.items()))))
+add("POST","/api/customers/{id}/registrations",operation("Submit an immutable customer registration snapshot to existing Workbench","Customers","customerSubmitRegistration",
+ security=SESSION,params=[id_param("id","Customer ID.")],
+ request={"application/json":{"schema":obj({"reviewerId":string()},required=["reviewerId"])}},
+ responses={"201":{"description":"Registration case submitted","content":{"application/json":{"schema":obj({"ok":boolean(),"data":CUSTOMER_REGISTRATION})}}},**CUSTOMER_ERRORS}))
+add("GET","/api/workbench/customer-registrations",operation("List customer registration cases addressed to actor or initiated by actor","Customers","customerRegistrations",
+ security=SESSION,params=[query("scope","inbox or mine.",string(enum=["inbox","mine"]))],
+ responses=dict([json_ok(obj({"items":arr(CUSTOMER_REGISTRATION)}),"Scope-limited business approval queue.")] + list(CUSTOMER_ERRORS.items()))))
+add("GET","/api/workbench/customer-registrations/{id}",operation("Read an authorized customer registration snapshot","Customers","customerRegistrationGet",
+ security=SESSION,params=[id_param("id","Registration case ID.")],
+ responses=dict([json_ok(CUSTOMER_REGISTRATION,"Applicant or designated reviewer only.")] + list(CUSTOMER_ERRORS.items()))))
+add("POST","/api/workbench/customer-registrations/{id}/decide",operation("Approve or reject a customer registration inside Workbench","Customers","customerRegistrationDecide",
+ security=SESSION,params=[id_param("id","Registration case ID."),CDW_IF_MATCH] if "CDW_IF_MATCH" in globals() else [id_param("id","Registration case ID."),
+ {"name":"If-Match","in":"header","required":True,"schema":string(),"description":"Strong rev-N ETag."}],
+ request={"application/json":{"schema":obj({"decision":string(enum=["approved","rejected"]),"reason":string(max_length=1000)},required=["decision"])}},
+ responses=dict([json_ok(CUSTOMER_REGISTRATION,"Immutable decision associated with the exact submitted snapshot.")] + list(CUSTOMER_ERRORS.items()))))
+
 # --- CDW task kernel (single-file pilot) ---
 CDW_ASSIGNEE = obj({"kind": string(enum=["user","workgroup"]), "id": string()},required=["kind","id"])
 CDW_TASK_RESULT = obj({

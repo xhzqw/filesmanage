@@ -103,6 +103,7 @@ export function CDWWorkbenchHome({items,appointmentCount,initiatedCount,initiate
       <RareButton type="button" tone="ghost" onClick={()=>onView("reviews")}>交付验收 <span>↗</span></RareButton>
       <RareButton type="button" tone="ghost" onClick={()=>onView("receipts")}>部门签收 <span>↗</span></RareButton>
       <Link to="/workbench/dhf">DHF 九阶段验收 <span>↗</span></Link>
+      <Link to="/workbench/customer-registrations">客户登记审批 <span>↗</span></Link>
      </div>
     </aside>
    </div>

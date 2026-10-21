@@ -58,6 +58,1706 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/customers:
+    get:
+      summary: List authorized customers with category, status and keyset filters
+      operationId: customerList
+      tags:
+      - Customers
+      security:
+      - cookieSession: []
+      parameters:
+      - name: q
+        in: query
+        required: false
+        description: Name, customer code or unified social credit code.
+        schema:
+          type: string
+      - name: category
+        in: query
+        required: false
+        description: wholesale, retail, mixed, medical or other.
+        schema:
+          type: string
+      - name: status
+        in: query
+        required: false
+        description: active or disabled.
+        schema:
+          type: string
+      - name: cursor
+        in: query
+        required: false
+        description: Last returned customer ID.
+        schema:
+          type: string
+      - name: limit
+        in: query
+        required: false
+        description: Rows (1..100).
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Customer master data; creation is separate from registration approval.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            code:
+                              type: string
+                            name:
+                              type: string
+                            category:
+                              type: string
+                            creditCode:
+                              type: string
+                            status:
+                              type: string
+                              enum:
+                              - active
+                              - disabled
+                            profile:
+                              type: object
+                              properties:
+                                contact:
+                                  type: string
+                                phone:
+                                  type: string
+                                address:
+                                  type: string
+                                legalRepresentative:
+                                  type: string
+                                businessScope:
+                                  type: string
+                                businessMethod:
+                                  type: string
+                                bankName:
+                                  type: string
+                                bankAccount:
+                                  type: string
+                                taxNumber:
+                                  type: string
+                                email:
+                                  type: string
+                                notes:
+                                  type: string
+                                certificates:
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      id:
+                                        type: string
+                                      kind:
+                                        type: string
+                                      number:
+                                        type: string
+                                      issuedOn:
+                                        type: string
+                                        format: date
+                                      expiresOn:
+                                        type: string
+                                        format: date
+                                      fileId:
+                                        type: string
+                                      note:
+                                        type: string
+                            revision:
+                              type: integer
+                              minimum: 1
+                            createdBy:
+                              type: string
+                            updatedBy:
+                              type: string
+                            createdAt:
+                              type: string
+                              format: date-time
+                            updatedAt:
+                              type: string
+                              format: date-time
+                          required:
+                          - id
+                          - code
+                          - name
+                          - category
+                          - status
+                          - profile
+                          - revision
+                          - createdBy
+                          - updatedBy
+                          - createdAt
+                          - updatedAt
+                      nextCursor:
+                        type: string
+                    required:
+                    - items
+                    - nextCursor
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      summary: Create an editable customer master record
+      operationId: customerCreate
+      tags:
+      - Customers
+      security:
+      - cookieSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 200
+                category:
+                  type: string
+                  enum:
+                  - wholesale
+                  - retail
+                  - mixed
+                  - medical
+                  - other
+                creditCode:
+                  type: string
+                  maxLength: 32
+                status:
+                  type: string
+                  enum:
+                  - active
+                  - disabled
+                profile:
+                  type: object
+                  properties:
+                    contact:
+                      type: string
+                    phone:
+                      type: string
+                    address:
+                      type: string
+                    legalRepresentative:
+                      type: string
+                    businessScope:
+                      type: string
+                    businessMethod:
+                      type: string
+                    bankName:
+                      type: string
+                    bankAccount:
+                      type: string
+                    taxNumber:
+                      type: string
+                    email:
+                      type: string
+                    notes:
+                      type: string
+                    certificates:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          kind:
+                            type: string
+                          number:
+                            type: string
+                          issuedOn:
+                            type: string
+                            format: date
+                          expiresOn:
+                            type: string
+                            format: date
+                          fileId:
+                            type: string
+                          note:
+                            type: string
+                expectedRevision:
+                  type: integer
+                  minimum: 0
+              required:
+              - name
+              - category
+              - status
+              - profile
+      responses:
+        '201':
+          description: Customer record created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      code:
+                        type: string
+                      name:
+                        type: string
+                      category:
+                        type: string
+                      creditCode:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                        - active
+                        - disabled
+                      profile:
+                        type: object
+                        properties:
+                          contact:
+                            type: string
+                          phone:
+                            type: string
+                          address:
+                            type: string
+                          legalRepresentative:
+                            type: string
+                          businessScope:
+                            type: string
+                          businessMethod:
+                            type: string
+                          bankName:
+                            type: string
+                          bankAccount:
+                            type: string
+                          taxNumber:
+                            type: string
+                          email:
+                            type: string
+                          notes:
+                            type: string
+                          certificates:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                kind:
+                                  type: string
+                                number:
+                                  type: string
+                                issuedOn:
+                                  type: string
+                                  format: date
+                                expiresOn:
+                                  type: string
+                                  format: date
+                                fileId:
+                                  type: string
+                                note:
+                                  type: string
+                      revision:
+                        type: integer
+                        minimum: 1
+                      createdBy:
+                        type: string
+                      updatedBy:
+                        type: string
+                      createdAt:
+                        type: string
+                        format: date-time
+                      updatedAt:
+                        type: string
+                        format: date-time
+                    required:
+                    - id
+                    - code
+                    - name
+                    - category
+                    - status
+                    - profile
+                    - revision
+                    - createdBy
+                    - updatedBy
+                    - createdAt
+                    - updatedAt
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/customers/{id}:
+    get:
+      summary: Read one customer master record
+      operationId: customerGet
+      tags:
+      - Customers
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Customer ID.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Customer record, including certificate file references.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      code:
+                        type: string
+                      name:
+                        type: string
+                      category:
+                        type: string
+                      creditCode:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                        - active
+                        - disabled
+                      profile:
+                        type: object
+                        properties:
+                          contact:
+                            type: string
+                          phone:
+                            type: string
+                          address:
+                            type: string
+                          legalRepresentative:
+                            type: string
+                          businessScope:
+                            type: string
+                          businessMethod:
+                            type: string
+                          bankName:
+                            type: string
+                          bankAccount:
+                            type: string
+                          taxNumber:
+                            type: string
+                          email:
+                            type: string
+                          notes:
+                            type: string
+                          certificates:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                kind:
+                                  type: string
+                                number:
+                                  type: string
+                                issuedOn:
+                                  type: string
+                                  format: date
+                                expiresOn:
+                                  type: string
+                                  format: date
+                                fileId:
+                                  type: string
+                                note:
+                                  type: string
+                      revision:
+                        type: integer
+                        minimum: 1
+                      createdBy:
+                        type: string
+                      updatedBy:
+                        type: string
+                      createdAt:
+                        type: string
+                        format: date-time
+                      updatedAt:
+                        type: string
+                        format: date-time
+                    required:
+                    - id
+                    - code
+                    - name
+                    - category
+                    - status
+                    - profile
+                    - revision
+                    - createdBy
+                    - updatedBy
+                    - createdAt
+                    - updatedAt
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    patch:
+      summary: Edit customer with optimistic revision check
+      operationId: customerUpdate
+      tags:
+      - Customers
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Customer ID.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 200
+                category:
+                  type: string
+                  enum:
+                  - wholesale
+                  - retail
+                  - mixed
+                  - medical
+                  - other
+                creditCode:
+                  type: string
+                  maxLength: 32
+                status:
+                  type: string
+                  enum:
+                  - active
+                  - disabled
+                profile:
+                  type: object
+                  properties:
+                    contact:
+                      type: string
+                    phone:
+                      type: string
+                    address:
+                      type: string
+                    legalRepresentative:
+                      type: string
+                    businessScope:
+                      type: string
+                    businessMethod:
+                      type: string
+                    bankName:
+                      type: string
+                    bankAccount:
+                      type: string
+                    taxNumber:
+                      type: string
+                    email:
+                      type: string
+                    notes:
+                      type: string
+                    certificates:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          kind:
+                            type: string
+                          number:
+                            type: string
+                          issuedOn:
+                            type: string
+                            format: date
+                          expiresOn:
+                            type: string
+                            format: date
+                          fileId:
+                            type: string
+                          note:
+                            type: string
+                expectedRevision:
+                  type: integer
+                  minimum: 0
+              required:
+              - name
+              - category
+              - status
+              - profile
+      responses:
+        '200':
+          description: Updated customer with incremented revision.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      code:
+                        type: string
+                      name:
+                        type: string
+                      category:
+                        type: string
+                      creditCode:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                        - active
+                        - disabled
+                      profile:
+                        type: object
+                        properties:
+                          contact:
+                            type: string
+                          phone:
+                            type: string
+                          address:
+                            type: string
+                          legalRepresentative:
+                            type: string
+                          businessScope:
+                            type: string
+                          businessMethod:
+                            type: string
+                          bankName:
+                            type: string
+                          bankAccount:
+                            type: string
+                          taxNumber:
+                            type: string
+                          email:
+                            type: string
+                          notes:
+                            type: string
+                          certificates:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                kind:
+                                  type: string
+                                number:
+                                  type: string
+                                issuedOn:
+                                  type: string
+                                  format: date
+                                expiresOn:
+                                  type: string
+                                  format: date
+                                fileId:
+                                  type: string
+                                note:
+                                  type: string
+                      revision:
+                        type: integer
+                        minimum: 1
+                      createdBy:
+                        type: string
+                      updatedBy:
+                        type: string
+                      createdAt:
+                        type: string
+                        format: date-time
+                      updatedAt:
+                        type: string
+                        format: date-time
+                    required:
+                    - id
+                    - code
+                    - name
+                    - category
+                    - status
+                    - profile
+                    - revision
+                    - createdBy
+                    - updatedBy
+                    - createdAt
+                    - updatedAt
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/customers/{id}/events:
+    get:
+      summary: Read audited customer changes and registration actions
+      operationId: customerEvents
+      tags:
+      - Customers
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Customer ID.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Most recent 100 immutable events.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            revision:
+                              type: integer
+                              minimum: 1
+                            action:
+                              type: string
+                            actorId:
+                              type: string
+                            before:
+                              type: object
+                              nullable: true
+                            after:
+                              type: object
+                              nullable: true
+                            reason:
+                              type: string
+                            createdAt:
+                              type: string
+                              format: date-time
+                          required:
+                          - id
+                          - revision
+                          - action
+                          - actorId
+                          - createdAt
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/customers/{id}/registrations:
+    post:
+      summary: Submit an immutable customer registration snapshot to existing Workbench
+      operationId: customerSubmitRegistration
+      tags:
+      - Customers
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Customer ID.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reviewerId:
+                  type: string
+              required:
+              - reviewerId
+      responses:
+        '201':
+          description: Registration case submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      customerId:
+                        type: string
+                      customerName:
+                        type: string
+                      customerCode:
+                        type: string
+                      snapshotRevision:
+                        type: integer
+                        minimum: 1
+                      snapshot:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          code:
+                            type: string
+                          name:
+                            type: string
+                          category:
+                            type: string
+                          creditCode:
+                            type: string
+                          status:
+                            type: string
+                            enum:
+                            - active
+                            - disabled
+                          profile:
+                            type: object
+                            properties:
+                              contact:
+                                type: string
+                              phone:
+                                type: string
+                              address:
+                                type: string
+                              legalRepresentative:
+                                type: string
+                              businessScope:
+                                type: string
+                              businessMethod:
+                                type: string
+                              bankName:
+                                type: string
+                              bankAccount:
+                                type: string
+                              taxNumber:
+                                type: string
+                              email:
+                                type: string
+                              notes:
+                                type: string
+                              certificates:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                    kind:
+                                      type: string
+                                    number:
+                                      type: string
+                                    issuedOn:
+                                      type: string
+                                      format: date
+                                    expiresOn:
+                                      type: string
+                                      format: date
+                                    fileId:
+                                      type: string
+                                    note:
+                                      type: string
+                          revision:
+                            type: integer
+                            minimum: 1
+                          createdBy:
+                            type: string
+                          updatedBy:
+                            type: string
+                          createdAt:
+                            type: string
+                            format: date-time
+                          updatedAt:
+                            type: string
+                            format: date-time
+                        required:
+                        - id
+                        - code
+                        - name
+                        - category
+                        - status
+                        - profile
+                        - revision
+                        - createdBy
+                        - updatedBy
+                        - createdAt
+                        - updatedAt
+                      requesterId:
+                        type: string
+                      reviewerId:
+                        type: string
+                      state:
+                        type: string
+                        enum:
+                        - pending
+                        - approved
+                        - rejected
+                      revision:
+                        type: integer
+                        minimum: 1
+                      reason:
+                        type: string
+                      decidedBy:
+                        type: string
+                      createdAt:
+                        type: string
+                        format: date-time
+                      decidedAt:
+                        type: string
+                        format: date-time
+                    required:
+                    - id
+                    - customerId
+                    - customerName
+                    - customerCode
+                    - snapshotRevision
+                    - snapshot
+                    - requesterId
+                    - reviewerId
+                    - state
+                    - revision
+                    - createdAt
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/customer-registrations:
+    get:
+      summary: List customer registration cases addressed to actor or initiated by actor
+      operationId: customerRegistrations
+      tags:
+      - Customers
+      security:
+      - cookieSession: []
+      parameters:
+      - name: scope
+        in: query
+        required: false
+        description: inbox or mine.
+        schema:
+          type: string
+          enum:
+          - inbox
+          - mine
+      responses:
+        '200':
+          description: Scope-limited business approval queue.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            customerId:
+                              type: string
+                            customerName:
+                              type: string
+                            customerCode:
+                              type: string
+                            snapshotRevision:
+                              type: integer
+                              minimum: 1
+                            snapshot:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                code:
+                                  type: string
+                                name:
+                                  type: string
+                                category:
+                                  type: string
+                                creditCode:
+                                  type: string
+                                status:
+                                  type: string
+                                  enum:
+                                  - active
+                                  - disabled
+                                profile:
+                                  type: object
+                                  properties:
+                                    contact:
+                                      type: string
+                                    phone:
+                                      type: string
+                                    address:
+                                      type: string
+                                    legalRepresentative:
+                                      type: string
+                                    businessScope:
+                                      type: string
+                                    businessMethod:
+                                      type: string
+                                    bankName:
+                                      type: string
+                                    bankAccount:
+                                      type: string
+                                    taxNumber:
+                                      type: string
+                                    email:
+                                      type: string
+                                    notes:
+                                      type: string
+                                    certificates:
+                                      type: array
+                                      items:
+                                        type: object
+                                        properties:
+                                          id:
+                                            type: string
+                                          kind:
+                                            type: string
+                                          number:
+                                            type: string
+                                          issuedOn:
+                                            type: string
+                                            format: date
+                                          expiresOn:
+                                            type: string
+                                            format: date
+                                          fileId:
+                                            type: string
+                                          note:
+                                            type: string
+                                revision:
+                                  type: integer
+                                  minimum: 1
+                                createdBy:
+                                  type: string
+                                updatedBy:
+                                  type: string
+                                createdAt:
+                                  type: string
+                                  format: date-time
+                                updatedAt:
+                                  type: string
+                                  format: date-time
+                              required:
+                              - id
+                              - code
+                              - name
+                              - category
+                              - status
+                              - profile
+                              - revision
+                              - createdBy
+                              - updatedBy
+                              - createdAt
+                              - updatedAt
+                            requesterId:
+                              type: string
+                            reviewerId:
+                              type: string
+                            state:
+                              type: string
+                              enum:
+                              - pending
+                              - approved
+                              - rejected
+                            revision:
+                              type: integer
+                              minimum: 1
+                            reason:
+                              type: string
+                            decidedBy:
+                              type: string
+                            createdAt:
+                              type: string
+                              format: date-time
+                            decidedAt:
+                              type: string
+                              format: date-time
+                          required:
+                          - id
+                          - customerId
+                          - customerName
+                          - customerCode
+                          - snapshotRevision
+                          - snapshot
+                          - requesterId
+                          - reviewerId
+                          - state
+                          - revision
+                          - createdAt
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/customer-registrations/{id}:
+    get:
+      summary: Read an authorized customer registration snapshot
+      operationId: customerRegistrationGet
+      tags:
+      - Customers
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Registration case ID.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Applicant or designated reviewer only.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      customerId:
+                        type: string
+                      customerName:
+                        type: string
+                      customerCode:
+                        type: string
+                      snapshotRevision:
+                        type: integer
+                        minimum: 1
+                      snapshot:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          code:
+                            type: string
+                          name:
+                            type: string
+                          category:
+                            type: string
+                          creditCode:
+                            type: string
+                          status:
+                            type: string
+                            enum:
+                            - active
+                            - disabled
+                          profile:
+                            type: object
+                            properties:
+                              contact:
+                                type: string
+                              phone:
+                                type: string
+                              address:
+                                type: string
+                              legalRepresentative:
+                                type: string
+                              businessScope:
+                                type: string
+                              businessMethod:
+                                type: string
+                              bankName:
+                                type: string
+                              bankAccount:
+                                type: string
+                              taxNumber:
+                                type: string
+                              email:
+                                type: string
+                              notes:
+                                type: string
+                              certificates:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                    kind:
+                                      type: string
+                                    number:
+                                      type: string
+                                    issuedOn:
+                                      type: string
+                                      format: date
+                                    expiresOn:
+                                      type: string
+                                      format: date
+                                    fileId:
+                                      type: string
+                                    note:
+                                      type: string
+                          revision:
+                            type: integer
+                            minimum: 1
+                          createdBy:
+                            type: string
+                          updatedBy:
+                            type: string
+                          createdAt:
+                            type: string
+                            format: date-time
+                          updatedAt:
+                            type: string
+                            format: date-time
+                        required:
+                        - id
+                        - code
+                        - name
+                        - category
+                        - status
+                        - profile
+                        - revision
+                        - createdBy
+                        - updatedBy
+                        - createdAt
+                        - updatedAt
+                      requesterId:
+                        type: string
+                      reviewerId:
+                        type: string
+                      state:
+                        type: string
+                        enum:
+                        - pending
+                        - approved
+                        - rejected
+                      revision:
+                        type: integer
+                        minimum: 1
+                      reason:
+                        type: string
+                      decidedBy:
+                        type: string
+                      createdAt:
+                        type: string
+                        format: date-time
+                      decidedAt:
+                        type: string
+                        format: date-time
+                    required:
+                    - id
+                    - customerId
+                    - customerName
+                    - customerCode
+                    - snapshotRevision
+                    - snapshot
+                    - requesterId
+                    - reviewerId
+                    - state
+                    - revision
+                    - createdAt
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/customer-registrations/{id}/decide:
+    post:
+      summary: Approve or reject a customer registration inside Workbench
+      operationId: customerRegistrationDecide
+      tags:
+      - Customers
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Registration case ID.
+        schema:
+          type: string
+      - name: If-Match
+        in: header
+        required: true
+        schema:
+          type: string
+        description: Strong rev-N ETag.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                decision:
+                  type: string
+                  enum:
+                  - approved
+                  - rejected
+                reason:
+                  type: string
+                  maxLength: 1000
+              required:
+              - decision
+      responses:
+        '200':
+          description: Immutable decision associated with the exact submitted snapshot.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      customerId:
+                        type: string
+                      customerName:
+                        type: string
+                      customerCode:
+                        type: string
+                      snapshotRevision:
+                        type: integer
+                        minimum: 1
+                      snapshot:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          code:
+                            type: string
+                          name:
+                            type: string
+                          category:
+                            type: string
+                          creditCode:
+                            type: string
+                          status:
+                            type: string
+                            enum:
+                            - active
+                            - disabled
+                          profile:
+                            type: object
+                            properties:
+                              contact:
+                                type: string
+                              phone:
+                                type: string
+                              address:
+                                type: string
+                              legalRepresentative:
+                                type: string
+                              businessScope:
+                                type: string
+                              businessMethod:
+                                type: string
+                              bankName:
+                                type: string
+                              bankAccount:
+                                type: string
+                              taxNumber:
+                                type: string
+                              email:
+                                type: string
+                              notes:
+                                type: string
+                              certificates:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    id:
+                                      type: string
+                                    kind:
+                                      type: string
+                                    number:
+                                      type: string
+                                    issuedOn:
+                                      type: string
+                                      format: date
+                                    expiresOn:
+                                      type: string
+                                      format: date
+                                    fileId:
+                                      type: string
+                                    note:
+                                      type: string
+                          revision:
+                            type: integer
+                            minimum: 1
+                          createdBy:
+                            type: string
+                          updatedBy:
+                            type: string
+                          createdAt:
+                            type: string
+                            format: date-time
+                          updatedAt:
+                            type: string
+                            format: date-time
+                        required:
+                        - id
+                        - code
+                        - name
+                        - category
+                        - status
+                        - profile
+                        - revision
+                        - createdBy
+                        - updatedBy
+                        - createdAt
+                        - updatedAt
+                      requesterId:
+                        type: string
+                      reviewerId:
+                        type: string
+                      state:
+                        type: string
+                        enum:
+                        - pending
+                        - approved
+                        - rejected
+                      revision:
+                        type: integer
+                        minimum: 1
+                      reason:
+                        type: string
+                      decidedBy:
+                        type: string
+                      createdAt:
+                        type: string
+                        format: date-time
+                      decidedAt:
+                        type: string
+                        format: date-time
+                    required:
+                    - id
+                    - customerId
+                    - customerName
+                    - customerCode
+                    - snapshotRevision
+                    - snapshot
+                    - requesterId
+                    - reviewerId
+                    - state
+                    - revision
+                    - createdAt
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/tasks:
     post:
       summary: Create single-file root work task (administrator only)

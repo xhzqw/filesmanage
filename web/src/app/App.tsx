@@ -23,6 +23,8 @@ import{Trash}from "../pages/Trash";
 import{Org}from "../pages/Org";
 import{Approvals}from "../pages/Approvals";
 import{CDWWorkbench}from "../pages/CDWWorkbench";
+import{CustomerData}from "../pages/CustomerData";
+import{CustomerRegistrationPage}from "../pages/CustomerRegistrationPage";
 import {DHFWorkbench} from "../pages/DHFWorkbench";
 import{CDWBranchEditor}from "../pages/CDWBranchEditor";
 import{Lifecycle}from "../pages/Lifecycle";
@@ -58,6 +60,8 @@ export function App(){
  if(loading)return <main className="brand-loading-screen" aria-busy="true"><BrandLoader size="lg" label="正在检查会话"/></main>;
  return <><MotionFeedback/>{feedback}<ToastViewport/>{user&&<GlobalUploadDrop key={user.id} userId={user.id} documentTarget={documentUploadTarget} browseFolders={{children:folderApi.children,search:folderApi.search}}/>}<ShellAccessories.Provider value={user?<NotificationCenter key={user.id}/>:null}><Routes><Route path="/login" element={user?<Navigate to="/doc" replace/>:<Login onSuccess={setUser}/>}/>
   <Route path="/doc" element={user?<Documents user={user} onLogout={logout} onUploadFolderChange={setDocumentUploadTarget}/>:<Navigate to="/login" replace/>}/>
+  <Route path="/customers" element={user?<CustomerData user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
+  <Route path="/workbench/customer-registrations" element={user?<CustomerRegistrationPage user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
   <Route path="/account/sessions" element={user?<SessionDevices user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/preview/:id" element={user?<Preview user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
  <Route path="/trash" element={user?<Trash user={user} onLogout={logout}/>:<Navigate to="/login" replace/>}/>
