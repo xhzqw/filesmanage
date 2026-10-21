@@ -91,12 +91,13 @@ class CDP {
   async login() {
     await this.evaluate(`(()=>{
       const set=(el,v)=>{const s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;s.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));};
+      document.querySelector('.login-entry')?.click();
       const fields=[...document.querySelectorAll('input')];
       const user=fields.find(f=>f.type==='text'||f.type==='email'||(!f.type&&f.offsetParent!==null));
       const pass=document.querySelector('input[type=password]');
       if(user)set(user,'admin');
       if(pass)set(pass,${JSON.stringify(password)});
-      const btn=[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='登录');
+      const btn=document.querySelector('.login-submit')||[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='登录');
       btn?.click();return true;})()`);
     return this.waitFor(`()=>location.pathname==='/doc'||location.pathname==='/first-sign-in'`, 20000);
   }
