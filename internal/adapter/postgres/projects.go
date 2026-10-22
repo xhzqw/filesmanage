@@ -255,5 +255,3 @@ func (r *Repository) ProjectPutViewState(ctx context.Context, userID, key string
  ON CONFLICT(user_id,view_key) DO UPDATE SET config=EXCLUDED.config,updated_at=now()`, userID, key, string(config))
 	return err
 }
-
-var _ = ports.ErrRowMissing
