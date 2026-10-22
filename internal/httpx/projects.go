@@ -252,7 +252,9 @@ func (h *Handler) projectAddTodo(c *gin.Context) {
 		projectError(c, err)
 		return
 	}
-	projectOK(c, 201, gin.H{"todo": gin.H{"id": todo.ID, "text": todo.Body, "done": todo.Done}})
+	// The contract declares Reply<{ok:true}>; the created todo is returned too so
+	// a caller can refresh without a second read.
+	projectOK(c, 201, gin.H{"ok": true, "todo": gin.H{"id": todo.ID, "text": todo.Body, "done": todo.Done}})
 }
 
 func (h *Handler) projectSetTodo(c *gin.Context) {

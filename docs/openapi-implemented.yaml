@@ -21659,6 +21659,8 @@ paths:
                   data:
                     type: object
                     properties:
+                      ok:
+                        type: boolean
                       todo:
                         $ref: '#/components/schemas/ProjectTodo'
         '400':
