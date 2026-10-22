@@ -144,7 +144,7 @@ try {
     await sleep(220);
     const metrics = await evalJS(`(()=>{const shell=document.querySelector('.pj-shell');if(!shell)return null;
      const r=shell.getBoundingClientRect();
-     return {docWidth:document.documentElement.scrollWidth,left:r.left,right:r.right,viewWidth:width};})()`);
+     return {docWidth:document.documentElement.scrollWidth,left:r.left,right:r.right,viewWidth:${width}};})()`);
     assert.ok(metrics, "project shell visible at " + width);
     assert.ok(metrics.docWidth <= width + 2, `horizontal overflow at ${width}: ${JSON.stringify(metrics)}`);
     assert.ok(metrics.left >= -2 && metrics.right <= width + 2, `shell escapes viewport at ${width}: ${JSON.stringify(metrics)}`);
