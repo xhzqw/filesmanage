@@ -49,6 +49,9 @@ assert.ok(cookie, "session cookie issued");
 // below proves the read/write contract either way.
 const initialView = ok(await call("GET", "/projects/view-state"), "view-state before save");
 assert.ok(initialView.config === null || typeof initialView.config === "object", "view-state is null or an object");
+// The workbench saves a view for admin whenever filters change, so this check
+// restores whatever was there instead of leaving a test view behind.
+const originalView = initialView.config;
 
 const listBefore = ok(await call("GET", "/projects"), "list");
 assert.ok(Array.isArray(listBefore.items), "items array");
@@ -183,6 +186,7 @@ ok(await call("PUT", "/projects/view-state", {view: "board", scope: "all"}), "vi
 const overwritten = ok(await call("GET", "/projects/view-state"), "view state re-read").config;
 assert.deepEqual(overwritten, {view: "board", scope: "all"}, "last PUT wins as a whole-object overwrite");
 fails(await call("PUT", "/projects/view-state", null), "null view state", 400, "E_INVALID_INPUT");
+if (originalView) ok(await call("PUT", "/projects/view-state", originalView), "view state restored");
 
 // --- list ordering and archive exclusion -----------------------------------
 const listAfter = ok(await call("GET", "/projects"), "list after writes");
