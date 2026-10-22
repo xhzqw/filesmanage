@@ -193,14 +193,14 @@ export function DocumentPicker({open,title="选择要关联的文档",excludeIds
   <div className="doc-picker" ref={listRef}>
    {/* 面包屑：逐级回退，当前层不可点 */}
    <nav className="doc-picker-crumbs" aria-label="目录路径">
-    {crumbs.length>1&&<button type="button" className="doc-crumb-up" onClick={goUp} aria-label="返回上一级" title="返回上一级">↑</button>}
+    {crumbs.length>1&&<RareButton type="button" tone="ghost" className="doc-crumb-up" onClick={goUp} aria-label="返回上一级" title="返回上一级">↑</RareButton>}
     {crumbs.map((c,i)=>{
      const last=i===crumbs.length-1;
      return<span className="doc-crumb" key={c.id||"root"}>
       {i>0&&<span className="doc-crumb-sep" aria-hidden="true">/</span>}
       {last
        ?<span className="doc-crumb-now" aria-current="location">{c.name}</span>
-       :<button type="button" className="doc-crumb-btn" onClick={()=>gotoCrumb(i)}>{c.name}</button>}
+       :<RareButton type="button" tone="ghost" className="doc-crumb-btn" onClick={()=>gotoCrumb(i)}>{c.name}</RareButton>}
      </span>;
     })}
    </nav>
@@ -221,24 +221,24 @@ export function DocumentPicker({open,title="选择要关联的文档",excludeIds
 
     {/* 子文件夹在前，点进去继续浏览 */}
     {folderMatches.map(f=>
-     <button type="button" key={"f-"+f.id} className="doc-picker-row doc-picker-folder"
+     <RareButton type="button" tone="ghost" key={"f-"+f.id} className="doc-picker-row doc-picker-folder"
       onClick={()=>enterFolder(f)} aria-label={"进入文件夹 "+f.name}>
       <span className="doc-picker-check doc-picker-check-empty" aria-hidden="true"/>
       <FolderResourceIcon size={16}/>
       <span className="doc-picker-name" title={f.name}>{f.name}</span>
       <span className="doc-picker-chev" aria-hidden="true">›</span>
-     </button>)}
+     </RareButton>)}
 
     {pickable.map(f=>{
      const on=picked.some(p=>p.docId===f.id);
-     return<button type="button" role="option" aria-selected={on} key={f.id}
+     return<RareButton type="button" tone="ghost" role="option" aria-selected={on} key={f.id}
       className={"doc-picker-row"+(on?" picked":"")} onClick={()=>toggle(f)}>
       <span className="doc-picker-check" aria-hidden="true">{on?"✓":""}</span>
       <FileTypeIcon name={f.name} size={18}/>
       <span className="doc-picker-name" title={f.name}>{f.name}</span>
       <span className="doc-picker-meta">{sizeText(f.sizeBytes)}</span>
       <span className="doc-picker-meta doc-picker-time">{shortTime(f.updatedAt)}</span>
-     </button>;
+     </RareButton>;
     })}
 
     {isEmpty&&<p className="doc-picker-empty">
@@ -259,7 +259,7 @@ export function DocumentPicker({open,title="选择要关联的文档",excludeIds
      <span className="doc-chosen-chip" key={p.docId}>
       <FileTypeIcon name={p.name} size={13}/>
       <span className="doc-chosen-name" title={p.name}>{p.name}</span>
-      <button type="button" aria-label={"移除 "+p.name} onClick={()=>removePicked(p.docId)}>✕</button>
+      <RareButton type="button" tone="ghost" aria-label={"移除 "+p.name} onClick={()=>removePicked(p.docId)}>✕</RareButton>
      </span>)}
    </div>}
 

@@ -429,9 +429,9 @@ export function ProjectDatabase({user,initialScope="all"}:{
       <div className="pj-cv-cap">属性可见性</div>
       <p className="pj-cv-sub">控制「表格」与侧边抽屉中这些属性行的显示（看板卡片始终全显）</p>
       {COLVIS_FIELDS.map(([k,ic,l])=>
-       <button type="button" className="pj-cv-item" key={k} onClick={()=>setColVis(c=>({...c,[k]:!c[k]}))}>
+       <RareButton type="button" tone="ghost" className="pj-cv-item" key={k} aria-pressed={colVis[k]} onClick={()=>setColVis(c=>({...c,[k]:!c[k]}))}>
         <span className="pj-ic" aria-hidden="true">{ic}</span><span>{l}</span><i className={"pj-cv-check"+(colVis[k]?" on":"")}>{colVis[k]?"✓":""}</i>
-       </button>)}
+       </RareButton>)}
       <div className="pj-cv-foot">点击切换可见性</div>
      </div>}
 
@@ -474,7 +474,7 @@ export function ProjectDatabase({user,initialScope="all"}:{
         }
        }}
        onClick={()=>openDrawer("edit",p)} data-pid={p.id}>
-       <button type="button" className="pj-card-peek" title="在侧边打开" aria-label="在侧边打开" onClick={ev=>{ev.stopPropagation();openDrawer("edit",p);}}>◫</button>
+       <RareButton type="button" tone="ghost" className="pj-card-peek" title="在侧边打开" aria-label="在侧边打开" onClick={ev=>{ev.stopPropagation();openDrawer("edit",p);}}>◫</RareButton>
        <div className="pj-card-title">{p.name}{p.favorite?<span className="pj-fav" aria-label="已收藏"> ★</span>:null}</div>
        <div className="pj-card-progress"><div className="pj-progress-bar"><i style={{width:p.progress+"%"}}/></div><b>{p.progress}%</b></div>
        <div className="pj-card-meta">
@@ -504,14 +504,14 @@ export function ProjectDatabase({user,initialScope="all"}:{
   return<table className="pj-table"><thead><tr>{heads}</tr></thead><tbody>{
    visible.map(p=>{
     const cells:React.ReactNode[]=[<td key="name" className="pj-td-name"><span className={"pj-prio-tag "+PRI_TONE[p.priority]}/>{p.name}</td>];
-    if(colVis.status)cells.push(<td key="st"><select className="pj-sel" value={p.status} onChange={e=>void patch(p.id,{status:e.target.value as ProjectStatus},p.name)}>{ST_KEYS.map(s=><option key={s} value={s}>{STATUS[s].label}</option>)}</select></td>);
-    if(colVis.owner)cells.push(<td key="ow"><select className="pj-sel" value={p.ownerId} onChange={e=>void patch(p.id,{ownerId:e.target.value},p.name)}><option value="">—</option>{users.map(u=><option key={u.id} value={u.id} disabled={!!u.disabled}>{u.displayName}</option>)}</select></td>);
-    if(colVis.priority)cells.push(<td key="pr"><select className="pj-sel" value={p.priority} onChange={e=>void patch(p.id,{priority:e.target.value as ProjectPriority},p.name)}>{(["high","mid","low"]as ProjectPriority[]).map(pr=><option key={pr} value={pr}>{PRI_LABEL[pr]}</option>)}</select></td>);
+    if(colVis.status)cells.push(<td key="st"><RareSelect className="pj-sel" aria-label={"状态：" + p.name} value={p.status} onChange={e=>void patch(p.id,{status:e.target.value as ProjectStatus},p.name)}>{ST_KEYS.map(s=><option key={s} value={s}>{STATUS[s].label}</option>)}</RareSelect></td>);
+    if(colVis.owner)cells.push(<td key="ow"><RareSelect searchable className="pj-sel" aria-label={"负责人：" + p.name} value={p.ownerId} onChange={e=>void patch(p.id,{ownerId:e.target.value},p.name)}><option value="">—</option>{users.map(u=><option key={u.id} value={u.id} disabled={!!u.disabled}>{u.displayName}</option>)}</RareSelect></td>);
+    if(colVis.priority)cells.push(<td key="pr"><RareSelect className="pj-sel" aria-label={"优先级：" + p.name} value={p.priority} onChange={e=>void patch(p.id,{priority:e.target.value as ProjectPriority},p.name)}>{(["high","mid","low"]as ProjectPriority[]).map(pr=><option key={pr} value={pr}>{PRI_LABEL[pr]}</option>)}</RareSelect></td>);
     if(colVis.start)cells.push(<td key="sa" className="pj-mono">{fmtDate(p.startDate)}</td>);
     if(colVis.end)cells.push(<td key="en" className="pj-mono">{fmtDate(p.endDate)}</td>);
-    if(colVis.team)cells.push(<td key="te"><select className="pj-sel" value={p.team} onChange={e=>void patch(p.id,{team:e.target.value as ProjectTeam},p.name)}>{TEAMS.map(t=><option key={t} value={t}>{t||"—"}</option>)}</select></td>);
+    if(colVis.team)cells.push(<td key="te"><RareSelect className="pj-sel" aria-label={"团队：" + p.name} value={p.team} onChange={e=>void patch(p.id,{team:e.target.value as ProjectTeam},p.name)}>{TEAMS.map(t=><option key={t} value={t}>{t||"—"}</option>)}</RareSelect></td>);
     if(colVis.progress)cells.push(<td key="pg"><div className="pj-progress-cell"><div className="pj-progress-bar"><i style={{width:p.progress+"%"}}/></div><b>{p.progress}%</b></div></td>);
-    cells.push(<td key="x"><button type="button" className="pj-del" title="删除" onClick={e=>{e.stopPropagation();onDelete(p);}}>🗑</button></td>);
+    cells.push(<td key="x"><RareButton type="button" tone="danger" className="pj-del" title="删除" aria-label={"删除 " + p.name} onClick={e=>{e.stopPropagation();onDelete(p);}}>🗑</RareButton></td>);
     return<tr key={p.id} onClick={()=>openDrawer("edit",p)}>{cells}</tr>;})}
    {visible.length===0&&<tr><td colSpan={heads.length} className="empty">当前筛选下没有项目</td></tr>}
   </tbody></table>;
@@ -525,9 +525,9 @@ export function ProjectDatabase({user,initialScope="all"}:{
   return<div className="pj-mask" onClick={()=>closeDrawer()}>
    <aside className="pj-drawer" ref={drawerRef} role="dialog" aria-modal="true" aria-label={drawer.mode==="new"?"新建项目":"编辑项目"} onClick={e=>e.stopPropagation()}>
     <div className="pj-dr-head">
-     <button type="button" className="pj-dr-icon" title="更换图标" onClick={()=>setDraft({icon:ICONS[(ICONS.indexOf(d.icon)+1)%ICONS.length]})}>{d.icon}</button>
-     <input className="pj-dr-title" value={d.name} placeholder="项目名称" maxLength={120} onChange={e=>setDraft({name:e.target.value})}/>
-     <button type="button" className={"pj-dr-fav"+(d.favorite?" on":"")} title="收藏" aria-pressed={d.favorite} onClick={()=>void toggleFav()}>{d.favorite?"★":"☆"}</button>
+     <RareButton type="button" tone="ghost" className="pj-dr-icon" title="更换图标" aria-label="更换图标" onClick={()=>setDraft({icon:ICONS[(ICONS.indexOf(d.icon)+1)%ICONS.length]})}>{d.icon}</RareButton>
+     <RareInput className="pj-dr-title" value={d.name} placeholder="项目名称" aria-label="项目名称" maxLength={120} onChange={e=>setDraft({name:e.target.value})}/>
+     <RareButton type="button" tone="ghost" className={"pj-dr-fav"+(d.favorite?" on":"")} title="收藏" aria-label="收藏" aria-pressed={d.favorite} onClick={()=>void toggleFav()}>{d.favorite?"★":"☆"}</RareButton>
      <RareButton type="button" tone="ghost" onClick={()=>closeDrawer()}>✕</RareButton>
     </div>
     <div className="pj-dr-scroll">
@@ -536,10 +536,10 @@ export function ProjectDatabase({user,initialScope="all"}:{
       <PersonRow label="负责人" glyph="☺" show={colVis.owner}><RareSelect value={d.ownerId} onChange={e=>setDraft({ownerId:e.target.value})}><option value="">空白</option>{users.map(u=><option key={u.id} value={u.id}>{u.displayName}</option>)}</RareSelect></PersonRow>
       <PersonRow label="优先级" glyph="◎" show={colVis.priority}><RareSelect value={d.priority} onChange={e=>setDraft({priority:e.target.value as ProjectPriority})}>{(["high","mid","low"]as ProjectPriority[]).map(p=><option key={p} value={p}>{PRI_LABEL[p]}</option>)}</RareSelect></PersonRow>
       <PersonRow label="团队" glyph="▤" show={colVis.team}><RareSelect value={d.team} onChange={e=>setDraft({team:e.target.value as ProjectTeam})}>{TEAMS.map(t=><option key={t} value={t}>{t||"空白"}</option>)}</RareSelect></PersonRow>
-      <PersonRow label="开始日期" glyph="▭" show={colVis.start}><input type="date" className="pj-date" value={d.startDate??""} onChange={e=>setDraft({startDate:e.target.value||null})}/></PersonRow>
-      <PersonRow label="结束日期" glyph="▭" show={colVis.end}><input type="date" className="pj-date" value={d.endDate??""} onChange={e=>setDraft({endDate:e.target.value||null})}/></PersonRow>
+      <PersonRow label="开始日期" glyph="▭" show={colVis.start}><RareInput type="date" className="pj-date" aria-label="开始日期" value={d.startDate??""} onChange={e=>setDraft({startDate:e.target.value||null})}/></PersonRow>
+      <PersonRow label="结束日期" glyph="▭" show={colVis.end}><RareInput type="date" className="pj-date" aria-label="结束日期" value={d.endDate??""} onChange={e=>setDraft({endDate:e.target.value||null})}/></PersonRow>
       <div className="pj-prop"><span className="pj-p-ic">◍</span><span className="pj-p-label">进度</span>
-       <input type="range" min={0} max={100} step={5} className="pj-slider" value={d.progress} onChange={e=>setDraft({progress:+e.target.value})}/>
+       <RareInput type="range" min={0} max={100} step={5} className="pj-slider" aria-label="进度" value={d.progress} onChange={e=>setDraft({progress:+e.target.value})}/>
        <b className="pj-p-val pj-pct">{d.progress}%</b></div>
      </div>
 
@@ -562,8 +562,8 @@ export function ProjectDatabase({user,initialScope="all"}:{
      <section className="pj-sec">
       <div className="pj-sec-head"><h3>待办 {detail?.todos.length?`（${detail.todos.filter(t=>t.done).length}/${detail.todos.length}）`:""}</h3></div>
       {detail?.todos.map(t=>{const id=drawer.id;return<div className={"pj-todo"+(t.done?" done":"")} key={t.id}>
-       <input type="checkbox" checked={t.done} onChange={e=>{if(id)void todoToggle(id,t.id,e.target.checked);}}/>
-       <span>{t.text}</span><button type="button" className="pj-todo-del" title="删除待办" onClick={()=>{if(id)void todoRemove(id,t.id);}}>✕</button></div>;})}
+       <RareInput type="checkbox" checked={t.done} aria-label={"完成 " + t.text} onChange={e=>{if(id)void todoToggle(id,t.id,e.target.checked);}}/>
+       <span>{t.text}</span><RareButton type="button" tone="ghost" className="pj-todo-del" title="删除待办" aria-label={"删除待办 " + t.text} onClick={()=>{if(id)void todoRemove(id,t.id);}}>✕</RareButton></div>;})}
       {drawer.mode==="edit"&&<div className="pj-todo-add">
        <RareInput placeholder="添加待办，回车保存…" value={todoText} disabled={todoBusy||!detail}
         onChange={e=>setTodoText(e.target.value)}
@@ -584,9 +584,9 @@ export function ProjectDatabase({user,initialScope="all"}:{
          onClick={e=>e.stopPropagation()}>
          <FileTypeIcon name={dc.name} size={14}/><span className="pj-doc-name">{dc.name}</span>
         </Link>
-        <button type="button" title="解除关联" aria-label={"解除关联 "+dc.name} onClick={()=>{if(id)void docRemove(id,dc.docId);}}>✕</button></span>;})}
+        <RareButton type="button" tone="ghost" title="解除关联" aria-label={"解除关联 "+dc.name} onClick={()=>{if(id)void docRemove(id,dc.docId);}}>✕</RareButton></span>;})}
        {detail?.docs?.length===0&&<span className="pj-docs-empty">还没有关联文档</span>}
-       {drawer.mode==="edit"&&<button type="button" className="pj-doc-add" onClick={()=>setDocPickerFor(drawer.id)}>＋ 关联文档</button>}
+       {drawer.mode==="edit"&&<RareButton type="button" tone="ghost" className="pj-doc-add" onClick={()=>setDocPickerFor(drawer.id)}>＋ 关联文档</RareButton>}
       </div>
       {drawer.mode==="new"&&<p className="pj-sec-hint">保存项目后即可关联文档</p>}
      </section>

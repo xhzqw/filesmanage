@@ -32,7 +32,7 @@
 .doc-picker-row:focus-visible{outline:3px solid var(--color-focus);outline-offset:-2px}
 
 .doc-picker-check{display:grid;place-items:center;flex:none;width:16px;height:16px;
- border:1px solid var(--color-border-strong);border-radius:4px;
+ border:1px solid var(--color-border-strong);border-radius:var(--radius-xs);
  font-size:11px;line-height:1;color:var(--color-text-secondary);background:var(--color-panel)}
 /* 选中态沿用 FolderPicker 的既有语言：浅底 + 品牌色前景，不用实心色块 */
 .doc-picker-row.picked .doc-picker-check{border-color:var(--color-action);background:var(--surface-subtle);color:var(--color-action);
@@ -91,12 +91,12 @@
  padding:var(--space-1);border:1px solid var(--color-border);
  border-radius:var(--radius-control);background:var(--color-panel-subtle)}
 .doc-chosen-chip{display:inline-flex;align-items:center;gap:4px;max-width:100%;
- padding:2px 6px;border:1px solid var(--color-border-strong);border-radius:999px;
+ padding:2px 6px;border:1px solid var(--color-border-strong);border-radius:var(--radius-pill);
  background:var(--color-panel);color:var(--color-text);font-size:11.5px}
 .doc-chosen-name{min-width:0;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .doc-chosen-chip button{flex:none;background:transparent;border:0;padding:0 1px;cursor:pointer;
  color:var(--color-text-secondary);font-size:10px;line-height:1}
 .doc-chosen-chip button:hover{color:var(--color-danger)}
-.doc-chosen-chip button:focus-visible{outline:2px solid var(--color-focus);outline-offset:1px;border-radius:3px}
+.doc-chosen-chip button:focus-visible{outline:2px solid var(--color-focus);outline-offset:1px;border-radius:var(--radius-xs)}
 
 @media (max-width:520px){.doc-crumb-now,.doc-crumb-btn{max-width:110px}}
