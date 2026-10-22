@@ -2674,13 +2674,13 @@ add("PATCH","/api/projects/{id}",operation("Shallow-merge a project patch (inlin
  responses=dict([json_ok(obj({"project":PROJECT},required=["project"]),"Updated project.")] + list(PROJECT_ERRORS.items()))))
 add("DELETE","/api/projects/{id}",operation("Soft-delete a project (archives it, keeps sub-resources)","Projects","projectDelete",security=SESSION,
  params=PROJECT_ID,
- responses=dict([json_ok(obj({"archived":boolean()},required=["archived"]),"The row is archived rather than removed.")] + list(PROJECT_ERRORS.items()))))
+ responses=dict([json_ok(obj({"ok":boolean(),"archived":boolean()},required=["ok","archived"]),"The row is archived rather than removed; sub-resources are kept.")] + list(PROJECT_ERRORS.items()))))
 add("POST","/api/projects/{id}/comments",operation("Append a comment to a project","Projects","projectAddComment",security=SESSION,
  params=PROJECT_ID,request={"application/json":{"schema":obj({"text":string(max_length=2000)},required=["text"])}},
  responses={"201":{"description":"Comment stored","content":{"application/json":{"schema":obj({"ok":boolean(),"data":obj({"comment":PROJECT_COMMENT})})}}},**PROJECT_ERRORS}))
 add("POST","/api/projects/{id}/todos",operation("Add a project todo","Projects","projectAddTodo",security=SESSION,
  params=PROJECT_ID,request={"application/json":{"schema":obj({"text":string(max_length=500)},required=["text"])}},
- responses={"201":{"description":"Todo stored","content":{"application/json":{"schema":obj({"ok":boolean(),"data":obj({"todo":PROJECT_TODO})})}}},**PROJECT_ERRORS}))
+ responses={"201":{"description":"Todo stored","content":{"application/json":{"schema":obj({"ok":boolean(),"data":obj({"ok":boolean(),"todo":PROJECT_TODO})})}}},**PROJECT_ERRORS}))
 add("PATCH","/api/projects/{id}/todos/{todoId}",operation("Toggle a project todo","Projects","projectSetTodo",security=SESSION,
  params=PROJECT_ID+[{"name":"todoId","in":"path","required":True,"schema":{"type":"integer","minimum":1},"description":"Todo id."}],
  request={"application/json":{"schema":obj({"done":boolean()},required=["done"])}},
