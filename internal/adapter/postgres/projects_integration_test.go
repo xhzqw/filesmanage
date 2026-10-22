@@ -2,8 +2,10 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
+	"reflect"
 	"regexp"
 	"testing"
 	"time"
@@ -170,7 +172,8 @@ func TestProjectPostgresRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	stored, err := service.ProjectViewState(ctx, admin)
-	if err != nil || string(stored) != string(view) {
+	// jsonb normalizes key order and whitespace, so equality is semantic.
+	if err != nil || !sameJSON(stored, view) {
 		t.Fatalf("view round trip: %s %v", stored, err)
 	}
 	if raw, err := service.ProjectViewState(ctx, member); err != nil || raw != nil {
@@ -220,4 +223,14 @@ func TestProjectPostgresRoundTrip(t *testing.T) {
 	if audits < 4 {
 		t.Fatalf("expected create/update/comment/docs audit rows, got %d", audits)
 	}
+}
+
+// sameJSON compares two documents after decoding: PostgreSQL re-serializes
+// jsonb with sorted keys and normalized spacing.
+func sameJSON(left, right []byte) bool {
+	var a, b any
+	if json.Unmarshal(left, &a) != nil || json.Unmarshal(right, &b) != nil {
+		return false
+	}
+	return reflect.DeepEqual(a, b)
 }
