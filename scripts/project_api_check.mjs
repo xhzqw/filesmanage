@@ -44,8 +44,11 @@ ok(login, "login");
 assert.ok(cookie, "session cookie issued");
 
 // --- list / detail defaults -------------------------------------------------
-const emptyView = ok(await call("GET", "/projects/view-state"), "view-state before save");
-assert.equal(emptyView.config, null, "unsaved view state must be null");
+// A previous session may already have saved a view (the workbench writes one on
+// every filter/view change), so only the shape is asserted here; the round trip
+// below proves the read/write contract either way.
+const initialView = ok(await call("GET", "/projects/view-state"), "view-state before save");
+assert.ok(initialView.config === null || typeof initialView.config === "object", "view-state is null or an object");
 
 const listBefore = ok(await call("GET", "/projects"), "list");
 assert.ok(Array.isArray(listBefore.items), "items array");
