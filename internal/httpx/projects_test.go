@@ -332,7 +332,7 @@ func TestProjectRoutesAuthAndSuccessEnvelopes(t *testing.T) {
 	if rec = call(http.MethodGet, "/api/projects/not-a-number", "", true); rec.Code != 400 || !strings.Contains(rec.Body.String(), "E_INVALID_INPUT") {
 		t.Fatalf("bad id must be 400 E_INVALID_INPUT: %d %s", rec.Code, rec.Body.String())
 	}
-	if rec = call(http.MethodPatch, "/api/projects/1", `{"favorite":true}`, true); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"favorite":true`) {
+	if rec = call(http.MethodPatch, "/api/projects/1", `{"favorite":true}`, true); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"favorite":true`) || !strings.Contains(rec.Body.String(), `"ok":true`) {
 		t.Fatalf("favorite patch broken: %d %s", rec.Code, rec.Body.String())
 	}
 	if rec = call(http.MethodPatch, "/api/projects/1", `{"name":"   "}`, true); rec.Code != 400 || !strings.Contains(rec.Body.String(), "E_INVALID_INPUT") {

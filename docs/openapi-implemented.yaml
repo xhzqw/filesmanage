@@ -21422,7 +21422,7 @@ paths:
               $ref: '#/components/schemas/ProjectPatch'
       responses:
         '200':
-          description: Updated project.
+          description: Updated project. ok:true also satisfies the archive contract (§3.6) that shares this route.
           content:
             application/json:
               schema:
@@ -21435,9 +21435,12 @@ paths:
                   data:
                     type: object
                     properties:
+                      ok:
+                        type: boolean
                       project:
                         $ref: '#/components/schemas/Project'
                     required:
+                    - ok
                     - project
                 required:
                 - ok

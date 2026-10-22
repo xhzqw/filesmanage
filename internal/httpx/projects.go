@@ -188,7 +188,9 @@ func (h *Handler) projectUpdate(c *gin.Context) {
 		projectError(c, err)
 		return
 	}
-	projectOK(c, 200, gin.H{"project": projectProjectPayload(p)})
+	// BACKEND-API.md §3.4 declares {project} and §3.6 declares {ok:true} for the
+	// same route (archive is a PATCH with archived:true), so both keys ship.
+	projectOK(c, 200, gin.H{"ok": true, "project": projectProjectPayload(p)})
 }
 
 func (h *Handler) projectDelete(c *gin.Context) {

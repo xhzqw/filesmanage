@@ -2671,7 +2671,8 @@ add("GET","/api/projects/{id}",operation("Read one project with its sub-resource
 add("PATCH","/api/projects/{id}",operation("Shallow-merge a project patch (inline edits, gantt drag, archive, favorite)","Projects","projectUpdate",security=SESSION,
  params=PROJECT_ID,
  request={"application/json":{"schema":ref("ProjectPatch")}},
- responses=dict([json_ok(obj({"project":PROJECT},required=["project"]),"Updated project.")] + list(PROJECT_ERRORS.items()))))
+ responses=dict([json_ok(obj({"ok":boolean(),"project":PROJECT},required=["ok","project"]),
+  "Updated project. ok:true also satisfies the archive contract (§3.6) that shares this route.")] + list(PROJECT_ERRORS.items()))))
 add("DELETE","/api/projects/{id}",operation("Soft-delete a project (archives it, keeps sub-resources)","Projects","projectDelete",security=SESSION,
  params=PROJECT_ID,
  responses=dict([json_ok(obj({"ok":boolean(),"archived":boolean()},required=["ok","archived"]),"The row is archived rather than removed; sub-resources are kept.")] + list(PROJECT_ERRORS.items()))))
