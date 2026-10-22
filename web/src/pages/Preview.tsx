@@ -2,7 +2,7 @@ import {RareBadge,RareButton,MicroHoldToDelete} from "../shared/ui/rare";
 import {toast} from "../shared/ui/feedback";
 import {BrandLoader,BrandLoadingLabel} from "../shared/ui/BrandLoader";
 import {lazy,Suspense,useEffect,useRef,useState} from "react";
-import {Link,useNavigate,useParams} from "react-router-dom";
+import {Link,useNavigate,useParams,useSearchParams} from "react-router-dom";
 import {fileApi,formatSize,type FileLifecycle} from "../features/documents/api";
 import {reuseVerifiedPreview} from "../features/documents/revalidate";
 import {MediaPreview} from "../features/documents/MediaPreview";
@@ -68,14 +68,36 @@ function WorkbenchNavIcon({type}:{type:Tab}){
  </svg>;
 }
 
+// 预览页可被多处打开（文件列表、搜索、客户档案、项目抽屉…）。`?from=` 让打开方
+// 声明来源，返回键据此指回原处。只认白名单：`from` 来自 URL，直接把参数当跳转
+// 目标等于开放重定向。项目抽屉的文档 chip 就带 `?from=projects`。
+const BACK_TARGETS:Record<string,{to:string;label:string}>={
+ projects:{to:"/workbench?view=projects",label:"返回项目"},
+ "my-projects":{to:"/workbench?view=my-projects",label:"返回我的项目"},
+ workbench:{to:"/workbench",label:"返回工作台"},
+ dhf:{to:"/workbench/dhf",label:"返回 DHF 工作台"},
+ approvals:{to:"/approvals",label:"返回审批"},
+ lifecycle:{to:"/lifecycle",label:"返回生命周期"},
+ customers:{to:"/customers",label:"返回客户资料"},
+ search:{to:"/search",label:"返回搜索结果"},
+ trash:{to:"/trash",label:"返回回收站"},
+ org:{to:"/org",label:"返回组织与权限"},
+};
+
 export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
  const{id=""}=useParams();
  const navigate=useNavigate();
+ const[searchParams]=useSearchParams();
+ // Unknown or forged values fall back to the file list instead of being navigated to.
+ const fromTarget=BACK_TARGETS[searchParams.get("from")??""]??null;
  const[preview,setPreview]=useState<PreviewData|null>(null);
  useEffect(()=>{
   if(preview?.name&&isOfficeName(preview.name))prewarmOfficeEditor();
  },[preview?.name]);
  const[file,setFile]=useState<FileItem|null>(null);
+ // backTarget reads file.folderId, so it must be declared after file (TDZ).
+ const backTarget=fromTarget?fromTarget.to:file?"/doc?folder="+encodeURIComponent(file.folderId):"/doc";
+ const backLabel=fromTarget?fromTarget.label:"返回文件列表";
  const[versions,setVersions]=useState<FileVersion[]>([]);
  const[lineageParent,setLineageParent]=useState<FileLineage|null>(null);
  const[lineageChildren,setLineageChildren]=useState<FileLineage[]>([]);
@@ -262,7 +284,8 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
   try{
    await fileApi.remove(file.id);
    toast.success("文件已移入回收站");
-   navigate("/doc?folder="+encodeURIComponent(file.folderId),{replace:true});
+   // 删除后回到打开方：从项目页进来就回项目页，而不是甩到无关的文件列表。
+   navigate(backTarget,{replace:true});
   }catch(err){announce(errorCopy(err,"删除失败"),true);}
   finally{setBusy(false);}
  }
@@ -284,7 +307,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
     {status==="failed"&&<div className="file-workbench-error"><p role="alert" className="notice error">{error}</p>
      <div className="file-workbench-recovery-actions">
       <RareButton onClick={refresh}>重新加载</RareButton>
-      <Link to="/doc" className="rare-button">返回文件列表</Link>
+      <Link to={backTarget} className="rare-button">{backLabel}</Link>
       <Link to="/trash" className="rare-button">查看回收站</Link>
      </div>
     </div>}
@@ -350,8 +373,8 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
        <div className="file-workbench-toolbar">
      <header className="file-preview-identity">
       <div className="file-workbench-heading">
-       <Link to={file?"/doc?folder="+encodeURIComponent(file.folderId):"/doc"} className="file-back"
-        aria-label="返回文件列表" title="返回文件列表">
+       <Link to={backTarget} className="file-back"
+        aria-label={backLabel} title={backLabel}>
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
          strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
          <path d="m14.5 5.5-6 6.5 6 6.5"/>

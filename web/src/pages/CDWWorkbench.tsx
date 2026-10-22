@@ -131,7 +131,13 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const[busy,setBusy]=useState(false);
  const[refreshToken,refresh]=useState(0);
  const[requestError,setRequestError]=useState("");
- const[filter,setFilter]=useState<View>(()=>params.get("view")==="initiated"?"initiated":params.get("task")?"all":"home");
+ // `?view=` deep links (used by the preview page's "返回项目") open the same
+ // rail view a click would; anything unrecognized keeps the previous fallback.
+ const[filter,setFilter]=useState<View>(()=>{
+  const fromUrl=params.get("view");
+  if(fromUrl==="projects"||fromUrl==="my-projects")return fromUrl;
+  return fromUrl==="initiated"?"initiated":params.get("task")?"all":"home";
+ });
  const[search,setSearch]=useState("");
  const[priorityFirst,setPriorityFirst]=useState(true);
  const[branches,setBranches]=useState<CDWBranch[]>([]);
