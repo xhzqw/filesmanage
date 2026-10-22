@@ -2602,6 +2602,102 @@ add("DELETE", "/api/trash/{id}", operation("Permanently purge a trash entry", "T
     params=[id_param("id", "Trash entry id.")],
     responses=dict([json_ok(obj({"purged": string()}, required=["purged"]), "Purged trash id."), resp("401", ERR["401"]), resp("403", ERR["403"]), resp("404", ERR["404"])])))
 
+# --- Project database (workbench "项目" view) ---
+PROJECT_COMMENT = obj({
+ "id":integer(),"who":string(),"whoId":string(),"text":string(),
+ "at":string("Display timestamp, e.g. 2026-10-22 11:43."),"createdAt":integer("Epoch milliseconds."),
+},required=["id","who","whoId","text","at","createdAt"])
+PROJECT_TODO = obj({"id":integer(),"text":string(),"done":boolean()},required=["id","text","done"])
+PROJECT_DOC = obj({"docId":string("files.id of the linked controlled document."),"name":string(),
+ "kind":string(enum=["gdrive","pdf","figma","file"])},required=["docId","name","kind"])
+PROJECT = obj({
+ "id":integer(minimum=1),"name":string(max_length=120),"icon":string(enum=["◇","◈","▦","✦","◎"]),
+ "description":string(max_length=4000),"status":string(enum=["notstarted","progress","done"]),
+ "priority":string(enum=["high","mid","low"]),
+ "team":string(enum=["","销售部","产品设计","人力资源","供应链","工程部","文件管理"]),
+ "ownerId":string(),"ownerName":string(),"progress":integer(minimum=0),
+ "startDate":{"type":"string","format":"date","nullable":True},"endDate":{"type":"string","format":"date","nullable":True},
+ "archived":boolean(),"favorite":boolean(),"comments":arr(PROJECT_COMMENT),"todos":arr(PROJECT_TODO),
+ "docs":arr(PROJECT_DOC),"createdBy":string(),"createdAt":integer(),"updatedAt":integer(),
+},required=["id","name","icon","description","status","priority","team","ownerId","ownerName","progress",
+ "startDate","endDate","archived","favorite","comments","todos","docs","createdBy","createdAt","updatedAt"])
+PROJECT_PAGE = obj({"items":arr(PROJECT),"nextCursor":{"type":"string","nullable":True},
+ "asOf":timestamp("Snapshot time of this read; mandatory for the frontend type.")},required=["items","nextCursor","asOf"])
+PROJECT_WRITE_OBJ = obj({
+ "name":string(max_length=120),"icon":string(enum=["◇","◈","▦","✦","◎"]),"description":string(max_length=4000),
+ "status":string(enum=["notstarted","progress","done"]),"priority":string(enum=["high","mid","low"]),
+ "team":string(enum=["","销售部","产品设计","人力资源","供应链","工程部","文件管理"]),"ownerId":string(),
+ "progress":integer(minimum=0),"startDate":{"type":"string","format":"date","nullable":True},
+ "endDate":{"type":"string","format":"date","nullable":True},
+},required=["name"])
+PROJECT_VIEW = obj({
+ "colVis":obj({k:boolean() for k in ["status","owner","priority","team","start","end","progress"]}),
+ "sort":obj({"field":string(enum=["name","priority","progress","startDate","ownerName","none"]),
+  "dir":{"type":"integer","enum":[1,-1]}},required=["field","dir"]),
+ "filters":obj({"status":obj({"notstarted":boolean(),"progress":boolean(),"done":boolean()})},required=["status"]),
+ "scope":string(enum=["all","mine"]),"view":string(enum=["board","table","gantt"]),
+ "columnConfig":obj({"widths":obj({}),"order":arr(string()),"ganttScale":{"type":"integer","enum":[0,1]},
+  "ganttStart":string(),"ganttEnd":string()}),
+},required=["colVis","sort","filters","scope","view"])
+schema("ProjectComment", PROJECT_COMMENT)
+schema("ProjectTodo", PROJECT_TODO)
+schema("ProjectDoc", PROJECT_DOC)
+schema("Project", PROJECT)
+schema("ProjectPage", PROJECT_PAGE)
+schema("ProjectWrite", PROJECT_WRITE_OBJ)
+schema("ProjectView", PROJECT_VIEW)
+PROJECT_COMMENT, PROJECT_TODO, PROJECT_DOC = ref("ProjectComment"), ref("ProjectTodo"), ref("ProjectDoc")
+PROJECT, PROJECT_PAGE, PROJECT_WRITE, PROJECT_VIEW = ref("Project"), ref("ProjectPage"), ref("ProjectWrite"), ref("ProjectView")
+schema("ProjectPatch", obj(dict(PROJECT_WRITE_OBJ["properties"],archived=boolean(),favorite=boolean()),
+ "Any subset is applied; omitted members keep their stored value."))
+PROJECT_ERRORS = errors("400", "401", "403", "404", "409")
+PROJECT_ERRORS["400"] = resp("400", "E_INVALID_INPUT — blank or oversize name, end before start, progress out of 0..100, or an unknown enum value")[1]
+PROJECT_ERRORS["403"] = resp("403", "E_FORBIDDEN — only administrators may write projects; reads stay open to signed-in users")[1]
+PROJECT_ID = [{"name":"id","in":"path","required":True,"schema":{"type":"integer","minimum":1},"description":"Project id."}]
+add("GET","/api/projects",operation("List every live project with comments, todos and linked documents","Projects","projectList",security=SESSION,
+ responses=dict([json_ok(PROJECT_PAGE,"Newest edit first; archived projects are excluded. Server-side filtering is intentionally absent.")] + list(PROJECT_ERRORS.items()))))
+add("POST","/api/projects",operation("Create a project","Projects","projectCreate",security=SESSION,
+ request={"application/json":{"schema":PROJECT_WRITE}},
+ responses={"201":{"description":"Project created","content":{"application/json":{"schema":obj({"ok":boolean(),"data":obj({"project":PROJECT},required=["project"])})}}},**PROJECT_ERRORS}))
+add("GET","/api/projects/view-state",operation("Read the caller's own saved project view","Projects","projectGetView",security=SESSION,
+ responses=dict([json_ok(obj({"config":{"type":"object","nullable":True}},required=["config"]),
+  "Per-user view preferences; config is null until the user saves one.")] + list(PROJECT_ERRORS.items()))))
+add("PUT","/api/projects/view-state",operation("Overwrite the caller's project view","Projects","projectPutView",security=SESSION,
+ request={"application/json":{"schema":PROJECT_VIEW}},
+ responses=dict([json_ok(obj({"ok":boolean()},required=["ok"]),"Whole-object overwrite; the last concurrent PUT wins.")] + list(PROJECT_ERRORS.items()))))
+add("GET","/api/projects/{id}",operation("Read one project with its sub-resources","Projects","projectGet",security=SESSION,
+ params=PROJECT_ID,
+ responses=dict([json_ok(obj({"project":PROJECT},required=["project"]),"Project detail.")] + list(PROJECT_ERRORS.items()))))
+add("PATCH","/api/projects/{id}",operation("Shallow-merge a project patch (inline edits, gantt drag, archive, favorite)","Projects","projectUpdate",security=SESSION,
+ params=PROJECT_ID,
+ request={"application/json":{"schema":ref("ProjectPatch")}},
+ responses=dict([json_ok(obj({"project":PROJECT},required=["project"]),"Updated project.")] + list(PROJECT_ERRORS.items()))))
+add("DELETE","/api/projects/{id}",operation("Soft-delete a project (archives it, keeps sub-resources)","Projects","projectDelete",security=SESSION,
+ params=PROJECT_ID,
+ responses=dict([json_ok(obj({"archived":boolean()},required=["archived"]),"The row is archived rather than removed.")] + list(PROJECT_ERRORS.items()))))
+add("POST","/api/projects/{id}/comments",operation("Append a comment to a project","Projects","projectAddComment",security=SESSION,
+ params=PROJECT_ID,request={"application/json":{"schema":obj({"text":string(max_length=2000)},required=["text"])}},
+ responses={"201":{"description":"Comment stored","content":{"application/json":{"schema":obj({"ok":boolean(),"data":obj({"comment":PROJECT_COMMENT})})}}},**PROJECT_ERRORS}))
+add("POST","/api/projects/{id}/todos",operation("Add a project todo","Projects","projectAddTodo",security=SESSION,
+ params=PROJECT_ID,request={"application/json":{"schema":obj({"text":string(max_length=500)},required=["text"])}},
+ responses={"201":{"description":"Todo stored","content":{"application/json":{"schema":obj({"ok":boolean(),"data":obj({"todo":PROJECT_TODO})})}}},**PROJECT_ERRORS}))
+add("PATCH","/api/projects/{id}/todos/{todoId}",operation("Toggle a project todo","Projects","projectSetTodo",security=SESSION,
+ params=PROJECT_ID+[{"name":"todoId","in":"path","required":True,"schema":{"type":"integer","minimum":1},"description":"Todo id."}],
+ request={"application/json":{"schema":obj({"done":boolean()},required=["done"])}},
+ responses=dict([json_ok(obj({"ok":boolean()},required=["ok"]),"Updated todo.")] + list(PROJECT_ERRORS.items()))))
+add("DELETE","/api/projects/{id}/todos/{todoId}",operation("Delete a project todo","Projects","projectDeleteTodo",security=SESSION,
+ params=PROJECT_ID+[{"name":"todoId","in":"path","required":True,"schema":{"type":"integer","minimum":1},"description":"Todo id."}],
+ responses=dict([json_ok(obj({"ok":boolean()},required=["ok"]),"Deleted todo.")] + list(PROJECT_ERRORS.items()))))
+add("POST","/api/projects/{id}/docs",operation("Link one controlled document to a project","Projects","projectAddDoc",security=SESSION,
+ params=PROJECT_ID,request={"application/json":{"schema":PROJECT_DOC}},
+ responses={"201":{"description":"Link created or already present","content":{"application/json":{"schema":obj({"ok":boolean(),"data":obj({"ok":boolean(),"added":integer()})})}}},**PROJECT_ERRORS}))
+add("POST","/api/projects/{id}/docs/batch",operation("Link many controlled documents in one transaction","Projects","projectAddDocs",security=SESSION,
+ params=PROJECT_ID,request={"application/json":{"schema":obj({"docs":arr(PROJECT_DOC)},required=["docs"])}},
+ responses={"201":{"description":"All links committed together; ids already linked are skipped","content":{"application/json":{"schema":obj({"ok":boolean(),"data":obj({"ok":boolean(),"added":integer()})})}}},**PROJECT_ERRORS}))
+add("DELETE","/api/projects/{id}/docs/{docId}",operation("Unlink a controlled document from a project","Projects","projectRemoveDoc",security=SESSION,
+ params=PROJECT_ID+[{"name":"docId","in":"path","required":True,"schema":string(),"description":"files.id of the linked document."}],
+ responses=dict([json_ok(obj({"ok":boolean()},required=["ok"]),"Link removed.")] + list(PROJECT_ERRORS.items()))))
+
 # --------------------------------------------------------------------------
 # Document assembly
 # --------------------------------------------------------------------------

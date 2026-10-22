@@ -101,6 +101,22 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.DELETE("/me/sessions/others", h.revokeOtherSessions)
 	api.DELETE("/me/sessions/:id", h.revokeOwnSession)
 	api.GET("/events/ws", h.websocketEvents)
+	// Project database ("项目" workbench view). Reads are open to any signed-in
+	// user; writes follow the admin-only rule in SPEC-project-db §3.4.
+	api.GET("/projects", h.projectList)
+	api.POST("/projects", h.projectCreate)
+	api.GET("/projects/view-state", h.projectGetView)
+	api.PUT("/projects/view-state", h.projectPutView)
+	api.GET("/projects/:id", h.projectGet)
+	api.PATCH("/projects/:id", h.projectUpdate)
+	api.DELETE("/projects/:id", h.projectDelete)
+	api.POST("/projects/:id/comments", h.projectAddComment)
+	api.POST("/projects/:id/todos", h.projectAddTodo)
+	api.PATCH("/projects/:id/todos/:todoId", h.projectSetTodo)
+	api.DELETE("/projects/:id/todos/:todoId", h.projectDeleteTodo)
+	api.POST("/projects/:id/docs", h.projectAddDoc)
+	api.POST("/projects/:id/docs/batch", h.projectAddDocs)
+	api.DELETE("/projects/:id/docs/:docId", h.projectRemoveDoc)
 	// Customer master data; registration reviews are handled in the existing workbench.
 	api.GET("/customers", h.customerList)
 	api.POST("/customers", h.customerCreate)

@@ -1,11 +1,11 @@
 // DocumentPicker.tsx
-// 「项目」抽屉里「关联文档」的取值来源：从受控文件库里挑文件，而不是手输名字。
+// 「关联文档」的选择面板：从受控文件库里挑文件，而不是手输名字。
 // 落地位置：web/src/shared/ui/DocumentPicker.tsx（与 FolderPicker 同层，可被其它模块复用）。
 //
 // 设计约束（对齐 shared/ui/FolderPicker.tsx 的既有约定）：
 //  · 面板本身不是 dialog，渲染在宿主 Dialog 里，因此背景/焦点陷阱/遮罩都由 Dialog 负责；
-//  · 数据走 features/documents 的 fileApi.list（带 folder 参数）+ features/folders 的
-//    folderApi.children，分页用 cursor，不在组件内重复实现请求层；
+//  · shared 层不得依赖 features/entities（scripts/check_architecture.py），因此数据源由宿主
+//    通过 `source` 注入：生产环境用 fileApi.list / folderApi.children，测试可注入假数据；
 //  · 颜色全部取 theme.css 语义 token，不写裸色值。
 //
 // 逐级浏览：从根目录进入，点文件夹下钻、用面包屑回退；切换目录时文件与子文件夹同页刷新。
@@ -17,19 +17,27 @@ import{RareButton,RareInput}from"./rare";
 import{FolderResourceIcon}from"./ResourceIcons";
 import{FileTypeIcon}from"./FileTypeIcon";
 import{errorCopy}from"../errors";
-import{fileApi}from"../../features/documents/api";
-import{folderApi}from"../../features/folders/api";
-import type{FileItem}from"../../entities/file/model";
 import"./documentPicker.css";
 
 export type PickedDocument={docId:string;name:string;kind:"gdrive"|"pdf"|"figma"|"file"};
 
+// Structural copies of the document/folder read rows: a shared -> entities or
+// shared -> features import fails the architecture gate, and the host already
+// holds richer objects, so these shapes stay assignable without casts.
+export type DocumentPickerItem={
+ id:string;name:string;sizeBytes:number;updatedAt:string;
+ kind?:PickedDocument["kind"];
+};
+export type DocumentPickerFolder={id:string;name:string;hasChildren:boolean};
+export type DocumentPickerPage={items:DocumentPickerItem[];nextCursor:string};
+export type DocumentPickerSource={
+ folders:(parentId:string)=>Promise<DocumentPickerFolder[]>;
+ files:(folderId:string,cursor:string,signal?:AbortSignal)=>Promise<DocumentPickerPage>;
+};
+
 const PAGE_SIZE=20;
 const FOLDER_LIMIT=50;
 const MAX_DEPTH=32;
-// 合法排序值见 features/documents/finderSort.ts；传错会被后端忽略或报错。
-const SORT="name_asc";
-
 type Crumb={id:string;name:string};
 
 function kindOf(name:string,contentType:string):PickedDocument["kind"]{
@@ -53,10 +61,11 @@ function shortTime(iso:string){
  return d.getFullYear()+"/"+p(d.getMonth()+1)+"/"+p(d.getDate());
 }
 
-export function DocumentPicker({open,title="选择要关联的文档",excludeIds=[],onPick,onClose}:{
+export function DocumentPicker({open,title="选择要关联的文档",excludeIds=[],source,onPick,onClose}:{
  open:boolean;
  title?:string;
  excludeIds?:readonly string[];
+ source:DocumentPickerSource;
  onPick:(docs:PickedDocument[])=>void;
  onClose:()=>void;
 }){
@@ -64,8 +73,8 @@ export function DocumentPicker({open,title="选择要关联的文档",excludeIds
  const[folderId,setFolderId]=useState("");
  const[crumbs,setCrumbs]=useState<Crumb[]>([{id:"",name:"全部文件"}]);
 
- const[folders,setFolders]=useState<{id:string;name:string;hasChildren:boolean}[]>([]);
- const[items,setItems]=useState<FileItem[]>([]);
+ const[folders,setFolders]=useState<DocumentPickerFolder[]>([]);
+ const[items,setItems]=useState<DocumentPickerItem[]>([]);
  const[cursor,setCursor]=useState("");
  const[hasMore,setHasMore]=useState(false);
  const[busy,setBusy]=useState(false);
@@ -81,15 +90,12 @@ export function DocumentPicker({open,title="选择要关联的文档",excludeIds
  const loadDir=useCallback(async(dirId:string,cursorIn:string,append:boolean,signal?:AbortSignal)=>{
   setBusy(true);setError("");
   try{
-   const [folderPage,filePage]=await Promise.all([
-    append?Promise.resolve(null):folderApi.children(dirId,""),
-    fileApi.list(dirId,SORT,cursorIn,PAGE_SIZE,signal),
+   const [folderList,filePage]=await Promise.all([
+    append?Promise.resolve(null):source.folders(dirId),
+    source.files(dirId,cursorIn,signal),
    ]);
-   if(folderPage){
-    setFolders((folderPage.items??[])
-     .filter(f=>f.canSelect!==false)
-     .slice(0,FOLDER_LIMIT)
-     .map(f=>({id:f.id,name:f.name,hasChildren:!!f.hasChildren})));
+   if(folderList){
+    setFolders(folderList.slice(0,FOLDER_LIMIT));
    }
    setItems(prev=>{
     const base=append?prev:[];
@@ -102,7 +108,7 @@ export function DocumentPicker({open,title="选择要关联的文档",excludeIds
    if(e instanceof DOMException&&e.name==="AbortError")return;
    setError(errorCopy(e,"目录加载失败"));
   }finally{setBusy(false);}
- },[]);
+ },[source]);
 
  // 进入/切换目录
  useEffect(()=>{
@@ -157,11 +163,12 @@ export function DocumentPicker({open,title="选择要关联的文档",excludeIds
  const pickable=fileMatches.filter(f=>!exclude.has(f.id)&&!picked.some(p=>p.docId===f.id));
  const allPickedInView=pickable.length>0&&pickable.every(f=>picked.some(p=>p.docId===f.id));
 
- function toggle(f:FileItem){
+ function kindFor(f:DocumentPickerItem){return f.kind??kindOf(f.name,"");}
+ function toggle(f:DocumentPickerItem){
   setPicked(list=>{
    const hit=list.some(p=>p.docId===f.id);
    if(hit)return list.filter(p=>p.docId!==f.id);
-   return [...list,{docId:f.id,name:f.name,kind:kindOf(f.name,f.contentType)}];
+   return [...list,{docId:f.id,name:f.name,kind:kindFor(f)}];
   });
  }
  function removePicked(id:string){setPicked(list=>list.filter(p=>p.docId!==id));}
@@ -171,7 +178,7 @@ export function DocumentPicker({open,title="选择要关联的文档",excludeIds
    const every=ids.length>0&&ids.every(id=>list.some(p=>p.docId===id));
    if(every)return list.filter(p=>!ids.includes(p.docId));
    const add=pickable.filter(f=>!list.some(p=>p.docId===f.id))
-    .map(f=>({docId:f.id,name:f.name,kind:kindOf(f.name,f.contentType)}));
+    .map(f=>({docId:f.id,name:f.name,kind:kindFor(f)}));
    return [...list,...add];
   });
  }

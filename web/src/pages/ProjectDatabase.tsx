@@ -15,7 +15,9 @@ import{errorCopy}from "../shared/errors";
 import{newIdempotencyKey}from "../shared/ids";
 import{organizationApi}from "../features/organization/api";
 import{observeWindowReturn}from "../shared/resourceSync";
-import{DocumentPicker,type PickedDocument}from "../shared/ui/DocumentPicker";
+import{DocumentPicker,type PickedDocument,type DocumentPickerSource}from "../shared/ui/DocumentPicker";
+import{fileApi}from "../features/documents/api";
+import{folderApi}from "../features/folders/api";
 import{FileTypeIcon}from "../shared/ui/FileTypeIcon";
 import{projectApi,type Project,type ProjectStatus,type ProjectPriority,type ProjectTeam,type ProjectWriteInput}from "../features/projects/api";
 import"./projectDatabase.css";
@@ -31,6 +33,17 @@ const PRI_TONE:Record<ProjectPriority,string>={high:"h",mid:"m",low:"l"};
 const PRI_LABEL:Record<ProjectPriority,string>={high:"高",mid:"中",low:"低"};
 const TEAMS:ProjectTeam[]=["","销售部","产品设计","人力资源","供应链","工程部","文件管理"];
 const ICONS=["◇","◈","▦","✦","◎"];
+
+// 「关联文档」选择器的数据源：shared/ui/DocumentPicker 不依赖 features，
+// 由本页（page 层）把真实的受控文件读取接口注入进去。
+const DOC_SOURCE:DocumentPickerSource={
+ folders:parentId=>folderApi.children(parentId,"").then(page=>
+  (page.items??[]).filter(f=>f.canSelect!==false).map(f=>({id:f.id,name:f.name,hasChildren:!!f.hasChildren}))),
+ files:(folderId,cursor,signal)=>fileApi.list(folderId,"name_asc",cursor,20,signal).then(page=>({
+  items:(page.items??[]).map(f=>({id:f.id,name:f.name,sizeBytes:f.sizeBytes,updatedAt:f.updatedAt})),
+  nextCursor:page.nextCursor??"",
+ })),
+};
 
 const ORIGIN=Date.parse("2025-01-01");
 const DAY=86400000;
@@ -427,6 +440,7 @@ export function ProjectDatabase({user,initialScope="all"}:{
      {/* 文档选择器用原生 <dialog> 顶层渲染，所以挂在抽屉里面也不会被遮罩压住 */}
      <DocumentPicker
       open={docPickerFor!=null}
+      source={DOC_SOURCE}
       excludeIds={detail?.docs.map(d=>d.docId)??[]}
       onPick={docs=>{if(docPickerFor!=null)void attachDocs(docPickerFor,docs);}}
       onClose={()=>setDocPickerFor(null)}/>

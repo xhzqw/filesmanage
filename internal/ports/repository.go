@@ -24,6 +24,7 @@ type Repository interface {
 	LifecycleWorkspaceStore
 	LifecyclePolicyStore
 	LifecycleStatisticsStore
+	ProjectStore
 
 	// Identity and sessions.
 	UserByLogin(context.Context, string) (domain.User, string, error)

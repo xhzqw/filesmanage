@@ -21085,6 +21085,994 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/projects:
+    get:
+      summary: List every live project with comments, todos and linked documents
+      operationId: projectList
+      tags:
+      - Projects
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Newest edit first; archived projects are excluded. Server-side filtering is intentionally absent.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/ProjectPage'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_INVALID_INPUT — blank or oversize name, end before start, progress out of 0..100, or an unknown enum
+            value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — only administrators may write projects; reads stay open to signed-in users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      summary: Create a project
+      operationId: projectCreate
+      tags:
+      - Projects
+      security:
+      - cookieSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectWrite'
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      project:
+                        $ref: '#/components/schemas/Project'
+                    required:
+                    - project
+        '400':
+          description: E_INVALID_INPUT — blank or oversize name, end before start, progress out of 0..100, or an unknown enum
+            value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — only administrators may write projects; reads stay open to signed-in users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/projects/view-state:
+    get:
+      summary: Read the caller's own saved project view
+      operationId: projectGetView
+      tags:
+      - Projects
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Per-user view preferences; config is null until the user saves one.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      config:
+                        type: object
+                        nullable: true
+                    required:
+                    - config
+                required:
+                - ok
+                - data
+        '400':
+          description: E_INVALID_INPUT — blank or oversize name, end before start, progress out of 0..100, or an unknown enum
+            value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — only administrators may write projects; reads stay open to signed-in users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    put:
+      summary: Overwrite the caller's project view
+      operationId: projectPutView
+      tags:
+      - Projects
+      security:
+      - cookieSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectView'
+      responses:
+        '200':
+          description: Whole-object overwrite; the last concurrent PUT wins.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      ok:
+                        type: boolean
+                    required:
+                    - ok
+                required:
+                - ok
+                - data
+        '400':
+          description: E_INVALID_INPUT — blank or oversize name, end before start, progress out of 0..100, or an unknown enum
+            value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — only administrators may write projects; reads stay open to signed-in users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/projects/{id}:
+    get:
+      summary: Read one project with its sub-resources
+      operationId: projectGet
+      tags:
+      - Projects
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+        description: Project id.
+      responses:
+        '200':
+          description: Project detail.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      project:
+                        $ref: '#/components/schemas/Project'
+                    required:
+                    - project
+                required:
+                - ok
+                - data
+        '400':
+          description: E_INVALID_INPUT — blank or oversize name, end before start, progress out of 0..100, or an unknown enum
+            value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — only administrators may write projects; reads stay open to signed-in users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    patch:
+      summary: Shallow-merge a project patch (inline edits, gantt drag, archive, favorite)
+      operationId: projectUpdate
+      tags:
+      - Projects
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+        description: Project id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectPatch'
+      responses:
+        '200':
+          description: Updated project.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      project:
+                        $ref: '#/components/schemas/Project'
+                    required:
+                    - project
+                required:
+                - ok
+                - data
+        '400':
+          description: E_INVALID_INPUT — blank or oversize name, end before start, progress out of 0..100, or an unknown enum
+            value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — only administrators may write projects; reads stay open to signed-in users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    delete:
+      summary: Soft-delete a project (archives it, keeps sub-resources)
+      operationId: projectDelete
+      tags:
+      - Projects
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+        description: Project id.
+      responses:
+        '200':
+          description: The row is archived rather than removed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      archived:
+                        type: boolean
+                    required:
+                    - archived
+                required:
+                - ok
+                - data
+        '400':
+          description: E_INVALID_INPUT — blank or oversize name, end before start, progress out of 0..100, or an unknown enum
+            value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — only administrators may write projects; reads stay open to signed-in users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/projects/{id}/comments:
+    post:
+      summary: Append a comment to a project
+      operationId: projectAddComment
+      tags:
+      - Projects
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+        description: Project id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+                  maxLength: 2000
+              required:
+              - text
+      responses:
+        '201':
+          description: Comment stored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      comment:
+                        $ref: '#/components/schemas/ProjectComment'
+        '400':
+          description: E_INVALID_INPUT — blank or oversize name, end before start, progress out of 0..100, or an unknown enum
+            value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — only administrators may write projects; reads stay open to signed-in users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/projects/{id}/todos:
+    post:
+      summary: Add a project todo
+      operationId: projectAddTodo
+      tags:
+      - Projects
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+        description: Project id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+                  maxLength: 500
+              required:
+              - text
+      responses:
+        '201':
+          description: Todo stored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      todo:
+                        $ref: '#/components/schemas/ProjectTodo'
+        '400':
+          description: E_INVALID_INPUT — blank or oversize name, end before start, progress out of 0..100, or an unknown enum
+            value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — only administrators may write projects; reads stay open to signed-in users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/projects/{id}/todos/{todoId}:
+    patch:
+      summary: Toggle a project todo
+      operationId: projectSetTodo
+      tags:
+      - Projects
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+        description: Project id.
+      - name: todoId
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+        description: Todo id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                done:
+                  type: boolean
+              required:
+              - done
+      responses:
+        '200':
+          description: Updated todo.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      ok:
+                        type: boolean
+                    required:
+                    - ok
+                required:
+                - ok
+                - data
+        '400':
+          description: E_INVALID_INPUT — blank or oversize name, end before start, progress out of 0..100, or an unknown enum
+            value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — only administrators may write projects; reads stay open to signed-in users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    delete:
+      summary: Delete a project todo
+      operationId: projectDeleteTodo
+      tags:
+      - Projects
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+        description: Project id.
+      - name: todoId
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+        description: Todo id.
+      responses:
+        '200':
+          description: Deleted todo.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      ok:
+                        type: boolean
+                    required:
+                    - ok
+                required:
+                - ok
+                - data
+        '400':
+          description: E_INVALID_INPUT — blank or oversize name, end before start, progress out of 0..100, or an unknown enum
+            value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — only administrators may write projects; reads stay open to signed-in users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/projects/{id}/docs:
+    post:
+      summary: Link one controlled document to a project
+      operationId: projectAddDoc
+      tags:
+      - Projects
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+        description: Project id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectDoc'
+      responses:
+        '201':
+          description: Link created or already present
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      ok:
+                        type: boolean
+                      added:
+                        type: integer
+        '400':
+          description: E_INVALID_INPUT — blank or oversize name, end before start, progress out of 0..100, or an unknown enum
+            value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — only administrators may write projects; reads stay open to signed-in users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/projects/{id}/docs/batch:
+    post:
+      summary: Link many controlled documents in one transaction
+      operationId: projectAddDocs
+      tags:
+      - Projects
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+        description: Project id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                docs:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ProjectDoc'
+              required:
+              - docs
+      responses:
+        '201':
+          description: All links committed together; ids already linked are skipped
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      ok:
+                        type: boolean
+                      added:
+                        type: integer
+        '400':
+          description: E_INVALID_INPUT — blank or oversize name, end before start, progress out of 0..100, or an unknown enum
+            value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — only administrators may write projects; reads stay open to signed-in users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/projects/{id}/docs/{docId}:
+    delete:
+      summary: Unlink a controlled document from a project
+      operationId: projectRemoveDoc
+      tags:
+      - Projects
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+        description: Project id.
+      - name: docId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: files.id of the linked document.
+      responses:
+        '200':
+          description: Link removed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      ok:
+                        type: boolean
+                    required:
+                    - ok
+                required:
+                - ok
+                - data
+        '400':
+          description: E_INVALID_INPUT — blank or oversize name, end before start, progress out of 0..100, or an unknown enum
+            value
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — only administrators may write projects; reads stay open to signed-in users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
 components:
   securitySchemes:
     cookieSession:
@@ -23725,3 +24713,576 @@ components:
       - nextCursor
       - hasMore
       - unreadCount
+    ProjectComment:
+      type: object
+      properties:
+        id:
+          type: integer
+        who:
+          type: string
+        whoId:
+          type: string
+        text:
+          type: string
+        at:
+          type: string
+          description: Display timestamp, e.g. 2026-10-22 11:43.
+        createdAt:
+          type: integer
+          description: Epoch milliseconds.
+      required:
+      - id
+      - who
+      - whoId
+      - text
+      - at
+      - createdAt
+    ProjectTodo:
+      type: object
+      properties:
+        id:
+          type: integer
+        text:
+          type: string
+        done:
+          type: boolean
+      required:
+      - id
+      - text
+      - done
+    ProjectDoc:
+      type: object
+      properties:
+        docId:
+          type: string
+          description: files.id of the linked controlled document.
+        name:
+          type: string
+        kind:
+          type: string
+          enum:
+          - gdrive
+          - pdf
+          - figma
+          - file
+      required:
+      - docId
+      - name
+      - kind
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        name:
+          type: string
+          maxLength: 120
+        icon:
+          type: string
+          enum:
+          - ◇
+          - ◈
+          - ▦
+          - ✦
+          - ◎
+        description:
+          type: string
+          maxLength: 4000
+        status:
+          type: string
+          enum:
+          - notstarted
+          - progress
+          - done
+        priority:
+          type: string
+          enum:
+          - high
+          - mid
+          - low
+        team:
+          type: string
+          enum:
+          - ''
+          - 销售部
+          - 产品设计
+          - 人力资源
+          - 供应链
+          - 工程部
+          - 文件管理
+        ownerId:
+          type: string
+        ownerName:
+          type: string
+        progress:
+          type: integer
+          minimum: 0
+        startDate:
+          type: string
+          format: date
+          nullable: true
+        endDate:
+          type: string
+          format: date
+          nullable: true
+        archived:
+          type: boolean
+        favorite:
+          type: boolean
+        comments:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              who:
+                type: string
+              whoId:
+                type: string
+              text:
+                type: string
+              at:
+                type: string
+                description: Display timestamp, e.g. 2026-10-22 11:43.
+              createdAt:
+                type: integer
+                description: Epoch milliseconds.
+            required:
+            - id
+            - who
+            - whoId
+            - text
+            - at
+            - createdAt
+        todos:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              text:
+                type: string
+              done:
+                type: boolean
+            required:
+            - id
+            - text
+            - done
+        docs:
+          type: array
+          items:
+            type: object
+            properties:
+              docId:
+                type: string
+                description: files.id of the linked controlled document.
+              name:
+                type: string
+              kind:
+                type: string
+                enum:
+                - gdrive
+                - pdf
+                - figma
+                - file
+            required:
+            - docId
+            - name
+            - kind
+        createdBy:
+          type: string
+        createdAt:
+          type: integer
+        updatedAt:
+          type: integer
+      required:
+      - id
+      - name
+      - icon
+      - description
+      - status
+      - priority
+      - team
+      - ownerId
+      - ownerName
+      - progress
+      - startDate
+      - endDate
+      - archived
+      - favorite
+      - comments
+      - todos
+      - docs
+      - createdBy
+      - createdAt
+      - updatedAt
+    ProjectPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                minimum: 1
+              name:
+                type: string
+                maxLength: 120
+              icon:
+                type: string
+                enum:
+                - ◇
+                - ◈
+                - ▦
+                - ✦
+                - ◎
+              description:
+                type: string
+                maxLength: 4000
+              status:
+                type: string
+                enum:
+                - notstarted
+                - progress
+                - done
+              priority:
+                type: string
+                enum:
+                - high
+                - mid
+                - low
+              team:
+                type: string
+                enum:
+                - ''
+                - 销售部
+                - 产品设计
+                - 人力资源
+                - 供应链
+                - 工程部
+                - 文件管理
+              ownerId:
+                type: string
+              ownerName:
+                type: string
+              progress:
+                type: integer
+                minimum: 0
+              startDate:
+                type: string
+                format: date
+                nullable: true
+              endDate:
+                type: string
+                format: date
+                nullable: true
+              archived:
+                type: boolean
+              favorite:
+                type: boolean
+              comments:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    who:
+                      type: string
+                    whoId:
+                      type: string
+                    text:
+                      type: string
+                    at:
+                      type: string
+                      description: Display timestamp, e.g. 2026-10-22 11:43.
+                    createdAt:
+                      type: integer
+                      description: Epoch milliseconds.
+                  required:
+                  - id
+                  - who
+                  - whoId
+                  - text
+                  - at
+                  - createdAt
+              todos:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    text:
+                      type: string
+                    done:
+                      type: boolean
+                  required:
+                  - id
+                  - text
+                  - done
+              docs:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    docId:
+                      type: string
+                      description: files.id of the linked controlled document.
+                    name:
+                      type: string
+                    kind:
+                      type: string
+                      enum:
+                      - gdrive
+                      - pdf
+                      - figma
+                      - file
+                  required:
+                  - docId
+                  - name
+                  - kind
+              createdBy:
+                type: string
+              createdAt:
+                type: integer
+              updatedAt:
+                type: integer
+            required:
+            - id
+            - name
+            - icon
+            - description
+            - status
+            - priority
+            - team
+            - ownerId
+            - ownerName
+            - progress
+            - startDate
+            - endDate
+            - archived
+            - favorite
+            - comments
+            - todos
+            - docs
+            - createdBy
+            - createdAt
+            - updatedAt
+        nextCursor:
+          type: string
+          nullable: true
+        asOf:
+          type: string
+          description: Snapshot time of this read; mandatory for the frontend type.
+          format: date-time
+      required:
+      - items
+      - nextCursor
+      - asOf
+    ProjectWrite:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 120
+        icon:
+          type: string
+          enum:
+          - ◇
+          - ◈
+          - ▦
+          - ✦
+          - ◎
+        description:
+          type: string
+          maxLength: 4000
+        status:
+          type: string
+          enum:
+          - notstarted
+          - progress
+          - done
+        priority:
+          type: string
+          enum:
+          - high
+          - mid
+          - low
+        team:
+          type: string
+          enum:
+          - ''
+          - 销售部
+          - 产品设计
+          - 人力资源
+          - 供应链
+          - 工程部
+          - 文件管理
+        ownerId:
+          type: string
+        progress:
+          type: integer
+          minimum: 0
+        startDate:
+          type: string
+          format: date
+          nullable: true
+        endDate:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - name
+    ProjectView:
+      type: object
+      properties:
+        colVis:
+          type: object
+          properties:
+            status:
+              type: boolean
+            owner:
+              type: boolean
+            priority:
+              type: boolean
+            team:
+              type: boolean
+            start:
+              type: boolean
+            end:
+              type: boolean
+            progress:
+              type: boolean
+        sort:
+          type: object
+          properties:
+            field:
+              type: string
+              enum:
+              - name
+              - priority
+              - progress
+              - startDate
+              - ownerName
+              - none
+            dir:
+              type: integer
+              enum:
+              - 1
+              - -1
+          required:
+          - field
+          - dir
+        filters:
+          type: object
+          properties:
+            status:
+              type: object
+              properties:
+                notstarted:
+                  type: boolean
+                progress:
+                  type: boolean
+                done:
+                  type: boolean
+          required:
+          - status
+        scope:
+          type: string
+          enum:
+          - all
+          - mine
+        view:
+          type: string
+          enum:
+          - board
+          - table
+          - gantt
+        columnConfig:
+          type: object
+          properties:
+            widths:
+              type: object
+              properties: {}
+            order:
+              type: array
+              items:
+                type: string
+            ganttScale:
+              type: integer
+              enum:
+              - 0
+              - 1
+            ganttStart:
+              type: string
+            ganttEnd:
+              type: string
+      required:
+      - colVis
+      - sort
+      - filters
+      - scope
+      - view
+    ProjectPatch:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 120
+        icon:
+          type: string
+          enum:
+          - ◇
+          - ◈
+          - ▦
+          - ✦
+          - ◎
+        description:
+          type: string
+          maxLength: 4000
+        status:
+          type: string
+          enum:
+          - notstarted
+          - progress
+          - done
+        priority:
+          type: string
+          enum:
+          - high
+          - mid
+          - low
+        team:
+          type: string
+          enum:
+          - ''
+          - 销售部
+          - 产品设计
+          - 人力资源
+          - 供应链
+          - 工程部
+          - 文件管理
+        ownerId:
+          type: string
+        progress:
+          type: integer
+          minimum: 0
+        startDate:
+          type: string
+          format: date
+          nullable: true
+        endDate:
+          type: string
+          format: date
+          nullable: true
+        archived:
+          type: boolean
+        favorite:
+          type: boolean
+      required: Any subset is applied; omitted members keep their stored value.

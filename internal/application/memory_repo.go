@@ -60,6 +60,7 @@ type memoryRepo struct {
 	audit                       []domain.AuditEvent
 	auditFileLinks              map[int64]map[string]bool
 	idempotency                 map[string][]byte
+	projectData                 *memoryProjects
 	failOnCommit                bool
 }
 
