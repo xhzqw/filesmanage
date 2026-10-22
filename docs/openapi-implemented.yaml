@@ -21490,7 +21490,7 @@ paths:
         description: Project id.
       responses:
         '200':
-          description: The row is archived rather than removed.
+          description: The row is archived rather than removed; sub-resources are kept.
           content:
             application/json:
               schema:
@@ -21503,9 +21503,12 @@ paths:
                   data:
                     type: object
                     properties:
+                      ok:
+                        type: boolean
                       archived:
                         type: boolean
                     required:
+                    - ok
                     - archived
                 required:
                 - ok

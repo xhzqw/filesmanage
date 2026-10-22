@@ -204,7 +204,9 @@ func (h *Handler) projectDelete(c *gin.Context) {
 		projectError(c, err)
 		return
 	}
-	projectOK(c, 200, gin.H{"archived": true})
+	// BACKEND-API.md declares Reply<{ok:true}> for delete and notes the row is
+	// archived rather than removed, so both facts are returned.
+	projectOK(c, 200, gin.H{"ok": true, "archived": true})
 }
 
 func (h *Handler) projectAddComment(c *gin.Context) {

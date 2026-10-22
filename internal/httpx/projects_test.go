@@ -367,7 +367,7 @@ func TestProjectRoutesAuthAndSuccessEnvelopes(t *testing.T) {
 	if rec = call(http.MethodDelete, "/api/projects/1/docs/file_1", "", true); rec.Code != 200 {
 		t.Fatalf("unlink broken: %d %s", rec.Code, rec.Body.String())
 	}
-	if rec = call(http.MethodDelete, "/api/projects/1", "", true); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"archived":true`) {
+	if rec = call(http.MethodDelete, "/api/projects/1", "", true); rec.Code != 200 || !strings.Contains(rec.Body.String(), `"archived":true`) || !strings.Contains(rec.Body.String(), `"ok":true`) {
 		t.Fatalf("delete envelope broken: %d %s", rec.Code, rec.Body.String())
 	}
 }
