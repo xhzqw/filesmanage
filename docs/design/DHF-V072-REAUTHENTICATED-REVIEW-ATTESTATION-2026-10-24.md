@@ -61,6 +61,27 @@ V0.7.2 新增“有当前账号密码再认证的审核确认凭证”。执行�
 | 全套 Go/Vet、Go 服务构建、Vite、OpenAPI 契约 | 实际退出码验证 |
 | 浏览器真实大小交互、正式电子签署法规/业务 SOP 验收 | **未执行，不得标记 PASS** |
 
+### 真实隔离环境执行结论
+
+2026-10-24 于 `root@10.144.144.1` 使用独立开发检出、临时 BlobStore 和 PostgreSQL 17 一次性数据库执行：
+
+| 项目 | 实际结果 |
+|---|---|
+| 全新数据库 migration `0001–0052`（包含两个 0034 和两个 0041 编号前缀的仓库历史文件） | **PASS：54/54** |
+| `TestDHFPilotRealPostgresSubmission` G5 专业与 Gate 原始提交、责任顺序、介入授权 | **PASS** |
+| 本人二次密码正确/错误、错误密码审计与每 15 分钟五次限流 | **PASS** |
+| 非本人代签、无同事务审计的 SQL 伪造、已签审事件更新/删除 | **PASS：均拒绝** |
+| MF 经 Gate 授权先行签审，但 Gate 不得在 SW 完成个人密码再认证前签审 | **PASS** |
+| SW 补签后总 Gate 本人再认证、相同签审操作重试 | **PASS** |
+| `TestDHFPilotFrozenPDFDOCXRealPostgres`、历史版本 v1/v2 与文件 ACL | **PASS** |
+| `go test ./internal/... -count=1`、`go vet ./internal/...`、server/worker/migrate 编译 | **PASS** |
+| TypeScript + Vite 生产构建 | **PASS**，保留既有 Three.js bundle 体积提示 |
+| 生成 OpenAPI 差异检查 | **PASS：137 paths / 166 operations** |
+| 既有验收矩阵合同检查 | **PASS：126 IDs，123 PASS、3 PARTIAL** |
+| 企业签名凭证、法定电子签署、真实浏览器大屏/笔记本/窄屏人工验收 | **NOT_RUN**，不能声称正式生产完成 |
+
+执行覆盖实际 PostgreSQL 的延迟审计约束、当前密码 bcrypt 校验、试点拒绝链路和底层文件 Blob 字节核对。**这不能替代签名合规、私钥防护、可信时间和最终 Gate 业务 SOP 的审批。**
+
 ## 6. NO-GO 和下一步
 
 企业有效签署仍需要正式授权的 SOP、可独立校验的签署凭证与密钥保护、可信签名时间及相应凭证撤销/寿命策略；之后在唯一 Gate finalization 事务中实现归口审批、整改复验正式关闭、责任回签、签署覆盖范围检查、CAS/outbox，以及与 CDW 文件受控发行状态机的明确边界。物理 Blob 留存/灾难恢复、安全/并发和真实浏览器验收同样是生产门禁。
