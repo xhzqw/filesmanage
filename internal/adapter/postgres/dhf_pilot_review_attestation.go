@@ -64,3 +64,21 @@ func(r *Repository)DHFPilotPersistAttestation(ctx context.Context,row ports.DHFP
  row.PolicySHA,row.ManifestSHA)
  return err
 }
+
+
+func(r *Repository)DHFPilotRecentAttestationAuthFailures(ctx context.Context,actorID string)(int,error){
+ var count int
+ err:=r.Q.QueryRow(ctx,`
+ SELECT count(*) FROM audit_events
+ WHERE actor_id=$1 AND event_type='dhf.pilot.review_auth_denied'
+   AND created_at > now()-interval '15 minutes' `,actorID).Scan(&count)
+ return count,err
+}
+func(r *Repository)DHFPilotAuditAttestationAuthFailure(ctx context.Context,actorID,taskID string)error{
+ _,err:=r.Q.Exec(ctx,`
+ INSERT INTO audit_events(actor_id,event_type,target_kind,target_id,outcome,details)
+ VALUES($1,'dhf.pilot.review_auth_denied','dhf_review_task',$2,'denied',
+  jsonb_build_object('authentication','password_reauthentication','reason','invalid_credential')) `,
+  actorID,taskID)
+ return err
+}
