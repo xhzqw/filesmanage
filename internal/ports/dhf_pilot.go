@@ -205,3 +205,55 @@ type DHFPilotReturnInboxRow struct {
  NewAttemptState string
  CanPrepare bool
 }
+
+
+// DHFPilotEarlyInterventionStore never grants formal signature authority.
+// It can only permit a later assigned SPECIALIST to record their own pilot
+// review while all earlier responsibility obligations remain outstanding.
+type DHFPilotEarlyInterventionStore interface {
+ DHFPilotBeginSubmission(context.Context) error
+ DHFPilotEarlyTargetForActor(context.Context,string,string)(DHFPilotEarlyTarget,error)
+ DHFPilotEarlyInterventionForTarget(context.Context,string)(DHFPilotEarlyInterventionRecord,error)
+ DHFPilotPersistEarlyIntervention(context.Context,DHFPilotEarlyInterventionRecord)error
+}
+type DHFPilotEarlyTarget struct{
+ TaskID string
+ SubmissionID string
+ ReviewKey string
+ StepOrdinal int
+ PolicySHA string
+ ManifestSHA string
+}
+type DHFPilotEarlyInterventionRecord struct {
+ ID string
+ TargetTaskID string
+ SubmissionID string
+ AuthorizedBy string
+ Reason string
+ IdempotencyKey string
+ RequestSHA string
+ PolicySHA string
+ ManifestSHA string
+}
+
+// DHFPilotDutyReadStore surfaces immutable responsibility obligations and
+// whether an early intervention was recorded; "reviewed" means trial review,
+// not an authorized enterprise electronic signature or released Stage Gate.
+type DHFPilotDutyReadStore interface {
+ DHFPilotBeginSnapshot(context.Context) error
+ DHFPilotDutiesForActor(context.Context,string,int)([]DHFPilotDutySnapshot,error)
+}
+type DHFPilotDutySnapshot struct {
+ SubmissionID string `json:"submissionId"`
+ ProjectID string `json:"projectId"`
+ StageID string `json:"stageId"`
+ TaskID string `json:"taskId"`
+ ReviewKey string `json:"reviewKey"`
+ StepOrdinal int `json:"stepOrdinal"`
+ ReviewerID string `json:"reviewerId"`
+ Status string `json:"status"`
+ EarlyIntervention bool `json:"earlyIntervention"`
+ InterventionReason string `json:"interventionReason,omitempty"`
+ OutstandingPrior int `json:"outstandingPrior"`
+ CanAuthorizeEarly bool `json:"canAuthorizeEarly"`
+}
