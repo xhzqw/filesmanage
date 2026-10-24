@@ -1396,6 +1396,37 @@ schema("DHFReturnInboxItem",obj({"decisionId":string(),"reviewKey":string(),"pro
 schema("DHFReturnInboxPage",obj({"items":arr(ref("DHFReturnInboxItem")),"trialOnly":boolean()},required=["items","trialOnly"]))
 add("GET","/api/workbench/dhf/returns",operation("List returned DHF review findings only for their original submitter","Workflow","dhfPilotReturns",security=SESSION,responses=dict([json_ok(ref("DHFReturnInboxPage"),"Owner-only return findings and correction status, maximum 100 items."),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("503",ERR["503"])])))
 
+schema("DHFDutySnapshot",obj({
+ "submissionId":string(),"projectId":string(),"stageId":string(),
+ "taskId":string(),"reviewKey":string(),"stepOrdinal":integer(minimum=1),
+ "reviewerId":string(),"status":string(),"earlyIntervention":boolean(),
+ "interventionReason":string(),"outstandingPrior":integer(minimum=0),
+ "canAuthorizeEarly":boolean(),
+},required=["submissionId","projectId","stageId","taskId","reviewKey","stepOrdinal",
+ "reviewerId","status","earlyIntervention","outstandingPrior","canAuthorizeEarly"]))
+schema("DHFDutyPage",obj({"items":arr(ref("DHFDutySnapshot")),"trialOnly":boolean()},
+ required=["items","trialOnly"]))
+schema("DHFEarlyInterventionInput",obj({
+ "reason":string("Specific sponsor's reason for reviewing out of order; upstream duty never waived."),
+ "idempotencyKey":string("Retry unchanged idempotency key."),
+},required=["reason","idempotencyKey"]))
+schema("DHFEarlyInterventionOutcome",obj({
+ "interventionId":string(),"targetTaskId":string(),"submissionId":string(),
+ "replayed":boolean(),"trialOnly":boolean(),"reason":string(),
+},required=["targetTaskId","trialOnly"]))
+add("GET","/api/workbench/dhf/duties",operation(
+ "Read immutable template-ordered G5 or G6 reviewer liabilities; completed trial opinions do not constitute signatures",
+ "Workflow","dhfPilotDutyChain",security=SESSION,
+ responses=dict([json_ok(ref("DHFDutyPage"),"Only for a participant assigned to the same frozen submission."),
+ resp("401",ERR["401"]),resp("403",ERR["403"]),resp("503",ERR["503"])])))
+add("POST","/api/workbench/dhf/tasks/{id}/early-intervention",operation(
+ "Record an assigned final Gate sponsor's immutable early-review intervention without waiving predecessor responsibilities",
+ "Workflow","dhfPilotAuthorizeEarlyReview",security=SESSION,
+ params=[id_param("id","Target specialty review task ID")],
+ request={"application/json":{"schema":ref("DHFEarlyInterventionInput")}},
+ responses=dict([json_ok(ref("DHFEarlyInterventionOutcome"),"Trial-only early review, not formal Gate approval."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
+
 # --- Approvals ---
 schema("ApprovalPage",obj({"items":arr(ref("Approval")),"nextCursor":string(),"hasMore":boolean(),"pendingCount":integer(minimum=0)},required=["items","nextCursor","hasMore","pendingCount"]))
 schema("ApprovalNotificationPage",obj({"items":arr(ref("ApprovalNotification")),"nextCursor":integer(minimum=0),"hasMore":boolean(),"unreadCount":integer(minimum=0)},required=["items","nextCursor","hasMore","unreadCount"]))
