@@ -205,6 +205,32 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	}
 	seedG5("dhf_g5_unassigned")
 	if _, deleteErr:=pool.Exec(ctx,"DELETE FROM dhf_pilot_review_assignments WHERE project_id='dhf_project' AND stage_id='G5' AND review_key='G5-MF'");deleteErr==nil {t.Fatal("applied review assignment must not be erased")}
+	// G6 first design transfer is a DISTINCT Gate. Unconfigured reviewers
+	// must abort the entire submission, and filling the assignment allows a
+	// fresh transaction with the SAME idempotency key.
+	g6Policy,err:=json.Marshal(map[string]any{
+		"stage_id":"G6","conditional_allowed":false,
+		"requirements":[]dhf.RequirementPolicy{{ID:"DHF-REQ-001",Mandatory:true,Critical:true}},
+		"dependencies":[]dhf.DependencyPolicy{},
+		"specialties":[]dhf.SpecialtyPolicy{},
+	})
+	if err!=nil {t.Fatal(err)}
+	exec("INSERT INTO dhf_pilot_templates(id,stage_id,policy_body,policy_sha,status,approved_by,approved_at) VALUES('dhf_g6_tpl','G6',$1,$2,'published',$3,now())",g6Policy,sha(g6Policy),actorID)
+	exec("INSERT INTO dhf_pilot_baselines(project_id,stage_id,template_id,active) VALUES('dhf_project','G6','dhf_g6_tpl',true)")
+	exec("INSERT INTO dhf_pilot_attempts(id,project_id,stage_id,template_id,manifest_body,manifest_sha,created_by) VALUES('dhf_g6_attempt','dhf_project','G6','dhf_g6_tpl',$1,$2,$3)",manifestBytes,sha(manifestBytes),actorID)
+	missingReviewer,missingReviewerErr:=service.DHFPilotSubmit(ctx,actor,"dhf_g6_attempt","dhf-g6-transfer-0001")
+	if missingReviewerErr==nil || missingReviewer.Verdict!=dhf.Deny {
+		t.Fatalf("G6 submission without review assignment must fail: %+v %v",missingReviewer,missingReviewerErr)
+	}
+	if err=pool.QueryRow(ctx,"SELECT state FROM dhf_pilot_attempts WHERE id='dhf_g6_attempt'").Scan(&state);err!=nil || state!="preparing" {
+		t.Fatalf("G6 failed reviewer validation failed to roll back: %q %v",state,err)
+	}
+	exec("INSERT INTO dhf_pilot_review_assignments(project_id,stage_id,review_key,reviewer_id,configured_by) VALUES('dhf_project','G6','__gate__','dhf_gate_reviewer',$1)",actorID)
+	g6Result,g6Err:=service.DHFPilotSubmit(ctx,actor,"dhf_g6_attempt","dhf-g6-transfer-0001")
+	if g6Err!=nil || g6Result.Verdict!=dhf.Allow {t.Fatalf("configured G6 gate submit: %+v %v",g6Result,g6Err)}
+	if err=pool.QueryRow(ctx,"SELECT count(*) FROM dhf_pilot_workbench_tasks WHERE submission_id=$1 AND stage_id='G6' AND review_key='__gate__' AND reviewer_id='dhf_gate_reviewer'",g6Result.SubmissionID).Scan(&count);err!=nil || count!=1 {
+		t.Fatalf("G6 Gate task was not created atomically: %d %v",count,err)
+	}
 	// Real physical tampering must be detected even if DB Blob rows and
 	// immutable file_versions still report the original checksum.
 	path,err:=physicalStore.PathFor(storageKey)
