@@ -7619,6 +7619,117 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/attestations:
+    get:
+      summary: List authenticated review confirmation records for their assigned reviewer only; this is not Gate acceptance
+      operationId: dhfPilotAttestationInbox
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Scoped signed and unsigned reviewed tasks with frozen hashes.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFReviewAttestationInboxPage'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/tasks/{id}/attest:
+    post:
+      summary: Reauthenticate assigned reviewer password in transaction and record immutable bounded signed intent
+      operationId: dhfPilotAttestReview
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Original assigned reviewer task ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DHFReviewAttestationInput'
+      responses:
+        '200':
+          description: Trial-only authenticated attestation, not legal electronic signature.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFReviewAttestationOutcome'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Per-account recent password reauthentication failure rate limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/approvals:
     get:
       summary: List approvals visible to the caller
@@ -12775,6 +12886,108 @@ components:
       required:
       - targetTaskId
       - trialOnly
+    DHFReviewAttestationInput:
+      type: object
+      properties:
+        decisionId:
+          type: string
+          description: Immutable reviewer decision being explicitly confirmed.
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          maxLength: 1024
+        signIntent:
+          type: string
+          description: Exact per-reviewer attestation of frozen decision and evidence.
+        idempotencyKey:
+          type: string
+          description: Retry same attestation intent using unchanged key.
+      required:
+      - decisionId
+      - password
+      - signIntent
+      - idempotencyKey
+    DHFReviewAttestationOutcome:
+      type: object
+      properties:
+        attestationId:
+          type: string
+        taskId:
+          type: string
+        reviewDecisionId:
+          type: string
+        contentSha:
+          type: string
+        replayed:
+          type: boolean
+        trialOnly:
+          type: boolean
+        reason:
+          type: string
+      required:
+      - taskId
+      - trialOnly
+    DHFReviewAttestationInboxItem:
+      type: object
+      properties:
+        taskId:
+          type: string
+        decisionId:
+          type: string
+        submissionId:
+          type: string
+        projectId:
+          type: string
+        stageId:
+          type: string
+        reviewKey:
+          type: string
+        outcome:
+          type: string
+        reviewComment:
+          type: string
+        policySha:
+          type: string
+        manifestSha:
+          type: string
+        outstandingPrior:
+          type: integer
+          minimum: 0
+        canAttest:
+          type: boolean
+        attestationId:
+          type: string
+        contentSha:
+          type: string
+      required:
+      - taskId
+      - decisionId
+      - submissionId
+      - projectId
+      - stageId
+      - reviewKey
+      - outcome
+      - reviewComment
+      - policySha
+      - manifestSha
+      - outstandingPrior
+      - canAttest
+    DHFReviewAttestationInboxPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFReviewAttestationInboxItem'
+        trialOnly:
+          type: boolean
+        signIntent:
+          type: string
+      required:
+      - items
+      - trialOnly
+      - signIntent
     ApprovalPage:
       type: object
       properties:
