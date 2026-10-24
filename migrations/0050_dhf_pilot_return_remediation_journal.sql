@@ -115,6 +115,33 @@ CREATE CONSTRAINT TRIGGER dhf_pilot_remediation_event_atomic
  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
  EXECUTE FUNCTION dhf_pilot_remediation_require_open_event();
 
+-- An attempt is normally editable while preparing; after opening an
+-- immutable remediation case its snapshot hash is a recorded audit fact.
+-- Freeze identity immediately even though the new attempt has not submitted.
+CREATE OR REPLACE FUNCTION dhf_pilot_guard_linked_remediation_attempt()
+RETURNS trigger LANGUAGE plpgsql AS $
+BEGIN
+ IF EXISTS(SELECT 1 FROM dhf_pilot_remediation_cases
+   WHERE new_attempt_id=OLD.id)
+ AND (
+    NEW.manifest_body IS DISTINCT FROM OLD.manifest_body OR
+    NEW.manifest_sha IS DISTINCT FROM OLD.manifest_sha OR
+    NEW.project_id IS DISTINCT FROM OLD.project_id OR
+    NEW.stage_id IS DISTINCT FROM OLD.stage_id OR
+    NEW.template_id IS DISTINCT FROM OLD.template_id OR
+    NEW.created_by IS DISTINCT FROM OLD.created_by
+ ) THEN
+   RAISE EXCEPTION 'DHF remediation-linked attempt evidence cannot be rewritten'
+     USING ERRCODE='23514';
+ END IF;
+ RETURN NEW;
+END;
+$;
+CREATE TRIGGER dhf_pilot_rework_attempt_manifest_immutable
+ BEFORE UPDATE OF manifest_body,manifest_sha,project_id,stage_id,template_id,created_by
+ ON dhf_pilot_attempts FOR EACH ROW
+ EXECUTE FUNCTION dhf_pilot_guard_linked_remediation_attempt();
+
 -- Neither remediation cases nor their events can be edited/deleted.
 CREATE TRIGGER dhf_pilot_remediation_case_immutable
  BEFORE UPDATE OR DELETE ON dhf_pilot_remediation_cases
