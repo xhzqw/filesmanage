@@ -1,6 +1,6 @@
 import {useEffect,useState} from "react";
 import {request} from "../../shared/http";
-import {RareButton} from "../../shared/ui/rare";
+import {RareButton,RareInput} from "../../shared/ui/rare";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {errorCopy} from "../../shared/errors";
 import "./dhfPilotInbox.css";
@@ -47,7 +47,7 @@ export function DHFPilotInbox(){
     <RareButton type="button" className="dhf-pilot-refresh" onClick={()=>setRefresh(i=>i+1)}>刷新</RareButton>
    </div>
    <div className="dhf-pilot-filter">
-    <input aria-label="筛选 DHF 审核任务" placeholder="搜索项目、阶段或提交" value={query} onChange={e=>setQuery(e.target.value)}/>
+    <RareInput type="search" aria-label="筛选 DHF 审核任务" placeholder="搜索项目、阶段或提交" value={query} onChange={e=>setQuery(e.target.value)}/>
    </div>
    {loading?<div className="dhf-pilot-empty"><BrandLoadingLabel>正在加载</BrandLoadingLabel></div>:
     error?<div className="dhf-pilot-empty" role="alert">{error}</div>:
