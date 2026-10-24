@@ -39,3 +39,42 @@ func(r *Repository)DHFPilotVerificationCandidate(ctx context.Context,caseID,acto
  if errors.Is(err,pgx.ErrNoRows){return x,ports.ErrRowMissing}
  return x,err
 }
+
+func(r *Repository)DHFPilotExistingVerification(ctx context.Context,caseID string)(ports.DHFPilotVerificationRecord,error){
+ var row ports.DHFPilotVerificationRecord
+ err:=r.Q.QueryRow(ctx,`
+ SELECT id,case_id,original_return_attestation_id,revised_submission_id,
+  verifier_id,comment,original_manifest_sha,revised_manifest_sha,
+  revised_policy_sha,idempotency_key,request_sha
+ FROM dhf_pilot_remediation_verifications WHERE case_id=$1`,caseID).
+ Scan(&row.ID,&row.CaseID,&row.OriginalReturnAttestationID,
+  &row.RevisedSubmissionID,&row.VerifierID,&row.Comment,
+  &row.OriginalManifestSHA,&row.RevisedManifestSHA,&row.RevisedPolicySHA,
+  &row.IdempotencyKey,&row.RequestSHA)
+ if errors.Is(err,pgx.ErrNoRows){return row,ports.ErrRowMissing}
+ return row,err
+}
+func(r *Repository)DHFPilotPersistVerification(ctx context.Context,rec ports.DHFPilotVerificationRecord)error{
+ if rec.ID==""||rec.CaseID==""||rec.VerifierID==""||rec.RevisedSubmissionID==""{
+  return errors.New("missing DHF corrected case verification")
+ }
+ _,err:=r.Q.Exec(ctx,`
+ INSERT INTO dhf_pilot_remediation_verifications(
+ id,case_id,original_return_attestation_id,revised_submission_id,
+ verifier_id,comment,original_manifest_sha,revised_manifest_sha,
+ revised_policy_sha,idempotency_key,request_sha)
+ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+ rec.ID,rec.CaseID,rec.OriginalReturnAttestationID,
+ rec.RevisedSubmissionID,rec.VerifierID,rec.Comment,
+ rec.OriginalManifestSHA,rec.RevisedManifestSHA,rec.RevisedPolicySHA,
+ rec.IdempotencyKey,rec.RequestSHA)
+ if err!=nil{return err}
+ _,err=r.Q.Exec(ctx,`
+ INSERT INTO audit_events(actor_id,event_type,target_kind,target_id,request_id,outcome,details)
+ VALUES($1,'dhf.pilot.remediation.verified','dhf_remediation',$2,$3,'success',
+ jsonb_build_object('verificationId',$4::text,'originalReturnAttestationId',$5::text,
+  'revisedSubmissionId',$6::text,'revisedManifestSha',$7::text))`,
+ rec.VerifierID,rec.CaseID,rec.IdempotencyKey,rec.ID,
+ rec.OriginalReturnAttestationID,rec.RevisedSubmissionID,rec.RevisedManifestSHA)
+ return err
+}
