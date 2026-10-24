@@ -44,8 +44,8 @@ export function DHFRemediationInbox(){
   void Promise.all(fileIds.map(async fileId=>{
    try{
     const meta=await fileApi.meta(fileId);
-    const newest=meta.versions.reduce((max,item)=>item.versionSeq>max.versionSeq?item:max,meta.versions[0]);
-    if(newest?.versionSeq>0)return [fileId,{seq:newest.versionSeq,sha:newest.sha256,name:meta.file.name}] as const;
+    const newest=[...meta.versions].sort((a,b)=>b.versionSeq-a.versionSeq)[0];
+    if(newest&&newest.versionSeq>0)return [fileId,{seq:newest.versionSeq,sha:newest.sha256,name:meta.file.name}] as const;
    }catch{/* Original file access may have been revoked; no selection offered. */}
    return null;
   })).then(result=>{
