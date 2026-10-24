@@ -516,7 +516,7 @@ VALUES('dhf-no-auth-audit',$1,$2,$3,'dhf_sw_reviewer','recommend_pass',$4,
 	}
 	nonOperator, nonOperatorErr := service.DHFPilotCredentialList(ctx, signer("dhf_mf_reviewer"))
 	if nonOperatorErr != nil || nonOperator.CanManage || len(nonOperator.Items) != 0 {
-		t.Fatalf("ung­ranted user could manage credentials: %+v %v", nonOperator, nonOperatorErr)
+		t.Fatalf("ungranted user could manage credentials: %+v %v", nonOperator, nonOperatorErr)
 	}
 	managementPub, _, managementErr := ed25519.GenerateKey(rand.Reader)
 	if managementErr != nil {
@@ -530,6 +530,17 @@ VALUES('dhf-no-auth-audit',$1,$2,$3,'dhf_sw_reviewer','recommend_pass',$4,
 		ExpiresAt:        time.Now().Add(time.Hour),
 		AuthorizationRef: "isolated-operator-authorization-reference",
 		Password:         reviewerPassword, IdempotencyKey: "dhf-register-api-test-001",
+	}
+	wrongOperatorInput := registerInput
+	wrongOperatorInput.Password = "incorrect-test-password"
+	wrongOperatorInput.IdempotencyKey = "dhf-register-api-wrong-password-001"
+	wrongOperator, wrongOperatorErr := service.DHFPilotRegisterCredential(ctx, operator, wrongOperatorInput)
+	if wrongOperatorErr != nil || wrongOperator.Reason != "DHF_REAUTH_FAILED" {
+		t.Fatalf("credential operator bypassed password check: %+v %v", wrongOperator, wrongOperatorErr)
+	}
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM audit_events
+WHERE event_type='dhf.pilot.credential_auth_denied' AND actor_id=$1`, actorID).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("credential operator password denial not audited: %d %v", count, err)
 	}
 	registered, registerErr := service.DHFPilotRegisterCredential(ctx, operator, registerInput)
 	if registerErr != nil || registered.ID == "" || registered.Replayed {
@@ -1228,6 +1239,50 @@ VALUES('dhf-unlogged-verification',$1,$2,$3,'dhf_gate_reviewer',$4,$5,$6,$7,
 	}
 	if _, err := pool.Exec(ctx, "UPDATE dhf_pilot_attempts SET state='reviewing' WHERE id='dhf_attempt_1'"); err == nil {
 		t.Fatal("pilot accepted unimplemented review state")
+	}
+	// Independent emergency operator de-authorization (not the signer's
+	// credential revoke). It must be immutable, audited and immediately block
+	// new issuer actions even though an original grant has not expired.
+	if _, unAudited := pool.Exec(ctx, `
+INSERT INTO dhf_pilot_credential_operator_revocations(id,grant_id,revoked_by,reason)
+VALUES('dhf-operator-unaudited-revoke','dhf-operator-grant','dhf_sw_reviewer',
+'missing required independent audit')`); unAudited == nil {
+		t.Fatal("operator grant could be revoked without a matching audit")
+	}
+	operatorRevokeTx, operatorRevokeErr := pool.Begin(ctx)
+	if operatorRevokeErr != nil {
+		t.Fatal(operatorRevokeErr)
+	}
+	defer operatorRevokeTx.Rollback(ctx)
+	if _, err = operatorRevokeTx.Exec(ctx, `
+INSERT INTO dhf_pilot_credential_operator_revocations(id,grant_id,revoked_by,reason)
+VALUES('dhf-operator-grant-revocation','dhf-operator-grant','dhf_sw_reviewer',
+'independent final test mandate removal')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = operatorRevokeTx.Exec(ctx, `
+INSERT INTO audit_events(actor_id,event_type,target_kind,target_id,request_id,outcome,details)
+VALUES('dhf_sw_reviewer','dhf.pilot.credential.operator_revoked','dhf_credential_operator',
+'dhf-operator-grant','dhf-operator-grant-revoked-test-001','trial_only',
+jsonb_build_object('revokeId','dhf-operator-grant-revocation'))`); err != nil {
+		t.Fatal(err)
+	}
+	if err = operatorRevokeTx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	afterGrantRevoke, afterGrantRevokeErr := service.DHFPilotCredentialList(ctx, operator)
+	if afterGrantRevokeErr != nil || afterGrantRevoke.CanManage || len(afterGrantRevoke.Items) != 0 {
+		t.Fatalf("revoked operator mandate still exposed signing custody: %+v %v", afterGrantRevoke, afterGrantRevokeErr)
+	}
+	afterGrantRevokeRegister := application.DHFPilotRegisterCredentialRequest{
+		SignerID: "dhf_gate_reviewer", PublicKeyBase64: base64.StdEncoding.EncodeToString(publicKey),
+		ValidFrom: time.Now().Add(-time.Minute), ExpiresAt: time.Now().Add(time.Hour),
+		AuthorizationRef: "post-revocation-attempt-is-forbidden", Password: reviewerPassword,
+		IdempotencyKey: "dhf-operator-post-revocation-denied",
+	}
+	deniedPostRevoke, deniedPostRevokeErr := service.DHFPilotRegisterCredential(ctx, operator, afterGrantRevokeRegister)
+	if deniedPostRevokeErr != nil || deniedPostRevoke.Reason != "DHF_CREDENTIAL_OPERATOR_DENIED" {
+		t.Fatalf("revoked operator successfully registered a credential: %+v %v", deniedPostRevoke, deniedPostRevokeErr)
 	}
 	fmt.Println("DHF_V064_DB_INTEGRATION_PASS")
 }
