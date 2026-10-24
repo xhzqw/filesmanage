@@ -257,3 +257,38 @@ type DHFPilotDutySnapshot struct {
  OutstandingPrior int `json:"outstandingPrior"`
  CanAuthorizeEarly bool `json:"canAuthorizeEarly"`
 }
+
+
+// DHFPilotAttestationStore is intentionally separate from file seals and
+// non-signing recommendations. Authentication occurs anew inside the same
+// SERIALIZABLE transaction and no password/password hash is persisted.
+type DHFPilotAttestationStore interface {
+ DHFPilotBeginSubmission(context.Context) error
+ DHFPilotAttestationDecisionForSigner(context.Context,string,string)(DHFPilotAttestationDecision,error)
+ DHFPilotAttestationForTask(context.Context,string)(DHFPilotAttestationRecord,error)
+ DHFPilotPersistAttestation(context.Context,DHFPilotAttestationRecord) error
+}
+type DHFPilotAttestationDecision struct {
+ DecisionID string
+ TaskID string
+ SubmissionID string
+ ReviewerID string
+ Outcome string
+ Comment string
+ PolicySHA string
+ ManifestSHA string
+}
+type DHFPilotAttestationRecord struct {
+ ID string
+ ReviewDecisionID string
+ TaskID string
+ SubmissionID string
+ SignerID string
+ Outcome string
+ SignIntent string
+ PolicySHA string
+ ManifestSHA string
+ ContentSHA string
+ IdempotencyKey string
+ RequestSHA string
+}
