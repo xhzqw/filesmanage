@@ -10,6 +10,8 @@ type DHFTask={
  reviewKey:string;status:string;gateReady:boolean;assignedAt:string;
 };
 type TaskResponse={items:DHFTask[];trialOnly:boolean};
+type FrozenEvidence={requirementId:string;fileId:string;fileName:string;versionSeq:number;sha256:string;sizeBytes:number};
+type EvidencePreview={name:string;content:string;textual:boolean;renderer:string;sha256:string;truncated:boolean;fixedVersionVerified:boolean};
 const displayStage:Record<string,string>={
  G5:"G5 · 设计开发输出",G6:"G6 · 首次设计开发转移",
 };
@@ -34,6 +36,12 @@ export function DHFPilotInbox(){
  const pendingIntent=useRef<{taskId:string;outcome:string;comment:string;key:string}|null>(null);
  const [feedback,setFeedback]=useState("");
  const [recommendError,setRecommendError]=useState("");
+ const [evidence,setEvidence]=useState<FrozenEvidence[]>([]);
+ const [evidenceLoading,setEvidenceLoading]=useState(false);
+ const [evidenceError,setEvidenceError]=useState("");
+ const [preview,setPreview]=useState<{requirementId:string;result:EvidencePreview}|null>(null);
+ const [previewError,setPreviewError]=useState("");
+ const [previewBusy,setPreviewBusy]=useState(false);
  useEffect(()=>{
   let alive=true;
   setLoading(true);
@@ -47,6 +55,28 @@ export function DHFPilotInbox(){
  const visible=tasks.filter(task=>[task.stageId,task.reviewKey,task.projectId,task.submissionId].some(value=>value.toLowerCase().includes(query.trim().toLowerCase())));
  const active=visible.find(task=>task.id===selected)??visible[0];
  useEffect(()=>{setComment("");setRecommendError("");},[active?.id]);
+ useEffect(()=>{
+  let valid=true;
+  setEvidence([]);setEvidenceError("");setPreview(null);setPreviewError("");
+  if(!active){setEvidenceLoading(false);return}
+  setEvidenceLoading(true);
+  request<{items:FrozenEvidence[]}>("/workbench/dhf/tasks/"+encodeURIComponent(active.id)+"/evidence")
+   .then(result=>{if(valid)setEvidence(result.items??[]);})
+   .catch(err=>{if(valid)setEvidenceError(errorCopy(err,"冻结证据加载失败或无文件预览权限"));})
+   .finally(()=>{if(valid)setEvidenceLoading(false)});
+  return()=>{valid=false};
+ },[active?.id]);
+ async function showFixedEvidence(requirementId:string){
+  if(!active||previewBusy)return;
+  setPreview(null);setPreviewError("");setPreviewBusy(true);
+  try{
+   const result=await request<EvidencePreview>("/workbench/dhf/tasks/"+encodeURIComponent(active.id)+
+    "/evidence/"+encodeURIComponent(requirementId)+"/preview");
+   if(!result.fixedVersionVerified)throw new Error("没有确认受控文件的固定版本");
+   setPreview({requirementId,result});
+  }catch(err){setPreviewError(errorCopy(err,"受控版本校验失败或无权限"))}
+  finally{setPreviewBusy(false)}
+ }
  async function recommend(outcome:"recommend_pass"|"recommend_return"){
   if(!active||busy)return;
   setBusy(true);setRecommendError("");setFeedback("");
@@ -100,6 +130,27 @@ export function DHFPilotInbox(){
        <div><dt>派发时间</dt><dd>{new Date(active.assignedAt).toLocaleString("zh-CN")}</dd></div>
      </dl>
      {active.reviewKey==="__gate__"&&!active.gateReady?<p className="dhf-pilot-gate-wait">该阶段的专业复核尚未全部完成，暂不能提出总 Gate 通过建议。</p>:null}
+     <section className="dhf-pilot-evidence" aria-label="提交时冻结的证据">
+      <h3>冻结证据</h3>
+      {evidenceLoading?<p>正在核对证据清单…</p>:
+       evidenceError?<p role="alert">{evidenceError}</p>:
+       evidence.length===0?<p>该提交未绑定可查看的文件证据</p>:
+       <div className="dhf-pilot-evidence-list">{evidence.map(item=><div className="dhf-pilot-evidence-item" key={item.requirementId}>
+        <strong>{item.fileName}</strong>
+        <span>要求 {item.requirementId} · 固定版本 v{item.versionSeq}</span>
+        <code title="证据 SHA-256">{item.sha256}</code>
+        <RareButton type="button" disabled={previewBusy} onClick={()=>void showFixedEvidence(item.requirementId)}>
+         校验并查看固定版本
+        </RareButton>
+       </div>)}</div>}
+      {previewError?<p role="alert">{previewError}</p>:null}
+      {preview?<div className="dhf-pilot-evidence-preview" role="region" aria-label="受控证据预览">
+       <strong>{preview.result.name} · 内容校验通过</strong>
+       {preview.result.textual?<pre>{preview.result.content}</pre>:
+         <p>原始字节及摘要已核验；此类型不能用摘要页面代替完整的受控排版预览。</p>}
+       {preview.result.truncated?<p>此处仅显示有限长度的文本预览，完整原件仍按固定版本保存。</p>:null}
+      </div>:null}
+     </section>
      <div className="dhf-pilot-opinion">
       <RareTextarea aria-label="试点复核意见" value={comment} onChange={e=>setComment(e.target.value)}
        placeholder="记录复核说明；建议退回时必须填写原因" rows={3}/>
