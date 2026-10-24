@@ -2,6 +2,13 @@
 
 Status: DRAFT / NOT PRODUCTION ENABLED, 2026-10-24.
 
+## Documentation criteria (must-read first)
+
+- [Engineering documentation standard](../DEVELOPMENT-DOCUMENTATION-STANDARD.md): identity, status, evidence, change control and release claims.
+- [DHF development document criteria](DHF-DESIGN-DEVELOPMENT-DOCUMENT-CRITERIA-v0.1.md): exact G1–G9 titles/lines, G5 specialties, G6/G8 distinction, form-code collisions, document evidence and review gates.
+- **Review warning (2026-10-24):** the V0.6 Go evaluator is a *partial policy prototype*, **not** a complete fail-closed authorization mechanism. A code review found P0 gaps for omitted requirement/dependency completeness, action/state validity, remediation linkage and specialty-submission identity. Never wire its `Allow` into a production approval, file-issuance or project gate endpoint until those gaps, trusted snapshot construction and integration tests are closed.
+- Both standards are currently drafts on the development branch; their checklists do not constitute approval of any original business SOP.
+
 ## 1. Source and exact scope
 
 - Source: `产品设计开发DHF_1-9阶段_XMind大纲.txt`, SHA-256 `c16d3c70a0687d363c0d33322d16900f89b49ae02160afb3b9b7c3457a4b097b`.
