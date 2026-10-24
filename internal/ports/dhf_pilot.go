@@ -44,3 +44,37 @@ type DHFPilotVersionFact struct {
 	Seq           int
 	Sha256        string
 }
+
+
+// DHFPilotSubmissionStore is implemented only by a WRITE transaction. It
+// deliberately does not implement formal Gate approval or document issuance.
+type DHFPilotSubmissionStore interface {
+	DHFPilotSnapshotStore
+	DHFPilotBeginSubmission(context.Context) error
+	DHFPilotLockAttempt(context.Context,string) error
+	DHFPilotSubmissionForAttempt(context.Context,string) (DHFPilotSubmissionRecord,error)
+	DHFPilotPersistSubmission(context.Context,DHFPilotSubmissionRecord,[]DHFPilotEvidencePin) error
+}
+
+// DHFPilotEvidencePin binds one manifest requirement to the already verified
+// immutable file-version/blob tuple, never the mutable current version.
+type DHFPilotEvidencePin struct {
+	RequirementID string
+	FileID string
+	VersionSeq int
+	BlobID string
+	Sha256 string
+}
+
+type DHFPilotSubmissionRecord struct {
+	ID string
+	AttemptID string
+	ProjectID string
+	StageID string
+	TemplateID string
+	SubmittedBy string
+	IdempotencyKey string
+	RequestSHA string
+	PolicySHA string
+	ManifestSHA string
+}
