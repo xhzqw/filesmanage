@@ -327,6 +327,7 @@ type DHFPilotRemediationVerificationStore interface {
  DHFPilotBeginSubmission(context.Context) error
  DHFPilotVerificationCandidate(context.Context,string,string)(DHFPilotVerificationCandidate,error)
  DHFPilotExistingVerification(context.Context,string)(DHFPilotVerificationRecord,error)
+ DHFPilotVerificationFrozenEvidence(context.Context,string,string)([]DHFPilotEvidencePin,error)
  DHFPilotPersistVerification(context.Context,DHFPilotVerificationRecord)error
  DHFPilotRecentAttestationAuthFailures(context.Context,string)(int,error)
  DHFPilotAuditAttestationAuthFailure(context.Context,string,string)error
