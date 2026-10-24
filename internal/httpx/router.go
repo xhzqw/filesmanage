@@ -215,6 +215,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.POST("/files/:id/lock/renew", h.renewLock)
 	api.DELETE("/files/:id/lock", h.releaseLock)
 	api.GET("/files/:id/lock", h.lockStatus)
+	api.GET("/workbench/dhf/tasks", h.dhfPilotWorkbenchTasks)
 	api.GET("/approvals", h.listApprovals)
 	api.GET("/approvals/:id", h.getApprovalDetail)
 	api.GET("/approvals/:id/draft", h.downloadApprovalDraft)
