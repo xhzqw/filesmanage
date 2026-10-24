@@ -109,6 +109,7 @@ func TestConditionalGateRequiresAuthorizedNoncriticalRemediation(t *testing.T) {
 		ID: "REQ-G5-SW-001", Applicability: Applicable, Mandatory: true,
 		Critical: false, ConditionEligible: true,
 	}
+	in.OpenRemediations = 1
 	in.Conditional = &ConditionalPermission{
 		TemplateEnabled: true, DecisionAuthorized: true,
 		Expiry: pilotNow.Add(24*time.Hour),
@@ -116,6 +117,9 @@ func TestConditionalGateRequiresAuthorizedNoncriticalRemediation(t *testing.T) {
 		RemediationRequirementIDs: []string{"REQ-G5-SW-001"},
 	}
 	requireDecision(t, Evaluate(in), LimitedAllow, "")
+	in.OpenRemediations = 0
+	requireDecision(t, Evaluate(in), Deny, "DHF_NO_CONDITIONAL_REMEDIATION")
+	in.OpenRemediations = 1
 	in.Conditional.DecisionAuthorized = false
 	requireDecision(t, Evaluate(in), Deny, "DHF_CONDITIONAL_UNAUTHORIZED")
 	in.Conditional.DecisionAuthorized = true
