@@ -376,3 +376,42 @@ type DHFPilotVerificationInboxRow struct{
  ReadyToVerify bool `json:"readyToVerify"`
  VerificationID string `json:"verificationId,omitempty"`
 }
+
+ 
+// Gate candidates are signed PILOT records only: stage position cannot be
+// accepted/issued without separately approved corporate signing policy.
+type DHFPilotGateCandidateStore interface{
+ DHFPilotBeginSubmission(context.Context)error
+ DHFPilotGateCandidateForSigner(context.Context,string,string)(DHFPilotGateCandidateSource,error)
+ DHFPilotExistingGateCandidate(context.Context,string)(DHFPilotGateCandidateRecord,error)
+ DHFPilotGateEvidenceForSigner(context.Context,string,string)([]DHFPilotEvidencePin,error)
+ DHFPilotPersistGateCandidate(context.Context,DHFPilotGateCandidateRecord)error
+}
+type DHFPilotGateCandidateSource struct{
+ SubmissionID string
+ AttemptID string
+ ProjectID string
+ StageID string
+ TemplateID string
+ SignerID string
+ GateAttestationID string
+ PolicySHA string
+ ManifestSHA string
+}
+type DHFPilotGateCandidateRecord struct{
+ ID string
+ SubmissionID string
+ AttemptID string
+ ProjectID string
+ StageID string
+ TemplateID string
+ GateAttestationID string
+ SignerID string
+ PolicySHA string
+ ManifestSHA string
+ DecisionPayloadSHA string
+ TrustedKeySHA string
+ Signature []byte
+ IdempotencyKey string
+ RequestSHA string
+}
