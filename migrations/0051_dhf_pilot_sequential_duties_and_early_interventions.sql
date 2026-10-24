@@ -86,6 +86,7 @@ BEGIN
     AND s.submitted_by<>NEW.authorized_by
     AND s.policy_sha=NEW.policy_sha AND s.manifest_sha=NEW.manifest_sha
     AND pol.status='published' AND project.state='active'
+    AND baseline.active AND baseline.template_id=s.template_id
     AND u.disabled_at IS NULL
     AND EXISTS(SELECT 1 FROM dhf_pilot_members member
        WHERE member.project_id=s.project_id AND member.user_id=NEW.authorized_by)
@@ -99,6 +100,8 @@ BEGIN
  JOIN dhf_pilot_submissions s ON s.id=target.submission_id
  JOIN dhf_pilot_templates pol ON pol.id=s.template_id
  JOIN dhf_pilot_projects project ON project.id=s.project_id
+ JOIN dhf_pilot_baselines baseline ON baseline.project_id=s.project_id
+   AND baseline.stage_id=s.stage_id
  JOIN users u ON u.id=NEW.authorized_by
  JOIN dhf_pilot_workbench_tasks gate ON gate.submission_id=target.submission_id AND gate.review_key='__gate__'
  WHERE target.task_id=NEW.target_task_id;
