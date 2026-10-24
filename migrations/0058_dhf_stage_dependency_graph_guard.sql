@@ -60,6 +60,7 @@ BEGIN
     jsonb_array_length(doc->'dependencies')>256 OR
     jsonb_typeof(doc->'requirements') IS DISTINCT FROM 'array' OR
     jsonb_array_length(doc->'requirements')=0 OR
+    jsonb_array_length(doc->'requirements')>1024 OR
     jsonb_typeof(doc->'conditional_allowed') IS DISTINCT FROM 'boolean'
   THEN
    RAISE EXCEPTION 'active DHF baseline missing full stage dependency policy'
@@ -70,11 +71,14 @@ BEGIN
   FOR edge IN SELECT value FROM jsonb_array_elements(doc->'dependencies') LOOP
    edge_predecessor:=edge->>'PredecessorStage';
    guarded:=edge->>'GuardedAction';
-   IF edge->>'ID' IS NULL OR btrim(edge->>'ID')='' OR
+   IF jsonb_typeof(edge) IS DISTINCT FROM 'object' OR
+     edge->>'ID' IS NULL OR btrim(edge->>'ID')='' OR
+     length(edge->>'ID')>160 OR
      edge->>'ID'=ANY(edge_ids) OR
      edge_predecessor IS NULL OR edge_predecessor NOT IN
        ('G1','G2','G3','G4','G5','G6','G7','G8','G9') OR
      edge_predecessor=node.stage_id OR
+     guarded IS NULL OR
      guarded NOT IN ('prepare','submit','conditional_approve','finalize','issue_document')
    THEN
     RAISE EXCEPTION 'DHF dependency edge is invalid, duplicated or self-linked'
@@ -85,6 +89,10 @@ BEGIN
       USING ERRCODE='23514';
    END IF;
    conditional:=(edge->>'AllowConditional')::boolean;
+   IF conditional AND (doc->>'conditional_allowed')::boolean IS DISTINCT FROM TRUE THEN
+    RAISE EXCEPTION 'DHF target template did not authorize conditional-scope proposal'
+      USING ERRCODE='23514';
+   END IF;
    IF conditional AND guarded NOT IN ('prepare','submit') THEN
     RAISE EXCEPTION 'DHF conditional edge cannot grant issue or finalize action'
       USING ERRCODE='23514';
@@ -125,7 +133,9 @@ BEGIN
  -- spanning more than two stages.
  IF EXISTS (
   WITH RECURSIVE edges AS (
-    SELECT n->>'stageId' AS stage_id,d->>'predecessorStage' AS predecessor
+    -- Duplicate direct edges are legitimate named obligations but MUST NOT
+    -- expand the graph walk combinatorially. At most 9 distinct stages exist.
+    SELECT DISTINCT n->>'stageId' AS stage_id,d->>'predecessorStage' AS predecessor
     FROM jsonb_array_elements(graph) n
     CROSS JOIN LATERAL jsonb_array_elements(n->'dependencies') d
   ), walk AS (
