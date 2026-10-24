@@ -109,5 +109,27 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	if err!=nil || denied.Verdict!=dhf.Deny {t.Fatalf("revoked ACL was not enforced: %+v %v",denied,err)}
 	err=pool.QueryRow(ctx,"SELECT count(*) FROM dhf_pilot_submissions WHERE attempt_id='dhf_attempt_2'").Scan(&count)
 	if err!=nil || count!=0 {t.Fatalf("denied submit had DB side effects: %d %v",count,err)}
-	fmt.Println("DHF_V063_DB_INTEGRATION_PASS")
+	// The new bidirectional invariant blocks a "submitted" state that has
+	// no corresponding immutable journal entry.
+	seedAttempt("dhf_attempt_3")
+	if _, err := pool.Exec(ctx,
+		"UPDATE dhf_pilot_attempts SET state='submitted' WHERE id='dhf_attempt_3'"); err == nil {
+		t.Fatal("unsigned standalone submitted state was accepted")
+	}
+	if err=pool.QueryRow(ctx,
+		"SELECT state FROM dhf_pilot_attempts WHERE id='dhf_attempt_3'").Scan(&state); err!=nil || state!="preparing" {
+		t.Fatalf("standalone submitted state was not rolled back: %q %v",state,err)
+	}
+	// A DB reference must prohibit gc_pending and DELETE, even if an operator
+	// attempts manual SQL after submission; unreferenced blobs are unaffected.
+	if _, err:=pool.Exec(ctx,"UPDATE blobs SET state='gc_pending' WHERE id='dhf_blob'"); err==nil {
+		t.Fatal("DHF referenced blob entered gc_pending")
+	}
+	if _, err:=pool.Exec(ctx,"DELETE FROM blobs WHERE id='dhf_blob'"); err==nil {
+		t.Fatal("DHF referenced blob was deleted")
+	}
+	if _, err:=pool.Exec(ctx,"UPDATE dhf_pilot_attempts SET state='reviewing' WHERE id='dhf_attempt_1'"); err==nil {
+		t.Fatal("pilot accepted unimplemented review state")
+	}
+	fmt.Println("DHF_V064_DB_INTEGRATION_PASS")
 }
