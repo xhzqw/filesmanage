@@ -142,3 +142,42 @@ type DHFPilotEvidenceStore interface {
 	DHFPilotSnapshotStore
 	DHFPilotEvidenceForReviewer(context.Context,string,string) ([]DHFPilotEvidencePin,error)
 }
+
+
+// DHFPilotRemediationStore is a write-transaction port. Return advice, new
+// preparation attempt, opened-case journal and audit are one SERIALIZABLE unit.
+// A remediation case cannot close a Gate or provide formal signature authority.
+type DHFPilotRemediationStore interface {
+ DHFPilotBeginSubmission(context.Context) error
+ DHFPilotReturnedReviewForActor(context.Context,string,string) (DHFPilotReturnedReview,error)
+ DHFPilotRemediationForReturn(context.Context,string) (DHFPilotRemediationRecord,error)
+ DHFPilotPersistRemediation(context.Context,DHFPilotRemediationRecord,[]byte) error
+}
+
+type DHFPilotReturnedReview struct {
+ DecisionID string
+ OriginalSubmissionID string
+ ProjectID string
+ StageID string
+ TemplateID string
+ SubmittedBy string
+ OriginalManifest []byte
+ OriginalManifestSHA string
+ PolicySHA string
+}
+
+type DHFPilotRemediationRecord struct {
+ ID string
+ ReturnDecisionID string
+ OriginalSubmissionID string
+ NewAttemptID string
+ ProjectID string
+ StageID string
+ TemplateID string
+ OpenedBy string
+ ResolutionPlan string
+ OriginalManifestSHA string
+ RevisedManifestSHA string
+ IdempotencyKey string
+ RequestSHA string
+}
