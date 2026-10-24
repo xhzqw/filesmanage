@@ -1,4 +1,4 @@
-import {useEffect,useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import {request} from "../../shared/http";
 import {RareButton,RareInput,RareTextarea} from "../../shared/ui/rare";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
@@ -30,6 +30,8 @@ export function DHFPilotInbox(){
  const [selected,setSelected]=useState<string|null>(null);
  const [comment,setComment]=useState("");
  const [busy,setBusy]=useState(false);
+ // Reuse the SAME idempotency key when a network failure leaves the result unknown.
+ const pendingIntent=useRef<{taskId:string;outcome:string;comment:string;key:string}|null>(null);
  const [feedback,setFeedback]=useState("");
  const [recommendError,setRecommendError]=useState("");
  useEffect(()=>{
@@ -49,11 +51,18 @@ export function DHFPilotInbox(){
   if(!active||busy)return;
   setBusy(true);setRecommendError("");setFeedback("");
   try{
-   const bytes=crypto.getRandomValues(new Uint8Array(16));
-   const idempotencyKey=Array.from(bytes,n=>n.toString(16).padStart(2,"0")).join("");
+   const normalizedComment=comment.trim();
+   if(!pendingIntent.current||pendingIntent.current.taskId!==active.id||
+      pendingIntent.current.outcome!==outcome||pendingIntent.current.comment!==normalizedComment){
+    const bytes=crypto.getRandomValues(new Uint8Array(16));
+    pendingIntent.current={taskId:active.id,outcome,comment:normalizedComment,
+      key:Array.from(bytes,n=>n.toString(16).padStart(2,"0")).join("")};
+   }
+   const idempotencyKey=pendingIntent.current.key;
    await request<{taskId:string;decisionId:string;status:string;trialOnly:boolean}>(
     "/workbench/dhf/tasks/"+encodeURIComponent(active.id)+"/recommendation",
     {method:"POST",body:JSON.stringify({outcome,comment,idempotencyKey})});
+   pendingIntent.current=null;
    setTasks(items=>items.filter(item=>item.id!==active.id));
    setSelected(null);
    setFeedback("试点复核意见已记录，不代表正式阶段批准。");
