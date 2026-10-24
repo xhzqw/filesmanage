@@ -145,3 +145,18 @@ func (*unsupportedPilotUOW) Begin(context.Context)(ports.Tx,error){return &unsup
 type unsupportedPilotTx struct{ports.Tx}
 func (*unsupportedPilotTx) Rollback(context.Context)error{return nil}
 func (*unsupportedPilotTx) Commit(context.Context)error{return nil}
+
+
+func TestDHFPilotRejectsOmittedMandatoryBooleanEvenWithMatchingHash(t *testing.T) {
+	s,u:=pilotTestService(t,false)
+	// A policy body that omits Mandatory must not be interpreted as a valid
+	// optional deliverable, even when the stored hash matches its bytes.
+	policy := []byte(`{"stage_id":"G1","conditional_allowed":false,"requirements":[{"ID":"REQ-1","Critical":false,"ConditionEligible":false,"AllowNotApplicable":false}],"dependencies":null,"specialties":null}`)
+	sum:=sha256.Sum256(policy)
+	u.record.PolicyBody=policy
+	u.record.PolicyHash=hex.EncodeToString(sum[:])
+	out,err:=s.DHFPilotPreflight(context.Background(),domain.User{ID:"user"},"attempt",dhf.ActionSubmit)
+	if err!=nil || out.Decision.Verdict!=dhf.Deny || !slices.Contains(out.Decision.Reasons,"DHF_POLICY_INVALID"){
+		t.Fatalf("missing mandatory boolean must deny: %+v %v",out,err)
+	}
+}
