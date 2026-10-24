@@ -181,3 +181,27 @@ type DHFPilotRemediationRecord struct {
  IdempotencyKey string
  RequestSHA string
 }
+
+
+// DHFPilotReturnInboxStore reads only return opinions from submissions whose
+// original submitter is the currently authenticated user. This is not a
+// privileged global review or an authorization to alter historic submissions.
+type DHFPilotReturnInboxStore interface {
+ DHFPilotBeginSnapshot(context.Context) error
+ DHFPilotReturnsForAuthor(context.Context,string,int)([]DHFPilotReturnInboxRow,error)
+}
+type DHFPilotReturnInboxRow struct {
+ DecisionID string
+ ReviewKey string
+ ProjectID string
+ StageID string
+ OriginalSubmissionID string
+ OriginalManifest []byte
+ OriginalManifestSHA string
+ Reason string
+ DecidedAt time.Time
+ CaseID string
+ NewAttemptID string
+ NewAttemptState string
+ CanPrepare bool
+}
