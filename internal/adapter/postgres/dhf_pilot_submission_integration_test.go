@@ -203,6 +203,56 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	if inboxErr!=nil || len(otherInbox)!=1 || otherInbox[0].ReviewKey!="G5-MF" {
 		t.Fatalf("G5 tasks leaked across assignees: %+v %v",otherInbox,inboxErr)
 	}
+	// Reviewer opinions are *trial-only*, unique and attached to exact
+	// submitted evidence. G5 total Gate cannot recommend pass until all
+	// required specialty reviews are actually recorded.
+	var swTask,mfTask,gateTask string
+	for _,entry:=range []struct{key string;dst *string}{
+		{"G5-SW",&swTask},{"G5-MF",&mfTask},{"__gate__",&gateTask},
+	}{
+		if err=pool.QueryRow(ctx,"SELECT id FROM dhf_pilot_workbench_tasks WHERE submission_id=$1 AND review_key=$2",
+			g5Result.SubmissionID,entry.key).Scan(entry.dst);err!=nil{t.Fatal(err)}
+	}
+	early,earlyErr:=service.DHFPilotRecommend(ctx,domain.User{ID:"dhf_gate_reviewer"},
+		gateTask,"recommend_pass","","dhf-g5-gate-before-specialties")
+	if earlyErr==nil || early.Reason!="DHF_REVIEW_CONFLICT"{
+		t.Fatalf("premature G5 Gate recommendation was accepted: %+v %v",early,earlyErr)
+	}
+	unauthorized,unauthorizedErr:=service.DHFPilotRecommend(ctx,actor,swTask,
+		"recommend_pass","","dhf-g5-review-unauthorized")
+	if unauthorizedErr!=nil || unauthorized.Reason!="DHF_SCOPE_DENIED" {
+		t.Fatalf("submitter could review own submission: %+v %v",unauthorized,unauthorizedErr)
+	}
+	swOpinion,swErr:=service.DHFPilotRecommend(ctx,domain.User{ID:"dhf_sw_reviewer"},swTask,
+		"recommend_pass","software evidence reviewed","dhf-g5-sw-recommendation")
+	if swErr!=nil || swOpinion.Status!="reviewed" || swOpinion.DecisionID==""{
+		t.Fatalf("software review did not persist: %+v %v",swOpinion,swErr)
+	}
+	replayedOpinion,replayedErr:=service.DHFPilotRecommend(ctx,domain.User{ID:"dhf_sw_reviewer"},swTask,
+		"recommend_pass","software evidence reviewed","dhf-g5-sw-recommendation")
+	if replayedErr!=nil || !replayedOpinion.Replayed || replayedOpinion.DecisionID!=swOpinion.DecisionID{
+		t.Fatalf("review idempotent replay failure: %+v %v",replayedOpinion,replayedErr)
+	}
+	mfOpinion,mfErr:=service.DHFPilotRecommend(ctx,domain.User{ID:"dhf_mf_reviewer"},mfTask,
+		"recommend_pass","manufacturing evidence reviewed","dhf-g5-mf-recommendation")
+	if mfErr!=nil || mfOpinion.Status!="reviewed"{t.Fatalf("manufacturing review failed: %+v %v",mfOpinion,mfErr)}
+	gatePending,pendingErr:=service.DHFPilotWorkbenchInbox(ctx,domain.User{ID:"dhf_gate_reviewer"})
+	if pendingErr!=nil || len(gatePending)!=1 || !gatePending[0].GateReady{
+		t.Fatalf("G5 Gate should be ready after all specialties: %+v %v",gatePending,pendingErr)
+	}
+	gateOpinion,gateErr:=service.DHFPilotRecommend(ctx,domain.User{ID:"dhf_gate_reviewer"},gateTask,
+		"recommend_pass","all specialties reviewed","dhf-g5-gate-recommendation")
+	if gateErr!=nil || gateOpinion.Status!="reviewed"{t.Fatalf("G5 Gate recommendation failed: %+v %v",gateOpinion,gateErr)}
+	if err=pool.QueryRow(ctx,"SELECT state FROM dhf_pilot_attempts WHERE id='dhf_g5_attempt'").Scan(&state);err!=nil || state!="submitted" {
+		t.Fatalf("trial recommendations must NOT formally approve stage: %q %v",state,err)
+	}
+	if err=pool.QueryRow(ctx,"SELECT count(*) FROM dhf_pilot_review_decisions WHERE submission_id=$1",g5Result.SubmissionID).Scan(&count);err!=nil || count!=3{
+		t.Fatalf("expected three immutable opinions: %d %v",count,err)
+	}
+	if _,mutateErr:=pool.Exec(ctx,"UPDATE dhf_pilot_review_decisions SET comment='rewritten' WHERE id=$1",swOpinion.DecisionID);mutateErr==nil{
+		t.Fatal("review opinion must be append-only")
+	}
+	// Returning a review requires a comment even for an authorized actor.
 	seedG5("dhf_g5_unassigned")
 	if _, deleteErr:=pool.Exec(ctx,"DELETE FROM dhf_pilot_review_assignments WHERE project_id='dhf_project' AND stage_id='G5' AND review_key='G5-MF'");deleteErr==nil {t.Fatal("applied review assignment must not be erased")}
 	if _, updateErr:=pool.Exec(ctx,"UPDATE dhf_pilot_review_assignments SET configured_by='dhf_sw_reviewer' WHERE project_id='dhf_project' AND stage_id='G5' AND review_key='G5-SW'");updateErr==nil {
