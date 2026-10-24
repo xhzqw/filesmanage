@@ -53,3 +53,40 @@ func(s *Service)DHFPilotVerifyRemediation(ctx context.Context,actor domain.User,
  failures,err:=store.DHFPilotRecentAttestationAuthFailures(ctx,actor.ID)
  if err!=nil{return fail("DHF_VERIFICATION_UNAVAILABLE"),err}
  if failures>=5{return fail("DHF_REAUTH_RATE_LIMITED"),nil}
+ current,hash,err:=tx.UserByLogin(ctx,trusted.Login)
+ if err!=nil||current.ID!=actor.ID||current.MustChangePassword||
+ bcrypt.CompareHashAndPassword([]byte(hash),[]byte(password))!=nil{
+  if err=store.DHFPilotAuditAttestationAuthFailure(ctx,actor.ID,caseID);err!=nil{
+   return fail("DHF_VERIFICATION_UNAVAILABLE"),err
+  }
+  if err=tx.Commit(ctx);err!=nil{return fail("DHF_VERIFICATION_UNAVAILABLE"),err}
+  return fail("DHF_REAUTH_FAILED"),nil
+ }
+ requestSHA:=hashPilotSubmit(caseID,actor.ID,key,source.RevisedSubmissionID,
+  source.RevisedManifestSHA+":"+comment+":"+intent)
+ existing,err:=store.DHFPilotExistingVerification(ctx,caseID)
+ if err==nil{
+  if existing.VerifierID==actor.ID&&existing.IdempotencyKey==key&&
+    existing.RequestSHA==requestSHA&&existing.Comment==comment&&
+    existing.RevisedSubmissionID==source.RevisedSubmissionID&&
+    existing.OriginalReturnAttestationID==source.OriginalReturnAttestationID{
+    return DHFPilotVerificationOutcome{VerificationID:existing.ID,CaseID:caseID,
+     RevisedSubmissionID:existing.RevisedSubmissionID,Replayed:true,TrialOnly:true},nil
+  }
+  return fail("DHF_VERIFICATION_ALREADY_EXISTS"),nil
+ }
+ if !errors.Is(err,ports.ErrRowMissing){return fail("DHF_VERIFICATION_UNAVAILABLE"),err}
+ rec:=ports.DHFPilotVerificationRecord{
+  ID:NewID("dhfverify"),CaseID:caseID,OriginalReturnAttestationID:source.OriginalReturnAttestationID,
+  RevisedSubmissionID:source.RevisedSubmissionID,VerifierID:actor.ID,
+  Comment:comment,OriginalManifestSHA:source.OriginalManifestSHA,
+  RevisedManifestSHA:source.RevisedManifestSHA,RevisedPolicySHA:source.RevisedPolicySHA,
+  IdempotencyKey:key,RequestSHA:requestSHA,
+ }
+ if err=store.DHFPilotPersistVerification(ctx,rec);err!=nil{
+  return fail("DHF_VERIFICATION_PRECONDITION"),err
+ }
+ if err=tx.Commit(ctx);err!=nil{return fail("DHF_VERIFICATION_PRECONDITION"),err}
+ return DHFPilotVerificationOutcome{VerificationID:rec.ID,CaseID:caseID,
+  RevisedSubmissionID:rec.RevisedSubmissionID,TrialOnly:true},nil
+}
