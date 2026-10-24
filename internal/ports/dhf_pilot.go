@@ -267,6 +267,8 @@ type DHFPilotAttestationStore interface {
  DHFPilotAttestationDecisionForSigner(context.Context,string,string)(DHFPilotAttestationDecision,error)
  DHFPilotAttestationForTask(context.Context,string)(DHFPilotAttestationRecord,error)
  DHFPilotPersistAttestation(context.Context,DHFPilotAttestationRecord) error
+ DHFPilotRecentAttestationAuthFailures(context.Context,string)(int,error)
+ DHFPilotAuditAttestationAuthFailure(context.Context,string,string) error
 }
 type DHFPilotAttestationDecision struct {
  DecisionID string
