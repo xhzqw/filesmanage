@@ -61,7 +61,6 @@ export function DHFPilotInbox(){
   finally{setBusy(false)}
  }
  return <div className="dhf-pilot-shell">
-  {feedback?<div className="dhf-pilot-feedback" role="status">{feedback}</div>:null}
   <section className="dhf-pilot-list" aria-label="DHF 阶段审核队列">
    <div className="dhf-pilot-toolbar">
     <strong>研发阶段审核</strong>
@@ -82,6 +81,7 @@ export function DHFPilotInbox(){
     </button>)}</div>}
   </section>
   <section className="dhf-pilot-detail" aria-label="阶段审核详情">
+   {feedback?<div className="dhf-pilot-feedback" role="status">{feedback}</div>:null}
    {active?<div className="dhf-pilot-content">
      <span className="dhf-pilot-overline">DHF / {active.stageId}</span>
      <h2>{specialtyNames[active.reviewKey]??active.reviewKey}</h2>
