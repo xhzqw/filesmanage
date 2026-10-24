@@ -10,7 +10,7 @@ type ReturnItem={
  decisionId:string;reviewKey:string;projectId:string;stageId:string;
  originalSubmissionId:string;originalManifest:{requirements:Req[]};
  returnReason:string;decidedAt:string;caseId?:string;newAttemptId?:string;
- newAttemptState?:string;canPrepare:boolean;
+ newAttemptState?:string;verificationId?:string;canPrepare:boolean;
 };
 type Latest={seq:number;sha:string;name:string};
 
@@ -97,7 +97,7 @@ export function DHFRemediationInbox(){
       key={item.decisionId} className={"dhf-pilot-task"+(active?.decisionId===item.decisionId?" is-selected":"")}
       aria-pressed={active?.decisionId===item.decisionId} onClick={()=>setSelected(item.decisionId)}>
       <span className="dhf-pilot-task-title">{item.stageId} · {item.reviewKey==="__gate__"?"阶段复核退回":item.reviewKey+" 专业退回"}</span>
-      <span className="dhf-pilot-task-meta">{item.projectId} · {item.caseId?"已关联整改批次":"待整改"}</span>
+      <span className="dhf-pilot-task-meta">{item.projectId} · {item.verificationId?"整改已复验":item.caseId?"已关联整改批次":"待整改"}</span>
       <span className="dhf-pilot-task-date">{new Date(item.decidedAt).toLocaleString("zh-CN")}</span>
     </button>)}</div>}
   </section>
@@ -107,10 +107,10 @@ export function DHFRemediationInbox(){
     <h2>整改与重新提交</h2>
     <p className="dhf-return-reason">{active.returnReason}</p>
     {active.caseId?<div className="dhf-pilot-evidence-item">
-     <strong>已创建独立整改批次</strong>
+     <strong>{active.verificationId?"已完成整改复验":"已创建独立整改批次"}</strong>
      <span>整改记录 {active.caseId}</span>
      <span>新尝试 {active.newAttemptId} · {active.newAttemptState==="submitted"?"已重新提交":"准备中"}</span>
-     <span>旧提交和退回意见完整保留；建立批次并不等于阶段验收完成。</span>
+     <span>{active.verificationId?"原退回审核人已确认复验；正式阶段批准仍未自动生效。":"旧提交和退回意见完整保留；建立批次并不等于阶段验收完成。"}</span>
     </div>:<>
      <section className="dhf-pilot-evidence" aria-label="选择受控整改证据版本">
       <h3>选择整改证据版本</h3>
