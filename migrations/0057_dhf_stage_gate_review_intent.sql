@@ -20,8 +20,7 @@ CREATE TABLE dhf_pilot_stage_gate_review_intents(
  candidate_payload_sha char(64) NOT NULL CHECK(candidate_payload_sha ~ '^[a-f0-9]{64}$'),
  -- Exhaustive policy-defined direct dependency edges + observed positions.
  dependency_snapshot jsonb NOT NULL,
- dependency_snapshot_sha char(64) GENERATED ALWAYS AS
-  (encode(sha256(convert_to(dependency_snapshot::text,'UTF8')),'hex')) STORED,
+ dependency_snapshot_sha char(64) NOT NULL CHECK(dependency_snapshot_sha ~ '^[a-f0-9]{64}$'),
  missing_preconditions jsonb NOT NULL CHECK(jsonb_typeof(missing_preconditions)='array'),
  idempotency_key text NOT NULL CHECK(length(idempotency_key) BETWEEN 8 AND 160),
  request_sha char(64) NOT NULL CHECK(request_sha ~ '^[a-f0-9]{64}$'),
@@ -97,6 +96,10 @@ BEGIN
  IF NEW.dependency_snapshot<>expected_deps THEN
   RAISE EXCEPTION 'Gate review dependency snapshot does not match every published-policy edge'
    USING ERRCODE='23514'; END IF;
+ -- jsonb -> text is not immutable for PostgreSQL generated columns.
+ -- Compute the canonical digest inside the guarded INSERT itself.
+ NEW.dependency_snapshot_sha:=
+  encode(sha256(convert_to(NEW.dependency_snapshot::text,'UTF8')),'hex');
  IF EXISTS(SELECT 1 FROM jsonb_array_elements(expected_deps) d
    WHERE (d->>'id') IS NULL OR (d->>'predecessorStage') IS NULL
    OR d->>'predecessorStage'=NEW.stage_id
