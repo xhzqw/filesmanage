@@ -98,7 +98,7 @@ func (r *Repository) DHFPilotPersistSubmission(ctx context.Context, record ports
 			record.ProjectID,record.StageID).Scan(&configured);err!=nil{return err}
 		if configured!=len(reviewKeys) {return errors.New("DHF review assignment set incomplete or contains unapproved extras")}
 		seenKeys:=map[string]bool{}
-		for _,key:=range reviewKeys {
+		for ordinal,key:=range reviewKeys {
 			if key=="" || seenKeys[key] {return errors.New("invalid or duplicate DHF reviewer key")}
 			seenKeys[key]=true
 			var reviewerID string
@@ -107,10 +107,15 @@ func (r *Repository) DHFPilotPersistSubmission(ctx context.Context, record ports
 				record.ProjectID,record.StageID,key).Scan(&reviewerID)
 			if err!=nil {return fmt.Errorf("DHF reviewer is not configured and active: %w",err)}
 			if reviewerID==record.SubmittedBy {return errors.New("DHF submitter cannot review own evidence")}
+			taskID:=newID("dhftask")
 			_,err=r.Q.Exec(ctx,
 				"INSERT INTO dhf_pilot_workbench_tasks(id,submission_id,project_id,stage_id,review_key,reviewer_id,assigned_by) VALUES($1,$2,$3,$4,$5,$6,$7)",
-				newID("dhftask"),record.ID,record.ProjectID,record.StageID,key,reviewerID,record.SubmittedBy)
+				taskID,record.ID,record.ProjectID,record.StageID,key,reviewerID,record.SubmittedBy)
 			if err!=nil {return err}
+			_,err=r.Q.Exec(ctx,
+				"INSERT INTO dhf_pilot_review_obligations(task_id,submission_id,step_ordinal,review_key,reviewer_id,policy_sha,manifest_sha) VALUES($1,$2,$3,$4,$5,$6,$7)",
+				taskID,record.ID,ordinal+1,key,reviewerID,record.PolicySHA,record.ManifestSHA)
+			if err!=nil{return err}
 		}
 	}
 	// Append audit in this same transaction; rollback removes all changes.
