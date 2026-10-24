@@ -254,6 +254,54 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	if unauthorizedErr!=nil || unauthorized.Reason!="DHF_SCOPE_DENIED" {
 		t.Fatalf("submitter could review own submission: %+v %v",unauthorized,unauthorizedErr)
 	}
+	// Published G5 specialties are a real immutable responsibility sequence.
+	// A later reviewer cannot leapfrog without an intervention from the
+	// explicitly assigned final Gate sponsor.
+	duties,dutiesErr:=service.DHFPilotDutyChain(ctx,domain.User{ID:"dhf_gate_reviewer"})
+	if dutiesErr!=nil||len(duties)!=3||
+		duties[0].ReviewKey!="G5-SW"||duties[0].StepOrdinal!=1||
+		duties[1].ReviewKey!="G5-MF"||duties[1].StepOrdinal!=2||
+		duties[2].ReviewKey!="__gate__"||duties[2].StepOrdinal!=3||
+		duties[1].OutstandingPrior!=1||!duties[1].CanAuthorizeEarly{
+		t.Fatalf("DHF responsibility chain not template-ordered: %+v %v",duties,dutiesErr)
+	}
+	prematureMF,mfEarlyErr:=service.DHFPilotRecommend(ctx,domain.User{ID:"dhf_mf_reviewer"},mfTask,
+		"recommend_pass","manufacturing wants to bypass software","dhf-mf-before-sw")
+	if mfEarlyErr==nil||prematureMF.Reason!="DHF_REVIEW_CONFLICT"{
+		t.Fatalf("later specialty proceeded without authorization: %+v %v",prematureMF,mfEarlyErr)
+	}
+	badSponsor,badSponsorErr:=service.DHFPilotAuthorizeEarlyReview(ctx,domain.User{ID:"dhf_sw_reviewer"},
+		mfTask,"提前评估制造工艺证据，但软件审核尚未完成","dhf-wrong-sponsor-0001")
+	if badSponsorErr!=nil||badSponsor.Reason!="DHF_SCOPE_DENIED"{
+		t.Fatalf("unassigned sponsor illegally intervened: %+v %v",badSponsor,badSponsorErr)
+	}
+	earlyMF,earlyMFErr:=service.DHFPilotAuthorizeEarlyReview(ctx,domain.User{ID:"dhf_gate_reviewer"},
+		mfTask,"为了并行评估工艺文件，允许生产审核人先提交意见；软件责任仍须单独完成","dhf-gate-intervene-mf-0001")
+	if earlyMFErr!=nil||earlyMF.InterventionID==""||earlyMF.Replayed{
+		t.Fatalf("Gate-sponsored early review not recorded: %+v %v",earlyMF,earlyMFErr)
+	}
+	earlyReplay,earlyReplayErr:=service.DHFPilotAuthorizeEarlyReview(ctx,domain.User{ID:"dhf_gate_reviewer"},
+		mfTask,"为了并行评估工艺文件，允许生产审核人先提交意见；软件责任仍须单独完成","dhf-gate-intervene-mf-0001")
+	if earlyReplayErr!=nil||!earlyReplay.Replayed||earlyReplay.InterventionID!=earlyMF.InterventionID{
+		t.Fatalf("intervention retry must reuse identical immutable event: %+v %v",earlyReplay,earlyReplayErr)
+	}
+	mfOpinion,mfErr:=service.DHFPilotRecommend(ctx,domain.User{ID:"dhf_mf_reviewer"},mfTask,
+		"recommend_pass","manufacturing evidence reviewed early with Gate sponsor","dhf-g5-mf-recommendation")
+	if mfErr!=nil||mfOpinion.Status!="reviewed"{t.Fatalf("sponsored early review failed: %+v %v",mfOpinion,mfErr)}
+	withOutstanding,outstandingErr:=service.DHFPilotDutyChain(ctx,domain.User{ID:"dhf_gate_reviewer"})
+	if outstandingErr!=nil||len(withOutstanding)!=3||
+		withOutstanding[0].Status!="pending"||
+		withOutstanding[1].Status!="reviewed"||
+		withOutstanding[1].OutstandingPrior!=1||
+		!withOutstanding[1].EarlyIntervention{
+		t.Fatalf("early intervention discharged an earlier duty or vanished: %+v %v",withOutstanding,outstandingErr)
+	}
+	if _,tamper:=pool.Exec(ctx,"UPDATE dhf_pilot_review_obligations SET reviewer_id='dhf_gate_reviewer' WHERE task_id=$1",swTask);tamper==nil{
+		t.Fatal("immutable original reviewer obligation changed")
+	}
+	if _,tamper:=pool.Exec(ctx,"DELETE FROM dhf_pilot_early_interventions WHERE id=$1",earlyMF.InterventionID);tamper==nil{
+		t.Fatal("non-waiver intervention audit event deleted")
+	}
 	swOpinion,swErr:=service.DHFPilotRecommend(ctx,domain.User{ID:"dhf_sw_reviewer"},swTask,
 		"recommend_pass","software evidence reviewed","dhf-g5-sw-recommendation")
 	if swErr!=nil || swOpinion.Status!="reviewed" || swOpinion.DecisionID==""{
@@ -264,9 +312,6 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	if replayedErr!=nil || !replayedOpinion.Replayed || replayedOpinion.DecisionID!=swOpinion.DecisionID{
 		t.Fatalf("review idempotent replay failure: %+v %v",replayedOpinion,replayedErr)
 	}
-	mfOpinion,mfErr:=service.DHFPilotRecommend(ctx,domain.User{ID:"dhf_mf_reviewer"},mfTask,
-		"recommend_pass","manufacturing evidence reviewed","dhf-g5-mf-recommendation")
-	if mfErr!=nil || mfOpinion.Status!="reviewed"{t.Fatalf("manufacturing review failed: %+v %v",mfOpinion,mfErr)}
 	gatePending,pendingErr:=service.DHFPilotWorkbenchInbox(ctx,domain.User{ID:"dhf_gate_reviewer"})
 	if pendingErr!=nil || len(gatePending)!=1 || !gatePending[0].GateReady{
 		t.Fatalf("G5 Gate should be ready after all specialties: %+v %v",gatePending,pendingErr)
