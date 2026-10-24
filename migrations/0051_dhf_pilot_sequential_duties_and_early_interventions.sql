@@ -159,7 +159,7 @@ CREATE TRIGGER dhf_pilot_step_order_review
 -- Every G5/G6 frozen submitted stage must commit ALL expected immutable
 -- reviewer responsibilities. A manual SQL journal must not omit obligations.
 CREATE OR REPLACE FUNCTION dhf_pilot_require_complete_duties()
-RETURNS trigger LANGUAGE plpgsql AS $
+RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE expected_count integer;
 DECLARE actual_count integer;
 DECLARE task_count integer;
@@ -177,7 +177,7 @@ BEGIN
  END IF;
  RETURN NULL;
 END;
-$;
+$$;
 CREATE CONSTRAINT TRIGGER dhf_pilot_submission_duties_complete
  AFTER INSERT ON dhf_pilot_submissions
  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
