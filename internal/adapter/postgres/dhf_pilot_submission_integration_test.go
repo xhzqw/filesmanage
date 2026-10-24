@@ -319,6 +319,14 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	gateOpinion,gateErr:=service.DHFPilotRecommend(ctx,domain.User{ID:"dhf_gate_reviewer"},gateTask,
 		"recommend_pass","all specialties reviewed","dhf-g5-gate-recommendation")
 	if gateErr!=nil || gateOpinion.Status!="reviewed"{t.Fatalf("G5 Gate recommendation failed: %+v %v",gateOpinion,gateErr)}
+	// Replay after BOTH the target and final Gate have finished must still
+	// return the same immutable intervention; no new bypass is created.
+	lateReplay,lateReplayErr:=service.DHFPilotAuthorizeEarlyReview(ctx,domain.User{ID:"dhf_gate_reviewer"},
+		mfTask,"为了并行评估工艺文件，允许生产审核人先提交意见；软件责任仍须单独完成","dhf-gate-intervene-mf-0001")
+	if lateReplayErr!=nil||!lateReplay.Replayed||lateReplay.InterventionID!=earlyMF.InterventionID{
+		t.Fatalf("post-completion identical authorization replay failed: %+v %v",lateReplay,lateReplayErr)
+	}
+
 	if err=pool.QueryRow(ctx,"SELECT state FROM dhf_pilot_attempts WHERE id='dhf_g5_attempt'").Scan(&state);err!=nil || state!="submitted" {
 		t.Fatalf("trial recommendations must NOT formally approve stage: %q %v",state,err)
 	}
