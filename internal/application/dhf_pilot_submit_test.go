@@ -43,7 +43,7 @@ func (t *pilotSubmissionTx) DHFPilotSubmissionForAttempt(context.Context,string)
 	if t.state.committed==nil {return ports.DHFPilotSubmissionRecord{},ports.ErrRowMissing}
 	return *t.state.committed,nil
 }
-func (t *pilotSubmissionTx) DHFPilotPersistSubmission(_ context.Context,r ports.DHFPilotSubmissionRecord,pins []ports.DHFPilotEvidencePin)error {
+func (t *pilotSubmissionTx) DHFPilotPersistSubmission(_ context.Context,r ports.DHFPilotSubmissionRecord,pins []ports.DHFPilotEvidencePin,keys []string)error {
 	t.state.persistCalls++
 	if t.state.failPersist {return errors.New("injected store failure")}
 	if len(pins)!=0 {return errors.New("fixture unexpectedly contained pins")}
