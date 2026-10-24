@@ -156,5 +156,32 @@ CREATE TRIGGER dhf_pilot_step_order_review
  BEFORE INSERT ON dhf_pilot_review_decisions
  FOR EACH ROW EXECUTE FUNCTION dhf_pilot_verify_review_step_order();
 
+-- Every G5/G6 frozen submitted stage must commit ALL expected immutable
+-- reviewer responsibilities. A manual SQL journal must not omit obligations.
+CREATE OR REPLACE FUNCTION dhf_pilot_require_complete_duties()
+RETURNS trigger LANGUAGE plpgsql AS $
+DECLARE expected_count integer;
+DECLARE actual_count integer;
+DECLARE task_count integer;
+BEGIN
+ IF NEW.stage_id NOT IN ('G5','G6') THEN RETURN NULL; END IF;
+ SELECT CASE WHEN NEW.stage_id='G5' THEN
+    jsonb_array_length(COALESCE(convert_from(t.policy_body,'UTF8')::jsonb->'specialties','[]'::jsonb))+1
+    ELSE 1 END
+ INTO expected_count FROM dhf_pilot_templates t WHERE t.id=NEW.template_id;
+ SELECT count(*) INTO actual_count FROM dhf_pilot_review_obligations WHERE submission_id=NEW.id;
+ SELECT count(*) INTO task_count FROM dhf_pilot_workbench_tasks WHERE submission_id=NEW.id;
+ IF expected_count IS NULL OR actual_count<>expected_count OR task_count<>expected_count THEN
+   RAISE EXCEPTION 'DHF submitted stage must atomically create complete reviewer duty chain'
+      USING ERRCODE='23514';
+ END IF;
+ RETURN NULL;
+END;
+$;
+CREATE CONSTRAINT TRIGGER dhf_pilot_submission_duties_complete
+ AFTER INSERT ON dhf_pilot_submissions
+ DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+ EXECUTE FUNCTION dhf_pilot_require_complete_duties();
+
 -- No columns or constraints permitting legal signatures, Gate accepted
 -- states, conditionally released states or CDW approval changes.
