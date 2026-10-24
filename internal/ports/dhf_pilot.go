@@ -97,3 +97,38 @@ type DHFPilotWorkbenchTask struct {
 	Status string `json:"status"`
 	AssignedAt time.Time `json:"assignedAt"`
 }
+
+
+// DHFPilotRecommendationStore persists a non-signing reviewer recommendation
+// in a SERIALIZABLE tx. It cannot authorize a production DHF stage acceptance.
+type DHFPilotRecommendationStore interface {
+	DHFPilotBeginSubmission(context.Context) error
+	DHFPilotReviewTaskForActor(context.Context,string,string) (DHFPilotRecommendationTask,error)
+	DHFPilotRecommendationForTask(context.Context,string) (DHFPilotRecommendationRecord,error)
+	DHFPilotPersistRecommendation(context.Context,DHFPilotRecommendationRecord) error
+}
+
+type DHFPilotRecommendationTask struct {
+	ID string
+	SubmissionID string
+	ProjectID string
+	StageID string
+	ReviewKey string
+	Status string
+	ReviewerID string
+	PolicySHA string
+	ManifestSHA string
+}
+
+type DHFPilotRecommendationRecord struct {
+	ID string
+	TaskID string
+	SubmissionID string
+	ReviewerID string
+	Outcome string
+	Comment string
+	IdempotencyKey string
+	RequestSHA string
+	PolicySHA string
+	ManifestSHA string
+}
