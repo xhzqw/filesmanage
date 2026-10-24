@@ -70,16 +70,17 @@ CREATE INDEX ix_dhf_pilot_attempt_project ON dhf_pilot_attempts(project_id,stage
 CREATE TABLE dhf_pilot_stage_positions (
  project_id text NOT NULL REFERENCES dhf_pilot_projects(id) ON DELETE RESTRICT,
  stage_id text NOT NULL CHECK(stage_id IN ('G1','G2','G3','G4','G5','G6','G7','G8','G9')),
+ -- No official decision service exists yet. The pilot database itself
+ -- forbids fabricated accepted/conditionally_released predecessor states.
  state text NOT NULL CHECK(state IN (
-   'preparing','submitted','reviewing','changes_requested',
-   'conditionally_released','accepted','cancelled'
+   'preparing','submitted','reviewing','changes_requested','cancelled'
  )),
- decision_attempt_id text,
+ decision_attempt_id text CHECK(decision_attempt_id IS NULL),
  changed_at timestamptz NOT NULL DEFAULT now(),
  PRIMARY KEY(project_id,stage_id),
  FOREIGN KEY(project_id,stage_id,decision_attempt_id)
  REFERENCES dhf_pilot_attempts(project_id,stage_id,id) ON DELETE RESTRICT,
- CHECK ((state IN ('accepted','conditionally_released'))=(decision_attempt_id IS NOT NULL))
+ CHECK (decision_attempt_id IS NULL)
 );
 
 -- One-time template approval is intentionally not exposed as an application
