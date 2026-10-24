@@ -13175,6 +13175,46 @@ components:
       - predecessorStage
       - guardedAction
       - state
+    DHFStageGateGraphEdge:
+      type: object
+      properties:
+        id:
+          type: string
+        predecessorStage:
+          type: string
+        guardedAction:
+          type: string
+        allowConditional:
+          type: boolean
+      required:
+      - id
+      - predecessorStage
+      - guardedAction
+      - allowConditional
+    DHFStageGateGraphNode:
+      type: object
+      properties:
+        stageId:
+          type: string
+        templateId:
+          type: string
+        policySha:
+          type: string
+        positionState:
+          type: string
+        conditionalTemplateFlag:
+          type: boolean
+        dependencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFStageGateGraphEdge'
+      required:
+      - stageId
+      - templateId
+      - policySha
+      - positionState
+      - conditionalTemplateFlag
+      - dependencies
     DHFStageGateReadiness:
       type: object
       properties:
@@ -13200,6 +13240,12 @@ components:
           type: array
           items:
             type: string
+        projectGraph:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFStageGateGraphNode'
+        projectGraphSha:
+          type: string
         strictRequestAllowed:
           type: boolean
         conditionalRequestAllowed:
@@ -13221,6 +13267,7 @@ components:
       - policySha
       - manifestSha
       - dependencies
+      - projectGraph
       - missingPreconditions
       - strictRequestAllowed
       - conditionalRequestAllowed

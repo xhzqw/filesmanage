@@ -120,6 +120,41 @@ port 8091 must not be modified by this pilot.
 
 ### Verification record
 
-Complete only after executing the final isolated PostgreSQL tests, code,
-OpenAPI, browser/static checks and remote Git revision. Failed preliminary
-tests must be recorded separately rather than silently counted as PASS.
+Tested implementation revision `6853e56`, final nine-stage regression
+revision `07a4ba8`, 2026-10-25.
+Real remote checkout: `10.144.144.1:/tmp/filesmanage-dhf-v075-99ade80`.
+Brand-new isolated PostgreSQL 17 database:
+`filesmanage_dhf_v063_integration_v080_graph_07a4ba8`.
+No production database, live server or production port 8091 was modified.
+
+| Executed validation | Observed status |
+|---|---|
+| Entire clean database migration from original schema to 0058 | **PASS — 60 migrations** |
+| Separate migration checksum verification of same database | **PASS — 60/60** |
+| Real PostgreSQL `TestDHFPilotRealPostgresSubmission` against final fresh database | **PASS — 8.08 seconds** |
+| Real original Gate signed-candidate and reviewer ACL regression | **PASS** |
+| G1–G9 in one project with only three explicitly authored nonnumeric edges | **PASS — 9 stages, 3 edges** |
+| Project G1/G5 no invented numeric edges, distinct G6/G8 valid explicit transfer edge | **PASS** |
+| 2-stage and 3-stage actual cyclic graphs: reject specifically for cyclic DAG | **PASS** |
+| Missing same-project predecessor, unsigned template SHA, forbidden issuance-scope conditional edge, target template lacks conditional flag | **PASS** with **specific error-reason assertions** |
+| 0058 graph snapshot and SHA frozen into one Gate intent, same SHA in audit and trial-only outbox | **PASS** |
+| `go test ./internal/... -count=1` plus `go vet ./internal/...` | **PASS** |
+| TypeScript check and Vite frontend production build | **PASS**, existing Three.js bundle warnings |
+| `python3 scripts/gen_openapi.py --check` | **PASS — 144 paths, 174 operations, 131 schemas** |
+| `python3 scripts/gen_acceptance_matrix.py --check` | **PASS — 126 IDs (123 PASS, 3 PARTIAL)** |
+| True in-browser wide/laptop/narrow accessibility and concurrent policy publishing stress | **NOT_RUN** |
+
+The first actual G1–G9 DB test on initial `d29d920` failed
+with PostgreSQL `SQLSTATE 42702` (ambiguous PL/pgSQL local variable
+`predecessor` versus recursive SQL graph column). Code fix `d1ba164`
+renamed the PL/pgSQL variable, with a newly created clean database and real
+PostgreSQL test passing at 5.90 seconds. Subsequent safety work in
+`070b03f` / `6853e56` additionally deduplicated traversal adjacency to
+bound recursive expansion, validated G5 specialty policy, constrained
+conditional template applicability and asserted exact negative error
+categories. The preliminary `6853e56` run passed at 5.80 seconds. The final
+`07a4ba8` nine-stage regression passed at 8.08 seconds on a freshly created
+60-migration database. The initial failure is not counted as PASS.
+
+**Engineering approval is not corporate Gate authorization.** `accepted`,
+`conditionally_released`, CDW release and downstream signing remain NO-GO.
