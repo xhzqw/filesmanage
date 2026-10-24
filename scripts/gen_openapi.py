@@ -1305,6 +1305,21 @@ schema("DHFWorkbenchTask",obj({
 },required=["id","projectId","stageId","submissionId","reviewKey","status","gateReady","assignedAt"]))
 schema("DHFWorkbenchPage",obj({"items":arr(ref("DHFWorkbenchTask")),"trialOnly":boolean()},
  required=["items","trialOnly"]))
+schema("DHFPilotGateVerification",obj({
+ "submissionId":string(),"stageId":string(),"candidateId":string(),
+ "candidateStatus":string(enum=["not_issued","trial_candidate"]),
+ "cryptographicValid":boolean(),"signatureDomain":string(),"signatureReason":string(),
+ "credentialId":string(),"credentialStatus":string(),"credentialExpiresAt":timestamp(),
+ "signerId":string(),"payloadSha":string(),"keySha":string(),
+ "missingPreconditions":arr(string()),"trialOnly":boolean(),"formalAccepted":boolean(),
+},required=["submissionId","stageId","candidateStatus","cryptographicValid",
+ "credentialStatus","missingPreconditions","trialOnly","formalAccepted"]))
+add("GET","/api/workbench/dhf/gates/{submissionId}/verification",operation(
+ "Read historical trial Gate Ed25519 verification and current credential status for assigned Gate reviewer only; not a Stage approval",
+ "Workflow","dhfPilotGateVerification",security=SESSION,
+ params=[id_param("submissionId","Frozen submission ID assigned to the current Gate reviewer")],
+ responses=dict([json_ok(ref("DHFPilotGateVerification"),"Historical pinned public verifier and current revocation are independent."),
+ resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("503",ERR["503"])])))
 add("GET","/api/workbench/dhf/tasks",operation(
  "Read trial DHF review assignments scoped to the active reviewer; no stage approval authority",
  "Workflow","dhfPilotWorkbenchTasks",security=SESSION,

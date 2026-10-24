@@ -480,6 +480,14 @@ VALUES('dhf-no-auth-audit',$1,$2,$3,'dhf_sw_reviewer','recommend_pass',$4,
 	if missingCredErr != nil || missingCredential.Reason != "DHF_GATE_CREDENTIAL_INACTIVE" {
 		t.Fatalf("public key without signer credential accepted: %+v %v", missingCredential, missingCredErr)
 	}
+	unsignedHistory, unsignedHistoryErr := service.DHFPilotGateVerification(ctx, signer("dhf_gate_reviewer"), g5Result.SubmissionID)
+	if unsignedHistoryErr != nil || unsignedHistory.CandidateStatus != "not_issued" ||
+		unsignedHistory.CryptographicValid || unsignedHistory.SignatureReason != "NO_SIGNED_CANDIDATE" ||
+		unsignedHistory.CredentialStatus != "unregistered" ||
+		len(unsignedHistory.MissingPreconditions) != 1 ||
+		unsignedHistory.MissingPreconditions[0] != "SIGNING_CREDENTIAL_NOT_ACTIVE" {
+		t.Fatalf("unsigned Gate candidate/precondition incorrectly displayed: %+v %v", unsignedHistory, unsignedHistoryErr)
+	}
 	credentialTx, beginCredentialErr := pool.Begin(ctx)
 	if beginCredentialErr != nil {
 		t.Fatal(beginCredentialErr)
@@ -560,6 +568,20 @@ INSERT INTO dhf_pilot_gate_candidates(id,submission_id,attempt_id,project_id,sta
 	if candidateErr != nil || candidate.CandidateID == "" || candidate.Replayed || !candidate.TrialOnly {
 		t.Fatalf("legitimate signed Gate trial candidate failed: %+v %v", candidate, candidateErr)
 	}
+	historyBefore, historyBeforeErr := service.DHFPilotGateVerification(ctx, signer("dhf_gate_reviewer"), g5Result.SubmissionID)
+	if historyBeforeErr != nil || historyBefore.CandidateID != candidate.CandidateID ||
+		!historyBefore.CryptographicValid || historyBefore.CredentialStatus != "activate" ||
+		historyBefore.FormalAccepted || !historyBefore.TrialOnly || len(historyBefore.MissingPreconditions) != 0 {
+		t.Fatalf("scoped Gate history and live credential invalid: %+v %v", historyBefore, historyBeforeErr)
+	}
+	_, deniedGateHistory := service.DHFPilotGateVerification(ctx, signer("dhf_sw_reviewer"), g5Result.SubmissionID)
+	if deniedGateHistory == nil {
+		t.Fatal("non-Gate reviewer read another signer's Gate verification")
+	}
+	_, deniedAnonymousHistory := service.DHFPilotGateVerification(ctx, domain.User{ID: ""}, g5Result.SubmissionID)
+	if deniedAnonymousHistory == nil {
+		t.Fatal("anonymous actor read Gate verification")
+	}
 	candidateRetry, candidateRetryErr := service.DHFPilotSealGateCandidate(ctx, signer("dhf_gate_reviewer"),
 		g5Result.SubmissionID, reviewerPassword, validSignature, "dhf-gate-candidate-001")
 	if candidateRetryErr != nil || !candidateRetry.Replayed || candidateRetry.CandidateID != candidate.CandidateID {
@@ -615,6 +637,13 @@ VALUES($1,'dhf.pilot.credential.revoke','dhf_signing_credential',
 	revoked, revokedErr := service.DHFPilotGateChallenge(ctx, signer("dhf_gate_reviewer"), g5Result.SubmissionID)
 	if revokedErr != nil || revoked.Reason != "DHF_GATE_CREDENTIAL_INACTIVE" {
 		t.Fatalf("revoked credential still generated signable challenge: %+v %v", revoked, revokedErr)
+	}
+	historicalAfterRevocation, historicalErr := service.DHFPilotGateVerification(ctx, signer("dhf_gate_reviewer"), g5Result.SubmissionID)
+	if historicalErr != nil || !historicalAfterRevocation.CryptographicValid ||
+		historicalAfterRevocation.CredentialStatus != "revoke" ||
+		historicalAfterRevocation.CandidateID != candidate.CandidateID ||
+		historicalAfterRevocation.FormalAccepted {
+		t.Fatalf("revocation rewrote old signature or claimed enterprise acceptance: %+v %v", historicalAfterRevocation, historicalErr)
 	}
 	if !ed25519.Verify(persistedPub, message, persistedSignature) {
 		t.Fatal("historical Gate signature lost verification after revocation")

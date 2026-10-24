@@ -13,11 +13,29 @@ type SignedReview={
  attestationId?:string;contentSha?:string;
 };
 type SigningResponse={items:SignedReview[];trialOnly:boolean;signIntent:string};
+type GateVerification={
+ submissionId:string;candidateId?:string;candidateStatus:"not_issued"|"trial_candidate";
+ cryptographicValid:boolean;signatureDomain?:string;signatureReason?:string;
+ credentialId?:string;credentialStatus:string;credentialExpiresAt?:string;
+ signerId?:string;payloadSha?:string;keySha?:string;
+ missingPreconditions:string[];trialOnly:boolean;formalAccepted:boolean;
+};
 type AttestationOutcome={attestationId:string;taskId:string;contentSha:string;trialOnly:boolean;replayed:boolean};
 const LABELS:Record<string,string>={
  "__gate__":"阶段总复核","G5-SW":"软件专业复核","G5-MF":"制造专业复核",
 };
 const localIntent="I confirm this DHF review opinion and its fixed evidence identity";
+const gateReasons:Record<string,string>={
+ NO_REVIEW_OBLIGATIONS:"尚未建立完整的审核责任",
+ UNSIGNED_REVIEW_OBLIGATIONS:"仍有专业审核或本人签审未完成",
+ REMEDIATION_NOT_VERIFIED:"整改尚未完成独立复验",
+ SIGNING_CREDENTIAL_NOT_ACTIVE:"当前没有有效的试点签署凭证",
+};
+const credentialLabels:Record<string,string>={
+ unregistered:"未登记",unactivated:"未激活",activate:"已激活",suspend:"已暂停",
+ revoke:"已撤销",replace:"已替换",expired:"已到期",
+ not_yet_valid:"尚未生效",legacy_unbound:"历史候选（未关联凭证）",
+};
 
 export function DHFReviewAttestationInbox(){
  const [rows,setRows]=useState<SignedReview[]>([]);
@@ -31,6 +49,9 @@ export function DHFReviewAttestationInbox(){
  const [submitError,setSubmitError]=useState("");
  const [message,setMessage]=useState("");
  const [serverIntent,setServerIntent]=useState("");
+ const [gateResult,setGateResult]=useState<GateVerification|null>(null);
+ const [gateLoading,setGateLoading]=useState(false);
+ const [gateError,setGateError]=useState("");
  const intent=useRef<{taskId:string;decisionId:string;key:string}|null>(null);
  useEffect(()=>{
   let live=true;setLoading(true);setError("");
@@ -41,6 +62,16 @@ export function DHFReviewAttestationInbox(){
   return()=>{live=false};
  },[refresh]);
  const active=rows.find(x=>x.taskId===selected)??rows[0];
+ useEffect(()=>{
+  let live=true;setGateResult(null);setGateError("");
+  if(active?.reviewKey!=="__gate__"){setGateLoading(false);return}
+  setGateLoading(true);
+  void request<GateVerification>("/workbench/dhf/gates/"+encodeURIComponent(active.submissionId)+"/verification")
+   .then(data=>{if(live)setGateResult(data)})
+   .catch(err=>{if(live)setGateError(errorCopy(err,"Gate 候选核验记录暂不可用"))})
+   .finally(()=>{if(live)setGateLoading(false)});
+  return()=>{live=false};
+ },[active?.submissionId,active?.reviewKey,refresh]);
  useEffect(()=>{setPassword("");setAcknowledged(false);setSubmitError("");setMessage("");intent.current=null;},[active?.taskId]);
  async function attest(){
   if(!active||active.attestationId||!active.canAttest||!acknowledged||
@@ -65,6 +96,7 @@ export function DHFReviewAttestationInbox(){
    setRows(prev=>prev.map(item=>item.taskId===active.taskId?
     {...item,attestationId:output.attestationId,contentSha:output.contentSha}:item));
    setMessage("已完成本次密码再认证及签审确认记录。正式阶段 Gate 接受尚未启用。");
+   setRefresh(n=>n+1);
   }catch(err){setSubmitError(errorCopy(err,"签审确认失败，请核对本人身份及前序责任"))}
   finally{setPassword("");setBusy(false)}
  }
@@ -122,7 +154,29 @@ export function DHFReviewAttestationInbox(){
       {message?<p role="status">{message}</p>:null}
      </div>
     </>}
-    <p className="dhf-pilot-disclaimer">此处仅形成经当前账号密码再认证的受控确认凭证。正式电子签名策略、身份签署凭证、整改复验关闭及 Stage Gate 接受仍未开放。</p>
+    {active.reviewKey==="__gate__"?<section className="dhf-pilot-evidence" aria-label="Gate 候选数字签名核验">
+      <h3>Gate 候选与独立验签</h3>
+      {gateLoading?<p>正在核对签名与凭证状态…</p>:
+       gateError?<p role="alert">{gateError}</p>:
+       gateResult?<div className="dhf-pilot-evidence-item">
+        <strong>{gateResult.candidateStatus==="trial_candidate"?
+          (gateResult.cryptographicValid?"试点候选 · 数字签名验证通过":"试点候选 · 数字签名验证未通过"):
+          "尚无数字签名的 Gate 候选"}</strong>
+        <span>签署凭证：{credentialLabels[gateResult.credentialStatus]??gateResult.credentialStatus}</span>
+        {gateResult.credentialExpiresAt?<span>凭证截止：{new Date(gateResult.credentialExpiresAt).toLocaleString("zh-CN")}</span>:null}
+        {gateResult.candidateId?<span>候选记录：{gateResult.candidateId}</span>:null}
+        {gateResult.signatureDomain?<span>签名内容标准：{gateResult.signatureDomain.endsWith("V1")?"历史 V1":"凭证绑定 V2"}</span>:null}
+        {gateResult.payloadSha?<><span>受控签署摘要</span><code>{gateResult.payloadSha}</code></>:null}
+        {gateResult.signatureReason&&gateResult.candidateStatus==="trial_candidate"?
+         <span role="alert">核验异常：{gateResult.signatureReason}</span>:null}
+        {gateResult.missingPreconditions.length?
+         <div><strong>待完成前置条件</strong>
+          {gateResult.missingPreconditions.map(reason=><p key={reason}>{gateReasons[reason]??reason}</p>)}
+         </div>:null}
+        <span>历史签名验证和当前凭证状态分别显示；撤销凭证不会抹除旧签名。这里不是企业正式 Stage Gate 批准。</span>
+       </div>:<p>暂无可核验的信息</p>}
+     </section>:null}
+    <p className="dhf-pilot-disclaimer">此处的密码再认证仅确认审核身份，不能代替 Ed25519 签名；即使独立验签成功，也不是企业正式 Stage Gate 接受。</p>
    </div>:<div className="dhf-pilot-empty">选择左侧本人审核记录</div>}
   </section>
  </div>

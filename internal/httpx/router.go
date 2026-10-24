@@ -223,6 +223,7 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.POST("/workbench/dhf/tasks/:id/recommendation", h.dhfPilotRecommend)
 	api.GET("/workbench/dhf/duties", h.dhfPilotDutyChain)
 	api.GET("/workbench/dhf/attestations", h.dhfPilotAttestationInbox)
+	api.GET("/workbench/dhf/gates/:submissionId/verification", h.dhfPilotGateVerification)
 	api.POST("/workbench/dhf/tasks/:id/attest", h.dhfPilotAttestReview)
 	api.POST("/workbench/dhf/tasks/:id/early-intervention", h.dhfPilotAuthorizeEarlyReview)
 	api.GET("/workbench/dhf/returns", h.dhfPilotReturns)
