@@ -411,6 +411,7 @@ type DHFPilotGateCandidateRecord struct{
  ManifestSHA string
  DecisionPayloadSHA string
  TrustedKeySHA string
+ TrustedPublicKey []byte
  Signature []byte
  IdempotencyKey string
  RequestSHA string
