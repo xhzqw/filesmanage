@@ -1,13 +1,13 @@
 import {useEffect,useState} from "react";
 import {request} from "../../shared/http";
-import {RareButton,RareInput} from "../../shared/ui/rare";
+import {RareButton,RareInput,RareTextarea} from "../../shared/ui/rare";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {errorCopy} from "../../shared/errors";
 import "./dhfPilotInbox.css";
 
 type DHFTask={
  id:string;projectId:string;stageId:string;submissionId:string;
- reviewKey:string;status:string;assignedAt:string;
+ reviewKey:string;status:string;gateReady:boolean;assignedAt:string;
 };
 type TaskResponse={items:DHFTask[];trialOnly:boolean};
 const displayStage:Record<string,string>={
@@ -28,6 +28,10 @@ export function DHFPilotInbox(){
  const [refresh,setRefresh]=useState(0);
  const [query,setQuery]=useState("");
  const [selected,setSelected]=useState<string|null>(null);
+ const [comment,setComment]=useState("");
+ const [busy,setBusy]=useState(false);
+ const [feedback,setFeedback]=useState("");
+ const [recommendError,setRecommendError]=useState("");
  useEffect(()=>{
   let alive=true;
   setLoading(true);
@@ -40,7 +44,24 @@ export function DHFPilotInbox(){
  },[refresh]);
  const visible=tasks.filter(task=>[task.stageId,task.reviewKey,task.projectId,task.submissionId].some(value=>value.toLowerCase().includes(query.trim().toLowerCase())));
  const active=visible.find(task=>task.id===selected)??visible[0];
+ useEffect(()=>{setComment("");setRecommendError("");},[active?.id]);
+ async function recommend(outcome:"recommend_pass"|"recommend_return"){
+  if(!active||busy)return;
+  setBusy(true);setRecommendError("");setFeedback("");
+  try{
+   const bytes=crypto.getRandomValues(new Uint8Array(16));
+   const idempotencyKey=Array.from(bytes,n=>n.toString(16).padStart(2,"0")).join("");
+   await request<{taskId:string;decisionId:string;status:string;trialOnly:boolean}>(
+    "/workbench/dhf/tasks/"+encodeURIComponent(active.id)+"/recommendation",
+    {method:"POST",body:JSON.stringify({outcome,comment,idempotencyKey})});
+   setTasks(items=>items.filter(item=>item.id!==active.id));
+   setSelected(null);
+   setFeedback("试点复核意见已记录，不代表正式阶段批准。");
+  }catch(err){setRecommendError(errorCopy(err,"试点复核意见提交失败，请刷新并核对任务状态。"))}
+  finally{setBusy(false)}
+ }
  return <div className="dhf-pilot-shell">
+  {feedback?<div className="dhf-pilot-feedback" role="status">{feedback}</div>:null}
   <section className="dhf-pilot-list" aria-label="DHF 阶段审核队列">
    <div className="dhf-pilot-toolbar">
     <strong>研发阶段审核</strong>
@@ -69,7 +90,19 @@ export function DHFPilotInbox(){
        <div><dt>当前状态</dt><dd>待专业核验</dd></div>
        <div><dt>派发时间</dt><dd>{new Date(active.assignedAt).toLocaleString("zh-CN")}</dd></div>
      </dl>
-     <p className="dhf-pilot-disclaimer">本队列已关联冻结提交记录，但正式专业签审与阶段总验收尚未启用。系统不会以查看任务代替审批决定。</p>
+     {active.reviewKey==="__gate__"&&!active.gateReady?<p className="dhf-pilot-gate-wait">该阶段的专业复核尚未全部完成，暂不能提出总 Gate 通过建议。</p>:null}
+     <div className="dhf-pilot-opinion">
+      <RareTextarea aria-label="试点复核意见" value={comment} onChange={e=>setComment(e.target.value)}
+       placeholder="记录复核说明；建议退回时必须填写原因" rows={3}/>
+      {recommendError?<p role="alert" className="dhf-pilot-opinion-error">{recommendError}</p>:null}
+      <div className="dhf-pilot-actions">
+       <RareButton type="button" disabled={busy||(active.reviewKey==="__gate__"&&!active.gateReady)}
+        onClick={()=>void recommend("recommend_pass")}>{busy?"处理中…":"记录通过建议"}</RareButton>
+       <RareButton type="button" disabled={busy||!comment.trim()}
+        onClick={()=>void recommend("recommend_return")}>记录退回建议</RareButton>
+      </div>
+     </div>
+     <p className="dhf-pilot-disclaimer">本操作仅保存试点复核意见；普通预览默认不是冻结版本，须先核验对应受控文件的准确版本和内容。正式电子签署、阶段批准和文件发行均未启用。</p>
    </div>:<div className="dhf-pilot-empty">选择左侧任务，查看阶段与提交信息</div>}
   </section>
  </div>
