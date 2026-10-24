@@ -1298,6 +1298,19 @@ add("POST","/api/files/{id}/seals/marks/revoke",operation("Selectively revoke an
  request={"application/json":{"schema":obj({"versionSeq":integer(minimum=1),"fileSha256":string(),"expectedRevision":integer(minimum=1),"markIds":arr(string()),"password":string()},required=["versionSeq","fileSha256","expectedRevision","markIds"])}},
  responses=dict([("201",{"description":"New audited signing revision without only the selected stamps and signatures; older evidence retained","content":{"application/json":{"schema":obj({"ok":boolean(),"data":ref("SealRevision")},required=["ok","data"])}}}),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
 
+# --- Unified Workbench / DHF staged review assignments ---
+schema("DHFWorkbenchTask",obj({
+ "id":string(),"projectId":string(),"stageId":string(),"submissionId":string(),
+ "reviewKey":string(),"status":string(enum=["pending"]),"assignedAt":timestamp(),
+},required=["id","projectId","stageId","submissionId","reviewKey","status","assignedAt"]))
+schema("DHFWorkbenchPage",obj({"items":arr(ref("DHFWorkbenchTask")),"trialOnly":boolean()},
+ required=["items","trialOnly"]))
+add("GET","/api/workbench/dhf/tasks",operation(
+ "Read trial DHF review assignments scoped to the active reviewer; no stage approval authority",
+ "Workflow","dhfPilotWorkbenchTasks",security=SESSION,
+ responses=dict([json_ok(ref("DHFWorkbenchPage"),"Read-only G5 specialty and G6 Gate task list, maximum 100 items."),
+ resp("401",ERR["401"]),resp("403",ERR["403"]),resp("503",ERR["503"])])))
+
 # --- Approvals ---
 schema("ApprovalPage",obj({"items":arr(ref("Approval")),"nextCursor":string(),"hasMore":boolean(),"pendingCount":integer(minimum=0)},required=["items","nextCursor","hasMore","pendingCount"]))
 schema("ApprovalNotificationPage",obj({"items":arr(ref("ApprovalNotification")),"nextCursor":integer(minimum=0),"hasMore":boolean(),"unreadCount":integer(minimum=0)},required=["items","nextCursor","hasMore","unreadCount"]))
