@@ -705,6 +705,18 @@ VALUES('dhf-gate-forged-no-audit',$1,$2,'dhf_g5_attempt','dhf_project','G5',
 		"strict", sha(g5Policy), sha(g5Manifest), challenge.PayloadSHA); forgedNoAudit == nil {
 		t.Fatal("unaudited formal Gate review intake inserted directly")
 	}
+	if _, tamperedDependencies := pool.Exec(ctx, `
+INSERT INTO dhf_pilot_stage_gate_review_intents(id,submission_id,gate_candidate_id,
+ attempt_id,project_id,stage_id,template_id,signer_id,mode,policy_sha,manifest_sha,
+ candidate_payload_sha,dependency_snapshot,missing_preconditions,idempotency_key,request_sha)
+VALUES('dhf-gate-forged-dependency',$1,$2,'dhf_g5_attempt','dhf_project','G5',
+'dhf_g5_tpl','dhf_gate_reviewer','strict',$3,$4,$5,
+'[{"id":"FAKE","predecessorStage":"G4","guardedAction":"finalize","state":"accepted"}]'::jsonb,
+'["ENTERPRISE_GATE_AUTHORITY_NOT_APPROVED"]'::jsonb,
+'dhf-gate-forged-dependency-001',repeat('b',64))`,
+		g5Result.SubmissionID, candidate.CandidateID, sha(g5Policy), sha(g5Manifest), challenge.PayloadSHA); tamperedDependencies == nil {
+		t.Fatal("fabricated unapproved predecessor accepted in Gate dependency snapshot")
+	}
 	deniedConditional, deniedConditionalErr := service.DHFStageGateRequest(ctx,
 		signer("dhf_gate_reviewer"), g5Result.SubmissionID, application.DHFStageGateRequestInput{
 			Mode: "conditional", Password: reviewerPassword, IdempotencyKey: "dhf-gate-conditional-disabled"})
@@ -726,6 +738,29 @@ VALUES('dhf-gate-forged-no-audit',$1,$2,'dhf_g5_attempt','dhf_project','G5',
 		!reviewIntake.TrialOnly || reviewIntake.FormalAccepted ||
 		reviewIntake.State != "awaiting_enterprise_authority" {
 		t.Fatalf("strict Stage Gate review intake did not commit: %+v %v", reviewIntake, reviewIntakeErr)
+	}
+	var depsSHA string
+	if err = pool.QueryRow(ctx, `SELECT dependency_snapshot_sha
+FROM dhf_pilot_stage_gate_review_intents WHERE id=$1`, reviewIntake.ReviewID).Scan(&depsSHA); err != nil || len(depsSHA) != 64 {
+		t.Fatalf("frozen Gate dependency digest absent: %q %v", depsSHA, err)
+	}
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE
+event_type='dhf.pilot.gate.review_requested' AND target_id=$1
+AND details->>'dependencySnapshotSha'=$2`, reviewIntake.ReviewID, depsSHA).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("Gate review intake missing exact dependency audit: %d %v", count, err)
+	}
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM outbox_jobs WHERE id=$1
+AND kind='dhf.pilot.gate.review_requested' AND payload->>'formalAccepted'='false'`,
+		"dhf-gate-review:"+reviewIntake.ReviewID).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("Gate review failed to queue trial-only outbox: %d %v", count, err)
+	}
+	if _, overwrite := pool.Exec(ctx, `UPDATE dhf_pilot_stage_gate_review_intents
+SET state='accepted' WHERE id=$1`, reviewIntake.ReviewID); overwrite == nil {
+		t.Fatal("pending Stage Gate intent promoted to formal accepted")
+	}
+	if _, erase := pool.Exec(ctx, `DELETE FROM dhf_pilot_stage_gate_review_intents WHERE id=$1`,
+		reviewIntake.ReviewID); erase == nil {
+		t.Fatal("immutable Stage Gate intake was deleted")
 	}
 	reviewReplay, replayIntakeErr := service.DHFStageGateRequest(ctx,
 		signer("dhf_gate_reviewer"), g5Result.SubmissionID, gateRequest)
