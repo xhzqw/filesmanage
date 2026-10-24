@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 
 	"filesmanage/internal/adapter/postgres"
@@ -100,6 +101,47 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 			err=pool.QueryRow(ctx,query).Scan(&count)
 		}
 		if err!=nil || count!=1 {t.Fatalf("expected one persisted journal/hold/audit: %s -> %d %v",query,count,err)}
+	}
+	// Competing SERIALIZABLE submissions for the SAME attempt must commit
+	// exactly once. Other contenders may see a serialization conflict or a
+	// replay, but can never create a second journal/evidence/audit record.
+	seedAttempt("dhf_attempt_race")
+	const contenders=6
+	type raceResult struct { outcome application.DHFPilotSubmitOutcome; err error }
+	barrier:=make(chan struct{})
+	results:=make(chan raceResult,contenders)
+	var wg sync.WaitGroup
+	for i:=0;i<contenders;i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-barrier
+			got,submitErr:=service.DHFPilotSubmit(ctx,actor,"dhf_attempt_race","dhf-isolated-concurrent-0001")
+			results<-raceResult{outcome:got,err:submitErr}
+		}()
+	}
+	close(barrier)
+	wg.Wait()
+	close(results)
+	uniqueWriters:=0
+	for result:=range results {
+		if result.err==nil && result.outcome.Verdict==dhf.Allow && !result.outcome.Replayed {
+			uniqueWriters++
+		}
+	}
+	if uniqueWriters!=1 {t.Fatalf("concurrent writers=%d, require exactly one",uniqueWriters)}
+	for _,query:=range []string{
+		"SELECT count(*) FROM dhf_pilot_submissions WHERE attempt_id='dhf_attempt_race'",
+		"SELECT count(*) FROM audit_events WHERE event_type='dhf.pilot.submitted' AND target_id='dhf_attempt_race'",
+		"SELECT count(*) FROM dhf_pilot_submission_evidence e JOIN dhf_pilot_submissions s ON s.id=e.submission_id WHERE s.attempt_id='dhf_attempt_race'",
+	} {
+		if err=pool.QueryRow(ctx,query).Scan(&count);err!=nil || count!=1 {
+			t.Fatalf("concurrent submit duplicate journal/audit/evidence %q: %d %v",query,count,err)
+		}
+	}
+	eventual,err:=service.DHFPilotSubmit(ctx,actor,"dhf_attempt_race","dhf-isolated-concurrent-0001")
+	if err!=nil || eventual.Verdict!=dhf.Allow || !eventual.Replayed {
+		t.Fatalf("eventual exact replay must recover committed result: %+v %v",eventual,err)
 	}
 	// Negative security scenario: losing the original file grant denies new
 	// submissions even when project membership and a valid manifest remain.
