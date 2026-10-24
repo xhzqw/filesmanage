@@ -76,9 +76,9 @@ func(r *Repository)DHFPilotRecentAttestationAuthFailures(ctx context.Context,act
 }
 func(r *Repository)DHFPilotAuditAttestationAuthFailure(ctx context.Context,actorID,taskID string)error{
  _,err:=r.Q.Exec(ctx,`
- INSERT INTO audit_events(actor_id,event_type,target_kind,target_id,outcome,details)
- VALUES($1,'dhf.pilot.review_auth_denied','dhf_review_task',$2,'denied',
+ INSERT INTO audit_events(actor_id,event_type,target_kind,target_id,request_id,outcome,details)
+ VALUES($1,'dhf.pilot.review_auth_denied','dhf_review_task',$2,$3,'denied',
   jsonb_build_object('authentication','password_reauthentication','reason','invalid_credential')) `,
-  actorID,taskID)
+  actorID,taskID,newID("dhfdeny"))
  return err
 }
