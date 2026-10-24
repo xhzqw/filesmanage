@@ -74,3 +74,7 @@
 .dhf-pilot-early-form textarea{flex-basis:100%;min-width:0;min-height:75px}
 .dhf-pilot-early-form p{flex-basis:100%;margin:0;font-size:12px}
 @media(max-width:560px){.dhf-pilot-duty-row{flex-wrap:wrap}.dhf-pilot-duty-row button{margin-left:37px}}
+
+.dhf-attest-ack{display:flex;align-items:flex-start;gap:9px;margin:11px 0;line-height:1.6;font-size:12px;color:#475569;cursor:pointer}
+.dhf-attest-ack input{margin-top:3px;accent-color:#475569;flex-shrink:0}
+.dhf-pilot-opinion input[type=password]{width:100%;max-width:360px}
