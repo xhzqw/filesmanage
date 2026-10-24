@@ -313,7 +313,7 @@ func Evaluate(in GateInput) Decision {
 		case !conditionalActionsSafe(grant.AllowedActions):
 			add("DHF_CONDITIONAL_SCOPE_UNSAFE")
 		}
-		if !missingNoncritical {
+		if !missingNoncritical || in.OpenRemediations <= 0 {
 			add("DHF_NO_CONDITIONAL_REMEDIATION")
 		}
 		for id := range remedySet {
