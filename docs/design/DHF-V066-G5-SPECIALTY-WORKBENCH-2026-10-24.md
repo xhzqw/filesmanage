@@ -24,6 +24,8 @@
 
 `DHFPilotPersistSubmission` 在原有 SERIALIZABLE 提交事务内派发全部审查任务。任务写入失败则阶段 `submitted` 状态、证据包、audit 和所有已创建任务一起回滚；不允许“先成功提交，稍后尽力派发”产生无人负责的悬空包。
 
+补充：`migrations/0048_dhf_pilot_review_assignment_history.sql` 禁止已经派发过的审核配置被改写；同阶段审核人默认必须相互独立，不能将一个人同时配置为专业审核和总 Gate；插入任务时再核对已发布模板确实包含该审核键、派发人确实是提交人。历史配置需要变更时，应通过后续受控版本或授权改派事件实现，而非更新旧审核记录。
+
 ## 3. 工作台 API 与 UI
 
 - `GET /api/workbench/dhf/tasks`：仅认证后执行；同一个只读 Repeatable Read 事务，重新读取数据库用户有效性。
