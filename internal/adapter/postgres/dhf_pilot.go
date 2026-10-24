@@ -27,6 +27,7 @@ func (r *Repository) DHFPilotBeginSnapshot(ctx context.Context) error {
 
 func (r *Repository) DHFPilotAttemptForActor(ctx context.Context, attemptID, actorID string) (ports.DHFPilotAttemptRecord, error) {
 	var out ports.DHFPilotAttemptRecord
+	var stageState string
 	if attemptID == "" || actorID == "" {
 		return out, ports.ErrRowMissing
 	}
@@ -43,24 +44,25 @@ func (r *Repository) DHFPilotAttemptForActor(ctx context.Context, attemptID, act
 		" WHERE a.id=$1", attemptID, actorID).Scan(
 		&out.ProjectID,&out.StageID,&out.AttemptID,&out.TemplateVersionID,
 		&out.PolicyBody,&out.PolicyHash,&out.PolicyStatus,&out.TemplateApproved,
-		&out.ManifestBody,&out.ManifestHash,&out.State,&out.ProjectState,&out.BaselineActive,
+		&out.ManifestBody,&out.ManifestHash,&stageState,&out.ProjectState,&out.BaselineActive,
 		&out.CanPrepare,&out.CanSubmit,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ports.DHFPilotAttemptRecord{}, ports.ErrRowMissing
 	}
+	out.State = dhf.StageState(stageState)
 	return out, err
 }
 
 // Only an exact stage within the same DHF project can serve as a predecessor.
 // Absence means no accepted stage, NOT "no dependency".
 func (r *Repository) DHFPilotPredecessor(ctx context.Context, projectID, stageID string) (dhf.StageState, error) {
-	var state dhf.StageState
+	var state string
 	err := r.Q.QueryRow(ctx,
 		"SELECT state FROM dhf_pilot_stage_positions WHERE project_id=$1 AND stage_id=$2",
 		projectID, stageID).Scan(&state)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return dhf.Preparing, nil
 	}
-	return state, err
+	return dhf.StageState(state), err
 }
