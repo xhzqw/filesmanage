@@ -484,6 +484,7 @@ VALUES('dhf-no-auth-audit',$1,$2,$3,'dhf_sw_reviewer','recommend_pass',$4,
 	if beginCredentialErr != nil {
 		t.Fatal(beginCredentialErr)
 	}
+	defer credentialTx.Rollback(ctx)
 	if _, err = credentialTx.Exec(ctx, `
 INSERT INTO dhf_pilot_signing_credentials(id,signer_id,public_key_ed25519,purpose,
  valid_from,expires_at,registered_by,authorization_ref)
@@ -493,9 +494,9 @@ VALUES('dhf-gate-credential','dhf_gate_reviewer',$1,'dhf.pilot.gate.candidate',
 		t.Fatal(err)
 	}
 	if _, err = credentialTx.Exec(ctx, `
-INSERT INTO audit_events(actor_id,event_type,target_kind,target_id,outcome,details)
+INSERT INTO audit_events(actor_id,event_type,target_kind,target_id,request_id,outcome,details)
 VALUES($1,'dhf.pilot.credential.register','dhf_signing_credential',
- 'dhf-gate-credential','trial_only',
+ 'dhf-gate-credential','dhf-gate-register-test-001','trial_only',
  jsonb_build_object('keySha',$2::text,'authorizationRef','isolated-pilot-test-authorization'))`,
 		actorID, sha(publicKey)); err != nil {
 		t.Fatal(err)
@@ -507,9 +508,9 @@ VALUES('dhf-gate-credential-active','dhf-gate-credential',$1,'activate',
 		t.Fatal(err)
 	}
 	if _, err = credentialTx.Exec(ctx, `
-INSERT INTO audit_events(actor_id,event_type,target_kind,target_id,outcome,details)
+INSERT INTO audit_events(actor_id,event_type,target_kind,target_id,request_id,outcome,details)
 VALUES($1,'dhf.pilot.credential.activate','dhf_signing_credential',
- 'dhf-gate-credential','trial_only',jsonb_build_object('eventId','dhf-gate-credential-active'))`,
+ 'dhf-gate-credential','dhf-gate-activate-test-001','trial_only',jsonb_build_object('eventId','dhf-gate-credential-active'))`,
 		actorID); err != nil {
 		t.Fatal(err)
 	}
@@ -594,6 +595,7 @@ VALUES('dhf-gate-revoke-unaudited','dhf-gate-credential',$1,'revoke',
 	if revokeBeginErr != nil {
 		t.Fatal(revokeBeginErr)
 	}
+	defer revokeTx.Rollback(ctx)
 	if _, err = revokeTx.Exec(ctx, `
 INSERT INTO dhf_pilot_signing_credential_events(id,credential_id,actor_id,event_kind,reason)
 VALUES('dhf-gate-credential-revoked','dhf-gate-credential',$1,'revoke',
@@ -601,9 +603,9 @@ VALUES('dhf-gate-credential-revoked','dhf-gate-credential',$1,'revoke',
 		t.Fatal(err)
 	}
 	if _, err = revokeTx.Exec(ctx, `
-INSERT INTO audit_events(actor_id,event_type,target_kind,target_id,outcome,details)
+INSERT INTO audit_events(actor_id,event_type,target_kind,target_id,request_id,outcome,details)
 VALUES($1,'dhf.pilot.credential.revoke','dhf_signing_credential',
- 'dhf-gate-credential','trial_only',jsonb_build_object('eventId','dhf-gate-credential-revoked'))`,
+ 'dhf-gate-credential','dhf-gate-revoke-test-001','trial_only',jsonb_build_object('eventId','dhf-gate-credential-revoked'))`,
 		actorID); err != nil {
 		t.Fatal(err)
 	}
