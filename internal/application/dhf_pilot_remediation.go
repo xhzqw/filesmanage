@@ -6,6 +6,7 @@ import (
  "encoding/hex"
  "errors"
  "filesmanage/internal/domain"
+ "filesmanage/internal/domain/dhf"
  "filesmanage/internal/ports"
  "strings"
  "unicode/utf8"
@@ -106,6 +107,16 @@ func(s *Service)DHFPilotOpenRemediation(ctx context.Context,actor domain.User,
  }
  if err=store.DHFPilotPersistRemediation(ctx,record,revisedManifest);err!=nil{
   return fail("DHF_REMEDIATION_CONFLICT"),err
+ }
+ // A remediation case is immutable. Reject a forged/unusable revised manifest
+ // BEFORE committing the case; otherwise one bad request would consume the
+ // only rework branch for this submission and strand its legitimate owner.
+ snapshot,ok:=any(tx).(ports.DHFPilotSnapshotStore)
+ if !ok{return fail("DHF_REMEDIATION_UNAVAILABLE"),errors.New("DHF snapshot adapter unavailable")}
+ evaluated,_,_,evalErr:=s.dhfPilotEvaluateTx(ctx,tx,snapshot,actor,record.NewAttemptID,dhf.ActionPrepare)
+ if evalErr!=nil{return fail("DHF_REMEDIATION_UNAVAILABLE"),evalErr}
+ if evaluated.Decision.Verdict!=dhf.Allow{
+  return fail("DHF_REMEDIATION_PREPARE_DENIED"),nil
  }
  if err=tx.Commit(ctx);err!=nil{return fail("DHF_REMEDIATION_CONFLICT"),err}
  return DHFPilotRemediationOutcome{CaseID:record.ID,ReturnDecisionID:decisionID,
