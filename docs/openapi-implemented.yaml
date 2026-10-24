@@ -7162,6 +7162,125 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/tasks/{id}/evidence:
+    get:
+      summary: List exact frozen file versions for assigned reviewer with independent original file preview ACL checks
+      operationId: dhfPilotEvidenceList
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Review task ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Original immutable version tuple with no Blob storage key exposure.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFReviewerEvidencePage'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/tasks/{id}/evidence/{rid}/preview:
+    get:
+      summary: Preview a bounded copy of the pinned historical document version, after reviewer+file ACL and physical SHA-256
+        checks
+      operationId: dhfPilotEvidencePreview
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Assigned reviewer task ID
+        schema:
+          type: string
+      - name: rid
+        in: path
+        required: true
+        description: Frozen requirement ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Only bounded text/structural preview; full PDF/Office page rendering is not represented.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFReviewerEvidencePreview'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/approvals:
     get:
       summary: List approvals visible to the caller
@@ -12042,6 +12161,74 @@ components:
       required:
       - taskId
       - trialOnly
+    DHFReviewerEvidenceItem:
+      type: object
+      properties:
+        requirementId:
+          type: string
+        fileId:
+          type: string
+        fileName:
+          type: string
+        versionSeq:
+          type: integer
+          minimum: 1
+        sha256:
+          type: string
+        sizeBytes:
+          type: integer
+          minimum: 0
+      required:
+      - requirementId
+      - fileId
+      - fileName
+      - versionSeq
+      - sha256
+      - sizeBytes
+    DHFReviewerEvidencePage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFReviewerEvidenceItem'
+        trialOnly:
+          type: boolean
+      required:
+      - items
+      - trialOnly
+    DHFReviewerEvidencePreview:
+      type: object
+      properties:
+        fileId:
+          type: string
+        name:
+          type: string
+        sha256:
+          type: string
+        size:
+          type: integer
+          minimum: 0
+        content:
+          type: string
+        textual:
+          type: boolean
+        truncated:
+          type: boolean
+        renderer:
+          type: string
+        mediaType:
+          type: string
+        fixedVersionVerified:
+          type: boolean
+      required:
+      - fileId
+      - name
+      - sha256
+      - size
+      - textual
+      - truncated
+      - fixedVersionVerified
     ApprovalPage:
       type: object
       properties:
