@@ -444,6 +444,9 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	if err=pool.QueryRow(ctx,"SELECT state FROM dhf_pilot_attempts WHERE id=$1",remed.NewAttemptID).Scan(&state);err!=nil||state!="preparing"{
 		t.Fatalf("new attempt must start preparing: %s %v",state,err)
 	}
+	if _,rewriteErr:=pool.Exec(ctx,"UPDATE dhf_pilot_attempts SET manifest_sha=repeat('f',64) WHERE id=$1",remed.NewAttemptID);rewriteErr==nil{
+		t.Fatal("immutable remediation-linked preparing manifest identity was rewritten")
+	}
 	if err=pool.QueryRow(ctx,"SELECT state FROM dhf_pilot_attempts WHERE id='dhf_g6_attempt'").Scan(&state);err!=nil||state!="submitted"{
 		t.Fatalf("original returned attempt state was overwritten: %s %v",state,err)
 	}
