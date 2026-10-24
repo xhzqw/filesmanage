@@ -680,6 +680,80 @@ INSERT INTO dhf_pilot_gate_candidates(id,submission_id,attempt_id,project_id,sta
 	if candidateErr != nil || candidate.CandidateID == "" || candidate.Replayed || !candidate.TrialOnly {
 		t.Fatalf("legitimate signed Gate trial candidate failed: %+v %v", candidate, candidateErr)
 	}
+	// V0.8.0 slice 1: filing an immutable, signed-source Gate review is not
+	// a formal acceptance. The original XMind supplies NO invented default
+	// G1-G9 DAG. An empty frozen policy dependencies array stays empty.
+	gateReadiness, readinessErr := service.DHFStageGateReadiness(ctx, signer("dhf_gate_reviewer"), g5Result.SubmissionID)
+	if readinessErr != nil || !gateReadiness.StrictRequestAllowed ||
+		gateReadiness.ConditionalRequestAllowed || gateReadiness.FormalAccepted ||
+		len(gateReadiness.Dependencies) != 0 ||
+		len(gateReadiness.MissingPreconditions) != 1 ||
+		gateReadiness.MissingPreconditions[0] != "ENTERPRISE_GATE_AUTHORITY_NOT_APPROVED" {
+		t.Fatalf("invented dependencies or corporate Stage acceptance: %+v %v", gateReadiness, readinessErr)
+	}
+	if _, deniedReadErr := service.DHFStageGateReadiness(ctx, signer("dhf_sw_reviewer"), g5Result.SubmissionID); deniedReadErr == nil {
+		t.Fatal("other reviewer could inspect Gate review source")
+	}
+	if _, forgedNoAudit := pool.Exec(ctx, `
+INSERT INTO dhf_pilot_stage_gate_review_intents(id,submission_id,gate_candidate_id,
+ attempt_id,project_id,stage_id,template_id,signer_id,mode,policy_sha,manifest_sha,
+ candidate_payload_sha,dependency_snapshot,missing_preconditions,idempotency_key,request_sha)
+VALUES('dhf-gate-forged-no-audit',$1,$2,'dhf_g5_attempt','dhf_project','G5',
+'dhf_g5_tpl','dhf_gate_reviewer',$3,$4,$5,$6,'[]'::jsonb,
+'["ENTERPRISE_GATE_AUTHORITY_NOT_APPROVED"]'::jsonb,
+'dhf-gate-forged-intent-001',repeat('a',64))`, g5Result.SubmissionID, candidate.CandidateID,
+		"strict", sha(g5Policy), sha(g5Manifest), challenge.PayloadSHA); forgedNoAudit == nil {
+		t.Fatal("unaudited formal Gate review intake inserted directly")
+	}
+	deniedConditional, deniedConditionalErr := service.DHFStageGateRequest(ctx,
+		signer("dhf_gate_reviewer"), g5Result.SubmissionID, application.DHFStageGateRequestInput{
+			Mode: "conditional", Password: reviewerPassword, IdempotencyKey: "dhf-gate-conditional-disabled"})
+	if deniedConditionalErr != nil || deniedConditional.Reason != "DHF_CONDITIONAL_GATE_NOT_AUTHORIZED" {
+		t.Fatalf("conditional release was requested without corporate permission: %+v %v", deniedConditional, deniedConditionalErr)
+	}
+	gateRequest := application.DHFStageGateRequestInput{Mode: "strict",
+		Password: reviewerPassword, IdempotencyKey: "dhf-gate-review-intake-001"}
+	badGateRequest := gateRequest
+	badGateRequest.Password = "not-the-current-password"
+	deniedGateRequest, deniedGateRequestErr := service.DHFStageGateRequest(ctx,
+		signer("dhf_gate_reviewer"), g5Result.SubmissionID, badGateRequest)
+	if deniedGateRequestErr != nil || deniedGateRequest.Reason != "DHF_REAUTH_FAILED" {
+		t.Fatalf("Gate review without current password: %+v %v", deniedGateRequest, deniedGateRequestErr)
+	}
+	reviewIntake, reviewIntakeErr := service.DHFStageGateRequest(ctx,
+		signer("dhf_gate_reviewer"), g5Result.SubmissionID, gateRequest)
+	if reviewIntakeErr != nil || reviewIntake.ReviewID == "" || reviewIntake.Replayed ||
+		!reviewIntake.TrialOnly || reviewIntake.FormalAccepted ||
+		reviewIntake.State != "awaiting_enterprise_authority" {
+		t.Fatalf("strict Stage Gate review intake did not commit: %+v %v", reviewIntake, reviewIntakeErr)
+	}
+	reviewReplay, replayIntakeErr := service.DHFStageGateRequest(ctx,
+		signer("dhf_gate_reviewer"), g5Result.SubmissionID, gateRequest)
+	if replayIntakeErr != nil || !reviewReplay.Replayed || reviewReplay.ReviewID != reviewIntake.ReviewID {
+		t.Fatalf("Gate review idempotency broken: %+v %v", reviewReplay, replayIntakeErr)
+	}
+	conflictingRequest := gateRequest
+	conflictingRequest.IdempotencyKey = "dhf-gate-review-intake-different"
+	conflictReview, conflictReviewErr := service.DHFStageGateRequest(ctx,
+		signer("dhf_gate_reviewer"), g5Result.SubmissionID, conflictingRequest)
+	if conflictReviewErr != nil || conflictReview.Reason != "DHF_GATE_REVIEW_ALREADY_REQUESTED" {
+		t.Fatalf("new key created a second Gate request: %+v %v", conflictReview, conflictReviewErr)
+	}
+	acceptedReadiness, acceptedReadinessErr := service.DHFStageGateReadiness(ctx,
+		signer("dhf_gate_reviewer"), g5Result.SubmissionID)
+	if acceptedReadinessErr != nil || acceptedReadiness.ReviewID != reviewIntake.ReviewID ||
+		acceptedReadiness.FormalAccepted || acceptedReadiness.ReviewState != "awaiting_enterprise_authority" {
+		t.Fatalf("Gate review was promoted to formal approval: %+v %v", acceptedReadiness, acceptedReadinessErr)
+	}
+	var formalState string
+	if err = pool.QueryRow(ctx, `SELECT state FROM dhf_pilot_attempts WHERE id='dhf_g5_attempt'`).Scan(&formalState); err != nil || formalState != "submitted" {
+		t.Fatalf("Stage Gate request wrote accepted state: %s %v", formalState, err)
+	}
+	if _, forgeAccepted := pool.Exec(ctx, `
+INSERT INTO dhf_pilot_stage_positions(project_id,stage_id,state)
+VALUES('dhf_project','G5','accepted')`); forgeAccepted == nil {
+		t.Fatal("direct SQL accepted Stage projection not rejected")
+	}
 	historyBefore, historyBeforeErr := service.DHFPilotGateVerification(ctx, signer("dhf_gate_reviewer"), g5Result.SubmissionID)
 	if historyBeforeErr != nil || historyBefore.CandidateID != candidate.CandidateID ||
 		!historyBefore.CryptographicValid || historyBefore.CredentialStatus != "activate" ||

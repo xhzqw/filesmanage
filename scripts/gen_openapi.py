@@ -1314,6 +1314,39 @@ schema("DHFPilotGateVerification",obj({
  "missingPreconditions":arr(string()),"trialOnly":boolean(),"formalAccepted":boolean(),
 },required=["submissionId","stageId","candidateStatus","cryptographicValid",
  "credentialStatus","missingPreconditions","trialOnly","formalAccepted"]))
+schema("DHFStageGateDependency",obj({
+ "id":string(),"predecessorStage":string(),"guardedAction":string(),"state":string(),
+},required=["id","predecessorStage","guardedAction","state"]))
+schema("DHFStageGateReadiness",obj({
+ "submissionId":string(),"candidateId":string(),"projectId":string(),
+ "stageId":string(),"templateId":string(),"policySha":string(),"manifestSha":string(),
+ "dependencies":arr(ref("DHFStageGateDependency")),"missingPreconditions":arr(string()),
+ "strictRequestAllowed":boolean(),"conditionalRequestAllowed":boolean(),
+ "formalAccepted":boolean(),"trialOnly":boolean(),"reviewId":string(),"reviewState":string(),
+},required=["submissionId","candidateId","projectId","stageId","templateId",
+ "policySha","manifestSha","dependencies","missingPreconditions",
+ "strictRequestAllowed","conditionalRequestAllowed","formalAccepted","trialOnly"]))
+schema("DHFStageGateReviewRequest",obj({
+ "mode":string(enum=["strict","conditional"]),"password":string(),"idempotencyKey":string(),
+},required=["mode","password","idempotencyKey"]))
+schema("DHFStageGateReviewOutcome",obj({
+ "reviewId":string(),"submissionId":string(),"state":string(),"replayed":boolean(),
+ "trialOnly":boolean(),"formalAccepted":boolean(),"reason":string(),
+},required=["submissionId","replayed","trialOnly","formalAccepted"]))
+add("GET","/api/workbench/dhf/gates/{submissionId}/readiness",operation(
+ "Assigned G5/G6 final Gate signer reads explicit published-template dependencies and frozen signed candidate without formal acceptance",
+ "Workflow","dhfStageGateReadiness",security=SESSION,
+ params=[id_param("submissionId","Frozen original DHF submission ID")],
+ responses=dict([json_ok(ref("DHFStageGateReadiness"),"Enterprise authority unapproved, conditional requests disabled; no inferred G1-G9 DAG."),
+ resp("401",ERR["401"]),resp("404",ERR["404"]),resp("503",ERR["503"])])))
+add("POST","/api/workbench/dhf/gates/{submissionId}/review-request",operation(
+ "File an immutable strict Stage Gate REVIEW INTAKE with independent password reauthentication, physical evidence recheck, policy-frozen dependency snapshot, audit and outbox. Never accepted.",
+ "Workflow","dhfStageGateRequest",security=SESSION,
+ params=[id_param("submissionId","Frozen original DHF submission ID")],
+ request={"application/json":{"schema":ref("DHFStageGateReviewRequest")}},
+ responses=dict([json_ok(ref("DHFStageGateReviewOutcome"),"Only state awaiting_enterprise_authority; enterprise accepted remains unreachable."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),
+ resp("404",ERR["404"]),resp("409",ERR["409"]),resp("503",ERR["503"])])))
 schema("DHFPilotCredentialItem",obj({
  "id":string(),"signerId":string(),"keySha":string(),
  "status":string(),"validFrom":timestamp(),"expiresAt":timestamp(),

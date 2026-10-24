@@ -2,6 +2,7 @@ import {useEffect,useRef,useState} from "react";
 import {request} from "../../shared/http";
 import {RareButton,RareInput} from "../../shared/ui/rare";
 import {errorCopy} from "../../shared/errors";
+import {DHFStageGateIntake} from "./DHFStageGateIntake";
 import "./dhfPilotInbox.css";
 
 type SignedReview={
@@ -176,7 +177,9 @@ export function DHFReviewAttestationInbox(){
          </div>:null}
         <span>历史签名验证和当前凭证状态分别显示；撤销凭证不会抹除旧签名。这里不是企业正式 Stage Gate 批准。</span>
        </div>:<p>暂无可核验的信息</p>}
-     </section>:null}
+    </section>:null}
+    {active.reviewKey==="__gate__"&&gateResult?.candidateStatus==="trial_candidate"&&
+     gateResult.cryptographicValid?<DHFStageGateIntake submissionId={active.submissionId}/>:null}
     <p className="dhf-pilot-disclaimer">此处的密码再认证仅确认审核身份，不能代替 Ed25519 签名；即使独立验签成功，也不是企业正式 Stage Gate 接受。</p>
    </div>:<div className="dhf-pilot-empty">选择左侧本人审核记录</div>}
   </section>
