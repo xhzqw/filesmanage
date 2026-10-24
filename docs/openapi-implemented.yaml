@@ -7080,6 +7080,88 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/tasks/{id}/recommendation:
+    post:
+      summary: Record an immutable non-signing DHF reviewer recommendation, never an official Stage Gate decision
+      operationId: dhfPilotRecommend
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Assigned DHF pilot reviewer task ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                outcome:
+                  type: string
+                  enum:
+                  - recommend_pass
+                  - recommend_return
+                comment:
+                  type: string
+                idempotencyKey:
+                  type: string
+              required:
+              - outcome
+              - comment
+              - idempotencyKey
+      responses:
+        '200':
+          description: Trial-only immutable reviewer opinion, not approval.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFRecommendationResult'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/approvals:
     get:
       summary: List approvals visible to the caller
@@ -11916,6 +11998,8 @@ components:
           type: string
           enum:
           - pending
+        gateReady:
+          type: boolean
         assignedAt:
           type: string
           format: date-time
@@ -11926,6 +12010,7 @@ components:
       - submissionId
       - reviewKey
       - status
+      - gateReady
       - assignedAt
     DHFWorkbenchPage:
       type: object
@@ -11938,6 +12023,24 @@ components:
           type: boolean
       required:
       - items
+      - trialOnly
+    DHFRecommendationResult:
+      type: object
+      properties:
+        taskId:
+          type: string
+        decisionId:
+          type: string
+        status:
+          type: string
+        reason:
+          type: string
+        replayed:
+          type: boolean
+        trialOnly:
+          type: boolean
+      required:
+      - taskId
       - trialOnly
     ApprovalPage:
       type: object
