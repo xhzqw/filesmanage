@@ -438,11 +438,11 @@ VALUES('dhf-no-auth-audit',$1,$2,$3,'dhf_sw_reviewer','recommend_pass',$4,
 	if _,noAuditErr:=pool.Exec(ctx,`
 INSERT INTO dhf_pilot_gate_candidates(id,submission_id,attempt_id,project_id,stage_id,
  template_id,gate_attestation_id,signer_id,policy_sha,manifest_sha,decision_payload_sha,
- trusted_key_sha,signature_ed25519,idempotency_key,request_sha)
+ trusted_key_sha,trusted_public_key_ed25519,signature_ed25519,idempotency_key,request_sha)
  VALUES('dhf-forged-gate-no-audit',$1,'dhf_g5_attempt','dhf_project','G5','dhf_g5_tpl',
- $2,'dhf_gate_reviewer',$3,$4,$5,$6,$7,'dhf-gate-no-audit-001',repeat('e',64))`,
+ $2,'dhf_gate_reviewer',$3,$4,$5,$6,$7,$8,'dhf-gate-no-audit-001',repeat('e',64))`,
 		g5Result.SubmissionID,gateSigned.AttestationID,sha(g5Policy),sha(g5Manifest),
-		challenge.PayloadSHA,sha(publicKey),ed25519.Sign(privateKey,message));noAuditErr==nil{
+		challenge.PayloadSHA,sha(publicKey),publicKey,ed25519.Sign(privateKey,message));noAuditErr==nil{
 		t.Fatal("manual SQL inserted a Gate signature without atomic audit and outbox")
 	}
 	candidate,candidateErr:=service.DHFPilotSealGateCandidate(ctx,signer("dhf_gate_reviewer"),
@@ -454,6 +454,15 @@ INSERT INTO dhf_pilot_gate_candidates(id,submission_id,attempt_id,project_id,sta
 		g5Result.SubmissionID,reviewerPassword,validSignature,"dhf-gate-candidate-001")
 	if candidateRetryErr!=nil||!candidateRetry.Replayed||candidateRetry.CandidateID!=candidate.CandidateID{
 		t.Fatalf("same signed Gate candidate must replay original: %+v %v",candidateRetry,candidateRetryErr)
+	}
+	// Exact historical public verifier and signature remain available even
+	// if the configured corporate pilot trust anchor later rotates.
+	var persistedPub,persistedSignature []byte
+	var persistedDigest string
+	if err=pool.QueryRow(ctx,"SELECT trusted_public_key_ed25519,signature_ed25519,decision_payload_sha FROM dhf_pilot_gate_candidates WHERE id=$1",candidate.CandidateID).
+		Scan(&persistedPub,&persistedSignature,&persistedDigest);err!=nil||
+		!ed25519.Verify(persistedPub,message,persistedSignature)||persistedDigest!=challenge.PayloadSHA{
+		t.Fatalf("historical Gate signature no longer independently verifiable: %s %v",persistedDigest,err)
 	}
 	if err=pool.QueryRow(ctx,"SELECT count(*) FROM outbox_jobs WHERE kind='dhf.pilot.gate.candidate' AND id=$1",
 		"dhf-gate-candidate:"+candidate.CandidateID).Scan(&count);err!=nil||count!=1{
