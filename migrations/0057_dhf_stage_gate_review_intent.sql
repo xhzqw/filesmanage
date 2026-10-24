@@ -154,11 +154,13 @@ BEGIN
   AND e.target_kind='dhf_stage_gate_review' AND e.target_id=NEW.id
   AND e.request_id=NEW.idempotency_key
   AND e.details->>'dependencySnapshotSha'=NEW.dependency_snapshot_sha
-  AND e.details->>'candidateId'=NEW.gate_candidate_id)
+  AND e.details->>'candidateId'=NEW.gate_candidate_id
+  AND e.details->>'formalAccepted'='false')
   OR NOT EXISTS(SELECT 1 FROM outbox_jobs job
    WHERE job.id='dhf-gate-review:'||NEW.id AND job.kind='dhf.pilot.gate.review_requested'
    AND job.payload->>'reviewId'=NEW.id AND job.payload->>'candidateId'=NEW.gate_candidate_id
-   AND job.payload->>'trialOnly'='true') THEN
+   AND job.payload->>'trialOnly'='true'
+   AND job.payload->>'formalAccepted'='false') THEN
   RAISE EXCEPTION 'Gate review requires atomic exact audit and pilot-only outbox'
    USING ERRCODE='23514'; END IF;
  RETURN NULL;

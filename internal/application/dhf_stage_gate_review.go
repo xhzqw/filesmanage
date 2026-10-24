@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"filesmanage/internal/domain"
 	"filesmanage/internal/domain/dhf"
@@ -231,10 +230,12 @@ func (s *Service) DHFStageGateRequest(ctx context.Context, actor domain.User, su
 			return fail("DHF_GATE_EVIDENCE_INVALID"), nil
 		}
 	}
-	deps, _ := json.Marshal(ready.Dependencies)
-	missing, _ := json.Marshal(ready.MissingPreconditions)
+	// Idempotency identifies the unchanged signer intent and signed source,
+	// not a later mutable upstream position snapshot. The latter is frozen
+	// separately in the first review and its SHA-256 audit.
 	requestSHA := hashPilotSubmit(submissionID, actor.ID, input.IdempotencyKey,
-		source.Candidate.DecisionPayloadSHA, dhfGateDigest(deps)+":"+dhfGateDigest(missing)+":strict")
+		source.Candidate.DecisionPayloadSHA,
+		"strict:"+source.Candidate.PolicySHA+":"+source.Candidate.ManifestSHA)
 	prev, err := store.DHFStageGateReviewBySubmission(ctx, submissionID)
 	if err == nil {
 		if prev.SignerID == actor.ID && prev.IdempotencyKey == input.IdempotencyKey &&
