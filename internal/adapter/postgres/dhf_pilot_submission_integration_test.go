@@ -353,6 +353,81 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	if err=pool.QueryRow(ctx,"SELECT state FROM dhf_pilot_attempts WHERE id='dhf_g6_attempt'").Scan(&state);err!=nil || state!="submitted" {
 		t.Fatalf("G6 trial recommendation must not close Gate: %q %v",state,err)
 	}
+	// V0.7.0: Returned G6 review creates a distinct new preparation attempt;
+	// the first submission, decision and original frozen evidence are NEVER
+	// overwritten. Neither reviewer nor global admin may forge ownership.
+	revisedManifest,err:=json.Marshal(map[string]any{"requirements":[]map[string]any{{
+		"id":"DHF-REQ-001","applicability":"applicable","file_id":"dhf_file",
+		"version_seq":2,"sha256":nextSHA,
+	}}})
+	if err!=nil{t.Fatal(err)}
+	plan:="按首次转移退回意见更正样机证据并由原责任人重新提交"
+	illegal,illegalErr:=service.DHFPilotOpenRemediation(ctx,domain.User{ID:"dhf_gate_reviewer"},
+		g6Review.DecisionID,revisedManifest,plan,"dhf-remed-reviewer-illegal")
+	if illegalErr!=nil||illegal.Reason!="DHF_SCOPE_DENIED"{
+		t.Fatalf("assigned reviewer may not initiate original submitter's remediation: %+v %v",illegal,illegalErr)
+	}
+	noChange,noChangeErr:=service.DHFPilotOpenRemediation(ctx,actor,
+		g6Review.DecisionID,manifestBytes,plan,"dhf-remed-no-evidence")
+	if noChangeErr!=nil||noChange.Reason!="DHF_REMEDIATION_EVIDENCE_UNCHANGED"{
+		t.Fatalf("same manifest cannot count as remediation: %+v %v",noChange,noChangeErr)
+	}
+	notReturned,notReturnedErr:=service.DHFPilotOpenRemediation(ctx,actor,
+		swOpinion.DecisionID,revisedManifest,plan,"dhf-remed-unreturned-review")
+	if notReturnedErr!=nil||notReturned.Reason!="DHF_SCOPE_DENIED"{
+		t.Fatalf("pass recommendation cannot be treated as a returned review: %+v %v",notReturned,notReturnedErr)
+	}
+	remed,remedErr:=service.DHFPilotOpenRemediation(ctx,actor,g6Review.DecisionID,
+		revisedManifest,plan,"dhf-remed-g6-0001")
+	if remedErr!=nil||remed.CaseID==""||remed.NewAttemptID==""||remed.Replayed{
+		t.Fatalf("cannot create an immutable return→new attempt lineage: %+v %v",remed,remedErr)
+	}
+	remedReplay,remedReplayErr:=service.DHFPilotOpenRemediation(ctx,actor,g6Review.DecisionID,
+		revisedManifest,plan,"dhf-remed-g6-0001")
+	if remedReplayErr!=nil||!remedReplay.Replayed||remedReplay.CaseID!=remed.CaseID||
+		remedReplay.NewAttemptID!=remed.NewAttemptID{
+		t.Fatalf("identical remediation must replay original attempt: %+v %v",remedReplay,remedReplayErr)
+	}
+	remedConflict,remedConflictErr:=service.DHFPilotOpenRemediation(ctx,actor,g6Review.DecisionID,
+		revisedManifest,plan+"不同范围","dhf-remed-g6-0002")
+	if remedConflictErr!=nil||remedConflict.Reason!="DHF_REMEDIATION_ALREADY_EXISTS"{
+		t.Fatalf("conflicting remediation cannot rewrite accepted plan: %+v %v",remedConflict,remedConflictErr)
+	}
+	for _,query:=range []string{
+		"SELECT count(*) FROM dhf_pilot_remediation_cases WHERE id=$1 AND return_decision_id=$2",
+		"SELECT count(*) FROM dhf_pilot_remediation_events WHERE case_id=$1 AND kind='opened'",
+		"SELECT count(*) FROM audit_events WHERE event_type='dhf.pilot.remediation.opened' AND target_id=$1",
+	} {
+		var probeErr error
+		if strings.Contains(query,"$2"){
+			probeErr=pool.QueryRow(ctx,query,remed.CaseID,g6Review.DecisionID).Scan(&count)
+		}else{
+			probeErr=pool.QueryRow(ctx,query,remed.CaseID).Scan(&count)
+		}
+		if probeErr!=nil||count!=1{t.Fatalf("remediation journal count invalid: %s: %d %v",query,count,probeErr)}
+	}
+	if err=pool.QueryRow(ctx,"SELECT state FROM dhf_pilot_attempts WHERE id=$1",remed.NewAttemptID).Scan(&state);err!=nil||state!="preparing"{
+		t.Fatalf("new attempt must start preparing: %s %v",state,err)
+	}
+	if err=pool.QueryRow(ctx,"SELECT state FROM dhf_pilot_attempts WHERE id='dhf_g6_attempt'").Scan(&state);err!=nil||state!="submitted"{
+		t.Fatalf("original returned attempt state was overwritten: %s %v",state,err)
+	}
+	if _,err=pool.Exec(ctx,"UPDATE dhf_pilot_remediation_cases SET resolution_plan='post-hoc tampering' WHERE id=$1",remed.CaseID);err==nil{
+		t.Fatal("DHF immutable remediation case unexpectedly rewritten")
+	}
+	if _,err=pool.Exec(ctx,"DELETE FROM dhf_pilot_remediation_events WHERE case_id=$1",remed.CaseID);err==nil{
+		t.Fatal("DHF immutable remediation event unexpectedly deleted")
+	}
+	remedSubmit,remedSubmitErr:=service.DHFPilotSubmit(ctx,actor,remed.NewAttemptID,
+		"dhf-revised-g6-submit-0001")
+	if remedSubmitErr!=nil||remedSubmit.Verdict!=dhf.Allow||remedSubmit.SubmissionID==""{
+		t.Fatalf("corrected G6 new attempt could not submit through existing Gate: %+v %v",remedSubmit,remedSubmitErr)
+	}
+	if err=pool.QueryRow(ctx,
+		"SELECT count(*) FROM dhf_pilot_workbench_tasks WHERE submission_id=$1 AND stage_id='G6' AND review_key='__gate__'",
+		remedSubmit.SubmissionID).Scan(&count);err!=nil||count!=1{
+		t.Fatalf("corrected attempt must create a NEW independent G6 reviewer task: %d %v",count,err)
+	}
 	// Real physical tampering must be detected even if DB Blob rows and
 	// immutable file_versions still report the original checksum.
 	path,err:=physicalStore.PathFor(storageKey)
