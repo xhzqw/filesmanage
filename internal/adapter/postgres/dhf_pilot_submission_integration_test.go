@@ -692,7 +692,7 @@ INSERT INTO dhf_pilot_remediation_verifications(id,case_id,original_return_attes
 VALUES('dhf-unlogged-verification',$1,$2,$3,'dhf_gate_reviewer',$4,$5,$6,$7,
  'dhf-rework-unlogged-0001',repeat('a',64))`,
 		remed.CaseID,originalReturnSigned.AttestationID,remedSubmit.SubmissionID,
-		verifiedPlan,sha(manifestBytes),sha(revisedManifest),g6Result.PolicySHA);forgedErr==nil{
+		verifiedPlan,sha(manifestBytes),sha(revisedManifest),sha(g6Policy));forgedErr==nil{
 		t.Fatal("direct unaudited correction verification was accepted")
 	}
 	wrongVerifyPassword,wrongVerifyErr:=service.DHFPilotVerifyRemediation(ctx,signer("dhf_gate_reviewer"),
