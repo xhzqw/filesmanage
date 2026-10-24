@@ -207,6 +207,15 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	if _, err:=pool.Exec(ctx,"DELETE FROM blobs WHERE id='dhf_blob'"); err==nil {
 		t.Fatal("DHF referenced blob was deleted")
 	}
+	for _,statement:=range []string{
+		"UPDATE blobs SET storage_key='ready/ff/ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff' WHERE id='dhf_blob'",
+		"UPDATE blobs SET sha256=repeat('f',64) WHERE id='dhf_blob'",
+		"UPDATE blobs SET size_bytes=999 WHERE id='dhf_blob'",
+	} {
+		if _,err:=pool.Exec(ctx,statement);err==nil {
+			t.Fatalf("referenced Blob identity was mutated: %s",statement)
+		}
+	}
 	if _, err:=pool.Exec(ctx,"UPDATE dhf_pilot_attempts SET state='reviewing' WHERE id='dhf_attempt_1'"); err==nil {
 		t.Fatal("pilot accepted unimplemented review state")
 	}
