@@ -1345,7 +1345,7 @@ add("POST","/api/workbench/dhf/credentials/{id}/events",operation(
  params=[id_param("id","Immutable trial credential ID")],
  request={"application/json":{"schema":obj({
   "kind":string(enum=["activate","suspend","revoke","replace"]),
-  "reason":string(minLength=8),"password":string(),"idempotencyKey":string(),
+  "reason":string(),"password":string(),"idempotencyKey":string(),
  },required=["kind","reason","password","idempotencyKey"])}},
  responses=dict([json_ok(ref("DHFPilotCredentialMutation"),"Append-only lifecycle, not formal signature authority."),
  resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),

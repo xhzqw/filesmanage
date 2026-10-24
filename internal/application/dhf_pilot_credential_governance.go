@@ -81,7 +81,7 @@ func (s *Service) DHFPilotCredentialList(ctx context.Context, actor domain.User)
 
 // Operator reauthentication is required even for idempotent retries.
 // All failed reauth attempts share the existing 15-minute limit with reviews.
-func (s *Service) dhfCredentialReauth(ctx context.Context, tx ports.Repository, store ports.DHFPilotCredentialGovernanceStore, actor domain.User, password, target string) (string, error) {
+func (s *Service) dhfCredentialReauth(ctx context.Context, tx ports.Tx, store ports.DHFPilotCredentialGovernanceStore, actor domain.User, password, target string) (string, error) {
 	trusted, err := tx.UserByID(ctx, actor.ID)
 	if err != nil || trusted.ID != actor.ID || trusted.DisabledAt != nil ||
 		trusted.MustChangePassword || trusted.Login == "" || trusted.Login != actor.Login {
