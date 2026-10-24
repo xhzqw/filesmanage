@@ -1427,6 +1427,41 @@ add("POST","/api/workbench/dhf/tasks/{id}/early-intervention",operation(
  responses=dict([json_ok(ref("DHFEarlyInterventionOutcome"),"Trial-only early review, not formal Gate approval."),
  resp("400",ERR["400"]),resp("401",ERR["401"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
 
+schema("DHFReviewAttestationInput",obj({
+ "decisionId":string("Immutable reviewer decision being explicitly confirmed."),
+ "password":{"type":"string","writeOnly":True,"minLength":1,"maxLength":1024},
+ "signIntent":string("Exact per-reviewer attestation of frozen decision and evidence."),
+ "idempotencyKey":string("Retry same attestation intent using unchanged key."),
+},required=["decisionId","password","signIntent","idempotencyKey"]))
+schema("DHFReviewAttestationOutcome",obj({
+ "attestationId":string(),"taskId":string(),"reviewDecisionId":string(),
+ "contentSha":string(),"replayed":boolean(),"trialOnly":boolean(),"reason":string(),
+},required=["taskId","trialOnly"]))
+schema("DHFReviewAttestationInboxItem",obj({
+ "taskId":string(),"decisionId":string(),"submissionId":string(),"projectId":string(),
+ "stageId":string(),"reviewKey":string(),"outcome":string(),"reviewComment":string(),
+ "policySha":string(),"manifestSha":string(),"outstandingPrior":integer(minimum=0),
+ "canAttest":boolean(),"attestationId":string(),"contentSha":string(),
+},required=["taskId","decisionId","submissionId","projectId","stageId","reviewKey",
+ "outcome","reviewComment","policySha","manifestSha","outstandingPrior","canAttest"]))
+schema("DHFReviewAttestationInboxPage",obj({
+ "items":arr(ref("DHFReviewAttestationInboxItem")),"trialOnly":boolean(),
+ "signIntent":string(),
+},required=["items","trialOnly","signIntent"]))
+add("GET","/api/workbench/dhf/attestations",operation(
+ "List authenticated review confirmation records for their assigned reviewer only; this is not Gate acceptance",
+ "Workflow","dhfPilotAttestationInbox",security=SESSION,
+ responses=dict([json_ok(ref("DHFReviewAttestationInboxPage"),"Scoped signed and unsigned reviewed tasks with frozen hashes."),
+ resp("401",ERR["401"]),resp("403",ERR["403"]),resp("503",ERR["503"])])))
+add("POST","/api/workbench/dhf/tasks/{id}/attest",operation(
+ "Reauthenticate assigned reviewer password in transaction and record immutable bounded signed intent",
+ "Workflow","dhfPilotAttestReview",security=SESSION,
+ params=[id_param("id","Original assigned reviewer task ID")],
+ request={"application/json":{"schema":ref("DHFReviewAttestationInput")}},
+ responses=dict([json_ok(ref("DHFReviewAttestationOutcome"),"Trial-only authenticated attestation, not legal electronic signature."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("404",ERR["404"]),resp("409",ERR["409"]),
+ ("429",{"description":"Per-account recent password reauthentication failure rate limit."})])))
+
 # --- Approvals ---
 schema("ApprovalPage",obj({"items":arr(ref("Approval")),"nextCursor":string(),"hasMore":boolean(),"pendingCount":integer(minimum=0)},required=["items","nextCursor","hasMore","pendingCount"]))
 schema("ApprovalNotificationPage",obj({"items":arr(ref("ApprovalNotification")),"nextCursor":integer(minimum=0),"hasMore":boolean(),"unreadCount":integer(minimum=0)},required=["items","nextCursor","hasMore","unreadCount"]))
