@@ -53,11 +53,12 @@ CREATE TRIGGER dhf_pilot_credential_operator_revocations_immutable
 CREATE FUNCTION dhf_pilot_operator_revoke_validate()
 RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE operator text;
+DECLARE approver text;
 BEGIN
- SELECT operator_id INTO operator FROM dhf_pilot_credential_operator_grants
+ SELECT operator_id,approved_by INTO operator,approver FROM dhf_pilot_credential_operator_grants
   WHERE id=NEW.grant_id FOR UPDATE;
- IF operator IS NULL OR NEW.revoked_by=operator THEN
-  RAISE EXCEPTION 'trial credential operator cannot self-revoke or forge grant'
+ IF operator IS NULL OR NEW.revoked_by=operator OR NEW.revoked_by<>approver THEN
+  RAISE EXCEPTION 'only the original independent grant approver may revoke delegation'
    USING ERRCODE='23514'; END IF;
  RETURN NEW;
 END; $$;

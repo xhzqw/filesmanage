@@ -101,7 +101,7 @@ export function DHFCredentialManagement(){
   </section>
   <section className="dhf-pilot-detail" aria-label="签署凭证详情与登记">
    {message?<div className="dhf-pilot-feedback" role="status">{message}</div>:null}
-   {!canManage?<div className="dhf-pilot-empty">凭证管理须先经独立授权，并由管理员以外的被授权操作员实施。</div>:
+   {!canManage?<div className="dhf-pilot-empty">凭证管理须先经独立授权；管理员身份本身不授予操作权限。</div>:
     <div className="dhf-pilot-content">
      {mode==="register"?<>
       <span className="dhf-pilot-overline">DHF / 凭证管理 · 试点</span>
