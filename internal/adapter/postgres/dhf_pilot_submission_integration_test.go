@@ -334,6 +334,17 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	if g6ReviewErr!=nil || g6Review.Status!="returned" || g6Review.DecisionID==""{
 		t.Fatalf("G6 return opinion missing: %+v %v",g6Review,g6ReviewErr)
 	}
+	returnedInbox,returnedInboxErr:=service.DHFPilotReturnInbox(ctx,actor)
+	if returnedInboxErr!=nil||len(returnedInbox)!=1||
+		returnedInbox[0].DecisionID!=g6Review.DecisionID||
+		returnedInbox[0].OriginalManifestSHA!=sha(manifestBytes)||
+		!returnedInbox[0].CanPrepare{
+		t.Fatalf("original author return inbox identity incorrect: %+v %v",returnedInbox,returnedInboxErr)
+	}
+	emptyReviewerInbox,emptyReviewerInboxErr:=service.DHFPilotReturnInbox(ctx,domain.User{ID:"dhf_gate_reviewer"})
+	if emptyReviewerInboxErr!=nil||len(emptyReviewerInbox)!=0{
+		t.Fatalf("reviewer read other submitter's correction inbox: %+v %v",emptyReviewerInbox,emptyReviewerInboxErr)
+	}
 	g6Retry,g6RetryErr:=service.DHFPilotRecommend(ctx,domain.User{ID:"dhf_gate_reviewer"},g6TaskID,
 		"recommend_return","首次转移证据未齐全","dhf-g6-return-0001")
 	if g6RetryErr!=nil || !g6Retry.Replayed || g6Retry.DecisionID!=g6Review.DecisionID{
@@ -398,6 +409,13 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 		revisedManifest,plan,"dhf-remed-g6-0001")
 	if remedErr!=nil||remed.CaseID==""||remed.NewAttemptID==""||remed.Replayed{
 		t.Fatalf("cannot create an immutable return→new attempt lineage: %+v %v",remed,remedErr)
+	}
+	caseInbox,caseInboxErr:=service.DHFPilotReturnInbox(ctx,actor)
+	if caseInboxErr!=nil||len(caseInbox)!=1||
+		caseInbox[0].CaseID!=remed.CaseID||
+		caseInbox[0].NewAttemptID!=remed.NewAttemptID||
+		caseInbox[0].NewAttemptState!="preparing"{
+		t.Fatalf("return inbox did not link fresh independent attempt: %+v %v",caseInbox,caseInboxErr)
 	}
 	remedReplay,remedReplayErr:=service.DHFPilotOpenRemediation(ctx,actor,g6Review.DecisionID,
 		revisedManifest,plan,"dhf-remed-g6-0001")
