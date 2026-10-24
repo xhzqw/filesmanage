@@ -234,7 +234,7 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	nextSHA:=sha(newContent)
 	exec("INSERT INTO blobs(id,storage_key,sha256,size_bytes,state) VALUES('dhf_blob_v2',$1,$2,$3,'ready')",
 		nextStorageKey,nextSHA,len(newContent))
-	exec("INSERT INTO file_versions(id,file_id,seq,blob_id,sha256,size_bytes,action,created_by) VALUES('dhf_v2','dhf_file',2,'dhf_blob_v2',$1,$2,'save',$3)",
+	exec("INSERT INTO file_versions(id,file_id,seq,blob_id,sha256,size_bytes,action,created_by) VALUES('dhf_v2','dhf_file',2,'dhf_blob_v2',$1,$2,'edit',$3)",
 		nextSHA,len(newContent),actorID)
 	exec("UPDATE files SET current_version_seq=2 WHERE id='dhf_file'")
 	previewV1,previewErr:=service.DHFPilotReviewerEvidencePreview(ctx,domain.User{ID:"dhf_sw_reviewer"},
