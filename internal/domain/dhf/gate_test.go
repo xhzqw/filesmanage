@@ -6,224 +6,383 @@ import (
 	"time"
 )
 
-var pilotNow = time.Date(2026, time.October, 24, 12, 0, 0, 0, time.UTC)
+var testNow = time.Date(2026, 10, 24, 13, 0, 0, 0, time.UTC)
 
-func validInput(action Action) GateInput {
+func baseInput(action Action) GateInput {
+	p := PolicySnapshot{
+		TemplateVersionID: "template-v1",
+		TemplateHash: "policy-sha",
+		StageID: "G5",
+		Published: true,
+		Requirements: []RequirementPolicy{
+			{ID: "SW", SpecialtyKey: "G5-SW", Mandatory: true, Critical: true},
+			{ID: "MF", SpecialtyKey: "G5-MF", Mandatory: true, Critical: true},
+		},
+		Specialties: []SpecialtyPolicy{
+			{Key: "G5-SW"},
+			{Key: "G5-MF"},
+		},
+	}
+	s := StageSnapshot{
+		ProjectID: "proj", StageID: "G5", AttemptID: "attempt-1",
+		TemplateVersionID: "template-v1", TemplateHash: "policy-sha",
+		EvidenceManifestHash: "evidence-sha", State: Reviewing,
+		ActorAuthorized: true, SeparationValid: true,
+		FileReleaseApproved: true, BaselineActive: true,
+		Now: testNow,
+	}
 	return GateInput{
-		Action: action,
-		State: Reviewing,
-		TemplatePublished: true,
-		BaselineActive: true,
-		ActorAuthorized: true,
-		SeparationValid: true,
-		FileReleaseApproved: true,
-		Now: pilotNow,
-		Requirements: []Requirement{{
-			ID: "REQ-G5-SW-001", Applicability: Applicable,
-			Mandatory: true, Critical: true, EvidenceBound: true, EvidenceVerified: true,
-		}},
+		Action: action, Policy: p, Stage: s,
+		Requirements: []RequirementResult{
+			{ID: "SW", Applicability: Applicable, EvidenceBound: true, EvidenceVerified: true},
+			{ID: "MF", Applicability: Applicable, EvidenceBound: true, EvidenceVerified: true},
+		},
+		Specialties: []SpecialtyReview{
+			{Key: "G5-SW", AttemptID: "attempt-1", TemplateHash: "policy-sha",
+				EvidenceManifestHash: "evidence-sha", Applicability: Applicable, Decision: SpecialtyApproved, Authorized: true},
+			{Key: "G5-MF", AttemptID: "attempt-1", TemplateHash: "policy-sha",
+				EvidenceManifestHash: "evidence-sha", Applicability: Applicable, Decision: SpecialtyApproved, Authorized: true},
+		},
 	}
 }
 
-func requireDecision(t *testing.T, got Decision, want Verdict, reason string) {
+func expect(t *testing.T, actual Decision, want Verdict, reason string) {
 	t.Helper()
-	if got.Verdict != want {
-		t.Fatalf("verdict = %q; want %q (reasons: %v)", got.Verdict, want, got.Reasons)
+	if actual.Verdict != want {
+		t.Fatalf("got %s, want %s; reasons=%v", actual.Verdict, want, actual.Reasons)
 	}
-	if reason != "" && !slices.Contains(got.Reasons, reason) {
-		t.Fatalf("missing reason %q: %v", reason, got.Reasons)
+	if reason != "" && !slices.Contains(actual.Reasons, reason) {
+		t.Fatalf("missing reason %q in %v", reason, actual.Reasons)
+	}
+	if !slices.IsSorted(actual.Reasons) || len(actual.Reasons) != len(slices.Compact(slices.Clone(actual.Reasons))) {
+		t.Fatalf("reason codes must be sorted and unique: %v", actual.Reasons)
 	}
 }
 
-func TestGateRejectsUnpublishedPolicyAndInactiveBaseline(t *testing.T) {
-	in := validInput(ActionFinalize)
-	in.TemplatePublished = false
-	requireDecision(t, Evaluate(in), Deny, "DHF_POLICY_UNPUBLISHED")
-	in.TemplatePublished, in.BaselineActive = true, false
-	requireDecision(t, Evaluate(in), Deny, "DHF_BASELINE_INACTIVE")
+func TestG5CompleteFinalDecision(t *testing.T) {
+	in := baseInput(ActionFinalize)
+	expect(t, Evaluate(in), Allow, "")
 }
 
-func TestGateDenyByDefaultForUnknownActionsAndSubjects(t *testing.T) {
-	in := validInput(Action("arbitrary"))
-	requireDecision(t, Evaluate(in), Deny, "DHF_ACTION_UNKNOWN")
-	in = validInput(ActionFinalize)
-	in.ActorAuthorized = false
-	requireDecision(t, Evaluate(in), Deny, "DHF_SCOPE_DENIED")
-	in.ActorAuthorized = true
-	in.SeparationValid = false
-	requireDecision(t, Evaluate(in), Deny, "DHF_SELF_REVIEW_DENIED")
+func TestUnpublishedAndInactiveBaselineRejected(t *testing.T) {
+	in := baseInput(ActionFinalize)
+	in.Policy.Published = false
+	expect(t, Evaluate(in), Deny, "DHF_POLICY_UNPUBLISHED")
+	in.Policy.Published = true
+	in.Stage.BaselineActive = false
+	expect(t, Evaluate(in), Deny, "DHF_BASELINE_INACTIVE")
 }
 
-func TestG5GateRequiresAllConfiguredSpecialties(t *testing.T) {
-	in := validInput(ActionFinalize)
-	in.IsG5 = true
-	in.ExpectedSpecialties = []string{"G5-SW", "G5-MF"}
-	in.SpecialtyReviews = []SpecialtyReview{
-		{Key: "G5-SW", Applicability: Applicable, Decision: SpecialtyApproved, AuthorizedDecision: true},
-	}
-	requireDecision(t, Evaluate(in), Deny, "DHF_SPECIALTY_PENDING")
-	in.SpecialtyReviews = append(in.SpecialtyReviews,
-		SpecialtyReview{Key: "G5-MF", Applicability: Applicable, Decision: SpecialtyApproved, AuthorizedDecision: true})
-	requireDecision(t, Evaluate(in), Allow, "")
-	in.SpecialtyReviews[1].Decision = SpecialtyReturned
-	requireDecision(t, Evaluate(in), Deny, "DHF_SPECIALTY_RETURNED")
+func TestMissingOrMismatchedIdentityRejected(t *testing.T) {
+	in := baseInput(ActionFinalize)
+	in.Stage.TemplateHash = "other-policy"
+	expect(t, Evaluate(in), Deny, "DHF_SNAPSHOT_IDENTITY_INVALID")
+	in = baseInput(ActionFinalize)
+	in.Stage.EvidenceManifestHash = ""
+	expect(t, Evaluate(in), Deny, "DHF_SNAPSHOT_IDENTITY_INVALID")
+	in = baseInput(ActionFinalize)
+	in.Stage.StageID = "G6"
+	expect(t, Evaluate(in), Deny, "DHF_SNAPSHOT_IDENTITY_INVALID")
 }
 
-func TestG5NotApplicableIsNotAnAutomaticSkip(t *testing.T) {
-	in := validInput(ActionFinalize)
-	in.IsG5 = true
-	in.ExpectedSpecialties = []string{"G5-SW"}
-	in.SpecialtyReviews = []SpecialtyReview{{
-		Key: "G5-SW", Applicability: NotApplicable,
-		Decision: SpecialtyNotApplicable, AuthorizedDecision: false,
-	}}
-	requireDecision(t, Evaluate(in), Deny, "DHF_SPECIALTY_UNAUTHORIZED")
-	in.SpecialtyReviews[0].AuthorizedDecision = true
-	requireDecision(t, Evaluate(in), Allow, "")
-}
-
-func TestG5SubmissionDoesNotRequireYetUncreatedSpecialtyReview(t *testing.T) {
-	in := validInput(ActionSubmit)
-	in.State = Preparing
-	in.IsG5 = true
-	in.ExpectedSpecialties = []string{"G5-SW", "G5-MF"}
-	requireDecision(t, Evaluate(in), Allow, "")
-}
-
-func TestRequirementApplicabilityAndEvidenceAreSeparate(t *testing.T) {
-	in := validInput(ActionFinalize)
-	in.Requirements[0].Applicability = ApplicabilityPending
-	requireDecision(t, Evaluate(in), Deny, "DHF_APPLICABILITY_PENDING")
-	in.Requirements[0].Applicability = NotApplicable
-	requireDecision(t, Evaluate(in), Deny, "DHF_APPLICABILITY_UNAUTHORIZED")
-	in.Requirements[0].ApplicabilityAuthorized = true
-	requireDecision(t, Evaluate(in), Allow, "")
-	in.Requirements[0].Applicability = Applicable
-	in.Requirements[0].EvidenceVerified = false
-	requireDecision(t, Evaluate(in), Deny, "DHF_EVIDENCE_MISSING")
-}
-
-func TestConditionalGateRequiresAuthorizedNoncriticalRemediation(t *testing.T) {
-	in := validInput(ActionConditionalApprove)
-	in.Requirements[0] = Requirement{
-		ID: "REQ-G5-SW-001", Applicability: Applicable, Mandatory: true,
-		Critical: false, ConditionEligible: true,
-	}
-	in.OpenRemediations = 1
-	in.Conditional = &ConditionalPermission{
-		TemplateEnabled: true, DecisionAuthorized: true,
-		Expiry: pilotNow.Add(24*time.Hour),
-		AllowedActions: []Action{ActionPrepare},
-		RemediationRequirementIDs: []string{"REQ-G5-SW-001"},
-	}
-	requireDecision(t, Evaluate(in), LimitedAllow, "")
-	in.OpenRemediations = 0
-	requireDecision(t, Evaluate(in), Deny, "DHF_NO_CONDITIONAL_REMEDIATION")
-	in.OpenRemediations = 1
-	in.Conditional.DecisionAuthorized = false
-	requireDecision(t, Evaluate(in), Deny, "DHF_CONDITIONAL_UNAUTHORIZED")
-	in.Conditional.DecisionAuthorized = true
-	in.Conditional.Expiry = pilotNow
-	requireDecision(t, Evaluate(in), Deny, "DHF_CONDITIONAL_EXPIRED")
-	in.Conditional.Expiry = pilotNow.Add(time.Hour)
-	in.Requirements[0].Critical = true
-	requireDecision(t, Evaluate(in), Deny, "DHF_EVIDENCE_MISSING")
-}
-
-func TestNoImplicitConditionalReleaseOfMissingEvidence(t *testing.T) {
-	in := validInput(ActionConditionalApprove)
-	in.Requirements[0].Critical = false
-	in.Requirements[0].ConditionEligible = true
-	in.Requirements[0].EvidenceBound = false
-	in.Conditional = &ConditionalPermission{
-		TemplateEnabled: true, DecisionAuthorized: true,
-		Expiry: pilotNow.Add(time.Hour), AllowedActions: []Action{ActionPrepare},
-	}
-	requireDecision(t, Evaluate(in), Deny, "DHF_EVIDENCE_MISSING")
-}
-
-func TestConditionalPredecessorsAreActionScopedAndNontransitive(t *testing.T) {
-	in := validInput(ActionSubmit)
-	in.State = Preparing
-	in.Dependencies = []Dependency{{
-		Key: "G6", GuardedAction: ActionSubmit, Result: ConditionallyReleased,
-		Direct: true, ConditionalValid: true,
-		ConditionalExpiresAt: pilotNow.Add(time.Hour), ConditionalScope: []Action{ActionSubmit},
-	}}
-	requireDecision(t, Evaluate(in), LimitedAllow, "")
-	in.Dependencies[0].Direct = false
-	requireDecision(t, Evaluate(in), Deny, "DHF_UPSTREAM_BLOCKED")
-	in.Dependencies[0].Direct = true
-	in.Dependencies[0].ConditionalScope = []Action{ActionPrepare}
-	requireDecision(t, Evaluate(in), Deny, "DHF_UPSTREAM_BLOCKED")
-	in.Dependencies[0].ConditionalScope = []Action{ActionSubmit}
-	in.Dependencies[0].ConditionalExpiresAt = pilotNow
-	requireDecision(t, Evaluate(in), Deny, "DHF_UPSTREAM_BLOCKED")
-}
-
-func TestConditionallyReleasedStageCannotIssueDocument(t *testing.T) {
-	in := validInput(ActionIssueDocument)
-	in.State = ConditionallyReleased
-	requireDecision(t, Evaluate(in), Deny, "DHF_RELEASE_POLICY_DENIED")
-	in.State = Accepted
-	in.FileReleaseApproved = false
-	requireDecision(t, Evaluate(in), Deny, "DHF_RELEASE_POLICY_DENIED")
-	in.FileReleaseApproved = true
-	requireDecision(t, Evaluate(in), Allow, "")
-}
-
-func TestConditionalRemediationMustBeClosedBeforeFinalization(t *testing.T) {
-	in := validInput(ActionFinalize)
-	in.State = ConditionallyReleased
-	in.OpenRemediations = 1
-	requireDecision(t, Evaluate(in), Deny, "DHF_REMEDIATION_OPEN")
-	in.OpenRemediations = 0
-	requireDecision(t, Evaluate(in), Allow, "")
-}
-
-func TestOrdinaryPreparationDoesNotRequireAcceptedUpstreamGate(t *testing.T) {
-	in := validInput(ActionPrepare)
-	in.State = Preparing
-	in.Dependencies = []Dependency{{Key: "G6", GuardedAction: ActionSubmit, Result: Preparing}}
-	in.Requirements[0].EvidenceVerified = false
-	requireDecision(t, Evaluate(in), Allow, "")
-}
-
-func TestInvalidDuplicateRequirementsAndUnknownRemediation(t *testing.T) {
-	in := validInput(ActionSubmit)
-	in.State = Preparing
+func TestPolicyCannotOmitExpectedRequirements(t *testing.T) {
+	in := baseInput(ActionFinalize)
+	in.Requirements = in.Requirements[:1]
+	expect(t, Evaluate(in), Deny, "DHF_REQUIREMENT_SET_INCOMPLETE")
+	in = baseInput(ActionFinalize)
+	in.Requirements[1].ID = "UNEXPECTED"
+	expect(t, Evaluate(in), Deny, "DHF_REQUIREMENT_SET_INVALID")
+	in = baseInput(ActionFinalize)
 	in.Requirements = append(in.Requirements, in.Requirements[0])
-	requireDecision(t, Evaluate(in), Deny, "DHF_REQUIREMENT_SET_INVALID")
+	expect(t, Evaluate(in), Deny, "DHF_REQUIREMENT_SET_INVALID")
+	in = baseInput(ActionFinalize)
+	in.Policy.Requirements[1].ID = "SW"
+	expect(t, Evaluate(in), Deny, "DHF_POLICY_REQUIREMENTS_INVALID")
 }
 
-func TestReasonCodesAreSortedDeduplicatedAndSafe(t *testing.T) {
-	in := validInput(ActionFinalize)
-	in.ActorAuthorized = false
+func TestMissingOrExtraDependencyFactsRejected(t *testing.T) {
+	in := baseInput(ActionSubmit)
+	in.Stage.State = Preparing
+	in.Specialties = nil
+	in.Policy.Dependencies = []DependencyPolicy{{ID: "G4-submit", PredecessorStage: "G4", GuardedAction: ActionSubmit}}
+	expect(t, Evaluate(in), Deny, "DHF_DEPENDENCY_SET_INCOMPLETE")
+	in.Dependencies = []DependencyResult{{ID: "G4-submit", PredecessorStage: "G4", State: Accepted}}
+	expect(t, Evaluate(in), Allow, "")
+	in.Dependencies[0].PredecessorStage = "G1"
+	expect(t, Evaluate(in), Deny, "DHF_DEPENDENCY_SET_INVALID")
+	in = baseInput(ActionSubmit)
+	in.Stage.State = Preparing
+	in.Specialties = nil
+	in.Dependencies = []DependencyResult{{ID: "unknown", PredecessorStage: "G1", State: Accepted}}
+	expect(t, Evaluate(in), Deny, "DHF_DEPENDENCY_SET_INVALID")
+}
+
+func TestPreparingHonorsExplicitTemplateDependencies(t *testing.T) {
+	in := baseInput(ActionPrepare)
+	in.Stage.State = Preparing
+	in.Specialties = nil
+	in.Policy.Dependencies = []DependencyPolicy{{ID: "G4-prep", PredecessorStage: "G4", GuardedAction: ActionPrepare}}
+	in.Dependencies = []DependencyResult{{ID: "G4-prep", PredecessorStage: "G4", State: Preparing}}
+	expect(t, Evaluate(in), Deny, "DHF_UPSTREAM_BLOCKED")
+	in.Dependencies[0].State = Accepted
+	expect(t, Evaluate(in), Allow, "")
+}
+
+func TestDraftMayPrepareWithPendingEvidence(t *testing.T) {
+	in := baseInput(ActionPrepare)
+	in.Stage.State = Preparing
+	in.Specialties = nil
+	in.Requirements[0].Applicability = ApplicabilityPending
 	in.Requirements[0].EvidenceBound = false
-	in.Requirements = append(in.Requirements, Requirement{
-		ID:"REQ-G5-MF-001", Applicability:Applicable,
-		Mandatory:true,
-	})
-	d := Evaluate(in)
-	if d.Verdict != Deny { t.Fatalf("verdict %q", d.Verdict) }
-	if !sortReasonsUnique(d.Reasons) { t.Fatalf("reasons not sorted/unique: %v", d.Reasons) }
+	expect(t, Evaluate(in), Allow, "")
+	in.Action = ActionSubmit
+	expect(t, Evaluate(in), Deny, "DHF_APPLICABILITY_PENDING")
 }
 
-func sortReasonsUnique(rs []string) bool {
-	return slices.IsSorted(rs) && len(rs) == len(slices.Compact(slices.Clone(rs)))
-}
-
-
-func TestConditionalGrantRejectsUnsafeAction(t *testing.T) {
-	in := validInput(ActionConditionalApprove)
-	in.Requirements[0] = Requirement{
-		ID: "REQ-SW", Applicability: Applicable, Mandatory: true, ConditionEligible: true,
+func TestStrictStageActionMatrix(t *testing.T) {
+	for _, tc := range []struct {
+		action Action
+		state StageState
+		allow bool
+	}{
+		{ActionPrepare, Preparing, true},
+		{ActionPrepare, ChangesRequested, true},
+		{ActionPrepare, Accepted, false},
+		{ActionPrepare, StageState("unknown"), false},
+		{ActionSubmit, Preparing, true},
+		{ActionSubmit, Reviewing, false},
+		{ActionConditionalApprove, Reviewing, true},
+		{ActionConditionalApprove, Accepted, false},
+		{ActionFinalize, Reviewing, true},
+		{ActionFinalize, ConditionallyReleased, true},
+		{ActionFinalize, Submitted, false},
+		{ActionIssueDocument, Accepted, true},
+		{ActionIssueDocument, ConditionallyReleased, false},
+	} {
+		in := baseInput(tc.action)
+		in.Stage.State = tc.state
+		if tc.action == ActionPrepare || tc.action == ActionSubmit || tc.action == ActionIssueDocument {
+			in.Specialties = nil
+		}
+		if tc.action == ActionConditionalApprove {
+			// Valid state is not sufficient: a conditional grant is still required.
+			tc.allow = false
+		}
+		got := Evaluate(in)
+		if tc.allow {
+			expect(t, got, Allow, "")
+		} else {
+			expect(t, got, Deny, "")
+		}
 	}
+	in := baseInput(Action("unknown_action"))
+	expect(t, Evaluate(in), Deny, "DHF_ACTION_UNKNOWN")
+}
+
+func TestG5RequiresEverySpecialtyAtFinalization(t *testing.T) {
+	in := baseInput(ActionFinalize)
+	in.Specialties = in.Specialties[:1]
+	expect(t, Evaluate(in), Deny, "DHF_SPECIALTY_SET_INCOMPLETE")
+	in = baseInput(ActionFinalize)
+	in.Specialties[1].Decision = SpecialtyReturned
+	expect(t, Evaluate(in), Deny, "DHF_SPECIALTY_RETURNED")
+	in = baseInput(ActionFinalize)
+	in.Specialties[1].Authorized = false
+	expect(t, Evaluate(in), Deny, "DHF_SPECIALTY_UNAUTHORIZED")
+}
+
+func TestG5ReviewMustMatchSameAttemptAndEvidence(t *testing.T) {
+	in := baseInput(ActionFinalize)
+	in.Specialties[0].AttemptID = "old-attempt"
+	expect(t, Evaluate(in), Deny, "DHF_SPECIALTY_REVIEW_INVALID")
+	in = baseInput(ActionFinalize)
+	in.Specialties[0].EvidenceManifestHash = "old-evidence"
+	expect(t, Evaluate(in), Deny, "DHF_SPECIALTY_REVIEW_INVALID")
+	in = baseInput(ActionFinalize)
+	in.Specialties[0].TemplateHash = "old-policy"
+	expect(t, Evaluate(in), Deny, "DHF_SPECIALTY_REVIEW_INVALID")
+}
+
+func TestG5InitialSubmitDoesNotRequireFutureSpecialtyReviews(t *testing.T) {
+	in := baseInput(ActionSubmit)
+	in.Stage.State = Preparing
+	in.Specialties = nil
+	expect(t, Evaluate(in), Allow, "")
+}
+
+func TestG5PolicyCannotBeDisabledByCallerFlag(t *testing.T) {
+	in := baseInput(ActionFinalize)
+	in.Policy.Specialties = nil
+	expect(t, Evaluate(in), Deny, "DHF_SPECIALTY_POLICY_INVALID")
+	in = baseInput(ActionFinalize)
+	in.Policy.StageID = "G6"
+	in.Stage.StageID = "G6"
+	expect(t, Evaluate(in), Deny, "DHF_SPECIALTY_POLICY_INVALID")
+}
+
+func TestNotApplicableRequiresPolicyAndDecisionAuthorization(t *testing.T) {
+	in := baseInput(ActionFinalize)
+	in.Requirements[0].Applicability = NotApplicable
+	in.Requirements[0].ApplicabilityAuthorized = true
+	expect(t, Evaluate(in), Deny, "DHF_APPLICABILITY_UNAUTHORIZED")
+	in.Policy.Requirements[0].AllowNotApplicable = true
+	in.Specialties[0].Applicability = NotApplicable
+	in.Specialties[0].Decision = SpecialtyNotApplicable
+	in.Policy.Specialties[0].AllowNotApplicable = true
+	expect(t, Evaluate(in), Allow, "")
+	in.Specialties[0].Authorized = false
+	expect(t, Evaluate(in), Deny, "DHF_SPECIALTY_UNAUTHORIZED")
+}
+
+func conditionalInput() GateInput {
+	in := baseInput(ActionConditionalApprove)
+	in.Policy.ConditionalAllowed = true
+	in.Policy.Requirements[0].Critical = false
+	in.Policy.Requirements[0].ConditionEligible = true
+	in.Requirements[0].EvidenceVerified = false
+	in.Specialties[0].Decision = SpecialtyConditional
+	in.Remediations = []Remediation{{
+		ID: "rem-SW", RequirementID: "SW", AttemptID: "attempt-1",
+		State: RemediationOpen, Authorized: true, DueAt: testNow.Add(48 * time.Hour),
+	}}
 	in.Conditional = &ConditionalPermission{
-		TemplateEnabled: true, DecisionAuthorized: true,
-		Expiry: pilotNow.Add(time.Hour),
-		AllowedActions: []Action{ActionIssueDocument},
-		RemediationRequirementIDs: []string{"REQ-SW"},
+		DecisionAuthorized: true, ExpiresAt: testNow.Add(24 * time.Hour),
+		AllowedActions: []Action{ActionPrepare}, RemediationIDs: []string{"rem-SW"},
 	}
-	requireDecision(t, Evaluate(in), Deny, "DHF_CONDITIONAL_SCOPE_UNSAFE")
+	return in
+}
+
+func TestConditionalWithBoundRemediationIsLimited(t *testing.T) {
+	in := conditionalInput()
+	got := Evaluate(in)
+	expect(t, got, LimitedAllow, "")
+	if !slices.Equal(got.AuthorizedActions, []Action{ActionPrepare}) || !got.ExpiresAt.Equal(testNow.Add(24*time.Hour)) {
+		t.Fatalf("limited decision loses scope or expiry: %+v", got)
+	}
+}
+
+func TestConditionalRequirementMustLinkExactRemediation(t *testing.T) {
+	in := conditionalInput()
+	in.Remediations[0].RequirementID = "MF"
+	expect(t, Evaluate(in), Deny, "DHF_CONDITIONAL_REMEDIATION_MISSING")
+	in = conditionalInput()
+	in.Remediations[0].AttemptID = "old-attempt"
+	expect(t, Evaluate(in), Deny, "DHF_REMEDIATION_INVALID")
+	in = conditionalInput()
+	in.Conditional.RemediationIDs[0] = "nonexistent"
+	expect(t, Evaluate(in), Deny, "DHF_CONDITIONAL_REMEDIATION_INVALID")
+	in = conditionalInput()
+	in.Remediations[0].DueAt = testNow
+	expect(t, Evaluate(in), Deny, "DHF_CONDITIONAL_REMEDIATION_INVALID")
+	in = conditionalInput()
+	in.Remediations[0].Authorized = false
+	expect(t, Evaluate(in), Deny, "DHF_CONDITIONAL_REMEDIATION_INVALID")
+}
+
+func TestConditionalRejectsCriticalGapAndUnsafeScope(t *testing.T) {
+	in := conditionalInput()
+	in.Policy.Requirements[0].Critical = true
+	in.Policy.Requirements[0].ConditionEligible = false
+	expect(t, Evaluate(in), Deny, "DHF_EVIDENCE_MISSING")
+	in = conditionalInput()
+	in.Conditional.AllowedActions = []Action{ActionFinalize}
+	expect(t, Evaluate(in), Deny, "DHF_CONDITIONAL_SCOPE_UNSAFE")
+	in = conditionalInput()
+	in.Conditional.AllowedActions = []Action{ActionIssueDocument}
+	expect(t, Evaluate(in), Deny, "DHF_CONDITIONAL_SCOPE_UNSAFE")
+	in = conditionalInput()
+	in.Conditional.ExpiresAt = testNow
+	expect(t, Evaluate(in), Deny, "DHF_CONDITIONAL_EXPIRED")
+	in = conditionalInput()
+	in.Policy.ConditionalAllowed = false
+	expect(t, Evaluate(in), Deny, "DHF_CONDITIONAL_UNAUTHORIZED")
+}
+
+func TestConditionalSpecialtyCannotMasqueradeAsFullyApproved(t *testing.T) {
+	in := conditionalInput()
+	in.Specialties[0].Decision = SpecialtyApproved
+	expect(t, Evaluate(in), Deny, "DHF_SPECIALTY_PENDING")
+	in = conditionalInput()
+	in.Specialties[1].Decision = SpecialtyConditional
+	expect(t, Evaluate(in), Deny, "DHF_SPECIALTY_PENDING")
+}
+
+func TestClosedRemediationAndFreshEvidenceAllowFinalization(t *testing.T) {
+	in := baseInput(ActionFinalize)
+	in.Stage.State = ConditionallyReleased
+	in.Remediations = []Remediation{{
+		ID: "rem-SW", RequirementID: "SW", AttemptID: "attempt-1",
+		State: RemediationClosed, ClosureVerified: true,
+	}}
+	expect(t, Evaluate(in), Allow, "")
+	in.Remediations[0].ClosureVerified = false
+	expect(t, Evaluate(in), Deny, "DHF_REMEDIATION_UNVERIFIED")
+	in.Remediations[0].ClosureVerified = true
+	in.Remediations[0].State = RemediationOpen
+	expect(t, Evaluate(in), Deny, "DHF_REMEDIATION_OPEN")
+}
+
+func TestConditionalPredecessorScopedDirectAndUnexpired(t *testing.T) {
+	in := baseInput(ActionSubmit)
+	in.Policy.StageID = "G7"
+	in.Policy.Specialties = nil
+	for idx := range in.Policy.Requirements { in.Policy.Requirements[idx].SpecialtyKey = "" }
+	in.Stage.StageID = "G7"
+	in.Stage.State = Preparing
+	in.Specialties = nil
+	in.Policy.Dependencies = []DependencyPolicy{{
+		ID: "G6-G7", PredecessorStage: "G6", GuardedAction: ActionSubmit, AllowConditional: true,
+	}}
+	in.Dependencies = []DependencyResult{{
+		ID: "G6-G7", PredecessorStage: "G6", State: ConditionallyReleased,
+		Grant: &UpstreamGrant{ID: "grant", TargetStageID: "G7", Direct: true, Authorized: true,
+			ExpiresAt: testNow.Add(time.Hour), AllowedActions: []Action{ActionSubmit}},
+	}}
+	expect(t, Evaluate(in), LimitedAllow, "")
+	in.Dependencies[0].Grant.InheritedFromID = "another-grant"
+	expect(t, Evaluate(in), Deny, "DHF_UPSTREAM_BLOCKED")
+	in.Dependencies[0].Grant.InheritedFromID = ""
+	in.Dependencies[0].Grant.ExpiresAt = testNow
+	expect(t, Evaluate(in), Deny, "DHF_UPSTREAM_BLOCKED")
+	in.Dependencies[0].Grant.ExpiresAt = testNow.Add(time.Hour)
+	in.Dependencies[0].Grant.AllowedActions = []Action{ActionFinalize}
+	expect(t, Evaluate(in), Deny, "DHF_UPSTREAM_BLOCKED")
+	in.Dependencies[0].Grant.AllowedActions = []Action{ActionSubmit}
+	in.Policy.Dependencies[0].AllowConditional = false
+	expect(t, Evaluate(in), Deny, "DHF_UPSTREAM_BLOCKED")
+}
+
+func TestConditionalPredecessorCannotAuthorizeFinalization(t *testing.T) {
+	in := baseInput(ActionFinalize)
+	in.Policy.Dependencies = []DependencyPolicy{{
+		ID: "G4-final", PredecessorStage: "G4", GuardedAction: ActionFinalize,
+		AllowConditional: true,
+	}}
+	in.Dependencies = []DependencyResult{{ID: "G4-final", PredecessorStage: "G4",
+		State: ConditionallyReleased,
+		Grant: &UpstreamGrant{ID: "grant", TargetStageID: "G5", Direct: true, Authorized: true,
+			ExpiresAt: testNow.Add(time.Hour), AllowedActions: []Action{ActionFinalize}},
+	}}
+	expect(t, Evaluate(in), Deny, "DHF_POLICY_DEPENDENCIES_INVALID")
+}
+
+func TestFormalIssueRequiresAcceptedStageAndIndependentRelease(t *testing.T) {
+	in := baseInput(ActionIssueDocument)
+	in.Specialties = nil
+	in.Stage.State = Accepted
+	expect(t, Evaluate(in), Allow, "")
+	in.Stage.FileReleaseApproved = false
+	expect(t, Evaluate(in), Deny, "DHF_RELEASE_POLICY_DENIED")
+	in.Stage.FileReleaseApproved = true
+	in.Stage.State = ConditionallyReleased
+	expect(t, Evaluate(in), Deny, "DHF_STATE_INVALID")
+}
+
+func TestSecurityScopeAndSeparation(t *testing.T) {
+	in := baseInput(ActionFinalize)
+	in.Stage.ActorAuthorized = false
+	expect(t, Evaluate(in), Deny, "DHF_SCOPE_DENIED")
+	in.Stage.ActorAuthorized = true
+	in.Stage.SeparationValid = false
+	expect(t, Evaluate(in), Deny, "DHF_SELF_REVIEW_DENIED")
 }
