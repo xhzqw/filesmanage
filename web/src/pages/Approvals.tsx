@@ -8,15 +8,16 @@ import type {User} from "../entities/user/model";
 import {ApprovalInbox,type ApprovalView} from "../features/workflow/ApprovalInbox";
 import {DHFPilotInbox} from "../features/workflow/DHFPilotInbox";
 import {DHFRemediationInbox} from "../features/workflow/DHFRemediationInbox";
+import {DHFReviewAttestationInbox} from "../features/workflow/DHFReviewAttestationInbox";
 import {AppShell} from "../shared/ui/AppShell";
 
-type Section=ApprovalView|"seals"|"dhf"|"dhf_returns";
+type Section=ApprovalView|"seals"|"dhf"|"dhf_returns"|"dhf_attestations";
 
 export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
  const[review,setReview]=useState<Approval|null>(null);
  const[params,setParams]=useSearchParams();
  const requested=params.get("tab");
- const section:Section=requested==="mine"||requested==="notifications"||requested==="seals"||requested==="dhf"||requested==="dhf_returns"||(user.isAdmin&&requested==="all_pending")?requested:"inbox";
+ const section:Section=requested==="mine"||requested==="notifications"||requested==="seals"||requested==="dhf"||requested==="dhf_returns"||requested==="dhf_attestations"||(user.isAdmin&&requested==="all_pending")?requested:"inbox";
  function changeSection(next:Section){
   setParams(previous=>{
    const updated=new URLSearchParams(previous);
@@ -32,6 +33,7 @@ export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
   {id:"mine",label:"我发起的"},
   {id:"dhf",label:"研发阶段审核"},
   {id:"dhf_returns",label:"我的研发整改"},
+  {id:"dhf_attestations",label:"签审身份确认"},
   {id:"notifications",label:"通知",count:counts.unread},
   {id:"seals",label:user.isAdmin?"签章管理":"我的签章"},
  ];
@@ -51,6 +53,7 @@ export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
       {section==="seals"?<SealLibrary isAdmin={user.isAdmin}/>:
        section==="dhf"?<DHFPilotInbox/>:
        section==="dhf_returns"?<DHFRemediationInbox/>:
+       section==="dhf_attestations"?<DHFReviewAttestationInbox/>:
        <ApprovalInbox currentUser={user} view={section} onCounts={setCounts} onReview={setReview}/>}
      </div>
     </div>
