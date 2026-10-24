@@ -134,3 +134,37 @@ This failure remains part of the engineering evidence, not a successful run.
 
 **This deliverable is one foundational V0.8.0 increment; it is not the
 completion of formal G1–G9 acceptance. Corporate acceptance remains NO-GO.**
+
+## 6. Real PostgreSQL 17 acceptance evidence (2026-10-25)
+
+Implementation revision under test: `1eabfb6`. Isolated Git checkout:
+`/tmp/filesmanage-dhf-v075-99ade80` on `10.144.144.1`.
+Fresh isolated PostgreSQL 17 database:
+`filesmanage_dhf_v063_integration_v080_review_1eabfb6`.
+The production business PostgreSQL database, port 8091 and live application
+services were **not** changed.
+
+| Executed check | Observed result |
+|---|---|
+| Full isolated migration from empty database, including new `0057` | **PASS — 59 migrations** |
+| Migration checksum validation on same database | **PASS — 59/59** |
+| `DHF_TEST_DATABASE_URL=... go test ./internal/adapter/postgres -run TestDHFPilotRealPostgresSubmission -v` (precompiled isolated test runner) | **PASS — 1.94 seconds** |
+| Scoping of original Gate signer, current password, conditional-mode refusal and absent corporate issuer authority | **PASS — real database assertions** |
+| Candidate/manifest/policy identity, tampered or invented prerequisite edges, unaudited direct INSERT, dependency SHA audit/outbox coupling | **PASS — real database assertions** |
+| Immutable Gate-review status, attempt remains `submitted`, no fabricated `accepted`, exact replay and changed-key conflict | **PASS — real database assertions** |
+| `go test ./internal/... -count=1` | **PASS** |
+| `go vet ./internal/...` + builds for `cmd/server`, `cmd/worker`, `cmd/migrate` | **PASS** |
+| `python3 scripts/gen_openapi.py --check` | **PASS — 144 paths / 174 operations** |
+| `python3 scripts/gen_acceptance_matrix.py --check` | **PASS — 126 IDs (123 PASS, 3 PARTIAL)** |
+| `npm --prefix web run build` | **PASS**, existing Three.js large-bundle warnings |
+| Live browser multi-width checks, parallel review-intake stress, enterprise signer policy | **NOT_RUN / NOT_APPROVED** |
+
+**Failure and correction:** the initial fresh database migration at
+`9cc0de2` failed on PostgreSQL `42P17` because a `jsonb::text` conversion
+inside a generated column is not marked immutable. Revision `9c0c0c1`
+computes and seals the exact JSONB snapshot digest in a guarded BEFORE INSERT
+trigger instead. The first failing database was not counted as PASS; a
+separate clean database was created and all 59 migrations were replayed.
+
+**Safety result:** the submitted attempts and stage-position CHECK constraints
+remain untouched. Nothing has been formally accepted or issued.
