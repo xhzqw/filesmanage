@@ -294,3 +294,27 @@ type DHFPilotAttestationRecord struct {
  IdempotencyKey string
  RequestSHA string
 }
+
+
+// Viewer scope is always the original assigned reviewer, never all project
+// members, admins, or consumers of a recommendation copied via a task ID.
+type DHFPilotAttestationInboxStore interface{
+ DHFPilotBeginSnapshot(context.Context) error
+ DHFPilotAttestationInboxForSigner(context.Context,string,int)([]DHFPilotAttestationInboxRow,error)
+}
+type DHFPilotAttestationInboxRow struct{
+ TaskID string `json:"taskId"`
+ DecisionID string `json:"decisionId"`
+ SubmissionID string `json:"submissionId"`
+ ProjectID string `json:"projectId"`
+ StageID string `json:"stageId"`
+ ReviewKey string `json:"reviewKey"`
+ Outcome string `json:"outcome"`
+ ReviewComment string `json:"reviewComment"`
+ PolicySHA string `json:"policySha"`
+ ManifestSHA string `json:"manifestSha"`
+ OutstandingPrior int `json:"outstandingPrior"`
+ CanAttest bool `json:"canAttest"`
+ AttestationID string `json:"attestationId,omitempty"`
+ ContentSHA string `json:"contentSha,omitempty"`
+}
