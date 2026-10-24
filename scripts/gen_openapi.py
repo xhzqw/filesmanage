@@ -1327,6 +1327,31 @@ add("POST","/api/workbench/dhf/tasks/{id}/recommendation",operation(
  resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),
  resp("404",ERR["404"]),resp("409",ERR["409"])])))
 
+schema("DHFReviewerEvidenceItem",obj({
+ "requirementId":string(),"fileId":string(),"fileName":string(),
+ "versionSeq":integer(minimum=1),"sha256":string(),"sizeBytes":integer(minimum=0),
+},required=["requirementId","fileId","fileName","versionSeq","sha256","sizeBytes"]))
+schema("DHFReviewerEvidencePage",obj({
+ "items":arr(ref("DHFReviewerEvidenceItem")),"trialOnly":boolean(),
+},required=["items","trialOnly"]))
+add("GET","/api/workbench/dhf/tasks/{id}/evidence",operation(
+ "List exact frozen file versions for assigned reviewer with independent original file preview ACL checks",
+ "Workflow","dhfPilotEvidenceList",security=SESSION,
+ params=[id_param("id","Review task ID")],
+ responses=dict([json_ok(ref("DHFReviewerEvidencePage"),"Original immutable version tuple with no Blob storage key exposure."),
+ resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("503",ERR["503"])])))
+schema("DHFReviewerEvidencePreview",obj({
+ "fileId":string(),"name":string(),"sha256":string(),"size":integer(minimum=0),
+ "content":string(),"textual":boolean(),"truncated":boolean(),
+ "renderer":string(),"mediaType":string(),"fixedVersionVerified":boolean(),
+},required=["fileId","name","sha256","size","textual","truncated","fixedVersionVerified"]))
+add("GET","/api/workbench/dhf/tasks/{id}/evidence/{rid}/preview",operation(
+ "Preview a bounded copy of the pinned historical document version, after reviewer+file ACL and physical SHA-256 checks",
+ "Workflow","dhfPilotEvidencePreview",security=SESSION,
+ params=[id_param("id","Assigned reviewer task ID"),id_param("rid","Frozen requirement ID")],
+ responses=dict([json_ok(ref("DHFReviewerEvidencePreview"),"Only bounded text/structural preview; full PDF/Office page rendering is not represented."),
+ resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("503",ERR["503"])])))
+
 # --- Approvals ---
 schema("ApprovalPage",obj({"items":arr(ref("Approval")),"nextCursor":string(),"hasMore":boolean(),"pendingCount":integer(minimum=0)},required=["items","nextCursor","hasMore","pendingCount"]))
 schema("ApprovalNotificationPage",obj({"items":arr(ref("ApprovalNotification")),"nextCursor":integer(minimum=0),"hasMore":boolean(),"unreadCount":integer(minimum=0)},required=["items","nextCursor","hasMore","unreadCount"]))
