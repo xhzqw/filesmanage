@@ -64,6 +64,7 @@ func(s *Service) dhfFrozenPDFBytes(ctx context.Context,fileName,sourceSHA string
  if ext==".pdf"&&(len(raw)>maxDocumentPDFPreviewBytes||len(raw)<8){return nil,0,ErrPreviewUnsupported}
  if ext==".docx"&&(len(raw)>maxOfficeSourceBytes||len(raw)<8){return nil,0,ErrPreviewUnsupported}
  pdfBytes:=raw
+ var err error
  if ext==".docx"{
    // The captured immutable bytes are used even if an administrator moves or
    // deletes the source after the integrity check. No second/latest read.
