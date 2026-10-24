@@ -11,6 +11,8 @@ type DHFTask={
  reviewKey:string;status:string;gateReady:boolean;assignedAt:string;
 };
 type TaskResponse={items:DHFTask[];trialOnly:boolean};
+type Duty={submissionId:string;projectId:string;stageId:string;taskId:string;reviewKey:string;stepOrdinal:number;reviewerId:string;status:string;earlyIntervention:boolean;interventionReason?:string;outstandingPrior:number;canAuthorizeEarly:boolean};
+
 type FrozenEvidence={requirementId:string;fileId:string;fileName:string;versionSeq:number;sha256:string;sizeBytes:number};
 type EvidencePreview={name:string;content:string;textual:boolean;renderer:string;sha256:string;truncated:boolean;fixedVersionVerified:boolean};
 const displayStage:Record<string,string>={
@@ -26,6 +28,13 @@ const specialtyNames:Record<string,string>={
 
 export function DHFPilotInbox(){
  const [tasks,setTasks]=useState<DHFTask[]>([]);
+ const [duties,setDuties]=useState<Duty[]>([]);
+ const [dutyError,setDutyError]=useState("");
+ const [earlyTarget,setEarlyTarget]=useState<string|null>(null);
+ const [earlyReason,setEarlyReason]=useState("");
+ const [earlyBusy,setEarlyBusy]=useState(false);
+ const [earlyError,setEarlyError]=useState("");
+ const earlyIntent=useRef<{taskId:string;reason:string;key:string}|null>(null);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
  const [refresh,setRefresh]=useState(0);
@@ -53,9 +62,19 @@ export function DHFPilotInbox(){
    .catch(err=>{if(alive)setError(errorCopy(err,"DHF 审核任务加载失败"));})
    .finally(()=>{if(alive)setLoading(false);});
   return()=>{alive=false};
+  let available=true;setDutyError("");
+  void request<{items:Duty[]}>("/workbench/dhf/duties")
+   .then(result=>{if(available)setDuties(result.items??[]);})
+   .catch(err=>{if(available)setDutyError(errorCopy(err,"责任清单读取失败"));});
+  return()=>{available=false};
  },[refresh]);
  const visible=tasks.filter(task=>[task.stageId,task.reviewKey,task.projectId,task.submissionId].some(value=>value.toLowerCase().includes(query.trim().toLowerCase())));
  const active=visible.find(task=>task.id===selected)??visible[0];
+ const chain=duties.filter(item=>item.submissionId===active?.submissionId)
+  .sort((a,b)=>a.stepOrdinal-b.stepOrdinal);
+ const currentStep=chain.find(item=>item.taskId===active?.id);
+ const allowedByOrder=Boolean(currentStep&&(
+  currentStep.outstandingPrior===0||currentStep.earlyIntervention));
  useEffect(()=>{setComment("");setRecommendError("");},[active?.id]);
  useEffect(()=>{
   let valid=true;
@@ -84,6 +103,25 @@ export function DHFPilotInbox(){
   if(/\.(pdf|docx)$/i.test(item.fileName)){setLayout(item);return;}
   void showFixedEvidence(item.requirementId);
  }
+ async function authorizeEarly(taskId:string){
+  if(!active||earlyBusy)return;
+  const reason=earlyReason.trim();
+  if(reason.length<10)return;
+  setEarlyBusy(true);setEarlyError("");
+  try{
+   if(!earlyIntent.current||earlyIntent.current.taskId!==taskId||
+      earlyIntent.current.reason!==reason){
+    const raw=crypto.getRandomValues(new Uint8Array(16));
+    earlyIntent.current={taskId,reason,
+     key:Array.from(raw,n=>n.toString(16).padStart(2,"0")).join("")};
+   }
+   await request("/workbench/dhf/tasks/"+encodeURIComponent(taskId)+"/early-intervention",
+    {method:"POST",body:JSON.stringify({reason,idempotencyKey:earlyIntent.current.key})});
+   earlyIntent.current=null;
+   setEarlyTarget(null);setEarlyReason("");setRefresh(value=>value+1);
+  }catch(err){setEarlyError(errorCopy(err,"提前介入记录失败，请核对责任范围"))}
+  finally{setEarlyBusy(false)}
+ }
  async function recommend(outcome:"recommend_pass"|"recommend_return"){
   if(!active||busy)return;
   setBusy(true);setRecommendError("");setFeedback("");
@@ -102,7 +140,8 @@ export function DHFPilotInbox(){
    pendingIntent.current=null;
    setTasks(items=>items.filter(item=>item.id!==active.id));
    setSelected(null);
-   setFeedback("试点复核意见已记录，不代表正式阶段批准。");
+   setFeedback("试点复核意见已记录，前序责任不因提前复核而免除。");
+   setRefresh(value=>value+1);
   }catch(err){setRecommendError(errorCopy(err,"试点复核意见提交失败，请刷新并核对任务状态。"))}
   finally{setBusy(false)}
  }
@@ -137,6 +176,36 @@ export function DHFPilotInbox(){
        <div><dt>派发时间</dt><dd>{new Date(active.assignedAt).toLocaleString("zh-CN")}</dd></div>
      </dl>
      {active.reviewKey==="__gate__"&&!active.gateReady?<p className="dhf-pilot-gate-wait">该阶段的专业复核尚未全部完成，暂不能提出总 Gate 通过建议。</p>:null}
+     <section className="dhf-pilot-duty-chain" aria-label="阶段审核责任顺序">
+      <h3>阶段责任链</h3>
+      {dutyError?<p role="alert">{dutyError}</p>:
+       chain.length===0?<p>责任链未加载，暂不能记录复核。</p>:
+       <div className="dhf-pilot-duty-list">{chain.map(step=><div className="dhf-pilot-duty-row" key={step.taskId}>
+        <span className="dhf-pilot-duty-order">{step.stepOrdinal}</span>
+        <div>
+         <strong>{specialtyNames[step.reviewKey]??step.reviewKey}</strong>
+         <p>{step.status==="reviewed"?"已记录通过建议":step.status==="returned"?"已退回":"责任待履行"}
+           {step.earlyIntervention?" · 允许提前复核，前序责任保留":""}</p>
+         {step.earlyIntervention&&step.interventionReason?<p>{step.interventionReason}</p>:null}
+        </div>
+        {step.canAuthorizeEarly&&active.reviewKey==="__gate__"?
+         <RareButton type="button" onClick={()=>{setEarlyTarget(step.taskId);setEarlyReason("");setEarlyError("");}}>
+          授权提前介入
+         </RareButton>:null}
+       </div>)}</div>}
+      {earlyTarget&&active.reviewKey==="__gate__"?<div className="dhf-pilot-early-form">
+       <RareTextarea aria-label="提前介入理由" rows={3} value={earlyReason}
+        onChange={e=>setEarlyReason(e.target.value)}
+        placeholder="说明为何允许后续专业先复核，且明确前序责任不免除"/>
+       {earlyError?<p role="alert">{earlyError}</p>:null}
+       <RareButton type="button" disabled={earlyBusy||earlyReason.trim().length<10}
+        onClick={()=>void authorizeEarly(earlyTarget)}>{earlyBusy?"正在记录…":"记录提前介入"}</RareButton>
+       <RareButton type="button" disabled={earlyBusy} onClick={()=>setEarlyTarget(null)}>取消</RareButton>
+      </div>:null}
+      {currentStep&&currentStep.outstandingPrior>0&&!currentStep.earlyIntervention?
+       <p className="dhf-pilot-gate-wait">前序责任尚有 {currentStep.outstandingPrior} 项未完成；本步骤须等待前序完成，或由总 Gate 指派责任人明确授权提前介入。</p>:null}
+      <p>试点责任顺序不会替代具有身份核验的正式电子签署。</p>
+     </section>
      <section className="dhf-pilot-evidence" aria-label="提交时冻结的证据">
       <h3>冻结证据</h3>
       {evidenceLoading?<p>正在核对证据清单…</p>:
@@ -166,9 +235,9 @@ export function DHFPilotInbox(){
        placeholder="记录复核说明；建议退回时必须填写原因" rows={3}/>
       {recommendError?<p role="alert" className="dhf-pilot-opinion-error">{recommendError}</p>:null}
       <div className="dhf-pilot-actions">
-       <RareButton type="button" disabled={busy||(active.reviewKey==="__gate__"&&!active.gateReady)}
+       <RareButton type="button" disabled={busy||!allowedByOrder||(active.reviewKey==="__gate__"&&!active.gateReady)}
         onClick={()=>void recommend("recommend_pass")}>{busy?"处理中…":"记录通过建议"}</RareButton>
-       <RareButton type="button" disabled={busy||!comment.trim()}
+       <RareButton type="button" disabled={busy||!allowedByOrder||!comment.trim()}
         onClick={()=>void recommend("recommend_return")}>记录退回建议</RareButton>
       </div>
      </div>
