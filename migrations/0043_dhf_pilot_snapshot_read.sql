@@ -88,7 +88,7 @@ CREATE TABLE dhf_pilot_stage_positions (
 CREATE FUNCTION dhf_pilot_reject_published_template_change()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
- IF OLD.status='published' AND (
+ IF OLD.status IN ('published','withdrawn') AND (
    NEW.policy_body IS DISTINCT FROM OLD.policy_body OR
    NEW.policy_sha IS DISTINCT FROM OLD.policy_sha OR
    NEW.stage_id IS DISTINCT FROM OLD.stage_id OR
@@ -127,3 +127,27 @@ CREATE TRIGGER dhf_pilot_attempt_immutable BEFORE UPDATE ON dhf_pilot_attempts
 
 -- The pilot is NOT permitted to approve or issue files. No permissions in the
 -- existing approval/CDW tables are granted or modified by this migration.
+
+
+-- Immutable audit inputs cannot be erased after publication/submission.
+CREATE FUNCTION dhf_pilot_reject_delete_frozen()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF TG_TABLE_NAME = 'dhf_pilot_templates'
+    AND OLD.status IN ('published','withdrawn') THEN
+   RAISE EXCEPTION 'published or withdrawn DHF template cannot be deleted'
+   USING ERRCODE='23514';
+ ELSIF TG_TABLE_NAME = 'dhf_pilot_attempts'
+    AND OLD.state <> 'preparing' THEN
+   RAISE EXCEPTION 'submitted DHF attempt cannot be deleted'
+   USING ERRCODE='23514';
+ END IF;
+ RETURN OLD;
+END;
+$$;
+CREATE TRIGGER dhf_pilot_template_delete_guard
+ BEFORE DELETE ON dhf_pilot_templates
+ FOR EACH ROW EXECUTE FUNCTION dhf_pilot_reject_delete_frozen();
+CREATE TRIGGER dhf_pilot_attempt_delete_guard
+ BEFORE DELETE ON dhf_pilot_attempts
+ FOR EACH ROW EXECUTE FUNCTION dhf_pilot_reject_delete_frozen();
