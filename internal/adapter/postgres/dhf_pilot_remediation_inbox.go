@@ -15,6 +15,7 @@ func(r *Repository)DHFPilotReturnsForAuthor(ctx context.Context,actorID string,l
  SELECT d.id,t.review_key,s.project_id,s.stage_id,s.id,src.manifest_body,
         src.manifest_sha,d.comment,d.decided_at,
         COALESCE(c.id,''),COALESCE(c.new_attempt_id,''),COALESCE(revised.state,''),
+        COALESCE(v.id,''),
         (p.state='active' AND m.can_prepare AND baseline.active
           AND baseline.template_id=s.template_id AND tmpl.status='published')
  FROM dhf_pilot_review_decisions d
@@ -28,6 +29,7 @@ func(r *Repository)DHFPilotReturnsForAuthor(ctx context.Context,actorID string,l
  JOIN dhf_pilot_templates tmpl ON tmpl.id=s.template_id
  LEFT JOIN dhf_pilot_remediation_cases c ON c.original_submission_id=s.id
  LEFT JOIN dhf_pilot_attempts revised ON revised.id=c.new_attempt_id
+ LEFT JOIN dhf_pilot_remediation_verifications v ON v.case_id=c.id
  WHERE s.submitted_by=$1 AND d.outcome='recommend_return'
  ORDER BY d.decided_at DESC,d.id DESC LIMIT $2 `,actorID,limit)
  if err!=nil{return nil,err}
@@ -38,7 +40,7 @@ func(r *Repository)DHFPilotReturnsForAuthor(ctx context.Context,actorID string,l
   if err=rows.Scan(&row.DecisionID,&row.ReviewKey,&row.ProjectID,&row.StageID,
     &row.OriginalSubmissionID,&row.OriginalManifest,&row.OriginalManifestSHA,
     &row.Reason,&row.DecidedAt,&row.CaseID,&row.NewAttemptID,
-    &row.NewAttemptState,&row.CanPrepare);err!=nil{return nil,err}
+    &row.NewAttemptState,&row.VerificationID,&row.CanPrepare);err!=nil{return nil,err}
   result=append(result,row)
  }
  return result,rows.Err()
