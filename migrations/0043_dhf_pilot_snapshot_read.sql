@@ -88,6 +88,11 @@ CREATE TABLE dhf_pilot_stage_positions (
 CREATE FUNCTION dhf_pilot_reject_published_template_change()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
+ IF (OLD.status = 'withdrawn' AND NEW.status <> 'withdrawn')
+    OR (OLD.status = 'published' AND NEW.status NOT IN ('published','withdrawn')) THEN
+   RAISE EXCEPTION 'published DHF template status cannot be reversed'
+   USING ERRCODE='23514';
+ END IF;
  IF OLD.status IN ('published','withdrawn') AND (
    NEW.policy_body IS DISTINCT FROM OLD.policy_body OR
    NEW.policy_sha IS DISTINCT FROM OLD.policy_sha OR
@@ -108,6 +113,10 @@ CREATE TRIGGER dhf_pilot_published_immutable BEFORE UPDATE ON dhf_pilot_template
 CREATE FUNCTION dhf_pilot_reject_frozen_attempt_change()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
+ IF OLD.state IN ('accepted','cancelled') AND NEW.state <> OLD.state THEN
+   RAISE EXCEPTION 'terminal DHF attempt state cannot be reopened in place'
+   USING ERRCODE='23514';
+ END IF;
  IF OLD.state <> 'preparing' AND (
    NEW.manifest_body IS DISTINCT FROM OLD.manifest_body OR
    NEW.manifest_sha IS DISTINCT FROM OLD.manifest_sha OR
