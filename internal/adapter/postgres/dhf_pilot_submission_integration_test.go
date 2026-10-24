@@ -628,6 +628,77 @@ VALUES('dhf-no-auth-audit',$1,$2,$3,'dhf_sw_reviewer','recommend_pass',$4,
 		remedSubmit.SubmissionID).Scan(&count);err!=nil||count!=1{
 		t.Fatalf("corrected attempt must create a NEW independent G6 reviewer task: %d %v",count,err)
 	}
+	// V0.7.3: returned advice and a corrected submission are insufficient.
+	// The original reviewer first authenticates the RETURN, then every new
+	// reviewer must password-attest their independent corrected decision.
+	const verifiedPlan="我已逐项复核原退回问题及新冻结版本，确认整改证据充分且责任完整"
+	const verifyIntent="I personally verified the corrected DHF submission against my original return"
+	earlyVerify,earlyVerifyErr:=service.DHFPilotVerifyRemediation(ctx,signer("dhf_gate_reviewer"),
+		remed.CaseID,verifiedPlan,reviewerPassword,verifyIntent,"dhf-verify-before-return-sign")
+	if earlyVerifyErr!=nil||earlyVerify.Reason!="DHF_SCOPE_DENIED"{
+		t.Fatalf("unsigned original return cannot permit closure: %+v %v",earlyVerify,earlyVerifyErr)
+	}
+	originalReturnSigned,originalReturnErr:=service.DHFPilotAttestReview(ctx,signer("dhf_gate_reviewer"),
+		g6TaskID,g6Review.DecisionID,reviewerPassword,intent,"dhf-g6-original-return-attest")
+	if originalReturnErr!=nil||originalReturnSigned.AttestationID==""{
+		t.Fatalf("original return not signed by actual reviewer: %+v %v",originalReturnSigned,originalReturnErr)
+	}
+	unsignedFix,unsignedFixErr:=service.DHFPilotVerifyRemediation(ctx,signer("dhf_gate_reviewer"),
+		remed.CaseID,verifiedPlan,reviewerPassword,verifyIntent,"dhf-verify-before-corrected-review")
+	if unsignedFixErr==nil||unsignedFix.Reason!="DHF_VERIFICATION_PRECONDITION"{
+		t.Fatalf("unreviewed corrected submission unexpectedly closed: %+v %v",unsignedFix,unsignedFixErr)
+	}
+	wrongReviewer,wrongReviewerErr:=service.DHFPilotVerifyRemediation(ctx,actor,
+		remed.CaseID,verifiedPlan,reviewerPassword,verifyIntent,"dhf-verify-by-submitter")
+	if wrongReviewerErr!=nil||wrongReviewer.Reason!="DHF_SCOPE_DENIED"{
+		t.Fatalf("source submitter forged review verification: %+v %v",wrongReviewer,wrongReviewerErr)
+	}
+	var revisedG6Task string
+	if err=pool.QueryRow(ctx,
+		"SELECT id FROM dhf_pilot_workbench_tasks WHERE submission_id=$1 AND review_key='__gate__'",
+		remedSubmit.SubmissionID).Scan(&revisedG6Task);err!=nil{t.Fatal(err)}
+	revisedOpinion,revisedOpinionErr:=service.DHFPilotRecommend(ctx,signer("dhf_gate_reviewer"),
+		revisedG6Task,"recommend_pass","更正样机证据已复核","dhf-revised-g6-gate-pass")
+	if revisedOpinionErr!=nil||revisedOpinion.Status!="reviewed"{
+		t.Fatalf("corrected attempt independent Gate review failed: %+v %v",revisedOpinion,revisedOpinionErr)
+	}
+	onlyRecommendation,onlyRecommendationErr:=service.DHFPilotVerifyRemediation(ctx,signer("dhf_gate_reviewer"),
+		remed.CaseID,verifiedPlan,reviewerPassword,verifyIntent,"dhf-verify-not-signed-corrected")
+	if onlyRecommendationErr==nil||onlyRecommendation.Reason!="DHF_VERIFICATION_PRECONDITION"{
+		t.Fatalf("unsigned corrected Gate suggestion wrongly closed remediation: %+v %v",onlyRecommendation,onlyRecommendationErr)
+	}
+	revisedSigned,revisedSignedErr:=service.DHFPilotAttestReview(ctx,signer("dhf_gate_reviewer"),
+		revisedG6Task,revisedOpinion.DecisionID,reviewerPassword,intent,"dhf-revised-g6-auth-review")
+	if revisedSignedErr!=nil||revisedSigned.AttestationID==""{
+		t.Fatalf("corrected review not reauthenticated: %+v %v",revisedSigned,revisedSignedErr)
+	}
+	wrongVerifyPassword,wrongVerifyErr:=service.DHFPilotVerifyRemediation(ctx,signer("dhf_gate_reviewer"),
+		remed.CaseID,verifiedPlan,"DHF-invalid-password",verifyIntent,"dhf-verify-wrong-password")
+	if wrongVerifyErr!=nil||wrongVerifyPassword.Reason!="DHF_REAUTH_FAILED"{
+		t.Fatalf("passwordless correction verification accepted: %+v %v",wrongVerifyPassword,wrongVerifyErr)
+	}
+	verified,verifiedErr:=service.DHFPilotVerifyRemediation(ctx,signer("dhf_gate_reviewer"),
+		remed.CaseID,verifiedPlan,reviewerPassword,verifyIntent,"dhf-verification-001")
+	if verifiedErr!=nil||verified.VerificationID==""||verified.Replayed{
+		t.Fatalf("fully signed corrected case not independently verified: %+v %v",verified,verifiedErr)
+	}
+	verifiedAgain,verifiedAgainErr:=service.DHFPilotVerifyRemediation(ctx,signer("dhf_gate_reviewer"),
+		remed.CaseID,verifiedPlan,reviewerPassword,verifyIntent,"dhf-verification-001")
+	if verifiedAgainErr!=nil||!verifiedAgain.Replayed||verifiedAgain.VerificationID!=verified.VerificationID{
+		t.Fatalf("identical remediation verification not idempotent: %+v %v",verifiedAgain,verifiedAgainErr)
+	}
+	if _,err=pool.Exec(ctx,"DELETE FROM dhf_pilot_remediation_verifications WHERE id=$1",verified.VerificationID);err==nil{
+		t.Fatal("corrective verification deleted after completion")
+	}
+	if _,err=pool.Exec(ctx,"UPDATE dhf_pilot_remediation_verifications SET comment='retroactive change' WHERE id=$1",verified.VerificationID);err==nil{
+		t.Fatal("corrective verification rewritten")
+	}
+	if err=pool.QueryRow(ctx,"SELECT count(*) FROM audit_events WHERE event_type='dhf.pilot.remediation.verified' AND target_id=$1",remed.CaseID).Scan(&count);err!=nil||count!=1{
+		t.Fatalf("correction verification missing audit or duplicated: %d %v",count,err)
+	}
+	if err=pool.QueryRow(ctx,"SELECT state FROM dhf_pilot_attempts WHERE id=$1",remed.NewAttemptID).Scan(&state);err!=nil||state!="submitted"{
+		t.Fatalf("correction verification illegally accepted stage: %s %v",state,err)
+	}
 	// Real physical tampering must be detected even if DB Blob rows and
 	// immutable file_versions still report the original checksum.
 	path,err:=physicalStore.PathFor(storageKey)
