@@ -361,6 +361,21 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	if prematureGateSignErr==nil||prematureGateSign.Reason!="DHF_ATTESTATION_CONFLICT"{
 		t.Fatalf("Gate reauthentication without predecessor attestations was accepted: %+v %v",prematureGateSign,prematureGateSignErr)
 	}
+	// The new signed identity row and the ordinary audit record must commit
+	// together. A direct SQL attestation, however accurately it references
+	// a legitimate reviewed decision, must never bypass audit provenance.
+	var signPolicySHA,signManifestSHA string
+	if err=pool.QueryRow(ctx,"SELECT policy_sha,manifest_sha FROM dhf_pilot_submissions WHERE id=$1",
+		g5Result.SubmissionID).Scan(&signPolicySHA,&signManifestSHA);err!=nil{t.Fatal(err)}
+	if _,forgedErr:=pool.Exec(ctx,`
+INSERT INTO dhf_pilot_review_attestations(id,review_decision_id,task_id,submission_id,
+ signer_id,outcome,sign_intent,policy_sha,manifest_sha,content_sha,idempotency_key,request_sha)
+VALUES('dhf-no-auth-audit',$1,$2,$3,'dhf_sw_reviewer','recommend_pass',$4,
+ $5,$6,repeat('f',64),'dhf-attestation-without-audit-0001',repeat('a',64))`,
+		swOpinion.DecisionID,swTask,g5Result.SubmissionID,intent,
+		signPolicySHA,signManifestSHA);forgedErr==nil{
+		t.Fatal("direct signed review inserted without same-transaction audit")
+	}
 	mfSigned,mfSignedErr:=service.DHFPilotAttestReview(ctx,signer("dhf_mf_reviewer"),
 		mfTask,mfOpinion.DecisionID,reviewerPassword,intent,"dhf-attest-mf-0001")
 	if mfSignedErr!=nil||mfSigned.AttestationID==""||mfSigned.Replayed{
@@ -394,6 +409,21 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	}
 	if err=pool.QueryRow(ctx,"SELECT count(*) FROM audit_events WHERE event_type='dhf.pilot.review_attested' AND target_kind='dhf_review_task' AND target_id=$1",gateTask).Scan(&count);err!=nil||count!=1{
 		t.Fatalf("signed Gate must have exactly one audit record: %d %v",count,err)
+	}
+	// An authenticated session alone is not an unlimited password oracle.
+	// Failed reauthentication is counted per original account for 15 min.
+	for attempt:=0;attempt<5;attempt++{
+		denied,deniedErr:=service.DHFPilotAttestReview(ctx,signer("dhf_mf_reviewer"),
+			mfTask,mfOpinion.DecisionID,"invalid-DHF-password",intent,
+			fmt.Sprintf("dhf-sign-attempt-denied-%d",attempt))
+		if deniedErr!=nil||denied.Reason!="DHF_REAUTH_FAILED"{
+			t.Fatalf("wrong password attempt %d not denied and audited: %+v %v",attempt,denied,deniedErr)
+		}
+	}
+	limited,limitedErr:=service.DHFPilotAttestReview(ctx,signer("dhf_mf_reviewer"),
+		mfTask,mfOpinion.DecisionID,reviewerPassword,intent,"dhf-signer-rate-limit-0001")
+	if limitedErr!=nil||limited.Reason!="DHF_REAUTH_RATE_LIMITED"{
+		t.Fatalf("signer login password oracle not throttled: %+v %v",limited,limitedErr)
 	}
 	if err=pool.QueryRow(ctx,"SELECT state FROM dhf_pilot_attempts WHERE id='dhf_g5_attempt'").Scan(&state);err!=nil||state!="submitted"{
 		t.Fatalf("authenticated trial signatures must never silently grant formal stage acceptance: %s %v",state,err)
