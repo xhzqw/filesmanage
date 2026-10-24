@@ -2,7 +2,10 @@ package postgres_test
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -395,6 +398,71 @@ VALUES('dhf-no-auth-audit',$1,$2,$3,'dhf_sw_reviewer','recommend_pass',$4,
 		gateTask,gateOpinion.DecisionID,reviewerPassword,intent,"dhf-attest-gate-0001")
 	if gateSignedErr!=nil||gateSigned.AttestationID==""||gateSigned.Replayed{
 		t.Fatalf("Gate could not attest after ALL prior signed reviews: %+v %v",gateSigned,gateSignedErr)
+	}
+	// V0.7.4: a password-reauthenticated trial recommendation alone cannot
+	// authorize a Gate. There must be a separately provisioned Ed25519 key.
+	t.Setenv("DHF_PILOT_GATE_TRUSTED_PUBKEY_B64","")
+	untrusted,untrustedErr:=service.DHFPilotGateChallenge(ctx,signer("dhf_gate_reviewer"),g5Result.SubmissionID)
+	if untrustedErr!=nil||untrusted.Reason!="DHF_GATE_TRUST_POLICY_MISSING"{
+		t.Fatalf("unprovisioned Gate signing authority accepted: %+v %v",untrusted,untrustedErr)
+	}
+	publicKey,privateKey,keyErr:=ed25519.GenerateKey(rand.Reader)
+	if keyErr!=nil{t.Fatal(keyErr)}
+	t.Setenv("DHF_PILOT_GATE_TRUSTED_PUBKEY_B64",base64.StdEncoding.EncodeToString(publicKey))
+	challenge,challengeErr:=service.DHFPilotGateChallenge(ctx,signer("dhf_gate_reviewer"),g5Result.SubmissionID)
+	if challengeErr!=nil||challenge.PayloadBase64==""||challenge.PayloadSHA==""{
+		t.Fatalf("assigned Gate challenge not generated: %+v %v",challenge,challengeErr)
+	}
+	message,decodeErr:=base64.StdEncoding.DecodeString(challenge.PayloadBase64)
+	if decodeErr!=nil{t.Fatal(decodeErr)}
+	validSignature:=base64.StdEncoding.EncodeToString(ed25519.Sign(privateKey,message))
+	forgedSignature:=base64.StdEncoding.EncodeToString(make([]byte,ed25519.SignatureSize))
+	badSignature,badSignatureErr:=service.DHFPilotSealGateCandidate(ctx,signer("dhf_gate_reviewer"),
+		g5Result.SubmissionID,reviewerPassword,forgedSignature,"dhf-gate-forged-signature-001")
+	if badSignatureErr!=nil||badSignature.Reason!="DHF_GATE_SIGNATURE_INVALID"{
+		t.Fatalf("invalid Gate signature not denied: %+v %v",badSignature,badSignatureErr)
+	}
+	crossSigner,crossSignerErr:=service.DHFPilotSealGateCandidate(ctx,signer("dhf_sw_reviewer"),
+		g5Result.SubmissionID,reviewerPassword,validSignature,"dhf-gate-not-sponsor-001")
+	if crossSignerErr!=nil||crossSigner.Reason!="DHF_SCOPE_DENIED"{
+		t.Fatalf("not-assigned Gate signer attempted to seal candidate: %+v %v",crossSigner,crossSignerErr)
+	}
+	withoutGatePreview,noGatePreviewErr:=service.DHFPilotSealGateCandidate(ctx,signer("dhf_gate_reviewer"),
+		g5Result.SubmissionID,reviewerPassword,validSignature,"dhf-gate-no-preview-001")
+	if noGatePreviewErr!=nil||withoutGatePreview.Reason!="DHF_GATE_EVIDENCE_DENIED"{
+		t.Fatalf("Gate candidate bypassed current file ACL: %+v %v",withoutGatePreview,noGatePreviewErr)
+	}
+	exec("INSERT INTO acls(id,folder_id,subject_kind,subject_id,actions,granted_by) VALUES('dhf_g5_gate_preview','dhf_folder','user','dhf_gate_reviewer',ARRAY['list','preview']::text[],$1)",actorID)
+	// Real source and valid reviewer credentials still cannot manufacture a
+	// database Gate candidate without an audit row and exact queued outbox.
+	if _,noAuditErr:=pool.Exec(ctx,`
+INSERT INTO dhf_pilot_gate_candidates(id,submission_id,attempt_id,project_id,stage_id,
+ template_id,gate_attestation_id,signer_id,policy_sha,manifest_sha,decision_payload_sha,
+ trusted_key_sha,signature_ed25519,idempotency_key,request_sha)
+ VALUES('dhf-forged-gate-no-audit',$1,'dhf_g5_attempt','dhf_project','G5','dhf_g5_tpl',
+ $2,'dhf_gate_reviewer',$3,$4,$5,$6,$7,'dhf-gate-no-audit-001',repeat('e',64))`,
+		g5Result.SubmissionID,gateSigned.AttestationID,sha(g5Policy),sha(g5Manifest),
+		challenge.PayloadSHA,sha(publicKey),ed25519.Sign(privateKey,message));noAuditErr==nil{
+		t.Fatal("manual SQL inserted a Gate signature without atomic audit and outbox")
+	}
+	candidate,candidateErr:=service.DHFPilotSealGateCandidate(ctx,signer("dhf_gate_reviewer"),
+		g5Result.SubmissionID,reviewerPassword,validSignature,"dhf-gate-candidate-001")
+	if candidateErr!=nil||candidate.CandidateID==""||candidate.Replayed||!candidate.TrialOnly{
+		t.Fatalf("legitimate signed Gate trial candidate failed: %+v %v",candidate,candidateErr)
+	}
+	candidateRetry,candidateRetryErr:=service.DHFPilotSealGateCandidate(ctx,signer("dhf_gate_reviewer"),
+		g5Result.SubmissionID,reviewerPassword,validSignature,"dhf-gate-candidate-001")
+	if candidateRetryErr!=nil||!candidateRetry.Replayed||candidateRetry.CandidateID!=candidate.CandidateID{
+		t.Fatalf("same signed Gate candidate must replay original: %+v %v",candidateRetry,candidateRetryErr)
+	}
+	if err=pool.QueryRow(ctx,"SELECT count(*) FROM outbox_jobs WHERE kind='dhf.pilot.gate.candidate' AND id=$1",
+		"dhf-gate-candidate:"+candidate.CandidateID).Scan(&count);err!=nil||count!=1{
+		t.Fatalf("pilot Gate event not queued atomically: %d %v",count,err)
+	}
+	if _,tamper:=pool.Exec(ctx,"UPDATE dhf_pilot_gate_candidates SET signature_ed25519=decode(repeat('a',128),'hex') WHERE id=$1",
+		candidate.CandidateID);tamper==nil{t.Fatal("sealed Gate signature unexpectedly rewritten")}
+	if err=pool.QueryRow(ctx,"SELECT state FROM dhf_pilot_attempts WHERE id='dhf_g5_attempt'").Scan(&state);err!=nil||state!="submitted"{
+		t.Fatalf("signed candidate was incorrectly promoted to official accepted stage: %s %v",state,err)
 	}
 	signedRetry,signedRetryErr:=service.DHFPilotAttestReview(ctx,signer("dhf_gate_reviewer"),
 		gateTask,gateOpinion.DecisionID,reviewerPassword,intent,"dhf-attest-gate-0001")
