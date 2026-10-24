@@ -275,6 +275,17 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	if badSponsorErr!=nil||badSponsor.Reason!="DHF_SCOPE_DENIED"{
 		t.Fatalf("unassigned sponsor illegally intervened: %+v %v",badSponsor,badSponsorErr)
 	}
+	// Direct SQL may not manufacture a sponsor event while omitting the
+	// matching audit record. The deferred guard aborts the whole statement.
+	var policySHAForIntervention,manifestSHAForIntervention string
+	if err=pool.QueryRow(ctx,"SELECT policy_sha,manifest_sha FROM dhf_pilot_submissions WHERE id=$1",g5Result.SubmissionID).
+		Scan(&policySHAForIntervention,&manifestSHAForIntervention);err!=nil{t.Fatal(err)}
+	if _,forgedErr:=pool.Exec(ctx,
+		"INSERT INTO dhf_pilot_early_interventions(id,target_task_id,submission_id,authorized_by,reason,idempotency_key,request_sha,policy_sha,manifest_sha) VALUES('dhf-intervention-without-audit',$1,$2,'dhf_gate_reviewer',$3,'dhf-direct-unlogged-0001',repeat('f',64),$4,$5)",
+		mfTask,g5Result.SubmissionID,"临时审核可以提前开展，但前序责任不得豁免",
+		policySHAForIntervention,manifestSHAForIntervention);forgedErr==nil{
+		t.Fatal("intervention must not commit without its matching audit event")
+	}
 	earlyMF,earlyMFErr:=service.DHFPilotAuthorizeEarlyReview(ctx,domain.User{ID:"dhf_gate_reviewer"},
 		mfTask,"为了并行评估工艺文件，允许生产审核人先提交意见；软件责任仍须单独完成","dhf-gate-intervene-mf-0001")
 	if earlyMFErr!=nil||earlyMF.InterventionID==""||earlyMF.Replayed{
