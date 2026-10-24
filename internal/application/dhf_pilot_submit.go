@@ -105,7 +105,7 @@ func (s *Service) DHFPilotSubmit(
 		if err := decodePilotJSON(row.PolicyBody, &policy); err != nil {
 			return denied("DHF_POLICY_INVALID"), nil
 		}
-		reviewKeys = []string{"__gate__"}
+		reviewKeys = []string{}
 		if row.StageID == "G5" {
 			if len(policy.Specialties) == 0 {
 				return denied("DHF_SPECIALTY_POLICY_INVALID"), nil
@@ -117,6 +117,8 @@ func (s *Service) DHFPilotSubmit(
 				reviewKeys = append(reviewKeys, specialty.Key)
 			}
 		}
+		// Source template order is binding; Gate always signs last.
+		reviewKeys = append(reviewKeys,"__gate__")
 	}
 	if err=store.DHFPilotPersistSubmission(ctx,record,pins,reviewKeys);err!=nil {
 		// A failed CAS, audit insert, composite FK or unique key rolls back
