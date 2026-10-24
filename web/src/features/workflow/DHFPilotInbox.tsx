@@ -3,6 +3,7 @@ import {request} from "../../shared/http";
 import {RareButton,RareInput,RareTextarea} from "../../shared/ui/rare";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
 import {errorCopy} from "../../shared/errors";
+import {DHFFrozenPagePreview} from "./DHFFrozenPagePreview";
 import "./dhfPilotInbox.css";
 
 type DHFTask={
@@ -42,6 +43,7 @@ export function DHFPilotInbox(){
  const [preview,setPreview]=useState<{requirementId:string;result:EvidencePreview}|null>(null);
  const [previewError,setPreviewError]=useState("");
  const [previewBusy,setPreviewBusy]=useState(false);
+ const [layout,setLayout]=useState<FrozenEvidence|null>(null);
  useEffect(()=>{
   let alive=true;
   setLoading(true);
@@ -57,7 +59,7 @@ export function DHFPilotInbox(){
  useEffect(()=>{setComment("");setRecommendError("");},[active?.id]);
  useEffect(()=>{
   let valid=true;
-  setEvidence([]);setEvidenceError("");setPreview(null);setPreviewError("");
+  setEvidence([]);setEvidenceError("");setPreview(null);setPreviewError("");setLayout(null);
   if(!active){setEvidenceLoading(false);return}
   setEvidenceLoading(true);
   request<{items:FrozenEvidence[]}>("/workbench/dhf/tasks/"+encodeURIComponent(active.id)+"/evidence")
@@ -76,6 +78,11 @@ export function DHFPilotInbox(){
    setPreview({requirementId,result});
   }catch(err){setPreviewError(errorCopy(err,"受控版本校验失败或无权限"))}
   finally{setPreviewBusy(false)}
+ }
+ function openFrozenEvidence(item:FrozenEvidence){
+  setLayout(null);setPreview(null);setPreviewError("");
+  if(/\.(pdf|docx)$/i.test(item.fileName)){setLayout(item);return;}
+  void showFixedEvidence(item.requirementId);
  }
  async function recommend(outcome:"recommend_pass"|"recommend_return"){
   if(!active||busy)return;
@@ -139,11 +146,14 @@ export function DHFPilotInbox(){
         <strong>{item.fileName}</strong>
         <span>要求 {item.requirementId} · 固定版本 v{item.versionSeq}</span>
         <code title="证据 SHA-256">{item.sha256}</code>
-        <RareButton type="button" disabled={previewBusy} onClick={()=>void showFixedEvidence(item.requirementId)}>
+        <RareButton type="button" disabled={previewBusy} onClick={()=>openFrozenEvidence(item)}>
          校验并查看固定版本
         </RareButton>
        </div>)}</div>}
       {previewError?<p role="alert">{previewError}</p>:null}
+      {layout&&active?<DHFFrozenPagePreview key={active.id+":"+layout.requirementId}
+       taskId={active.id} requirementId={layout.requirementId}
+       fileName={layout.fileName} versionSeq={layout.versionSeq}/>:null}
       {preview?<div className="dhf-pilot-evidence-preview" role="region" aria-label="受控证据预览">
        <strong>{preview.result.name} · 内容校验通过</strong>
        {preview.result.textual?<pre>{preview.result.content}</pre>:
