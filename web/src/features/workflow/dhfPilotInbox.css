@@ -59,3 +59,18 @@
 .dhf-return-reason{font-size:13px;line-height:1.75;background:#f4f7fa;padding:12px 14px;border-radius:9px;color:#30435d;white-space:pre-wrap;overflow-wrap:anywhere}
 .dhf-pilot-opinion label{font-size:12px;font-weight:600;color:#33465d}
 .dhf-pilot-opinion textarea{display:block;width:100%;min-height:88px;margin:9px 0 10px}
+
+.dhf-pilot-duty-chain{margin:16px 0;padding:13px;background:#f7f9fb;border-radius:10px;min-width:0}
+.dhf-pilot-duty-chain h3{font-size:13px;font-weight:650;margin:0 0 11px}
+.dhf-pilot-duty-list{display:grid;gap:4px}
+.dhf-pilot-duty-row{display:flex;align-items:center;gap:11px;padding:8px 4px;min-width:0}
+.dhf-pilot-duty-row+.dhf-pilot-duty-row{border-top:1px solid #e7ecf1}
+.dhf-pilot-duty-row>div{flex:1;min-width:0}
+.dhf-pilot-duty-row strong{font-size:12px;overflow-wrap:anywhere}
+.dhf-pilot-duty-row p,.dhf-pilot-duty-chain>p{font-size:11px;line-height:1.65;margin:4px 0;color:#64748b;overflow-wrap:anywhere}
+.dhf-pilot-duty-order{display:grid;place-items:center;width:26px;height:26px;flex:0 0 26px;border-radius:50%;background:#eaf0f7;color:#475569;font-size:12px;font-weight:650}
+.dhf-pilot-duty-row button{flex-shrink:0;font-size:11px}
+.dhf-pilot-early-form{margin:10px 0;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.dhf-pilot-early-form textarea{flex-basis:100%;min-width:0;min-height:75px}
+.dhf-pilot-early-form p{flex-basis:100%;margin:0;font-size:12px}
+@media(max-width:560px){.dhf-pilot-duty-row{flex-wrap:wrap}.dhf-pilot-duty-row button{margin-left:37px}}
