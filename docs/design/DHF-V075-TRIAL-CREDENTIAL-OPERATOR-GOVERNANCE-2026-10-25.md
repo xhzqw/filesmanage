@@ -93,8 +93,36 @@ engineering integration run.**
 
 ### Verification evidence
 
-Exact remote test commands, database name, source revision, migrations count,
-checksums and pass/fail results are recorded in the implementation PR.
-The app's production databases, production port 8091 and running services must
-not be altered by this engineering trial. Formal stage approval remains
-**NOT_IMPLEMENTED / NO-GO**.
+Final implementation under test: Git feature-branch `97295d1` (2026-10-25),
+`10.144.144.1`, clean isolated checkout
+`/tmp/filesmanage-dhf-v075-99ade80`. Database:
+`filesmanage_dhf_v063_integration_v075_operator_97295d1` (new PostgreSQL 17
+database, isolated from business data).
+
+| Real remote check | Observation |
+|---|---|
+| `go run ./cmd/migrate -dir migrations` equivalent via isolated compiled `cmd/migrate` | **PASS: 58 applied** |
+| `cmd/migrate -dir migrations -check` on same DB | **PASS: 58/58 checksums** |
+| `go test -c ./internal/adapter/postgres` and `DHF_TEST_DATABASE_URL=... -test.run TestDHFPilotRealPostgresSubmission -test.v` | **PASS: 3.33 seconds** with actual key registration and emergency delegated-operator revocation |
+| Wrong password and audit, idempotent retry vs changed body, active/suspended/revoked transition and revoked operator denial | **PASS: assertions inside real PostgreSQL integration test** |
+| `go test ./internal/... -count=1` | **PASS** |
+| `go vet ./internal/...` + `go build ./cmd/server` | **PASS** |
+| TypeScript `tsc --noEmit` and `vite build` | **PASS**; existing Three.js large-chunk warnings |
+| `python3 scripts/gen_openapi.py --check` | **PASS: 142 paths / 172 operations** |
+| `python3 scripts/gen_acceptance_matrix.py --check` | **PASS: 126 IDs (123 PASS, 3 PARTIAL)** |
+| `node scripts/rare_emil_interaction_check.mjs` | **PASS: static design/interaction check** |
+| Live browser wide/laptop/narrow UX, performance & concurrent issuance | **NOT_RUN** |
+| Enterprise credential issuance approval, CA/HSM and Stage `accepted` | **NOT_APPROVED / NOT_IMPLEMENTED** |
+
+An earlier V0.7.5 test build failed because `ports.Repository` does not own
+transaction commit control, and the OpenAPI generator rejects `minLength`
+in its `string()` helper; commit `70ce8b5` fixed both. Another intermediate
+database run revealed that an *unsigned* candidate had been displaying an
+unrelated historical revoked credential after rotating the external public
+trust key; `16af617` constrained the live status to the active trust-anchor
+fingerprint. Both fixes are included in the final tests. The last independent
+grant-revocation approver restriction was checked with final migration
+`97295d1`.
+
+The production business databases, checkout, production port 8091 and running
+services were not altered. Formal Stage Gate approval remains **NO-GO**.
