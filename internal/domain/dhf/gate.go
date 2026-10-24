@@ -321,7 +321,7 @@ func Evaluate(in GateInput) Decision {
 	// Duplicates and missing/extra results are blocking rather than ignored.
 	requirements := make(map[string]RequirementPolicy, len(p.Requirements))
 	for _, req := range p.Requirements {
-		if req.ID == "" || (req.Critical && req.ConditionEligible) {
+		if req.ID == "" || (req.ConditionEligible && (!req.Mandatory || req.Critical)) {
 			add("DHF_POLICY_REQUIREMENTS_INVALID")
 		}
 		if _, exists := requirements[req.ID]; exists {
@@ -370,7 +370,7 @@ func Evaluate(in GateInput) Decision {
 	}
 	depResults := make(map[string]DependencyResult, len(in.Dependencies))
 	for _, dep := range in.Dependencies {
-		if dep.ID == "" {
+		if dep.ID == "" || !validState(dep.State) {
 			add("DHF_DEPENDENCY_SET_INVALID")
 		}
 		if _, exists := depResults[dep.ID]; exists {
@@ -421,7 +421,8 @@ func Evaluate(in GateInput) Decision {
 	remediations := make(map[string]Remediation, len(in.Remediations))
 	openByRequirement := map[string][]Remediation{}
 	for _, r := range in.Remediations {
-		if r.ID == "" || r.RequirementID == "" || r.AttemptID != s.AttemptID {
+		if r.ID == "" || r.RequirementID == "" || r.AttemptID != s.AttemptID ||
+			!r.Authorized || r.DueAt.IsZero() {
 			add("DHF_REMEDIATION_INVALID")
 		}
 		if _, exists := remediations[r.ID]; exists {
