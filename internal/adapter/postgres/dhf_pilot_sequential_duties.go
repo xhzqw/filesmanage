@@ -18,9 +18,9 @@ func(r *Repository)DHFPilotEarlyTargetForActor(ctx context.Context,taskID,actorI
  SELECT target.task_id,target.submission_id,target.review_key,target.step_ordinal,
         target.policy_sha,target.manifest_sha
  FROM dhf_pilot_review_obligations target
- JOIN dhf_pilot_workbench_tasks t ON t.id=target.task_id AND t.status='pending'
+ JOIN dhf_pilot_workbench_tasks t ON t.id=target.task_id
  JOIN dhf_pilot_workbench_tasks gate ON gate.submission_id=target.submission_id
-    AND gate.review_key='__gate__' AND gate.reviewer_id=$2 AND gate.status='pending'
+    AND gate.review_key='__gate__' AND gate.reviewer_id=$2
  JOIN dhf_pilot_submissions sub ON sub.id=target.submission_id
  JOIN dhf_pilot_projects p ON p.id=sub.project_id AND p.state='active'
  JOIN dhf_pilot_templates pol ON pol.id=sub.template_id AND pol.status='published'
@@ -28,12 +28,6 @@ func(r *Repository)DHFPilotEarlyTargetForActor(ctx context.Context,taskID,actorI
  JOIN users actor ON actor.id=$2 AND actor.disabled_at IS NULL
  WHERE target.task_id=$1 AND target.step_ordinal>1 AND target.review_key<>'__gate__'
    AND sub.submitted_by<>$2 AND t.reviewer_id<>$2
-   AND EXISTS (
-     SELECT 1 FROM dhf_pilot_review_obligations earlier
-     JOIN dhf_pilot_workbench_tasks prev ON prev.id=earlier.task_id
-     WHERE earlier.submission_id=target.submission_id
-       AND earlier.step_ordinal<target.step_ordinal AND prev.status<>'reviewed'
-   )
  FOR UPDATE OF t `,taskID,actorID).
  Scan(&result.TaskID,&result.SubmissionID,&result.ReviewKey,&result.StepOrdinal,&result.PolicySHA,&result.ManifestSHA)
  if errors.Is(err,pgx.ErrNoRows){return result,ports.ErrRowMissing}
