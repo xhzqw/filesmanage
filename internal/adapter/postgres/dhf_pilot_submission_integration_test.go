@@ -643,6 +643,7 @@ VALUES('dhf-no-auth-audit',$1,$2,$3,'dhf_sw_reviewer','recommend_pass',$4,
 	if originalReturnErr!=nil||originalReturnSigned.AttestationID==""{
 		t.Fatalf("original return not signed by actual reviewer: %+v %v",originalReturnSigned,originalReturnErr)
 	}
+	exec("INSERT INTO acls(id,folder_id,subject_kind,subject_id,actions,granted_by) VALUES('dhf_gate_file_preview','dhf_folder','user','dhf_gate_reviewer',ARRAY['list','preview']::text[],$1)",actorID)
 	unsignedFix,unsignedFixErr:=service.DHFPilotVerifyRemediation(ctx,signer("dhf_gate_reviewer"),
 		remed.CaseID,verifiedPlan,reviewerPassword,verifyIntent,"dhf-verify-before-corrected-review")
 	if unsignedFixErr==nil||unsignedFix.Reason!="DHF_VERIFICATION_PRECONDITION"{
@@ -700,6 +701,7 @@ VALUES('dhf-unlogged-verification',$1,$2,$3,'dhf_gate_reviewer',$4,$5,$6,$7,
 	if wrongVerifyErr!=nil||wrongVerifyPassword.Reason!="DHF_REAUTH_FAILED"{
 		t.Fatalf("passwordless correction verification accepted: %+v %v",wrongVerifyPassword,wrongVerifyErr)
 	}
+	exec("DELETE FROM acls WHERE id='dhf_gate_file_preview'")
 	withoutReadAccess,withoutReadErr:=service.DHFPilotVerifyRemediation(ctx,signer("dhf_gate_reviewer"),
 		remed.CaseID,verifiedPlan,reviewerPassword,verifyIntent,"dhf-verify-no-preview-access")
 	if withoutReadErr!=nil||withoutReadAccess.Reason!="DHF_VERIFICATION_EVIDENCE_DENIED"{
