@@ -205,6 +205,13 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	}
 	seedG5("dhf_g5_unassigned")
 	if _, deleteErr:=pool.Exec(ctx,"DELETE FROM dhf_pilot_review_assignments WHERE project_id='dhf_project' AND stage_id='G5' AND review_key='G5-MF'");deleteErr==nil {t.Fatal("applied review assignment must not be erased")}
+	if _, updateErr:=pool.Exec(ctx,"UPDATE dhf_pilot_review_assignments SET configured_by='dhf_sw_reviewer' WHERE project_id='dhf_project' AND stage_id='G5' AND review_key='G5-SW'");updateErr==nil {
+		t.Fatal("applied reviewer configuration history must not be modified")
+	}
+	if _, forgeErr:=pool.Exec(ctx,
+		"INSERT INTO dhf_pilot_workbench_tasks(id,submission_id,project_id,stage_id,review_key,reviewer_id,assigned_by) VALUES('dhf-forged-task',$1,'dhf_project','G5','G5-SW','dhf_sw_reviewer','dhf_gate_reviewer')",g5Result.SubmissionID);forgeErr==nil {
+		t.Fatal("task with forged assigning actor should be rejected")
+	}
 	// G6 first design transfer is a DISTINCT Gate. Unconfigured reviewers
 	// must abort the entire submission, and filling the assignment allows a
 	// fresh transaction with the SAME idempotency key.
