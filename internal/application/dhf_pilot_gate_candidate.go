@@ -116,10 +116,7 @@ func(s *Service)DHFPilotSealGateCandidate(ctx context.Context,actor domain.User,
  trusted.MustChangePassword||trusted.Login==""||actor.Login!=trusted.Login{
   return fail("DHF_SCOPE_DENIED"),nil
  }
- attempts,err:=tx.UserByLogin(ctx,trusted.Login)
- _=attempts
- _=err
- // Rate limit with the same persisted password-denial policy as review
+// Rate limit with the same persisted password-denial policy as review
  // attestations, not a new independently bypassable login counter.
  attemptsStore,ok:=any(tx).(ports.DHFPilotAttestationStore)
  if !ok{return fail("DHF_GATE_UNAVAILABLE"),errors.New("reauth audit store unavailable")}
