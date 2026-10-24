@@ -97,7 +97,7 @@ func(r *Repository)DHFPilotDutiesForActor(ctx context.Context,actorID string,lim
  LEFT JOIN dhf_pilot_early_interventions i ON i.target_task_id=o.task_id
  WHERE EXISTS(SELECT 1 FROM dhf_pilot_workbench_tasks mine
     WHERE mine.submission_id=o.submission_id AND mine.reviewer_id=$1)
- ORDER BY s.created_at DESC,o.submission_id,o.step_ordinal LIMIT $2 `,actorID,limit)
+ ORDER BY s.submitted_at DESC,o.submission_id,o.step_ordinal LIMIT $2 `,actorID,limit)
  if err!=nil{return nil,err}
  defer rows.Close()
  out:=make([]ports.DHFPilotDutySnapshot,0)
