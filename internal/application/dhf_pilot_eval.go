@@ -96,6 +96,14 @@ func (s *Service) dhfPilotEvaluateTx(
 			if err != nil || blob.State != "ready" || blob.Sha256 != evidence.Sha256 {
 				return fail("DHF_EVIDENCE_INVALID"), empty, nil, nil
 			}
+			// The database tuple is not evidence that bytes still exist or
+			// retain their committed digest. Stream the real content on every
+			// submit evaluation; never trust metadata alone.
+			if action == dhf.ActionSubmit {
+				if err := verifyDHFPilotPhysicalBlob(ctx, s.blobs, blob.StorageKey, blob.Sha256, blob.SizeBytes); err != nil {
+					return fail("DHF_EVIDENCE_BYTES_INVALID"), empty, nil, nil
+				}
+			}
 			bound, verified = true, true
 			pins = append(pins, ports.DHFPilotEvidencePin{
 				RequirementID: evidence.ID, FileID: evidence.FileID,
