@@ -77,6 +77,12 @@ func (s *Service) DHFPilotPreflight(ctx context.Context, actor domain.User, atte
 	if err != nil {
 		return fail("DHF_SNAPSHOT_UNAVAILABLE"), err
 	}
+	// Actor capabilities used by file ACL evaluation must also come from
+	// the same database snapshot, never a caller-provided IsAdmin flag.
+	trustedActor, err := tx.UserByID(ctx, actor.ID)
+	if err != nil || trustedActor.ID != actor.ID || trustedActor.DisabledAt != nil {
+		return fail("DHF_SCOPE_DENIED"), nil
+	}
 	if !checkPilotHash(row.PolicyBody, row.PolicyHash) || !checkPilotHash(row.ManifestBody, row.ManifestHash) {
 		return fail("DHF_SOURCE_HASH_MISMATCH"), nil
 	}
@@ -123,7 +129,7 @@ func (s *Service) DHFPilotPreflight(ctx context.Context, actor domain.User, atte
 		verified := false
 		if evidence.FileID != "" && evidence.VersionSeq > 0 && len(evidence.Sha256) == 64 {
 			// DHF project membership alone never grants access to a file.
-			_, aclErr := s.visibleFile(ctx, tx, actor, evidence.FileID, domain.ActionDownload)
+			_, aclErr := s.visibleFile(ctx, tx, trustedActor, evidence.FileID, domain.ActionDownload)
 			if aclErr == nil {
 				version, versionErr := tx.VersionBySeq(ctx, evidence.FileID, evidence.VersionSeq)
 				if versionErr == nil && version.Sha256 == evidence.Sha256 {
