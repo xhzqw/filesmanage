@@ -2,6 +2,7 @@ package httpx
 
 import(
  "github.com/gin-gonic/gin"
+ "filesmanage/internal/application"
  "net/http"
 )
 
@@ -38,4 +39,13 @@ func(h *Handler)dhfPilotVerifyRemediation(c *gin.Context){
  }
  c.Header("Cache-Control","private, no-store")
  c.JSON(http.StatusOK,gin.H{"ok":true,"data":result})
+}
+
+func(h *Handler)dhfPilotVerificationInbox(c *gin.Context){
+ actor,ok:=h.auth(c);if !ok{return}
+ rows,err:=h.S.DHFPilotVerificationInbox(c.Request.Context(),actor)
+ if err!=nil{respondError(c,err);return}
+ c.Header("Cache-Control","private, no-store")
+ c.JSON(http.StatusOK,gin.H{"ok":true,"data":gin.H{"items":rows,"trialOnly":true,
+  "verificationIntent":application.DHFPilotVerificationIntent}})
 }
