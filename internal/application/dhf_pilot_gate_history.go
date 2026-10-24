@@ -104,7 +104,8 @@ func (s *Service) DHFPilotGateVerification(ctx context.Context, actor domain.Use
 	if err != nil || trusted.ID != actor.ID || trusted.DisabledAt != nil {
 		return DHFPilotGateVerification{}, ports.ErrRowMissing
 	}
-	h, err := store.DHFPilotGateHistoryForSigner(ctx, submissionID, actor.ID)
+	_, activeTrustKeySHA, _ := dhfTrustedGateKey()
+	h, err := store.DHFPilotGateHistoryForSigner(ctx, submissionID, actor.ID, activeTrustKeySHA)
 	if err != nil {
 		return DHFPilotGateVerification{}, err
 	}

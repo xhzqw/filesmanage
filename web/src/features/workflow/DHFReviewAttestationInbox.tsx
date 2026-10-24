@@ -35,6 +35,7 @@ const credentialLabels:Record<string,string>={
  unregistered:"未登记",unactivated:"未激活",activate:"已激活",suspend:"已暂停",
  revoke:"已撤销",replace:"已替换",expired:"已到期",
  not_yet_valid:"尚未生效",legacy_unbound:"历史候选（未关联凭证）",
+ trust_anchor_missing:"信任公钥未配置",
 };
 
 export function DHFReviewAttestationInbox(){

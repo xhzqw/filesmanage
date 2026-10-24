@@ -9,7 +9,7 @@ import (
 // The repository, not the HTTP caller, resolves the original candidate.
 type DHFPilotGateHistoryStore interface {
 	DHFPilotBeginSnapshot(context.Context) error
-	DHFPilotGateHistoryForSigner(context.Context, string, string) (DHFPilotGateHistory, error)
+	DHFPilotGateHistoryForSigner(context.Context, string, string, string) (DHFPilotGateHistory, error)
 }
 
 type DHFPilotGateHistory struct {

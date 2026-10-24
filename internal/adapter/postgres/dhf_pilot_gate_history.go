@@ -12,7 +12,7 @@ var _ ports.DHFPilotGateHistoryStore = (*Repository)(nil)
 
 // The Gate reviewer must still have an active account and project membership.
 // An admin flag is never a substitute for the assigned Gate identity.
-func (r *Repository) DHFPilotGateHistoryForSigner(ctx context.Context, submissionID, signerID string) (ports.DHFPilotGateHistory, error) {
+func (r *Repository) DHFPilotGateHistoryForSigner(ctx context.Context, submissionID, signerID, activeTrustKeySHA string) (ports.DHFPilotGateHistory, error) {
 	var item ports.DHFPilotGateHistory
 	if submissionID == "" || signerID == "" {
 		return item, ports.ErrRowMissing
@@ -70,6 +70,10 @@ SELECT
 	if item.Candidate != nil {
 		credentialID = item.Candidate.SigningCredentialID
 	}
+	if credentialID == "" && activeTrustKeySHA == "" {
+		item.CredentialStatus = "trust_anchor_missing"
+		return item, nil
+	}
 	var state string
 	var keyExpiresAt time.Time
 	// Current status describes whether this credential could sign NOW.
@@ -86,9 +90,9 @@ LEFT JOIN LATERAL (
  WHERE e.credential_id=c.id ORDER BY e.event_seq DESC LIMIT 1
 ) latest ON true
 WHERE ($2<>'' AND c.id=$2 AND c.signer_id=$1)
-   OR ($2='' AND c.signer_id=$1 AND c.purpose='dhf.pilot.gate.candidate')
+   OR ($2='' AND c.signer_id=$1 AND c.key_sha=$3 AND c.purpose='dhf.pilot.gate.candidate')
 ORDER BY CASE WHEN c.id=$2 THEN 0 ELSE 1 END,c.registered_at DESC LIMIT 1
-`, signerID, credentialID).Scan(&state, &keyExpiresAt)
+`, signerID, credentialID, activeTrustKeySHA).Scan(&state, &keyExpiresAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		item.CredentialStatus = "unregistered"
 		return item, nil
