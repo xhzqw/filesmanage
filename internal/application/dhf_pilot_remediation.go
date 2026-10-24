@@ -83,7 +83,7 @@ func(s *Service)DHFPilotOpenRemediation(ctx context.Context,actor domain.User,
     !changedPilotManifest(returned.OriginalManifest,revisedManifest){
   return fail("DHF_REMEDIATION_EVIDENCE_UNCHANGED"),nil
  }
- requestSHA:=hashPilotSubmit(decisionID,actor.ID,key,returned.OriginalManifestSHA,revisedSHA,plan)
+ requestSHA:=hashPilotSubmit(decisionID,actor.ID,key,returned.OriginalManifestSHA,revisedSHA+":"+plan)
  prior,err:=store.DHFPilotRemediationForReturn(ctx,decisionID)
  if err==nil{
   if prior.OpenedBy==actor.ID&&prior.IdempotencyKey==key&&
