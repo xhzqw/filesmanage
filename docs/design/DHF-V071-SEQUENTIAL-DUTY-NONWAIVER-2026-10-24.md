@@ -63,6 +63,24 @@ V0.7.1 仅实现该已确认责任链的**审计可追踪试点层**，而非企
 | 全套 Go/Vet、Vite、OpenAPI 和验收矩阵 | 实测退出码决定 PASS |
 | 三种真实浏览器尺寸、法定身份签署、正式条件放行 | **NOT_RUN / BLOCKED** |
 
+### 已取得的远端执行结果（2026-10-24）
+
+| 远端执行项 | 实际结果 |
+|---|---|
+| PostgreSQL 17 全新一次性数据库迁移 | **PASS：53/53**，包含 `0051` |
+| 真实 Go + PostgreSQL G5 顺序、提前介入和审计原子性用例 | **PASS**，`TestDHFPilotRealPostgresSubmission` |
+| 无授权时 MF 抢先、非 Gate 授权、直接无审计插入、篡改义务和删除授权 | **PASS：均被拒绝** |
+| MF 提前复核而 SW 仍为待办、Gate 等待 SW，完成后准确幂等重放 | **PASS** |
+| G6 退回整改、新冻结 Attempt 和不可变链路 | **PASS**，同一真实数据库 |
+| PDF/DOCX 真实受权固定 v1 页图和 v2 指针隔离 | **PASS**，`TestDHFPilotFrozenPDFDOCXRealPostgres` |
+| `go test ./internal/... -count=1`、`go vet ./internal/...`、三项 Go 命令构建 | **PASS**，退出码 0 |
+| `npm --prefix web run build` (TypeScript + Vite) | **PASS**，退出码 0；原有 Three.js chunk 体积警告尚存 |
+| `python3 scripts/gen_openapi.py --check` | **PASS：135 paths / 164 operations** |
+| `python3 scripts/gen_acceptance_matrix.py --check` | **PASS：126 IDs**（原有 123 PASS / 3 PARTIAL） |
+| 真实浏览器桌面/笔记本/窄内容区与签署凭证测试 | **NOT_RUN**；不得据此声称 UI 已通过人工验收 |
+
+测试均在 `10.144.144.1` 临时检出与一次性数据库中完成；V0.7.1 **没有对正式业务数据库迁移、切换服务或执行正式电子签署**。严格把工程回归 PASS 和企业业务授权/法定签章 NOT_RUN 分开。
+
 ## 5. 后续正式签审的不可绕过门禁
 
 本版不会制造“正式签名”假象。进入正式生产 Gate 前还需新增：独立签名凭证和二次身份核验、由受权企业 SOP 发布的审核人/越级授权范围、每级决定与签名哈希、前序待签责任纠偏和期限、Gate finalization CAS/outbox、整改复验的具体证据闭环、CDW 独立受控发行、物理 Blob 保留/恢复以及真实 LAN 浏览器交互/安全验收。
