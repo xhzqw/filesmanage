@@ -288,6 +288,40 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	if err=pool.QueryRow(ctx,"SELECT count(*) FROM dhf_pilot_workbench_tasks WHERE submission_id=$1 AND stage_id='G6' AND review_key='__gate__' AND reviewer_id='dhf_gate_reviewer'",g6Result.SubmissionID).Scan(&count);err!=nil || count!=1 {
 		t.Fatalf("G6 Gate task was not created atomically: %d %v",count,err)
 	}
+	// G6 is independent from G5. Return advice is not allowed without a
+	// concrete explanation; any subsequent retry is a replay of the same
+	// immutable result, not a second approval or an acceptance transition.
+	var g6TaskID string
+	if err=pool.QueryRow(ctx,"SELECT id FROM dhf_pilot_workbench_tasks WHERE submission_id=$1 AND review_key='__gate__'",g6Result.SubmissionID).Scan(&g6TaskID);err!=nil{t.Fatal(err)}
+	invalidReturn,invalidErr:=service.DHFPilotRecommend(ctx,domain.User{ID:"dhf_gate_reviewer"},g6TaskID,
+		"recommend_return"," ","dhf-g6-return-empty-0001")
+	if invalidErr!=nil || invalidReturn.Reason!="DHF_REVIEW_COMMENT_INVALID"{
+		t.Fatalf("empty G6 return advice must fail: %+v %v",invalidReturn,invalidErr)
+	}
+	g6Review,g6ReviewErr:=service.DHFPilotRecommend(ctx,domain.User{ID:"dhf_gate_reviewer"},g6TaskID,
+		"recommend_return","首次转移证据未齐全","dhf-g6-return-0001")
+	if g6ReviewErr!=nil || g6Review.Status!="returned" || g6Review.DecisionID==""{
+		t.Fatalf("G6 return opinion missing: %+v %v",g6Review,g6ReviewErr)
+	}
+	g6Retry,g6RetryErr:=service.DHFPilotRecommend(ctx,domain.User{ID:"dhf_gate_reviewer"},g6TaskID,
+		"recommend_return","首次转移证据未齐全","dhf-g6-return-0001")
+	if g6RetryErr!=nil || !g6Retry.Replayed || g6Retry.DecisionID!=g6Review.DecisionID{
+		t.Fatalf("G6 identical opinion retry must replay: %+v %v",g6Retry,g6RetryErr)
+	}
+	conflicting,conflictingErr:=service.DHFPilotRecommend(ctx,domain.User{ID:"dhf_gate_reviewer"},g6TaskID,
+		"recommend_pass","override previous return","dhf-g6-return-newkey-0002")
+	if conflictingErr!=nil || conflicting.Reason!="DHF_REVIEW_ALREADY_DECIDED" {
+		t.Fatalf("G6 cannot overwrite immutable advice: %+v %v",conflicting,conflictingErr)
+	}
+	if err=pool.QueryRow(ctx,"SELECT count(*) FROM dhf_pilot_review_decisions WHERE task_id=$1",g6TaskID).Scan(&count);err!=nil || count!=1{
+		t.Fatalf("G6 recommendations must not duplicate: %d %v",count,err)
+	}
+	if _,tamperErr:=pool.Exec(ctx,"UPDATE dhf_pilot_workbench_tasks SET status='pending' WHERE id=$1",g6TaskID);tamperErr==nil{
+		t.Fatal("G6 task status must not regress without a new accountable review")
+	}
+	if err=pool.QueryRow(ctx,"SELECT state FROM dhf_pilot_attempts WHERE id='dhf_g6_attempt'").Scan(&state);err!=nil || state!="submitted" {
+		t.Fatalf("G6 trial recommendation must not close Gate: %q %v",state,err)
+	}
 	// Real physical tampering must be detected even if DB Blob rows and
 	// immutable file_versions still report the original checksum.
 	path,err:=physicalStore.PathFor(storageKey)
