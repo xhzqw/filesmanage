@@ -213,6 +213,37 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 		if err=pool.QueryRow(ctx,"SELECT id FROM dhf_pilot_workbench_tasks WHERE submission_id=$1 AND review_key=$2",
 			g5Result.SubmissionID,entry.key).Scan(entry.dst);err!=nil{t.Fatal(err)}
 	}
+	// A reviewer assignment NEVER grants file read rights by itself.
+	// Grant preview explicitly, then prove the preview remains pinned to v1
+	// even after the Finder current-version pointer advances to v2.
+	_,noACL:=service.DHFPilotReviewerEvidence(ctx,domain.User{ID:"dhf_sw_reviewer"},swTask)
+	if noACL==nil {t.Fatal("DHF review task leaked file metadata without preview ACL")}
+	exec("INSERT INTO acls(id,folder_id,subject_kind,subject_id,actions,granted_by) VALUES('dhf_sw_file_preview','dhf_folder','user','dhf_sw_reviewer',ARRAY['list','preview']::text[],$1)",actorID)
+	items,evidenceErr:=service.DHFPilotReviewerEvidence(ctx,domain.User{ID:"dhf_sw_reviewer"},swTask)
+	if evidenceErr!=nil || len(items)!=2 || items[0].VersionSeq!=1 || items[0].Sha256!=fileSHA {
+		t.Fatalf("reviewer must see exact frozen v1 metadata after ACL: %+v %v",items,evidenceErr)
+	}
+	_,nonAssigneeErr:=service.DHFPilotReviewerEvidence(ctx,actor,swTask)
+	if nonAssigneeErr==nil {t.Fatal("project submitter read another reviewer's evidence through task ID")}
+	newContent:=[]byte("a different later file version")
+	nextStage,nextErr:=physicalStore.Stage()
+	if nextErr!=nil {t.Fatal(nextErr)}
+	if _,nextErr=nextStage.Write(newContent);nextErr!=nil {t.Fatal(nextErr)}
+	nextStorageKey,_,nextErr:=nextStage.Commit()
+	if nextErr!=nil {t.Fatal(nextErr)}
+	nextSHA:=sha(newContent)
+	exec("INSERT INTO blobs(id,storage_key,sha256,size_bytes,state) VALUES('dhf_blob_v2',$1,$2,$3,'ready')",
+		nextStorageKey,nextSHA,len(newContent))
+	exec("INSERT INTO file_versions(id,file_id,seq,blob_id,sha256,size_bytes,action,created_by) VALUES('dhf_v2','dhf_file',2,'dhf_blob_v2',$1,$2,'save',$3)",
+		nextSHA,len(newContent),actorID)
+	exec("UPDATE files SET current_version_seq=2 WHERE id='dhf_file'")
+	previewV1,previewErr:=service.DHFPilotReviewerEvidencePreview(ctx,domain.User{ID:"dhf_sw_reviewer"},
+		swTask,"REQ-G5-SW")
+	if previewErr!=nil || previewV1.Sha256!=fileSHA || !strings.Contains(previewV1.Content,string(content)) {
+		t.Fatalf("DHF frozen preview silently followed mutable current version: %+v %v",previewV1,previewErr)
+	}
+	_,previewDenied:=service.DHFPilotReviewerEvidencePreview(ctx,domain.User{ID:"dhf_mf_reviewer"},mfTask,"REQ-G5-MF")
+	if previewDenied==nil {t.Fatal("reviewer without original file preview ACL received bytes")}
 	early,earlyErr:=service.DHFPilotRecommend(ctx,domain.User{ID:"dhf_gate_reviewer"},
 		gateTask,"recommend_pass","","dhf-g5-gate-before-specialties")
 	if earlyErr==nil || early.Reason!="DHF_REVIEW_CONFLICT"{
