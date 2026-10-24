@@ -47,6 +47,9 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	exec("INSERT INTO blobs(id,storage_key,sha256,size_bytes,state) VALUES('dhf_blob','dhf-pilot-test-only', $1,1,'ready')",fileSHA)
 	exec("INSERT INTO files(id,folder_id,name,uploaded_by) VALUES('dhf_file','dhf_folder','artifact.txt',$1)",actorID)
 	exec("INSERT INTO file_versions(id,file_id,seq,blob_id,sha256,size_bytes,action,created_by) VALUES('dhf_v1','dhf_file',1,'dhf_blob',$1,1,'upload',$2)",fileSHA,actorID)
+	// Match the real upload lifecycle: current pointer is set only after the
+	// immutable version exists, otherwise fileSelect sees NULL version fields.
+	exec("UPDATE files SET current_version_seq=1 WHERE id='dhf_file'")
 	policyBytes,err:=json.Marshal(map[string]any{
 		"stage_id":"G1","conditional_allowed":false,
 		"requirements":[]dhf.RequirementPolicy{{ID:"DHF-REQ-001",Mandatory:true,Critical:true,ConditionEligible:false,AllowNotApplicable:false}},
