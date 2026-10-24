@@ -46,3 +46,12 @@
 .dhf-pilot-evidence-preview{margin-top:12px;padding:12px;background:#f4f7fb;border-radius:9px;min-width:0}
 .dhf-pilot-evidence-preview strong{font-size:12px}
 .dhf-pilot-evidence-preview pre{margin:10px 0 0;max-height:280px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.6}
+
+.dhf-frozen-layout{margin-top:16px;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;background:#f2f4f7;min-width:0}
+.dhf-frozen-layout-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;background:#fff;flex-wrap:wrap;border-bottom:1px solid #e7ebf0}
+.dhf-frozen-layout-toolbar strong{font-size:12px;overflow-wrap:anywhere}
+.dhf-frozen-layout-controls{display:flex;align-items:center;gap:8px;font-size:12px}
+.dhf-frozen-layout-canvas{position:relative;overflow:auto;max-height:65vh;min-height:240px;padding:14px;display:flex;align-items:flex-start;justify-content:center}
+.dhf-frozen-layout-canvas img{max-width:100%;width:auto;height:auto;box-shadow:0 3px 18px rgba(20,40,65,.13);background:#fff}
+.dhf-frozen-loading{position:absolute;top:28px;display:flex;align-items:center;gap:8px;color:#667990;font-size:12px}
+.dhf-frozen-layout>.dhf-pilot-disclaimer{margin:0;padding:9px 12px;background:#fff}
