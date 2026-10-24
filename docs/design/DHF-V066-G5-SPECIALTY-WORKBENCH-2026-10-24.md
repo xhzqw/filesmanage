@@ -57,7 +57,17 @@
 
 DHF 原始大纲来源节点是候选集合，仍不能自动转为全部必交文件或正式责任人。真实业务模板发布需授权核准。
 
-## 6. 验收记录
+## 6. 验收记录（远端隔离环境实测）
+
+- 远端：`root@10.144.144.1`，隔离检出 `/tmp/filesmanage-dhf-v062-G1B4hb`。
+- Go 代码验证提交：`6d715d4`。执行 `go test ./internal/... -count=1`、`go vet ./internal/...` 及 Server/Worker/Migrate 构建，**PASS**，退出码 0。
+- 前端／OpenAPI 验证提交：`ed5c583`。执行 `python3 scripts/gen_openapi.py --check`、`python3 scripts/gen_acceptance_matrix.py --check`、`npm --prefix web run build`，**PASS**，退出码 0。之后仅调整了任务列表选中态 CSS，需复验最终提交才可将整个最新前端标为 PASS。
+- PostgreSQL 17 全新隔离数据库使用仓库原生迁移器：**50 个迁移 PASS**；二次 `-check` 同样 **50/50 PASS**。
+- `TestDHFPilotRealPostgresSubmission`：G5 软件/生产工艺/总 Gate 三项任务、分配人隔离、已用配置删除和历史修改保护、伪造任务派发人拒绝、G6 首次转移未配置审核人整笔回滚、补齐配置后生成独立 Gate 任务，均 **PASS**，退出码 0。
+- 隔离测试数据库已销毁；生产数据库、运行服务和远端正式工作树未改变。
+- **NOT_RUN：** 浏览器真实尺寸 UI 验收、电子签署、审核人执行批准或退回的事务、正式 G5 总 Gate 接收、带历史责任的授权越级、条件放行及实际部署。不得冒称正式 DHF 合规批准。
+
+
 
 - 当前 Go 试点事务和迁移在开发分支；
 - 本次新增迁移 0047，在远端隔离 PostgreSQL 演练；
