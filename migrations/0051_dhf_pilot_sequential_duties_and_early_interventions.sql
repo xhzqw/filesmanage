@@ -119,6 +119,31 @@ CREATE TRIGGER dhf_pilot_early_intervention_immutable
  BEFORE UPDATE OR DELETE ON dhf_pilot_early_interventions
  FOR EACH ROW EXECUTE FUNCTION dhf_pilot_reject_submission_mutation();
 
+-- An intervention is a sensitive authorization action: the immutable
+-- sponsor decision and the ordinary audit trail must commit atomically.
+CREATE OR REPLACE FUNCTION dhf_pilot_require_early_intervention_audit()
+RETURNS trigger LANGUAGE plpgsql AS $
+BEGIN
+ IF NOT EXISTS (
+   SELECT 1 FROM audit_events a
+   WHERE a.actor_id=NEW.authorized_by
+     AND a.event_type='dhf.pilot.early_intervention'
+     AND a.target_kind='dhf_review_task'
+     AND a.target_id=NEW.target_task_id
+     AND a.request_id=NEW.idempotency_key
+     AND a.details->>'interventionId'=NEW.id
+ ) THEN
+   RAISE EXCEPTION 'DHF sponsor early intervention requires same-transaction audit event'
+     USING ERRCODE='23514';
+ END IF;
+ RETURN NULL;
+END;
+$;
+CREATE CONSTRAINT TRIGGER dhf_pilot_early_intervention_audit_atomic
+ AFTER INSERT ON dhf_pilot_early_interventions
+ DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+ EXECUTE FUNCTION dhf_pilot_require_early_intervention_audit();
+
 -- Enforce the sequence inside PostgreSQL even for direct SQL inserts.
 -- Gate PASS is NEVER allowed by an early-intervention alone: existing 0049
 -- Gate check requires every specialty task to become reviewed.
