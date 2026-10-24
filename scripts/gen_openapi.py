@@ -1392,6 +1392,10 @@ add("POST","/api/workbench/dhf/returns/{id}/remediation",operation(
  "content":{"application/json":{"schema":obj({"ok":{"type":"boolean","enum":[True]},"data":ref("DHFRemediationOutcome")},required=["ok","data"])}}}),
  resp("400",ERR["400"]),resp("401",ERR["401"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
 
+schema("DHFReturnInboxItem",obj({"decisionId":string(),"reviewKey":string(),"projectId":string(),"stageId":string(),"originalSubmissionId":string(),"originalManifest":{"type":"object"},"originalManifestSha":string(),"returnReason":string(),"decidedAt":timestamp(),"caseId":string(),"newAttemptId":string(),"newAttemptState":string(),"canPrepare":boolean()},required=["decisionId","reviewKey","projectId","stageId","originalSubmissionId","originalManifest","originalManifestSha","returnReason","decidedAt","canPrepare"]))
+schema("DHFReturnInboxPage",obj({"items":arr(ref("DHFReturnInboxItem")),"trialOnly":boolean()},required=["items","trialOnly"]))
+add("GET","/api/workbench/dhf/returns",operation("List returned DHF review findings only for their original submitter","Workflow","dhfPilotReturns",security=SESSION,responses=dict([json_ok(ref("DHFReturnInboxPage"),"Owner-only return findings and correction status, maximum 100 items."),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("503",ERR["503"])])))
+
 # --- Approvals ---
 schema("ApprovalPage",obj({"items":arr(ref("Approval")),"nextCursor":string(),"hasMore":boolean(),"pendingCount":integer(minimum=0)},required=["items","nextCursor","hasMore","pendingCount"]))
 schema("ApprovalNotificationPage",obj({"items":arr(ref("ApprovalNotification")),"nextCursor":integer(minimum=0),"hasMore":boolean(),"unreadCount":integer(minimum=0)},required=["items","nextCursor","hasMore","unreadCount"]))
