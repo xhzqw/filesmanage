@@ -20,6 +20,7 @@ import (
 	"filesmanage/internal/ports"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Opt-in ONLY: run after applying ALL migrations to a fresh isolated database.
@@ -330,6 +331,73 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	gateOpinion,gateErr:=service.DHFPilotRecommend(ctx,domain.User{ID:"dhf_gate_reviewer"},gateTask,
 		"recommend_pass","all specialties reviewed","dhf-g5-gate-recommendation")
 	if gateErr!=nil || gateOpinion.Status!="reviewed"{t.Fatalf("G5 Gate recommendation failed: %+v %v",gateOpinion,gateErr)}
+	// V0.7.2: each existing trial decision needs its OWN current password
+	// reauthentication. Neither the Gate role nor an early intervention
+	// substitutes for missing predecessor authenticated attestations.
+	const reviewerPassword="DHF-v072-test-only-personal-password!"
+	passwordHash,hashErr:=bcrypt.GenerateFromPassword([]byte(reviewerPassword),bcrypt.MinCost)
+	if hashErr!=nil{t.Fatal(hashErr)}
+	for _,reviewer:=range []string{"dhf_sw_reviewer","dhf_mf_reviewer","dhf_gate_reviewer"}{
+		exec("UPDATE users SET password_hash=$2 WHERE id=$1",reviewer,string(passwordHash))
+	}
+	signer:=func(id string)domain.User{return domain.User{ID:id,Login:id}}
+	const intent="I confirm this DHF review opinion and its fixed evidence identity"
+	unauthorizedSign,unauthorizedSignErr:=service.DHFPilotAttestReview(ctx,signer("dhf_gate_reviewer"),
+		swTask,swOpinion.DecisionID,reviewerPassword,intent,"dhf-sign-someone-elses-review")
+	if unauthorizedSignErr!=nil||unauthorizedSign.Reason!="DHF_SCOPE_DENIED"{
+		t.Fatalf("Gate task must not grant another reviewer's signoff: %+v %v",unauthorizedSign,unauthorizedSignErr)
+	}
+	wrongPassword,wrongPasswordErr:=service.DHFPilotAttestReview(ctx,signer("dhf_sw_reviewer"),
+		swTask,swOpinion.DecisionID,"wrong-password",intent,"dhf-attest-sw-wrong-password")
+	if wrongPasswordErr!=nil||wrongPassword.Reason!="DHF_REAUTH_FAILED"{
+		t.Fatalf("incorrect password unexpectedly signed: %+v %v",wrongPassword,wrongPasswordErr)
+	}
+	if err=pool.QueryRow(ctx,"SELECT count(*) FROM audit_events WHERE event_type='dhf.pilot.review_auth_denied' AND actor_id='dhf_sw_reviewer'").
+		Scan(&count);err!=nil||count!=1{
+		t.Fatalf("password denial must audit with no password material: %d %v",count,err)
+	}
+	prematureGateSign,prematureGateSignErr:=service.DHFPilotAttestReview(ctx,signer("dhf_gate_reviewer"),
+		gateTask,gateOpinion.DecisionID,reviewerPassword,intent,"dhf-gate-attest-before-specialties")
+	if prematureGateSignErr==nil||prematureGateSign.Reason!="DHF_ATTESTATION_CONFLICT"{
+		t.Fatalf("Gate reauthentication without predecessor attestations was accepted: %+v %v",prematureGateSign,prematureGateSignErr)
+	}
+	mfSigned,mfSignedErr:=service.DHFPilotAttestReview(ctx,signer("dhf_mf_reviewer"),
+		mfTask,mfOpinion.DecisionID,reviewerPassword,intent,"dhf-attest-mf-0001")
+	if mfSignedErr!=nil||mfSigned.AttestationID==""||mfSigned.Replayed{
+		t.Fatalf("previously sponsored MF review could not reauthenticate: %+v %v",mfSigned,mfSignedErr)
+	}
+	var signInbox []ports.DHFPilotAttestationInboxRow
+	signInbox,err=service.DHFPilotAttestationInbox(ctx,signer("dhf_gate_reviewer"))
+	if err!=nil||len(signInbox)!=1||signInbox[0].CanAttest||signInbox[0].OutstandingPrior!=1{
+		t.Fatalf("Gate lost predecessor signature obligation: %+v %v",signInbox,err)
+	}
+	swSigned,swSignedErr:=service.DHFPilotAttestReview(ctx,signer("dhf_sw_reviewer"),
+		swTask,swOpinion.DecisionID,reviewerPassword,intent,"dhf-attest-sw-0001")
+	if swSignedErr!=nil||swSigned.AttestationID==""{
+		t.Fatalf("original SW reviewer unable to personally attest: %+v %v",swSigned,swSignedErr)
+	}
+	gateSigned,gateSignedErr:=service.DHFPilotAttestReview(ctx,signer("dhf_gate_reviewer"),
+		gateTask,gateOpinion.DecisionID,reviewerPassword,intent,"dhf-attest-gate-0001")
+	if gateSignedErr!=nil||gateSigned.AttestationID==""||gateSigned.Replayed{
+		t.Fatalf("Gate could not attest after ALL prior signed reviews: %+v %v",gateSigned,gateSignedErr)
+	}
+	signedRetry,signedRetryErr:=service.DHFPilotAttestReview(ctx,signer("dhf_gate_reviewer"),
+		gateTask,gateOpinion.DecisionID,reviewerPassword,intent,"dhf-attest-gate-0001")
+	if signedRetryErr!=nil||!signedRetry.Replayed||signedRetry.AttestationID!=gateSigned.AttestationID{
+		t.Fatalf("exact reauthentication retry must reuse first signed event: %+v %v",signedRetry,signedRetryErr)
+	}
+	if _,tamper:=pool.Exec(ctx,"UPDATE dhf_pilot_review_attestations SET signer_id='dhf_gate_reviewer' WHERE id=$1",swSigned.AttestationID);tamper==nil{
+		t.Fatal("signer identity could be rewritten after account reauthentication")
+	}
+	if _,tamper:=pool.Exec(ctx,"DELETE FROM dhf_pilot_review_attestations WHERE id=$1",mfSigned.AttestationID);tamper==nil{
+		t.Fatal("re-authenticated review could be erased")
+	}
+	if err=pool.QueryRow(ctx,"SELECT count(*) FROM audit_events WHERE event_type='dhf.pilot.review_attested' AND target_kind='dhf_review_task' AND target_id=$1",gateTask).Scan(&count);err!=nil||count!=1{
+		t.Fatalf("signed Gate must have exactly one audit record: %d %v",count,err)
+	}
+	if err=pool.QueryRow(ctx,"SELECT state FROM dhf_pilot_attempts WHERE id='dhf_g5_attempt'").Scan(&state);err!=nil||state!="submitted"{
+		t.Fatalf("authenticated trial signatures must never silently grant formal stage acceptance: %s %v",state,err)
+	}
 	// Replay after BOTH the target and final Gate have finished must still
 	// return the same immutable intervention; no new bypass is created.
 	lateReplay,lateReplayErr:=service.DHFPilotAuthorizeEarlyReview(ctx,domain.User{ID:"dhf_gate_reviewer"},
