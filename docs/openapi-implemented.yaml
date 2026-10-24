@@ -13099,6 +13099,103 @@ components:
       - items
       - trialOnly
       - signIntent
+    DHFRemediationVerificationInput:
+      type: object
+      properties:
+        comment:
+          type: string
+          description: Evidence-specific original return reviewer's corrective verification reason.
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          maxLength: 1024
+        verificationIntent:
+          type: string
+          description: Explicit independent corrective verification intent.
+        idempotencyKey:
+          type: string
+          description: Retry unchanged key for exactly the same verifier and corrected submission.
+      required:
+      - comment
+      - password
+      - verificationIntent
+      - idempotencyKey
+    DHFRemediationVerificationOutcome:
+      type: object
+      properties:
+        verificationId:
+          type: string
+        caseId:
+          type: string
+        revisedSubmissionId:
+          type: string
+        replayed:
+          type: boolean
+        trialOnly:
+          type: boolean
+        reason:
+          type: string
+      required:
+      - caseId
+      - trialOnly
+    DHFRemediationVerificationQueueItem:
+      type: object
+      properties:
+        caseId:
+          type: string
+        returnDecisionId:
+          type: string
+        projectId:
+          type: string
+        stageId:
+          type: string
+        originalSubmissionId:
+          type: string
+        revisedSubmissionId:
+          type: string
+        originalManifestSha:
+          type: string
+        revisedManifestSha:
+          type: string
+        returnReason:
+          type: string
+        resolutionPlan:
+          type: string
+        newAttemptState:
+          type: string
+        readyToVerify:
+          type: boolean
+        verificationId:
+          type: string
+      required:
+      - caseId
+      - returnDecisionId
+      - projectId
+      - stageId
+      - originalSubmissionId
+      - revisedSubmissionId
+      - originalManifestSha
+      - revisedManifestSha
+      - returnReason
+      - resolutionPlan
+      - newAttemptState
+      - readyToVerify
+    DHFRemediationVerificationQueue:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFRemediationVerificationQueueItem'
+        trialOnly:
+          type: boolean
+        verificationIntent:
+          type: string
+      required:
+      - items
+      - trialOnly
+      - verificationIntent
     ApprovalPage:
       type: object
       properties:
