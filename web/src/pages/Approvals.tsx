@@ -37,7 +37,7 @@ export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
   <div className="panels">
    <main className="work approval-work">
     <div className="approval-shell">
-     <nav className="approval-nav" aria-label="审批工作区">
+     <nav className="approval-nav" aria-label="工作台导航">
       <div className="approval-nav-heading">工作台</div>
       {navigation.map(item=><RareButton type="button" key={item.id}
        className="approval-nav-item" aria-current={section===item.id?"page":undefined}
