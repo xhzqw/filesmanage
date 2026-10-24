@@ -17,6 +17,7 @@ import (
 	"filesmanage/internal/application"
 	"filesmanage/internal/domain"
 	"filesmanage/internal/domain/dhf"
+	"filesmanage/internal/ports"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -83,7 +84,7 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 		exec("INSERT INTO dhf_pilot_attempts(id,project_id,stage_id,template_id,manifest_body,manifest_sha,created_by) VALUES($1,'dhf_project','G1','dhf_tpl',$2,$3,$4)",id,manifestBytes,sha(manifestBytes),actorID)
 	}
 	seedAttempt("dhf_attempt_1")
-	service:=application.New(postgres.New(pool),physicalStore)
+	service:=application.New(postgres.New(pool),dhfTestBlobAdapter{Store:physicalStore})
 	actor:=domain.User{ID:actorID,IsAdmin:true} // caller flag intentionally untrusted
 	first,err:=service.DHFPilotSubmit(ctx,actor,"dhf_attempt_1","dhf-isolated-idempotency-0001")
 	if err!=nil || first.Verdict!=dhf.Allow || first.Replayed || first.SubmissionID=="" {
@@ -221,3 +222,9 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	}
 	fmt.Println("DHF_V064_DB_INTEGRATION_PASS")
 }
+
+
+// Same interface adaptation as cmd/server: Stage exposes the ports contract,
+// while Open remains the production BlobStore implementation.
+type dhfTestBlobAdapter struct { *blob.Store }
+func (a dhfTestBlobAdapter) Stage() (ports.BlobStage,error) { return a.Store.Stage() }
