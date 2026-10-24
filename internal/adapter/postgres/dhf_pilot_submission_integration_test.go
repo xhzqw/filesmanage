@@ -364,6 +364,9 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 		!slices.Contains(tampered.ReasonCodes,"DHF_EVIDENCE_BYTES_INVALID") {
 		t.Fatalf("physically altered evidence was accepted: %+v %v",tampered,submitErr)
 	}
+	if _,err=service.DHFPilotReviewerEvidencePreview(ctx,domain.User{ID:"dhf_sw_reviewer"},swTask,"REQ-G5-SW");err==nil {
+		t.Fatal("reviewer preview must recheck physical bytes after disk corruption")
+	}
 	if err=os.WriteFile(path,content,0600);err!=nil {t.Fatal(err)}
 	// Negative security scenario: losing the original file grant denies new
 	// submissions even when project membership and a valid manifest remain.
