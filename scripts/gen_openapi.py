@@ -1462,6 +1462,45 @@ add("POST","/api/workbench/dhf/tasks/{id}/attest",operation(
  resp("400",ERR["400"]),resp("401",ERR["401"]),resp("404",ERR["404"]),resp("409",ERR["409"]),
  ("429",{"description":"Per-account recent password reauthentication failure rate limit."})])))
 
+schema("DHFRemediationVerificationInput",obj({
+ "comment":string("Evidence-specific original return reviewer's corrective verification reason."),
+ "password":{"type":"string","writeOnly":True,"minLength":1,"maxLength":1024},
+ "verificationIntent":string("Explicit independent corrective verification intent."),
+ "idempotencyKey":string("Retry unchanged key for exactly the same verifier and corrected submission."),
+},required=["comment","password","verificationIntent","idempotencyKey"]))
+schema("DHFRemediationVerificationOutcome",obj({
+ "verificationId":string(),"caseId":string(),"revisedSubmissionId":string(),
+ "replayed":boolean(),"trialOnly":boolean(),"reason":string(),
+},required=["caseId","trialOnly"]))
+schema("DHFRemediationVerificationQueueItem",obj({
+ "caseId":string(),"returnDecisionId":string(),"projectId":string(),"stageId":string(),
+ "originalSubmissionId":string(),"revisedSubmissionId":string(),
+ "originalManifestSha":string(),"revisedManifestSha":string(),
+ "returnReason":string(),"resolutionPlan":string(),"newAttemptState":string(),
+ "readyToVerify":boolean(),"verificationId":string(),
+},required=["caseId","returnDecisionId","projectId","stageId","originalSubmissionId",
+ "revisedSubmissionId","originalManifestSha","revisedManifestSha","returnReason",
+ "resolutionPlan","newAttemptState","readyToVerify"]))
+schema("DHFRemediationVerificationQueue",obj({
+ "items":arr(ref("DHFRemediationVerificationQueueItem")),
+ "trialOnly":boolean(),"verificationIntent":string(),
+},required=["items","trialOnly","verificationIntent"]))
+add("GET","/api/workbench/dhf/verifications",operation(
+ "List corrective verification cases only for the signer of their original returned review",
+ "Workflow","dhfPilotVerificationInbox",security=SESSION,
+ responses=dict([json_ok(ref("DHFRemediationVerificationQueue"),
+ "Reviewer-only correction readiness, preserving pending predecessor responsibility."),
+ resp("401",ERR["401"]),resp("403",ERR["403"]),resp("503",ERR["503"])])))
+add("POST","/api/workbench/dhf/remediations/{id}/verify",operation(
+ "Reauthenticate original returned reviewer and immutably verify correction after all revised reviewers signed",
+ "Workflow","dhfPilotVerifyRemediation",security=SESSION,
+ params=[id_param("id","Immutable source remediation case ID")],
+ request={"application/json":{"schema":ref("DHFRemediationVerificationInput")}},
+ responses=dict([json_ok(ref("DHFRemediationVerificationOutcome"),
+ "Independent verified corrective evidence fact, NOT final Stage Gate acceptance."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("404",ERR["404"]),resp("409",ERR["409"]),
+ ("429",{"description":"Five recent failed account reauthentication attempts within 15 minutes."})])))
+
 # --- Approvals ---
 schema("ApprovalPage",obj({"items":arr(ref("Approval")),"nextCursor":string(),"hasMore":boolean(),"pendingCount":integer(minimum=0)},required=["items","nextCursor","hasMore","pendingCount"]))
 schema("ApprovalNotificationPage",obj({"items":arr(ref("ApprovalNotification")),"nextCursor":integer(minimum=0),"hasMore":boolean(),"unreadCount":integer(minimum=0)},required=["items","nextCursor","hasMore","unreadCount"]))
