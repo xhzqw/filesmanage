@@ -1365,7 +1365,7 @@ add("GET","/api/workbench/dhf/tasks/{id}/evidence/{rid}/page",operation(
  "Return a server-rasterized PNG page from frozen PDF or sandbox-converted DOCX; never latest file bytes",
  "Workflow","dhfPilotFrozenPage",security=SESSION,
  params=[id_param("id","Authorized DHF review task ID"),id_param("rid","Pinned requirement ID"),
- query("page","PDF/DOCX page number",integer(minimum=1,maximum=1000))],
+ query("page","PDF/DOCX page number (1-1000)",integer(minimum=1))],
  responses=dict([("200",{"description":"Verified immutable page image, private no-store.","content":{"image/png":{"schema":{"type":"string","format":"binary"}}}}),
  resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("503",ERR["503"])])))
 
