@@ -672,6 +672,29 @@ VALUES('dhf-no-auth-audit',$1,$2,$3,'dhf_sw_reviewer','recommend_pass',$4,
 	if revisedSignedErr!=nil||revisedSigned.AttestationID==""{
 		t.Fatalf("corrected review not reauthenticated: %+v %v",revisedSigned,revisedSignedErr)
 	}
+	verificationCases,verificationInboxErr:=service.DHFPilotVerificationInbox(ctx,signer("dhf_gate_reviewer"))
+	if verificationInboxErr!=nil||len(verificationCases)!=1||
+		verificationCases[0].CaseID!=remed.CaseID||
+		!verificationCases[0].ReadyToVerify||
+		verificationCases[0].RevisedSubmissionID!=remedSubmit.SubmissionID{
+		t.Fatalf("original reviewer cannot see ready correction: %+v %v",verificationCases,verificationInboxErr)
+	}
+	notReviewerInbox,notReviewerInboxErr:=service.DHFPilotVerificationInbox(ctx,actor)
+	if notReviewerInboxErr!=nil||len(notReviewerInbox)!=0{
+		t.Fatalf("original submitter improperly saw reviewer verification queue: %+v %v",notReviewerInbox,notReviewerInboxErr)
+	}
+	// A direct SQL insertion cannot create a purported correction verification
+	// without a matching audit event committed in the same transaction.
+	if _,forgedErr:=pool.Exec(ctx,`
+INSERT INTO dhf_pilot_remediation_verifications(id,case_id,original_return_attestation_id,
+ revised_submission_id,verifier_id,comment,original_manifest_sha,revised_manifest_sha,
+ revised_policy_sha,idempotency_key,request_sha)
+VALUES('dhf-unlogged-verification',$1,$2,$3,'dhf_gate_reviewer',$4,$5,$6,$7,
+ 'dhf-rework-unlogged-0001',repeat('a',64))`,
+		remed.CaseID,originalReturnSigned.AttestationID,remedSubmit.SubmissionID,
+		verifiedPlan,sha(manifestBytes),sha(revisedManifest),g6Result.PolicySHA);forgedErr==nil{
+		t.Fatal("direct unaudited correction verification was accepted")
+	}
 	wrongVerifyPassword,wrongVerifyErr:=service.DHFPilotVerifyRemediation(ctx,signer("dhf_gate_reviewer"),
 		remed.CaseID,verifiedPlan,"DHF-invalid-password",verifyIntent,"dhf-verify-wrong-password")
 	if wrongVerifyErr!=nil||wrongVerifyPassword.Reason!="DHF_REAUTH_FAILED"{
