@@ -153,6 +153,58 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	if err!=nil || eventual.Verdict!=dhf.Allow || !eventual.Replayed {
 		t.Fatalf("eventual exact replay must recover committed result: %+v %v",eventual,err)
 	}
+	// Submitted G5 evidence must create distinct professional + stage-Gate
+	// review tasks in the EXISTING Workbench, assigned only by explicit
+	// reviewer configuration, never inherited from global admin privileges.
+	for _, reviewer:=range []string{"dhf_sw_reviewer","dhf_mf_reviewer","dhf_gate_reviewer"} {
+		exec("INSERT INTO users(id,login,display_name,password_hash) VALUES($1,$1,$1,'not-a-real-password')",reviewer)
+		exec("INSERT INTO dhf_pilot_members(project_id,user_id) VALUES('dhf_project',$1)",reviewer)
+	}
+	g5Policy,err:=json.Marshal(map[string]any{
+		"stage_id":"G5","conditional_allowed":false,
+		"requirements":[]dhf.RequirementPolicy{
+			{ID:"REQ-G5-SW",SpecialtyKey:"G5-SW",Mandatory:true,Critical:true},
+			{ID:"REQ-G5-MF",SpecialtyKey:"G5-MF",Mandatory:true,Critical:true},
+		},
+		"dependencies":[]dhf.DependencyPolicy{},
+		"specialties":[]dhf.SpecialtyPolicy{{Key:"G5-SW"},{Key:"G5-MF"}},
+	})
+	if err!=nil {t.Fatal(err)}
+	g5Manifest,err:=json.Marshal(map[string]any{"requirements":[]map[string]any{
+		{"id":"REQ-G5-SW","applicability":"applicable","file_id":"dhf_file","version_seq":1,"sha256":fileSHA},
+		{"id":"REQ-G5-MF","applicability":"applicable","file_id":"dhf_file","version_seq":1,"sha256":fileSHA},
+	}})
+	if err!=nil {t.Fatal(err)}
+	exec("INSERT INTO dhf_pilot_templates(id,stage_id,policy_body,policy_sha,status,approved_by,approved_at) VALUES('dhf_g5_tpl','G5',$1,$2,'published',$3,now())",g5Policy,sha(g5Policy),actorID)
+	exec("INSERT INTO dhf_pilot_baselines(project_id,stage_id,template_id,active) VALUES('dhf_project','G5','dhf_g5_tpl',true)")
+	for _,a:=range [][2]string{{"G5-SW","dhf_sw_reviewer"},{"G5-MF","dhf_mf_reviewer"},{"__gate__","dhf_gate_reviewer"}} {
+		exec("INSERT INTO dhf_pilot_review_assignments(project_id,stage_id,review_key,reviewer_id,configured_by) VALUES('dhf_project','G5',$1,$2,$3)",a[0],a[1],actorID)
+	}
+	seedG5:=func(id string){
+		t.Helper()
+		exec("INSERT INTO dhf_pilot_attempts(id,project_id,stage_id,template_id,manifest_body,manifest_sha,created_by) VALUES($1,'dhf_project','G5','dhf_g5_tpl',$2,$3,$4)",id,g5Manifest,sha(g5Manifest),actorID)
+	}
+	seedG5("dhf_g5_attempt")
+	g5Result,g5Err:=service.DHFPilotSubmit(ctx,actor,"dhf_g5_attempt","dhf-g5-reviewed-0001")
+	if g5Err!=nil || g5Result.Verdict!=dhf.Allow {t.Fatalf("G5 submit denied: %+v %v",g5Result,g5Err)}
+	if err=pool.QueryRow(ctx,"SELECT count(*) FROM dhf_pilot_workbench_tasks WHERE submission_id=$1",g5Result.SubmissionID).Scan(&count);err!=nil || count!=3 {
+		t.Fatalf("expected two specialties + total Gate: %d %v",count,err)
+	}
+	for _,tc:=range [][2]string{{"G5-SW","dhf_sw_reviewer"},{"G5-MF","dhf_mf_reviewer"},{"__gate__","dhf_gate_reviewer"}} {
+		if err=pool.QueryRow(ctx,"SELECT count(*) FROM dhf_pilot_workbench_tasks WHERE submission_id=$1 AND review_key=$2 AND reviewer_id=$3",g5Result.SubmissionID,tc[0],tc[1]).Scan(&count);err!=nil || count!=1 {
+			t.Fatalf("missing G5 reviewer %s: %d %v",tc[0],count,err)
+		}
+	}
+	inbox,inboxErr:=service.DHFPilotWorkbenchInbox(ctx,domain.User{ID:"dhf_sw_reviewer"})
+	if inboxErr!=nil || len(inbox)!=1 || inbox[0].ReviewKey!="G5-SW" || inbox[0].SubmissionID!=g5Result.SubmissionID {
+		t.Fatalf("wrong specialty inbox: %+v %v",inbox,inboxErr)
+	}
+	otherInbox,inboxErr:=service.DHFPilotWorkbenchInbox(ctx,domain.User{ID:"dhf_mf_reviewer"})
+	if inboxErr!=nil || len(otherInbox)!=1 || otherInbox[0].ReviewKey!="G5-MF" {
+		t.Fatalf("G5 tasks leaked across assignees: %+v %v",otherInbox,inboxErr)
+	}
+	seedG5("dhf_g5_unassigned")
+	if _, deleteErr:=pool.Exec(ctx,"DELETE FROM dhf_pilot_review_assignments WHERE project_id='dhf_project' AND stage_id='G5' AND review_key='G5-MF'");deleteErr==nil {t.Fatal("applied review assignment must not be erased")}
 	// Real physical tampering must be detected even if DB Blob rows and
 	// immutable file_versions still report the original checksum.
 	path,err:=physicalStore.PathFor(storageKey)
