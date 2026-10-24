@@ -7281,6 +7281,134 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/tasks/{id}/evidence/{rid}/pages:
+    get:
+      summary: Count exact pinned PDF/DOCX pages after reviewer/file ACL and original disk SHA checks
+      operationId: dhfPilotFrozenPages
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Authorized DHF review task ID
+        schema:
+          type: string
+      - name: rid
+        in: path
+        required: true
+        description: Pinned requirement ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Exact historical PDF/DOCX version page count.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFFrozenPages'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/tasks/{id}/evidence/{rid}/page:
+    get:
+      summary: Return a server-rasterized PNG page from frozen PDF or sandbox-converted DOCX; never latest file bytes
+      operationId: dhfPilotFrozenPage
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Authorized DHF review task ID
+        schema:
+          type: string
+      - name: rid
+        in: path
+        required: true
+        description: Pinned requirement ID
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        description: PDF/DOCX page number (1-1000)
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Verified immutable page image, private no-store.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/approvals:
     get:
       summary: List approvals visible to the caller
@@ -12229,6 +12357,20 @@ components:
       - textual
       - truncated
       - fixedVersionVerified
+    DHFFrozenPages:
+      type: object
+      properties:
+        pageCount:
+          type: integer
+          minimum: 1
+        immutable:
+          type: boolean
+        trialOnly:
+          type: boolean
+      required:
+      - pageCount
+      - immutable
+      - trialOnly
     ApprovalPage:
       type: object
       properties:
