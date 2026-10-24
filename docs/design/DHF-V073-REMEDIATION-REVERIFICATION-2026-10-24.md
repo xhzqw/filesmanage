@@ -52,6 +52,11 @@
 | 复验记录 UPDATE / DELETE | **PASS：拒绝** |
 | 复验后新 Stage Attempt 状态 | **PASS：仍为 submitted，无隐式正式批准** |
 | G5/G6 原始评审责任、退回整改、PDF/DOCX 固定页图回归 | **PASS** |
+| `go test ./internal/... -count=1`、`go vet ./internal/...`、server/worker/migrate 构建 | **PASS**，退出码 0 |
+| TypeScript + Vite 生产构建 | **PASS**，保留原有 Three.js 动态导入/大块体积优化警告 |
+| `python3 scripts/gen_openapi.py --check` | **PASS：139 paths / 168 operations** |
+| `python3 scripts/gen_acceptance_matrix.py --check` | **PASS：126 ids（123 PASS / 3 PARTIAL）** |
+| `cmd/migrate -check` 从测试库校验所有迁移 checksum | **PASS：55/55** |
 | 浏览器宽屏、笔记本、窄内容区人工验收 | **NOT_RUN** |
 | 公司授权的电子签名凭证、私钥、可信时间与 Stage Gate 受控发行 | **NOT_RUN / NO-GO** |
 
