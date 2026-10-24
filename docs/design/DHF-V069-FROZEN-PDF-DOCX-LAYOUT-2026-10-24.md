@@ -40,10 +40,10 @@ V0.6.8 已可读取审核时绑定的精确 file_id、version_seq、Blob、SHA-2
 | 未被指派的提交人不能借任务读取页图 | **PASS** |
 | 审核人原文件预览 ACL 撤销后页图拒绝 | **PASS** |
 | 原始 51 迁移在测试数据库加载 | **PASS**，无新增正式数据结构迁移 |
-| Go 全包、go vet、Server/Worker/Migrate 构建 | 最终验证命令执行后记录退出码 |
-| Vite TypeScript 生产构建、OpenAPI/验收矩阵 `--check` | 最终验证命令执行后记录退出码 |
+| Go 全包、go vet、Server/Worker/Migrate 构建 | **PASS**；远端提交 `5873291`，退出码 0 |
+| Vite TypeScript 生产构建、OpenAPI/验收矩阵 `--check` | **PASS**：131 条 OpenAPI 路径，126 条验收矩阵，退出码 0 |
 
-上述数据测试程序验证了真实数据库、真实底层 Blob 字节以及实际外部渲染程序的联动；它不等同于已在生产业务系统的浏览器上人工验收。既有 CDW 文件审批数据和运行系统不得被误删。
+最终又从全新数据库执行了**联合集成回归**：`TestDHFPilotFrozenPDFDOCXRealPostgres` 和 `TestDHFPilotRealPostgresSubmission` 同时 PASS，原有证据固定、ACL、幂等、G5/G6 任务与复核审计并未被页图功能破坏。上述数据测试程序验证了真实数据库、真实底层 Blob 字节以及实际外部渲染程序的联动；它不等同于已在生产业务系统的浏览器上人工验收。既有 CDW 文件审批数据和运行系统不得被误删。
 
 ## 4. 必须继续执行的签审与整改门禁
 
