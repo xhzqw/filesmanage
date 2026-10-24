@@ -50,6 +50,29 @@
 | 生成 OpenAPI、验收矩阵、Go 全量测试及构建、Vite | 以实际结果判定 |
 | 企业正式密钥签署 SOP、电子签章法规验收、CAS stage accepted、CDW 分发 | **NOT_RUN / NO-GO** |
 
+### 远端测试实际结果（2026-10-24）
+
+执行位置：`10.144.144.1` 的独立 Git 检出、一次性 PostgreSQL 17 测试数据库及随机生成的进程内 Ed25519 测试密钥。测试密钥未提交、未部署。
+
+| 断言 | 观察结果 |
+|---|---|
+| 56 项 migration 从空库执行及二次 checksum `-check` | **PASS** |
+| 缺失信任公钥、无效签名、错误审核人 | **PASS，均被拒绝** |
+| 只有现有 Gate 密码再认证但没有文件预览 ACL | **PASS，被拒绝** |
+| 伪造候选但没有同事务 audit/outbox | **PASS，被拒绝** |
+| 真实授权 Gate + 本人当前口令 + 临时测试私钥 Ed25519 签名 | **PASS** |
+| 从数据库重新读取签名和历史公钥独立 Ed25519 验签 | **PASS** |
+| 同幂等键重放与候选篡改 | **PASS：重用原 ID / 拒绝修改** |
+| Gate 候选成功后 Stage Attempt 保持 submitted | **PASS，无正式批准的越权状态转换** |
+| G5/G6 逐级签审、G6 整改复验、旧版 PDF/DOCX 字节固定预览 | **PASS，真实 PostgreSQL 集成** |
+| `python3 scripts/gen_openapi.py --check` | **PASS：139 paths**（本版无新 HTTP 路径） |
+| `python3 scripts/gen_acceptance_matrix.py --check` | **PASS：126 IDs / 123 PASS / 3 PARTIAL** |
+| `go test ./internal/... -count=1` + `go vet ./internal/...` + 3 个 Go 后端命令构建 | **PASS，退出码 0** |
+| `npm --prefix web run build`（TypeScript/Vite） | **PASS，退出码 0**；原 Three.js 大 bundle / 动态导入提示保留 |
+| 浏览器三尺寸、正式签名政策、正式 accepted CAS、CDW 部门签收 | **NOT_RUN / NO-GO** |
+
+**局限：** PostgreSQL 能强制来源关联、任务/证据/整改完成、不可变审计及 outbox 原子性，但 PostgreSQL 触发器本身不做 Ed25519 验签；当前服务应用层在落库前使用外部公钥进行密码学核验。具有数据库超级用户权限者仍可能伪造数据库记录，因此正式投产还须独立信任域与外部可验证签名证明和操作权限隔离。本版的公钥来自隔离测试环境，不是企业批准的公钥身份管理制度。
+
 ## 5. 不可解除的生产门禁
 
 正式 `accepted` 事务必须另具：1) 由公司质量/研发主管批准的生效模板及责任人清单，且可校验签署授权、密钥撤销与寿命；2) 被企业认可的身份认证强度、签名算法和可信时间源；3) 全 G1–G9 已批准要求适用性和 Gate 依赖；4) 正式 Stage Position 状态 CAS 及统一提交审计/outbox（区别于本次 trial candidate）；5) 不完整或不符合的整改关闭严禁批准；6) 受控 CDW 文件发行、部门签收和培训另行验收。原始 XMind 的暂定文件名、括号数量及模板示例不能直接作为法定必交条件。
