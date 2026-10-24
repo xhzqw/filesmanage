@@ -6,15 +6,16 @@ import {SealLibrary} from "../features/seals/SealLibrary";
 import {ApprovalReviewDialog} from "./ApprovalReviewDialog";
 import type {User} from "../entities/user/model";
 import {ApprovalInbox,type ApprovalView} from "../features/workflow/ApprovalInbox";
+import {DHFPilotInbox} from "../features/workflow/DHFPilotInbox";
 import {AppShell} from "../shared/ui/AppShell";
 
-type Section=ApprovalView|"seals";
+type Section=ApprovalView|"seals"|"dhf";
 
 export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
  const[review,setReview]=useState<Approval|null>(null);
  const[params,setParams]=useSearchParams();
  const requested=params.get("tab");
- const section:Section=requested==="mine"||requested==="notifications"||requested==="seals"||(user.isAdmin&&requested==="all_pending")?requested:"inbox";
+ const section:Section=requested==="mine"||requested==="notifications"||requested==="seals"||requested==="dhf"||(user.isAdmin&&requested==="all_pending")?requested:"inbox";
  function changeSection(next:Section){
   setParams(previous=>{
    const updated=new URLSearchParams(previous);
@@ -28,6 +29,7 @@ export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
   {id:"inbox",label:"待我审批",count:counts.pending},
   ...(user.isAdmin?[{id:"all_pending" as const,label:"全部待审批"}]:[]),
   {id:"mine",label:"我发起的"},
+  {id:"dhf",label:"研发阶段审核"},
   {id:"notifications",label:"通知",count:counts.unread},
   {id:"seals",label:user.isAdmin?"签章管理":"我的签章"},
  ];
@@ -36,7 +38,7 @@ export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
    <main className="work approval-work">
     <div className="approval-shell">
      <nav className="approval-nav" aria-label="审批工作区">
-      <div className="approval-nav-heading">审批</div>
+      <div className="approval-nav-heading">工作台</div>
       {navigation.map(item=><RareButton type="button" key={item.id}
        className="approval-nav-item" aria-current={section===item.id?"page":undefined}
        onClick={()=>changeSection(item.id)}>
@@ -45,6 +47,7 @@ export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
      </nav>
      <div className="approval-stage">
       {section==="seals"?<SealLibrary isAdmin={user.isAdmin}/>:
+       section==="dhf"?<DHFPilotInbox/>:
        <ApprovalInbox currentUser={user} view={section} onCounts={setCounts} onReview={setReview}/>}
      </div>
     </div>
