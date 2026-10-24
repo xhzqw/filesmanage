@@ -95,6 +95,7 @@ type DHFPilotWorkbenchTask struct {
 	SubmissionID string `json:"submissionId"`
 	ReviewKey string `json:"reviewKey"`
 	Status string `json:"status"`
+	GateReady bool `json:"gateReady"`
 	AssignedAt time.Time `json:"assignedAt"`
 }
 
