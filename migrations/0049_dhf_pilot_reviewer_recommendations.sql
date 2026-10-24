@@ -109,7 +109,7 @@ RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE task_status text;
 BEGIN
  SELECT status INTO task_status FROM dhf_pilot_workbench_tasks WHERE id=NEW.task_id;
- IF task_status IS DISTINCT FROM CASE WHEN NEW.outcome='recommend_pass' THEN 'reviewed' ELSE 'returned' END THEN
+ IF task_status IS DISTINCT FROM (CASE WHEN NEW.outcome='recommend_pass' THEN 'reviewed' ELSE 'returned' END) THEN
    RAISE EXCEPTION 'DHF review decision must commit with matching task status'
      USING ERRCODE='23514';
  END IF;
