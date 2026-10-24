@@ -7409,6 +7409,68 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/returns/{id}/remediation:
+    post:
+      summary: Create an immutable trial corrective case and new preparing attempt from own returned reviewer decision
+      operationId: dhfPilotOpenRemediation
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Immutable returned-review decision ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DHFRemediationStart'
+      responses:
+        '201':
+          description: New immutable remediation lineage with separate new preparing attempt; never formal Stage Gate approval.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFRemediationOutcome'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/approvals:
     get:
       summary: List approvals visible to the caller
@@ -12370,6 +12432,64 @@ components:
       required:
       - pageCount
       - immutable
+      - trialOnly
+    DHFRemediationStart:
+      type: object
+      properties:
+        manifest:
+          type: object
+          description: Full replacement manifest for the same known requirement IDs; changed pinned evidence version mandatory.
+          properties:
+            requirements:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  applicability:
+                    type: string
+                  file_id:
+                    type: string
+                  version_seq:
+                    type: integer
+                    minimum: 1
+                  sha256:
+                    type: string
+                required:
+                - id
+                - applicability
+          required:
+          - requirements
+        resolutionPlan:
+          type: string
+          description: Required substantive corrective plan (10–2000 characters).
+        idempotencyKey:
+          type: string
+          description: Retry exactly the same request using this key.
+      required:
+      - manifest
+      - resolutionPlan
+      - idempotencyKey
+    DHFRemediationOutcome:
+      type: object
+      properties:
+        caseId:
+          type: string
+        returnDecisionId:
+          type: string
+        originalSubmissionId:
+          type: string
+        newAttemptId:
+          type: string
+        replayed:
+          type: boolean
+        trialOnly:
+          type: boolean
+        reason:
+          type: string
+      required:
+      - returnDecisionId
       - trialOnly
     ApprovalPage:
       type: object
