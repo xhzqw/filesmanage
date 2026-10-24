@@ -1462,6 +1462,27 @@ jsonb_build_object('revokeId','dhf-operator-grant-revocation'))`); err != nil {
 		!graphNodes[1].Dependencies[0].AllowConditional {
 		t.Fatalf("first G6 transfer conflated with distinct G8: %+v %v", graphNodes, err)
 	}
+	// Explicit, non-numerical DAG with all nine stage identities: the
+	// source outline itself NEVER supplies this fixture as a real SOP.
+	seedGraphProject("dhf_graph_all_nine", []string{"G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9"},
+		map[string][]dhf.DependencyPolicy{
+			"G4": {{ID: "EXPLICIT-4-2", PredecessorStage: "G2", GuardedAction: dhf.ActionSubmit}},
+			"G8": {{ID: "EXPLICIT-8-6", PredecessorStage: "G6", GuardedAction: dhf.ActionPrepare}},
+			"G9": {{ID: "EXPLICIT-9-3", PredecessorStage: "G3", GuardedAction: dhf.ActionFinalize}},
+		}, nil)
+	if err = pool.QueryRow(ctx, "SELECT dhf_pilot_verified_project_graph('dhf_graph_all_nine')").Scan(&rawGraph); err != nil {
+		t.Fatalf("valid nine-stage explicit project graph rejected: %v", err)
+	}
+	if err = json.Unmarshal(rawGraph, &graphNodes); err != nil || len(graphNodes) != 9 {
+		t.Fatalf("G1-G9 active published baselines not all represented: %d %v", len(graphNodes), err)
+	}
+	edgeTotal := 0
+	for _, stage := range graphNodes {
+		edgeTotal += len(stage.Dependencies)
+	}
+	if edgeTotal != 3 || graphNodes[5].StageID != "G6" || graphNodes[7].StageID != "G8" {
+		t.Fatalf("unpublished numerical G1-G9 edges inferred or G6/G8 conflated: %+v", graphNodes)
+	}
 	seedGraphProject("dhf_graph_cycle", []string{"G7", "G8"},
 		map[string][]dhf.DependencyPolicy{
 			"G7": {{ID: "CYCLIC-7", PredecessorStage: "G8", GuardedAction: dhf.ActionPrepare}},
