@@ -49,7 +49,7 @@ export function DHFPilotInbox(){
    <div className="dhf-pilot-filter">
     <input aria-label="筛选 DHF 审核任务" placeholder="搜索项目、阶段或提交" value={query} onChange={e=>setQuery(e.target.value)}/>
    </div>
-   {loading?<div className="dhf-pilot-empty"><BrandLoadingLabel label="正在加载"/></div>:
+   {loading?<div className="dhf-pilot-empty"><BrandLoadingLabel>正在加载</BrandLoadingLabel></div>:
     error?<div className="dhf-pilot-empty" role="alert">{error}</div>:
     visible.length===0?<div className="dhf-pilot-empty">暂无指派给我的阶段审核任务</div>:
     <div className="dhf-pilot-scroll">{visible.map(task=><button type="button" key={task.id}
