@@ -22,6 +22,7 @@ type DHFPilotReturnInboxItem struct {
  CaseID string `json:"caseId,omitempty"`
  NewAttemptID string `json:"newAttemptId,omitempty"`
  NewAttemptState string `json:"newAttemptState,omitempty"`
+ VerificationID string `json:"verificationId,omitempty"`
  CanPrepare bool `json:"canPrepare"`
 }
 
@@ -52,7 +53,7 @@ func(s *Service)DHFPilotReturnInbox(ctx context.Context,actor domain.User)([]DHF
    OriginalManifest:json.RawMessage(r.OriginalManifest),OriginalManifestSHA:r.OriginalManifestSHA,
    ReturnReason:r.Reason,DecidedAt:r.DecidedAt,
    CaseID:r.CaseID,NewAttemptID:r.NewAttemptID,
-   NewAttemptState:r.NewAttemptState,CanPrepare:r.CanPrepare,
+   NewAttemptState:r.NewAttemptState,VerificationID:r.VerificationID,CanPrepare:r.CanPrepare,
   })
  }
  return out,nil
