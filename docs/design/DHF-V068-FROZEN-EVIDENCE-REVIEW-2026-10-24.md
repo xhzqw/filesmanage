@@ -22,7 +22,7 @@ G5 专业审核和 G6 第一次设计开发转移继续使用原始九阶段 DHF
 
 ## 3. 实际工程验证
 
-V0.6.8 在 `root@10.144.144.1` 的 Git 独立检出及 PostgreSQL 17 一次性数据库执行：
+V0.6.8 在 `root@10.144.144.1` 的 Git 独立检出及 PostgreSQL 17 一次性数据库执行。代码/文档收尾提交基线：`9751042`；前端与 Go 完整回归基于 `a88c89f`（后续仅新增测试与文档，实际集成按最新基线重跑）：
 
 | 测试 | 执行方法 | 结果 |
 |---|---|---|
@@ -31,8 +31,8 @@ V0.6.8 在 `root@10.144.144.1` 的 Git 独立检出及 PostgreSQL 17 一次性�
 | 明确授权 | 给该文件添加受控预览 ACL，再列出两条正确 v1 证据 | PASS |
 | 禁止凭任务绕过成员身份 | 提交人使用审核任务 ID 尝试读取 | PASS，拒绝 |
 | 防止“最新版本冒充证据” | 受控文件当前指针转至 v2 后请求原提交 v1 | PASS，内容和 SHA 仍与 v1 一致 |
-| 磁盘物理篡改 | 相同字节长度的磁盘内容发生变化后重新预览 v1 | 负例在后续回归核验 |
-| Go 全包与 Vite/OpenAPI 构建 | 远端 CI 命令 `go test ./internal/...`、`go vet`、`npm --prefix web run build`、文档 `--check` | 以最终远端实测退出码为准，不得因命令已启动标为 PASS |
+| 磁盘物理篡改 | 相同字节长度的磁盘内容变化后，审核人重新预览原固定 v1 必须失败 | **PASS** |
+| Go 全包与 Vite/OpenAPI 构建 | `go test ./internal/... -count=1`、`go vet ./internal/...`、Go build、Vite production build、OpenAPI 和验收矩阵 `--check` | **PASS**，退出码 0，129 API paths |
 
 ## 4. 未完成事项
 
