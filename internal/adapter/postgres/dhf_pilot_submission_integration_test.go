@@ -372,6 +372,23 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	if noChangeErr!=nil||noChange.Reason!="DHF_REMEDIATION_EVIDENCE_UNCHANGED"{
 		t.Fatalf("same manifest cannot count as remediation: %+v %v",noChange,noChangeErr)
 	}
+	// An immutable remediation must NOT consume the unique return decision
+	// when its proposed file tuple is not a real authorized file version.
+	forgedManifest,err:=json.Marshal(map[string]any{"requirements":[]map[string]any{{
+		"id":"DHF-REQ-001","applicability":"applicable","file_id":"dhf_file",
+		"version_seq":999,"sha256":strings.Repeat("f",64),
+	}}})
+	if err!=nil{t.Fatal(err)}
+	forgedCase,forgedErr:=service.DHFPilotOpenRemediation(ctx,actor,
+		g6Review.DecisionID,forgedManifest,plan,"dhf-remed-forged-version")
+	if forgedErr!=nil||forgedCase.Reason!="DHF_REMEDIATION_PREPARE_DENIED"{
+		t.Fatalf("invalid physical/version identity must not consume remediation: %+v %v",forgedCase,forgedErr)
+	}
+	if err=pool.QueryRow(ctx,
+		"SELECT count(*) FROM dhf_pilot_remediation_cases WHERE return_decision_id=$1",
+		g6Review.DecisionID).Scan(&count);err!=nil||count!=0{
+		t.Fatalf("invalid remediation was not transactionally rolled back: %d %v",count,err)
+	}
 	notReturned,notReturnedErr:=service.DHFPilotOpenRemediation(ctx,actor,
 		swOpinion.DecisionID,revisedManifest,plan,"dhf-remed-unreturned-review")
 	if notReturnedErr!=nil||notReturned.Reason!="DHF_SCOPE_DENIED"{
