@@ -206,6 +206,14 @@ func validAction(action Action) bool {
 	return false
 }
 
+func validStageID(id string) bool {
+	switch id {
+	case "G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9":
+		return true
+	}
+	return false
+}
+
 func validState(state StageState) bool {
 	switch state {
 	case Preparing, Submitted, Reviewing, ChangesRequested, ConditionallyReleased, Accepted, Cancelled:
@@ -253,6 +261,23 @@ func uniqueActions(actions []Action) []Action {
 	return result
 }
 
+// A specialty can be marked not applicable only when ALL its linked
+// requirements received individually authorized N/A determinations.
+func specialtyRequirementsNotApplicable(key string, rules []RequirementPolicy, results map[string]RequirementResult) bool {
+	found := false
+	for _, rule := range rules {
+		if rule.SpecialtyKey != key {
+			continue
+		}
+		found = true
+		result, ok := results[rule.ID]
+		if !ok || !rule.AllowNotApplicable || result.Applicability != NotApplicable || !result.ApplicabilityAuthorized {
+			return false
+		}
+	}
+	return found
+}
+
 // Evaluate checks set completeness, identity and rules using trusted facts.
 // It cannot cryptographically prove that the template came from the database;
 // authoritative construction and locking remain mandatory at integration.
@@ -267,7 +292,7 @@ func Evaluate(in GateInput) Decision {
 	if !validState(s.State) || !stateAllows(in.Action, s.State) {
 		add("DHF_STATE_INVALID")
 	}
-	if p.StageID == "" || p.TemplateVersionID == "" || p.TemplateHash == "" ||
+	if !validStageID(p.StageID) || p.TemplateVersionID == "" || p.TemplateHash == "" ||
 		s.ProjectID == "" || s.AttemptID == "" || s.EvidenceManifestHash == "" ||
 		p.StageID != s.StageID || p.TemplateVersionID != s.TemplateVersionID ||
 		p.TemplateHash != s.TemplateHash {
@@ -492,7 +517,8 @@ func Evaluate(in GateInput) Decision {
 				}
 				found := false
 				for _, remedy := range openByRequirement[id] {
-					if grantRemediations[remedy.ID] && remedy.Authorized && remedy.DueAt.After(s.Now) {
+					if grantRemediations[remedy.ID] && remedy.Authorized && remedy.DueAt.After(s.Now) &&
+						!grant.ExpiresAt.After(remedy.DueAt) {
 						found = true
 					}
 				}
@@ -576,7 +602,8 @@ func Evaluate(in GateInput) Decision {
 			}
 			switch {
 			case review.Applicability == Applicable && review.Decision == SpecialtyApproved && !missingSpecialties[review.Key]:
-			case review.Applicability == NotApplicable && rule.AllowNotApplicable && review.Decision == SpecialtyNotApplicable:
+			case review.Applicability == NotApplicable && rule.AllowNotApplicable &&
+				review.Decision == SpecialtyNotApplicable && specialtyRequirementsNotApplicable(review.Key, p.Requirements, results):
 			case review.Applicability == Applicable && review.Decision == SpecialtyConditional &&
 				in.Action == ActionConditionalApprove && missingSpecialties[review.Key]:
 			case review.Decision == SpecialtyReturned:
