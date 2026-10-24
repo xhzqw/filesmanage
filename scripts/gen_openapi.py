@@ -1301,8 +1301,8 @@ add("POST","/api/files/{id}/seals/marks/revoke",operation("Selectively revoke an
 # --- Unified Workbench / DHF staged review assignments ---
 schema("DHFWorkbenchTask",obj({
  "id":string(),"projectId":string(),"stageId":string(),"submissionId":string(),
- "reviewKey":string(),"status":string(enum=["pending"]),"assignedAt":timestamp(),
-},required=["id","projectId","stageId","submissionId","reviewKey","status","assignedAt"]))
+ "reviewKey":string(),"status":string(enum=["pending"]),"gateReady":boolean(),"assignedAt":timestamp(),
+},required=["id","projectId","stageId","submissionId","reviewKey","status","gateReady","assignedAt"]))
 schema("DHFWorkbenchPage",obj({"items":arr(ref("DHFWorkbenchTask")),"trialOnly":boolean()},
  required=["items","trialOnly"]))
 add("GET","/api/workbench/dhf/tasks",operation(
@@ -1310,6 +1310,22 @@ add("GET","/api/workbench/dhf/tasks",operation(
  "Workflow","dhfPilotWorkbenchTasks",security=SESSION,
  responses=dict([json_ok(ref("DHFWorkbenchPage"),"Read-only G5 specialty and G6 Gate task list, maximum 100 items."),
  resp("401",ERR["401"]),resp("403",ERR["403"]),resp("503",ERR["503"])])))
+
+schema("DHFRecommendationResult",obj({
+ "taskId":string(),"decisionId":string(),"status":string(),"reason":string(),
+ "replayed":boolean(),"trialOnly":boolean(),
+},required=["taskId","trialOnly"]))
+add("POST","/api/workbench/dhf/tasks/{id}/recommendation",operation(
+ "Record an immutable non-signing DHF reviewer recommendation, never an official Stage Gate decision",
+ "Workflow","dhfPilotRecommend",security=SESSION,
+ params=[id_param("id","Assigned DHF pilot reviewer task ID")],
+ request={"application/json":{"schema":obj({
+  "outcome":string(enum=["recommend_pass","recommend_return"]),
+  "comment":string(),"idempotencyKey":string(),
+ },required=["outcome","comment","idempotencyKey"])}},
+ responses=dict([json_ok(ref("DHFRecommendationResult"),"Trial-only immutable reviewer opinion, not approval."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),
+ resp("404",ERR["404"]),resp("409",ERR["409"])])))
 
 # --- Approvals ---
 schema("ApprovalPage",obj({"items":arr(ref("Approval")),"nextCursor":string(),"hasMore":boolean(),"pendingCount":integer(minimum=0)},required=["items","nextCursor","hasMore","pendingCount"]))
