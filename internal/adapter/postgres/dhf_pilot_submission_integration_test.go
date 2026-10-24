@@ -710,6 +710,15 @@ VALUES('dhf-unlogged-verification',$1,$2,$3,'dhf_gate_reviewer',$4,$5,$6,$7,
 	if verifiedAgainErr!=nil||!verifiedAgain.Replayed||verifiedAgain.VerificationID!=verified.VerificationID{
 		t.Fatalf("identical remediation verification not idempotent: %+v %v",verifiedAgain,verifiedAgainErr)
 	}
+	changedRequest,changedRequestErr:=service.DHFPilotVerifyRemediation(ctx,signer("dhf_gate_reviewer"),
+		remed.CaseID,verifiedPlan+"不同结论",reviewerPassword,verifyIntent,"dhf-verification-002")
+	if changedRequestErr!=nil||changedRequest.Reason!="DHF_VERIFICATION_ALREADY_EXISTS"{
+		t.Fatalf("verified case cannot be overwritten with a different claim: %+v %v",changedRequest,changedRequestErr)
+	}
+	authorAfterVerify,authorAfterErr:=service.DHFPilotReturnInbox(ctx,actor)
+	if authorAfterErr!=nil||len(authorAfterVerify)!=1||authorAfterVerify[0].VerificationID!=verified.VerificationID{
+		t.Fatalf("submitter must see independent source-reviewer verification: %+v %v",authorAfterVerify,authorAfterErr)
+	}
 	if _,err=pool.Exec(ctx,"DELETE FROM dhf_pilot_remediation_verifications WHERE id=$1",verified.VerificationID);err==nil{
 		t.Fatal("corrective verification deleted after completion")
 	}
