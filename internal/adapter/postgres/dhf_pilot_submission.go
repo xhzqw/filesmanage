@@ -88,7 +88,7 @@ func (r *Repository) DHFPilotPersistSubmission(ctx context.Context, record ports
 		if err!=nil{return err}
 	}
 	// Append audit in this same transaction; rollback removes all changes.
-	_,err=r.Q.Exec(ctx, "INSERT INTO audit_events(actor_id,event_type,target_kind,target_id,request_id,outcome,details) VALUES($1,'dhf.pilot.submitted','dhf_attempt',$2,$3,'success',jsonb_build_object('submissionId',$4,'manifestSha',$5,'policySha',$6))",
+	_,err=r.Q.Exec(ctx, "INSERT INTO audit_events(actor_id,event_type,target_kind,target_id,request_id,outcome,details) VALUES($1,'dhf.pilot.submitted','dhf_attempt',$2,$3,'success',jsonb_build_object('submissionId',$4::text,'manifestSha',$5::text,'policySha',$6::text))",
 		record.SubmittedBy,record.AttemptID,record.IdempotencyKey,record.ID,record.ManifestSHA,record.PolicySHA)
 	return err
 }
