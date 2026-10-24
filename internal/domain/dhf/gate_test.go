@@ -386,3 +386,58 @@ func TestSecurityScopeAndSeparation(t *testing.T) {
 	in.Stage.SeparationValid = false
 	expect(t, Evaluate(in), Deny, "DHF_SELF_REVIEW_DENIED")
 }
+
+
+func TestSpecialtyNotApplicableNeedsAllLinkedRequirementsNotApplicable(t *testing.T) {
+	in := baseInput(ActionFinalize)
+	in.Policy.Specialties[0].AllowNotApplicable = true
+	in.Policy.Requirements[0].AllowNotApplicable = true
+	in.Specialties[0].Applicability = NotApplicable
+	in.Specialties[0].Decision = SpecialtyNotApplicable
+	expect(t, Evaluate(in), Deny, "DHF_SPECIALTY_PENDING")
+	in.Requirements[0].Applicability = NotApplicable
+	in.Requirements[0].ApplicabilityAuthorized = true
+	expect(t, Evaluate(in), Allow, "")
+}
+
+func TestConditionalExpiryCannotOutliveRemediationDeadline(t *testing.T) {
+	in := conditionalInput()
+	in.Conditional.ExpiresAt = testNow.Add(72 * time.Hour)
+	expect(t, Evaluate(in), Deny, "DHF_CONDITIONAL_REMEDIATION_MISSING")
+	in.Conditional.ExpiresAt = testNow.Add(24 * time.Hour)
+	expect(t, Evaluate(in), LimitedAllow, "")
+}
+
+func TestEachMissingRequirementNeedsItsOwnRemediationBinding(t *testing.T) {
+	in := conditionalInput()
+	in.Policy.Requirements[1].Critical = false
+	in.Policy.Requirements[1].ConditionEligible = true
+	in.Requirements[1].EvidenceBound = false
+	in.Specialties[1].Decision = SpecialtyConditional
+	expect(t, Evaluate(in), Deny, "DHF_CONDITIONAL_REMEDIATION_MISSING")
+	in.Remediations = append(in.Remediations, Remediation{
+		ID: "rem-MF", RequirementID: "MF", AttemptID: "attempt-1",
+		State: RemediationOpen, Authorized: true, DueAt: testNow.Add(48 * time.Hour),
+	})
+	in.Conditional.RemediationIDs = append(in.Conditional.RemediationIDs, "rem-MF")
+	expect(t, Evaluate(in), LimitedAllow, "")
+}
+
+func TestUnknownStageAndEmptyPolicyAreRejected(t *testing.T) {
+	in := baseInput(ActionFinalize)
+	in.Policy.StageID, in.Stage.StageID = "G10", "G10"
+	expect(t, Evaluate(in), Deny, "DHF_SNAPSHOT_IDENTITY_INVALID")
+	in = baseInput(ActionFinalize)
+	in.Policy.Requirements = nil
+	in.Requirements = nil
+	expect(t, Evaluate(in), Deny, "DHF_POLICY_REQUIREMENTS_INVALID")
+}
+
+func TestFinalizedReviewWithOpenRemediationCannotPass(t *testing.T) {
+	in := baseInput(ActionFinalize)
+	in.Remediations = []Remediation{{
+		ID: "rem1", RequirementID: "SW", AttemptID: "attempt-1",
+		State: RemediationOpen, Authorized: true, DueAt: testNow.Add(24 * time.Hour),
+	}}
+	expect(t, Evaluate(in), Deny, "DHF_REMEDIATION_OPEN")
+}
