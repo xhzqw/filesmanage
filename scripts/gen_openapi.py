@@ -1352,6 +1352,23 @@ add("GET","/api/workbench/dhf/tasks/{id}/evidence/{rid}/preview",operation(
  responses=dict([json_ok(ref("DHFReviewerEvidencePreview"),"Only bounded text/structural preview; full PDF/Office page rendering is not represented."),
  resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("503",ERR["503"])])))
 
+schema("DHFFrozenPages",obj({
+ "pageCount":integer(minimum=1),"immutable":boolean(),"trialOnly":boolean(),
+},required=["pageCount","immutable","trialOnly"]))
+add("GET","/api/workbench/dhf/tasks/{id}/evidence/{rid}/pages",operation(
+ "Count exact pinned PDF/DOCX pages after reviewer/file ACL and original disk SHA checks",
+ "Workflow","dhfPilotFrozenPages",security=SESSION,
+ params=[id_param("id","Authorized DHF review task ID"),id_param("rid","Pinned requirement ID")],
+ responses=dict([json_ok(ref("DHFFrozenPages"),"Exact historical PDF/DOCX version page count."),
+ resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("503",ERR["503"])])))
+add("GET","/api/workbench/dhf/tasks/{id}/evidence/{rid}/page",operation(
+ "Return a server-rasterized PNG page from frozen PDF or sandbox-converted DOCX; never latest file bytes",
+ "Workflow","dhfPilotFrozenPage",security=SESSION,
+ params=[id_param("id","Authorized DHF review task ID"),id_param("rid","Pinned requirement ID"),
+ query("page","PDF/DOCX page number",integer(minimum=1,maximum=1000))],
+ responses=dict([("200",{"description":"Verified immutable page image, private no-store.","content":{"image/png":{"schema":{"type":"string","format":"binary"}}}}),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("503",ERR["503"])])))
+
 # --- Approvals ---
 schema("ApprovalPage",obj({"items":arr(ref("Approval")),"nextCursor":string(),"hasMore":boolean(),"pendingCount":integer(minimum=0)},required=["items","nextCursor","hasMore","pendingCount"]))
 schema("ApprovalNotificationPage",obj({"items":arr(ref("ApprovalNotification")),"nextCursor":integer(minimum=0),"hasMore":boolean(),"unreadCount":integer(minimum=0)},required=["items","nextCursor","hasMore","unreadCount"]))
