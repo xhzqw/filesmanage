@@ -7471,6 +7471,49 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/returns:
+    get:
+      summary: List returned DHF review findings only for their original submitter
+      operationId: dhfPilotReturns
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Owner-only return findings and correction status, maximum 100 items.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFReturnInboxPage'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/approvals:
     get:
       summary: List approvals visible to the caller
@@ -12490,6 +12533,59 @@ components:
           type: string
       required:
       - returnDecisionId
+      - trialOnly
+    DHFReturnInboxItem:
+      type: object
+      properties:
+        decisionId:
+          type: string
+        reviewKey:
+          type: string
+        projectId:
+          type: string
+        stageId:
+          type: string
+        originalSubmissionId:
+          type: string
+        originalManifest:
+          type: object
+        originalManifestSha:
+          type: string
+        returnReason:
+          type: string
+        decidedAt:
+          type: string
+          format: date-time
+        caseId:
+          type: string
+        newAttemptId:
+          type: string
+        newAttemptState:
+          type: string
+        canPrepare:
+          type: boolean
+      required:
+      - decisionId
+      - reviewKey
+      - projectId
+      - stageId
+      - originalSubmissionId
+      - originalManifest
+      - originalManifestSha
+      - returnReason
+      - decidedAt
+      - canPrepare
+    DHFReturnInboxPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFReturnInboxItem'
+        trialOnly:
+          type: boolean
+      required:
+      - items
       - trialOnly
     ApprovalPage:
       type: object
