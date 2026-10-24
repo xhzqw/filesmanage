@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-type pilotUOW struct { record ports.DHFPilotAttemptRecord; errorOnLoad error; predecessor dhf.StageState }
+type pilotUOW struct { record ports.DHFPilotAttemptRecord; errorOnLoad error; predecessor dhf.StageState; authoritativeDisabled bool }
 func (u *pilotUOW) Begin(context.Context) (ports.Tx,error) {
 	return &pilotTx{uow:u},nil
 }
@@ -24,6 +24,15 @@ type pilotTx struct {
 }
 func (t *pilotTx) Commit(context.Context) error { return errors.New("pilot preflight cannot commit") }
 func (t *pilotTx) Rollback(context.Context) error { return nil }
+func (t *pilotTx) UserByID(_ context.Context,id string)(domain.User,error){
+	u:=domain.User{ID:id,IsAdmin:false}
+	if t.uow.authoritativeDisabled {
+		now:=testNowForPilot()
+		u.DisabledAt=&now
+	}
+	return u,nil
+}
+func testNowForPilot()time.Time{return time.Date(2026,10,24,12,0,0,0,time.UTC)}
 func (t *pilotTx) DHFPilotBeginSnapshot(context.Context) error { return nil }
 func (t *pilotTx) DHFPilotAttemptForActor(_ context.Context, _, _ string) (ports.DHFPilotAttemptRecord,error) {
 	if t.uow.errorOnLoad != nil { return ports.DHFPilotAttemptRecord{},t.uow.errorOnLoad }
@@ -158,5 +167,15 @@ func TestDHFPilotRejectsOmittedMandatoryBooleanEvenWithMatchingHash(t *testing.T
 	out,err:=s.DHFPilotPreflight(context.Background(),domain.User{ID:"user"},"attempt",dhf.ActionSubmit)
 	if err!=nil || out.Decision.Verdict!=dhf.Deny || !slices.Contains(out.Decision.Reasons,"DHF_POLICY_INVALID"){
 		t.Fatalf("missing mandatory boolean must deny: %+v %v",out,err)
+	}
+}
+
+
+func TestDHFPilotRejectsDisabledAuthoritativeUser(t *testing.T){
+	s,u:=pilotTestService(t,false)
+	u.authoritativeDisabled=true
+	out,err:=s.DHFPilotPreflight(context.Background(),domain.User{ID:"user",IsAdmin:true},"attempt",dhf.ActionPrepare)
+	if err!=nil || out.Decision.Verdict!=dhf.Deny || !slices.Contains(out.Decision.Reasons,"DHF_SCOPE_DENIED"){
+		t.Fatalf("caller-supplied admin flag must not override disabled DB user: %+v %v",out,err)
 	}
 }
