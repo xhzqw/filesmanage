@@ -79,8 +79,7 @@ CREATE TABLE dhf_pilot_stage_positions (
  changed_at timestamptz NOT NULL DEFAULT now(),
  PRIMARY KEY(project_id,stage_id),
  FOREIGN KEY(project_id,stage_id,decision_attempt_id)
- REFERENCES dhf_pilot_attempts(project_id,stage_id,id) ON DELETE RESTRICT,
- CHECK (decision_attempt_id IS NULL)
+ REFERENCES dhf_pilot_attempts(project_id,stage_id,id) ON DELETE RESTRICT
 );
 
 -- One-time template approval is intentionally not exposed as an application
@@ -113,6 +112,10 @@ CREATE TRIGGER dhf_pilot_published_immutable BEFORE UPDATE ON dhf_pilot_template
 CREATE FUNCTION dhf_pilot_reject_frozen_attempt_change()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
+ IF OLD.state <> 'preparing' AND NEW.state = 'preparing' THEN
+   RAISE EXCEPTION 'submitted DHF attempt cannot regress to editable draft'
+   USING ERRCODE='23514';
+ END IF;
  IF OLD.state IN ('accepted','cancelled') AND NEW.state <> OLD.state THEN
    RAISE EXCEPTION 'terminal DHF attempt state cannot be reopened in place'
    USING ERRCODE='23514';
