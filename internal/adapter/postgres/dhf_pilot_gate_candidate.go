@@ -43,11 +43,11 @@ func(r *Repository)DHFPilotExistingGateCandidate(ctx context.Context,submissionI
  err:=r.Q.QueryRow(ctx,`
  SELECT id,submission_id,attempt_id,project_id,stage_id,template_id,
  gate_attestation_id,signer_id,policy_sha,manifest_sha,
- decision_payload_sha,trusted_key_sha,signature_ed25519,idempotency_key,request_sha
+ decision_payload_sha,trusted_key_sha,trusted_public_key_ed25519,signature_ed25519,idempotency_key,request_sha
  FROM dhf_pilot_gate_candidates WHERE submission_id=$1`,submissionID).
  Scan(&x.ID,&x.SubmissionID,&x.AttemptID,&x.ProjectID,&x.StageID,&x.TemplateID,
   &x.GateAttestationID,&x.SignerID,&x.PolicySHA,&x.ManifestSHA,
-  &x.DecisionPayloadSHA,&x.TrustedKeySHA,&x.Signature,&x.IdempotencyKey,&x.RequestSHA)
+  &x.DecisionPayloadSHA,&x.TrustedKeySHA,&x.TrustedPublicKey,&x.Signature,&x.IdempotencyKey,&x.RequestSHA)
  if errors.Is(err,pgx.ErrNoRows){return x,ports.ErrRowMissing}
  return x,err
 }
@@ -62,17 +62,17 @@ func(r *Repository)DHFPilotGateEvidenceForSigner(ctx context.Context,submissionI
  return r.DHFPilotEvidenceForReviewer(ctx,gateTaskID,actorID)
 }
 func(r *Repository)DHFPilotPersistGateCandidate(ctx context.Context,rec ports.DHFPilotGateCandidateRecord)error{
- if rec.ID==""||rec.SubmissionID==""||rec.SignerID==""||len(rec.Signature)!=64{
+ if rec.ID==""||rec.SubmissionID==""||rec.SignerID==""||len(rec.Signature)!=64||len(rec.TrustedPublicKey)!=32{
   return errors.New("incomplete independently signed gate candidate")
  }
  _,err:=r.Q.Exec(ctx,`
  INSERT INTO dhf_pilot_gate_candidates(id,submission_id,attempt_id,project_id,stage_id,
   template_id,gate_attestation_id,signer_id,policy_sha,manifest_sha,decision_payload_sha,
-  trusted_key_sha,signature_ed25519,idempotency_key,request_sha)
- VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+  trusted_key_sha,trusted_public_key_ed25519,signature_ed25519,idempotency_key,request_sha)
+ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
  rec.ID,rec.SubmissionID,rec.AttemptID,rec.ProjectID,rec.StageID,
  rec.TemplateID,rec.GateAttestationID,rec.SignerID,rec.PolicySHA,rec.ManifestSHA,
- rec.DecisionPayloadSHA,rec.TrustedKeySHA,rec.Signature,rec.IdempotencyKey,rec.RequestSHA)
+ rec.DecisionPayloadSHA,rec.TrustedKeySHA,rec.TrustedPublicKey,rec.Signature,rec.IdempotencyKey,rec.RequestSHA)
  if err!=nil{return err}
  _,err=r.Q.Exec(ctx,`
  INSERT INTO audit_events(actor_id,event_type,target_kind,target_id,request_id,outcome,details)
