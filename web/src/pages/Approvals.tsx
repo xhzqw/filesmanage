@@ -7,15 +7,16 @@ import {ApprovalReviewDialog} from "./ApprovalReviewDialog";
 import type {User} from "../entities/user/model";
 import {ApprovalInbox,type ApprovalView} from "../features/workflow/ApprovalInbox";
 import {DHFPilotInbox} from "../features/workflow/DHFPilotInbox";
+import {DHFRemediationInbox} from "../features/workflow/DHFRemediationInbox";
 import {AppShell} from "../shared/ui/AppShell";
 
-type Section=ApprovalView|"seals"|"dhf";
+type Section=ApprovalView|"seals"|"dhf"|"dhf_returns";
 
 export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
  const[review,setReview]=useState<Approval|null>(null);
  const[params,setParams]=useSearchParams();
  const requested=params.get("tab");
- const section:Section=requested==="mine"||requested==="notifications"||requested==="seals"||requested==="dhf"||(user.isAdmin&&requested==="all_pending")?requested:"inbox";
+ const section:Section=requested==="mine"||requested==="notifications"||requested==="seals"||requested==="dhf"||requested==="dhf_returns"||(user.isAdmin&&requested==="all_pending")?requested:"inbox";
  function changeSection(next:Section){
   setParams(previous=>{
    const updated=new URLSearchParams(previous);
@@ -30,6 +31,7 @@ export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
   ...(user.isAdmin?[{id:"all_pending" as const,label:"全部待审批"}]:[]),
   {id:"mine",label:"我发起的"},
   {id:"dhf",label:"研发阶段审核"},
+  {id:"dhf_returns",label:"我的研发整改"},
   {id:"notifications",label:"通知",count:counts.unread},
   {id:"seals",label:user.isAdmin?"签章管理":"我的签章"},
  ];
@@ -48,6 +50,7 @@ export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
      <div className="approval-stage">
       {section==="seals"?<SealLibrary isAdmin={user.isAdmin}/>:
        section==="dhf"?<DHFPilotInbox/>:
+       section==="dhf_returns"?<DHFRemediationInbox/>:
        <ApprovalInbox currentUser={user} view={section} onCounts={setCounts} onReview={setReview}/>}
      </div>
     </div>
