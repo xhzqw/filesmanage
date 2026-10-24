@@ -50,7 +50,7 @@ func (r *Repository) DHFPilotSubmissionForAttempt(ctx context.Context, attemptID
 	return record,err
 }
 
-func (r *Repository) DHFPilotPersistSubmission(ctx context.Context, record ports.DHFPilotSubmissionRecord, pins []ports.DHFPilotEvidencePin) error {
+func (r *Repository) DHFPilotPersistSubmission(ctx context.Context, record ports.DHFPilotSubmissionRecord, pins []ports.DHFPilotEvidencePin, reviewKeys []string) error {
 	if record.AttemptID=="" || record.ProjectID=="" || record.TemplateID=="" || record.SubmittedBy=="" {
 		return errors.New("DHF submission identity missing")
 	}
@@ -86,6 +86,32 @@ func (r *Repository) DHFPilotPersistSubmission(ctx context.Context, record ports
 		_,err=r.Q.Exec(ctx,"INSERT INTO dhf_pilot_submission_evidence(submission_id,requirement_id,file_id,version_seq,blob_id,sha256) VALUES($1,$2,$3,$4,$5,$6)",
 			record.ID,pin.RequirementID,pin.FileID,pin.VersionSeq,pin.BlobID,pin.Sha256)
 		if err!=nil{return err}
+	}
+	// G5 professional reviews and the final Gate (or G6 transfer Gate)
+	// become separate assignments in the SAME submitted evidence transaction.
+	// A missing reviewer aborts everything; there is no implicit admin or
+	// submitter auto-review and no reassignment by overwriting history.
+	if len(reviewKeys) > 0 {
+		var configured int
+		if err:=r.Q.QueryRow(ctx,
+			"SELECT count(*) FROM dhf_pilot_review_assignments WHERE project_id=$1 AND stage_id=$2",
+			record.ProjectID,record.StageID).Scan(&configured);err!=nil{return err}
+		if configured!=len(reviewKeys) {return errors.New("DHF review assignment set incomplete or contains unapproved extras")}
+		seenKeys:=map[string]bool{}
+		for _,key:=range reviewKeys {
+			if key=="" || seenKeys[key] {return errors.New("invalid or duplicate DHF reviewer key")}
+			seenKeys[key]=true
+			var reviewerID string
+			err:=r.Q.QueryRow(ctx,
+				"SELECT a.reviewer_id FROM dhf_pilot_review_assignments a JOIN users u ON u.id=a.reviewer_id AND u.disabled_at IS NULL WHERE a.project_id=$1 AND a.stage_id=$2 AND a.review_key=$3 FOR SHARE OF a",
+				record.ProjectID,record.StageID,key).Scan(&reviewerID)
+			if err!=nil {return fmt.Errorf("DHF reviewer is not configured and active: %w",err)}
+			if reviewerID==record.SubmittedBy {return errors.New("DHF submitter cannot review own evidence")}
+			_,err=r.Q.Exec(ctx,
+				"INSERT INTO dhf_pilot_workbench_tasks(id,submission_id,project_id,stage_id,review_key,reviewer_id,assigned_by) VALUES($1,$2,$3,$4,$5,$6,$7)",
+				newID("dhftask"),record.ID,record.ProjectID,record.StageID,key,reviewerID,record.SubmittedBy)
+			if err!=nil {return err}
+		}
 	}
 	// Append audit in this same transaction; rollback removes all changes.
 	_,err=r.Q.Exec(ctx, "INSERT INTO audit_events(actor_id,event_type,target_kind,target_id,request_id,outcome,details) VALUES($1,'dhf.pilot.submitted','dhf_attempt',$2,$3,'success',jsonb_build_object('submissionId',$4::text,'manifestSha',$5::text,'policySha',$6::text))",
