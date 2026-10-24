@@ -7514,6 +7514,111 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/duties:
+    get:
+      summary: Read immutable template-ordered G5 or G6 reviewer liabilities; completed trial opinions do not constitute signatures
+      operationId: dhfPilotDutyChain
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Only for a participant assigned to the same frozen submission.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFDutyPage'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/tasks/{id}/early-intervention:
+    post:
+      summary: Record an assigned final Gate sponsor's immutable early-review intervention without waiving predecessor responsibilities
+      operationId: dhfPilotAuthorizeEarlyReview
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Target specialty review task ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DHFEarlyInterventionInput'
+      responses:
+        '200':
+          description: Trial-only early review, not formal Gate approval.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFEarlyInterventionOutcome'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/approvals:
     get:
       summary: List approvals visible to the caller
@@ -12586,6 +12691,89 @@ components:
           type: boolean
       required:
       - items
+      - trialOnly
+    DHFDutySnapshot:
+      type: object
+      properties:
+        submissionId:
+          type: string
+        projectId:
+          type: string
+        stageId:
+          type: string
+        taskId:
+          type: string
+        reviewKey:
+          type: string
+        stepOrdinal:
+          type: integer
+          minimum: 1
+        reviewerId:
+          type: string
+        status:
+          type: string
+        earlyIntervention:
+          type: boolean
+        interventionReason:
+          type: string
+        outstandingPrior:
+          type: integer
+          minimum: 0
+        canAuthorizeEarly:
+          type: boolean
+      required:
+      - submissionId
+      - projectId
+      - stageId
+      - taskId
+      - reviewKey
+      - stepOrdinal
+      - reviewerId
+      - status
+      - earlyIntervention
+      - outstandingPrior
+      - canAuthorizeEarly
+    DHFDutyPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFDutySnapshot'
+        trialOnly:
+          type: boolean
+      required:
+      - items
+      - trialOnly
+    DHFEarlyInterventionInput:
+      type: object
+      properties:
+        reason:
+          type: string
+          description: Specific sponsor's reason for reviewing out of order; upstream duty never waived.
+        idempotencyKey:
+          type: string
+          description: Retry unchanged idempotency key.
+      required:
+      - reason
+      - idempotencyKey
+    DHFEarlyInterventionOutcome:
+      type: object
+      properties:
+        interventionId:
+          type: string
+        targetTaskId:
+          type: string
+        submissionId:
+          type: string
+        replayed:
+          type: boolean
+        trialOnly:
+          type: boolean
+        reason:
+          type: string
+      required:
+      - targetTaskId
       - trialOnly
     ApprovalPage:
       type: object
