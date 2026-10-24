@@ -7037,6 +7037,229 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/credentials:
+    get:
+      summary: Trial-only signer credentials registered by the independently delegated operator; no administrator role bypass
+      operationId: dhfPilotCredentialList
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Denied operators receive no credential records and canManage false.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFPilotCredentialPage'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      summary: Register an externally trusted trial Gate signing public key; independent time-bounded operator grant, password
+        reauthentication, and immutable audit required
+      operationId: dhfPilotCredentialRegister
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                signerId:
+                  type: string
+                publicKeyBase64:
+                  type: string
+                authorizationRef:
+                  type: string
+                validFrom:
+                  type: string
+                  format: date-time
+                expiresAt:
+                  type: string
+                  format: date-time
+                password:
+                  type: string
+                idempotencyKey:
+                  type: string
+              required:
+              - signerId
+              - publicKeyBase64
+              - authorizationRef
+              - validFrom
+              - expiresAt
+              - password
+              - idempotencyKey
+      responses:
+        '200':
+          description: Registration is UNACTIVATED and trial-only; never issues a corporate certificate.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFPilotCredentialMutation'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/credentials/{id}/events:
+    post:
+      summary: Append one audited, operator-scoped, reauthenticated trial credential lifecycle event, subject to irreversible
+        revocation/replace
+      operationId: dhfPilotCredentialEvent
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Immutable trial credential ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kind:
+                  type: string
+                  enum:
+                  - activate
+                  - suspend
+                  - revoke
+                  - replace
+                reason:
+                  type: string
+                password:
+                  type: string
+                idempotencyKey:
+                  type: string
+              required:
+              - kind
+              - reason
+              - password
+              - idempotencyKey
+      responses:
+        '200':
+          description: Append-only lifecycle, not formal signature authority.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFPilotCredentialMutation'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/dhf/gates/{submissionId}/verification:
     get:
       summary: Read historical trial Gate Ed25519 verification and current credential status for assigned Gate reviewer only;
@@ -12810,6 +13033,70 @@ components:
       - missingPreconditions
       - trialOnly
       - formalAccepted
+    DHFPilotCredentialItem:
+      type: object
+      properties:
+        id:
+          type: string
+        signerId:
+          type: string
+        keySha:
+          type: string
+        status:
+          type: string
+        validFrom:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        registeredBy:
+          type: string
+        authorizationRef:
+          type: string
+        trialOnly:
+          type: boolean
+      required:
+      - id
+      - signerId
+      - keySha
+      - status
+      - validFrom
+      - expiresAt
+      - registeredBy
+      - authorizationRef
+      - trialOnly
+    DHFPilotCredentialPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFPilotCredentialItem'
+        canManage:
+          type: boolean
+        trialOnly:
+          type: boolean
+      required:
+      - items
+      - canManage
+      - trialOnly
+    DHFPilotCredentialMutation:
+      type: object
+      properties:
+        id:
+          type: string
+        credentialId:
+          type: string
+        replayed:
+          type: boolean
+        trialOnly:
+          type: boolean
+        reason:
+          type: string
+      required:
+      - replayed
+      - trialOnly
     DHFRecommendationResult:
       type: object
       properties:
