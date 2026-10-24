@@ -174,7 +174,7 @@ func(s *Service)DHFPilotSealGateCandidate(ctx context.Context,actor domain.User,
   ProjectID:source.ProjectID,StageID:source.StageID,TemplateID:source.TemplateID,
   GateAttestationID:source.GateAttestationID,SignerID:source.SignerID,
   PolicySHA:source.PolicySHA,ManifestSHA:source.ManifestSHA,
-  DecisionPayloadSHA:payloadSHA,TrustedKeySHA:keySHA,Signature:signature,
+  DecisionPayloadSHA:payloadSHA,TrustedKeySHA:keySHA,TrustedPublicKey:trustedKey,Signature:signature,
   IdempotencyKey:key,RequestSHA:requestSHA,
  }
  if err=store.DHFPilotPersistGateCandidate(ctx,rec);err!=nil{
