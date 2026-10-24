@@ -120,6 +120,22 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 		"SELECT state FROM dhf_pilot_attempts WHERE id='dhf_attempt_3'").Scan(&state); err!=nil || state!="preparing" {
 		t.Fatalf("standalone submitted state was not rolled back: %q %v",state,err)
 	}
+	// A fabricated journal with correct attempt/role but the wrong policy
+	// digest must roll back its attempt transition and journal atomically.
+	tx,err:=pool.Begin(ctx)
+	if err!=nil {t.Fatal(err)}
+	_,err=tx.Exec(ctx,"UPDATE dhf_pilot_attempts SET state='submitted' WHERE id='dhf_attempt_3'")
+	if err!=nil { _=tx.Rollback(ctx);t.Fatal(err)}
+	_,err=tx.Exec(ctx, "INSERT INTO dhf_pilot_submissions(id,attempt_id,project_id,stage_id,template_id,submitted_by,idempotency_key,request_sha,policy_sha,manifest_sha) VALUES('forged-sub','dhf_attempt_3','dhf_project','G1','dhf_tpl',$1,'forged-policy-key-0001',$2,$3,$4)",
+		actorID,strings.Repeat("b",64),strings.Repeat("e",64),sha(manifestBytes))
+	if err!=nil { _=tx.Rollback(ctx);t.Fatal(err)}
+	if err=tx.Commit(ctx);err==nil {t.Fatal("wrong template digest accepted at commit")}
+	if err=pool.QueryRow(ctx,"SELECT state FROM dhf_pilot_attempts WHERE id='dhf_attempt_3'").Scan(&state);err!=nil || state!="preparing" {
+		t.Fatalf("forged commit modified frozen state %q %v",state,err)
+	}
+	if err=pool.QueryRow(ctx,"SELECT count(*) FROM dhf_pilot_submissions WHERE id='forged-sub'").Scan(&count);err!=nil || count!=0 {
+		t.Fatalf("forged submission was persisted: %d %v",count,err)
+	}
 	// A DB reference must prohibit gc_pending and DELETE, even if an operator
 	// attempts manual SQL after submission; unreferenced blobs are unaffected.
 	if _, err:=pool.Exec(ctx,"UPDATE blobs SET state='gc_pending' WHERE id='dhf_blob'"); err==nil {
