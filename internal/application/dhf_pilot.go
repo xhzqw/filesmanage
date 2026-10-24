@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"filesmanage/internal/domain"
 	"filesmanage/internal/domain/dhf"
 	"filesmanage/internal/ports"
