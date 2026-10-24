@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"filesmanage/internal/domain"
 	"filesmanage/internal/domain/dhf"
 	"filesmanage/internal/ports"
@@ -70,97 +69,8 @@ func (s *Service) DHFPilotPreflight(ctx context.Context, actor domain.User, atte
 		return fail("DHF_SNAPSHOT_UNAVAILABLE"), err
 	}
 
-	row, err := store.DHFPilotAttemptForActor(ctx, attemptID, actor.ID)
-	if errors.Is(err, ports.ErrRowMissing) {
-		return fail("DHF_SCOPE_DENIED"), nil
-	}
-	if err != nil {
-		return fail("DHF_SNAPSHOT_UNAVAILABLE"), err
-	}
-	// Actor capabilities used by file ACL evaluation must also come from
-	// the same database snapshot, never a caller-provided IsAdmin flag.
-	trustedActor, err := tx.UserByID(ctx, actor.ID)
-	if err != nil || trustedActor.ID != actor.ID || trustedActor.DisabledAt != nil {
-		return fail("DHF_SCOPE_DENIED"), nil
-	}
-	if !checkPilotHash(row.PolicyBody, row.PolicyHash) || !checkPilotHash(row.ManifestBody, row.ManifestHash) {
-		return fail("DHF_SOURCE_HASH_MISMATCH"), nil
-	}
-	var policyDoc dhfPilotPolicyDocument
-	var manifest dhfPilotManifest
-	if decodePilotJSON(row.PolicyBody, &policyDoc) != nil || !pilotPolicyFieldsComplete(row.PolicyBody) {
-		return fail("DHF_POLICY_INVALID"), nil
-	}
-	if decodePilotJSON(row.ManifestBody, &manifest) != nil {
-		return fail("DHF_MANIFEST_INVALID"), nil
-	}
-
-	input := dhf.GateInput{
-		Action: action,
-		Policy: dhf.PolicySnapshot{
-			TemplateVersionID: row.TemplateVersionID,
-			TemplateHash: row.PolicyHash,
-			StageID: policyDoc.StageID,
-			Published: row.PolicyStatus == "published" && row.TemplateApproved,
-			ConditionalAllowed: policyDoc.ConditionalAllowed,
-			Requirements: policyDoc.Requirements,
-			Dependencies: policyDoc.Dependencies,
-			Specialties: policyDoc.Specialties,
-		},
-		Stage: dhf.StageSnapshot{
-			ProjectID: row.ProjectID, StageID: row.StageID,
-			AttemptID: row.AttemptID, TemplateVersionID: row.TemplateVersionID,
-			TemplateHash: row.PolicyHash, EvidenceManifestHash: row.ManifestHash,
-			State: row.State,
-			BaselineActive: row.BaselineActive && row.ProjectState == "active",
-			ActorAuthorized: (action == dhf.ActionPrepare && row.CanPrepare) ||
-				(action == dhf.ActionSubmit && row.CanSubmit),
-			Now: s.now(),
-			SeparationValid: false, FileReleaseApproved: false,
-		},
-	}
-	if len(manifest.Requirements) > 1024 || len(input.Policy.Dependencies) > 256 {
-		return fail("DHF_SNAPSHOT_TOO_LARGE"), nil
-	}
-
-	// Evaluate receives every manifest entry; it compares the set against the
-	// authoritative policy and rejects missing, duplicated or extra results.
-	for _, evidence := range manifest.Requirements {
-		verified := false
-		if evidence.FileID != "" && evidence.VersionSeq > 0 && len(evidence.Sha256) == 64 {
-			// DHF project membership alone never grants access to a file.
-			_, aclErr := s.visibleFile(ctx, tx, trustedActor, evidence.FileID, domain.ActionDownload)
-			if aclErr == nil {
-				version, versionErr := tx.VersionBySeq(ctx, evidence.FileID, evidence.VersionSeq)
-				if versionErr == nil && version.Sha256 == evidence.Sha256 {
-					blob, blobErr := tx.BlobByID(ctx, version.BlobID)
-					verified = blobErr == nil && blob.State == "ready" &&
-						blob.Sha256 == evidence.Sha256
-				}
-			}
-		}
-		input.Requirements = append(input.Requirements, dhf.RequirementResult{
-			ID: evidence.ID, Applicability: evidence.Applicability,
-			// N/A requires separately approved applicability decisions; no
-			// such approval channel exists in this pilot, so fail closed.
-			ApplicabilityAuthorized: false,
-			EvidenceBound: evidence.FileID != "" && evidence.VersionSeq > 0,
-			EvidenceVerified: verified,
-		})
-	}
-
-	// Resolve each dependency from the same project in the same DB snapshot.
-	// An absent predecessor is blocked, never interpreted as no rule.
-	for _, dependency := range policyDoc.Dependencies {
-		state, err := store.DHFPilotPredecessor(ctx, row.ProjectID, dependency.PredecessorStage)
-		if err != nil {
-			return fail("DHF_SNAPSHOT_UNAVAILABLE"), err
-		}
-		input.Dependencies = append(input.Dependencies, dhf.DependencyResult{
-			ID: dependency.ID, PredecessorStage: dependency.PredecessorStage, State: state,
-		})
-	}
-	return DHFPilotPreflightResult{Decision: dhf.Evaluate(input), AdvisoryOnly: true}, nil
+	result, _, _, err := s.dhfPilotEvaluateTx(ctx, tx, store, actor, attemptID, action)
+	return result, err
 }
 
 func checkPilotHash(body []byte, stored string) bool {
