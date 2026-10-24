@@ -22,7 +22,7 @@ DECLARE stage_edges jsonb;
 DECLARE graph jsonb := '[]'::jsonb;
 DECLARE assigned_count integer;
 DECLARE edge_ids text[];
-DECLARE predecessor text;
+DECLARE edge_predecessor text;
 DECLARE guarded text;
 DECLARE conditional boolean;
 BEGIN
@@ -68,13 +68,13 @@ BEGIN
   stage_edges:='[]'::jsonb;
   edge_ids:=ARRAY[]::text[];
   FOR edge IN SELECT value FROM jsonb_array_elements(doc->'dependencies') LOOP
-   predecessor:=edge->>'PredecessorStage';
+   edge_predecessor:=edge->>'PredecessorStage';
    guarded:=edge->>'GuardedAction';
    IF edge->>'ID' IS NULL OR btrim(edge->>'ID')='' OR
      edge->>'ID'=ANY(edge_ids) OR
-     predecessor IS NULL OR predecessor NOT IN
+     edge_predecessor IS NULL OR edge_predecessor NOT IN
        ('G1','G2','G3','G4','G5','G6','G7','G8','G9') OR
-     predecessor=node.stage_id OR
+     edge_predecessor=node.stage_id OR
      guarded NOT IN ('prepare','submit','conditional_approve','finalize','issue_document')
    THEN
     RAISE EXCEPTION 'DHF dependency edge is invalid, duplicated or self-linked'
@@ -92,7 +92,7 @@ BEGIN
    IF NOT EXISTS (
     SELECT 1 FROM dhf_pilot_baselines pre
     JOIN dhf_pilot_templates t ON t.id=pre.template_id AND t.stage_id=pre.stage_id
-    WHERE pre.project_id=project AND pre.stage_id=predecessor
+    WHERE pre.project_id=project AND pre.stage_id=edge_predecessor
       AND pre.active AND t.status='published' AND t.approved_by IS NOT NULL
       AND t.approved_at IS NOT NULL
       AND encode(sha256(t.policy_body),'hex')=t.policy_sha
@@ -102,7 +102,7 @@ BEGIN
    END IF;
    edge_ids:=array_append(edge_ids,edge->>'ID');
    stage_edges:=stage_edges||jsonb_build_array(jsonb_build_object(
-    'id',edge->>'ID','predecessorStage',predecessor,
+    'id',edge->>'ID','predecessorStage',edge_predecessor,
     'guardedAction',guarded,'allowConditional',conditional
    ));
   END LOOP;
