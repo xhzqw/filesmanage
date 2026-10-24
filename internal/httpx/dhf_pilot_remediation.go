@@ -40,3 +40,14 @@ func(h *Handler) dhfPilotOpenRemediation(c *gin.Context){
  c.Header("Cache-Control","private, no-store")
  c.JSON(201,gin.H{"ok":true,"data":result})
 }
+
+
+// Returned findings are visible only to their original submitting owner.
+// This list shows immutable source and new-attempt status, not reviewer secrets.
+func(h *Handler) dhfPilotReturns(c *gin.Context){
+ actor,ok:=h.auth(c);if !ok{return}
+ items,err:=h.S.DHFPilotReturnInbox(c.Request.Context(),actor)
+ if err!=nil{respondError(c,err);return}
+ c.Header("Cache-Control","private, no-store")
+ c.JSON(200,gin.H{"ok":true,"data":gin.H{"items":items,"trialOnly":true}})
+}
