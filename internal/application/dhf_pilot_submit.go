@@ -96,7 +96,29 @@ func (s *Service) DHFPilotSubmit(
 		SubmittedBy:actor.ID,IdempotencyKey:idempotencyKey,
 		RequestSHA:requestSHA,PolicySHA:row.PolicyHash,ManifestSHA:row.ManifestHash,
 	}
-	if err=store.DHFPilotPersistSubmission(ctx,record,pins);err!=nil {
+	// Reviewer tasks share this exact transaction and immutable submission.
+	// Never generate a G5/G6 review task without an explicitly configured,
+	// distinct responsible reviewer. The server re-parses the verified policy.
+	var reviewKeys []string
+	if row.StageID == "G5" || row.StageID == "G6" {
+		var policy dhfPilotPolicyDocument
+		if err := decodePilotJSON(row.PolicyBody, &policy); err != nil {
+			return denied("DHF_POLICY_INVALID"), nil
+		}
+		reviewKeys = []string{"__gate__"}
+		if row.StageID == "G5" {
+			if len(policy.Specialties) == 0 {
+				return denied("DHF_SPECIALTY_POLICY_INVALID"), nil
+			}
+			for _, specialty := range policy.Specialties {
+				if specialty.Key == "" || specialty.Key == "__gate__" {
+					return denied("DHF_SPECIALTY_POLICY_INVALID"), nil
+				}
+				reviewKeys = append(reviewKeys, specialty.Key)
+			}
+		}
+	}
+	if err=store.DHFPilotPersistSubmission(ctx,record,pins,reviewKeys);err!=nil {
 		// A failed CAS, audit insert, composite FK or unique key rolls back
 		// the whole transaction; callers must retry with the SAME key.
 		return denied("DHF_SUBMISSION_CONFLICT"),err
