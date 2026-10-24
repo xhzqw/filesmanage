@@ -318,3 +318,39 @@ type DHFPilotAttestationInboxRow struct{
  AttestationID string `json:"attestationId,omitempty"`
  ContentSHA string `json:"contentSha,omitempty"`
 }
+
+
+// V0.7.3 verification closes only a PILOT remediation fact. It never mutates
+// a submitted attempt or grants formal Gate/controlled-release status.
+type DHFPilotRemediationVerificationStore interface {
+ DHFPilotBeginSubmission(context.Context) error
+ DHFPilotVerificationCandidate(context.Context,string,string)(DHFPilotVerificationCandidate,error)
+ DHFPilotExistingVerification(context.Context,string)(DHFPilotVerificationRecord,error)
+ DHFPilotPersistVerification(context.Context,DHFPilotVerificationRecord)error
+ DHFPilotRecentAttestationAuthFailures(context.Context,string)(int,error)
+ DHFPilotAuditAttestationAuthFailure(context.Context,string,string)error
+}
+type DHFPilotVerificationCandidate struct {
+ CaseID string
+ OriginalReturnDecisionID string
+ OriginalReturnAttestationID string
+ OriginalSubmissionID string
+ RevisedSubmissionID string
+ VerifierID string
+ OriginalManifestSHA string
+ RevisedManifestSHA string
+ RevisedPolicySHA string
+}
+type DHFPilotVerificationRecord struct {
+ ID string
+ CaseID string
+ OriginalReturnAttestationID string
+ RevisedSubmissionID string
+ VerifierID string
+ Comment string
+ OriginalManifestSHA string
+ RevisedManifestSHA string
+ RevisedPolicySHA string
+ IdempotencyKey string
+ RequestSHA string
+}
