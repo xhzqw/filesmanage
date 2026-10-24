@@ -1426,11 +1426,17 @@ jsonb_build_object('revokeId','dhf-operator-grant-revocation'))`); err != nil {
 			if edges == nil {
 				edges = []dhf.DependencyPolicy{}
 			}
+			specialties := []dhf.SpecialtyPolicy{}
+			requirement := dhf.RequirementPolicy{ID: "GRAPH-FIXTURE-" + stage, Mandatory: true, Critical: true}
+			if stage == "G5" {
+				specialties = []dhf.SpecialtyPolicy{{Key: "G5-GRAPH-FIXTURE"}}
+				requirement.SpecialtyKey = "G5-GRAPH-FIXTURE"
+			}
 			policy, encodeErr := json.Marshal(map[string]any{
 				"stage_id": stage, "conditional_allowed": flags[stage],
 				"dependencies": edges,
-				"requirements": []dhf.RequirementPolicy{{ID: "GRAPH-FIXTURE-" + stage, Mandatory: true, Critical: true}},
-				"specialties":  []dhf.SpecialtyPolicy{},
+				"requirements": []dhf.RequirementPolicy{requirement},
+				"specialties":  specialties,
 			})
 			if encodeErr != nil {
 				t.Fatal(encodeErr)
@@ -1461,8 +1467,8 @@ jsonb_build_object('revokeId','dhf-operator-grant-revocation'))`); err != nil {
 			"G7": {{ID: "CYCLIC-7", PredecessorStage: "G8", GuardedAction: dhf.ActionPrepare}},
 			"G8": {{ID: "CYCLIC-8", PredecessorStage: "G7", GuardedAction: dhf.ActionSubmit}},
 		}, nil)
-	if err = pool.QueryRow(ctx, "SELECT dhf_pilot_verified_project_graph('dhf_graph_cycle')").Scan(&rawGraph); err == nil {
-		t.Fatal("published project DAG with a two-stage circular dependency was accepted")
+	if err = pool.QueryRow(ctx, "SELECT dhf_pilot_verified_project_graph('dhf_graph_cycle')").Scan(&rawGraph); err == nil || !strings.Contains(err.Error(), "cyclic G1-G9") {
+		t.Fatalf("two-stage cycle detection did not run: %v", err)
 	}
 	seedGraphProject("dhf_graph_long_cycle", []string{"G4", "G5", "G6"},
 		map[string][]dhf.DependencyPolicy{
@@ -1470,31 +1476,31 @@ jsonb_build_object('revokeId','dhf-operator-grant-revocation'))`); err != nil {
 			"G5": {{ID: "LONG-CYCLE-5", PredecessorStage: "G6", GuardedAction: dhf.ActionFinalize}},
 			"G6": {{ID: "LONG-CYCLE-6", PredecessorStage: "G4", GuardedAction: dhf.ActionPrepare}},
 		}, nil)
-	if err = pool.QueryRow(ctx, "SELECT dhf_pilot_verified_project_graph('dhf_graph_long_cycle')").Scan(&rawGraph); err == nil {
-		t.Fatal("published project DAG with three-stage circular dependency was accepted")
+	if err = pool.QueryRow(ctx, "SELECT dhf_pilot_verified_project_graph('dhf_graph_long_cycle')").Scan(&rawGraph); err == nil || !strings.Contains(err.Error(), "cyclic G1-G9") {
+		t.Fatalf("three-stage cycle detection did not run: %v", err)
 	}
 	seedGraphProject("dhf_graph_missing", []string{"G8"},
 		map[string][]dhf.DependencyPolicy{
 			"G8": {{ID: "MISSING-PREDECESSOR", PredecessorStage: "G6", GuardedAction: dhf.ActionSubmit}},
 		}, nil)
-	if err = pool.QueryRow(ctx, "SELECT dhf_pilot_verified_project_graph('dhf_graph_missing')").Scan(&rawGraph); err == nil {
-		t.Fatal("cross-project predecessor baseline unexpectedly allowed")
+	if err = pool.QueryRow(ctx, "SELECT dhf_pilot_verified_project_graph('dhf_graph_missing')").Scan(&rawGraph); err == nil || !strings.Contains(err.Error(), "no active published baseline") {
+		t.Fatalf("cross-project predecessor scope check did not run: %v", err)
 	}
 	seedGraphProject("dhf_graph_unsafe", []string{"G6", "G8"},
 		map[string][]dhf.DependencyPolicy{
 			"G8": {{ID: "UNSAFE-ISSUE", PredecessorStage: "G6",
 				GuardedAction: dhf.ActionIssueDocument, AllowConditional: true}},
 		}, map[string]bool{"G8": true})
-	if err = pool.QueryRow(ctx, "SELECT dhf_pilot_verified_project_graph('dhf_graph_unsafe')").Scan(&rawGraph); err == nil {
-		t.Fatal("template conditional bypass allowed document issuance")
+	if err = pool.QueryRow(ctx, "SELECT dhf_pilot_verified_project_graph('dhf_graph_unsafe')").Scan(&rawGraph); err == nil || !strings.Contains(err.Error(), "cannot grant issue") {
+		t.Fatalf("conditional document issuance restriction did not run: %v", err)
 	}
 	seedGraphProject("dhf_graph_unapproved_scope", []string{"G6", "G8"},
 		map[string][]dhf.DependencyPolicy{
 			"G8": {{ID: "FLAG-NOT-APPROVED", PredecessorStage: "G6",
 				GuardedAction: dhf.ActionPrepare, AllowConditional: true}},
 		}, nil)
-	if err = pool.QueryRow(ctx, "SELECT dhf_pilot_verified_project_graph('dhf_graph_unapproved_scope')").Scan(&rawGraph); err == nil {
-		t.Fatal("target template lacking conditional permission authorized dependency scope")
+	if err = pool.QueryRow(ctx, "SELECT dhf_pilot_verified_project_graph('dhf_graph_unapproved_scope')").Scan(&rawGraph); err == nil || !strings.Contains(err.Error(), "did not authorize conditional-scope") {
+		t.Fatalf("target template conditional flag restriction did not run: %v", err)
 	}
 	exec("INSERT INTO dhf_pilot_projects(id,owner_id,state) VALUES('dhf_graph_wrong_hash',$1,'active')", actorID)
 	badPolicy, _ := json.Marshal(map[string]any{
@@ -1504,8 +1510,8 @@ jsonb_build_object('revokeId','dhf-operator-grant-revocation'))`); err != nil {
 	})
 	exec("INSERT INTO dhf_pilot_templates(id,stage_id,policy_body,policy_sha,status,approved_by,approved_at) VALUES('dhf_graph_wrong_hash_template','G9',$1,repeat('a',64),'published',$2,now())", badPolicy, actorID)
 	exec("INSERT INTO dhf_pilot_baselines(project_id,stage_id,template_id,active) VALUES('dhf_graph_wrong_hash','G9','dhf_graph_wrong_hash_template',true)")
-	if err = pool.QueryRow(ctx, "SELECT dhf_pilot_verified_project_graph('dhf_graph_wrong_hash')").Scan(&rawGraph); err == nil {
-		t.Fatal("tampered published-template SHA accepted as project Gate policy")
+	if err = pool.QueryRow(ctx, "SELECT dhf_pilot_verified_project_graph('dhf_graph_wrong_hash')").Scan(&rawGraph); err == nil || !strings.Contains(err.Error(), "untampered published template") {
+		t.Fatalf("published-template SHA integrity check did not run: %v", err)
 	}
 	fmt.Println("DHF_V064_DB_INTEGRATION_PASS")
 }

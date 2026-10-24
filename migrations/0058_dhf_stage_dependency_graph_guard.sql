@@ -61,9 +61,16 @@ BEGIN
     jsonb_typeof(doc->'requirements') IS DISTINCT FROM 'array' OR
     jsonb_array_length(doc->'requirements')=0 OR
     jsonb_array_length(doc->'requirements')>1024 OR
+    jsonb_typeof(doc->'specialties') IS DISTINCT FROM 'array' OR
+    jsonb_array_length(doc->'specialties')>32 OR
     jsonb_typeof(doc->'conditional_allowed') IS DISTINCT FROM 'boolean'
   THEN
    RAISE EXCEPTION 'active DHF baseline missing full stage dependency policy'
+     USING ERRCODE='23514';
+  END IF;
+  IF (node.stage_id='G5' AND jsonb_array_length(doc->'specialties')=0)
+   OR (node.stage_id<>'G5' AND jsonb_array_length(doc->'specialties')<>0) THEN
+   RAISE EXCEPTION 'G5 specialty responsibilities must be explicitly configured'
      USING ERRCODE='23514';
   END IF;
   stage_edges:='[]'::jsonb;
