@@ -122,7 +122,7 @@ CREATE TRIGGER dhf_pilot_early_intervention_immutable
 -- An intervention is a sensitive authorization action: the immutable
 -- sponsor decision and the ordinary audit trail must commit atomically.
 CREATE OR REPLACE FUNCTION dhf_pilot_require_early_intervention_audit()
-RETURNS trigger LANGUAGE plpgsql AS $
+RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
  IF NOT EXISTS (
    SELECT 1 FROM audit_events a
@@ -138,7 +138,7 @@ BEGIN
  END IF;
  RETURN NULL;
 END;
-$;
+$$;
 CREATE CONSTRAINT TRIGGER dhf_pilot_early_intervention_audit_atomic
  AFTER INSERT ON dhf_pilot_early_interventions
  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
