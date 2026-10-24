@@ -78,3 +78,31 @@ func(r *Repository)DHFPilotPersistVerification(ctx context.Context,rec ports.DHF
  rec.OriginalReturnAttestationID,rec.RevisedSubmissionID,rec.RevisedManifestSHA)
  return err
 }
+
+func(r *Repository)DHFPilotVerificationFrozenEvidence(ctx context.Context,caseID,actorID string)([]ports.DHFPilotEvidencePin,error){
+ rows,err:=r.Q.Query(ctx,`
+ SELECT e.requirement_id,e.file_id,e.version_seq,e.blob_id,e.sha256
+ FROM dhf_pilot_remediation_cases c
+ JOIN dhf_pilot_review_decisions returned ON returned.id=c.return_decision_id
+   AND returned.outcome='recommend_return' AND returned.reviewer_id=$2
+ JOIN dhf_pilot_review_attestations old_att ON old_att.review_decision_id=returned.id
+   AND old_att.signer_id=$2 AND old_att.outcome='recommend_return'
+ JOIN dhf_pilot_submissions revised ON revised.attempt_id=c.new_attempt_id
+   AND revised.manifest_sha=c.revised_manifest_sha
+ JOIN dhf_pilot_submission_evidence e ON e.submission_id IN(c.original_submission_id,revised.id)
+ WHERE c.id=$1
+ ORDER BY e.file_id,e.version_seq,e.requirement_id
+ LIMIT 2049`,caseID,actorID)
+ if err!=nil{return nil,err}
+ defer rows.Close()
+ pins:=make([]ports.DHFPilotEvidencePin,0)
+ for rows.Next(){
+  var row ports.DHFPilotEvidencePin
+  if err=rows.Scan(&row.RequirementID,&row.FileID,&row.VersionSeq,&row.BlobID,&row.Sha256);err!=nil{return nil,err}
+  pins=append(pins,row)
+ }
+ if err=rows.Err();err!=nil{return nil,err}
+ if len(pins)>2048{return nil,errors.New("DHF remediation verification evidence exceeds bounded count")}
+ if len(pins)==0{return nil,ports.ErrRowMissing}
+ return pins,nil
+}
