@@ -4,8 +4,8 @@ Status: DRAFT / NOT PRODUCTION ENABLED, 2026-10-24.
 
 ## 1. Source and exact scope
 
-- Source: \`产品设计开发DHF_1-9阶段_XMind大纲.txt\`, SHA-256 \`c16d3c70a0687d363c0d33322d16900f89b49ae02160afb3b9b7c3457a4b097b\`.
-- V0.5 reference: \`DHF_V0.5_Go服务端合同与状态机设计.md\` (working artifact, not a published SOP).
+- Source: `产品设计开发DHF_1-9阶段_XMind大纲.txt`, SHA-256 `c16d3c70a0687d363c0d33322d16900f89b49ae02160afb3b9b7c3457a4b097b`.
+- V0.5 reference: `DHF_V0.5_Go服务端合同与状态机设计.md` (working artifact, not a published SOP).
 - G5 software candidate nodes: source L39–63, 25 visible leaf candidates; includes repeated PEMS self-check entry at L61/L63.
 - G5 process/manufacturing candidates: source L74–91, 17 visible leaf candidates; L76 ("总装") must not be assumed a formal deliverable.
 - G6 first transfer: source L115–129, 10 visible leaf candidates; distinguish from G8 (L160–164).
@@ -13,11 +13,11 @@ Status: DRAFT / NOT PRODUCTION ENABLED, 2026-10-24.
 
 ## 2. What this PR DOES
 
-- Adds a standalone, pure Go fail-closed Stage Gate evaluator at \`internal/domain/dhf\`.
+- Adds a standalone, pure Go fail-closed Stage Gate evaluator at `internal/domain/dhf`.
 - Rejects unknown actions, unpublished template versions, inactive project baselines, missing actor grants, and invalid decision-stage combinations.
 - Checks requirement applicability separately from mandatory evidence presence and pinned evidence verification.
 - Checks configured G5 specialty reviews *only at final decision time*, not on initial submission.
-- Requires signed, recorded authorization for an \`not_applicable\` specialty decision; missing/returned specialties prevent final acceptance.
+- Requires signed, recorded authorization for an `not_applicable` specialty decision; missing/returned specialties prevent final acceptance.
 - Allows a conditional decision only for template-eligible, noncritical unmet requirements with corresponding remediation IDs, current authorization, a future expiry and an explicitly safe scope.
 - Prohibits implied/transitive scope and expired predecessor conditional grants. Document issuance always requires independently approved file release policy and accepted stage.
 - Adds unit tests for those boundaries, including the G5 initial-submission trap.
@@ -25,36 +25,36 @@ Status: DRAFT / NOT PRODUCTION ENABLED, 2026-10-24.
 ## 3. What this PR does NOT do
 
 - Does NOT implement PostgreSQL migration, actual template publishing, source-node import, files/Blob holds or production permissions.
-- Does NOT introduce an HTTP handler, scheduler, UI, working approval button, signed electronic record, nor change existing \`/approvals\`.
+- Does NOT introduce an HTTP handler, scheduler, UI, working approval button, signed electronic record, nor change existing `/approvals`.
 - Does NOT establish actual admissibility of any named G5/G6 deliverable.
 - Does NOT deploy to dev or production. No claim of Go test execution in the designated remote environment.
 
 ## 4. Application boundary (P0 before enabling commands)
 
-The future Go application service must construct \`dhf.GateInput\` ONLY from a consistent server-side transaction snapshot (never from request flags):
+The future Go application service must construct `dhf.GateInput` ONLY from a consistent server-side transaction snapshot (never from request flags):
 
 1. Verify actor session and project-specific business capability.
 2. Resolve a published immutable template, its actual published hash and active project baseline.
-3. Read requirement/evidence identities via composite template/baseline constraints; verify pinned \`(file_id,seq,sha256)\` against \`file_versions\`.
+3. Read requirement/evidence identities via composite template/baseline constraints; verify pinned `(file_id,seq,sha256)` against `file_versions`.
 4. Resolve effective file ACL for ordinary reads or narrowly scoped evidence authorization for assigned review tasks.
 5. Evaluate segregation-of-duties against frozen requester/contributor/reviewer identities.
 6. Lock resources in documented global order, inspect active Evidence Hold + Blob readiness.
 7. Resolve all applicable upstream rules and conditional authorizations; ensure each direct grant has an unexpired scope.
 8. Compute G5 specialty *expected* set from signed template, and decisions from same immutable submission attempt.
-9. Run \`Evaluate\` inside the write transaction, then append decisions, stage projection changes, audit, idempotency result and outbox atomically.
+9. Run `Evaluate` inside the write transaction, then append decisions, stage projection changes, audit, idempotency result and outbox atomically.
 10. Perform notification *after commit*; on a retry resolve the same result with matching payload hash.
 
-The booleans inside \`GateInput\` are trusted *internal facts*. Merely calling \`Evaluate\` with booleans provided by a client would be a severe authorization defect.
+The booleans inside `GateInput` are trusted *internal facts*. Merely calling `Evaluate` with booleans provided by a client would be a severe authorization defect.
 
 ## 5. Pilot test strategy
 
-Remote-only as required by \`AGENTS.md\`. On the authorized remote dev host:
+Remote-only as required by `AGENTS.md`. On the authorized remote dev host:
 
-\`\`\`sh
+```sh
 go test ./internal/domain/dhf -count=1
 go test ./internal/domain/... -count=1
 bash scripts/build.sh --with-tests
-\`\`\`
+```
 
 Additional repository-level acceptance gates before any schema or route integration:
 
