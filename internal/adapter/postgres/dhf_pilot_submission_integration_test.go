@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 
+	"filesmanage/internal/adapter/blob"
 	"filesmanage/internal/adapter/postgres"
 	"filesmanage/internal/application"
 	"filesmanage/internal/domain"
@@ -42,12 +44,19 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	exec("INSERT INTO users(id,login,display_name,password_hash) VALUES($1,$1,'DHF Test','not-a-real-password')",actorID)
 	exec("INSERT INTO folders(id,name,owner_id) VALUES('dhf_folder','DHF Test', $1)",actorID)
 	exec("INSERT INTO acls(id,folder_id,subject_kind,subject_id,actions,granted_by) VALUES('dhf_acl','dhf_folder','user',$1,ARRAY['list','download']::text[],$1)",actorID)
-	// A real integration fixture would stage BlobStore bytes; this test
-	// proves database tuple and ACL integrity, NOT physical blob-retention.
-	const fileSHA="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-	exec("INSERT INTO blobs(id,storage_key,sha256,size_bytes,state) VALUES('dhf_blob','dhf-pilot-test-only', $1,1,'ready')",fileSHA)
+	// Stage REAL content through the production BlobStore. Database metadata
+	// alone must never be sufficient for an approved DHF evidence submission.
+	physicalStore:=blob.New(t.TempDir())
+	stage,err:=physicalStore.Stage()
+	if err!=nil {t.Fatal(err)}
+	content:=[]byte("DHF pilot immutable evidence bytes")
+	if _,err=stage.Write(content);err!=nil {t.Fatal(err)}
+	storageKey,_,err:=stage.Commit()
+	if err!=nil {t.Fatal(err)}
+	fileSHA:=stage.Sha256()
+	exec("INSERT INTO blobs(id,storage_key,sha256,size_bytes,state) VALUES('dhf_blob',$1,$2,$3,'ready')",storageKey,fileSHA,len(content))
 	exec("INSERT INTO files(id,folder_id,name,uploaded_by) VALUES('dhf_file','dhf_folder','artifact.txt',$1)",actorID)
-	exec("INSERT INTO file_versions(id,file_id,seq,blob_id,sha256,size_bytes,action,created_by) VALUES('dhf_v1','dhf_file',1,'dhf_blob',$1,1,'upload',$2)",fileSHA,actorID)
+	exec("INSERT INTO file_versions(id,file_id,seq,blob_id,sha256,size_bytes,action,created_by) VALUES('dhf_v1','dhf_file',1,'dhf_blob',$1,$2,'upload',$3)",fileSHA,len(content),actorID)
 	// Match the real upload lifecycle: current pointer is set only after the
 	// immutable version exists, otherwise fileSelect sees NULL version fields.
 	exec("UPDATE files SET current_version_seq=1 WHERE id='dhf_file'")
@@ -74,7 +83,7 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 		exec("INSERT INTO dhf_pilot_attempts(id,project_id,stage_id,template_id,manifest_body,manifest_sha,created_by) VALUES($1,'dhf_project','G1','dhf_tpl',$2,$3,$4)",id,manifestBytes,sha(manifestBytes),actorID)
 	}
 	seedAttempt("dhf_attempt_1")
-	service:=application.New(postgres.New(pool),nil)
+	service:=application.New(postgres.New(pool),physicalStore)
 	actor:=domain.User{ID:actorID,IsAdmin:true} // caller flag intentionally untrusted
 	first,err:=service.DHFPilotSubmit(ctx,actor,"dhf_attempt_1","dhf-isolated-idempotency-0001")
 	if err!=nil || first.Verdict!=dhf.Allow || first.Replayed || first.SubmissionID=="" {
@@ -143,6 +152,18 @@ func TestDHFPilotRealPostgresSubmission(t *testing.T) {
 	if err!=nil || eventual.Verdict!=dhf.Allow || !eventual.Replayed {
 		t.Fatalf("eventual exact replay must recover committed result: %+v %v",eventual,err)
 	}
+	// Real physical tampering must be detected even if DB Blob rows and
+	// immutable file_versions still report the original checksum.
+	path,err:=physicalStore.PathFor(storageKey)
+	if err!=nil {t.Fatal(err)}
+	if err=os.WriteFile(path,[]byte("XXX pilot immutable evidence bytes"),0600);err!=nil {t.Fatal(err)}
+	seedAttempt("dhf_attempt_tamper")
+	tampered,submitErr:=service.DHFPilotSubmit(ctx,actor,"dhf_attempt_tamper","dhf-isolated-tamper-0001")
+	if submitErr!=nil || tampered.Verdict!=dhf.Deny ||
+		!slices.Contains(tampered.ReasonCodes,"DHF_EVIDENCE_BYTES_INVALID") {
+		t.Fatalf("physically altered evidence was accepted: %+v %v",tampered,submitErr)
+	}
+	if err=os.WriteFile(path,content,0600);err!=nil {t.Fatal(err)}
 	// Negative security scenario: losing the original file grant denies new
 	// submissions even when project membership and a valid manifest remain.
 	exec("DELETE FROM acls WHERE id='dhf_acl'")
