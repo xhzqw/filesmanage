@@ -2,6 +2,7 @@ package ports
 
 import (
 	"context"
+	"time"
 	"filesmanage/internal/domain/dhf"
 )
 
@@ -53,7 +54,7 @@ type DHFPilotSubmissionStore interface {
 	DHFPilotBeginSubmission(context.Context) error
 	DHFPilotLockAttempt(context.Context,string) error
 	DHFPilotSubmissionForAttempt(context.Context,string) (DHFPilotSubmissionRecord,error)
-	DHFPilotPersistSubmission(context.Context,DHFPilotSubmissionRecord,[]DHFPilotEvidencePin) error
+	DHFPilotPersistSubmission(context.Context,DHFPilotSubmissionRecord,[]DHFPilotEvidencePin,[]string) error
 }
 
 // DHFPilotEvidencePin binds one manifest requirement to the already verified
@@ -77,4 +78,22 @@ type DHFPilotSubmissionRecord struct {
 	RequestSHA string
 	PolicySHA string
 	ManifestSHA string
+}
+
+
+// DHFPilotWorkbenchStore is a read-only assignment-scoped view for the
+// existing Workbench. It never grants review or approval permissions.
+type DHFPilotWorkbenchStore interface {
+	DHFPilotSnapshotStore
+	DHFPilotReviewTasksForActor(context.Context,string,int) ([]DHFPilotWorkbenchTask,error)
+}
+
+type DHFPilotWorkbenchTask struct {
+	ID string `json:"id"`
+	ProjectID string `json:"projectId"`
+	StageID string `json:"stageId"`
+	SubmissionID string `json:"submissionId"`
+	ReviewKey string `json:"reviewKey"`
+	Status string `json:"status"`
+	AssignedAt time.Time `json:"assignedAt"`
 }
