@@ -1,4 +1,6 @@
 -- DHF V0.7.0 — remediation of a returned PILOT review.
+-- One corrective preparation branch per original submission. Multiple returned
+-- reviewer opinions remain discoverable through the original submission ID.
 -- Immutable trace: recommendation -> case -> new preparing attempt -> optional
 -- later submission. An "opened" case NEVER means remediation closed or a
 -- formal Gate has passed. No change to CDW issuance / accepted stage states.
@@ -6,7 +8,7 @@ CREATE TABLE dhf_pilot_remediation_cases (
  id text PRIMARY KEY,
  return_decision_id text NOT NULL UNIQUE
    REFERENCES dhf_pilot_review_decisions(id) ON DELETE RESTRICT,
- original_submission_id text NOT NULL REFERENCES dhf_pilot_submissions(id) ON DELETE RESTRICT,
+ original_submission_id text NOT NULL UNIQUE REFERENCES dhf_pilot_submissions(id) ON DELETE RESTRICT,
  new_attempt_id text NOT NULL UNIQUE,
  project_id text NOT NULL,
  stage_id text NOT NULL,
