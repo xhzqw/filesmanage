@@ -125,6 +125,11 @@ ALTER TABLE dhf_pilot_signing_credentials
 ALTER TABLE dhf_pilot_signing_credentials
  ADD CONSTRAINT dhf_pilot_credential_request_pair CHECK
  ((idempotency_key IS NULL)=(request_sha IS NULL));
+-- Legacy 0055 rows are preserved, but every newly registered verifier must
+-- respect the trial maximum lifetime regardless of the calling API.
+ALTER TABLE dhf_pilot_signing_credentials
+ ADD CONSTRAINT dhf_pilot_credential_trial_lifetime
+ CHECK(expires_at-valid_from<=interval '30 days') NOT VALID;
 CREATE UNIQUE INDEX ux_dhf_credential_operator_idempotency
  ON dhf_pilot_signing_credentials(registered_by,idempotency_key)
  WHERE idempotency_key IS NOT NULL;
