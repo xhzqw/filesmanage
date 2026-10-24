@@ -66,3 +66,31 @@ CREATE INDEX ix_dhf_pilot_evidence_blob
 -- (2) A persisted submission prevents Blob state='gc_pending' / Blob DELETE.
 -- (3) Stage approval/review transitions remain unavailable in this pilot.
 -- Still missing: physical BlobStore mark/sweep cooperation and signed Gate.
+
+
+-- Prevent direct SQL from creating a submission that references the right
+-- attempt ID but a different template, stage or historical hash.
+CREATE OR REPLACE FUNCTION dhf_pilot_verify_submission_snapshot()
+ RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE identity_ok boolean;
+BEGIN
+ SELECT (
+    a.project_id=NEW.project_id AND a.stage_id=NEW.stage_id AND
+    a.template_id=NEW.template_id AND a.manifest_sha=NEW.manifest_sha AND
+    t.policy_sha=NEW.policy_sha AND t.stage_id=NEW.stage_id
+ ) INTO identity_ok
+ FROM dhf_pilot_attempts a
+ JOIN dhf_pilot_templates t ON t.id=a.template_id
+ WHERE a.id=NEW.attempt_id;
+ IF identity_ok IS DISTINCT FROM TRUE THEN
+    RAISE EXCEPTION 'DHF submission identity or snapshot hash mismatch'
+       USING ERRCODE='23514';
+ END IF;
+ RETURN NULL;
+END;
+$$;
+
+CREATE CONSTRAINT TRIGGER dhf_pilot_submission_snapshot_consistent
+ AFTER INSERT ON dhf_pilot_submissions
+ DEFERRABLE INITIALLY DEFERRED
+ FOR EACH ROW EXECUTE FUNCTION dhf_pilot_verify_submission_snapshot();
