@@ -70,7 +70,7 @@ func(r *Repository)DHFPilotRecentAttestationAuthFailures(ctx context.Context,act
  var count int
  err:=r.Q.QueryRow(ctx,`
  SELECT count(*) FROM audit_events
- WHERE actor_id=$1 AND event_type='dhf.pilot.review_auth_denied'
+ WHERE actor_id=$1 AND event_type IN ('dhf.pilot.review_auth_denied','dhf.pilot.credential_auth_denied')
    AND created_at > now()-interval '15 minutes' `,actorID).Scan(&count)
  return count,err
 }

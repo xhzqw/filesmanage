@@ -1314,6 +1314,42 @@ schema("DHFPilotGateVerification",obj({
  "missingPreconditions":arr(string()),"trialOnly":boolean(),"formalAccepted":boolean(),
 },required=["submissionId","stageId","candidateStatus","cryptographicValid",
  "credentialStatus","missingPreconditions","trialOnly","formalAccepted"]))
+schema("DHFPilotCredentialItem",obj({
+ "id":string(),"signerId":string(),"keySha":string(),
+ "status":string(),"validFrom":timestamp(),"expiresAt":timestamp(),
+ "registeredBy":string(),"authorizationRef":string(),"trialOnly":boolean(),
+},required=["id","signerId","keySha","status","validFrom","expiresAt","registeredBy","authorizationRef","trialOnly"]))
+schema("DHFPilotCredentialPage",obj({"items":arr(ref("DHFPilotCredentialItem")),
+ "canManage":boolean(),"trialOnly":boolean()},required=["items","canManage","trialOnly"]))
+schema("DHFPilotCredentialMutation",obj({
+ "id":string(),"credentialId":string(),"replayed":boolean(),"trialOnly":boolean(),"reason":string(),
+},required=["replayed","trialOnly"]))
+add("GET","/api/workbench/dhf/credentials",operation(
+ "Trial-only signer credentials registered by the independently delegated operator; no administrator role bypass",
+ "Workflow","dhfPilotCredentialList",security=SESSION,
+ responses=dict([json_ok(ref("DHFPilotCredentialPage"),"Denied operators receive no credential records and canManage false."),
+ resp("401",ERR["401"]),resp("403",ERR["403"]),resp("503",ERR["503"])])))
+add("POST","/api/workbench/dhf/credentials",operation(
+ "Register an externally trusted trial Gate signing public key; independent time-bounded operator grant, password reauthentication, and immutable audit required",
+ "Workflow","dhfPilotCredentialRegister",security=SESSION,
+ request={"application/json":{"schema":obj({
+  "signerId":string(),"publicKeyBase64":string(),"authorizationRef":string(),
+  "validFrom":timestamp(),"expiresAt":timestamp(),"password":string(),"idempotencyKey":string(),
+ },required=["signerId","publicKeyBase64","authorizationRef","validFrom","expiresAt","password","idempotencyKey"])}},
+ responses=dict([json_ok(ref("DHFPilotCredentialMutation"),"Registration is UNACTIVATED and trial-only; never issues a corporate certificate."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),
+ resp("409",ERR["409"]),resp("503",ERR["503"])])))
+add("POST","/api/workbench/dhf/credentials/{id}/events",operation(
+ "Append one audited, operator-scoped, reauthenticated trial credential lifecycle event, subject to irreversible revocation/replace",
+ "Workflow","dhfPilotCredentialEvent",security=SESSION,
+ params=[id_param("id","Immutable trial credential ID")],
+ request={"application/json":{"schema":obj({
+  "kind":string(enum=["activate","suspend","revoke","replace"]),
+  "reason":string(minLength=8),"password":string(),"idempotencyKey":string(),
+ },required=["kind","reason","password","idempotencyKey"])}},
+ responses=dict([json_ok(ref("DHFPilotCredentialMutation"),"Append-only lifecycle, not formal signature authority."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),
+ resp("404",ERR["404"]),resp("409",ERR["409"]),resp("503",ERR["503"])])))
 add("GET","/api/workbench/dhf/gates/{submissionId}/verification",operation(
  "Read historical trial Gate Ed25519 verification and current credential status for assigned Gate reviewer only; not a Stage approval",
  "Workflow","dhfPilotGateVerification",security=SESSION,

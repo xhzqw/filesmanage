@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"filesmanage/internal/adapter/blob"
 	"filesmanage/internal/adapter/postgres"
@@ -473,6 +474,31 @@ VALUES('dhf-no-auth-audit',$1,$2,$3,'dhf_sw_reviewer','recommend_pass',$4,
 		t.Fatal(keyErr)
 	}
 	t.Setenv("DHF_PILOT_GATE_TRUSTED_PUBKEY_B64", base64.StdEncoding.EncodeToString(publicKey))
+	// 0056 requires a separately granted trial credential operator. Grant
+	// approval by the SW reviewer is distinct from both operator and signer.
+	// This fixture simulates an out-of-band approved DBA action, NOT an API
+	// that automatically delegates issuance authority to an admin.
+	grantTx, grantErr := pool.Begin(ctx)
+	if grantErr != nil {
+		t.Fatal(grantErr)
+	}
+	defer grantTx.Rollback(ctx)
+	if _, err = grantTx.Exec(ctx, `INSERT INTO dhf_pilot_credential_operator_grants
+    (id,operator_id,approved_by,authorization_ref,valid_from,expires_at)
+    VALUES('dhf-operator-grant',$1,'dhf_sw_reviewer','isolated-fixture-two-person-authorization',
+    now()-interval '1 hour',now()+interval '1 day')`, actorID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = grantTx.Exec(ctx, `INSERT INTO audit_events
+    (actor_id,event_type,target_kind,target_id,request_id,outcome,details)
+    VALUES('dhf_sw_reviewer','dhf.pilot.credential.operator_granted','dhf_credential_operator',
+    'dhf-operator-grant','dhf-operator-grant-fixture-001','trial_only',
+    jsonb_build_object('operatorId',$1::text,'authorizationRef','isolated-fixture-two-person-authorization'))`, actorID); err != nil {
+		t.Fatal(err)
+	}
+	if err = grantTx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
 	// A machine-wide trust anchor is insufficient: only an active,
 	// user-bound, purpose-limited and independently audited credential may
 	// sign the Gate candidate. An unregistered key remains denied.
@@ -480,6 +506,81 @@ VALUES('dhf-no-auth-audit',$1,$2,$3,'dhf_sw_reviewer','recommend_pass',$4,
 	if missingCredErr != nil || missingCredential.Reason != "DHF_GATE_CREDENTIAL_INACTIVE" {
 		t.Fatalf("public key without signer credential accepted: %+v %v", missingCredential, missingCredErr)
 	}
+	// A delegated trial operator must reauthenticate before registering a
+	// verifier. Mere application-admin status is not a credential mandate.
+	exec("UPDATE users SET password_hash=$2,must_change_password=false WHERE id=$1", actorID, passwordHash)
+	operator := signer(actorID)
+	operatorList, operatorErr := service.DHFPilotCredentialList(ctx, operator)
+	if operatorErr != nil || !operatorList.CanManage {
+		t.Fatalf("approved operator not recognized: %+v %v", operatorList, operatorErr)
+	}
+	nonOperator, nonOperatorErr := service.DHFPilotCredentialList(ctx, signer("dhf_mf_reviewer"))
+	if nonOperatorErr != nil || nonOperator.CanManage || len(nonOperator.Items) != 0 {
+		t.Fatalf("ung­ranted user could manage credentials: %+v %v", nonOperator, nonOperatorErr)
+	}
+	managementPub, _, managementErr := ed25519.GenerateKey(rand.Reader)
+	if managementErr != nil {
+		t.Fatal(managementErr)
+	}
+	t.Setenv("DHF_PILOT_GATE_TRUSTED_PUBKEY_B64", base64.StdEncoding.EncodeToString(managementPub))
+	registerInput := application.DHFPilotRegisterCredentialRequest{
+		SignerID:         "dhf_gate_reviewer",
+		PublicKeyBase64:  base64.StdEncoding.EncodeToString(managementPub),
+		ValidFrom:        time.Now().Add(-time.Minute),
+		ExpiresAt:        time.Now().Add(time.Hour),
+		AuthorizationRef: "isolated-operator-authorization-reference",
+		Password:         reviewerPassword, IdempotencyKey: "dhf-register-api-test-001",
+	}
+	registered, registerErr := service.DHFPilotRegisterCredential(ctx, operator, registerInput)
+	if registerErr != nil || registered.ID == "" || registered.Replayed {
+		t.Fatalf("delegated operator registration failed: %+v %v", registered, registerErr)
+	}
+	retried, retryErr := service.DHFPilotRegisterCredential(ctx, operator, registerInput)
+	if retryErr != nil || !retried.Replayed || retried.ID != registered.ID {
+		t.Fatalf("idempotent registration did not replay: %+v %v", retried, retryErr)
+	}
+	registerInput.AuthorizationRef = "conflicting-authorization-reference"
+	conflict, conflictErr := service.DHFPilotRegisterCredential(ctx, operator, registerInput)
+	if conflictErr != nil || conflict.Reason != "DHF_CREDENTIAL_IDEMPOTENCY_CONFLICT" {
+		t.Fatalf("credential replay collision allowed: %+v %v", conflict, conflictErr)
+	}
+	eventInput := application.DHFPilotCredentialActionRequest{
+		Kind: "activate", Reason: "isolated verified operator activation",
+		Password: reviewerPassword, IdempotencyKey: "dhf-credential-api-activate-001",
+	}
+	activated, activateErr := service.DHFPilotCredentialTransition(ctx, operator, registered.CredentialID, eventInput)
+	if activateErr != nil || activated.ID == "" || activated.Replayed {
+		t.Fatalf("credential activation denied: %+v %v", activated, activateErr)
+	}
+	activatedAgain, againErr := service.DHFPilotCredentialTransition(ctx, operator, registered.CredentialID, eventInput)
+	if againErr != nil || !activatedAgain.Replayed || activatedAgain.ID != activated.ID {
+		t.Fatalf("credential activation not idempotent: %+v %v", activatedAgain, againErr)
+	}
+	eventInput.Kind = "suspend"
+	eventInput.Reason = "temporary documented credential security hold"
+	eventInput.IdempotencyKey = "dhf-credential-api-suspend-001"
+	suspended, suspendErr := service.DHFPilotCredentialTransition(ctx, operator, registered.CredentialID, eventInput)
+	if suspendErr != nil || suspended.ID == "" {
+		t.Fatalf("credential suspension denied: %+v %v", suspended, suspendErr)
+	}
+	noSuspendedSign, signErr := service.DHFPilotGateChallenge(ctx, signer("dhf_gate_reviewer"), g5Result.SubmissionID)
+	if signErr != nil || noSuspendedSign.Reason != "DHF_GATE_CREDENTIAL_INACTIVE" {
+		t.Fatalf("suspended key created a signing challenge: %+v %v", noSuspendedSign, signErr)
+	}
+	eventInput.Kind = "revoke"
+	eventInput.Reason = "documented terminal trial credential revocation"
+	eventInput.IdempotencyKey = "dhf-credential-api-revoke-001"
+	revokedAPI, apiRevokeErr := service.DHFPilotCredentialTransition(ctx, operator, registered.CredentialID, eventInput)
+	if apiRevokeErr != nil || revokedAPI.ID == "" {
+		t.Fatalf("credential revocation denied: %+v %v", revokedAPI, apiRevokeErr)
+	}
+	eventInput.Kind = "activate"
+	eventInput.IdempotencyKey = "dhf-credential-api-reopen-001"
+	illegalReopen, reopenErr := service.DHFPilotCredentialTransition(ctx, operator, registered.CredentialID, eventInput)
+	if reopenErr != nil || illegalReopen.Reason != "DHF_CREDENTIAL_TRANSITION_INVALID" {
+		t.Fatalf("revoked credential reopened: %+v %v", illegalReopen, reopenErr)
+	}
+	t.Setenv("DHF_PILOT_GATE_TRUSTED_PUBKEY_B64", base64.StdEncoding.EncodeToString(publicKey))
 	unsignedHistory, unsignedHistoryErr := service.DHFPilotGateVerification(ctx, signer("dhf_gate_reviewer"), g5Result.SubmissionID)
 	if unsignedHistoryErr != nil || unsignedHistory.CandidateStatus != "not_issued" ||
 		unsignedHistory.CryptographicValid || unsignedHistory.SignatureReason != "NO_SIGNED_CANDIDATE" ||
