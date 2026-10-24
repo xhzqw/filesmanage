@@ -119,7 +119,7 @@ CREATE CONSTRAINT TRIGGER dhf_pilot_remediation_event_atomic
 -- immutable remediation case its snapshot hash is a recorded audit fact.
 -- Freeze identity immediately even though the new attempt has not submitted.
 CREATE OR REPLACE FUNCTION dhf_pilot_guard_linked_remediation_attempt()
-RETURNS trigger LANGUAGE plpgsql AS $
+RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
  IF EXISTS(SELECT 1 FROM dhf_pilot_remediation_cases
    WHERE new_attempt_id=OLD.id)
@@ -136,7 +136,7 @@ BEGIN
  END IF;
  RETURN NEW;
 END;
-$;
+$$;
 CREATE TRIGGER dhf_pilot_rework_attempt_manifest_immutable
  BEFORE UPDATE OF manifest_body,manifest_sha,project_id,stage_id,template_id,created_by
  ON dhf_pilot_attempts FOR EACH ROW
