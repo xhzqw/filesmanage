@@ -461,6 +461,9 @@ INSERT INTO dhf_pilot_gate_candidates(id,submission_id,attempt_id,project_id,sta
 	}
 	if _,tamper:=pool.Exec(ctx,"UPDATE dhf_pilot_gate_candidates SET signature_ed25519=decode(repeat('a',128),'hex') WHERE id=$1",
 		candidate.CandidateID);tamper==nil{t.Fatal("sealed Gate signature unexpectedly rewritten")}
+	// Finish the temporary G5 signer ACL fixture before exercising G6
+	// revocation tests; otherwise unrelated grants mask the denial.
+	exec("DELETE FROM acls WHERE id='dhf_g5_gate_preview'")
 	if err=pool.QueryRow(ctx,"SELECT state FROM dhf_pilot_attempts WHERE id='dhf_g5_attempt'").Scan(&state);err!=nil||state!="submitted"{
 		t.Fatalf("signed candidate was incorrectly promoted to official accepted stage: %s %v",state,err)
 	}
