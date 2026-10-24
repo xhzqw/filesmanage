@@ -62,6 +62,28 @@ func(s *Service)DHFPilotVerifyRemediation(ctx context.Context,actor domain.User,
   if err=tx.Commit(ctx);err!=nil{return fail("DHF_VERIFICATION_UNAVAILABLE"),err}
   return fail("DHF_REAUTH_FAILED"),nil
  }
+ // Both immutable submissions must remain physically readable with a
+ // valid ACL, file version, Blob identity and actual on-disk SHA-256.
+ // Neither a database SHA nor a prior recommendation is sufficient.
+ if s.blobs==nil{return fail("DHF_VERIFICATION_EVIDENCE_UNAVAILABLE"),nil}
+ pins,err:=store.DHFPilotVerificationFrozenEvidence(ctx,caseID,actor.ID)
+ if err!=nil{return fail("DHF_VERIFICATION_EVIDENCE_UNAVAILABLE"),err}
+ for _,pin:=range pins {
+  if _,err=s.visibleFile(ctx,tx,trusted,pin.FileID,domain.ActionPreview);err!=nil{
+   return fail("DHF_VERIFICATION_EVIDENCE_DENIED"),nil
+  }
+  ver,versionErr:=tx.VersionBySeq(ctx,pin.FileID,pin.VersionSeq)
+  if versionErr!=nil||ver.BlobID!=pin.BlobID||ver.Sha256!=pin.Sha256{
+   return fail("DHF_VERIFICATION_EVIDENCE_INVALID"),nil
+  }
+  blob,blobErr:=tx.BlobByID(ctx,pin.BlobID)
+  if blobErr!=nil||blob.State!="ready"||blob.Sha256!=pin.Sha256{
+   return fail("DHF_VERIFICATION_EVIDENCE_INVALID"),nil
+  }
+  if verifyDHFPilotPhysicalBlob(ctx,s.blobs,blob.StorageKey,pin.Sha256,blob.SizeBytes)!=nil{
+   return fail("DHF_VERIFICATION_EVIDENCE_INVALID"),nil
+  }
+ }
  requestSHA:=hashPilotSubmit(caseID,actor.ID,key,source.RevisedSubmissionID,
   source.RevisedManifestSHA+":"+comment+":"+intent)
  existing,err:=store.DHFPilotExistingVerification(ctx,caseID)
