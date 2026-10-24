@@ -83,6 +83,8 @@ type Dependency struct {
 	Result           StageState
 	Direct           bool
 	ConditionalScope []Action // from approved predecessor authorization
+	ConditionalValid bool
+	ConditionalExpiresAt time.Time
 }
 
 type ConditionalPermission struct {
@@ -126,6 +128,15 @@ func decision(verdict Verdict, reasons ...string) Decision {
 
 func inScope(action Action, allowed []Action) bool {
 	return slices.Contains(allowed, action)
+}
+
+func conditionalActionsSafe(actions []Action) bool {
+	for _, action := range actions {
+		if action != ActionPrepare && action != ActionSubmit {
+			return false
+		}
+	}
+	return true
 }
 
 // Evaluate is deterministic and side-effect free. "allow" is never sufficient
@@ -199,7 +210,7 @@ func Evaluate(in GateInput) Decision {
 		switch dep.Result {
 		case Accepted:
 		case ConditionallyReleased:
-			if !dep.Direct || !inScope(in.Action, dep.ConditionalScope) || in.Action == ActionIssueDocument {
+			if !dep.Direct || !dep.ConditionalValid || in.Now.IsZero() || !dep.ConditionalExpiresAt.After(in.Now) || !inScope(in.Action, dep.ConditionalScope) || in.Action == ActionIssueDocument {
 				add("DHF_UPSTREAM_BLOCKED")
 			} else {
 				upstreamLimited = true
@@ -299,7 +310,7 @@ func Evaluate(in GateInput) Decision {
 			add("DHF_CONDITIONAL_EXPIRED")
 		case len(grant.AllowedActions) == 0:
 			add("DHF_CONDITIONAL_SCOPE_EMPTY")
-		case slices.Contains(grant.AllowedActions, ActionIssueDocument):
+		case !conditionalActionsSafe(grant.AllowedActions):
 			add("DHF_CONDITIONAL_SCOPE_UNSAFE")
 		}
 		if !missingNoncritical {
