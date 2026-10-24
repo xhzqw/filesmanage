@@ -219,6 +219,9 @@ func Evaluate(in GateInput) Decision {
 			remedySet[id] = true
 		}
 	}
+	if len(in.Requirements) == 0 {
+		add("DHF_REQUIREMENT_SET_INVALID")
+	}
 	missingNoncritical := false
 	seenRequirements := map[string]bool{}
 	for _, req := range in.Requirements {
@@ -251,7 +254,7 @@ func Evaluate(in GateInput) Decision {
 		}
 	}
 
-	if in.IsG5 {
+	if in.IsG5 && (in.Action == ActionFinalize || in.Action == ActionConditionalApprove) {
 		if len(in.ExpectedSpecialties) == 0 {
 			add("DHF_SPECIALTY_SET_INVALID")
 		}
@@ -296,6 +299,8 @@ func Evaluate(in GateInput) Decision {
 			add("DHF_CONDITIONAL_EXPIRED")
 		case len(grant.AllowedActions) == 0:
 			add("DHF_CONDITIONAL_SCOPE_EMPTY")
+		case slices.Contains(grant.AllowedActions, ActionIssueDocument):
+			add("DHF_CONDITIONAL_SCOPE_UNSAFE")
 		}
 		if !missingNoncritical {
 			add("DHF_NO_CONDITIONAL_REMEDIATION")
