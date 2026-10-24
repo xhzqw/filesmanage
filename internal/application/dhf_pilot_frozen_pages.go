@@ -50,14 +50,27 @@ func(s *Service) dhfPilotFrozenPDF(ctx context.Context,actor domain.User,taskID,
   if int64(len(raw))!=item.Blob.SizeBytes||hex.EncodeToString(hash[:])!=item.Pin.Sha256{
    return nil,0,errors.New("DHF frozen evidence bytes changed")
   }
-  pdfBytes:=raw
-  if ext==".docx"{
+  return s.dhfFrozenPDFBytes(ctx,item.File.Name,item.Pin.Sha256,raw)
+ }
+ return nil,0,domain.ErrNotFound
+}
+
+// The derivative path is shared by fixed file-version preview and layout
+// regression tests. Its input is an already authenticated and hashed
+// immutable document; unlike OfficePDFPreview it never reopens latest.
+func(s *Service) dhfFrozenPDFBytes(ctx context.Context,fileName,sourceSHA string,raw []byte)([]byte,int,error){
+ ext:=extensionOf(fileName)
+ if ext!=".docx"&&ext!=".pdf"{return nil,0,ErrPreviewUnsupported}
+ if ext==".pdf"&&(len(raw)>maxDocumentPDFPreviewBytes||len(raw)<8){return nil,0,ErrPreviewUnsupported}
+ if ext==".docx"&&(len(raw)>maxOfficeSourceBytes||len(raw)<8){return nil,0,ErrPreviewUnsupported}
+ pdfBytes:=raw
+ if ext==".docx"{
    // The captured immutable bytes are used even if an administrator moves or
    // deletes the source after the integrity check. No second/latest read.
-   key:="dhf-frozen-docx|"+item.Pin.Sha256
+   key:="dhf-frozen-docx|"+sourceSHA
    pdfBytes,err=s.cachedOfficePDF(ctx,key,func(workCtx context.Context)([]byte,error){
     return renderOfficePDFSource(workCtx,Download{
-     FileName:item.File.Name,Size:int64(len(raw)),Sha256:item.Pin.Sha256,
+     FileName:fileName,Size:int64(len(raw)),Sha256:sourceSHA,
      Reader:dhfReadSeekCloser{Reader:bytes.NewReader(raw)},
     })
    })
@@ -71,8 +84,6 @@ func(s *Service) dhfPilotFrozenPDF(ctx context.Context,actor domain.User,taskID,
    return nil,0,ErrPreviewUnsupported
   }
   return pdfBytes,document.NumPage(),nil
- }
- return nil,0,domain.ErrNotFound
 }
 
 func(s *Service) DHFPilotFrozenPages(ctx context.Context,actor domain.User,taskID,requirementID string)(int,error){
