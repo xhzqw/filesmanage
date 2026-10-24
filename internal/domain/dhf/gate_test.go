@@ -313,6 +313,7 @@ func TestClosedRemediationAndFreshEvidenceAllowFinalization(t *testing.T) {
 	in.Remediations = []Remediation{{
 		ID: "rem-SW", RequirementID: "SW", AttemptID: "attempt-1",
 		State: RemediationClosed, ClosureVerified: true,
+		Authorized: true, DueAt: testNow.Add(24 * time.Hour),
 	}}
 	expect(t, Evaluate(in), Allow, "")
 	in.Remediations[0].ClosureVerified = false
@@ -440,4 +441,30 @@ func TestFinalizedReviewWithOpenRemediationCannotPass(t *testing.T) {
 		State: RemediationOpen, Authorized: true, DueAt: testNow.Add(24 * time.Hour),
 	}}
 	expect(t, Evaluate(in), Deny, "DHF_REMEDIATION_OPEN")
+}
+
+
+func TestUnexpectedDependencyStateDeniedEvenWhenGuardingAnotherAction(t *testing.T) {
+	in := baseInput(ActionFinalize)
+	in.Policy.Dependencies = []DependencyPolicy{{ID: "G4-prep", PredecessorStage: "G4", GuardedAction: ActionPrepare}}
+	in.Dependencies = []DependencyResult{{ID: "G4-prep", PredecessorStage: "G4", State: StageState("invalid")}}
+	expect(t, Evaluate(in), Deny, "DHF_DEPENDENCY_SET_INVALID")
+}
+
+func TestOptionalOrCriticalRequirementsCannotBeConditionEligible(t *testing.T) {
+	in := baseInput(ActionFinalize)
+	in.Policy.Requirements[0].ConditionEligible = true
+	expect(t, Evaluate(in), Deny, "DHF_POLICY_REQUIREMENTS_INVALID")
+	in.Policy.Requirements[0].Critical = false
+	in.Policy.Requirements[0].Mandatory = false
+	expect(t, Evaluate(in), Deny, "DHF_POLICY_REQUIREMENTS_INVALID")
+}
+
+func TestUnapprovedRemediationNeverCountsAsClosed(t *testing.T) {
+	in := baseInput(ActionFinalize)
+	in.Remediations = []Remediation{{
+		ID: "rm", RequirementID: "SW", AttemptID: "attempt-1", State: RemediationClosed,
+		ClosureVerified: true, Authorized: false, DueAt: testNow.Add(time.Hour),
+	}}
+	expect(t, Evaluate(in), Deny, "DHF_REMEDIATION_INVALID")
 }
