@@ -203,6 +203,7 @@ type DHFPilotReturnInboxRow struct {
  CaseID string
  NewAttemptID string
  NewAttemptState string
+ VerificationID string
  CanPrepare bool
 }
 
@@ -353,4 +354,24 @@ type DHFPilotVerificationRecord struct {
  RevisedPolicySHA string
  IdempotencyKey string
  RequestSHA string
+}
+
+type DHFPilotVerificationInboxStore interface{
+ DHFPilotBeginSnapshot(context.Context)error
+ DHFPilotVerificationCasesForReviewer(context.Context,string,int)([]DHFPilotVerificationInboxRow,error)
+}
+type DHFPilotVerificationInboxRow struct{
+ CaseID string `json:"caseId"`
+ ReturnDecisionID string `json:"returnDecisionId"`
+ ProjectID string `json:"projectId"`
+ StageID string `json:"stageId"`
+ OriginalSubmissionID string `json:"originalSubmissionId"`
+ RevisedSubmissionID string `json:"revisedSubmissionId"`
+ OriginalManifestSHA string `json:"originalManifestSha"`
+ RevisedManifestSHA string `json:"revisedManifestSha"`
+ ReturnReason string `json:"returnReason"`
+ ResolutionPlan string `json:"resolutionPlan"`
+ NewAttemptState string `json:"newAttemptState"`
+ ReadyToVerify bool `json:"readyToVerify"`
+ VerificationID string `json:"verificationId,omitempty"`
 }
