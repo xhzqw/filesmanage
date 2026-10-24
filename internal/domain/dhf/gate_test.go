@@ -143,13 +143,17 @@ func TestConditionalPredecessorsAreActionScopedAndNontransitive(t *testing.T) {
 	in.State = Preparing
 	in.Dependencies = []Dependency{{
 		Key: "G6", GuardedAction: ActionSubmit, Result: ConditionallyReleased,
-		Direct: true, ConditionalScope: []Action{ActionSubmit},
+		Direct: true, ConditionalValid: true,
+		ConditionalExpiresAt: pilotNow.Add(time.Hour), ConditionalScope: []Action{ActionSubmit},
 	}}
 	requireDecision(t, Evaluate(in), LimitedAllow, "")
 	in.Dependencies[0].Direct = false
 	requireDecision(t, Evaluate(in), Deny, "DHF_UPSTREAM_BLOCKED")
 	in.Dependencies[0].Direct = true
 	in.Dependencies[0].ConditionalScope = []Action{ActionPrepare}
+	requireDecision(t, Evaluate(in), Deny, "DHF_UPSTREAM_BLOCKED")
+	in.Dependencies[0].ConditionalScope = []Action{ActionSubmit}
+	in.Dependencies[0].ConditionalExpiresAt = pilotNow
 	requireDecision(t, Evaluate(in), Deny, "DHF_UPSTREAM_BLOCKED")
 }
 
@@ -203,4 +207,19 @@ func TestReasonCodesAreSortedDeduplicatedAndSafe(t *testing.T) {
 
 func sortReasonsUnique(rs []string) bool {
 	return slices.IsSorted(rs) && len(rs) == len(slices.Compact(slices.Clone(rs)))
+}
+
+
+func TestConditionalGrantRejectsUnsafeAction(t *testing.T) {
+	in := validInput(ActionConditionalApprove)
+	in.Requirements[0] = Requirement{
+		ID: "REQ-SW", Applicability: Applicable, Mandatory: true, ConditionEligible: true,
+	}
+	in.Conditional = &ConditionalPermission{
+		TemplateEnabled: true, DecisionAuthorized: true,
+		Expiry: pilotNow.Add(time.Hour),
+		AllowedActions: []Action{ActionIssueDocument},
+		RemediationRequirementIDs: []string{"REQ-SW"},
+	}
+	requireDecision(t, Evaluate(in), Deny, "DHF_CONDITIONAL_SCOPE_UNSAFE")
 }
