@@ -23,6 +23,8 @@ type DHFStageGateReadiness struct {
 	PolicySHA                 string                         `json:"policySha"`
 	ManifestSHA               string                         `json:"manifestSha"`
 	Dependencies              []ports.DHFStageGateDependency `json:"dependencies"`
+	ProjectGraph              []ports.DHFStageGateGraphNode  `json:"projectGraph"`
+	ProjectGraphSHA           string                         `json:"projectGraphSha,omitempty"`
 	MissingPreconditions      []string                       `json:"missingPreconditions"`
 	StrictRequestAllowed      bool                           `json:"strictRequestAllowed"`
 	ConditionalRequestAllowed bool                           `json:"conditionalRequestAllowed"`
@@ -71,6 +73,23 @@ func (s *Service) dhfStageGateReadinessTx(ctx context.Context, store ports.DHFSt
 	if !valid {
 		return out, source, errors.New("Gate candidate cryptographic verification failed")
 	}
+	// Complete project-wide G1-G9 DAG is verified from the active published
+	// baselines: missing predecessor templates or any multi-stage cycle fail
+	// closed. An empty policy edge list never implies numeric stage order.
+	out.ProjectGraph, err = store.DHFStageGateProjectGraph(ctx, candidate.ProjectID)
+	if err != nil {
+		return out, source, err
+	}
+	foundSource := false
+	for _, node := range out.ProjectGraph {
+		if node.StageID == candidate.StageID &&
+			node.TemplateID == candidate.TemplateID && node.PolicySHA == candidate.PolicySHA {
+			foundSource = true
+		}
+	}
+	if !foundSource {
+		return out, source, errors.New("Gate candidate is not part of verified published project DAG")
+	}
 	var doc dhfPilotPolicyDocument
 	if decodePilotJSON(source.PolicyBody, &doc) != nil ||
 		!pilotPolicyFieldsComplete(source.PolicyBody) || doc.StageID != candidate.StageID ||
@@ -112,6 +131,7 @@ func (s *Service) dhfStageGateReadinessTx(ctx context.Context, store ports.DHFSt
 	if err == nil {
 		out.ReviewID = previous.ID
 		out.ReviewState = previous.State
+		out.ProjectGraphSHA = previous.ProjectGraphSHA
 	} else if !errors.Is(err, ports.ErrRowMissing) {
 		return out, source, err
 	}

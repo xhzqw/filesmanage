@@ -1317,14 +1317,23 @@ schema("DHFPilotGateVerification",obj({
 schema("DHFStageGateDependency",obj({
  "id":string(),"predecessorStage":string(),"guardedAction":string(),"state":string(),
 },required=["id","predecessorStage","guardedAction","state"]))
+schema("DHFStageGateGraphEdge",obj({
+ "id":string(),"predecessorStage":string(),"guardedAction":string(),"allowConditional":boolean(),
+},required=["id","predecessorStage","guardedAction","allowConditional"]))
+schema("DHFStageGateGraphNode",obj({
+ "stageId":string(),"templateId":string(),"policySha":string(),"positionState":string(),
+ "conditionalTemplateFlag":boolean(),"dependencies":arr(ref("DHFStageGateGraphEdge")),
+},required=["stageId","templateId","policySha","positionState",
+ "conditionalTemplateFlag","dependencies"]))
 schema("DHFStageGateReadiness",obj({
  "submissionId":string(),"candidateId":string(),"projectId":string(),
  "stageId":string(),"templateId":string(),"policySha":string(),"manifestSha":string(),
  "dependencies":arr(ref("DHFStageGateDependency")),"missingPreconditions":arr(string()),
+ "projectGraph":arr(ref("DHFStageGateGraphNode")),"projectGraphSha":string(),
  "strictRequestAllowed":boolean(),"conditionalRequestAllowed":boolean(),
  "formalAccepted":boolean(),"trialOnly":boolean(),"reviewId":string(),"reviewState":string(),
 },required=["submissionId","candidateId","projectId","stageId","templateId",
- "policySha","manifestSha","dependencies","missingPreconditions",
+ "policySha","manifestSha","dependencies","projectGraph","missingPreconditions",
  "strictRequestAllowed","conditionalRequestAllowed","formalAccepted","trialOnly"]))
 schema("DHFStageGateReviewRequest",obj({
  "mode":string(enum=["strict","conditional"]),"password":string(),"idempotencyKey":string(),

@@ -11,6 +11,22 @@ import (
 
 var _ ports.DHFStageGateReviewStore = (*Repository)(nil)
 
+func (r *Repository) DHFStageGateProjectGraph(ctx context.Context, projectID string) ([]ports.DHFStageGateGraphNode, error) {
+	var encoded []byte
+	err := r.Q.QueryRow(ctx, `SELECT dhf_pilot_verified_project_graph($1)`, projectID).Scan(&encoded)
+	if err != nil {
+		return nil, err
+	}
+	var nodes []ports.DHFStageGateGraphNode
+	if err := json.Unmarshal(encoded, &nodes); err != nil {
+		return nil, err
+	}
+	if len(nodes) == 0 || len(nodes) > 9 {
+		return nil, errors.New("verified DHF project graph must contain one to nine stages")
+	}
+	return nodes, nil
+}
+
 func (r *Repository) DHFStageGateReviewSourceForSigner(ctx context.Context, submissionID, actorID string) (ports.DHFStageGateReviewSource, error) {
 	var out ports.DHFStageGateReviewSource
 	x := &out.Candidate
@@ -60,16 +76,18 @@ WHERE project_id=$1 AND stage_id=$2`, projectID, stageID).Scan(&state)
 }
 func (r *Repository) DHFStageGateReviewBySubmission(ctx context.Context, submissionID string) (ports.DHFStageGateReviewRecord, error) {
 	var x ports.DHFStageGateReviewRecord
-	var deps, missing []byte
+	var deps, missing, graph []byte
+	var graphSHA *string
 	err := r.Q.QueryRow(ctx, `SELECT id,submission_id,gate_candidate_id,attempt_id,
  project_id,stage_id,template_id,signer_id,mode,state,policy_sha,manifest_sha,
  candidate_payload_sha,dependency_snapshot,missing_preconditions,idempotency_key,
- request_sha,dependency_snapshot_sha,trial_only FROM dhf_pilot_stage_gate_review_intents
+ request_sha,dependency_snapshot_sha,trial_only,project_graph_snapshot,project_graph_sha
+ FROM dhf_pilot_stage_gate_review_intents
  WHERE submission_id=$1`, submissionID).
 		Scan(&x.ID, &x.SubmissionID, &x.CandidateID, &x.AttemptID, &x.ProjectID,
 			&x.StageID, &x.TemplateID, &x.SignerID, &x.Mode, &x.State, &x.PolicySHA,
 			&x.ManifestSHA, &x.CandidatePayloadSHA, &deps, &missing, &x.IdempotencyKey,
-			&x.RequestSHA, &x.DependencySnapshotSHA, &x.TrialOnly)
+			&x.RequestSHA, &x.DependencySnapshotSHA, &x.TrialOnly, &graph, &graphSHA)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return x, ports.ErrRowMissing
 	}
@@ -81,6 +99,14 @@ func (r *Repository) DHFStageGateReviewBySubmission(ctx context.Context, submiss
 	}
 	if err = json.Unmarshal(missing, &x.MissingPreconditions); err != nil {
 		return x, err
+	}
+	if graphSHA != nil {
+		x.ProjectGraphSHA = *graphSHA
+	}
+	if len(graph) != 0 {
+		if err = json.Unmarshal(graph, &x.ProjectGraph); err != nil {
+			return x, err
+		}
 	}
 	x.FormalAccepted = false
 	return x, nil
@@ -105,23 +131,23 @@ func (r *Repository) DHFStageGatePersistReview(ctx context.Context, x ports.DHFS
 	if err != nil {
 		return err
 	}
-	if err = r.Q.QueryRow(ctx, `SELECT dependency_snapshot_sha
- FROM dhf_pilot_stage_gate_review_intents WHERE id=$1`, x.ID).Scan(&x.DependencySnapshotSHA); err != nil {
+	if err = r.Q.QueryRow(ctx, `SELECT dependency_snapshot_sha,project_graph_sha
+ FROM dhf_pilot_stage_gate_review_intents WHERE id=$1`, x.ID).Scan(&x.DependencySnapshotSHA, &x.ProjectGraphSHA); err != nil {
 		return err
 	}
 	_, err = r.Q.Exec(ctx, `INSERT INTO audit_events(
  actor_id,event_type,target_kind,target_id,request_id,outcome,details)
  VALUES($1,'dhf.pilot.gate.review_requested','dhf_stage_gate_review',$2,$3,'pending_enterprise_authority',
  jsonb_build_object('candidateId',$4::text,'dependencySnapshotSha',$5::text,
- 'mode',$6::text,'formalAccepted',false))`, x.SignerID, x.ID, x.IdempotencyKey,
-		x.CandidateID, x.DependencySnapshotSHA, x.Mode)
+ 'mode',$6::text,'formalAccepted',false,'projectGraphSha',$7::text))`, x.SignerID, x.ID, x.IdempotencyKey,
+		x.CandidateID, x.DependencySnapshotSHA, x.Mode, x.ProjectGraphSHA)
 	if err != nil {
 		return err
 	}
 	_, err = r.Q.Exec(ctx, `INSERT INTO outbox_jobs(id,kind,payload)
  VALUES($1,'dhf.pilot.gate.review_requested',
  jsonb_build_object('reviewId',$2::text,'candidateId',$3::text,
- 'trialOnly',true,'formalAccepted',false))`,
-		"dhf-gate-review:"+x.ID, x.ID, x.CandidateID)
+ 'trialOnly',true,'formalAccepted',false,'projectGraphSha',$4::text))`,
+		"dhf-gate-review:"+x.ID, x.ID, x.CandidateID, x.ProjectGraphSHA)
 	return err
 }

@@ -691,6 +691,16 @@ INSERT INTO dhf_pilot_gate_candidates(id,submission_id,attempt_id,project_id,sta
 		gateReadiness.MissingPreconditions[0] != "ENTERPRISE_GATE_AUTHORITY_NOT_APPROVED" {
 		t.Fatalf("invented dependencies or corporate Stage acceptance: %+v %v", gateReadiness, readinessErr)
 	}
+	// 0058: graph evaluates EVERY active project baseline rather than one
+	// Gate's caller-visible dependency list. An unconfigured numeric
+	// predecessor is never synthesized, and G6/G8 remain independent IDs.
+	if len(gateReadiness.ProjectGraph) != 2 ||
+		gateReadiness.ProjectGraph[0].StageID != "G1" ||
+		gateReadiness.ProjectGraph[1].StageID != "G5" ||
+		len(gateReadiness.ProjectGraph[0].Dependencies) != 0 ||
+		len(gateReadiness.ProjectGraph[1].Dependencies) != 0 {
+		t.Fatalf("full project DAG fabricated stages or edges: %+v", gateReadiness.ProjectGraph)
+	}
 	if _, deniedReadErr := service.DHFStageGateReadiness(ctx, signer("dhf_sw_reviewer"), g5Result.SubmissionID); deniedReadErr == nil {
 		t.Fatal("other reviewer could inspect Gate review source")
 	}
@@ -744,14 +754,25 @@ VALUES('dhf-gate-forged-dependency',$1,$2,'dhf_g5_attempt','dhf_project','G5',
 FROM dhf_pilot_stage_gate_review_intents WHERE id=$1`, reviewIntake.ReviewID).Scan(&depsSHA); err != nil || len(depsSHA) != 64 {
 		t.Fatalf("frozen Gate dependency digest absent: %q %v", depsSHA, err)
 	}
+	var projectGraphSHA string
+	if err = pool.QueryRow(ctx, `SELECT project_graph_sha FROM
+dhf_pilot_stage_gate_review_intents WHERE id=$1`, reviewIntake.ReviewID).Scan(&projectGraphSHA); err != nil || len(projectGraphSHA) != 64 {
+		t.Fatalf("project-wide published policy graph not frozen: %q %v", projectGraphSHA, err)
+	}
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE
+event_type='dhf.pilot.gate.review_requested' AND target_id=$1
+AND details->>'projectGraphSha'=$2`, reviewIntake.ReviewID, projectGraphSHA).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("Gate audit lacks frozen cross-stage dependency graph: %d %v", count, err)
+	}
 	if err = pool.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE
 event_type='dhf.pilot.gate.review_requested' AND target_id=$1
 AND details->>'dependencySnapshotSha'=$2`, reviewIntake.ReviewID, depsSHA).Scan(&count); err != nil || count != 1 {
 		t.Fatalf("Gate review intake missing exact dependency audit: %d %v", count, err)
 	}
 	if err = pool.QueryRow(ctx, `SELECT count(*) FROM outbox_jobs WHERE id=$1
-AND kind='dhf.pilot.gate.review_requested' AND payload->>'formalAccepted'='false'`,
-		"dhf-gate-review:"+reviewIntake.ReviewID).Scan(&count); err != nil || count != 1 {
+AND kind='dhf.pilot.gate.review_requested' AND payload->>'formalAccepted'='false'
+AND payload->>'projectGraphSha'=$2`,
+		"dhf-gate-review:"+reviewIntake.ReviewID, projectGraphSHA).Scan(&count); err != nil || count != 1 {
 		t.Fatalf("Gate review failed to queue trial-only outbox: %d %v", count, err)
 	}
 	if _, overwrite := pool.Exec(ctx, `UPDATE dhf_pilot_stage_gate_review_intents
@@ -1392,6 +1413,71 @@ jsonb_build_object('revokeId','dhf-operator-grant-revocation'))`); err != nil {
 	deniedPostRevoke, deniedPostRevokeErr := service.DHFPilotRegisterCredential(ctx, operator, afterGrantRevokeRegister)
 	if deniedPostRevokeErr != nil || deniedPostRevoke.Reason != "DHF_CREDENTIAL_OPERATOR_DENIED" {
 		t.Fatalf("revoked operator successfully registered a credential: %+v %v", deniedPostRevoke, deniedPostRevokeErr)
+	}
+	// V0.8.0 slice 2: real PostgreSQL G1-G9 full-project graph fixtures.
+	// Only explicit signed/published baseline dependencies count. The test
+	// policy documents here are artificial fixtures, NOT corporate SOP.
+	seedGraphProject := func(projectID string, stages []string, dependencies map[string][]dhf.DependencyPolicy, flags map[string]bool) {
+		t.Helper()
+		exec("INSERT INTO dhf_pilot_projects(id,owner_id,state) VALUES($1,$2,'active')", projectID, actorID)
+		for _, stage := range stages {
+			templateID := projectID + "_" + stage + "_template"
+			edges := dependencies[stage]
+			if edges == nil {
+				edges = []dhf.DependencyPolicy{}
+			}
+			policy, encodeErr := json.Marshal(map[string]any{
+				"stage_id": stage, "conditional_allowed": flags[stage],
+				"dependencies": edges,
+				"requirements": []dhf.RequirementPolicy{{ID: "GRAPH-FIXTURE-" + stage, Mandatory: true, Critical: true}},
+				"specialties":  []dhf.SpecialtyPolicy{},
+			})
+			if encodeErr != nil {
+				t.Fatal(encodeErr)
+			}
+			exec("INSERT INTO dhf_pilot_templates(id,stage_id,policy_body,policy_sha,status,approved_by,approved_at) VALUES($1,$2,$3,$4,'published',$5,now())",
+				templateID, stage, policy, sha(policy), actorID)
+			exec("INSERT INTO dhf_pilot_baselines(project_id,stage_id,template_id,active) VALUES($1,$2,$3,true)",
+				projectID, stage, templateID)
+		}
+	}
+	seedGraphProject("dhf_graph_valid", []string{"G6", "G8"},
+		map[string][]dhf.DependencyPolicy{"G8": {{ID: "TRANSFER-VERIFY-1", PredecessorStage: "G6",
+			GuardedAction: dhf.ActionPrepare, AllowConditional: true}}}, map[string]bool{"G8": true})
+	var rawGraph []byte
+	if err = pool.QueryRow(ctx, "SELECT dhf_pilot_verified_project_graph('dhf_graph_valid')").Scan(&rawGraph); err != nil {
+		t.Fatalf("independently named G6 and G8 published baselines rejected: %v", err)
+	}
+	var graphNodes []ports.DHFStageGateGraphNode
+	if err = json.Unmarshal(rawGraph, &graphNodes); err != nil || len(graphNodes) != 2 ||
+		graphNodes[0].StageID != "G6" || graphNodes[1].StageID != "G8" ||
+		len(graphNodes[1].Dependencies) != 1 ||
+		graphNodes[1].Dependencies[0].PredecessorStage != "G6" ||
+		!graphNodes[1].Dependencies[0].AllowConditional {
+		t.Fatalf("first G6 transfer conflated with distinct G8: %+v %v", graphNodes, err)
+	}
+	seedGraphProject("dhf_graph_cycle", []string{"G7", "G8"},
+		map[string][]dhf.DependencyPolicy{
+			"G7": {{ID: "CYCLIC-7", PredecessorStage: "G8", GuardedAction: dhf.ActionPrepare}},
+			"G8": {{ID: "CYCLIC-8", PredecessorStage: "G7", GuardedAction: dhf.ActionSubmit}},
+		}, nil)
+	if err = pool.QueryRow(ctx, "SELECT dhf_pilot_verified_project_graph('dhf_graph_cycle')").Scan(&rawGraph); err == nil {
+		t.Fatal("published project DAG with a two-stage circular dependency was accepted")
+	}
+	seedGraphProject("dhf_graph_missing", []string{"G8"},
+		map[string][]dhf.DependencyPolicy{
+			"G8": {{ID: "MISSING-PREDECESSOR", PredecessorStage: "G6", GuardedAction: dhf.ActionSubmit}},
+		}, nil)
+	if err = pool.QueryRow(ctx, "SELECT dhf_pilot_verified_project_graph('dhf_graph_missing')").Scan(&rawGraph); err == nil {
+		t.Fatal("cross-project predecessor baseline unexpectedly allowed")
+	}
+	seedGraphProject("dhf_graph_unsafe", []string{"G6", "G8"},
+		map[string][]dhf.DependencyPolicy{
+			"G8": {{ID: "UNSAFE-ISSUE", PredecessorStage: "G6",
+				GuardedAction: dhf.ActionIssueDocument, AllowConditional: true}},
+		}, map[string]bool{"G8": true})
+	if err = pool.QueryRow(ctx, "SELECT dhf_pilot_verified_project_graph('dhf_graph_unsafe')").Scan(&rawGraph); err == nil {
+		t.Fatal("template conditional bypass allowed document issuance")
 	}
 	fmt.Println("DHF_V064_DB_INTEGRATION_PASS")
 }

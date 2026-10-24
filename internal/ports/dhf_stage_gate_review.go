@@ -6,12 +6,29 @@ import "context"
 // Stage Gate review intake. This is NOT an accepted-stage transition port.
 type DHFStageGateReviewStore interface {
 	DHFPilotBeginSubmission(context.Context) error
+	DHFStageGateProjectGraph(context.Context, string) ([]DHFStageGateGraphNode, error)
 	DHFStageGateReviewSourceForSigner(context.Context, string, string) (DHFStageGateReviewSource, error)
 	DHFStageGateReviewBySubmission(context.Context, string) (DHFStageGateReviewRecord, error)
 	DHFStageGateObservedDependency(context.Context, string, string) (string, error)
 	DHFStageGatePersistReview(context.Context, DHFStageGateReviewRecord) error
 	DHFPilotRecentAttestationAuthFailures(context.Context, string) (int, error)
 	DHFPilotAuditAttestationAuthFailure(context.Context, string, string) error
+}
+
+// Verified project-wide, explicit (never numerically inferred) G1-G9 graph.
+type DHFStageGateGraphNode struct {
+	StageID                 string                  `json:"stageId"`
+	TemplateID              string                  `json:"templateId"`
+	PolicySHA               string                  `json:"policySha"`
+	PositionState           string                  `json:"positionState"`
+	ConditionalTemplateFlag bool                    `json:"conditionalTemplateFlag"`
+	Dependencies            []DHFStageGateGraphEdge `json:"dependencies"`
+}
+type DHFStageGateGraphEdge struct {
+	ID               string `json:"id"`
+	PredecessorStage string `json:"predecessorStage"`
+	GuardedAction    string `json:"guardedAction"`
+	AllowConditional bool   `json:"allowConditional"`
 }
 
 type DHFStageGateReviewSource struct {
@@ -44,6 +61,8 @@ type DHFStageGateReviewRecord struct {
 	IdempotencyKey        string                   `json:"-"`
 	RequestSHA            string                   `json:"-"`
 	DependencySnapshotSHA string                   `json:"dependencySnapshotSha"`
+	ProjectGraph          []DHFStageGateGraphNode  `json:"projectGraph,omitempty"`
+	ProjectGraphSHA       string                   `json:"projectGraphSha,omitempty"`
 	TrialOnly             bool                     `json:"trialOnly"`
 	FormalAccepted        bool                     `json:"formalAccepted"`
 }

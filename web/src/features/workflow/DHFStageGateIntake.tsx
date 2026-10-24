@@ -4,10 +4,14 @@ import {errorCopy} from "../../shared/errors";
 import {RareButton,RareInput} from "../../shared/ui/rare";
 
 type Dependency={id:string;predecessorStage:string;guardedAction:string;state:string};
+type ProjectGraphNode={stageId:string;templateId:string;policySha:string;
+ positionState:string;conditionalTemplateFlag:boolean;
+ dependencies:{id:string;predecessorStage:string;guardedAction:string;allowConditional:boolean}[]};
 type Readiness={
  submissionId:string;candidateId:string;projectId:string;stageId:string;
  templateId:string;policySha:string;manifestSha:string;
  dependencies:Dependency[];missingPreconditions:string[];
+ projectGraph:ProjectGraphNode[];projectGraphSha?:string;
  strictRequestAllowed:boolean;conditionalRequestAllowed:boolean;
  reviewId?:string;reviewState?:string;trialOnly:boolean;formalAccepted:boolean;
 };
@@ -58,6 +62,21 @@ export function DHFStageGateIntake({submissionId}:{submissionId:string}){
    data?<div className="dhf-pilot-evidence-item">
     <strong>{data.reviewId?"已登记待授权验收申请":"尚未申请企业正式阶段验收"}</strong>
     <span>严格模式 · {data.stageId} · 原始候选 {data.candidateId}</span>
+    <section aria-label="项目九阶段依赖全图">
+     <strong>项目有效模板依赖图 · {data.projectGraph?.length??0} 个已配置阶段</strong>
+     <span>仅展示项目已发布并激活的模板；没有配置的阶段不会被推定为已完成。</span>
+     <div role="list">{(data.projectGraph??[]).map(node=><div key={node.stageId}
+       role="listitem" className="dhf-pilot-evidence-item">
+      <strong>{node.stageId}{node.stageId===data.stageId?" · 当前阶段":""} · {node.positionState}</strong>
+      <span>模板 {node.templateId} · 直接依赖 {node.dependencies.length} 条</span>
+      {node.dependencies.map(edge=><span key={edge.id}>
+       {edge.predecessorStage} → {node.stageId} · {edge.guardedAction}
+       {edge.allowConditional?" · 模板可建议受限放行（尚未授权）":""}
+      </span>)}
+     </div>)}</div>
+     {data.projectGraphSha?<><span>已冻结项目依赖图 SHA-256</span>
+       <code>{data.projectGraphSha}</code></>:null}
+    </section>
     <span>已发布模板显式定义的上游依赖：{data.dependencies.length} 项。未定义的阶段关联不会自动推定。</span>
     {data.dependencies.map(dep=><div key={dep.id}>
      <span>{dep.predecessorStage} → {data.stageId} · {dep.guardedAction} · {dep.state==="accepted"?"正式已通过":"尚未正式通过"}</span>
