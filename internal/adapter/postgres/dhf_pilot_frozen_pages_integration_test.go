@@ -152,7 +152,7 @@ func TestDHFPilotFrozenPDFDOCXRealPostgres(t *testing.T){
    t.Fatalf("%s accepted out-of-range frozen page",test.reviewKey)
   }
   // Move Finder's current pointer to v2 AFTER DHF's v1 evidence was frozen.
-  changed:=[]byte("this version 2 is not a valid historical PDF/DOCX")
+  changed:=[]byte("this version 2 is not a valid historical PDF/DOCX: "+test.reviewKey)
   stage,stageErr:=root.Stage();if stageErr!=nil{t.Fatal(stageErr)}
   if _,stageErr=stage.Write(changed);stageErr!=nil{t.Fatal(stageErr)}
   storageKey,_,stageErr:=stage.Commit();if stageErr!=nil{t.Fatal(stageErr)}
