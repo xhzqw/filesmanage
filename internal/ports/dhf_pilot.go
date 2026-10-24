@@ -133,3 +133,12 @@ type DHFPilotRecommendationRecord struct {
 	PolicySHA string
 	ManifestSHA string
 }
+
+
+// DHFPilotEvidenceStore reads pinned version tuples only for the task's
+// current configured reviewer. Actual file ACL and physical digest checks
+// MUST be applied in the application layer before exposing any file details.
+type DHFPilotEvidenceStore interface {
+	DHFPilotSnapshotStore
+	DHFPilotEvidenceForReviewer(context.Context,string,string) ([]DHFPilotEvidencePin,error)
+}
