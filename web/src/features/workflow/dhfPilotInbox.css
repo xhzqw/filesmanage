@@ -55,3 +55,7 @@
 .dhf-frozen-layout-canvas img{max-width:100%;width:auto;height:auto;box-shadow:0 3px 18px rgba(20,40,65,.13);background:#fff}
 .dhf-frozen-loading{position:absolute;top:28px;display:flex;align-items:center;gap:8px;color:#667990;font-size:12px}
 .dhf-frozen-layout>.dhf-pilot-disclaimer{margin:0;padding:9px 12px;background:#fff}
+
+.dhf-return-reason{font-size:13px;line-height:1.75;background:#f4f7fa;padding:12px 14px;border-radius:9px;color:#30435d;white-space:pre-wrap;overflow-wrap:anywhere}
+.dhf-pilot-opinion label{font-size:12px;font-weight:600;color:#33465d}
+.dhf-pilot-opinion textarea{display:block;width:100%;min-height:88px;margin:9px 0 10px}
