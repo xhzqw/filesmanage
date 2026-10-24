@@ -23,6 +23,8 @@ func(r *Repository)DHFPilotEarlyTargetForActor(ctx context.Context,taskID,actorI
     AND gate.review_key='__gate__' AND gate.reviewer_id=$2
  JOIN dhf_pilot_submissions sub ON sub.id=target.submission_id
  JOIN dhf_pilot_projects p ON p.id=sub.project_id AND p.state='active'
+ JOIN dhf_pilot_baselines baseline ON baseline.project_id=sub.project_id
+   AND baseline.stage_id=sub.stage_id AND baseline.template_id=sub.template_id AND baseline.active
  JOIN dhf_pilot_templates pol ON pol.id=sub.template_id AND pol.status='published'
  JOIN dhf_pilot_members member ON member.project_id=sub.project_id AND member.user_id=$2
  JOIN users actor ON actor.id=$2 AND actor.disabled_at IS NULL
