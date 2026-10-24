@@ -1369,6 +1369,29 @@ add("GET","/api/workbench/dhf/tasks/{id}/evidence/{rid}/page",operation(
  responses=dict([("200",{"description":"Verified immutable page image, private no-store.","content":{"image/png":{"schema":{"type":"string","format":"binary"}}}}),
  resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("503",ERR["503"])])))
 
+# --- DHF returned review remediation (no formal Stage Gate approval) ---
+schema("DHFRemediationStart",obj({
+ "manifest":obj({"requirements":arr(obj({
+  "id":string(),"applicability":string(),"file_id":string(),
+  "version_seq":integer(minimum=1),"sha256":string(),
+ },required=["id","applicability"]))},required=["requirements"],
+ desc="Full replacement manifest for the same known requirement IDs; changed pinned evidence version mandatory."),
+ "resolutionPlan":string("Required substantive corrective plan (10–2000 characters)."),
+ "idempotencyKey":string("Retry exactly the same request using this key."),
+},required=["manifest","resolutionPlan","idempotencyKey"]))
+schema("DHFRemediationOutcome",obj({
+ "caseId":string(),"returnDecisionId":string(),"originalSubmissionId":string(),
+ "newAttemptId":string(),"replayed":boolean(),"trialOnly":boolean(),"reason":string(),
+},required=["returnDecisionId","trialOnly"]))
+add("POST","/api/workbench/dhf/returns/{id}/remediation",operation(
+ "Create an immutable trial corrective case and new preparing attempt from own returned reviewer decision",
+ "Workflow","dhfPilotOpenRemediation",security=SESSION,
+ params=[id_param("id","Immutable returned-review decision ID")],
+ request={"application/json":{"schema":ref("DHFRemediationStart")}},
+ responses=dict([("201",{"description":"New immutable remediation lineage with separate new preparing attempt; never formal Stage Gate approval.",
+ "content":{"application/json":{"schema":obj({"ok":{"type":"boolean","enum":[True]},"data":ref("DHFRemediationOutcome")},required=["ok","data"])}}}),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
+
 # --- Approvals ---
 schema("ApprovalPage",obj({"items":arr(ref("Approval")),"nextCursor":string(),"hasMore":boolean(),"pendingCount":integer(minimum=0)},required=["items","nextCursor","hasMore","pendingCount"]))
 schema("ApprovalNotificationPage",obj({"items":arr(ref("ApprovalNotification")),"nextCursor":integer(minimum=0),"hasMore":boolean(),"unreadCount":integer(minimum=0)},required=["items","nextCursor","hasMore","unreadCount"]))
