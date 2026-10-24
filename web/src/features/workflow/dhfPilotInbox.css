@@ -33,3 +33,16 @@
 .dhf-pilot-gate-wait,.dhf-pilot-feedback{font-size:12px;line-height:1.7;color:#526b87;padding:10px 12px;background:#f0f4f9;border-radius:8px}
 .dhf-pilot-gate-wait{margin:20px 0 0}
 .dhf-pilot-feedback{margin-bottom:16px}
+
+.dhf-pilot-evidence{margin-top:24px;border-top:1px solid #e8edf2;padding-top:16px;min-width:0}
+.dhf-pilot-evidence h3{font-size:13px;font-weight:650;margin:0 0 12px}
+.dhf-pilot-evidence p{font-size:12px;line-height:1.65;color:#65758b}
+.dhf-pilot-evidence-list{display:grid;gap:8px}
+.dhf-pilot-evidence-item{padding:10px 11px;background:#f6f8fa;border-radius:9px;display:grid;gap:5px;min-width:0}
+.dhf-pilot-evidence-item strong{font-size:12px;overflow-wrap:anywhere}
+.dhf-pilot-evidence-item span{font-size:11px;color:#67758a}
+.dhf-pilot-evidence-item code{font-size:10px;color:#667889;word-break:break-all}
+.dhf-pilot-evidence-item button{justify-self:start;font-size:12px}
+.dhf-pilot-evidence-preview{margin-top:12px;padding:12px;background:#f4f7fb;border-radius:9px;min-width:0}
+.dhf-pilot-evidence-preview strong{font-size:12px}
+.dhf-pilot-evidence-preview pre{margin:10px 0 0;max-height:280px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.6}
