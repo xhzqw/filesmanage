@@ -700,6 +700,21 @@ VALUES('dhf-unlogged-verification',$1,$2,$3,'dhf_gate_reviewer',$4,$5,$6,$7,
 	if wrongVerifyErr!=nil||wrongVerifyPassword.Reason!="DHF_REAUTH_FAILED"{
 		t.Fatalf("passwordless correction verification accepted: %+v %v",wrongVerifyPassword,wrongVerifyErr)
 	}
+	withoutReadAccess,withoutReadErr:=service.DHFPilotVerifyRemediation(ctx,signer("dhf_gate_reviewer"),
+		remed.CaseID,verifiedPlan,reviewerPassword,verifyIntent,"dhf-verify-no-preview-access")
+	if withoutReadErr!=nil||withoutReadAccess.Reason!="DHF_VERIFICATION_EVIDENCE_DENIED"{
+		t.Fatalf("reviewer cannot verify remediation without original file preview grant: %+v %v",withoutReadAccess,withoutReadErr)
+	}
+	exec("INSERT INTO acls(id,folder_id,subject_kind,subject_id,actions,granted_by) VALUES('dhf_gate_file_preview','dhf_folder','user','dhf_gate_reviewer',ARRAY['list','preview']::text[],$1)",actorID)
+	tamperSourcePath,sourcePathErr:=physicalStore.PathFor(storageKey)
+	if sourcePathErr!=nil{t.Fatal(sourcePathErr)}
+	if err=os.WriteFile(tamperSourcePath,[]byte("DHF fixture physically altered prior to verified closure"),0600);err!=nil{t.Fatal(err)}
+	corruptedBlob,corruptedBlobErr:=service.DHFPilotVerifyRemediation(ctx,signer("dhf_gate_reviewer"),
+		remed.CaseID,verifiedPlan,reviewerPassword,verifyIntent,"dhf-verify-corrupted-blob")
+	if corruptedBlobErr!=nil||corruptedBlob.Reason!="DHF_VERIFICATION_EVIDENCE_INVALID"{
+		t.Fatalf("physically corrupted frozen original file allowed correction closure: %+v %v",corruptedBlob,corruptedBlobErr)
+	}
+	if err=os.WriteFile(tamperSourcePath,content,0600);err!=nil{t.Fatal(err)}
 	verified,verifiedErr:=service.DHFPilotVerifyRemediation(ctx,signer("dhf_gate_reviewer"),
 		remed.CaseID,verifiedPlan,reviewerPassword,verifyIntent,"dhf-verification-001")
 	if verifiedErr!=nil||verified.VerificationID==""||verified.Replayed{
