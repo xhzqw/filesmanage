@@ -779,7 +779,7 @@ AND payload->>'projectGraphSha'=$2`,
 	// signer) can append a non-authorizing opinion. Approval is impossible.
 	emptyDecisionInbox, emptyDecisionErr := service.DHFGateDecisionReviewInbox(ctx, signer("dhf_sw_reviewer"))
 	if emptyDecisionErr != nil || len(emptyDecisionInbox.Items) != 0 {
-		t.Fatalf("ung­ranted Gate reviewer could see decision intake: %+v %v", emptyDecisionInbox, emptyDecisionErr)
+		t.Fatalf("unauthorized Gate reviewer could see decision intake: %+v %v", emptyDecisionInbox, emptyDecisionErr)
 	}
 	if _, unauditedMandate := pool.Exec(ctx, `
 INSERT INTO dhf_pilot_gate_decision_reviewer_grants(
@@ -884,9 +884,19 @@ AND payload->>'trialOnly'='true'`,
 		"dhf-gate-decision-review:"+independentOpinion.OpinionID).Scan(&count); err != nil || count != 1 {
 		t.Fatalf("independent recommendation emitted unsafe outbox: %d %v", count, err)
 	}
+	if _, unauthorisedRevoke := pool.Exec(ctx, `
+INSERT INTO dhf_pilot_gate_decision_reviewer_revocations(id,grant_id,revoked_by,reason)
+VALUES('dhf-revoke-by-signer','dhf-independent-gate-mandate',
+'dhf_gate_reviewer','unauthorized signer attempted revoke')`); unauthorisedRevoke == nil {
+		t.Fatal("original Gate signer revoked a separately approved independent reviewer mandate")
+	}
 	if _, overwriteDecision := pool.Exec(ctx, `UPDATE dhf_pilot_gate_decision_review_opinions
 SET state='accepted' WHERE id=$1`, independentOpinion.OpinionID); overwriteDecision == nil {
 		t.Fatal("immutable Gate decision opinion promoted to accepted")
+	}
+	if _, eraseDecision := pool.Exec(ctx, `DELETE FROM dhf_pilot_gate_decision_review_opinions
+WHERE id=$1`, independentOpinion.OpinionID); eraseDecision == nil {
+		t.Fatal("independent Gate opinion was deleted instead of preserved")
 	}
 	revocationTx, revocationTxErr := pool.Begin(ctx)
 	if revocationTxErr != nil {
@@ -913,6 +923,17 @@ jsonb_build_object('revokeId','dhf-reviewer-grant-revoked'))`); err != nil {
 	revokedInbox, revokedInboxErr := service.DHFGateDecisionReviewInbox(ctx, signer("dhf_sw_reviewer"))
 	if revokedInboxErr != nil || len(revokedInbox.Items) != 0 {
 		t.Fatalf("revoked reviewer retains Stage Gate access: %+v %v", revokedInbox, revokedInboxErr)
+	}
+	postRevocation, postRevocationErr := service.DHFGateDecisionReviewRecommend(ctx,
+		signer("dhf_sw_reviewer"), reviewIntake.ReviewID, inputDecision)
+	if postRevocationErr != nil || postRevocation.Reason != "DHF_SCOPE_DENIED" {
+		t.Fatalf("reviewer action still authorized after independent mandate revocation: %+v %v",
+			postRevocation, postRevocationErr)
+	}
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM dhf_pilot_gate_decision_review_opinions
+WHERE id=$1 AND opinion='recommend_return' AND state='recommendation_only'`,
+		independentOpinion.OpinionID).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("mandate revocation corrupted immutable historical recommendation: %d %v", count, err)
 	}
 	if _, overwrite := pool.Exec(ctx, `UPDATE dhf_pilot_stage_gate_review_intents
 SET state='accepted' WHERE id=$1`, reviewIntake.ReviewID); overwrite == nil {
