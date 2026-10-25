@@ -121,20 +121,20 @@ export function DHFConditionalRemediationPlans(){
     loadError?<p role="alert" className="dhf-pilot-empty">{loadError}</p>:
     <div className="dhf-pilot-scroll">
      <span className="dhf-pilot-overline">可申请的已发布模板直接依赖</span>
-     {options.map(option=><button type="button" key={option.projectId+":"+option.stageId+":"+option.dependencyId}
+     {options.map(option=><RareButton type="button" key={option.projectId+":"+option.stageId+":"+option.dependencyId}
       className={"dhf-pilot-task"+(activeOption===option?" is-selected":"")}
       onClick={()=>chooseOption(option)}>
       <strong className="dhf-pilot-task-title">{option.projectId} · {option.stageId}</strong>
       <span className="dhf-pilot-task-meta">{option.predecessorStage} → {option.stageId} · {option.guardedAction} · {option.dependencyId}</span>
-     </button>)}
+     </RareButton>)}
      <span className="dhf-pilot-overline">我的不可变预案</span>
-     {plans.map(plan=><button type="button" key={plan.id}
+     {plans.map(plan=><RareButton type="button" key={plan.id}
       className={"dhf-pilot-task"+(activePlan?.id===plan.id?" is-selected":"")}
       onClick={()=>choosePlan(plan.id)}>
       <strong className="dhf-pilot-task-title">{plan.stageId} · {plan.projectId}</strong>
       <span className="dhf-pilot-task-meta">{statusLabels[plan.status]??plan.status}</span>
       <span className="dhf-pilot-task-date">{plan.id}</span>
-     </button>)}
+     </RareButton>)}
      {!options.length&&!plans.length?<div className="dhf-pilot-empty">
       没有符合条件的已发布模板依赖或本人预案。普通项目角色不等于企业放行授权。</div>:null}
     </div>}
