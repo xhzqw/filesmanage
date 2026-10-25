@@ -304,7 +304,6 @@ export function Documents({user,onLogout,onUploadFolderChange}:{user:User;onLogo
       </RareButton>
      </div>
      <strong className="folder-current-title" title={selected.name}>{selected.name}</strong>
-     <Link className="folder-knowledge-home-link" to={"/knowledge?folder="+encodeURIComponent(selected.id)}>▤ 知识首页</Link>
      <div id="document-file-toolbar-host" className="folder-file-toolbar-host"/>
      <div className="folder-actions-slot finder-dialog-host">
       <FolderActions folder={selected} isAdmin={user.isAdmin} hideTrigger actionRequest={folderTopAction}
