@@ -57,17 +57,6 @@ export function CDWWorkbenchHome({items,appointmentCount,initiatedCount,initiate
  const display=expanded?filteredTodo:filteredTodo.slice(0,8);
 
  return <section className="cdw-home" aria-label="工作首页">
-  <header className="cdw-home-toolbar">
-   <div className="cdw-home-identity">
-    <div className="cdw-home-heading">
-     <h2>工作台</h2>
-    </div>
-   </div>
-   <div className="cdw-home-actions">
-    <RareButton type="button" tone="ghost" disabled={busy} onClick={onRefresh}>刷新</RareButton>
-    {canCreate&&<RareButton type="button" tone="primary" aria-expanded={chooseKind} onClick={()=>setChooseKind(v=>!v)}>+ 发起工作</RareButton>}
-   </div>
-  </header>
   {chooseKind&&canCreate&&<div className="cdw-home-chooser" role="region" aria-label="发起工作类型">
    <div className="cdw-home-chooser-intro">
     <strong>发起工作事项</strong>
@@ -88,39 +77,7 @@ export function CDWWorkbenchHome({items,appointmentCount,initiatedCount,initiate
    </div>
   </div>}
   <div className="cdw-home-scroll">
-   <div className="cdw-home-stats" aria-label="工作概况">
-    <RareButton type="button" className="cdw-home-stat is-todo" onClick={()=>onView("todo")}>
-     <div className="cdw-stat-top">
-      <span className="cdw-stat-dot dot-amber"/>
-      <small>待我处理</small>
-     </div>
-     <strong>{todo.length+appointmentCount}</strong>
-    </RareButton>
-    <RareButton type="button" className="cdw-home-stat is-initiated" onClick={()=>onView("initiated")}>
-     <div className="cdw-stat-top">
-      <span className="cdw-stat-dot dot-blue"/>
-      <small>我发起的</small>
-     </div>
-     <strong>{initiatedError?"—":initiatedBusy&&initiatedCount===0?"…":initiatedCount}{!initiatedError&&initiatedHasMore?"+":""}</strong>
-    </RareButton>
-    <RareButton type="button" className="cdw-home-stat is-following" onClick={()=>onView("following")}>
-     <div className="cdw-stat-top">
-      <span className="cdw-stat-dot dot-purple"/>
-      <small>观察事项</small>
-     </div>
-     <strong>{following.length}</strong>
-    </RareButton>
-    <RareButton type="button" className="cdw-home-stat is-returned" onClick={()=>onView("todo")}>
-     <div className="cdw-stat-top">
-      <span className="cdw-stat-dot dot-rose"/>
-      <small>退回需改</small>
-     </div>
-     <strong>{returned.length}</strong>
-    </RareButton>
-   </div>
-   {(error||initiatedError)&&<RareNotice tone="warning">部分工作数据暂时无法读取。{error||initiatedError} <RareButton type="button" onClick={onRefresh}>重试</RareButton></RareNotice>}
-   <DHFHomeProjects canCreate={canCreate}/>
-   <div className="cdw-home-content">
+   <div className="cdw-home-main">
     <div className="cdw-home-primary">
      <div className="cdw-home-section-head">
       <div className="cdw-home-filter-tabs">
@@ -137,7 +94,11 @@ export function CDWWorkbenchHome({items,appointmentCount,initiatedCount,initiate
         签收与阅读 ({receiptTasks.length})
        </RareButton>
       </div>
-      <RareButton type="button" tone="ghost" onClick={()=>onView("todo")}>进入队列视图 →</RareButton>
+      <div className="cdw-home-actions">
+       <RareButton type="button" tone="ghost" className="cdw-home-queue-link" onClick={()=>onView("todo")}>进入队列视图 →</RareButton>
+       <RareButton type="button" tone="ghost" disabled={busy} onClick={onRefresh}>刷新</RareButton>
+       {canCreate&&<RareButton type="button" tone="primary" aria-expanded={chooseKind} onClick={()=>setChooseKind(v=>!v)}>+ 发起工作</RareButton>}
+      </div>
      </div>
      {busy&&items.length===0?<div className="cdw-home-loading"><BrandLoadingLabel showContext>读取工作中</BrandLoadingLabel></div>:
      todo.length===0&&appointmentCount===0?<div className="cdw-home-empty-card">
@@ -149,18 +110,10 @@ export function CDWWorkbenchHome({items,appointmentCount,initiatedCount,initiate
        </div>
       </div>
       <div className="cdw-home-quick-actions">
-       {canCreate&&<RareButton type="button" tone="neutral" onClick={onCreate}>
-        <span aria-hidden="true">📄</span> 发起文件修订
-       </RareButton>}
-       <Link to="/workbench/dhf?create=1" className="cdw-quick-link">
-        <span aria-hidden="true">🔬</span> 新建 DHF 项目
-       </Link>
-       <RareButton type="button" tone="neutral" onClick={()=>onView("receipts")}>
-        <span aria-hidden="true">📦</span> 部门签收台账
-       </RareButton>
-       <RareButton type="button" tone="neutral" onClick={()=>onView("seals")}>
-        <span aria-hidden="true">🔐</span> 电子印章中心
-       </RareButton>
+       {canCreate&&<RareButton type="button" tone="neutral" onClick={onCreate}>发起文件修订</RareButton>}
+       <Link to="/workbench/dhf?create=1" className="cdw-quick-link">新建 DHF 项目</Link>
+       <RareButton type="button" tone="neutral" onClick={()=>onView("receipts")}>部门签收台账</RareButton>
+       <RareButton type="button" tone="neutral" onClick={()=>onView("seals")}>电子印章中心</RareButton>
       </div>
      </div>:<div className="cdw-home-work-list">
       {display.map(item=><RareButton type="button" key={itemKey(item)} className="cdw-home-work-row" onClick={()=>onOpen(item)}>
@@ -193,6 +146,28 @@ export function CDWWorkbenchHome({items,appointmentCount,initiatedCount,initiate
      </div>}
     </div>
    </div>
+   <aside className="cdw-home-rail" aria-label="工作概况与研发项目">
+    <div className="cdw-home-stats" aria-label="工作概况">
+     <RareButton type="button" className={"cdw-home-stat is-todo"+(todo.length+appointmentCount===0?" is-zero":"")} onClick={()=>onView("todo")}>
+      <small>待我处理</small>
+      <strong>{todo.length+appointmentCount}</strong>
+     </RareButton>
+     <RareButton type="button" className={"cdw-home-stat is-initiated"+(initiatedCount===0&&!initiatedBusy&&!initiatedError?" is-zero":"")} onClick={()=>onView("initiated")}>
+      <small>我发起的</small>
+      <strong>{initiatedError?"—":initiatedBusy&&initiatedCount===0?"…":initiatedCount}{!initiatedError&&initiatedHasMore?"+":""}</strong>
+     </RareButton>
+     <RareButton type="button" className={"cdw-home-stat is-following"+(following.length===0?" is-zero":"")} onClick={()=>onView("following")}>
+      <small>观察事项</small>
+      <strong>{following.length}</strong>
+     </RareButton>
+     <RareButton type="button" className={"cdw-home-stat is-returned"+(returned.length===0?" is-zero":"")} onClick={()=>onView("todo")}>
+      <small>退回需改</small>
+      <strong>{returned.length}</strong>
+     </RareButton>
+    </div>
+    {(error||initiatedError)&&<RareNotice tone="warning">部分工作数据暂时无法读取。{error||initiatedError} <RareButton type="button" onClick={onRefresh}>重试</RareButton></RareNotice>}
+    <DHFHomeProjects canCreate={canCreate}/>
+   </aside>
   </div>
  </section>;
 }
