@@ -137,6 +137,7 @@ function RecipientPicker({value,onChange,users}:{value:string;onChange:(id:strin
 }
 export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const[params,setParams]=useSearchParams();
+ const[advancedNavOpen,setAdvancedNavOpen]=useState(false);
  const[items,setItems]=useState<CDWInboxItem[]>([]);
  const[initiatedItems,setInitiatedItems]=useState<CDWInitiatedItem[]>([]);
  const[initiatedCursor,setInitiatedCursor]=useState("");
@@ -458,19 +459,23 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  return <AppShell user={user} onLogout={onLogout} finderSidebarWidth={240}>
   <div className="panels document-explorer cdw-panels">
    <aside className="sidebar finder-sidebar cdw-rail" aria-label="工作视图分类" style={{width:"240px"}}>
-    <Link to="/doc" className="finder-sidebar-home" aria-label="中晟生物 · 返回文档首页">
+    <Link to="/workbench" className="finder-sidebar-home" aria-label="中晟生物 · 返回工作台首页">
      <BrandLogo size={27} className="finder-sidebar-logo" transparent/><span>中晟生物</span>
     </Link>
     <div className="sidebar-scroll">
      <nav className="cdw-rail-nav" aria-label="工作分类">
       {viewGroups.map(group=><div className="cdw-rail-group" key={group.name}>
        <div className="cdw-rail-caption">{group.name}</div>
-       {group.views.map(({key,label,icon})=>
+       {group.views.filter(({key})=>group.name!=="受控文件工作"||advancedNavOpen||["tasks","receipts","effective","all"].includes(key)||filter===key).map(({key,label,icon})=>
         <RareButton key={key} type="button" className={"cdw-rail-item"+(filter===key?" is-current":"")}
-         aria-current={filter===key?"page":undefined} onClick={()=>{setFilter(key);setActiveForm(null);setFormalDraft(false);setParams(prev=>{const p=new URLSearchParams(prev);p.set("view",key);p.delete("task");p.delete("gateTab");return p;});}}>
+         aria-current={filter===key?"page":undefined} onClick={()=>{setFilter(key);setActiveForm(null);setFormalDraft(false);setParams(prev=>{const p=new URLSearchParams(prev);p.set("view",key);p.delete("task");p.delete("gateTab");if(key!=="knowledge"){p.delete("page");p.delete("folder");p.delete("attachFile");p.delete("file");}return p;});}}>
          <span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name={icon}/></span><span className="cdw-rail-label">{label}</span>
          {counts[key]>0&&<small className="has-count">{counts[key]}</small>}
         </RareButton>)}
+       {group.name==="受控文件工作"?<RareButton type="button" tone="ghost" className="cdw-rail-expand"
+        aria-expanded={advancedNavOpen} onClick={()=>setAdvancedNavOpen(x=>!x)}>
+         {advancedNavOpen?"收起次要工作视图":"显示更多流程与工具"} <span aria-hidden="true">{advancedNavOpen?"⌃":"⌄"}</span>
+        </RareButton>:null}
       </div>)}
      </nav>
      <Link className="cdw-rail-dhf" to="/workbench/dhf"><span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name="dhf"/></span><span>DHF 九阶段验收</span><span aria-hidden="true">↗</span></Link>
