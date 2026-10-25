@@ -1,8 +1,10 @@
-import {useMemo,useState} from "react";
+import {useEffect,useMemo,useState} from "react";
 import {Link} from "react-router-dom";
 import {RareButton,RareNotice} from "../shared/ui/rare";
 import {BrandLoadingLabel} from "../shared/ui/BrandLoader";
 import type {CDWInboxItem} from "../features/cdw/api";
+import {workflowApi} from "../features/workflow/api";
+import {request} from "../shared/http";
 import {DHFHomeProjects} from "./DHFHomeProjects";
 import {workNeedsAction,workNextStep,type HomeView} from "./CDWWorkbenchHome";
 import "./workbenchV2.css";
@@ -42,6 +44,14 @@ export function WorkbenchCommandCenter({userName,items,appointmentCount,initiate
  const [lane,setLane]=useState<Lane>("all");
  const [showAll,setShowAll]=useState(false);
  const [createOpen,setCreateOpen]=useState(false);
+ const [countsReload,setCountsReload]=useState(0);
+ const [otherCounts,setOtherCounts]=useState<{approval:number|null;dhf:number|null}>({approval:null,dhf:null});
+ useEffect(()=>{let alive=true;
+  void workflowApi.approvalsPage("inbox","",1).then(page=>{if(alive)setOtherCounts(x=>({...x,approval:page.pendingCount}))}).catch(()=>{if(alive)setOtherCounts(x=>({...x,approval:null}))});
+  void request<{items:Array<{status:string}>}>("/workbench/dhf/tasks").then(page=>{if(alive)setOtherCounts(x=>({...x,dhf:page.items?.length??0}))}).catch(()=>{if(alive)setOtherCounts(x=>({...x,dhf:null}))});
+  return()=>{alive=false};
+ },[countsReload]);
+ const refreshAll=()=>{setCountsReload(x=>x+1);onRefresh()};
  const todo=useMemo(()=>items.filter(workNeedsAction).sort((a,b)=>urgentRank(a)-urgentRank(b)),[items]);
  const following=items.filter(i=>!workNeedsAction(i));
  const returned=todo.filter(x=>x.state==="returned");
@@ -64,7 +74,7 @@ export function WorkbenchCommandCenter({userName,items,appointmentCount,initiate
     <p className="wbv2-hero-description">聚焦当前责任、验收阻断与正在推进的项目。每件事项直接进入办理流程。</p>
    </div>
    <div className="wbv2-hero-actions">
-    <RareButton type="button" tone="ghost" disabled={busy} onClick={onRefresh}>刷新工作状态</RareButton>
+    <RareButton type="button" tone="ghost" disabled={busy} onClick={refreshAll}>刷新工作状态</RareButton>
     {canCreate?<RareButton type="button" tone="primary" aria-expanded={createOpen} onClick={()=>setCreateOpen(x=>!x)}>＋ 发起工作</RareButton>:null}
    </div>
   </header>
@@ -73,9 +83,13 @@ export function WorkbenchCommandCenter({userName,items,appointmentCount,initiate
    <Link to="/workbench/dhf?create=1" onClick={()=>setCreateOpen(false)}>DHF 研发项目 <span>创建阶段验收项目</span></Link>
    <Link to="/workbench/customer-registrations" onClick={()=>setCreateOpen(false)}>客户登记 <span>发起资质审批</span></Link>
   </div>:null}
-  <div className="wbv2-metrics" aria-label="工作状态汇总">
+  <div className="wbv2-other-queues" aria-label="跨流程待处理入口">
+   <Link to="/workbench?view=approvals"><span>审批待办</span><strong>{otherCounts.approval??"—"}</strong><span>进入审批中心 ›</span></Link>
+   <Link to="/workbench?view=dhf-operations&gateTab=review"><span>DHF 阶段签审</span><strong>{otherCounts.dhf??"—"}</strong><span>进入阶段操作中心 ›</span></Link>
+  </div>
+  <div className="wbv2-metrics" aria-label="受控文件与工作流状态汇总">
    <RareButton type="button" className="wbv2-metric is-priority" onClick={()=>onView("todo")}>
-    <span>待我处理</span><strong>{busy&&items.length===0?"…":total}</strong><small>进入我的工作队列</small>
+    <span>受控文件待办</span><strong>{busy&&items.length===0?"…":total}</strong><small>进入文件工作队列</small>
    </RareButton>
    <RareButton type="button" className="wbv2-metric" onClick={()=>onView("initiated")}>
     <span>我发起的</span><strong>{initiatedError?"—":initiatedBusy&&initiatedCount===0?"…":initiatedCount}{initiatedHasMore&&!initiatedError?"+":""}</strong><small>查看流转和反馈</small>
@@ -88,7 +102,7 @@ export function WorkbenchCommandCenter({userName,items,appointmentCount,initiate
    </RareButton>
   </div>
   {(error||initiatedError)?<RareNotice tone="warning">
-   部分工作信息未能载入：{error||initiatedError} <RareButton type="button" tone="ghost" onClick={onRefresh}>重试</RareButton>
+   部分工作信息未能载入：{error||initiatedError} <RareButton type="button" tone="ghost" onClick={refreshAll}>重试</RareButton>
   </RareNotice>:null}
   <div className="wbv2-dashboard">
    <main className="wbv2-primary">
@@ -135,10 +149,12 @@ export function WorkbenchCommandCenter({userName,items,appointmentCount,initiate
     <section className="wbv2-next-section" aria-label="流程快捷入口">
      <div className="wbv2-section-heading"><div><p className="wbv2-eyebrow">PROCESSES</p><h2>流程与决策</h2></div></div>
      <div className="wbv2-shortcuts">
+      <Link to="/workbench?view=approvals"><strong>审批中心</strong><span>我的审批 · 我发起的</span></Link>
       <Link to="/workbench?view=dhf-operations&gateTab=review"><strong>阶段签审</strong><span>待签审 · 冻结证据</span></Link>
       <Link to="/workbench?view=dhf-operations&gateTab=verification"><strong>整改复验</strong><span>责任闭环 · 复核记录</span></Link>
       <Link to="/workbench?view=dhf-operations&gateTab=gate"><strong>独立 Gate 复核</strong><span>阶段阻断与建议</span></Link>
       <Link to="/workbench?view=dhf-operations&gateTab=conditional"><strong>条件整改预案</strong><span>申请不等于批准</span></Link>
+      <Link to="/workbench?view=knowledge"><strong>知识与会议记录</strong><span>页面树 · 研发记录</span></Link>
      </div>
     </section>
    </main>
