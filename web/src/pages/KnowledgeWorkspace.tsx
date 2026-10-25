@@ -18,7 +18,7 @@ const enc=encodeURIComponent,base="/knowledge/pages/";
 const kinds:Kind[]=["paragraph","heading1","heading2","bullet","todo","quote"];
 const labels=["正文","标题","小标题","项目符号","待办","引用"];
 const fresh=():Block=>({id:"block_"+crypto.randomUUID(),type:"paragraph",text:""});
-export function KnowledgeWorkspace({user,onLogout}:{user:User;onLogout:()=>void}){
+export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onLogout:()=>void;embedded?:boolean}){
  const[params,setParams]=useSearchParams();
  const pageId=params.get("page")||"",folderId=params.get("folder")||"";
  const fileId=params.get("file")||"",attachFile=params.get("attachFile")||"";
@@ -80,10 +80,10 @@ export function KnowledgeWorkspace({user,onLogout}:{user:User;onLogout:()=>void}
  }
  const canEdit=Boolean(draft?.canEdit);
  const siblingPages=pages.filter(p=>p.folderId===folderId);
- return <AppShell user={user} onLogout={onLogout}>
+ const content=<div className="kn-in-workbench">
   <div className="kn-shell">
    <aside className="kn-nav" aria-label="知识页面树">
-    <div className="kn-nav-header"><Link to="/doc">‹ 文档管理</Link><strong>知识空间</strong></div>
+    <div className="kn-nav-header"><Link to="/workbench">‹ 工作台</Link><strong>知识空间</strong></div>
     <div className="kn-nav-actions"><RareButton tone="primary" type="button" onClick={()=>{setCreateParent("");setTitle("")}}>＋ 新建页面</RareButton></div>
     {folderId?<div className="kn-context"><Link to={"/doc?folder="+enc(folderId)}>返回当前文件夹</Link><span>文件夹关联页面</span></div>:<div className="kn-context">我的知识页面</div>}
     <div className="kn-tree">{tree(null)}{!available.length?<p className="kn-muted">尚无页面，从新建开始</p>:null}</div>
@@ -101,7 +101,7 @@ export function KnowledgeWorkspace({user,onLogout}:{user:User;onLogout:()=>void}
       {!backlinks.length?<p className="kn-muted">暂无你有权访问的关联页面</p>:backlinks.map(b=><RareButton key={b.pageId} type="button" onClick={()=>go(b.pageId)}>{b.title}</RareButton>)}
     </section>:null}
     {folderId?<section className="kn-context-panel"><strong>文件夹知识首页</strong>
-     {homeId?<><Link to={"/knowledge?folder="+enc(folderId)+"&page="+enc(homeId)}>打开已关联的知识首页</Link><RareButton type="button" tone="ghost" disabled={busy} onClick={()=>void unlinkHome()}>解除关联</RareButton></>:<span className="kn-muted">尚未关联；默认不会自动创建</span>}
+     {homeId?<><Link to={"/workbench?view=knowledge&folder="+enc(folderId)+"&page="+enc(homeId)}>打开已关联的知识首页</Link><RareButton type="button" tone="ghost" disabled={busy} onClick={()=>void unlinkHome()}>解除关联</RareButton></>:<span className="kn-muted">尚未关联；默认不会自动创建</span>}
      {!homeId&&siblingPages.length?<span className="kn-muted">选择已有知识页后，可将其手动关联</span>:null}
     </section>:null}
     {draft?<article className="kn-page" aria-label="知识页面编辑区">
@@ -144,6 +144,7 @@ export function KnowledgeWorkspace({user,onLogout}:{user:User;onLogout:()=>void}
     </article>:!createParent&&!fileId?<div className="kn-empty">从左侧页面树选择页面，或新建第一篇知识页。</div>:null}
    </main>
   </div>
- </AppShell>;
+ </div>;
+ return embedded ? content : <AppShell user={user} onLogout={onLogout}>{content}</AppShell>;
 }
 function reorder(items:Block[],from:number,to:number):Block[]{const next=[...items];const [moved]=next.splice(from,1);if(!moved)return items;next.splice(to,0,moved);return next;}
