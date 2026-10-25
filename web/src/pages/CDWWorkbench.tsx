@@ -28,6 +28,7 @@ import "./cdwWorkbench.css";
 import {workNeedsAction} from "./CDWWorkbenchHome";
 import {WorkbenchCommandCenter} from "./WorkbenchCommandCenter";
 import {WorkbenchDHFOperations} from "./WorkbenchDHFOperations";
+import {WorkbenchApprovals} from "./WorkbenchApprovals";
 import {KnowledgeWorkspace} from "./KnowledgeWorkspace";
 import {CDWInitiatedWorkspace} from "./CDWInitiatedWorkspace";
 import {SealLibrary} from "../features/seals/SealLibrary";
@@ -79,7 +80,7 @@ export function WorkbenchIcon({name,className=""}:{name:string;className?:string
  }
 }
 
-type View="home"|"todo"|"initiated"|"following"|"tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all"|"seals"|"projects"|"my-projects"|"knowledge"|"dhf-operations";
+type View="home"|"todo"|"initiated"|"following"|"tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all"|"seals"|"projects"|"my-projects"|"knowledge"|"dhf-operations"|"approvals";
 const viewGroups:{name:string;views:{key:View;label:string;icon:string}[]}[]=[
  {name:"个人工作",views:[
   {key:"home",label:"工作首页",icon:"home"},
@@ -91,6 +92,7 @@ const viewGroups:{name:string;views:{key:View;label:string;icon:string}[]}[]=[
   {key:"my-projects",label:"我的项目",icon:"dhf"},
   {key:"knowledge",label:"知识页面",icon:"knowledge"}]},
  {name:"审批与 Gate",views:[
+  {key:"approvals",label:"审批中心",icon:"reviews"},
   {key:"dhf-operations",label:"DHF 阶段操作",icon:"gate"},
   {key:"reviews",label:"交付验收",icon:"reviews"},
   {key:"formal",label:"正式审批",icon:"formal"},
@@ -441,7 +443,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
   home:allItems.filter(isActionable).length+appointmentCount,todo:allItems.filter(isActionable).length+appointmentCount,initiated:initiatedItems.length,following:allItems.filter(x=>!isActionable(x)).length,
   tasks:totalTasks,obligations:totalObligations,reviews:totalReviews,formal:totalFormal,
   appointments:appointmentCount,control:totalControl,scope:totalScope,receipts:totalReceipts,
-  reading:totalReading,effective:0,all:allItems.length,seals:0,projects:0,"my-projects":0,knowledge:0,"dhf-operations":0,
+  reading:totalReading,effective:0,all:allItems.length,seals:0,projects:0,"my-projects":0,knowledge:0,"dhf-operations":0,approvals:0,
  };
  const selectedView=viewGroups.flatMap(group=>group.views).find(view=>view.key===filter)?.label??"工作事项";
  const actionableVisible=visible.filter(isActionable).length;
@@ -478,7 +480,8 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
    </aside>
    <main className="work cdw-work">
     <div className="cdw-layout">
-     {filter==="knowledge"?<div className="cdw-projects-view wbv2-knowledge-view"><KnowledgeWorkspace user={user} onLogout={onLogout} embedded/></div>:
+     {filter==="approvals"?<WorkbenchApprovals user={user}/>:
+      filter==="knowledge"?<div className="cdw-projects-view wbv2-knowledge-view"><KnowledgeWorkspace user={user} onLogout={onLogout} embedded/></div>:
       filter==="dhf-operations"?<WorkbenchDHFOperations/>:
       (filter==="projects"||filter==="my-projects")?<div className="cdw-projects-view"><ProjectDatabase user={user} initialScope={filter==="my-projects"?"mine":"all"}/></div>:filter==="home"?<WorkbenchCommandCenter userName={user.displayName} initiatedCount={initiatedItems.length} initiatedHasMore={Boolean(initiatedCursor)} initiatedError={initiatedError} initiatedBusy={initiatedBusy} items={allItems} appointmentCount={appointmentCount} busy={busy} error={requestError}
       canCreate={user.isAdmin} onRefresh={()=>refresh(v=>v+1)} onCreate={()=>{setFilter("tasks");beginForm("create");}}
