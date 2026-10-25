@@ -113,3 +113,11 @@
 .cdw-rail .rare-button.cdw-rail-expand{width:100%;min-height:29px;display:flex;align-items:center;justify-content:space-between;text-align:left;font-size:11px;color:var(--text-secondary);padding:5px 10px;border-radius:var(--radius-sm);background:transparent}
 .cdw-rail .rare-button.cdw-rail-expand:hover{background:var(--surface-row-hover)}
 .cdw-rail .rare-button.cdw-rail-expand span{font-size:15px}
+
+/* Independent workflow counts are shown separately; no misleading merged count. */
+.wbv2-other-queues{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:-7px 0 16px}
+.wbv2-other-queues>a{display:flex;align-items:center;gap:13px;min-width:0;padding:12px 17px;border-radius:var(--radius-lg);background:var(--surface-panel);border:1px solid var(--border-hairline);box-shadow:var(--shadow-panel);font-size:11.5px;color:var(--text-secondary)}
+.wbv2-other-queues>a:hover{border-color:var(--border-strong)}
+.wbv2-other-queues strong{font-size:19px;line-height:1;font-weight:750;font-variant-numeric:tabular-nums;color:var(--text-primary)}
+.wbv2-other-queues>a span:last-child{margin-left:auto;font-size:10.5px;white-space:nowrap;color:var(--brand-blue)}
+@media(max-width:540px){.wbv2-other-queues{grid-template-columns:1fr}.wbv2-other-queues>a{min-height:44px}}
