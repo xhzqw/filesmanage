@@ -7163,6 +7163,118 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/gate-decision-reviews:
+    get:
+      summary: Read scoped independent pilot Gate reviewer inbox; not an approved corporate Gate decision.
+      operationId: dhfGateDecisionReviewInbox
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Only active independently delegated reviewer may see source-bound Gate requests.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFGateDecisionReviewPage'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/gate-decision-reviews/{reviewId}/recommendation:
+    post:
+      summary: File one immutable signed-in Gate reviewer recommendation of return/reject, after independent authorization
+        and password reauthentication. No formal approval or condition grant.
+      operationId: dhfGateDecisionReviewRecommend
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: reviewId
+        in: path
+        required: true
+        description: Frozen strict Gate review ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DHFGateDecisionReviewRequest'
+      responses:
+        '200':
+          description: Only recommendation_only; no accepted or conditionally released state.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFGateDecisionReviewOutcome'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/dhf/credentials:
     get:
       summary: Trial-only signer credentials registered by the independently delegated operator; no administrator role bypass
@@ -13308,6 +13420,132 @@ components:
           type: string
       required:
       - submissionId
+      - replayed
+      - trialOnly
+      - formalAccepted
+    DHFGateDecisionReviewOpinion:
+      type: object
+      properties:
+        id:
+          type: string
+        reviewId:
+          type: string
+        reviewerId:
+          type: string
+        opinion:
+          type: string
+          enum:
+          - recommend_return
+          - recommend_reject
+        reason:
+          type: string
+        sourceGraphSha:
+          type: string
+        sourceCandidateSha:
+          type: string
+        trialOnly:
+          type: boolean
+        formalAccepted:
+          type: boolean
+      required:
+      - id
+      - reviewId
+      - reviewerId
+      - opinion
+      - reason
+      - sourceGraphSha
+      - sourceCandidateSha
+      - trialOnly
+      - formalAccepted
+    DHFGateDecisionReviewItem:
+      type: object
+      properties:
+        reviewId:
+          type: string
+        submissionId:
+          type: string
+        projectId:
+          type: string
+        stageId:
+          type: string
+        gateSignerId:
+          type: string
+        candidateId:
+          type: string
+        candidatePayloadSha:
+          type: string
+        projectGraphSha:
+          type: string
+        opinion:
+          $ref: '#/components/schemas/DHFGateDecisionReviewOpinion'
+        trialOnly:
+          type: boolean
+        formalAccepted:
+          type: boolean
+      required:
+      - reviewId
+      - submissionId
+      - projectId
+      - stageId
+      - gateSignerId
+      - candidateId
+      - candidatePayloadSha
+      - projectGraphSha
+      - trialOnly
+      - formalAccepted
+    DHFGateDecisionReviewPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFGateDecisionReviewItem'
+        trialOnly:
+          type: boolean
+        formalAccepted:
+          type: boolean
+      required:
+      - items
+      - trialOnly
+      - formalAccepted
+    DHFGateDecisionReviewRequest:
+      type: object
+      properties:
+        opinion:
+          type: string
+          enum:
+          - recommend_return
+          - recommend_reject
+        reason:
+          type: string
+        password:
+          type: string
+        idempotencyKey:
+          type: string
+      required:
+      - opinion
+      - reason
+      - password
+      - idempotencyKey
+    DHFGateDecisionReviewOutcome:
+      type: object
+      properties:
+        opinionId:
+          type: string
+        reviewId:
+          type: string
+        state:
+          type: string
+        replayed:
+          type: boolean
+        trialOnly:
+          type: boolean
+        formalAccepted:
+          type: boolean
+        reason:
+          type: string
+      required:
+      - reviewId
       - replayed
       - trialOnly
       - formalAccepted

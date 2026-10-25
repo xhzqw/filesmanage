@@ -92,7 +92,37 @@ by this engineering-pilot development.
 
 ### Actual verification evidence
 
-Record the *final* code revision, freshly migrated PostgreSQL 17 DB name,
-migration count and checksum, actual integration result, Go/frontend builds,
-API generation and discrepancies only after their execution. Failed
-intermediate test runs must be disclosed, not counted as PASS.
+Implementation source revision `e82746c`, 2026-10-25.
+Executed on the isolated remote checkout
+`10.144.144.1:/tmp/filesmanage-dhf-v075-99ade80` and a **new**
+PostgreSQL 17 database named
+`filesmanage_dhf_v063_integration_v080_decision_e82746c`. The
+production database, port 8091 and running business services were untouched.
+
+| Exact independent validation | Observed result |
+|---|---|
+| New database full migration from original schema to 0059 | **PASS — 61 migrations** |
+| Independent migration checksum comparison | **PASS — 61/61** |
+| Real `TestDHFPilotRealPostgresSubmission` on fresh DB with physical Blob and signed Ed25519 original Gate | **PASS — 8.20 seconds** |
+| Unauthorized reviewer inbox, nonaudited independent grant, original Gate signer scope exclusion, current password failure audit, formal approval refusal | **PASS — real SQL integration** |
+| Independently audited grant, original reviewer candidate/graph binding, actual immutable return suggestion | **PASS — real SQL integration** |
+| Missing audit/outbox, exact opinion replay, conflicting second opinion, immutable recommendation, wrong reviewer grant revocation, emergency original-approver revocation, post-revocation denial with historic record retained | **PASS — real SQL integration** |
+| Original attempt/state remains submitted; Stage `accepted`/conditional release remains prohibited | **PASS — real DB assertions** |
+| `go test ./internal/... -count=1` and `go vet ./internal/...` | **PASS** |
+| `go build` of `cmd/server`, `cmd/worker`, `cmd/migrate` | **PASS** |
+| `npm --prefix web run build` including `tsc --noEmit` | **PASS — Vite 700 modules**, existing Three.js bundle-size warnings |
+| `node scripts/rare_emil_interaction_check.mjs` | **PASS** |
+| `python3 scripts/gen_openapi.py --check` | **PASS — 146 paths / 176 operations / 136 schemas** |
+| `python3 scripts/gen_acceptance_matrix.py --check` | **PASS — 126 IDs / 123 PASS / 3 PARTIAL** |
+| Actual browser three-width/accessibility E2E; concurrent grant-revocation stress; real enterprise signing approval | **NOT_RUN / NO-GO** |
+
+The initial code revision `2dc6aa5` passed a real 61-migration
+PostgreSQL test in **8.38 seconds**. Revision `e82746c`
+added direct wrong-approver revoke, post-revocation action rejection
+and historical opinion retention assertions; those expanded tests then
+passed on a **separate** clean database (8.20 seconds).
+No failed or unrun action is represented as business acceptance.
+
+**Scope conclusion:** an immutable *review recommendation* is recorded,
+not a legally authorized Stage Gate decision. Corporate `accepted`,
+`conditionally_released`, training, CDW issuance and receipt remain NO-GO.
