@@ -123,7 +123,8 @@ func dhfConditionalReauth(ctx context.Context, tx ports.Tx,
 	}
 	trusted, err := tx.UserByID(ctx, actor.ID)
 	if err != nil || trusted.ID != actor.ID || trusted.DisabledAt != nil ||
-		trusted.MustChangePassword || trusted.Login == "" || actor.Login != trusted.Login {
+		trusted.MustChangePassword || trusted.Login == "" ||
+		(actor.Login != "" && actor.Login != trusted.Login) {
 		return false, nil
 	}
 	attempts, err := store.DHFPilotRecentAttestationAuthFailures(ctx, actor.ID)
