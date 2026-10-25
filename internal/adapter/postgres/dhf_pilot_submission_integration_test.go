@@ -775,6 +775,145 @@ AND payload->>'projectGraphSha'=$2`,
 		"dhf-gate-review:"+reviewIntake.ReviewID, projectGraphSHA).Scan(&count); err != nil || count != 1 {
 		t.Fatalf("Gate review failed to queue trial-only outbox: %d %v", count, err)
 	}
+	// Only a separately approved pilot reviewer (never submitter or Gate
+	// signer) can append a non-authorizing opinion. Approval is impossible.
+	emptyDecisionInbox, emptyDecisionErr := service.DHFGateDecisionReviewInbox(ctx, signer("dhf_sw_reviewer"))
+	if emptyDecisionErr != nil || len(emptyDecisionInbox.Items) != 0 {
+		t.Fatalf("ung­ranted Gate reviewer could see decision intake: %+v %v", emptyDecisionInbox, emptyDecisionErr)
+	}
+	if _, unauditedMandate := pool.Exec(ctx, `
+INSERT INTO dhf_pilot_gate_decision_reviewer_grants(
+id,project_id,stage_id,reviewer_id,approved_by,authorization_ref,valid_from,expires_at)
+VALUES('dhf-dec-unaudited','dhf_project','G5','dhf_sw_reviewer',
+'dhf_mf_reviewer','independent test mandate',now()-interval '1 minute',
+now()+interval '1 day')`); unauditedMandate == nil {
+		t.Fatal("decision reviewer mandate inserted without audit")
+	}
+	mandateTx, mandateTxErr := pool.Begin(ctx)
+	if mandateTxErr != nil {
+		t.Fatal(mandateTxErr)
+	}
+	defer mandateTx.Rollback(ctx)
+	if _, err = mandateTx.Exec(ctx, `
+INSERT INTO dhf_pilot_gate_decision_reviewer_grants(
+id,project_id,stage_id,reviewer_id,approved_by,authorization_ref,valid_from,expires_at)
+VALUES('dhf-independent-gate-mandate','dhf_project','G5','dhf_sw_reviewer',
+'dhf_mf_reviewer','independent gate trial mandate',now()-interval '1 minute',
+now()+interval '1 day')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = mandateTx.Exec(ctx, `
+INSERT INTO audit_events(actor_id,event_type,target_kind,target_id,request_id,outcome,details)
+VALUES('dhf_mf_reviewer','dhf.pilot.gate.decision_reviewer_granted',
+'dhf_gate_decision_reviewer','dhf-independent-gate-mandate',
+'dhf-gate-mandate-granted-001','trial_only',
+jsonb_build_object('reviewerId','dhf_sw_reviewer',
+'authorizationRef','independent gate trial mandate',
+'projectId','dhf_project','stageId','G5'))`); err != nil {
+		t.Fatal(err)
+	}
+	if err = mandateTx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	authorizedInbox, authorizedErr := service.DHFGateDecisionReviewInbox(ctx, signer("dhf_sw_reviewer"))
+	if authorizedErr != nil || len(authorizedInbox.Items) != 1 ||
+		authorizedInbox.Items[0].ReviewID != reviewIntake.ReviewID ||
+		authorizedInbox.Items[0].ProjectGraphSHA != projectGraphSHA {
+		t.Fatalf("independent decision reviewer scope broken: %+v %v", authorizedInbox, authorizedErr)
+	}
+	originalSignerInbox, originalSignerErr := service.DHFGateDecisionReviewInbox(ctx, signer("dhf_gate_reviewer"))
+	if originalSignerErr != nil || len(originalSignerInbox.Items) != 0 {
+		t.Fatalf("Gate signer became independent decision reviewer: %+v %v", originalSignerInbox, originalSignerErr)
+	}
+	inputDecision := application.DHFGateDecisionReviewInput{Opinion: "recommend_return",
+		Reason:   "A separate authorized corporate decision is still required before release",
+		Password: reviewerPassword, IdempotencyKey: "dhf-independent-gate-opinion-001"}
+	formalDecision := inputDecision
+	formalDecision.Opinion = "approve"
+	deniedFormal, deniedFormalErr := service.DHFGateDecisionReviewRecommend(ctx,
+		signer("dhf_sw_reviewer"), reviewIntake.ReviewID, formalDecision)
+	if deniedFormalErr != nil || deniedFormal.Reason != "DHF_GATE_FORMAL_DECISION_NOT_AUTHORIZED" {
+		t.Fatalf("unauthorized formal Gate approval accepted: %+v %v", deniedFormal, deniedFormalErr)
+	}
+	badPasswordDecision := inputDecision
+	badPasswordDecision.Password = "not-the-current-password"
+	deniedReauth, deniedReauthErr := service.DHFGateDecisionReviewRecommend(ctx,
+		signer("dhf_sw_reviewer"), reviewIntake.ReviewID, badPasswordDecision)
+	if deniedReauthErr != nil || deniedReauth.Reason != "DHF_REAUTH_FAILED" {
+		t.Fatalf("independent decision reviewer bypassed password: %+v %v", deniedReauth, deniedReauthErr)
+	}
+	if _, missingOpinionAudit := pool.Exec(ctx, `
+INSERT INTO dhf_pilot_gate_decision_review_opinions(
+id,review_id,grant_id,reviewer_id,opinion,reason,source_graph_sha,
+source_candidate_sha,idempotency_key,request_sha)
+VALUES('dhf-gate-unaudited-opinion',$1,'dhf-independent-gate-mandate',
+'dhf_sw_reviewer','recommend_return','This review deliberately has no audit record',
+$2,$3,'dhf-opinion-no-audit-001',repeat('a',64))`,
+		reviewIntake.ReviewID, projectGraphSHA, challenge.PayloadSHA); missingOpinionAudit == nil {
+		t.Fatal("unlogged Gate decision opinion was stored")
+	}
+	independentOpinion, independentOpinionErr := service.DHFGateDecisionReviewRecommend(ctx,
+		signer("dhf_sw_reviewer"), reviewIntake.ReviewID, inputDecision)
+	if independentOpinionErr != nil || independentOpinion.OpinionID == "" ||
+		independentOpinion.State != "recommendation_only" ||
+		!independentOpinion.TrialOnly || independentOpinion.FormalAccepted {
+		t.Fatalf("pilot independent recommendation did not commit: %+v %v", independentOpinion, independentOpinionErr)
+	}
+	decisionReplay, decisionReplayErr := service.DHFGateDecisionReviewRecommend(ctx,
+		signer("dhf_sw_reviewer"), reviewIntake.ReviewID, inputDecision)
+	if decisionReplayErr != nil || !decisionReplay.Replayed ||
+		decisionReplay.OpinionID != independentOpinion.OpinionID {
+		t.Fatalf("independent Gate opinion replay not stable: %+v %v", decisionReplay, decisionReplayErr)
+	}
+	conflictDecision := inputDecision
+	conflictDecision.IdempotencyKey = "dhf-independent-gate-opinion-changed"
+	secondDecision, secondDecisionErr := service.DHFGateDecisionReviewRecommend(ctx,
+		signer("dhf_sw_reviewer"), reviewIntake.ReviewID, conflictDecision)
+	if secondDecisionErr != nil || secondDecision.Reason != "DHF_GATE_OPINION_ALREADY_RECORDED" {
+		t.Fatalf("multiple independent Gate opinions on one frozen review: %+v %v", secondDecision, secondDecisionErr)
+	}
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM audit_events
+WHERE event_type='dhf.pilot.gate.decision_review_recommended' AND target_id=$1
+AND details->>'graphSha'=$2 AND details->>'formalAccepted'='false'`,
+		independentOpinion.OpinionID, projectGraphSHA).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("independent Gate recommendation audit was not frozen: %d %v", count, err)
+	}
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM outbox_jobs
+WHERE id=$1 AND payload->>'formalAccepted'='false'
+AND payload->>'trialOnly'='true'`,
+		"dhf-gate-decision-review:"+independentOpinion.OpinionID).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("independent recommendation emitted unsafe outbox: %d %v", count, err)
+	}
+	if _, overwriteDecision := pool.Exec(ctx, `UPDATE dhf_pilot_gate_decision_review_opinions
+SET state='accepted' WHERE id=$1`, independentOpinion.OpinionID); overwriteDecision == nil {
+		t.Fatal("immutable Gate decision opinion promoted to accepted")
+	}
+	revocationTx, revocationTxErr := pool.Begin(ctx)
+	if revocationTxErr != nil {
+		t.Fatal(revocationTxErr)
+	}
+	defer revocationTx.Rollback(ctx)
+	if _, err = revocationTx.Exec(ctx, `
+INSERT INTO dhf_pilot_gate_decision_reviewer_revocations(id,grant_id,revoked_by,reason)
+VALUES('dhf-reviewer-grant-revoked','dhf-independent-gate-mandate',
+'dhf_mf_reviewer','independent test mandate terminated')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = revocationTx.Exec(ctx, `
+INSERT INTO audit_events(actor_id,event_type,target_kind,target_id,request_id,outcome,details)
+VALUES('dhf_mf_reviewer','dhf.pilot.gate.decision_reviewer_revoked',
+'dhf_gate_decision_reviewer','dhf-independent-gate-mandate',
+'dhf-revoke-reviewer-mandate-001','trial_only',
+jsonb_build_object('revokeId','dhf-reviewer-grant-revoked'))`); err != nil {
+		t.Fatal(err)
+	}
+	if err = revocationTx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	revokedInbox, revokedInboxErr := service.DHFGateDecisionReviewInbox(ctx, signer("dhf_sw_reviewer"))
+	if revokedInboxErr != nil || len(revokedInbox.Items) != 0 {
+		t.Fatalf("revoked reviewer retains Stage Gate access: %+v %v", revokedInbox, revokedInboxErr)
+	}
 	if _, overwrite := pool.Exec(ctx, `UPDATE dhf_pilot_stage_gate_review_intents
 SET state='accepted' WHERE id=$1`, reviewIntake.ReviewID); overwrite == nil {
 		t.Fatal("pending Stage Gate intent promoted to formal accepted")

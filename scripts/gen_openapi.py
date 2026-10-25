@@ -1342,6 +1342,31 @@ schema("DHFStageGateReviewOutcome",obj({
  "reviewId":string(),"submissionId":string(),"state":string(),"replayed":boolean(),
  "trialOnly":boolean(),"formalAccepted":boolean(),"reason":string(),
 },required=["submissionId","replayed","trialOnly","formalAccepted"]))
+schema("DHFGateDecisionReviewOpinion",obj({
+ "id":string(),"reviewId":string(),"reviewerId":string(),
+ "opinion":string(enum=["recommend_return","recommend_reject"]),
+ "reason":string(),"sourceGraphSha":string(),"sourceCandidateSha":string(),
+ "trialOnly":boolean(),"formalAccepted":boolean(),
+},required=["id","reviewId","reviewerId","opinion","reason","sourceGraphSha",
+ "sourceCandidateSha","trialOnly","formalAccepted"]))
+schema("DHFGateDecisionReviewItem",obj({
+ "reviewId":string(),"submissionId":string(),"projectId":string(),"stageId":string(),
+ "gateSignerId":string(),"candidateId":string(),"candidatePayloadSha":string(),
+ "projectGraphSha":string(),"opinion":ref("DHFGateDecisionReviewOpinion"),
+ "trialOnly":boolean(),"formalAccepted":boolean(),
+},required=["reviewId","submissionId","projectId","stageId","gateSignerId",
+ "candidateId","candidatePayloadSha","projectGraphSha","trialOnly","formalAccepted"]))
+schema("DHFGateDecisionReviewPage",obj({
+ "items":arr(ref("DHFGateDecisionReviewItem")),"trialOnly":boolean(),"formalAccepted":boolean(),
+},required=["items","trialOnly","formalAccepted"]))
+schema("DHFGateDecisionReviewRequest",obj({
+ "opinion":string(enum=["recommend_return","recommend_reject"]),
+ "reason":string(),"password":string(),"idempotencyKey":string(),
+},required=["opinion","reason","password","idempotencyKey"]))
+schema("DHFGateDecisionReviewOutcome",obj({
+ "opinionId":string(),"reviewId":string(),"state":string(),"replayed":boolean(),
+ "trialOnly":boolean(),"formalAccepted":boolean(),"reason":string(),
+},required=["reviewId","replayed","trialOnly","formalAccepted"]))
 add("GET","/api/workbench/dhf/gates/{submissionId}/readiness",operation(
  "Assigned G5/G6 final Gate signer reads explicit published-template dependencies and frozen signed candidate without formal acceptance",
  "Workflow","dhfStageGateReadiness",security=SESSION,
@@ -1354,6 +1379,19 @@ add("POST","/api/workbench/dhf/gates/{submissionId}/review-request",operation(
  params=[id_param("submissionId","Frozen original DHF submission ID")],
  request={"application/json":{"schema":ref("DHFStageGateReviewRequest")}},
  responses=dict([json_ok(ref("DHFStageGateReviewOutcome"),"Only state awaiting_enterprise_authority; enterprise accepted remains unreachable."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),
+ resp("404",ERR["404"]),resp("409",ERR["409"]),resp("503",ERR["503"])])))
+add("GET","/api/workbench/dhf/gate-decision-reviews",operation(
+ "Read scoped independent pilot Gate reviewer inbox; not an approved corporate Gate decision.",
+ "Workflow","dhfGateDecisionReviewInbox",security=SESSION,
+ responses=dict([json_ok(ref("DHFGateDecisionReviewPage"),"Only active independently delegated reviewer may see source-bound Gate requests."),
+ resp("401",ERR["401"]),resp("503",ERR["503"])])))
+add("POST","/api/workbench/dhf/gate-decision-reviews/{reviewId}/recommendation",operation(
+ "File one immutable signed-in Gate reviewer recommendation of return/reject, after independent authorization and password reauthentication. No formal approval or condition grant.",
+ "Workflow","dhfGateDecisionReviewRecommend",security=SESSION,
+ params=[id_param("reviewId","Frozen strict Gate review ID")],
+ request={"application/json":{"schema":ref("DHFGateDecisionReviewRequest")}},
+ responses=dict([json_ok(ref("DHFGateDecisionReviewOutcome"),"Only recommendation_only; no accepted or conditionally released state."),
  resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),
  resp("404",ERR["404"]),resp("409",ERR["409"]),resp("503",ERR["503"])])))
 schema("DHFPilotCredentialItem",obj({
