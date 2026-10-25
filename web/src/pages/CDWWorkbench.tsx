@@ -25,7 +25,10 @@ import {organizationApi} from "../features/organization/api";
 import {fileApi} from "../features/documents/api";
 import {cdwApi,type CDWBranch,type CDWInboxItem,type CDWInitiatedItem,type CDWRecipient,type CDWReviewGate,type CDWFormalApproval,type CDWApprovedCandidate,type CDWDistributionPlan,type CDWReceiptTarget,type CDWReadingAssignment,type CDWQMSPendingReview,type CDWQMSAppointmentAlert,type CDWQMSSpecialAlert,type CDWQMSSpecialAuthority,type CDWQMSSpecialPolicyImpact,type CDWQMSLegacyAnomaly,type CDWQMSFormalNotice} from "../features/cdw/api";
 import "./cdwWorkbench.css";
-import {CDWWorkbenchHome,workNeedsAction} from "./CDWWorkbenchHome";
+import {workNeedsAction} from "./CDWWorkbenchHome";
+import {WorkbenchCommandCenter} from "./WorkbenchCommandCenter";
+import {WorkbenchDHFOperations} from "./WorkbenchDHFOperations";
+import {KnowledgeWorkspace} from "./KnowledgeWorkspace";
 import {CDWInitiatedWorkspace} from "./CDWInitiatedWorkspace";
 import {SealLibrary} from "../features/seals/SealLibrary";
 
@@ -63,6 +66,10 @@ export function WorkbenchIcon({name,className=""}:{name:string;className?:string
    return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
   case "seals":
    return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><circle cx="12" cy="12" r="3"/></svg>;
+  case "knowledge":
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M5 4h10a4 4 0 0 1 4 4v12H7a3 3 0 0 1-3-3V5a1 1 0 0 1 1-1Z"/><path d="M8 9h7M8 13h7M4 17a3 3 0 0 1 3-3h12"/></svg>;
+  case "gate":
+   return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M4 21V3h16v18M10 3v18M4 10h16M14 15l2 2 3-3"/></svg>;
   case "dhf":
    return <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>;
   case "customers":
@@ -72,12 +79,32 @@ export function WorkbenchIcon({name,className=""}:{name:string;className?:string
  }
 }
 
-type View="home"|"todo"|"initiated"|"following"|"tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all"|"seals"|"projects"|"my-projects";
+type View="home"|"todo"|"initiated"|"following"|"tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all"|"seals"|"projects"|"my-projects"|"knowledge"|"dhf-operations";
 const viewGroups:{name:string;views:{key:View;label:string;icon:string}[]}[]=[
- {name:"工作区",views:[{key:"home",label:"工作首页",icon:"home"},{key:"todo",label:"待我处理",icon:"todo"},{key:"initiated",label:"我发起的",icon:"initiated"},{key:"all",label:"全部事项",icon:"all"}]},
- {name:"项目与任务",views:[{key:"projects",label:"项目",icon:"projects"},{key:"my-projects",label:"我的项目",icon:"projects"}]},
- {name:"审批与验收",views:[{key:"formal",label:"正式审批",icon:"formal"},{key:"reviews",label:"交付验收",icon:"reviews"},{key:"scope",label:"范围审批",icon:"scope"},{key:"appointments",label:"任命核验",icon:"appointments"}]},
- {name:"受控与流转",views:[{key:"tasks",label:"文件工作",icon:"tasks"},{key:"obligations",label:"责任待办",icon:"obligations"},{key:"control",label:"发行准备",icon:"control"},{key:"receipts",label:"部门签收",icon:"receipts"},{key:"reading",label:"阅读确认",icon:"reading"},{key:"effective",label:"生效文件",icon:"effective"},{key:"seals",label:"电子签章",icon:"seals"}]},
+ {name:"个人工作",views:[
+  {key:"home",label:"工作首页",icon:"home"},
+  {key:"todo",label:"待我处理",icon:"todo"},
+  {key:"initiated",label:"我发起的",icon:"initiated"},
+  {key:"following",label:"等待与跟踪",icon:"following"}]},
+ {name:"项目与知识",views:[
+  {key:"projects",label:"项目数据库",icon:"projects"},
+  {key:"my-projects",label:"我的项目",icon:"dhf"},
+  {key:"knowledge",label:"知识页面",icon:"knowledge"}]},
+ {name:"审批与 Gate",views:[
+  {key:"dhf-operations",label:"DHF 阶段操作",icon:"gate"},
+  {key:"reviews",label:"交付验收",icon:"reviews"},
+  {key:"formal",label:"正式审批",icon:"formal"},
+  {key:"scope",label:"范围审批",icon:"scope"},
+  {key:"appointments",label:"任命核验",icon:"appointments"}]},
+ {name:"受控文件工作",views:[
+  {key:"tasks",label:"文件工作",icon:"tasks"},
+  {key:"obligations",label:"履责待办",icon:"obligations"},
+  {key:"control",label:"发行准备",icon:"control"},
+  {key:"receipts",label:"部门签收",icon:"receipts"},
+  {key:"reading",label:"阅读确认",icon:"reading"},
+  {key:"effective",label:"生效文件",icon:"effective"},
+  {key:"seals",label:"电子签章",icon:"seals"},
+  {key:"all",label:"全部事项",icon:"all"}]}
 ];
 const kindName:Record<CDWInboxItem["kind"],string>={
  task:"工作交付",obligation:"责任履行",review:"交付验收",formal:"正式审批",
@@ -135,8 +162,8 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  // rail view a click would; anything unrecognized keeps the previous fallback.
  const[filter,setFilter]=useState<View>(()=>{
   const fromUrl=params.get("view");
-  if(fromUrl==="projects"||fromUrl==="my-projects")return fromUrl;
-  return fromUrl==="initiated"?"initiated":params.get("task")?"all":"home";
+  if(fromUrl&&viewGroups.some(g=>g.views.some(v=>v.key===fromUrl)))return fromUrl as View;
+  return params.get("task")?"all":"home";
  });
  const[search,setSearch]=useState("");
  const[priorityFirst,setPriorityFirst]=useState(true);
@@ -414,11 +441,17 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
   home:allItems.filter(isActionable).length+appointmentCount,todo:allItems.filter(isActionable).length+appointmentCount,initiated:initiatedItems.length,following:allItems.filter(x=>!isActionable(x)).length,
   tasks:totalTasks,obligations:totalObligations,reviews:totalReviews,formal:totalFormal,
   appointments:appointmentCount,control:totalControl,scope:totalScope,receipts:totalReceipts,
-  reading:totalReading,effective:0,all:allItems.length,seals:0,projects:0,"my-projects":0,
+  reading:totalReading,effective:0,all:allItems.length,seals:0,projects:0,"my-projects":0,knowledge:0,"dhf-operations":0,
  };
  const selectedView=viewGroups.flatMap(group=>group.views).find(view=>view.key===filter)?.label??"工作事项";
  const actionableVisible=visible.filter(isActionable).length;
  const canWork=selected?.kind==="task"&&(selected.state==="accepted"||selected.state==="in_progress");
+ useEffect(()=>{
+  const fromUrl=params.get("view");
+  if(fromUrl&&viewGroups.some(g=>g.views.some(v=>v.key===fromUrl))&&fromUrl!==filter){
+   setFilter(fromUrl as View);
+  }
+ },[params]);
  const editingBranch=branches.find(b=>b.state==="open");
  return <AppShell user={user} onLogout={onLogout} finderSidebarWidth={240}>
   <div className="panels document-explorer cdw-panels">
@@ -432,7 +465,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
        <div className="cdw-rail-caption">{group.name}</div>
        {group.views.map(({key,label,icon})=>
         <RareButton key={key} type="button" className={"cdw-rail-item"+(filter===key?" is-current":"")}
-         aria-current={filter===key?"page":undefined} onClick={()=>{setFilter(key);setActiveForm(null);setFormalDraft(false);}}>
+         aria-current={filter===key?"page":undefined} onClick={()=>{setFilter(key);setActiveForm(null);setFormalDraft(false);setParams(prev=>{const p=new URLSearchParams(prev);p.set("view",key);p.delete("task");p.delete("gateTab");return p;});}}>
          <span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name={icon}/></span><span className="cdw-rail-label">{label}</span>
          {counts[key]>0&&<small className="has-count">{counts[key]}</small>}
         </RareButton>)}
@@ -445,7 +478,9 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
    </aside>
    <main className="work cdw-work">
     <div className="cdw-layout">
-     {(filter==="projects"||filter==="my-projects")?<div className="cdw-projects-view"><ProjectDatabase user={user} initialScope={filter==="my-projects"?"mine":"all"}/></div>:filter==="home"?<CDWWorkbenchHome initiatedCount={initiatedItems.length} initiatedHasMore={Boolean(initiatedCursor)} initiatedError={initiatedError} initiatedBusy={initiatedBusy} items={allItems} appointmentCount={appointmentCount} busy={busy} error={requestError}
+     {filter==="knowledge"?<div className="cdw-projects-view wbv2-knowledge-view"><KnowledgeWorkspace user={user} onLogout={onLogout} embedded/></div>:
+      filter==="dhf-operations"?<WorkbenchDHFOperations/>:
+      (filter==="projects"||filter==="my-projects")?<div className="cdw-projects-view"><ProjectDatabase user={user} initialScope={filter==="my-projects"?"mine":"all"}/></div>:filter==="home"?<WorkbenchCommandCenter userName={user.displayName} initiatedCount={initiatedItems.length} initiatedHasMore={Boolean(initiatedCursor)} initiatedError={initiatedError} initiatedBusy={initiatedBusy} items={allItems} appointmentCount={appointmentCount} busy={busy} error={requestError}
       canCreate={user.isAdmin} onRefresh={()=>refresh(v=>v+1)} onCreate={()=>{setFilter("tasks");beginForm("create");}}
       onOpen={item=>{setFilter("all");select(item);}} onView={view=>{setFilter(view);setActiveForm(null);setFormalDraft(false);}}/>:filter==="initiated"?
       <CDWInitiatedWorkspace items={initiatedItems} busy={initiatedBusy} error={initiatedError} nextCursor={initiatedCursor}
