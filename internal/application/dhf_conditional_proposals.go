@@ -73,6 +73,17 @@ func dhfConditionalOption(source ports.DHFConditionalPolicySource) ([]ports.DHFC
 		options := []ports.DHFConditionalPlanOption{}
 		for _, edge := range node.Dependencies {
 			if edge.AllowConditional && (edge.GuardedAction == "prepare" || edge.GuardedAction == "submit") {
+				// Accepted predecessors never need a conditional exception.
+				alreadyAccepted := false
+				for _, predecessor := range source.Graph {
+					if predecessor.StageID == edge.PredecessorStage && predecessor.PositionState == "accepted" {
+						alreadyAccepted = true
+						break
+					}
+				}
+				if alreadyAccepted {
+					continue
+				}
 				options = append(options, ports.DHFConditionalPlanOption{ProjectID: source.ProjectID,
 					StageID: source.StageID, TemplateID: source.TemplateID, DependencyID: edge.ID,
 					PredecessorStage: edge.PredecessorStage, GuardedAction: edge.GuardedAction,
@@ -114,6 +125,20 @@ func (s *Service) DHFConditionalProposalCatalog(ctx context.Context, actor domai
 		output.Options = append(output.Options, eligible...)
 	}
 	output.Plans, err = store.DHFConditionalProposalsForActor(ctx, actor.ID)
+	if err != nil {
+		return output, err
+	}
+	alreadyFiled := map[string]bool{}
+	for _, plan := range output.Plans {
+		alreadyFiled[plan.ProjectID+"|"+plan.StageID+"|"+plan.DependencyID] = true
+	}
+	remaining := make([]ports.DHFConditionalPlanOption, 0, len(output.Options))
+	for _, option := range output.Options {
+		if !alreadyFiled[option.ProjectID+"|"+option.StageID+"|"+option.DependencyID] {
+			remaining = append(remaining, option)
+		}
+	}
+	output.Options = remaining
 	return output, err
 }
 func dhfConditionalReauth(ctx context.Context, tx ports.Tx,

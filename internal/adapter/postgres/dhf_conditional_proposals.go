@@ -65,15 +65,24 @@ func (r *Repository) DHFConditionalPoliciesForActor(ctx context.Context, actorID
 	if err != nil {
 		return nil, err
 	}
+	// Every stage in one project uses the same verified DAG and owner list.
+	// Cache within this serializable read transaction to bound DB roundtrips.
+	graphByProject := map[string][]ports.DHFStageGateGraphNode{}
+	ownersByProject := map[string][]ports.DHFConditionalOwner{}
 	for i := range sources {
-		sources[i].Graph, err = r.DHFStageGateProjectGraph(ctx, sources[i].ProjectID)
-		if err != nil {
-			return nil, err
+		projectID := sources[i].ProjectID
+		if _, exists := graphByProject[projectID]; !exists {
+			graphByProject[projectID], err = r.DHFStageGateProjectGraph(ctx, projectID)
+			if err != nil {
+				return nil, err
+			}
+			ownersByProject[projectID], err = r.dhfConditionalProjectOwners(ctx, projectID)
+			if err != nil {
+				return nil, err
+			}
 		}
-		sources[i].Owners, err = r.dhfConditionalProjectOwners(ctx, sources[i].ProjectID)
-		if err != nil {
-			return nil, err
-		}
+		sources[i].Graph = graphByProject[projectID]
+		sources[i].Owners = ownersByProject[projectID]
 	}
 	return sources, nil
 }

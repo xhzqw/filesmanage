@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from "react";
 import {request} from "../../shared/http";
 import {errorCopy} from "../../shared/errors";
-import {RareButton,RareInput,RareTextarea} from "../../shared/ui/rare";
+import {RareButton,RareInput,RareSelect,RareTextarea} from "../../shared/ui/rare";
 import "./dhfPilotInbox.css";
 
 type Opinion={id:string;reviewId:string;reviewerId:string;opinion:string;
@@ -91,10 +91,10 @@ export function DHFGateDecisionReviewInbox(){
     </div>:<div className="dhf-pilot-opinion">
      <p>必须具备独立批准、限定项目与阶段、未过期的试点复核授权。只能建议退回或拒绝，正式通过及条件放行保持禁用。</p>
      <label>复核意见
-      <select value={choice} onChange={e=>{setChoice(e.target.value as typeof choice);pending.current=null}}>
+      <RareSelect aria-label="独立 Gate 复核意见" value={choice} onChange={e=>{setChoice(e.target.value as typeof choice);pending.current=null}}>
        <option value="recommend_return">建议退回整改</option>
        <option value="recommend_reject">建议拒绝</option>
-      </select>
+      </RareSelect>
      </label>
      <label>逐项说明理由
       <RareTextarea rows={4} value={reason} onChange={e=>{setReason(e.target.value);pending.current=null}}/>

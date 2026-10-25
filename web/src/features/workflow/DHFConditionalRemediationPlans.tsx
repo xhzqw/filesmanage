@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from "react";
 import {request} from "../../shared/http";
 import {errorCopy} from "../../shared/errors";
-import {RareButton,RareInput,RareTextarea} from "../../shared/ui/rare";
+import {RareButton,RareInput,RareSelect,RareTextarea} from "../../shared/ui/rare";
 import "./dhfPilotInbox.css";
 
 type Owner={id:string;displayName:string};
@@ -20,6 +20,11 @@ const makeKey=()=>Array.from(crypto.getRandomValues(new Uint8Array(16)),
 const statusLabels:Record<string,string>={
  awaiting_enterprise_authority:"待企业独立授权（无权限）",
  withdrawn:"已撤回（无权限）",expired:"已到期（无权限）"};
+const parseLocalDate=(value:string)=>value?new Date(value).getTime():NaN;
+const futureDeadline=(value:string,max:number)=>{
+ const timestamp=parseLocalDate(value);
+ return Number.isFinite(timestamp)&&timestamp>Date.now()+60_000&&timestamp<=max;
+};
 
 /** Proposal authoring only. Not even a preparation/submit bypass is exposed. */
 export function DHFConditionalRemediationPlans(){
@@ -66,9 +71,19 @@ export function DHFConditionalRemediationPlans(){
  }
  async function submit(){
   if(!activeOption||!reason||!expiry||!password||!obligations.length||busy)return;
+  const expires=parseLocalDate(expiry);
+  if(!futureDeadline(expiry,Date.now()+30*24*60*60*1000)||
+     obligations.some(item=>!item.ownerId||
+      !activeOption.eligibleOwners.some(owner=>owner.id===item.ownerId)||
+      !activeOption.eligibleRequirements.includes(item.requirementId)||
+      item.correctiveAction.trim().length<10||
+      !futureDeadline(item.dueAt,expires))){
+   setError("请确认有效期不超过 30 天，且每项整改都设置了有效责任人、说明和早于预案到期的截止时间。");
+   return;
+  }
   const body=JSON.stringify({projectId:activeOption.projectId,stageId:activeOption.stageId,
    dependencyId:activeOption.dependencyId,reason:reason.trim(),
-   expiresAt:new Date(expiry).toISOString(),
+   expiresAt:new Date(expires).toISOString(),
    obligations:obligations.map(x=>({...x,correctiveAction:x.correctiveAction.trim(),
     dueAt:new Date(x.dueAt).toISOString()}))});
   if(!pending.current||pending.current.body!==body)pending.current={body,key:makeKey()};
@@ -158,11 +173,11 @@ export function DHFConditionalRemediationPlans(){
       onChange={e=>{setReason(e.target.value);pending.current=null}}/></label>
      {obligations.map((item,i)=><div className="dhf-pilot-evidence-item" key={item.requirementId}>
       <strong>{item.requirementId} · 非关键且被模板明确允许</strong>
-      <label>责任人<select value={item.ownerId}
+      <label>责任人<RareSelect searchable value={item.ownerId} aria-label={"整改要求 "+item.requirementId+" 责任人"}
        onChange={e=>updateObligation(i,{ownerId:e.target.value})}>
        {activeOption.eligibleOwners.map(owner=><option key={owner.id} value={owner.id}>
         {owner.displayName} · {owner.id}</option>)}
-      </select></label>
+      </RareSelect></label>
       <label>本项整改截止<RareInput type="datetime-local" value={item.dueAt}
        onChange={e=>updateObligation(i,{dueAt:e.target.value})}/></label>
       <label>本项整改任务与拟提交证据<RareTextarea rows={2} value={item.correctiveAction}
@@ -179,8 +194,11 @@ export function DHFConditionalRemediationPlans(){
       }}>添加整改要求：{id}</RareButton>)}
      <label>当前账号密码再认证<RareInput type="password" autoComplete="off"
       value={password} onChange={e=>setPassword(e.target.value)}/></label>
-     <RareButton type="button" disabled={busy||!password||!reason.trim()||!expiry||
-      obligations.some(x=>!x.ownerId||!x.dueAt||x.correctiveAction.trim().length<10)}
+     <RareButton type="button" disabled={busy||!password||reason.trim().length<10||
+      !futureDeadline(expiry,Date.now()+30*24*60*60*1000)||
+      obligations.length===0||
+      obligations.some(x=>!x.ownerId||x.correctiveAction.trim().length<10||
+       !futureDeadline(x.dueAt,parseLocalDate(expiry)))}
       onClick={()=>void submit()}>{busy?"正在核对与登记…":"登记不可变整改预案"}</RareButton>
     </div>:<p>先选择左侧已发布模板中的直接依赖，或查看历史预案。</p>}
     {message?<p role="status" className="dhf-pilot-feedback">{message}</p>:null}

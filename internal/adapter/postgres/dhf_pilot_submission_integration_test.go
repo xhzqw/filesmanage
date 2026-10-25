@@ -1799,6 +1799,7 @@ SET state='conditionally_released' WHERE id=$1`, conditionFiled.ID); forceApprov
 	}
 	finalCatalog, finalCatalogErr := service.DHFConditionalProposalCatalog(ctx, actor)
 	if finalCatalogErr != nil || len(finalCatalog.Plans) != 1 ||
+		len(finalCatalog.Options) != 0 ||
 		finalCatalog.Plans[0].Status != "withdrawn" ||
 		finalCatalog.Plans[0].ID != conditionFiled.ID ||
 		finalCatalog.Plans[0].FormalAccepted {
