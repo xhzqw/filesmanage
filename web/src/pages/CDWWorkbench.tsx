@@ -3,6 +3,7 @@ import {Link,useNavigate,useSearchParams} from "react-router-dom";
 import type {User} from "../entities/user/model";
 import type {FileItem} from "../entities/file/model";
 import {AppShell,BrandLogo} from "../shared/ui/AppShell";
+import {observeWorkspaceChange,observeWindowReturn} from "../shared/resourceSync";
 import {RareBadge,RareButton,RareInput,RareNotice,RareSelect} from "../shared/ui/rare";
 import {CDWReviewPanel} from "../features/cdw/CDWReviewPanel";
 import {CDWFormalPanel} from "../features/cdw/CDWFormalPanel";
@@ -160,6 +161,24 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const[formalDraft,setFormalDraft]=useState(false);
  const[busy,setBusy]=useState(false);
  const[refreshToken,refresh]=useState(0);
+ // Centralized invalidation from existing LAN WebSocket and window-return
+ // recovery. No parallel polling or trust in push payloads; always re-read ACL-scoped APIs.
+ useEffect(()=>{
+  let pending:number|undefined;
+  const invalidate=()=>{
+   if(pending!==undefined)return;
+   pending=window.setTimeout(()=>{pending=undefined;refresh(value=>value+1)},150);
+  };
+  const stopWorkspace=observeWorkspaceChange(invalidate,["review","file","permissions","collaboration"]);
+  const stopFocus=observeWindowReturn(invalidate);
+  window.addEventListener("filesmanage:approvals-changed",invalidate);
+  return()=>{
+   stopWorkspace();stopFocus();
+   window.removeEventListener("filesmanage:approvals-changed",invalidate);
+   if(pending!==undefined)window.clearTimeout(pending);
+  };
+ },[]);
+
  const[requestError,setRequestError]=useState("");
  // `?view=` deep links (used by the preview page's "返回项目") open the same
  // rail view a click would; anything unrecognized keeps the previous fallback.
