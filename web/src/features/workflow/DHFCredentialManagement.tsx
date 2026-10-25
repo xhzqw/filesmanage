@@ -91,13 +91,13 @@ export function DHFCredentialManagement(){
     loadError?<div className="dhf-pilot-empty" role="alert">{loadError}</div>:
     !canManage?<div className="dhf-pilot-empty">当前账号没有独立审批的试点凭证操作员授权。管理员身份不自动授予此权限。</div>:
     rows.length===0?<div className="dhf-pilot-empty">尚无由你登记的试点凭证</div>:
-    <div className="dhf-pilot-scroll">{rows.map(item=><button type="button" key={item.id}
+    <div className="dhf-pilot-scroll">{rows.map(item=><RareButton type="button" key={item.id}
      className={"dhf-pilot-task"+(active?.id===item.id&&mode==="detail"?" is-selected":"")}
      onClick={()=>choose(item.id)} aria-pressed={active?.id===item.id&&mode==="detail"}>
      <strong className="dhf-pilot-task-title">{item.signerId}</strong>
      <span className="dhf-pilot-task-meta">{stateLabels[item.status]??item.status} · {item.id}</span>
      <span className="dhf-pilot-task-date">至 {new Date(item.expiresAt).toLocaleString("zh-CN")}</span>
-    </button>)}</div>}
+    </RareButton>)}</div>}
   </section>
   <section className="dhf-pilot-detail" aria-label="签署凭证详情与登记">
    {message?<div className="dhf-pilot-feedback" role="status">{message}</div>:null}

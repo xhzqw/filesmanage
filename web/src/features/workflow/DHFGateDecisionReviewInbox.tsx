@@ -64,14 +64,14 @@ export function DHFGateDecisionReviewInbox(){
    {loading?<div className="dhf-pilot-empty">正在核验独立复核授权及有效期…</div>:
     items.length===0?<div className="dhf-pilot-empty">
      无符合独立授权的 Gate 复核记录。管理员身份不会自动产生 Gate 决策权限。</div>:
-    <div className="dhf-pilot-scroll">{items.map(item=><button type="button"
+    <div className="dhf-pilot-scroll">{items.map(item=><RareButton type="button"
       className={"dhf-pilot-task"+(current?.reviewId===item.reviewId?" is-selected":"")}
       aria-pressed={current?.reviewId===item.reviewId} key={item.reviewId}
       onClick={()=>select(item.reviewId)}>
       <strong className="dhf-pilot-task-title">{item.stageId} · {item.projectId}</strong>
       <span className="dhf-pilot-task-meta">{item.opinion?names[item.opinion.opinion]:"待独立复核"} · {item.reviewId}</span>
       <span className="dhf-pilot-task-date">原 Gate 签署人：{item.gateSignerId}</span>
-     </button>)}</div>}
+     </RareButton>)}</div>}
   </section>
   <section className="dhf-pilot-detail" aria-label="独立 Gate 复核意见">
    {current?<div className="dhf-pilot-content">

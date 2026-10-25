@@ -157,13 +157,13 @@ export function DHFPilotInbox(){
    {loading?<div className="dhf-pilot-empty"><BrandLoadingLabel>正在加载</BrandLoadingLabel></div>:
     error?<div className="dhf-pilot-empty" role="alert">{error}</div>:
     visible.length===0?<div className="dhf-pilot-empty">暂无指派给我的阶段审核任务</div>:
-    <div className="dhf-pilot-scroll">{visible.map(task=><button type="button" key={task.id}
+    <div className="dhf-pilot-scroll">{visible.map(task=><RareButton type="button" key={task.id}
       className={"dhf-pilot-task"+(active?.id===task.id?" is-selected":"")}
       aria-pressed={active?.id===task.id} onClick={()=>setSelected(task.id)}>
       <span className="dhf-pilot-task-title">{specialtyNames[task.reviewKey]??task.reviewKey}</span>
       <span className="dhf-pilot-task-meta">{displayStage[task.stageId]??task.stageId} · {task.projectId}</span>
       <span className="dhf-pilot-task-date">{new Date(task.assignedAt).toLocaleString("zh-CN")}</span>
-    </button>)}</div>}
+    </RareButton>)}</div>}
   </section>
   <section className="dhf-pilot-detail" aria-label="阶段审核详情">
    {feedback?<div className="dhf-pilot-feedback" role="status">{feedback}</div>:null}

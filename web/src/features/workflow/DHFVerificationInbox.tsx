@@ -76,7 +76,7 @@ export function DHFVerificationInbox(){
    {loading?<div className="dhf-pilot-empty">正在加载需本人复验的整改…</div>:
     error?<div role="alert" className="dhf-pilot-empty">{error}</div>:
     items.length===0?<div className="dhf-pilot-empty">当前没有分配给你的整改复验事项</div>:
-    <div className="dhf-pilot-scroll">{items.map(item=><button type="button"
+    <div className="dhf-pilot-scroll">{items.map(item=><RareButton type="button"
       className={"dhf-pilot-task"+(current?.caseId===item.caseId?" is-selected":"")}
       key={item.caseId} aria-pressed={current?.caseId===item.caseId}
       onClick={()=>setSelected(item.caseId)}>
@@ -84,7 +84,7 @@ export function DHFVerificationInbox(){
       <span className="dhf-pilot-task-meta">{item.projectId}</span>
       <span className="dhf-pilot-task-date">{item.verificationId?"已完成复验":
         item.readyToVerify?"待本人复验":"等待修订及签审责任完成"}</span>
-    </button>)}</div>}
+    </RareButton>)}</div>}
   </section>
   <section className="dhf-pilot-detail" aria-label="整改复验内容">
    {current?<div className="dhf-pilot-content">
@@ -116,7 +116,7 @@ export function DHFVerificationInbox(){
        <RareInput id="dhf-verification-password" type="password" autoComplete="off"
         value={password} onChange={e=>setPassword(e.target.value)} placeholder="仅用于本次身份核验"/>
        <label className="dhf-attest-ack">
-        <input type="checkbox" checked={checked} onChange={e=>setChecked(e.target.checked)}/>
+        <RareInput type="checkbox" checked={checked} onChange={e=>setChecked(e.target.checked)}/>
         <span>我已检查原退回意见和新冻结提交的证据，并愿意对本次复验结论负责。</span>
        </label>
        <RareButton type="button" disabled={busy||!current.readyToVerify||

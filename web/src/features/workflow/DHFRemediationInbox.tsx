@@ -93,13 +93,13 @@ export function DHFRemediationInbox(){
    {loading?<div className="dhf-pilot-empty">正在加载退回意见…</div>:
     fetchError?<div className="dhf-pilot-empty" role="alert">{fetchError}</div>:
     items.length===0?<div className="dhf-pilot-empty">目前没有退回给我的研发提交</div>:
-    <div className="dhf-pilot-scroll">{items.map(item=><button type="button"
+    <div className="dhf-pilot-scroll">{items.map(item=><RareButton type="button"
       key={item.decisionId} className={"dhf-pilot-task"+(active?.decisionId===item.decisionId?" is-selected":"")}
       aria-pressed={active?.decisionId===item.decisionId} onClick={()=>setSelected(item.decisionId)}>
       <span className="dhf-pilot-task-title">{item.stageId} · {item.reviewKey==="__gate__"?"阶段复核退回":item.reviewKey+" 专业退回"}</span>
       <span className="dhf-pilot-task-meta">{item.projectId} · {item.verificationId?"整改已复验":item.caseId?"已关联整改批次":"待整改"}</span>
       <span className="dhf-pilot-task-date">{new Date(item.decidedAt).toLocaleString("zh-CN")}</span>
-    </button>)}</div>}
+    </RareButton>)}</div>}
   </section>
   <section className="dhf-pilot-detail" aria-label="退回原因与整改证据">
    {active?<div className="dhf-pilot-content">

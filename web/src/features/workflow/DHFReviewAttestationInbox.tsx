@@ -111,14 +111,14 @@ export function DHFReviewAttestationInbox(){
    {loading?<div className="dhf-pilot-empty">正在加载本人复核记录…</div>:
     error?<div role="alert" className="dhf-pilot-empty">{error}</div>:
     rows.length===0?<div className="dhf-pilot-empty">暂无需要本人核验的复核决定</div>:
-    <div className="dhf-pilot-scroll">{rows.map(item=><button type="button" key={item.taskId}
+    <div className="dhf-pilot-scroll">{rows.map(item=><RareButton type="button" key={item.taskId}
       className={"dhf-pilot-task"+(active?.taskId===item.taskId?" is-selected":"")}
       aria-pressed={active?.taskId===item.taskId}
       onClick={()=>setSelected(item.taskId)}>
       <span className="dhf-pilot-task-title">{LABELS[item.reviewKey]??item.reviewKey}</span>
       <span className="dhf-pilot-task-meta">{item.stageId} · {item.projectId}</span>
       <span className="dhf-pilot-task-date">{item.attestationId?"已再认证":"尚未进行密码再认证"}</span>
-    </button>)}</div>}
+    </RareButton>)}</div>}
   </section>
   <section className="dhf-pilot-detail" aria-label="签审确认详情">
    {active?<div className="dhf-pilot-content">
@@ -147,7 +147,7 @@ export function DHFReviewAttestationInbox(){
       <RareInput id="dhf-attest-password" type="password" value={password}
        onChange={e=>setPassword(e.target.value)} autoComplete="off" placeholder="用于本次身份再认证"/>
       <label className="dhf-attest-ack">
-       <input type="checkbox" checked={acknowledged} onChange={e=>setAcknowledged(e.target.checked)}/>
+       <RareInput type="checkbox" checked={acknowledged} onChange={e=>setAcknowledged(e.target.checked)}/>
        <span>我已复核上述决定及其冻结证据身份，同意建立不可变的本人确认记录。</span>
       </label>
       <RareButton type="button" disabled={busy||!active.canAttest||!password||!acknowledged||serverIntent!==localIntent}
