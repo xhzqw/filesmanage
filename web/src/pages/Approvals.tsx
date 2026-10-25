@@ -11,16 +11,17 @@ import {DHFRemediationInbox} from "../features/workflow/DHFRemediationInbox";
 import {DHFReviewAttestationInbox} from "../features/workflow/DHFReviewAttestationInbox";
 import {DHFCredentialManagement} from "../features/workflow/DHFCredentialManagement";
 import {DHFGateDecisionReviewInbox} from "../features/workflow/DHFGateDecisionReviewInbox";
+import {DHFConditionalRemediationPlans} from "../features/workflow/DHFConditionalRemediationPlans";
 import {AppShell} from "../shared/ui/AppShell";
 import {DHFVerificationInbox} from "../features/workflow/DHFVerificationInbox";
 
-type Section=ApprovalView|"seals"|"dhf"|"dhf_returns"|"dhf_attestations"|"dhf_verification"|"dhf_credentials"|"dhf_gate_decisions";
+type Section=ApprovalView|"seals"|"dhf"|"dhf_returns"|"dhf_attestations"|"dhf_verification"|"dhf_credentials"|"dhf_gate_decisions"|"dhf_condition_plans";
 
 export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
  const[review,setReview]=useState<Approval|null>(null);
  const[params,setParams]=useSearchParams();
  const requested=params.get("tab");
- const section:Section=requested==="mine"||requested==="notifications"||requested==="seals"||requested==="dhf"||requested==="dhf_returns"||requested==="dhf_attestations"||requested==="dhf_verification"||requested==="dhf_credentials"||requested==="dhf_gate_decisions"||(user.isAdmin&&requested==="all_pending")?requested:"inbox";
+ const section:Section=requested==="mine"||requested==="notifications"||requested==="seals"||requested==="dhf"||requested==="dhf_returns"||requested==="dhf_attestations"||requested==="dhf_verification"||requested==="dhf_credentials"||requested==="dhf_gate_decisions"||requested==="dhf_condition_plans"||(user.isAdmin&&requested==="all_pending")?requested:"inbox";
  function changeSection(next:Section){
   setParams(previous=>{
    const updated=new URLSearchParams(previous);
@@ -38,6 +39,7 @@ export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
   {id:"dhf_returns",label:"我的研发整改"},
   {id:"dhf_attestations",label:"签审身份确认"},
   {id:"dhf_gate_decisions",label:"独立 Gate 复核"},
+  {id:"dhf_condition_plans",label:"条件整改预案"},
   {id:"dhf_credentials",label:"签署凭证"},
   {id:"dhf_verification",label:"整改复验"},
   {id:"notifications",label:"通知",count:counts.unread},
@@ -61,6 +63,7 @@ export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
        section==="dhf_returns"?<DHFRemediationInbox/>:
        section==="dhf_attestations"?<DHFReviewAttestationInbox/>:
        section==="dhf_gate_decisions"?<DHFGateDecisionReviewInbox/>:
+       section==="dhf_condition_plans"?<DHFConditionalRemediationPlans/>:
        section==="dhf_credentials"?<DHFCredentialManagement/>:
        section==="dhf_verification"?<DHFVerificationInbox/>:
        <ApprovalInbox currentUser={user} view={section} onCounts={setCounts} onReview={setReview}/>}

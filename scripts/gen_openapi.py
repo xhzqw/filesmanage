@@ -1367,6 +1367,36 @@ schema("DHFGateDecisionReviewOutcome",obj({
  "opinionId":string(),"reviewId":string(),"state":string(),"replayed":boolean(),
  "trialOnly":boolean(),"formalAccepted":boolean(),"reason":string(),
 },required=["reviewId","replayed","trialOnly","formalAccepted"]))
+schema("DHFConditionalRemediationObligation",obj({
+ "requirementId":string(),"ownerId":string(),"correctiveAction":string(),"dueAt":timestamp(),
+},required=["requirementId","ownerId","correctiveAction","dueAt"]))
+schema("DHFConditionalPlanOwner",obj({
+ "id":string(),"displayName":string(),
+},required=["id","displayName"]))
+schema("DHFConditionalPlanOption",obj({
+ "projectId":string(),"stageId":string(),"templateId":string(),
+ "dependencyId":string(),"predecessorStage":string(),"guardedAction":string(),
+ "eligibleRequirements":arr(string()),"eligibleOwners":arr(ref("DHFConditionalPlanOwner")),
+},required=["projectId","stageId","templateId","dependencyId","predecessorStage",
+ "guardedAction","eligibleRequirements","eligibleOwners"]))
+schema("DHFConditionalProposal",obj({
+ "id":string(),"projectId":string(),"stageId":string(),"templateId":string(),
+ "policySha":string(),"proposedBy":string(),"dependencyId":string(),
+ "predecessorStage":string(),"guardedAction":string(),"graphSha":string(),
+ "obligations":arr(ref("DHFConditionalRemediationObligation")),
+ "reason":string(),"expiresAt":timestamp(),"status":string(),
+ "withdrawalReason":string(),"trialOnly":boolean(),"formalAccepted":boolean(),
+},required=["id","projectId","stageId","templateId","policySha","proposedBy",
+ "dependencyId","predecessorStage","guardedAction","graphSha","obligations",
+ "reason","expiresAt","status","trialOnly","formalAccepted"]))
+schema("DHFConditionalProposalCatalog",obj({
+ "options":arr(ref("DHFConditionalPlanOption")),"plans":arr(ref("DHFConditionalProposal")),
+ "trialOnly":boolean(),"formalAccepted":boolean(),
+},required=["options","plans","trialOnly","formalAccepted"]))
+schema("DHFConditionalProposalMutation",obj({
+ "id":string(),"status":string(),"replayed":boolean(),
+ "trialOnly":boolean(),"formalAccepted":boolean(),"reason":string(),
+},required=["replayed","trialOnly","formalAccepted"]))
 add("GET","/api/workbench/dhf/gates/{submissionId}/readiness",operation(
  "Assigned G5/G6 final Gate signer reads explicit published-template dependencies and frozen signed candidate without formal acceptance",
  "Workflow","dhfStageGateReadiness",security=SESSION,
@@ -1392,6 +1422,34 @@ add("POST","/api/workbench/dhf/gate-decision-reviews/{reviewId}/recommendation",
  params=[id_param("reviewId","Frozen strict Gate review ID")],
  request={"application/json":{"schema":ref("DHFGateDecisionReviewRequest")}},
  responses=dict([json_ok(ref("DHFGateDecisionReviewOutcome"),"Only recommendation_only; no accepted or conditionally released state."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),
+ resp("404",ERR["404"]),resp("409",ERR["409"]),resp("503",ERR["503"])])))
+add("GET","/api/workbench/dhf/conditional-plans",operation(
+ "Show authorized preparer's independently verified published direct dependency planning opportunities and immutable own pilot proposals with database-derived expired/withdrawn status; never a conditional grant.",
+ "Workflow","dhfConditionalPlanCatalog",security=SESSION,
+ responses=dict([json_ok(ref("DHFConditionalProposalCatalog"),"No unauthorized transitive predecessor or downstream action permission."),
+ resp("401",ERR["401"]),resp("503",ERR["503"])])))
+add("POST","/api/workbench/dhf/conditional-plans",operation(
+ "File one immutable 30-day-max nonauthorizing conditional remediation plan against an explicit published direct edge, with per-noncritical-requirement owner, corrective action, due date, password reauthentication, graph SHA audit and outbox.",
+ "Workflow","dhfConditionalPlanFile",security=SESSION,
+ request={"application/json":{"schema":obj({
+  "projectId":string(),"stageId":string(),"dependencyId":string(),
+  "reason":string(),"expiresAt":timestamp(),
+  "obligations":arr(ref("DHFConditionalRemediationObligation")),
+  "password":string(),"idempotencyKey":string(),
+ },required=["projectId","stageId","dependencyId","reason",
+ "expiresAt","obligations","password","idempotencyKey"])}},
+ responses=dict([json_ok(ref("DHFConditionalProposalMutation"),"Only awaiting_enterprise_authority; planning never grants prepare, submit or document issuance."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),
+ resp("404",ERR["404"]),resp("409",ERR["409"]),resp("503",ERR["503"])])))
+add("POST","/api/workbench/dhf/conditional-plans/{id}/withdraw",operation(
+ "Append an independently audited irreversible withdrawal of an unapproved conditional plan by its original preparer; historical obligations remain immutable.",
+ "Workflow","dhfConditionalPlanWithdraw",security=SESSION,
+ params=[id_param("id","Immutable conditional remediation proposal ID")],
+ request={"application/json":{"schema":obj({
+ "reason":string(),"password":string(),
+ },required=["reason","password"])}},
+ responses=dict([json_ok(ref("DHFConditionalProposalMutation"),"Only withdrawn; no Stage Gate state transition."),
  resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),
  resp("404",ERR["404"]),resp("409",ERR["409"]),resp("503",ERR["503"])])))
 schema("DHFPilotCredentialItem",obj({

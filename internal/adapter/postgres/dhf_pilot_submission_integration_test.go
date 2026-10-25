@@ -1588,6 +1588,10 @@ jsonb_build_object('revokeId','dhf-operator-grant-revocation'))`); err != nil {
 			}
 			specialties := []dhf.SpecialtyPolicy{}
 			requirement := dhf.RequirementPolicy{ID: "GRAPH-FIXTURE-" + stage, Mandatory: true, Critical: true}
+			if flags[stage] && stage == "G8" {
+				requirement.Critical = false
+				requirement.ConditionEligible = true
+			}
 			if stage == "G5" {
 				specialties = []dhf.SpecialtyPolicy{{Key: "G5-GRAPH-FIXTURE"}}
 				requirement.SpecialtyKey = "G5-GRAPH-FIXTURE"
@@ -1610,6 +1614,7 @@ jsonb_build_object('revokeId','dhf-operator-grant-revocation'))`); err != nil {
 	seedGraphProject("dhf_graph_valid", []string{"G6", "G8"},
 		map[string][]dhf.DependencyPolicy{"G8": {{ID: "TRANSFER-VERIFY-1", PredecessorStage: "G6",
 			GuardedAction: dhf.ActionPrepare, AllowConditional: true}}}, map[string]bool{"G8": true})
+	exec("INSERT INTO dhf_pilot_members(project_id,user_id,can_prepare) VALUES('dhf_graph_valid',$1,true)", actorID)
 	var rawGraph []byte
 	if err = pool.QueryRow(ctx, "SELECT dhf_pilot_verified_project_graph('dhf_graph_valid')").Scan(&rawGraph); err != nil {
 		t.Fatalf("independently named G6 and G8 published baselines rejected: %v", err)
@@ -1621,6 +1626,138 @@ jsonb_build_object('revokeId','dhf-operator-grant-revocation'))`); err != nil {
 		graphNodes[1].Dependencies[0].PredecessorStage != "G6" ||
 		!graphNodes[1].Dependencies[0].AllowConditional {
 		t.Fatalf("first G6 transfer conflated with distinct G8: %+v %v", graphNodes, err)
+	}
+	// V0.8.0 slice 4: conditional REMEDIATION PLAN only; never a privilege.
+	// A published G8 -> G6 direct edge can propose a 30-day bounded plan
+	// for its own explicitly noncritical eligible requirement.
+	conditionCatalog, conditionCatalogErr := service.DHFConditionalProposalCatalog(ctx, actor)
+	if conditionCatalogErr != nil || len(conditionCatalog.Options) != 1 ||
+		conditionCatalog.Options[0].ProjectID != "dhf_graph_valid" ||
+		conditionCatalog.Options[0].PredecessorStage != "G6" ||
+		conditionCatalog.Options[0].GuardedAction != "prepare" ||
+		len(conditionCatalog.Options[0].EligibleRequirements) != 1 ||
+		conditionCatalog.Options[0].EligibleRequirements[0] != "GRAPH-FIXTURE-G8" ||
+		conditionCatalog.FormalAccepted || !conditionCatalog.TrialOnly {
+		t.Fatalf("conditional plan options ignored published direct eligibility: %+v %v",
+			conditionCatalog, conditionCatalogErr)
+	}
+	notPrepared, notPreparedErr := service.DHFConditionalProposalCatalog(ctx, signer("dhf_sw_reviewer"))
+	if notPreparedErr != nil || len(notPrepared.Options) != 0 || len(notPrepared.Plans) != 0 {
+		t.Fatalf("nonmember read confidential conditional planning catalog: %+v %v", notPrepared, notPreparedErr)
+	}
+	planNow := time.Now().UTC()
+	planInput := application.DHFConditionalProposalInput{
+		ProjectID: "dhf_graph_valid", StageID: "G8", DependencyID: "TRANSFER-VERIFY-1",
+		Reason:    "Plan a controlled noncritical design handover correction with independent owner",
+		ExpiresAt: planNow.Add(7 * 24 * time.Hour), Password: reviewerPassword,
+		IdempotencyKey: "dhf-cond-plan-001",
+		Obligations: []ports.DHFConditionalObligation{{
+			RequirementID: "GRAPH-FIXTURE-G8", OwnerID: actorID,
+			CorrectiveAction: "Provide amended handover verification evidence for the G8 requirement",
+			DueAt:            planNow.Add(48 * time.Hour),
+		}},
+	}
+	invalidCritical := planInput
+	invalidCritical.Obligations = []ports.DHFConditionalObligation{{
+		RequirementID: "GRAPH-FIXTURE-G6", OwnerID: actorID,
+		CorrectiveAction: "Do not waive a critical or wrong-stage requirement",
+		DueAt:            planNow.Add(48 * time.Hour),
+	}}
+	criticalResult, criticalErr := service.DHFConditionalProposalFile(ctx, actor, invalidCritical)
+	if criticalErr != nil || criticalResult.Reason != "DHF_CONDITION_OBLIGATION_INVALID" {
+		t.Fatalf("cross-stage or critical requirement was waived: %+v %v", criticalResult, criticalErr)
+	}
+	invalidDependency := planInput
+	invalidDependency.DependencyID = "G7-G8-INVENTED"
+	invalidDepResult, invalidDepErr := service.DHFConditionalProposalFile(ctx, actor, invalidDependency)
+	if invalidDepErr != nil || invalidDepResult.Reason != "DHF_CONDITION_NOT_ELIGIBLE" {
+		t.Fatalf("invented transitive dependency was considered conditional: %+v %v", invalidDepResult, invalidDepErr)
+	}
+	invalidLongExpiry := planInput
+	invalidLongExpiry.ExpiresAt = planNow.Add(45 * 24 * time.Hour)
+	longExpiryResult, longExpiryErr := service.DHFConditionalProposalFile(ctx, actor, invalidLongExpiry)
+	if longExpiryErr != nil || longExpiryResult.Reason != "DHF_CONDITION_DEADLINE_INVALID" {
+		t.Fatalf("45-day conditional draft accepted: %+v %v", longExpiryResult, longExpiryErr)
+	}
+	wrongOwner := planInput
+	wrongOwner.Obligations = []ports.DHFConditionalObligation{{
+		RequirementID: "GRAPH-FIXTURE-G8", OwnerID: "dhf_sw_reviewer",
+		CorrectiveAction: "No accountability may be assigned to another project's staff",
+		DueAt:            planNow.Add(48 * time.Hour),
+	}}
+	wrongOwnerResult, wrongOwnerErr := service.DHFConditionalProposalFile(ctx, actor, wrongOwner)
+	if wrongOwnerErr == nil || wrongOwnerResult.Reason != "DHF_CONDITION_PRECONDITION" {
+		t.Fatalf("project-external correction owner was allowed: %+v %v", wrongOwnerResult, wrongOwnerErr)
+	}
+	invalidPasswordPlan := planInput
+	invalidPasswordPlan.Password = "incorrect-current-password"
+	deniedPasswordPlan, deniedPasswordPlanErr := service.DHFConditionalProposalFile(ctx, actor, invalidPasswordPlan)
+	if deniedPasswordPlanErr != nil || deniedPasswordPlan.Reason != "DHF_REAUTH_FAILED" {
+		t.Fatalf("conditional plan bypassed password reauthentication: %+v %v",
+			deniedPasswordPlan, deniedPasswordPlanErr)
+	}
+	conditionFiled, conditionFiledErr := service.DHFConditionalProposalFile(ctx, actor, planInput)
+	if conditionFiledErr != nil || conditionFiled.ID == "" ||
+		conditionFiled.Status != "awaiting_enterprise_authority" || !conditionFiled.TrialOnly ||
+		conditionFiled.FormalAccepted {
+		t.Fatalf("fully scoped conditional plan draft not filed: %+v %v", conditionFiled, conditionFiledErr)
+	}
+	var planGraphSHA string
+	if err = pool.QueryRow(ctx, `SELECT graph_sha FROM
+dhf_pilot_conditional_remediation_proposals WHERE id=$1`, conditionFiled.ID).Scan(&planGraphSHA); err != nil || len(planGraphSHA) != 64 {
+		t.Fatalf("conditional proposal did not seal project graph SHA: %s %v", planGraphSHA, err)
+	}
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM audit_events
+WHERE event_type='dhf.pilot.conditional_proposal_filed' AND target_id=$1
+AND details->>'graphSha'=$2 AND details->>'formalAccepted'='false'`,
+		conditionFiled.ID, planGraphSHA).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("conditional plan missing exact audit: %d %v", count, err)
+	}
+	if err = pool.QueryRow(ctx, `SELECT count(*) FROM outbox_jobs
+WHERE id=$1 AND payload->>'trialOnly'='true' AND payload->>'formalAccepted'='false'`,
+		"dhf-conditional-proposal:"+conditionFiled.ID).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("conditional plan outbox implied formal approval: %d %v", count, err)
+	}
+	conditionReplay, conditionReplayErr := service.DHFConditionalProposalFile(ctx, actor, planInput)
+	if conditionReplayErr != nil || !conditionReplay.Replayed || conditionReplay.ID != conditionFiled.ID {
+		t.Fatalf("exact conditional proposal idempotency failed: %+v %v", conditionReplay, conditionReplayErr)
+	}
+	changeKey := planInput
+	changeKey.IdempotencyKey = "dhf-cond-plan-different"
+	keyConflict, keyConflictErr := service.DHFConditionalProposalFile(ctx, actor, changeKey)
+	if keyConflictErr != nil || keyConflict.Reason != "DHF_CONDITION_ALREADY_FILED" {
+		t.Fatalf("duplicate conditional proposal created: %+v %v", keyConflict, keyConflictErr)
+	}
+	if _, forceApproval := pool.Exec(ctx, `UPDATE dhf_pilot_conditional_remediation_proposals
+SET state='conditionally_released' WHERE id=$1`, conditionFiled.ID); forceApproval == nil {
+		t.Fatal("conditional planning record mutated into enterprise release")
+	}
+	withdrawInput := application.DHFConditionalWithdrawalInput{
+		Reason: "Withdraw pending trial plan and retain all proposed corrections", Password: reviewerPassword}
+	unauthorizedWithdrawal, unauthorizedWithdrawalErr := service.DHFConditionalProposalWithdraw(ctx,
+		signer("dhf_sw_reviewer"), conditionFiled.ID, withdrawInput)
+	if unauthorizedWithdrawalErr != nil || unauthorizedWithdrawal.Reason != "DHF_SCOPE_DENIED" {
+		t.Fatalf("other project signer could withdraw plan: %+v %v", unauthorizedWithdrawal, unauthorizedWithdrawalErr)
+	}
+	withdrawnPlan, withdrawnPlanErr := service.DHFConditionalProposalWithdraw(ctx, actor,
+		conditionFiled.ID, withdrawInput)
+	if withdrawnPlanErr != nil || withdrawnPlan.Status != "withdrawn" ||
+		!withdrawnPlan.TrialOnly || withdrawnPlan.FormalAccepted {
+		t.Fatalf("conditional plan withdrawal failed: %+v %v", withdrawnPlan, withdrawnPlanErr)
+	}
+	withdrawalReplay, withdrawalReplayErr := service.DHFConditionalProposalWithdraw(ctx, actor,
+		conditionFiled.ID, withdrawInput)
+	if withdrawalReplayErr != nil || !withdrawalReplay.Replayed ||
+		withdrawalReplay.Status != "withdrawn" {
+		t.Fatalf("conditional withdrawal replay failed: %+v %v", withdrawalReplay, withdrawalReplayErr)
+	}
+	finalCatalog, finalCatalogErr := service.DHFConditionalProposalCatalog(ctx, actor)
+	if finalCatalogErr != nil || len(finalCatalog.Plans) != 1 ||
+		finalCatalog.Plans[0].Status != "withdrawn" ||
+		finalCatalog.Plans[0].ID != conditionFiled.ID ||
+		finalCatalog.Plans[0].FormalAccepted {
+		t.Fatalf("historical withdrawn conditional plan disappeared: %+v %v",
+			finalCatalog, finalCatalogErr)
 	}
 	// Explicit, non-numerical DAG with all nine stage identities: the
 	// source outline itself NEVER supplies this fixture as a real SOP.
