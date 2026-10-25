@@ -171,3 +171,18 @@
  .document-explorer .finder-sidebar-home{display:none}
 }
 @media(max-width:600px){.shell.shell-finder{--height-header:52px}}
+
+/* Finder/Notion unified rail: one navigation tree for folder and page resources. */
+.kn-finder-section{min-width:0}
+.kn-finder-add{color:var(--text-secondary);padding:1px 6px;text-decoration:none;font-size:18px}
+.kn-finder-tree{display:flex;flex-direction:column;max-height:260px;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}
+.kn-finder-item{display:flex;align-items:center;min-width:0;height:28px;border-radius:var(--radius-finder)}
+.kn-finder-item:hover{background:var(--surface-row-hover)}
+.kn-finder-item.is-current{background:var(--ui-state-selected-sidebar)}
+.kn-finder-item>.rare-button{width:17px;min-width:17px;height:22px;min-height:22px;padding:0}
+.kn-finder-indent{width:17px;flex:none}
+.kn-finder-item>a{flex:1;min-width:0;color:var(--text-primary);text-overflow:ellipsis;white-space:nowrap;overflow:hidden;text-decoration:none;font-size:12px}
+.kn-finder-item.is-current>a{font-weight:600}
+.folder-knowledge-home-link{white-space:nowrap;font-size:12px;color:var(--text-secondary);text-decoration:none;padding:5px 7px;border-radius:var(--radius-sm)}
+.folder-knowledge-home-link:hover{background:var(--surface-row-hover);color:var(--text-primary)}
+@media(max-width:700px){.kn-finder-tree{display:none}.kn-finder-add{display:none}.kn-finder-section{display:contents}.kn-finder-section>.finder-nav-heading>a:first-child{display:flex;align-items:center;min-height:39px;padding:7px 10px;color:var(--text-primary);font-size:13px}}

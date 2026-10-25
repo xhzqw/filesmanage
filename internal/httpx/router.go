@@ -103,6 +103,22 @@ func New(s *application.Service, secure bool, dist string) *gin.Engine {
 	api.GET("/events/ws", h.websocketEvents)
 	// Project database ("项目" workbench view). Reads are open to any signed-in
 	// user; writes follow the admin-only rule in SPEC-project-db §3.4.
+	// Knowledge pages are a separate, explicitly linked workspace.
+	api.GET("/knowledge/pages", h.knowledgeList)
+	api.POST("/knowledge/pages", h.knowledgeCreate)
+	api.GET("/knowledge/pages/:id", h.knowledgeGet)
+	api.GET("/knowledge/pages/:id/history", h.knowledgeHistory)
+	api.GET("/knowledge/pages/:id/links", h.knowledgePageLinks)
+	api.PUT("/knowledge/pages/:id/links/:targetId", h.knowledgePageRelation)
+	api.DELETE("/knowledge/pages/:id/links/:targetId", h.knowledgePageRelation)
+	api.PUT("/knowledge/pages/:id", h.knowledgeUpdate)
+	api.POST("/knowledge/pages/:id/archive", h.knowledgeDelete)
+	api.PUT("/knowledge/pages/:id/files/:fileId", h.knowledgeFileReference)
+	api.DELETE("/knowledge/pages/:id/files/:fileId", h.knowledgeFileReference)
+	api.GET("/knowledge/files/:fileId/backlinks", h.knowledgeBacklinks)
+	api.GET("/knowledge/folders/:folderId/home", h.knowledgeFolderHome)
+	api.PUT("/knowledge/folders/:folderId/home", h.knowledgeLinkFolderHome)
+	api.DELETE("/knowledge/folders/:folderId/home", h.knowledgeUnlinkFolderHome)
 	api.GET("/projects", h.projectList)
 	api.POST("/projects", h.projectCreate)
 	api.GET("/projects/view-state", h.projectGetView)

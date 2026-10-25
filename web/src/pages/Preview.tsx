@@ -385,6 +385,7 @@ export function Preview({user,onLogout}:{user:User;onLogout:()=>void}){
        <div className="file-workbench-title">
         <h1 title={preview.name}><span className="file-workbench-name">{fileNameParts(preview.name).stem}</span><span className="file-workbench-extension">{fileNameParts(preview.name).extension}</span></h1>
        </div>
+       <Link className="file-lineage-pill" to={"/knowledge?file="+encodeURIComponent(id)+"&attachFile="+encodeURIComponent(id)}>知识引用</Link>
        <div className="file-workbench-subtitle"><span className="file-workbench-size">{formatSize(preview.size)}</span><span className="file-workbench-version">v{currentSeq}</span>
          {lifecycle&&<RareBadge tone={archived?"warning":lifecycle.state==="released"?(lifecycle.publishedSeq===currentSeq?"success":"warning"):"neutral"} dot>{archived?"已归档":lifecycle.state==="released"?(lifecycle.publishedSeq===currentSeq?"已发布":"待发布更新"):"草稿"}</RareBadge>}
          {lifecycle?.dueStatus==="soon"&&<RareBadge tone="warning">即将到期</RareBadge>}

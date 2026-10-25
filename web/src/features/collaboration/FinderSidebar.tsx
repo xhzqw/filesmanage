@@ -7,6 +7,7 @@ import {compactExplorerName} from "../../shared/explorerDisplayName";
 import {RareButton} from "../../shared/ui/rare";
 import "./finderSidebar.css";
 import {FinderTags} from "./FinderTags";
+import {KnowledgeFinderRail} from "./KnowledgeFinderRail";
 
 export type DocumentSection="files"|"favorites"|"received"|"sent"|"labels";
 
@@ -60,6 +61,7 @@ export function FinderSidebar({section,revision}:{section:DocumentSection;revisi
    {link("received","与我共享","received")}
    {link("sent","我共享的","sent")}
   </div>
+  <KnowledgeFinderRail/>
   <FinderTags/>
  </nav>;
 }

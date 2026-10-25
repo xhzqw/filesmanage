@@ -720,6 +720,43 @@ add("GET", "/health/ready", operation("Readiness probe (PostgreSQL reachable)", 
     responses={"200": {"description": "Database reachable", "content": {"application/json": {"schema": OK_SCHEMA}}},
                "503": {"description": ERR["503"]}}))
 
+# --- Knowledge pages: source of truth distinct from controlled file revisions ---
+KNOWLEDGE_BLOCK = obj({"id":string(),"type":string(enum=["paragraph","heading1","heading2","bullet","todo","quote"]),"text":string(),"checked":boolean()})
+KNOWLEDGE_PAGE = obj({"id":string(),"parentId":string(),"folderId":string(),"ownerId":string(),"title":string(),"revision":integer(minimum=1),"blocks":arr(KNOWLEDGE_BLOCK),"updatedAt":timestamp()})
+KNOWLEDGE_WRITE = obj({"title":string(max_length=180),"blocks":arr(KNOWLEDGE_BLOCK),"revision":integer(minimum=1)},required=["title","blocks","revision"])
+KNOWLEDGE_CREATE = obj({"title":string(max_length=180),"parentId":string(),"folderId":string()},required=["title"])
+KNOWLEDGE_IDS = {
+ "/api/knowledge/pages/{id}":[id_param("id","Knowledge page identity")],
+ "/api/knowledge/pages/{id}/history":[id_param("id","Knowledge page identity")],
+ "/api/knowledge/pages/{id}/links":[id_param("id","Knowledge page identity")],
+ "/api/knowledge/pages/{id}/links/{targetId}":[id_param("id","Knowledge page identity"),id_param("targetId","Target page identity")],
+ "/api/knowledge/pages/{id}/archive":[id_param("id","Knowledge page identity")],
+ "/api/knowledge/pages/{id}/files/{fileId}":[id_param("id","Knowledge page identity"),id_param("fileId","Referenced file identity")],
+ "/api/knowledge/files/{fileId}/backlinks":[id_param("fileId","File identity")],
+ "/api/knowledge/folders/{folderId}/home":[id_param("folderId","Folder identity")]
+}
+KNOWLEDGE_ROUTES=[
+ ("GET","/api/knowledge/pages","knowledgeList","List knowledge page tree",arr(KNOWLEDGE_PAGE),None),
+ ("POST","/api/knowledge/pages","knowledgeCreate","Create owned page",KNOWLEDGE_PAGE,KNOWLEDGE_CREATE),
+ ("GET","/api/knowledge/pages/{id}","knowledgeGet","Read ACL-scoped page and live file references",KNOWLEDGE_PAGE,None),
+ ("GET","/api/knowledge/pages/{id}/history","knowledgeHistory","Read immutable page revision snapshots",arr(obj({"revision":integer(),"title":string(),"blocks":arr(KNOWLEDGE_BLOCK),"editorId":string(),"recordedAt":timestamp()})),None),
+ ("GET","/api/knowledge/pages/{id}/links","knowledgePageLinks","Read page references and backlinks",arr(obj({"pageId":string(),"title":string(),"direction":string()})),None),
+ ("PUT","/api/knowledge/pages/{id}/links/{targetId}","knowledgePageLink","Reference an accessible knowledge page",obj({"targetId":string()}),None),
+ ("DELETE","/api/knowledge/pages/{id}/links/{targetId}","knowledgePageUnlink","Remove page reference",obj({"targetId":string()}),None),
+ ("PUT","/api/knowledge/pages/{id}","knowledgeUpdate","Save page with revision compare-and-swap",KNOWLEDGE_PAGE,KNOWLEDGE_WRITE),
+ ("POST","/api/knowledge/pages/{id}/archive","knowledgeDelete","Archive an unlinked page without children",obj({"archived":boolean()}),obj({"revision":integer(minimum=1)})),
+ ("PUT","/api/knowledge/pages/{id}/files/{fileId}","knowledgeFileLink","Create authorized file reference",obj({"fileId":string()}),None),
+ ("DELETE","/api/knowledge/pages/{id}/files/{fileId}","knowledgeFileUnlink","Remove active file reference without deleting file",obj({"fileId":string()}),None),
+ ("GET","/api/knowledge/files/{fileId}/backlinks","knowledgeFileBacklinks","ACL-filtered reverse file references",arr(obj({"pageId":string(),"title":string()})),None),
+ ("GET","/api/knowledge/folders/{folderId}/home","knowledgeFolderHome","Read explicitly linked folder home",obj({"pageId":string(),"automatic":boolean()}),None),
+ ("PUT","/api/knowledge/folders/{folderId}/home","knowledgeFolderHomeLink","Manually link folder knowledge home",obj({"pageId":string(),"automatic":boolean()}),obj({"pageId":string()},required=["pageId"])),
+ ("DELETE","/api/knowledge/folders/{folderId}/home","knowledgeFolderHomeUnlink","Manually unlink home without deleting page",obj({"pageId":string()}),None),
+]
+for method,path,operation_id,summary,response_schema,body_schema in KNOWLEDGE_ROUTES:
+ add(method,path,operation(summary,"Knowledge",operation_id,security=SESSION,params=KNOWLEDGE_IDS.get(path),
+  request={"application/json":{"schema":body_schema}} if body_schema is not None else None,
+  responses=dict([json_ok(response_schema,"Knowledge data is ACL-filtered; content writes carry audit and revision history.")]+list(errors("400","401","403","404","409").items()))))
+
 # --- Customer master data: registration decisions take place under Workbench routes ---
 CUSTOMER_CERT = obj({
     "id": string(), "kind": string(), "number": string(), "issuedOn": string(fmt="date"),

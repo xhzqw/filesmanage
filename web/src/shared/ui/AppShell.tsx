@@ -25,7 +25,7 @@ export function BrandLogo({size,className,transparent=false}:{size:number;classN
 }
 
 const NAV=[
- {to:"/doc",label:"文档管理"},
+ {to:"/doc",label:"文件与知识"},
  {to:"/customers",label:"客户资料"},
  {to:"/stats",label:"统计"},
  {to:"/workbench",label:"工作台"},
@@ -75,7 +75,7 @@ export function AppShell({user,onLogout,actions,children,finderSidebarWidth}:{us
  },[previewRoute,pathname]);
  // Keep the main navigation tied to actual routes, including browser
  // back/forward; preview and account subpages have no misleading active tile.
- const activeNav=NAV.findIndex(item=>item.to===pathname||(item.to==="/workbench"&&pathname.startsWith("/workbench/")));
+ const activeNav=NAV.findIndex(item=>(item.to===pathname||(item.to==="/doc"&&pathname==="/knowledge"))||(item.to==="/workbench"&&pathname.startsWith("/workbench/")));
  const notificationSlot=useContext(ShellAccessories);
  // Once the collapsed navigation opens, keyboard focus must enter the links,
  // otherwise Escape remains on the toggle and cannot close the menu.
