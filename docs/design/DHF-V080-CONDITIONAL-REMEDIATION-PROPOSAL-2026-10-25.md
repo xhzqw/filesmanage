@@ -114,7 +114,46 @@ outside the isolated engineering scope.
 
 ### Verification evidence
 
-Record only actual remote source revision, clean PostgreSQL 17 database,
-full migration count/checksum, real positive/negative integration tests,
-Go/TypeScript builds, OpenAPI and acceptance-matrix results **after**
-execution. Unverified or failing gates remain NO-GO.
+Final tested source revision `c5605f0`, on 2026-10-25.
+Isolated remote checkout: `10.144.144.1:/tmp/filesmanage-dhf-v075-99ade80`.
+Fresh PostgreSQL 17 test database:
+`filesmanage_dhf_v063_integration_v080_cond_c5605f0`.
+This is not the production PostgreSQL database. Port 8091 and running
+business services were not changed.
+
+| Actually executed check | Result |
+|---|---|
+| Complete empty PostgreSQL DB migration including 0060 | **PASS — 62 migrations** |
+| Independent migration checksum verification | **PASS — 62/62** |
+| Real `TestDHFPilotRealPostgresSubmission` using current Go service and real PG | **PASS — 14.96 seconds** |
+| Full G1–G9 explicit published project graph and G6/G8 separate stage scope | **PASS** |
+| Scoped prepare-only G8→G6 source; published requirement must be Mandatory, noncritical and condition-eligible | **PASS** |
+| Nonproject correction owner, invented cross-stage dependency, irrelevant/critical requirement, 45-day expiry and failed password | **PASS — denied** |
+| Tampered/hash-invalid SQL direct-write and source-correct unaudited direct-write | **PASS — denied** |
+| DB clock-injected effective pending, expired and withdrawn precedence; no privileged background mutation required | **PASS** |
+| Atomic project graph SHA audit and trial-only outbox, exact idempotent replay, new-key conflict | **PASS** |
+| Unauthorized withdrawal denied; authenticated append-only original-author withdrawal; withdrawn history retained | **PASS** |
+| `go test ./internal/... -count=1` and `go vet ./internal/...` | **PASS** |
+| Builds of `cmd/server`, `cmd/worker`, `cmd/migrate` | **PASS** |
+| `npm --prefix web run build` (loading contract, TypeScript type-check and Vite) | **PASS — 701 modules**, existing Three.js large-bundle warnings |
+| `node scripts/rare_emil_interaction_check.mjs` | **PASS** |
+| `python3 scripts/gen_openapi.py --check` | **PASS — 148 paths / 179 operations / 142 schemas** |
+| `python3 scripts/gen_acceptance_matrix.py --check` | **PASS — 126 IDs / 123 PASS / 3 PARTIAL** |
+| Live browser 3-width accessibility E2E, concurrent plan/withdraw stress, corporate signing and conditional authorization | **NOT_RUN / NO-GO** |
+
+**Intermediate failure:** The initial `1899b41` test on a distinct
+new PostgreSQL DB failed because test user fixtures omit an optional
+session login string even though the actor's ID is authenticated. Revision
+`55f6701` corrected reauthentication to re-read the user's current
+ID/login/password from the database and compare an optional caller login
+only when present. The password hash remains mandatory. That revision
+passed 62 migrations and real integration (14.14 seconds) on a separate
+DB. Revision `c5605f0` added direct unaudited SQL negative tests and a
+clock-expiry predicate, then **repeated** clean migration and the extended
+integration suite on the final fresh DB (14.96 seconds). The failing
+initial run is **not** counted as a PASS.
+
+**Engineering NO-GO remains:** an accepted Stage Gate, a conditionally
+released predecessor and actual file issuance require a separate,
+independently qualified corporate decision and execution engine.
+This work adds only a time-bounded, nonauthorizing *proposal*.

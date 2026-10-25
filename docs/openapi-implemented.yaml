@@ -7275,6 +7275,224 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/conditional-plans:
+    get:
+      summary: Show authorized preparer's independently verified published direct dependency planning opportunities and immutable
+        own pilot proposals with database-derived expired/withdrawn status; never a conditional grant.
+      operationId: dhfConditionalPlanCatalog
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: No unauthorized transitive predecessor or downstream action permission.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFConditionalProposalCatalog'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      summary: File one immutable 30-day-max nonauthorizing conditional remediation plan against an explicit published direct
+        edge, with per-noncritical-requirement owner, corrective action, due date, password reauthentication, graph SHA audit
+        and outbox.
+      operationId: dhfConditionalPlanFile
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                projectId:
+                  type: string
+                stageId:
+                  type: string
+                dependencyId:
+                  type: string
+                reason:
+                  type: string
+                expiresAt:
+                  type: string
+                  format: date-time
+                obligations:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/DHFConditionalRemediationObligation'
+                password:
+                  type: string
+                idempotencyKey:
+                  type: string
+              required:
+              - projectId
+              - stageId
+              - dependencyId
+              - reason
+              - expiresAt
+              - obligations
+              - password
+              - idempotencyKey
+      responses:
+        '200':
+          description: Only awaiting_enterprise_authority; planning never grants prepare, submit or document issuance.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFConditionalProposalMutation'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/conditional-plans/{id}/withdraw:
+    post:
+      summary: Append an independently audited irreversible withdrawal of an unapproved conditional plan by its original preparer;
+        historical obligations remain immutable.
+      operationId: dhfConditionalPlanWithdraw
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Immutable conditional remediation proposal ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                password:
+                  type: string
+              required:
+              - reason
+              - password
+      responses:
+        '200':
+          description: Only withdrawn; no Stage Gate state transition.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFConditionalProposalMutation'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/workbench/dhf/credentials:
     get:
       summary: Trial-only signer credentials registered by the independently delegated operator; no administrator role bypass
@@ -13546,6 +13764,161 @@ components:
           type: string
       required:
       - reviewId
+      - replayed
+      - trialOnly
+      - formalAccepted
+    DHFConditionalRemediationObligation:
+      type: object
+      properties:
+        requirementId:
+          type: string
+        ownerId:
+          type: string
+        correctiveAction:
+          type: string
+        dueAt:
+          type: string
+          format: date-time
+      required:
+      - requirementId
+      - ownerId
+      - correctiveAction
+      - dueAt
+    DHFConditionalPlanOwner:
+      type: object
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+      required:
+      - id
+      - displayName
+    DHFConditionalPlanOption:
+      type: object
+      properties:
+        projectId:
+          type: string
+        stageId:
+          type: string
+        templateId:
+          type: string
+        dependencyId:
+          type: string
+        predecessorStage:
+          type: string
+        guardedAction:
+          type: string
+        eligibleRequirements:
+          type: array
+          items:
+            type: string
+        eligibleOwners:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFConditionalPlanOwner'
+      required:
+      - projectId
+      - stageId
+      - templateId
+      - dependencyId
+      - predecessorStage
+      - guardedAction
+      - eligibleRequirements
+      - eligibleOwners
+    DHFConditionalProposal:
+      type: object
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        stageId:
+          type: string
+        templateId:
+          type: string
+        policySha:
+          type: string
+        proposedBy:
+          type: string
+        dependencyId:
+          type: string
+        predecessorStage:
+          type: string
+        guardedAction:
+          type: string
+        graphSha:
+          type: string
+        obligations:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFConditionalRemediationObligation'
+        reason:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+        withdrawalReason:
+          type: string
+        trialOnly:
+          type: boolean
+        formalAccepted:
+          type: boolean
+      required:
+      - id
+      - projectId
+      - stageId
+      - templateId
+      - policySha
+      - proposedBy
+      - dependencyId
+      - predecessorStage
+      - guardedAction
+      - graphSha
+      - obligations
+      - reason
+      - expiresAt
+      - status
+      - trialOnly
+      - formalAccepted
+    DHFConditionalProposalCatalog:
+      type: object
+      properties:
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFConditionalPlanOption'
+        plans:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFConditionalProposal'
+        trialOnly:
+          type: boolean
+        formalAccepted:
+          type: boolean
+      required:
+      - options
+      - plans
+      - trialOnly
+      - formalAccepted
+    DHFConditionalProposalMutation:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+        replayed:
+          type: boolean
+        trialOnly:
+          type: boolean
+        formalAccepted:
+          type: boolean
+        reason:
+          type: string
+      required:
       - replayed
       - trialOnly
       - formalAccepted
