@@ -108,3 +108,8 @@
 .wbv2-approvals-tabs .rare-button span{font-variant-numeric:tabular-nums;color:var(--text-secondary)}
 .wbv2-approvals-content{min-height:0;min-width:0;flex:1;background:var(--surface-panel);border:1px solid var(--border-hairline);border-radius:var(--radius-lg);overflow:auto}
 @media(max-width:700px){.wbv2-approvals{padding:8px}.wbv2-approvals-head{padding:9px}.wbv2-approvals-content{border:0}}
+
+/* Progressive disclosure in the Workbench sidebar, never the Finder sidebar. */
+.cdw-rail .rare-button.cdw-rail-expand{width:100%;min-height:29px;display:flex;align-items:center;justify-content:space-between;text-align:left;font-size:11px;color:var(--text-secondary);padding:5px 10px;border-radius:var(--radius-sm);background:transparent}
+.cdw-rail .rare-button.cdw-rail-expand:hover{background:var(--surface-row-hover)}
+.cdw-rail .rare-button.cdw-rail-expand span{font-size:15px}
