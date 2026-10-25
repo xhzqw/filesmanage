@@ -1689,6 +1689,52 @@ jsonb_build_object('revokeId','dhf-operator-grant-revocation'))`); err != nil {
 	if wrongOwnerErr == nil || wrongOwnerResult.Reason != "DHF_CONDITION_PRECONDITION" {
 		t.Fatalf("project-external correction owner was allowed: %+v %v", wrongOwnerResult, wrongOwnerErr)
 	}
+	validPlanJSON, jsonErr := json.Marshal(planInput.Obligations)
+	if jsonErr != nil {
+		t.Fatal(jsonErr)
+	}
+	if _, forgedUnaudited := pool.Exec(ctx, `
+INSERT INTO dhf_pilot_conditional_remediation_proposals(
+id,project_id,stage_id,template_id,policy_sha,proposed_by,dependency_id,
+ predecessor_stage,guarded_action,graph_snapshot,graph_sha,obligations,
+ reason,expires_at,idempotency_key,request_sha)
+VALUES('dhf-plan-no-audit','dhf_graph_valid','G8','dhf_graph_valid_G8_template',
+$1,$2,'TRANSFER-VERIFY-1','G6','prepare','[]'::jsonb,repeat('0',64),
+$3::jsonb,$4,$5,'dhf-no-audit-proposal-001',repeat('a',64))`,
+		sha([]byte{}), actorID, string(validPlanJSON), planInput.Reason, planInput.ExpiresAt); forgedUnaudited == nil {
+		t.Fatal("unaudited conditional proposal created outside atomic audit/outbox")
+	}
+	// SQL guard must reject a fully source-verified proposal even when a
+	// privileged SQL writer tries to skip the matching transaction audit.
+	var graphTemplateSHA string
+	if err = pool.QueryRow(ctx, `SELECT policy_sha FROM dhf_pilot_templates
+WHERE id='dhf_graph_valid_G8_template'`).Scan(&graphTemplateSHA); err != nil {
+		t.Fatal(err)
+	}
+	if _, unauditedValid := pool.Exec(ctx, `
+INSERT INTO dhf_pilot_conditional_remediation_proposals(
+id,project_id,stage_id,template_id,policy_sha,proposed_by,dependency_id,
+ predecessor_stage,guarded_action,graph_snapshot,graph_sha,obligations,
+ reason,expires_at,idempotency_key,request_sha)
+VALUES('dhf-plan-valid-no-audit','dhf_graph_valid','G8','dhf_graph_valid_G8_template',
+$1,$2,'TRANSFER-VERIFY-1','G6','prepare','[]'::jsonb,repeat('0',64),
+$3::jsonb,$4,$5,'dhf-valid-no-audit-001',repeat('a',64))`,
+		graphTemplateSHA, actorID, string(validPlanJSON), planInput.Reason, planInput.ExpiresAt); unauditedValid == nil || !strings.Contains(unauditedValid.Error(), "same-transaction immutable audit") {
+		t.Fatalf("source-correct direct SQL could bypass conditional proposal audit: %v", unauditedValid)
+	}
+	var computedState string
+	if err = pool.QueryRow(ctx, `SELECT dhf_pilot_conditional_proposal_status(
+now()+interval '1 day',NULL,now())`).Scan(&computedState); err != nil || computedState != "awaiting_enterprise_authority" {
+		t.Fatalf("pending proposal status became permission: %q %v", computedState, err)
+	}
+	if err = pool.QueryRow(ctx, `SELECT dhf_pilot_conditional_proposal_status(
+now()+interval '1 day',NULL,now()+interval '2 days')`).Scan(&computedState); err != nil || computedState != "expired" {
+		t.Fatalf("expired proposal still awaiting authorization: %q %v", computedState, err)
+	}
+	if err = pool.QueryRow(ctx, `SELECT dhf_pilot_conditional_proposal_status(
+now()-interval '1 day',now()-interval '2 days',now())`).Scan(&computedState); err != nil || computedState != "withdrawn" {
+		t.Fatalf("withdrawal did not win over expiry: %q %v", computedState, err)
+	}
 	invalidPasswordPlan := planInput
 	invalidPasswordPlan.Password = "incorrect-current-password"
 	deniedPasswordPlan, deniedPasswordPlanErr := service.DHFConditionalProposalFile(ctx, actor, invalidPasswordPlan)

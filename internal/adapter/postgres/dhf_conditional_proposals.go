@@ -118,9 +118,8 @@ func scanDHFConditionalProposal(row rowScanner) (ports.DHFConditionalProposal, e
 const dhfConditionalFields = `SELECT p.id,p.project_id,p.stage_id,p.template_id,p.policy_sha,
 p.proposed_by,p.dependency_id,p.predecessor_stage,p.guarded_action,p.graph_sha,
 p.obligations,p.reason,p.expires_at,p.idempotency_key,p.request_sha,
-CASE WHEN w.id IS NOT NULL THEN 'withdrawn'
- WHEN transaction_timestamp()>=p.expires_at THEN 'expired'
- ELSE 'awaiting_enterprise_authority' END,w.reason
+dhf_pilot_conditional_proposal_status(
+ p.expires_at,w.happened_at,transaction_timestamp()),w.reason
 FROM dhf_pilot_conditional_remediation_proposals p
 LEFT JOIN dhf_pilot_conditional_proposal_withdrawals w ON w.proposal_id=p.id `
 

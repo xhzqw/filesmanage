@@ -183,6 +183,17 @@ CREATE TABLE dhf_pilot_conditional_proposal_withdrawals(
  reason text NOT NULL CHECK(length(btrim(reason)) BETWEEN 10 AND 1000),
  happened_at timestamptz NOT NULL DEFAULT transaction_timestamp()
 );
+-- Injected clock makes boundary behavior independently testable without
+-- background mutation. Production callers MUST use transaction_timestamp().
+CREATE FUNCTION dhf_pilot_conditional_proposal_status(
+ deadline timestamptz, withdrawn timestamptz, evaluated_at timestamptz)
+RETURNS text LANGUAGE sql IMMUTABLE AS $$
+ SELECT CASE
+  WHEN withdrawn IS NOT NULL THEN 'withdrawn'
+  WHEN evaluated_at>=deadline THEN 'expired'
+  ELSE 'awaiting_enterprise_authority'
+ END
+$$;
 CREATE FUNCTION dhf_pilot_validate_conditional_withdrawal()
 RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE owner_id text;
