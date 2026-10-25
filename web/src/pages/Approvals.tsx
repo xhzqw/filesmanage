@@ -6,15 +6,22 @@ import {SealLibrary} from "../features/seals/SealLibrary";
 import {ApprovalReviewDialog} from "./ApprovalReviewDialog";
 import type {User} from "../entities/user/model";
 import {ApprovalInbox,type ApprovalView} from "../features/workflow/ApprovalInbox";
+import {DHFPilotInbox} from "../features/workflow/DHFPilotInbox";
+import {DHFRemediationInbox} from "../features/workflow/DHFRemediationInbox";
+import {DHFReviewAttestationInbox} from "../features/workflow/DHFReviewAttestationInbox";
+import {DHFCredentialManagement} from "../features/workflow/DHFCredentialManagement";
+import {DHFGateDecisionReviewInbox} from "../features/workflow/DHFGateDecisionReviewInbox";
+import {DHFConditionalRemediationPlans} from "../features/workflow/DHFConditionalRemediationPlans";
 import {AppShell} from "../shared/ui/AppShell";
+import {DHFVerificationInbox} from "../features/workflow/DHFVerificationInbox";
 
-type Section=ApprovalView|"seals";
+type Section=ApprovalView|"seals"|"dhf"|"dhf_returns"|"dhf_attestations"|"dhf_verification"|"dhf_credentials"|"dhf_gate_decisions"|"dhf_condition_plans";
 
 export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
  const[review,setReview]=useState<Approval|null>(null);
  const[params,setParams]=useSearchParams();
  const requested=params.get("tab");
- const section:Section=requested==="mine"||requested==="notifications"||requested==="seals"||(user.isAdmin&&requested==="all_pending")?requested:"inbox";
+ const section:Section=requested==="mine"||requested==="notifications"||requested==="seals"||requested==="dhf"||requested==="dhf_returns"||requested==="dhf_attestations"||requested==="dhf_verification"||requested==="dhf_credentials"||requested==="dhf_gate_decisions"||requested==="dhf_condition_plans"||(user.isAdmin&&requested==="all_pending")?requested:"inbox";
  function changeSection(next:Section){
   setParams(previous=>{
    const updated=new URLSearchParams(previous);
@@ -28,6 +35,13 @@ export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
   {id:"inbox",label:"待我审批",count:counts.pending},
   ...(user.isAdmin?[{id:"all_pending" as const,label:"全部待审批"}]:[]),
   {id:"mine",label:"我发起的"},
+  {id:"dhf",label:"研发阶段审核"},
+  {id:"dhf_returns",label:"我的研发整改"},
+  {id:"dhf_attestations",label:"签审身份确认"},
+  {id:"dhf_gate_decisions",label:"独立 Gate 复核"},
+  {id:"dhf_condition_plans",label:"条件整改预案"},
+  {id:"dhf_credentials",label:"签署凭证"},
+  {id:"dhf_verification",label:"整改复验"},
   {id:"notifications",label:"通知",count:counts.unread},
   {id:"seals",label:user.isAdmin?"签章管理":"我的签章"},
  ];
@@ -35,8 +49,8 @@ export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
   <div className="panels">
    <main className="work approval-work">
     <div className="approval-shell">
-     <nav className="approval-nav" aria-label="审批工作区">
-      <div className="approval-nav-heading">审批</div>
+     <nav className="approval-nav" aria-label="工作台导航">
+      <div className="approval-nav-heading">工作台</div>
       {navigation.map(item=><RareButton type="button" key={item.id}
        className="approval-nav-item" aria-current={section===item.id?"page":undefined}
        onClick={()=>changeSection(item.id)}>
@@ -45,6 +59,13 @@ export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
      </nav>
      <div className="approval-stage">
       {section==="seals"?<SealLibrary isAdmin={user.isAdmin}/>:
+       section==="dhf"?<DHFPilotInbox/>:
+       section==="dhf_returns"?<DHFRemediationInbox/>:
+       section==="dhf_attestations"?<DHFReviewAttestationInbox/>:
+       section==="dhf_gate_decisions"?<DHFGateDecisionReviewInbox/>:
+       section==="dhf_condition_plans"?<DHFConditionalRemediationPlans/>:
+       section==="dhf_credentials"?<DHFCredentialManagement/>:
+       section==="dhf_verification"?<DHFVerificationInbox/>:
        <ApprovalInbox currentUser={user} view={section} onCounts={setCounts} onReview={setReview}/>}
      </div>
     </div>

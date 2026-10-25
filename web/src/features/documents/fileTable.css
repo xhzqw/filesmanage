@@ -261,7 +261,7 @@
   height:32px;min-height:32px;line-height:1;padding:0 12px;
   font-size:12px;font-weight:500;border:1px solid #E2E8F0;
   background:#FFFFFF;color:var(--text-primary);
-  border-radius:8px;cursor:pointer;white-space:nowrap;
+  border-radius:var(--radius-sm);cursor:pointer;white-space:nowrap;
   transition:background-color .16s ease,color .16s ease;
 }
 .file-toolbar .action-btn-secondary:hover{
@@ -337,7 +337,7 @@
 .work-body .file-toolbar input.filter-search-input{
   display:block;box-sizing:border-box;width:100%;min-width:0;
   height:32px;font-size:12px;padding:0 12px 0 34px;
-  border:1px solid transparent;border-radius:999px;
+  border:1px solid transparent;border-radius:var(--radius-pill);
   background:#F1F5F9;color:var(--text-primary);
 }
 .file-toolbar .filter-search-input:hover{background:#E9EFF6}

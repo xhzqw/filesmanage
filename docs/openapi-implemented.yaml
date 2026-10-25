@@ -7037,6 +7037,1546 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/gates/{submissionId}/readiness:
+    get:
+      summary: Assigned G5/G6 final Gate signer reads explicit published-template dependencies and frozen signed candidate
+        without formal acceptance
+      operationId: dhfStageGateReadiness
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: submissionId
+        in: path
+        required: true
+        description: Frozen original DHF submission ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Enterprise authority unapproved, conditional requests disabled; no inferred G1-G9 DAG.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFStageGateReadiness'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/gates/{submissionId}/review-request:
+    post:
+      summary: File an immutable strict Stage Gate REVIEW INTAKE with independent password reauthentication, physical evidence
+        recheck, policy-frozen dependency snapshot, audit and outbox. Never accepted.
+      operationId: dhfStageGateRequest
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: submissionId
+        in: path
+        required: true
+        description: Frozen original DHF submission ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DHFStageGateReviewRequest'
+      responses:
+        '200':
+          description: Only state awaiting_enterprise_authority; enterprise accepted remains unreachable.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFStageGateReviewOutcome'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/gate-decision-reviews:
+    get:
+      summary: Read scoped independent pilot Gate reviewer inbox; not an approved corporate Gate decision.
+      operationId: dhfGateDecisionReviewInbox
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Only active independently delegated reviewer may see source-bound Gate requests.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFGateDecisionReviewPage'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/gate-decision-reviews/{reviewId}/recommendation:
+    post:
+      summary: File one immutable signed-in Gate reviewer recommendation of return/reject, after independent authorization
+        and password reauthentication. No formal approval or condition grant.
+      operationId: dhfGateDecisionReviewRecommend
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: reviewId
+        in: path
+        required: true
+        description: Frozen strict Gate review ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DHFGateDecisionReviewRequest'
+      responses:
+        '200':
+          description: Only recommendation_only; no accepted or conditionally released state.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFGateDecisionReviewOutcome'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/conditional-plans:
+    get:
+      summary: Show authorized preparer's independently verified published direct dependency planning opportunities and immutable
+        own pilot proposals with database-derived expired/withdrawn status; never a conditional grant.
+      operationId: dhfConditionalPlanCatalog
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: No unauthorized transitive predecessor or downstream action permission.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFConditionalProposalCatalog'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      summary: File one immutable 30-day-max nonauthorizing conditional remediation plan against an explicit published direct
+        edge, with per-noncritical-requirement owner, corrective action, due date, password reauthentication, graph SHA audit
+        and outbox.
+      operationId: dhfConditionalPlanFile
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                projectId:
+                  type: string
+                stageId:
+                  type: string
+                dependencyId:
+                  type: string
+                reason:
+                  type: string
+                expiresAt:
+                  type: string
+                  format: date-time
+                obligations:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/DHFConditionalRemediationObligation'
+                password:
+                  type: string
+                idempotencyKey:
+                  type: string
+              required:
+              - projectId
+              - stageId
+              - dependencyId
+              - reason
+              - expiresAt
+              - obligations
+              - password
+              - idempotencyKey
+      responses:
+        '200':
+          description: Only awaiting_enterprise_authority; planning never grants prepare, submit or document issuance.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFConditionalProposalMutation'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/conditional-plans/{id}/withdraw:
+    post:
+      summary: Append an independently audited irreversible withdrawal of an unapproved conditional plan by its original preparer;
+        historical obligations remain immutable.
+      operationId: dhfConditionalPlanWithdraw
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Immutable conditional remediation proposal ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                password:
+                  type: string
+              required:
+              - reason
+              - password
+      responses:
+        '200':
+          description: Only withdrawn; no Stage Gate state transition.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFConditionalProposalMutation'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/credentials:
+    get:
+      summary: Trial-only signer credentials registered by the independently delegated operator; no administrator role bypass
+      operationId: dhfPilotCredentialList
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Denied operators receive no credential records and canManage false.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFPilotCredentialPage'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      summary: Register an externally trusted trial Gate signing public key; independent time-bounded operator grant, password
+        reauthentication, and immutable audit required
+      operationId: dhfPilotCredentialRegister
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                signerId:
+                  type: string
+                publicKeyBase64:
+                  type: string
+                authorizationRef:
+                  type: string
+                validFrom:
+                  type: string
+                  format: date-time
+                expiresAt:
+                  type: string
+                  format: date-time
+                password:
+                  type: string
+                idempotencyKey:
+                  type: string
+              required:
+              - signerId
+              - publicKeyBase64
+              - authorizationRef
+              - validFrom
+              - expiresAt
+              - password
+              - idempotencyKey
+      responses:
+        '200':
+          description: Registration is UNACTIVATED and trial-only; never issues a corporate certificate.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFPilotCredentialMutation'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/credentials/{id}/events:
+    post:
+      summary: Append one audited, operator-scoped, reauthenticated trial credential lifecycle event, subject to irreversible
+        revocation/replace
+      operationId: dhfPilotCredentialEvent
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Immutable trial credential ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kind:
+                  type: string
+                  enum:
+                  - activate
+                  - suspend
+                  - revoke
+                  - replace
+                reason:
+                  type: string
+                password:
+                  type: string
+                idempotencyKey:
+                  type: string
+              required:
+              - kind
+              - reason
+              - password
+              - idempotencyKey
+      responses:
+        '200':
+          description: Append-only lifecycle, not formal signature authority.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFPilotCredentialMutation'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/gates/{submissionId}/verification:
+    get:
+      summary: Read historical trial Gate Ed25519 verification and current credential status for assigned Gate reviewer only;
+        not a Stage approval
+      operationId: dhfPilotGateVerification
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: submissionId
+        in: path
+        required: true
+        description: Frozen submission ID assigned to the current Gate reviewer
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Historical pinned public verifier and current revocation are independent.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFPilotGateVerification'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/tasks:
+    get:
+      summary: Read trial DHF review assignments scoped to the active reviewer; no stage approval authority
+      operationId: dhfPilotWorkbenchTasks
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Read-only G5 specialty and G6 Gate task list, maximum 100 items.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFWorkbenchPage'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/tasks/{id}/recommendation:
+    post:
+      summary: Record an immutable non-signing DHF reviewer recommendation, never an official Stage Gate decision
+      operationId: dhfPilotRecommend
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Assigned DHF pilot reviewer task ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                outcome:
+                  type: string
+                  enum:
+                  - recommend_pass
+                  - recommend_return
+                comment:
+                  type: string
+                idempotencyKey:
+                  type: string
+              required:
+              - outcome
+              - comment
+              - idempotencyKey
+      responses:
+        '200':
+          description: Trial-only immutable reviewer opinion, not approval.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFRecommendationResult'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/tasks/{id}/evidence:
+    get:
+      summary: List exact frozen file versions for assigned reviewer with independent original file preview ACL checks
+      operationId: dhfPilotEvidenceList
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Review task ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Original immutable version tuple with no Blob storage key exposure.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFReviewerEvidencePage'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/tasks/{id}/evidence/{rid}/preview:
+    get:
+      summary: Preview a bounded copy of the pinned historical document version, after reviewer+file ACL and physical SHA-256
+        checks
+      operationId: dhfPilotEvidencePreview
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Assigned reviewer task ID
+        schema:
+          type: string
+      - name: rid
+        in: path
+        required: true
+        description: Frozen requirement ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Only bounded text/structural preview; full PDF/Office page rendering is not represented.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFReviewerEvidencePreview'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/tasks/{id}/evidence/{rid}/pages:
+    get:
+      summary: Count exact pinned PDF/DOCX pages after reviewer/file ACL and original disk SHA checks
+      operationId: dhfPilotFrozenPages
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Authorized DHF review task ID
+        schema:
+          type: string
+      - name: rid
+        in: path
+        required: true
+        description: Pinned requirement ID
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Exact historical PDF/DOCX version page count.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFFrozenPages'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/tasks/{id}/evidence/{rid}/page:
+    get:
+      summary: Return a server-rasterized PNG page from frozen PDF or sandbox-converted DOCX; never latest file bytes
+      operationId: dhfPilotFrozenPage
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Authorized DHF review task ID
+        schema:
+          type: string
+      - name: rid
+        in: path
+        required: true
+        description: Pinned requirement ID
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: false
+        description: PDF/DOCX page number (1-1000)
+        schema:
+          type: integer
+          minimum: 1
+      responses:
+        '200':
+          description: Verified immutable page image, private no-store.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/returns/{id}/remediation:
+    post:
+      summary: Create an immutable trial corrective case and new preparing attempt from own returned reviewer decision
+      operationId: dhfPilotOpenRemediation
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Immutable returned-review decision ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DHFRemediationStart'
+      responses:
+        '201':
+          description: New immutable remediation lineage with separate new preparing attempt; never formal Stage Gate approval.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFRemediationOutcome'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/returns:
+    get:
+      summary: List returned DHF review findings only for their original submitter
+      operationId: dhfPilotReturns
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Owner-only return findings and correction status, maximum 100 items.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFReturnInboxPage'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/duties:
+    get:
+      summary: Read immutable template-ordered G5 or G6 reviewer liabilities; completed trial opinions do not constitute signatures
+      operationId: dhfPilotDutyChain
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Only for a participant assigned to the same frozen submission.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFDutyPage'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/tasks/{id}/early-intervention:
+    post:
+      summary: Record an assigned final Gate sponsor's immutable early-review intervention without waiving predecessor responsibilities
+      operationId: dhfPilotAuthorizeEarlyReview
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Target specialty review task ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DHFEarlyInterventionInput'
+      responses:
+        '200':
+          description: Trial-only early review, not formal Gate approval.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFEarlyInterventionOutcome'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/attestations:
+    get:
+      summary: List authenticated review confirmation records for their assigned reviewer only; this is not Gate acceptance
+      operationId: dhfPilotAttestationInbox
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Scoped signed and unsigned reviewed tasks with frozen hashes.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFReviewAttestationInboxPage'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/tasks/{id}/attest:
+    post:
+      summary: Reauthenticate assigned reviewer password in transaction and record immutable bounded signed intent
+      operationId: dhfPilotAttestReview
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Original assigned reviewer task ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DHFReviewAttestationInput'
+      responses:
+        '200':
+          description: Trial-only authenticated attestation, not legal electronic signature.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFReviewAttestationOutcome'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Per-account recent password reauthentication failure rate limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/verifications:
+    get:
+      summary: List corrective verification cases only for the signer of their original returned review
+      operationId: dhfPilotVerificationInbox
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      responses:
+        '200':
+          description: Reviewer-only correction readiness, preserving pending predecessor responsibility.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFRemediationVerificationQueue'
+                required:
+                - ok
+                - data
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: E_FORBIDDEN — authorization denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          description: E_DEPENDENCY — database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+  /api/workbench/dhf/remediations/{id}/verify:
+    post:
+      summary: Reauthenticate original returned reviewer and immutably verify correction after all revised reviewers signed
+      operationId: dhfPilotVerifyRemediation
+      tags:
+      - Workflow
+      security:
+      - cookieSession: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Immutable source remediation case ID
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DHFRemediationVerificationInput'
+      responses:
+        '200':
+          description: Independent verified corrective evidence fact, NOT final Stage Gate acceptance.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DHFRemediationVerificationOutcome'
+                required:
+                - ok
+                - data
+        '400':
+          description: E_BAD — malformed request body or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: E_AUTH — missing or expired session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: E_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '409':
+          description: Conflict — E_NAME_CONFLICT, E_VERSION_CONFLICT, E_LOCKED, E_APPROVAL_PENDING or E_PARENT_MISSING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: Five recent failed account reauthentication attempts within 15 minutes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/approvals:
     get:
       summary: List approvals visible to the caller
@@ -11856,6 +13396,1089 @@ components:
       - revision
       - markCount
       - action
+    DHFWorkbenchTask:
+      type: object
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        stageId:
+          type: string
+        submissionId:
+          type: string
+        reviewKey:
+          type: string
+        status:
+          type: string
+          enum:
+          - pending
+        gateReady:
+          type: boolean
+        assignedAt:
+          type: string
+          format: date-time
+      required:
+      - id
+      - projectId
+      - stageId
+      - submissionId
+      - reviewKey
+      - status
+      - gateReady
+      - assignedAt
+    DHFWorkbenchPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFWorkbenchTask'
+        trialOnly:
+          type: boolean
+      required:
+      - items
+      - trialOnly
+    DHFPilotGateVerification:
+      type: object
+      properties:
+        submissionId:
+          type: string
+        stageId:
+          type: string
+        candidateId:
+          type: string
+        candidateStatus:
+          type: string
+          enum:
+          - not_issued
+          - trial_candidate
+        cryptographicValid:
+          type: boolean
+        signatureDomain:
+          type: string
+        signatureReason:
+          type: string
+        credentialId:
+          type: string
+        credentialStatus:
+          type: string
+        credentialExpiresAt:
+          type: string
+          format: date-time
+        signerId:
+          type: string
+        payloadSha:
+          type: string
+        keySha:
+          type: string
+        missingPreconditions:
+          type: array
+          items:
+            type: string
+        trialOnly:
+          type: boolean
+        formalAccepted:
+          type: boolean
+      required:
+      - submissionId
+      - stageId
+      - candidateStatus
+      - cryptographicValid
+      - credentialStatus
+      - missingPreconditions
+      - trialOnly
+      - formalAccepted
+    DHFStageGateDependency:
+      type: object
+      properties:
+        id:
+          type: string
+        predecessorStage:
+          type: string
+        guardedAction:
+          type: string
+        state:
+          type: string
+      required:
+      - id
+      - predecessorStage
+      - guardedAction
+      - state
+    DHFStageGateGraphEdge:
+      type: object
+      properties:
+        id:
+          type: string
+        predecessorStage:
+          type: string
+        guardedAction:
+          type: string
+        allowConditional:
+          type: boolean
+      required:
+      - id
+      - predecessorStage
+      - guardedAction
+      - allowConditional
+    DHFStageGateGraphNode:
+      type: object
+      properties:
+        stageId:
+          type: string
+        templateId:
+          type: string
+        policySha:
+          type: string
+        positionState:
+          type: string
+        conditionalTemplateFlag:
+          type: boolean
+        dependencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFStageGateGraphEdge'
+      required:
+      - stageId
+      - templateId
+      - policySha
+      - positionState
+      - conditionalTemplateFlag
+      - dependencies
+    DHFStageGateReadiness:
+      type: object
+      properties:
+        submissionId:
+          type: string
+        candidateId:
+          type: string
+        projectId:
+          type: string
+        stageId:
+          type: string
+        templateId:
+          type: string
+        policySha:
+          type: string
+        manifestSha:
+          type: string
+        dependencies:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFStageGateDependency'
+        missingPreconditions:
+          type: array
+          items:
+            type: string
+        projectGraph:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFStageGateGraphNode'
+        projectGraphSha:
+          type: string
+        strictRequestAllowed:
+          type: boolean
+        conditionalRequestAllowed:
+          type: boolean
+        formalAccepted:
+          type: boolean
+        trialOnly:
+          type: boolean
+        reviewId:
+          type: string
+        reviewState:
+          type: string
+      required:
+      - submissionId
+      - candidateId
+      - projectId
+      - stageId
+      - templateId
+      - policySha
+      - manifestSha
+      - dependencies
+      - projectGraph
+      - missingPreconditions
+      - strictRequestAllowed
+      - conditionalRequestAllowed
+      - formalAccepted
+      - trialOnly
+    DHFStageGateReviewRequest:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum:
+          - strict
+          - conditional
+        password:
+          type: string
+        idempotencyKey:
+          type: string
+      required:
+      - mode
+      - password
+      - idempotencyKey
+    DHFStageGateReviewOutcome:
+      type: object
+      properties:
+        reviewId:
+          type: string
+        submissionId:
+          type: string
+        state:
+          type: string
+        replayed:
+          type: boolean
+        trialOnly:
+          type: boolean
+        formalAccepted:
+          type: boolean
+        reason:
+          type: string
+      required:
+      - submissionId
+      - replayed
+      - trialOnly
+      - formalAccepted
+    DHFGateDecisionReviewOpinion:
+      type: object
+      properties:
+        id:
+          type: string
+        reviewId:
+          type: string
+        reviewerId:
+          type: string
+        opinion:
+          type: string
+          enum:
+          - recommend_return
+          - recommend_reject
+        reason:
+          type: string
+        sourceGraphSha:
+          type: string
+        sourceCandidateSha:
+          type: string
+        trialOnly:
+          type: boolean
+        formalAccepted:
+          type: boolean
+      required:
+      - id
+      - reviewId
+      - reviewerId
+      - opinion
+      - reason
+      - sourceGraphSha
+      - sourceCandidateSha
+      - trialOnly
+      - formalAccepted
+    DHFGateDecisionReviewItem:
+      type: object
+      properties:
+        reviewId:
+          type: string
+        submissionId:
+          type: string
+        projectId:
+          type: string
+        stageId:
+          type: string
+        gateSignerId:
+          type: string
+        candidateId:
+          type: string
+        candidatePayloadSha:
+          type: string
+        projectGraphSha:
+          type: string
+        opinion:
+          $ref: '#/components/schemas/DHFGateDecisionReviewOpinion'
+        trialOnly:
+          type: boolean
+        formalAccepted:
+          type: boolean
+      required:
+      - reviewId
+      - submissionId
+      - projectId
+      - stageId
+      - gateSignerId
+      - candidateId
+      - candidatePayloadSha
+      - projectGraphSha
+      - trialOnly
+      - formalAccepted
+    DHFGateDecisionReviewPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFGateDecisionReviewItem'
+        trialOnly:
+          type: boolean
+        formalAccepted:
+          type: boolean
+      required:
+      - items
+      - trialOnly
+      - formalAccepted
+    DHFGateDecisionReviewRequest:
+      type: object
+      properties:
+        opinion:
+          type: string
+          enum:
+          - recommend_return
+          - recommend_reject
+        reason:
+          type: string
+        password:
+          type: string
+        idempotencyKey:
+          type: string
+      required:
+      - opinion
+      - reason
+      - password
+      - idempotencyKey
+    DHFGateDecisionReviewOutcome:
+      type: object
+      properties:
+        opinionId:
+          type: string
+        reviewId:
+          type: string
+        state:
+          type: string
+        replayed:
+          type: boolean
+        trialOnly:
+          type: boolean
+        formalAccepted:
+          type: boolean
+        reason:
+          type: string
+      required:
+      - reviewId
+      - replayed
+      - trialOnly
+      - formalAccepted
+    DHFConditionalRemediationObligation:
+      type: object
+      properties:
+        requirementId:
+          type: string
+        ownerId:
+          type: string
+        correctiveAction:
+          type: string
+        dueAt:
+          type: string
+          format: date-time
+      required:
+      - requirementId
+      - ownerId
+      - correctiveAction
+      - dueAt
+    DHFConditionalPlanOwner:
+      type: object
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+      required:
+      - id
+      - displayName
+    DHFConditionalPlanOption:
+      type: object
+      properties:
+        projectId:
+          type: string
+        stageId:
+          type: string
+        templateId:
+          type: string
+        dependencyId:
+          type: string
+        predecessorStage:
+          type: string
+        guardedAction:
+          type: string
+        eligibleRequirements:
+          type: array
+          items:
+            type: string
+        eligibleOwners:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFConditionalPlanOwner'
+      required:
+      - projectId
+      - stageId
+      - templateId
+      - dependencyId
+      - predecessorStage
+      - guardedAction
+      - eligibleRequirements
+      - eligibleOwners
+    DHFConditionalProposal:
+      type: object
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        stageId:
+          type: string
+        templateId:
+          type: string
+        policySha:
+          type: string
+        proposedBy:
+          type: string
+        dependencyId:
+          type: string
+        predecessorStage:
+          type: string
+        guardedAction:
+          type: string
+        graphSha:
+          type: string
+        obligations:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFConditionalRemediationObligation'
+        reason:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+        withdrawalReason:
+          type: string
+        trialOnly:
+          type: boolean
+        formalAccepted:
+          type: boolean
+      required:
+      - id
+      - projectId
+      - stageId
+      - templateId
+      - policySha
+      - proposedBy
+      - dependencyId
+      - predecessorStage
+      - guardedAction
+      - graphSha
+      - obligations
+      - reason
+      - expiresAt
+      - status
+      - trialOnly
+      - formalAccepted
+    DHFConditionalProposalCatalog:
+      type: object
+      properties:
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFConditionalPlanOption'
+        plans:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFConditionalProposal'
+        trialOnly:
+          type: boolean
+        formalAccepted:
+          type: boolean
+      required:
+      - options
+      - plans
+      - trialOnly
+      - formalAccepted
+    DHFConditionalProposalMutation:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+        replayed:
+          type: boolean
+        trialOnly:
+          type: boolean
+        formalAccepted:
+          type: boolean
+        reason:
+          type: string
+      required:
+      - replayed
+      - trialOnly
+      - formalAccepted
+    DHFPilotCredentialItem:
+      type: object
+      properties:
+        id:
+          type: string
+        signerId:
+          type: string
+        keySha:
+          type: string
+        status:
+          type: string
+        validFrom:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        registeredBy:
+          type: string
+        authorizationRef:
+          type: string
+        trialOnly:
+          type: boolean
+      required:
+      - id
+      - signerId
+      - keySha
+      - status
+      - validFrom
+      - expiresAt
+      - registeredBy
+      - authorizationRef
+      - trialOnly
+    DHFPilotCredentialPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFPilotCredentialItem'
+        canManage:
+          type: boolean
+        trialOnly:
+          type: boolean
+      required:
+      - items
+      - canManage
+      - trialOnly
+    DHFPilotCredentialMutation:
+      type: object
+      properties:
+        id:
+          type: string
+        credentialId:
+          type: string
+        replayed:
+          type: boolean
+        trialOnly:
+          type: boolean
+        reason:
+          type: string
+      required:
+      - replayed
+      - trialOnly
+    DHFRecommendationResult:
+      type: object
+      properties:
+        taskId:
+          type: string
+        decisionId:
+          type: string
+        status:
+          type: string
+        reason:
+          type: string
+        replayed:
+          type: boolean
+        trialOnly:
+          type: boolean
+      required:
+      - taskId
+      - trialOnly
+    DHFReviewerEvidenceItem:
+      type: object
+      properties:
+        requirementId:
+          type: string
+        fileId:
+          type: string
+        fileName:
+          type: string
+        versionSeq:
+          type: integer
+          minimum: 1
+        sha256:
+          type: string
+        sizeBytes:
+          type: integer
+          minimum: 0
+      required:
+      - requirementId
+      - fileId
+      - fileName
+      - versionSeq
+      - sha256
+      - sizeBytes
+    DHFReviewerEvidencePage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFReviewerEvidenceItem'
+        trialOnly:
+          type: boolean
+      required:
+      - items
+      - trialOnly
+    DHFReviewerEvidencePreview:
+      type: object
+      properties:
+        fileId:
+          type: string
+        name:
+          type: string
+        sha256:
+          type: string
+        size:
+          type: integer
+          minimum: 0
+        content:
+          type: string
+        textual:
+          type: boolean
+        truncated:
+          type: boolean
+        renderer:
+          type: string
+        mediaType:
+          type: string
+        fixedVersionVerified:
+          type: boolean
+      required:
+      - fileId
+      - name
+      - sha256
+      - size
+      - textual
+      - truncated
+      - fixedVersionVerified
+    DHFFrozenPages:
+      type: object
+      properties:
+        pageCount:
+          type: integer
+          minimum: 1
+        immutable:
+          type: boolean
+        trialOnly:
+          type: boolean
+      required:
+      - pageCount
+      - immutable
+      - trialOnly
+    DHFRemediationStart:
+      type: object
+      properties:
+        manifest:
+          type: object
+          description: Full replacement manifest for the same known requirement IDs; changed pinned evidence version mandatory.
+          properties:
+            requirements:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  applicability:
+                    type: string
+                  file_id:
+                    type: string
+                  version_seq:
+                    type: integer
+                    minimum: 1
+                  sha256:
+                    type: string
+                required:
+                - id
+                - applicability
+          required:
+          - requirements
+        resolutionPlan:
+          type: string
+          description: Required substantive corrective plan (10–2000 characters).
+        idempotencyKey:
+          type: string
+          description: Retry exactly the same request using this key.
+      required:
+      - manifest
+      - resolutionPlan
+      - idempotencyKey
+    DHFRemediationOutcome:
+      type: object
+      properties:
+        caseId:
+          type: string
+        returnDecisionId:
+          type: string
+        originalSubmissionId:
+          type: string
+        newAttemptId:
+          type: string
+        replayed:
+          type: boolean
+        trialOnly:
+          type: boolean
+        reason:
+          type: string
+      required:
+      - returnDecisionId
+      - trialOnly
+    DHFReturnInboxItem:
+      type: object
+      properties:
+        decisionId:
+          type: string
+        reviewKey:
+          type: string
+        projectId:
+          type: string
+        stageId:
+          type: string
+        originalSubmissionId:
+          type: string
+        originalManifest:
+          type: object
+        originalManifestSha:
+          type: string
+        returnReason:
+          type: string
+        decidedAt:
+          type: string
+          format: date-time
+        caseId:
+          type: string
+        newAttemptId:
+          type: string
+        newAttemptState:
+          type: string
+        canPrepare:
+          type: boolean
+      required:
+      - decisionId
+      - reviewKey
+      - projectId
+      - stageId
+      - originalSubmissionId
+      - originalManifest
+      - originalManifestSha
+      - returnReason
+      - decidedAt
+      - canPrepare
+    DHFReturnInboxPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFReturnInboxItem'
+        trialOnly:
+          type: boolean
+      required:
+      - items
+      - trialOnly
+    DHFDutySnapshot:
+      type: object
+      properties:
+        submissionId:
+          type: string
+        projectId:
+          type: string
+        stageId:
+          type: string
+        taskId:
+          type: string
+        reviewKey:
+          type: string
+        stepOrdinal:
+          type: integer
+          minimum: 1
+        reviewerId:
+          type: string
+        status:
+          type: string
+        earlyIntervention:
+          type: boolean
+        interventionReason:
+          type: string
+        outstandingPrior:
+          type: integer
+          minimum: 0
+        canAuthorizeEarly:
+          type: boolean
+      required:
+      - submissionId
+      - projectId
+      - stageId
+      - taskId
+      - reviewKey
+      - stepOrdinal
+      - reviewerId
+      - status
+      - earlyIntervention
+      - outstandingPrior
+      - canAuthorizeEarly
+    DHFDutyPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFDutySnapshot'
+        trialOnly:
+          type: boolean
+      required:
+      - items
+      - trialOnly
+    DHFEarlyInterventionInput:
+      type: object
+      properties:
+        reason:
+          type: string
+          description: Specific sponsor's reason for reviewing out of order; upstream duty never waived.
+        idempotencyKey:
+          type: string
+          description: Retry unchanged idempotency key.
+      required:
+      - reason
+      - idempotencyKey
+    DHFEarlyInterventionOutcome:
+      type: object
+      properties:
+        interventionId:
+          type: string
+        targetTaskId:
+          type: string
+        submissionId:
+          type: string
+        replayed:
+          type: boolean
+        trialOnly:
+          type: boolean
+        reason:
+          type: string
+      required:
+      - targetTaskId
+      - trialOnly
+    DHFReviewAttestationInput:
+      type: object
+      properties:
+        decisionId:
+          type: string
+          description: Immutable reviewer decision being explicitly confirmed.
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          maxLength: 1024
+        signIntent:
+          type: string
+          description: Exact per-reviewer attestation of frozen decision and evidence.
+        idempotencyKey:
+          type: string
+          description: Retry same attestation intent using unchanged key.
+      required:
+      - decisionId
+      - password
+      - signIntent
+      - idempotencyKey
+    DHFReviewAttestationOutcome:
+      type: object
+      properties:
+        attestationId:
+          type: string
+        taskId:
+          type: string
+        reviewDecisionId:
+          type: string
+        contentSha:
+          type: string
+        replayed:
+          type: boolean
+        trialOnly:
+          type: boolean
+        reason:
+          type: string
+      required:
+      - taskId
+      - trialOnly
+    DHFReviewAttestationInboxItem:
+      type: object
+      properties:
+        taskId:
+          type: string
+        decisionId:
+          type: string
+        submissionId:
+          type: string
+        projectId:
+          type: string
+        stageId:
+          type: string
+        reviewKey:
+          type: string
+        outcome:
+          type: string
+        reviewComment:
+          type: string
+        policySha:
+          type: string
+        manifestSha:
+          type: string
+        outstandingPrior:
+          type: integer
+          minimum: 0
+        canAttest:
+          type: boolean
+        attestationId:
+          type: string
+        contentSha:
+          type: string
+      required:
+      - taskId
+      - decisionId
+      - submissionId
+      - projectId
+      - stageId
+      - reviewKey
+      - outcome
+      - reviewComment
+      - policySha
+      - manifestSha
+      - outstandingPrior
+      - canAttest
+    DHFReviewAttestationInboxPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFReviewAttestationInboxItem'
+        trialOnly:
+          type: boolean
+        signIntent:
+          type: string
+      required:
+      - items
+      - trialOnly
+      - signIntent
+    DHFRemediationVerificationInput:
+      type: object
+      properties:
+        comment:
+          type: string
+          description: Evidence-specific original return reviewer's corrective verification reason.
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          maxLength: 1024
+        verificationIntent:
+          type: string
+          description: Explicit independent corrective verification intent.
+        idempotencyKey:
+          type: string
+          description: Retry unchanged key for exactly the same verifier and corrected submission.
+      required:
+      - comment
+      - password
+      - verificationIntent
+      - idempotencyKey
+    DHFRemediationVerificationOutcome:
+      type: object
+      properties:
+        verificationId:
+          type: string
+        caseId:
+          type: string
+        revisedSubmissionId:
+          type: string
+        replayed:
+          type: boolean
+        trialOnly:
+          type: boolean
+        reason:
+          type: string
+      required:
+      - caseId
+      - trialOnly
+    DHFRemediationVerificationQueueItem:
+      type: object
+      properties:
+        caseId:
+          type: string
+        returnDecisionId:
+          type: string
+        projectId:
+          type: string
+        stageId:
+          type: string
+        originalSubmissionId:
+          type: string
+        revisedSubmissionId:
+          type: string
+        originalManifestSha:
+          type: string
+        revisedManifestSha:
+          type: string
+        returnReason:
+          type: string
+        resolutionPlan:
+          type: string
+        newAttemptState:
+          type: string
+        readyToVerify:
+          type: boolean
+        verificationId:
+          type: string
+      required:
+      - caseId
+      - returnDecisionId
+      - projectId
+      - stageId
+      - originalSubmissionId
+      - revisedSubmissionId
+      - originalManifestSha
+      - revisedManifestSha
+      - returnReason
+      - resolutionPlan
+      - newAttemptState
+      - readyToVerify
+    DHFRemediationVerificationQueue:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DHFRemediationVerificationQueueItem'
+        trialOnly:
+          type: boolean
+        verificationIntent:
+          type: string
+      required:
+      - items
+      - trialOnly
+      - verificationIntent
     ApprovalPage:
       type: object
       properties:

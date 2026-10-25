@@ -1298,6 +1298,398 @@ add("POST","/api/files/{id}/seals/marks/revoke",operation("Selectively revoke an
  request={"application/json":{"schema":obj({"versionSeq":integer(minimum=1),"fileSha256":string(),"expectedRevision":integer(minimum=1),"markIds":arr(string()),"password":string()},required=["versionSeq","fileSha256","expectedRevision","markIds"])}},
  responses=dict([("201",{"description":"New audited signing revision without only the selected stamps and signatures; older evidence retained","content":{"application/json":{"schema":obj({"ok":boolean(),"data":ref("SealRevision")},required=["ok","data"])}}}),resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
 
+# --- Unified Workbench / DHF staged review assignments ---
+schema("DHFWorkbenchTask",obj({
+ "id":string(),"projectId":string(),"stageId":string(),"submissionId":string(),
+ "reviewKey":string(),"status":string(enum=["pending"]),"gateReady":boolean(),"assignedAt":timestamp(),
+},required=["id","projectId","stageId","submissionId","reviewKey","status","gateReady","assignedAt"]))
+schema("DHFWorkbenchPage",obj({"items":arr(ref("DHFWorkbenchTask")),"trialOnly":boolean()},
+ required=["items","trialOnly"]))
+schema("DHFPilotGateVerification",obj({
+ "submissionId":string(),"stageId":string(),"candidateId":string(),
+ "candidateStatus":string(enum=["not_issued","trial_candidate"]),
+ "cryptographicValid":boolean(),"signatureDomain":string(),"signatureReason":string(),
+ "credentialId":string(),"credentialStatus":string(),"credentialExpiresAt":timestamp(),
+ "signerId":string(),"payloadSha":string(),"keySha":string(),
+ "missingPreconditions":arr(string()),"trialOnly":boolean(),"formalAccepted":boolean(),
+},required=["submissionId","stageId","candidateStatus","cryptographicValid",
+ "credentialStatus","missingPreconditions","trialOnly","formalAccepted"]))
+schema("DHFStageGateDependency",obj({
+ "id":string(),"predecessorStage":string(),"guardedAction":string(),"state":string(),
+},required=["id","predecessorStage","guardedAction","state"]))
+schema("DHFStageGateGraphEdge",obj({
+ "id":string(),"predecessorStage":string(),"guardedAction":string(),"allowConditional":boolean(),
+},required=["id","predecessorStage","guardedAction","allowConditional"]))
+schema("DHFStageGateGraphNode",obj({
+ "stageId":string(),"templateId":string(),"policySha":string(),"positionState":string(),
+ "conditionalTemplateFlag":boolean(),"dependencies":arr(ref("DHFStageGateGraphEdge")),
+},required=["stageId","templateId","policySha","positionState",
+ "conditionalTemplateFlag","dependencies"]))
+schema("DHFStageGateReadiness",obj({
+ "submissionId":string(),"candidateId":string(),"projectId":string(),
+ "stageId":string(),"templateId":string(),"policySha":string(),"manifestSha":string(),
+ "dependencies":arr(ref("DHFStageGateDependency")),"missingPreconditions":arr(string()),
+ "projectGraph":arr(ref("DHFStageGateGraphNode")),"projectGraphSha":string(),
+ "strictRequestAllowed":boolean(),"conditionalRequestAllowed":boolean(),
+ "formalAccepted":boolean(),"trialOnly":boolean(),"reviewId":string(),"reviewState":string(),
+},required=["submissionId","candidateId","projectId","stageId","templateId",
+ "policySha","manifestSha","dependencies","projectGraph","missingPreconditions",
+ "strictRequestAllowed","conditionalRequestAllowed","formalAccepted","trialOnly"]))
+schema("DHFStageGateReviewRequest",obj({
+ "mode":string(enum=["strict","conditional"]),"password":string(),"idempotencyKey":string(),
+},required=["mode","password","idempotencyKey"]))
+schema("DHFStageGateReviewOutcome",obj({
+ "reviewId":string(),"submissionId":string(),"state":string(),"replayed":boolean(),
+ "trialOnly":boolean(),"formalAccepted":boolean(),"reason":string(),
+},required=["submissionId","replayed","trialOnly","formalAccepted"]))
+schema("DHFGateDecisionReviewOpinion",obj({
+ "id":string(),"reviewId":string(),"reviewerId":string(),
+ "opinion":string(enum=["recommend_return","recommend_reject"]),
+ "reason":string(),"sourceGraphSha":string(),"sourceCandidateSha":string(),
+ "trialOnly":boolean(),"formalAccepted":boolean(),
+},required=["id","reviewId","reviewerId","opinion","reason","sourceGraphSha",
+ "sourceCandidateSha","trialOnly","formalAccepted"]))
+schema("DHFGateDecisionReviewItem",obj({
+ "reviewId":string(),"submissionId":string(),"projectId":string(),"stageId":string(),
+ "gateSignerId":string(),"candidateId":string(),"candidatePayloadSha":string(),
+ "projectGraphSha":string(),"opinion":ref("DHFGateDecisionReviewOpinion"),
+ "trialOnly":boolean(),"formalAccepted":boolean(),
+},required=["reviewId","submissionId","projectId","stageId","gateSignerId",
+ "candidateId","candidatePayloadSha","projectGraphSha","trialOnly","formalAccepted"]))
+schema("DHFGateDecisionReviewPage",obj({
+ "items":arr(ref("DHFGateDecisionReviewItem")),"trialOnly":boolean(),"formalAccepted":boolean(),
+},required=["items","trialOnly","formalAccepted"]))
+schema("DHFGateDecisionReviewRequest",obj({
+ "opinion":string(enum=["recommend_return","recommend_reject"]),
+ "reason":string(),"password":string(),"idempotencyKey":string(),
+},required=["opinion","reason","password","idempotencyKey"]))
+schema("DHFGateDecisionReviewOutcome",obj({
+ "opinionId":string(),"reviewId":string(),"state":string(),"replayed":boolean(),
+ "trialOnly":boolean(),"formalAccepted":boolean(),"reason":string(),
+},required=["reviewId","replayed","trialOnly","formalAccepted"]))
+schema("DHFConditionalRemediationObligation",obj({
+ "requirementId":string(),"ownerId":string(),"correctiveAction":string(),"dueAt":timestamp(),
+},required=["requirementId","ownerId","correctiveAction","dueAt"]))
+schema("DHFConditionalPlanOwner",obj({
+ "id":string(),"displayName":string(),
+},required=["id","displayName"]))
+schema("DHFConditionalPlanOption",obj({
+ "projectId":string(),"stageId":string(),"templateId":string(),
+ "dependencyId":string(),"predecessorStage":string(),"guardedAction":string(),
+ "eligibleRequirements":arr(string()),"eligibleOwners":arr(ref("DHFConditionalPlanOwner")),
+},required=["projectId","stageId","templateId","dependencyId","predecessorStage",
+ "guardedAction","eligibleRequirements","eligibleOwners"]))
+schema("DHFConditionalProposal",obj({
+ "id":string(),"projectId":string(),"stageId":string(),"templateId":string(),
+ "policySha":string(),"proposedBy":string(),"dependencyId":string(),
+ "predecessorStage":string(),"guardedAction":string(),"graphSha":string(),
+ "obligations":arr(ref("DHFConditionalRemediationObligation")),
+ "reason":string(),"expiresAt":timestamp(),"status":string(),
+ "withdrawalReason":string(),"trialOnly":boolean(),"formalAccepted":boolean(),
+},required=["id","projectId","stageId","templateId","policySha","proposedBy",
+ "dependencyId","predecessorStage","guardedAction","graphSha","obligations",
+ "reason","expiresAt","status","trialOnly","formalAccepted"]))
+schema("DHFConditionalProposalCatalog",obj({
+ "options":arr(ref("DHFConditionalPlanOption")),"plans":arr(ref("DHFConditionalProposal")),
+ "trialOnly":boolean(),"formalAccepted":boolean(),
+},required=["options","plans","trialOnly","formalAccepted"]))
+schema("DHFConditionalProposalMutation",obj({
+ "id":string(),"status":string(),"replayed":boolean(),
+ "trialOnly":boolean(),"formalAccepted":boolean(),"reason":string(),
+},required=["replayed","trialOnly","formalAccepted"]))
+add("GET","/api/workbench/dhf/gates/{submissionId}/readiness",operation(
+ "Assigned G5/G6 final Gate signer reads explicit published-template dependencies and frozen signed candidate without formal acceptance",
+ "Workflow","dhfStageGateReadiness",security=SESSION,
+ params=[id_param("submissionId","Frozen original DHF submission ID")],
+ responses=dict([json_ok(ref("DHFStageGateReadiness"),"Enterprise authority unapproved, conditional requests disabled; no inferred G1-G9 DAG."),
+ resp("401",ERR["401"]),resp("404",ERR["404"]),resp("503",ERR["503"])])))
+add("POST","/api/workbench/dhf/gates/{submissionId}/review-request",operation(
+ "File an immutable strict Stage Gate REVIEW INTAKE with independent password reauthentication, physical evidence recheck, policy-frozen dependency snapshot, audit and outbox. Never accepted.",
+ "Workflow","dhfStageGateRequest",security=SESSION,
+ params=[id_param("submissionId","Frozen original DHF submission ID")],
+ request={"application/json":{"schema":ref("DHFStageGateReviewRequest")}},
+ responses=dict([json_ok(ref("DHFStageGateReviewOutcome"),"Only state awaiting_enterprise_authority; enterprise accepted remains unreachable."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),
+ resp("404",ERR["404"]),resp("409",ERR["409"]),resp("503",ERR["503"])])))
+add("GET","/api/workbench/dhf/gate-decision-reviews",operation(
+ "Read scoped independent pilot Gate reviewer inbox; not an approved corporate Gate decision.",
+ "Workflow","dhfGateDecisionReviewInbox",security=SESSION,
+ responses=dict([json_ok(ref("DHFGateDecisionReviewPage"),"Only active independently delegated reviewer may see source-bound Gate requests."),
+ resp("401",ERR["401"]),resp("503",ERR["503"])])))
+add("POST","/api/workbench/dhf/gate-decision-reviews/{reviewId}/recommendation",operation(
+ "File one immutable signed-in Gate reviewer recommendation of return/reject, after independent authorization and password reauthentication. No formal approval or condition grant.",
+ "Workflow","dhfGateDecisionReviewRecommend",security=SESSION,
+ params=[id_param("reviewId","Frozen strict Gate review ID")],
+ request={"application/json":{"schema":ref("DHFGateDecisionReviewRequest")}},
+ responses=dict([json_ok(ref("DHFGateDecisionReviewOutcome"),"Only recommendation_only; no accepted or conditionally released state."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),
+ resp("404",ERR["404"]),resp("409",ERR["409"]),resp("503",ERR["503"])])))
+add("GET","/api/workbench/dhf/conditional-plans",operation(
+ "Show authorized preparer's independently verified published direct dependency planning opportunities and immutable own pilot proposals with database-derived expired/withdrawn status; never a conditional grant.",
+ "Workflow","dhfConditionalPlanCatalog",security=SESSION,
+ responses=dict([json_ok(ref("DHFConditionalProposalCatalog"),"No unauthorized transitive predecessor or downstream action permission."),
+ resp("401",ERR["401"]),resp("503",ERR["503"])])))
+add("POST","/api/workbench/dhf/conditional-plans",operation(
+ "File one immutable 30-day-max nonauthorizing conditional remediation plan against an explicit published direct edge, with per-noncritical-requirement owner, corrective action, due date, password reauthentication, graph SHA audit and outbox.",
+ "Workflow","dhfConditionalPlanFile",security=SESSION,
+ request={"application/json":{"schema":obj({
+  "projectId":string(),"stageId":string(),"dependencyId":string(),
+  "reason":string(),"expiresAt":timestamp(),
+  "obligations":arr(ref("DHFConditionalRemediationObligation")),
+  "password":string(),"idempotencyKey":string(),
+ },required=["projectId","stageId","dependencyId","reason",
+ "expiresAt","obligations","password","idempotencyKey"])}},
+ responses=dict([json_ok(ref("DHFConditionalProposalMutation"),"Only awaiting_enterprise_authority; planning never grants prepare, submit or document issuance."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),
+ resp("404",ERR["404"]),resp("409",ERR["409"]),resp("503",ERR["503"])])))
+add("POST","/api/workbench/dhf/conditional-plans/{id}/withdraw",operation(
+ "Append an independently audited irreversible withdrawal of an unapproved conditional plan by its original preparer; historical obligations remain immutable.",
+ "Workflow","dhfConditionalPlanWithdraw",security=SESSION,
+ params=[id_param("id","Immutable conditional remediation proposal ID")],
+ request={"application/json":{"schema":obj({
+ "reason":string(),"password":string(),
+ },required=["reason","password"])}},
+ responses=dict([json_ok(ref("DHFConditionalProposalMutation"),"Only withdrawn; no Stage Gate state transition."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),
+ resp("404",ERR["404"]),resp("409",ERR["409"]),resp("503",ERR["503"])])))
+schema("DHFPilotCredentialItem",obj({
+ "id":string(),"signerId":string(),"keySha":string(),
+ "status":string(),"validFrom":timestamp(),"expiresAt":timestamp(),
+ "registeredBy":string(),"authorizationRef":string(),"trialOnly":boolean(),
+},required=["id","signerId","keySha","status","validFrom","expiresAt","registeredBy","authorizationRef","trialOnly"]))
+schema("DHFPilotCredentialPage",obj({"items":arr(ref("DHFPilotCredentialItem")),
+ "canManage":boolean(),"trialOnly":boolean()},required=["items","canManage","trialOnly"]))
+schema("DHFPilotCredentialMutation",obj({
+ "id":string(),"credentialId":string(),"replayed":boolean(),"trialOnly":boolean(),"reason":string(),
+},required=["replayed","trialOnly"]))
+add("GET","/api/workbench/dhf/credentials",operation(
+ "Trial-only signer credentials registered by the independently delegated operator; no administrator role bypass",
+ "Workflow","dhfPilotCredentialList",security=SESSION,
+ responses=dict([json_ok(ref("DHFPilotCredentialPage"),"Denied operators receive no credential records and canManage false."),
+ resp("401",ERR["401"]),resp("403",ERR["403"]),resp("503",ERR["503"])])))
+add("POST","/api/workbench/dhf/credentials",operation(
+ "Register an externally trusted trial Gate signing public key; independent time-bounded operator grant, password reauthentication, and immutable audit required",
+ "Workflow","dhfPilotCredentialRegister",security=SESSION,
+ request={"application/json":{"schema":obj({
+  "signerId":string(),"publicKeyBase64":string(),"authorizationRef":string(),
+  "validFrom":timestamp(),"expiresAt":timestamp(),"password":string(),"idempotencyKey":string(),
+ },required=["signerId","publicKeyBase64","authorizationRef","validFrom","expiresAt","password","idempotencyKey"])}},
+ responses=dict([json_ok(ref("DHFPilotCredentialMutation"),"Registration is UNACTIVATED and trial-only; never issues a corporate certificate."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),
+ resp("409",ERR["409"]),resp("503",ERR["503"])])))
+add("POST","/api/workbench/dhf/credentials/{id}/events",operation(
+ "Append one audited, operator-scoped, reauthenticated trial credential lifecycle event, subject to irreversible revocation/replace",
+ "Workflow","dhfPilotCredentialEvent",security=SESSION,
+ params=[id_param("id","Immutable trial credential ID")],
+ request={"application/json":{"schema":obj({
+  "kind":string(enum=["activate","suspend","revoke","replace"]),
+  "reason":string(),"password":string(),"idempotencyKey":string(),
+ },required=["kind","reason","password","idempotencyKey"])}},
+ responses=dict([json_ok(ref("DHFPilotCredentialMutation"),"Append-only lifecycle, not formal signature authority."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),
+ resp("404",ERR["404"]),resp("409",ERR["409"]),resp("503",ERR["503"])])))
+add("GET","/api/workbench/dhf/gates/{submissionId}/verification",operation(
+ "Read historical trial Gate Ed25519 verification and current credential status for assigned Gate reviewer only; not a Stage approval",
+ "Workflow","dhfPilotGateVerification",security=SESSION,
+ params=[id_param("submissionId","Frozen submission ID assigned to the current Gate reviewer")],
+ responses=dict([json_ok(ref("DHFPilotGateVerification"),"Historical pinned public verifier and current revocation are independent."),
+ resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("503",ERR["503"])])))
+add("GET","/api/workbench/dhf/tasks",operation(
+ "Read trial DHF review assignments scoped to the active reviewer; no stage approval authority",
+ "Workflow","dhfPilotWorkbenchTasks",security=SESSION,
+ responses=dict([json_ok(ref("DHFWorkbenchPage"),"Read-only G5 specialty and G6 Gate task list, maximum 100 items."),
+ resp("401",ERR["401"]),resp("403",ERR["403"]),resp("503",ERR["503"])])))
+
+schema("DHFRecommendationResult",obj({
+ "taskId":string(),"decisionId":string(),"status":string(),"reason":string(),
+ "replayed":boolean(),"trialOnly":boolean(),
+},required=["taskId","trialOnly"]))
+add("POST","/api/workbench/dhf/tasks/{id}/recommendation",operation(
+ "Record an immutable non-signing DHF reviewer recommendation, never an official Stage Gate decision",
+ "Workflow","dhfPilotRecommend",security=SESSION,
+ params=[id_param("id","Assigned DHF pilot reviewer task ID")],
+ request={"application/json":{"schema":obj({
+  "outcome":string(enum=["recommend_pass","recommend_return"]),
+  "comment":string(),"idempotencyKey":string(),
+ },required=["outcome","comment","idempotencyKey"])}},
+ responses=dict([json_ok(ref("DHFRecommendationResult"),"Trial-only immutable reviewer opinion, not approval."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),
+ resp("404",ERR["404"]),resp("409",ERR["409"])])))
+
+schema("DHFReviewerEvidenceItem",obj({
+ "requirementId":string(),"fileId":string(),"fileName":string(),
+ "versionSeq":integer(minimum=1),"sha256":string(),"sizeBytes":integer(minimum=0),
+},required=["requirementId","fileId","fileName","versionSeq","sha256","sizeBytes"]))
+schema("DHFReviewerEvidencePage",obj({
+ "items":arr(ref("DHFReviewerEvidenceItem")),"trialOnly":boolean(),
+},required=["items","trialOnly"]))
+add("GET","/api/workbench/dhf/tasks/{id}/evidence",operation(
+ "List exact frozen file versions for assigned reviewer with independent original file preview ACL checks",
+ "Workflow","dhfPilotEvidenceList",security=SESSION,
+ params=[id_param("id","Review task ID")],
+ responses=dict([json_ok(ref("DHFReviewerEvidencePage"),"Original immutable version tuple with no Blob storage key exposure."),
+ resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("503",ERR["503"])])))
+schema("DHFReviewerEvidencePreview",obj({
+ "fileId":string(),"name":string(),"sha256":string(),"size":integer(minimum=0),
+ "content":string(),"textual":boolean(),"truncated":boolean(),
+ "renderer":string(),"mediaType":string(),"fixedVersionVerified":boolean(),
+},required=["fileId","name","sha256","size","textual","truncated","fixedVersionVerified"]))
+add("GET","/api/workbench/dhf/tasks/{id}/evidence/{rid}/preview",operation(
+ "Preview a bounded copy of the pinned historical document version, after reviewer+file ACL and physical SHA-256 checks",
+ "Workflow","dhfPilotEvidencePreview",security=SESSION,
+ params=[id_param("id","Assigned reviewer task ID"),id_param("rid","Frozen requirement ID")],
+ responses=dict([json_ok(ref("DHFReviewerEvidencePreview"),"Only bounded text/structural preview; full PDF/Office page rendering is not represented."),
+ resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("503",ERR["503"])])))
+
+schema("DHFFrozenPages",obj({
+ "pageCount":integer(minimum=1),"immutable":boolean(),"trialOnly":boolean(),
+},required=["pageCount","immutable","trialOnly"]))
+add("GET","/api/workbench/dhf/tasks/{id}/evidence/{rid}/pages",operation(
+ "Count exact pinned PDF/DOCX pages after reviewer/file ACL and original disk SHA checks",
+ "Workflow","dhfPilotFrozenPages",security=SESSION,
+ params=[id_param("id","Authorized DHF review task ID"),id_param("rid","Pinned requirement ID")],
+ responses=dict([json_ok(ref("DHFFrozenPages"),"Exact historical PDF/DOCX version page count."),
+ resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("503",ERR["503"])])))
+add("GET","/api/workbench/dhf/tasks/{id}/evidence/{rid}/page",operation(
+ "Return a server-rasterized PNG page from frozen PDF or sandbox-converted DOCX; never latest file bytes",
+ "Workflow","dhfPilotFrozenPage",security=SESSION,
+ params=[id_param("id","Authorized DHF review task ID"),id_param("rid","Pinned requirement ID"),
+ query("page","PDF/DOCX page number (1-1000)",integer(minimum=1))],
+ responses=dict([("200",{"description":"Verified immutable page image, private no-store.","content":{"image/png":{"schema":{"type":"string","format":"binary"}}}}),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("404",ERR["404"]),resp("503",ERR["503"])])))
+
+# --- DHF returned review remediation (no formal Stage Gate approval) ---
+schema("DHFRemediationStart",obj({
+ "manifest":obj({"requirements":arr(obj({
+  "id":string(),"applicability":string(),"file_id":string(),
+  "version_seq":integer(minimum=1),"sha256":string(),
+ },required=["id","applicability"]))},required=["requirements"],
+ desc="Full replacement manifest for the same known requirement IDs; changed pinned evidence version mandatory."),
+ "resolutionPlan":string("Required substantive corrective plan (10–2000 characters)."),
+ "idempotencyKey":string("Retry exactly the same request using this key."),
+},required=["manifest","resolutionPlan","idempotencyKey"]))
+schema("DHFRemediationOutcome",obj({
+ "caseId":string(),"returnDecisionId":string(),"originalSubmissionId":string(),
+ "newAttemptId":string(),"replayed":boolean(),"trialOnly":boolean(),"reason":string(),
+},required=["returnDecisionId","trialOnly"]))
+add("POST","/api/workbench/dhf/returns/{id}/remediation",operation(
+ "Create an immutable trial corrective case and new preparing attempt from own returned reviewer decision",
+ "Workflow","dhfPilotOpenRemediation",security=SESSION,
+ params=[id_param("id","Immutable returned-review decision ID")],
+ request={"application/json":{"schema":ref("DHFRemediationStart")}},
+ responses=dict([("201",{"description":"New immutable remediation lineage with separate new preparing attempt; never formal Stage Gate approval.",
+ "content":{"application/json":{"schema":obj({"ok":{"type":"boolean","enum":[True]},"data":ref("DHFRemediationOutcome")},required=["ok","data"])}}}),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
+
+schema("DHFReturnInboxItem",obj({"decisionId":string(),"reviewKey":string(),"projectId":string(),"stageId":string(),"originalSubmissionId":string(),"originalManifest":{"type":"object"},"originalManifestSha":string(),"returnReason":string(),"decidedAt":timestamp(),"caseId":string(),"newAttemptId":string(),"newAttemptState":string(),"canPrepare":boolean()},required=["decisionId","reviewKey","projectId","stageId","originalSubmissionId","originalManifest","originalManifestSha","returnReason","decidedAt","canPrepare"]))
+schema("DHFReturnInboxPage",obj({"items":arr(ref("DHFReturnInboxItem")),"trialOnly":boolean()},required=["items","trialOnly"]))
+add("GET","/api/workbench/dhf/returns",operation("List returned DHF review findings only for their original submitter","Workflow","dhfPilotReturns",security=SESSION,responses=dict([json_ok(ref("DHFReturnInboxPage"),"Owner-only return findings and correction status, maximum 100 items."),resp("401",ERR["401"]),resp("403",ERR["403"]),resp("503",ERR["503"])])))
+
+schema("DHFDutySnapshot",obj({
+ "submissionId":string(),"projectId":string(),"stageId":string(),
+ "taskId":string(),"reviewKey":string(),"stepOrdinal":integer(minimum=1),
+ "reviewerId":string(),"status":string(),"earlyIntervention":boolean(),
+ "interventionReason":string(),"outstandingPrior":integer(minimum=0),
+ "canAuthorizeEarly":boolean(),
+},required=["submissionId","projectId","stageId","taskId","reviewKey","stepOrdinal",
+ "reviewerId","status","earlyIntervention","outstandingPrior","canAuthorizeEarly"]))
+schema("DHFDutyPage",obj({"items":arr(ref("DHFDutySnapshot")),"trialOnly":boolean()},
+ required=["items","trialOnly"]))
+schema("DHFEarlyInterventionInput",obj({
+ "reason":string("Specific sponsor's reason for reviewing out of order; upstream duty never waived."),
+ "idempotencyKey":string("Retry unchanged idempotency key."),
+},required=["reason","idempotencyKey"]))
+schema("DHFEarlyInterventionOutcome",obj({
+ "interventionId":string(),"targetTaskId":string(),"submissionId":string(),
+ "replayed":boolean(),"trialOnly":boolean(),"reason":string(),
+},required=["targetTaskId","trialOnly"]))
+add("GET","/api/workbench/dhf/duties",operation(
+ "Read immutable template-ordered G5 or G6 reviewer liabilities; completed trial opinions do not constitute signatures",
+ "Workflow","dhfPilotDutyChain",security=SESSION,
+ responses=dict([json_ok(ref("DHFDutyPage"),"Only for a participant assigned to the same frozen submission."),
+ resp("401",ERR["401"]),resp("403",ERR["403"]),resp("503",ERR["503"])])))
+add("POST","/api/workbench/dhf/tasks/{id}/early-intervention",operation(
+ "Record an assigned final Gate sponsor's immutable early-review intervention without waiving predecessor responsibilities",
+ "Workflow","dhfPilotAuthorizeEarlyReview",security=SESSION,
+ params=[id_param("id","Target specialty review task ID")],
+ request={"application/json":{"schema":ref("DHFEarlyInterventionInput")}},
+ responses=dict([json_ok(ref("DHFEarlyInterventionOutcome"),"Trial-only early review, not formal Gate approval."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("404",ERR["404"]),resp("409",ERR["409"])])))
+
+schema("DHFReviewAttestationInput",obj({
+ "decisionId":string("Immutable reviewer decision being explicitly confirmed."),
+ "password":{"type":"string","writeOnly":True,"minLength":1,"maxLength":1024},
+ "signIntent":string("Exact per-reviewer attestation of frozen decision and evidence."),
+ "idempotencyKey":string("Retry same attestation intent using unchanged key."),
+},required=["decisionId","password","signIntent","idempotencyKey"]))
+schema("DHFReviewAttestationOutcome",obj({
+ "attestationId":string(),"taskId":string(),"reviewDecisionId":string(),
+ "contentSha":string(),"replayed":boolean(),"trialOnly":boolean(),"reason":string(),
+},required=["taskId","trialOnly"]))
+schema("DHFReviewAttestationInboxItem",obj({
+ "taskId":string(),"decisionId":string(),"submissionId":string(),"projectId":string(),
+ "stageId":string(),"reviewKey":string(),"outcome":string(),"reviewComment":string(),
+ "policySha":string(),"manifestSha":string(),"outstandingPrior":integer(minimum=0),
+ "canAttest":boolean(),"attestationId":string(),"contentSha":string(),
+},required=["taskId","decisionId","submissionId","projectId","stageId","reviewKey",
+ "outcome","reviewComment","policySha","manifestSha","outstandingPrior","canAttest"]))
+schema("DHFReviewAttestationInboxPage",obj({
+ "items":arr(ref("DHFReviewAttestationInboxItem")),"trialOnly":boolean(),
+ "signIntent":string(),
+},required=["items","trialOnly","signIntent"]))
+add("GET","/api/workbench/dhf/attestations",operation(
+ "List authenticated review confirmation records for their assigned reviewer only; this is not Gate acceptance",
+ "Workflow","dhfPilotAttestationInbox",security=SESSION,
+ responses=dict([json_ok(ref("DHFReviewAttestationInboxPage"),"Scoped signed and unsigned reviewed tasks with frozen hashes."),
+ resp("401",ERR["401"]),resp("403",ERR["403"]),resp("503",ERR["503"])])))
+add("POST","/api/workbench/dhf/tasks/{id}/attest",operation(
+ "Reauthenticate assigned reviewer password in transaction and record immutable bounded signed intent",
+ "Workflow","dhfPilotAttestReview",security=SESSION,
+ params=[id_param("id","Original assigned reviewer task ID")],
+ request={"application/json":{"schema":ref("DHFReviewAttestationInput")}},
+ responses=dict([json_ok(ref("DHFReviewAttestationOutcome"),"Trial-only authenticated attestation, not legal electronic signature."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("404",ERR["404"]),resp("409",ERR["409"]),
+ ("429",{"description":"Per-account recent password reauthentication failure rate limit."})])))
+
+schema("DHFRemediationVerificationInput",obj({
+ "comment":string("Evidence-specific original return reviewer's corrective verification reason."),
+ "password":{"type":"string","writeOnly":True,"minLength":1,"maxLength":1024},
+ "verificationIntent":string("Explicit independent corrective verification intent."),
+ "idempotencyKey":string("Retry unchanged key for exactly the same verifier and corrected submission."),
+},required=["comment","password","verificationIntent","idempotencyKey"]))
+schema("DHFRemediationVerificationOutcome",obj({
+ "verificationId":string(),"caseId":string(),"revisedSubmissionId":string(),
+ "replayed":boolean(),"trialOnly":boolean(),"reason":string(),
+},required=["caseId","trialOnly"]))
+schema("DHFRemediationVerificationQueueItem",obj({
+ "caseId":string(),"returnDecisionId":string(),"projectId":string(),"stageId":string(),
+ "originalSubmissionId":string(),"revisedSubmissionId":string(),
+ "originalManifestSha":string(),"revisedManifestSha":string(),
+ "returnReason":string(),"resolutionPlan":string(),"newAttemptState":string(),
+ "readyToVerify":boolean(),"verificationId":string(),
+},required=["caseId","returnDecisionId","projectId","stageId","originalSubmissionId",
+ "revisedSubmissionId","originalManifestSha","revisedManifestSha","returnReason",
+ "resolutionPlan","newAttemptState","readyToVerify"]))
+schema("DHFRemediationVerificationQueue",obj({
+ "items":arr(ref("DHFRemediationVerificationQueueItem")),
+ "trialOnly":boolean(),"verificationIntent":string(),
+},required=["items","trialOnly","verificationIntent"]))
+add("GET","/api/workbench/dhf/verifications",operation(
+ "List corrective verification cases only for the signer of their original returned review",
+ "Workflow","dhfPilotVerificationInbox",security=SESSION,
+ responses=dict([json_ok(ref("DHFRemediationVerificationQueue"),
+ "Reviewer-only correction readiness, preserving pending predecessor responsibility."),
+ resp("401",ERR["401"]),resp("403",ERR["403"]),resp("503",ERR["503"])])))
+add("POST","/api/workbench/dhf/remediations/{id}/verify",operation(
+ "Reauthenticate original returned reviewer and immutably verify correction after all revised reviewers signed",
+ "Workflow","dhfPilotVerifyRemediation",security=SESSION,
+ params=[id_param("id","Immutable source remediation case ID")],
+ request={"application/json":{"schema":ref("DHFRemediationVerificationInput")}},
+ responses=dict([json_ok(ref("DHFRemediationVerificationOutcome"),
+ "Independent verified corrective evidence fact, NOT final Stage Gate acceptance."),
+ resp("400",ERR["400"]),resp("401",ERR["401"]),resp("404",ERR["404"]),resp("409",ERR["409"]),
+ ("429",{"description":"Five recent failed account reauthentication attempts within 15 minutes."})])))
+
 # --- Approvals ---
 schema("ApprovalPage",obj({"items":arr(ref("Approval")),"nextCursor":string(),"hasMore":boolean(),"pendingCount":integer(minimum=0)},required=["items","nextCursor","hasMore","pendingCount"]))
 schema("ApprovalNotificationPage",obj({"items":arr(ref("ApprovalNotification")),"nextCursor":integer(minimum=0),"hasMore":boolean(),"unreadCount":integer(minimum=0)},required=["items","nextCursor","hasMore","unreadCount"]))
