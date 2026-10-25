@@ -62,6 +62,8 @@ export function DHFPilotInbox(){
    .catch(err=>{if(alive)setError(errorCopy(err,"DHF 审核任务加载失败"));})
    .finally(()=>{if(alive)setLoading(false);});
   return()=>{alive=false};
+ },[refresh]);
+ useEffect(()=>{
   let available=true;setDutyError("");
   void request<{items:Duty[]}>("/workbench/dhf/duties")
    .then(result=>{if(available)setDuties(result.items??[]);})

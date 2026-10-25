@@ -1,0 +1,63 @@
+name: Workbench V2 Release Bundle
+
+on:
+  push:
+    branches:
+      - feat/workbench-v2
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Check Finder boundary
+        run: node scripts/workbench_v2_contract_check.mjs
+      - name: Build frontend
+        run: |
+          npm --prefix web ci
+          npm --prefix web run build
+      - name: Build isolated Linux server and migration binary
+        env:
+          GOOS: linux
+          GOARCH: amd64
+          CGO_ENABLED: '0'
+        run: |
+          mkdir -p staging/web
+          go build -trimpath -o staging/server ./cmd/server
+          go build -trimpath -o staging/migrate ./cmd/migrate
+          cp -a web/dist staging/web/dist
+          cp -a migrations staging/migrations
+      - name: Bundle manifest and checksums
+        run: |
+          {
+            echo 'Filesmanage Workbench V2 Review Bundle'
+            echo "Commit: ${GITHUB_SHA}"
+            echo 'Target: Linux/amd64'
+            echo 'Scope: Review development :18091 only; no production deployment'
+            echo 'Deployment requires authenticated browser checks and original brand verification'
+          } > staging/RELEASE.txt
+          (cd staging && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+          tar -C staging -czf filesmanage-workbench-v2-linux-amd64.tar.gz .
+          sha256sum filesmanage-workbench-v2-linux-amd64.tar.gz > filesmanage-workbench-v2-linux-amd64.tar.gz.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: workbench-v2-review-linux-amd64
+          path: |
+            filesmanage-workbench-v2-linux-amd64.tar.gz
+            filesmanage-workbench-v2-linux-amd64.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error

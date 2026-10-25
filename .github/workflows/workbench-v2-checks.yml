@@ -1,0 +1,52 @@
+name: Workbench V2 Checks
+
+on:
+  push:
+    branches:
+      - feat/workbench-v2
+  pull_request:
+    paths:
+      - 'web/src/pages/**'
+      - 'web/src/app/**'
+      - 'web/src/shared/ui/**'
+      - 'web/src/features/workflow/**'
+      - 'scripts/workbench_v2_contract_check.mjs'
+      - '.github/workflows/workbench-v2-checks.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  workbench-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Preserve Finder boundaries
+        run: node scripts/workbench_v2_contract_check.mjs
+      - name: Frontend dependency install
+        run: npm --prefix web ci
+      - name: Typecheck and build
+        run: npm --prefix web run build
+      - name: UI style governance
+        run: node scripts/ui_style_governance_check.mjs
+      - name: Component governance
+        run: node scripts/ui_component_governance_check.mjs
+  go-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Compile and test internal packages
+        run: go test ./internal/... -count=1
+      - name: Vet
+        run: go vet ./internal/...
