@@ -150,6 +150,9 @@ perf 实例停止时运行**：perf 实例与 dev 实例共享 CPU 与同一台 
 | 浏览器旅程 | `node scripts/browser_journey_check.mjs` | 19/19 |
 | 项目 API 合同 | `node scripts/project_api_check.mjs` | PASS（§3–§5 全端点 + 幂等批量关联 + 视图状态） |
 | 项目界面验收 | `node scripts/project_browser_check.mjs` | PASS（新建/内联改状态/甘特/归档 + 1440/1280/1024 三档无横向溢出） |
+| 工作台布局与滚动 | `node scripts/workbench_layout_browser_check.mjs` | PASS（十视图、1440/1024/760/390、长标题与120行滚动夹具、项目子路由） |
+| 知识页实际入口只读验收 | `node scripts/workbench_notion_v05_browser_check.mjs http://127.0.0.1:18091 --read-only` | PASS（页面树、知识页读取、项目视图、移动导航与四尺寸） |
+| 知识页隔离编辑验收 | `node scripts/workbench_notion_v05_browser_check.mjs http://127.0.0.1:18092` | PASS（须先准备隔离数据库服务；自动保存、保存中离开、冲突恢复、键盘与浏览器返回保护） |
 | 预览返回来源 | `node scripts/preview_return_check.mjs` | PASS（`from=projects/my-projects` 回项目页；伪造/大小写不匹配回文件列表；`/workbench?view=projects` 直达） |
 | 项目库隔离测试 | `bash scripts/project_fresh_pg_lab.sh` | PASS（临时库建迁移 → 跑 `TestProjectPostgresRoundTrip` → 删库） |
 | 业务界面 | `node scripts/browser_business_check.mjs` | 12/12 |
