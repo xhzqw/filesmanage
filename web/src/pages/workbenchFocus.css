@@ -1,0 +1,42 @@
+/* Only one task canvas on the Workbench home. Finder styles are unaffected. */
+.wbf-home{grid-column:1/-1;min-width:0;min-height:0;height:100%;overflow-y:auto;overscroll-behavior:contain;background:var(--surface-shell,#f2f4f7);padding:20px clamp(14px,3vw,35px) 32px}
+.wbf-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}
+.wbf-heading>div:first-child{display:flex;flex-direction:column;gap:4px;min-width:0}
+.wbf-heading h1{margin:0;font-size:21px;line-height:1.25;font-weight:700;letter-spacing:-.035em;color:var(--text-primary)}
+.wbf-heading span{font-size:11.5px;color:var(--text-secondary)}
+.wbf-heading-actions{display:flex;gap:8px;flex:none}
+.wbf-heading-actions .rare-button{min-height:31px}
+.wbf-create{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 0;margin:-4px 0 10px;font-size:12px}
+.wbf-create>a,.wbf-create .rare-button{background:var(--surface-panel);padding:7px 12px;border-radius:var(--radius-sm);color:var(--text-primary);text-decoration:none;min-height:30px}
+.wbf-worklist{max-width:1020px;min-height:260px;background:var(--surface-panel,#fff);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);overflow:hidden}
+.wbf-controls{min-width:0;display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border-subtle)}
+.wbf-tabs{display:flex;align-items:center;gap:3px;min-width:0;overflow-x:auto;scrollbar-width:thin}
+.wbf-tabs .rare-button.wbf-tab{display:flex;align-items:center;gap:6px;min-height:28px;white-space:nowrap;padding:6px 11px;border-radius:var(--radius-pill);font-size:11.5px;color:var(--text-secondary)}
+.wbf-tabs .rare-button.wbf-tab.is-active{background:var(--ui-state-selected-sidebar);color:var(--text-primary);font-weight:650}
+.wbf-tab span{font-size:10.5px;font-variant-numeric:tabular-nums;opacity:.72}
+.wbf-controls>.rare-button{font-size:11px;white-space:nowrap;color:var(--text-secondary);min-height:27px}
+.wbf-list{min-height:170px;padding:0 12px}
+.wbf-row,.wbf-list .rare-button.wbf-row{display:flex;align-items:center;gap:12px;width:100%;min-width:0;min-height:56px;padding:10px 4px;border:0;border-bottom:1px solid var(--border-subtle);border-radius:0;background:transparent;color:var(--text-primary);text-align:left;text-decoration:none;box-shadow:none;cursor:pointer}
+.wbf-row:hover,.wbf-list .rare-button.wbf-row:hover{background:var(--surface-row-hover)}
+.wbf-dot{display:block;flex:none;height:7px;width:7px;background:var(--text-tertiary);border-radius:50%}
+.wbf-dot.is-returned{background:var(--status-warning,#996b19)}
+.wbf-main{display:flex;flex:1;min-width:0;flex-direction:column;gap:5px}
+.wbf-main strong{font-size:12.5px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wbf-main small{font-size:11px;font-weight:400;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wbf-count{flex:none;min-width:20px;text-align:right;font-size:13px;font-variant-numeric:tabular-nums;font-weight:650}
+.wbf-arrow{flex:none;font-size:20px;font-weight:300;color:var(--text-tertiary)}
+.wbf-loading{min-height:130px;display:flex;justify-content:center;align-items:center}
+.wbf-empty{min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center}
+.wbf-empty strong{font-size:13px;font-weight:650}
+.wbf-empty span{font-size:11px;color:var(--text-secondary)}
+.wbf-list .rare-button.wbf-more{display:block;margin:9px auto;font-size:11px;color:var(--text-secondary)}
+.wbf-footer{display:flex;align-items:center;gap:4px;min-height:43px;padding:5px 13px;border-top:1px solid var(--border-subtle);color:var(--text-tertiary)}
+.wbf-footer .rare-button{min-height:26px;color:var(--text-secondary);font-size:11px}
+/* Primary Workbench navigation is a flat list of just three destinations. */
+.cdw-panels .cdw-rail-group:first-child .cdw-rail-caption{display:none}
+.cdw-panels .cdw-rail-group:first-child{margin-top:10px}
+.cdw-panels .cdw-rail-group:first-child .cdw-rail-item{min-height:37px}
+.cdw-panels .wbv3-advanced-links{display:flex;flex-direction:column}
+.cdw-panels .cdw-rail-group:not(:first-child) .cdw-rail-caption{display:none}
+@media(max-width:720px){.wbf-home{padding:12px}.wbf-heading{align-items:flex-start}.wbf-heading h1{font-size:18px}.wbf-controls{padding:8px;gap:6px}.wbf-list{padding:0 7px}}
+@media(max-width:470px){.wbf-heading span{font-size:10.5px}.wbf-heading-actions{gap:3px}.wbf-tabs .rare-button.wbf-tab{padding:6px 8px}.wbf-main small{max-width:220px}}
