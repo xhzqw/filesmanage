@@ -9,8 +9,13 @@ import {join} from "node:path";
 import {setTimeout as sleep} from "node:timers/promises";
 
 const base=(process.argv[2]||"http://127.0.0.1:18098").replace(/\/+$/,"");
-assert.match(base,/^http:\/\/(127\.0\.0\.1|localhost):18098$/,"isolated V05 canary only");
-const password=readFileSync(process.argv[3]||".secrets/admin.password","utf8").trim();
+const readOnly=process.argv.includes("--read-only");
+assert.match(base,readOnly?
+ /^http:\/\/(127\.0\.0\.1|localhost):18091$/:
+ /^http:\/\/(127\.0\.0\.1|localhost):18098$/,
+ readOnly?"local V05 read-only endpoint only":"isolated V05 canary only");
+const credentialPath=process.argv[3]&&!process.argv[3].startsWith("--")?process.argv[3]:".secrets/admin.password";
+const password=readFileSync(credentialPath,"utf8").trim();
 const port=19000+process.pid%14000;
 const profile=mkdtempSync(join(tmpdir(),"fm-notion-v05-"));
 const chrome=spawn("/usr/bin/google-chrome",[
@@ -65,6 +70,37 @@ try{
  assert.equal(login.status,200);
  assert.equal(login.ok,true);
 
+ if(readOnly){
+  await send("Page.navigate",{url:base+"/workbench"});
+  await until("!!document.querySelector('.wbn-home h1')","Notion home");
+  assert.ok(await js("document.querySelector('link[rel=icon]')?.href.includes('/assets/brand/')"),"existing favicon");
+  await send("Page.navigate",{url:base+"/workbench?view=knowledge"});
+  await until("!!document.querySelector('.kn-shell')&&!!document.querySelector('.wbn-pages')","Notion page canvas");
+  const visible=await js("(async()=>{const r=await fetch('/api/knowledge/pages');return (await r.json()).data;})()");
+  assert.ok(Array.isArray(visible),"permitted knowledge page list");
+  if(visible.length){
+   const target=visible.find(p=>p.folderId==null)||visible[0];
+   await send("Page.navigate",{url:base+"/workbench?view=knowledge&page="+encodeURIComponent(target.id)});
+   await until("!!document.querySelector('.kn-title')","saved knowledge page");
+   assert.equal(await js("document.querySelector('.kn-title')?.value"),target.title);
+  }
+  for(const width of [1440,1024,760,390]){
+   await send("Emulation.setDeviceMetricsOverride",{width,height:900,deviceScaleFactor:1,mobile:false});
+   await sleep(250);
+   const geometry=await js("({document:document.documentElement.scrollWidth,canvas:document.querySelector('.kn-canvas').getBoundingClientRect().right})");
+   assert.ok(geometry.document<=width+2&&geometry.canvas<=width+2,"live page overflow "+width+" "+JSON.stringify(geometry));
+   console.log("NOTION_LIVE_VIEWPORT_PASS",width);
+  }
+  await send("Emulation.clearDeviceMetricsOverride");
+  // The workbench check does not mutate or assert layout ownership of Finder.
+  const docStatus=await js("(async()=>{const r=await fetch('/doc');return r.status;})()");
+  assert.equal(docStatus,200,"Finder route still serves the app");
+  console.log("NOTION_LIVE_FINDER_HTTP_PASS");
+  const dhfStatus=await js("(async()=>{const r=await fetch('/api/workbench/dhf/projects');return r.status;})()");
+  assert.equal(dhfStatus,200,"DHF read API");
+  console.log("NOTION_LIVE_DHF_API_READONLY_PASS");
+  console.log("NOTION_V05_LIVE_READONLY_PASS");
+ }else{
  const stamp=Date.now().toString();
  const names=["QA 祖先 "+stamp,"QA 子页面 "+stamp,"QA 孙页面 "+stamp];
  for(let i=0;i<3;i++){
@@ -111,6 +147,7 @@ try{
  assert.ok(first.includes(grand.id),"latest modified page first "+first);
  console.log("NOTION_RECENCY_PASS");
  console.log("NOTION_V05_BROWSER_PASS");
+ }
 }finally{
  if(ws?.readyState===1){
   for(const p of [...created].reverse()){
