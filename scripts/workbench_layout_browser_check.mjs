@@ -95,6 +95,27 @@ try{
   assert.equal(await evalJS("new URLSearchParams(location.search).get('view')"),'projects','项目子视图不能覆盖父路由');
   assert.ok(await evalJS("!!document.querySelector('.pj-shell')"));
  }
+ // 浏览器内生成长标题/大列表布局夹具，不写业务数据。
+ await send('Page.navigate',{url:base+'/workbench?view=todo'});
+ await until("!!document.querySelector('.cdw-task-row')");
+ await evalJS(`(()=>{
+  const list=document.querySelector('.cdw-inbox-scroll'),row=list.querySelector('.cdw-task-row');
+  for(let i=0;i<120;i++){
+   const clone=row.cloneNode(true);clone.querySelector('strong').textContent='长文件名与审批事项标题'.repeat(35)+i;
+   list.appendChild(clone);
+  }
+ })()`);
+ for(const width of [1440,760]){
+  await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
+  await sleep(150);
+  const stress=await evalJS(`(()=>{
+   const list=document.querySelector('.cdw-inbox-scroll');list.scrollTop=list.scrollHeight;
+   return {doc:document.documentElement.scrollWidth,scroll:list.scrollTop,excess:list.scrollHeight-list.clientHeight};
+  })()`);
+  assert.ok(stress.doc<=width+2&&stress.excess>0&&stress.scroll>0,'长标题/大数据列表在自己的区域滚动 '+JSON.stringify(stress));
+ }
+ await send('Emulation.clearDeviceMetricsOverride');
+ console.log('WORKBENCH_LONG_TITLE_LARGE_LIST_PASS');
  await send('Page.navigate',{url:base+'/doc'});await until("!!document.querySelector('.document-explorer')");
  assert.equal(await evalJS("!!document.querySelector('.cdw-workspace')"),false,'文档管理不使用工作台布局');
  assert.deepEqual(errors,[],'无未捕获浏览器错误');
