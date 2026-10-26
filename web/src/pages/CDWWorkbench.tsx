@@ -476,7 +476,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const editingBranch=branches.find(b=>b.state==="open");
  return <AppShell user={user} onLogout={onLogout} finderSidebarWidth={240}>
   <div className="panels document-explorer cdw-panels cdw-workspace">
-   {mobileRailOpen?<button type="button" className="wbn-mobile-backdrop" aria-label="关闭工作台导航" onClick={()=>setMobileRailOpen(false)}/>:null}
+   {mobileRailOpen?<RareButton type="button" tone="ghost" tabIndex={-1} className="wbn-mobile-backdrop" aria-label="关闭工作台导航" onClick={()=>setMobileRailOpen(false)}/>:null}
    <aside id="wbn-workbench-sidebar" className={"sidebar finder-sidebar cdw-rail"+(mobileRailOpen?" is-mobile-open":"")}
     aria-label="工作视图分类" style={{width:"240px"}}
     onClickCapture={e=>{

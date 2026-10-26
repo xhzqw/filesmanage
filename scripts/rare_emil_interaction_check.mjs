@@ -50,4 +50,12 @@ assert.match(read("web/src/pages/Documents.tsx"),/toolbarHostId="document-file-t
 assert.match(table,/className="finder-bottom-path" aria-label="当前位置完整路径"/,"full directory path must remain a navigable Finder path bar");
 assert.match(table,/to=\{"\/doc\?folder="\+encodeURIComponent\(segment.id\)\}/,"ancestor path must retain working directory links");
 assert.match(table,/className="status-bar finder-bottom-bar"/,"Finder must have one combined path and status footer");
+// 工作台以实际工作内容开场，创建入口不应在每列和空状态重复。
+for(const path of ["web/src/pages/ProjectDatabase.tsx","web/src/pages/WorkbenchNotionHome.tsx",
+ "web/src/pages/WorkbenchApprovals.tsx","web/src/pages/WorkbenchDHFOperations.tsx"]){
+ assert.doesNotMatch(read(path),/<h1|className="(?:pj-header|wbv2-approvals-head|wbn-home-toolbar)"/,path+": 不重复页面名称");
+}
+const projects=read("web/src/pages/ProjectDatabase.tsx");
+assert.equal((projects.match(/>＋ 新建项目<\/RareButton>/g)||[]).length,1,"项目只有一个主创建按钮");
+assert.match(read("web/src/pages/workbenchNotion.css"),/@container workbench/,"窄工作区按可用宽度重排");
 console.log("RARE_EMIL_INTERACTION_PASS: drag, selection, toast lifecycle, preview actions, no redundant page title rows");
