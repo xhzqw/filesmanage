@@ -80,6 +80,8 @@
 .cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-canvas{min-height:100%;width:100%;background:#fff;border-radius:0;box-shadow:none;padding:20px clamp(22px,7vw,90px);overflow-y:auto}
 .cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-page{max-width:750px;padding-top:35px}
 .cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-breadcrumb{display:flex;align-items:center;gap:9px;font-size:12px;color:#92928d;min-height:24px}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-breadcrumb{flex-wrap:wrap;overflow-wrap:anywhere}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-ancestor{display:inline-flex;align-items:center;gap:9px;min-width:0}
 .cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-breadcrumb a{color:#92928d;text-decoration:none}
 .cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-breadcrumb a:hover{color:#37352f}
 .cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-empty h2{font-size:27px;color:#37352f;margin:10px 0}

@@ -1,4 +1,4 @@
-import {useEffect,useRef,useState} from "react";
+import {useEffect,useMemo,useRef,useState} from "react";
 import {Link,useSearchParams} from "react-router-dom";
 import type {User} from "../entities/user/model";
 import {AppShell} from "../shared/ui/AppShell";
@@ -32,12 +32,14 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
  const[slashBlock,setSlashBlock]=useState<string|null>(null);
  const[saving,setSaving]=useState(false),[saveBlocked,setSaveBlocked]=useState(false);
  const savingRef=useRef(false);
+ const activePageId=useRef(pageId);
+ activePageId.current=pageId;
  const showHistory=async()=>{if(!page)return;setError("");if(history!==null){setHistory(null);return}try{setHistory(await request<Version[]>(base+enc(page.id)+"/history"))}catch(e){setError(errorCopy(e,"修订历史读取失败"))}};
  const dirty=Boolean(page&&draft&&(page.title!==draft.title||JSON.stringify(page.blocks)!==JSON.stringify(draft.blocks)));
  const reload=()=>setStamp(x=>x+1);
  const go=(id:string)=>{if(dirty&&!confirm("内容尚未保存，仍然离开？"))return;const next=new URLSearchParams(params);if(id)next.set("page",id);else next.delete("page");setParams(next);};
  useEffect(()=>{let live=true;request<Page[]>("/knowledge/pages").then(x=>{if(live)setPages(x||[])}).catch(e=>{if(live)setError(errorCopy(e,"页面树加载失败"))});return()=>{live=false}},[stamp]);
- useEffect(()=>{let live=true;setPage(null);setDraft(null);setError("");setNotice("");setHistory(null);
+ useEffect(()=>{let live=true;setPage(null);setDraft(null);setError("");setNotice("");setHistory(null);setSaveBlocked(false);setSlashBlock(null);
   if(pageId)request<Page>(base+enc(pageId)).then(p=>{if(live){setPage(p);setDraft({...p,blocks:p.blocks.map(b=>({...b}))})}}).catch(e=>{if(live)setError(errorCopy(e,"页面读取失败"))});
   return()=>{live=false};
  },[pageId,stamp]);
@@ -58,13 +60,24 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
     method:"PUT",body:JSON.stringify({title:snapshot.title,blocks:snapshot.blocks,revision:snapshot.revision})
    });
    // Never destroy unsaved keystrokes or move the caret after a debounced save.
-   setPage(saved);
-   setDraft(current=>current?.id===snapshot.id?{...current,revision:saved.revision}:current);
-   setError("");setNotice("已保存");
+   setPage(current=>current?.id===snapshot.id?saved:current);
+   setDraft(current=>{
+    if(current?.id!==snapshot.id)return current;
+    // A save may normalize blocks server-side. When no newer keystrokes exist,
+    // align with the returned canonical revision/content to clear dirty state.
+    // If typing continued during the request, retain the newer draft.
+    const unchanged=current.title===snapshot.title&&
+     JSON.stringify(current.blocks)===JSON.stringify(snapshot.blocks);
+    return unchanged?{...current,title:saved.title,blocks:saved.blocks,revision:saved.revision}
+     :{...current,revision:saved.revision};
+   });
+   if(activePageId.current===snapshot.id)setError("");
    window.dispatchEvent(new Event("filesmanage:knowledge-changed"));
   }catch(e){
-   setSaveBlocked(true);
-   setError(errorCopy(e,"保存失败，页面可能已被修改，请核对版本后重试"));
+   if(activePageId.current===snapshot.id){
+    setSaveBlocked(true);
+    setError(errorCopy(e,"保存失败，页面可能已被修改，请核对版本后重试"));
+   }
   }finally{
    savingRef.current=false;setSaving(false);
   }
@@ -83,16 +96,18 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
    setHomeId("");setNotice("已解除知识首页关联，知识页及历史记录已保留");
   }catch(e){setError(errorCopy(e,"解除知识首页失败"))}finally{setBusy(false)}
  }
- async function fileLink(id:string,remove=false){if(!draft)return;setBusy(true);try{await request(base+enc(draft.id)+"/files/"+enc(id),{method:remove?"DELETE":"PUT"});setNotice(remove?"已解除引用":"文件引用已建立，原文件权限不变");reload()}catch(e){setError(errorCopy(e,"更新文件引用失败"))}finally{setBusy(false)}}
+ async function fileLink(id:string,remove=false){if(!draft)return;if(dirty){setError("请先保存页面内容，再修改文件引用");return;}setBusy(true);try{await request(base+enc(draft.id)+"/files/"+enc(id),{method:remove?"DELETE":"PUT"});setNotice(remove?"已解除引用":"文件引用已建立，原文件权限不变");reload()}catch(e){setError(errorCopy(e,"更新文件引用失败"))}finally{setBusy(false)}}
  async function pageLink(id:string,remove=false){
-  if(!draft||!id||busy)return;setBusy(true);setError("");
+  if(!draft||!id||busy)return;
+  if(dirty){setError("请先保存页面内容，再修改页面关联");return;}
+  setBusy(true);setError("");
   try{
    await request(base+enc(draft.id)+"/links/"+enc(id),{method:remove?"DELETE":"PUT"});
    setTargetPage("");setNotice(remove?"已解除页面关联":"已关联知识页面，双方均可查看来源");
    reload();
   }catch(e){setError(errorCopy(e,"知识页面关联失败"))}finally{setBusy(false)}
  }
- async function archive(){if(!draft||!confirm("归档知识页？有子页面或已设为首页时不可归档。"))return;setBusy(true);try{await request(base+enc(draft.id)+"/archive",{method:"POST",body:JSON.stringify({revision:draft.revision})});window.dispatchEvent(new Event("filesmanage:knowledge-changed"));go("");reload()}catch(e){setError(errorCopy(e,"无法归档该页面"))}finally{setBusy(false)}}
+ async function archive(){if(!draft)return;if(dirty){setError("请先保存页面内容，再归档");return;}if(!confirm("归档知识页？有子页面或已设为首页时不可归档。"))return;setBusy(true);try{await request(base+enc(draft.id)+"/archive",{method:"POST",body:JSON.stringify({revision:draft.revision})});window.dispatchEvent(new Event("filesmanage:knowledge-changed"));go("");reload()}catch(e){setError(errorCopy(e,"无法归档该页面"))}finally{setBusy(false)}}
  function editBlock(index:number,change:Partial<Block>){setDraft(prev=>prev?{...prev,blocks:prev.blocks.map((b,i)=>i===index?{...b,...change}:b)}:prev)}
  function selectBlockKind(index:number,type:Kind){
   editBlock(index,{type});setSlashBlock(null);
@@ -110,6 +125,20 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
  }
  const canEdit=Boolean(draft?.canEdit);
  const siblingPages=pages.filter(p=>p.folderId===folderId);
+ const ancestors=useMemo(()=>{
+  const byId=new Map(pages.map(p=>[p.id,p]));
+  const chain:Page[]=[];
+  const visited=new Set<string>(draft?[draft.id]:[]);
+  let cursor=draft?.parentId;
+  while(cursor&&!visited.has(cursor)&&chain.length<20){
+   visited.add(cursor);
+   const parent=byId.get(cursor);
+   if(!parent)break;
+   chain.unshift(parent);
+   cursor=parent.parentId;
+  }
+  return chain;
+ },[pages,draft?.id,draft?.parentId]);
  const content=<div className="kn-in-workbench">
   <div className="kn-shell">
    {!embedded?<aside className="kn-nav" aria-label="知识页面树">
@@ -121,6 +150,10 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
    <main className="kn-canvas">
     {embedded?<nav className="kn-breadcrumb" aria-label="页面位置">
       <Link to="/workbench">工作空间</Link><span>/</span>
+      {ancestors.map(parent=><span className="kn-ancestor" key={parent.id}>
+       <Link to={"/workbench?view=knowledge&page="+enc(parent.id)+(folderId?"&folder="+enc(folderId):"")}>{parent.title}</Link>
+       <span>/</span>
+      </span>)}
       <span>{draft?.title||"知识页面"}</span>
      </nav>:null}
     {error?<p role="alert" className="kn-alert">{error}</p>:null}
@@ -139,7 +172,7 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
      {!homeId&&siblingPages.length?<span className="kn-muted">选择已有知识页后，可将其手动关联</span>:null}
     </section>:null}
     {draft?<article className="kn-page" aria-label="知识页面编辑区">
-     <div className="kn-page-top"><span>{saving?"保存中…":dirty?"编辑中 · 未保存":"已保存"} · v{draft.revision}</span><div>
+     <div className="kn-page-top"><span>{saving?"保存中…":dirty?"未保存":"已保存"}</span><div>
       {folderId&&draft.folderId===folderId&&canEdit?<RareButton type="button" disabled={busy||dirty} onClick={()=>void setHome()}>{homeId===draft.id?"当前文件夹首页":"关联为文件夹首页"}</RareButton>:null}
       <RareButton type="button" tone="ghost" onClick={()=>void showHistory()}>历史</RareButton> {canEdit?<RareButton type="button" tone="ghost" disabled={!dirty||busy||saving} onClick={()=>void save()}>立即保存</RareButton>:null}
       {canEdit?<RareButton type="button" tone="danger" disabled={busy} onClick={()=>void archive()}>归档</RareButton>:null}

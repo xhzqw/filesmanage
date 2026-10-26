@@ -6,7 +6,7 @@ import {RareButton,RareNotice} from "../shared/ui/rare";
 import {workNeedsAction,workNextStep,type HomeView} from "./CDWWorkbenchHome";
 import "./workbenchNotion.css";
 
-type PageLink={id:string;title:string;parentId:string|null};
+type PageLink={id:string;title:string;parentId:string|null;updatedAt?:string};
 type Props={
  userName:string;items:CDWInboxItem[];appointmentCount:number;
  initiatedCount:number;initiatedHasMore:boolean;initiatedError:string;
@@ -38,6 +38,9 @@ export function WorkbenchNotionHome({
   return()=>{live=false;window.removeEventListener("filesmanage:knowledge-changed",load)};
  },[]);
  const todo=useMemo(()=>items.filter(workNeedsAction),[items]);
+ const recentPages=useMemo(()=>[...pages]
+  .sort((a,b)=>(Date.parse(b.updatedAt||"")||0)-(Date.parse(a.updatedAt||"")||0))
+  .slice(0,7),[pages]);
  async function newPage(){
   if(creating)return;setCreating(true);
   try{
@@ -65,12 +68,10 @@ export function WorkbenchNotionHome({
       <RareButton type="button" tone="ghost" disabled={creating} onClick={()=>void newPage()}>＋ 新建</RareButton>
      </div>
      <div className="wbn-page-links">
-      {pages.slice(-7).reverse().map(page=><Link key={page.id}
+      {recentPages.map(page=><Link key={page.id}
        to={"/workbench?view=knowledge&page="+encodeURIComponent(page.id)}
        className="wbn-line"><span className="wbn-line-icon">▤</span><span>{page.title}</span><span className="wbn-line-arrow">›</span></Link>)}
-      {pages.length===0&&!pageError?<RareButton type="button" tone="ghost" className="wbn-page-placeholder" onClick={()=>void newPage()}>
-       ＋ 在这里新建你的第一个页面
-      </RareButton>:null}
+      {pages.length===0&&!pageError?<p className="wbn-quiet">还没有页面，使用上方「新建」开始。</p>:null}
       {pageError?<p role="status" className="wbn-page-error">{pageError}</p>:null}
      </div>
     </section>

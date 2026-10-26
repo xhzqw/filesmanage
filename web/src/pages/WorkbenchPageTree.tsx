@@ -45,6 +45,24 @@ export function WorkbenchPageTree({userId}:Props){
   }
   return pages.filter(p=>visible.has(p.id));
  },[pages,normalized]);
+ // Deep links must reveal every ancestor, not just the direct parent.
+ // Keep expansion state user-controlled after the selected route is revealed.
+ useEffect(()=>{
+  if(!selected)return;
+  const byId=new Map(pages.map(page=>[page.id,page]));
+  const ancestors=new Set<string>();
+  const visited=new Set<string>([selected]);
+  let cursor=byId.get(selected)?.parentId;
+  while(cursor&&!visited.has(cursor)&&ancestors.size<20){
+   ancestors.add(cursor);visited.add(cursor);
+   cursor=byId.get(cursor)?.parentId;
+  }
+  if(!ancestors.size)return;
+  setExpanded(current=>{
+   if([...ancestors].every(id=>current.has(id)))return current;
+   return new Set([...current,...ancestors]);
+  });
+ },[pages,selected]);
  async function create(parentId=""){
   if(busy)return;
   setBusy(true);setError("");
@@ -58,13 +76,13 @@ export function WorkbenchPageTree({userId}:Props){
   }catch{setError("新建失败，请检查页面权限。");}
   finally{setBusy(false);}
  }
- function tree(subset:PageNode[],parent:string|null,depth=0):React.ReactNode{
+ function tree(subset:PageNode[],parent:string|null,depth=0,ancestors=new Set<string>()):React.ReactNode{
   if(depth>20)return null;
   const scopeIds=new Set(subset.map(p=>p.id));
   const children=subset.filter(p=>p.parentId===parent||(parent===null&&p.parentId&&!scopeIds.has(p.parentId)));
-  return children.map(page=>{
+  return children.filter(page=>!ancestors.has(page.id)).map(page=>{
    const hasChildren=subset.some(p=>p.parentId===page.id);
-   const open=Boolean(normalized)||expanded.has(page.id)||page.id===selected||subset.some(p=>p.id===selected&&p.parentId===page.id);
+   const open=Boolean(normalized)||expanded.has(page.id);
    return <div key={page.id}>
     <div className={"wbn-tree-item"+(page.id===selected?" is-current":"")} style={{paddingLeft:8+depth*12}}>
      {hasChildren?<RareButton type="button" tone="ghost" className="wbn-expand"
@@ -77,7 +95,7 @@ export function WorkbenchPageTree({userId}:Props){
      {page.ownerId===userId?<RareButton type="button" tone="ghost" className="wbn-new-child"
       disabled={busy} aria-label={"在"+page.title+"下新建页面"} onClick={()=>void create(page.id)}>＋</RareButton>:null}
     </div>
-    {hasChildren&&open?tree(subset,page.id,depth+1):null}
+    {hasChildren&&open?tree(subset,page.id,depth+1,new Set([...ancestors,page.id])):null}
    </div>;
   });
  }
