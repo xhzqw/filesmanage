@@ -24,7 +24,7 @@ export function DHFHomeProjects({canCreate}:{canCreate:boolean}){
    busy?<p className="cdw-home-dhf-empty">正在加载…</p>:
    projects.length===0?<div className="cdw-home-dhf-empty">
     <span>暂无进行中的研发项目</span>
-    {canCreate&&<Link to="/workbench/dhf?create=1">+ 创建项目</Link>}
+    {canCreate&&<small>从「+ 发起工作」新建</small>}
    </div>:<div className="cdw-home-dhf-list">
     {(more?projects:projects.slice(0,3)).map(project=><Link key={project.id} to={"/workbench/dhf?project="+encodeURIComponent(project.id)}
      className="cdw-home-dhf-row">
