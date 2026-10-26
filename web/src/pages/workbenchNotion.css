@@ -140,3 +140,96 @@
  .cdw-panels:has(.wbn-pages) .cdw-layout{flex:1;min-height:0;min-width:0}
  .cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-canvas{padding:15px 20px}
 }
+/* V10: the Finder brand link is positioned absolute. Keep its reserved header
+   space inside the Workbench rail or the first navigation row is overlaid. */
+.cdw-panels:has(.wbn-pages) .cdw-rail{
+ padding:calc(var(--height-header, 56px) + 8px) 9px 12px;
+}
+.cdw-panels:has(.wbn-pages) .cdw-rail .finder-sidebar-home{
+ height:var(--height-header,56px);min-height:var(--height-header,56px);
+ padding:0 15px;margin:0;background:transparent;border-radius:0;
+}
+/* The old .cdw-rail-nav flex:1 pushed private pages to the very bottom. */
+.cdw-panels:has(.wbn-pages) .cdw-rail-nav{
+ flex:0 0 auto;width:100%;height:auto;min-height:0;overflow:visible;
+}
+.cdw-panels:has(.wbn-pages) .cdw-rail-group{margin:0 0 13px}
+.cdw-panels:has(.wbn-pages) .cdw-rail-group:first-child{margin-top:0}
+.cdw-panels:has(.wbn-pages) .cdw-rail .cdw-rail-caption{
+ display:block;margin:0;padding:8px 9px 6px;
+ font-size:11px;font-weight:600;letter-spacing:0;color:#858580;
+}
+.cdw-panels:has(.wbn-pages) .cdw-rail .cdw-rail-item.rare-button{
+ min-height:33px;height:33px;font-size:12.5px;
+}
+.cdw-panels:has(.wbn-pages) .cdw-rail-item.is-current .cdw-rail-icon{color:#37352f}
+.cdw-panels:has(.wbn-pages) .wbn-pages{
+ flex:0 0 auto;width:100%;margin:4px 0 0;padding:0 2px 14px;
+}
+.cdw-panels:has(.wbn-pages) .wbn-page-search{padding:0 6px 8px}
+.cdw-panels:has(.wbn-pages) .wbn-pages-head{padding-top:7px}
+.cdw-panels:has(.wbn-pages) .cdw-rail .sidebar-scroll{
+ flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;align-items:stretch;
+}
+@media(max-width:570px){
+ .cdw-panels:has(.wbn-pages) .cdw-rail{
+  padding:10px 8px 12px;
+ }
+ .cdw-panels:has(.wbn-pages) .cdw-rail .finder-sidebar-home{
+  position:relative;top:auto;left:auto;right:auto;height:36px;
+  min-height:36px;padding:0 8px;
+ }
+}
+/* A working surface, not a narrow document pretending to be a dashboard. */
+.cdw-panels:has(.wbn-pages) .wbn-home-content{
+ display:block;width:100%;max-width:1460px;
+ margin:0 auto;padding:24px clamp(24px,4vw,65px) 48px;
+}
+.cdw-panels:has(.wbn-pages) .wbn-home-overview{
+ display:flex;align-items:center;justify-content:space-between;
+ margin:0 0 28px;padding:0;
+}
+.cdw-panels:has(.wbn-pages) .wbn-home-content h1{
+ font-size:26px;line-height:1.35;font-weight:700;
+}
+.cdw-panels:has(.wbn-pages) .wbn-home-columns{
+ display:grid;grid-template-columns:minmax(0,1.45fr) minmax(290px,0.85fr);
+ column-gap:clamp(26px,4vw,68px);align-items:start;
+}
+.cdw-panels:has(.wbn-pages) .wbn-home-primary,
+.cdw-panels:has(.wbn-pages) .wbn-home-secondary{min-width:0}
+.cdw-panels:has(.wbn-pages) .wbn-home-section{margin:0 0 31px}
+.cdw-panels:has(.wbn-pages) .wbn-section-heading{
+ min-height:36px;align-items:center;border-color:#e6e6e3;
+}
+.cdw-panels:has(.wbn-pages) .wbn-section-heading h2{font-size:14px}
+.cdw-panels:has(.wbn-pages) .wbn-section-heading a{
+ font-size:12px;text-decoration:none;color:#777771;
+}
+.cdw-panels:has(.wbn-pages) .wbn-section-heading a:hover{color:#37352f}
+.cdw-panels:has(.wbn-pages) .wbn-line,
+.cdw-panels:has(.wbn-pages) .wbn-task-list .rare-button.wbn-task-row{
+ min-height:41px;font-size:13px;border-radius:5px;
+}
+.cdw-panels:has(.wbn-pages) .wbn-work-links{
+ flex-wrap:wrap;gap:18px;padding-top:16px;
+ font-size:12px;
+}
+.cdw-panels:has(.wbn-pages) .wbn-work-links a,
+.cdw-panels:has(.wbn-pages) .wbn-work-links .rare-button{
+ font-size:12px;color:#5c5c58;
+}
+@media(max-width:1050px){
+ .cdw-panels:has(.wbn-pages) .wbn-home-columns{
+  grid-template-columns:minmax(0,1fr);gap:6px;
+ }
+ .cdw-panels:has(.wbn-pages) .wbn-home-content{
+  padding:20px 22px 40px;
+ }
+}
+@media(max-width:570px){
+ .cdw-panels:has(.wbn-pages) .wbn-home-overview{
+  align-items:flex-start;gap:12px;flex-wrap:wrap;
+ }
+ .cdw-panels:has(.wbn-pages) .wbn-home-content{padding:18px 18px 32px}
+}

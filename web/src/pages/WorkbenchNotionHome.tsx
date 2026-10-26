@@ -60,23 +60,15 @@ export function WorkbenchNotionHome({
    </header>
    <div className="wbn-home-content">
     <div className="wbn-home-overview">
-     <div><h1>我的工作台</h1><p className="wbn-intro">从待处理事项开始，也可以继续编辑页面。</p></div>
+     <div><h1>工作台</h1><p className="wbn-intro">待处理、项目与知识页面</p></div>
      <RareButton type="button" tone="ghost" disabled={creating} onClick={()=>void newPage()}>＋ 新建页面</RareButton>
     </div>
-
-    <section className="wbn-home-section wbn-section-pages" aria-label="最近页面">
-     <div className="wbn-section-heading"><h2>最近页面</h2></div>
-     <div className="wbn-page-links">
-      {recentPages.map(page=><Link key={page.id}
-       to={"/workbench?view=knowledge&page="+encodeURIComponent(page.id)}
-       className="wbn-line"><span className="wbn-line-icon">▤</span><span>{page.title}</span><span className="wbn-line-arrow">›</span></Link>)}
-      {pages.length===0&&!pageError?<p className="wbn-quiet">还没有页面。点击右上方「新建页面」即可开始输入。</p>:null}
-      {pageError?<p role="status" className="wbn-page-error">{pageError}</p>:null}
-     </div>
-    </section>
-
+    <div className="wbn-home-columns">
+     <div className="wbn-home-primary">
     <section className={"wbn-home-section wbn-section-actions"+(todo.length+appointmentCount?" has-actions":"")} aria-label="我的待办">
-     <div className="wbn-section-heading"><h2>待我处理</h2><span>{todo.length+appointmentCount} 项</span></div>
+     <div className="wbn-section-heading"><h2>待我处理</h2>
+      <RareButton type="button" tone="ghost" onClick={()=>onView("todo")}>{todo.length+appointmentCount} 项 · 查看全部</RareButton>
+     </div>
      {error||initiatedError?<RareNotice tone="warning">
        部分事项读取失败：{error||initiatedError}
       </RareNotice>:null}
@@ -103,13 +95,26 @@ export function WorkbenchNotionHome({
       </RareButton>
      </div>
     </section>
-
+     </div>
+     <div className="wbn-home-secondary">
+    <section className="wbn-home-section wbn-section-pages" aria-label="最近页面">
+     <div className="wbn-section-heading"><h2>最近页面</h2><Link to="/workbench?view=knowledge">所有页面</Link></div>
+     <div className="wbn-page-links">
+      {recentPages.map(page=><Link key={page.id}
+       to={"/workbench?view=knowledge&page="+encodeURIComponent(page.id)}
+       className="wbn-line"><span className="wbn-line-icon">▤</span><span>{page.title}</span><span className="wbn-line-arrow">›</span></Link>)}
+      {pages.length===0&&!pageError?<p className="wbn-quiet">还没有页面，点击右上方新建。</p>:null}
+      {pageError?<p role="status" className="wbn-page-error">{pageError}</p>:null}
+     </div>
+    </section>
     <section className="wbn-home-section wbn-section-projects" aria-label="项目空间">
      <div className="wbn-section-heading"><h2>项目</h2></div>
      <Link className="wbn-line" to="/workbench?view=projects">
       <span className="wbn-line-icon">▦</span><span>所有项目</span><span className="wbn-line-arrow">›</span>
      </Link>
     </section>
+     </div>
+    </div>
    </div>
   </div>
  </section>;

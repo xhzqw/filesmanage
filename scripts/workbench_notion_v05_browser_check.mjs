@@ -73,11 +73,23 @@ try{
  if(readOnly){
   await send("Page.navigate",{url:base+"/workbench"});
   await until("!!document.querySelector('.wbn-home h1')","Notion home");
-  assert.equal(await js("document.querySelector('.wbn-home h1')?.textContent?.trim()"),"我的工作台",
+  assert.equal(await js("document.querySelector('.wbn-home h1')?.textContent?.trim()"),"工作台",
    "workbench should lead with an actionable home, not a decorative splash");
-  assert.ok(await js("(()=>{const a=document.querySelector('.wbn-section-actions')?.getBoundingClientRect();"
-   +"const p=document.querySelector('.wbn-section-pages')?.getBoundingClientRect();return !!a&&!!p&&a.top<p.top})()"),
-   "actionable inbox must precede page history in the visible home");
+  const homeLayout=await js("(()=>{const a=document.querySelector('.wbn-section-actions')?.getBoundingClientRect();"
+   +"const p=document.querySelector('.wbn-section-pages')?.getBoundingClientRect();"
+   +"const brand=document.querySelector('.cdw-rail .finder-sidebar-home')?.getBoundingClientRect();"
+   +"const home=[...document.querySelectorAll('.cdw-rail-item')].find(el=>el.textContent.includes('主页'))?.getBoundingClientRect();"
+   +"const search=document.querySelector('.wbn-page-search')?.getBoundingClientRect();"
+   +"return {action:{x:a?.x,width:a?.width,top:a?.top},pages:{x:p?.x,width:p?.width,top:p?.top},"
+   +"brandBottom:brand?.bottom,homeTop:home?.top,searchTop:search?.top,viewport:innerHeight};})()");
+  assert.ok(homeLayout.homeTop>=homeLayout.brandBottom-2,
+   "sidebar homepage must be below brand, not hidden by it "+JSON.stringify(homeLayout));
+  assert.ok(homeLayout.searchTop<homeLayout.viewport*0.77,
+   "page search/tree must be near other navigation, not stranded at bottom "+JSON.stringify(homeLayout));
+  assert.ok(homeLayout.action.width>300&&homeLayout.pages.width>200&&
+   homeLayout.action.x<homeLayout.pages.x,
+   "home should show useful task/page columns instead of tiny centered lists "+JSON.stringify(homeLayout));
+  console.log("NOTION_SIDEBAR_BRAND_AND_TREE_PASS");
   console.log("NOTION_USABILITY_HOME_PRIORITY_PASS");
   assert.ok(await js("document.querySelector('link[rel=icon]')?.href.includes('/assets/brand/')"),"existing favicon");
   await send("Page.navigate",{url:base+"/workbench?view=knowledge"});

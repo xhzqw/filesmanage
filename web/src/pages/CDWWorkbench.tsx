@@ -88,11 +88,13 @@ type View="home"|"todo"|"initiated"|"following"|"tasks"|"obligations"|"reviews"|
 const viewGroups:{name:string;views:{key:View;label:string;icon:string}[]}[]=[
  {name:"工作空间",views:[
   {key:"home",label:"主页",icon:"home"},
-  {key:"projects",label:"项目",icon:"projects"}]},
- {name:"更多业务",views:[
-  {key:"todo",label:"文件待办",icon:"todo"},
+  {key:"projects",label:"项目",icon:"projects"},
+  {key:"knowledge",label:"所有页面",icon:"knowledge"}]},
+ {name:"工作事项",views:[
+  {key:"todo",label:"待我处理",icon:"todo"},
   {key:"approvals",label:"审批中心",icon:"reviews"},
-  {key:"dhf-operations",label:"DHF 阶段操作",icon:"gate"},
+  {key:"dhf-operations",label:"DHF 阶段任务",icon:"gate"}]},
+ {name:"更多业务",views:[
   {key:"initiated",label:"我发起的",icon:"initiated"},
   {key:"following",label:"流转跟踪",icon:"following"},
   {key:"appointments",label:"任命核验",icon:"appointments"},
@@ -102,7 +104,7 @@ const viewGroups:{name:string;views:{key:View;label:string;icon:string}[]}[]=[
 ];
 // Retain older deep links and contextual task actions without repeating all
 // domain-specific filters as permanent navigation destinations.
-const legacyViews:readonly View[]=["knowledge","my-projects","tasks","obligations","reviews",
+const legacyViews:readonly View[]=["my-projects","tasks","obligations","reviews",
  "formal","control","scope","receipts","reading"];
 const isKnownView=(key:string):key is View=>
  viewGroups.some(g=>g.views.some(v=>v.key===key))||legacyViews.includes(key as View);
