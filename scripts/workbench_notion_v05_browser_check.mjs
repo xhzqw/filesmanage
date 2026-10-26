@@ -12,7 +12,7 @@ const base=(process.argv[2]||"http://127.0.0.1:18098").replace(/\/+$/,"");
 const readOnly=process.argv.includes("--read-only");
 assert.match(base,readOnly?
  /^http:\/\/(127\.0\.0\.1|localhost):18091$/:
- /^http:\/\/(127\.0\.0\.1|localhost):18098$/,
+ /^http:\/\/(127\.0\.0\.1|localhost):(18092|18098)$/,
  readOnly?"local V05 read-only endpoint only":"isolated V05 canary only");
 const credentialPath=process.argv[3]&&!process.argv[3].startsWith("--")?process.argv[3]:".secrets/admin.password";
 const password=readFileSync(credentialPath,"utf8").trim();
