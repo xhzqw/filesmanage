@@ -300,8 +300,7 @@ try{
  await until("document.querySelector('.kn-page-top')?.innerText.includes('未保存')","history draft dirty");
  await js("history.back()");
  await until("window.__historyGuards===1","back navigation intercepted");
- await sleep(300);
- assert.equal(await js("new URL(location.href).searchParams.get('page')"),grand.id,
+ await until("new URL(location.href).searchParams.get('page')==="+JSON.stringify(grand.id),
   "cancelled back navigation restores the current URL");
  assert.equal(await js("document.querySelector('[data-kn-block="+JSON.stringify(blockId)+"] textarea')?.value"),
   historyDraft,"cancelled back navigation retains the unsaved block");

@@ -52,19 +52,21 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
  const leaveMessage="当前页面有尚未保存的修改。确定放弃这些修改并离开吗？";
  // An in-flight write cannot be cancelled: navigation must wait for its
  // authoritative acknowledgement rather than promise an impossible discard.
- const confirmLeave=()=>!saving&&window.confirm(leaveMessage);
+ const pendingNavigation=useRef(hasPendingChanges);
+ pendingNavigation.current=hasPendingChanges;
+ const rollingBack=useRef(false);
+ const confirmLeave=()=>!savingRef.current&&window.confirm(leaveMessage);
  const go=(id:string)=>{
   if(id===pageId)return;
   if(hasPendingChanges&&!confirmLeave())return;
   const next=new URLSearchParams(params);if(id)next.set("page",id);else next.delete("page");setParams(next);
  };
  useEffect(()=>{
-  if(!embedded||!hasPendingChanges)return;
-  const beforeUnload=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue="";};
-  let rollingBack=false;
+  if(!embedded)return;
+  const beforeUnload=(event:BeforeUnloadEvent)=>{if(pendingNavigation.current){event.preventDefault();event.returnValue="";}};
   const beforePop=(event:PopStateEvent)=>{
-   if(rollingBack){rollingBack=false;event.stopImmediatePropagation();return;}
-   if(confirmLeave())return;
+   if(rollingBack.current){rollingBack.current=false;event.stopImmediatePropagation();return;}
+   if(!pendingNavigation.current||confirmLeave())return;
    // BrowserRouter listens in the bubble phase. Prevent its transition and
    // return to the original history index without discarding the draft.
    event.stopImmediatePropagation();
@@ -72,13 +74,13 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
    const nextIndex=event.state?.idx;
    const delta=typeof current.index==="number"&&typeof nextIndex==="number"
     ?current.index-nextIndex:0;
-   if(delta){rollingBack=true;window.history.go(delta);}
+   if(delta){rollingBack.current=true;window.history.go(delta);}
    else window.history.replaceState({...window.history.state,idx:current.index}, "",current.href);
   };
   // Links in the global shell, page tree and breadcrumb live outside the
   // editor; React Router's BrowserRouter does not guard those transitions.
   const beforeClick=(event:MouseEvent)=>{
-   if(event.defaultPrevented||event.button!==0)return;
+   if(!pendingNavigation.current||event.defaultPrevented||event.button!==0)return;
    const element=event.target;
    if(!(element instanceof Element))return;
    const anchor=element.closest<HTMLAnchorElement>("a[href]");
@@ -102,7 +104,7 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
    window.removeEventListener("popstate",beforePop,true);
    document.removeEventListener("click",beforeClick,true);
   };
- },[embedded,hasPendingChanges]);
+ },[embedded]);
  useEffect(()=>{let live=true;request<Page[]>("/knowledge/pages").then(x=>{if(live)setPages(x||[])}).catch(e=>{if(live)setError(errorCopy(e,"页面树加载失败"))});return()=>{live=false}},[stamp]);
  useEffect(()=>{let live=true;setPage(null);setDraft(null);setError("");setNotice("");setHistory(null);setSaveBlocked(false);setConflictServer(null);setSlashBlock(null);
   if(pageId)request<Page>(base+enc(pageId)).then(p=>{if(live){
