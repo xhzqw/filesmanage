@@ -78,6 +78,7 @@ const viewGroups:{name:string;views:{key:View;label:string;icon:string}[]}[]=[
  {name:"工作空间",views:[{key:"home",label:"首页",icon:"home"},{key:"todo",label:"待我处理",icon:"todo"},{key:"initiated",label:"我发起的",icon:"initiated"},{key:"projects",label:"全部项目",icon:"projects"}]},
  {name:"业务流程",views:[{key:"all",label:"全部事项",icon:"all"},{key:"formal",label:"正式审批",icon:"formal"},{key:"reviews",label:"交付验收",icon:"reviews"},{key:"scope",label:"范围审批",icon:"scope"},{key:"appointments",label:"任命核验",icon:"appointments"},{key:"tasks",label:"文件工作",icon:"tasks"},{key:"obligations",label:"责任待办",icon:"obligations"},{key:"control",label:"发行准备",icon:"control"},{key:"receipts",label:"部门签收",icon:"receipts"},{key:"reading",label:"阅读确认",icon:"reading"},{key:"effective",label:"生效文件",icon:"effective"},{key:"seals",label:"电子签章",icon:"seals"},{key:"my-projects",label:"我的项目",icon:"projects"}]},
 ];
+const secondaryViews=viewGroups.slice(1).flatMap(group=>group.views);
 const kindName:Record<CDWInboxItem["kind"],string>={
  task:"工作交付",obligation:"责任履行",review:"交付验收",formal:"正式审批",
  control:"发行准备",scope:"范围审批",receipt:"部门签收",reading:"阅读确认",
@@ -479,7 +480,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
        <RareButton type="button" tone="ghost" className="cdw-rail-section-toggle" aria-expanded={processesOpen} onClick={()=>setProcessesOpen(v=>!v)}>
         <span aria-hidden="true">{processesOpen?"⌄":"›"}</span> 更多业务流程
        </RareButton>
-       {(processesOpen||viewGroups[1].views.some(v=>v.key===filter))&&viewGroups[1].views.map(({key,label,icon})=>
+       {(processesOpen||secondaryViews.some(v=>v.key===filter))&&secondaryViews.map(({key,label,icon})=>
         <RareButton key={key} type="button" className={"cdw-rail-item"+(filter===key?" is-current":"")} aria-current={filter===key?"page":undefined} onClick={()=>navigateView(key)}>
          <span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name={icon}/></span><span className="cdw-rail-label">{label}</span>
          {counts[key]>0&&<small className="has-count">{counts[key]}</small>}
