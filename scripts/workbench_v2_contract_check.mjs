@@ -37,6 +37,7 @@ assert.match(primary,/name:"更多业务"/);
 assert.match(primary,/key:"home",label:"主页"/);
 assert.match(primary,/key:"projects",label:"项目"/);
 assert.match(wb,/const legacyViews:/);
+assert.match(wb,/const legacyViews:readonly View\[\]=\["knowledge"/);
 assert.match(wb,/const isKnownView=/);
 assert.doesNotMatch(primary,/label:"履责待办"|label:"交付验收"|label:"范围审批"/);
 const focus=read("web/src/pages/WorkbenchNotionHome.tsx");

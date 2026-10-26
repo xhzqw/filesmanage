@@ -102,7 +102,7 @@ const viewGroups:{name:string;views:{key:View;label:string;icon:string}[]}[]=[
 ];
 // Retain older deep links and contextual task actions without repeating all
 // domain-specific filters as permanent navigation destinations.
-const legacyViews:readonly View[]=["my-projects","tasks","obligations","reviews",
+const legacyViews:readonly View[]=["knowledge","my-projects","tasks","obligations","reviews",
  "formal","control","scope","receipts","reading"];
 const isKnownView=(key:string):key is View=>
  viewGroups.some(g=>g.views.some(v=>v.key===key))||legacyViews.includes(key as View);
