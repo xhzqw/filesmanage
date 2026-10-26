@@ -5,6 +5,7 @@ import {AppShell} from "../shared/ui/AppShell";
 import {RareButton,RareInput,RareSelect,RareTextarea} from "../shared/ui/rare";
 import {ApiError,request} from "../shared/http";
 import {errorCopy} from "../shared/errors";
+import {observeHistoryNavigationGuard} from "../shared/historyNavigationGuard";
 import "./knowledgeWorkspace.css";
 
 type Kind="paragraph"|"heading1"|"heading2"|"bullet"|"todo"|"quote";
@@ -97,11 +98,11 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
    if(!confirmLeave()){event.preventDefault();event.stopPropagation();}
   };
   window.addEventListener("beforeunload",beforeUnload);
-  window.addEventListener("popstate",beforePop,true);
+  const stopHistoryGuard=observeHistoryNavigationGuard(beforePop);
   document.addEventListener("click",beforeClick,true);
   return()=>{
    window.removeEventListener("beforeunload",beforeUnload);
-   window.removeEventListener("popstate",beforePop,true);
+   stopHistoryGuard();
    document.removeEventListener("click",beforeClick,true);
   };
  },[embedded]);
