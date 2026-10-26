@@ -188,6 +188,32 @@ try{
    return j.data?.blocks?.[0]?.text===${JSON.stringify(altered)};})()`,"autosave persisted");
  await until("document.querySelector('.kn-page-top')?.innerText.includes('已保存')","saved indicator");
  console.log("NOTION_AUTOSAVE_PASS");
+ // 暂停真实保存请求，验证保存中离开不会误用编辑前的旧状态。
+ let heldSave;
+ const holdSave=event=>{
+  const message=JSON.parse(event.data);
+  if(message.method!=="Fetch.requestPaused")return;
+  if(message.params.request.method==="PUT")heldSave=message.params.requestId;
+  else void send("Fetch.continueRequest",{requestId:message.params.requestId});
+ };
+ ws.addEventListener("message",holdSave);
+ await send("Fetch.enable",{patterns:[{urlPattern:"*/api/knowledge/pages/*",requestStage:"Request"}]});
+ await js("(()=>{const el=document.querySelector('[data-kn-block="+JSON.stringify(blockId)+"] textarea');"
+  +"Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,"
+  +JSON.stringify(altered+" / 保存中保护")+");el.dispatchEvent(new Event('input',{bubbles:true}));})()");
+ for(let i=0;i<100&&!heldSave;i++)await sleep(100);
+ assert.ok(heldSave,"保存请求已进入等待状态");
+ const inflight=await js("(()=>{window.__saveLeavePrompts=0;window.confirm=()=>{window.__saveLeavePrompts++;return true};"
+  +"[...document.querySelectorAll('.wbn-page-link')].find(x=>x.textContent.includes("
+  +JSON.stringify(names[0])+"))?.click();return {page:new URL(location.href).searchParams.get('page'),prompts:window.__saveLeavePrompts};})()");
+ assert.equal(inflight.page,grand.id,"保存确认前保持当前页面");
+ assert.equal(inflight.prompts,0,"保存中的请求不可承诺放弃");
+ await send("Fetch.continueRequest",{requestId:heldSave});
+ await send("Fetch.disable");
+ ws.removeEventListener("message",holdSave);
+ await until("document.querySelector('.kn-page-top')?.innerText.includes('已保存')","held save acknowledged");
+ console.log("NOTION_INFLIGHT_SAVE_GUARD_PASS");
+
 
  // Simulate an independently saved revision. The editor must preserve the
  // local draft, expose the server version and require an explicit resolution.
