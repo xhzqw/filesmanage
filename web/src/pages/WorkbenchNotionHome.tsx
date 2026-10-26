@@ -39,7 +39,7 @@ export function WorkbenchNotionHome({
   load();
   window.addEventListener("filesmanage:knowledge-changed",load);
   return()=>{live=false;window.removeEventListener("filesmanage:knowledge-changed",load)};
- },[]);
+ },[refreshToken]);
  useEffect(()=>{
   let active=true;
   void readWorkSources().then(sources=>{if(active)setWorkSources(sources)});
@@ -62,20 +62,12 @@ export function WorkbenchNotionHome({
  }
  return <section className="wbn-home" aria-label="工作台首页">
   <div className="wbn-home-page">
-   <header className="wbn-home-toolbar">
-    <span>工作空间　/　主页</span>
-    <RareButton type="button" tone="ghost" disabled={busy} onClick={onRefresh}>刷新</RareButton>
-   </header>
    <div className="wbn-home-content">
-    <div className="wbn-home-overview">
-     <div><h1>工作台</h1><p className="wbn-intro">待处理、项目与知识页面</p></div>
-     <RareButton type="button" tone="ghost" disabled={creating} onClick={()=>void newPage()}>＋ 新建页面</RareButton>
-    </div>
     <div className="wbn-home-columns">
      <div className="wbn-home-primary">
     <section className={"wbn-home-section wbn-section-actions"+(todo.length+appointmentCount?" has-actions":"")} aria-label="CDW 文件工作待办">
      <div className="wbn-section-heading"><h2>文件工作待办</h2>
-      <RareButton type="button" tone="ghost" onClick={()=>onView("todo")}>{todo.length+appointmentCount} 项 · 查看文件工作</RareButton>
+      <div className="wbn-section-tools"><RareButton type="button" tone="ghost" disabled={busy} onClick={onRefresh}>刷新</RareButton><RareButton type="button" tone="ghost" onClick={()=>onView("todo")}>{todo.length+appointmentCount} 项 · 查看全部</RareButton></div>
      </div>
      {error||initiatedError?<RareNotice tone="warning">
        部分事项读取失败：{error||initiatedError}
@@ -96,15 +88,15 @@ export function WorkbenchNotionHome({
      {todo.length>8?<RareButton type="button" tone="ghost" className="wbn-more"
       onClick={()=>onView("todo")}>查看其余 {todo.length-8} 项</RareButton>:null}
      <div className="wbn-work-links">
-      <Link to="/workbench?view=approvals">查看通用审批（独立队列）</Link>
-      <Link to="/workbench?view=dhf-operations">查看 DHF 签审（独立队列）</Link>
+      <Link to="/workbench?view=approvals">审批</Link>
+      <Link to="/workbench?view=dhf-operations">DHF 签审</Link>
       <RareButton type="button" tone="ghost" onClick={()=>onView("initiated")}>
        我发起的 {initiatedBusy?"…":initiatedError?"—":initiatedCount}
       </RareButton>
      </div>
     </section>
     <section className="wbn-home-section wbn-source-section" aria-label="其他受控工作来源">
-     <div className="wbn-section-heading"><h2>其他工作来源</h2><span>来自独立受控业务队列</span></div>
+     <div className="wbn-section-heading"><h2>其他工作来源</h2></div>
      <div className="wbn-source-list">
       {!workSources?<p className="wbn-quiet">正在读取审批和 DHF 事项…</p>:
        workSources.map(source=><Link key={source.key} to={source.href} className="wbn-source-row">
@@ -114,12 +106,12 @@ export function WorkbenchNotionHome({
         </span>
        </Link>)}
      </div>
-     <p className="wbn-source-note">仅显示当前权限范围的数据。试点 DHF 意见不是正式 Gate 批准。</p>
+     <p className="wbn-source-note">DHF 签审意见不替代正式 Gate 批准。</p>
     </section>
      </div>
      <div className="wbn-home-secondary">
     <section className="wbn-home-section wbn-section-pages" aria-label="最近页面">
-     <div className="wbn-section-heading"><h2>最近页面</h2><Link to="/workbench?view=knowledge">所有页面</Link></div>
+     <div className="wbn-section-heading"><h2>最近页面</h2><RareButton type="button" tone="ghost" disabled={creating} onClick={()=>void newPage()}>＋ 新建页面</RareButton></div>
      <div className="wbn-page-links">
       {recentPages.map(page=><Link key={page.id}
        to={"/workbench?view=knowledge&page="+encodeURIComponent(page.id)}

@@ -22,11 +22,6 @@ export function WorkbenchApprovals({user}:{user:User}){
   setParams(prev=>{const p=new URLSearchParams(prev);p.set("view","approvals");p.set("approvalTab",next);return p;});
  }
  return <section className="wbv2-approvals" aria-label="审批与经办工作区">
-  <div className="wbv2-approvals-head">
-   <p className="wbv2-eyebrow">APPROVALS / 审批与经办</p>
-   <h2>我的审批工作</h2>
-   <p>审批依据、处理记录及申请进度均在原有受控审批流程中保留。</p>
-  </div>
   <div className="wbv2-approvals-tabs" role="group" aria-label="审批队列筛选">
    {options.map(({key,label,count})=><RareButton key={key} type="button" tone="ghost"
     className={view===key?"is-current":""} aria-pressed={view===key}

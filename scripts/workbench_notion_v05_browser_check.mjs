@@ -72,9 +72,9 @@ try{
 
  if(readOnly){
   await send("Page.navigate",{url:base+"/workbench"});
-  await until("!!document.querySelector('.wbn-home h1')","Notion home");
-  assert.equal(await js("document.querySelector('.wbn-home h1')?.textContent?.trim()"),"工作台",
-   "workbench should lead with an actionable home, not a decorative splash");
+  await until("!!document.querySelector('.wbn-home .wbn-section-actions')","Notion home");
+  assert.equal(await js("document.querySelectorAll('.wbn-home h1,.wbn-home-toolbar').length"),0,
+   "主导航已标识工作台，首页直接显示工作内容");
   const homeLayout=await js("(()=>{const a=document.querySelector('.wbn-section-actions')?.getBoundingClientRect();"
    +"const p=document.querySelector('.wbn-section-pages')?.getBoundingClientRect();"
    +"const brand=document.querySelector('.cdw-rail .finder-sidebar-home')?.getBoundingClientRect();"

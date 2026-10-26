@@ -382,14 +382,11 @@ export function ProjectDatabase({user,initialScope="all"}:{
  // 它作为工作台的一个视图渲染，侧栏由 CDWWorkbench 提供，避免出现「两套壳」。
  return<>
      <div className="pj-shell">
-      <header className="pj-header"><div className="pj-crumb">工作台 <span>/</span> <b>项目</b></div></header>
-      <div className="pj-title-row">
-       <div><h1 className="pj-h1">项目</h1><p className="pj-sub">统一管理研发、受控流程与部门协作项目的进度、负责人与交付状态</p></div>
-       {canManage?<RareButton type="button" tone="primary" onClick={()=>openDrawer("new")}>＋ 新建项目</RareButton>:<span className="pj-readonly-hint">只读视图 · 项目管理需管理员权限</span>}
-      </div>
       <div className="pj-scope-tabs">
        <RareButton type="button" className={"pj-scope"+(scope==="all"?" active":"")} onClick={()=>setScope("all")}>全部项目</RareButton>
        <RareButton type="button" className={"pj-scope"+(scope==="mine"?" active":"")} onClick={()=>setScope("mine")}>我的项目</RareButton>
+       <span className="pj-tool-spacer"/>
+       {canManage&&<RareButton type="button" tone="primary" onClick={()=>openDrawer("new")}>＋ 新建项目</RareButton>}
       </div>
 
       <div className="pj-toolbar">
@@ -425,7 +422,7 @@ export function ProjectDatabase({user,initialScope="all"}:{
        <div className="cdw-empty"><span className="cdw-empty-icon" aria-hidden="true">▤</span>
         <strong>还没有任何项目</strong>
         <p>点击「＋ 新建项目」登记第一个项目</p>
-        {canManage?<RareButton type="button" tone="primary" onClick={()=>openDrawer("new")}>新建项目</RareButton>:null}</div>)}
+</div>)}
       {!busy&&!error&&emptyKind==="search"&&(
        <div className="cdw-empty"><span className="cdw-empty-icon" aria-hidden="true">⌕</span>
         <strong>没有匹配「{search.trim()}」的项目</strong>
@@ -464,7 +461,7 @@ export function ProjectDatabase({user,initialScope="all"}:{
  </>;
 
  function renderBoard(){
-  return<div className="pj-board">{[...ST_KEYS].reverse().map(st=>
+  return<div className="pj-board">{ST_KEYS.map(st=>
    <div className="pj-col" key={st} data-status={st} onDragOver={e=>e.preventDefault()} onDrop={dropCol(st)}>
     <div className="pj-col-head"><span className={"pj-dot pj-dot-"+(STATUS[st].tone==="success"?"d":STATUS[st].tone==="info"?"p":"n")}/><b>{STATUS[st].label}</b><span className="pj-col-count">{groups[st].length}</span></div>
     <div className="pj-col-body">
@@ -475,7 +472,7 @@ export function ProjectDatabase({user,initialScope="all"}:{
        onKeyDown={e=>{
         // 键盘等价于拖拽：← / → 换到相邻列，Enter 打开详情
         if(e.key==="Enter"||e.key===" "){e.preventDefault();openDrawer("edit",p);return;}
-        const order=[...ST_KEYS].reverse();
+        const order=ST_KEYS;
         const i=order.indexOf(p.status);
         if(canManage&&(e.key==="ArrowLeft"||e.key==="ArrowRight")){
          e.preventDefault();
@@ -501,7 +498,6 @@ export function ProjectDatabase({user,initialScope="all"}:{
        </div>
       </div>)}
      {groups[st].length===0&&<div className="pj-col-empty">这一列还空着</div>}
-     {canManage?<RareButton type="button" tone="ghost" className="pj-col-add" onClick={()=>openDrawer("new")}>＋ 新建项目</RareButton>:null}
     </div>
    </div>)}
   </div>;

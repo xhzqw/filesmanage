@@ -30,9 +30,6 @@ export function WorkbenchDHFOperations(){
  }
  return <section className="wbv2-operations" aria-label="DHF 阶段操作中心">
   <header className="wbv2-operations-head">
-   <div><p className="wbv2-eyebrow">DHF / Gate 工作区</p>
-    <h2>阶段操作中心</h2>
-    <p>签审、退回、复验及独立复核集中办理。所有决策继续遵循原阶段状态机与权限。</p></div>
    <Link to="/workbench/dhf" className="wbv2-subtle-link">查看九阶段项目</Link>
   </header>
   <div className="wbv2-operations-layout">

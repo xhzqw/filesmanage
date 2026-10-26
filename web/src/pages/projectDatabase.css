@@ -238,3 +238,10 @@ body.pj-gdragging .pj-gbar{box-shadow:0 0 0 2px rgba(0,100,225,.35)}
  border-radius:var(--radius-lg,15px);background:var(--surface-subtle,#F6F9FD);
  color:var(--text-tertiary,#6B7C93);font-size:26px}
 .pj-error-hold::after{content:"数据暂时不可用，重试后此处会显示项目列表";max-width:460px;line-height:1.6}
+
+/* 视图筛选与唯一创建入口同行，主结果直接进入首屏。 */
+.pj-scope-tabs{align-items:center;flex-wrap:wrap;gap:4px}
+.pj-scope-tabs>.rare-button:last-child{margin-bottom:5px}
+.pj-card-title{overflow-wrap:anywhere}
+.pj-toolbar .pj-search-wrap{flex:0 1 210px;min-width:120px}
+.pj-toolbar .pj-search{width:100%}

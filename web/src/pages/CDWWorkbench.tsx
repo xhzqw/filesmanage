@@ -475,7 +475,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  },[params]);
  const editingBranch=branches.find(b=>b.state==="open");
  return <AppShell user={user} onLogout={onLogout} finderSidebarWidth={240}>
-  <div className="panels document-explorer cdw-panels">
+  <div className="panels document-explorer cdw-panels cdw-workspace">
    {mobileRailOpen?<button type="button" className="wbn-mobile-backdrop" aria-label="关闭工作台导航" onClick={()=>setMobileRailOpen(false)}/>:null}
    <aside id="wbn-workbench-sidebar" className={"sidebar finder-sidebar cdw-rail"+(mobileRailOpen?" is-mobile-open":"")}
     aria-label="工作视图分类" style={{width:"240px"}}
@@ -488,7 +488,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
     <div className="sidebar-scroll">
      <nav className="cdw-rail-nav" aria-label="工作分类">
       {viewGroups.map(group=><div className="cdw-rail-group" key={group.name}>
-       <div className="cdw-rail-caption">{group.name}</div>
+       {group.name!=="更多业务"&&<div className="cdw-rail-caption">{group.name}</div>}
        {group.views.filter(({key})=>group.name!=="更多业务"||advancedNavOpen||filter===key).map(({key,label,icon})=>
         <RareButton key={key} type="button" className={"cdw-rail-item"+(filter===key?" is-current":"")}
          aria-current={filter===key?"page":undefined} onClick={()=>{setFilter(key);setActiveForm(null);setFormalDraft(false);setParams(prev=>{const p=new URLSearchParams(prev);p.set("view",key);p.delete("task");p.delete("gateTab");if(key!=="knowledge"){p.delete("page");p.delete("folder");p.delete("attachFile");p.delete("file");}return p;});}}>
@@ -542,7 +542,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
       <div className="cdw-search"><div className="cdw-search-field"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><RareInput type="search" aria-label="筛选工作或文件" placeholder="搜索工作或文件…" value={search} onChange={e=>setSearch(e.target.value)}/></div></div>
       <div className="cdw-list-meta"><span>{actionableVisible>0?<><i className="cdw-meta-dot"/> {actionableVisible} 项待处理</>:"当前分类的全部事项"}</span><RareButton type="button" className={"cdw-sort-button"+(priorityFirst?" is-active":"")} aria-pressed={priorityFirst} tone="ghost" onClick={()=>setPriorityFirst(v=>!v)}>待处理优先 <span aria-hidden="true">{priorityFirst?"↓":"↕"}</span></RareButton></div>
       <div className="cdw-inbox-scroll">
-       {filter==="todo"&&appointmentCount>0&&<RareButton type="button" className="cdw-appointment-shortcut" onClick={()=>setFilter("appointments")}>
+       {filter==="todo"&&appointmentCount>0&&<RareButton type="button" className="cdw-appointment-shortcut" onClick={()=>{setFilter("appointments");setParams({view:"appointments"});}}>
         <strong>专项核验及通知</strong><small>{appointmentCount} 项需关注或处理</small><span aria-hidden="true">→</span>
        </RareButton>}
        {busy&&items.length===0&&<div className="cdw-message"><BrandLoadingLabel showContext>加载工作事项</BrandLoadingLabel></div>}
