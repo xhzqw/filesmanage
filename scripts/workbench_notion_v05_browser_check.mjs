@@ -11,9 +11,9 @@ import {setTimeout as sleep} from "node:timers/promises";
 const base=(process.argv[2]||"http://127.0.0.1:18098").replace(/\/+$/,"");
 const readOnly=process.argv.includes("--read-only");
 assert.match(base,readOnly?
- /^http:\/\/(127\.0\.0\.1|localhost):18091$/:
+ /^http:\/\/(127\.0\.0\.1|localhost):(18091|18098)$/:
  /^http:\/\/(127\.0\.0\.1|localhost):18098$/,
- readOnly?"local V05 read-only endpoint only":"isolated V05 canary only");
+ readOnly?"local live or isolated read-only endpoint only":"isolated V05 canary only");
 const credentialPath=process.argv[3]&&!process.argv[3].startsWith("--")?process.argv[3]:".secrets/admin.password";
 const password=readFileSync(credentialPath,"utf8").trim();
 const port=19000+process.pid%14000;
@@ -91,6 +91,22 @@ try{
    "home should show useful task/page columns instead of tiny centered lists "+JSON.stringify(homeLayout));
   console.log("NOTION_SIDEBAR_BRAND_AND_TREE_PASS");
   console.log("NOTION_USABILITY_HOME_PRIORITY_PASS");
+  await until("document.querySelectorAll('.wbn-source-row').length===4",
+   "source-aware work queues are displayed");
+  const sources=await js("[...document.querySelectorAll('.wbn-source-row')].map(a=>({title:a.textContent,href:a.getAttribute('href')}))");
+  assert.equal(sources.length,4,"four permission-scoped work sources");
+  assert.ok(sources.some(s=>s.href.includes("approvalTab=inbox")),"approval inbox shortcut");
+  assert.ok(sources.some(s=>s.href.includes("gateTab=review")),"DHF review shortcut");
+  assert.ok(sources.some(s=>s.href.includes("gateTab=verification")),"DHF verification shortcut");
+  assert.ok(sources.some(s=>s.href.includes("gateTab=returns")),"DHF remediation shortcut");
+  assert.ok(!sources.some(s=>s.title.includes("undefined")||s.title.includes("NaN")),
+   "unavailable data must not appear as a fabricated count");
+  const actionLinks=await js("[...document.querySelectorAll('.wbn-source-item')].map(a=>a.getAttribute('href'))");
+  assert.ok(actionLinks.every(href=>
+   href.startsWith("/workbench?view=")&&
+   /(?:[&?](?:item|dhfReviewTask|dhfVerificationCase|dhfReturnDecision)=)/.test(href)),
+   "individual work references must route to source-qualified deep links");
+  console.log("WORKBENCH_CROSS_SOURCE_OVERVIEW_PASS");
   assert.ok(await js("document.querySelector('link[rel=icon]')?.href.includes('/assets/brand/')"),"existing favicon");
   // Parent workbench routing and project database subviews must not share
   // ?view=. Verify actual clicks rather than looking for a static selector.

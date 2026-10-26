@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from "react";
+import {useSearchParams} from "react-router-dom";
 import {request} from "../../shared/http";
 import {RareButton,RareInput,RareTextarea} from "../../shared/ui/rare";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
@@ -27,6 +28,8 @@ const specialtyNames:Record<string,string>={
 };
 
 export function DHFPilotInbox(){
+ const [params]=useSearchParams();
+ const requestedTask=params.get("dhfReviewTask");
  const [tasks,setTasks]=useState<DHFTask[]>([]);
  const [duties,setDuties]=useState<Duty[]>([]);
  const [dutyError,setDutyError]=useState("");
@@ -40,6 +43,7 @@ export function DHFPilotInbox(){
  const [refresh,setRefresh]=useState(0);
  const [query,setQuery]=useState("");
  const [selected,setSelected]=useState<string|null>(null);
+ useEffect(()=>{if(requestedTask)setSelected(requestedTask)},[requestedTask]);
  const [comment,setComment]=useState("");
  const [busy,setBusy]=useState(false);
  // Reuse the SAME idempotency key when a network failure leaves the result unknown.

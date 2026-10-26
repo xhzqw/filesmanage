@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from "react";
+import {useSearchParams} from "react-router-dom";
 import {request} from "../../shared/http";
 import {RareButton,RareInput,RareTextarea} from "../../shared/ui/rare";
 import {errorCopy} from "../../shared/errors";
@@ -16,8 +17,11 @@ type Verified={verificationId:string;revisedSubmissionId:string;trialOnly:boolea
 const intentText="I personally verified the corrected DHF submission against my original return";
 
 export function DHFVerificationInbox(){
+ const[params]=useSearchParams();
+ const requestedCase=params.get("dhfVerificationCase");
  const[items,setItems]=useState<VerificationCase[]>([]);
  const[selected,setSelected]=useState<string|null>(null);
+ useEffect(()=>{if(requestedCase)setSelected(requestedCase)},[requestedCase]);
  const[loading,setLoading]=useState(true);
  const[error,setError]=useState("");
  const[refresh,setRefresh]=useState(0);

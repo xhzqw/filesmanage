@@ -247,3 +247,11 @@
 .cdw-panels:has(.wbn-pages) .wbn-source-count{font-size:12px;white-space:nowrap;color:#777771}
 .cdw-panels:has(.wbn-pages) .wbn-source-error{font-size:12px;white-space:nowrap;color:#a45b45}
 .cdw-panels:has(.wbn-pages) .wbn-source-note{font-size:11px;line-height:1.6;color:#858580;margin:10px 8px 0}
+.cdw-panels:has(.wbn-pages) .wbn-source-group{border-bottom:1px solid #f1f1ee;padding:1px 0 5px}
+.cdw-panels:has(.wbn-pages) .wbn-source-group:last-child{border-bottom:0}
+.cdw-panels:has(.wbn-pages) .wbn-source-items{padding-left:10px}
+.cdw-panels:has(.wbn-pages) .wbn-source-item{display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:5px;padding:6px 11px;text-decoration:none;font-size:12px;color:#4a4a46}
+.cdw-panels:has(.wbn-pages) .wbn-source-item:hover{background:#f4f4f1}
+.cdw-panels:has(.wbn-pages) .wbn-source-item-main{display:flex;flex-direction:column;min-width:0;gap:2px}
+.cdw-panels:has(.wbn-pages) .wbn-source-item-main>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cdw-panels:has(.wbn-pages) .wbn-source-item-main small{font-size:10px;color:#858580}

@@ -107,12 +107,20 @@ export function WorkbenchNotionHome({
      <div className="wbn-section-heading"><h2>其他工作来源</h2><span>来自独立受控业务队列</span></div>
      <div className="wbn-source-list">
       {!workSources?<p className="wbn-quiet">正在读取审批和 DHF 事项…</p>:
-       workSources.map(source=><Link key={source.key} to={source.href} className="wbn-source-row">
-        <span>{source.label}</span>
-        <span className={source.error?"wbn-source-error":"wbn-source-count"}>
-         {source.error?"读取失败":source.truncated?"至少 "+source.count+" 项":source.count+" 项"}
-        </span>
-       </Link>)}
+       workSources.map(source=><div key={source.key} className="wbn-source-group">
+        <Link to={source.href} className="wbn-source-row">
+         <span>{source.label}</span>
+         <span className={source.error?"wbn-source-error":"wbn-source-count"}>
+          {source.error?"读取失败":source.truncated?"至少 "+source.count+" 项":source.count+" 项"}
+         </span>
+        </Link>
+        {source.items.length>0?<div className="wbn-source-items">
+         {source.items.map(item=><Link key={item.id} className="wbn-source-item" to={item.href}>
+          <span className="wbn-source-item-main"><span>{item.title}</span><small>{item.context}</small></span>
+          <span aria-hidden="true">›</span>
+         </Link>)}
+        </div>:null}
+       </div>)}
      </div>
      <p className="wbn-source-note">仅显示当前权限范围的数据。试点 DHF 意见不是正式 Gate 批准。</p>
     </section>

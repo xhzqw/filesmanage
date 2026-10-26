@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useRef,useState} from "react";
+import {useSearchParams} from "react-router-dom";
 import {request} from "../../shared/http";
 import {RareButton,RareTextarea} from "../../shared/ui/rare";
 import {fileApi} from "../documents/api";
@@ -15,11 +16,14 @@ type ReturnItem={
 type Latest={seq:number;sha:string;name:string};
 
 export function DHFRemediationInbox(){
+ const[params]=useSearchParams();
+ const requestedDecision=params.get("dhfReturnDecision");
  const[items,setItems]=useState<ReturnItem[]>([]);
  const[fetchError,setFetchError]=useState("");
  const[loading,setLoading]=useState(true);
  const[refresh,setRefresh]=useState(0);
  const[selected,setSelected]=useState<string|null>(null);
+ useEffect(()=>{if(requestedDecision)setSelected(requestedDecision)},[requestedDecision]);
  const[latest,setLatest]=useState<Record<string,Latest>>({});
  const[chosen,setChosen]=useState<Record<string,boolean>>({});
  const[plan,setPlan]=useState("");

@@ -41,6 +41,21 @@ assert.match(actionSources,/count:null,truncated:false,error:true/);
 assert.doesNotMatch(actionSources,/method:"(?:POST|PUT|PATCH|DELETE)"/);
 assert.match(notionHome,/readWorkSources\(\)/);
 assert.match(notionHome,/source\.error\?"读取失败"/);
+assert.match(notionHome,/source\.items\.map\(item=>/);
+assert.match(actionSources,/id:"approvals:"\+row\.id/);
+assert.match(actionSources,/id:"dhf-review:"\+item\.id/);
+assert.match(actionSources,/id:"dhf-verify:"\+item\.caseId/);
+assert.match(actionSources,/id:"dhf-remediation:"\+item\.decisionId/);
+for(const [component,queryParam] of [
+ ["DHFPilotInbox","dhfReviewTask"],
+ ["DHFVerificationInbox","dhfVerificationCase"],
+ ["DHFRemediationInbox","dhfReturnDecision"],
+]){
+ const target=read("web/src/features/workflow/"+component+".tsx");
+ assert.ok(target.includes('params.get("'+queryParam+'")'),
+  component+" must read the source-qualified deep link");
+ assert.match(target,/setSelected\(/,component+" must select authorized inbox item");
+}
 const primary=wb.slice(wb.indexOf('const viewGroups:'),wb.indexOf('const kindName:'));
 assert.match(primary,/name:"工作空间"/);
 assert.match(primary,/name:"工作事项"/);
