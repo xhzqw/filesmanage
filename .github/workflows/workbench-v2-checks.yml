@@ -5,6 +5,7 @@ on:
     branches:
       - feat/workbench-v2
       - feat/workbench-v3-reduction
+      - feat/workbench-v4-notion
   pull_request:
     paths:
       - 'web/src/pages/**'

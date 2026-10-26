@@ -1,0 +1,106 @@
+/* Notion-inspired workspace. Strictly scoped to Workbench; Finder is untouched. */
+.cdw-panels:has(.wbn-pages){background:#fff;padding:0}
+.cdw-panels:has(.wbn-pages) .cdw-layout{display:flex;min-height:0;min-width:0;background:#fff}
+.cdw-panels:has(.wbn-pages) .cdw-work{min-width:0;min-height:0;background:#fff}
+.cdw-panels:has(.wbn-pages) .cdw-rail{width:245px!important;flex:0 0 245px;min-width:0;background:#f7f7f5;border-right:1px solid #e9e9e7;border-radius:0;padding:6px 7px}
+.cdw-panels:has(.wbn-pages) .cdw-rail .finder-sidebar-home{padding:7px 9px;margin:0 0 7px;border-radius:5px;min-height:35px;font-size:13px;color:#37352f}
+.cdw-panels:has(.wbn-pages) .cdw-rail .finder-sidebar-home:hover{background:#efefed}
+.cdw-panels:has(.wbn-pages) .cdw-rail .sidebar-scroll{display:flex;flex-direction:column;align-items:stretch;gap:2px;min-width:0;min-height:0;overflow-x:hidden;overflow-y:auto;padding:0}
+.cdw-panels:has(.wbn-pages) .cdw-rail-nav{display:flex;flex-direction:column;align-items:stretch;gap:2px;height:auto;min-width:0;min-height:auto;overflow:visible;padding:0}
+.cdw-panels:has(.wbn-pages) .cdw-rail-group{display:flex;flex-direction:column;align-items:stretch;margin:0 0 4px;gap:1px}
+.cdw-panels:has(.wbn-pages) .cdw-rail-caption{display:none}
+.cdw-panels:has(.wbn-pages) .cdw-rail .cdw-rail-item.rare-button{height:29px;min-height:29px;width:100%;justify-content:flex-start;font-size:12px;font-weight:450;color:#565650;border:0;border-radius:5px;padding:3px 8px;box-shadow:none;gap:8px}
+.cdw-panels:has(.wbn-pages) .cdw-rail .cdw-rail-item.rare-button.is-current{background:#e9e9e7;color:#37352f;font-weight:600}
+.cdw-panels:has(.wbn-pages) .cdw-rail .cdw-rail-item.rare-button:hover{background:#ececeb;color:#37352f}
+.cdw-panels:has(.wbn-pages) .cdw-rail-icon{color:#777771;width:17px}
+.cdw-panels:has(.wbn-pages) .cdw-rail-item small.has-count{background:transparent;color:#9b9b96;font-size:10px}
+.cdw-panels:has(.wbn-pages) .cdw-rail .rare-button.cdw-rail-expand{height:28px;min-height:28px;padding:4px 10px;color:#8a8a84;font-size:11px}
+.cdw-panels:has(.wbn-pages) .cdw-rail .sidebar-resizer{display:none}
+.cdw-panels:has(.wbn-pages) .cdw-layout>.wbv2-knowledge-view{width:100%;flex:1;min-width:0;background:#fff}
+
+.wbn-pages{margin-top:17px;flex:1 0 auto;min-width:0;padding:0 2px 12px}
+.wbn-page-search{padding:0 6px 11px}
+.wbn-page-search .rare-input{height:29px;min-height:29px;border:0;background:#ececeb;border-radius:5px;color:#575751;font-size:11px;box-shadow:none}
+.wbn-page-search .rare-input:focus{background:#fff;box-shadow:0 0 0 1px #d1d1cb}
+.wbn-pages-shared{margin-top:18px}
+.wbn-tree-hint{font-size:10.5px;color:#aaa;padding:4px 11px}
+.wbn-pages-head{display:flex;align-items:center;justify-content:space-between;padding:3px 8px 4px;font-size:11px;font-weight:600;color:#9b9b96}
+.wbn-pages-head .rare-button{width:22px;min-width:22px;min-height:22px;padding:0;color:#888880;font-size:16px}
+.wbn-pages-body{display:flex;flex-direction:column;gap:1px;min-width:0}
+.wbn-tree-item{display:flex;align-items:center;gap:3px;min-width:0;height:29px;border-radius:5px}
+.wbn-tree-item:hover{background:#ececeb}
+.wbn-tree-item.is-current{background:#e9e9e7}
+.wbn-tree-item .rare-button.wbn-expand{width:16px;min-width:16px;min-height:22px;padding:0;background:transparent;font-size:16px;color:#999993}
+.wbn-expand-spacer{width:16px;min-width:16px}
+.wbn-page-link{display:flex;align-items:center;gap:7px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:none;color:#5b5b55;font-size:12px}
+.wbn-page-link>span:first-child{font-size:14px;color:#92928d}
+.wbn-page-link>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wbn-tree-item .rare-button.wbn-new-child{width:23px;min-width:23px;min-height:23px;opacity:0;padding:0;font-size:15px;color:#777}
+.wbn-tree-item:hover .rare-button.wbn-new-child,.wbn-tree-item:focus-within .rare-button.wbn-new-child{opacity:1}
+.wbn-empty{width:100%;justify-content:flex-start;font-size:11px;color:#999;padding:6px 10px}
+.wbn-tree-error{font-size:11px;color:#b65c4a;padding:5px 10px}
+
+.wbn-home{width:100%;flex:1;min-width:0;min-height:0;overflow-y:auto;background:#fff;color:#37352f}
+.wbn-home-page{min-width:0;min-height:100%;display:flex;flex-direction:column}
+.wbn-home-toolbar{display:flex;align-items:center;justify-content:space-between;gap:15px;min-height:45px;padding:6px 18px;border-bottom:1px solid #f1f1ef;font-size:12px;color:#92928d;flex:none}
+.wbn-home-toolbar .rare-button{height:26px;min-height:26px;font-size:11px;color:#92928d}
+.wbn-home-content{width:100%;max-width:850px;margin:0 auto;padding:54px 54px 95px}
+.wbn-home-icon{font-size:48px;display:block;margin-bottom:12px;color:#9c9c96}
+.wbn-home-content h1{font-size:39px;font-weight:750;letter-spacing:-.045em;line-height:1.25;margin:0 0 5px}
+.wbn-intro{color:#9b9b96;font-size:13px;line-height:1.8;margin:5px 0 42px}
+.wbn-home-section{margin-bottom:34px}
+.wbn-section-heading{display:flex;align-items:center;justify-content:space-between;padding:0 2px 7px;border-bottom:1px solid #e9e9e7;margin-bottom:7px}
+.wbn-section-heading h2{font-size:16px;font-weight:650;letter-spacing:-.02em;margin:0}
+.wbn-section-heading>span,.wbn-section-heading .rare-button{font-size:11px;color:#9b9b96}
+.wbn-section-heading .rare-button{min-height:24px;padding:3px 7px}
+.wbn-page-links{display:flex;flex-direction:column;gap:1px}
+.wbn-line,.wbn-task-list .rare-button.wbn-task-row{min-height:37px;display:flex;align-items:center;gap:11px;padding:7px 10px;border:0;border-radius:5px;box-shadow:none;background:transparent;text-decoration:none;color:#37352f;text-align:left;width:100%;font-size:13px}
+.wbn-line:hover,.wbn-task-list .rare-button.wbn-task-row:hover{background:#f7f7f5}
+.wbn-line>span:nth-child(2){flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wbn-line-icon{font-size:16px;color:#a2a29c;width:20px;text-align:center}
+.wbn-line-arrow{margin-left:auto;font-size:17px;font-weight:300;color:#b0b0a9}
+.wbn-page-placeholder{background:transparent;border:0;text-align:left;padding:10px;color:#9b9b96;font-size:12px;cursor:pointer}
+.wbn-page-placeholder:hover{color:#37352f;background:#f7f7f5}
+.wbn-page-error{font-size:12px;color:#bd584f;padding:6px}
+.wbn-task-list{display:flex;flex-direction:column}
+.wbn-task-icon{flex:none;font-size:17px;color:#aeaea8}
+.wbn-task-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.wbn-task-text strong{font-size:12px;font-weight:570;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wbn-task-text small{font-size:10.5px;color:#92928d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wbn-quiet{font-size:12px;color:#9b9b96;padding:12px 11px}
+.wbn-more{margin:8px 0;color:#787870;font-size:11px}
+.wbn-work-links{display:flex;gap:16px;align-items:center;flex-wrap:wrap;padding:13px 5px 0;font-size:11px}
+.wbn-work-links a,.wbn-work-links .rare-button{min-height:24px;color:#77776f;font-size:11px;padding:2px}
+.wbn-work-links a:hover{color:#37352f}
+.wbn-bottom-note{font-size:10.5px;color:#b2b2ac;margin-top:55px}
+
+/* The knowledge editor uses the SAME rail: no nested second navigation. */
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-shell{padding:0;margin:0;display:block;height:100%;background:#fff}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-nav{display:none}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-canvas{min-height:100%;width:100%;background:#fff;border-radius:0;box-shadow:none;padding:20px clamp(22px,7vw,90px);overflow-y:auto}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-page{max-width:750px;padding-top:35px}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-breadcrumb{display:flex;align-items:center;gap:9px;font-size:12px;color:#92928d;min-height:24px}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-breadcrumb{flex-wrap:wrap;overflow-wrap:anywhere}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-ancestor{display:inline-flex;align-items:center;gap:9px;min-width:0}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-breadcrumb a{color:#92928d;text-decoration:none}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-breadcrumb a:hover{color:#37352f}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-empty h2{font-size:27px;color:#37352f;margin:10px 0}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-empty p{font-size:13px;color:#9b9b96;line-height:1.7}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-empty-icon{font-size:46px;color:#a6a6a1}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-page .rare-input.kn-title{font-size:39px;font-weight:730;letter-spacing:-.045em;color:#37352f;line-height:1.25}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-block{position:relative;padding:3px 5px;margin:1px 0;min-height:31px;background:transparent}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-block:hover{background:#fafaf9}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-block-tools{position:absolute;left:-104px;top:2px;z-index:2;opacity:0;transition:opacity .13s;display:flex;gap:2px}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-block:hover .kn-block-tools,.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-block:focus-within .kn-block-tools{opacity:1}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-block-content>.rare-textarea{color:#37352f;font-size:15px;line-height:1.55;min-height:32px;padding:2px 0;resize:none}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-block-heading1 .kn-block-content>.rare-textarea{font-size:25px;font-weight:680}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-block-heading2 .kn-block-content>.rare-textarea{font-size:19px;font-weight:620}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-files{border-top:1px solid #f1f1ef;margin-top:35px}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-empty{max-width:650px;margin:0 auto;text-align:left;padding:100px 12px 20px;color:#a2a29c}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-add{opacity:.5;font-size:12px}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-block{isolation:isolate}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-slash-menu{position:absolute;top:38px;left:9px;z-index:20;width:245px;max-height:280px;overflow:auto;background:#fff;border:1px solid #e5e5e2;box-shadow:0 8px 28px rgba(0,0,0,.14);border-radius:7px;padding:7px}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-slash-title{font-size:11px;font-weight:600;color:#9b9b96;padding:8px}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-slash-menu .rare-button{display:flex;width:100%;min-height:31px;justify-content:flex-start;font-size:12px;text-align:left;color:#37352f}
+@media(max-width:830px){.cdw-panels:has(.wbn-pages) .cdw-rail{width:202px!important;flex-basis:202px}.wbn-home-content{padding:35px 30px 70px}}
+@media(max-width:570px){.cdw-panels:has(.wbn-pages) .cdw-rail{width:165px!important;flex-basis:165px;padding:5px 3px}.wbn-home-content{padding:24px 18px 60px}.wbn-home-content h1{font-size:30px}.wbn-home-icon{font-size:37px}.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-canvas{padding:15px}.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-page .rare-input.kn-title{font-size:27px}.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-block-tools{position:static;opacity:.75}}

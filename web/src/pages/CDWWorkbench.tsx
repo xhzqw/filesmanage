@@ -27,7 +27,9 @@ import {fileApi} from "../features/documents/api";
 import {cdwApi,type CDWBranch,type CDWInboxItem,type CDWInitiatedItem,type CDWRecipient,type CDWReviewGate,type CDWFormalApproval,type CDWApprovedCandidate,type CDWDistributionPlan,type CDWReceiptTarget,type CDWReadingAssignment,type CDWQMSPendingReview,type CDWQMSAppointmentAlert,type CDWQMSSpecialAlert,type CDWQMSSpecialAuthority,type CDWQMSSpecialPolicyImpact,type CDWQMSLegacyAnomaly,type CDWQMSFormalNotice} from "../features/cdw/api";
 import "./cdwWorkbench.css";
 import {workNeedsAction} from "./CDWWorkbenchHome";
-import {WorkbenchFocusHome} from "./WorkbenchFocusHome";
+import {WorkbenchNotionHome} from "./WorkbenchNotionHome";
+import {WorkbenchPageTree} from "./WorkbenchPageTree";
+import "./workbenchNotion.css";
 import "./workbenchV2.css";
 import {WorkbenchDHFOperations} from "./WorkbenchDHFOperations";
 import {WorkbenchApprovals} from "./WorkbenchApprovals";
@@ -84,10 +86,9 @@ export function WorkbenchIcon({name,className=""}:{name:string;className?:string
 
 type View="home"|"todo"|"initiated"|"following"|"tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all"|"seals"|"projects"|"my-projects"|"knowledge"|"dhf-operations"|"approvals";
 const viewGroups:{name:string;views:{key:View;label:string;icon:string}[]}[]=[
- {name:"常用",views:[
-  {key:"home",label:"我的工作",icon:"home"},
-  {key:"projects",label:"项目",icon:"projects"},
-  {key:"knowledge",label:"知识",icon:"knowledge"}]},
+ {name:"工作空间",views:[
+  {key:"home",label:"主页",icon:"home"},
+  {key:"projects",label:"项目",icon:"projects"}]},
  {name:"更多业务",views:[
   {key:"todo",label:"文件待办",icon:"todo"},
   {key:"approvals",label:"审批中心",icon:"reviews"},
@@ -101,7 +102,7 @@ const viewGroups:{name:string;views:{key:View;label:string;icon:string}[]}[]=[
 ];
 // Retain older deep links and contextual task actions without repeating all
 // domain-specific filters as permanent navigation destinations.
-const legacyViews:readonly View[]=["my-projects","tasks","obligations","reviews",
+const legacyViews:readonly View[]=["knowledge","my-projects","tasks","obligations","reviews",
  "formal","control","scope","receipts","reading"];
 const isKnownView=(key:string):key is View=>
  viewGroups.some(g=>g.views.some(v=>v.key===key))||legacyViews.includes(key as View);
@@ -493,6 +494,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
         </RareButton>:null}
       </div>)}
      </nav>
+     <WorkbenchPageTree userId={user.id}/>
      {advancedNavOpen?<div className="wbv3-advanced-links">
       <Link className="cdw-rail-dhf" to="/workbench/dhf"><span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name="dhf"/></span><span>DHF 九阶段验收</span><span aria-hidden="true">↗</span></Link>
       <Link className="cdw-rail-dhf" to="/workbench/customer-registrations"><span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name="customers"/></span><span>客户登记审批</span><span aria-hidden="true">↗</span></Link>
@@ -505,7 +507,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
      {filter==="approvals"?<WorkbenchApprovals user={user}/>:
       filter==="knowledge"?<div className="cdw-projects-view wbv2-knowledge-view"><KnowledgeWorkspace user={user} onLogout={onLogout} embedded/></div>:
       filter==="dhf-operations"?<WorkbenchDHFOperations/>:
-      (filter==="projects"||filter==="my-projects")?<div className="cdw-projects-view"><ProjectDatabase user={user} initialScope={filter==="my-projects"?"mine":"all"}/></div>:filter==="home"?<WorkbenchFocusHome userName={user.displayName} initiatedCount={initiatedItems.length} initiatedHasMore={Boolean(initiatedCursor)} initiatedError={initiatedError} initiatedBusy={initiatedBusy} items={allItems} appointmentCount={appointmentCount} busy={busy} error={requestError}
+      (filter==="projects"||filter==="my-projects")?<div className="cdw-projects-view"><ProjectDatabase user={user} initialScope={filter==="my-projects"?"mine":"all"}/></div>:filter==="home"?<WorkbenchNotionHome userName={user.displayName} initiatedCount={initiatedItems.length} initiatedHasMore={Boolean(initiatedCursor)} initiatedError={initiatedError} initiatedBusy={initiatedBusy} items={allItems} appointmentCount={appointmentCount} busy={busy} error={requestError}
       canCreate={user.isAdmin} onRefresh={()=>refresh(v=>v+1)} onCreate={()=>{setFilter("tasks");beginForm("create");}}
       onOpen={item=>{setFilter("all");select(item);}} onView={view=>{setFilter(view);setActiveForm(null);setFormalDraft(false);}}/>:filter==="initiated"?
       <CDWInitiatedWorkspace items={initiatedItems} busy={initiatedBusy} error={initiatedError} nextCursor={initiatedCursor}
