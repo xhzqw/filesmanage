@@ -1,9 +1,9 @@
-import {useEffect,useMemo,useRef,useState} from "react";
-import {Link,useSearchParams} from "react-router-dom";
+import {useEffect,useLayoutEffect,useMemo,useRef,useState} from "react";
+import {Link,useLocation,useSearchParams} from "react-router-dom";
 import type {User} from "../entities/user/model";
 import {AppShell} from "../shared/ui/AppShell";
 import {RareButton,RareInput,RareSelect,RareTextarea} from "../shared/ui/rare";
-import {request} from "../shared/http";
+import {ApiError,request} from "../shared/http";
 import {errorCopy} from "../shared/errors";
 import "./knowledgeWorkspace.css";
 
@@ -31,7 +31,13 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
  const[error,setError]=useState(""),[notice,setNotice]=useState(""),[busy,setBusy]=useState(false),[stamp,setStamp]=useState(0);
  const[slashBlock,setSlashBlock]=useState<string|null>(null);
  const[saving,setSaving]=useState(false),[saveBlocked,setSaveBlocked]=useState(false);
+ const[conflictServer,setConflictServer]=useState<Page|null>(null);
  const savingRef=useRef(false);
+ const routerLocation=useLocation();
+ const lastRoute=useRef({href:window.location.href,index:window.history.state?.idx as number|undefined});
+ useLayoutEffect(()=>{
+  lastRoute.current={href:window.location.href,index:window.history.state?.idx as number|undefined};
+ },[routerLocation.key,routerLocation.pathname,routerLocation.search]);
  const activePageId=useRef(pageId);
  activePageId.current=pageId;
  const showHistory=async()=>{if(!page)return;setError("");if(history!==null){setHistory(null);return}try{setHistory(await request<Version[]>(base+enc(page.id)+"/history"))}catch(e){setError(errorCopy(e,"修订历史读取失败"))}};
@@ -39,14 +45,31 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
  const reload=()=>setStamp(x=>x+1);
  const hasPendingChanges=dirty||saving;
  const leaveMessage="当前页面有尚未保存的修改。确定放弃这些修改并离开吗？";
+ // An in-flight write cannot be cancelled: navigation must wait for its
+ // authoritative acknowledgement rather than promise an impossible discard.
+ const confirmLeave=()=>!saving&&window.confirm(leaveMessage);
  const go=(id:string)=>{
   if(id===pageId)return;
-  if(hasPendingChanges&&!window.confirm(leaveMessage))return;
+  if(hasPendingChanges&&!confirmLeave())return;
   const next=new URLSearchParams(params);if(id)next.set("page",id);else next.delete("page");setParams(next);
  };
  useEffect(()=>{
   if(!embedded||!hasPendingChanges)return;
   const beforeUnload=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue="";};
+  let rollingBack=false;
+  const beforePop=(event:PopStateEvent)=>{
+   if(rollingBack){rollingBack=false;event.stopImmediatePropagation();return;}
+   if(confirmLeave())return;
+   // BrowserRouter listens in the bubble phase. Prevent its transition and
+   // return to the original history index without discarding the draft.
+   event.stopImmediatePropagation();
+   const current=lastRoute.current;
+   const nextIndex=event.state?.idx;
+   const delta=typeof current.index==="number"&&typeof nextIndex==="number"
+    ?current.index-nextIndex:0;
+   if(delta){rollingBack=true;window.history.go(delta);}
+   else window.history.replaceState({...window.history.state,idx:current.index}, "",current.href);
+  };
   // Links in the global shell, page tree and breadcrumb live outside the
   // editor; React Router's BrowserRouter does not guard those transitions.
   const beforeClick=(event:MouseEvent)=>{
@@ -64,17 +87,19 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
     if(!button||!button.matches(".cdw-rail-item, .wbn-new-child, .wbn-pages-head button, .wbn-empty"))return;
     if(button.matches(".cdw-rail-item.is-current"))return;
    }
-   if(!window.confirm(leaveMessage)){event.preventDefault();event.stopPropagation();}
+   if(!confirmLeave()){event.preventDefault();event.stopPropagation();}
   };
   window.addEventListener("beforeunload",beforeUnload);
+  window.addEventListener("popstate",beforePop,true);
   document.addEventListener("click",beforeClick,true);
   return()=>{
    window.removeEventListener("beforeunload",beforeUnload);
+   window.removeEventListener("popstate",beforePop,true);
    document.removeEventListener("click",beforeClick,true);
   };
  },[embedded,hasPendingChanges]);
  useEffect(()=>{let live=true;request<Page[]>("/knowledge/pages").then(x=>{if(live)setPages(x||[])}).catch(e=>{if(live)setError(errorCopy(e,"页面树加载失败"))});return()=>{live=false}},[stamp]);
- useEffect(()=>{let live=true;setPage(null);setDraft(null);setError("");setNotice("");setHistory(null);setSaveBlocked(false);setSlashBlock(null);
+ useEffect(()=>{let live=true;setPage(null);setDraft(null);setError("");setNotice("");setHistory(null);setSaveBlocked(false);setConflictServer(null);setSlashBlock(null);
   if(pageId)request<Page>(base+enc(pageId)).then(p=>{if(live){setPage(p);setDraft({...p,blocks:p.blocks.map(b=>({...b}))})}}).catch(e=>{if(live)setError(errorCopy(e,"页面读取失败"))});
   return()=>{live=false};
  },[pageId,stamp]);
@@ -88,8 +113,9 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
  async function create(){if(!title.trim()||busy)return;setBusy(true);try{const p=await request<Page>("/knowledge/pages",{method:"POST",body:JSON.stringify({title:title.trim(),parentId:createParent||"",folderId})});setCreateParent(null);setTitle("");window.dispatchEvent(new Event("filesmanage:knowledge-changed"));go(p.id);reload()}catch(e){setError(errorCopy(e,"创建页面失败"))}finally{setBusy(false)}}
  async function save(){
   if(!draft||!dirty||busy||savingRef.current)return;
-  const snapshot={...draft,blocks:draft.blocks.map(b=>({...b}))};
-  savingRef.current=true;setSaving(true);setSaveBlocked(false);
+   const snapshot={...draft,blocks:draft.blocks.map(b=>({...b}))};
+   savingRef.current=true;setSaving(true);setSaveBlocked(false);
+   setConflictServer(null);
   try{
    const saved=await request<Page>(base+enc(snapshot.id),{
     method:"PUT",body:JSON.stringify({title:snapshot.title,blocks:snapshot.blocks,revision:snapshot.revision})
@@ -111,11 +137,39 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
   }catch(e){
    if(activePageId.current===snapshot.id){
     setSaveBlocked(true);
-    setError(errorCopy(e,"保存失败，页面可能已被修改，请核对版本后重试"));
+    if(e instanceof ApiError&&(e.httpStatus===409||e.httpStatus===0)){
+     try{
+      const latest=await request<Page>(base+enc(snapshot.id));
+      if(activePageId.current!==snapshot.id)return;
+      if(latest.title===snapshot.title&&JSON.stringify(latest.blocks)===JSON.stringify(snapshot.blocks)){
+       setPage(latest);
+       setDraft(current=>current?.id===snapshot.id?{...current,revision:latest.revision}:current);
+       setSaveBlocked(false);setError("");return;
+      }
+      if(e.httpStatus===409&&e.code==="E_CONFLICT"){
+       setConflictServer(latest);
+       setError("页面已有更新，当前草稿仍保留。请选择要使用的版本。");
+       return;
+      }
+     }catch{ /* Keep the current draft if the read-back fails. */ }
+    }
+    setError(errorCopy(e,"保存未确认，草稿已保留。请核对网络后重试。"));
    }
   }finally{
    savingRef.current=false;setSaving(false);
   }
+ }
+ function resolveConflict(useMine:boolean){
+  if(!draft||!conflictServer||draft.id!==conflictServer.id)return;
+  if(!window.confirm(useMine
+   ?"将以你的当前草稿覆盖服务器最新内容，可能替换他人的修改。确定继续？"
+   :"放弃当前未保存的修改，使用服务器的最新版本？"))return;
+  const latest=conflictServer;
+  setPage(latest);
+  setDraft(current=>current?.id===latest.id
+   ?useMine?{...current,revision:latest.revision}:{...latest,blocks:latest.blocks.map(b=>({...b}))}
+   :current);
+  setConflictServer(null);setError("");setSaveBlocked(false);
  }
  useEffect(()=>{
   if(!embedded||!draft?.canEdit||!dirty||busy||saving||saveBlocked)return;
@@ -146,6 +200,14 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
  function editBlock(index:number,change:Partial<Block>){setDraft(prev=>prev?{...prev,blocks:prev.blocks.map((b,i)=>i===index?{...b,...change}:b)}:prev)}
  function selectBlockKind(index:number,type:Kind){
   editBlock(index,{type});setSlashBlock(null);
+ }
+ function focusBlock(id:string,atEnd=false){
+  requestAnimationFrame(()=>{
+   const element=document.querySelector<HTMLTextAreaElement>('[data-kn-block="'+id+'"] textarea');
+   element?.focus();
+   const offset=atEnd?element?.value.length??0:0;
+   element?.setSelectionRange(offset,offset);
+  });
  }
  const available=pages.filter(p=>!folderId||p.folderId===folderId);
  function tree(parent:string|null,depth=0):React.ReactNode{
@@ -192,6 +254,21 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
       <span>{draft?.title||"知识页面"}</span>
      </nav>:null}
     {error?<p role="alert" className="kn-alert">{error}</p>:null}
+    {conflictServer&&draft?.id===conflictServer.id?<section className="kn-conflict" role="region" aria-label="页面保存冲突">
+     <strong>检测到新的服务器版本</strong>
+     <p>服务器为 v{conflictServer.revision}；当前未保存草稿仍在编辑区。请对照内容后自行决定，不会自动覆盖任何版本。</p>
+     <details><summary>查看服务器版本内容</summary>
+      <strong>{conflictServer.title}</strong>
+      {conflictServer.blocks.map(b=><p key={b.id}>{b.text||"（空内容块）"}</p>)}
+     </details>
+     <div className="kn-conflict-actions">
+      <RareButton type="button" onClick={()=>resolveConflict(false)}>使用服务器版本</RareButton>
+      <RareButton type="button" tone="danger" onClick={()=>resolveConflict(true)}>以我的草稿覆盖</RareButton>
+     </div>
+    </section>:null}
+    {saveBlocked&&!conflictServer&&draft?.canEdit?<div className="kn-retry">
+     <RareButton type="button" disabled={saving} onClick={()=>void save()}>重试保存</RareButton>
+    </div>:null}
     {notice?<p role="status" className="kn-notice">{notice}</p>:null}
     {createParent!==null?<div className="kn-create">
      <strong>{createParent?"创建子页面":folderId?"在当前文件夹新建知识页":"新建独立知识页"}</strong>
@@ -207,9 +284,9 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
      {!homeId&&siblingPages.length?<span className="kn-muted">选择已有知识页后，可将其手动关联</span>:null}
     </section>:null}
     {draft?<article className="kn-page" aria-label="知识页面编辑区">
-     <div className="kn-page-top"><span>{saving?"保存中…":dirty?"未保存":"已保存"}</span><div>
+     <div className="kn-page-top"><span aria-live="polite">{saving?"保存中…":saveBlocked?"保存失败":dirty?"未保存":"已保存"}</span><div>
       {folderId&&draft.folderId===folderId&&canEdit?<RareButton type="button" disabled={busy||dirty} onClick={()=>void setHome()}>{homeId===draft.id?"当前文件夹首页":"关联为文件夹首页"}</RareButton>:null}
-      <RareButton type="button" tone="ghost" onClick={()=>void showHistory()}>历史</RareButton> {canEdit?<RareButton type="button" tone="ghost" disabled={!dirty||busy||saving} onClick={()=>void save()}>立即保存</RareButton>:null}
+      <RareButton type="button" tone="ghost" onClick={()=>void showHistory()}>历史</RareButton> {canEdit?<RareButton type="button" tone="ghost" disabled={!dirty||busy||saving||Boolean(conflictServer)} onClick={()=>void save()}>立即保存</RareButton>:null}
       {canEdit?<RareButton type="button" tone="danger" disabled={busy} onClick={()=>void archive()}>归档</RareButton>:null}
      </div></div>
      <RareInput className="kn-title" aria-label="页面标题" autoFocus={draft.title==="无标题"} value={draft.title} readOnly={!canEdit} onChange={e=>setDraft({...draft,title:e.target.value})}/>
@@ -235,30 +312,46 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
         onChange={e=>editBlock(i,{text:e.target.value})}
         onKeyDown={e=>{
          if(!canEdit||e.nativeEvent.isComposing)return;
+         if((e.metaKey||e.ctrlKey)&&e.altKey&&["1","2","0"].includes(e.key)){
+          e.preventDefault();
+          selectBlockKind(i,e.key==="1"?"heading1":e.key==="2"?"heading2":"paragraph");
+          return;
+         }
          if(e.key==="Escape"&&slashBlock===b.id){e.preventDefault();setSlashBlock(null);return;}
          if(e.key==="/"&&!b.text&&slashBlock!==b.id){e.preventDefault();setSlashBlock(b.id);return;}
+         if(!e.shiftKey&&!e.altKey&&!e.ctrlKey&&!e.metaKey&&e.currentTarget.selectionStart===e.currentTarget.selectionEnd){
+          if(e.key==="ArrowUp"&&e.currentTarget.selectionStart===0&&i>0){
+           const previous=draft.blocks[i-1];
+           if(previous){e.preventDefault();focusBlock(previous.id,true);return;}
+          }
+          if(e.key==="ArrowDown"&&e.currentTarget.selectionEnd===b.text.length&&i<draft.blocks.length-1){
+           const next=draft.blocks[i+1];
+           if(next){e.preventDefault();focusBlock(next.id);return;}
+          }
+         }
          if(e.key==="Backspace"&&!b.text&&i>0){
           e.preventDefault();setSlashBlock(null);
           const prev=draft.blocks[i-1];
           if(!prev)return;
           setDraft({...draft,blocks:draft.blocks.filter((_,j)=>i!==j)});
-          requestAnimationFrame(()=>{
-           const el=document.querySelector<HTMLTextAreaElement>('[data-kn-block="'+prev.id+'"] textarea');
-           el?.focus();el?.setSelectionRange(el.value.length,el.value.length);
-          });
+          focusBlock(prev.id,true);
           return;
          }
-         if(e.key==="Enter"&&!e.shiftKey){
+         if(e.key==="Backspace"&&!b.text&&i===0&&b.type!=="paragraph"){
+          e.preventDefault();selectBlockKind(i,"paragraph");return;
+         }
+         if(e.key==="Enter"&&!e.shiftKey&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
           e.preventDefault();setSlashBlock(null);
+          if(!b.text&&b.type!=="paragraph"){
+           editBlock(i,{type:"paragraph",checked:false});return;
+          }
           const caret=e.currentTarget.selectionStart??b.text.length;
           const left=b.text.slice(0,caret),right=b.text.slice(e.currentTarget.selectionEnd??caret);
-          const nextBlock={...fresh(),text:right};
+          const nextType:Kind=b.type==="bullet"||b.type==="todo"?b.type:"paragraph";
+          const nextBlock={...fresh(),type:nextType,text:right,checked:false};
           const next=[...draft.blocks];next.splice(i,1,{...b,text:left});
           next.splice(i+1,0,nextBlock);setDraft({...draft,blocks:next});
-          requestAnimationFrame(()=>{
-           const el=document.querySelector<HTMLTextAreaElement>('[data-kn-block="'+nextBlock.id+'"] textarea');
-           el?.focus();el?.setSelectionRange(0,0);
-          });
+          focusBlock(nextBlock.id);
          }
         }}/>
       </div>

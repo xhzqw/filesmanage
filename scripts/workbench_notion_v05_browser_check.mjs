@@ -132,6 +132,69 @@ try{
  await until("document.querySelector('.kn-page-top')?.innerText.includes('已保存')","saved indicator");
  console.log("NOTION_AUTOSAVE_PASS");
 
+ // Simulate an independently saved revision. The editor must preserve the
+ // local draft, expose the server version and require an explicit resolution.
+ const externalText="其他编辑者提交 "+stamp;
+ const external=await api("/knowledge/pages/"+grand.id);
+ await api("/knowledge/pages/"+grand.id,"PUT",{
+  title:external.title,revision:external.revision,
+  blocks:[{id:blockId,type:"paragraph",text:externalText}]
+ });
+ const conflictText=altered+" / 冲突草稿";
+ await js("(()=>{const el=document.querySelector('[data-kn-block="+JSON.stringify(blockId)+"] textarea');"
+  +"const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;"
+  +"setter.call(el,"+JSON.stringify(conflictText)+");el.dispatchEvent(new Event('input',{bubbles:true}));})()");
+ await until("!!document.querySelector('.kn-conflict')","optimistic revision conflict");
+ assert.equal(await js("document.querySelector('[data-kn-block="+JSON.stringify(blockId)+"] textarea')?.value"),
+  conflictText,"conflicting user draft must remain untouched");
+ assert.ok(await js("document.querySelector('.kn-conflict details')?.textContent.includes("+JSON.stringify(externalText)+")"),
+  "latest server version shown for comparison");
+ await js("(()=>{window.confirm=()=>true;[...document.querySelectorAll('.kn-conflict button')]"
+  +".find(x=>x.textContent.includes('使用服务器版本'))?.click()})()");
+ await until("!document.querySelector('.kn-conflict')&&document.querySelector('.kn-page-top')?.innerText.includes('已保存')",
+  "server version restored");
+ assert.equal(await js("document.querySelector('[data-kn-block="+JSON.stringify(blockId)+"] textarea')?.value"),
+  externalText,"server resolution discards only the explicitly rejected draft");
+ const secondLatest=await api("/knowledge/pages/"+grand.id);
+ await api("/knowledge/pages/"+grand.id,"PUT",{
+  title:secondLatest.title,revision:secondLatest.revision,
+  blocks:[{id:blockId,type:"paragraph",text:externalText+" 最新修改"}]
+ });
+ await js("(()=>{const el=document.querySelector('[data-kn-block="+JSON.stringify(blockId)+"] textarea');"
+  +"const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;"
+  +"setter.call(el,"+JSON.stringify(altered)+");el.dispatchEvent(new Event('input',{bubbles:true}));})()");
+ await until("!!document.querySelector('.kn-conflict')","second revision conflict");
+ await js("(()=>{window.confirm=()=>true;[...document.querySelectorAll('.kn-conflict button')]"
+  +".find(x=>x.textContent.includes('以我的草稿覆盖'))?.click()})()");
+ await until("(async()=>{const r=await fetch('/api/knowledge/pages/"+grand.id+"');"
+  +"const j=await r.json();return j.data?.blocks?.[0]?.text==="+JSON.stringify(altered)+";})()",
+  "explicit local conflict resolution saved");
+ await until("document.querySelector('.kn-page-top')?.innerText.includes('已保存')","conflict resolved status");
+ console.log("NOTION_REVISION_CONFLICT_RECOVERY_PASS");
+
+ // Notion-style block keyboard: heading shortcut, Enter split, arrow travel.
+ await js("(()=>{const el=document.querySelector('[data-kn-block="+JSON.stringify(blockId)+"] textarea');"
+  +"el.focus();el.dispatchEvent(new KeyboardEvent('keydown',{key:'1',ctrlKey:true,altKey:true,bubbles:true}));})()");
+ await until("!!document.querySelector('[data-kn-block="+JSON.stringify(blockId)+"].kn-block-heading1')",
+  "heading keyboard shortcut");
+ await js("(()=>{const el=document.querySelector('[data-kn-block="+JSON.stringify(blockId)+"] textarea');"
+  +"el.focus();el.setSelectionRange(el.value.length,el.value.length);"
+  +"el.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));})()");
+ await until("document.querySelectorAll('.kn-block').length>=2","Enter creates following paragraph");
+ assert.equal(await js("document.querySelectorAll('.kn-block')[1]?.classList.contains('kn-block-paragraph')"),
+  true,"heading Enter creates normal body text");
+ await js("(()=>{const el=document.querySelectorAll('.kn-block textarea')[1];"
+  +"el.focus();el.setSelectionRange(0,0);"
+  +"el.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true}));})()");
+ await until("document.activeElement===document.querySelectorAll('.kn-block textarea')[0]",
+  "ArrowUp moves to previous block");
+ await js("(()=>{const el=document.activeElement;el.setSelectionRange(el.value.length,el.value.length);"
+  +"el.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));})()");
+ await until("document.activeElement===document.querySelectorAll('.kn-block textarea')[1]",
+  "ArrowDown moves to following block");
+ await until("document.querySelector('.kn-page-top')?.innerText.includes('已保存')","keyboard edits saved");
+ console.log("NOTION_KEYBOARD_BLOCKS_PASS");
+
  for(const width of [1440,1024,760,390]){
   await send("Emulation.setDeviceMetricsOverride",{width,height:900,deviceScaleFactor:1,mobile:false});
   await sleep(230);
@@ -167,6 +230,29 @@ try{
  const persisted=await api("/knowledge/pages/"+grand.id);
  assert.equal(persisted.blocks[0].text,altered,"confirmed discard must not write unsaved data");
  console.log("NOTION_CONFIRMED_DISCARD_PASS");
+ await js("(()=>{[...document.querySelectorAll('.wbn-page-link')]"
+  +".find(x=>x.textContent.includes("+JSON.stringify(names[2])+"))?.click()})()");
+ await until("new URL(location.href).searchParams.get('page')==="+JSON.stringify(grand.id),
+  "reopen child page for browser history");
+ const historyDraft=altered+" / 返回保护";
+ await js("(()=>{const el=document.querySelector('[data-kn-block="+JSON.stringify(blockId)+"] textarea');"
+  +"const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;"
+  +"setter.call(el,"+JSON.stringify(historyDraft)+");el.dispatchEvent(new Event('input',{bubbles:true}));"
+  +"window.__historyGuards=0;window.confirm=()=>{window.__historyGuards++;return false};})()");
+ await until("document.querySelector('.kn-page-top')?.innerText.includes('未保存')","history draft dirty");
+ await js("history.back()");
+ await until("window.__historyGuards===1","back navigation intercepted");
+ await sleep(300);
+ assert.equal(await js("new URL(location.href).searchParams.get('page')"),grand.id,
+  "cancelled back navigation restores the current URL");
+ assert.equal(await js("document.querySelector('[data-kn-block="+JSON.stringify(blockId)+"] textarea')?.value"),
+  historyDraft,"cancelled back navigation retains the unsaved block");
+ await js("(()=>{window.confirm=()=>true;history.back()})()");
+ await until("new URL(location.href).searchParams.get('page')==="+JSON.stringify(created[0].id),
+  "confirmed browser back navigation");
+ assert.equal((await api("/knowledge/pages/"+grand.id)).blocks[0].text,altered,
+  "browser history discard does not silently write the draft");
+ console.log("NOTION_BROWSER_HISTORY_GUARD_PASS");
  await send("Page.navigate",{url:base+"/workbench"});
  await until("!!document.querySelector('.wbn-home .wbn-page-links')","home");
  await until("!!document.querySelector('.wbn-page-links .wbn-line')","recent pages fetched");
