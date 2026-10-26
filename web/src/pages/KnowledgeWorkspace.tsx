@@ -37,7 +37,42 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
  const showHistory=async()=>{if(!page)return;setError("");if(history!==null){setHistory(null);return}try{setHistory(await request<Version[]>(base+enc(page.id)+"/history"))}catch(e){setError(errorCopy(e,"修订历史读取失败"))}};
  const dirty=Boolean(page&&draft&&(page.title!==draft.title||JSON.stringify(page.blocks)!==JSON.stringify(draft.blocks)));
  const reload=()=>setStamp(x=>x+1);
- const go=(id:string)=>{if(dirty&&!confirm("内容尚未保存，仍然离开？"))return;const next=new URLSearchParams(params);if(id)next.set("page",id);else next.delete("page");setParams(next);};
+ const hasPendingChanges=dirty||saving;
+ const leaveMessage="当前页面有尚未保存的修改。确定放弃这些修改并离开吗？";
+ const go=(id:string)=>{
+  if(id===pageId)return;
+  if(hasPendingChanges&&!window.confirm(leaveMessage))return;
+  const next=new URLSearchParams(params);if(id)next.set("page",id);else next.delete("page");setParams(next);
+ };
+ useEffect(()=>{
+  if(!embedded||!hasPendingChanges)return;
+  const beforeUnload=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue="";};
+  // Links in the global shell, page tree and breadcrumb live outside the
+  // editor; React Router's BrowserRouter does not guard those transitions.
+  const beforeClick=(event:MouseEvent)=>{
+   if(event.defaultPrevented||event.button!==0)return;
+   const element=event.target;
+   if(!(element instanceof Element))return;
+   const anchor=element.closest<HTMLAnchorElement>("a[href]");
+   if(anchor){
+    if(anchor.hasAttribute("download")||anchor.target==="_blank")return;
+    const destination=new URL(anchor.href,window.location.href);
+    const here=new URL(window.location.href);
+    if(destination.pathname===here.pathname&&destination.search===here.search)return;
+   }else{
+    const button=element.closest<HTMLButtonElement>("button");
+    if(!button||!button.matches(".cdw-rail-item, .wbn-new-child, .wbn-pages-head button, .wbn-empty"))return;
+    if(button.matches(".cdw-rail-item.is-current"))return;
+   }
+   if(!window.confirm(leaveMessage)){event.preventDefault();event.stopPropagation();}
+  };
+  window.addEventListener("beforeunload",beforeUnload);
+  document.addEventListener("click",beforeClick,true);
+  return()=>{
+   window.removeEventListener("beforeunload",beforeUnload);
+   document.removeEventListener("click",beforeClick,true);
+  };
+ },[embedded,hasPendingChanges]);
  useEffect(()=>{let live=true;request<Page[]>("/knowledge/pages").then(x=>{if(live)setPages(x||[])}).catch(e=>{if(live)setError(errorCopy(e,"页面树加载失败"))});return()=>{live=false}},[stamp]);
  useEffect(()=>{let live=true;setPage(null);setDraft(null);setError("");setNotice("");setHistory(null);setSaveBlocked(false);setSlashBlock(null);
   if(pageId)request<Page>(base+enc(pageId)).then(p=>{if(live){setPage(p);setDraft({...p,blocks:p.blocks.map(b=>({...b}))})}}).catch(e=>{if(live)setError(errorCopy(e,"页面读取失败"))});

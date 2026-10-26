@@ -140,6 +140,33 @@ try{
   console.log("NOTION_VIEWPORT_PASS",width);
  }
  await send("Emulation.clearDeviceMetricsOverride");
+ const unsaved=altered+" / 尚未保存";
+ await js("(()=>{window.__guardCount=0;window.confirm=()=>{window.__guardCount++;return false};"
+  +"const el=document.querySelector('[data-kn-block="+JSON.stringify(blockId)+"] textarea');"
+  +"const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;"
+  +"setter.call(el,"+JSON.stringify(unsaved)+");el.dispatchEvent(new Event('input',{bubbles:true}));})()");
+ await until("document.querySelector('.kn-page-top')?.innerText.includes('未保存')","unsaved edit visible");
+ const blocked=await js("(()=>{const anchor=[...document.querySelectorAll('.wbn-page-link')]"
+  +".find(el=>el.textContent.includes("+JSON.stringify(names[0])+"));anchor?.click();"
+  +"return {clicked:!!anchor,confirmations:window.__guardCount,page:new URL(location.href).searchParams.get('page')};})()");
+ assert.ok(blocked.clicked&&blocked.confirmations===1&&blocked.page===grand.id,
+  "page tree navigation blocks unsaved changes "+JSON.stringify(blocked));
+ assert.equal(await js("document.querySelector('.kn-block textarea')?.value"),unsaved,
+  "cancelled navigation preserves the current draft");
+ const blockedRail=await js("(()=>{const button=[...document.querySelectorAll('.cdw-rail-item')]"
+  +".find(el=>el.textContent.includes('主页'));button?.click();"
+  +"return {clicked:!!button,confirmations:window.__guardCount,page:new URL(location.href).searchParams.get('page')};})()");
+ assert.ok(blockedRail.clicked&&blockedRail.confirmations===2&&blockedRail.page===grand.id,
+  "workbench rail also blocks unsaved changes "+JSON.stringify(blockedRail));
+ console.log("NOTION_UNSAVED_NAVIGATION_GUARD_PASS");
+ await js("(()=>{window.confirm=()=>true;"
+  +"[...document.querySelectorAll('.wbn-page-link')].find(el=>el.textContent.includes("
+  +JSON.stringify(names[0])+"))?.click()})()");
+ await until("new URL(location.href).searchParams.get('page')==="+JSON.stringify(created[0].id),
+  "confirmed navigation");
+ const persisted=await api("/knowledge/pages/"+grand.id);
+ assert.equal(persisted.blocks[0].text,altered,"confirmed discard must not write unsaved data");
+ console.log("NOTION_CONFIRMED_DISCARD_PASS");
  await send("Page.navigate",{url:base+"/workbench"});
  await until("!!document.querySelector('.wbn-home .wbn-page-links')","home");
  await until("!!document.querySelector('.wbn-page-links .wbn-line')","recent pages fetched");
