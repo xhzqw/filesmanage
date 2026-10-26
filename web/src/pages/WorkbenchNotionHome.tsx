@@ -65,9 +65,9 @@ export function WorkbenchNotionHome({
     </div>
     <div className="wbn-home-columns">
      <div className="wbn-home-primary">
-    <section className={"wbn-home-section wbn-section-actions"+(todo.length+appointmentCount?" has-actions":"")} aria-label="我的待办">
-     <div className="wbn-section-heading"><h2>待我处理</h2>
-      <RareButton type="button" tone="ghost" onClick={()=>onView("todo")}>{todo.length+appointmentCount} 项 · 查看全部</RareButton>
+    <section className={"wbn-home-section wbn-section-actions"+(todo.length+appointmentCount?" has-actions":"")} aria-label="CDW 文件工作待办">
+     <div className="wbn-section-heading"><h2>文件工作待办</h2>
+      <RareButton type="button" tone="ghost" onClick={()=>onView("todo")}>{todo.length+appointmentCount} 项 · 查看文件工作</RareButton>
      </div>
      {error||initiatedError?<RareNotice tone="warning">
        部分事项读取失败：{error||initiatedError}
@@ -83,13 +83,13 @@ export function WorkbenchNotionHome({
        onClick={()=>onView("appointments")}><span className="wbn-task-icon">☐</span>
        <span className="wbn-task-text"><strong>任命资格核验</strong><small>{appointmentCount} 项待确认</small></span>
        <span className="wbn-line-arrow">›</span></RareButton>:null}
-      {!todo.length&&!appointmentCount&&!busy?<p className="wbn-quiet">当前没有待处理事项。</p>:null}
+      {!todo.length&&!appointmentCount&&!busy?<p className="wbn-quiet">当前没有待处理的 CDW 文件事项；审批与 DHF 任务请分别查看对应队列。</p>:null}
      </div>
      {todo.length>8?<RareButton type="button" tone="ghost" className="wbn-more"
       onClick={()=>onView("todo")}>查看其余 {todo.length-8} 项</RareButton>:null}
      <div className="wbn-work-links">
-      <Link to="/workbench?view=approvals">审批</Link>
-      <Link to="/workbench?view=dhf-operations">DHF 阶段任务</Link>
+      <Link to="/workbench?view=approvals">查看通用审批（独立队列）</Link>
+      <Link to="/workbench?view=dhf-operations">查看 DHF 签审（独立队列）</Link>
       <RareButton type="button" tone="ghost" onClick={()=>onView("initiated")}>
        我发起的 {initiatedBusy?"…":initiatedError?"—":initiatedCount}
       </RareButton>

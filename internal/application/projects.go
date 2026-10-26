@@ -189,6 +189,10 @@ func (s *Service) ProjectCreate(ctx context.Context, actor domain.User, in Proje
 	if in.Progress != nil {
 		progress = *in.Progress
 	}
+	// A newly completed project has a complete progress value.
+	if in.Status == "done" {
+		progress = 100
+	}
 	project := ports.Project{
 		Name: in.Name, Icon: in.Icon, Description: in.Description, Status: in.Status,
 		Priority: in.Priority, Team: in.Team, OwnerID: in.OwnerID, Progress: progress,
@@ -286,6 +290,13 @@ func (s *Service) ProjectUpdate(ctx context.Context, actor domain.User, id int64
 	}
 	if patch.Progress != nil {
 		current.Progress = *patch.Progress
+	}
+	// Reconcile explicit completion/progress changes without migrating
+	// existing historical rows during unrelated metadata edits.
+	if patch.Status != nil && current.Status == "done" {
+		current.Progress = 100
+	} else if patch.Progress != nil && current.Status == "done" && current.Progress < 100 {
+		current.Status = "progress"
 	}
 	if patch.StartDate != nil {
 		start, ok := parseProjectDate(*patch.StartDate)

@@ -233,3 +233,11 @@
  }
  .cdw-panels:has(.wbn-pages) .wbn-home-content{padding:18px 18px 32px}
 }
+/* The workbench owns a flex canvas; the old project grid-column rule must
+   not leave a narrow board stranded at the left edge of a large viewport. */
+.cdw-panels:has(.wbn-pages) .cdw-layout>.cdw-projects-view:not(.wbv2-knowledge-view){
+ flex:1 1 0%;width:100%;max-width:100%;min-width:0;
+}
+.cdw-panels:has(.wbn-pages) .cdw-projects-view:not(.wbv2-knowledge-view)>.pj-shell{
+ max-width:none;width:100%;
+}

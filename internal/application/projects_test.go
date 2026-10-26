@@ -76,6 +76,24 @@ func mustDate(t *testing.T, value string) time.Time {
 	return *parsed
 }
 
+func TestProjectCompletionStatusProgressStayConsistent(t *testing.T) {
+	s, admin, _ := projectAdminAndMember(t)
+	ctx := context.Background()
+	completed, err := s.ProjectCreate(ctx, admin, ProjectWriteInput{Name: "创建已完成项目", Status: "done", Progress: new(0)})
+	if err != nil || completed.Status != "done" || completed.Progress != 100 {
+		t.Fatalf("completed create must be 100%%: %+v %v", completed, err)
+	}
+	project := mustProject(t, s, admin, "变更项目")
+	updated, err := s.ProjectUpdate(ctx, admin, project.ID, ProjectPatch{Status: new("done")})
+	if err != nil || updated.Status != "done" || updated.Progress != 100 {
+		t.Fatalf("completed status transition must be 100%%: %+v %v", updated, err)
+	}
+	updated, err = s.ProjectUpdate(ctx, admin, project.ID, ProjectPatch{Progress: new(40)})
+	if err != nil || updated.Status != "progress" || updated.Progress != 40 {
+		t.Fatalf("partial progress must reopen a completed project: %+v %v", updated, err)
+	}
+}
+
 func TestProjectCreateRejectsImpossibleCalendarDates(t *testing.T) {
 	s, admin, _ := projectAdminAndMember(t)
 	for _, bad := range []string{"2026-02-31", "2026-13-01", "2026-03-10T00:00:00Z", "2026/03/10", "tomorrow"} {

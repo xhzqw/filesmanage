@@ -45,12 +45,10 @@ const DOC_SOURCE:DocumentPickerSource={
  })),
 };
 
-const ORIGIN=Date.parse("2025-01-01");
 const DAY=86400000;
-const SPAN=365;
 const MONTH_L=["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
-function dayIdx(t:number){return Math.round((t-ORIGIN)/DAY);}
-function isoDate(d:Date){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function dayIdx(t:number,origin:number){return Math.round((t-origin)/DAY);}
+function isoDate(d:Date){return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0")+"-"+String(d.getUTCDate()).padStart(2,"0");}
 function fmtDate(iso:string|null){return iso?iso.split("-")[1]+"/"+iso.split("-")[2]+"/"+iso.split("-")[0]:"—";}
 
 type ViewKind="board"|"table"|"gantt";
@@ -88,7 +86,9 @@ export function ProjectDatabase({user,initialScope="all"}:{
  const[error,setError]=useState("");
  const[refreshToken,refresh]=useState(0);
 
- const[view,setView]=useState<ViewKind>(params.get("view")==="table"?"table":params.get("view")==="gantt"?"gantt":"board");
+ const projectViewParam=params.get("projectView");
+ const[view,setView]=useState<ViewKind>(projectViewParam==="table"||projectViewParam==="gantt"?projectViewParam:"board");
+ const canManage=user.isAdmin;
  const[colVis,setColVis]=useState<ColVis>(DEFAULT_COLVIS);
  const[sort,setSort]=useState<{field:string;dir:1|-1}>({field:"none",dir:1});
  const[filterStatus,setFilterStatus]=useState<Record<ProjectStatus,boolean>>({notstarted:true,progress:true,done:true});
@@ -216,6 +216,7 @@ export function ProjectDatabase({user,initialScope="all"}:{
  // 否则一次下拉会让整张表短暂失去响应。
  const inflight=useRef(new Set<string>());
  async function patch(id:number,patch:Partial<ProjectWriteInput>&{favorite?:boolean},name?:string){
+  if(!canManage)return;
   // 幂等键必须按「项目 + 字段集」区分：同一项目同一批字段在途时复用同一个键
   // （重试不产生重复写入），不同字段则用新键（否则会被后端当成重复请求丢弃）。
   const sig="patch:"+id+":"+Object.keys(patch).sort().join(",");
@@ -230,7 +231,7 @@ export function ProjectDatabase({user,initialScope="all"}:{
  }
  // 抽屉保存走全屏锁（一次提交整份草稿）
  async function patchFull(id:number,patch:Partial<ProjectWriteInput>&{favorite?:boolean},name?:string){
-  if(processing)return;
+  if(processing||!canManage)return;
   setProcessing(true);
   const sig="full:"+id;
   const key=requestKeys.current.get(sig)??newIdempotencyKey();
@@ -242,7 +243,7 @@ export function ProjectDatabase({user,initialScope="all"}:{
   }catch{return false;}finally{setProcessing(false);}
  }
  async function create(input:ProjectWriteInput){
-  if(processing)return;
+  if(processing||!canManage)return;
   setProcessing(true);
   try{
    await toast.track(()=>projectApi.create(input),{loading:"正在创建…",success:"项目已创建",error:e=>errorCopy(e,"创建失败")});
@@ -339,7 +340,7 @@ export function ProjectDatabase({user,initialScope="all"}:{
  }
 
  const dragId=useRef<number|null>(null);
- function dropCol(status:ProjectStatus){return(ev:React.DragEvent)=>{ev.preventDefault();const id=dragId.current;dragId.current=null;if(id==null)return;const p=projects.find(x=>x.id===id);if(!p||p.status===status)return;const body:Partial<ProjectWriteInput>={status};if(status==="done")body.progress=100;void patch(id,body,p.name);};}
+ function dropCol(status:ProjectStatus){return(ev:React.DragEvent)=>{ev.preventDefault();if(!canManage)return;const id=dragId.current;dragId.current=null;if(id==null)return;const p=projects.find(x=>x.id===id);if(!p||p.status===status)return;const body:Partial<ProjectWriteInput>={status};if(status==="done")body.progress=100;void patch(id,body,p.name);};}
 
  // 抽屉 Esc 关闭 + 打开时把焦点移进去（键盘用户不被困在背景）
  const drawerRef=useRef<HTMLElement|null>(null);
@@ -357,7 +358,16 @@ export function ProjectDatabase({user,initialScope="all"}:{
   // eslint-disable-next-line react-hooks/exhaustive-deps
  },[drawer?.mode,drawer?.id]);
 
- function setViewWrite(k:ViewKind){setView(k);setParams(prev=>{const n=new URLSearchParams(prev);n.set("view",k);return n;},{replace:true});}
+ // view=projects belongs to the Workbench router. Never write board/table/gantt
+ // into that parent-level parameter: it would redirect away from this screen.
+ function setViewWrite(k:ViewKind){setView(k);setParams(prev=>{
+  const n=new URLSearchParams(prev);n.set("view",initialScope==="mine"?"my-projects":"projects");
+  n.set("projectView",k);return n;
+ },{replace:true});}
+ useEffect(()=>{
+  const next=params.get("projectView");
+  if(next==="board"||next==="table"||next==="gantt")setView(current=>current===next?current:next);
+ },[params]);
  function toggleStatus(k:ProjectStatus){setFilterStatus(s=>({...s,[k]:!s[k]}));}
 
  /* ============================ 渲染 ============================ */
@@ -365,10 +375,10 @@ export function ProjectDatabase({user,initialScope="all"}:{
  // 它作为工作台的一个视图渲染，侧栏由 CDWWorkbench 提供，避免出现「两套壳」。
  return<>
      <div className="pj-shell">
-      <header className="pj-header"><div className="pj-crumb">赖·威威的工作空间 总部 <span>/</span> <b>项目</b></div></header>
+      <header className="pj-header"><div className="pj-crumb">工作台 <span>/</span> <b>项目</b></div></header>
       <div className="pj-title-row">
        <div><h1 className="pj-h1">项目</h1><p className="pj-sub">统一管理研发、受控流程与部门协作项目的进度、负责人与交付状态</p></div>
-       <RareButton type="button" tone="primary" onClick={()=>openDrawer("new")}>＋ 新建项目</RareButton>
+       {canManage?<RareButton type="button" tone="primary" onClick={()=>openDrawer("new")}>＋ 新建项目</RareButton>:<span className="pj-readonly-hint">只读视图 · 项目管理需管理员权限</span>}
       </div>
       <div className="pj-scope-tabs">
        <RareButton type="button" className={"pj-scope"+(scope==="all"?" active":"")} onClick={()=>setScope("all")}>全部项目</RareButton>
@@ -398,7 +408,7 @@ export function ProjectDatabase({user,initialScope="all"}:{
 
       {/* 错误与加载态沿用工作台既有写法：RareNotice + .cdw-message，
           不要在这里另造一套提示样式。 */}
-      {error&&<><RareNotice tone="danger">{error} <RareButton type="button" onClick={()=>refresh(v=>v+1)}>重试</RareButton></RareNotice>
+       {error&&<><RareNotice tone="danger">{error} <RareButton type="button" onClick={()=>refresh(v=>v+1)}>重试</RareButton></RareNotice>
        <div className="pj-error-hold" aria-hidden="true"/></>}
       {busy&&!projects.length&&<div className="cdw-message">加载项目…</div>}
 
@@ -408,7 +418,7 @@ export function ProjectDatabase({user,initialScope="all"}:{
        <div className="cdw-empty"><span className="cdw-empty-icon" aria-hidden="true">▤</span>
         <strong>还没有任何项目</strong>
         <p>点击「＋ 新建项目」登记第一个项目</p>
-        <RareButton type="button" tone="primary" onClick={()=>openDrawer("new")}>新建项目</RareButton></div>)}
+        {canManage?<RareButton type="button" tone="primary" onClick={()=>openDrawer("new")}>新建项目</RareButton>:null}</div>)}
       {!busy&&!error&&emptyKind==="search"&&(
        <div className="cdw-empty"><span className="cdw-empty-icon" aria-hidden="true">⌕</span>
         <strong>没有匹配「{search.trim()}」的项目</strong>
@@ -421,7 +431,7 @@ export function ProjectDatabase({user,initialScope="all"}:{
         <RareButton type="button" tone="ghost" onClick={()=>setFilterStatus({notstarted:true,progress:true,done:true})}>显示全部状态</RareButton></div>)}
 
       {!busy&&visible.length>0&&(view==="board"?renderBoard():view==="table"?renderTable():
-       <ProjectGantt key={ganttScale} projects={visible} scale={ganttScale} onScale={setGanttScale}
+       <ProjectGantt key={ganttScale} projects={visible} scale={ganttScale} onScale={setGanttScale} canEdit={canManage}
         onBarClick={p=>openDrawer("edit",p)} onPatch={(id,pg)=>void patch(id,pg)}/>)}
      </div>
 
@@ -452,7 +462,7 @@ export function ProjectDatabase({user,initialScope="all"}:{
     <div className="pj-col-head"><span className={"pj-dot pj-dot-"+(STATUS[st].tone==="success"?"d":STATUS[st].tone==="info"?"p":"n")}/><b>{STATUS[st].label}</b><span className="pj-col-count">{groups[st].length}</span></div>
     <div className="pj-col-body">
      {groups[st].map(p=>
-      <div className={"pj-card pj-card-"+PRI_TONE[p.priority]} key={p.id} draggable tabIndex={0}
+      <div className={"pj-card pj-card-"+PRI_TONE[p.priority]} key={p.id} draggable={canManage} tabIndex={0}
        role="button" aria-label={p.name+"，"+STATUS[p.status].label+"，优先级"+PRI_LABEL[p.priority]}
        onDragStart={e=>{dragId.current=p.id;e.dataTransfer.effectAllowed="move";}}
        onKeyDown={e=>{
@@ -460,7 +470,7 @@ export function ProjectDatabase({user,initialScope="all"}:{
         if(e.key==="Enter"||e.key===" "){e.preventDefault();openDrawer("edit",p);return;}
         const order=[...ST_KEYS].reverse();
         const i=order.indexOf(p.status);
-        if(e.key==="ArrowLeft"||e.key==="ArrowRight"){
+        if(canManage&&(e.key==="ArrowLeft"||e.key==="ArrowRight")){
          e.preventDefault();
          const ni=Math.max(0,Math.min(order.length-1,i+(e.key==="ArrowRight"?1:-1)));
          const target=order[ni];if(!target||target===p.status)return;
@@ -474,9 +484,9 @@ export function ProjectDatabase({user,initialScope="all"}:{
         }
        }}
        onClick={()=>openDrawer("edit",p)} data-pid={p.id}>
-       <RareButton type="button" tone="ghost" className="pj-card-peek" title="在侧边打开" aria-label="在侧边打开" onClick={ev=>{ev.stopPropagation();openDrawer("edit",p);}}>◫</RareButton>
+       <RareButton type="button" tone="ghost" className="pj-card-peek" title="查看详情" aria-label="查看详情" onClick={ev=>{ev.stopPropagation();openDrawer("edit",p);}}>◫</RareButton>
        <div className="pj-card-title">{p.name}{p.favorite?<span className="pj-fav" aria-label="已收藏"> ★</span>:null}</div>
-       <div className="pj-card-progress"><div className="pj-progress-bar"><i style={{width:p.progress+"%"}}/></div><b>{p.progress}%</b></div>
+       <div className="pj-card-progress" title={p.status==="done"&&p.progress<100?"历史数据的完成状态与进度不一致；需要管理员核对":undefined}><div className="pj-progress-bar"><i style={{width:p.progress+"%"}}/></div><b>{p.status==="done"&&p.progress<100?"待核验 "+p.progress+"%":p.progress+"%"}</b></div>
        <div className="pj-card-meta">
         {p.team&&<span className="pj-pill pj-pill-team">{p.team}</span>}
         <span className={"pj-pill pj-pr-"+PRI_TONE[p.priority]}>{PRI_LABEL[p.priority]}</span>
@@ -484,7 +494,7 @@ export function ProjectDatabase({user,initialScope="all"}:{
        </div>
       </div>)}
      {groups[st].length===0&&<div className="pj-col-empty">这一列还空着</div>}
-     <RareButton type="button" tone="ghost" className="pj-col-add" onClick={()=>openDrawer("new")}>＋ 新建项目</RareButton>
+     {canManage?<RareButton type="button" tone="ghost" className="pj-col-add" onClick={()=>openDrawer("new")}>＋ 新建项目</RareButton>:null}
     </div>
    </div>)}
   </div>;
@@ -504,14 +514,14 @@ export function ProjectDatabase({user,initialScope="all"}:{
   return<table className="pj-table"><thead><tr>{heads}</tr></thead><tbody>{
    visible.map(p=>{
     const cells:React.ReactNode[]=[<td key="name" className="pj-td-name"><span className={"pj-prio-tag "+PRI_TONE[p.priority]}/>{p.name}</td>];
-    if(colVis.status)cells.push(<td key="st"><RareSelect className="pj-sel" aria-label={"状态：" + p.name} value={p.status} onChange={e=>void patch(p.id,{status:e.target.value as ProjectStatus},p.name)}>{ST_KEYS.map(s=><option key={s} value={s}>{STATUS[s].label}</option>)}</RareSelect></td>);
-    if(colVis.owner)cells.push(<td key="ow"><RareSelect searchable className="pj-sel" aria-label={"负责人：" + p.name} value={p.ownerId} onChange={e=>void patch(p.id,{ownerId:e.target.value},p.name)}><option value="">—</option>{users.map(u=><option key={u.id} value={u.id} disabled={!!u.disabled}>{u.displayName}</option>)}</RareSelect></td>);
-    if(colVis.priority)cells.push(<td key="pr"><RareSelect className="pj-sel" aria-label={"优先级：" + p.name} value={p.priority} onChange={e=>void patch(p.id,{priority:e.target.value as ProjectPriority},p.name)}>{(["high","mid","low"]as ProjectPriority[]).map(pr=><option key={pr} value={pr}>{PRI_LABEL[pr]}</option>)}</RareSelect></td>);
+    if(colVis.status)cells.push(<td key="st">{canManage?<RareSelect className="pj-sel" aria-label={"状态：" + p.name} value={p.status} onChange={e=>void patch(p.id,{status:e.target.value as ProjectStatus,...(e.target.value==="done"?{progress:100}:{})},p.name)}>{ST_KEYS.map(s=><option key={s} value={s}>{STATUS[s].label}</option>)}</RareSelect>:STATUS[p.status].label}</td>);
+    if(colVis.owner)cells.push(<td key="ow">{canManage?<RareSelect searchable className="pj-sel" aria-label={"负责人：" + p.name} value={p.ownerId} onChange={e=>void patch(p.id,{ownerId:e.target.value},p.name)}><option value="">—</option>{users.map(u=><option key={u.id} value={u.id} disabled={!!u.disabled}>{u.displayName}</option>)}</RareSelect>:p.ownerName||"—"}</td>);
+    if(colVis.priority)cells.push(<td key="pr">{canManage?<RareSelect className="pj-sel" aria-label={"优先级：" + p.name} value={p.priority} onChange={e=>void patch(p.id,{priority:e.target.value as ProjectPriority},p.name)}>{(["high","mid","low"]as ProjectPriority[]).map(pr=><option key={pr} value={pr}>{PRI_LABEL[pr]}</option>)}</RareSelect>:PRI_LABEL[p.priority]}</td>);
     if(colVis.start)cells.push(<td key="sa" className="pj-mono">{fmtDate(p.startDate)}</td>);
     if(colVis.end)cells.push(<td key="en" className="pj-mono">{fmtDate(p.endDate)}</td>);
-    if(colVis.team)cells.push(<td key="te"><RareSelect className="pj-sel" aria-label={"团队：" + p.name} value={p.team} onChange={e=>void patch(p.id,{team:e.target.value as ProjectTeam},p.name)}>{TEAMS.map(t=><option key={t} value={t}>{t||"—"}</option>)}</RareSelect></td>);
+    if(colVis.team)cells.push(<td key="te">{canManage?<RareSelect className="pj-sel" aria-label={"团队：" + p.name} value={p.team} onChange={e=>void patch(p.id,{team:e.target.value as ProjectTeam},p.name)}>{TEAMS.map(t=><option key={t} value={t}>{t||"—"}</option>)}</RareSelect>:p.team||"—"}</td>);
     if(colVis.progress)cells.push(<td key="pg"><div className="pj-progress-cell"><div className="pj-progress-bar"><i style={{width:p.progress+"%"}}/></div><b>{p.progress}%</b></div></td>);
-    cells.push(<td key="x"><RareButton type="button" tone="danger" className="pj-del" title="删除" aria-label={"删除 " + p.name} onClick={e=>{e.stopPropagation();onDelete(p);}}>🗑</RareButton></td>);
+    cells.push(<td key="x">{canManage?<RareButton type="button" tone="danger" className="pj-del" title="删除" aria-label={"删除 " + p.name} onClick={e=>{e.stopPropagation();onDelete(p);}}>🗑</RareButton>:null}</td>);
     return<tr key={p.id} onClick={()=>openDrawer("edit",p)}>{cells}</tr>;})}
    {visible.length===0&&<tr><td colSpan={heads.length} className="empty">当前筛选下没有项目</td></tr>}
   </tbody></table>;
@@ -525,28 +535,28 @@ export function ProjectDatabase({user,initialScope="all"}:{
   return<div className="pj-mask" onClick={()=>closeDrawer()}>
    <aside className="pj-drawer" ref={drawerRef} role="dialog" aria-modal="true" aria-label={drawer.mode==="new"?"新建项目":"编辑项目"} onClick={e=>e.stopPropagation()}>
     <div className="pj-dr-head">
-     <RareButton type="button" tone="ghost" className="pj-dr-icon" title="更换图标" aria-label="更换图标" onClick={()=>setDraft({icon:ICONS[(ICONS.indexOf(d.icon)+1)%ICONS.length]})}>{d.icon}</RareButton>
-     <RareInput className="pj-dr-title" value={d.name} placeholder="项目名称" aria-label="项目名称" maxLength={120} onChange={e=>setDraft({name:e.target.value})}/>
-     <RareButton type="button" tone="ghost" className={"pj-dr-fav"+(d.favorite?" on":"")} title="收藏" aria-label="收藏" aria-pressed={d.favorite} onClick={()=>void toggleFav()}>{d.favorite?"★":"☆"}</RareButton>
+     {canManage?<RareButton type="button" tone="ghost" className="pj-dr-icon" title="更换图标" aria-label="更换图标" onClick={()=>setDraft({icon:ICONS[(ICONS.indexOf(d.icon)+1)%ICONS.length]})}>{d.icon}</RareButton>:<span className="pj-dr-icon" aria-hidden="true">{d.icon}</span>}
+     <RareInput className="pj-dr-title" value={d.name} placeholder="项目名称" aria-label="项目名称" maxLength={120} readOnly={!canManage} onChange={e=>setDraft({name:e.target.value})}/>
+     {canManage?<RareButton type="button" tone="ghost" className={"pj-dr-fav"+(d.favorite?" on":"")} title="收藏" aria-label="收藏" aria-pressed={d.favorite} onClick={()=>void toggleFav()}>{d.favorite?"★":"☆"}</RareButton>:null}
      <RareButton type="button" tone="ghost" onClick={()=>closeDrawer()}>✕</RareButton>
     </div>
     <div className="pj-dr-scroll">
      <div className="pj-dr-props">
-      <PersonRow label="状态" glyph="◔" show><RareSelect value={d.status} onChange={e=>setDraft({status:e.target.value as ProjectStatus})}>{ST_KEYS.map(s=><option key={s} value={s}>{STATUS[s].label}</option>)}</RareSelect></PersonRow>
-      <PersonRow label="负责人" glyph="☺" show={colVis.owner}><RareSelect value={d.ownerId} onChange={e=>setDraft({ownerId:e.target.value})}><option value="">空白</option>{users.map(u=><option key={u.id} value={u.id}>{u.displayName}</option>)}</RareSelect></PersonRow>
-      <PersonRow label="优先级" glyph="◎" show={colVis.priority}><RareSelect value={d.priority} onChange={e=>setDraft({priority:e.target.value as ProjectPriority})}>{(["high","mid","low"]as ProjectPriority[]).map(p=><option key={p} value={p}>{PRI_LABEL[p]}</option>)}</RareSelect></PersonRow>
-      <PersonRow label="团队" glyph="▤" show={colVis.team}><RareSelect value={d.team} onChange={e=>setDraft({team:e.target.value as ProjectTeam})}>{TEAMS.map(t=><option key={t} value={t}>{t||"空白"}</option>)}</RareSelect></PersonRow>
-      <PersonRow label="开始日期" glyph="▭" show={colVis.start}><RareInput type="date" className="pj-date" aria-label="开始日期" value={d.startDate??""} onChange={e=>setDraft({startDate:e.target.value||null})}/></PersonRow>
-      <PersonRow label="结束日期" glyph="▭" show={colVis.end}><RareInput type="date" className="pj-date" aria-label="结束日期" value={d.endDate??""} onChange={e=>setDraft({endDate:e.target.value||null})}/></PersonRow>
+      <PersonRow label="状态" glyph="◔" show>{canManage?<RareSelect value={d.status} onChange={e=>setDraft({status:e.target.value as ProjectStatus,...(e.target.value==="done"?{progress:100}:{})})}>{ST_KEYS.map(s=><option key={s} value={s}>{STATUS[s].label}</option>)}</RareSelect>:STATUS[d.status].label}</PersonRow>
+      <PersonRow label="负责人" glyph="☺" show={colVis.owner}>{canManage?<RareSelect value={d.ownerId} onChange={e=>setDraft({ownerId:e.target.value})}><option value="">空白</option>{users.map(u=><option key={u.id} value={u.id}>{u.displayName}</option>)}</RareSelect>:detail?.ownerName||"—"}</PersonRow>
+      <PersonRow label="优先级" glyph="◎" show={colVis.priority}>{canManage?<RareSelect value={d.priority} onChange={e=>setDraft({priority:e.target.value as ProjectPriority})}>{(["high","mid","low"]as ProjectPriority[]).map(p=><option key={p} value={p}>{PRI_LABEL[p]}</option>)}</RareSelect>:PRI_LABEL[d.priority]}</PersonRow>
+      <PersonRow label="团队" glyph="▤" show={colVis.team}>{canManage?<RareSelect value={d.team} onChange={e=>setDraft({team:e.target.value as ProjectTeam})}>{TEAMS.map(t=><option key={t} value={t}>{t||"空白"}</option>)}</RareSelect>:d.team||"—"}</PersonRow>
+      <PersonRow label="开始日期" glyph="▭" show={colVis.start}>{canManage?<RareInput type="date" className="pj-date" aria-label="开始日期" value={d.startDate??""} onChange={e=>setDraft({startDate:e.target.value||null})}/>:fmtDate(d.startDate)}</PersonRow>
+      <PersonRow label="结束日期" glyph="▭" show={colVis.end}>{canManage?<RareInput type="date" className="pj-date" aria-label="结束日期" value={d.endDate??""} onChange={e=>setDraft({endDate:e.target.value||null})}/>:fmtDate(d.endDate)}</PersonRow>
       <div className="pj-prop"><span className="pj-p-ic">◍</span><span className="pj-p-label">进度</span>
-       <RareInput type="range" min={0} max={100} step={5} className="pj-slider" aria-label="进度" value={d.progress} onChange={e=>setDraft({progress:+e.target.value})}/>
+       <RareInput type="range" min={0} max={100} step={5} className="pj-slider" aria-label="进度" value={d.progress} disabled={!canManage} onChange={e=>setDraft({progress:+e.target.value,...(d.status==="done"&&+e.target.value<100?{status:"progress" as const}:{})})}/>
        <b className="pj-p-val pj-pct">{d.progress}%</b></div>
      </div>
 
      <section className="pj-sec">
       <div className="pj-sec-head"><h3>评论 {detail?.comments.length?`（${detail.comments.length} 条）`:""}</h3></div>
       {detail?.comments.map(c=><div className="pj-cmt" key={c.id}><span className="pj-avatar-sm">{c.who?.[0]}</span><div className="pj-cmt-body"><b>{c.who}</b> <small>{c.at}</small><p>{c.text}</p></div></div>)}
-      {drawer.mode==="edit"&&<div className="pj-cmt-add">
+      {drawer.mode==="edit"&&canManage&&<div className="pj-cmt-add">
        <RareInput placeholder="评论…（回车发送）" value={cmtText} disabled={!detail}
         onChange={e=>setCmtText(e.target.value)}
         onKeyDown={e=>{if(e.key==="Enter"&&!e.nativeEvent.isComposing){const t=cmtText.trim();if(t&&drawer.id){void commentNow(drawer.id,t);}}}}/>
@@ -556,15 +566,15 @@ export function ProjectDatabase({user,initialScope="all"}:{
 
      <section className="pj-sec">
       <div className="pj-sec-head"><h3>关于此项目</h3></div>
-      <RareTextarea className="pj-desc" value={d.description} placeholder="写点项目背景…" rows={4} onChange={e=>setDraft({description:e.target.value})}/>
+      <RareTextarea className="pj-desc" value={d.description} placeholder="项目背景" rows={4} readOnly={!canManage} onChange={e=>setDraft({description:e.target.value})}/>
      </section>
 
      <section className="pj-sec">
       <div className="pj-sec-head"><h3>待办 {detail?.todos.length?`（${detail.todos.filter(t=>t.done).length}/${detail.todos.length}）`:""}</h3></div>
       {detail?.todos.map(t=>{const id=drawer.id;return<div className={"pj-todo"+(t.done?" done":"")} key={t.id}>
-       <RareInput type="checkbox" checked={t.done} aria-label={"完成 " + t.text} onChange={e=>{if(id)void todoToggle(id,t.id,e.target.checked);}}/>
-       <span>{t.text}</span><RareButton type="button" tone="ghost" className="pj-todo-del" title="删除待办" aria-label={"删除待办 " + t.text} onClick={()=>{if(id)void todoRemove(id,t.id);}}>✕</RareButton></div>;})}
-      {drawer.mode==="edit"&&<div className="pj-todo-add">
+       <RareInput type="checkbox" checked={t.done} disabled={!canManage} aria-label={"完成 " + t.text} onChange={e=>{if(id)void todoToggle(id,t.id,e.target.checked);}}/>
+       <span>{t.text}</span>{canManage?<RareButton type="button" tone="ghost" className="pj-todo-del" title="删除待办" aria-label={"删除待办 " + t.text} onClick={()=>{if(id)void todoRemove(id,t.id);}}>✕</RareButton>:null}</div>;})}
+      {drawer.mode==="edit"&&canManage&&<div className="pj-todo-add">
        <RareInput placeholder="添加待办，回车保存…" value={todoText} disabled={todoBusy||!detail}
         onChange={e=>setTodoText(e.target.value)}
         onKeyDown={e=>{if(e.key==="Enter"&&!e.nativeEvent.isComposing){const t=todoText.trim();if(t&&drawer.id)void todoAdd(drawer.id,t);}}}/>
@@ -584,9 +594,9 @@ export function ProjectDatabase({user,initialScope="all"}:{
          onClick={e=>e.stopPropagation()}>
          <FileTypeIcon name={dc.name} size={14}/><span className="pj-doc-name">{dc.name}</span>
         </Link>
-        <RareButton type="button" tone="ghost" title="解除关联" aria-label={"解除关联 "+dc.name} onClick={()=>{if(id)void docRemove(id,dc.docId);}}>✕</RareButton></span>;})}
+        {canManage?<RareButton type="button" tone="ghost" title="解除关联" aria-label={"解除关联 "+dc.name} onClick={()=>{if(id)void docRemove(id,dc.docId);}}>✕</RareButton>:null}</span>;})}
        {detail?.docs?.length===0&&<span className="pj-docs-empty">还没有关联文档</span>}
-       {drawer.mode==="edit"&&<RareButton type="button" tone="ghost" className="pj-doc-add" onClick={()=>setDocPickerFor(drawer.id)}>＋ 关联文档</RareButton>}
+       {drawer.mode==="edit"&&canManage?<RareButton type="button" tone="ghost" className="pj-doc-add" onClick={()=>setDocPickerFor(drawer.id)}>＋ 关联文档</RareButton>:null}
       </div>
       {drawer.mode==="new"&&<p className="pj-sec-hint">保存项目后即可关联文档</p>}
      </section>
@@ -596,9 +606,9 @@ export function ProjectDatabase({user,initialScope="all"}:{
      <RareButton type="button" tone="ghost" onClick={()=>closeDrawer()}>取消</RareButton>
      <span className="pj-spacer"/>
      {dirty&&<span className="pj-dirty" title="有未保存的改动">未保存</span>}
-     {drawer.mode==="edit"&&<RareButton type="button" tone="ghost" onClick={()=>void archiveMe()}>归档</RareButton>}
-     {drawer.mode==="edit"&&<RareButton type="button" tone="ghost" loading={processing} onClick={()=>void removeMe()}>删除</RareButton>}
-     <RareButton type="button" tone="primary" loading={processing} disabled={!d.name.trim()||(drawer.mode==="edit"&&!dirty)} onClick={()=>void saveDrawer()}>保存</RareButton>
+     {drawer.mode==="edit"&&canManage?<RareButton type="button" tone="ghost" onClick={()=>void archiveMe()}>归档</RareButton>:null}
+     {drawer.mode==="edit"&&canManage?<RareButton type="button" tone="ghost" loading={processing} onClick={()=>void removeMe()}>删除</RareButton>:null}
+     {canManage?<RareButton type="button" tone="primary" loading={processing} disabled={!d.name.trim()||(drawer.mode==="edit"&&!dirty)} onClick={()=>void saveDrawer()}>保存</RareButton>:null}
     </div>
    </aside>
   </div>;
@@ -606,19 +616,22 @@ export function ProjectDatabase({user,initialScope="all"}:{
 }
 
 /* ------------ 甘特（含拖条改起止日期）------------ */
-function ProjectGantt({projects,scale,onScale,onBarClick,onPatch}:{
- projects:Project[];scale:0|1;onScale:(s:0|1)=>void;onBarClick:(p:Project)=>void;
+function ProjectGantt({projects,scale,onScale,onBarClick,onPatch,canEdit}:{
+ projects:Project[];scale:0|1;onScale:(s:0|1)=>void;onBarClick:(p:Project)=>void;canEdit:boolean;
  onPatch:(id:number,patch:Partial<ProjectWriteInput>)=>void;
 }){
  const scrollRef=useRef<HTMLDivElement|null>(null);
  const gdrag=useRef<{id:number;side:"move"|"l"|"r";startX:number;startLeft:number;startW:number;moved:boolean}|null>(null);
+ const[year,setYear]=useState(()=>new Date().getFullYear());
+ const origin=Date.UTC(year,0,1);
+ const span=Math.round((Date.UTC(year+1,0,1)-origin)/DAY);
 
  const timeline=useMemo(()=>{
   const cells:{label:string;w:number}[]=[];
-  if(scale===0){for(let m=0;m<12;m++){const days=new Date(2025,m+1,0).getDate();cells.push({label:MONTH_L[m]??"",w:days/SPAN*100});}}
-  else{for(let d=0;d<SPAN;d+=14){const dt=new Date(ORIGIN+d*DAY);cells.push({label:(dt.getMonth()+1)+"/"+dt.getDate(),w:14/SPAN*100});}}
+  if(scale===0){for(let m=0;m<12;m++){const days=new Date(Date.UTC(year,m+1,0)).getUTCDate();cells.push({label:MONTH_L[m]??"",w:days/span*100});}}
+  else{for(let d=0;d<span;d+=14){const dt=new Date(origin+d*DAY);cells.push({label:(dt.getUTCMonth()+1)+"/"+dt.getUTCDate(),w:Math.min(14,span-d)/span*100});}}
   return cells;
- },[scale]);
+ },[scale,year,origin,span]);
 
  useEffect(()=>{
   function move(ev:MouseEvent){
@@ -638,35 +651,39 @@ function ProjectGantt({projects,scale,onScale,onBarClick,onPatch}:{
    const bar=track.querySelector('.pj-gbar[data-id="'+g?.id+'"]')as HTMLElement|null;if(!g||!g.moved||!bar)return;
    // 用 round 把像素对齐到「天」，不再用 +0.5 的偏置（原写法在右侧拖拽时会整体偏移一天）
    const leftPct=parseFloat(bar.style.left)||0;const wPct=parseFloat(bar.style.width)||1.4;
-   const startDay=Math.round((leftPct/100)*SPAN);
-   const spanD=Math.max(1,Math.round((wPct/100)*SPAN));
-   const S=Math.max(0,Math.min(SPAN-1,startDay));
-   const E2=Math.max(S,Math.min(SPAN-1,S+spanD-1));
-   const ns=isoDate(new Date(ORIGIN+S*DAY));const ne=isoDate(new Date(ORIGIN+E2*DAY));
+   const startDay=Math.round((leftPct/100)*span);
+   const spanD=Math.max(1,Math.round((wPct/100)*span));
+   const S=Math.max(0,Math.min(span-1,startDay));
+   const E2=Math.max(S,Math.min(span-1,S+spanD-1));
+   const ns=isoDate(new Date(origin+S*DAY));const ne=isoDate(new Date(origin+E2*DAY));
    const p0=projects.find(x=>x.id===g.id);if(!p0)return;
    let patch:Partial<ProjectWriteInput>;
    if(g.side==="r"){patch={endDate:ne};if(p0.startDate&&ne<p0.startDate)patch.startDate=ne;}
    else if(g.side==="l"){patch={startDate:ns};if(p0.endDate&&ns>p0.endDate)patch.endDate=ns;}
    else{
     // 整体平移：按天差平移，起止一起走，保持原工期不变
-    const origStart=p0.startDate?dayIdx(Date.parse(p0.startDate)):startDay;
+    const origStart=p0.startDate?dayIdx(Date.parse(p0.startDate),origin):startDay;
     const delta=S-origStart;
     patch={startDate:ns};
-    if(p0.endDate){const oe=Math.max(0,Math.min(SPAN-1,dayIdx(Date.parse(p0.endDate))+delta));patch.endDate=isoDate(new Date(ORIGIN+oe*DAY));}
+    if(p0.endDate){const oe=Math.max(0,Math.min(span-1,dayIdx(Date.parse(p0.endDate),origin)+delta));patch.endDate=isoDate(new Date(origin+oe*DAY));}
    }
    void onPatch(p0.id,patch);
   }
   window.addEventListener("mousemove",move);window.addEventListener("mouseup",up);
   return()=>{window.removeEventListener("mousemove",move);window.removeEventListener("mouseup",up);};
- },[projects,onPatch]);
+ },[projects,onPatch,origin,span]);
 
  function down(id:number,side:"move"|"l"|"r"){return(ev:React.MouseEvent|React.PointerEvent)=>{ev.preventDefault();ev.stopPropagation();
+  if(!canEdit)return;
   const track=scrollRef.current?.querySelector(".pj-g-track")as HTMLElement|null;const bar=track?.querySelector('.pj-gbar[data-id="'+id+'"]')as HTMLElement|null;if(!track||!bar)return;
   gdrag.current={id,side,startX:ev.clientX,startLeft:parseFloat(bar.style.left)||0,startW:parseFloat(bar.style.width)||1.4,moved:false};
  };}
 
  return<div className="pj-gantt">
   <div className="pj-g-tools">
+   <RareButton type="button" tone="ghost" aria-label="上一年" onClick={()=>setYear(y=>y-1)}>‹</RareButton>
+   <strong className="pj-g-year">{year} 年</strong>
+   <RareButton type="button" tone="ghost" aria-label="下一年" onClick={()=>setYear(y=>y+1)}>›</RareButton>
    <RareButton type="button" tone="ghost" className={scale===0?"active":""} onClick={()=>onScale(0)}>月</RareButton>
    <RareButton type="button" tone="ghost" className={scale===1?"active":""} onClick={()=>onScale(1)}>周</RareButton>
   </div>
@@ -681,16 +698,17 @@ function ProjectGantt({projects,scale,onScale,onBarClick,onPatch}:{
      <div key={st}>
       <div className="pj-g-group"><span className={"pj-dot pj-dot-"+(STATUS[st].tone==="success"?"d":STATUS[st].tone==="info"?"p":"n")}/><b>{STATUS[st].label}</b><span className="pj-g-gcount">{items.length}</span></div>
       {items.map(p=>{
-       const s=p.startDate||p.endDate||"2025-01-01",e=p.endDate||p.startDate||"2025-01-01";
-       const off=dayIdx(Date.parse(s));const len=Math.max(dayIdx(Date.parse(e))-off+1,1);
-       const wPct=Math.max(len/SPAN*100,1.4);
+       const fallback=year+"-01-01";
+       const s=p.startDate||p.endDate||fallback,e=p.endDate||p.startDate||fallback;
+       const off=dayIdx(Date.parse(s),origin);const len=Math.max(dayIdx(Date.parse(e),origin)-off+1,1);
+       const wPct=Math.max(len/span*100,1.4);
        return(
         <div className="pj-g-row" key={p.id}>
          <div className="pj-g-name" onClick={()=>onBarClick(p)}>{p.name}</div>
          <div className="pj-g-track">
           {timeline.map((c,i)=><div className="pj-g-track-cell" key={i} style={{width:c.w+"%"}}/>)}
           <div className={"pj-gbar pj-gbar-"+p.status+(wPct<9?" hide":"")} data-id={p.id}
-           style={{left:off/SPAN*100+"%",width:wPct+"%"}}
+           style={{left:off/span*100+"%",width:wPct+"%"}}
            onMouseDown={down(p.id,"move")} onDoubleClick={ev=>{ev.stopPropagation();onBarClick(p);}}>
            <span className="pj-g-resize pj-g-resize-l" onMouseDown={down(p.id,"l")} title="拖动改开始日期"/>
            <span className="pj-g-core" onClick={ev=>{ev.stopPropagation();onBarClick(p);}}>{p.name}</span>

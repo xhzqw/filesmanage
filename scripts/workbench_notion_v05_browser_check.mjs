@@ -92,6 +92,32 @@ try{
   console.log("NOTION_SIDEBAR_BRAND_AND_TREE_PASS");
   console.log("NOTION_USABILITY_HOME_PRIORITY_PASS");
   assert.ok(await js("document.querySelector('link[rel=icon]')?.href.includes('/assets/brand/')"),"existing favicon");
+  // Parent workbench routing and project database subviews must not share
+  // ?view=. Verify actual clicks rather than looking for a static selector.
+  await send("Page.navigate",{url:base+"/workbench?view=projects"});
+  await until("!!document.querySelector('.pj-view-toggle')","project view toolbar");
+  const projectCanvas=await js("(()=>{const outer=document.querySelector('.cdw-layout').getBoundingClientRect();"
+   +"const project=document.querySelector('.cdw-projects-view').getBoundingClientRect();"
+   +"return {outer:outer.width,project:project.width}})()");
+  assert.ok(projectCanvas.project/projectCanvas.outer>.94,
+   "project board must use the full available workspace "+JSON.stringify(projectCanvas));
+  await js("([...document.querySelectorAll('.pj-vt')].find(x=>x.textContent.includes('表格')))?.click()");
+  await until("new URL(location.href).searchParams.get('view')==='projects'&&new URL(location.href).searchParams.get('projectView')==='table'",
+   "table subview stays in workbench projects");
+  assert.ok(await js("!!document.querySelector('.pj-vt.active')?.textContent.includes('表格')"),
+   "table subview remains selected");
+  await send("Page.navigate",{url:base+"/workbench?view=projects&projectView=table"});
+  await until("document.querySelector('.pj-vt.active')?.textContent.includes('表格')",
+   "table project deep link");
+  await js("([...document.querySelectorAll('.pj-vt')].find(x=>x.textContent.includes('甘特')))?.click()");
+  await until("new URL(location.href).searchParams.get('view')==='projects'&&new URL(location.href).searchParams.get('projectView')==='gantt'",
+   "Gantt subview stays in workbench projects");
+  assert.ok(await js("!!document.querySelector('.pj-gantt')||!!document.querySelector('.cdw-empty')"),
+   "Gantt timeline or explicit empty state renders");
+  const year=await js("document.querySelector('.pj-g-year')?.textContent");
+  if(year)assert.ok(year.includes(String(new Date().getFullYear())),"Gantt must not be hardcoded to 2025");
+  console.log("WORKBENCH_PROJECT_SUBVIEW_ROUTING_PASS");
+  console.log("WORKBENCH_PROJECT_FULL_CANVAS_PASS");
   await send("Page.navigate",{url:base+"/workbench?view=knowledge"});
   await until("!!document.querySelector('.kn-shell')&&!!document.querySelector('.wbn-pages')","Notion page canvas");
   const visible=await js("(async()=>{const r=await fetch('/api/knowledge/pages');return (await r.json()).data;})()");
