@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/workbench-v2
+      - feat/workbench-v3-reduction
   pull_request:
     paths:
       - 'web/src/pages/**'

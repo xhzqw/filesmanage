@@ -27,7 +27,8 @@ import {fileApi} from "../features/documents/api";
 import {cdwApi,type CDWBranch,type CDWInboxItem,type CDWInitiatedItem,type CDWRecipient,type CDWReviewGate,type CDWFormalApproval,type CDWApprovedCandidate,type CDWDistributionPlan,type CDWReceiptTarget,type CDWReadingAssignment,type CDWQMSPendingReview,type CDWQMSAppointmentAlert,type CDWQMSSpecialAlert,type CDWQMSSpecialAuthority,type CDWQMSSpecialPolicyImpact,type CDWQMSLegacyAnomaly,type CDWQMSFormalNotice} from "../features/cdw/api";
 import "./cdwWorkbench.css";
 import {workNeedsAction} from "./CDWWorkbenchHome";
-import {WorkbenchCommandCenter} from "./WorkbenchCommandCenter";
+import {WorkbenchFocusHome} from "./WorkbenchFocusHome";
+import "./workbenchV2.css";
 import {WorkbenchDHFOperations} from "./WorkbenchDHFOperations";
 import {WorkbenchApprovals} from "./WorkbenchApprovals";
 import {KnowledgeWorkspace} from "./KnowledgeWorkspace";
@@ -83,31 +84,29 @@ export function WorkbenchIcon({name,className=""}:{name:string;className?:string
 
 type View="home"|"todo"|"initiated"|"following"|"tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all"|"seals"|"projects"|"my-projects"|"knowledge"|"dhf-operations"|"approvals";
 const viewGroups:{name:string;views:{key:View;label:string;icon:string}[]}[]=[
- {name:"个人工作",views:[
-  {key:"home",label:"工作首页",icon:"home"},
-  {key:"todo",label:"待我处理",icon:"todo"},
-  {key:"initiated",label:"我发起的",icon:"initiated"},
-  {key:"following",label:"等待与跟踪",icon:"following"}]},
- {name:"项目与知识",views:[
-  {key:"projects",label:"项目数据库",icon:"projects"},
-  {key:"my-projects",label:"我的项目",icon:"dhf"},
-  {key:"knowledge",label:"知识页面",icon:"knowledge"}]},
- {name:"审批与 Gate",views:[
+ {name:"常用",views:[
+  {key:"home",label:"我的工作",icon:"home"},
+  {key:"projects",label:"项目",icon:"projects"},
+  {key:"knowledge",label:"知识",icon:"knowledge"}]},
+ {name:"更多业务",views:[
+  {key:"todo",label:"文件待办",icon:"todo"},
   {key:"approvals",label:"审批中心",icon:"reviews"},
   {key:"dhf-operations",label:"DHF 阶段操作",icon:"gate"},
-  {key:"reviews",label:"交付验收",icon:"reviews"},
-  {key:"formal",label:"正式审批",icon:"formal"},
-  {key:"scope",label:"范围审批",icon:"scope"},
-  {key:"appointments",label:"任命核验",icon:"appointments"}]},
- {name:"受控文件工作",views:[
+  {key:"initiated",label:"我发起的",icon:"initiated"},
+  {key:"following",label:"流转跟踪",icon:"following"},
+  {key:"my-projects",label:"我的项目",icon:"dhf"},
   {key:"tasks",label:"文件工作",icon:"tasks"},
   {key:"obligations",label:"履责待办",icon:"obligations"},
+  {key:"reviews",label:"交付验收",icon:"reviews"},
+  {key:"formal",label:"正式审批",icon:"formal"},
+  {key:"appointments",label:"任命核验",icon:"appointments"},
   {key:"control",label:"发行准备",icon:"control"},
+  {key:"scope",label:"范围审批",icon:"scope"},
   {key:"receipts",label:"部门签收",icon:"receipts"},
   {key:"reading",label:"阅读确认",icon:"reading"},
   {key:"effective",label:"生效文件",icon:"effective"},
   {key:"seals",label:"电子签章",icon:"seals"},
-  {key:"all",label:"全部事项",icon:"all"}]}
+  {key:"all",label:"全部文件事项",icon:"all"}]}
 ];
 const kindName:Record<CDWInboxItem["kind"],string>={
  task:"工作交付",obligation:"责任履行",review:"交付验收",formal:"正式审批",
@@ -485,20 +484,22 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
      <nav className="cdw-rail-nav" aria-label="工作分类">
       {viewGroups.map(group=><div className="cdw-rail-group" key={group.name}>
        <div className="cdw-rail-caption">{group.name}</div>
-       {group.views.filter(({key})=>group.name!=="受控文件工作"||advancedNavOpen||["tasks","receipts","effective","all"].includes(key)||filter===key).map(({key,label,icon})=>
+       {group.views.filter(({key})=>group.name!=="更多业务"||advancedNavOpen||filter===key).map(({key,label,icon})=>
         <RareButton key={key} type="button" className={"cdw-rail-item"+(filter===key?" is-current":"")}
          aria-current={filter===key?"page":undefined} onClick={()=>{setFilter(key);setActiveForm(null);setFormalDraft(false);setParams(prev=>{const p=new URLSearchParams(prev);p.set("view",key);p.delete("task");p.delete("gateTab");if(key!=="knowledge"){p.delete("page");p.delete("folder");p.delete("attachFile");p.delete("file");}return p;});}}>
          <span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name={icon}/></span><span className="cdw-rail-label">{label}</span>
          {counts[key]>0&&<small className="has-count">{counts[key]}</small>}
         </RareButton>)}
-       {group.name==="受控文件工作"?<RareButton type="button" tone="ghost" className="cdw-rail-expand"
+       {group.name==="更多业务"?<RareButton type="button" tone="ghost" className="cdw-rail-expand"
         aria-expanded={advancedNavOpen} onClick={()=>setAdvancedNavOpen(x=>!x)}>
-         {advancedNavOpen?"收起次要工作视图":"显示更多流程与工具"} <span aria-hidden="true">{advancedNavOpen?"⌃":"⌄"}</span>
+         {advancedNavOpen?"收起":"更多业务"} <span aria-hidden="true">{advancedNavOpen?"⌃":"⌄"}</span>
         </RareButton>:null}
       </div>)}
      </nav>
-     <Link className="cdw-rail-dhf" to="/workbench/dhf"><span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name="dhf"/></span><span>DHF 九阶段验收</span><span aria-hidden="true">↗</span></Link>
-     <Link className="cdw-rail-dhf" to="/workbench/customer-registrations"><span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name="customers"/></span><span>客户登记审批</span><span aria-hidden="true">↗</span></Link>
+     {advancedNavOpen?<div className="wbv3-advanced-links">
+      <Link className="cdw-rail-dhf" to="/workbench/dhf"><span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name="dhf"/></span><span>DHF 九阶段验收</span><span aria-hidden="true">↗</span></Link>
+      <Link className="cdw-rail-dhf" to="/workbench/customer-registrations"><span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name="customers"/></span><span>客户登记审批</span><span aria-hidden="true">↗</span></Link>
+     </div>:null}
     </div>
     <div className="sidebar-resizer" role="separator" aria-orientation="vertical" tabIndex={-1}/>
    </aside>
@@ -507,7 +508,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
      {filter==="approvals"?<WorkbenchApprovals user={user}/>:
       filter==="knowledge"?<div className="cdw-projects-view wbv2-knowledge-view"><KnowledgeWorkspace user={user} onLogout={onLogout} embedded/></div>:
       filter==="dhf-operations"?<WorkbenchDHFOperations/>:
-      (filter==="projects"||filter==="my-projects")?<div className="cdw-projects-view"><ProjectDatabase user={user} initialScope={filter==="my-projects"?"mine":"all"}/></div>:filter==="home"?<WorkbenchCommandCenter userName={user.displayName} initiatedCount={initiatedItems.length} initiatedHasMore={Boolean(initiatedCursor)} initiatedError={initiatedError} initiatedBusy={initiatedBusy} items={allItems} appointmentCount={appointmentCount} busy={busy} error={requestError}
+      (filter==="projects"||filter==="my-projects")?<div className="cdw-projects-view"><ProjectDatabase user={user} initialScope={filter==="my-projects"?"mine":"all"}/></div>:filter==="home"?<WorkbenchFocusHome userName={user.displayName} initiatedCount={initiatedItems.length} initiatedHasMore={Boolean(initiatedCursor)} initiatedError={initiatedError} initiatedBusy={initiatedBusy} items={allItems} appointmentCount={appointmentCount} busy={busy} error={requestError}
       canCreate={user.isAdmin} onRefresh={()=>refresh(v=>v+1)} onCreate={()=>{setFilter("tasks");beginForm("create");}}
       onOpen={item=>{setFilter("all");select(item);}} onView={view=>{setFilter(view);setActiveForm(null);setFormalDraft(false);}}/>:filter==="initiated"?
       <CDWInitiatedWorkspace items={initiatedItems} busy={initiatedBusy} error={initiatedError} nextCursor={initiatedCursor}
