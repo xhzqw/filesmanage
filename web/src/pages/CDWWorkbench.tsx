@@ -94,20 +94,17 @@ const viewGroups:{name:string;views:{key:View;label:string;icon:string}[]}[]=[
   {key:"dhf-operations",label:"DHF 阶段操作",icon:"gate"},
   {key:"initiated",label:"我发起的",icon:"initiated"},
   {key:"following",label:"流转跟踪",icon:"following"},
-  {key:"my-projects",label:"我的项目",icon:"dhf"},
-  {key:"tasks",label:"文件工作",icon:"tasks"},
-  {key:"obligations",label:"履责待办",icon:"obligations"},
-  {key:"reviews",label:"交付验收",icon:"reviews"},
-  {key:"formal",label:"正式审批",icon:"formal"},
   {key:"appointments",label:"任命核验",icon:"appointments"},
-  {key:"control",label:"发行准备",icon:"control"},
-  {key:"scope",label:"范围审批",icon:"scope"},
-  {key:"receipts",label:"部门签收",icon:"receipts"},
-  {key:"reading",label:"阅读确认",icon:"reading"},
   {key:"effective",label:"生效文件",icon:"effective"},
   {key:"seals",label:"电子签章",icon:"seals"},
   {key:"all",label:"全部文件事项",icon:"all"}]}
 ];
+// Retain older deep links and contextual task actions without repeating all
+// domain-specific filters as permanent navigation destinations.
+const legacyViews:readonly View[]=["my-projects","tasks","obligations","reviews",
+ "formal","control","scope","receipts","reading"];
+const isKnownView=(key:string):key is View=>
+ viewGroups.some(g=>g.views.some(v=>v.key===key))||legacyViews.includes(key as View);
 const kindName:Record<CDWInboxItem["kind"],string>={
  task:"工作交付",obligation:"责任履行",review:"交付验收",formal:"正式审批",
  control:"发行准备",scope:"范围审批",receipt:"部门签收",reading:"阅读确认",
@@ -183,7 +180,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  // rail view a click would; anything unrecognized keeps the previous fallback.
  const[filter,setFilter]=useState<View>(()=>{
   const fromUrl=params.get("view");
-  if(fromUrl&&viewGroups.some(g=>g.views.some(v=>v.key===fromUrl)))return fromUrl as View;
+  if(fromUrl&&isKnownView(fromUrl))return fromUrl;
   return params.get("task")?"all":"home";
  });
  const[search,setSearch]=useState("");
@@ -469,7 +466,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const canWork=selected?.kind==="task"&&(selected.state==="accepted"||selected.state==="in_progress");
  useEffect(()=>{
   const fromUrl=params.get("view");
-  if(fromUrl&&viewGroups.some(g=>g.views.some(v=>v.key===fromUrl))&&fromUrl!==filter){
+  if(fromUrl&&isKnownView(fromUrl)&&fromUrl!==filter){
    setFilter(fromUrl as View);
   }
  },[params]);
