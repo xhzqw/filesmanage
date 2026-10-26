@@ -241,3 +241,9 @@
 .cdw-panels:has(.wbn-pages) .cdw-projects-view:not(.wbv2-knowledge-view)>.pj-shell{
  max-width:none;width:100%;
 }
+.cdw-panels:has(.wbn-pages) .wbn-source-list{display:flex;flex-direction:column;gap:2px}
+.cdw-panels:has(.wbn-pages) .wbn-source-row{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:40px;padding:7px 10px;border-radius:6px;text-decoration:none;color:#37352f;font-size:12.5px}
+.cdw-panels:has(.wbn-pages) .wbn-source-row:hover{background:#f4f4f1}
+.cdw-panels:has(.wbn-pages) .wbn-source-count{font-size:12px;white-space:nowrap;color:#777771}
+.cdw-panels:has(.wbn-pages) .wbn-source-error{font-size:12px;white-space:nowrap;color:#a45b45}
+.cdw-panels:has(.wbn-pages) .wbn-source-note{font-size:11px;line-height:1.6;color:#858580;margin:10px 8px 0}

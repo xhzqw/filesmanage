@@ -89,6 +89,8 @@ export function ProjectDatabase({user,initialScope="all"}:{
  const projectViewParam=params.get("projectView");
  const[view,setView]=useState<ViewKind>(projectViewParam==="table"||projectViewParam==="gantt"?projectViewParam:"board");
  const canManage=user.isAdmin;
+ const [viewConfigLoaded,setViewConfigLoaded]=useState(false);
+ const viewChangedByUser=useRef(false);
  const[colVis,setColVis]=useState<ColVis>(DEFAULT_COLVIS);
  const[sort,setSort]=useState<{field:string;dir:1|-1}>({field:"none",dir:1});
  const[filterStatus,setFilterStatus]=useState<Record<ProjectStatus,boolean>>({notstarted:true,progress:true,done:true});
@@ -129,11 +131,15 @@ export function ProjectDatabase({user,initialScope="all"}:{
    if(config.colVis)setColVis({...DEFAULT_COLVIS,...config.colVis});
    if(config.sort)setSort(config.sort);
    if(config.filters?.status)setFilterStatus(config.filters.status);
-   if(config.scope)setScope(config.scope);
+   if(config.scope&&initialScope==="all")setScope(config.scope);
    if(config.columnConfig?.ganttScale!=null)setGanttScale(config.columnConfig.ganttScale);
-  }).catch(()=>undefined);
+   if(!projectViewParam&&!viewChangedByUser.current&&
+      (config.view==="board"||config.view==="table"||config.view==="gantt"))setView(config.view);
+  }).catch(()=>undefined).finally(()=>{if(live)setViewConfigLoaded(true)});
   return()=>{live=false;};
- },[user.id]);
+ },[user.id,initialScope]);
+
+ useEffect(()=>{setScope(initialScope)},[initialScope]);
 
  useEffect(()=>{
   let live=true;
@@ -154,6 +160,7 @@ export function ProjectDatabase({user,initialScope="all"}:{
 
  /* 视图状态落库（防抖） */
  useEffect(()=>{
+  if(!viewConfigLoaded)return;
   const when=window.setTimeout(()=>{
    void projectApi.putView({
     colVis,
@@ -165,7 +172,7 @@ export function ProjectDatabase({user,initialScope="all"}:{
    }).catch(()=>undefined);
   },450);
   return()=>window.clearTimeout(when);
- },[colVis,sort,filterStatus,scope,view,ganttScale]);
+ },[viewConfigLoaded,colVis,sort,filterStatus,scope,view,ganttScale]);
 
  const visible=useMemo(()=>{
   const q=search.trim().toLocaleLowerCase();
@@ -360,7 +367,7 @@ export function ProjectDatabase({user,initialScope="all"}:{
 
  // view=projects belongs to the Workbench router. Never write board/table/gantt
  // into that parent-level parameter: it would redirect away from this screen.
- function setViewWrite(k:ViewKind){setView(k);setParams(prev=>{
+ function setViewWrite(k:ViewKind){viewChangedByUser.current=true;setView(k);setParams(prev=>{
   const n=new URLSearchParams(prev);n.set("view",initialScope==="mine"?"my-projects":"projects");
   n.set("projectView",k);return n;
  },{replace:true});}

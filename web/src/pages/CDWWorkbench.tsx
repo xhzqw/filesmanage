@@ -519,7 +519,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
      {filter==="approvals"?<WorkbenchApprovals user={user}/>:
       filter==="knowledge"?<div className="cdw-projects-view wbv2-knowledge-view"><KnowledgeWorkspace user={user} onLogout={onLogout} embedded/></div>:
       filter==="dhf-operations"?<WorkbenchDHFOperations/>:
-      (filter==="projects"||filter==="my-projects")?<div className="cdw-projects-view"><ProjectDatabase user={user} initialScope={filter==="my-projects"?"mine":"all"}/></div>:filter==="home"?<WorkbenchNotionHome userName={user.displayName} initiatedCount={initiatedItems.length} initiatedHasMore={Boolean(initiatedCursor)} initiatedError={initiatedError} initiatedBusy={initiatedBusy} items={allItems} appointmentCount={appointmentCount} busy={busy} error={requestError}
+      (filter==="projects"||filter==="my-projects")?<div className="cdw-projects-view"><ProjectDatabase user={user} initialScope={filter==="my-projects"?"mine":"all"}/></div>:filter==="home"?<WorkbenchNotionHome userName={user.displayName} initiatedCount={initiatedItems.length} initiatedHasMore={Boolean(initiatedCursor)} initiatedError={initiatedError} initiatedBusy={initiatedBusy} items={allItems} appointmentCount={appointmentCount} busy={busy} error={requestError} refreshToken={refreshToken}
       canCreate={user.isAdmin} onRefresh={()=>refresh(v=>v+1)} onCreate={()=>{
        setFilter("tasks");setParams({view:"tasks"});beginForm("create");
       }}

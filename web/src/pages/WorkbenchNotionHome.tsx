@@ -4,6 +4,7 @@ import type {CDWInboxItem} from "../features/cdw/api";
 import {request} from "../shared/http";
 import {RareButton,RareNotice} from "../shared/ui/rare";
 import {workNeedsAction,workNextStep,type HomeView} from "./CDWWorkbenchHome";
+import {readWorkSources,type WorkSource} from "../features/workbench/actionSources";
 import "./workbenchNotion.css";
 
 type PageLink={id:string;title:string;parentId:string|null;updatedAt?:string};
@@ -11,6 +12,7 @@ type Props={
  userName:string;items:CDWInboxItem[];appointmentCount:number;
  initiatedCount:number;initiatedHasMore:boolean;initiatedError:string;
  initiatedBusy:boolean;busy:boolean;error:string;canCreate:boolean;
+ refreshToken:number;
  onCreate:()=>void;onRefresh:()=>void;onOpen:(item:CDWInboxItem)=>void;
  onView:(view:HomeView)=>void;
 };
@@ -20,9 +22,10 @@ const keyOf=(item:CDWInboxItem)=>item.kind+":"+
 
 export function WorkbenchNotionHome({
  items,appointmentCount,initiatedCount,initiatedError,initiatedBusy,
- busy,error,onRefresh,onOpen,onView
+ busy,error,onRefresh,onOpen,onView,refreshToken
 }:Props){
  const [pages,setPages]=useState<PageLink[]>([]);
+ const [workSources,setWorkSources]=useState<WorkSource[]|null>(null);
  const [creating,setCreating]=useState(false);
  const [pageError,setPageError]=useState("");
  const navigate=useNavigate();
@@ -37,6 +40,11 @@ export function WorkbenchNotionHome({
   window.addEventListener("filesmanage:knowledge-changed",load);
   return()=>{live=false;window.removeEventListener("filesmanage:knowledge-changed",load)};
  },[]);
+ useEffect(()=>{
+  let active=true;
+  void readWorkSources().then(sources=>{if(active)setWorkSources(sources)});
+  return()=>{active=false};
+ },[refreshToken]);
  const todo=useMemo(()=>items.filter(workNeedsAction),[items]);
  const recentPages=useMemo(()=>[...pages]
   .sort((a,b)=>(Date.parse(b.updatedAt||"")||0)-(Date.parse(a.updatedAt||"")||0))
@@ -94,6 +102,19 @@ export function WorkbenchNotionHome({
        我发起的 {initiatedBusy?"…":initiatedError?"—":initiatedCount}
       </RareButton>
      </div>
+    </section>
+    <section className="wbn-home-section wbn-source-section" aria-label="其他受控工作来源">
+     <div className="wbn-section-heading"><h2>其他工作来源</h2><span>来自独立受控业务队列</span></div>
+     <div className="wbn-source-list">
+      {!workSources?<p className="wbn-quiet">正在读取审批和 DHF 事项…</p>:
+       workSources.map(source=><Link key={source.key} to={source.href} className="wbn-source-row">
+        <span>{source.label}</span>
+        <span className={source.error?"wbn-source-error":"wbn-source-count"}>
+         {source.error?"读取失败":source.truncated?"至少 "+source.count+" 项":source.count+" 项"}
+        </span>
+       </Link>)}
+     </div>
+     <p className="wbn-source-note">仅显示当前权限范围的数据。试点 DHF 意见不是正式 Gate 批准。</p>
     </section>
      </div>
      <div className="wbn-home-secondary">
