@@ -73,6 +73,12 @@ try{
  if(readOnly){
   await send("Page.navigate",{url:base+"/workbench"});
   await until("!!document.querySelector('.wbn-home h1')","Notion home");
+  assert.equal(await js("document.querySelector('.wbn-home h1')?.textContent?.trim()"),"我的工作台",
+   "workbench should lead with an actionable home, not a decorative splash");
+  assert.ok(await js("(()=>{const a=document.querySelector('.wbn-section-actions')?.getBoundingClientRect();"
+   +"const p=document.querySelector('.wbn-section-pages')?.getBoundingClientRect();return !!a&&!!p&&a.top<p.top})()"),
+   "actionable inbox must precede page history in the visible home");
+  console.log("NOTION_USABILITY_HOME_PRIORITY_PASS");
   assert.ok(await js("document.querySelector('link[rel=icon]')?.href.includes('/assets/brand/')"),"existing favicon");
   await send("Page.navigate",{url:base+"/workbench?view=knowledge"});
   await until("!!document.querySelector('.kn-shell')&&!!document.querySelector('.wbn-pages')","Notion page canvas");
@@ -89,6 +95,19 @@ try{
    await sleep(250);
    const geometry=await js("({document:document.documentElement.scrollWidth,canvas:document.querySelector('.kn-canvas').getBoundingClientRect().right})");
    assert.ok(geometry.document<=width+2&&geometry.canvas<=width+2,"live page overflow "+width+" "+JSON.stringify(geometry));
+   if(width===390){
+    assert.ok(await js("getComputedStyle(document.querySelector('.wbn-mobile-navbar')).display!=='none'"),
+     "narrow workspace must have a discoverable navigation control");
+    assert.equal(await js("getComputedStyle(document.querySelector('.cdw-rail')).display"),"none",
+     "mobile document must not permanently lose space to navigation");
+    await js("document.querySelector('.wbn-mobile-navbar button')?.click()");
+    await until("getComputedStyle(document.querySelector('.cdw-rail')).display!=='none'","mobile navigation opens");
+    assert.ok(await js("document.querySelector('.wbn-pages')?.getBoundingClientRect().width>80"),
+     "mobile navigation provides accessible page tree");
+    await js("document.querySelector('.wbn-mobile-backdrop')?.click()");
+    await until("getComputedStyle(document.querySelector('.cdw-rail')).display==='none'","mobile navigation closes");
+    console.log("NOTION_MOBILE_NAVIGATION_PASS");
+   }
    console.log("NOTION_LIVE_VIEWPORT_PASS",width);
   }
   await send("Emulation.clearDeviceMetricsOverride");

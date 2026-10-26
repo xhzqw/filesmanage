@@ -19,7 +19,7 @@ const keyOf=(item:CDWInboxItem)=>item.kind+":"+
  item.scope?.id??item.receipt?.targetId??item.reading?.id??item.taskId);
 
 export function WorkbenchNotionHome({
- userName,items,appointmentCount,initiatedCount,initiatedError,initiatedBusy,
+ items,appointmentCount,initiatedCount,initiatedError,initiatedBusy,
  busy,error,onRefresh,onOpen,onView
 }:Props){
  const [pages,setPages]=useState<PageLink[]>([]);
@@ -52,32 +52,31 @@ export function WorkbenchNotionHome({
   }catch{setPageError("无法新建页面，请检查权限。");}
   finally{setCreating(false)}
  }
- return <section className="wbn-home" aria-label="Notion 式工作空间首页">
+ return <section className="wbn-home" aria-label="工作台首页">
   <div className="wbn-home-page">
    <header className="wbn-home-toolbar">
     <span>工作空间　/　主页</span>
     <RareButton type="button" tone="ghost" disabled={busy} onClick={onRefresh}>刷新</RareButton>
    </header>
    <div className="wbn-home-content">
-    <span className="wbn-home-icon" aria-hidden="true">▤</span>
-    <h1>工作空间</h1>
-    <p className="wbn-intro">记录想法、推进项目、处理需要你行动的事项。</p>
+    <div className="wbn-home-overview">
+     <div><h1>我的工作台</h1><p className="wbn-intro">从待处理事项开始，也可以继续编辑页面。</p></div>
+     <RareButton type="button" tone="ghost" disabled={creating} onClick={()=>void newPage()}>＋ 新建页面</RareButton>
+    </div>
 
-    <section className="wbn-home-section" aria-label="最近页面">
-     <div className="wbn-section-heading"><h2>页面</h2>
-      <RareButton type="button" tone="ghost" disabled={creating} onClick={()=>void newPage()}>＋ 新建</RareButton>
-     </div>
+    <section className="wbn-home-section wbn-section-pages" aria-label="最近页面">
+     <div className="wbn-section-heading"><h2>最近页面</h2></div>
      <div className="wbn-page-links">
       {recentPages.map(page=><Link key={page.id}
        to={"/workbench?view=knowledge&page="+encodeURIComponent(page.id)}
        className="wbn-line"><span className="wbn-line-icon">▤</span><span>{page.title}</span><span className="wbn-line-arrow">›</span></Link>)}
-      {pages.length===0&&!pageError?<p className="wbn-quiet">还没有页面，使用上方「新建」开始。</p>:null}
+      {pages.length===0&&!pageError?<p className="wbn-quiet">还没有页面。点击右上方「新建页面」即可开始输入。</p>:null}
       {pageError?<p role="status" className="wbn-page-error">{pageError}</p>:null}
      </div>
     </section>
 
-    <section className="wbn-home-section" aria-label="我的待办">
-     <div className="wbn-section-heading"><h2>待处理</h2><span>{todo.length+appointmentCount} 项文件工作</span></div>
+    <section className={"wbn-home-section wbn-section-actions"+(todo.length+appointmentCount?" has-actions":"")} aria-label="我的待办">
+     <div className="wbn-section-heading"><h2>待我处理</h2><span>{todo.length+appointmentCount} 项</span></div>
      {error||initiatedError?<RareNotice tone="warning">
        部分事项读取失败：{error||initiatedError}
       </RareNotice>:null}
@@ -92,7 +91,7 @@ export function WorkbenchNotionHome({
        onClick={()=>onView("appointments")}><span className="wbn-task-icon">☐</span>
        <span className="wbn-task-text"><strong>任命资格核验</strong><small>{appointmentCount} 项待确认</small></span>
        <span className="wbn-line-arrow">›</span></RareButton>:null}
-      {!todo.length&&!appointmentCount&&!busy?<p className="wbn-quiet">这里还没有待处理的文件任务。</p>:null}
+      {!todo.length&&!appointmentCount&&!busy?<p className="wbn-quiet">当前没有待处理事项。</p>:null}
      </div>
      {todo.length>8?<RareButton type="button" tone="ghost" className="wbn-more"
       onClick={()=>onView("todo")}>查看其余 {todo.length-8} 项</RareButton>:null}
@@ -105,13 +104,12 @@ export function WorkbenchNotionHome({
      </div>
     </section>
 
-    <section className="wbn-home-section" aria-label="项目空间">
+    <section className="wbn-home-section wbn-section-projects" aria-label="项目空间">
      <div className="wbn-section-heading"><h2>项目</h2></div>
      <Link className="wbn-line" to="/workbench?view=projects">
       <span className="wbn-line-icon">▦</span><span>所有项目</span><span className="wbn-line-arrow">›</span>
      </Link>
     </section>
-    <p className="wbn-bottom-note">{userName} · 在页面中引用受控文件，不会更改文件权限或审批状态。</p>
    </div>
   </div>
  </section>;

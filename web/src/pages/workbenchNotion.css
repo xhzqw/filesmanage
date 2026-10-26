@@ -17,6 +17,7 @@
 .cdw-panels:has(.wbn-pages) .cdw-rail .rare-button.cdw-rail-expand{height:28px;min-height:28px;padding:4px 10px;color:#8a8a84;font-size:11px}
 .cdw-panels:has(.wbn-pages) .cdw-rail .sidebar-resizer{display:none}
 .cdw-panels:has(.wbn-pages) .cdw-layout>.wbv2-knowledge-view{width:100%;flex:1;min-width:0;background:#fff}
+.cdw-panels:has(.wbn-pages) .wbn-mobile-navbar,.cdw-panels:has(.wbn-pages) .wbn-mobile-backdrop{display:none}
 
 .wbn-pages{margin-top:17px;flex:1 0 auto;min-width:0;padding:0 2px 12px}
 .wbn-page-search{padding:0 6px 11px}
@@ -102,5 +103,40 @@
 .cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-slash-menu{position:absolute;top:38px;left:9px;z-index:20;width:245px;max-height:280px;overflow:auto;background:#fff;border:1px solid #e5e5e2;box-shadow:0 8px 28px rgba(0,0,0,.14);border-radius:7px;padding:7px}
 .cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-slash-title{font-size:11px;font-weight:600;color:#9b9b96;padding:8px}
 .cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-slash-menu .rare-button{display:flex;width:100%;min-height:31px;justify-content:flex-start;font-size:12px;text-align:left;color:#37352f}
+/* V09: keep the actual work above the fold; a welcome splash is not a workbench. */
+.cdw-panels:has(.wbn-pages) .wbn-home-content{display:flex;flex-direction:column;max-width:970px;padding:25px clamp(22px,4vw,48px) 60px}
+.cdw-panels:has(.wbn-pages) .wbn-home-overview{order:0;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px}
+.cdw-panels:has(.wbn-pages) .wbn-home-content h1{font-size:26px;font-weight:700;letter-spacing:-.035em}
+.cdw-panels:has(.wbn-pages) .wbn-home-content .wbn-intro{font-size:12px;margin:4px 0 0}
+.cdw-panels:has(.wbn-pages) .wbn-home-overview>.rare-button{flex:none;min-height:31px;font-size:12px}
+.cdw-panels:has(.wbn-pages) .wbn-home-section{margin:0 0 23px}
+.cdw-panels:has(.wbn-pages) .wbn-section-actions{order:1}
+.cdw-panels:has(.wbn-pages) .wbn-section-pages{order:2}
+.cdw-panels:has(.wbn-pages) .wbn-section-projects{order:3}
+.cdw-panels:has(.wbn-pages) .wbn-task-list .rare-button.wbn-task-row{min-height:44px}
+.cdw-panels:has(.wbn-pages) .wbn-home-content .wbn-section-heading{margin-bottom:5px}
+/* Editors stay clean when typing. Tools remain available on hover/focus. */
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-page{padding-top:17px}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-page-top{margin-bottom:9px}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-block-tools{left:auto;right:0;top:-30px;padding:2px 4px;background:#fff;border:1px solid #e9e9e7;border-radius:6px;box-shadow:0 2px 9px rgba(0,0,0,.07);pointer-events:none}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-block:hover .kn-block-tools,.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-block:focus-within .kn-block-tools{pointer-events:auto}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-block-content>.rare-textarea:focus-visible{outline:none;box-shadow:none}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-empty{padding:50px 12px 20px}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-empty>.rare-button{margin-top:10px}
+.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-files{font-size:12px;color:#858580}
 @media(max-width:830px){.cdw-panels:has(.wbn-pages) .cdw-rail{width:202px!important;flex-basis:202px}.wbn-home-content{padding:35px 30px 70px}}
-@media(max-width:570px){.cdw-panels:has(.wbn-pages) .cdw-rail{width:165px!important;flex-basis:165px;padding:5px 3px}.wbn-home-content{padding:24px 18px 60px}.wbn-home-content h1{font-size:30px}.wbn-home-icon{font-size:37px}.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-canvas{padding:15px}.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-page .rare-input.kn-title{font-size:27px}.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-block-tools{position:static;opacity:.75}}
+@media(max-width:570px){.cdw-panels:has(.wbn-pages) .cdw-rail{width:165px!important;flex-basis:165px;padding:5px 3px}.wbn-home-content{padding:24px 18px 60px}.cdw-panels:has(.wbn-pages) .wbn-home-overview{flex-wrap:wrap}.wbn-home-icon{font-size:37px}.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-canvas{padding:15px}.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-page .rare-input.kn-title{font-size:27px}.cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-block-tools{position:static;opacity:.75;pointer-events:auto}}
+/* Narrow viewports must leave the document writable, not reserve half the
+   available width for a permanently visible navigation rail. */
+@media(max-width:570px){
+ .cdw-panels:has(.wbn-pages){position:relative}
+ .cdw-panels:has(.wbn-pages) .cdw-rail{display:none!important;position:absolute;top:0;bottom:0;left:0;z-index:32;width:min(84vw,290px)!important;max-width:none;flex-basis:auto!important;padding:7px;box-shadow:8px 0 25px rgba(0,0,0,.13)}
+ .cdw-panels:has(.wbn-pages) .cdw-rail.is-mobile-open{display:flex!important}
+ .cdw-panels:has(.wbn-pages) .wbn-mobile-backdrop{display:block;position:absolute;inset:0;background:rgba(0,0,0,.1);border:0;padding:0;z-index:31}
+ .cdw-panels:has(.wbn-pages) .cdw-work{width:100%;min-width:0;display:flex;flex-direction:column}
+ .cdw-panels:has(.wbn-pages) .wbn-mobile-navbar{display:flex;align-items:center;gap:10px;min-height:43px;flex:none;padding:5px 10px;border-bottom:1px solid #e9e9e7;background:#fff}
+ .cdw-panels:has(.wbn-pages) .wbn-mobile-navbar .rare-button{min-height:30px;padding:4px 8px;font-size:12px}
+ .cdw-panels:has(.wbn-pages) .wbn-mobile-navbar span{font-size:12px;color:#8a8a84;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .cdw-panels:has(.wbn-pages) .cdw-layout{flex:1;min-height:0;min-width:0}
+ .cdw-panels:has(.wbn-pages) .wbv2-knowledge-view .kn-canvas{padding:15px 20px}
+}

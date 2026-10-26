@@ -16,6 +16,12 @@
 .kn-page-top{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;color:var(--text-secondary);flex-wrap:wrap;margin-bottom:20px}
 .kn-page-top>div{display:flex;gap:6px;flex-wrap:wrap}
 .kn-page-top .rare-button{min-height:28px}
+.kn-page-more{position:relative;align-self:center}
+.kn-page-more>summary{list-style:none;cursor:pointer;border-radius:5px;font-size:18px;line-height:28px;min-width:30px;text-align:center;color:var(--text-secondary)}
+.kn-page-more>summary::-webkit-details-marker{display:none}
+.kn-page-more>summary:hover,.kn-page-more[open]>summary{background:var(--surface-row-hover)}
+.kn-page-more-menu{position:absolute;right:0;top:32px;z-index:12;display:flex;flex-direction:column;min-width:145px;padding:5px;border:1px solid var(--border-subtle);border-radius:7px;background:var(--surface-panel,#fff);box-shadow:0 6px 22px rgba(0,0,0,.1)}
+.kn-page-more-menu .rare-button{justify-content:flex-start}
 .kn-page .rare-input.kn-title{font-size:27px;font-weight:650;padding:6px 0;border:0;background:transparent;width:100%;height:auto;line-height:1.4;box-shadow:none}
 .kn-blocks{display:flex;flex-direction:column;gap:2px;margin-top:17px}
 .kn-block{border-radius:var(--radius-sm);padding:7px 6px;display:flex;flex-direction:column;gap:5px}

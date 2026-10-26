@@ -184,6 +184,7 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
   if(fromUrl&&isKnownView(fromUrl))return fromUrl;
   return params.get("task")?"all":"home";
  });
+ const[mobileRailOpen,setMobileRailOpen]=useState(false);
  const[search,setSearch]=useState("");
  const[priorityFirst,setPriorityFirst]=useState(true);
  const[branches,setBranches]=useState<CDWBranch[]>([]);
@@ -467,14 +468,18 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  const canWork=selected?.kind==="task"&&(selected.state==="accepted"||selected.state==="in_progress");
  useEffect(()=>{
   const fromUrl=params.get("view");
-  if(fromUrl&&isKnownView(fromUrl)&&fromUrl!==filter){
-   setFilter(fromUrl as View);
-  }
+  const next=fromUrl&&isKnownView(fromUrl)?fromUrl:params.get("task")?"all":"home";
+  setFilter(current=>current===next?current:next);
  },[params]);
  const editingBranch=branches.find(b=>b.state==="open");
  return <AppShell user={user} onLogout={onLogout} finderSidebarWidth={240}>
   <div className="panels document-explorer cdw-panels">
-   <aside className="sidebar finder-sidebar cdw-rail" aria-label="工作视图分类" style={{width:"240px"}}>
+   {mobileRailOpen?<button type="button" className="wbn-mobile-backdrop" aria-label="关闭工作台导航" onClick={()=>setMobileRailOpen(false)}/>:null}
+   <aside id="wbn-workbench-sidebar" className={"sidebar finder-sidebar cdw-rail"+(mobileRailOpen?" is-mobile-open":"")}
+    aria-label="工作视图分类" style={{width:"240px"}}
+    onClickCapture={e=>{
+     if((e.target as HTMLElement).closest("a.wbn-page-link,button.cdw-rail-item,a.cdw-rail-dhf,a.finder-sidebar-home"))setMobileRailOpen(false);
+    }}>
     <Link to="/workbench" className="finder-sidebar-home" aria-label="中晟生物 · 返回工作台首页">
      <BrandLogo size={27} className="finder-sidebar-logo" transparent/><span>中晟生物</span>
     </Link>
@@ -503,13 +508,23 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
     <div className="sidebar-resizer" role="separator" aria-orientation="vertical" tabIndex={-1}/>
    </aside>
    <main className="work cdw-work">
+    <div className="wbn-mobile-navbar">
+     <RareButton type="button" tone="ghost" aria-controls="wbn-workbench-sidebar" aria-expanded={mobileRailOpen}
+      onClick={()=>setMobileRailOpen(open=>!open)}>{mobileRailOpen?"收起导航":"☰ 页面与工作"}</RareButton>
+     <span>{filter==="knowledge"?"知识页面":selectedView}</span>
+    </div>
     <div className="cdw-layout">
      {filter==="approvals"?<WorkbenchApprovals user={user}/>:
       filter==="knowledge"?<div className="cdw-projects-view wbv2-knowledge-view"><KnowledgeWorkspace user={user} onLogout={onLogout} embedded/></div>:
       filter==="dhf-operations"?<WorkbenchDHFOperations/>:
       (filter==="projects"||filter==="my-projects")?<div className="cdw-projects-view"><ProjectDatabase user={user} initialScope={filter==="my-projects"?"mine":"all"}/></div>:filter==="home"?<WorkbenchNotionHome userName={user.displayName} initiatedCount={initiatedItems.length} initiatedHasMore={Boolean(initiatedCursor)} initiatedError={initiatedError} initiatedBusy={initiatedBusy} items={allItems} appointmentCount={appointmentCount} busy={busy} error={requestError}
-      canCreate={user.isAdmin} onRefresh={()=>refresh(v=>v+1)} onCreate={()=>{setFilter("tasks");beginForm("create");}}
-      onOpen={item=>{setFilter("all");select(item);}} onView={view=>{setFilter(view);setActiveForm(null);setFormalDraft(false);}}/>:filter==="initiated"?
+      canCreate={user.isAdmin} onRefresh={()=>refresh(v=>v+1)} onCreate={()=>{
+       setFilter("tasks");setParams({view:"tasks"});beginForm("create");
+      }}
+      onOpen={item=>{setFilter("all");setParams({view:"all",task:taskKey(item)});setActiveForm(null);setFormalDraft(false);}}
+      onView={view=>{
+       setFilter(view);setParams({view});setActiveForm(null);setFormalDraft(false);
+      }}/>:filter==="initiated"?
       <CDWInitiatedWorkspace items={initiatedItems} busy={initiatedBusy} error={initiatedError} nextCursor={initiatedCursor}
        onMore={()=>void loadMoreInitiated()} onRefresh={()=>refresh(v=>v+1)}/>:filter==="effective"?<CDWEffectiveSearchPanel/>:filter==="appointments"?
       <CDWQMSReviewInbox items={pendingAppointments} alerts={appointmentAlerts} actorId={user.id}

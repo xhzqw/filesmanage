@@ -41,7 +41,12 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
  const activePageId=useRef(pageId);
  activePageId.current=pageId;
  const showHistory=async()=>{if(!page)return;setError("");if(history!==null){setHistory(null);return}try{setHistory(await request<Version[]>(base+enc(page.id)+"/history"))}catch(e){setError(errorCopy(e,"修订历史读取失败"))}};
- const dirty=Boolean(page&&draft&&(page.title!==draft.title||JSON.stringify(page.blocks)!==JSON.stringify(draft.blocks)));
+ const hasPersistedBlockChanges=Boolean(page&&draft&&
+  JSON.stringify(page.blocks)!==JSON.stringify(draft.blocks)&&
+  // A virtual empty paragraph is an editor affordance, not a database edit.
+  !(page.blocks.length===0&&draft.blocks.length===1&&draft.blocks[0]?.type==="paragraph"&&
+    !draft.blocks[0].text&&!draft.blocks[0].checked));
+ const dirty=Boolean(page&&draft&&(page.title!==draft.title||hasPersistedBlockChanges));
  const reload=()=>setStamp(x=>x+1);
  const hasPendingChanges=dirty||saving;
  const leaveMessage="当前页面有尚未保存的修改。确定放弃这些修改并离开吗？";
@@ -100,7 +105,12 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
  },[embedded,hasPendingChanges]);
  useEffect(()=>{let live=true;request<Page[]>("/knowledge/pages").then(x=>{if(live)setPages(x||[])}).catch(e=>{if(live)setError(errorCopy(e,"页面树加载失败"))});return()=>{live=false}},[stamp]);
  useEffect(()=>{let live=true;setPage(null);setDraft(null);setError("");setNotice("");setHistory(null);setSaveBlocked(false);setConflictServer(null);setSlashBlock(null);
-  if(pageId)request<Page>(base+enc(pageId)).then(p=>{if(live){setPage(p);setDraft({...p,blocks:p.blocks.map(b=>({...b}))})}}).catch(e=>{if(live)setError(errorCopy(e,"页面读取失败"))});
+  if(pageId)request<Page>(base+enc(pageId)).then(p=>{if(live){
+   setPage(p);
+   // New knowledge pages have no blocks in the database. Never make the user
+   // find a separate "add block" control before they can start writing.
+   setDraft({...p,blocks:p.blocks.length?p.blocks.map(b=>({...b})):p.canEdit?[fresh()]:[]});
+  }}).catch(e=>{if(live)setError(errorCopy(e,"页面读取失败"))});
   return()=>{live=false};
  },[pageId,stamp]);
  useEffect(()=>{let live=true;setLinks([]);
@@ -112,7 +122,7 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
  useEffect(()=>{let live=true;setBacklinks([]);if(fileId)request<Backlink[]>("/knowledge/files/"+enc(fileId)+"/backlinks").then(x=>{if(live)setBacklinks(x||[])}).catch(e=>{if(live)setError(errorCopy(e,"反向引用读取失败"))});return()=>{live=false}},[fileId,stamp]);
  async function create(){if(!title.trim()||busy)return;setBusy(true);try{const p=await request<Page>("/knowledge/pages",{method:"POST",body:JSON.stringify({title:title.trim(),parentId:createParent||"",folderId})});setCreateParent(null);setTitle("");window.dispatchEvent(new Event("filesmanage:knowledge-changed"));go(p.id);reload()}catch(e){setError(errorCopy(e,"创建页面失败"))}finally{setBusy(false)}}
  async function save(){
-  if(!draft||!dirty||busy||savingRef.current)return;
+  if(!draft||!dirty||!draft.title.trim()||busy||savingRef.current)return;
    const snapshot={...draft,blocks:draft.blocks.map(b=>({...b}))};
    savingRef.current=true;setSaving(true);setSaveBlocked(false);
    setConflictServer(null);
@@ -286,10 +296,19 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
     {draft?<article className="kn-page" aria-label="知识页面编辑区">
      <div className="kn-page-top"><span aria-live="polite">{saving?"保存中…":saveBlocked?"保存失败":dirty?"未保存":"已保存"}</span><div>
       {folderId&&draft.folderId===folderId&&canEdit?<RareButton type="button" disabled={busy||dirty} onClick={()=>void setHome()}>{homeId===draft.id?"当前文件夹首页":"关联为文件夹首页"}</RareButton>:null}
-      <RareButton type="button" tone="ghost" onClick={()=>void showHistory()}>历史</RareButton> {canEdit?<RareButton type="button" tone="ghost" disabled={!dirty||busy||saving||Boolean(conflictServer)} onClick={()=>void save()}>立即保存</RareButton>:null}
-      {canEdit?<RareButton type="button" tone="danger" disabled={busy} onClick={()=>void archive()}>归档</RareButton>:null}
+      {canEdit&&dirty?<RareButton type="button" tone="ghost" disabled={busy||saving||Boolean(conflictServer)} onClick={()=>void save()}>保存</RareButton>:null}
+      <details className="kn-page-more"><summary aria-label="页面操作">···</summary>
+       <div className="kn-page-more-menu">
+        <RareButton type="button" tone="ghost" onClick={()=>void showHistory()}>修订历史</RareButton>
+        {canEdit?<RareButton type="button" tone="ghost" disabled={busy||dirty||saving} onClick={()=>void archive()}>归档页面</RareButton>:null}
+       </div>
+      </details>
      </div></div>
-     <RareInput className="kn-title" aria-label="页面标题" autoFocus={draft.title==="无标题"} value={draft.title} readOnly={!canEdit} onChange={e=>setDraft({...draft,title:e.target.value})}/>
+     <RareInput className="kn-title" aria-label="页面标题" placeholder="无标题" autoFocus={draft.title==="无标题"} value={draft.title} readOnly={!canEdit}
+      onFocus={e=>{if(draft.title==="无标题")e.target.select()}}
+      onChange={e=>setDraft({...draft,title:e.target.value})}
+      onBlur={()=>{if(!draft.title.trim())setDraft(current=>current?{...current,title:"无标题"}:current)}}
+      onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();if(draft.blocks[0])focusBlock(draft.blocks[0].id)}}}/>
      {history!==null?<section className="kn-history" aria-label="页面修订历史"><strong>修订记录（只读）</strong>
       {!history.length?<p className="kn-muted">还没有修订记录</p>:history.map(v=><details key={v.revision}>
        <summary>v{v.revision} · {v.title} · {new Date(v.recordedAt).toLocaleString()}</summary>
@@ -307,9 +326,14 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
       </div>:null}
       <div className="kn-block-content">{b.type==="todo"?<RareInput type="checkbox" checked={Boolean(b.checked)} disabled={!canEdit} onChange={e=>editBlock(i,{checked:e.target.checked})}/>:null}
        {b.type==="bullet"?<span aria-hidden="true">•</span>:null}
-       <RareTextarea rows={b.type==="paragraph"?2:1} aria-label={labels[kinds.indexOf(b.type)]} readOnly={!canEdit}
-        placeholder={i===0?"输入内容，按 / 选择块类型…":"输入内容…"} value={b.text}
-        onChange={e=>editBlock(i,{text:e.target.value})}
+       <RareTextarea rows={1} aria-label={labels[kinds.indexOf(b.type)]} readOnly={!canEdit}
+        ref={element=>{if(element){element.style.height="auto";element.style.height=Math.max(32,element.scrollHeight)+"px";}}}
+        placeholder={i===0?"输入内容；/ 插入标题、列表、待办…":"输入内容，回车继续…"} value={b.text}
+        onChange={e=>{
+         e.currentTarget.style.height="auto";
+         e.currentTarget.style.height=Math.max(32,e.currentTarget.scrollHeight)+"px";
+         editBlock(i,{text:e.target.value});
+        }}
         onKeyDown={e=>{
          if(!canEdit||e.nativeEvent.isComposing)return;
          if((e.metaKey||e.ctrlKey)&&e.altKey&&["1","2","0"].includes(e.key)){
@@ -361,17 +385,20 @@ export function KnowledgeWorkspace({user,onLogout,embedded=false}:{user:User;onL
         onClick={()=>selectBlockKind(i,type)}>{labels[j]}</RareButton>)}
       </div>:null}
      </div>)}</div>
-     {canEdit?<RareButton className="kn-add" type="button" tone="ghost" onClick={()=>setDraft({...draft,blocks:[...draft.blocks,fresh()]})}>＋ 添加内容块</RareButton>:null}
-     <section className="kn-files"><strong>文件引用</strong>
+     {canEdit?<RareButton className="kn-add" type="button" tone="ghost" onClick={()=>{
+      const block=fresh();setDraft({...draft,blocks:[...draft.blocks,block]});focusBlock(block.id);
+     }}>＋ 新的一行</RareButton>:null}
+     {(draft.files?.length||attachFile)?<section className="kn-files"><strong>文件引用</strong>
       {(draft.files||[]).map(f=><div key={f.fileId}><Link to={"/preview/"+enc(f.fileId)}>{f.fileName}</Link>
        {canEdit?<RareButton type="button" tone="ghost" onClick={()=>void fileLink(f.fileId,true)}>解除引用</RareButton>:null}</div>)}
       {attachFile&&canEdit?<RareButton type="button" tone="primary" disabled={busy} onClick={()=>void fileLink(attachFile)}>引用从预览选择的文件</RareButton>:null}
       <p className="kn-muted">引用是双向关联，不复制文件、不修改文件的受控状态。</p>
-     </section>
+     </section>:null}
     </article>:!createParent&&!fileId?<div className="kn-empty">
       <span className="kn-empty-icon" aria-hidden="true">▤</span>
-      <h2>知识页面</h2>
-      <p>从左侧页面树中选择页面，或点击「私人页面」旁的＋创建新页面。</p>
+      <h2>选择页面，开始工作</h2>
+      <p>从左侧打开已有页面，也可以直接新建一页。</p>
+      <RareButton type="button" onClick={()=>{setCreateParent("");setTitle("")}}>＋ 新建页面</RareButton>
      </div>:null}
    </main>
   </div>
