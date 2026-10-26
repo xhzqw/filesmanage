@@ -3,10 +3,10 @@ import {Link} from "react-router-dom";
 import {RareButton,RareNotice} from "../shared/ui/rare";
 import {BrandLoadingLabel} from "../shared/ui/BrandLoader";
 import type {CDWInboxItem} from "../features/cdw/api";
-import {DHFHomeProjects} from "./DHFHomeProjects";
+import type {Project} from "../features/projects/api";
 
 export type HomeView="home"|"todo"|"initiated"|"following"|"tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all"|"seals";
-type Props={items:CDWInboxItem[];appointmentCount:number;initiatedCount:number;initiatedHasMore:boolean;initiatedError:string;initiatedBusy:boolean;busy:boolean;error:string;canCreate:boolean;
+type Props={items:CDWInboxItem[];projects:Project[];appointmentCount:number;initiatedCount:number;initiatedHasMore:boolean;initiatedError:string;initiatedBusy:boolean;busy:boolean;error:string;canCreate:boolean;
  onCreate:()=>void;onRefresh:()=>void;onOpen:(item:CDWInboxItem)=>void;onView:(view:HomeView)=>void};
 export function workNeedsAction(item:CDWInboxItem):boolean{
  switch(item.kind){
@@ -43,18 +43,12 @@ export function workNextStep(item:CDWInboxItem):string{
 function itemKey(item:CDWInboxItem){
  return item.kind+":"+(item.obligationId??item.review?.gateId??item.formal?.id??item.candidate?.id??item.scope?.id??item.receipt?.targetId??item.reading?.id??item.taskId);
 }
-export function CDWWorkbenchHome({items,appointmentCount,initiatedCount,initiatedHasMore,initiatedError,initiatedBusy,busy,error,canCreate,onCreate,onRefresh,onOpen,onView}:Props){
+export function CDWWorkbenchHome({items,projects,appointmentCount,initiatedCount,initiatedHasMore,initiatedError,initiatedBusy,busy,error,canCreate,onCreate,onRefresh,onOpen,onView}:Props){
  const[expanded,setExpanded]=useState(false);
  const[chooseKind,setChooseKind]=useState(false);
- const[activeCategory,setActiveCategory]=useState<"all"|"tasks"|"reviews"|"receipts">("all");
  const todo=items.filter(workNeedsAction);
- const following=items.filter(item=>!workNeedsAction(item));
- const returned=todo.filter(item=>item.state==="returned");
- const reviewTasks=todo.filter(item=>item.kind==="review"||item.kind==="formal"||item.kind==="scope");
- const workTasks=todo.filter(item=>item.kind==="task"||item.kind==="obligation");
- const receiptTasks=todo.filter(item=>item.kind==="receipt"||item.kind==="reading");
- const filteredTodo=activeCategory==="tasks"?workTasks:activeCategory==="reviews"?reviewTasks:activeCategory==="receipts"?receiptTasks:todo;
- const display=expanded?filteredTodo:filteredTodo.slice(0,8);
+ const display=expanded?todo:todo.slice(0,8);
+ const recentProjects=projects.filter(p=>!p.archived).sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,6);
 
  return <section className="cdw-home" aria-label="工作首页">
   <header className="cdw-home-toolbar">
@@ -88,7 +82,7 @@ export function CDWWorkbenchHome({items,appointmentCount,initiatedCount,initiate
    </div>
   </div>}
   <div className="cdw-home-scroll">
-   <div className="cdw-home-stats" aria-label="工作概况">
+   <div className="cdw-home-stats cdw-home-stats-compact" aria-label="工作概况">
     <RareButton type="button" className="cdw-home-stat is-todo" onClick={()=>onView("todo")}>
      <div className="cdw-stat-top">
       <span className="cdw-stat-dot dot-amber"/>
@@ -103,41 +97,23 @@ export function CDWWorkbenchHome({items,appointmentCount,initiatedCount,initiate
      </div>
      <strong>{initiatedError?"—":initiatedBusy&&initiatedCount===0?"…":initiatedCount}{!initiatedError&&initiatedHasMore?"+":""}</strong>
     </RareButton>
-    <RareButton type="button" className="cdw-home-stat is-following" onClick={()=>onView("following")}>
-     <div className="cdw-stat-top">
-      <span className="cdw-stat-dot dot-purple"/>
-      <small>观察事项</small>
-     </div>
-     <strong>{following.length}</strong>
-    </RareButton>
-    <RareButton type="button" className="cdw-home-stat is-returned" onClick={()=>onView("todo")}>
-     <div className="cdw-stat-top">
-      <span className="cdw-stat-dot dot-rose"/>
-      <small>退回需改</small>
-     </div>
-     <strong>{returned.length}</strong>
-    </RareButton>
    </div>
    {(error||initiatedError)&&<RareNotice tone="warning">部分工作数据暂时无法读取。{error||initiatedError} <RareButton type="button" onClick={onRefresh}>重试</RareButton></RareNotice>}
-   <DHFHomeProjects canCreate={canCreate}/>
+   {recentProjects.length>0&&<section className="cdw-home-pages" aria-label="最近项目">
+    <div className="cdw-home-pages-head"><strong>最近项目</strong><Link to="/workbench?view=projects">查看全部</Link></div>
+    <div className="cdw-home-pages-list">
+     {recentProjects.map(project=><Link key={project.id} className="cdw-home-page-link" to={"/workbench?view=projects&page="+project.id} title={project.name}>
+      <span className="cdw-home-page-icon" aria-hidden="true">{project.icon}</span>
+      <span className="cdw-home-page-name">{project.name}</span>
+      <small>{project.status==="done"?"已完成":project.status==="progress"?"进行中":"未开始"}</small>
+     </Link>)}
+    </div>
+   </section>}
    <div className="cdw-home-content">
     <div className="cdw-home-primary">
      <div className="cdw-home-section-head">
-      <div className="cdw-home-filter-tabs">
-       <RareButton type="button" tone="ghost" className={activeCategory==="all"?"active":""} onClick={()=>setActiveCategory("all")}>
-        全部待办 ({todo.length+appointmentCount})
-       </RareButton>
-       <RareButton type="button" tone="ghost" className={activeCategory==="reviews"?"active":""} onClick={()=>setActiveCategory("reviews")}>
-        审批与验收 ({reviewTasks.length+appointmentCount})
-       </RareButton>
-       <RareButton type="button" tone="ghost" className={activeCategory==="tasks"?"active":""} onClick={()=>setActiveCategory("tasks")}>
-        文件工作 ({workTasks.length})
-       </RareButton>
-       <RareButton type="button" tone="ghost" className={activeCategory==="receipts"?"active":""} onClick={()=>setActiveCategory("receipts")}>
-        签收与阅读 ({receiptTasks.length})
-       </RareButton>
-      </div>
-      <RareButton type="button" tone="ghost" onClick={()=>onView("todo")}>进入队列视图 →</RareButton>
+      <strong>待我处理</strong>
+      <RareButton type="button" tone="ghost" onClick={()=>onView("todo")}>查看全部</RareButton>
      </div>
      {busy&&items.length===0?<div className="cdw-home-loading"><BrandLoadingLabel showContext>读取工作中</BrandLoadingLabel></div>:
      todo.length===0&&appointmentCount===0?<div className="cdw-home-empty-card">
@@ -147,20 +123,6 @@ export function CDWWorkbenchHome({items,appointmentCount,initiatedCount,initiate
         <strong>待办事项均已处理完成</strong>
         <p>当前暂无需要处理的审批或流转任务</p>
        </div>
-      </div>
-      <div className="cdw-home-quick-actions">
-       {canCreate&&<RareButton type="button" tone="neutral" onClick={onCreate}>
-        <span aria-hidden="true">📄</span> 发起文件修订
-       </RareButton>}
-       <Link to="/workbench/dhf?create=1" className="cdw-quick-link">
-        <span aria-hidden="true">🔬</span> 新建 DHF 项目
-       </Link>
-       <RareButton type="button" tone="neutral" onClick={()=>onView("receipts")}>
-        <span aria-hidden="true">📦</span> 部门签收台账
-       </RareButton>
-       <RareButton type="button" tone="neutral" onClick={()=>onView("seals")}>
-        <span aria-hidden="true">🔐</span> 电子印章中心
-       </RareButton>
       </div>
      </div>:<div className="cdw-home-work-list">
       {display.map(item=><RareButton type="button" key={itemKey(item)} className="cdw-home-work-row" onClick={()=>onOpen(item)}>
@@ -189,7 +151,7 @@ export function CDWWorkbenchHome({items,appointmentCount,initiatedCount,initiate
        </span>
        <span className="cdw-home-work-go">办理 →</span>
       </RareButton>}
-      {!expanded&&filteredTodo.length>display.length&&<RareButton type="button" tone="ghost" className="cdw-home-more" onClick={()=>setExpanded(true)}>展开其余 {filteredTodo.length-display.length} 项</RareButton>}
+      {!expanded&&todo.length>display.length&&<RareButton type="button" tone="ghost" className="cdw-home-more" onClick={()=>setExpanded(true)}>展开其余 {todo.length-display.length} 项</RareButton>}
      </div>}
     </div>
    </div>

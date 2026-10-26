@@ -157,7 +157,25 @@ try {
   await until("!!document.querySelector('.pj-board')", "board again");
   await evalJS(`(()=>{const cards=[...document.querySelectorAll('.pj-card')];
    const card=cards.find(c=>c.textContent.includes(${JSON.stringify(NAME)}));card.click();return true;})()`);
-  await until("!!document.querySelector('.pj-drawer')", "drawer reopened");
+  await until("!!document.querySelector('.pj-inline-page')", "project content page opened");
+  assert.equal(await evalJS("document.querySelectorAll('.pj-mask').length"), 0,
+    "existing project is an inline page, not a modal overlay");
+  assert.ok(await evalJS("new URLSearchParams(location.search).get('page')"),
+    "project page has a shareable URL");
+  const pageUrl = await evalJS("location.href");
+  await send("Page.navigate", {url: pageUrl});
+  await until("!!document.querySelector('.pj-inline-page .pj-dr-title')", "direct project deep link");
+  assert.equal(await evalJS("document.querySelector('.pj-dr-title').value"), NAME,
+    "deep link resolves the existing project");
+  for (const width of [1440, 1280, 820]) {
+    await send("Emulation.setDeviceMetricsOverride", {width, height: 900, deviceScaleFactor: 1, mobile: false});
+    await sleep(220);
+    const metrics = await evalJS("({docWidth:document.documentElement.scrollWidth,pageWidth:document.querySelector('.pj-page-canvas').getBoundingClientRect().width})");
+    assert.ok(metrics.docWidth <= width + 2, "project page overflow at " + width + ": " + JSON.stringify(metrics));
+    assert.ok(metrics.pageWidth > 260, "project canvas remains usable at " + width);
+    console.log("PROJECT_PAGE_LAYOUT_PASS", width);
+  }
+  await send("Emulation.clearDeviceMetricsOverride");
   // window.confirm must be auto-accepted for the archive confirmation.
   await evalJS("window.confirm=()=>true");
   const archived = await evalJS(`(()=>{const b=[...document.querySelectorAll('.pj-dr-foot button')]

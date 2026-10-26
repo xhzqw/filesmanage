@@ -28,6 +28,7 @@ import "./cdwWorkbench.css";
 import {CDWWorkbenchHome,workNeedsAction} from "./CDWWorkbenchHome";
 import {CDWInitiatedWorkspace} from "./CDWInitiatedWorkspace";
 import {SealLibrary} from "../features/seals/SealLibrary";
+import {projectApi,type Project} from "../features/projects/api";
 
 export function WorkbenchIcon({name,className=""}:{name:string;className?:string}){
  switch(name){
@@ -74,10 +75,8 @@ export function WorkbenchIcon({name,className=""}:{name:string;className?:string
 
 type View="home"|"todo"|"initiated"|"following"|"tasks"|"obligations"|"reviews"|"formal"|"appointments"|"control"|"scope"|"receipts"|"reading"|"effective"|"all"|"seals"|"projects"|"my-projects";
 const viewGroups:{name:string;views:{key:View;label:string;icon:string}[]}[]=[
- {name:"工作区",views:[{key:"home",label:"工作首页",icon:"home"},{key:"todo",label:"待我处理",icon:"todo"},{key:"initiated",label:"我发起的",icon:"initiated"},{key:"all",label:"全部事项",icon:"all"}]},
- {name:"项目与任务",views:[{key:"projects",label:"项目",icon:"projects"},{key:"my-projects",label:"我的项目",icon:"projects"}]},
- {name:"审批与验收",views:[{key:"formal",label:"正式审批",icon:"formal"},{key:"reviews",label:"交付验收",icon:"reviews"},{key:"scope",label:"范围审批",icon:"scope"},{key:"appointments",label:"任命核验",icon:"appointments"}]},
- {name:"受控与流转",views:[{key:"tasks",label:"文件工作",icon:"tasks"},{key:"obligations",label:"责任待办",icon:"obligations"},{key:"control",label:"发行准备",icon:"control"},{key:"receipts",label:"部门签收",icon:"receipts"},{key:"reading",label:"阅读确认",icon:"reading"},{key:"effective",label:"生效文件",icon:"effective"},{key:"seals",label:"电子签章",icon:"seals"}]},
+ {name:"工作空间",views:[{key:"home",label:"首页",icon:"home"},{key:"todo",label:"待我处理",icon:"todo"},{key:"initiated",label:"我发起的",icon:"initiated"},{key:"projects",label:"全部项目",icon:"projects"}]},
+ {name:"业务流程",views:[{key:"all",label:"全部事项",icon:"all"},{key:"formal",label:"正式审批",icon:"formal"},{key:"reviews",label:"交付验收",icon:"reviews"},{key:"scope",label:"范围审批",icon:"scope"},{key:"appointments",label:"任命核验",icon:"appointments"},{key:"tasks",label:"文件工作",icon:"tasks"},{key:"obligations",label:"责任待办",icon:"obligations"},{key:"control",label:"发行准备",icon:"control"},{key:"receipts",label:"部门签收",icon:"receipts"},{key:"reading",label:"阅读确认",icon:"reading"},{key:"effective",label:"生效文件",icon:"effective"},{key:"seals",label:"电子签章",icon:"seals"},{key:"my-projects",label:"我的项目",icon:"projects"}]},
 ];
 const kindName:Record<CDWInboxItem["kind"],string>={
  task:"工作交付",obligation:"责任履行",review:"交付验收",formal:"正式审批",
@@ -135,9 +134,35 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
  // rail view a click would; anything unrecognized keeps the previous fallback.
  const[filter,setFilter]=useState<View>(()=>{
   const fromUrl=params.get("view");
-  if(fromUrl==="projects"||fromUrl==="my-projects")return fromUrl;
-  return fromUrl==="initiated"?"initiated":params.get("task")?"all":"home";
+  if(viewGroups.some(group=>group.views.some(view=>view.key===fromUrl)))return fromUrl as View;
+  return params.get("page")?"projects":params.get("task")?"all":"home";
  });
+ const[projectNav,setProjectNav]=useState<Project[]>([]);
+ const[projectNavError,setProjectNavError]=useState(false);
+ const[processesOpen,setProcessesOpen]=useState(false);
+ const[pagesOpen,setPagesOpen]=useState(true);
+ const activeProject=params.get("page");
+ function navigateView(view:View,pageId?:number){
+  setFilter(view);setActiveForm(null);setFormalDraft(false);
+  setParams(prev=>{
+   const next=new URLSearchParams(prev);
+   next.set("view",view);
+   if(pageId!=null)next.set("page",String(pageId));else next.delete("page");
+   next.delete("task");
+   return next;
+  });
+ }
+ useEffect(()=>{
+  const next=params.get("view");
+  if(next&&viewGroups.some(group=>group.views.some(view=>view.key===next)))setFilter(next as View);
+ },[params]);
+ useEffect(()=>{
+  const controller=new AbortController();
+  setProjectNavError(false);
+  projectApi.list(controller.signal).then(page=>setProjectNav(page.items??[]))
+   .catch(error=>{if(!(error instanceof DOMException&&error.name==="AbortError"))setProjectNavError(true);});
+  return()=>controller.abort();
+ },[user.id,refreshToken]);
  const[search,setSearch]=useState("");
  const[priorityFirst,setPriorityFirst]=useState(true);
  const[branches,setBranches]=useState<CDWBranch[]>([]);
@@ -428,24 +453,49 @@ export function CDWWorkbench({user,onLogout}:{user:User;onLogout:()=>void}){
     </Link>
     <div className="sidebar-scroll">
      <nav className="cdw-rail-nav" aria-label="工作分类">
-      {viewGroups.map(group=><div className="cdw-rail-group" key={group.name}>
+      {viewGroups.slice(0,1).map(group=><div className="cdw-rail-group" key={group.name}>
        <div className="cdw-rail-caption">{group.name}</div>
        {group.views.map(({key,label,icon})=>
-        <RareButton key={key} type="button" className={"cdw-rail-item"+(filter===key?" is-current":"")}
-         aria-current={filter===key?"page":undefined} onClick={()=>{setFilter(key);setActiveForm(null);setFormalDraft(false);}}>
+        <RareButton key={key} type="button" className={"cdw-rail-item"+(filter===key&&!activeProject?" is-current":"")}
+         aria-current={filter===key&&!activeProject?"page":undefined} onClick={()=>navigateView(key)}>
          <span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name={icon}/></span><span className="cdw-rail-label">{label}</span>
          {counts[key]>0&&<small className="has-count">{counts[key]}</small>}
         </RareButton>)}
       </div>)}
+      <div className="cdw-rail-group cdw-pages-group">
+       <RareButton type="button" tone="ghost" className="cdw-rail-section-toggle" aria-expanded={pagesOpen} onClick={()=>setPagesOpen(v=>!v)}>
+        <span aria-hidden="true">{pagesOpen?"⌄":"›"}</span> 项目页面
+       </RareButton>
+       {pagesOpen&&<div className="cdw-rail-page-tree">
+        {projectNav.filter(p=>!p.archived).sort((a,b)=>Number(b.favorite)-Number(a.favorite)||b.updatedAt-a.updatedAt).slice(0,24).map(p=>
+         <RareButton key={p.id} type="button" className={"cdw-rail-item cdw-rail-page"+(filter==="projects"&&activeProject===String(p.id)?" is-current":"")} aria-current={filter==="projects"&&activeProject===String(p.id)?"page":undefined} onClick={()=>navigateView("projects",p.id)} title={p.name}>
+          <span className="cdw-rail-page-icon" aria-hidden="true">{p.icon}</span><span className="cdw-rail-label">{p.name}</span>{p.favorite&&<span className="cdw-rail-page-star" aria-label="已收藏">★</span>}
+         </RareButton>)}
+        {!projectNavError&&projectNav.length===0&&<span className="cdw-rail-page-empty">暂无项目页面</span>}
+        {projectNavError&&<span className="cdw-rail-page-empty">项目页面暂不可用</span>}
+       </div>}
+      </div>
+      <div className="cdw-rail-group">
+       <RareButton type="button" tone="ghost" className="cdw-rail-section-toggle" aria-expanded={processesOpen} onClick={()=>setProcessesOpen(v=>!v)}>
+        <span aria-hidden="true">{processesOpen?"⌄":"›"}</span> 更多业务流程
+       </RareButton>
+       {(processesOpen||viewGroups[1].views.some(v=>v.key===filter))&&viewGroups[1].views.map(({key,label,icon})=>
+        <RareButton key={key} type="button" className={"cdw-rail-item"+(filter===key?" is-current":"")} aria-current={filter===key?"page":undefined} onClick={()=>navigateView(key)}>
+         <span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name={icon}/></span><span className="cdw-rail-label">{label}</span>
+         {counts[key]>0&&<small className="has-count">{counts[key]}</small>}
+        </RareButton>)}
+      </div>
      </nav>
-     <Link className="cdw-rail-dhf" to="/workbench/dhf"><span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name="dhf"/></span><span>DHF 九阶段验收</span><span aria-hidden="true">↗</span></Link>
-     <Link className="cdw-rail-dhf" to="/workbench/customer-registrations"><span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name="customers"/></span><span>客户登记审批</span><span aria-hidden="true">↗</span></Link>
+     <div className="cdw-rail-external">
+      <Link className="cdw-rail-dhf" to="/workbench/dhf"><span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name="dhf"/></span><span>DHF 项目</span></Link>
+      <Link className="cdw-rail-dhf" to="/workbench/customer-registrations"><span className="cdw-rail-icon" aria-hidden="true"><WorkbenchIcon name="customers"/></span><span>客户登记</span></Link>
+     </div>
     </div>
     <div className="sidebar-resizer" role="separator" aria-orientation="vertical" tabIndex={-1}/>
    </aside>
    <main className="work cdw-work">
     <div className="cdw-layout">
-     {(filter==="projects"||filter==="my-projects")?<div className="cdw-projects-view"><ProjectDatabase user={user} initialScope={filter==="my-projects"?"mine":"all"}/></div>:filter==="home"?<CDWWorkbenchHome initiatedCount={initiatedItems.length} initiatedHasMore={Boolean(initiatedCursor)} initiatedError={initiatedError} initiatedBusy={initiatedBusy} items={allItems} appointmentCount={appointmentCount} busy={busy} error={requestError}
+     {(filter==="projects"||filter==="my-projects")?<div className="cdw-projects-view"><ProjectDatabase user={user} initialScope={filter==="my-projects"?"mine":"all"} onProjectsChange={setProjectNav}/></div>:filter==="home"?<CDWWorkbenchHome projects={projectNav} initiatedCount={initiatedItems.length} initiatedHasMore={Boolean(initiatedCursor)} initiatedError={initiatedError} initiatedBusy={initiatedBusy} items={allItems} appointmentCount={appointmentCount} busy={busy} error={requestError}
       canCreate={user.isAdmin} onRefresh={()=>refresh(v=>v+1)} onCreate={()=>{setFilter("tasks");beginForm("create");}}
       onOpen={item=>{setFilter("all");select(item);}} onView={view=>{setFilter(view);setActiveForm(null);setFormalDraft(false);}}/>:filter==="initiated"?
       <CDWInitiatedWorkspace items={initiatedItems} busy={initiatedBusy} error={initiatedError} nextCursor={initiatedCursor}

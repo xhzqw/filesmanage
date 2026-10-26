@@ -79,16 +79,18 @@ function inputOf(d:Draft):ProjectWriteInput{
   team:d.team,priority:d.priority,startDate:d.startDate||null,endDate:d.endDate||null,progress:d.progress};
 }
 
-export function ProjectDatabase({user,initialScope="all"}:{
- user:User;initialScope?:"all"|"mine";
+export function ProjectDatabase({user,initialScope="all",onProjectsChange}:{
+ user:User;initialScope?:"all"|"mine";onProjectsChange?:(projects:Project[])=>void;
 }){
  const[params,setParams]=useSearchParams();
+ const pageParam=params.get("page");
+ const pageId=pageParam&&/^[1-9][0-9]*$/.test(pageParam)&&Number.isSafeInteger(Number(pageParam))?Number(pageParam):null;
  const[projects,setProjects]=useState<Project[]>([]);
  const[busy,setBusy]=useState(true);
  const[error,setError]=useState("");
  const[refreshToken,refresh]=useState(0);
 
- const[view,setView]=useState<ViewKind>(params.get("view")==="table"?"table":params.get("view")==="gantt"?"gantt":"board");
+ const[view,setView]=useState<ViewKind>(params.get("layout")==="table"?"table":params.get("layout")==="gantt"?"gantt":"board");
  const[colVis,setColVis]=useState<ColVis>(DEFAULT_COLVIS);
  const[sort,setSort]=useState<{field:string;dir:1|-1}>({field:"none",dir:1});
  const[filterStatus,setFilterStatus]=useState<Record<ProjectStatus,boolean>>({notstarted:true,progress:true,done:true});
@@ -116,11 +118,11 @@ export function ProjectDatabase({user,initialScope="all"}:{
  useEffect(()=>{
   const controller=new AbortController();let active=true;
   setBusy(true);setError("");
-  projectApi.list(controller.signal).then(page=>{if(active)setProjects(page.items??[]);})
+  projectApi.list(controller.signal).then(page=>{if(active){setProjects(page.items??[]);onProjectsChange?.(page.items??[]);}})
    .catch(e=>{if(active&&!(e instanceof DOMException&&e.name==="AbortError"))setError(errorCopy(e,"项目加载失败"));})
    .finally(()=>{if(active)setBusy(false);});
   return()=>{active=false;controller.abort();};
- },[refreshToken,user.id]);
+ },[refreshToken,user.id,onProjectsChange]);
 
  useEffect(()=>{
   let live=true;
@@ -251,10 +253,22 @@ export function ProjectDatabase({user,initialScope="all"}:{
  }
 
  function openDrawer(mode:"new"|"edit",p?:Project){
-  if(p){setDetail(p);setDrawer({mode,id:p.id,draft:draftOf(p)});projectApi.get(p.id).then(r=>{if(r?.project)setDetail(r.project);}).catch(()=>undefined);}
-  else{setDetail(null);setDrawer({mode:"new",id:0,draft:emptyDraft()});}
+  if(p){
+   setParams(prev=>{const n=new URLSearchParams(prev);n.set("view","projects");n.set("page",String(p.id));return n;});
+  }else{setDetail(null);setDrawer({mode:"new",id:0,draft:emptyDraft()});}
   setColVisOpen(false);
  }
+ // 项目是可分享和刷新的真实页面，不是只能从卡片打开的临时弹窗。
+ useEffect(()=>{
+  if(!pageId){setDrawer(d=>d?.mode==="edit"?null:d);return;}
+  const project=projects.find(p=>p.id===pageId);
+  if(!project||project.archived)return;
+  setDrawer(d=>d?.mode==="edit"&&d.id===pageId?d:{mode:"edit",id:pageId,draft:draftOf(project)});
+  setDetail(project);
+  let live=true;
+  projectApi.get(pageId).then(r=>{if(live&&r?.project)setDetail(r.project);}).catch(()=>undefined);
+  return()=>{live=false;};
+ },[pageId,projects]);
  function setDraft(patch:Partial<Draft>){setDrawer(d=>d?{...d,draft:{...d.draft,...patch}}:d);}
  // 有未保存改动时关抽屉要拦一下，避免白填一遍
  const dirty=useMemo(()=>{
@@ -269,13 +283,14 @@ export function ProjectDatabase({user,initialScope="all"}:{
    if(dirty&&!window.confirm("还有未保存的改动，确定关闭？"))return;
   }
   setDrawer(null);setDetail(null);
+  if(pageId)setParams(prev=>{const n=new URLSearchParams(prev);n.delete("page");return n;});
  }
  async function saveDrawer(){
   if(!drawer)return;
   if(!drawer.draft.name.trim()){toast.info("请填写项目名称");return;}
   if(drawer.draft.startDate&&drawer.draft.endDate&&drawer.draft.endDate<drawer.draft.startDate){toast.error("结束日期不能早于开始日期");return;}
   if(drawer.mode==="new"){await create(inputOf(drawer.draft));}
-  else{const ok=await patchFull(drawer.id,inputOf(drawer.draft),drawer.draft.name);if(ok)closeDrawer(true);}
+  else{const ok=await patchFull(drawer.id,inputOf(drawer.draft),drawer.draft.name);if(ok&&!pageId)closeDrawer(true);}
  }
  async function toggleFav(){
   if(!drawer)return;
@@ -344,7 +359,7 @@ export function ProjectDatabase({user,initialScope="all"}:{
  // 抽屉 Esc 关闭 + 打开时把焦点移进去（键盘用户不被困在背景）
  const drawerRef=useRef<HTMLElement|null>(null);
  useEffect(()=>{
-  if(!drawer)return;
+  if(!drawer||pageId)return;
   const prev=document.activeElement as HTMLElement|null;
   const node=drawerRef.current?.querySelector<HTMLInputElement>(".pj-dr-title");
   node?.focus();
@@ -355,19 +370,19 @@ export function ProjectDatabase({user,initialScope="all"}:{
   document.addEventListener("keydown",onKey);
   return()=>{document.removeEventListener("keydown",onKey);prev?.focus?.();};
   // eslint-disable-next-line react-hooks/exhaustive-deps
- },[drawer?.mode,drawer?.id]);
+ },[drawer?.mode,drawer?.id,pageId]);
 
- function setViewWrite(k:ViewKind){setView(k);setParams(prev=>{const n=new URLSearchParams(prev);n.set("view",k);return n;},{replace:true});}
+ function setViewWrite(k:ViewKind){setView(k);setParams(prev=>{const n=new URLSearchParams(prev);n.set("layout",k);return n;},{replace:true});}
  function toggleStatus(k:ProjectStatus){setFilterStatus(s=>({...s,[k]:!s[k]}));}
 
  /* ============================ 渲染 ============================ */
  // 纯内容组件：不套 AppShell、不带自己的侧栏。
  // 它作为工作台的一个视图渲染，侧栏由 CDWWorkbench 提供，避免出现「两套壳」。
  return<>
+     {!pageParam&&
      <div className="pj-shell">
-      <header className="pj-header"><div className="pj-crumb">赖·威威的工作空间 总部 <span>/</span> <b>项目</b></div></header>
       <div className="pj-title-row">
-       <div><h1 className="pj-h1">项目</h1><p className="pj-sub">统一管理研发、受控流程与部门协作项目的进度、负责人与交付状态</p></div>
+       <div><h1 className="pj-h1">项目</h1></div>
        <RareButton type="button" tone="primary" onClick={()=>openDrawer("new")}>＋ 新建项目</RareButton>
       </div>
       <div className="pj-scope-tabs">
@@ -423,9 +438,9 @@ export function ProjectDatabase({user,initialScope="all"}:{
       {!busy&&visible.length>0&&(view==="board"?renderBoard():view==="table"?renderTable():
        <ProjectGantt key={ganttScale} projects={visible} scale={ganttScale} onScale={setGanttScale}
         onBarClick={p=>openDrawer("edit",p)} onPatch={(id,pg)=>void patch(id,pg)}/>)}
-     </div>
+     </div>}
 
-     {colVisOpen&&<div className="pj-colvis">
+     {colVisOpen&&!pageParam&&<div className="pj-colvis">
       <div className="pj-cv-cap">属性可见性</div>
       <p className="pj-cv-sub">控制「表格」与侧边抽屉中这些属性行的显示（看板卡片始终全显）</p>
       {COLVIS_FIELDS.map(([k,ic,l])=>
@@ -435,7 +450,8 @@ export function ProjectDatabase({user,initialScope="all"}:{
       <div className="pj-cv-foot">点击切换可见性</div>
      </div>}
 
-     {drawer&&renderDrawer()}
+     {pageParam&&(!pageId||!drawer||drawer.mode!=="edit"||drawer.id!==pageId)&&<div className="pj-page-loading">{busy?"正在打开项目页面…":"项目页面不存在或已归档"} <RareButton type="button" tone="ghost" onClick={()=>closeDrawer(true)}>返回项目</RareButton></div>}
+     {drawer&&renderDrawer(Boolean(pageParam&&pageId))}
 
      {/* 文档选择器用原生 <dialog> 顶层渲染，所以挂在抽屉里面也不会被遮罩压住 */}
      <DocumentPicker
@@ -517,18 +533,18 @@ export function ProjectDatabase({user,initialScope="all"}:{
   </tbody></table>;
  }
 
- function renderDrawer(){
+ function renderDrawer(inline=false){
   if(!drawer)return null;
   const d=drawer.draft;
   const PersonRow=({label,glyph,show,children}:{label:string;glyph:string;show:boolean;children:React.ReactNode})=>
    show?<div className="pj-prop"><span className="pj-p-ic">{glyph}</span><span className="pj-p-label">{label}</span><span className="pj-p-val">{children}</span></div>:null;
-  return<div className="pj-mask" onClick={()=>closeDrawer()}>
-   <aside className="pj-drawer" ref={drawerRef} role="dialog" aria-modal="true" aria-label={drawer.mode==="new"?"新建项目":"编辑项目"} onClick={e=>e.stopPropagation()}>
+  return<div className={inline?"pj-page-canvas":"pj-mask"} onClick={inline?undefined:()=>closeDrawer()}>
+   <aside className={inline?"pj-drawer pj-inline-page":"pj-drawer"} ref={drawerRef} role={inline?undefined:"dialog"} aria-modal={inline?undefined:true} aria-label={drawer.mode==="new"?"新建项目":"项目页面"} onClick={e=>e.stopPropagation()}>
     <div className="pj-dr-head">
      <RareButton type="button" tone="ghost" className="pj-dr-icon" title="更换图标" aria-label="更换图标" onClick={()=>setDraft({icon:ICONS[(ICONS.indexOf(d.icon)+1)%ICONS.length]})}>{d.icon}</RareButton>
      <RareInput className="pj-dr-title" value={d.name} placeholder="项目名称" aria-label="项目名称" maxLength={120} onChange={e=>setDraft({name:e.target.value})}/>
      <RareButton type="button" tone="ghost" className={"pj-dr-fav"+(d.favorite?" on":"")} title="收藏" aria-label="收藏" aria-pressed={d.favorite} onClick={()=>void toggleFav()}>{d.favorite?"★":"☆"}</RareButton>
-     <RareButton type="button" tone="ghost" onClick={()=>closeDrawer()}>✕</RareButton>
+     <RareButton type="button" tone="ghost" aria-label="返回项目列表" title="返回项目列表" onClick={()=>closeDrawer()}>{inline?"返回":"✕"}</RareButton>
     </div>
     <div className="pj-dr-scroll">
      <div className="pj-dr-props">
@@ -593,7 +609,7 @@ export function ProjectDatabase({user,initialScope="all"}:{
     </div>
 
     <div className="pj-dr-foot">
-     <RareButton type="button" tone="ghost" onClick={()=>closeDrawer()}>取消</RareButton>
+     <RareButton type="button" tone="ghost" onClick={()=>closeDrawer()}>{inline?"返回项目":"取消"}</RareButton>
      <span className="pj-spacer"/>
      {dirty&&<span className="pj-dirty" title="有未保存的改动">未保存</span>}
      {drawer.mode==="edit"&&<RareButton type="button" tone="ghost" onClick={()=>void archiveMe()}>归档</RareButton>}
