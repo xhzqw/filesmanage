@@ -4,7 +4,7 @@ import type {CDWInboxItem} from "../features/cdw/api";
 import {request} from "../shared/http";
 import {RareButton,RareNotice} from "../shared/ui/rare";
 import {workNeedsAction,workNextStep,type HomeView} from "./CDWWorkbenchHome";
-import {readWorkSources,type WorkSource} from "../features/workbench/actionSources";
+import {readWorkSources,type WorkSource} from "./workbenchActionSources";
 import "./workbenchNotion.css";
 
 type PageLink={id:string;title:string;parentId:string|null;updatedAt?:string};

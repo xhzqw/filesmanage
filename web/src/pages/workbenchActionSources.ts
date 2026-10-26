@@ -1,5 +1,5 @@
-import {request} from "../../shared/http";
-import {workflowApi} from "../workflow/api";
+import {request} from "../shared/http";
+import {workflowApi} from "../features/workflow/api";
 
 export type WorkSourceKey="approvals"|"dhf-review"|"dhf-verify"|"dhf-remediation";
 export type WorkSource={

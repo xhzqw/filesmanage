@@ -1,3 +1,4 @@
+import {fileApi} from "../features/documents/api";
 import {useState} from "react";
 import {Link,useSearchParams} from "react-router-dom";
 import {BrandLogo} from "../shared/ui/AppShell";
@@ -75,7 +76,7 @@ export function Approvals({user,onLogout}:{user:User;onLogout:()=>void}){
     <div className="approval-stage">
      {section==="seals"?<SealLibrary isAdmin={user.isAdmin}/>:
       section==="dhf_pilot"?<DHFPilotInbox/>:
-      section==="dhf_returns"?<DHFRemediationInbox/>:
+      section==="dhf_returns"?<DHFRemediationInbox loadFileMeta={fileApi.meta}/>:
       section==="dhf_attestations"?<DHFReviewAttestationInbox/>:
       section==="dhf_verification"?<DHFVerificationInbox/>:
       section==="dhf_credentials"?<DHFCredentialManagement/>:

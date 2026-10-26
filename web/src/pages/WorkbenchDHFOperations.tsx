@@ -1,3 +1,4 @@
+import {fileApi} from "../features/documents/api";
 import {useState} from "react";
 import {Link,useSearchParams} from "react-router-dom";
 import {RareButton} from "../shared/ui/rare";
@@ -48,7 +49,7 @@ export function WorkbenchDHFOperations(){
       active==="attest"?<DHFReviewAttestationInbox/>:
       active==="verification"?<DHFVerificationInbox/>:
       active==="gate"?<DHFGateDecisionReviewInbox/>:
-      active==="returns"?<DHFRemediationInbox/>:
+      active==="returns"?<DHFRemediationInbox loadFileMeta={fileApi.meta}/>:
       active==="conditional"?<DHFConditionalRemediationPlans/>:
       <DHFCredentialManagement/>}
     </div>

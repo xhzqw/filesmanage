@@ -1,7 +1,6 @@
 import {useEffect,useMemo,useRef,useState} from "react";
 import {request} from "../../shared/http";
 import {RareButton,RareTextarea} from "../../shared/ui/rare";
-import {fileApi} from "../documents/api";
 import {errorCopy} from "../../shared/errors";
 import "./dhfPilotInbox.css";
 
@@ -14,7 +13,8 @@ type ReturnItem={
 };
 type Latest={seq:number;sha:string;name:string};
 
-export function DHFRemediationInbox(){
+type EvidenceMeta={file:{name:string};versions:{versionSeq:number;sha256:string}[]};
+export function DHFRemediationInbox({loadFileMeta}:{loadFileMeta:(id:string)=>Promise<EvidenceMeta>}){
  const[items,setItems]=useState<ReturnItem[]>([]);
  const[fetchError,setFetchError]=useState("");
  const[loading,setLoading]=useState(true);
@@ -43,7 +43,7 @@ export function DHFRemediationInbox(){
   const fileIds=[...new Set((active.originalManifest?.requirements??[]).map(x=>x.file_id).filter((x):x is string=>Boolean(x)))];
   void Promise.all(fileIds.map(async fileId=>{
    try{
-    const meta=await fileApi.meta(fileId);
+    const meta=await loadFileMeta(fileId);
     const newest=[...meta.versions].sort((a,b)=>b.versionSeq-a.versionSeq)[0];
     if(newest&&newest.versionSeq>0)return [fileId,{seq:newest.versionSeq,sha:newest.sha256,name:meta.file.name}] as const;
    }catch{/* Original file access may have been revoked; no selection offered. */}
@@ -53,7 +53,7 @@ export function DHFRemediationInbox(){
    setLatest(Object.fromEntries(result.filter((x):x is readonly [string,Latest]=>x!==null)));
   });
   return()=>{live=false};
- },[active?.decisionId]);
+ },[active?.decisionId,loadFileMeta]);
  const original=active?.originalManifest?.requirements??[];
  const revised=useMemo(()=>original.map(item=>{
   const choice=item.file_id&&chosen[item.id]?latest[item.file_id]:null;

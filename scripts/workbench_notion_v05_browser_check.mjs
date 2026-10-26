@@ -291,6 +291,7 @@ try{
   +".find(x=>x.textContent.includes("+JSON.stringify(names[2])+"))?.click()})()");
  await until("new URL(location.href).searchParams.get('page')==="+JSON.stringify(grand.id),
   "reopen child page for browser history");
+ await until("!!document.querySelector('[data-kn-block="+JSON.stringify(blockId)+"] textarea')","reopened page content loaded");
  const historyDraft=altered+" / 返回保护";
  await js("(()=>{const el=document.querySelector('[data-kn-block="+JSON.stringify(blockId)+"] textarea');"
   +"const setter=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;"

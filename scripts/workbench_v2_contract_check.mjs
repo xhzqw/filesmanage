@@ -31,7 +31,7 @@ assert.match(wb,/setParams\(prev/);
 assert.match(wb,/observeWorkspaceChange/);
 assert.match(wb,/observeWindowReturn/);
 assert.match(wb,/filesmanage:approvals-changed/);
-const actionSources=read("web/src/features/workbench/actionSources.ts");
+const actionSources=read("web/src/pages/workbenchActionSources.ts");
 const notionHome=read("web/src/pages/WorkbenchNotionHome.tsx");
 assert.match(actionSources,/workflowApi\.approvalsPage\("inbox"/);
 assert.match(actionSources,/\/workbench\/dhf\/tasks/);
