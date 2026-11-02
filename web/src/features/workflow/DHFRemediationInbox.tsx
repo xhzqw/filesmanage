@@ -39,7 +39,7 @@ export function DHFRemediationInbox(){
    .finally(()=>{if(live)setLoading(false)});
   return()=>{live=false};
  },[refresh]);
- const active=items.find(x=>x.decisionId===selected)??items[0];
+ const active=selected?items.find(x=>x.decisionId===selected):items[0];
  useEffect(()=>{
   let live=true;
   setLatest({});setChosen({});setPlan("");setError("");setNotice("");
@@ -106,6 +106,7 @@ export function DHFRemediationInbox(){
     </RareButton>)}</div>}
   </section>
   <section className="dhf-pilot-detail" aria-label="退回原因与整改证据">
+   {!loading&&!fetchError&&requestedDecision&&!active?<div role="status" className="dhf-pilot-empty">该整改事项不在当前可访问列表中，请从左侧选择其他任务。</div>:null}
    {active?<div className="dhf-pilot-content">
     <span className="dhf-pilot-overline">{active.stageId} / 原始提交 {active.originalSubmissionId}</span>
     <h2>整改与重新提交</h2>

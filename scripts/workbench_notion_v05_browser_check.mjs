@@ -107,6 +107,13 @@ try{
    /(?:[&?](?:item|dhfReviewTask|dhfVerificationCase|dhfReturnDecision)=)/.test(href)),
    "individual work references must route to source-qualified deep links");
   console.log("WORKBENCH_CROSS_SOURCE_OVERVIEW_PASS");
+  // A stale or unauthorized DHF target must not open another task.
+  for(const [tab,key] of [["review","dhfReviewTask"],["verification","dhfVerificationCase"],["returns","dhfReturnDecision"]]){
+   await send("Page.navigate",{url:base+"/workbench?view=dhf-operations&gateTab="+tab+"&"+key+"=review-unknown-id"});
+   await until("document.querySelector('.wbv2-operations-content')?.innerText.includes('不在当前可访问列表中')",
+    "unavailable DHF deep link "+tab);
+  }
+  console.log("WORKBENCH_DHF_STALE_DEEPLINK_GUARD_PASS");
   assert.ok(await js("document.querySelector('link[rel=icon]')?.href.includes('/assets/brand/')"),"existing favicon");
   // Parent workbench routing and project database subviews must not share
   // ?view=. Verify actual clicks rather than looking for a static selector.
