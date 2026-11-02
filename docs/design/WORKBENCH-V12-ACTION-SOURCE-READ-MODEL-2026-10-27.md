@@ -16,12 +16,25 @@ The CDW work list remains separately sourced from the existing CDW inbox.
 Each source links back to its authoritative work view. This is a **source-aware
 overview**, not yet a merged inbox or task-level unified index.
 
+## Next UI increment (V13 candidate)
+
+Read sources additionally expose up to three ACL-authorized action references
+per source. IDs are qualified as source + native ID; no cross-workflow ID
+collision can hide an action. The approval deep link uses the existing
+inbox item parameter, while DHF review / verification / return links use
+separate source-specific query parameters. Target inboxes select the matching
+authorized record from the response; a URL alone never grants authority.
+
+Preview lists are not used as total counts: approvals use the server-provided
+pending count, and capped DHF lists show at-least semantics.
+
 ## Invariants
 
 - Existing service endpoints enforce access rights; no new write endpoint.
 - Read failures are shown as unavailable, never silently as zero.
 - DHF trial review tasks are not represented as formal Gate approvals.
-- At-limit DHF review counts show a lower bound, not an exact total.
+- At-limit DHF review, verification and returns lists show a lower bound,
+  not an exact total. Their server-side queries are each limited to 100 rows.
 - Cross-source duplicates cannot yet be excluded without qualified object IDs,
   so the UI does not present a misleading combined total.
 - Actions remain in the original workflow, with its audit and responsibility chain.

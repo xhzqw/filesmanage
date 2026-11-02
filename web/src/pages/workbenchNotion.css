@@ -277,3 +277,11 @@
  .cdw-panels.cdw-workspace .wbv2-operations-nav>div{flex:none;min-width:130px}
  .cdw-panels.cdw-workspace .pj-board{grid-template-columns:minmax(0,1fr)}
 }
+.cdw-panels.cdw-workspace .wbn-source-group{border-bottom:1px solid #f1f1ee;padding:1px 0 5px}
+.cdw-panels.cdw-workspace .wbn-source-group:last-child{border-bottom:0}
+.cdw-panels.cdw-workspace .wbn-source-items{padding-left:10px}
+.cdw-panels.cdw-workspace .wbn-source-item{display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:5px;padding:6px 11px;text-decoration:none;font-size:12px;color:#4a4a46}
+.cdw-panels.cdw-workspace .wbn-source-item:hover{background:#f4f4f1}
+.cdw-panels.cdw-workspace .wbn-source-item-main{display:flex;flex-direction:column;min-width:0;gap:2px}
+.cdw-panels.cdw-workspace .wbn-source-item-main>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cdw-panels.cdw-workspace .wbn-source-item-main small{font-size:10px;color:#858580}

@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from "react";
+import {useSearchParams} from "react-router-dom";
 import {request} from "../../shared/http";
 import {RareButton,RareInput,RareTextarea} from "../../shared/ui/rare";
 import {errorCopy} from "../../shared/errors";
@@ -16,8 +17,11 @@ type Verified={verificationId:string;revisedSubmissionId:string;trialOnly:boolea
 const intentText="I personally verified the corrected DHF submission against my original return";
 
 export function DHFVerificationInbox(){
+ const[params]=useSearchParams();
+ const requestedCase=params.get("dhfVerificationCase");
  const[items,setItems]=useState<VerificationCase[]>([]);
  const[selected,setSelected]=useState<string|null>(null);
+ useEffect(()=>{if(requestedCase)setSelected(requestedCase)},[requestedCase]);
  const[loading,setLoading]=useState(true);
  const[error,setError]=useState("");
  const[refresh,setRefresh]=useState(0);
@@ -37,7 +41,7 @@ export function DHFVerificationInbox(){
    .finally(()=>{if(active)setLoading(false)});
   return()=>{active=false};
  },[refresh]);
- const current=items.find(item=>item.caseId===selected)??items[0];
+ const current=selected?items.find(item=>item.caseId===selected):items[0];
  useEffect(()=>{
   setComment("");setPassword("");setChecked(false);setNotice("");
   setSubmitError("");pending.current=null;
@@ -87,6 +91,7 @@ export function DHFVerificationInbox(){
     </RareButton>)}</div>}
   </section>
   <section className="dhf-pilot-detail" aria-label="整改复验内容">
+   {!loading&&!error&&requestedCase&&!current?<div role="status" className="dhf-pilot-empty">该复验事项不在当前可访问列表中，请从左侧选择其他任务。</div>:null}
    {current?<div className="dhf-pilot-content">
     <span className="dhf-pilot-overline">{current.stageId} · 原提交 {current.originalSubmissionId}</span>
     <h2>独立整改复验</h2>

@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useRef,useState} from "react";
+import {useSearchParams} from "react-router-dom";
 import {request} from "../../shared/http";
 import {RareButton,RareTextarea} from "../../shared/ui/rare";
 import {errorCopy} from "../../shared/errors";
@@ -15,11 +16,14 @@ type Latest={seq:number;sha:string;name:string};
 
 type EvidenceMeta={file:{name:string};versions:{versionSeq:number;sha256:string}[]};
 export function DHFRemediationInbox({loadFileMeta}:{loadFileMeta:(id:string)=>Promise<EvidenceMeta>}){
+ const[params]=useSearchParams();
+ const requestedDecision=params.get("dhfReturnDecision");
  const[items,setItems]=useState<ReturnItem[]>([]);
  const[fetchError,setFetchError]=useState("");
  const[loading,setLoading]=useState(true);
  const[refresh,setRefresh]=useState(0);
  const[selected,setSelected]=useState<string|null>(null);
+ useEffect(()=>{if(requestedDecision)setSelected(requestedDecision)},[requestedDecision]);
  const[latest,setLatest]=useState<Record<string,Latest>>({});
  const[chosen,setChosen]=useState<Record<string,boolean>>({});
  const[plan,setPlan]=useState("");
@@ -35,7 +39,7 @@ export function DHFRemediationInbox({loadFileMeta}:{loadFileMeta:(id:string)=>Pr
    .finally(()=>{if(live)setLoading(false)});
   return()=>{live=false};
  },[refresh]);
- const active=items.find(x=>x.decisionId===selected)??items[0];
+ const active=selected?items.find(x=>x.decisionId===selected):items[0];
  useEffect(()=>{
   let live=true;
   setLatest({});setChosen({});setPlan("");setError("");setNotice("");
@@ -102,6 +106,7 @@ export function DHFRemediationInbox({loadFileMeta}:{loadFileMeta:(id:string)=>Pr
     </RareButton>)}</div>}
   </section>
   <section className="dhf-pilot-detail" aria-label="退回原因与整改证据">
+   {!loading&&!fetchError&&requestedDecision&&!active?<div role="status" className="dhf-pilot-empty">该整改事项不在当前可访问列表中，请从左侧选择其他任务。</div>:null}
    {active?<div className="dhf-pilot-content">
     <span className="dhf-pilot-overline">{active.stageId} / 原始提交 {active.originalSubmissionId}</span>
     <h2>整改与重新提交</h2>

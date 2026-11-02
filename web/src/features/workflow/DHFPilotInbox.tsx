@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from "react";
+import {useSearchParams} from "react-router-dom";
 import {request} from "../../shared/http";
 import {RareButton,RareInput,RareTextarea} from "../../shared/ui/rare";
 import {BrandLoadingLabel} from "../../shared/ui/BrandLoader";
@@ -27,6 +28,8 @@ const specialtyNames:Record<string,string>={
 };
 
 export function DHFPilotInbox(){
+ const [params]=useSearchParams();
+ const requestedTask=params.get("dhfReviewTask");
  const [tasks,setTasks]=useState<DHFTask[]>([]);
  const [duties,setDuties]=useState<Duty[]>([]);
  const [dutyError,setDutyError]=useState("");
@@ -40,6 +43,7 @@ export function DHFPilotInbox(){
  const [refresh,setRefresh]=useState(0);
  const [query,setQuery]=useState("");
  const [selected,setSelected]=useState<string|null>(null);
+ useEffect(()=>{if(requestedTask)setSelected(requestedTask)},[requestedTask]);
  const [comment,setComment]=useState("");
  const [busy,setBusy]=useState(false);
  // Reuse the SAME idempotency key when a network failure leaves the result unknown.
@@ -71,7 +75,8 @@ export function DHFPilotInbox(){
   return()=>{available=false};
  },[refresh]);
  const visible=tasks.filter(task=>[task.stageId,task.reviewKey,task.projectId,task.submissionId].some(value=>value.toLowerCase().includes(query.trim().toLowerCase())));
- const active=visible.find(task=>task.id===selected)??visible[0];
+ // Never silently open another task when a deep link is stale or unauthorized.
+ const active=selected?visible.find(task=>task.id===selected):visible[0];
  const chain=duties.filter(item=>item.submissionId===active?.submissionId)
   .sort((a,b)=>a.stepOrdinal-b.stepOrdinal);
  const currentStep=chain.find(item=>item.taskId===active?.id);
@@ -168,6 +173,7 @@ export function DHFPilotInbox(){
     </RareButton>)}</div>}
   </section>
   <section className="dhf-pilot-detail" aria-label="阶段审核详情">
+   {!loading&&!error&&requestedTask&&!active?<div role="status" className="dhf-pilot-empty">该阶段审核事项不在当前可访问列表中，请从左侧选择其他任务。</div>:null}
    {feedback?<div className="dhf-pilot-feedback" role="status">{feedback}</div>:null}
    {active?<div className="dhf-pilot-content">
      <span className="dhf-pilot-overline">DHF / {active.stageId}</span>
