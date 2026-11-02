@@ -42,7 +42,7 @@ export function DHFPilotInbox(){
  const [error,setError]=useState("");
  const [refresh,setRefresh]=useState(0);
  const [query,setQuery]=useState("");
- const [selected,setSelected]=useState<string|null>(null);
+ const [selected,setSelected]=useState<string|null>(requestedTask);
  useEffect(()=>{if(requestedTask)setSelected(requestedTask)},[requestedTask]);
  const [comment,setComment]=useState("");
  const [busy,setBusy]=useState(false);

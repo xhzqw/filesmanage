@@ -57,6 +57,8 @@ for(const [component,queryParam] of [
  assert.match(target,/setSelected\(/,component+" must select authorized inbox item");
  assert.match(target,/不在当前可访问列表中/,
   component+" must not silently substitute another task for a stale link");
+ assert.match(target,/useState<string\|null>\(requested/,
+  component+" must select the deep-link target on first render");
 }
 const primary=wb.slice(wb.indexOf('const viewGroups:'),wb.indexOf('const kindName:'));
 assert.match(primary,/name:"工作空间"/);

@@ -20,7 +20,7 @@ export function DHFVerificationInbox(){
  const[params]=useSearchParams();
  const requestedCase=params.get("dhfVerificationCase");
  const[items,setItems]=useState<VerificationCase[]>([]);
- const[selected,setSelected]=useState<string|null>(null);
+ const[selected,setSelected]=useState<string|null>(requestedCase);
  useEffect(()=>{if(requestedCase)setSelected(requestedCase)},[requestedCase]);
  const[loading,setLoading]=useState(true);
  const[error,setError]=useState("");
